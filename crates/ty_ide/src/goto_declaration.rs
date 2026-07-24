@@ -1,6 +1,7 @@
 use crate::goto::find_goto_target;
 use crate::{Db, NavigationTargets, RangedValue};
-use ruff_db::files::{File, FileRange};
+use ruff_db::PythonFile;
+use ruff_db::files::FileRange;
 use ruff_db::parsed::parsed_module;
 use ruff_text_size::{Ranged, TextSize};
 use ty_python_semantic::{ImportAliasResolution, SemanticModel};
@@ -12,7 +13,7 @@ use ty_python_semantic::{ImportAliasResolution, SemanticModel};
 /// is needed because Python doesn't require formal declarations of variables like most languages do.
 pub fn goto_declaration(
     db: &dyn Db,
-    file: File,
+    file: PythonFile<'_>,
     offset: TextSize,
 ) -> Option<RangedValue<NavigationTargets>> {
     let module = parsed_module(db, file).load(db);
@@ -25,7 +26,7 @@ pub fn goto_declaration(
         .into_navigation_targets(model.db());
 
     Some(RangedValue {
-        range: FileRange::new(file, goto_target.range()),
+        range: FileRange::new(file.file(db), goto_target.range()),
         value: declaration_targets,
     })
 }
@@ -2921,7 +2922,11 @@ def ab(a: int, *, c: int): ...
     impl CursorTest {
         fn goto_declaration(&self) -> String {
             let Some(targets) = salsa::attach(&self.db, || {
-                goto_declaration(&self.db, self.cursor.file, self.cursor.offset)
+                goto_declaration(
+                    &self.db,
+                    self.python_file(self.cursor.file),
+                    self.cursor.offset,
+                )
             }) else {
                 return "No goto target found".to_string();
             };

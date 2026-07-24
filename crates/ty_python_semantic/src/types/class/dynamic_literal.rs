@@ -1,3 +1,4 @@
+use crate::SemanticEnvironment;
 use ruff_db::{diagnostic::Span, parsed::parsed_module};
 use ruff_python_ast::{self as ast, NodeIndex, name::Name};
 use ruff_text_size::{Ranged, TextRange};
@@ -111,7 +112,7 @@ pub enum DynamicClassAnchor<'db> {
 impl<'db> DynamicClassAnchor<'db> {
     fn recursive_type_normalized_impl(
         &self,
-        db: &'db dyn Db,
+        env: &SemanticEnvironment<'db>,
         div: Type<'db>,
         nested: bool,
     ) -> Option<Self> {
@@ -125,7 +126,7 @@ impl<'db> DynamicClassAnchor<'db> {
                 let explicit_bases = explicit_bases
                     .iter()
                     .map(|base| {
-                        let base = base.recursive_type_normalized_impl(db, div, true);
+                        let base = base.recursive_type_normalized_impl(env, div, true);
                         if nested {
                             base
                         } else {
@@ -191,15 +192,26 @@ impl<'db> DynamicClassLiteral<'db> {
     /// or if the bases argument cannot be extracted precisely.
     ///
     /// Returns `[Unknown]` if the bases iterable is variable-length.
-    pub(crate) fn explicit_bases(self, db: &'db dyn Db) -> &'db [Type<'db>] {
+    pub(crate) fn explicit_bases(self, env: &SemanticEnvironment<'db>) -> &'db [Type<'db>] {
         /// Inner cached function for deferred inference of bases.
         /// Only called for assigned calls where inference was deferred.
-        #[salsa::tracked(returns(deref), cycle_initial=|_, _, _| Box::default(), heap_size=ruff_memory_usage::heap_size)]
         fn deferred_explicit_bases<'db>(
+            env: &SemanticEnvironment<'db>,
+            definition: Definition<'db>,
+        ) -> &'db [Type<'db>] {
+            let db = env.db();
+            debug_assert_eq!(env.program(), definition.program(db));
+            deferred_explicit_bases_inner(db, definition)
+        }
+
+        #[salsa::tracked(returns(deref), cycle_initial=|_, _, _| Box::default(), heap_size=ruff_memory_usage::heap_size)]
+        fn deferred_explicit_bases_inner<'db>(
             db: &'db dyn Db,
             definition: Definition<'db>,
         ) -> Box<[Type<'db>]> {
-            let module = parsed_module(db, definition.file(db)).load(db);
+            let python_file = definition.python_file(db);
+            let env = SemanticEnvironment::from_file(db, python_file);
+            let module = parsed_module(db, python_file).load(db);
 
             let value = definition
                 .kind(db)
@@ -214,17 +226,17 @@ impl<'db> DynamicClassLiteral<'db> {
             };
 
             // Use `definition_expression_type` for deferred inference support.
-            extract_fixed_length_iterable_element_types(db, bases_arg, |expr| {
-                definition_expression_type(db, definition, expr)
+            extract_fixed_length_iterable_element_types(&env, bases_arg, |expr| {
+                definition_expression_type(&env, definition, expr)
             })
             .unwrap_or_else(|| Box::from([Type::unknown()]))
         }
 
-        match self.anchor(db) {
+        match self.anchor(env.db()) {
             // For dangling calls, bases are stored directly on the anchor.
             DynamicClassAnchor::ScopeOffset { explicit_bases, .. } => explicit_bases.as_ref(),
             // For assigned calls, use deferred inference.
-            DynamicClassAnchor::Definition(definition) => deferred_explicit_bases(db, *definition),
+            DynamicClassAnchor::Definition(definition) => deferred_explicit_bases(env, *definition),
         }
     }
 
@@ -238,8 +250,7 @@ impl<'db> DynamicClassLiteral<'db> {
     /// Returns the range of the `type()` call expression that created this class.
     pub(crate) fn header_range(self, db: &'db dyn Db) -> TextRange {
         let scope = self.scope(db);
-        let file = scope.file(db);
-        let module = parsed_module(db, file).load(db);
+        let module = parsed_module(db, scope.python_file(db)).load(db);
 
         match self.anchor(db) {
             DynamicClassAnchor::Definition(definition) => {
@@ -275,8 +286,8 @@ impl<'db> DynamicClassLiteral<'db> {
     /// that is a subclass of all other base metaclasses.
     ///
     /// See <https://docs.python.org/3/reference/datamodel.html#determining-the-appropriate-metaclass>
-    pub(crate) fn metaclass(self, db: &'db dyn Db) -> Type<'db> {
-        self.try_metaclass(db)
+    pub(crate) fn metaclass(self, env: &SemanticEnvironment<'db>) -> Type<'db> {
+        self.try_metaclass(env)
             .unwrap_or_else(|_| SubclassOfType::subclass_of_unknown())
     }
 
@@ -288,19 +299,19 @@ impl<'db> DynamicClassLiteral<'db> {
     /// See <https://docs.python.org/3/reference/datamodel.html#determining-the-appropriate-metaclass>
     pub(crate) fn try_metaclass(
         self,
-        db: &'db dyn Db,
+        env: &SemanticEnvironment<'db>,
     ) -> Result<Type<'db>, DynamicMetaclassConflict<'db>> {
-        let original_bases = self.explicit_bases(db);
+        let original_bases = self.explicit_bases(env);
 
         // If no bases, metaclass is `type`.
         // To dynamically create a class with no bases that has a custom metaclass,
         // you have to invoke that metaclass rather than `type()`.
         if original_bases.is_empty() {
-            return Ok(KnownClass::Type.to_class_literal(db));
+            return Ok(KnownClass::Type.to_class_literal(env));
         }
 
         // If there's an MRO error, return unknown to avoid cascading errors.
-        if self.try_mro(db).is_err() {
+        if self.try_mro(env).is_err() {
             return Ok(SubclassOfType::subclass_of_unknown());
         }
 
@@ -309,42 +320,42 @@ impl<'db> DynamicClassLiteral<'db> {
         // returned `Err(InvalidBases)` if any failed, causing us to return early.
         let bases: Vec<ClassBase<'db>> = original_bases
             .iter()
-            .filter_map(|base_type| ClassBase::try_from_type(db, *base_type, None))
+            .filter_map(|base_type| ClassBase::try_from_type(env, *base_type, None))
             .collect();
 
         // If all bases failed to convert, return type as the metaclass.
         if bases.is_empty() {
-            return Ok(KnownClass::Type.to_class_literal(db));
+            return Ok(KnownClass::Type.to_class_literal(env));
         }
 
         // Start with the first base's metaclass as the candidate.
-        let mut candidate = bases[0].metaclass(db);
+        let mut candidate = bases[0].metaclass(env);
 
         // Track which base the candidate metaclass came from.
         let (mut candidate_base, rest) = bases.split_first().unwrap();
 
         // Reconcile with other bases' metaclasses.
         for base in rest {
-            let base_metaclass = base.metaclass(db);
+            let base_metaclass = base.metaclass(env);
 
             // Get the ClassType for comparison.
-            let Some(candidate_class) = candidate.to_class_type(db) else {
+            let Some(candidate_class) = candidate.to_class_type(env) else {
                 // If candidate isn't a class type, keep it as is.
                 continue;
             };
-            let Some(base_metaclass_class) = base_metaclass.to_class_type(db) else {
+            let Some(base_metaclass_class) = base_metaclass.to_class_type(env) else {
                 continue;
             };
 
             // If base's metaclass is more derived, use it.
-            if base_metaclass_class.is_subclass_of(db, candidate_class) {
+            if base_metaclass_class.is_subclass_of(env, candidate_class) {
                 candidate = base_metaclass;
                 candidate_base = base;
                 continue;
             }
 
             // If candidate is already more derived, keep it.
-            if candidate_class.is_subclass_of(db, base_metaclass_class) {
+            if candidate_class.is_subclass_of(env, base_metaclass_class) {
                 continue;
             }
 
@@ -368,19 +379,23 @@ impl<'db> DynamicClassLiteral<'db> {
     ///
     /// If the MRO cannot be computed (e.g., due to inconsistent ordering), falls back
     /// to iterating over base MROs sequentially with deduplication.
-    pub(crate) fn iter_mro(self, db: &'db dyn Db) -> MroIterator<'db> {
-        MroIterator::new(db, ClassLiteral::Dynamic(self), None)
+    pub(crate) fn iter_mro(self, env: &SemanticEnvironment<'db>) -> MroIterator<'db> {
+        MroIterator::new(env, ClassLiteral::Dynamic(self), None)
     }
 
     /// Look up an instance member by iterating through the MRO.
-    pub(crate) fn instance_member(self, db: &'db dyn Db, name: &str) -> PlaceAndQualifiers<'db> {
-        match MroLookup::new(db, self.iter_mro(db)).instance_member(name) {
+    pub(crate) fn instance_member(
+        self,
+        env: &SemanticEnvironment<'db>,
+        name: &str,
+    ) -> PlaceAndQualifiers<'db> {
+        match MroLookup::new(env, self.iter_mro(env)).instance_member(name) {
             InstanceMemberResult::Done(result) => result,
             InstanceMemberResult::TypedDict => {
                 // Simplified `TypedDict` handling without type mapping.
                 KnownClass::TypedDictFallback
-                    .to_instance(db)
-                    .instance_member(db, name)
+                    .to_instance(env)
+                    .instance_member(env, name)
             }
         }
     }
@@ -392,21 +407,21 @@ impl<'db> DynamicClassLiteral<'db> {
     /// - `is_self_object = false` (dynamic classes are never `object`).
     pub(crate) fn class_member(
         self,
-        db: &'db dyn Db,
+        env: &SemanticEnvironment<'db>,
         name: &str,
         policy: MemberLookupPolicy,
     ) -> PlaceAndQualifiers<'db> {
         // Check if this dynamic class is dataclass-like (via dataclass_transform inheritance).
-        if CodeGeneratorKind::from_class(db, self.into())
+        if CodeGeneratorKind::from_class(env, self.into())
             .is_some_and(CodeGeneratorKind::is_dataclass_like)
         {
             if name == "__dataclass_fields__" {
                 // Make this class look like a subclass of the `DataClassInstance` protocol.
                 return Place::declared(KnownClass::Dict.to_specialized_instance(
-                    db,
+                    env,
                     &[
-                        KnownClass::Str.to_instance(db),
-                        KnownClass::Field.to_specialized_instance(db, &[Type::any()]),
+                        KnownClass::Str.to_instance(env),
+                        KnownClass::Field.to_specialized_instance(env, &[Type::any()]),
                     ],
                 ))
                 .with_qualifiers(TypeQualifiers::CLASS_VAR);
@@ -416,15 +431,15 @@ impl<'db> DynamicClassLiteral<'db> {
             }
         }
 
-        let result = MroLookup::new(db, self.iter_mro(db)).class_member(
+        let result = MroLookup::new(env, self.iter_mro(env)).class_member(
             name, policy, None,  // No inherited generic context.
             false, // Dynamic classes are never `object`.
         );
 
         match result {
-            ClassMemberResult::Done(result) => result.finalize(db),
+            ClassMemberResult::Done(result) => result.finalize(env),
             ClassMemberResult::TypedDict(module) => {
-                typed_dict_fallback_class_member(db, module, policy, name)
+                typed_dict_fallback_class_member(env, module, policy, name)
             }
         }
     }
@@ -433,7 +448,12 @@ impl<'db> DynamicClassLiteral<'db> {
     ///
     /// Returns [`Member::unbound`] if the member is not found in the namespace dict,
     /// unless the namespace is dynamic, in which case returns `Unknown`.
-    pub(super) fn own_class_member(self, db: &'db dyn Db, name: &str) -> Member<'db> {
+    pub(super) fn own_class_member(
+        self,
+        env: &SemanticEnvironment<'db>,
+        name: &str,
+    ) -> Member<'db> {
+        let db = env.db();
         // If the namespace is dynamic (not a literal dict) and the name isn't in `self.members`,
         // return Unknown since we can't know what attributes might be defined.
         self.members(db)
@@ -448,7 +468,11 @@ impl<'db> DynamicClassLiteral<'db> {
     ///
     /// Namespace entries are class attributes, not values stored directly on instances.
     #[expect(clippy::unused_self)]
-    pub(super) fn own_instance_member(self, _db: &'db dyn Db, _name: &str) -> Member<'db> {
+    pub(super) fn own_instance_member(
+        self,
+        _ctx: &SemanticEnvironment<'db>,
+        _name: &str,
+    ) -> Member<'db> {
         Member::unbound()
     }
 
@@ -456,18 +480,28 @@ impl<'db> DynamicClassLiteral<'db> {
     ///
     /// Returns `Ok(Mro)` if successful, or `Err(DynamicMroError)` if there's
     /// an error (duplicate bases or C3 linearization failure).
+    pub(crate) fn try_mro(
+        self,
+        env: &SemanticEnvironment<'db>,
+    ) -> &'db Result<Mro<'db>, DynamicMroError<'db>> {
+        let db = env.db();
+        debug_assert_eq!(env.program(), self.scope(db).program(db));
+        self.try_mro_inner(db)
+    }
+
     #[salsa::tracked(
         returns(ref),
         cycle_initial=|db, _, self_: DynamicClassLiteral<'db>| {
             Ok(Mro::from([
                 ClassBase::Class(ClassType::NonGeneric(ClassLiteral::Dynamic(self_))),
-                ClassBase::object(db),
+                ClassBase::object(&SemanticEnvironment::from_file(db, self_.scope(db).python_file(db))),
             ]))
         },
         heap_size=ruff_memory_usage::heap_size
     )]
-    pub(crate) fn try_mro(self, db: &'db dyn Db) -> Result<Mro<'db>, DynamicMroError<'db>> {
-        Mro::of_dynamic_class(db, self)
+    fn try_mro_inner(self, db: &'db dyn Db) -> Result<Mro<'db>, DynamicMroError<'db>> {
+        let env = SemanticEnvironment::from_file(db, self.scope(db).python_file(db));
+        Mro::of_dynamic_class(&env, self)
     }
 
     /// Return `Some()` if this dynamic class is known to be a [`DisjointBase`].
@@ -477,14 +511,18 @@ impl<'db> DynamicClassLiteral<'db> {
     /// ```python
     /// X = type("X", (), {"__slots__": ("a",)})
     /// ```
-    pub(super) fn as_disjoint_base(self, db: &'db dyn Db) -> Option<DisjointBase<'db>> {
+    pub(super) fn as_disjoint_base(
+        self,
+        env: &SemanticEnvironment<'db>,
+    ) -> Option<DisjointBase<'db>> {
+        let db = env.db();
         // Check if __slots__ is in the members
         for (name, ty) in self.members(db) {
             if name.as_str() == "__slots__" {
                 // Check if the slots are non-empty
                 let is_non_empty = match ty {
                     // __slots__ = ("a", "b")
-                    Type::NominalInstance(nominal) => nominal.tuple_spec(db).is_some_and(|spec| {
+                    Type::NominalInstance(nominal) => nominal.tuple_spec(env).is_some_and(|spec| {
                         spec.len().into_fixed_length().is_some_and(|len| len > 0)
                     }),
                     // __slots__ = "abc"  # Same as ("abc",)
@@ -507,11 +545,11 @@ impl<'db> DynamicClassLiteral<'db> {
     /// if synthesis is valid.
     ///
     /// If the namespace is dynamic, returns `true` since we can't know if ordering methods exist.
-    pub(crate) fn has_own_ordering_method(self, db: &'db dyn Db) -> bool {
+    pub(crate) fn has_own_ordering_method(self, env: &SemanticEnvironment<'db>) -> bool {
         const ORDERING_METHODS: &[&str] = &["__lt__", "__le__", "__gt__", "__ge__"];
         ORDERING_METHODS
             .iter()
-            .any(|name| !self.own_class_member(db, name).is_undefined())
+            .any(|name| !self.own_class_member(env, name).is_undefined())
     }
 
     /// Returns a new [`DynamicClassLiteral`] with the given dataclass params, preserving all other fields.
@@ -535,24 +573,25 @@ impl<'db> DynamicClassLiteral<'db> {
     /// Normalize types that are part of this dynamic class's interned identity.
     pub(super) fn recursive_type_normalized_impl(
         self,
-        db: &'db dyn Db,
+        env: &SemanticEnvironment<'db>,
         div: Type<'db>,
         nested: bool,
     ) -> Option<Self> {
+        let db = env.db();
         let anchor = self
             .anchor(db)
-            .recursive_type_normalized_impl(db, div, nested)?;
+            .recursive_type_normalized_impl(env, div, nested)?;
         let members = self
             .members(db)
             .iter()
             .map(|(name, ty)| {
-                let ty = ty.recursive_type_normalized_impl(db, div, true);
+                let ty = ty.recursive_type_normalized_impl(env, div, true);
                 let ty = if nested { ty? } else { ty.unwrap_or(div) };
                 Some((name.clone(), ty))
             })
             .collect::<Option<Box<_>>>()?;
         let dataclass_params = match self.dataclass_params(db) {
-            Some(params) => Some(params.recursive_type_normalized_impl(db, div, nested)?),
+            Some(params) => Some(params.recursive_type_normalized_impl(env, div, nested)?),
             None => None,
         };
 

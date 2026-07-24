@@ -30,8 +30,8 @@ use type_generation::{intersection, union};
 
 /// A macro to define a property test for types.
 ///
-/// The `$test_name` identifier specifies the name of the test function. The `$db` identifier
-/// is used to refer to the salsa database in the property to be tested. The actual property is
+/// The `$test_name` identifier specifies the name of the test function. The `$env` identifier
+/// is used to refer to the semantic environment in the property to be tested. The actual property is
 /// specified using the syntax:
 ///
 ///     forall types t1, t2, ..., tn . <property>`
@@ -39,34 +39,36 @@ use type_generation::{intersection, union};
 /// where `t1`, `t2`, ..., `tn` are identifiers that represent arbitrary types, and `<property>`
 /// is an expression using these identifiers.
 macro_rules! type_property_test {
-    ($test_name:ident, $db:ident, forall types $($types:ident),+ . $property:expr) => {
+    ($test_name:ident, $env:ident, forall types $($types:ident),+ . $property:expr) => {
         #[quickcheck_macros::quickcheck]
         #[ignore]
-        fn $test_name($($types: crate::types::property_tests::type_generation::Ty),+) -> bool {
-            let $db = &crate::types::property_tests::setup::get_cached_db();
-            $(let $types = $types.into_type($db);)+
+        fn $test_name($($types: Ty),+) -> bool {
+            let db = &get_cached_db();
+            let $env = &db.semantic_environment();
+            $(let $types = $types.into_type($env);)+
             let result = $property;
 
             if !result {
                 println!("\nFailing types were:");
-                $(println!("{}", $types.display($db));)+
+                $(println!("{}", $types.display($env));)+
             }
 
             result
         }
     };
 
-    ($test_name:ident, $db:ident, forall fully_static_types $($types:ident),+ . $property:expr) => {
+    ($test_name:ident, $env:ident, forall fully_static_types $($types:ident),+ . $property:expr) => {
         #[quickcheck_macros::quickcheck]
         #[ignore]
-        fn $test_name($($types: crate::types::property_tests::type_generation::FullyStaticTy),+) -> bool {
-            let $db = &crate::types::property_tests::setup::get_cached_db();
-            $(let $types = $types.into_type($db);)+
+        fn $test_name($($types: FullyStaticTy),+) -> bool {
+            let db = &get_cached_db();
+            let $env = &db.semantic_environment();
+            $(let $types = $types.into_type($env);)+
             let result = $property;
 
             if !result {
                 println!("\nFailing types were:");
-                $(println!("{}", $types.display($db));)+
+                $(println!("{}", $types.display($env));)+
             }
 
             result
@@ -74,157 +76,161 @@ macro_rules! type_property_test {
     };
 
     // A property test with a logical implication.
-    ($name:ident, $db:ident, forall $typekind:ident $($types:ident),+ . $premise:expr => $conclusion:expr) => {
-        type_property_test!($name, $db, forall $typekind $($types),+ . !($premise) || ($conclusion));
+    ($name:ident, $env:ident, forall $typekind:ident $($types:ident),+ . $premise:expr => $conclusion:expr) => {
+        type_property_test!($name, $env, forall $typekind $($types),+ . !($premise) || ($conclusion));
     };
 }
 
 mod stable {
-    use super::union;
+    use super::{
+        setup::get_cached_db,
+        type_generation::{FullyStaticTy, Ty},
+        union,
+    };
     use crate::types::{CallableType, IntersectionBuilder, KnownClass, Type};
 
     // Reflexivity: `T` is equivalent to itself.
     type_property_test!(
-        equivalent_to_is_reflexive, db,
-        forall types t. t.is_equivalent_to(db, t)
+        equivalent_to_is_reflexive, env,
+        forall types t. t.is_equivalent_to(env, t)
     );
 
     // Symmetry: If `S` is equivalent to `T`, then `T` must be equivalent to `S`.
     type_property_test!(
-        equivalent_to_is_symmetric, db,
-        forall types s, t. s.is_equivalent_to(db, t) => t.is_equivalent_to(db, s)
+        equivalent_to_is_symmetric, env,
+        forall types s, t. s.is_equivalent_to(env, t) => t.is_equivalent_to(env, s)
     );
 
     // Transitivity: If `S` is equivalent to `T` and `T` is equivalent to `U`, then `S` must be equivalent to `U`.
     type_property_test!(
-        equivalent_to_is_transitive, db,
-        forall types s, t, u. s.is_equivalent_to(db, t) && t.is_equivalent_to(db, u) => s.is_equivalent_to(db, u)
+        equivalent_to_is_transitive, env,
+        forall types s, t, u. s.is_equivalent_to(env, t) && t.is_equivalent_to(env, u) => s.is_equivalent_to(env, u)
     );
 
     // `S <: T` and `T <: U` implies that `S <: U`.
     type_property_test!(
-        subtype_of_is_transitive, db,
-        forall types s, t, u. s.is_subtype_of(db, t) && t.is_subtype_of(db, u) => s.is_subtype_of(db, u)
+        subtype_of_is_transitive, env,
+        forall types s, t, u. s.is_subtype_of(env, t) && t.is_subtype_of(env, u) => s.is_subtype_of(env, u)
     );
 
     // `S <: T` and `T <: S` implies that `S` is equivalent to `T`.
     type_property_test!(
-        subtype_of_is_antisymmetric, db,
-        forall types s, t. s.is_subtype_of(db, t) && t.is_subtype_of(db, s) => s.is_equivalent_to(db, t)
+        subtype_of_is_antisymmetric, env,
+        forall types s, t. s.is_subtype_of(env, t) && t.is_subtype_of(env, s) => s.is_equivalent_to(env, t)
     );
 
     type_property_test!(
-        structural_negation_subtyping_matches_materialized_negation, db,
+        structural_negation_subtyping_matches_materialized_negation, env,
         forall types s, t. {
             let mut cache = None;
-            s.negation_is_subtype_of_cached(db, t, &mut cache) == s.negate(db).is_subtype_of(db, t)
+            s.negation_is_subtype_of_cached(env, t, &mut cache) == s.negate(env).is_subtype_of(env, t)
         }
     );
 
     // `T` is not disjoint from itself, unless `T` is `Never`.
     type_property_test!(
-        disjoint_from_is_irreflexive, db,
-        forall types t. t.is_disjoint_from(db, t) => t.is_never()
+        disjoint_from_is_irreflexive, env,
+        forall types t. t.is_disjoint_from(env, t) => t.is_never()
     );
 
     // `S` is disjoint from `T` implies that `T` is disjoint from `S`.
     type_property_test!(
-        disjoint_from_is_symmetric, db,
-        forall types s, t. s.is_disjoint_from(db, t) == t.is_disjoint_from(db, s)
+        disjoint_from_is_symmetric, env,
+        forall types s, t. s.is_disjoint_from(env, t) == t.is_disjoint_from(env, s)
     );
 
     // `S <: T` implies that `S` is not disjoint from `T`, unless `S` is `Never`.
     type_property_test!(
-        subtype_of_implies_not_disjoint_from, db,
-        forall types s, t. s.is_subtype_of(db, t) => !s.is_disjoint_from(db, t) || s.is_never()
+        subtype_of_implies_not_disjoint_from, env,
+        forall types s, t. s.is_subtype_of(env, t) => !s.is_disjoint_from(env, t) || s.is_never()
     );
 
     // `S <: T` implies that `S` can be assigned to `T`.
     type_property_test!(
-        subtype_of_implies_assignable_to, db,
-        forall types s, t. s.is_subtype_of(db, t) => s.is_assignable_to(db, t)
+        subtype_of_implies_assignable_to, env,
+        forall types s, t. s.is_subtype_of(env, t) => s.is_assignable_to(env, t)
     );
 
     // If `T` is a singleton, it is also single-valued.
     type_property_test!(
-        singleton_implies_single_valued, db,
-        forall types t. t.is_singleton(db) => t.is_single_valued(db)
+        singleton_implies_single_valued, env,
+        forall types t. t.is_singleton(env) => t.is_single_valued(env)
     );
 
     // All types should be assignable to `object`
     type_property_test!(
-        all_types_assignable_to_object, db,
-        forall types t. t.is_assignable_to(db, Type::object())
+        all_types_assignable_to_object, env,
+        forall types t. t.is_assignable_to(env, Type::object())
     );
 
     // And all types should be subtypes of `object`
     type_property_test!(
-        all_types_subtype_of_object, db,
-        forall types t. t.is_subtype_of(db, Type::object())
+        all_types_subtype_of_object, env,
+        forall types t. t.is_subtype_of(env, Type::object())
     );
 
     // Never should be assignable to every type
     type_property_test!(
-        never_assignable_to_every_type, db,
-        forall types t. Type::Never.is_assignable_to(db, t)
+        never_assignable_to_every_type, env,
+        forall types t. Type::Never.is_assignable_to(env, t)
     );
 
     // And it should be a subtype of all types
     type_property_test!(
-        never_subtype_of_every_type, db,
-        forall types t. Type::Never.is_subtype_of(db, t)
+        never_subtype_of_every_type, env,
+        forall types t. Type::Never.is_subtype_of(env, t)
     );
 
     // Similar to `Never`, a "bottom" callable type should be a subtype of all callable types
     type_property_test!(
-        bottom_callable_is_subtype_of_all_callable, db,
+        bottom_callable_is_subtype_of_all_callable, env,
         forall types t. t.is_callable_type()
-            => Type::Callable(CallableType::bottom(db)).is_subtype_of(db, t)
+            => Type::Callable(CallableType::bottom(env.db())).is_subtype_of(env, t)
     );
 
     // `T` can be assigned to itself.
     type_property_test!(
-        assignable_to_is_reflexive, db,
-        forall types t. t.is_assignable_to(db, t)
+        assignable_to_is_reflexive, env,
+        forall types t. t.is_assignable_to(env, t)
     );
 
     // For *any* pair of types, each of the pair should be assignable to the union of the two.
     type_property_test!(
-        all_type_pairs_are_assignable_to_their_union, db,
-        forall types s, t. s.is_assignable_to(db, union(db, [s, t])) && t.is_assignable_to(db, union(db, [s, t]))
+        all_type_pairs_are_assignable_to_their_union, env,
+        forall types s, t. s.is_assignable_to(env, union(env, [s, t])) && t.is_assignable_to(env, union(env, [s, t]))
     );
 
     // Only `Never` is a subtype of `Any`.
     type_property_test!(
-        only_never_is_subtype_of_any, db,
-        forall types s. !s.is_equivalent_to(db, Type::Never) => !s.is_subtype_of(db, Type::any())
+        only_never_is_subtype_of_any, env,
+        forall types s. !s.is_equivalent_to(env, Type::Never) => !s.is_subtype_of(env, Type::any())
     );
 
     // Only `object` is a supertype of `Any`.
     type_property_test!(
-        only_object_is_supertype_of_any, db,
-        forall types t. !t.is_equivalent_to(db, Type::object()) => !Type::any().is_subtype_of(db, t)
+        only_object_is_supertype_of_any, env,
+        forall types t. !t.is_equivalent_to(env, Type::object()) => !Type::any().is_subtype_of(env, t)
     );
 
     // Equivalence is commutative.
     type_property_test!(
-        equivalent_to_is_commutative, db,
-        forall types s, t. s.is_equivalent_to(db, t) == t.is_equivalent_to(db, s)
+        equivalent_to_is_commutative, env,
+        forall types s, t. s.is_equivalent_to(env, t) == t.is_equivalent_to(env, s)
     );
 
     // A fully static type `T` is a subtype of itself. (This is not true for non-fully-static
     // types; `Any` is not a subtype of `Any`, only `Never` is.)
     type_property_test!(
-        subtype_of_is_reflexive_for_fully_static_types, db,
-        forall fully_static_types t. t.is_subtype_of(db, t)
+        subtype_of_is_reflexive_for_fully_static_types, env,
+        forall fully_static_types t. t.is_subtype_of(env, t)
     );
 
     // For any two fully static types, each type in the pair must be a subtype of their union.
     // (This is clearly not true for non-fully-static types, since their subtyping is not
     // reflexive.)
     type_property_test!(
-        all_fully_static_type_pairs_are_subtype_of_their_union, db,
-        forall fully_static_types s, t. s.is_subtype_of(db, union(db, [s, t])) && t.is_subtype_of(db, union(db, [s, t]))
+        all_fully_static_type_pairs_are_subtype_of_their_union, env,
+        forall fully_static_types s, t. s.is_subtype_of(env, union(env, [s, t])) && t.is_subtype_of(env, union(env, [s, t]))
     );
 
     // Any type assignable to `Iterable[object]` should be considered iterable.
@@ -242,15 +248,15 @@ mod stable {
     // the Liskov violation). All you need to do is to create a class that subclasses
     // `Iterable` but assigns `__iter__ = None` in the class body (or similar).
     type_property_test!(
-        all_types_assignable_to_iterable_are_iterable, db,
-        forall types t. t.is_assignable_to(db, KnownClass::Iterable.to_specialized_instance(db, &[Type::object()])) => t.try_iterate(db).is_ok()
+        all_types_assignable_to_iterable_are_iterable, env,
+        forall types t. t.is_assignable_to(env, KnownClass::Iterable.to_specialized_instance(env, &[Type::object()])) => t.try_iterate(env).is_ok()
     );
 
     // Our optimized `Type::negate()` function should always produce the exact same type
     // as going "the long way" via the `IntersectionBuilder`.
     type_property_test!(
-        all_negated_types_identical_to_intersection_with_single_negated_element, db,
-        forall types t. t.negate(db) == IntersectionBuilder::new(db).add_negative(t).build()
+        all_negated_types_identical_to_intersection_with_single_negated_element, env,
+        forall types t. t.negate(env) == IntersectionBuilder::new(env).add_negative(t).build()
     );
 }
 
@@ -264,68 +270,73 @@ mod stable {
 mod flaky {
     use itertools::Itertools;
 
-    use super::{intersection, union};
+    use super::{
+        intersection,
+        setup::get_cached_db,
+        type_generation::{FullyStaticTy, Ty},
+        union,
+    };
 
     // Negating `T` twice is equivalent to `T`.
     type_property_test!(
-        double_negation_is_identity, db,
-        forall types t. t.negate(db).negate(db).is_equivalent_to(db, t)
+        double_negation_is_identity, env,
+        forall types t. t.negate(env).negate(env).is_equivalent_to(env, t)
     );
 
     // For any fully static type `T`, `T` should be disjoint from `~T`.
     // https://github.com/astral-sh/ty/issues/216
     type_property_test!(
-        negation_of_fully_static_types_is_disjoint, db,
-        forall fully_static_types t. t.negate(db).is_disjoint_from(db, t)
+        negation_of_fully_static_types_is_disjoint, env,
+        forall fully_static_types t. t.negate(env).is_disjoint_from(env, t)
     );
 
     // For two types, their intersection must be a subtype of each type in the pair.
     type_property_test!(
-        all_type_pairs_are_supertypes_of_their_intersection, db,
+        all_type_pairs_are_supertypes_of_their_intersection, env,
         forall types s, t.
-            intersection(db, [s, t]).is_subtype_of(db, s) && intersection(db, [s, t]).is_subtype_of(db, t)
+            intersection(env, [s, t]).is_subtype_of(env, s) && intersection(env, [s, t]).is_subtype_of(env, t)
     );
 
     // And the intersection of a pair of types
     // should be assignable to both types of the pair.
     // Currently fails due to https://github.com/astral-sh/ruff/issues/14899
     type_property_test!(
-        all_type_pairs_can_be_assigned_from_their_intersection, db,
-        forall types s, t. intersection(db, [s, t]).is_assignable_to(db, s) && intersection(db, [s, t]).is_assignable_to(db, t)
+        all_type_pairs_can_be_assigned_from_their_intersection, env,
+        forall types s, t. intersection(env, [s, t]).is_assignable_to(env, s) && intersection(env, [s, t]).is_assignable_to(env, t)
     );
 
     // Equal element sets of intersections implies equivalence
     // flaky at least in part because of https://github.com/astral-sh/ruff/issues/15513
     type_property_test!(
-        intersection_equivalence_not_order_dependent, db,
+        intersection_equivalence_not_order_dependent, env,
         forall types s, t, u.
             [s, t, u]
                 .into_iter()
                 .permutations(3)
-                .map(|trio_of_types| intersection(db, trio_of_types))
+                .map(|trio_of_types| intersection(env, trio_of_types))
                 .permutations(2)
-                .all(|vec_of_intersections| vec_of_intersections[0].is_equivalent_to(db, vec_of_intersections[1]))
+                .all(|vec_of_intersections| vec_of_intersections[0].is_equivalent_to(env, vec_of_intersections[1]))
     );
 
     // Equal element sets of unions implies equivalence
     // flaky at least in part because of https://github.com/astral-sh/ruff/issues/15513
     type_property_test!(
-        union_equivalence_not_order_dependent, db,
+        union_equivalence_not_order_dependent, env,
         forall types s, t, u.
             [s, t, u]
                 .into_iter()
                 .permutations(3)
-                .map(|trio_of_types| union(db, trio_of_types))
+                .map(|trio_of_types| union(env, trio_of_types))
                 .permutations(2)
-                .all(|vec_of_unions| vec_of_unions[0].is_equivalent_to(db, vec_of_unions[1]))
+                .all(|vec_of_unions| vec_of_unions[0].is_equivalent_to(env, vec_of_unions[1]))
     );
 
     // `S | T` is always a supertype of `S`.
     // Thus, `S` is never disjoint from `S | T`.
     type_property_test!(
-        constituent_members_of_union_is_not_disjoint_from_that_union, db,
+        constituent_members_of_union_is_not_disjoint_from_that_union, env,
         forall types s, t.
-            !s.is_disjoint_from(db, union(db, [s, t])) && !t.is_disjoint_from(db, union(db, [s, t]))
+            !s.is_disjoint_from(env, union(env, [s, t])) && !t.is_disjoint_from(env, union(env, [s, t]))
     );
 
     // If `S <: T`, then `~T <: ~S`.
@@ -339,8 +350,8 @@ mod flaky {
     // occur very rarely (even running the test with several million seeds does
     // not always reliably reproduce the flake).
     type_property_test!(
-        negation_reverses_subtype_order, db,
-        forall types s, t. s.is_subtype_of(db, t) => t.negate(db).is_subtype_of(db, s.negate(db))
+        negation_reverses_subtype_order, env,
+        forall types s, t. s.is_subtype_of(env, t) => t.negate(env).is_subtype_of(env, s.negate(env))
     );
 
     // Both the top and bottom materialization tests are flaky in part due to various failures that
@@ -349,13 +360,13 @@ mod flaky {
 
     // `T'`, the top materialization of `T`, should be assignable to `T`.
     type_property_test!(
-        top_materialization_of_type_is_assignable_to_type, db,
-        forall types t. t.top_materialization(db).is_assignable_to(db, t)
+        top_materialization_of_type_is_assignable_to_type, env,
+        forall types t. t.top_materialization(env).is_assignable_to(env, t)
     );
 
     // Similarly, `T'`, the bottom materialization of `T`, should also be assignable to `T`.
     type_property_test!(
-        bottom_materialization_of_type_is_assignable_to_type, db,
-        forall types t. t.bottom_materialization(db).is_assignable_to(db, t)
+        bottom_materialization_of_type_is_assignable_to_type, env,
+        forall types t. t.bottom_materialization(env).is_assignable_to(env, t)
     );
 }

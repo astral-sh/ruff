@@ -1,9 +1,8 @@
-use crate::Db;
 use crate::place::{
     ConsideredDefinitions, DefinedPlace, Place, PlaceAndQualifiers, RequiresExplicitReExport,
     place_by_id, place_from_bindings,
 };
-use crate::types::Type;
+use crate::types::{SemanticEnvironment, Type};
 use ty_python_core::{place_table, scope::ScopeId, use_def_map};
 
 /// The return type of certain member-lookup operations. Contains information
@@ -53,12 +52,17 @@ impl<'db> Member<'db> {
 
 /// Infer the public type of a class member/symbol (its type as seen from outside its scope) in the given
 /// `scope`.
-pub(super) fn class_member<'db>(db: &'db dyn Db, scope: ScopeId<'db>, name: &str) -> Member<'db> {
+pub(super) fn class_member<'db>(
+    env: &SemanticEnvironment<'db>,
+    scope: ScopeId<'db>,
+    name: &str,
+) -> Member<'db> {
+    let db = env.db();
     place_table(db, scope)
         .symbol_id(name)
         .map(|symbol_id| {
             let place_and_quals = place_by_id(
-                db,
+                env,
                 scope,
                 symbol_id.into(),
                 RequiresExplicitReExport::No,
@@ -85,7 +89,7 @@ pub(super) fn class_member<'db>(db: &'db dyn Db, scope: ScopeId<'db>, name: &str
                 // Otherwise, we need to check if the symbol has bindings
                 let use_def = use_def_map(db, scope);
                 let bindings = use_def.end_of_scope_symbol_bindings(symbol_id);
-                let inferred = place_from_bindings(db, bindings).place;
+                let inferred = place_from_bindings(env, bindings).place;
 
                 // TODO: we should not need to calculate inferred type second time. This is a temporary
                 // solution until the notion of Boundness and Declaredness is split. See #16036, #16264

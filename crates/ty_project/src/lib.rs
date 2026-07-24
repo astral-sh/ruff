@@ -14,6 +14,7 @@ use files::{Index, Indexed, IndexedFiles};
 use metadata::settings::Settings;
 pub use metadata::{ProjectMetadata, ProjectMetadataError};
 use rayon::prelude::*;
+use ruff_db::PythonFile;
 use ruff_db::diagnostic::{
     Diagnostic, DiagnosticId, Severity, SubDiagnostic, SubDiagnosticSeverity,
 };
@@ -27,6 +28,7 @@ use std::collections::{BTreeSet, hash_set};
 use std::iter::FusedIterator;
 use std::panic::{AssertUnwindSafe, UnwindSafe};
 use std::sync::Arc;
+pub use ty_python_semantic::Db as SemanticDb;
 use ty_python_semantic::lint::RuleSelection;
 
 mod db;
@@ -392,8 +394,9 @@ impl Project {
                 let check_file_span =
                     tracing::debug_span!(parent: &project_span, "check_file", ?file);
                 let _entered = check_file_span.entered();
+                let python_file = PythonFile::new(db, file, db.python_version());
 
-                match check_file_impl(db, file) {
+                match check_file_impl(db, python_file) {
                     Ok(diagnostics) => {
                         reporter.report_checked_file(db, file, diagnostics);
 
@@ -402,7 +405,7 @@ impl Project {
                         if !open_files.contains(&file) {
                             // The module has already been parsed by `check_file_impl`.
                             // We only retrieve it here so that we can call `clear` on it.
-                            let parsed = parsed_module(db, file);
+                            let parsed = parsed_module(db, python_file);
 
                             // Drop the AST now that we are done checking this file. It is not currently open,
                             // so it is unlikely to be accessed again soon. If any queries need to access the AST
@@ -657,7 +660,7 @@ pub(crate) fn check_file(db: &dyn Db, file: File) -> Vec<Diagnostic> {
         return Vec::new();
     }
 
-    check_file_impl(db, file)
+    check_file_impl(db, PythonFile::new(db, file, db.python_version()))
         .map(<[Diagnostic]>::to_vec)
         .unwrap_or_else(|diagnostic| vec![diagnostic.clone()])
 }
@@ -739,10 +742,16 @@ pub enum ProjectReloadResult {
 }
 
 #[salsa::tracked(returns(as_deref), heap_size=ruff_memory_usage::heap_size)]
-pub(crate) fn check_file_impl(db: &dyn Db, file: File) -> Result<Box<[Diagnostic]>, Diagnostic> {
+pub(crate) fn check_file_impl(
+    db: &dyn Db,
+    file: PythonFile<'_>,
+) -> Result<Box<[Diagnostic]>, Diagnostic> {
+    let source_file = file.file(db);
     {
         let db = AssertUnwindSafe(db);
-        match catch(&**db, file, || ty_python_semantic::check_file(*db, file)) {
+        match catch(&**db, source_file, || {
+            ty_python_semantic::check_file(*db, file)
+        }) {
             Ok(result) => result,
             Err(diagnostic) => Ok(Box::new([diagnostic])),
         }
@@ -885,6 +894,7 @@ mod tests {
     use crate::db::Db as _;
     use crate::db::testing::TestDb;
     use crate::{IncludeResult, ProjectMetadata};
+    use ruff_db::PythonFile;
     use ruff_db::files::system_path_to_file;
     use ruff_db::source::source_text;
     use ruff_db::system::{DbWithTestSystem, DbWithWritableSystem as _, SystemPath, SystemPathBuf};
@@ -907,7 +917,7 @@ mod tests {
 
         assert_eq!(source_text(&db, file).as_str(), "");
         assert_eq!(
-            check_file_impl(&db, file)
+            check_file_impl(&db, PythonFile::new(&db, file, db.python_version()))
                 .as_ref()
                 .unwrap_err()
                 .primary_message()
@@ -916,7 +926,12 @@ mod tests {
         );
 
         let events = db.take_salsa_events();
-        assert_function_query_was_not_run(&db, check_types, file, &events);
+        assert_function_query_was_not_run(
+            &db,
+            check_types,
+            PythonFile::new(&db, file, db.python_version()),
+            &events,
+        );
 
         // The user now creates a new file with an empty text. The source text
         // content returned by `source_text` remains unchanged, but the diagnostics should get updated.
@@ -924,7 +939,7 @@ mod tests {
 
         assert_eq!(source_text(&db, file).as_str(), "");
         assert_eq!(
-            check_file_impl(&db, file)
+            check_file_impl(&db, PythonFile::new(&db, file, db.python_version()))
                 .as_ref()
                 .unwrap()
                 .iter()

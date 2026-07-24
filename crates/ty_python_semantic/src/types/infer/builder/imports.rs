@@ -5,7 +5,7 @@ use ty_module_resolver::{
 };
 
 use crate::{
-    Program, TypeQualifiers, add_inferred_python_version_hint_to_diagnostic,
+    TypeQualifiers, add_inferred_python_version_hint_to_diagnostic,
     place::{DefinedPlace, Definedness, Place, PlaceAndQualifiers, TypeOrigin},
     types::{
         ModuleLiteralType, Type, TypeAndQualifiers,
@@ -69,14 +69,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         if level == 0 {
             if let Some(module_name) = module_name {
-                let program = Program::get(db);
+                let program = ty_python_core::program::Program::get(db);
                 let typeshed_versions = program.search_paths(db).typeshed_versions();
 
                 // Loop over ancestors in case we have info on the parent module but not submodule
                 for module_name in module_name.ancestors() {
                     if let Some(version_range) = typeshed_versions.exact(&module_name) {
                         // We know it is a stdlib module on *some* Python versions...
-                        let python_version = program.python_version(db);
+                        let python_version = self.semantic_environment().python_version();
                         if !version_range.contains(python_version) {
                             // ...But not on *this* Python version.
                             diagnostic.info(format_args!(
@@ -97,12 +97,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         } else {
             if let Some(better_level) = (0..level).rev().find(|reduced_level| {
-                let Ok(module_name) =
-                    ModuleName::from_identifier_parts(db, self.file(), module, *reduced_level)
-                else {
+                let Ok(module_name) = ModuleName::from_identifier_parts(
+                    db,
+                    self.python_file(),
+                    module,
+                    *reduced_level,
+                ) else {
                     return false;
                 };
-                resolve_module(db, self.file(), &module_name).is_some()
+                resolve_module(db, self.python_file(), &module_name).is_some()
             }) {
                 diagnostic
                     .help("The module can be resolved if the number of leading dots is reduced");
@@ -235,7 +238,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         for alias in names {
             for definition in self.index.definitions(alias) {
-                let inferred = infer_definition_types(db, *definition);
+                let inferred = infer_definition_types(self.semantic_environment(), *definition);
                 // Check non-star imports for deprecations
                 if definition.kind(db).as_star_import().is_none() {
                     // In the initial cycle, `declaration_types()` is empty, so no deprecation check is performed.
@@ -268,7 +271,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             format_import_from_module(*level, module),
             self.file().path(db),
         );
-        let module_name = ModuleName::from_import_statement(db, self.file(), import_from);
+        let module_name = ModuleName::from_import_statement(db, self.python_file(), import_from);
 
         let module_name = match module_name {
             Ok(module_name) => module_name,
@@ -297,7 +300,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         };
 
-        if resolve_module(db, self.file(), &module_name).is_none() {
+        if resolve_module(db, self.python_file(), &module_name).is_none() {
             self.report_unresolved_import(module_ref.range(), *level, module, Some(&module_name));
         }
     }
@@ -310,7 +313,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     ) {
         let db = self.db();
 
-        let Ok(module_name) = ModuleName::from_import_statement(db, self.file(), import_from)
+        let Ok(module_name) =
+            ModuleName::from_import_statement(db, self.python_file(), import_from)
         else {
             self.add_unknown_declaration_with_binding(alias.into(), definition);
             return;
@@ -330,7 +334,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return;
         }
 
-        let Some(module) = resolve_module(db, self.file(), &module_name) else {
+        let Some(module) = resolve_module(db, self.python_file(), &module_name) else {
             self.add_unknown_declaration_with_binding(alias.into(), definition);
             return;
         };
@@ -338,7 +342,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let module_literal = ModuleLiteralType::new(
             db,
             module,
-            module.kind(db).is_package().then_some(self.file()),
+            module.kind(db).is_package().then_some(self.python_file()),
         );
         let module_ty = Type::ModuleLiteral(module_literal);
 
@@ -376,7 +380,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         ..
                     }),
                 qualifiers,
-            } = module_literal.static_member(db, name)
+            } = module_literal.static_member(self.semantic_environment(), name)
             {
                 if &alias.name != "*" && boundness == Definedness::PossiblyUndefined {
                     // TODO: Consider loading _both_ the attribute and any submodule and unioning them
@@ -535,13 +539,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let db = self.db();
 
         // Get this package's absolute module name by resolving `.`, and make sure it exists
-        let Ok(thispackage_name) = ModuleName::package_for_file(db, self.file()) else {
+        let Ok(thispackage_name) = ModuleName::package_for_file(db, self.python_file()) else {
             self.add_binding(import_from.into(), definition)
                 .insert(self, Type::unknown());
             return;
         };
 
-        let Some(module) = resolve_module(db, self.file(), &thispackage_name) else {
+        let Some(module) = resolve_module(db, self.python_file(), &thispackage_name) else {
             self.add_binding(import_from.into(), definition)
                 .insert(self, Type::unknown());
             return;
@@ -553,7 +557,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // First we normalize to `whatever.thispackage.x.y`
         let Some(final_part) = ModuleName::from_identifier_parts(
             db,
-            self.file(),
+            self.python_file(),
             import_from.module.as_deref(),
             import_from.level,
         )

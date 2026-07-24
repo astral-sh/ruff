@@ -37,6 +37,7 @@ use std::iter::FusedIterator;
 
 use rustc_hash::{FxBuildHasher, FxHashSet};
 
+use ruff_db::PythonFile;
 use ruff_db::files::{File, FilePath, FileRootKind, directory_listing, system_path_to_file};
 use ruff_db::source::source_text;
 use ruff_db::system::{System, SystemPath, SystemPathBuf};
@@ -57,13 +58,18 @@ use crate::{SearchPathSettings, SearchPathSettingsError};
 /// Resolves a module name to a module.
 pub fn resolve_module<'db>(
     db: &'db dyn Db,
-    importing_file: File,
+    importing_file: PythonFile<'db>,
     module_name: &ModuleName,
 ) -> Option<Module<'db>> {
-    let interned_name = ModuleNameIngredient::new(db, module_name, ModuleResolveMode::Typing);
+    let interned_name = ModuleNameIngredient::new(
+        db,
+        module_name,
+        ModuleResolveMode::Typing,
+        importing_file.python_version(db),
+    );
 
     resolve_module_query(db, interned_name)
-        .or_else(|| desperately_resolve_module(db, importing_file, interned_name))
+        .or_else(|| desperately_resolve_module(db, importing_file.file(db), interned_name))
 }
 
 /// Resolves a module name to a module, without desperate resolution available.
@@ -72,9 +78,11 @@ pub fn resolve_module<'db>(
 /// we don't have a well-defined importing file.
 pub fn resolve_module_confident<'db>(
     db: &'db dyn Db,
+    python_version: PythonVersion,
     module_name: &ModuleName,
 ) -> Option<Module<'db>> {
-    let interned_name = ModuleNameIngredient::new(db, module_name, ModuleResolveMode::Typing);
+    let interned_name =
+        ModuleNameIngredient::new(db, module_name, ModuleResolveMode::Typing, python_version);
 
     resolve_module_query(db, interned_name)
 }
@@ -82,13 +90,18 @@ pub fn resolve_module_confident<'db>(
 /// Resolves a module name to a module (stubs not allowed).
 pub fn resolve_real_module<'db>(
     db: &'db dyn Db,
-    importing_file: File,
+    importing_file: PythonFile<'db>,
     module_name: &ModuleName,
 ) -> Option<Module<'db>> {
-    let interned_name = ModuleNameIngredient::new(db, module_name, ModuleResolveMode::Runtime);
+    let interned_name = ModuleNameIngredient::new(
+        db,
+        module_name,
+        ModuleResolveMode::Runtime,
+        importing_file.python_version(db),
+    );
 
     resolve_module_query(db, interned_name)
-        .or_else(|| desperately_resolve_module(db, importing_file, interned_name))
+        .or_else(|| desperately_resolve_module(db, importing_file.file(db), interned_name))
 }
 
 /// Resolves a module name to a module, without desperate resolution available (stubs not allowed).
@@ -97,9 +110,11 @@ pub fn resolve_real_module<'db>(
 /// we don't have a well-defined importing file.
 pub fn resolve_real_module_confident<'db>(
     db: &'db dyn Db,
+    python_version: PythonVersion,
     module_name: &ModuleName,
 ) -> Option<Module<'db>> {
-    let interned_name = ModuleNameIngredient::new(db, module_name, ModuleResolveMode::Runtime);
+    let interned_name =
+        ModuleNameIngredient::new(db, module_name, ModuleResolveMode::Runtime, python_version);
 
     resolve_module_query(db, interned_name)
 }
@@ -117,17 +132,18 @@ pub fn resolve_real_module_confident<'db>(
 /// are involved in an import cycle with `builtins`.
 pub fn resolve_real_shadowable_module<'db>(
     db: &'db dyn Db,
-    importing_file: File,
+    importing_file: PythonFile<'db>,
     module_name: &ModuleName,
 ) -> Option<Module<'db>> {
     let interned_name = ModuleNameIngredient::new(
         db,
         module_name,
         ModuleResolveMode::RuntimeSomeShadowingAllowed,
+        importing_file.python_version(db),
     );
 
     resolve_module_query(db, interned_name)
-        .or_else(|| desperately_resolve_module(db, importing_file, interned_name))
+        .or_else(|| desperately_resolve_module(db, importing_file.file(db), interned_name))
 }
 
 /// Selects typing or runtime module-resolution semantics.
@@ -212,9 +228,10 @@ fn resolve_module_query<'db>(
 ) -> Option<Module<'db>> {
     let name = module_name.name(db);
     let mode = module_name.mode(db);
+    let python_version = module_name.python_version(db);
     let _span = tracing::trace_span!("resolve_module", %name).entered();
 
-    let Some(resolved) = resolve_name(db, name, mode) else {
+    let Some(resolved) = resolve_name(db, name, mode, python_version) else {
         tracing::debug!("Module `{name}` not found in search paths");
         return None;
     };
@@ -222,7 +239,7 @@ fn resolve_module_query<'db>(
     resolved
         .into_iter()
         .next()
-        .map(|candidate| candidate.into_module(db, name))
+        .map(|candidate| candidate.into_module(db, name, python_version))
 }
 
 /// Like `resolve_module_query` but for cases where it failed to resolve the module
@@ -245,9 +262,11 @@ fn desperately_resolve_module<'db>(
 ) -> Option<Module<'db>> {
     let name = module_name.name(db);
     let mode = module_name.mode(db);
+    let python_version = module_name.python_version(db);
     let _span = tracing::trace_span!("desperately_resolve_module", %name).entered();
 
-    let Some(resolved) = desperately_resolve_name(db, importing_file, name, mode) else {
+    let Some(resolved) = desperately_resolve_name(db, importing_file, name, mode, python_version)
+    else {
         let mode = match mode {
             ModuleResolveMode::Typing => "typing mode",
             ModuleResolveMode::Runtime => "runtime mode",
@@ -262,14 +281,18 @@ fn desperately_resolve_module<'db>(
     resolved
         .into_iter()
         .next()
-        .map(|candidate| candidate.into_module(db, name))
+        .map(|candidate| candidate.into_module(db, name, python_version))
 }
 
 /// Resolves the module for the given path.
 ///
 /// Returns `None` if the path is not a module locatable via any of the known search paths.
 #[allow(unused)]
-pub(crate) fn path_to_module<'db>(db: &'db dyn Db, path: &FilePath) -> Option<Module<'db>> {
+pub(crate) fn path_to_module<'db>(
+    db: &'db dyn Db,
+    path: &FilePath,
+    python_version: PythonVersion,
+) -> Option<Module<'db>> {
     // It's not entirely clear on first sight why this method calls `file_to_module` instead of
     // it being the other way round, considering that the first thing that `file_to_module` does
     // is to retrieve the file's path.
@@ -279,7 +302,7 @@ pub(crate) fn path_to_module<'db>(db: &'db dyn Db, path: &FilePath) -> Option<Mo
     // `VfsFile` is. So what we do here is to retrieve the `path`'s `VfsFile` so that we can make
     // use of Salsa's caching and invalidation.
     let file = path.to_file(db)?;
-    file_to_module(db, file)
+    file_to_module(db, PythonFile::new(db, file, python_version))
 }
 
 /// Resolves the module for the file with the given id.
@@ -291,24 +314,25 @@ pub(crate) fn path_to_module<'db>(db: &'db dyn Db, path: &FilePath) -> Option<Mo
 /// This intuition is particularly useful for understanding why it's correct that we pass
 /// the file itself as `importing_file` to various subroutines.
 #[salsa::tracked(returns(copy), heap_size=ruff_memory_usage::heap_size)]
-pub fn file_to_module(db: &dyn Db, file: File) -> Option<Module<'_>> {
-    let _span = tracing::trace_span!("file_to_module", ?file).entered();
+pub fn file_to_module<'db>(db: &'db dyn Db, file: PythonFile<'db>) -> Option<Module<'db>> {
+    let source_file = file.file(db);
+    let _span = tracing::trace_span!("file_to_module", file=?source_file).entered();
 
-    let path = SystemOrVendoredPathRef::try_from_file(db, file)?;
+    let path = SystemOrVendoredPathRef::try_from_file(db, source_file)?;
 
     file_to_module_impl(db, file, path, search_paths(db, ModuleResolveMode::Typing)).or_else(|| {
         file_to_module_impl(
             db,
             file,
             path,
-            relative_desperate_search_paths(db, file).iter(),
+            relative_desperate_search_paths(db, source_file).iter(),
         )
     })
 }
 
 fn file_to_module_impl<'db, 'a>(
     db: &'db dyn Db,
-    file: File,
+    file: PythonFile<'db>,
     path: SystemOrVendoredPathRef<'a>,
     mut search_paths: impl Iterator<Item = &'a SearchPath>,
 ) -> Option<Module<'db>> {
@@ -327,10 +351,11 @@ fn file_to_module_impl<'db, 'a>(
     let module = resolve_module(db, file, &module_name)?;
     let module_file = module.file(db)?;
 
-    let file_path = file.path(db);
+    let source_file = file.file(db);
+    let file_path = source_file.path(db);
     if file_path == module_file.path(db) {
         return Some(module);
-    } else if file.source_type(db) == PySourceType::Python
+    } else if source_file.source_type(db) == PySourceType::Python
         && module_file.source_type(db) == PySourceType::Stub
     {
         // If a .py and .pyi are both defined, the .pyi will be the one returned by `resolve_module().file`,
@@ -1048,7 +1073,8 @@ impl<'db> Iterator for SearchPathIterator<'db> {
 
 impl FusedIterator for SearchPathIterator<'_> {}
 
-/// A thin wrapper around `ModuleName` to make it a Salsa ingredient.
+/// A thin wrapper around a module name, resolution mode, and Python version to make them a Salsa
+/// ingredient.
 ///
 /// This is needed because Salsa requires that all query arguments are salsa ingredients.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
@@ -1057,12 +1083,19 @@ struct ModuleNameIngredient<'db> {
     pub(super) name: ModuleName,
     #[returns(copy)]
     pub(super) mode: ModuleResolveMode,
+    #[returns(copy)]
+    pub(super) python_version: PythonVersion,
 }
 
 /// Given a module name and a list of search paths in which to lookup modules,
 /// attempt to resolve the module name
-fn resolve_name(db: &dyn Db, name: &ModuleName, mode: ModuleResolveMode) -> Option<ResolvedNames> {
-    let resolver = NameResolver::new(db, name, mode);
+fn resolve_name(
+    db: &dyn Db,
+    name: &ModuleName,
+    mode: ModuleResolveMode,
+    python_version: PythonVersion,
+) -> Option<ResolvedNames> {
+    let resolver = NameResolver::new(db, name, mode, python_version);
 
     match mode {
         ModuleResolveMode::Typing => resolver.resolve_typing(stub_package_index(db)),
@@ -1081,9 +1114,10 @@ fn desperately_resolve_name(
     importing_file: File,
     name: &ModuleName,
     mode: ModuleResolveMode,
+    python_version: PythonVersion,
 ) -> Option<ResolvedNames> {
     let search_paths = absolute_desperate_search_paths(db, importing_file).unwrap_or_default();
-    let resolver = NameResolver::new(db, name, mode);
+    let resolver = NameResolver::new(db, name, mode, python_version);
 
     match mode {
         ModuleResolveMode::Typing => resolver.resolve_desperate_typing(search_paths),
@@ -1167,11 +1201,16 @@ impl ModuleResolutionCandidate {
     }
 
     // This is the module we were actually interested in resolving, complete the resolution
-    fn into_module<'db>(self, db: &'db dyn Db, name: &ModuleName) -> Module<'db> {
+    fn into_module<'db>(
+        self,
+        db: &'db dyn Db,
+        name: &ModuleName,
+        python_version: PythonVersion,
+    ) -> Module<'db> {
         match self.module {
             ResolvedModule::NamespacePackage => {
                 tracing::trace!("Resolve namespace package `{name}`");
-                Module::namespace_package(db, Cow::Borrowed(name))
+                Module::namespace_package(db, Cow::Borrowed(name), python_version)
             }
             ResolvedModule::LegacyNamespacePackage(file) => {
                 // legacy namespace packages behave like regular packages
@@ -1185,7 +1224,7 @@ impl ModuleResolutionCandidate {
                     Cow::Borrowed(name),
                     ModuleKind::Package,
                     self.path.into_search_path(),
-                    file,
+                    PythonFile::new(db, file, python_version),
                 )
             }
             ResolvedModule::RegularPackage(file) => {
@@ -1198,7 +1237,7 @@ impl ModuleResolutionCandidate {
                     Cow::Borrowed(name),
                     ModuleKind::Package,
                     self.path.into_search_path(),
-                    file,
+                    PythonFile::new(db, file, python_version),
                 )
             }
             ResolvedModule::Module(file) => {
@@ -1208,7 +1247,7 @@ impl ModuleResolutionCandidate {
                     Cow::Borrowed(name),
                     ModuleKind::Module,
                     self.path.into_search_path(),
-                    file,
+                    PythonFile::new(db, file, python_version),
                 )
             }
         }
@@ -1248,8 +1287,12 @@ struct NameResolver<'db, 'name> {
 }
 
 impl<'db, 'name> NameResolver<'db, 'name> {
-    fn new(db: &'db dyn Db, name: &'name ModuleName, mode: ModuleResolveMode) -> Self {
-        let python_version = db.python_version();
+    fn new(
+        db: &'db dyn Db,
+        name: &'name ModuleName,
+        mode: ModuleResolveMode,
+        python_version: PythonVersion,
+    ) -> Self {
         Self {
             context: ResolverContext::new(db, python_version, mode),
             name,
@@ -1696,7 +1739,10 @@ fn is_legacy_namespace_package(
     //
     // The downside is if you write slightly different syntax we will fail to detect the idiom,
     // but hey, this is better than nothing!
-    let parsed = ruff_db::parsed::parsed_module(context.db, init);
+    let parsed = ruff_db::parsed::parsed_module(
+        context.db,
+        ruff_db::PythonFile::new(context.db, init, context.python_version),
+    );
     let mut visitor = LegacyNamespacePackageVisitor::default();
     visitor.visit_body(parsed.load(context.db).suite());
 
@@ -1970,6 +2016,24 @@ mod tests {
 
     use super::*;
 
+    fn resolve_module_confident<'db>(
+        db: &'db TestDb,
+        module_name: &ModuleName,
+    ) -> Option<Module<'db>> {
+        super::resolve_module_confident(db, db.python_version(), module_name)
+    }
+
+    fn resolve_real_module_confident<'db>(
+        db: &'db TestDb,
+        module_name: &ModuleName,
+    ) -> Option<Module<'db>> {
+        super::resolve_real_module_confident(db, db.python_version(), module_name)
+    }
+
+    fn path_to_module<'db>(db: &'db TestDb, path: &FilePath) -> Option<Module<'db>> {
+        super::path_to_module(db, path, db.python_version())
+    }
+
     #[test]
     fn first_party_module() {
         let TestCase { db, src, .. } = TestCaseBuilder::new()
@@ -2041,6 +2105,7 @@ mod tests {
             ])
             .build();
         let importing_file = system_path_to_file(&db, src.join("nested/main.py")).unwrap();
+        let importing_file = PythonFile::new(&db, importing_file, db.python_version());
 
         let foo =
             resolve_module(&db, importing_file, &ModuleName::new_static("foo").unwrap()).unwrap();
@@ -2238,6 +2303,62 @@ mod tests {
             .iter()
             .map(|raw| ModuleName::new(raw).unwrap())
             .collect()
+    }
+
+    #[test]
+    fn resolve_module_uses_importing_file_python_version() {
+        const TYPESHED: MockedTypeshed = MockedTypeshed {
+            stdlib_files: &[("_sha256.pyi", ""), ("py312_only.pyi", "")],
+            versions: "_sha256: 3.11-\npy312_only: 3.12-",
+        };
+
+        let TestCase {
+            db, src, stdlib, ..
+        } = TestCaseBuilder::new()
+            .with_src_files(&[
+                ("main.py", ""),
+                ("_sha256.py", ""),
+                ("namespace/module.py", ""),
+            ])
+            .with_mocked_typeshed(TYPESHED)
+            .with_python_version(PythonVersion::PY311)
+            .build();
+        let importing_file = system_path_to_file(&db, src.join("main.py")).unwrap();
+        let py311 = PythonFile::new(&db, importing_file, PythonVersion::PY311);
+        let py312 = PythonFile::new(&db, importing_file, PythonVersion::PY312);
+
+        let sha256 = ModuleName::new_static("_sha256").unwrap();
+        let py311_module = resolve_module(&db, py311, &sha256).unwrap();
+        let py312_module = resolve_module(&db, py312, &sha256).unwrap();
+        assert_eq!(
+            py311_module.file(&db).unwrap().path(&db),
+            &stdlib.join("_sha256.pyi")
+        );
+        assert_eq!(
+            py312_module.file(&db).unwrap().path(&db),
+            &src.join("_sha256.py")
+        );
+        assert_eq!(py311_module.python_version(&db), PythonVersion::PY311);
+        assert_eq!(py312_module.python_version(&db), PythonVersion::PY312);
+
+        let namespace = ModuleName::new_static("namespace").unwrap();
+        let py311_namespace = resolve_module(&db, py311, &namespace).unwrap();
+        let py312_namespace = resolve_module(&db, py312, &namespace).unwrap();
+        assert!(matches!(py311_namespace, Module::Namespace(_)));
+        assert!(matches!(py312_namespace, Module::Namespace(_)));
+        assert_eq!(py311_namespace.python_version(&db), PythonVersion::PY311);
+        assert_eq!(py312_namespace.python_version(&db), PythonVersion::PY312);
+        assert_ne!(py311_namespace, py312_namespace);
+
+        let py312_only = ModuleName::new_static("py312_only").unwrap();
+        assert!(resolve_module(&db, py311, &py312_only).is_none());
+        assert_eq!(
+            resolve_module(&db, py312, &py312_only)
+                .and_then(|module| module.file(&db))
+                .unwrap()
+                .path(&db),
+            &stdlib.join("py312_only.pyi")
+        );
     }
 
     #[test]
@@ -2772,7 +2893,12 @@ mod tests {
         assert_function_query_was_not_run(
             &db,
             resolve_module_query,
-            ModuleNameIngredient::new(&db, functools_module_name, ModuleResolveMode::Typing),
+            ModuleNameIngredient::new(
+                &db,
+                functools_module_name,
+                ModuleResolveMode::Typing,
+                db.python_version(),
+            ),
             &events,
         );
         assert_eq!(&functools_search_path, &stdlib);
@@ -3307,7 +3433,11 @@ not_a_directory
         db.set_search_paths(search_paths);
 
         let foo_module_file = File::new(&db, FilePath::from(installed_foo_module));
-        let module = file_to_module(&db, foo_module_file).unwrap();
+        let module = file_to_module(
+            &db,
+            PythonFile::new(&db, foo_module_file, db.python_version()),
+        )
+        .unwrap();
         assert_eq!(module.search_path(&db).unwrap(), &site_packages);
     }
 }

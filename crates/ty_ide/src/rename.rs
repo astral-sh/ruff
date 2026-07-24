@@ -1,14 +1,20 @@
 use crate::goto::find_goto_target;
 use crate::references::{ReferencesMode, references};
 use crate::{Db, ReferenceTarget};
+use ruff_db::PythonFile;
 use ruff_db::files::File;
 use ruff_text_size::{Ranged, TextSize};
 use ty_python_semantic::SemanticModel;
 
 /// Returns the range of the symbol if it can be renamed, None if not.
-pub fn can_rename(db: &dyn Db, file: File, offset: TextSize) -> Option<ruff_text_size::TextRange> {
+pub fn can_rename(
+    db: &dyn Db,
+    file: PythonFile<'_>,
+    offset: TextSize,
+) -> Option<ruff_text_size::TextRange> {
     let parsed = ruff_db::parsed::parsed_module(db, file);
     let module = parsed.load(db);
+    let source_file = file.file(db);
     let model = SemanticModel::new(db, file);
 
     // Get the definitions for the symbol at the offset
@@ -22,7 +28,7 @@ pub fn can_rename(db: &dyn Db, file: File, offset: TextSize) -> Option<ruff_text
         return None;
     }
 
-    let current_file_in_project = is_file_in_project(db, file);
+    let current_file_in_project = is_file_in_project(db, source_file);
 
     let declaration_targets = goto_target
         .definitions(&model, ReferencesMode::Rename.to_import_alias_resolution())?
@@ -38,7 +44,7 @@ pub fn can_rename(db: &dyn Db, file: File, offset: TextSize) -> Option<ruff_text
         }
 
         // If current file is not in project and any definition is outside current file, refuse rename
-        if !current_file_in_project && target_file != file {
+        if !current_file_in_project && target_file != source_file {
             return None;
         }
     }
@@ -50,7 +56,7 @@ pub fn can_rename(db: &dyn Db, file: File, offset: TextSize) -> Option<ruff_text
 /// Returns all locations that need to be updated with the new name.
 pub fn rename(
     db: &dyn Db,
-    file: File,
+    file: PythonFile<'_>,
     offset: TextSize,
     new_name: &str,
 ) -> Option<Vec<ReferenceTarget>> {
@@ -68,7 +74,7 @@ pub fn rename(
 
     // Determine if we should do a multi-file rename or single-file rename
     // based on whether the current file is part of the project
-    let current_file_in_project = is_file_in_project(db, file);
+    let current_file_in_project = is_file_in_project(db, file.file(db));
 
     // Choose the appropriate rename mode:
     // - If current file is in project, do multi-file rename
@@ -100,7 +106,11 @@ mod tests {
     impl CursorTest {
         fn prepare_rename(&self) -> String {
             let Some(range) = salsa::attach(&self.db, || {
-                can_rename(&self.db, self.cursor.file, self.cursor.offset)
+                can_rename(
+                    &self.db,
+                    self.python_file(self.cursor.file),
+                    self.cursor.offset,
+                )
             }) else {
                 return "Cannot rename".to_string();
             };
@@ -110,9 +120,18 @@ mod tests {
 
         fn rename(&self, new_name: &str) -> String {
             let rename_results = salsa::attach(&self.db, || {
-                can_rename(&self.db, self.cursor.file, self.cursor.offset)?;
+                can_rename(
+                    &self.db,
+                    self.python_file(self.cursor.file),
+                    self.cursor.offset,
+                )?;
 
-                rename(&self.db, self.cursor.file, self.cursor.offset, new_name)
+                rename(
+                    &self.db,
+                    self.python_file(self.cursor.file),
+                    self.cursor.offset,
+                    new_name,
+                )
             });
 
             let Some(rename_results) = rename_results else {

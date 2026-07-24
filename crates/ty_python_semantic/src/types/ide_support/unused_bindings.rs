@@ -1,8 +1,9 @@
-use crate::Db;
 use crate::reachability::is_reachable;
 use crate::types::function::FunctionDecorators;
 use crate::types::infer::function_known_decorator_flags;
+use crate::{Db, SemanticEnvironment};
 use get_size2::GetSize;
+use ruff_db::PythonFile;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::name::Name;
 use ruff_text_size::TextRange;
@@ -45,7 +46,7 @@ fn should_consider_definition(kind: &DefinitionKind<'_>) -> bool {
 }
 
 fn function_scope_is_overload_declaration(
-    db: &dyn Db,
+    env: &SemanticEnvironment<'_>,
     index: &SemanticIndex<'_>,
     file_scope_id: FileScopeId,
 ) -> bool {
@@ -55,7 +56,7 @@ fn function_scope_is_overload_declaration(
     };
 
     let definition = index.expect_single_definition(function);
-    function_known_decorator_flags(db, definition).contains(FunctionDecorators::OVERLOAD)
+    function_known_decorator_flags(env, definition).contains(FunctionDecorators::OVERLOAD)
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, GetSize)]
@@ -72,11 +73,13 @@ pub struct UnusedBinding {
 /// without broader reference analysis. Bare local annotations (`x: int`) are also
 /// reported, but only if the symbol is neither bound nor used elsewhere in the scope.
 #[salsa::tracked(returns(deref), heap_size=ruff_memory_usage::heap_size)]
-pub fn unused_bindings(db: &dyn Db, file: ruff_db::files::File) -> Box<[UnusedBinding]> {
+pub fn unused_bindings(db: &dyn Db, file: PythonFile<'_>) -> Box<[UnusedBinding]> {
+    let source_file = file.file(db);
     let parsed = parsed_module(db, file).load(db);
-    let is_stub_file = file.is_stub(db);
+    let is_stub_file = source_file.is_stub(db);
     let index = semantic_index(db, file);
     let mut unused = Vec::new();
+    let env = SemanticEnvironment::from_file(db, file);
 
     for scope_id in index.scope_ids() {
         let file_scope_id = scope_id.file_scope_id(db);
@@ -96,7 +99,7 @@ pub fn unused_bindings(db: &dyn Db, file: ruff_db::files::File) -> Box<[UnusedBi
                 crate::types::function::function_has_stub_body(function.node(&parsed))
             });
         let function_is_overload_declaration =
-            function_scope_is_overload_declaration(db, index, file_scope_id);
+            function_scope_is_overload_declaration(&env, index, file_scope_id);
         let place_table = index.place_table(file_scope_id);
         let use_def_map = index.use_def_map(file_scope_id);
         // Loop headers are synthesized before the loop body definitions they point to;
@@ -115,7 +118,7 @@ pub fn unused_bindings(db: &dyn Db, file: ruff_db::files::File) -> Box<[UnusedBi
 
                 let loop_header = use_def_map.loop_header(loop_header_definition.loop_header_id());
                 for live_binding in loop_header.bindings_for_place(loop_header_definition.place()) {
-                    if is_reachable(db, use_def_map, live_binding.reachability_constraint()) {
+                    if is_reachable(&env, use_def_map, live_binding.reachability_constraint()) {
                         loop_header_used_definition_ids.insert(live_binding.binding());
                     }
                 }
@@ -188,6 +191,7 @@ pub fn unused_bindings(db: &dyn Db, file: ruff_db::files::File) -> Box<[UnusedBi
 mod tests {
     use super::{UnusedBinding, unused_bindings};
     use crate::db::tests::TestDbBuilder;
+    use ruff_db::PythonFile;
     use ruff_db::files::system_path_to_file;
     use ruff_python_ast::name::Name;
     use ruff_python_trivia::textwrap::dedent;
@@ -199,7 +203,8 @@ mod tests {
     ) -> anyhow::Result<Vec<UnusedBinding>> {
         let db = TestDbBuilder::new().with_file(path, source).build()?;
         let file = system_path_to_file(&db, path).unwrap();
-        let mut bindings = unused_bindings(&db, file).to_vec();
+        let mut bindings =
+            unused_bindings(&db, PythonFile::new(&db, file, db.python_version())).to_vec();
         bindings.sort_unstable_by_key(|binding| (binding.range.start(), binding.range.end()));
         Ok(bindings)
     }

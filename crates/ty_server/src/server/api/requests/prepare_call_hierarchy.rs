@@ -2,6 +2,8 @@ use std::borrow::Cow;
 
 use lsp_types::CallHierarchyPrepareRequest;
 use lsp_types::{CallHierarchyItem, CallHierarchyPrepareParams, Uri};
+use ruff_db::PythonFile;
+use ty_project::Db as _;
 use ty_project::ProjectDatabase;
 
 use crate::PositionEncoding;
@@ -57,7 +59,11 @@ impl BackgroundDocumentRequestHandler for PrepareCallHierarchyRequestHandler {
             return Ok(None);
         };
 
-        let Some(items) = ty_ide::prepare_call_hierarchy(db, file, offset) else {
+        let Some(items) = ty_ide::prepare_call_hierarchy(
+            db,
+            PythonFile::new(db, file, db.python_version()),
+            offset,
+        ) else {
             return Ok(None);
         };
 

@@ -1,6 +1,6 @@
 use compact_str::CompactString;
 use rayon::prelude::*;
-use ruff_db::files::File;
+use ruff_db::{PythonFile, files::File};
 use ty_module_resolver::{Module, ModuleName, all_modules, resolve_real_shadowable_module};
 use ty_project::{Db, parallel::ParallelIteratorExt};
 
@@ -15,7 +15,7 @@ use crate::{
 /// by the query.
 pub fn all_symbols<'db>(
     db: &'db dyn Db,
-    importing_from: File,
+    importing_from: PythonFile<'db>,
     query: &QueryPattern,
 ) -> Vec<AllSymbolInfo<'db>> {
     // If the query is empty, return immediately to avoid expensive file scanning
@@ -27,15 +27,12 @@ pub fn all_symbols<'db>(
     let _span = all_symbols_span.enter();
 
     let typing_extensions = ModuleName::new_static("typing_extensions").unwrap();
-    let is_typing_extensions_available = importing_from.is_stub(db)
+    let is_typing_extensions_available = importing_from.file(db).is_stub(db)
         || resolve_real_shadowable_module(db, importing_from, &typing_extensions).is_some();
 
-    let results = all_modules(db)
+    let results = all_modules(db, importing_from.python_version(db))
         .into_par_iter()
         .map_with_db(db, |db, module| {
-            let Some(file) = module.file(db) else {
-                return Vec::new();
-            };
             let name = module.name(db);
 
             // Note that this will always consider namespace
@@ -58,6 +55,11 @@ pub fn all_symbols<'db>(
                 return Vec::new();
             }
 
+            let Some(python_file) = module.python_file(db) else {
+                return Vec::new();
+            };
+            let file = python_file.file(db);
+
             let symbols_for_file_span = tracing::debug_span!(
                 parent: &all_symbols_span,
                 "symbols_for_file_global_only",
@@ -69,7 +71,7 @@ pub fn all_symbols<'db>(
             if query.is_match_symbol_name(module.name(db)) {
                 symbols.push(AllSymbolInfo::from_module(db, module, file));
             }
-            for (_, symbol) in symbols_for_file_global_only(db, file).search(query) {
+            for (_, symbol) in symbols_for_file_global_only(db, python_file).search(query) {
                 // Test functions (starting with `test_`) in third-party
                 // packages are almost never useful to import.
                 if is_non_first_party && symbol.name.starts_with("test_") {
@@ -709,7 +711,11 @@ def zqzqzq():
         info: Function zqzqzq
         ");
 
-        let symbols = all_symbols(&test.db, test.cursor.file, &QueryPattern::fuzzy("zqzqzq"));
+        let symbols = all_symbols(
+            &test.db,
+            test.python_file(test.cursor.file),
+            &QueryPattern::fuzzy("zqzqzq"),
+        );
         let symbol = symbols
             .iter()
             .find_map(|info| info.symbol.as_ref())
@@ -1126,7 +1132,11 @@ def test_helper_xyzxyzxyz():
 
     impl CursorTest {
         fn all_symbols(&self, query: &str) -> String {
-            let symbols = all_symbols(&self.db, self.cursor.file, &QueryPattern::fuzzy(query));
+            let symbols = all_symbols(
+                &self.db,
+                self.python_file(self.cursor.file),
+                &QueryPattern::fuzzy(query),
+            );
 
             if symbols.is_empty() {
                 return "No symbols found".to_string();

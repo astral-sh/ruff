@@ -4,6 +4,7 @@ use crate::Db;
 use crate::place::Provenance;
 use crate::types::call::bind::BindingError;
 use crate::types::{MemberLookupPolicy, PropertyInstanceType};
+use crate::{Program, SemanticEnvironment};
 use ruff_python_ast as ast;
 
 mod arguments;
@@ -29,11 +30,11 @@ enum ReflectedMethodPriority {
 ///
 /// This is intentionally conservative: a false negative only widens a binary operation's result,
 /// while a false positive could discard a valid normal-method result.
-fn has_exact_runtime_class<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
+fn has_exact_runtime_class<'db>(env: &SemanticEnvironment<'db>, ty: Type<'db>) -> bool {
     match ty {
         Type::ClassLiteral(_) | Type::LiteralValue(_) => true,
-        Type::NominalInstance(instance) => instance.class(db).is_final(db),
-        Type::TypeAlias(alias) => has_exact_runtime_class(db, alias.value_type(db)),
+        Type::NominalInstance(instance) => instance.class(env).is_final(env),
+        Type::TypeAlias(alias) => has_exact_runtime_class(env, alias.value_type(env)),
         _ => false,
     }
 }
@@ -42,10 +43,13 @@ fn has_exact_runtime_class<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
 ///
 /// Instances dispatch through their nominal class, while class objects dispatch through their
 /// metaclass.
-fn operator_dispatch_class<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<ClassType<'db>> {
+fn operator_dispatch_class<'db>(
+    env: &SemanticEnvironment<'db>,
+    ty: Type<'db>,
+) -> Option<ClassType<'db>> {
     match ty {
-        Type::ClassLiteral(class) => class.metaclass(db).to_class_type(db),
-        _ => ty.nominal_class(db),
+        Type::ClassLiteral(class) => class.metaclass(env).to_class_type(env),
+        _ => ty.nominal_class(env),
     }
 }
 
@@ -64,7 +68,7 @@ fn operator_dispatch_class<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<ClassT
 /// left + right
 /// ```
 fn reflected_method_priority<'db>(
-    db: &'db dyn Db,
+    env: &SemanticEnvironment<'db>,
     left_ty: Type<'db>,
     right_ty: Type<'db>,
 ) -> ReflectedMethodPriority {
@@ -72,18 +76,19 @@ fn reflected_method_priority<'db>(
         return ReflectedMethodPriority::Never;
     }
 
+    let db = env.db();
     if let (Some(left_class), Some(right_class)) = (
-        operator_dispatch_class(db, left_ty),
-        operator_dispatch_class(db, right_ty),
+        operator_dispatch_class(env, left_ty),
+        operator_dispatch_class(env, right_ty),
     ) && left_class.class_literal(db) != right_class.class_literal(db)
-        && right_class.is_subtype_of_class_literal(db, left_class.class_literal(db))
+        && right_class.is_subtype_of_class_literal(env, left_class.class_literal(db))
     {
-        if has_exact_runtime_class(db, left_ty) {
+        if has_exact_runtime_class(env, left_ty) {
             ReflectedMethodPriority::Definitely
         } else {
             ReflectedMethodPriority::Possibly
         }
-    } else if right_ty.is_subtype_of(db, left_ty) {
+    } else if right_ty.is_subtype_of(env, left_ty) {
         ReflectedMethodPriority::Possibly
     } else {
         ReflectedMethodPriority::Never
@@ -94,37 +99,39 @@ impl<'db> Type<'db> {
     /// Memoize the pure return-type part of binary dunder resolution so repeated identical
     /// expressions don't re-run overload selection at every call site.
     pub(crate) fn try_call_bin_op_return_type(
-        db: &'db dyn Db,
+        env: &SemanticEnvironment<'db>,
         left_ty: Type<'db>,
         op: ast::Operator,
         right_ty: Type<'db>,
     ) -> Option<Type<'db>> {
-        #[salsa::tracked(returns(copy), cycle_initial=|_, _, _, _, _| None, heap_size=ruff_memory_usage::heap_size)]
+        #[salsa::tracked(returns(copy), cycle_initial=|_, _, _, _, _, _| None, heap_size=ruff_memory_usage::heap_size)]
         fn try_call_bin_op_return_type_impl<'db>(
             db: &'db dyn Db,
+            program: Program,
             left_ty: Type<'db>,
             op: ast::Operator,
             right_ty: Type<'db>,
         ) -> Option<Type<'db>> {
-            Type::try_call_bin_op(db, left_ty, op, right_ty)
+            let env = &SemanticEnvironment::from_program(db, program);
+            Type::try_call_bin_op(env, left_ty, op, right_ty)
                 .ok()
-                .map(|bindings| bindings.return_type(db))
+                .map(|bindings| bindings.return_type(env))
         }
 
-        try_call_bin_op_return_type_impl(db, left_ty, op, right_ty)
+        try_call_bin_op_return_type_impl(env.db(), env.program(), left_ty, op, right_ty)
     }
 
     pub(crate) fn try_call_bin_op(
-        db: &'db dyn Db,
+        env: &SemanticEnvironment<'db>,
         left_ty: Type<'db>,
         op: ast::Operator,
         right_ty: Type<'db>,
     ) -> Result<Bindings<'db>, CallBinOpError> {
-        Self::try_call_bin_op_with_policy(db, left_ty, op, right_ty, MemberLookupPolicy::default())
+        Self::try_call_bin_op_with_policy(env, left_ty, op, right_ty, MemberLookupPolicy::default())
     }
 
     pub(crate) fn try_call_bin_op_with_policy(
-        db: &'db dyn Db,
+        env: &SemanticEnvironment<'db>,
         left_ty: Type<'db>,
         op: ast::Operator,
         right_ty: Type<'db>,
@@ -143,21 +150,21 @@ impl<'db> Type<'db> {
 
         // Runtime classes determine reflected priority, but static operand types may only
         // establish that priority conditionally.
-        let reflected_priority = reflected_method_priority(db, left_ty, right_ty);
+        let reflected_priority = reflected_method_priority(env, left_ty, right_ty);
 
-        let left_class = left_ty.to_meta_type(db);
-        let right_class = right_ty.to_meta_type(db);
+        let left_class = left_ty.to_meta_type(env);
+        let right_class = right_ty.to_meta_type(env);
         if reflected_priority != ReflectedMethodPriority::Never {
             let reflected_dunder = op.reflected_dunder();
-            let rhs_reflected = right_class.member(db, reflected_dunder).place;
+            let rhs_reflected = right_class.member(env, reflected_dunder).place;
             // TODO: if `rhs_reflected` is possibly unbound, we should union the two possible
             // Bindings together
             if !rhs_reflected.is_undefined()
                 && !rhs_reflected
-                    .is_equal_ignoring_provenance(left_class.member(db, reflected_dunder).place)
+                    .is_equal_ignoring_provenance(left_class.member(env, reflected_dunder).place)
             {
                 let call_on_right_instance = right_ty.try_call_dunder_with_policy(
-                    db,
+                    env,
                     reflected_dunder,
                     &mut CallArguments::positional([left_ty]),
                     TypeContext::default(),
@@ -167,7 +174,7 @@ impl<'db> Type<'db> {
                 if reflected_priority == ReflectedMethodPriority::Definitely {
                     return Ok(call_on_right_instance.or_else(|_| {
                         left_ty.try_call_dunder_with_policy(
-                            db,
+                            env,
                             op.dunder(),
                             &mut CallArguments::positional([right_ty]),
                             TypeContext::default(),
@@ -177,7 +184,7 @@ impl<'db> Type<'db> {
                 }
 
                 let call_on_left_instance = left_ty.try_call_dunder_with_policy(
-                    db,
+                    env,
                     op.dunder(),
                     &mut CallArguments::positional([right_ty]),
                     TypeContext::default(),
@@ -187,7 +194,7 @@ impl<'db> Type<'db> {
                 return match (call_on_right_instance, call_on_left_instance) {
                     (Ok(right_bindings), Ok(left_bindings)) => {
                         let callable_type = UnionType::from_two_elements(
-                            db,
+                            env,
                             right_bindings.callable_type(),
                             left_bindings.callable_type(),
                         );
@@ -203,7 +210,7 @@ impl<'db> Type<'db> {
         }
 
         let call_on_left_instance = left_ty.try_call_dunder_with_policy(
-            db,
+            env,
             op.dunder(),
             &mut CallArguments::positional([right_ty]),
             TypeContext::default(),
@@ -215,7 +222,7 @@ impl<'db> Type<'db> {
                 Err(CallBinOpError::NotSupported)
             } else {
                 Ok(right_ty.try_call_dunder_with_policy(
-                    db,
+                    env,
                     op.reflected_dunder(),
                     &mut CallArguments::positional([left_ty]),
                     TypeContext::default(),
@@ -234,8 +241,8 @@ impl<'db> Type<'db> {
 pub(crate) struct CallError<'db>(pub(crate) CallErrorKind, pub(crate) Box<Bindings<'db>>);
 
 impl<'db> CallError<'db> {
-    pub(crate) fn return_type(&self, db: &'db dyn Db) -> Type<'db> {
-        self.1.return_type(db)
+    pub(crate) fn return_type(&self, env: &SemanticEnvironment<'db>) -> Type<'db> {
+        self.1.return_type(env)
     }
 
     /// Returns `Some(property)` if the call error was caused by an attempt to set a property
@@ -342,16 +349,16 @@ impl<'db> CallDunderError<'db> {
         }
     }
 
-    pub(super) fn return_type(&self, db: &'db dyn Db) -> Option<Type<'db>> {
+    pub(super) fn return_type(&self, env: &SemanticEnvironment<'db>) -> Option<Type<'db>> {
         match self {
             Self::MethodNotAvailable | Self::CallError(CallErrorKind::NotCallable, _, _) => None,
-            Self::CallError(_, bindings, _) => Some(bindings.return_type(db)),
-            Self::PossiblyUnbound { bindings, .. } => Some(bindings.return_type(db)),
+            Self::CallError(_, bindings, _) => Some(bindings.return_type(env)),
+            Self::PossiblyUnbound { bindings, .. } => Some(bindings.return_type(env)),
         }
     }
 
-    pub(super) fn fallback_return_type(&self, db: &'db dyn Db) -> Type<'db> {
-        self.return_type(db).unwrap_or(Type::unknown())
+    pub(super) fn fallback_return_type(&self, env: &SemanticEnvironment<'db>) -> Type<'db> {
+        self.return_type(env).unwrap_or(Type::unknown())
     }
 }
 

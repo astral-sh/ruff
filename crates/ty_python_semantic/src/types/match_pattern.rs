@@ -1,3 +1,4 @@
+use crate::SemanticEnvironment;
 use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
 use ty_python_core::Truthiness;
@@ -6,7 +7,6 @@ use ty_python_core::predicate::{
     SequencePatternPredicateKind,
 };
 
-use crate::Db;
 use crate::place::{DefinedPlace, Place};
 use crate::types::callable::{CallableFunctionProvenance, CallableTypeKind};
 use crate::types::equality::{
@@ -22,22 +22,28 @@ use crate::types::{
     infer_same_file_expression_type,
 };
 
-pub(crate) fn singleton_pattern_type(db: &dyn Db, singleton: ast::Singleton) -> Type<'_> {
+pub(crate) fn singleton_pattern_type<'db>(
+    env: &SemanticEnvironment<'db>,
+    singleton: ast::Singleton,
+) -> Type<'db> {
     let ty = match singleton {
-        ast::Singleton::None => Type::none(db),
+        ast::Singleton::None => Type::none(env),
         ast::Singleton::True => Type::bool_literal(true),
         ast::Singleton::False => Type::bool_literal(false),
     };
-    debug_assert!(ty.is_singleton(db));
+    debug_assert!(ty.is_singleton(env));
     ty
 }
 
-pub(crate) fn mapping_pattern_type(db: &dyn Db) -> Type<'_> {
-    KnownClass::Mapping.to_instance(db).top_materialization(db)
+pub(crate) fn mapping_pattern_type<'db>(env: &SemanticEnvironment<'db>) -> Type<'db> {
+    KnownClass::Mapping
+        .to_instance(env)
+        .top_materialization(env)
 }
 
-pub(crate) fn callable_pattern_type(db: &dyn Db) -> Type<'_> {
-    Type::Callable(CallableType::unknown(db)).top_materialization(db)
+pub(crate) fn callable_pattern_type<'db>(env: &SemanticEnvironment<'db>) -> Type<'db> {
+    let db = env.db();
+    Type::Callable(CallableType::unknown(db)).top_materialization(env)
 }
 
 /// Return whether every runtime value represented by a `TypedDict` satisfies `class`.
@@ -45,64 +51,75 @@ pub(crate) fn callable_pattern_type(db: &dyn Db) -> Type<'_> {
 /// `TypedDict` is not a nominal subtype of `dict` in the static type system, but every runtime
 /// value is a dictionary. A `TypedDict` therefore matches class patterns such as `dict()`,
 /// `Mapping()`, and `MutableMapping()`.
-pub(crate) fn typed_dict_matches_class_pattern(db: &dyn Db, class: ClassLiteral<'_>) -> bool {
-    let Some(dict) = KnownClass::Dict.to_class_literal(db).as_class_literal() else {
+pub(crate) fn typed_dict_matches_class_pattern<'db>(
+    env: &SemanticEnvironment<'db>,
+    class: ClassLiteral<'db>,
+) -> bool {
+    let Some(dict) = KnownClass::Dict.to_class_literal(env).as_class_literal() else {
         return false;
     };
-    Type::instance(db, dict.top_materialization(db))
-        .is_subtype_of(db, Type::instance(db, class.top_materialization(db)))
+    Type::instance(env, dict.top_materialization(env))
+        .is_subtype_of(env, Type::instance(env, class.top_materialization(env)))
 }
 
 /// Return whether every value in `ty` belongs to a `TypedDict` domain accepted by `predicate`.
 fn typed_dict_pattern_domain_satisfies<'db>(
-    db: &'db dyn Db,
+    env: &SemanticEnvironment<'db>,
     ty: Type<'db>,
     predicate: &impl Fn(TypedDictType<'db>) -> bool,
 ) -> bool {
-    match ty.resolve_type_alias(db) {
+    let db = env.db();
+    match ty.resolve_type_alias(env) {
         Type::TypedDict(typed_dict) => predicate(typed_dict),
-        Type::TypeVar(typevar) => match typevar.typevar(db).bound_or_constraints(db) {
+        Type::TypeVar(typevar) => match typevar.typevar(db).bound_or_constraints(env) {
             Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
-                typed_dict_pattern_domain_satisfies(db, bound, predicate)
+                typed_dict_pattern_domain_satisfies(env, bound, predicate)
             }
             Some(TypeVarBoundOrConstraints::Constraints(constraints)) => constraints
                 .elements(db)
                 .iter()
-                .all(|constraint| typed_dict_pattern_domain_satisfies(db, *constraint, predicate)),
+                .all(|constraint| typed_dict_pattern_domain_satisfies(env, *constraint, predicate)),
             None => false,
         },
         Type::Union(union) => union
             .elements(db)
             .iter()
-            .all(|element| typed_dict_pattern_domain_satisfies(db, *element, predicate)),
+            .all(|element| typed_dict_pattern_domain_satisfies(env, *element, predicate)),
         Type::Intersection(intersection) => intersection
             .positive(db)
             .iter()
-            .any(|element| typed_dict_pattern_domain_satisfies(db, *element, predicate)),
+            .any(|element| typed_dict_pattern_domain_satisfies(env, *element, predicate)),
         _ => false,
     }
 }
 
 /// Return whether every value in `ty` is represented by a `TypedDict` schema at runtime.
-fn is_typed_dict_pattern_domain(db: &dyn Db, ty: Type<'_>) -> bool {
-    typed_dict_pattern_domain_satisfies(db, ty, &|_| true)
+fn is_typed_dict_pattern_domain(env: &SemanticEnvironment<'_>, ty: Type<'_>) -> bool {
+    typed_dict_pattern_domain_satisfies(env, ty, &|_| true)
 }
 
-pub(crate) fn sequence_pattern_type_builder(db: &dyn Db) -> IntersectionBuilder<'_> {
-    IntersectionBuilder::new(db)
-        .add_positive(KnownClass::Sequence.to_instance(db).top_materialization(db))
+pub(crate) fn sequence_pattern_type_builder<'db>(
+    env: &SemanticEnvironment<'db>,
+) -> IntersectionBuilder<'db> {
+    IntersectionBuilder::new(env)
+        .add_positive(
+            KnownClass::Sequence
+                .to_instance(env)
+                .top_materialization(env),
+        )
         // `str`, `bytes`, and `bytearray` are sequences, but Python sequence
         // patterns explicitly do not match them or their subclasses.
-        .add_negative(KnownClass::Str.to_instance(db))
-        .add_negative(KnownClass::Bytes.to_instance(db))
-        .add_negative(KnownClass::Bytearray.to_instance(db))
+        .add_negative(KnownClass::Str.to_instance(env))
+        .add_negative(KnownClass::Bytes.to_instance(env))
+        .add_negative(KnownClass::Bytearray.to_instance(env))
 }
 
 fn sequence_pattern_getitem_method<'db>(
-    db: &'db dyn Db,
+    env: &SemanticEnvironment<'db>,
     indexed_element_types: impl IntoIterator<Item = (i64, Type<'db>)>,
     fallback_return_type: Option<Type<'db>>,
 ) -> CallableType<'db> {
+    let db = env.db();
     let self_parameter = || Parameter::positional_only(Some(Name::new_static("self")));
 
     let overloads = indexed_element_types
@@ -122,7 +139,7 @@ fn sequence_pattern_getitem_method<'db>(
             Parameters::standard([
                 self_parameter(),
                 Parameter::positional_only(Some(Name::new_static("index")))
-                    .with_annotated_type(KnownClass::Int.to_instance(db)),
+                    .with_annotated_type(KnownClass::Int.to_instance(env)),
             ]),
             fallback_return_type,
         )
@@ -150,17 +167,18 @@ fn sequence_pattern_getitem_method<'db>(
 /// whose `__len__` and indexed `__getitem__` methods encode the fixed length
 /// and element types.
 pub(crate) fn exact_sequence_pattern_type<'db>(
-    db: &'db dyn Db,
+    env: &SemanticEnvironment<'db>,
     element_types: impl ExactSizeIterator<Item = Type<'db>>,
 ) -> Type<'db> {
+    let db = env.db();
     let Ok(length) = i64::try_from(element_types.len()) else {
-        return sequence_pattern_type_builder(db).build();
+        return sequence_pattern_type_builder(env).build();
     };
 
     // `False == 0` and `True == 1`, so the protocol must accept both literals.
     let length_type = match length {
-        0 => UnionType::from_two_elements(db, Type::int_literal(0), Type::bool_literal(false)),
-        1 => UnionType::from_two_elements(db, Type::int_literal(1), Type::bool_literal(true)),
+        0 => UnionType::from_two_elements(env, Type::int_literal(0), Type::bool_literal(false)),
+        1 => UnionType::from_two_elements(env, Type::int_literal(1), Type::bool_literal(true)),
         _ => Type::int_literal(length),
     };
 
@@ -172,16 +190,16 @@ pub(crate) fn exact_sequence_pattern_type<'db>(
     let getitem_method = (element_types.len() > 0).then(|| {
         (
             "__getitem__",
-            sequence_pattern_getitem_method(db, (0..length).zip(element_types), None),
+            sequence_pattern_getitem_method(env, (0..length).zip(element_types), None),
         )
     });
 
     let protocol = Type::protocol_with_methods(
-        db,
+        env,
         std::iter::once(("__len__", len_method)).chain(getitem_method),
     );
 
-    sequence_pattern_type_builder(db)
+    sequence_pattern_type_builder(env)
         .add_positive(protocol)
         .build()
 }
@@ -191,26 +209,26 @@ pub(crate) fn exact_sequence_pattern_type<'db>(
 /// Fixed prefix elements use non-negative indices and fixed suffix elements use
 /// negative indices. Other integer indices retain the sequence's element type.
 pub(crate) fn starred_sequence_pattern_type<'db>(
-    db: &'db dyn Db,
+    env: &SemanticEnvironment<'db>,
     prefix_element_types: impl ExactSizeIterator<Item = Type<'db>>,
     suffix_element_types: impl ExactSizeIterator<Item = Type<'db>>,
 ) -> Type<'db> {
     if prefix_element_types.len() == 0 && suffix_element_types.len() == 0 {
-        return sequence_pattern_type_builder(db).build();
+        return sequence_pattern_type_builder(env).build();
     }
 
     let Ok(suffix_length) = i64::try_from(suffix_element_types.len()) else {
-        return sequence_pattern_type_builder(db).build();
+        return sequence_pattern_type_builder(env).build();
     };
 
     let indexed_element_types = (0_i64..)
         .zip(prefix_element_types)
         .chain((-suffix_length..0).zip(suffix_element_types));
     let getitem_method =
-        sequence_pattern_getitem_method(db, indexed_element_types, Some(Type::object()));
-    let protocol = Type::protocol_with_methods(db, [("__getitem__", getitem_method)]);
+        sequence_pattern_getitem_method(env, indexed_element_types, Some(Type::object()));
+    let protocol = Type::protocol_with_methods(env, [("__getitem__", getitem_method)]);
 
-    sequence_pattern_type_builder(db)
+    sequence_pattern_type_builder(env)
         .add_positive(protocol)
         .build()
 }
@@ -230,15 +248,15 @@ pub(crate) fn starred_sequence_pattern_type<'db>(
 /// case Base(x=_): ...
 /// ```
 fn class_pattern_is_exhaustive(
-    db: &dyn Db,
+    env: &SemanticEnvironment<'_>,
     class: ClassLiteral<'_>,
     subject_ty: Type<'_>,
     kind: &ClassPatternPredicateKind<'_>,
 ) -> bool {
-    let class_instance_ty = Type::instance(db, class.top_materialization(db));
-    let is_typed_dict_match =
-        is_typed_dict_pattern_domain(db, subject_ty) && typed_dict_matches_class_pattern(db, class);
-    if !is_typed_dict_match && !subject_ty.is_subtype_of(db, class_instance_ty) {
+    let class_instance_ty = Type::instance(env, class.top_materialization(env));
+    let is_typed_dict_match = is_typed_dict_pattern_domain(env, subject_ty)
+        && typed_dict_matches_class_pattern(env, class);
+    if !is_typed_dict_match && !subject_ty.is_subtype_of(env, class_instance_ty) {
         return false;
     }
 
@@ -247,21 +265,21 @@ fn class_pattern_is_exhaustive(
     }
 
     if !kind.keywords.iter().all(|keyword| {
-        member_pattern_is_exhaustive(db, subject_ty, keyword.attr.as_str(), &keyword.pattern)
+        member_pattern_is_exhaustive(env, subject_ty, keyword.attr.as_str(), &keyword.pattern)
     }) {
         return false;
     }
 
-    let positional_sources = class_pattern_positional_sources(db, class, kind.positional.len());
+    let positional_sources = class_pattern_positional_sources(env, class, kind.positional.len());
     kind.positional
         .iter()
         .zip(positional_sources)
         .all(|(pattern, source)| match source {
             ClassPatternPositionalSource::MatchSelf => {
-                pattern_is_exhaustive_for_subject(db, pattern, subject_ty)
+                pattern_is_exhaustive_for_subject(env, pattern, subject_ty)
             }
             ClassPatternPositionalSource::Attribute(name) => {
-                member_pattern_is_exhaustive(db, subject_ty, name.as_str(), pattern)
+                member_pattern_is_exhaustive(env, subject_ty, name.as_str(), pattern)
             }
             ClassPatternPositionalSource::Unknown => false,
         })
@@ -302,8 +320,14 @@ pub(crate) enum ClassPatternPositionalSource {
 /// attributes, inferred assignments retain their literal binding type while an explicit annotation
 /// remains authoritative. `PossiblyUndefined` is distinct from `Undefined` because only a truly
 /// absent `__match_args__` enables match-self behavior.
-fn class_match_args_type<'db>(db: &'db dyn Db, class: ClassLiteral<'db>) -> ClassMatchArgs<'db> {
-    match Type::ClassLiteral(class).member(db, "__match_args__").place {
+fn class_match_args_type<'db>(
+    env: &SemanticEnvironment<'db>,
+    class: ClassLiteral<'db>,
+) -> ClassMatchArgs<'db> {
+    match Type::ClassLiteral(class)
+        .member(env, "__match_args__")
+        .place
+    {
         Place::Defined(
             place @ DefinedPlace {
                 ty,
@@ -318,7 +342,7 @@ fn class_match_args_type<'db>(db: &'db dyn Db, class: ClassLiteral<'db>) -> Clas
             } else {
                 provenance
                     .definition()
-                    .map_or(ty, |definition| binding_type(db, definition))
+                    .map_or(ty, |definition| binding_type(env, definition))
             },
         },
         Place::Defined(_) => ClassMatchArgs::PossiblyUndefined,
@@ -331,9 +355,10 @@ fn class_match_args_type<'db>(db: &'db dyn Db, class: ClassLiteral<'db>) -> Clas
 /// Callers must first establish that `__match_args__` is statically absent. A definite definition
 /// overrides match-self behavior, while a conditional definition makes it runtime-dependent;
 /// neither case should consult this flag.
-fn class_has_match_self_flag(db: &dyn Db, class: ClassLiteral<'_>) -> bool {
+fn class_has_match_self_flag(env: &SemanticEnvironment<'_>, class: ClassLiteral<'_>) -> bool {
+    let db = env.db();
     class
-        .iter_mro(db)
+        .iter_mro(env)
         .filter_map(ClassBase::into_class)
         .any(|base| {
             matches!(
@@ -365,11 +390,12 @@ pub(crate) enum ClassPatternPositionalResult<'db> {
 
 /// Validate positional subpatterns against a statically known `__match_args__` type.
 pub(crate) fn class_pattern_positional_result<'db>(
-    db: &'db dyn Db,
+    env: &SemanticEnvironment<'db>,
     class: ClassLiteral<'db>,
 ) -> Option<ClassPatternPositionalResult<'db>> {
-    match class_match_args_type(db, class) {
-        ClassMatchArgs::Undefined if class_has_match_self_flag(db, class) => {
+    let db = env.db();
+    match class_match_args_type(env, class) {
+        ClassMatchArgs::Undefined if class_has_match_self_flag(env, class) => {
             Some(ClassPatternPositionalResult::Limit(1))
         }
         ClassMatchArgs::Undefined
@@ -381,7 +407,7 @@ pub(crate) fn class_pattern_positional_result<'db>(
             Some(ClassPatternPositionalResult::Limit(0))
         }
         ClassMatchArgs::Defined { member_type, .. } => {
-            let match_args = member_type.resolve_type_alias(db);
+            let match_args = member_type.resolve_type_alias(env);
             if let Some(limit) = match_args.exact_tuple_instance_spec(db).and_then(|tuple| {
                 tuple
                     .as_fixed_length()
@@ -390,7 +416,7 @@ pub(crate) fn class_pattern_positional_result<'db>(
                 Some(ClassPatternPositionalResult::Limit(limit))
             } else {
                 match_args
-                    .is_disjoint_from(db, Type::homogeneous_tuple(db, Type::unknown()))
+                    .is_disjoint_from(env, Type::homogeneous_tuple(db, Type::unknown()))
                     .then_some(ClassPatternPositionalResult::InvalidType(match_args))
             }
         }
@@ -419,12 +445,13 @@ pub(crate) fn class_pattern_positional_result<'db>(
 ///         pass
 /// ```
 pub(crate) fn class_pattern_positional_sources(
-    db: &dyn Db,
+    env: &SemanticEnvironment<'_>,
     class: ClassLiteral<'_>,
     positional_count: usize,
 ) -> Vec<ClassPatternPositionalSource> {
-    let fixed = match class_match_args_type(db, class) {
-        ClassMatchArgs::Undefined if class_has_match_self_flag(db, class) => {
+    let db = env.db();
+    let fixed = match class_match_args_type(env, class) {
+        ClassMatchArgs::Undefined if class_has_match_self_flag(env, class) => {
             return (0..positional_count)
                 .map(|index| {
                     if index == 0 {
@@ -460,27 +487,27 @@ pub(crate) fn class_pattern_positional_sources(
 
 /// Return whether `name` is definitely bound and `pattern` consumes its entire static member type.
 fn member_pattern_is_exhaustive(
-    db: &dyn Db,
+    env: &SemanticEnvironment<'_>,
     instance_ty: Type<'_>,
     name: &str,
     pattern: &PatternPredicateKind<'_>,
 ) -> bool {
-    let place = instance_ty.member(db, name).place;
+    let place = instance_ty.member(env, name).place;
     place.is_definitely_bound()
         && place
             .raw_type()
-            .is_some_and(|member_ty| pattern_is_exhaustive_for_subject(db, pattern, member_ty))
+            .is_some_and(|member_ty| pattern_is_exhaustive_for_subject(env, pattern, member_ty))
 }
 
 /// Return whether `pattern` is statically guaranteed to match every value in `subject_ty`.
 fn pattern_is_exhaustive_for_subject(
-    db: &dyn Db,
+    env: &SemanticEnvironment<'_>,
     pattern: &PatternPredicateKind<'_>,
     subject_ty: Type<'_>,
 ) -> bool {
     subject_ty.is_subtype_of(
-        db,
-        definite_match_pattern_type_for_subject(db, pattern, subject_ty),
+        env,
+        definite_match_pattern_type_for_subject(env, pattern, subject_ty),
     )
 }
 
@@ -490,19 +517,20 @@ fn pattern_is_exhaustive_for_subject(
 /// field and every nested pattern exhausts that field's declared type. Other mapping types do not
 /// guarantee that a particular key is present.
 fn mapping_pattern_is_exhaustive(
-    db: &dyn Db,
+    env: &SemanticEnvironment<'_>,
     kind: &MappingPatternPredicateKind<'_>,
     subject_ty: Type<'_>,
 ) -> bool {
-    typed_dict_pattern_domain_satisfies(db, subject_ty, &|typed_dict| {
+    let db = env.db();
+    typed_dict_pattern_domain_satisfies(env, subject_ty, &|typed_dict| {
         kind.entries.iter().all(|entry| {
-            let key_ty = infer_same_file_expression_type(db, entry.key, TypeContext::default());
+            let key_ty = infer_same_file_expression_type(env, entry.key, TypeContext::default());
             let Some(key) = key_ty.as_string_literal() else {
                 return false;
             };
-            typed_dict.item(db, key.value(db)).is_some_and(|field| {
+            typed_dict.item(env, key.value(db)).is_some_and(|field| {
                 field.is_required()
-                    && pattern_is_exhaustive_for_subject(db, &entry.pattern, field.declared_ty)
+                    && pattern_is_exhaustive_for_subject(env, &entry.pattern, field.declared_ty)
             })
         })
     })
@@ -513,11 +541,12 @@ fn mapping_pattern_is_exhaustive(
 /// Each aligned element is checked with the subject-aware matcher so nested class patterns use the
 /// tuple element's actual static type.
 fn sequence_pattern_is_exhaustive_for_subject(
-    db: &dyn Db,
+    env: &SemanticEnvironment<'_>,
     kind: &SequencePatternPredicateKind<'_>,
     subject_ty: Type<'_>,
 ) -> bool {
-    if !subject_ty.is_subtype_of(db, sequence_pattern_type_builder(db).build()) {
+    let db = env.db();
+    if !subject_ty.is_subtype_of(env, sequence_pattern_type_builder(env).build()) {
         return false;
     }
 
@@ -539,7 +568,7 @@ fn sequence_pattern_is_exhaustive_for_subject(
                 .iter()
                 .zip(kind.patterns.iter())
                 .all(|(element, pattern)| {
-                    pattern_is_exhaustive_for_subject(db, pattern, *element)
+                    pattern_is_exhaustive_for_subject(env, pattern, *element)
                 });
     };
     if elements.len() < prefix.len() + suffix.len() {
@@ -550,7 +579,7 @@ fn sequence_pattern_is_exhaustive_for_subject(
         .iter()
         .zip(prefix)
         .chain(elements.iter().rev().zip(suffix.iter().rev()))
-        .all(|(element, pattern)| pattern_is_exhaustive_for_subject(db, pattern, *element))
+        .all(|(element, pattern)| pattern_is_exhaustive_for_subject(env, pattern, *element))
 }
 
 /// Return the values that are statically guaranteed to match `kind`, using `subject_ty` when the
@@ -583,31 +612,32 @@ fn sequence_pattern_is_exhaustive_for_subject(
 /// case [Base(x=_)]: ...
 /// ```
 pub(crate) fn definite_match_pattern_type_for_subject<'db>(
-    db: &'db dyn Db,
+    env: &SemanticEnvironment<'db>,
     kind: &PatternPredicateKind<'db>,
     subject_ty: Type<'db>,
 ) -> Type<'db> {
-    if let Some(subject_independent_ty) = subject_independent_definite_match_pattern_type(db, kind)
+    let db = env.db();
+    if let Some(subject_independent_ty) = subject_independent_definite_match_pattern_type(env, kind)
     {
         return subject_independent_ty;
     }
 
-    let resolved_subject_ty = subject_ty.resolve_type_alias(db);
+    let resolved_subject_ty = subject_ty.resolve_type_alias(env);
     if let Type::Union(union) = resolved_subject_ty {
         return UnionType::from_elements(
-            db,
+            env,
             union
                 .elements(db)
                 .iter()
-                .map(|element| definite_match_pattern_type_for_subject(db, kind, *element)),
+                .map(|element| definite_match_pattern_type_for_subject(env, kind, *element)),
         );
     }
 
     match kind {
         PatternPredicateKind::Value(value) => {
-            let value_ty = infer_same_file_expression_type(db, *value, TypeContext::default());
+            let value_ty = infer_same_file_expression_type(env, *value, TypeContext::default());
             if equality_truthiness(
-                db,
+                env,
                 resolved_subject_ty,
                 value_ty,
                 ComparisonSoundnessPolicy::from_analysis_settings(
@@ -619,12 +649,12 @@ pub(crate) fn definite_match_pattern_type_for_subject<'db>(
             }
         }
         PatternPredicateKind::Class(kind) => {
-            let class_ty = infer_same_file_expression_type(db, kind.class, TypeContext::default());
+            let class_ty = infer_same_file_expression_type(env, kind.class, TypeContext::default());
             match class_ty {
                 Type::ClassLiteral(class) => {
-                    if class_pattern_is_exhaustive(db, class, resolved_subject_ty, kind) {
-                        let top_subject_ty = resolved_subject_ty.top_materialization(db);
-                        if !class_pattern_is_exhaustive(db, class, top_subject_ty, kind) {
+                    if class_pattern_is_exhaustive(env, class, resolved_subject_ty, kind) {
+                        let top_subject_ty = resolved_subject_ty.top_materialization(env);
+                        if !class_pattern_is_exhaustive(env, class, top_subject_ty, kind) {
                             return subject_ty;
                         }
                         return top_subject_ty;
@@ -632,8 +662,8 @@ pub(crate) fn definite_match_pattern_type_for_subject<'db>(
                 }
                 Type::SpecialForm(SpecialFormType::CollectionsAbcCallable)
                     if kind.is_empty()
-                        && let callable_pattern_ty = callable_pattern_type(db)
-                        && subject_ty.is_subtype_of(db, callable_pattern_ty) =>
+                        && let callable_pattern_ty = callable_pattern_type(env)
+                        && subject_ty.is_subtype_of(env, callable_pattern_ty) =>
                 {
                     return callable_pattern_ty;
                 }
@@ -641,25 +671,25 @@ pub(crate) fn definite_match_pattern_type_for_subject<'db>(
             }
         }
         PatternPredicateKind::Sequence(kind) => {
-            if !sequence_pattern_is_exhaustive_for_subject(db, kind, resolved_subject_ty) {
+            if !sequence_pattern_is_exhaustive_for_subject(env, kind, resolved_subject_ty) {
                 // A nested subject-dependent pattern rejected the context-free approximation.
                 // Reusing that approximation for the surrounding sequence would reintroduce the
                 // values that the recursive analysis deliberately excluded.
                 return Type::Never;
             }
-            let top_subject_ty = resolved_subject_ty.top_materialization(db);
-            return if sequence_pattern_is_exhaustive_for_subject(db, kind, top_subject_ty) {
+            let top_subject_ty = resolved_subject_ty.top_materialization(env);
+            return if sequence_pattern_is_exhaustive_for_subject(env, kind, top_subject_ty) {
                 top_subject_ty
             } else {
                 subject_ty
             };
         }
         PatternPredicateKind::Mapping(kind) => {
-            if !mapping_pattern_is_exhaustive(db, kind, resolved_subject_ty) {
+            if !mapping_pattern_is_exhaustive(env, kind, resolved_subject_ty) {
                 return Type::Never;
             }
-            let top_subject_ty = resolved_subject_ty.top_materialization(db);
-            return if mapping_pattern_is_exhaustive(db, kind, top_subject_ty) {
+            let top_subject_ty = resolved_subject_ty.top_materialization(env);
+            return if mapping_pattern_is_exhaustive(env, kind, top_subject_ty) {
                 top_subject_ty
             } else {
                 subject_ty
@@ -667,21 +697,21 @@ pub(crate) fn definite_match_pattern_type_for_subject<'db>(
         }
         PatternPredicateKind::Or(patterns) => {
             return UnionType::from_elements(
-                db,
+                env,
                 patterns.iter().map(|pattern| {
-                    definite_match_pattern_type_for_subject(db, pattern, subject_ty)
+                    definite_match_pattern_type_for_subject(env, pattern, subject_ty)
                 }),
             );
         }
         PatternPredicateKind::As(Some(pattern), _) => {
-            return definite_match_pattern_type_for_subject(db, pattern, subject_ty);
+            return definite_match_pattern_type_for_subject(env, pattern, subject_ty);
         }
         _ => return Type::Never,
     }
 
-    IntersectionBuilder::new(db)
+    IntersectionBuilder::new(env)
         .add_positive(subject_ty)
-        .add_positive(definite_match_pattern_type(db, kind))
+        .add_positive(definite_match_pattern_type(env, kind))
         .build()
 }
 
@@ -701,20 +731,21 @@ pub(crate) fn definite_match_pattern_type_for_subject<'db>(
 ///             reveal_type(other)  # Literal[2]
 /// ```
 pub(crate) fn pattern_fallthrough_type<'db>(
-    db: &'db dyn Db,
+    env: &SemanticEnvironment<'db>,
     kind: &PatternPredicateKind<'db>,
     subject_ty: Type<'db>,
 ) -> Type<'db> {
+    let db = env.db();
     if let PatternPredicateKind::Value(value) = kind {
-        let value_ty = infer_same_file_expression_type(db, *value, TypeContext::default());
+        let value_ty = infer_same_file_expression_type(env, *value, TypeContext::default());
         // A subject confined to the same enum cannot contain cross-type values that compare equal
         // to the pattern, so direct subtraction avoids repeated equality evaluation in large enum
         // matches. This includes narrowed intersections containing `Self` or another type variable
         // whose upper bound is that enum.
         if let Some(enum_literal) = value_ty.as_enum_literal()
-            && is_same_enum_pattern_domain(db, subject_ty, enum_literal)
+            && is_same_enum_pattern_domain(env, subject_ty, enum_literal)
             && equality_truthiness(
-                db,
+                env,
                 value_ty,
                 value_ty,
                 ComparisonSoundnessPolicy::from_analysis_settings(
@@ -722,29 +753,29 @@ pub(crate) fn pattern_fallthrough_type<'db>(
                 ),
             ) == Truthiness::AlwaysTrue
         {
-            return IntersectionBuilder::new(db)
+            return IntersectionBuilder::new(env)
                 .add_positive(subject_ty)
                 .add_negative(value_ty)
                 .build();
         }
         if let Some(constraint) = evaluate_type_equality(
-            db,
+            env,
             subject_ty,
             value_ty,
             false,
             ComparisonSoundnessPolicy::from_analysis_settings(db.analysis_settings(value.file(db))),
         ) {
-            return IntersectionBuilder::new(db)
+            return IntersectionBuilder::new(env)
                 .add_positive(subject_ty)
                 .add_positive(constraint)
                 .build();
         }
     }
 
-    IntersectionBuilder::new(db)
+    IntersectionBuilder::new(env)
         .add_positive(subject_ty)
         .add_negative(definite_match_pattern_type_for_subject(
-            db, kind, subject_ty,
+            env, kind, subject_ty,
         ))
         .build()
 }
@@ -769,13 +800,13 @@ pub(crate) fn pattern_fallthrough_type<'db>(
 ///             reveal_type(value)
 /// ```
 pub(crate) fn pattern_binding_fallthrough_type<'db>(
-    db: &'db dyn Db,
+    env: &SemanticEnvironment<'db>,
     kind: &PatternPredicateKind<'db>,
     subject_ty: Type<'db>,
 ) -> Type<'db> {
     let mut budget = ExactTuplePatternExpansionBudget::default();
-    try_pattern_binding_fallthrough_type(db, kind, subject_ty, &mut budget)
-        .unwrap_or_else(|()| conservative_pattern_binding_fallthrough_type(db, kind, subject_ty))
+    try_pattern_binding_fallthrough_type(env, kind, subject_ty, &mut budget)
+        .unwrap_or_else(|()| conservative_pattern_binding_fallthrough_type(env, kind, subject_ty))
 }
 
 /// Compute binding fallthrough while charging every nested exact-tuple expansion to `budget`.
@@ -783,24 +814,24 @@ pub(crate) fn pattern_binding_fallthrough_type<'db>(
 /// An error means that the caller must discard the partially expanded type and recompute the
 /// complete pattern conservatively.
 fn try_pattern_binding_fallthrough_type<'db>(
-    db: &'db dyn Db,
+    env: &SemanticEnvironment<'db>,
     kind: &PatternPredicateKind<'db>,
     subject_ty: Type<'db>,
     budget: &mut ExactTuplePatternExpansionBudget,
 ) -> Result<Type<'db>, ()> {
     match kind {
         PatternPredicateKind::Sequence(sequence) => {
-            try_sequence_pattern_binding_fallthrough_type(db, sequence, subject_ty, budget)
+            try_sequence_pattern_binding_fallthrough_type(env, sequence, subject_ty, budget)
         }
         PatternPredicateKind::Or(patterns) => {
             patterns.iter().try_fold(subject_ty, |remaining, pattern| {
-                try_pattern_binding_fallthrough_type(db, pattern, remaining, budget)
+                try_pattern_binding_fallthrough_type(env, pattern, remaining, budget)
             })
         }
         PatternPredicateKind::As(Some(pattern), _) => {
-            try_pattern_binding_fallthrough_type(db, pattern, subject_ty, budget)
+            try_pattern_binding_fallthrough_type(env, pattern, subject_ty, budget)
         }
-        _ => Ok(pattern_fallthrough_type(db, kind, subject_ty)),
+        _ => Ok(pattern_fallthrough_type(env, kind, subject_ty)),
     }
 }
 
@@ -809,20 +840,20 @@ fn try_pattern_binding_fallthrough_type<'db>(
 /// This preserves the recursive handling of `Or` and `As` patterns while providing the fallback
 /// used when the precise traversal exceeds its expansion budget.
 fn conservative_pattern_binding_fallthrough_type<'db>(
-    db: &'db dyn Db,
+    env: &SemanticEnvironment<'db>,
     kind: &PatternPredicateKind<'db>,
     subject_ty: Type<'db>,
 ) -> Type<'db> {
     match kind {
         PatternPredicateKind::Or(patterns) => {
             patterns.iter().fold(subject_ty, |remaining, pattern| {
-                conservative_pattern_binding_fallthrough_type(db, pattern, remaining)
+                conservative_pattern_binding_fallthrough_type(env, pattern, remaining)
             })
         }
         PatternPredicateKind::As(Some(pattern), _) => {
-            conservative_pattern_binding_fallthrough_type(db, pattern, subject_ty)
+            conservative_pattern_binding_fallthrough_type(env, pattern, subject_ty)
         }
-        _ => pattern_fallthrough_type(db, kind, subject_ty),
+        _ => pattern_fallthrough_type(env, kind, subject_ty),
     }
 }
 
@@ -831,22 +862,23 @@ fn conservative_pattern_binding_fallthrough_type<'db>(
 /// The budget is shared by unions, intersections, and nested patterns so that their cumulative
 /// expansion cannot exceed the configured limits.
 fn try_sequence_pattern_binding_fallthrough_type<'db>(
-    db: &'db dyn Db,
+    env: &SemanticEnvironment<'db>,
     kind: &SequencePatternPredicateKind<'db>,
     subject_ty: Type<'db>,
     budget: &mut ExactTuplePatternExpansionBudget,
 ) -> Result<Type<'db>, ()> {
-    let resolved = subject_ty.resolve_type_alias(db);
+    let db = env.db();
+    let resolved = subject_ty.resolve_type_alias(env);
     let narrowed = match resolved {
         Type::Union(union) => union
-            .try_map(db, |element| {
-                try_sequence_pattern_binding_fallthrough_type(db, kind, *element, budget).ok()
+            .try_map(env, |element| {
+                try_sequence_pattern_binding_fallthrough_type(env, kind, *element, budget).ok()
             })
             .ok_or(())?,
         Type::Intersection(intersection) => {
             let mut failed = false;
-            let narrowed = intersection.map_positive(db, |element| {
-                try_sequence_pattern_binding_fallthrough_type(db, kind, *element, budget)
+            let narrowed = intersection.map_positive(env, |element| {
+                try_sequence_pattern_binding_fallthrough_type(env, kind, *element, budget)
                     .unwrap_or_else(|()| {
                         failed = true;
                         *element
@@ -858,18 +890,18 @@ fn try_sequence_pattern_binding_fallthrough_type<'db>(
             narrowed
         }
         Type::TypeVar(typevar)
-            if typevar.typevar(db).upper_bound(db).is_some_and(|bound| {
-                pattern_fallthrough_type(db, &PatternPredicateKind::Sequence(kind.clone()), bound)
+            if typevar.typevar(db).upper_bound(env).is_some_and(|bound| {
+                pattern_fallthrough_type(env, &PatternPredicateKind::Sequence(kind.clone()), bound)
                     .is_never()
             }) =>
         {
             Type::Never
         }
         _ if resolved.exact_tuple_instance_spec(db).is_some() => {
-            exact_tuple_sequence_pattern_fallthrough_type(db, kind, resolved, budget)?
+            exact_tuple_sequence_pattern_fallthrough_type(env, kind, resolved, budget)?
                 .unwrap_or_else(|| {
                     pattern_fallthrough_type(
-                        db,
+                        env,
                         &PatternPredicateKind::Sequence(kind.clone()),
                         resolved,
                     )
@@ -877,9 +909,9 @@ fn try_sequence_pattern_binding_fallthrough_type<'db>(
         }
         // An irrefutable sequence pattern can only fail if the subject is not eligible for sequence
         // matching. Unlike length and indexed-element facts, eligibility is unaffected by mutation.
-        _ if kind.is_irrefutable() => IntersectionBuilder::new(db)
+        _ if kind.is_irrefutable() => IntersectionBuilder::new(env)
             .add_positive(resolved)
-            .add_negative(sequence_pattern_type_builder(db).build())
+            .add_negative(sequence_pattern_type_builder(env).build())
             .build(),
         _ => resolved,
     };
@@ -921,11 +953,12 @@ impl ExactTuplePatternExpansionBudget {
 /// alternative per element. Large expansions and gradual tuples keep the synthesized-protocol
 /// representation used by the general fallthrough path.
 fn exact_tuple_sequence_pattern_fallthrough_type<'db>(
-    db: &'db dyn Db,
+    env: &SemanticEnvironment<'db>,
     kind: &SequencePatternPredicateKind<'db>,
     subject_ty: Type<'db>,
     budget: &mut ExactTuplePatternExpansionBudget,
 ) -> Result<Option<Type<'db>>, ()> {
+    let db = env.db();
     if kind.split_around_star().is_some() {
         return Ok(None);
     }
@@ -939,7 +972,7 @@ fn exact_tuple_sequence_pattern_fallthrough_type<'db>(
     if tuple
         .all_elements()
         .iter()
-        .any(|element| any_over_type(db, *element, true, |ty| ty.is_dynamic()))
+        .any(|element| any_over_type(env, *element, true, |ty| ty.is_dynamic()))
     {
         return Ok(None);
     }
@@ -952,7 +985,7 @@ fn exact_tuple_sequence_pattern_fallthrough_type<'db>(
         .zip(kind.patterns.iter())
         .enumerate()
     {
-        let remaining = try_pattern_binding_fallthrough_type(db, pattern, element, budget)?;
+        let remaining = try_pattern_binding_fallthrough_type(env, pattern, element, budget)?;
         if remaining == element {
             return Ok(Some(subject_ty));
         }
@@ -966,33 +999,34 @@ fn exact_tuple_sequence_pattern_fallthrough_type<'db>(
         alternatives.push(Type::heterogeneous_tuple(db, elements));
     }
 
-    Ok(Some(UnionType::from_elements(db, alternatives)))
+    Ok(Some(UnionType::from_elements(env, alternatives)))
 }
 
 /// Return whether every possible value of `ty` belongs to the same enum as `right`, including
 /// bounded type variables nested inside unions or intersections.
 fn is_same_enum_pattern_domain<'db>(
-    db: &'db dyn Db,
+    env: &SemanticEnvironment<'db>,
     ty: Type<'db>,
     right: EnumLiteralType<'db>,
 ) -> bool {
-    if is_same_enum_domain(db, ty, right) {
+    let db = env.db();
+    if is_same_enum_domain(env, ty, right) {
         return true;
     }
 
-    match ty.resolve_type_alias(db) {
+    match ty.resolve_type_alias(env) {
         Type::TypeVar(typevar) => typevar
             .typevar(db)
-            .upper_bound(db)
-            .is_some_and(|bound| is_same_enum_domain(db, bound, right)),
+            .upper_bound(env)
+            .is_some_and(|bound| is_same_enum_domain(env, bound, right)),
         Type::Union(union) => union
             .elements(db)
             .iter()
-            .all(|element| is_same_enum_pattern_domain(db, *element, right)),
+            .all(|element| is_same_enum_pattern_domain(env, *element, right)),
         Type::Intersection(intersection) => intersection
             .positive(db)
             .iter()
-            .any(|element| is_same_enum_pattern_domain(db, *element, right)),
+            .any(|element| is_same_enum_pattern_domain(env, *element, right)),
         _ => false,
     }
 }
@@ -1003,48 +1037,48 @@ fn is_same_enum_pattern_domain<'db>(
 /// context-free approximation. In particular, attribute class patterns can depend on members of
 /// the static subject type.
 fn subject_independent_definite_match_pattern_type<'db>(
-    db: &'db dyn Db,
+    env: &SemanticEnvironment<'db>,
     kind: &PatternPredicateKind<'db>,
 ) -> Option<Type<'db>> {
     match kind {
         PatternPredicateKind::Class(kind) => {
-            match infer_same_file_expression_type(db, kind.class, TypeContext::default()) {
+            match infer_same_file_expression_type(env, kind.class, TypeContext::default()) {
                 Type::ClassLiteral(class) if kind.is_empty() => {
-                    let class_instance_ty = Type::instance(db, class.top_materialization(db));
+                    let class_instance_ty = Type::instance(env, class.top_materialization(env));
                     let typed_dict_adds_runtime_matches =
-                        typed_dict_matches_class_pattern(db, class)
-                            && !Type::object().is_subtype_of(db, class_instance_ty);
+                        typed_dict_matches_class_pattern(env, class)
+                            && !Type::object().is_subtype_of(env, class_instance_ty);
                     (!typed_dict_adds_runtime_matches).then_some(class_instance_ty)
                 }
                 Type::ClassLiteral(_) => None,
                 Type::SpecialForm(SpecialFormType::CollectionsAbcCallable) if kind.is_empty() => {
-                    Some(callable_pattern_type(db))
+                    Some(callable_pattern_type(env))
                 }
                 _ => Some(Type::Never),
             }
         }
         PatternPredicateKind::Sequence(kind) => {
-            build_definite_sequence_pattern_type(db, kind, |pattern| {
-                subject_independent_definite_match_pattern_type(db, pattern)
+            build_definite_sequence_pattern_type(env, kind, |pattern| {
+                subject_independent_definite_match_pattern_type(env, pattern)
             })
         }
         PatternPredicateKind::Mapping(kind) => {
             if kind.is_irrefutable() {
-                Some(mapping_pattern_type(db))
+                Some(mapping_pattern_type(env))
             } else {
                 None
             }
         }
         PatternPredicateKind::Or(patterns) => patterns
             .iter()
-            .map(|pattern| subject_independent_definite_match_pattern_type(db, pattern))
+            .map(|pattern| subject_independent_definite_match_pattern_type(env, pattern))
             .collect::<Option<Vec<_>>>()
-            .map(|types| UnionType::from_elements(db, types)),
+            .map(|types| UnionType::from_elements(env, types)),
         PatternPredicateKind::As(Some(pattern), _) => {
-            subject_independent_definite_match_pattern_type(db, pattern)
+            subject_independent_definite_match_pattern_type(env, pattern)
         }
         PatternPredicateKind::Value(_) => None,
-        _ => Some(definite_match_pattern_type(db, kind)),
+        _ => Some(definite_match_pattern_type(env, kind)),
     }
 }
 
@@ -1052,52 +1086,52 @@ fn subject_independent_definite_match_pattern_type<'db>(
 ///
 /// Reachability and negative narrowing can only subtract this under-approximation.
 pub(crate) fn definite_match_pattern_type<'db>(
-    db: &'db dyn Db,
+    env: &SemanticEnvironment<'db>,
     kind: &PatternPredicateKind<'db>,
 ) -> Type<'db> {
     match kind {
-        PatternPredicateKind::Singleton(singleton) => singleton_pattern_type(db, *singleton),
+        PatternPredicateKind::Singleton(singleton) => singleton_pattern_type(env, *singleton),
         PatternPredicateKind::Value(value) => {
-            let ty = infer_same_file_expression_type(db, *value, TypeContext::default());
+            let ty = infer_same_file_expression_type(env, *value, TypeContext::default());
             // Only return the type if it's guaranteed to match itself.
             // Otherwise, we can't definitively exclude it from subsequent patterns.
             let policy = ComparisonSoundnessPolicy::from_analysis_settings(
-                db.analysis_settings(value.file(db)),
+                env.db().analysis_settings(value.file(env.db())),
             );
-            if equality_truthiness(db, ty, ty, policy) == Truthiness::AlwaysTrue {
+            if equality_truthiness(env, ty, ty, policy) == Truthiness::AlwaysTrue {
                 ty
             } else {
                 Type::Never
             }
         }
         PatternPredicateKind::Class(kind) => {
-            match infer_same_file_expression_type(db, kind.class, TypeContext::default()) {
+            match infer_same_file_expression_type(env, kind.class, TypeContext::default()) {
                 Type::ClassLiteral(class) if kind.is_empty() => {
-                    Type::instance(db, class.top_materialization(db))
+                    Type::instance(env, class.top_materialization(env))
                 }
                 Type::SpecialForm(SpecialFormType::CollectionsAbcCallable) if kind.is_empty() => {
-                    callable_pattern_type(db)
+                    callable_pattern_type(env)
                 }
                 _ => Type::Never,
             }
         }
         PatternPredicateKind::Mapping(kind) => {
             if kind.is_irrefutable() {
-                mapping_pattern_type(db)
+                mapping_pattern_type(env)
             } else {
                 Type::Never
             }
         }
-        PatternPredicateKind::Sequence(kind) => definite_sequence_pattern_type(db, kind),
+        PatternPredicateKind::Sequence(kind) => definite_sequence_pattern_type(env, kind),
         PatternPredicateKind::Or(predicates) => UnionType::from_elements(
-            db,
+            env,
             predicates
                 .iter()
-                .map(|p| definite_match_pattern_type(db, p)),
+                .map(|p| definite_match_pattern_type(env, p)),
         ),
         PatternPredicateKind::As(pattern, _) => pattern
             .as_deref()
-            .map(|p| definite_match_pattern_type(db, p))
+            .map(|p| definite_match_pattern_type(env, p))
             .unwrap_or_else(Type::object),
         PatternPredicateKind::Star(_) => Type::object(),
     }
@@ -1105,22 +1139,23 @@ pub(crate) fn definite_match_pattern_type<'db>(
 
 /// Return the values that are guaranteed to match a sequence pattern.
 fn definite_sequence_pattern_type<'db>(
-    db: &'db dyn Db,
+    env: &SemanticEnvironment<'db>,
     kind: &SequencePatternPredicateKind<'db>,
 ) -> Type<'db> {
-    build_definite_sequence_pattern_type(db, kind, |pattern| {
-        Some(definite_match_pattern_type(db, pattern))
+    build_definite_sequence_pattern_type(env, kind, |pattern| {
+        Some(definite_match_pattern_type(env, pattern))
     })
     .unwrap_or(Type::Never)
 }
 
 fn build_definite_sequence_pattern_type<'db>(
-    db: &'db dyn Db,
+    env: &SemanticEnvironment<'db>,
     kind: &SequencePatternPredicateKind<'db>,
     mut element_type: impl FnMut(&PatternPredicateKind<'db>) -> Option<Type<'db>>,
 ) -> Option<Type<'db>> {
+    let db = env.db();
     if kind.is_irrefutable() {
-        return Some(sequence_pattern_type_builder(db).build());
+        return Some(sequence_pattern_type_builder(env).build());
     }
 
     if let Some((prefix, suffix)) = kind.split_around_star() {
@@ -1149,6 +1184,6 @@ fn build_definite_sequence_pattern_type<'db>(
     if element_types.iter().any(Type::is_never) {
         Some(Type::Never)
     } else {
-        Some(exact_sequence_pattern_type(db, element_types.into_iter()))
+        Some(exact_sequence_pattern_type(env, element_types.into_iter()))
     }
 }

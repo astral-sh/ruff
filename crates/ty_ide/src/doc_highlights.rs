@@ -1,7 +1,7 @@
 use crate::goto::find_goto_target;
 use crate::references::{ReferencesMode, references};
 use crate::{Db, ReferenceTarget};
-use ruff_db::files::File;
+use ruff_db::PythonFile;
 use ruff_text_size::TextSize;
 use ty_python_semantic::SemanticModel;
 
@@ -9,7 +9,7 @@ use ty_python_semantic::SemanticModel;
 /// Document highlights are limited to the current file only.
 pub fn document_highlights(
     db: &dyn Db,
-    file: File,
+    file: PythonFile<'_>,
     offset: TextSize,
 ) -> Option<Vec<ReferenceTarget>> {
     let parsed = ruff_db::parsed::parsed_module(db, file);
@@ -34,9 +34,11 @@ mod tests {
 
     impl CursorTest {
         fn document_highlights(&self) -> String {
-            let Some(highlight_results) =
-                document_highlights(&self.db, self.cursor.file, self.cursor.offset)
-            else {
+            let Some(highlight_results) = document_highlights(
+                &self.db,
+                self.python_file(self.cursor.file),
+                self.cursor.offset,
+            ) else {
                 return "No highlights found".to_string();
             };
 

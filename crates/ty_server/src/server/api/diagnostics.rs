@@ -12,6 +12,7 @@ use ruff_text_size::Ranged;
 use rustc_hash::{FxHashMap, FxHashSet};
 use ty_ide::{Hint, hints};
 
+use ruff_db::PythonFile;
 use ruff_db::diagnostic::{
     Annotation, DisplayDiagnosticConfig, HyperlinkMode, Severity, SubDiagnostic,
 };
@@ -401,7 +402,7 @@ pub(super) fn compute_diagnostics(
     };
 
     let diagnostics = db.check_file(file);
-    let unnecessary_hints = hints(db, file);
+    let unnecessary_hints = hints(db, PythonFile::new(db, file, db.python_version()));
 
     Some(Diagnostics {
         items: diagnostics,

@@ -22,8 +22,8 @@ use ty_python_semantic::types::ide_support::{
     typed_dict_key_definition,
 };
 use ty_python_semantic::{
-    HasDefinition, HasType, ImportAliasResolution, SemanticModel, TypeQualifiers,
-    definitions_for_imported_symbol, definitions_for_name,
+    HasDefinition, HasType, ImportAliasResolution, SemanticEnvironment, SemanticModel,
+    TypeQualifiers, definitions_for_imported_symbol, definitions_for_name,
 };
 
 #[derive(Clone, Debug)]
@@ -256,11 +256,11 @@ impl<'db> Definitions<'db> {
         Self(resolved)
     }
 
-    pub(crate) fn from_ty(db: &'db dyn crate::Db, ty: Type<'db>) -> Option<Self> {
-        let ty_def = ty.definition(db)?;
+    pub(crate) fn from_ty(env: &SemanticEnvironment<'db>, ty: Type<'db>) -> Option<Self> {
+        let ty_def = ty.definition(env)?;
         let resolved = match ty_def {
             ty_python_semantic::types::TypeDefinition::Module(module) => {
-                ResolvedDefinition::Module(module.file(db)?)
+                ResolvedDefinition::Module(module.python_file(env.db())?)
             }
             ty_python_semantic::types::TypeDefinition::StaticClass(definition)
             | ty_python_semantic::types::TypeDefinition::DynamicClass(definition)
@@ -352,8 +352,8 @@ impl<'db> Definitions<'db> {
             .into_iter()
             .map(|definition| match definition {
                 ResolvedDefinition::Definition(definition) => {
-                    let file = definition.file(db);
-                    let module = ruff_db::parsed::parsed_module(db, file).load(db);
+                    let module =
+                        ruff_db::parsed::parsed_module(db, definition.python_file(db)).load(db);
 
                     let focus_range = definition.focus_range(db, &module);
                     let full_range = definition.full_range(db, &module);
@@ -365,7 +365,7 @@ impl<'db> Definitions<'db> {
                     }
                 }
                 ResolvedDefinition::Module(file) => {
-                    NavigationTarget::new(file, TextRange::default())
+                    NavigationTarget::new(file.file(db), TextRange::default())
                 }
                 ResolvedDefinition::FileWithRange(file_range) => NavigationTarget::from(file_range),
             })
@@ -1393,7 +1393,7 @@ fn definitions_for_module<'db>(
     level: u32,
 ) -> Option<Vec<ResolvedDefinition<'db>>> {
     let module = model.resolve_module(module, level)?;
-    let file = module.file(model.db())?;
+    let file = module.python_file(model.db())?;
     Some(vec![ResolvedDefinition::Module(file)])
 }
 

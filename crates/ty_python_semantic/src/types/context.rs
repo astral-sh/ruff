@@ -1,13 +1,16 @@
-use std::fmt;
+use std::{cell::Cell, fmt, hint::cold_path};
 
 use drop_bomb::DebugDropBomb;
+use ruff_db::PythonFile;
 use ruff_db::diagnostic::DiagnosticTag;
 use ruff_db::parsed::ParsedModuleRef;
 use ruff_db::{
     diagnostic::{Annotation, Diagnostic, DiagnosticId, IntoDiagnosticMessage, Severity, Span},
     files::File,
 };
+use ruff_python_ast::PythonVersion;
 use ruff_text_size::{Ranged, TextRange};
+use salsa::plumbing::{AsId, FromId, Id};
 
 use super::{Type, TypeCheckDiagnostics, infer_definition_types};
 
@@ -18,12 +21,75 @@ use crate::types::diagnostic::{INVALID_TYPE_FORM, UNBOUND_TYPE_VARIABLE};
 use crate::types::function::FunctionDecorators;
 use crate::types::infer::InferenceFlags;
 use crate::{
-    Db,
+    Db, Program,
     lint::{LintId, LintMetadata},
     suppression::suppressions,
 };
 use ty_python_core::scope::ScopeId;
 use ty_python_core::semantic_index;
+
+/// The database and Python environment used by a semantic operation.
+#[derive(Clone)]
+pub struct SemanticEnvironment<'db> {
+    db: &'db dyn Db,
+    environment: Cell<ProgramSource>,
+}
+
+impl<'db> SemanticEnvironment<'db> {
+    /// Creates an environment that lazily obtains its Python version from `file`.
+    pub fn from_file(db: &'db dyn Db, file: PythonFile<'db>) -> Self {
+        Self {
+            db,
+            environment: Cell::new(ProgramSource::File(file.as_id())),
+        }
+    }
+
+    /// Creates an environment with an already-established program.
+    pub const fn from_program(db: &'db dyn Db, program: Program) -> Self {
+        Self {
+            db,
+            environment: Cell::new(ProgramSource::Program(program)),
+        }
+    }
+
+    /// Returns the database used by this operation.
+    #[inline]
+    pub const fn db(&self) -> &'db dyn Db {
+        self.db
+    }
+
+    /// Returns the program used by this operation.
+    #[inline]
+    pub fn program(&self) -> Program {
+        match self.environment.get() {
+            ProgramSource::Program(program) => program,
+            ProgramSource::File(file) => {
+                cold_path();
+                // `from_file` paired this `Id` with `self.db` from the same `'db`; immediately
+                // re-wrapping it for this ingredient read restores that database lifetime.
+                let program = PythonFile::from_id(file).python_version(self.db);
+                self.environment.set(ProgramSource::Program(program));
+                program
+            }
+        }
+    }
+
+    /// Returns the Python version used by this operation.
+    #[inline]
+    pub fn python_version(&self) -> PythonVersion {
+        self.program()
+    }
+}
+
+#[derive(Clone, Copy)]
+enum ProgramSource {
+    Program(Program),
+    // Salsa interned handles are thin `Id` wrappers, so converting between `PythonFile` and `Id`
+    // is an inlined representation change with no database lookup. Keeping the lifetime-bearing
+    // `PythonFile` out of the `Cell` preserves covariance in `'db`; replacing this variant after
+    // the first read avoids repeated Salsa ingredient reads in hot, recursive type operations.
+    File(Id),
+}
 
 /// Context for inferring the types of a single file.
 ///
@@ -38,9 +104,10 @@ use ty_python_core::semantic_index;
 /// [`InferContext::finish`] and the returned diagnostics must be stored
 /// on the current inference result.
 pub(crate) struct InferContext<'db, 'ast> {
-    db: &'db dyn Db,
+    semantic_environment: &'ast SemanticEnvironment<'db>,
     scope: ScopeId<'db>,
     file: File,
+    python_file: PythonFile<'db>,
     module: &'ast ParsedModuleRef,
     diagnostics: std::cell::RefCell<TypeCheckDiagnostics>,
     diagnostics_suppressed: bool,
@@ -50,12 +117,23 @@ pub(crate) struct InferContext<'db, 'ast> {
 }
 
 impl<'db, 'ast> InferContext<'db, 'ast> {
-    pub(crate) fn new(db: &'db dyn Db, scope: ScopeId<'db>, module: &'ast ParsedModuleRef) -> Self {
+    pub(crate) fn new(
+        semantic_environment: &'ast SemanticEnvironment<'db>,
+        scope: ScopeId<'db>,
+        file: File,
+        python_file: PythonFile<'db>,
+        module: &'ast ParsedModuleRef,
+    ) -> Self {
+        let db = semantic_environment.db();
+        debug_assert_eq!(scope.python_file(db), python_file);
+        debug_assert_eq!(python_file.file(db), file);
+
         Self {
-            db,
+            semantic_environment,
             scope,
             module,
-            file: scope.file(db),
+            file,
+            python_file,
             diagnostics: std::cell::RefCell::new(TypeCheckDiagnostics::default()),
             diagnostics_suppressed: false,
             inference_flags: InferenceFlags::empty(),
@@ -68,6 +146,20 @@ impl<'db, 'ast> InferContext<'db, 'ast> {
     /// The file for which the types are inferred.
     pub(crate) fn file(&self) -> File {
         self.file
+    }
+
+    pub(crate) fn python_file(&self) -> PythonFile<'db> {
+        self.python_file
+    }
+
+    #[inline]
+    pub(crate) fn semantic_environment(&self) -> &'ast SemanticEnvironment<'db> {
+        self.semantic_environment
+    }
+
+    #[inline]
+    pub(crate) fn program(&self) -> Program {
+        self.semantic_environment.program()
     }
 
     /// The module for which the types are inferred.
@@ -97,8 +189,9 @@ impl<'db, 'ast> InferContext<'db, 'ast> {
         Annotation::secondary(self.span(ranged))
     }
 
+    #[inline]
     pub(crate) fn db(&self) -> &'db dyn Db {
-        self.db
+        self.semantic_environment.db()
     }
 
     pub(crate) fn extend(&mut self, other: &TypeCheckDiagnostics) {
@@ -187,9 +280,9 @@ impl<'db, 'ast> InferContext<'db, 'ast> {
 
         // Accessing the semantic index here is fine because
         // the index belongs to the same file as for which we emit the diagnostic.
-        let index = semantic_index(self.db, self.file);
+        let index = semantic_index(self.db(), self.python_file);
 
-        let scope_id = self.scope.file_scope_id(self.db);
+        let scope_id = self.scope.file_scope_id(self.db());
 
         // Inspect all ancestor function scopes by walking bottom up and check
         // if any is decorated with `@no_type_check`. We use the undecorated type
@@ -200,12 +293,18 @@ impl<'db, 'ast> InferContext<'db, 'ast> {
             .ancestor_scopes(scope_id)
             .filter_map(|(_, scope)| scope.node().as_function())
             .filter_map(|node| {
-                infer_definition_types(self.db, index.expect_single_definition(node))
-                    .undecorated_type()
-                    .and_then(Type::as_function_literal)
+                infer_definition_types(
+                    self.semantic_environment(),
+                    index.expect_single_definition(node),
+                )
+                .undecorated_type()
+                .and_then(Type::as_function_literal)
             })
             .any(|function_ty| {
-                function_ty.has_known_decorator(self.db, FunctionDecorators::NO_TYPE_CHECK)
+                function_ty.has_known_decorator(
+                    self.semantic_environment(),
+                    FunctionDecorators::NO_TYPE_CHECK,
+                )
             })
     }
 
@@ -214,9 +313,9 @@ impl<'db, 'ast> InferContext<'db, 'ast> {
     /// This checks both whether the scope itself is reachable and whether the
     /// specific statement or expression containing this range is reachable.
     fn is_range_reachable(&self, range: TextRange) -> bool {
-        let index = semantic_index(self.db, self.file);
-        let scope_id = self.scope.file_scope_id(self.db);
-        is_range_reachable(self.db, index, scope_id, range)
+        let index = semantic_index(self.db(), self.python_file);
+        let scope_id = self.scope.file_scope_id(self.db());
+        is_range_reachable(self.semantic_environment(), index, scope_id, range)
     }
 
     /// Are we currently inferring types in a stub file?
@@ -246,10 +345,14 @@ impl<'db, 'ast> InferContext<'db, 'ast> {
 
 impl fmt::Debug for InferContext<'_, '_> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.debug_struct("TyContext")
+        f.debug_struct("InferContext")
+            .field("db", &"<dyn Db>")
+            .field("scope", &self.scope)
             .field("file", &self.file)
+            .field("python_file", &self.python_file)
             .field("diagnostics", &self.diagnostics)
-            .field("defused", &self.bomb)
+            .field("diagnostics_suppressed", &self.diagnostics_suppressed)
+            .field("inference_flags", &self.inference_flags)
             .finish()
     }
 }
@@ -441,12 +544,12 @@ impl<'db, 'ctx> LintDiagnosticGuardBuilder<'db, 'ctx> {
         //   returns a rule selector for a given file that respects the package's settings,
         //   any global pragma comments in the file, and any per-file-ignores.
 
-        if !ctx.db.should_check_file(ctx.file) {
+        if !ctx.db().should_check_file(ctx.file) {
             return None;
         }
         // Skip over diagnostics if the rule
         // is disabled.
-        let (severity, source) = ctx.db.rule_selection(ctx.file).get(lint)?;
+        let (severity, source) = ctx.db().rule_selection(ctx.file).get(lint)?;
         // If we're not in type checking mode,
         // we can bail now.
         if ctx.is_in_no_type_check() {
@@ -477,7 +580,7 @@ impl<'db, 'ctx> LintDiagnosticGuardBuilder<'db, 'ctx> {
 
         let (severity, source) = Self::severity_and_source(ctx, lint_id)?;
 
-        let suppressions = suppressions(ctx.db(), ctx.file());
+        let suppressions = suppressions(ctx.db(), ctx.python_file());
         if let Some(suppression) = suppressions.find_suppression(range, lint_id) {
             ctx.diagnostics.borrow_mut().mark_used(suppression.id());
             return None;
@@ -575,7 +678,7 @@ impl<'db, 'ctx> DiagnosticGuardBuilder<'db, 'ctx> {
             return None;
         }
 
-        if !ctx.db.should_check_file(ctx.file) {
+        if !ctx.db().should_check_file(ctx.file) {
             return None;
         }
         Some(DiagnosticGuardBuilder { ctx, id, severity })

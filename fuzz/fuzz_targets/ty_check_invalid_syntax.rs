@@ -8,6 +8,7 @@ use std::sync::{Arc, Mutex, OnceLock};
 use libfuzzer_sys::{Corpus, fuzz_target};
 
 use ruff_db::Db as SourceDb;
+use ruff_db::PythonFile;
 use ruff_db::diagnostic::Diagnostic;
 use ruff_db::files::{File, Files, system_path_to_file};
 use ruff_db::system::{
@@ -56,6 +57,10 @@ impl TestDb {
             analysis_settings: AnalysisSettings::default().into(),
         }
     }
+
+    fn python_version(&self) -> PythonVersion {
+        Program::get(self).python_version(self)
+    }
 }
 
 #[salsa::db]
@@ -70,10 +75,6 @@ impl SourceDb for TestDb {
 
     fn files(&self) -> &Files {
         &self.files
-    }
-
-    fn python_version(&self) -> PythonVersion {
-        Program::get(self).python_version(self)
     }
 }
 
@@ -105,7 +106,8 @@ impl ty_python_core::Db for TestDb {
 impl SemanticDb for TestDb {
     fn check_file(&self, file: File) -> Vec<Diagnostic> {
         if self.should_check_file(file) {
-            ty_python_semantic::check_file_unwrap(self, file)
+            let python_file = PythonFile::new(self, file, self.python_version());
+            ty_python_semantic::check_file_unwrap(self, python_file)
         } else {
             Vec::new()
         }
@@ -181,7 +183,7 @@ fn do_fuzz(case: &[u8]) -> Corpus {
     for path in &["/src/a.py", "/src/a.pyi"] {
         db.write_file(path, code).unwrap();
         let file = system_path_to_file(&*db, path).unwrap();
-        check_types(&*db, file);
+        check_types(&*db, PythonFile::new(&*db, file, db.python_version()));
         db.memory_file_system().remove_file(path).unwrap();
         file.sync(&mut *db);
     }

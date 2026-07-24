@@ -9,7 +9,7 @@ use std::hash::{Hash, Hasher};
 use ruff_db::diagnostic::{
     Annotation, Diagnostic, DiagnosticId, IntoDiagnosticMessage, LintName, Severity, Span,
 };
-use ruff_db::{files::File, parsed::parsed_module, source::source_text};
+use ruff_db::{PythonFile, files::File, parsed::parsed_module, source::source_text};
 use ruff_python_ast::token::{TokenKind, Tokens};
 use ruff_python_trivia::indentation_at_offset;
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
@@ -75,11 +75,14 @@ pub fn is_unused_ignore_comment_lint(name: LintName) -> bool {
 }
 
 #[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
-pub(crate) fn suppressions(db: &dyn Db, file: File) -> Suppressions {
+pub(crate) fn suppressions(db: &dyn Db, file: PythonFile<'_>) -> Suppressions {
+    let source_file = file.file(db);
     let parsed = parsed_module(db, file).load(db);
-    let source = source_text(db, file);
+    let source = source_text(db, source_file);
 
-    let respect_type_ignore = db.analysis_settings(file).respect_type_ignore_comments;
+    let respect_type_ignore = db
+        .analysis_settings(source_file)
+        .respect_type_ignore_comments;
 
     let mut builder = SuppressionsBuilder::new(&source, db.lint_registry());
     let mut line_start = TextSize::default();
@@ -136,7 +139,7 @@ pub(crate) fn suppressions(db: &dyn Db, file: File) -> Suppressions {
 
 pub(crate) fn check_suppressions(
     db: &dyn Db,
-    file: File,
+    file: PythonFile<'_>,
     diagnostics: TypeCheckDiagnostics,
 ) -> Vec<Diagnostic> {
     let mut context = CheckSuppressionsContext::new(db, file, diagnostics);
@@ -215,11 +218,11 @@ struct CheckSuppressionsContext<'a> {
 }
 
 impl<'a> CheckSuppressionsContext<'a> {
-    fn new(db: &'a dyn Db, file: File, diagnostics: TypeCheckDiagnostics) -> Self {
+    fn new(db: &'a dyn Db, file: PythonFile<'a>, diagnostics: TypeCheckDiagnostics) -> Self {
         let suppressions = suppressions(db, file);
         Self {
             db,
-            file,
+            file: file.file(db),
             suppressions,
             diagnostics: diagnostics.into(),
         }
@@ -914,7 +917,7 @@ impl IntervalIndex {
 
 #[cfg(test)]
 mod tests {
-    use ruff_db::files::system_path_to_file;
+    use ruff_db::{PythonFile, files::system_path_to_file};
     use ruff_text_size::{TextLen as _, TextRange};
 
     use super::suppressions;
@@ -939,7 +942,7 @@ value = missing
         let missing_start = source.find("missing").unwrap().try_into().unwrap();
         let missing_range = TextRange::at(missing_start, "missing".text_len());
 
-        let suppressions = suppressions(&db, file);
+        let suppressions = suppressions(&db, PythonFile::new(&db, file, db.python_version()));
         assert_eq!(suppressions.inline.len(), 4);
         assert_eq!(
             suppressions
@@ -966,7 +969,7 @@ value = missing
         let missing_start = source.find("missing").unwrap().try_into().unwrap();
         let missing_range = TextRange::at(missing_start, "missing".text_len());
 
-        let suppressions = suppressions(&db, file);
+        let suppressions = suppressions(&db, PythonFile::new(&db, file, db.python_version()));
         assert_eq!(suppressions.inline.len(), 4);
         assert_eq!(
             suppressions

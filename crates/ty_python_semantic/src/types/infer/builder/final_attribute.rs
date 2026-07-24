@@ -26,7 +26,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     ) {
         let db = self.db();
         let file = declaration.file(db);
-        let module = parsed_module(db, file).load(db);
+        let module = parsed_module(db, declaration.python_file(db)).load(db);
         let range = match declaration.kind(db) {
             DefinitionKind::AnnotatedAssignment(assignment) => {
                 assignment.annotation(&module).range()
@@ -50,9 +50,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         attribute: &str,
     ) -> Option<Definition<'db>> {
         let db = self.db();
-        let class_ty = object_ty.nominal_class(db)?;
+        let env = self.semantic_environment();
+        let class_ty = object_ty.nominal_class(env)?;
 
-        for base in class_ty.iter_mro(db) {
+        for base in class_ty.iter_mro(env) {
             let Some(class) = base.into_class() else {
                 continue;
             };
@@ -62,16 +63,15 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
             let class_body_scope = class_literal.body_scope(db);
             let class_scope_id = class_body_scope.file_scope_id(db);
-            let class_index = semantic_index(db, class_body_scope.file(db));
+            let class_index = semantic_index(db, class_body_scope.python_file(db));
             let place_table = class_index.place_table(class_scope_id);
             let Some(symbol_id) = place_table.symbol_id(attribute) else {
                 continue;
             };
 
             let use_def = class_index.use_def_map(class_scope_id);
-
             let place_and_quals_result =
-                place_from_declarations(db, use_def.end_of_scope_symbol_declarations(symbol_id));
+                place_from_declarations(env, use_def.end_of_scope_symbol_declarations(symbol_id));
 
             let Some(declaration) = place_and_quals_result.first_declaration else {
                 continue;
@@ -183,11 +183,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         attribute: &str,
         qualifiers: TypeQualifiers,
     ) -> bool {
+        let env = self.semantic_environment();
+        let db = self.db();
         if !qualifiers.contains(TypeQualifiers::FINAL) {
             return false;
         }
-
-        let db = self.db();
         let final_declaration = self.precise_final_attribute_declaration(object_ty, attribute);
 
         // TODO: Use the full assignment statement range for these diagnostics instead of
@@ -199,10 +199,12 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
         let report_not_in_init = || {
             let is_dataclass_like = object_ty
-                .nominal_class(db)
-                .or_else(|| object_ty.to_class_type(db))
+                .nominal_class(env)
+                .or_else(|| object_ty.to_class_type(env))
                 .and_then(|cls| cls.static_class_literal(db))
-                .is_some_and(|(class_literal, _)| class_literal.is_dataclass_like(db));
+                .is_some_and(|(class_literal, _)| {
+                    class_literal.is_dataclass_like(self.semantic_environment())
+                });
             let Some(builder) = self
                 .context
                 .report_lint(&INVALID_ASSIGNMENT, target.range())
@@ -211,7 +213,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             };
             let mut diagnostic = builder.into_diagnostic(format_args!(
                 "Cannot assign to final attribute `{attribute}` on type `{}`",
-                object_ty.display(db)
+                object_ty.display(env)
             ));
             diagnostic.set_primary_message(if is_dataclass_like {
                 "`Final` attributes can only be assigned in the class body, `__init__`, or `__post_init__` on dataclass-like classes"
@@ -238,10 +240,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         // that happens to have the right type.
         let is_self_parameter = self.is_instance_attribute_assignment(target);
 
-        let class_instance_ty = Type::instance(db, class_ty).top_materialization(db);
-        let object_instance_ty = object_ty.bind_self_typevars(db, class_instance_ty);
+        let class_instance_ty = Type::instance(env, class_ty).top_materialization(env);
+        let object_instance_ty = object_ty.bind_self_typevars(env, class_instance_ty);
         let is_current_class_instance =
-            is_self_parameter && object_instance_ty.is_subtype_of(db, class_instance_ty);
+            is_self_parameter && object_instance_ty.is_subtype_of(env, class_instance_ty);
         if !is_current_class_instance {
             report_not_in_init();
             return true;
@@ -250,7 +252,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         if let Some((class_literal, _)) = class_ty.static_class_literal(db) {
             let class_body_scope = class_literal.body_scope(db);
             let class_scope_id = class_body_scope.file_scope_id(db);
-            let class_index = semantic_index(db, class_body_scope.file(db));
+            let class_index = semantic_index(db, class_body_scope.python_file(db));
             let pt = class_index.place_table(class_scope_id);
 
             if let Some(symbol) = pt.symbol_by_name(attribute)
@@ -290,7 +292,6 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         }
 
         if emit_diagnostics {
-            let db = self.db();
             let final_declaration = self.precise_final_attribute_declaration(object_ty, attribute);
 
             if let Some(builder) = self
@@ -299,7 +300,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             {
                 let mut diagnostic = builder.into_diagnostic(format_args!(
                     "Cannot delete final attribute `{attribute}` on type `{}`",
-                    object_ty.display(db)
+                    object_ty.display(self.semantic_environment())
                 ));
                 diagnostic.set_primary_message("`Final` attributes cannot be deleted");
                 if let Some(final_declaration) = final_declaration {
@@ -317,7 +318,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         object_ty: Type<'db>,
         attribute: &str,
     ) {
-        let Some(members) = assignment_attribute_members(self.db(), object_ty, attribute) else {
+        let Some(members) =
+            assignment_attribute_members(self.semantic_environment(), object_ty, attribute)
+        else {
             return;
         };
 
@@ -340,7 +343,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         attribute: &str,
         emit_diagnostics: bool,
     ) -> bool {
-        let Some(members) = assignment_attribute_members(self.db(), object_ty, attribute) else {
+        let Some(members) =
+            assignment_attribute_members(self.semantic_environment(), object_ty, attribute)
+        else {
             return false;
         };
 

@@ -1,14 +1,15 @@
 use crate::Db;
 use crate::goto::find_goto_target;
 use rayon::prelude::*;
+use ruff_db::PythonFile;
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::name::Name;
 use ruff_text_size::{TextRange, TextSize};
 use ty_project::parallel::ParallelIteratorExt;
-use ty_python_semantic::SemanticModel;
 use ty_python_semantic::TypeHierarchyClass;
 use ty_python_semantic::types::Type;
+use ty_python_semantic::{SemanticEnvironment, SemanticModel};
 
 /// Represents a type hierarchy item returned by the LSP type hierarchy requests.
 #[derive(Debug, Clone)]
@@ -30,7 +31,7 @@ pub struct TypeHierarchyItem {
 /// Returns `None` if the position is not on a class definition or class reference.
 pub fn prepare_type_hierarchy(
     db: &dyn Db,
-    file: File,
+    file: PythonFile<'_>,
     offset: TextSize,
 ) -> Option<TypeHierarchyItem> {
     let module = parsed_module(db, file).load(db);
@@ -38,20 +39,22 @@ pub fn prepare_type_hierarchy(
     let goto_target = find_goto_target(&model, &module, offset)?;
     let ty = goto_target.inferred_type(&model)?;
 
-    let hierarchy_class = ty_python_semantic::type_hierarchy_prepare(db, ty)?;
+    let env = model.semantic_environment();
+    let hierarchy_class = ty_python_semantic::type_hierarchy_prepare(&env, ty)?;
     Some(type_hierarchy_class_to_item(db, hierarchy_class))
 }
 
 /// Get the supertypes (base classes) of a type hierarchy item.
 pub fn type_hierarchy_supertypes(
     db: &dyn Db,
-    file: File,
+    file: PythonFile<'_>,
     offset: TextSize,
 ) -> Vec<TypeHierarchyItem> {
     let Some(ty) = resolve_type_at(db, file, offset) else {
         return vec![];
     };
-    ty_python_semantic::type_hierarchy_supertypes(db, ty)
+    let env = SemanticEnvironment::from_file(db, file);
+    ty_python_semantic::type_hierarchy_supertypes(&env, ty)
         .into_iter()
         .map(|c| type_hierarchy_class_to_item(db, c))
         .collect()
@@ -62,17 +65,18 @@ pub fn type_hierarchy_supertypes(
 /// This scans all available modules and can be expensive in large projects.
 pub fn type_hierarchy_subtypes(
     db: &dyn Db,
-    file: File,
+    file: PythonFile<'_>,
     offset: TextSize,
 ) -> Vec<TypeHierarchyItem> {
     let Some(ty) = resolve_type_at(db, file, offset) else {
         return vec![];
     };
 
-    ty_module_resolver::all_modules(db)
+    ty_module_resolver::all_modules(db, file.python_version(db))
         .into_par_iter()
         .map_with_db(db, |db, module| {
-            ty_python_semantic::type_hierarchy_subtypes(db, ty, &[module])
+            let env = SemanticEnvironment::from_file(db, file);
+            ty_python_semantic::type_hierarchy_subtypes(&env, ty, &[module])
                 .into_iter()
                 .map(|class| type_hierarchy_class_to_item(db, class))
                 .collect::<Vec<_>>()
@@ -85,7 +89,11 @@ pub fn type_hierarchy_subtypes(
 ///
 /// If a symbol could not be found at the given offset or its type could
 /// not be inferred, `None` is returned.
-fn resolve_type_at(db: &dyn Db, file: File, offset: TextSize) -> Option<Type<'_>> {
+fn resolve_type_at<'db>(
+    db: &'db dyn Db,
+    file: PythonFile<'db>,
+    offset: TextSize,
+) -> Option<Type<'db>> {
     let module = parsed_module(db, file).load(db);
     let model = SemanticModel::new(db, file);
 
@@ -93,14 +101,17 @@ fn resolve_type_at(db: &dyn Db, file: File, offset: TextSize) -> Option<Type<'_>
     goto_target.inferred_type(&model)
 }
 
-fn type_hierarchy_class_to_item(db: &dyn Db, class: TypeHierarchyClass) -> TypeHierarchyItem {
+fn type_hierarchy_class_to_item<'db>(
+    db: &'db dyn Db,
+    class: TypeHierarchyClass<'db>,
+) -> TypeHierarchyItem {
     let detail = ty_module_resolver::file_to_module(db, class.file)
         .map(|module| module.name(db).to_string());
 
     TypeHierarchyItem {
         name: class.name,
         detail,
-        file: class.file,
+        file: class.file.file(db),
         full_range: class.full_range,
         selection_range: class.selection_range,
     }
@@ -720,21 +731,33 @@ Public = _Internal
 
     impl CursorTest {
         fn prepare(&self) -> Option<TypeHierarchyItem> {
-            prepare_type_hierarchy(&self.db, self.cursor.file, self.cursor.offset)
+            prepare_type_hierarchy(
+                &self.db,
+                self.python_file(self.cursor.file),
+                self.cursor.offset,
+            )
         }
 
         fn supertypes(&self) -> Vec<TypeHierarchyItem> {
             let Some(item) = self.prepare() else {
                 return vec![];
             };
-            type_hierarchy_supertypes(&self.db, item.file, item.selection_range.start())
+            type_hierarchy_supertypes(
+                &self.db,
+                self.python_file(item.file),
+                item.selection_range.start(),
+            )
         }
 
         fn subtypes(&self) -> Vec<TypeHierarchyItem> {
             let Some(item) = self.prepare() else {
                 return vec![];
             };
-            type_hierarchy_subtypes(&self.db, item.file, item.selection_range.start())
+            type_hierarchy_subtypes(
+                &self.db,
+                self.python_file(item.file),
+                item.selection_range.start(),
+            )
         }
     }
 }

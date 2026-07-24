@@ -7,12 +7,12 @@ use mdtest::parser::{self};
 use mdtest::{
     Failures, FileFailures, MarkdownEdit, OutputFormat, TestFile, TestOutcome, attempt_test,
 };
-use ruff_db::Db;
 use ruff_db::cancellation::CancellationTokenSource;
 use ruff_db::diagnostic::DiagnosticId;
 use ruff_db::files::{FileRootKind, system_path_to_file};
 use ruff_db::system::{DbWithWritableSystem as _, SystemPath, SystemPathBuf};
 use ruff_db::testing::{setup_logging, setup_logging_with_filter};
+use ruff_db::{Db, PythonFile};
 use ruff_diagnostics::Applicability;
 use ruff_source_file::OneIndexed;
 use std::fmt::Write;
@@ -348,16 +348,22 @@ fn run_test(
                 }
             };
 
-            let failure = match matcher::match_file(db, test_file.file, &diagnostics, options)
-                .and_then(|inline_diagnostics| {
-                    mdtest::validate_inline_snapshot(
-                        db,
-                        "ty",
-                        test_file,
-                        &inline_diagnostics,
-                        &mut markdown_edits,
-                    )
-                }) {
+            let failure = match matcher::match_file(
+                db,
+                test_file.file,
+                python_version,
+                &diagnostics,
+                options,
+            )
+            .and_then(|inline_diagnostics| {
+                mdtest::validate_inline_snapshot(
+                    db,
+                    "ty",
+                    test_file,
+                    &inline_diagnostics,
+                    &mut markdown_edits,
+                )
+            }) {
                 Ok(()) => None,
                 Err(line_failures) => Some(FileFailures {
                     backtick_offsets: test_file.to_code_block_backtick_offsets(),
@@ -367,7 +373,10 @@ fn run_test(
 
             all_diagnostics.extend(diagnostics);
 
-            let pull_types_result = attempt_test(|file| pull_types(db, file), test_file);
+            let pull_types_result = attempt_test(
+                |file| pull_types(db, PythonFile::new(db, file, python_version)),
+                test_file,
+            );
             match pull_types_result {
                 Ok(()) => {}
                 Err(failures) => {
@@ -428,6 +437,7 @@ fn run_test(
         let token_source = CancellationTokenSource::new();
         let result = fix_all_diagnostics(
             db,
+            python_version,
             all_diagnostics,
             Applicability::Unsafe,
             &token_source.token(),
@@ -498,22 +508,25 @@ struct ModuleInconsistency<'db> {
 /// `list_module`.
 fn run_module_resolution_consistency_test(db: &db::Db) -> Result<(), Vec<ModuleInconsistency<'_>>> {
     let mut errs = vec![];
-    for from_list in list_modules(db).iter().copied() {
+    let python_version = db.python_version();
+    for from_list in list_modules(db, python_version).iter().copied() {
         // TODO: For now list_modules does not partake in desperate module resolution so
         // only compare against confident module resolution.
-        errs.push(match resolve_module_confident(db, from_list.name(db)) {
-            None => ModuleInconsistency {
-                db,
-                from_list,
-                from_resolve: None,
+        errs.push(
+            match resolve_module_confident(db, python_version, from_list.name(db)) {
+                None => ModuleInconsistency {
+                    db,
+                    from_list,
+                    from_resolve: None,
+                },
+                Some(from_resolve) if from_list != from_resolve => ModuleInconsistency {
+                    db,
+                    from_list,
+                    from_resolve: Some(from_resolve),
+                },
+                _ => continue,
             },
-            Some(from_resolve) if from_list != from_resolve => ModuleInconsistency {
-                db,
-                from_list,
-                from_resolve: Some(from_resolve),
-            },
-            _ => continue,
-        });
+        );
     }
     if errs.is_empty() { Ok(()) } else { Err(errs) }
 }

@@ -6,10 +6,13 @@ use lsp_types::{
     CompletionParams, CompletionRequest, CompletionResponse, Documentation, InsertTextFormat,
     TextEdit, Uri,
 };
+use ruff_db::PythonFile;
 use ruff_source_file::OneIndexed;
 use ruff_text_size::Ranged;
 use ty_ide::{CompletionCapabilities, CompletionInsertTextFormat, CompletionKind, completion};
+use ty_project::Db as _;
 use ty_project::ProjectDatabase;
+use ty_python_semantic::SemanticEnvironment;
 
 use crate::document::{PositionExt, ToRangeExt};
 use crate::server::api::traits::{
@@ -57,12 +60,14 @@ impl BackgroundDocumentRequestHandler for CompletionRequestHandler {
             return Ok(None);
         };
         let client_capabilities = snapshot.resolved_client_capabilities();
+        let python_file = PythonFile::new(db, file, db.python_version());
+        let env = SemanticEnvironment::from_file(db, python_file);
         let completions = completion(
             db,
             snapshot.workspace_settings().completions(),
             CompletionCapabilities::default()
                 .snippets(client_capabilities.supports_completion_item_snippets()),
-            file,
+            python_file,
             offset,
         );
         if completions.is_empty() {
@@ -76,7 +81,7 @@ impl BackgroundDocumentRequestHandler for CompletionRequestHandler {
             .enumerate()
             .map(|(i, comp)| {
                 let kind = comp.kind.map(ty_kind_to_lsp_kind);
-                let type_display = comp.ty.map(|ty| ty.display(db).to_string());
+                let type_display = comp.ty.map(|ty| ty.display(&env).to_string());
                 let import_edit = comp.import.as_ref().and_then(|edit| {
                     let range = edit
                         .range()

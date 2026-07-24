@@ -18,8 +18,9 @@ The main differences here are:
 
 use rustc_hash::FxHashMap;
 
-use ruff_db::files::File;
 use ruff_db::parsed::ParsedModuleRef;
+
+use ruff_db::PythonFile;
 use ruff_db::source::source_text;
 use ruff_diagnostics::Edit;
 use ruff_python_ast as ast;
@@ -40,7 +41,7 @@ pub(crate) struct Importer<'a> {
     db: &'a dyn Db,
     /// The file corresponding to the module that
     /// we want to insert an import statement into.
-    file: File,
+    file: PythonFile<'a>,
     /// The parsed module ref.
     parsed: &'a ParsedModuleRef,
     /// The tokens representing the Python AST.
@@ -73,7 +74,7 @@ impl<'a> Importer<'a> {
     pub(crate) fn new(
         db: &'a dyn Db,
         stylist: &'a Stylist<'a>,
-        file: File,
+        file: PythonFile<'a>,
         source: &'a str,
         parsed: &'a ParsedModuleRef,
     ) -> Self {
@@ -151,7 +152,7 @@ impl<'a> Importer<'a> {
             let insertion = if let Some(future) = self.find_last_future_import(members.at) {
                 Insertion::end_of_statement(future.stmt, self.source, self.stylist)
             } else {
-                let range = source_text(self.db, self.file)
+                let range = source_text(self.db, self.file.file(self.db))
                     .as_notebook()
                     .and_then(|notebook| notebook.cell_offsets().containing_range(members.at));
 
@@ -226,7 +227,7 @@ impl<'a> Importer<'a> {
         available_at: TextSize,
     ) -> Option<ImportResponse<'importer, 'a>> {
         let mut choice = None;
-        let source = source_text(self.db, self.file);
+        let source = source_text(self.db, self.file.file(self.db));
         let notebook = source.as_notebook();
 
         for import in &self.imports {
@@ -283,7 +284,7 @@ impl<'a> Importer<'a> {
 
     /// Find the last `from __future__` import statement in the AST.
     fn find_last_future_import(&self, at: TextSize) -> Option<&'a AstImport> {
-        let source = source_text(self.db, self.file);
+        let source = source_text(self.db, self.file.file(self.db));
         let notebook = source.as_notebook();
 
         self.imports
@@ -330,7 +331,7 @@ pub struct MembersInScope<'ast> {
 impl<'ast> MembersInScope<'ast> {
     fn new(
         db: &'ast dyn Db,
-        file: File,
+        file: PythonFile<'ast>,
         parsed: &'ast ParsedModuleRef,
         node: ast::AnyNodeRef<'_>,
         at: TextSize,
@@ -375,7 +376,7 @@ impl<'ast> MembersInScope<'ast> {
     pub(crate) fn satisfies(
         &self,
         db: &dyn Db,
-        importing_file: File,
+        importing_file: PythonFile<'_>,
         request: &ImportRequest<'_>,
     ) -> bool {
         let symbol_text = request.member.unwrap_or(request.module);
@@ -411,7 +412,7 @@ impl<'ast> MemberInScope<'ast> {
     fn satisfies_anywhere(
         &self,
         db: &dyn Db,
-        importing_file: File,
+        importing_file: PythonFile<'_>,
         request: &ImportRequest<'_>,
     ) -> bool {
         let MemberImportKind::Imported(ref ast_import) = self.kind else {
@@ -483,7 +484,7 @@ impl<'ast> AstImport<'ast> {
     fn satisfies<'importer>(
         &'importer self,
         db: &'_ dyn Db,
-        importing_file: File,
+        importing_file: PythonFile<'_>,
         request: &ImportRequest<'_>,
     ) -> Option<ImportResponse<'importer, 'ast>> {
         self.kind
@@ -514,7 +515,7 @@ impl<'ast> AstImportKind<'ast> {
     fn satisfies<'importer>(
         &'importer self,
         db: &'_ dyn Db,
-        importing_file: File,
+        importing_file: PythonFile<'_>,
         request: &ImportRequest<'_>,
     ) -> Option<ImportResponseKind<'ast>> {
         match *self {
@@ -638,7 +639,12 @@ impl<'a> ImportRequest<'a> {
     /// Attempts to change the import request style so that the chances
     /// of an import conflict are minimized (although not always reduced
     /// to zero).
-    fn avoid_conflicts(self, db: &dyn Db, importing_file: File, members: &MembersInScope) -> Self {
+    fn avoid_conflicts(
+        self,
+        db: &dyn Db,
+        importing_file: PythonFile<'_>,
+        members: &MembersInScope,
+    ) -> Self {
         let Some(member) = self.member else {
             return Self {
                 style: ImportStyle::Import,
@@ -921,6 +927,7 @@ mod tests {
     use ty_module_resolver::SearchPathSettings;
     use ty_project::ProjectMetadata;
     use ty_python_core::program::{Program, ProgramSettings};
+    use ty_python_semantic::Db as _;
     use ty_python_semantic::{PythonVersionWithSource, SemanticModel};
 
     use super::*;
@@ -975,7 +982,7 @@ mod tests {
             Importer::new(
                 &self.db,
                 &self.cursor.stylist,
-                self.cursor.file,
+                PythonFile::new(&self.db, self.cursor.file, self.db.python_version()),
                 self.cursor.source.as_str(),
                 &self.cursor.parsed,
             )

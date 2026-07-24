@@ -1,3 +1,4 @@
+use crate::SemanticEnvironment;
 use crate::types::class::CodeGeneratorKind;
 use crate::types::generics::{ApplySpecialization, Specialization};
 use crate::types::mro::MroIterator;
@@ -44,7 +45,7 @@ impl<'db> ClassBase<'db> {
 
     pub(super) fn recursive_type_normalized_impl(
         self,
-        db: &'db dyn Db,
+        env: &SemanticEnvironment<'db>,
         div: Type<'db>,
         nested: bool,
     ) -> Option<Self> {
@@ -52,7 +53,7 @@ impl<'db> ClassBase<'db> {
             Self::Dynamic(dynamic) => Some(Self::Dynamic(dynamic.recursive_type_normalized())),
             Self::Divergent(_) => Some(self),
             Self::Class(class) => Some(Self::Class(
-                class.recursive_type_normalized_impl(db, div, nested)?,
+                class.recursive_type_normalized_impl(env, div, nested)?,
             )),
             Self::Any | Self::Protocol | Self::Generic | Self::TypedDict(_) => Some(self),
         }
@@ -79,8 +80,8 @@ impl<'db> ClassBase<'db> {
     }
 
     /// Return a `ClassBase` representing the class `builtins.object`
-    pub(super) fn object(db: &'db dyn Db) -> Self {
-        Self::Class(ClassType::object(db))
+    pub(super) fn object(env: &SemanticEnvironment<'db>) -> Self {
+        Self::Class(ClassType::object(env))
     }
 
     pub(super) const fn is_typed_dict(self) -> bool {
@@ -112,14 +113,14 @@ impl<'db> ClassBase<'db> {
 
     /// Convert an explicit base while preserving a direct use of the `Any` special form.
     pub(super) fn try_from_explicit_base(
-        db: &'db dyn Db,
+        env: &SemanticEnvironment<'db>,
         ty: Type<'db>,
         subclass: Option<ClassLiteral<'db>>,
     ) -> Option<Self> {
         if matches!(ty, Type::SpecialForm(SpecialFormType::Any)) {
             Some(Self::Any)
         } else {
-            Self::try_from_type(db, ty, subclass)
+            Self::try_from_type(env, ty, subclass)
         }
     }
 
@@ -127,19 +128,20 @@ impl<'db> ClassBase<'db> {
     ///
     /// Return `None` if `ty` is not an acceptable type for a class base.
     pub(super) fn try_from_type(
-        db: &'db dyn Db,
+        env: &SemanticEnvironment<'db>,
         ty: Type<'db>,
         subclass: Option<ClassLiteral<'db>>,
     ) -> Option<Self> {
+        let db = env.db();
         match ty {
             Type::Dynamic(dynamic) => Some(Self::Dynamic(dynamic)),
             Type::Divergent(divergent) => Some(Self::Divergent(divergent)),
-            Type::ClassLiteral(literal) => Some(Self::Class(literal.default_specialization(db))),
+            Type::ClassLiteral(literal) => Some(Self::Class(literal.default_specialization(env))),
             Type::GenericAlias(generic) => Some(Self::Class(ClassType::Generic(generic))),
             Type::NominalInstance(instance)
                 if instance.has_known_class(db, KnownClass::GenericAlias) =>
             {
-                Self::try_from_type(db, todo_type!("GenericAlias instance"), subclass)
+                Self::try_from_type(env, todo_type!("GenericAlias instance"), subclass)
             }
             Type::SubclassOf(subclass_of) => subclass_of
                 .subclass_of()
@@ -149,9 +151,9 @@ impl<'db> ClassBase<'db> {
                 let valid_element = inter
                     .positive(db)
                     .iter()
-                    .find_map(|elem| ClassBase::try_from_type(db, *elem, subclass))?;
+                    .find_map(|elem| ClassBase::try_from_type(env, *elem, subclass))?;
 
-                if ty.is_disjoint_from(db, KnownClass::Type.to_instance(db)) {
+                if ty.is_disjoint_from(env, KnownClass::Type.to_instance(env)) {
                     None
                 } else {
                     Some(valid_element)
@@ -180,7 +182,7 @@ impl<'db> ClassBase<'db> {
                 if union
                     .elements(db)
                     .iter()
-                    .all(|elem| ClassBase::try_from_type(db, *elem, subclass).is_some())
+                    .all(|elem| ClassBase::try_from_type(env, *elem, subclass).is_some())
                 {
                     Some(ClassBase::Dynamic(*dynamic))
                 } else {
@@ -193,10 +195,10 @@ impl<'db> ClassBase<'db> {
             // in which case we want to treat `Never` in a forgiving way and silence diagnostics
             Type::Never => Some(ClassBase::unknown()),
 
-            Type::TypeAlias(alias) => Self::try_from_type(db, alias.value_type(db), subclass),
+            Type::TypeAlias(alias) => Self::try_from_type(env, alias.value_type(env), subclass),
 
             Type::NewTypeInstance(newtype) => {
-                ClassBase::try_from_type(db, newtype.concrete_base_type(db), subclass)
+                ClassBase::try_from_type(env, newtype.concrete_base_type(env), subclass)
             }
 
             Type::PropertyInstance(_)
@@ -245,13 +247,17 @@ impl<'db> ClassBase<'db> {
                 | KnownInstanceType::FunctoolsPartial(_)
                 | KnownInstanceType::FunctoolsPartialCall(_) => None,
                 KnownInstanceType::TypeGenericAlias(_) => {
-                    Self::try_from_type(db, KnownClass::Type.to_class_literal(db), subclass)
+                    Self::try_from_type(
+                        env,
+                        KnownClass::Type.to_class_literal(env),
+                        subclass,
+                    )
                 }
                 KnownInstanceType::Annotated(ty) => {
                     match ty.inner(db) {
                         Type::Dynamic(dynamic) => Some(Self::Dynamic(dynamic)),
                         Type::NominalInstance(instance) => {
-                            Some(Self::Class(instance.class(db)))
+                            Some(Self::Class(instance.class(env)))
                         }
                         _ => None,
                     }
@@ -295,14 +301,14 @@ impl<'db> ClassBase<'db> {
 
                 SpecialFormType::NamedTuple => {
                     let class = subclass?.as_static()?;
-                    let fields = class.own_fields(db, None, CodeGeneratorKind::NamedTuple);
+                    let fields = class.own_fields(env, None, CodeGeneratorKind::NamedTuple);
                     Self::try_from_type(
-                        db,
+                        env,
                         TupleType::heterogeneous(
                             db,
                             fields.values().map(|field| field.declared_ty),
                         )?
-                        .to_class_type(db)
+                        .to_class_type(db, env.program())
                         .into(),
                         subclass,
                     )
@@ -310,20 +316,20 @@ impl<'db> ClassBase<'db> {
 
                 // TODO: Classes inheriting from `typing.Type` also have `Generic` in their MRO
                 SpecialFormType::Type => {
-                    Self::try_from_type(db, KnownClass::Type.to_class_literal(db), subclass)
+                    Self::try_from_type(env, KnownClass::Type.to_class_literal(env), subclass)
                 }
 
                 SpecialFormType::Tuple => {
-                    Self::try_from_type(db, KnownClass::Tuple.to_class_literal(db), subclass)
+                    Self::try_from_type(env, KnownClass::Tuple.to_class_literal(env), subclass)
                 }
 
                 SpecialFormType::LegacyStdlibAlias(alias) => {
-                    Self::try_from_type(db, alias.aliased_class().to_class_literal(db), subclass)
+                    Self::try_from_type(env, alias.aliased_class().to_class_literal(env), subclass)
                 }
 
                 SpecialFormType::TypingCallable | SpecialFormType::CollectionsAbcCallable => {
                     Self::try_from_type(
-                        db,
+                        env,
                         todo_type!("Support for Callable as a base class"),
                         subclass,
                     )
@@ -345,27 +351,29 @@ impl<'db> ClassBase<'db> {
     }
 
     /// Return the metaclass of this class base.
-    pub(crate) fn metaclass(self, db: &'db dyn Db) -> Type<'db> {
+    pub(crate) fn metaclass(self, env: &SemanticEnvironment<'db>) -> Type<'db> {
         match self {
-            Self::Class(class) => class.metaclass(db),
+            Self::Class(class) => class.metaclass(env),
             Self::Any => Type::Dynamic(DynamicType::Any),
             Self::Dynamic(dynamic) => Type::Dynamic(dynamic),
             Self::Divergent(divergent) => Type::Divergent(divergent),
             // TODO: all `Protocol` classes actually have `_ProtocolMeta` as their metaclass.
-            Self::Protocol | Self::Generic | Self::TypedDict(_) => KnownClass::Type.to_instance(db),
+            Self::Protocol | Self::Generic | Self::TypedDict(_) => {
+                KnownClass::Type.to_instance(env)
+            }
         }
     }
 
     fn apply_type_mapping_impl<'a>(
         self,
-        db: &'db dyn Db,
+        env: &SemanticEnvironment<'db>,
         type_mapping: &TypeMapping<'a, 'db>,
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> Self {
         match self {
             Self::Class(class) => {
-                Self::Class(class.apply_type_mapping_impl(db, type_mapping, tcx, visitor))
+                Self::Class(class.apply_type_mapping_impl(env, type_mapping, tcx, visitor))
             }
             Self::Any
             | Self::Dynamic(_)
@@ -378,12 +386,13 @@ impl<'db> ClassBase<'db> {
 
     pub(crate) fn apply_optional_specialization(
         self,
-        db: &'db dyn Db,
+        env: &SemanticEnvironment<'db>,
         specialization: Option<Specialization<'db>>,
     ) -> Self {
+        let db = env.db();
         if let Some(specialization) = specialization {
             let new_self = self.apply_type_mapping_impl(
-                db,
+                env,
                 &TypeMapping::ApplySpecialization(ApplySpecialization::Specialization(
                     specialization,
                 )),
@@ -392,23 +401,24 @@ impl<'db> ClassBase<'db> {
             );
             match specialization.materialization_kind(db) {
                 None => new_self,
-                Some(materialization_kind) => new_self.materialize(db, materialization_kind),
+                Some(materialization_kind) => new_self.materialize(env, materialization_kind),
             }
         } else {
             self
         }
     }
 
-    fn materialize(self, db: &'db dyn Db, kind: MaterializationKind) -> Self {
+    fn materialize(self, env: &SemanticEnvironment<'db>, kind: MaterializationKind) -> Self {
         self.apply_type_mapping_impl(
-            db,
+            env,
             &TypeMapping::Materialize(kind),
             TypeContext::default(),
             &ApplyTypeMappingVisitor::default(),
         )
     }
 
-    pub(super) fn has_cyclic_mro(self, db: &'db dyn Db) -> bool {
+    pub(super) fn has_cyclic_mro(self, env: &SemanticEnvironment<'db>) -> bool {
+        let db = env.db();
         match self {
             ClassBase::Class(class) => {
                 let Some((class_literal, specialization)) = class.static_class_literal(db) else {
@@ -419,7 +429,7 @@ impl<'db> ClassBase<'db> {
                     return false;
                 };
                 class_literal
-                    .try_mro(db, specialization)
+                    .try_mro(env, specialization)
                     .is_err_and(StaticMroError::is_cycle)
             }
             ClassBase::Any
@@ -434,45 +444,45 @@ impl<'db> ClassBase<'db> {
     /// Iterate over the MRO of this base
     pub(super) fn mro(
         self,
-        db: &'db dyn Db,
+        env: &SemanticEnvironment<'db>,
         additional_specialization: Option<Specialization<'db>>,
     ) -> impl Iterator<Item = ClassBase<'db>> + Clone {
         match self {
-            ClassBase::Protocol => ClassBaseMroIterator::length_3(db, self, ClassBase::Generic),
+            ClassBase::Protocol => ClassBaseMroIterator::length_3(env, self, ClassBase::Generic),
             ClassBase::Any
             | ClassBase::Dynamic(_)
             | ClassBase::Divergent(_)
             | ClassBase::Generic
-            | ClassBase::TypedDict(_) => ClassBaseMroIterator::length_2(db, self),
+            | ClassBase::TypedDict(_) => ClassBaseMroIterator::length_2(env, self),
             ClassBase::Class(class) => {
-                ClassBaseMroIterator::from_class(db, class, additional_specialization)
+                ClassBaseMroIterator::from_class(env, class, additional_specialization)
             }
         }
     }
 
-    pub(super) fn display(self, db: &'db dyn Db) -> impl std::fmt::Display {
-        self.display_with(db, DisplaySettings::default())
+    pub(super) fn display(self, env: &SemanticEnvironment<'db>) -> impl std::fmt::Display {
+        self.display_with(env, DisplaySettings::default())
     }
 
-    pub(super) fn display_with(
+    pub(super) fn display_with<'env>(
         self,
-        db: &'db dyn Db,
+        env: &'env SemanticEnvironment<'db>,
         display_settings: DisplaySettings<'db>,
-    ) -> impl std::fmt::Display {
-        struct ClassBaseDisplay<'db> {
-            db: &'db dyn Db,
+    ) -> impl std::fmt::Display + 'env {
+        struct ClassBaseDisplay<'env, 'db> {
+            env: &'env SemanticEnvironment<'db>,
             base: ClassBase<'db>,
             settings: DisplaySettings<'db>,
         }
 
-        impl std::fmt::Display for ClassBaseDisplay<'_> {
+        impl std::fmt::Display for ClassBaseDisplay<'_, '_> {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                 match self.base {
                     ClassBase::Any => f.write_str("Any"),
                     ClassBase::Dynamic(dynamic) => dynamic.fmt(f),
                     ClassBase::Divergent(_) => f.write_str("Divergent"),
                     ClassBase::Class(class) => Type::from(class)
-                        .display_with(self.db, self.settings.clone())
+                        .display_with(self.env, self.settings.clone())
                         .fmt(f),
                     ClassBase::Protocol => f.write_str("typing.Protocol"),
                     ClassBase::Generic => f.write_str("typing.Generic"),
@@ -482,7 +492,7 @@ impl<'db> ClassBase<'db> {
         }
 
         ClassBaseDisplay {
-            db,
+            env,
             base: self,
             settings: display_settings,
         }
@@ -525,22 +535,26 @@ enum ClassBaseMroIterator<'db> {
 
 impl<'db> ClassBaseMroIterator<'db> {
     /// Iterate over an MRO of length 2 that consists of `first_element` and then `object`.
-    fn length_2(db: &'db dyn Db, first_element: ClassBase<'db>) -> Self {
-        ClassBaseMroIterator::Length2([first_element, ClassBase::object(db)].into_iter())
+    fn length_2(env: &SemanticEnvironment<'db>, first_element: ClassBase<'db>) -> Self {
+        ClassBaseMroIterator::Length2([first_element, ClassBase::object(env)].into_iter())
     }
 
     /// Iterate over an MRO of length 3 that consists of `first_element`, then `second_element`, then `object`.
-    fn length_3(db: &'db dyn Db, element_1: ClassBase<'db>, element_2: ClassBase<'db>) -> Self {
-        ClassBaseMroIterator::Length3([element_1, element_2, ClassBase::object(db)].into_iter())
+    fn length_3(
+        env: &SemanticEnvironment<'db>,
+        element_1: ClassBase<'db>,
+        element_2: ClassBase<'db>,
+    ) -> Self {
+        ClassBaseMroIterator::Length3([element_1, element_2, ClassBase::object(env)].into_iter())
     }
 
     /// Iterate over the MRO of an arbitrary class. The MRO may be of any length.
     fn from_class(
-        db: &'db dyn Db,
+        env: &SemanticEnvironment<'db>,
         class: ClassType<'db>,
         additional_specialization: Option<Specialization<'db>>,
     ) -> Self {
-        ClassBaseMroIterator::FromClass(class.iter_mro_specialized(db, additional_specialization))
+        ClassBaseMroIterator::FromClass(class.iter_mro_specialized(env, additional_specialization))
     }
 }
 

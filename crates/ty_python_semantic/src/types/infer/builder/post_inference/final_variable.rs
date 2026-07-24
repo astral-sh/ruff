@@ -27,9 +27,10 @@ pub(crate) fn check_final_without_value<'db>(
 
     let use_def = index.use_def_map(file_scope_id);
     let place_table = index.place_table(file_scope_id);
+    let env = context.semantic_environment();
 
     for (symbol_id, declarations) in use_def.all_end_of_scope_symbol_declarations() {
-        let result = place_from_declarations(db, declarations);
+        let result = place_from_declarations(env, declarations);
         let first_declaration = result.first_declaration;
         let (place_and_quals, _) = result.into_place_and_conflicting_declarations();
 
@@ -46,7 +47,7 @@ pub(crate) fn check_final_without_value<'db>(
 
         // Check if the symbol has any bindings in the current scope.
         let bindings = use_def.end_of_scope_symbol_bindings(symbol_id);
-        let binding_place = place_from_bindings(db, bindings);
+        let binding_place = place_from_bindings(env, bindings);
 
         if !binding_place.place.is_undefined() {
             continue;

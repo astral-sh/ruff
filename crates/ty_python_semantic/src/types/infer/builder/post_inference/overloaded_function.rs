@@ -46,6 +46,7 @@ pub(crate) fn check_overloaded_function<'db>(
     };
 
     let db = context.db();
+    let env = context.semantic_environment();
 
     if function.file(db) != context.file() {
         // If the function is not in this file, we don't need to check it.
@@ -53,7 +54,7 @@ pub(crate) fn check_overloaded_function<'db>(
         return;
     }
 
-    if !function.has_known_decorator(db, FunctionDecorators::OVERLOAD) {
+    if !function.has_known_decorator(env, FunctionDecorators::OVERLOAD) {
         return;
     }
 
@@ -66,7 +67,7 @@ pub(crate) fn check_overloaded_function<'db>(
         definedness: Definedness::AlwaysDefined,
         ..
     }) = place_from_bindings(
-        db,
+        env,
         use_def.end_of_scope_symbol_bindings(place.as_symbol().unwrap()),
     )
     .place
@@ -74,7 +75,7 @@ pub(crate) fn check_overloaded_function<'db>(
         return;
     };
 
-    if !function.contains_definition(db, definition) {
+    if !function.contains_definition(env, definition) {
         // The public end-of-scope binding for this place can be a different overloaded function
         // value assigned to the same name. In that case, the current local overload definition is
         // shadowed, and checking the public function here would report against the wrong function.
@@ -91,7 +92,7 @@ pub(crate) fn check_overloaded_function<'db>(
         return;
     }
 
-    let (overloads, implementation) = function.overloads_and_implementation(db);
+    let (overloads, implementation) = function.overloads_and_implementation(env);
     if overloads.is_empty() {
         return;
     }
@@ -114,8 +115,8 @@ pub(crate) fn check_overloaded_function<'db>(
                 function_node.name
             ));
             diagnostic.set_primary_message("Only one overload defined here");
-            if let Some(decorator) =
-                single_overload.find_known_decorator_span(db, KnownFunction::Overload)
+            if let Some(decorator) = single_overload
+                .find_known_decorator_span(context.semantic_environment(), KnownFunction::Overload)
             {
                 diagnostic.annotate(Annotation::secondary(decorator));
             }
@@ -128,7 +129,7 @@ pub(crate) fn check_overloaded_function<'db>(
     if implementation.is_none() && !context.in_stub() {
         let mut implementation_required = true;
 
-        if function.iter_overloads_and_implementation(db).all(|f| {
+        if function.iter_overloads_and_implementation(env).all(|f| {
             index.is_in_type_checking_block(
                 f.body_scope(db).file_scope_id(db),
                 f.node(db, context.file(), context.module()).range(),
@@ -141,12 +142,13 @@ pub(crate) fn check_overloaded_function<'db>(
                 index.expect_single_definition(class_node_ref.node(context.module())),
             )
         {
-            if class.is_protocol(db)
-                || (Type::ClassLiteral(class)
-                    .is_subtype_of(db, KnownClass::ABCMeta.to_instance(db))
-                    && overloads.iter().all(|overload| {
-                        overload.has_known_decorator(db, FunctionDecorators::ABSTRACT_METHOD)
-                    }))
+            if class.is_protocol(env)
+                || ({
+                    Type::ClassLiteral(class)
+                        .is_subtype_of(env, KnownClass::ABCMeta.to_instance(env))
+                } && overloads.iter().all(|overload| {
+                    overload.has_known_decorator(db, FunctionDecorators::ABSTRACT_METHOD)
+                }))
             {
                 implementation_required = false;
             }
@@ -191,9 +193,10 @@ pub(crate) fn check_overloaded_function<'db>(
                         .secondary(function.focus_range(db, context.module()))
                         .message(format_args!("Missing here")),
                 );
-                if let Some(decorator) =
-                    function.find_known_decorator_span(db, KnownFunction::Overload)
-                {
+                if let Some(decorator) = function.find_known_decorator_span(
+                    context.semantic_environment(),
+                    KnownFunction::Overload,
+                ) {
                     diagnostic.annotate(Annotation::secondary(decorator));
                 }
             }
@@ -220,7 +223,8 @@ pub(crate) fn check_overloaded_function<'db>(
                     name = known_function.name()
                 ));
                 for known_function in [known_function, KnownFunction::Overload] {
-                    if let Some(decorator) = overload.find_known_decorator_span(db, known_function)
+                    if let Some(decorator) = overload
+                        .find_known_decorator_span(context.semantic_environment(), known_function)
                     {
                         diagnostic.annotate(Annotation::secondary(decorator));
                     }
@@ -250,11 +254,13 @@ pub(crate) fn check_overloaded_function<'db>(
                         first overload",
                     name = known_function.name()
                 ));
-                if let Some(decorator) = overload.find_known_decorator_span(db, known_function) {
+                if let Some(decorator) = overload
+                    .find_known_decorator_span(context.semantic_environment(), known_function)
+                {
                     diagnostic.annotate(Annotation::secondary(decorator));
                 }
                 let file = function.file(db);
-                let module = parsed_module(db, file).load(db);
+                let module = parsed_module(db, first_overload.python_file(db)).load(db);
                 let node = first_overload.node(db, file, &module);
                 let span = if node.body.len() == 1 {
                     Span::from(file).with_range(node.range())
@@ -285,7 +291,8 @@ fn check_non_generic_overload_implementation_consistency<'db>(
     }
 
     let db = context.db();
-    let implementation_signature = implementation.signature(db);
+    let env = context.semantic_environment();
+    let implementation_signature = implementation.signature(env);
 
     // TODO: Remove this temporary non-generic restriction once overload implementation consistency
     // handles type-variable domains.
@@ -295,7 +302,7 @@ fn check_non_generic_overload_implementation_consistency<'db>(
 
     let overload_signatures = overloads
         .iter()
-        .map(|overload| (overload, overload.signature(db)));
+        .map(|overload| (overload, overload.signature(env)));
 
     if overload_signatures
         .clone()
@@ -307,9 +314,9 @@ fn check_non_generic_overload_implementation_consistency<'db>(
     for (overload, overload_signature) in overload_signatures {
         let function_node = overload.node(db, context.file(), context.module());
         let parameter_consistency = implementation_signature
-            .non_generic_implementation_parameters_consistency_with(db, &overload_signature);
+            .non_generic_implementation_parameters_consistency_with(env, &overload_signature);
         let return_type_consistency = implementation_signature
-            .non_generic_implementation_return_type_consistency_with(db, &overload_signature);
+            .non_generic_implementation_return_type_consistency_with(env, &overload_signature);
 
         let (parameter_error_context, return_type_error_context, message) =
             match (parameter_consistency, return_type_consistency) {
@@ -347,18 +354,18 @@ fn check_non_generic_overload_implementation_consistency<'db>(
         if let Some(error_context) = parameter_error_context {
             diagnostic.info(format_args!(
                 "Implementation signature `{}` is not assignable to overload signature `{}`",
-                implementation_signature.display(db),
-                overload_signature.display(db),
+                implementation_signature.display(env),
+                overload_signature.display(env),
             ));
-            error_context.attach_to(db, &mut diagnostic);
+            error_context.attach_to(env, &mut diagnostic);
         }
         if let Some(error_context) = return_type_error_context {
             diagnostic.info(format_args!(
                 "Overload returns `{}`, which is not assignable to implementation return type `{}`",
-                overload_signature.return_ty.display(db),
-                implementation_signature.return_ty.display(db),
+                overload_signature.return_ty.display(env),
+                implementation_signature.return_ty.display(env),
             ));
-            error_context.attach_to(db, &mut diagnostic);
+            error_context.attach_to(env, &mut diagnostic);
         }
         diagnostic.annotate(
             context

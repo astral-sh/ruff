@@ -1,3 +1,4 @@
+use crate::{Program, SemanticEnvironment};
 use std::fmt::Write;
 
 pub(crate) use self::dynamic_literal::{
@@ -51,6 +52,7 @@ use crate::{
     },
     types::{MetaclassCandidate, TypeDefinition, UnionType},
 };
+use ruff_db::PythonFile;
 use ruff_db::diagnostic::Span;
 use ruff_db::files::File;
 use ruff_python_ast::name::Name;
@@ -101,17 +103,24 @@ impl<'db> CodeGeneratorKind<'db> {
     /// This is invariant across generic specializations. Type arguments affect the types of
     /// synthesized members, but not whether the class is dataclass-like, a Pydantic model, a
     /// `NamedTuple`, or a `TypedDict`.
-    pub(crate) fn from_class(db: &'db dyn Db, class: ClassLiteral<'db>) -> Option<Self> {
+    pub(crate) fn from_class(
+        env: &SemanticEnvironment<'db>,
+        class: ClassLiteral<'db>,
+    ) -> Option<Self> {
         match class {
-            ClassLiteral::Static(static_class) => Self::from_static_class(db, static_class),
-            ClassLiteral::Dynamic(dynamic_class) => Self::from_dynamic_class(db, dynamic_class),
+            ClassLiteral::Static(static_class) => Self::from_static_class(env, static_class),
+            ClassLiteral::Dynamic(dynamic_class) => Self::from_dynamic_class(env, dynamic_class),
             ClassLiteral::DynamicNamedTuple(_) => Some(Self::NamedTuple),
             ClassLiteral::DynamicTypedDict(_) => Some(Self::TypedDict),
             ClassLiteral::DynamicEnum(_) => None,
         }
     }
 
-    fn from_static_class(db: &'db dyn Db, class: StaticClassLiteral<'db>) -> Option<Self> {
+    fn from_static_class(
+        env: &SemanticEnvironment<'db>,
+        class: StaticClassLiteral<'db>,
+    ) -> Option<Self> {
+        let db = env.db();
         if class.dataclass_params(db).is_none()
             && class.known(db).is_none()
             && !class.has_explicit_bases(db)
@@ -129,6 +138,7 @@ impl<'db> CodeGeneratorKind<'db> {
             db: &'db dyn Db,
             class: StaticClassLiteral<'db>,
         ) -> Option<CodeGeneratorKind<'db>> {
+            let env = SemanticEnvironment::from_file(db, class.python_file(db));
             // If a class is directly decorated as a dataclass, it's a dataclass.
             // If a class' metaclass is a dataclass transformer, it's a dataclass.
             // If a class inherits from a base class that is a dataclass
@@ -138,23 +148,23 @@ impl<'db> CodeGeneratorKind<'db> {
             // dataclass.)
             if class.dataclass_params(db).is_some() {
                 Some(CodeGeneratorKind::DataclassLike(None))
-            } else if let Ok((_, Some(info))) = class.try_metaclass(db) {
+            } else if let Ok((_, Some(info))) = class.try_metaclass(&env) {
                 Some(CodeGeneratorKind::from_dataclass_transformer(
-                    db,
+                    &env,
                     class,
                     info.params,
                 ))
             } else if KnownClass::Type
-                .try_to_class_literal(db)
+                .try_to_class_literal(&env)
                 .is_none_or(|type_class| {
                     !class.is_subclass_of(
-                        db,
+                        &env,
                         None,
                         ClassType::NonGeneric(ClassLiteral::Static(type_class)),
                     )
                 })
                 && let Some(transformer_params) =
-                    class.iter_mro(db, None).skip(1).find_map(|base| {
+                    class.iter_mro(&env, None).skip(1).find_map(|base| {
                         base.into_class().and_then(|class| {
                             class
                                 .static_class_literal(db)
@@ -163,33 +173,34 @@ impl<'db> CodeGeneratorKind<'db> {
                     })
             {
                 Some(CodeGeneratorKind::from_dataclass_transformer(
-                    db,
+                    &env,
                     class,
                     transformer_params,
                 ))
             } else if class
-                .explicit_bases(db)
+                .explicit_bases(&env)
                 .contains(&Type::SpecialForm(SpecialFormType::NamedTuple))
             {
                 Some(CodeGeneratorKind::NamedTuple)
-            } else if class.is_typed_dict(db) {
+            } else if class.is_typed_dict(&env) {
                 Some(CodeGeneratorKind::TypedDict)
             } else {
                 None
             }
         }
 
+        debug_assert_eq!(env.program(), class.program(db));
         code_generator_of_static_class(db, class)
     }
 
     fn from_dataclass_transformer(
-        db: &'db dyn Db,
+        env: &SemanticEnvironment<'db>,
         class: StaticClassLiteral<'db>,
         transformer_params: DataclassTransformerParams<'db>,
     ) -> Self {
-        if pydantic::is_model(db, class) {
+        if pydantic::is_model(env, class) {
             Self::Pydantic(pydantic::ModelMetadata::from_class(
-                db,
+                env,
                 class,
                 transformer_params,
             ))
@@ -198,7 +209,10 @@ impl<'db> CodeGeneratorKind<'db> {
         }
     }
 
-    fn from_dynamic_class(db: &'db dyn Db, class: DynamicClassLiteral<'db>) -> Option<Self> {
+    fn from_dynamic_class(
+        env: &SemanticEnvironment<'db>,
+        class: DynamicClassLiteral<'db>,
+    ) -> Option<Self> {
         #[salsa::tracked(
             returns(copy),
             cycle_initial=|_, _, _| None,
@@ -214,7 +228,8 @@ impl<'db> CodeGeneratorKind<'db> {
             }
 
             // Dynamic classes can also inherit from classes with dataclass_transform.
-            class.iter_mro(db).skip(1).find_map(|base| {
+            let env = SemanticEnvironment::from_file(db, class.scope(db).python_file(db));
+            class.iter_mro(&env).skip(1).find_map(|base| {
                 base.into_class().and_then(|class| {
                     class
                         .static_class_literal(db)
@@ -224,12 +239,14 @@ impl<'db> CodeGeneratorKind<'db> {
             })
         }
 
+        let db = env.db();
+        debug_assert_eq!(env.program(), class.scope(db).program(db));
         code_generator_of_dynamic_class(db, class)
     }
 
-    pub(super) fn matches(self, db: &'db dyn Db, class: ClassLiteral<'db>) -> bool {
+    pub(super) fn matches(self, env: &SemanticEnvironment<'db>, class: ClassLiteral<'db>) -> bool {
         matches!(
-            (CodeGeneratorKind::from_class(db, class), self),
+            (CodeGeneratorKind::from_class(env, class), self),
             (Some(Self::DataclassLike(_)), Self::DataclassLike(_))
                 | (Some(Self::Pydantic(_)), Self::Pydantic(_))
                 | (Some(Self::NamedTuple), Self::NamedTuple)
@@ -300,12 +317,14 @@ impl<'db> CodeGeneratorKind<'db> {
     /// ```
     pub(super) fn synthesizes_constructor_signature_from_fields(
         self,
-        db: &'db dyn Db,
+        env: &SemanticEnvironment<'db>,
         class: StaticClassLiteral<'db>,
     ) -> bool {
         match self {
             Self::DataclassLike(_) => true,
-            Self::Pydantic(_) => pydantic::synthesizes_constructor_signature_from_fields(db, class),
+            Self::Pydantic(_) => {
+                pydantic::synthesizes_constructor_signature_from_fields(env, class)
+            }
             Self::NamedTuple | Self::TypedDict => false,
         }
     }
@@ -328,11 +347,12 @@ pub struct GenericAlias<'db> {
 }
 
 pub(super) fn walk_generic_alias<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
-    db: &'db dyn Db,
+    env: &SemanticEnvironment<'db>,
     alias: GenericAlias<'db>,
     visitor: &V,
 ) {
-    walk_specialization(db, alias.specialization(db), visitor);
+    let db = env.db();
+    walk_specialization(env, alias.specialization(db), visitor);
 }
 
 // The Salsa heap is tracked separately.
@@ -359,15 +379,16 @@ impl<'db> GenericAlias<'db> {
 
     pub(super) fn recursive_type_normalized_impl(
         self,
-        db: &'db dyn Db,
+        env: &SemanticEnvironment<'db>,
         div: Type<'db>,
         nested: bool,
     ) -> Option<Self> {
+        let db = env.db();
         Some(Self::new(
             db,
             self.origin(db),
             self.specialization(db)
-                .recursive_type_normalized_impl(db, div, nested)?,
+                .recursive_type_normalized_impl(env, div, nested)?,
         ))
     }
 
@@ -377,20 +398,21 @@ impl<'db> GenericAlias<'db> {
 
     pub(super) fn apply_type_mapping_impl<'a>(
         self,
-        db: &'db dyn Db,
+        env: &SemanticEnvironment<'db>,
         type_mapping: &TypeMapping<'a, 'db>,
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> Self {
+        let db = env.db();
         let tcx = tcx
             .annotation
-            .and_then(|ty| ty.specialization_of(db, self.origin(db)))
+            .and_then(|ty| ty.specialization_of(env, self.origin(db)))
             .map(|specialization| specialization.types(db))
             .unwrap_or(&[]);
 
         let original_specialization = self.specialization(db);
         let specialization =
-            original_specialization.apply_type_mapping_impl(db, type_mapping, tcx, visitor);
+            original_specialization.apply_type_mapping_impl(env, type_mapping, tcx, visitor);
         if specialization == original_specialization {
             self
         } else {
@@ -400,17 +422,18 @@ impl<'db> GenericAlias<'db> {
 
     pub(super) fn find_legacy_typevars_impl(
         self,
-        db: &'db dyn Db,
+        env: &SemanticEnvironment<'db>,
         binding_context: Option<Definition<'db>>,
         typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
         visitor: &FindLegacyTypeVarsVisitor<'db>,
     ) {
+        let db = env.db();
         self.specialization(db)
-            .find_legacy_typevars_impl(db, binding_context, typevars, visitor);
+            .find_legacy_typevars_impl(env, binding_context, typevars, visitor);
     }
 
-    pub(crate) fn is_typed_dict(self, db: &'db dyn Db) -> bool {
-        self.origin(db).is_typed_dict(db)
+    pub(crate) fn is_typed_dict(self, env: &SemanticEnvironment<'db>) -> bool {
+        self.origin(env.db()).is_typed_dict(env)
     }
 }
 
@@ -420,15 +443,32 @@ impl<'db> From<GenericAlias<'db>> for Type<'db> {
     }
 }
 
-#[salsa::tracked]
 impl<'db> VarianceInferable<'db> for GenericAlias<'db> {
+    fn variance_of(
+        self,
+        env: &SemanticEnvironment<'db>,
+        typevar: BoundTypeVarIdentity<'db>,
+    ) -> TypeVarVariance {
+        let db = env.db();
+        debug_assert_eq!(env.program(), self.origin(db).program(db));
+        self.variance_of_owner(db, typevar)
+    }
+}
+
+#[salsa::tracked]
+impl<'db> GenericAlias<'db> {
     #[salsa::tracked(
         returns(copy),
         cycle_initial=|_, _, _, _| TypeVarVariance::Bivariant,
         heap_size=ruff_memory_usage::heap_size
     )]
-    fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarIdentity<'db>) -> TypeVarVariance {
+    fn variance_of_owner(
+        self,
+        db: &'db dyn Db,
+        typevar: BoundTypeVarIdentity<'db>,
+    ) -> TypeVarVariance {
         let origin = self.origin(db);
+        let env = SemanticEnvironment::from_file(db, origin.python_file(db));
 
         let specialization = self.specialization(db);
 
@@ -440,7 +480,8 @@ impl<'db> VarianceInferable<'db> for GenericAlias<'db> {
             .zip(specialization.types(db))
             .map(|(generic_typevar, ty)| {
                 if let Some(explicit_variance) = generic_typevar.typevar(db).explicit_variance(db) {
-                    ty.with_polarity(explicit_variance).variance_of(db, typevar)
+                    ty.with_polarity(explicit_variance)
+                        .variance_of(&env, typevar)
                 } else {
                     // `with_polarity` composes the passed variance with the
                     // inferred one. The inference is done lazily, as we can
@@ -453,10 +494,10 @@ impl<'db> VarianceInferable<'db> for GenericAlias<'db> {
                     // If salsa let us look at the cache, we could check first
                     // to see if the class literal query was already run.
 
-                    let typevar_variance_in_substituted_type = ty.variance_of(db, typevar);
+                    let typevar_variance_in_substituted_type = ty.variance_of(&env, typevar);
                     origin
                         .with_polarity(typevar_variance_in_substituted_type)
-                        .variance_of(db, generic_typevar.identity(db))
+                        .variance_of(&env, generic_typevar.identity(db))
                 }
             })
             .collect()
@@ -483,31 +524,31 @@ pub enum ClassLiteral<'db> {
 #[salsa::tracked]
 impl<'db> ClassLiteral<'db> {
     /// Return a `ClassLiteral` representing the class `builtins.object`
-    pub(super) fn object(db: &'db dyn Db) -> Self {
+    pub(super) fn object(env: &SemanticEnvironment<'db>) -> Self {
         KnownClass::Object
-            .to_class_literal(db)
+            .to_class_literal(env)
             .as_class_literal()
             .expect("`object` should always be a non-generic class in typeshed")
     }
 
     pub(super) fn recursive_type_normalized_impl(
         self,
-        db: &'db dyn Db,
+        env: &SemanticEnvironment<'db>,
         div: Type<'db>,
         nested: bool,
     ) -> Option<Self> {
         match self {
             Self::Dynamic(dynamic) => Some(Self::Dynamic(
-                dynamic.recursive_type_normalized_impl(db, div, nested)?,
+                dynamic.recursive_type_normalized_impl(env, div, nested)?,
             )),
             Self::DynamicNamedTuple(named_tuple) => Some(Self::DynamicNamedTuple(
-                named_tuple.recursive_type_normalized_impl(db, div, nested)?,
+                named_tuple.recursive_type_normalized_impl(env, div, nested)?,
             )),
             Self::DynamicTypedDict(typed_dict) => Some(Self::DynamicTypedDict(
-                typed_dict.recursive_type_normalized_impl(db, div, nested)?,
+                typed_dict.recursive_type_normalized_impl(env, div, nested)?,
             )),
             Self::DynamicEnum(enum_literal) => Some(Self::DynamicEnum(
-                enum_literal.recursive_type_normalized_impl(db, div, nested)?,
+                enum_literal.recursive_type_normalized_impl(env, div, nested)?,
             )),
             Self::Static(_) => Some(self),
         }
@@ -530,30 +571,30 @@ impl<'db> ClassLiteral<'db> {
     }
 
     /// Returns whether this class has PEP 695 type parameters.
-    pub(crate) fn has_pep_695_type_params(self, db: &'db dyn Db) -> bool {
+    pub(crate) fn has_pep_695_type_params(self, env: &SemanticEnvironment<'db>) -> bool {
         self.as_static()
-            .is_some_and(|class| class.has_pep_695_type_params(db))
+            .is_some_and(|class| class.has_pep_695_type_params(env))
     }
 
     /// Returns an iterator over the MRO.
-    pub(crate) fn iter_mro(self, db: &'db dyn Db) -> MroIterator<'db> {
-        MroIterator::new(db, self, None)
+    pub(crate) fn iter_mro(self, env: &SemanticEnvironment<'db>) -> MroIterator<'db> {
+        MroIterator::new(env, self, None)
     }
 
     /// Return the properties that affect how instances of this class are represented.
-    pub(super) fn instance_flags(self, db: &'db dyn Db) -> ClassInstanceFlags {
+    pub(super) fn instance_flags(self, env: &SemanticEnvironment<'db>) -> ClassInstanceFlags {
         match self {
-            Self::Static(literal) => literal.instance_flags(db),
+            Self::Static(literal) => literal.instance_flags(env),
             Self::DynamicTypedDict(_) => ClassInstanceFlags::TYPED_DICT,
             Self::DynamicNamedTuple(_) => ClassInstanceFlags::empty(),
-            Self::Dynamic(literal) if literal.explicit_bases(db).is_empty() => {
+            Self::Dynamic(literal) if literal.explicit_bases(env).is_empty() => {
                 ClassInstanceFlags::empty()
             }
-            Self::DynamicEnum(literal) if literal.explicit_bases(db).is_empty() => {
+            Self::DynamicEnum(literal) if literal.explicit_bases(env).is_empty() => {
                 ClassInstanceFlags::empty()
             }
             Self::Dynamic(_) | Self::DynamicEnum(_) => {
-                if self.iter_mro(db).any(ClassBase::is_explicit_any_base) {
+                if self.iter_mro(env).any(ClassBase::is_explicit_any_base) {
                     ClassInstanceFlags::INHERITS_FROM_EXPLICIT_ANY
                 } else {
                     ClassInstanceFlags::empty()
@@ -563,35 +604,35 @@ impl<'db> ClassLiteral<'db> {
     }
 
     /// Return whether this class directly or indirectly inherits from an explicit `Any` base.
-    pub(super) fn inherits_from_explicit_any(self, db: &'db dyn Db) -> bool {
-        self.instance_flags(db)
+    pub(super) fn inherits_from_explicit_any(self, env: &SemanticEnvironment<'db>) -> bool {
+        self.instance_flags(env)
             .contains(ClassInstanceFlags::INHERITS_FROM_EXPLICIT_ANY)
     }
 
     /// Returns the metaclass of this class.
-    pub(crate) fn metaclass(self, db: &'db dyn Db) -> Type<'db> {
+    pub(crate) fn metaclass(self, env: &SemanticEnvironment<'db>) -> Type<'db> {
         match self {
-            Self::Static(class) => class.metaclass(db),
-            Self::Dynamic(class) => class.metaclass(db),
-            Self::DynamicNamedTuple(namedtuple) => namedtuple.metaclass(db),
-            Self::DynamicTypedDict(typeddict) => typeddict.metaclass(db),
-            Self::DynamicEnum(enum_lit) => enum_lit.metaclass(db),
+            Self::Static(class) => class.metaclass(env),
+            Self::Dynamic(class) => class.metaclass(env),
+            Self::DynamicNamedTuple(namedtuple) => namedtuple.metaclass(env),
+            Self::DynamicTypedDict(typeddict) => typeddict.metaclass(env),
+            Self::DynamicEnum(enum_lit) => enum_lit.metaclass(env),
         }
     }
 
     /// Look up a class-level member by iterating through the MRO.
     pub(crate) fn class_member(
         self,
-        db: &'db dyn Db,
+        env: &SemanticEnvironment<'db>,
         name: &str,
         policy: MemberLookupPolicy,
     ) -> PlaceAndQualifiers<'db> {
         match self {
-            Self::Static(class) => class.class_member(db, name, policy),
-            Self::Dynamic(class) => class.class_member(db, name, policy),
-            Self::DynamicNamedTuple(namedtuple) => namedtuple.class_member(db, name, policy),
-            Self::DynamicTypedDict(typeddict) => typeddict.class_member(db, name, policy),
-            Self::DynamicEnum(enum_lit) => enum_lit.class_member(db, name),
+            Self::Static(class) => class.class_member(env, name, policy),
+            Self::Dynamic(class) => class.class_member(env, name, policy),
+            Self::DynamicNamedTuple(namedtuple) => namedtuple.class_member(env, name, policy),
+            Self::DynamicTypedDict(typeddict) => typeddict.class_member(env, name, policy),
+            Self::DynamicEnum(enum_lit) => enum_lit.class_member(env, name),
         }
     }
 
@@ -600,23 +641,23 @@ impl<'db> ClassLiteral<'db> {
     /// This is used by `super()` to start the MRO lookup after the pivot class.
     pub(super) fn class_member_from_mro(
         self,
-        db: &'db dyn Db,
+        env: &SemanticEnvironment<'db>,
         name: &str,
         policy: MemberLookupPolicy,
         mro_iter: impl Iterator<Item = ClassBase<'db>>,
     ) -> PlaceAndQualifiers<'db> {
         match self {
-            Self::Static(class) => class.class_member_from_mro(db, name, policy, mro_iter),
+            Self::Static(class) => class.class_member_from_mro(env, name, policy, mro_iter),
             Self::Dynamic(_)
             | Self::DynamicNamedTuple(_)
             | Self::DynamicTypedDict(_)
             | Self::DynamicEnum(_) => {
                 // Dynamic classes don't have inherited generic context and are never `object`.
-                let result = MroLookup::new(db, mro_iter).class_member(name, policy, None, false);
+                let result = MroLookup::new(env, mro_iter).class_member(name, policy, None, false);
                 match result {
-                    ClassMemberResult::Done(result) => result.finalize(db),
+                    ClassMemberResult::Done(result) => result.finalize(env),
                     ClassMemberResult::TypedDict(module) => {
-                        typed_dict::typed_dict_fallback_class_member(db, module, policy, name)
+                        typed_dict::typed_dict_fallback_class_member(env, module, policy, name)
                     }
                 }
             }
@@ -632,9 +673,9 @@ impl<'db> ClassLiteral<'db> {
     ///
     /// For static classes, this applies default type arguments.
     /// For dynamic classes, this returns a non-generic class type.
-    pub(crate) fn default_specialization(self, db: &'db dyn Db) -> ClassType<'db> {
+    pub(crate) fn default_specialization(self, env: &SemanticEnvironment<'db>) -> ClassType<'db> {
         match self {
-            Self::Static(class) => class.default_specialization(db),
+            Self::Static(class) => class.default_specialization(env),
             Self::Dynamic(_)
             | Self::DynamicNamedTuple(_)
             | Self::DynamicTypedDict(_)
@@ -647,9 +688,9 @@ impl<'db> ClassLiteral<'db> {
     /// For non-generic classes, the class is returned unchanged.
     /// For a non-specialized generic class, we return a generic alias that maps each of the class's
     /// typevars to `Unknown`.
-    pub(crate) fn unknown_specialization(self, db: &'db dyn Db) -> ClassType<'db> {
+    pub(crate) fn unknown_specialization(self, env: &SemanticEnvironment<'db>) -> ClassType<'db> {
         match self {
-            Self::Static(class) => class.unknown_specialization(db),
+            Self::Static(class) => class.unknown_specialization(env),
             Self::Dynamic(_)
             | Self::DynamicNamedTuple(_)
             | Self::DynamicTypedDict(_)
@@ -658,9 +699,9 @@ impl<'db> ClassLiteral<'db> {
     }
 
     /// Returns the identity specialization for this class (same as default for non-generic).
-    pub(crate) fn identity_specialization(self, db: &'db dyn Db) -> ClassType<'db> {
+    pub(crate) fn identity_specialization(self, env: &SemanticEnvironment<'db>) -> ClassType<'db> {
         match self {
-            Self::Static(class) => class.identity_specialization(db),
+            Self::Static(class) => class.identity_specialization(env),
             Self::Dynamic(_)
             | Self::DynamicNamedTuple(_)
             | Self::DynamicTypedDict(_)
@@ -669,19 +710,23 @@ impl<'db> ClassLiteral<'db> {
     }
 
     /// Returns the generic context if this is a generic class.
-    pub(crate) fn generic_context(self, db: &'db dyn Db) -> Option<GenericContext<'db>> {
-        self.as_static().and_then(|class| class.generic_context(db))
+    pub(crate) fn generic_context(
+        self,
+        env: &SemanticEnvironment<'db>,
+    ) -> Option<GenericContext<'db>> {
+        self.as_static()
+            .and_then(|class| class.generic_context(env))
     }
 
     /// Returns whether this class is a protocol.
-    pub(crate) fn is_protocol(self, db: &'db dyn Db) -> bool {
-        self.as_static().is_some_and(|class| class.is_protocol(db))
+    pub(crate) fn is_protocol(self, env: &SemanticEnvironment<'db>) -> bool {
+        self.as_static().is_some_and(|class| class.is_protocol(env))
     }
 
     /// Returns whether this class is a `TypedDict`.
-    pub fn is_typed_dict(self, db: &'db dyn Db) -> bool {
+    pub fn is_typed_dict(self, env: &SemanticEnvironment<'db>) -> bool {
         match self {
-            Self::Static(class) => class.is_typed_dict(db),
+            Self::Static(class) => class.is_typed_dict(env),
             Self::DynamicTypedDict(_) => true,
             Self::Dynamic(_) | Self::DynamicNamedTuple(_) | Self::DynamicEnum(_) => false,
         }
@@ -699,9 +744,9 @@ impl<'db> ClassLiteral<'db> {
     }
 
     /// Return a type representing "the set of all instances of the metaclass of this class".
-    pub(crate) fn metaclass_instance_type(self, db: &'db dyn Db) -> Type<'db> {
-        self.metaclass(db)
-            .to_instance_approximation(db)
+    pub(crate) fn metaclass_instance_type(self, env: &SemanticEnvironment<'db>) -> Type<'db> {
+        self.metaclass(env)
+            .to_instance_approximation(env)
             .expect("`Type::to_instance()` should always return `Some()` when called on the type of a metaclass")
     }
 
@@ -719,6 +764,26 @@ impl<'db> ClassLiteral<'db> {
             Self::DynamicNamedTuple(class) => class.scope(db).file(db),
             Self::DynamicTypedDict(class) => class.scope(db).file(db),
             Self::DynamicEnum(enum_lit) => enum_lit.scope(db).file(db),
+        }
+    }
+
+    pub(crate) fn python_file(self, db: &'db dyn Db) -> PythonFile<'db> {
+        match self {
+            Self::Static(class) => class.python_file(db),
+            Self::Dynamic(class) => class.scope(db).python_file(db),
+            Self::DynamicNamedTuple(class) => class.scope(db).python_file(db),
+            Self::DynamicTypedDict(class) => class.scope(db).python_file(db),
+            Self::DynamicEnum(enum_lit) => enum_lit.scope(db).python_file(db),
+        }
+    }
+
+    pub(crate) fn program(self, db: &'db dyn Db) -> Program {
+        match self {
+            Self::Static(class) => class.program(db),
+            Self::Dynamic(class) => class.scope(db).program(db),
+            Self::DynamicNamedTuple(class) => class.scope(db).program(db),
+            Self::DynamicTypedDict(class) => class.scope(db).program(db),
+            Self::DynamicEnum(enum_lit) => enum_lit.scope(db).program(db),
         }
     }
 
@@ -742,11 +807,11 @@ impl<'db> ClassLiteral<'db> {
     }
 
     /// Returns whether this class is final.
-    pub(crate) fn is_final(self, db: &'db dyn Db) -> bool {
+    pub(crate) fn is_final(self, env: &SemanticEnvironment<'db>) -> bool {
         match self {
-            Self::Static(class) => class.is_final(db),
+            Self::Static(class) => class.is_final(env),
             Self::DynamicEnum(enum_lit) => {
-                crate::types::enums::enum_metadata(db, Self::DynamicEnum(enum_lit))
+                crate::types::enums::enum_metadata(env, Self::DynamicEnum(enum_lit))
                     .is_some_and(|metadata| !metadata.members.is_empty())
             }
             // Dynamic classes created via `type()`, `collections.namedtuple()`, etc. cannot be
@@ -764,10 +829,10 @@ impl<'db> ClassLiteral<'db> {
     /// ```python
     /// X = type("X", (), {"__lt__": lambda self, other: True})
     /// ```
-    pub(crate) fn has_own_ordering_method(self, db: &'db dyn Db) -> bool {
+    pub(crate) fn has_own_ordering_method(self, env: &SemanticEnvironment<'db>) -> bool {
         match self {
-            Self::Static(class) => class.has_own_ordering_method(db),
-            Self::Dynamic(class) => class.has_own_ordering_method(db),
+            Self::Static(class) => class.has_own_ordering_method(env),
+            Self::Dynamic(class) => class.has_own_ordering_method(env),
             Self::DynamicNamedTuple(_) | Self::DynamicTypedDict(_) | Self::DynamicEnum(_) => false,
         }
     }
@@ -850,10 +915,13 @@ impl<'db> ClassLiteral<'db> {
     ///     class Foo(int, X): ...
     /// TypeError: multiple bases have instance lay-out conflict
     /// ```
-    pub(super) fn as_disjoint_base(self, db: &'db dyn Db) -> Option<DisjointBase<'db>> {
+    pub(super) fn as_disjoint_base(
+        self,
+        env: &SemanticEnvironment<'db>,
+    ) -> Option<DisjointBase<'db>> {
         match self {
-            Self::Static(class) => class.as_disjoint_base(db),
-            Self::Dynamic(class) => class.as_disjoint_base(db),
+            Self::Static(class) => class.as_disjoint_base(env),
+            Self::Dynamic(class) => class.as_disjoint_base(env),
             // Dynamic namedtuples define `__slots__ = ()`, but `__slots__` must be
             // non-empty for a class to be a disjoint base.
             // Dynamic TypedDicts don't define `__slots__`.
@@ -862,33 +930,33 @@ impl<'db> ClassLiteral<'db> {
     }
 
     /// Returns a non-generic instance of this class.
-    pub(crate) fn to_non_generic_instance(self, db: &'db dyn Db) -> Type<'db> {
+    pub(crate) fn to_non_generic_instance(self, env: &SemanticEnvironment<'db>) -> Type<'db> {
         match self {
-            Self::Static(class) => class.to_non_generic_instance(db),
+            Self::Static(class) => class.to_non_generic_instance(env),
             Self::Dynamic(_)
             | Self::DynamicNamedTuple(_)
             | Self::DynamicTypedDict(_)
-            | Self::DynamicEnum(_) => Type::instance(db, ClassType::NonGeneric(self)),
+            | Self::DynamicEnum(_) => Type::instance(env, ClassType::NonGeneric(self)),
         }
     }
 
     /// Returns the protocol class if this is a protocol.
     pub(super) fn into_protocol_class(
         self,
-        db: &'db dyn Db,
+        env: &SemanticEnvironment<'db>,
     ) -> Option<super::protocol_class::ProtocolClass<'db>> {
         self.as_static()
-            .and_then(|class| class.into_protocol_class(db))
+            .and_then(|class| class.into_protocol_class(env))
     }
 
     /// Apply a specialization to this class.
     pub(crate) fn apply_specialization(
         self,
-        db: &'db dyn Db,
+        env: &SemanticEnvironment<'db>,
         f: impl FnOnce(GenericContext<'db>) -> Specialization<'db>,
     ) -> ClassType<'db> {
         match self {
-            Self::Static(class) => class.apply_specialization(db, f),
+            Self::Static(class) => class.apply_specialization(env, f),
             Self::Dynamic(_)
             | Self::DynamicNamedTuple(_)
             | Self::DynamicTypedDict(_)
@@ -899,23 +967,23 @@ impl<'db> ClassLiteral<'db> {
     /// Returns the instance member lookup.
     pub(crate) fn instance_member(
         self,
-        db: &'db dyn Db,
+        env: &SemanticEnvironment<'db>,
         specialization: Option<Specialization<'db>>,
         name: &str,
     ) -> PlaceAndQualifiers<'db> {
         match self {
-            Self::Static(class) => class.instance_member(db, specialization, name),
-            Self::Dynamic(class) => class.instance_member(db, name),
-            Self::DynamicNamedTuple(namedtuple) => namedtuple.instance_member(db, name),
+            Self::Static(class) => class.instance_member(env, specialization, name),
+            Self::Dynamic(class) => class.instance_member(env, name),
+            Self::DynamicNamedTuple(namedtuple) => namedtuple.instance_member(env, name),
             Self::DynamicTypedDict(_) => PlaceAndQualifiers::default(),
-            Self::DynamicEnum(enum_lit) => enum_lit.instance_member(db, name),
+            Self::DynamicEnum(enum_lit) => enum_lit.instance_member(env, name),
         }
     }
 
     /// Returns the top materialization for this class.
-    pub(crate) fn top_materialization(self, db: &'db dyn Db) -> ClassType<'db> {
+    pub(crate) fn top_materialization(self, env: &SemanticEnvironment<'db>) -> ClassType<'db> {
         match self {
-            Self::Static(class) => class.top_materialization(db),
+            Self::Static(class) => class.top_materialization(env),
             Self::Dynamic(_)
             | Self::DynamicNamedTuple(_)
             | Self::DynamicTypedDict(_)
@@ -926,14 +994,14 @@ impl<'db> ClassLiteral<'db> {
     /// Returns the `TypedDict` member lookup.
     pub(crate) fn typed_dict_member(
         self,
-        db: &'db dyn Db,
+        env: &SemanticEnvironment<'db>,
         specialization: Option<Specialization<'db>>,
         name: &str,
         policy: MemberLookupPolicy,
     ) -> PlaceAndQualifiers<'db> {
         match self {
-            Self::Static(class) => class.typed_dict_member(db, specialization, name, policy),
-            Self::DynamicTypedDict(typeddict) => typeddict.class_member(db, name, policy),
+            Self::Static(class) => class.typed_dict_member(env, specialization, name, policy),
+            Self::DynamicTypedDict(typeddict) => typeddict.class_member(env, name, policy),
             Self::Dynamic(_) | Self::DynamicNamedTuple(_) | Self::DynamicEnum(_) => {
                 Place::Undefined.into()
             }
@@ -959,18 +1027,18 @@ impl<'db> ClassLiteral<'db> {
     ///
     /// Note that when this is a namedtuple this always returns a sequence
     /// of length one corresponding to `tuple`.
-    pub(crate) fn explicit_bases(self, db: &'db dyn Db) -> Box<[Type<'db>]> {
+    pub(crate) fn explicit_bases(self, env: &SemanticEnvironment<'db>) -> Box<[Type<'db>]> {
         match self {
-            Self::Static(static_class) => static_class.explicit_bases(db).into(),
-            Self::Dynamic(dynamic_class) => dynamic_class.explicit_bases(db).into(),
+            Self::Static(static_class) => static_class.explicit_bases(env).into(),
+            Self::Dynamic(dynamic_class) => dynamic_class.explicit_bases(env).into(),
             Self::DynamicNamedTuple(namedtuple) => {
-                [Type::from(namedtuple.tuple_base_class(db))].into()
+                [Type::from(namedtuple.tuple_base_class(env))].into()
             }
             Self::DynamicTypedDict(_) => {
                 // TypedDicts always inherit from `dict`
                 Box::default()
             }
-            Self::DynamicEnum(enum_lit) => enum_lit.explicit_bases(db),
+            Self::DynamicEnum(enum_lit) => enum_lit.explicit_bases(env),
         }
     }
 }
@@ -1023,8 +1091,8 @@ pub enum ClassType<'db> {
 #[salsa::tracked]
 impl<'db> ClassType<'db> {
     /// Return a `ClassType` representing the class `builtins.object`
-    pub(super) fn object(db: &'db dyn Db) -> Self {
-        ClassType::NonGeneric(ClassLiteral::object(db))
+    pub(super) fn object(env: &SemanticEnvironment<'db>) -> Self {
+        ClassType::NonGeneric(ClassLiteral::object(env))
     }
 
     pub(super) const fn is_generic(self) -> bool {
@@ -1040,22 +1108,22 @@ impl<'db> ClassType<'db> {
 
     pub(super) fn recursive_type_normalized_impl(
         self,
-        db: &'db dyn Db,
+        env: &SemanticEnvironment<'db>,
         div: Type<'db>,
         nested: bool,
     ) -> Option<Self> {
         match self {
             Self::NonGeneric(class) => Some(Self::NonGeneric(
-                class.recursive_type_normalized_impl(db, div, nested)?,
+                class.recursive_type_normalized_impl(env, div, nested)?,
             )),
             Self::Generic(generic) => Some(Self::Generic(
-                generic.recursive_type_normalized_impl(db, div, nested)?,
+                generic.recursive_type_normalized_impl(env, div, nested)?,
             )),
         }
     }
 
-    pub(super) fn has_pep_695_type_params(self, db: &'db dyn Db) -> bool {
-        self.class_literal(db).has_pep_695_type_params(db)
+    pub(super) fn has_pep_695_type_params(self, env: &SemanticEnvironment<'db>) -> bool {
+        self.class_literal(env.db()).has_pep_695_type_params(env)
     }
 
     /// Returns the underlying class literal for this class, ignoring any specialization.
@@ -1108,9 +1176,10 @@ impl<'db> ClassType<'db> {
     /// specialization applied if the class is generic.
     pub(crate) fn static_class_literal_specialized(
         self,
-        db: &'db dyn Db,
+        env: &SemanticEnvironment<'db>,
         additional_specialization: Option<Specialization<'db>>,
     ) -> Option<(StaticClassLiteral<'db>, Option<Specialization<'db>>)> {
+        let db = env.db();
         match self {
             Self::NonGeneric(ClassLiteral::Static(class)) => Some((class, None)),
             Self::NonGeneric(
@@ -1119,14 +1188,17 @@ impl<'db> ClassType<'db> {
                 | ClassLiteral::DynamicTypedDict(_)
                 | ClassLiteral::DynamicEnum(_),
             ) => None,
-            Self::Generic(generic) => Some((
-                generic.origin(db),
-                Some(
-                    generic
-                        .specialization(db)
-                        .apply_optional_specialization(db, additional_specialization),
-                ),
-            )),
+            Self::Generic(generic) => {
+                let origin = generic.origin(db);
+                Some((
+                    origin,
+                    Some(
+                        generic
+                            .specialization(db)
+                            .apply_optional_specialization(env, additional_specialization),
+                    ),
+                ))
+            }
         }
     }
 
@@ -1153,8 +1225,11 @@ impl<'db> ClassType<'db> {
     }
 
     /// Return `Some` if this class is known to be a [`DisjointBase`], or `None` if it is not.
-    pub(super) fn as_disjoint_base(self, db: &'db dyn Db) -> Option<DisjointBase<'db>> {
-        self.class_literal(db).as_disjoint_base(db)
+    pub(super) fn as_disjoint_base(
+        self,
+        env: &SemanticEnvironment<'db>,
+    ) -> Option<DisjointBase<'db>> {
+        self.class_literal(env.db()).as_disjoint_base(env)
     }
 
     /// Return `true` if this class represents `known_class`
@@ -1168,24 +1243,25 @@ impl<'db> ClassType<'db> {
     }
 
     /// Return `true` if this class is a `TypedDict`.
-    pub(crate) fn is_typed_dict(self, db: &'db dyn Db) -> bool {
-        self.class_literal(db).is_typed_dict(db)
+    pub(crate) fn is_typed_dict(self, env: &SemanticEnvironment<'db>) -> bool {
+        self.class_literal(env.db()).is_typed_dict(env)
     }
 
     /// Return `true` if this class is a subtype of (any specialization of) `class_literal`.
     pub(crate) fn is_subtype_of_class_literal(
         self,
-        db: &'db dyn Db,
+        env: &SemanticEnvironment<'db>,
         class_literal: ClassLiteral<'db>,
     ) -> bool {
-        self.iter_mro(db)
+        let db = env.db();
+        self.iter_mro(env)
             .filter_map(ClassBase::into_class)
             .any(|base| base.class_literal(db) == class_literal)
     }
 
     pub(super) fn apply_type_mapping_impl<'a>(
         self,
-        db: &'db dyn Db,
+        env: &SemanticEnvironment<'db>,
         type_mapping: &TypeMapping<'a, 'db>,
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'db>,
@@ -1193,14 +1269,14 @@ impl<'db> ClassType<'db> {
         match self {
             Self::NonGeneric(_) => self,
             Self::Generic(generic) => {
-                Self::Generic(generic.apply_type_mapping_impl(db, type_mapping, tcx, visitor))
+                Self::Generic(generic.apply_type_mapping_impl(env, type_mapping, tcx, visitor))
             }
         }
     }
 
     pub(super) fn find_legacy_typevars_impl(
         self,
-        db: &'db dyn Db,
+        env: &SemanticEnvironment<'db>,
         binding_context: Option<Definition<'db>>,
         typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
         visitor: &FindLegacyTypeVarsVisitor<'db>,
@@ -1208,7 +1284,7 @@ impl<'db> ClassType<'db> {
         match self {
             Self::NonGeneric(_) => {}
             Self::Generic(generic) => {
-                generic.find_legacy_typevars_impl(db, binding_context, typevars, visitor);
+                generic.find_legacy_typevars_impl(env, binding_context, typevars, visitor);
             }
         }
     }
@@ -1221,11 +1297,12 @@ impl<'db> ClassType<'db> {
     /// cases rather than simply iterating over the inferred resolution order for the class.
     ///
     /// [method resolution order]: https://docs.python.org/3/glossary.html#term-method-resolution-order
-    pub(super) fn iter_mro(self, db: &'db dyn Db) -> MroIterator<'db> {
+    pub(super) fn iter_mro(self, env: &SemanticEnvironment<'db>) -> MroIterator<'db> {
+        let db = env.db();
         match self {
-            Self::NonGeneric(class) => class.iter_mro(db),
+            Self::NonGeneric(class) => class.iter_mro(env),
             Self::Generic(generic) => MroIterator::new(
-                db,
+                env,
                 ClassLiteral::Static(generic.origin(db)),
                 Some(generic.specialization(db)),
             ),
@@ -1236,57 +1313,71 @@ impl<'db> ClassType<'db> {
     /// additional specialization to it if the class is generic.
     pub(super) fn iter_mro_specialized(
         self,
-        db: &'db dyn Db,
+        env: &SemanticEnvironment<'db>,
         additional_specialization: Option<Specialization<'db>>,
     ) -> MroIterator<'db> {
+        let db = env.db();
         match self {
-            Self::NonGeneric(class) => class.iter_mro(db),
-            Self::Generic(generic) => MroIterator::new(
-                db,
-                ClassLiteral::Static(generic.origin(db)),
-                Some(
-                    generic
-                        .specialization(db)
-                        .apply_optional_specialization(db, additional_specialization),
-                ),
-            ),
+            Self::NonGeneric(class) => MroIterator::new(env, class, None),
+            Self::Generic(generic) => {
+                let origin = generic.origin(db);
+                MroIterator::new(
+                    env,
+                    ClassLiteral::Static(origin),
+                    Some(
+                        generic
+                            .specialization(db)
+                            .apply_optional_specialization(env, additional_specialization),
+                    ),
+                )
+            }
         }
     }
 
     /// Is this class final?
-    pub(super) fn is_final(self, db: &'db dyn Db) -> bool {
-        self.class_literal(db).is_final(db)
+    pub(super) fn is_final(self, env: &SemanticEnvironment<'db>) -> bool {
+        self.class_literal(env.db()).is_final(env)
     }
 
     /// Returns a map of methods on this class that were defined as abstract on a superclass
     /// and have not been overridden with a concrete implementation anywhere in the MRO
     ///
     /// The value of the map is a struct containing information about the abstract method.
+    pub(in crate::types) fn abstract_methods(
+        self,
+        env: &SemanticEnvironment<'db>,
+    ) -> &'db FxIndexMap<Name, AbstractMethod<'db>> {
+        let db = env.db();
+        debug_assert_eq!(env.program(), self.class_literal(db).program(db));
+        self.abstract_methods_inner(db)
+    }
+
     #[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
-    pub(crate) fn abstract_methods(self, db: &'db dyn Db) -> FxIndexMap<Name, AbstractMethod<'db>> {
+    fn abstract_methods_inner(self, db: &'db dyn Db) -> FxIndexMap<Name, AbstractMethod<'db>> {
         fn type_as_abstract_method<'db>(
-            db: &'db dyn Db,
+            env: &SemanticEnvironment<'db>,
             ty: Type<'db>,
             defining_class: ClassType<'db>,
         ) -> Option<AbstractMethodKind> {
+            let db = env.db();
             match ty {
-                Type::FunctionLiteral(function) => function.as_abstract_method(db, defining_class),
+                Type::FunctionLiteral(function) => function.as_abstract_method(env, defining_class),
                 Type::BoundMethod(method) => {
-                    method.function(db).as_abstract_method(db, defining_class)
+                    method.function(db).as_abstract_method(env, defining_class)
                 }
                 Type::PropertyInstance(property) => {
                     // A property is abstract if any of its accessors is abstract.
                     property
                         .getter(db)
-                        .and_then(|getter| type_as_abstract_method(db, getter, defining_class))
+                        .and_then(|getter| type_as_abstract_method(env, getter, defining_class))
                         .or_else(|| {
                             property.setter(db).and_then(|setter| {
-                                type_as_abstract_method(db, setter, defining_class)
+                                type_as_abstract_method(env, setter, defining_class)
                             })
                         })
                         .or_else(|| {
                             property.deleter(db).and_then(|deleter| {
-                                type_as_abstract_method(db, deleter, defining_class)
+                                type_as_abstract_method(env, deleter, defining_class)
                             })
                         })
                 }
@@ -1295,10 +1386,11 @@ impl<'db> ClassType<'db> {
         }
 
         let mut abstract_methods: FxIndexMap<Name, _> = FxIndexMap::default();
+        let env = &SemanticEnvironment::from_file(db, self.class_literal(db).python_file(db));
 
         // Iterate through the MRO in reverse order,
         // skipping `object` (we know it doesn't define any abstract methods)
-        for supercls in self.iter_mro(db).rev().skip(1) {
+        for supercls in self.iter_mro(env).rev().skip(1) {
             let ClassBase::Class(class) = supercls else {
                 continue;
             };
@@ -1307,7 +1399,7 @@ impl<'db> ClassType<'db> {
             // but we do recognise them as being able to override abstract methods defined in static classes.
             let ClassLiteral::Static(class_literal) = class.class_literal(db) else {
                 abstract_methods
-                    .retain(|name, _| class.own_class_member(db, None, name).is_undefined());
+                    .retain(|name, _| class.own_class_member(env, None, name).is_undefined());
                 continue;
             };
 
@@ -1320,7 +1412,7 @@ impl<'db> ClassType<'db> {
             // or this class has a `ClassVar` declaration by that name
             abstract_methods.retain(|name, _| {
                 if class_literal
-                    .own_synthesized_member(db, None, None, name)
+                    .own_synthesized_member(env, None, None, name)
                     .is_some()
                 {
                     return false;
@@ -1328,7 +1420,7 @@ impl<'db> ClassType<'db> {
 
                 place_table.symbol_id(name).is_none_or(|symbol_id| {
                     let declarations = use_def_map.end_of_scope_symbol_declarations(symbol_id);
-                    !place_from_declarations(db, declarations)
+                    !place_from_declarations(env, declarations)
                         .ignore_conflicting_declarations()
                         .qualifiers
                         .contains(TypeQualifiers::CLASS_VAR)
@@ -1337,14 +1429,14 @@ impl<'db> ClassType<'db> {
 
             for (symbol_id, bindings_iterator) in use_def_map.all_end_of_scope_symbol_bindings() {
                 let name = place_table.symbol(symbol_id).name();
-                let place_and_definition = place_from_bindings(db, bindings_iterator);
+                let place_and_definition = place_from_bindings(env, bindings_iterator);
                 let Place::Defined(DefinedPlace { ty, .. }) = place_and_definition.place else {
                     continue;
                 };
                 let Some(definition) = place_and_definition.first_definition else {
                     continue;
                 };
-                if let Some(kind) = type_as_abstract_method(db, ty, class) {
+                if let Some(kind) = type_as_abstract_method(env, ty, class) {
                     let abstract_method = AbstractMethod {
                         defining_class: class,
                         definition,
@@ -1365,15 +1457,20 @@ impl<'db> ClassType<'db> {
 
     /// Returns `true` if any class in this class's MRO (excluding `object`) defines an ordering
     /// method (`__lt__`, `__le__`, `__gt__`, `__ge__`). Used by `@total_ordering` validation.
-    pub(super) fn has_ordering_method_in_mro(self, db: &'db dyn Db) -> bool {
-        self.iter_mro(db)
+    pub(super) fn has_ordering_method_in_mro(self, env: &SemanticEnvironment<'db>) -> bool {
+        let db = env.db();
+        self.iter_mro(env)
             .filter_map(ClassBase::into_class)
             .filter(|class| !class.is_object(db))
-            .any(|class| class.class_literal(db).has_own_ordering_method(db))
+            .any(|class| class.class_literal(db).has_own_ordering_method(env))
     }
 
     /// Return `true` if `other` is present in this class's MRO.
-    pub(super) fn is_subclass_of(self, db: &'db dyn Db, target: ClassType<'db>) -> bool {
+    pub(super) fn is_subclass_of(
+        self,
+        env: &SemanticEnvironment<'db>,
+        target: ClassType<'db>,
+    ) -> bool {
         let constraints = ConstraintSetBuilder::new();
         let relation_visitor = HasRelationToVisitor::default(&constraints);
         let disjointness_visitor = IsDisjointVisitor::default(&constraints);
@@ -1388,45 +1485,56 @@ impl<'db> ClassType<'db> {
             &materialization_visitor,
         );
         checker
-            .check_class_pair(db, self, target)
-            .is_always_satisfied(db)
+            .check_class_pair(env, self, target)
+            .is_always_satisfied(env)
     }
 
     /// Return the metaclass of this class, or `type[Unknown]` if the metaclass cannot be inferred.
-    pub(super) fn metaclass(self, db: &'db dyn Db) -> Type<'db> {
+    pub(super) fn metaclass(self, env: &SemanticEnvironment<'db>) -> Type<'db> {
+        let db = env.db();
         match self {
-            Self::NonGeneric(class) => class.metaclass(db),
+            Self::NonGeneric(class) => class.metaclass(env),
             Self::Generic(generic) => generic
                 .origin(db)
-                .metaclass(db)
-                .apply_optional_specialization(db, Some(generic.specialization(db))),
+                .metaclass(env)
+                .apply_optional_specialization(env, Some(generic.specialization(db))),
         }
     }
 
     /// Return the [`DisjointBase`] that appears first in the MRO of this class.
     ///
     /// Returns `None` if this class does not have any disjoint bases in its MRO.
+    pub(super) fn nearest_disjoint_base(
+        self,
+        env: &SemanticEnvironment<'db>,
+    ) -> Option<DisjointBase<'db>> {
+        let db = env.db();
+        debug_assert_eq!(env.program(), self.class_literal(db).program(db));
+        self.nearest_disjoint_base_inner(db)
+    }
+
     #[salsa::tracked(
         returns(copy),
         cycle_initial=|_, _, _| None,
         heap_size=ruff_memory_usage::heap_size
     )]
-    pub(super) fn nearest_disjoint_base(self, db: &'db dyn Db) -> Option<DisjointBase<'db>> {
-        self.iter_mro(db)
+    fn nearest_disjoint_base_inner(self, db: &'db dyn Db) -> Option<DisjointBase<'db>> {
+        let env = SemanticEnvironment::from_file(db, self.class_literal(db).python_file(db));
+        self.iter_mro(&env)
             .filter_map(ClassBase::into_class)
-            .find_map(|base| base.as_disjoint_base(db))
+            .find_map(|base| base.as_disjoint_base(&env))
     }
 
     /// Return `true` if this class could exist in the MRO of `other`.
     pub(super) fn could_exist_in_mro_of(
         self,
-        db: &'db dyn Db,
+        env: &SemanticEnvironment<'db>,
         other: Self,
         constraints: &ConstraintSetBuilder<'db>,
     ) -> bool {
-        self.could_exist_in_mro_of_impl(db, other, |this, other| {
-            this.is_disjoint_from(db, other, constraints, InferableTypeVars::None)
-                .is_always_satisfied(db)
+        self.could_exist_in_mro_of_impl(env, other, |this, other| {
+            this.is_disjoint_from(env, other, constraints, InferableTypeVars::None)
+                .is_always_satisfied(env)
         })
     }
 
@@ -1434,25 +1542,26 @@ impl<'db> ClassType<'db> {
     /// nested specialization checks so recursive class graphs keep the same cycle guard.
     pub(super) fn could_exist_in_mro_of_with_disjointness_checker<'c>(
         self,
-        db: &'db dyn Db,
+        env: &SemanticEnvironment<'db>,
         other: Self,
         checker: &DisjointnessChecker<'_, 'c, 'db>,
     ) -> bool {
-        self.could_exist_in_mro_of_impl(db, other, |this, other| {
+        self.could_exist_in_mro_of_impl(env, other, |this, other| {
             checker
-                .check_specialization_pair(db, this, other)
-                .is_always_satisfied(db)
+                .check_specialization_pair(env, this, other)
+                .is_always_satisfied(env)
         })
     }
 
     fn could_exist_in_mro_of_impl(
         self,
-        db: &'db dyn Db,
+        env: &SemanticEnvironment<'db>,
         other: Self,
         specializations_are_disjoint: impl Fn(Specialization<'db>, Specialization<'db>) -> bool,
     ) -> bool {
+        let db = env.db();
         other
-            .iter_mro(db)
+            .iter_mro(env)
             .filter_map(ClassBase::into_class)
             .any(|class| match (self, class) {
                 (ClassType::NonGeneric(this_class), ClassType::NonGeneric(other_class)) => {
@@ -1472,17 +1581,18 @@ impl<'db> ClassType<'db> {
 
     fn has_incompatible_generic_base(
         self,
-        db: &'db dyn Db,
+        env: &SemanticEnvironment<'db>,
         other: Self,
         specializations_are_disjoint: impl Fn(Specialization<'db>, Specialization<'db>) -> bool,
     ) -> bool {
+        let db = env.db();
         let other_generic_bases: Vec<_> = other
-            .iter_mro(db)
+            .iter_mro(env)
             .filter_map(ClassBase::into_class)
             .filter_map(ClassType::into_generic_alias)
             .collect();
 
-        self.iter_mro(db)
+        self.iter_mro(env)
             .filter_map(ClassBase::into_class)
             .filter_map(ClassType::into_generic_alias)
             .any(|self_alias| {
@@ -1503,53 +1613,53 @@ impl<'db> ClassType<'db> {
     /// In these situations, this method returns `false`; in all others, it returns `true`.
     pub(super) fn could_coexist_in_mro_with(
         self,
-        db: &'db dyn Db,
+        env: &SemanticEnvironment<'db>,
         other: Self,
         constraints: &ConstraintSetBuilder<'db>,
     ) -> bool {
         self.could_coexist_in_mro_with_impl(
-            db,
+            env,
             other,
-            |this, other| this.could_exist_in_mro_of(db, other, constraints),
+            |this, other| this.could_exist_in_mro_of(env, other, constraints),
             |this, other| {
-                this.is_disjoint_from(db, other, constraints, InferableTypeVars::None)
-                    .is_always_satisfied(db)
+                this.is_disjoint_from(env, other, constraints, InferableTypeVars::None)
+                    .is_always_satisfied(env)
             },
             |this, other| {
-                this.when_disjoint_from(db, other, constraints, InferableTypeVars::None)
-                    .is_always_satisfied(db)
+                this.when_disjoint_from(env, other, constraints, InferableTypeVars::None)
+                    .is_always_satisfied(env)
             },
         )
     }
 
     pub(super) fn could_coexist_in_mro_with_disjointness_checker<'c>(
         self,
-        db: &'db dyn Db,
+        env: &SemanticEnvironment<'db>,
         other: Self,
         checker: &DisjointnessChecker<'_, 'c, 'db>,
     ) -> bool {
         // Reuse the active disjointness checker for nested specialization and
         // metaclass checks so recursive class graphs keep the same cycle guard.
         self.could_coexist_in_mro_with_impl(
-            db,
+            env,
             other,
-            |this, other| this.could_exist_in_mro_of_with_disjointness_checker(db, other, checker),
+            |this, other| this.could_exist_in_mro_of_with_disjointness_checker(env, other, checker),
             |this, other| {
                 checker
-                    .check_specialization_pair(db, this, other)
-                    .is_always_satisfied(db)
+                    .check_specialization_pair(env, this, other)
+                    .is_always_satisfied(env)
             },
             |this, other| {
                 checker
-                    .check_type_pair(db, this, other)
-                    .is_always_satisfied(db)
+                    .check_type_pair(env, this, other)
+                    .is_always_satisfied(env)
             },
         )
     }
 
     fn could_coexist_in_mro_with_impl(
         self,
-        db: &'db dyn Db,
+        env: &SemanticEnvironment<'db>,
         other: Self,
         could_exist_in_mro_of: impl Fn(Self, Self) -> bool,
         specializations_are_disjoint: impl Fn(Specialization<'db>, Specialization<'db>) -> bool,
@@ -1559,27 +1669,27 @@ impl<'db> ClassType<'db> {
             return true;
         }
 
-        if self.is_final(db) {
+        if self.is_final(env) {
             return could_exist_in_mro_of(other, self);
         }
 
-        if other.is_final(db) {
+        if other.is_final(env) {
             return could_exist_in_mro_of(self, other);
         }
 
         // A class cannot implement two incompatible specializations of an invariant base.
-        if self.has_incompatible_generic_base(db, other, specializations_are_disjoint) {
+        if self.has_incompatible_generic_base(env, other, specializations_are_disjoint) {
             return false;
         }
 
         // Two disjoint bases can only coexist in an MRO if one is a subclass of the other.
         if self
-            .nearest_disjoint_base(db)
+            .nearest_disjoint_base(env)
             .is_some_and(|disjoint_base_1| {
                 other
-                    .nearest_disjoint_base(db)
+                    .nearest_disjoint_base(env)
                     .is_some_and(|disjoint_base_2| {
-                        !disjoint_base_1.could_coexist_in_mro_with(db, &disjoint_base_2)
+                        !disjoint_base_1.could_coexist_in_mro_with(env, &disjoint_base_2)
                     })
             })
         {
@@ -1591,19 +1701,19 @@ impl<'db> ClassType<'db> {
         // however, since we end up with infinite recursion in that case due to the fact
         // that `type` is its own metaclass (and we know that `type` can coexist in an MRO
         // with any other arbitrary class, anyway).
-        let type_class = KnownClass::Type.to_class_literal(db);
-        let self_metaclass = self.metaclass(db);
+        let type_class = KnownClass::Type.to_class_literal(env);
+        let self_metaclass = self.metaclass(env);
         if self_metaclass == type_class {
             return true;
         }
-        let other_metaclass = other.metaclass(db);
+        let other_metaclass = other.metaclass(env);
         if other_metaclass == type_class {
             return true;
         }
-        let Some(self_metaclass_instance) = self_metaclass.to_instance_approximation(db) else {
+        let Some(self_metaclass_instance) = self_metaclass.to_instance_approximation(env) else {
             return true;
         };
-        let Some(other_metaclass_instance) = other_metaclass.to_instance_approximation(db) else {
+        let Some(other_metaclass_instance) = other_metaclass.to_instance_approximation(env) else {
             return true;
         };
         if types_are_disjoint(self_metaclass_instance, other_metaclass_instance) {
@@ -1614,10 +1724,10 @@ impl<'db> ClassType<'db> {
     }
 
     /// Return a type representing "the set of all instances of the metaclass of this class".
-    pub(super) fn metaclass_instance_type(self, db: &'db dyn Db) -> Type<'db> {
+    pub(super) fn metaclass_instance_type(self, env: &SemanticEnvironment<'db>) -> Type<'db> {
         self
-            .metaclass(db)
-            .to_instance_approximation(db)
+            .metaclass(env)
+            .to_instance_approximation(env)
             .expect("`Type::to_instance()` should always return `Some()` when called on the type of a metaclass")
     }
 
@@ -1628,14 +1738,15 @@ impl<'db> ClassType<'db> {
     /// TODO: Should this be made private...?
     pub(super) fn class_member(
         self,
-        db: &'db dyn Db,
+        env: &SemanticEnvironment<'db>,
         name: &str,
         policy: MemberLookupPolicy,
     ) -> PlaceAndQualifiers<'db> {
+        let db = env.db();
         match self {
-            Self::NonGeneric(class) => class.class_member(db, name, policy),
+            Self::NonGeneric(class) => class.class_member(env, name, policy),
             Self::Generic(generic) => generic.origin(db).class_member_inner(
-                db,
+                env,
                 Some(generic.specialization(db)),
                 name,
                 policy,
@@ -1656,7 +1767,7 @@ impl<'db> ClassType<'db> {
     /// traverse through the MRO until it finds the member.
     pub(super) fn own_class_member(
         self,
-        db: &'db dyn Db,
+        env: &SemanticEnvironment<'db>,
         inherited_generic_context: Option<GenericContext<'db>>,
         name: &str,
     ) -> Member<'db> {
@@ -1671,18 +1782,19 @@ impl<'db> ClassType<'db> {
             Signature::new(parameters, return_annotation)
         }
 
+        let db = env.db();
         let (class_literal, specialization) = match self {
             Self::NonGeneric(ClassLiteral::Dynamic(dynamic)) => {
-                return dynamic.own_class_member(db, name);
+                return dynamic.own_class_member(env, name);
             }
             Self::NonGeneric(ClassLiteral::DynamicNamedTuple(namedtuple)) => {
-                return namedtuple.own_class_member(db, name);
+                return namedtuple.own_class_member(env, name);
             }
             Self::NonGeneric(ClassLiteral::DynamicTypedDict(typeddict)) => {
-                return typeddict.own_class_member(db, name);
+                return typeddict.own_class_member(env, name);
             }
             Self::NonGeneric(ClassLiteral::DynamicEnum(enum_lit)) => {
-                return enum_lit.own_class_member(db, name);
+                return enum_lit.own_class_member(env, name);
             }
             Self::NonGeneric(ClassLiteral::Static(class)) => (class, None),
             Self::Generic(generic) => (generic.origin(db), Some(generic.specialization(db))),
@@ -1690,10 +1802,10 @@ impl<'db> ClassType<'db> {
 
         let fallback_member_lookup = || {
             let specialization = specialization
-                .map(|specialization| specialization.tuple_runtime_element_specialization(db));
+                .map(|specialization| specialization.tuple_runtime_element_specialization(env));
             class_literal
-                .own_class_member(db, inherited_generic_context, specialization, name)
-                .map_type(|ty| ty.apply_optional_specialization(db, specialization))
+                .own_class_member(env, inherited_generic_context, specialization, name)
+                .map_type(|ty| ty.apply_optional_specialization(env, specialization))
         };
 
         match name {
@@ -1703,12 +1815,12 @@ impl<'db> ClassType<'db> {
                     .and_then(|tuple| tuple.len().into_fixed_length())
                     .and_then(|len| i64::try_from(len).ok())
                     .map(Type::int_literal)
-                    .unwrap_or_else(|| KnownClass::Int.to_instance(db));
+                    .unwrap_or_else(|| KnownClass::Int.to_instance(env));
 
                 let parameters = Parameters::standard([Parameter::positional_only(Some(
                     Name::new_static("self"),
                 ))
-                .with_annotated_type(Type::instance(db, self))]);
+                .with_annotated_type(Type::instance(env, self))]);
 
                 let synthesized_dunder_method =
                     Type::function_like_callable(db, Signature::new(parameters, return_type));
@@ -1769,7 +1881,7 @@ impl<'db> ClassType<'db> {
                                             + one_based_index,
                                     ) {
                                         let overload_return = UnionType::from_elements(
-                                            db,
+                                            env,
                                             std::iter::once(
                                                 variable_length_tuple.variable().element_type(db),
                                             )
@@ -1805,7 +1917,7 @@ impl<'db> ClassType<'db> {
                                         variable_length_tuple.prefix_elements().len() + index,
                                     ) {
                                         let overload_return = UnionType::from_elements(
-                                            db,
+                                            env,
                                             std::iter::once(
                                                 variable_length_tuple.variable().element_type(db),
                                             )
@@ -1824,14 +1936,14 @@ impl<'db> ClassType<'db> {
                             }
                         }
 
-                        let all_elements_unioned = tuple.homogeneous_element_type(db);
+                        let all_elements_unioned = tuple.homogeneous_element_type(env);
 
                         let mut overload_signatures =
                             Vec::with_capacity(element_type_to_indices.len().saturating_add(2));
 
                         overload_signatures.extend(element_type_to_indices.into_iter().filter_map(
                             |(return_type, mut indices)| {
-                                if return_type.is_equivalent_to(db, all_elements_unioned) {
+                                if return_type.is_equivalent_to(env, all_elements_unioned) {
                                     return None;
                                 }
 
@@ -1839,7 +1951,7 @@ impl<'db> ClassType<'db> {
                                 indices.sort_unstable();
 
                                 let index_annotation = UnionType::from_elements(
-                                    db,
+                                    env,
                                     indices.into_iter().map(Type::int_literal),
                                 );
 
@@ -1861,17 +1973,17 @@ impl<'db> ClassType<'db> {
                         //    __getitem__(self, index: slice[SupportsIndex | None, SupportsIndex | None, SupportsIndex | None], /) -> tuple[str | float | bytes, ...]
                         //
                         overload_signatures.push(synthesize_getitem_overload_signature(
-                            KnownClass::SupportsIndex.to_instance(db),
+                            KnownClass::SupportsIndex.to_instance(env),
                             all_elements_unioned,
                         ));
 
                         let slice_bound = UnionType::from_elements(
-                            db,
-                            [KnownClass::SupportsIndex.to_instance(db), Type::none(db)],
+                            env,
+                            [KnownClass::SupportsIndex.to_instance(env), Type::none(env)],
                         );
                         overload_signatures.push(synthesize_getitem_overload_signature(
                             KnownClass::Slice.to_specialized_instance(
-                                db,
+                                env,
                                 &[slice_bound, slice_bound, slice_bound],
                             ),
                             Type::homogeneous_tuple(db, all_elements_unioned),
@@ -1919,8 +2031,8 @@ impl<'db> ClassType<'db> {
                             );
                             iterable_parameter = iterable_parameter.with_annotated_type(
                                 KnownClass::Iterable.to_specialized_instance(
-                                    db,
-                                    &[tuple.homogeneous_element_type(db)],
+                                    env,
+                                    &[tuple.homogeneous_element_type(env)],
                                 ),
                             );
                         } else {
@@ -1928,13 +2040,13 @@ impl<'db> ClassType<'db> {
                             // than an iterable, as a tuple is the only kind of iterable for which we can
                             // specify a fixed length, or that the iterable must be at least a certain length.
                             iterable_parameter =
-                                iterable_parameter.with_annotated_type(Type::instance(db, self));
+                                iterable_parameter.with_annotated_type(Type::instance(env, self));
                         }
                     }
                     None => {
                         // If the tuple isn't specialized at all, we allow any argument as long as it is iterable.
                         iterable_parameter = iterable_parameter
-                            .with_annotated_type(KnownClass::Iterable.to_instance(db));
+                            .with_annotated_type(KnownClass::Iterable.to_instance(env));
                     }
                 }
 
@@ -1949,7 +2061,7 @@ impl<'db> ClassType<'db> {
 
                 let parameters = Parameters::standard([
                     Parameter::positional_only(Some(Name::new_static("self")))
-                        .with_annotated_type(SubclassOfType::from(db, self)),
+                        .with_annotated_type(SubclassOfType::from(env, self)),
                     iterable_parameter,
                 ]);
 
@@ -1968,33 +2080,38 @@ impl<'db> ClassType<'db> {
     /// Look up an instance attribute (available in `__dict__`) of the given name.
     ///
     /// See [`Type::instance_member`] for more details.
-    pub(super) fn instance_member(self, db: &'db dyn Db, name: &str) -> PlaceAndQualifiers<'db> {
+    pub(super) fn instance_member(
+        self,
+        env: &SemanticEnvironment<'db>,
+        name: &str,
+    ) -> PlaceAndQualifiers<'db> {
+        let db = env.db();
         match self {
-            Self::NonGeneric(ClassLiteral::Dynamic(class)) => class.instance_member(db, name),
+            Self::NonGeneric(ClassLiteral::Dynamic(class)) => class.instance_member(env, name),
             Self::NonGeneric(ClassLiteral::DynamicNamedTuple(namedtuple)) => {
-                namedtuple.instance_member(db, name)
+                namedtuple.instance_member(env, name)
             }
             Self::NonGeneric(ClassLiteral::DynamicTypedDict(_)) => PlaceAndQualifiers::default(),
             Self::NonGeneric(ClassLiteral::DynamicEnum(enum_lit)) => {
-                enum_lit.instance_member(db, name)
+                enum_lit.instance_member(env, name)
             }
             Self::NonGeneric(ClassLiteral::Static(class)) => {
-                if class.is_typed_dict(db) {
+                if class.is_typed_dict(env) {
                     return Place::Undefined.into();
                 }
-                class.instance_member(db, None, name)
+                class.instance_member(env, None, name)
             }
             Self::Generic(generic) => {
                 let class_literal = generic.origin(db);
                 let specialization = Some(generic.specialization(db));
 
-                if class_literal.is_typed_dict(db) {
+                if class_literal.is_typed_dict(env) {
                     return Place::Undefined.into();
                 }
 
                 class_literal
-                    .instance_member(db, specialization, name)
-                    .map_type(|ty| ty.apply_optional_specialization(db, specialization))
+                    .instance_member(env, specialization, name)
+                    .map_type(|ty| ty.apply_optional_specialization(env, specialization))
             }
         }
     }
@@ -2002,17 +2119,18 @@ impl<'db> ClassType<'db> {
     /// Returns the converter input type for a dataclass field, if the field has a `converter`.
     pub(super) fn converter_input_type_for_field(
         self,
-        db: &'db dyn Db,
+        env: &SemanticEnvironment<'db>,
         name: &str,
     ) -> Option<Type<'db>> {
+        let db = env.db();
         match self {
             Self::NonGeneric(ClassLiteral::Static(class)) => {
-                class.converter_input_type_for_field(db, name)
+                class.converter_input_type_for_field(env, name)
             }
             Self::Generic(generic) => generic
                 .origin(db)
-                .converter_input_type_for_field(db, name)
-                .map(|ty| ty.apply_optional_specialization(db, Some(generic.specialization(db)))),
+                .converter_input_type_for_field(env, name)
+                .map(|ty| ty.apply_optional_specialization(env, Some(generic.specialization(db)))),
             Self::NonGeneric(
                 ClassLiteral::Dynamic(_)
                 | ClassLiteral::DynamicNamedTuple(_)
@@ -2024,39 +2142,51 @@ impl<'db> ClassType<'db> {
 
     /// A helper function for `instance_member` that looks up the `name` attribute only on
     /// this class, not on its superclasses.
-    pub(super) fn own_instance_member(self, db: &'db dyn Db, name: &str) -> Member<'db> {
+    pub(super) fn own_instance_member(
+        self,
+        env: &SemanticEnvironment<'db>,
+        name: &str,
+    ) -> Member<'db> {
+        let db = env.db();
         match self {
             Self::NonGeneric(ClassLiteral::Dynamic(dynamic)) => {
-                dynamic.own_instance_member(db, name)
+                dynamic.own_instance_member(env, name)
             }
             Self::NonGeneric(ClassLiteral::DynamicNamedTuple(namedtuple)) => {
-                namedtuple.own_instance_member(db, name)
+                namedtuple.own_instance_member(env, name)
             }
             Self::NonGeneric(ClassLiteral::DynamicTypedDict(_)) => Member::default(),
             Self::NonGeneric(ClassLiteral::DynamicEnum(enum_lit)) => {
-                enum_lit.own_instance_member(db, name)
+                enum_lit.own_instance_member(env, name)
             }
             Self::NonGeneric(ClassLiteral::Static(class_literal)) => {
-                class_literal.own_instance_member(db, name)
+                class_literal.own_instance_member(env, name)
             }
             Self::Generic(generic) => {
                 let specialization = generic.specialization(db);
                 generic
                     .origin(db)
-                    .own_instance_member(db, name)
-                    .map_type(|ty| ty.apply_optional_specialization(db, Some(specialization)))
+                    .own_instance_member(env, name)
+                    .map_type(|ty| ty.apply_optional_specialization(env, Some(specialization)))
             }
         }
     }
 
     /// Return a callable type (or union of callable types) that represents the callable
     /// constructor signature of this class.
+    pub(super) fn into_callable(self, env: &SemanticEnvironment<'db>) -> CallableTypes<'db> {
+        let db = env.db();
+        debug_assert_eq!(env.program(), self.class_literal(db).program(db));
+        self.into_callable_inner(db)
+    }
+
     #[salsa::tracked(
         returns(clone),
         cycle_initial=|db, _, _| CallableTypes::one(CallableType::bottom(db)),
         heap_size=ruff_memory_usage::heap_size
     )]
-    pub(super) fn into_callable(self, db: &'db dyn Db) -> CallableTypes<'db> {
+    fn into_callable_inner(self, db: &'db dyn Db) -> CallableTypes<'db> {
+        let env = &SemanticEnvironment::from_file(db, self.class_literal(db).python_file(db));
         // TODO: This mimics a lot of the logic in Type::try_call_from_constructor. Can we
         // consolidate the two? Can we invoke a class by upcasting the class into a Callable, and
         // then relying on the call binding machinery to Just Work™?
@@ -2064,12 +2194,12 @@ impl<'db> ClassType<'db> {
         // Dynamic classes don't have a generic context.
         let class_generic_context = self
             .static_class_literal(db)
-            .and_then(|(class_literal, _)| class_literal.generic_context(db));
+            .and_then(|(class_literal, _)| class_literal.generic_context(env));
 
         let self_ty = Type::from(self);
         let metaclass_dunder_call_function_symbol = self_ty
             .member_lookup_with_policy(
-                db,
+                env,
                 "__call__",
                 MemberLookupPolicy::NO_INSTANCE_FALLBACK
                     | MemberLookupPolicy::META_CLASS_NO_TYPE_FALLBACK,
@@ -2091,18 +2221,18 @@ impl<'db> ClassType<'db> {
             // back to `Enum.__new__`/`StrEnum.__new__`/... which have more precise signatures for calls like
             // `Color("red")`, instead of the overloaded signature of `EnumMeta.__call__` which also accounts
             // for dynamic Enum creation.
-            let is_actual_enum = enum_metadata(db, self.class_literal(db)).is_some();
+            let is_actual_enum = enum_metadata(env, self.class_literal(db)).is_some();
             if !is_actual_enum {
-                return CallableTypes::one(metaclass_dunder_call_function.into_callable_type(db));
+                return CallableTypes::one(metaclass_dunder_call_function.into_callable_type(env));
             }
         }
 
-        let dunder_new_function_symbol = self_ty.lookup_dunder_new(db);
+        let dunder_new_function_symbol = self_ty.lookup_dunder_new(env);
 
         let dunder_new_signature = dunder_new_function_symbol
             .and_then(|place_and_quals| place_and_quals.ignore_possibly_undefined())
             .and_then(|ty| match ty {
-                Type::FunctionLiteral(function) => Some(function.signature(db)),
+                Type::FunctionLiteral(function) => Some(function.signature(env)),
                 Type::Callable(callable) => Some(callable.signatures(db)),
                 _ => None,
             });
@@ -2112,17 +2242,17 @@ impl<'db> ClassType<'db> {
             // then we should ignore the `__init__` and just return the `__new__` method.
             let returns_non_subclass = dunder_new_signature.overloads.iter().any(|signature| {
                 !signature.return_ty.is_assignable_to(
-                    db,
+                    env,
                     self_ty
-                        .to_instance_approximation(db)
+                        .to_instance_approximation(env)
                         .expect("ClassType should be instantiable"),
                 )
             });
 
-            let instance_ty = Type::instance(db, self);
+            let instance_ty = Type::instance(env, self);
             let dunder_new_bound_method = CallableType::new(
                 db,
-                dunder_new_signature.bind_self_with_receiver(db, Some(self_ty), Some(instance_ty)),
+                dunder_new_signature.bind_self_with_receiver(env, Some(self_ty), Some(instance_ty)),
                 CallableTypeKind::Regular,
                 CallableFunctionProvenance::None,
             );
@@ -2137,7 +2267,7 @@ impl<'db> ClassType<'db> {
 
         let dunder_init_function_symbol = self_ty
             .member_lookup_with_policy(
-                db,
+                env,
                 "__init__",
                 MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK
                     | MemberLookupPolicy::META_CLASS_NO_TYPE_FALLBACK,
@@ -2145,7 +2275,7 @@ impl<'db> ClassType<'db> {
             .place;
 
         let correct_return_type = self_ty
-            .to_instance_approximation(db)
+            .to_instance_approximation(env)
             .unwrap_or_else(Type::unknown);
 
         // If the class defines an `__init__` method, then we synthesize a callable type with the
@@ -2156,7 +2286,7 @@ impl<'db> ClassType<'db> {
         {
             let signature = match ty {
                 Type::FunctionLiteral(dunder_init_function) => {
-                    Some(dunder_init_function.signature(db))
+                    Some(dunder_init_function.signature(env))
                 }
                 Type::Callable(callable) => Some(callable.signatures(db)),
                 _ => None,
@@ -2174,7 +2304,7 @@ impl<'db> ClassType<'db> {
                                 .is_none_or(|bound_typevar| !bound_typevar.typevar(db).is_self(db))
                         });
                     let return_type = self_annotation.unwrap_or(correct_return_type);
-                    let instance_ty = Type::instance(db, self);
+                    let instance_ty = Type::instance(env, self);
                     let generic_context = GenericContext::merge_optional(
                         db,
                         class_generic_context,
@@ -2187,7 +2317,7 @@ impl<'db> ClassType<'db> {
                     )
                     .with_definition(signature.definition())
                     .bind_self_with_receiver(
-                        db,
+                        env,
                         Some(instance_ty),
                         Some(instance_ty),
                     )
@@ -2225,7 +2355,7 @@ impl<'db> ClassType<'db> {
                 // an `object.__new__` method.
                 let new_function_symbol = self_ty
                     .member_lookup_with_policy(
-                        db,
+                        env,
                         "__new__",
                         MemberLookupPolicy::META_CLASS_NO_TYPE_FALLBACK,
                     )
@@ -2238,12 +2368,12 @@ impl<'db> ClassType<'db> {
                 {
                     if let Some(class_generic_context) = class_generic_context {
                         new_function =
-                            new_function.with_inherited_generic_context(db, class_generic_context);
+                            new_function.with_inherited_generic_context(env, class_generic_context);
                     }
                     CallableTypes::one(
                         new_function
                             .into_bound_method_type(db, correct_return_type)
-                            .into_callable_type(db),
+                            .into_callable_type(env),
                     )
                 } else {
                     // Fallback if no `object.__new__` is found.
@@ -2260,9 +2390,9 @@ impl<'db> ClassType<'db> {
         }
     }
 
-    pub(super) fn is_protocol(self, db: &'db dyn Db) -> bool {
-        self.static_class_literal(db)
-            .is_some_and(|(class, _)| class.is_protocol(db))
+    pub(super) fn is_protocol(self, env: &SemanticEnvironment<'db>) -> bool {
+        self.static_class_literal(env.db())
+            .is_some_and(|(class, _)| class.is_protocol(env))
     }
 
     /// Returns a [`Span`] pointing to the definition of this class.
@@ -2308,16 +2438,20 @@ impl<'db> From<ClassType<'db>> for Type<'db> {
 }
 
 impl<'db> VarianceInferable<'db> for ClassType<'db> {
-    fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarIdentity<'db>) -> TypeVarVariance {
+    fn variance_of(
+        self,
+        env: &SemanticEnvironment<'db>,
+        typevar: BoundTypeVarIdentity<'db>,
+    ) -> TypeVarVariance {
         match self {
-            Self::NonGeneric(ClassLiteral::Static(class)) => class.variance_of(db, typevar),
+            Self::NonGeneric(ClassLiteral::Static(class)) => class.variance_of(env, typevar),
             Self::NonGeneric(
                 ClassLiteral::Dynamic(_)
                 | ClassLiteral::DynamicNamedTuple(_)
                 | ClassLiteral::DynamicTypedDict(_)
                 | ClassLiteral::DynamicEnum(_),
             ) => TypeVarVariance::Bivariant,
-            Self::Generic(generic) => generic.variance_of(db, typevar),
+            Self::Generic(generic) => generic.variance_of(env, typevar),
         }
     }
 }
@@ -2325,10 +2459,11 @@ impl<'db> VarianceInferable<'db> for ClassType<'db> {
 impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
     pub(super) fn check_class_pair(
         &self,
-        db: &'db dyn Db,
+        env: &SemanticEnvironment<'db>,
         source: ClassType<'db>,
         target: ClassType<'db>,
     ) -> ConstraintSet<'db, 'c> {
+        let db = env.db();
         // Fast path: if source and target are the same class (possibly with different
         // specializations), we can compare them directly without walking the MRO.
         match (source, target) {
@@ -2339,7 +2474,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 if source_alias.origin(db) == target_alias.origin(db) =>
             {
                 return self.check_specialization_pair(
-                    db,
+                    env,
                     source_alias.specialization(db),
                     target_alias.specialization(db),
                 );
@@ -2347,56 +2482,61 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             _ => {}
         }
 
-        source.iter_mro(db).when_any(db, self.constraints, |base| {
-            match base {
-                ClassBase::Any => ConstraintSet::from_bool(
-                    self.constraints,
-                    self.relation.is_assignability() || target.is_object(db),
-                ),
-                ClassBase::Dynamic(_) | ClassBase::Divergent(_) => match self.relation {
-                    TypeRelation::Subtyping
-                    | TypeRelation::Redundancy { .. }
-                    | TypeRelation::SubtypingAssuming => {
-                        ConstraintSet::from_bool(self.constraints, target.is_object(db))
-                    }
-                    TypeRelation::Assignability => {
-                        ConstraintSet::from_bool(self.constraints, !target.is_final(db))
-                    }
-                },
+        source
+            .iter_mro(env)
+            .when_any(env, self.constraints, |base| {
+                match base {
+                    ClassBase::Any => ConstraintSet::from_bool(
+                        self.constraints,
+                        self.relation.is_assignability() || target.is_object(db),
+                    ),
+                    ClassBase::Dynamic(_) | ClassBase::Divergent(_) => match self.relation {
+                        TypeRelation::Subtyping
+                        | TypeRelation::Redundancy { .. }
+                        | TypeRelation::SubtypingAssuming => {
+                            ConstraintSet::from_bool(self.constraints, target.is_object(db))
+                        }
+                        TypeRelation::Assignability => {
+                            ConstraintSet::from_bool(self.constraints, !target.is_final(env))
+                        }
+                    },
 
-                // Protocol, Generic, and TypedDict are special bases that don't match ClassType.
-                ClassBase::Protocol | ClassBase::Generic | ClassBase::TypedDict(_) => self.never(),
-
-                ClassBase::Class(source) => match (source, target) {
-                    // Two non-generic classes match if they have the same class literal.
-                    (
-                        ClassType::NonGeneric(source_literal),
-                        ClassType::NonGeneric(target_literal),
-                    ) => {
-                        ConstraintSet::from_bool(self.constraints, source_literal == target_literal)
+                    // Protocol, Generic, and TypedDict are special bases that don't match ClassType.
+                    ClassBase::Protocol | ClassBase::Generic | ClassBase::TypedDict(_) => {
+                        self.never()
                     }
 
-                    // Two generic classes match if they have the same origin and compatible specializations.
-                    (ClassType::Generic(source), ClassType::Generic(target)) => {
-                        ConstraintSet::from_bool(
+                    ClassBase::Class(source) => match (source, target) {
+                        // Two non-generic classes match if they have the same class literal.
+                        (
+                            ClassType::NonGeneric(source_literal),
+                            ClassType::NonGeneric(target_literal),
+                        ) => ConstraintSet::from_bool(
                             self.constraints,
-                            source.origin(db) == target.origin(db),
-                        )
-                        .and(db, self.constraints, || {
-                            self.check_specialization_pair(
-                                db,
-                                source.specialization(db),
-                                target.specialization(db),
-                            )
-                        })
-                    }
+                            source_literal == target_literal,
+                        ),
 
-                    // Generic and non-generic classes don't match.
-                    (ClassType::Generic(_), ClassType::NonGeneric(_))
-                    | (ClassType::NonGeneric(_), ClassType::Generic(_)) => self.never(),
-                },
-            }
-        })
+                        // Two generic classes match if they have the same origin and compatible specializations.
+                        (ClassType::Generic(source), ClassType::Generic(target)) => {
+                            ConstraintSet::from_bool(
+                                self.constraints,
+                                source.origin(db) == target.origin(db),
+                            )
+                            .and(env, self.constraints, || {
+                                self.check_specialization_pair(
+                                    env,
+                                    source.specialization(db),
+                                    target.specialization(db),
+                                )
+                            })
+                        }
+
+                        // Generic and non-generic classes don't match.
+                        (ClassType::Generic(_), ClassType::NonGeneric(_))
+                        | (ClassType::NonGeneric(_), ClassType::Generic(_)) => self.never(),
+                    },
+                }
+            })
     }
 }
 
@@ -2421,8 +2561,8 @@ pub enum MethodDecorator {
 
 impl MethodDecorator {
     /// Returns the decorator category for a function type.
-    pub fn try_from_fn_type(db: &dyn Db, fn_type: FunctionType) -> Option<Self> {
-        match (fn_type.is_classmethod(db), fn_type.is_staticmethod(db)) {
+    pub fn try_from_fn_type(env: &SemanticEnvironment, fn_type: FunctionType) -> Option<Self> {
+        match (fn_type.is_classmethod(env), fn_type.is_staticmethod(env)) {
             (true, true) => None, // A method can't be static and class method at the same time.
             (true, false) => Some(Self::ClassMethod),
             (false, true) => Some(Self::StaticMethod),
@@ -2528,9 +2668,13 @@ impl<'db> Field<'db> {
 }
 
 impl<'db> VarianceInferable<'db> for ClassLiteral<'db> {
-    fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarIdentity<'db>) -> TypeVarVariance {
+    fn variance_of(
+        self,
+        env: &SemanticEnvironment<'db>,
+        typevar: BoundTypeVarIdentity<'db>,
+    ) -> TypeVarVariance {
         match self {
-            Self::Static(class) => class.variance_of(db, typevar),
+            Self::Static(class) => class.variance_of(env, typevar),
             Self::Dynamic(_)
             | Self::DynamicNamedTuple(_)
             | Self::DynamicTypedDict(_)
@@ -2545,14 +2689,17 @@ impl<'db> VarianceInferable<'db> for ClassLiteral<'db> {
 /// members by iterating through an MRO. Both `StaticClassLiteral` and `DynamicClassLiteral`
 /// use this to avoid duplicating the MRO traversal logic.
 pub(super) struct MroLookup<'db, I> {
-    db: &'db dyn Db,
+    env: SemanticEnvironment<'db>,
     mro_iter: I,
 }
 
 impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
     /// Create a new MRO lookup from a database and an MRO iterator.
-    pub(super) fn new(db: &'db dyn Db, mro_iter: I) -> Self {
-        Self { db, mro_iter }
+    pub(super) fn new(env: &SemanticEnvironment<'db>, mro_iter: I) -> Self {
+        Self {
+            env: env.clone(),
+            mro_iter,
+        }
     }
 
     /// Look up a class member by iterating through the MRO.
@@ -2576,7 +2723,7 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
         inherited_generic_context: Option<GenericContext<'db>>,
         is_self_object: bool,
     ) -> ClassMemberResult<'db> {
-        let db = self.db;
+        let db = self.env.db();
         let mut dynamic_type: Option<Type<'db>> = None;
         let mut lookup_result: LookupResult<'db> =
             Err(LookupError::Undefined(TypeQualifiers::empty()));
@@ -2619,9 +2766,9 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
 
                     lookup_result = lookup_result.or_else(|lookup_error| {
                         lookup_error.or_fall_back_to(
-                            db,
+                            &self.env,
                             class
-                                .own_class_member(db, inherited_generic_context, name)
+                                .own_class_member(&self.env, inherited_generic_context, name)
                                 .inner,
                         )
                     });
@@ -2651,8 +2798,7 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
     /// Returns `InstanceMemberResult::TypedDict` if a `TypedDict` base is encountered,
     /// allowing the caller to handle this case specially.
     pub(super) fn instance_member(self, name: &str) -> InstanceMemberResult<'db> {
-        let db = self.db;
-        let mut union = UnionBuilder::new(db);
+        let mut union = UnionBuilder::new(&self.env);
         let mut union_qualifiers = TypeQualifiers::empty();
         let mut is_definitely_bound = false;
         let mut provenance = Provenance::Unknown;
@@ -2679,7 +2825,7 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
                                 ..
                             }),
                         qualifiers,
-                    } = class.own_instance_member(db, name).inner
+                    } = class.own_instance_member(&self.env, name).inner
                     {
                         if boundness == Definedness::AlwaysDefined {
                             if origin.is_declared() {
@@ -2746,7 +2892,7 @@ pub(super) struct CompletedMemberLookup<'db> {
 
 impl<'db> CompletedMemberLookup<'db> {
     /// Finalize the lookup result by handling dynamic type intersection.
-    pub(super) fn finalize(self, db: &'db dyn Db) -> PlaceAndQualifiers<'db> {
+    pub(super) fn finalize(self, env: &SemanticEnvironment<'db>) -> PlaceAndQualifiers<'db> {
         match (
             PlaceAndQualifiers::from(self.lookup_result),
             self.dynamic_type,
@@ -2759,7 +2905,7 @@ impl<'db> CompletedMemberLookup<'db> {
                     qualifiers,
                 },
                 Some(dynamic),
-            ) => Place::bound(IntersectionType::from_two_elements(db, ty, dynamic))
+            ) => Place::bound(IntersectionType::from_two_elements(env, ty, dynamic))
                 .with_provenance(provenance)
                 .with_qualifiers(qualifiers),
 
@@ -2810,7 +2956,7 @@ impl<'db> QualifiedClassName<'db> {
                 let body_scope = class.body_scope(self.db);
                 // Skip the class body scope itself.
                 (
-                    body_scope.file(self.db),
+                    body_scope.python_file(self.db),
                     body_scope.file_scope_id(self.db),
                     1,
                 )
@@ -2818,20 +2964,20 @@ impl<'db> QualifiedClassName<'db> {
             ClassLiteral::Dynamic(class) => {
                 // Dynamic classes don't have a body scope; start from the enclosing scope.
                 let scope = class.scope(self.db);
-                (scope.file(self.db), scope.file_scope_id(self.db), 0)
+                (scope.python_file(self.db), scope.file_scope_id(self.db), 0)
             }
             ClassLiteral::DynamicNamedTuple(namedtuple) => {
                 // Dynamic namedtuples don't have a body scope; start from the enclosing scope.
                 let scope = namedtuple.scope(self.db);
-                (scope.file(self.db), scope.file_scope_id(self.db), 0)
+                (scope.python_file(self.db), scope.file_scope_id(self.db), 0)
             }
             ClassLiteral::DynamicTypedDict(typeddict) => {
                 let scope = typeddict.scope(self.db);
-                (scope.file(self.db), scope.file_scope_id(self.db), 0)
+                (scope.python_file(self.db), scope.file_scope_id(self.db), 0)
             }
             ClassLiteral::DynamicEnum(enum_lit) => {
                 let scope = enum_lit.scope(self.db);
-                (scope.file(self.db), scope.file_scope_id(self.db), 0)
+                (scope.python_file(self.db), scope.file_scope_id(self.db), 0)
             }
         };
 
@@ -2892,18 +3038,18 @@ impl<'db> DisjointBase<'db> {
     }
 
     /// Two disjoint bases can only coexist in a class's MRO if one is a subclass of the other
-    fn could_coexist_in_mro_with(&self, db: &'db dyn Db, other: &Self) -> bool {
+    fn could_coexist_in_mro_with(&self, env: &SemanticEnvironment<'db>, other: &Self) -> bool {
         // CPython's layout check operates on runtime classes. Type arguments are irrelevant here:
         // a generic disjoint base and any specialization of that base share the same layout.
         self == other
             || self
                 .class
-                .default_specialization(db)
-                .is_subtype_of_class_literal(db, other.class)
+                .default_specialization(env)
+                .is_subtype_of_class_literal(env, other.class)
             || other
                 .class
-                .default_specialization(db)
-                .is_subtype_of_class_literal(db, self.class)
+                .default_specialization(env)
+                .is_subtype_of_class_literal(env, self.class)
     }
 }
 
@@ -2971,13 +3117,13 @@ enum SlotsKind {
 }
 
 impl SlotsKind {
-    fn from(db: &dyn Db, base: StaticClassLiteral) -> Self {
+    fn from(env: &SemanticEnvironment, base: StaticClassLiteral) -> Self {
         let Place::Defined(DefinedPlace {
             ty: slots_ty,
             definedness: bound,
             ..
         }) = base
-            .own_class_member(db, base.inherited_generic_context(db), None, "__slots__")
+            .own_class_member(env, base.inherited_generic_context(env), None, "__slots__")
             .inner
             .place
         else {
@@ -2991,7 +3137,7 @@ impl SlotsKind {
         match slots_ty {
             // __slots__ = ("a", "b")
             Type::NominalInstance(nominal) => match nominal
-                .tuple_spec(db)
+                .tuple_spec(env)
                 .and_then(|spec| spec.len().into_fixed_length())
             {
                 Some(0) => Self::Empty,

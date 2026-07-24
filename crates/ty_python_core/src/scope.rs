@@ -1,19 +1,19 @@
 use std::ops::Range;
 
-use ruff_db::{files::File, parsed::ParsedModuleRef};
+use ruff_db::{PythonFile, files::File, parsed::ParsedModuleRef};
 use ruff_index::newtype_index;
 use ruff_python_ast::{self as ast, NodeIndex};
 
 use crate::{
-    Db, SemanticIndex, ast_node_ref::AstNodeRef, definition::Definition, node_key::NodeKey,
-    semantic_index,
+    Db, Program, SemanticIndex, ast_node_ref::AstNodeRef, definition::Definition,
+    node_key::NodeKey, semantic_index,
 };
 
 /// A cross-module identifier of a scope that can be used as a salsa query parameter.
 #[salsa::tracked(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct ScopeId<'db> {
     #[returns(copy)]
-    pub file: File,
+    pub python_file: PythonFile<'db>,
 
     #[returns(copy)]
     pub file_scope_id: FileScopeId,
@@ -23,16 +23,24 @@ pub struct ScopeId<'db> {
 impl get_size2::GetSize for ScopeId<'_> {}
 
 impl<'db> ScopeId<'db> {
+    pub fn file(self, db: &dyn Db) -> File {
+        self.python_file(db).file(db)
+    }
+
+    pub fn program(self, db: &dyn Db) -> Program {
+        self.python_file(db).python_version(db)
+    }
+
     pub fn is_annotation(self, db: &'db dyn Db) -> bool {
         self.node(db).scope_kind().is_annotation()
     }
 
-    pub fn node(self, db: &dyn Db) -> &NodeWithScopeKind {
+    pub fn node(self, db: &'db dyn Db) -> &'db NodeWithScopeKind {
         self.scope(db).node()
     }
 
     /// Returns `true` if this scope may require type context from its parent scope.
-    pub fn accepts_type_context(self, db: &dyn Db) -> bool {
+    pub fn accepts_type_context(self, db: &'db dyn Db) -> bool {
         matches!(
             self.node(db),
             NodeWithScopeKind::Lambda(_)
@@ -43,13 +51,13 @@ impl<'db> ScopeId<'db> {
         )
     }
 
-    pub fn scope(self, db: &dyn Db) -> &Scope {
-        semantic_index(db, self.file(db)).scope(self.file_scope_id(db))
+    pub fn scope(self, db: &'db dyn Db) -> &'db Scope {
+        semantic_index(db, self.python_file(db)).scope(self.file_scope_id(db))
     }
 
     /// Returns the class definition for the enclosing class if this scope is a method body.
     pub fn class_definition_of_method(self, db: &'db dyn Db) -> Option<Definition<'db>> {
-        semantic_index(db, self.file(db)).class_definition_of_method(self.file_scope_id(db))
+        semantic_index(db, self.python_file(db)).class_definition_of_method(self.file_scope_id(db))
     }
 
     pub fn is_method_scope(self, db: &'db dyn Db) -> bool {
@@ -97,7 +105,7 @@ impl FileScopeId {
         self == FileScopeId::global()
     }
 
-    pub fn to_scope_id(self, db: &dyn Db, file: File) -> ScopeId<'_> {
+    pub fn to_scope_id<'db>(self, db: &'db dyn Db, file: PythonFile<'db>) -> ScopeId<'db> {
         let index = semantic_index(db, file);
         index.scope_ids_by_scope[self]
     }
