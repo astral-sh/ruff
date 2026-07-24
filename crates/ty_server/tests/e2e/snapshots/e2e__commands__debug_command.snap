@@ -46,6 +46,7 @@ Settings: Settings {
     },
     src: SrcSettings {
         respect_ignore_files: true,
+        exclude_scripts: false,
         files: IncludeExcludeFilter {
             include: IncludeFilter(
                 [

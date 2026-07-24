@@ -1586,6 +1586,13 @@
             }
           ]
         },
+        "exclude-scripts": {
+          "description": "Whether to exclude files containing PEP 723 inline script metadata unless they are\nexplicitly passed on the command line.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
         "include": {
           "description": "A list of files and directories to check. The `include` option\nfollows a similar syntax to `.gitignore` but reversed:\nIncluding a file or directory will make it so that it (and its contents)\nare type checked.\n\n- `./src/` matches only a directory\n- `./src` matches both files and directories\n- `src` matches a file or directory named `src`\n- `*` matches any (possibly empty) sequence of characters (except `/`).\n- `**` matches zero or more path components.\n  This sequence **must** form a single path component, so both `**a` and `b**` are invalid and will result in an error.\n  A sequence of more than two consecutive `*` characters is also invalid.\n- `?` matches any single character except `/`\n- `[abc]` matches any character inside the brackets. Character sequences can also specify ranges of characters, as ordered by Unicode,\n  so e.g. `[0-9]` specifies any character between `0` and `9` inclusive. An unclosed bracket is invalid.\n\nAll paths are anchored relative to the project root (`src` only\nmatches `<project_root>/src` and not `<project_root>/test/src`).\n\n`exclude` takes precedence over `include`.",
           "anyOf": [
