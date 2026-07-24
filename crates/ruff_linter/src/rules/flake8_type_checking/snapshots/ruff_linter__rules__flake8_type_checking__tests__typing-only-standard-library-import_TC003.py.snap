@@ -24,3 +24,51 @@ help: Move into type-checking block
 12 |
    |
 note: This is an unsafe fix and may change runtime behavior
+
+TC003 [*] Move standard library import `pathlib` into a type-checking block
+  --> TC003.py:31:12
+   |
+30 | def f():
+31 |     import pathlib
+   |            ^^^^^^^
+32 |
+33 |     type Paths = list[pathlib.Path]
+   |
+help: Move into type-checking block
+   |
+20 | from dataclasses import KW_ONLY, dataclass
+21 + from typing import TYPE_CHECKING
+22 +
+23 + if TYPE_CHECKING:
+24 +     import pathlib
+25 |
+--------------------------------------------------------------------------------
+34 | def f():
+   -     import pathlib
+35 |
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+TC003 [*] Move standard library import `pathlib` into a type-checking block
+  --> TC003.py:45:12
+   |
+44 | def f():
+45 |     import pathlib
+   |            ^^^^^^^
+46 |
+47 |     type Paths = list[pathlib.Path]
+   |
+help: Move into type-checking block
+   |
+20 | from dataclasses import KW_ONLY, dataclass
+21 + from typing import TYPE_CHECKING
+22 +
+23 + if TYPE_CHECKING:
+24 +     import pathlib
+25 |
+--------------------------------------------------------------------------------
+48 | def f():
+   -     import pathlib
+49 |
+   |
+note: This is an unsafe fix and may change runtime behavior

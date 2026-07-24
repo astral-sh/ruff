@@ -23,6 +23,30 @@ help: Move into type-checking block
 note: This is an unsafe fix and may change runtime behavior
 
 TC001 [*] Move application import `.foo` into a type-checking block
+  --> TC001_future.py:47:19
+   |
+45 | # non-generic type alias
+46 | def m():
+47 |     from . import foo
+   |                   ^^^
+48 |
+49 |     type Alias = foo.Ty
+   |
+help: Move into type-checking block
+   |
+1  + from typing import TYPE_CHECKING
+2  +
+3  + if TYPE_CHECKING:
+4  +     from . import foo
+5  | def f():
+--------------------------------------------------------------------------------
+50 | def m():
+   -     from . import foo
+51 |
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+TC001 [*] Move application import `.foo` into a type-checking block
   --> TC001_future.py:57:19
    |
 56 | def n():
