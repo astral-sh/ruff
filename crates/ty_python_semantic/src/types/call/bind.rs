@@ -5550,27 +5550,24 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                 // establishes the instantiated return `R[T]`. The same call therefore satisfies
                 // every retained `R[T]`, so their intersection is sound regardless of why
                 // `pending` is disjunctive.
-                let returns: Vec<_> = paths
-                    .into_iter()
-                    .filter_map(|inference| {
-                        if !inference.is_complete_for(self.db, original_return_ty)
-                            || !inference.is_fully_static(self.db)
-                        {
-                            return None;
-                        }
+                let mut returns = Vec::with_capacity(paths.len());
+                for inference in paths {
+                    let specialization = inference.specialization(self.db);
+                    let return_ty =
+                        original_return_ty.apply_specialization(self.db, specialization);
 
-                        let specialization = inference.specialization(self.db);
-                        if !self.specialization_validates_arguments(specialization) {
-                            return None;
-                        }
+                    // Dropping an incomplete path while retaining a complete sibling can discard
+                    // a valid return alternative, so use the merged fallback for the whole call.
+                    if !inference.is_complete_for(self.db, original_return_ty, return_ty) {
+                        return None;
+                    }
 
-                        let return_ty =
-                            original_return_ty.apply_specialization(self.db, specialization);
-                        (return_ty.bottom_materialization(self.db)
-                            == return_ty.top_materialization(self.db))
-                        .then_some((inference, return_ty))
-                    })
-                    .collect();
+                    if inference.is_fully_static(self.db)
+                        && self.specialization_validates_arguments(specialization)
+                    {
+                        returns.push((inference, return_ty));
+                    }
+                }
                 // Argument checking still expects one valid specialization, so retain one path
                 // as its witness rather than merging mappings that may not validate the call.
                 // TODO: Preserve every valid inference for constructors, contextual inference,
@@ -5584,11 +5581,12 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             });
 
         // Fall back to one merged specialization when path refinement is disabled, unsupported,
-        // or produces no complete, static, independently valid paths. If the combined constraints
-        // are unsatisfiable, infer each argument separately to preserve useful diagnostics.
+        // contains an incomplete path, or produces no static, independently valid paths. If the
+        // combined constraints are unsatisfiable, infer each argument separately to preserve
+        // useful diagnostics.
         // TODO: Limit this fallback to unconstrained calls and diagnostic recovery once path
         // inference tracks gradual evidence, supports ParamSpecs and recursive solutions, and
-        // preserves correlated partial applications.
+        // preserves callable-local generics and correlated partial applications.
         let (inference, return_ty) = path_result.unwrap_or_else(|| {
             let inference = match builder.build_inference_with(generic_context, &mut choose) {
                 Ok(inference) => inference,

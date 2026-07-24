@@ -681,6 +681,49 @@ def _(string: str, data: bytes, either: str | bytes) -> None:
     reveal_type(accepts_callable_and_value(overloaded_consumer, either))  # revealed: str | bytes
 ```
 
+## Overloaded methods with `Self` passed to a decorator
+
+A concrete overload can be fully solved while another valid overload keeps its receiver and return
+type correlated through `Self`. Ideally, the generic alternative would pass through the solver with
+that correlation preserved; this is not yet supported:
+
+```py
+from typing import Callable, Self, TypeVar, overload
+
+A = TypeVar("A")
+B = TypeVar("B")
+R = TypeVar("R")
+
+def identity(fn: Callable[[A, B], R]) -> Callable[[A, B], R]:
+    return fn
+
+class Expr: ...
+
+class Matrix:
+    @overload
+    def __mul__(self, other: "Matrix") -> "Matrix": ...
+    @overload
+    def __mul__(self, other: Expr) -> Self: ...
+    def __mul__(self, other: "Matrix | Expr") -> "Matrix | Self":
+        raise NotImplementedError
+
+class SpecialMatrix(Matrix): ...
+
+matrix = Matrix()
+special = SpecialMatrix()
+expr = Expr()
+
+# TODO: Preserve both overloads, including the generic `Self` alternative, without erroring.
+# error: [invalid-argument-type]
+mul = identity(Matrix.__mul__)
+reveal_type(mul)  # revealed: (Matrix, Matrix | Expr, /) -> Matrix
+reveal_type(mul(matrix, expr))  # revealed: Matrix
+reveal_type(mul(matrix, matrix))  # revealed: Matrix
+# TODO: revealed: SpecialMatrix
+reveal_type(mul(special, expr))  # revealed: Matrix
+reveal_type(mul(special, special))  # revealed: Matrix
+```
+
 When `T` is constrained to a union by other arguments, the overloaded callable must still be treated
 as a whole to satisfy `Callable[[T], T]`.
 

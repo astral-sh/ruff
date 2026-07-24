@@ -2097,8 +2097,14 @@ impl<'db> TypeVarInference<'db> {
     }
 
     /// Returns `true` if inference solved every type variable from this context that appears in
-    /// `ty`.
-    pub(crate) fn is_complete_for(self, db: &'db dyn Db, ty: Type<'db>) -> bool {
+    /// `ty`, including variables that remain in `specialized_ty` after applying the inferred
+    /// mappings.
+    pub(crate) fn is_complete_for(
+        self,
+        db: &'db dyn Db,
+        ty: Type<'db>,
+        specialized_ty: Type<'db>,
+    ) -> bool {
         let variables = self.generic_context(db).variables_inner(db);
         let inferred = self.types(db);
         let mut complete = true;
@@ -2111,6 +2117,20 @@ impl<'db> TypeVarInference<'db> {
                 complete = false;
             }
         });
+
+        if complete {
+            // TODO: Have path solving mark unresolved recursive mappings as incomplete. Every
+            // mapping can be `Some` while a cycle such as `A = R, R = A` still leaves `A` in the
+            // specialized return, so check the result of applying the mappings here.
+            specialized_ty.visit_specialization(db, |nested, _| {
+                if let Type::TypeVar(typevar) = nested
+                    && variables.contains_key(&typevar.identity(db))
+                {
+                    complete = false;
+                }
+            });
+        }
+
         complete
     }
 
