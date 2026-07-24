@@ -174,6 +174,7 @@ async def format_then_format(
     config_overrides: ConfigOverrides,
     cloned_repo: ClonedRepository,
 ) -> Sequence[str]:
+    # TODO(brent) Remove this workaround when human-readable rule names are stabilized.
     rule_names = (
         rule_name_to_code(ruff_comparison_executable.resolve())
         if not options.preview
@@ -207,6 +208,7 @@ async def format_and_format(
     config_overrides: ConfigOverrides,
     cloned_repo: ClonedRepository,
 ) -> Sequence[str]:
+    # TODO(brent) Remove this workaround when human-readable rule names are stabilized.
     rule_names = (
         rule_name_to_code(ruff_comparison_executable.resolve())
         if not options.preview

@@ -56,6 +56,7 @@ ALWAYS_CONFIG_OVERRIDES = {
     "required-version": None
 }
 
+# TODO(brent) Remove selector normalization when human-readable rule names are stabilized.
 RULE_SELECTOR_OPTIONS = (
     "select",
     "extend-select",
