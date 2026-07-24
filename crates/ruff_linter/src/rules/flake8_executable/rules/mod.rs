@@ -1,6 +1,7 @@
 use std::path::Path;
 
 use ruff_python_trivia::CommentRanges;
+use ruff_text_size::TextSize;
 pub(crate) use shebang_leading_whitespace::*;
 pub(crate) use shebang_missing_executable_file::*;
 pub(crate) use shebang_missing_python::*;
@@ -28,17 +29,18 @@ pub(crate) fn from_tokens(
     for range in comment_ranges {
         let comment = locator.slice(range);
         if let Some(shebang) = ShebangDirective::try_extract(comment) {
-            has_any_shebang = true;
+            if range.start() == TextSize::from(0) {
+                has_any_shebang = true;
 
-            shebang_missing_python(range, &shebang, context);
+                shebang_missing_python(range, &shebang, context);
 
-            if context.is_rule_enabled(Rule::ShebangNotExecutable) {
-                shebang_not_executable(path, range, context);
+                if context.is_rule_enabled(Rule::ShebangNotExecutable) {
+                    shebang_not_executable(path, range, context);
+                }
+            } else {
+                shebang_leading_whitespace(context, range, locator);
+                shebang_not_first_line(range, locator, context);
             }
-
-            shebang_leading_whitespace(context, range, locator);
-
-            shebang_not_first_line(range, locator, context);
         }
     }
 

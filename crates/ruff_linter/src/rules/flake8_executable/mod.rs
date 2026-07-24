@@ -23,6 +23,7 @@ mod tests {
     #[test_case(Rule::ShebangMissingExecutableFile, Path::new("EXE002_3.py"))]
     #[test_case(Rule::ShebangMissingPython, Path::new("EXE003.py"))]
     #[test_case(Rule::ShebangMissingPython, Path::new("EXE003_uv.py"))]
+    #[test_case(Rule::ShebangMissingPython, Path::new("EXE003_uv_2.py"))]
     #[test_case(Rule::ShebangMissingPython, Path::new("EXE003_uv_tool.py"))]
     #[test_case(Rule::ShebangMissingPython, Path::new("EXE003_uvx.py"))]
     #[test_case(Rule::ShebangLeadingWhitespace, Path::new("EXE004_1.py"))]
