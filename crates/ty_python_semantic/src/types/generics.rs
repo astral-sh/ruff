@@ -2273,10 +2273,9 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             return None;
         };
 
-        let fallback = self.solve_hash_map_with(generic_context, &mut choose);
         let mut inferences = Vec::with_capacity(solutions.len());
         for solution in solutions {
-            let mut types = fallback.clone();
+            let mut types = FxHashMap::default();
             for binding in solution {
                 let identity = binding.bound_typevar.identity(self.db);
                 let solution = self.remove_inferable_typevar_artifacts_from_solution(
