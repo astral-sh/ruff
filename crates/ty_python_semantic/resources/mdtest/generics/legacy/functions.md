@@ -1303,10 +1303,10 @@ reveal_type(flatten_covariant(b"abc"))  # revealed: tuple[int, ...]
 reveal_type(flatten_covariant(b"abc", ("x",)))  # revealed: tuple[int | Literal["x"], ...]
 ```
 
-## Single-path call inference
+## Simple generic calls
 
-A single inference path still specializes the return type and leaves ordinary argument checking in
-place. Gradual arguments can contribute to that specialization.
+Arguments to a generic function determine its return type without bypassing ordinary argument
+checking. Gradual arguments can also affect the inferred return type.
 
 ```py
 from typing import Any, TypeVar

@@ -3616,6 +3616,9 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                         // will handle implicitly implemented protocols and generic protocols. We
                         // eventually want this logic to be used for _all_ nominal instances
                         // (replacing the logic below).
+                        // TODO: Account for `polarity`. This comparison assumes covariance and
+                        // infers the wrong bounds when the protocol is nested in a contravariant
+                        // or invariant generic.
                         let when = actual.when_constraint_set_assignable_to_owned(self.db, formal);
                         let when = self.constraints.load(self.db, &when);
                         self.infer_from_constraint_set(when)?;
@@ -3657,6 +3660,8 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             // TODO: in principle this could be a generalized Union-actual arm that maps over the
             // union, but the old solver isn't well-equipped to handle that (due to side effects
             // from even failed matches), so for now we handle this particular case.
+            // TODO: These protocol comparisons also assume covariant polarity and can infer the
+            // wrong bounds when the protocol is nested in a contravariant or invariant generic.
             (formal @ Type::ProtocolInstance(_), actual @ Type::Union(actual_union)) => {
                 let when = self
                     .common_typed_dict_protocol_constraints(formal, actual_union)
@@ -3677,6 +3682,9 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             // When the formal type is a protocol with a `__call__` method, infer the specialization
             // from matching the actual type's callable signature against the protocol's `__call__`
             // method signature.
+            // TODO: Pass `polarity` into callable-signature inference. These callable arms assume
+            // covariance and infer the wrong bounds when nested in a contravariant or invariant
+            // generic.
             (Type::ProtocolInstance(formal_protocol), _) => {
                 let Some(call_method) = formal_protocol.interface(self.db).call_method(self.db)
                 else {
