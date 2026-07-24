@@ -91,6 +91,9 @@ pub fn register_lints(registry: &mut LintRegistryBuilder) {
 
 #[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize)]
 pub struct AnalysisSettings {
+    /// Whether narrowing with generic classes uses the top materialization.
+    pub strict_generic_narrowing: bool,
+
     /// Whether ty should use conservative equality and inequality semantics.
     pub strict_equality_semantics: bool,
 
@@ -111,6 +114,7 @@ pub struct AnalysisSettings {
 impl Default for AnalysisSettings {
     fn default() -> Self {
         Self {
+            strict_generic_narrowing: false,
             strict_equality_semantics: false,
             respect_type_ignore_comments: true,
             allowed_unresolved_imports: ModuleGlobSet::empty(),

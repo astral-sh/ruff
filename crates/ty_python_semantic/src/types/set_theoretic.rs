@@ -12,6 +12,7 @@ use crate::types::{TypeVarBoundOrConstraints, visitor};
 use crate::{Db, FxOrderSet};
 
 pub(crate) mod builder;
+mod generic_gradual_intersections;
 
 pub(crate) use builder::{IntersectionBuilder, UnionBuilder};
 

@@ -10,7 +10,7 @@ use ty_module_resolver::{ModuleName, file_to_module};
 use super::protocol_class::ProtocolInterface;
 use super::{
     BoundTypeVarIdentity, BoundTypeVarInstance, ClassType, DivergentType, KnownClass,
-    MaterializationKind, SubclassOfType, Type, TypeAliasType, TypeVarVariance,
+    Materialization, MaterializationKind, SubclassOfType, Type, TypeAliasType, TypeVarVariance,
 };
 use crate::place::PlaceAndQualifiers;
 use crate::types::constraints::{
@@ -47,7 +47,10 @@ impl<'db> Type<'db> {
             self,
             Type::NominalInstance(NominalInstanceType(NominalInstanceInner::Object))
                 | Type::Divergent(DivergentType {
-                    materialization: Some(MaterializationKind::Top),
+                    materialization: Some(Materialization {
+                        kind: MaterializationKind::Top,
+                        ..
+                    }),
                     ..
                 })
         )
@@ -505,6 +508,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         ty: Type<'db>,
         protocol: ProtocolInstanceType<'db>,
     ) -> ConstraintSet<'db, 'c> {
+        let protocol = protocol.apply_transient_materialization(db, self.materialization_visitor);
+
         // `ty` might satisfy the protocol nominally, if `protocol` is a class-based protocol and
         // `ty` has the protocol class in its MRO. This is a much cheaper check than the
         // structural check we perform below, so we do it first to avoid the structural check when
@@ -975,6 +980,24 @@ impl<'db> ProtocolInstanceType<'db> {
             Protocol::FromClass(class) => Some(class),
             Protocol::Synthesized(_) => None,
         }
+    }
+
+    /// Applies transient materialization to a class-based protocol's specialization.
+    fn apply_transient_materialization(
+        self,
+        db: &'db dyn Db,
+        visitor: &ApplyTypeMappingVisitor<'db>,
+    ) -> Self {
+        let Protocol::FromClass(class) = self.inner else {
+            return self;
+        };
+        let materialized = (*class).apply_transient_materialization(db, visitor);
+        if materialized == *class {
+            return self;
+        }
+        materialized
+            .into_protocol_class(db)
+            .map_or(self, Self::from_class)
     }
 
     /// If this is a class-based protocol, convert the protocol-instance into a nominal instance.

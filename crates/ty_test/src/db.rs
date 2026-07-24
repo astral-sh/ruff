@@ -252,6 +252,7 @@ fn mdtest_analysis_settings(options: Option<&Analysis>) -> AnalysisSettings {
     };
 
     let AnalysisSettings {
+        strict_generic_narrowing: strict_generic_narrowing_default,
         strict_equality_semantics: strict_equality_semantics_default,
         respect_type_ignore_comments: respect_type_ignore_comments_default,
         allowed_unresolved_imports: allowed_unresolved_imports_default,
@@ -285,6 +286,9 @@ fn mdtest_analysis_settings(options: Option<&Analysis>) -> AnalysisSettings {
         };
 
     AnalysisSettings {
+        strict_generic_narrowing: options
+            .strict_generic_narrowing
+            .unwrap_or(strict_generic_narrowing_default),
         strict_equality_semantics: options
             .strict_equality_semantics
             .unwrap_or(strict_equality_semantics_default),

@@ -32,7 +32,8 @@ use crate::types::relation::{DisjointnessChecker, TypeRelationChecker, TypeVarEv
 use crate::types::set_theoretic::RecursivelyDefined;
 use crate::types::{
     ApplyTypeMappingVisitor, BoundTypeVarInstance, ErrorContext, FindLegacyTypeVarsVisitor,
-    IntersectionType, Type, TypeContext, TypeMapping, UnionBuilder, UnionType,
+    IntersectionType, Materialization, MaterializationKind, Type, TypeContext, TypeMapping,
+    UnionBuilder, UnionType,
 };
 use crate::{Db, FxOrderSet, Program};
 use ty_python_core::Truthiness;
@@ -134,6 +135,9 @@ impl TupleLength {
 pub struct TupleType<'db> {
     #[returns(ref)]
     pub(crate) tuple: TupleSpec<'db>,
+    /// Whether this tuple is a transient top materialization.
+    #[returns(copy)]
+    pub(crate) transient_top_materialization: bool,
 }
 
 pub(super) fn walk_tuple_type<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
@@ -186,14 +190,16 @@ impl<'db> TupleType<'db> {
                     .iter_prefix_elements()
                     .chain(tuple.iter_suffix_elements()),
             ));
-            return Some(TupleType::new_internal::<_, TupleSpec<'db>>(db, tuple));
+            return Some(TupleType::new_internal::<_, TupleSpec<'db>, _>(
+                db, tuple, false,
+            ));
         }
 
-        Some(TupleType::new_internal(db, spec))
+        Some(TupleType::new_internal(db, spec, false))
     }
 
     pub(crate) fn empty(db: &'db dyn Db) -> Self {
-        TupleType::new_internal(db, TupleSpec::from(FixedLengthTuple::empty()))
+        TupleType::new_internal(db, TupleSpec::from(FixedLengthTuple::empty()), false)
     }
 
     pub(crate) fn heterogeneous(
@@ -224,7 +230,7 @@ impl<'db> TupleType<'db> {
     pub(crate) fn homogeneous(db: &'db dyn Db, element: Type<'db>) -> Self {
         match element {
             Type::Never => TupleType::empty(db),
-            _ => TupleType::new_internal(db, TupleSpec::homogeneous(element)),
+            _ => TupleType::new_internal(db, TupleSpec::homogeneous(element), false),
         }
     }
 
@@ -237,6 +243,7 @@ impl<'db> TupleType<'db> {
         TupleType::new_internal(
             db,
             VariableLengthTuple::mixed([], VariableSegment::TypeVarTuple(typevar), []),
+            false,
         )
     }
 
@@ -252,7 +259,13 @@ impl<'db> TupleType<'db> {
         tuple_class.apply_specialization(db, |generic_context| {
             if generic_context.variables(db).len() == 1 {
                 let element_type = self.tuple(db).tuple_class_type(db);
-                generic_context.specialize_tuple(db, element_type, self)
+                generic_context
+                    .specialize_tuple(db, element_type, self)
+                    .with_materialization(
+                        db,
+                        self.transient_top_materialization(db)
+                            .then_some(Materialization::transient(MaterializationKind::Top)),
+                    )
             } else {
                 generic_context.default_specialization(db, Some(KnownClass::Tuple))
             }
@@ -269,6 +282,7 @@ impl<'db> TupleType<'db> {
             db,
             self.tuple(db)
                 .recursive_type_normalized_impl(db, div, nested)?,
+            self.transient_top_materialization(db),
         ))
     }
 
@@ -279,12 +293,53 @@ impl<'db> TupleType<'db> {
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> Option<Self> {
-        TupleType::new(
+        if matches!(
+            type_mapping,
+            TypeMapping::Materialize(Materialization {
+                kind: MaterializationKind::Top,
+                transient: true,
+            })
+        ) {
+            return Some(if self.transient_top_materialization(db) {
+                self
+            } else {
+                TupleType::new_internal(db, self.tuple(db), true)
+            });
+        }
+
+        if self.transient_top_materialization(db)
+            && matches!(type_mapping, TypeMapping::Materialize(_))
+        {
+            return Some(self);
+        }
+
+        let transient_top_materialization = self.transient_top_materialization(db)
+            && !matches!(type_mapping, TypeMapping::EraseTransientMaterialization);
+        let tuple = self
+            .tuple(db)
+            .apply_type_mapping_impl(db, type_mapping, tcx, visitor);
+        TupleType::new(db, &tuple).map(|tuple| {
+            TupleType::new_internal(db, tuple.tuple(db), transient_top_materialization)
+        })
+    }
+
+    /// Applies the tuple's transient top materialization: `TransientTop[..]` becomes `Top[..]`.
+    fn apply_transient_materialization(
+        self,
+        db: &'db dyn Db,
+        visitor: &ApplyTypeMappingVisitor<'db>,
+    ) -> Option<Self> {
+        if !self.transient_top_materialization(db) {
+            return Some(self);
+        }
+
+        let tuple = self.tuple(db).apply_type_mapping_impl(
             db,
-            &self
-                .tuple(db)
-                .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
-        )
+            &TypeMapping::Materialize(Materialization::new(MaterializationKind::Top)),
+            TypeContext::default(),
+            visitor,
+        );
+        TupleType::new(db, &tuple)
     }
 
     pub(crate) fn find_legacy_typevars_impl(
@@ -310,6 +365,11 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         source: TupleType<'db>,
         target: TupleType<'db>,
     ) -> ConstraintSet<'db, 'c> {
+        let source = source.apply_transient_materialization(db, self.materialization_visitor);
+        let target = target.apply_transient_materialization(db, self.materialization_visitor);
+        let (Some(source), Some(target)) = (source, target) else {
+            return ConstraintSet::from_bool(self.constraints, source.is_none());
+        };
         self.check_tuple_spec_pair(db, source.tuple(db), target.tuple(db))
     }
 
@@ -660,6 +720,13 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
         left: TupleType<'db>,
         right: TupleType<'db>,
     ) -> ConstraintSet<'db, 'c> {
+        let visitor = ApplyTypeMappingVisitor::default();
+        let Some(left) = left.apply_transient_materialization(db, &visitor) else {
+            return self.always();
+        };
+        let Some(right) = right.apply_transient_materialization(db, &visitor) else {
+            return self.always();
+        };
         self.check_tuple_spec_pair(db, left.tuple(db), right.tuple(db))
     }
 
@@ -733,7 +800,14 @@ fn to_class_type_cycle_initial<'db>(
 
     tuple_class.apply_specialization(db, |generic_context| {
         if generic_context.variables(db).len() == 1 {
-            generic_context.specialize_tuple(db, Type::divergent(id), self_)
+            generic_context
+                .specialize_tuple(db, Type::divergent(id), self_)
+                .with_materialization(
+                    db,
+                    self_
+                        .transient_top_materialization(db)
+                        .then_some(Materialization::transient(MaterializationKind::Top)),
+                )
         } else {
             generic_context.default_specialization(db, Some(KnownClass::Tuple))
         }

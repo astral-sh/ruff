@@ -4,7 +4,7 @@ use crate::types::mro::MroIterator;
 use crate::types::tuple::TupleType;
 use crate::types::{
     ApplyTypeMappingVisitor, ClassLiteral, ClassType, DivergentType, DynamicType, KnownClass,
-    KnownInstanceType, MaterializationKind, SpecialFormType, StaticMroError, Type, TypeContext,
+    KnownInstanceType, Materialization, SpecialFormType, StaticMroError, Type, TypeContext,
     TypeMapping, TypedDictModule, todo_type,
 };
 use crate::{Db, DisplaySettings};
@@ -390,19 +390,19 @@ impl<'db> ClassBase<'db> {
                 TypeContext::default(),
                 &ApplyTypeMappingVisitor::default(),
             );
-            match specialization.materialization_kind(db) {
+            match specialization.materialization(db) {
                 None => new_self,
-                Some(materialization_kind) => new_self.materialize(db, materialization_kind),
+                Some(materialization) => new_self.materialize(db, materialization),
             }
         } else {
             self
         }
     }
 
-    fn materialize(self, db: &'db dyn Db, kind: MaterializationKind) -> Self {
+    fn materialize(self, db: &'db dyn Db, materialization: Materialization) -> Self {
         self.apply_type_mapping_impl(
             db,
-            &TypeMapping::Materialize(kind),
+            &TypeMapping::Materialize(materialization),
             TypeContext::default(),
             &ApplyTypeMappingVisitor::default(),
         )

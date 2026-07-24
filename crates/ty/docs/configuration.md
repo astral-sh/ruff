@@ -266,6 +266,46 @@ def narrow_match(x: str) -> None:
 
 ---
 
+### `strict-generic-narrowing`
+
+Whether ty should use strict narrowing for unspecialized generic classes in
+`isinstance()` and `issubclass()` checks.
+
+When enabled, ty narrows to the top materialization of the class. For example,
+`isinstance(value, list)` narrows a value of type `object` to `Top[list[Unknown]]`,
+representing the (infinite) union of all possible `list` specializations. Iterating
+over the list would yield values of type `object`.
+
+When disabled, ty narrows to the class's `Unknown`-specialization instead. The same
+check narrows a value of type `object` to `list[Unknown]`. Iterating over the list then
+yields values of type `Unknown`, which is more permissive than `object`.
+
+Defaults to `false`.
+
+**Default value**: `false`
+
+**Type**: `bool`
+
+**Example usage**:
+
+=== "pyproject.toml"
+
+    ```toml
+    [tool.ty.analysis]
+    # Use the top materialization when narrowing to an unspecialized generic class
+    strict-generic-narrowing = true
+    ```
+
+=== "ty.toml"
+
+    ```toml
+    [analysis]
+    # Use the top materialization when narrowing to an unspecialized generic class
+    strict-generic-narrowing = true
+    ```
+
+---
+
 ## `environment`
 
 ### `extra-paths`
@@ -862,6 +902,46 @@ def narrow_match(x: str) -> None:
     [overrides.analysis]
     # Preserve broad builtin types instead of narrowing them to literals
     strict-equality-semantics = true
+    ```
+
+---
+
+#### `strict-generic-narrowing`
+
+Whether ty should use strict narrowing for unspecialized generic classes in
+`isinstance()` and `issubclass()` checks.
+
+When enabled, ty narrows to the top materialization of the class. For example,
+`isinstance(value, list)` narrows a value of type `object` to `Top[list[Unknown]]`,
+representing the (infinite) union of all possible `list` specializations. Iterating
+over the list would yield values of type `object`.
+
+When disabled, ty narrows to the class's `Unknown`-specialization instead. The same
+check narrows a value of type `object` to `list[Unknown]`. Iterating over the list then
+yields values of type `Unknown`, which is more permissive than `object`.
+
+Defaults to `false`.
+
+**Default value**: `false`
+
+**Type**: `bool`
+
+**Example usage**:
+
+=== "pyproject.toml"
+
+    ```toml
+    [tool.ty.overrides.analysis]
+    # Use the top materialization when narrowing to an unspecialized generic class
+    strict-generic-narrowing = true
+    ```
+
+=== "ty.toml"
+
+    ```toml
+    [overrides.analysis]
+    # Use the top materialization when narrowing to an unspecialized generic class
+    strict-generic-narrowing = true
     ```
 
 ---

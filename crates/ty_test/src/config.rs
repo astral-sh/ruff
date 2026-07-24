@@ -148,6 +148,9 @@ pub(crate) struct Environment {
 #[derive(Deserialize, Default, Debug, Clone)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub(crate) struct Analysis {
+    /// Whether narrowing with generic classes uses the top materialization.
+    pub(crate) strict_generic_narrowing: Option<bool>,
+
     /// Whether equality-based checks should preserve possible subclass behavior.
     #[serde(alias = "strict-literal-narrowing")]
     pub(crate) strict_equality_semantics: Option<bool>,
