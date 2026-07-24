@@ -1181,6 +1181,13 @@ impl<'db> Type<'db> {
         })
     }
 
+    pub(crate) const fn as_intersection(self) -> Option<IntersectionType<'db>> {
+        match self {
+            Type::Intersection(intersection) => Some(intersection),
+            _ => None,
+        }
+    }
+
     pub const fn is_unknown(&self) -> bool {
         matches!(
             self,
@@ -8560,7 +8567,7 @@ impl<'db> InvalidTypeExpression<'db> {
             {
                 return;
             }
-            diagnostic.set_primary_message(format_args!(
+            diagnostic.set_primary_annotation_message(format_args!(
                 "Did you mean to use the module's member \
                 `{module_name_final_part}.{module_name_final_part}`?"
             ));
@@ -8586,7 +8593,7 @@ impl<'db> InvalidTypeExpression<'db> {
                 .map(|parent| parent.to_scope_id(db, function_body_scope.file(db)))
                 == builtins_module_scope(db)
         {
-            diagnostic.set_primary_message("Did you mean `collections.abc.Callable`?");
+            diagnostic.set_primary_annotation_message("Did you mean `collections.abc.Callable`?");
         } else if matches!(self, InvalidTypeExpression::InvalidBareParamSpec(_)) {
             diagnostic.info("A bare ParamSpec is only valid:");
             diagnostic.info(" - as the first argument to `Callable`");

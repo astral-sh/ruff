@@ -42,7 +42,7 @@ fn get_symbol<'db>(
 fn assert_diagnostic_messages(diagnostics: &[Diagnostic], expected: &[&str]) {
     let messages: Vec<&str> = diagnostics
         .iter()
-        .map(Diagnostic::primary_message)
+        .map(Diagnostic::headline_message)
         .collect();
     assert_eq!(&messages, expected);
 }

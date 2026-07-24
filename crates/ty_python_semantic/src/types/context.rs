@@ -129,7 +129,7 @@ impl<'db, 'ast> InferContext<'db, 'ast> {
     /// The severity of the diagnostic returned is automatically determined
     /// by the given lint and configuration. The message given to
     /// `LintDiagnosticGuardBuilder::to_diagnostic` is used to construct the
-    /// initial diagnostic and should be considered the "top-level message" of
+    /// initial diagnostic and should be considered the "headline message" of
     /// the diagnostic. (i.e., If nothing else about the diagnostic is seen,
     /// aside from its identifier, the message is probably the thing you'd pick
     /// to show.)
@@ -139,7 +139,7 @@ impl<'db, 'ast> InferContext<'db, 'ast> {
     /// typing context. (That means the range given _must_ be valid for the
     /// `File` currently being type checked.) This primary annotation does
     /// not have a message attached to it, but callers can attach one via
-    /// `LintDiagnosticGuard::set_primary_message`.
+    /// `LintDiagnosticGuard::set_primary_annotation_message`.
     ///
     /// After using the builder to make a guard, once the guard is dropped, the
     /// diagnostic is added to the context, unless there is something in the
@@ -263,7 +263,7 @@ impl fmt::Debug for InferContext<'_, '_> {
 ///
 /// * On `Drop`, the underlying diagnostic is added to the typing context.
 /// * Some convenience methods for mutating the underlying `Diagnostic`
-///   in lint context. For example, `LintDiagnosticGuard::set_primary_message`
+///   in lint context. For example, `LintDiagnosticGuard::set_primary_annotation_message`
 ///   will attach a message to the primary span on the diagnostic.
 pub(super) struct LintDiagnosticGuard<'db, 'ctx> {
     /// The typing context.
@@ -289,7 +289,7 @@ impl LintDiagnosticGuard<'_, '_> {
     ///
     /// Callers can add additional primary or secondary annotations via the
     /// `DerefMut` trait implementation to a `Diagnostic`.
-    pub(super) fn set_primary_message(&mut self, message: impl IntoDiagnosticMessage) {
+    pub(super) fn set_primary_annotation_message(&mut self, message: impl IntoDiagnosticMessage) {
         // N.B. It is normally bad juju to define `self` methods
         // on types that implement `Deref`. Instead, it's idiomatic
         // to do `fn foo(this: &mut LintDiagnosticGuard)`, which in
@@ -506,7 +506,7 @@ impl<'db, 'ctx> LintDiagnosticGuardBuilder<'db, 'ctx> {
     /// the ID and severity derived from the `LintMetadata` used to create
     /// this builder. The diagnostic also includes a primary annotation
     /// without a message. To add a message to this primary annotation, use
-    /// `LintDiagnosticGuard::set_primary_message`.
+    /// `LintDiagnosticGuard::set_primary_annotation_message`.
     ///
     /// The diagnostic can be further mutated on the guard via its `DerefMut`
     /// impl to `Diagnostic`.
@@ -516,9 +516,9 @@ impl<'db, 'ctx> LintDiagnosticGuardBuilder<'db, 'ctx> {
         self,
         message: impl std::fmt::Display,
     ) -> LintDiagnosticGuard<'db, 'ctx> {
-        // This is why `LintDiagnosticGuard::set_primary_message` exists.
+        // This is why `LintDiagnosticGuard::set_primary_annotation_message` exists.
         // We add the primary annotation here (because it's required). Without a message
-        // override, its optional message can be added later via `set_primary_message`.
+        // override, its optional message can be added later via `set_primary_annotation_message`.
         let primary_span = Span::from(self.ctx.file()).with_range(self.primary_range);
         let mut diag = if let Some((message_override, info)) = self.message_override {
             let mut diag = Diagnostic::new(
@@ -543,7 +543,7 @@ impl<'db, 'ctx> LintDiagnosticGuardBuilder<'db, 'ctx> {
         }
     }
 
-    /// Replace the top-level message and add an info sub-diagnostic while retaining the original
+    /// Replace the headline message and add an info sub-diagnostic while retaining the original
     /// message on the primary annotation.
     pub(super) fn with_message_override(mut self, message: String, info: &str) -> Self {
         self.message_override = Some((message, info.to_string()));

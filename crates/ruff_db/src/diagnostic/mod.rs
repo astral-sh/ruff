@@ -155,8 +155,8 @@ impl Diagnostic {
     ///
     /// An "info" diagnostic is useful when contextualizing or otherwise
     /// helpful information can be added to help end users understand the
-    /// main diagnostic message better. For example, if a the main diagnostic
-    /// message is about a function call being invalid, a useful "info"
+    /// headline message better. For example, if the headline message is about
+    /// a function call being invalid, a useful "info"
     /// sub-diagnostic could show the function definition (or only the relevant
     /// parts of it).
     ///
@@ -203,18 +203,17 @@ impl Diagnostic {
         self.inner.id
     }
 
-    /// Returns the primary message for this diagnostic.
+    /// Returns the headline message for this diagnostic.
     ///
     /// A diagnostic always has a message, but it may be empty.
-    pub fn primary_message(&self) -> &str {
+    pub fn headline_message(&self) -> &str {
         self.inner.message.as_str()
     }
 
-    /// Introspects this diagnostic and returns what kind of "primary" message
-    /// it contains for concise formatting.
+    /// Introspects this diagnostic and returns its message for concise formatting.
     ///
     /// When we concisely format diagnostics, we likely want to not only
-    /// include the primary diagnostic message but also the message attached
+    /// include the headline message but also the message attached
     /// to the primary annotation. In particular, the primary annotation often
     /// contains *essential* information or context for understanding the
     /// diagnostic.
@@ -242,7 +241,7 @@ impl Diagnostic {
     /// Set a custom message for the concise formatting of this diagnostic.
     ///
     /// This overrides the default behavior of generating a concise message
-    /// from the main diagnostic message and the primary annotation.
+    /// from the headline message and the primary annotation.
     pub fn set_concise_message(&mut self, message: impl IntoDiagnosticMessage) {
         Arc::make_mut(&mut self.inner).custom_concise_message =
             Some(message.into_diagnostic_message());
@@ -702,18 +701,17 @@ impl SubDiagnostic {
         self.primary_annotation().map(Annotation::get_span)
     }
 
-    /// Returns the primary message for this sub-diagnostic.
+    /// Returns the headline message for this sub-diagnostic.
     ///
     /// A sub-diagnostic always has a message, but it may be empty.
-    pub fn primary_message(&self) -> &str {
+    pub fn headline_message(&self) -> &str {
         self.inner.message.as_str()
     }
 
-    /// Introspects this diagnostic and returns what kind of "primary" message
-    /// it contains for concise formatting.
+    /// Introspects this sub-diagnostic and returns its message for concise formatting.
     ///
     /// When we concisely format diagnostics, we likely want to not only
-    /// include the primary diagnostic message but also the message attached
+    /// include the headline message but also the message attached
     /// to the primary annotation. In particular, the primary annotation often
     /// contains *essential* information or context for understanding the
     /// diagnostic.
@@ -722,7 +720,7 @@ impl SubDiagnostic {
     /// cases, just converting it to a string (or printing it) will do what
     /// you want.
     pub fn concise_message(&self) -> ConciseMessage<'_> {
-        let main = self.primary_message();
+        let main = self.headline_message();
         let annotation = self
             .primary_annotation()
             .and_then(|ann| ann.get_message())
@@ -1633,10 +1631,10 @@ pub enum DiagnosticFormat {
 
 /// A representation of the kinds of messages inside a diagnostic.
 pub enum ConciseMessage<'a> {
-    /// A diagnostic contains a non-empty main message and an empty
+    /// A diagnostic contains a non-empty headline message and an empty
     /// primary annotation message.
     MainDiagnostic(&'a str),
-    /// A diagnostic contains a non-empty main message and a non-empty
+    /// A diagnostic contains a non-empty headline message and a non-empty
     /// primary annotation message.
     Both { main: &'a str, annotation: &'a str },
     /// A custom concise message has been provided.

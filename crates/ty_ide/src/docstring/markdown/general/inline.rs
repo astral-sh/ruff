@@ -49,11 +49,9 @@
 
 use std::borrow::Cow;
 
-use ruff_text_size::TextSize;
+use ruff_text_size::{Ranged, TextSize};
 
-use crate::docstring::document::syntax::{
-    find_backtick_run, is_backtick_run_escaped, markdown_code_span,
-};
+use crate::docstring::document::syntax::BacktickScanner;
 
 /// Exposes an interface for rendering a line of prose that may contain a hyperlink.
 #[derive(Default)]
@@ -278,28 +276,26 @@ enum Candidate<'a> {
 
 /// Finds the first complete hyperlink or plausible wrapped candidate in `input`.
 fn find_link(input: &str) -> Option<(usize, Candidate<'_>)> {
-    let mut offset = TextSize::ZERO;
+    let mut scanner = BacktickScanner::new(input);
 
     // Visit each backtick run that could delimit inline markup.
-    while let Some(run) = find_backtick_run(input, offset) {
+    while let Some(run) = scanner.next() {
         let index = run.start().to_usize();
 
         // An escaped run is literal text, so continue immediately after it.
-        if is_backtick_run_escaped(input, index) {
-            offset = run.end();
+        if run.is_escaped() {
             continue;
         }
 
-        // Try parsing a link only when a single backtick has valid surrounding characters.
-        if run.len() == TextSize::new(1)
-            && is_link_start(input, index)
+        // Try parsing a link only when the backtick run has valid surrounding characters.
+        if is_link_start(input, index)
             && let Some(candidate) = parse_candidate(&input[index..])
         {
             return Some((index, candidate));
         }
 
         // Skip other backtick-delimited spans rather than searching inside them.
-        offset = markdown_code_span(input, run)?.end();
+        scanner.eat_span(run)?;
     }
 
     None
@@ -310,7 +306,13 @@ fn find_link(input: &str) -> Option<(usize, Candidate<'_>)> {
 /// Plausible wrapped labels without a closing backtick remain pending;
 /// malformed or unsupported forms return `None`.
 fn parse_candidate(input: &str) -> Option<Candidate<'_>> {
-    let after_opening = input.strip_prefix('`')?;
+    let mut scanner = BacktickScanner::new(input);
+    let opening = scanner.next()?;
+    if opening.start() != TextSize::ZERO {
+        return None;
+    }
+
+    let after_opening = scanner.as_str();
     if after_opening
         .chars()
         .next()
@@ -319,7 +321,11 @@ fn parse_candidate(input: &str) -> Option<Candidate<'_>> {
         return None;
     }
 
-    let Some(closing) = find_backtick_run(input, TextSize::new(1)) else {
+    let Some(closing) = scanner.next() else {
+        if !opening.is_single() {
+            return None;
+        }
+
         // Eliminate candidates whose content already contains a disallowed
         // backslash or closing `>`, or whose target cannot become HTTP(S). A
         // partial URI scheme remains valid so it can wrap immediately after
@@ -333,21 +339,22 @@ fn parse_candidate(input: &str) -> Option<Candidate<'_>> {
         }
         return Some(Candidate::Pending);
     };
-    if closing.len() != TextSize::new(1) {
+    let span = scanner.span(opening, closing)?;
+    if !span.is_single() {
         return None;
     }
 
-    let content = &input[1..closing.start().to_usize()];
+    let content = span.content();
     if content.contains('\\') {
         return None;
     }
 
-    let after_closing = &input[closing.end().to_usize()..];
+    let after_closing = scanner.as_str();
     let underscore_count = after_closing
         .bytes()
         .take_while(|byte| *byte == b'_')
         .count();
-    let len = closing.end().to_usize() + underscore_count;
+    let len = span.end().to_usize() + underscore_count;
     if !(1..=2).contains(&underscore_count) || !is_link_suffix(&after_closing[underscore_count..]) {
         return None;
     }

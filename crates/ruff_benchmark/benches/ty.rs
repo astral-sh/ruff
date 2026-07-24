@@ -212,7 +212,7 @@ fn assert_diagnostics(db: &dyn Db, diagnostics: &[Diagnostic], expected: &[KeyDi
                     .primary_span()
                     .and_then(|span| span.range())
                     .map(Range::<usize>::from),
-                diagnostic.primary_message(),
+                diagnostic.headline_message(),
                 diagnostic.severity(),
             )
         })

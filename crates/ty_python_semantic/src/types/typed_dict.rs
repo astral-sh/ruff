@@ -1462,7 +1462,7 @@ impl<'db> TypedDictKeyAssignment<'_, 'db, '_> {
                     self.key,
                 ));
 
-                diagnostic.set_primary_message(format_args!("key is marked read-only"));
+                diagnostic.set_primary_annotation_message(format_args!("key is marked read-only"));
                 self.add_object_type_annotation(db, &mut diagnostic);
                 Self::add_item_definition_subdiagnostic(
                     db,
@@ -1502,7 +1502,7 @@ impl<'db> TypedDictKeyAssignment<'_, 'db, '_> {
                 self.key,
             ));
 
-            diagnostic.set_primary_message(format_args!("value of type `{value_d}`"));
+            diagnostic.set_primary_annotation_message(format_args!("value of type `{value_d}`"));
 
             diagnostic.annotate(
                 self.context

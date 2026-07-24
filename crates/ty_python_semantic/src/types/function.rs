@@ -1615,7 +1615,8 @@ fn check_classinfo_in_isinstance<'db>(
             let mut diagnostic = builder.into_diagnostic(format_args!(
                 "`typing.Any` cannot be used with `isinstance()`"
             ));
-            diagnostic.set_primary_message("This call will raise `TypeError` at runtime");
+            diagnostic
+                .set_primary_annotation_message("This call will raise `TypeError` at runtime");
         }
         Type::KnownInstance(KnownInstanceType::UnionType(_)) => {
             report_invalid_union_type_elements(
@@ -2563,7 +2564,7 @@ impl KnownFunction {
                     };
                     let mut diagnostic =
                         builder.into_diagnostic("Invalid argument to `reveal_mro`");
-                    diagnostic.set_primary_message(format_args!(
+                    diagnostic.set_primary_annotation_message(format_args!(
                         "Can only pass a class object, generic alias or a union thereof"
                     ));
                     return;
