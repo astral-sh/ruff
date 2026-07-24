@@ -37,7 +37,8 @@ use crate::types::generics::Specialization;
 use crate::types::list_members::all_members;
 use crate::types::visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard};
 use crate::types::{
-    ClassType, NominalInstanceType, ProtocolInstanceType, Type, TypeAliasType, TypedDictType,
+    ClassType, GenericAlias, NominalInstanceType, ProtocolInstanceType, SubclassOfType, Type,
+    TypeAliasType, TypedDictType,
 };
 
 /// The type identity used for recursive checks/transformations.
@@ -53,6 +54,15 @@ pub enum TypeIdentity<'db> {
 }
 
 impl<'db> Type<'db> {
+    /// Returns the type that can define recursion for `self`.
+    fn recursive_identity_subject(self, db: &'db dyn Db) -> Self {
+        match self {
+            Type::GenericAlias(alias) => Type::instance(db, ClassType::Generic(alias)),
+            Type::SubclassOf(subclass_of) => subclass_of.to_instance(db),
+            _ => self,
+        }
+    }
+
     pub(crate) fn to_type_identity(self, db: &'db dyn Db) -> TypeIdentity<'db> {
         self.recursive_identity(db)
             .unwrap_or(TypeIdentity::NonRecursive(self))
@@ -63,6 +73,13 @@ impl<'db> Type<'db> {
     /// A `true` result is only a candidate match and must be confirmed with
     /// [`Type::to_type_identity`].
     pub(crate) fn may_share_type_identity(self, db: &'db dyn Db, other: Self) -> bool {
+        let self_subject = self.recursive_identity_subject(db);
+        let other_subject = other.recursive_identity_subject(db);
+
+        if self_subject != self || other_subject != other {
+            return self_subject.may_share_type_identity(db, other_subject);
+        }
+
         if self == other {
             return true;
         }
@@ -86,6 +103,11 @@ impl<'db> Type<'db> {
     #[allow(clippy::inline_always)]
     #[inline(always)]
     pub(crate) fn recursive_identity(self, db: &'db dyn Db) -> Option<TypeIdentity<'db>> {
+        let subject = self.recursive_identity_subject(db);
+        if subject != self {
+            return subject.recursive_identity(db);
+        }
+
         match self {
             // We can create a self-referential function type: e.g. `def f(x: "TypeOf[f]"): reveal_type(x)`
             // To avoid the difficulty of equality checking for function types containing this, we simply use `literal` for equality checking.
@@ -175,6 +197,23 @@ impl<'db> DefinitionReferenceVisitor<'db> {
             _ => {}
         }
     }
+
+    fn visit_members(&self, db: &'db dyn Db, ty: Type<'db>) {
+        let mut members = all_members(db, ty).into_iter().collect::<Vec<_>>();
+        members.sort_unstable();
+        for member in members {
+            // `all_members` synthesizes `__class__: type[Self]` for every nominal instance.
+            // Ignore this implicit back-reference so that it does not make every class recursive.
+            if member.name == "__class__" {
+                continue;
+            }
+            match member.ty {
+                // Method relations have a separate declaration-based recursion guard.
+                Type::FunctionLiteral(_) | Type::BoundMethod(_) | Type::KnownBoundMethod(_) => {}
+                ty => self.visit_type(db, ty),
+            }
+        }
+    }
 }
 
 impl<'db> TypeVisitor<'db> for DefinitionReferenceVisitor<'db> {
@@ -215,18 +254,16 @@ impl<'db> TypeVisitor<'db> for DefinitionReferenceVisitor<'db> {
         }
     }
 
+    fn visit_generic_alias_type(&self, db: &'db dyn Db, alias: GenericAlias<'db>) {
+        self.visit_type(db, Type::instance(db, ClassType::Generic(alias)));
+    }
+
+    fn visit_subclass_of_type(&self, db: &'db dyn Db, subclass_of: SubclassOfType<'db>) {
+        self.visit_type(db, subclass_of.to_instance(db));
+    }
+
     fn visit_nominal_instance_type(&self, db: &'db dyn Db, nominal: NominalInstanceType<'db>) {
-        let mut members = all_members(db, Type::NominalInstance(nominal))
-            .into_iter()
-            .collect::<Vec<_>>();
-        members.sort_unstable();
-        for member in members {
-            match member.ty {
-                // Method relations have a separate declaration-based recursion guard.
-                Type::FunctionLiteral(_) | Type::BoundMethod(_) | Type::KnownBoundMethod(_) => {}
-                ty => self.visit_type(db, ty),
-            }
-        }
+        self.visit_members(db, Type::NominalInstance(nominal));
     }
 
     fn visit_type_alias_type(&self, db: &'db dyn Db, alias: TypeAliasType<'db>) {

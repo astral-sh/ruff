@@ -454,3 +454,94 @@ reveal_mro(GenericBase["Foo", "Bar"])
 class Foo: ...
 class Bar: ...
 ```
+
+## Nominal instances in recursively-specialized relations
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from __future__ import annotations
+
+from typing import Protocol
+
+class Impl[T]:
+    child: Impl[list[T]]
+
+class Proto[T](Protocol):
+    child: Proto[list[T]]
+
+def assign(value: Impl[int]) -> Proto[int]:
+    # TODO: This should be accepted once recursive structural relations can represent an
+    # indeterminate result instead of conservatively rejecting the recursive pair.
+    return value  # error: [invalid-return-type]
+```
+
+## Generic aliases in recursively-specialized relations
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from __future__ import annotations
+
+from typing import Protocol
+from ty_extensions._internal import TypeOf
+
+class Impl[T]:
+    child: TypeOf[Impl[list[T]]]
+
+class Proto[T](Protocol):
+    child: Proto[list[T]]
+
+def assign(value: TypeOf[Impl[int]]) -> Proto[int]:
+    return value  # error: [invalid-return-type]
+```
+
+## Subclass-of types in recursively-specialized relations
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from __future__ import annotations
+
+from typing import Protocol
+
+class Impl[T]:
+    child: type[Impl[list[T]]]
+
+class Proto[T](Protocol):
+    child: Proto[list[T]]
+
+def assign(value: type[Impl[int]]) -> Proto[int]:
+    return value  # error: [invalid-return-type]
+```
+
+## Subclass-of types in recursively-specialized meta-type relations
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from __future__ import annotations
+
+from typing import Protocol
+
+class Impl[T]:
+    child: type[Impl[list[T]]]
+
+class Proto[T](Protocol):
+    child: type[Proto[list[T]]]
+
+def assign(value: type[Impl[int]]) -> type[Proto[int]]:
+    return value  # error: [invalid-return-type]
+```
