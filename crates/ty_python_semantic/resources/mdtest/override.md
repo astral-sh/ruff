@@ -558,6 +558,82 @@ class StubAbstractImplementation(StubAbstractInterface):
     def method(self) -> int: ...  # error: [missing-override-decorator]
 ```
 
+## Missing `@override` decorator on Python 3.11
+
+```toml
+[environment]
+python-version = "3.11"
+
+[rules]
+missing-override-decorator = "error"
+```
+
+```py
+from typing_extensions import override
+
+class Parent:
+    def method(self) -> None: ...
+
+class Child(Parent):
+    def method(self) -> None: ...  # snapshot: missing-override-decorator
+
+class ExplicitChild(Parent):
+    @override
+    def method(self) -> None: ...
+```
+
+```snapshot
+error[missing-override-decorator]: Method `method` overrides `Parent.method` but is not decorated with `@override`
+ --> src/mdtest_snippet.py:4:9
+  |
+4 |     def method(self) -> None: ...
+  |         ------ `Parent.method` defined here
+5 |
+6 | class Child(Parent):
+7 |     def method(self) -> None: ...  # snapshot: missing-override-decorator
+  |         ^^^^^^
+  |
+info: Decorate the method with `@typing_extensions.override` to make the override explicit
+```
+
+## Missing `@override` decorator on Python 3.12
+
+```toml
+[environment]
+python-version = "3.12"
+
+[rules]
+missing-override-decorator = "error"
+```
+
+```py
+from typing import override
+
+class Parent:
+    def method(self) -> None: ...
+
+class Child(Parent):
+    def method(self) -> None: ...  # snapshot: missing-override-decorator
+
+class ExplicitChild(Parent):
+    @override
+    def method(self) -> None: ...
+```
+
+```snapshot
+error[missing-override-decorator]: Method `method` overrides `Parent.method` but is not decorated with `@override`
+ --> src/mdtest_snippet.py:4:9
+  |
+4 |     def method(self) -> None: ...
+  |         ------ `Parent.method` defined here
+5 |
+6 | class Child(Parent):
+7 |     def method(self) -> None: ...  # snapshot: missing-override-decorator
+  |         ^^^^^^
+  |
+info: Decorate the method with `@typing.override` to make the override explicit
+```
+
 ## Possibly-unbound definitions
 
 ```py

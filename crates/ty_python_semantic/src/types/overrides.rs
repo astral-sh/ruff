@@ -1553,7 +1553,14 @@ fn check_missing_overrides<'db>(
         "Method `{}` overrides `{superclass_member}` but is not decorated with `@override`",
         member.name
     ));
-    diagnostic.info("Decorate the method with `@typing.override` to make the override explicit");
+    let override_module = if Program::get(db).python_version(db) >= PythonVersion::PY312 {
+        "typing"
+    } else {
+        "typing_extensions"
+    };
+    diagnostic.info(format_args!(
+        "Decorate the method with `@{override_module}.override` to make the override explicit"
+    ));
 
     if let Some(superclass_definition) = superclass_definition
         && superclass_definition.file(db) == context.file()
