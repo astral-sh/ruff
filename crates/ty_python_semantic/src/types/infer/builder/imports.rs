@@ -85,7 +85,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 version_range = version_range.diagnostic_display(),
                             ));
                             add_inferred_python_version_hint_to_diagnostic(
-                                db,
+                                self.semantic_environment(),
                                 &mut diagnostic,
                                 "resolving modules",
                             );
@@ -535,7 +535,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         if let Some(full_submodule_name) = full_submodule_name {
             submodule_hint_added = hint_if_stdlib_submodule_exists_on_other_versions(
-                db,
+                self.semantic_environment(),
                 &mut diagnostic,
                 &full_submodule_name,
                 module,
@@ -659,7 +659,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         ));
 
         hint_if_stdlib_submodule_exists_on_other_versions(
-            db,
+            self.semantic_environment(),
             &mut diagnostic,
             &full_submodule_name,
             module,

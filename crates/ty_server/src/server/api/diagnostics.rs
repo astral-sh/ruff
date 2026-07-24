@@ -19,8 +19,7 @@ use ruff_db::files::{File, FileRange};
 use ruff_db::source::source_text;
 use ruff_db::system::SystemPathBuf;
 use serde::{Deserialize, Serialize};
-use ty_project::{Db as _, ProjectDatabase};
-use ty_python_core::program::Program;
+use ty_project::{Db as _, ProjectDatabase, SemanticDb as _};
 
 use crate::capabilities::ResolvedClientCapabilities;
 use crate::document::{FileRangeExt, ToRangeExt};
@@ -402,7 +401,7 @@ pub(super) fn compute_diagnostics(
     };
 
     let diagnostics = db.check_file(file);
-    let unnecessary_hints = hints(db, Program::get(db).program_file(db, file));
+    let unnecessary_hints = hints(db, db.program_file(file));
 
     Some(Diagnostics {
         items: diagnostics,

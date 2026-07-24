@@ -3041,7 +3041,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                             continue;
                         };
                         let referenced_program_file =
-                            ProgramFile::new(self.db, referenced_file, resolver_environment);
+                            ProgramFile::new(self.db, referenced_file, self.file.program(self.db));
                         // In order to understand the reachability of definitions created by a `*` import,
                         // we need to know the reachability of the global-scope definitions in the
                         // `referenced_module` the symbols imported from. Much like predicates for `if`

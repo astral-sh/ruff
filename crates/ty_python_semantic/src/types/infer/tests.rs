@@ -8,10 +8,13 @@ use ruff_db::files::{File, system_path_to_file};
 use ruff_db::system::DbWithWritableSystem as _;
 use ruff_db::testing::{assert_function_query_was_not_run, assert_function_query_was_run};
 use ruff_python_ast::PythonVersion;
-use ty_module_resolver::ResolverEnvironment;
+use salsa::Setter;
+use salsa::plumbing::AsId;
 use ty_python_core::definition::Definition;
+use ty_python_core::program::{Program, ProgramSettings};
 use ty_python_core::scope::FileScopeId;
 use ty_python_core::{ProgramFile, global_scope, place_table, semantic_index, use_def_map};
+use ty_site_packages::{PythonVersionSource, PythonVersionWithSource};
 
 use super::*;
 
@@ -111,16 +114,38 @@ fn same_file_at_different_python_versions() -> anyhow::Result<()> {
     db.write_dedented("src/py312_dependency.py", "value: int = 312")?;
 
     let file = system_path_to_file(&db, "src/main.py").expect("file to exist");
-    let search_paths = db.semantic_environment().program().search_paths(&db);
+    let default_program = db.program();
+    let search_paths = default_program.search_paths(&db).clone();
+    let python_platform = default_program.python_platform(&db).clone();
     let py311 = ProgramFile::new(
         &db,
         file,
-        ResolverEnvironment::new(&db, PythonVersion::PY311, search_paths),
+        Program::from_settings(
+            &db,
+            ProgramSettings {
+                python_version: PythonVersionWithSource {
+                    version: PythonVersion::PY311,
+                    source: PythonVersionSource::Default,
+                },
+                python_platform: python_platform.clone(),
+                search_paths: search_paths.clone(),
+            },
+        ),
     );
     let py312 = ProgramFile::new(
         &db,
         file,
-        ResolverEnvironment::new(&db, PythonVersion::PY312, search_paths),
+        Program::from_settings(
+            &db,
+            ProgramSettings {
+                python_version: PythonVersionWithSource {
+                    version: PythonVersion::PY312,
+                    source: PythonVersionSource::Default,
+                },
+                python_platform,
+                search_paths,
+            },
+        ),
     );
 
     let check = |file, expected_type, expect_invalid_syntax, expect_unresolved_import| {
@@ -158,6 +183,33 @@ fn same_file_at_different_python_versions() -> anyhow::Result<()> {
     check(py312, "`int`", false, false);
     check(py311, "`str`", true, true);
 
+    Ok(())
+}
+
+#[test]
+fn program_file_follows_python_version_updates() -> anyhow::Result<()> {
+    let mut db = TestDbBuilder::new()
+        .with_python_version(PythonVersion::PY311)
+        .with_file("src/main.py", "type Alias = int")
+        .build()?;
+    let file = system_path_to_file(&db, "src/main.py").expect("file to exist");
+    let program = db.program();
+    let (program_file_id, py311) = {
+        let program_file = program.program_file(&db, file);
+        (program_file.as_id(), program_file.python_file(&db).as_id())
+    };
+
+    program
+        .set_python_version_with_source(&mut db)
+        .to(PythonVersionWithSource {
+            version: PythonVersion::PY312,
+            source: PythonVersionSource::Default,
+        });
+
+    let program_file = program.program_file(&db, file);
+    assert_eq!(program_file_id, program_file.as_id());
+    assert_eq!(program_file.python_version(&db), PythonVersion::PY312);
+    assert_ne!(py311, program_file.python_file(&db).as_id());
     Ok(())
 }
 

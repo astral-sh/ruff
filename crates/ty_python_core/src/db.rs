@@ -38,6 +38,7 @@ pub(crate) mod tests {
         files: Files,
         system: TestSystem,
         vendored: VendoredFileSystem,
+        program: Option<Program>,
     }
 
     impl TestDb {
@@ -54,7 +55,12 @@ pub(crate) mod tests {
                 system: TestSystem::default(),
                 vendored: ty_vendored::file_system().clone(),
                 files: Files::default(),
+                program: None,
             }
+        }
+
+        pub(crate) fn program(&self) -> Program {
+            self.program.expect("the program should be initialized")
         }
     }
 
@@ -132,7 +138,7 @@ pub(crate) mod tests {
             db.write_files(self.files)
                 .context("Failed to write test files")?;
 
-            Program::from_settings(
+            db.program = Some(Program::from_settings(
                 &db,
                 ProgramSettings {
                     python_version: PythonVersionWithSource {
@@ -144,7 +150,7 @@ pub(crate) mod tests {
                         .to_search_paths(db.system(), db.vendored(), &FallibleStrategy)
                         .context("Invalid search path settings")?,
                 },
-            );
+            ));
 
             Ok(db)
         }

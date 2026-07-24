@@ -15,11 +15,7 @@ use ruff_text_size::TextRange;
 use rustc_hash::{FxHashMap, FxHashSet};
 use salsa::plumbing::AsId;
 use smallvec::SmallVec;
-use ty_module_resolver::{ModuleName, ResolverEnvironment};
-
-// FIXME: Replace this temporary alias once semantic query keys can use the environment-bearing
-// `Program` Salsa ingredient directly.
-pub type Program<'db> = ResolverEnvironment<'db>;
+use ty_module_resolver::ModuleName;
 
 use crate::frozen::{FrozenMap, FrozenSet};
 use crate::place::ScopedPlaceId;
@@ -66,6 +62,7 @@ mod use_def;
 pub use db::Db;
 pub mod program;
 pub mod program_file;
+pub use program::Program;
 pub use program_file::ProgramFile;
 
 /// Returns the semantic index for `file`.
@@ -1130,7 +1127,7 @@ mod tests {
     }
 
     fn program_file(db: &TestDb, file: File) -> ProgramFile<'_> {
-        Program::get(db).program_file(db, file)
+        db.program().program_file(db, file)
     }
 
     fn names(table: &PlaceTable) -> Vec<String> {
@@ -1865,13 +1862,14 @@ class C[T]:
             scopes: impl Iterator<Item = (FileScopeId, &'db Scope)>,
             db: &'db dyn Db,
             file: File,
+            program: Program,
             module: &'a ParsedModuleRef,
         ) -> Vec<&'a str> {
             scopes
                 .into_iter()
                 .map(|(scope_id, _)| {
                     scope_id
-                        .to_scope_id(db, Program::get(db).program_file(db, file))
+                        .to_scope_id(db, program.program_file(db, file))
                         .name(db, module)
                 })
                 .collect()
@@ -1895,17 +1893,20 @@ def x():
 
         let descendants = index.descendent_scopes(FileScopeId::global());
         assert_eq!(
-            scope_names(descendants, &db, file, &module),
+            scope_names(descendants, &db, file, db.program(), &module),
             vec!["Test", "foo", "bar", "baz", "x"]
         );
 
         let children = index.child_scopes(FileScopeId::global());
-        assert_eq!(scope_names(children, &db, file, &module), vec!["Test", "x"]);
+        assert_eq!(
+            scope_names(children, &db, file, db.program(), &module),
+            vec!["Test", "x"]
+        );
 
         let test_class = index.child_scopes(FileScopeId::global()).next().unwrap().0;
         let test_child_scopes = index.child_scopes(test_class);
         assert_eq!(
-            scope_names(test_child_scopes, &db, file, &module),
+            scope_names(test_child_scopes, &db, file, db.program(), &module),
             vec!["foo", "baz"]
         );
 
@@ -1917,7 +1918,7 @@ def x():
         let ancestors = index.ancestor_scopes(bar_scope);
 
         assert_eq!(
-            scope_names(ancestors, &db, file, &module),
+            scope_names(ancestors, &db, file, db.program(), &module),
             vec!["bar", "foo", "Test", "<module>"]
         );
     }

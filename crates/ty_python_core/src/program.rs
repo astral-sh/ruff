@@ -2,6 +2,7 @@ use crate::{Db, platform::PythonPlatform};
 
 use ruff_db::files::File;
 use ruff_db::system::SystemPath;
+use ruff_db::vendored::VendoredFileSystem;
 use ruff_python_ast::PythonVersion;
 use salsa::Durability;
 use salsa::Setter;
@@ -13,8 +14,11 @@ use crate::ProgramFile;
 // Re-export the misconfiguration strategy types from ty_module_resolver.
 pub use ty_module_resolver::{FallibleStrategy, MisconfigurationStrategy, UseDefaultStrategy};
 
-#[salsa::input(singleton, heap_size=ruff_memory_usage::heap_size)]
+#[salsa::input(heap_size=ruff_memory_usage::heap_size)]
+#[derive(Debug)]
 pub struct Program {
+    // FIXME: Move the source out of `Program`. Different source locations prevent otherwise
+    // equivalent programs from being reused across scripts.
     #[returns(ref)]
     pub python_version_with_source: PythonVersionWithSource,
 
@@ -25,18 +29,10 @@ pub struct Program {
     pub search_paths: SearchPaths,
 }
 
+impl get_size2::GetSize for Program {}
+
 #[salsa::tracked]
 impl Program {
-    pub fn init_or_update(db: &mut dyn Db, settings: ProgramSettings) -> Self {
-        match Self::try_get(db) {
-            Some(program) => {
-                program.update_from_settings(db, settings);
-                program
-            }
-            None => Self::from_settings(db, settings),
-        }
-    }
-
     pub fn from_settings(db: &dyn Db, settings: ProgramSettings) -> Self {
         let ProgramSettings {
             python_version,
@@ -56,12 +52,13 @@ impl Program {
     }
 
     /// Returns the module-resolution environment for this program.
+    #[salsa::tracked(returns(copy))]
     pub fn resolver_environment(self, db: &dyn Db) -> ResolverEnvironment<'_> {
         ResolverEnvironment::new(db, self.python_version(db), self.search_paths(db))
     }
 
     pub fn program_file(self, db: &dyn Db, file: File) -> ProgramFile<'_> {
-        ProgramFile::new(db, file, self.resolver_environment(db))
+        ProgramFile::new(db, file, self)
     }
 
     pub fn update_from_settings(self, db: &mut dyn Db, settings: ProgramSettings) {
@@ -119,4 +116,14 @@ pub struct ProgramSettings {
     pub python_version: PythonVersionWithSource,
     pub python_platform: PythonPlatform,
     pub search_paths: SearchPaths,
+}
+
+impl ProgramSettings {
+    pub fn empty(vendored: &VendoredFileSystem) -> Self {
+        Self {
+            python_version: PythonVersionWithSource::default(),
+            python_platform: PythonPlatform::default(),
+            search_paths: SearchPaths::empty(vendored),
+        }
+    }
 }

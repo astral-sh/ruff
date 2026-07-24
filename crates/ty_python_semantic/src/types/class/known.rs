@@ -2044,7 +2044,7 @@ struct KnownClassArgument<'db> {
     class: KnownClass,
 
     #[returns(copy)]
-    program: Program<'db>,
+    program: Program,
 }
 
 /// Enumeration of ways in which looking up a [`KnownClass`] in its canonical module could fail.
@@ -2128,24 +2128,20 @@ impl<'db> KnownClassLookupError<'db> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::db::tests::setup_db;
+    use crate::db::tests::{TestDbBuilder, setup_db};
     use crate::{PythonVersionSource, PythonVersionWithSource};
     use salsa::Setter;
     use strum::IntoEnumIterator;
     use ty_module_resolver::resolve_module_confident;
-    use ty_python_core::program::Program as ProjectProgram;
 
     #[test]
     fn known_class_roundtrip_from_str() {
-        let mut db = setup_db();
-        ProjectProgram::get(&db)
-            .set_python_version_with_source(&mut db)
-            .to(PythonVersionWithSource {
-                version: PythonVersion::latest_preview(),
-                source: PythonVersionSource::default(),
-            });
+        let db = TestDbBuilder::new()
+            .with_python_version(PythonVersion::latest_preview())
+            .build()
+            .expect("valid TestDb setup");
         let python_version = db.python_version();
-        let resolver_environment = ProjectProgram::get(&db).resolver_environment(&db);
+        let resolver_environment = db.program().resolver_environment(&db);
         for class in KnownClass::iter() {
             if class.canonical_module(python_version).is_third_party() {
                 continue;
@@ -2172,14 +2168,10 @@ mod tests {
 
     #[test]
     fn known_class_doesnt_fallback_to_unknown_unexpectedly_on_latest_version() {
-        let mut db = setup_db();
-
-        ty_python_core::program::Program::get(&db)
-            .set_python_version_with_source(&mut db)
-            .to(PythonVersionWithSource {
-                version: PythonVersion::latest_ty(),
-                source: PythonVersionSource::default(),
-            });
+        let db = TestDbBuilder::new()
+            .with_python_version(PythonVersion::latest_ty())
+            .build()
+            .expect("valid TestDb setup");
 
         let python_version = db.python_version();
         let env = db.semantic_environment();
@@ -2235,7 +2227,7 @@ mod tests {
 
         classes.sort_unstable_by_key(|(_, version)| *version);
 
-        let program = ty_python_core::program::Program::get(&db);
+        let program = db.program();
         let mut current_version = program.python_version(&db);
 
         for (class, version_added) in classes {

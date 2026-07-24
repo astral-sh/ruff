@@ -2260,8 +2260,7 @@ fn add_unimported_completions<'db>(
     let importer = Importer::new(db, &stylist, file, source.as_str(), parsed);
     let members = importer.members_in_scope_at(scoped.node, scoped.node.start());
     let resolver_file = file.resolver_file(db);
-
-    for symbol in all_symbols(db, resolver_file, &completions.query.pattern) {
+    for symbol in all_symbols(db, file, &completions.query.pattern) {
         if symbol.file() == source_file || symbol.module().is_known(db, KnownModule::Builtins) {
             continue;
         }

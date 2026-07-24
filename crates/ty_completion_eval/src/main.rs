@@ -17,8 +17,7 @@ use ty_module_resolver::ModuleName;
 use ty_project::metadata::Options;
 use ty_project::metadata::options::EnvironmentOptions;
 use ty_project::metadata::value::RelativePathBuf;
-use ty_project::{ProjectDatabase, ProjectMetadata};
-use ty_python_core::program::Program;
+use ty_project::{ProjectDatabase, ProjectMetadata, SemanticDb as _};
 
 #[derive(Debug, clap::Parser)]
 #[command(
@@ -331,7 +330,7 @@ impl Task {
             &self.db,
             &self.settings,
             CompletionCapabilities::default(),
-            Program::get(&self.db).program_file(&self.db, file),
+            self.db.program_file(file),
             offset,
         );
         Ok(completions)

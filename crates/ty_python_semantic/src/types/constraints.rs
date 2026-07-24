@@ -3563,7 +3563,7 @@ impl<'db> Type<'db> {
         )]
         fn assignable_solutions_impl<'db>(
             db: &'db dyn Db,
-            program: Program<'db>,
+            program: Program,
             source: Type<'db>,
             target: Type<'db>,
             inferable: InferableTypeVars<'db>,

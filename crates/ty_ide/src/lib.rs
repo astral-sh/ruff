@@ -407,16 +407,16 @@ mod tests {
     use ruff_db::files::{File, FileRootKind, system_path_to_file};
     use ruff_db::parsed::{ParsedModuleRef, parsed_module};
     use ruff_db::source::{SourceText, source_text};
-    use ruff_db::system::{DbWithTestSystem, DbWithWritableSystem, SystemPath, SystemPathBuf};
+    use ruff_db::system::{DbWithWritableSystem, SystemPath, SystemPathBuf};
     use ruff_python_ast::PythonVersion;
     use ruff_python_codegen::Stylist;
     use ruff_python_trivia::textwrap::dedent;
     use ruff_text_size::TextSize;
     use ty_module_resolver::SearchPathSettings;
-    use ty_project::{Db as _, ProjectMetadata};
+    use ty_project::{Db as _, ProjectMetadata, SemanticDb as _};
     use ty_python_core::ProgramFile;
     use ty_python_core::platform::PythonPlatform;
-    use ty_python_core::program::{FallibleStrategy, Program, ProgramSettings};
+    use ty_python_core::program::{FallibleStrategy, ProgramSettings};
     use ty_python_semantic::PythonVersionWithSource;
 
     /// A way to create a simple single-file (named `main.py`) cursor test.
@@ -439,7 +439,7 @@ mod tests {
         }
 
         pub(super) fn program_file(&self, file: File) -> ProgramFile<'_> {
-            Program::get(&self.db).program_file(&self.db, file)
+            self.db.program_file(file)
         }
 
         pub(super) fn write_file(
@@ -523,10 +523,9 @@ mod tests {
             let mut db =
                 ty_project::TestDb::new(ProjectMetadata::new("test", SystemPathBuf::from("/")));
 
-            db.init_program_with_python_version(
-                self.python_version.unwrap_or_else(PythonVersion::latest_ty),
-            )
-            .unwrap();
+            if let Some(python_version) = self.python_version {
+                db.set_python_version(python_version);
+            }
 
             let mut cursor: Option<Cursor> = None;
             for &Source {
@@ -566,11 +565,8 @@ mod tests {
                     db.project().open_file(&mut db, file);
 
                     let source = source_text(&db, file);
-                    let parsed = parsed_module(
-                        &db,
-                        Program::get(&db).program_file(&db, file).python_file(&db),
-                    )
-                    .load(&db);
+                    let parsed =
+                        parsed_module(&db, db.program_file(file).python_file(&db)).load(&db);
                     let stylist =
                         Stylist::from_tokens(parsed.tokens(), source.as_str()).into_owned();
                     cursor = Some(Cursor {
@@ -657,7 +653,7 @@ mod tests {
             let mut db =
                 ty_project::TestDb::new(ProjectMetadata::new("test", project_root.clone()));
 
-            // Write site-packages files first (before init)
+            // Write site-packages files first.
             for Source {
                 path,
                 contents,
@@ -669,11 +665,6 @@ mod tests {
                     .expect("write to memory file system to be successful");
             }
 
-            // Create /src directory for first-party code
-            db.memory_file_system()
-                .create_directory_all(&project_root)
-                .expect("create /src directory");
-
             // Configure search paths with site-packages
             let search_paths = SearchPathSettings {
                 src_roots: vec![project_root.clone()],
@@ -683,8 +674,9 @@ mod tests {
             .to_search_paths(db.system(), db.vendored(), &FallibleStrategy)
             .expect("valid search paths");
 
-            Program::from_settings(
-                &db,
+            let program = db.project().program(&db);
+            program.update_from_settings(
+                &mut db,
                 ProgramSettings {
                     python_version: PythonVersionWithSource::default(),
                     python_platform: PythonPlatform::default(),
@@ -722,11 +714,8 @@ mod tests {
                     db.project().open_file(&mut db, file);
 
                     let source = source_text(&db, file);
-                    let parsed = parsed_module(
-                        &db,
-                        Program::get(&db).program_file(&db, file).python_file(&db),
-                    )
-                    .load(&db);
+                    let parsed =
+                        parsed_module(&db, db.program_file(file).python_file(&db)).load(&db);
                     let stylist =
                         Stylist::from_tokens(parsed.tokens(), source.as_str()).into_owned();
                     cursor = Some(Cursor {

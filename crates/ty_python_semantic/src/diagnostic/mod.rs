@@ -1,6 +1,6 @@
 use crate::{
-    Db, PythonVersionSource, PythonVersionWithSource, lint::lint_documentation_url,
-    types::TypeCheckDiagnostics,
+    Db, PythonVersionSource, PythonVersionWithSource, SemanticEnvironment,
+    lint::lint_documentation_url, types::TypeCheckDiagnostics,
 };
 use levenshtein::{HideUnderscoredSuggestions, find_best_suggestion};
 use ruff_db::{
@@ -44,12 +44,12 @@ pub fn inferred_python_version_source_annotation(
 /// ty can infer the Python version from various sources, such as command-line arguments,
 /// configuration files, or defaults.
 pub fn add_inferred_python_version_hint_to_diagnostic(
-    db: &dyn Db,
+    env: &SemanticEnvironment,
     diagnostic: &mut Diagnostic,
     action: &str,
 ) {
-    let program = ty_python_core::program::Program::get(db);
-    let PythonVersionWithSource { version, source } = program.python_version_with_source(db);
+    let db = env.db();
+    let PythonVersionWithSource { version, source } = env.program().python_version_with_source(db);
 
     match source {
         crate::PythonVersionSource::Cli => {

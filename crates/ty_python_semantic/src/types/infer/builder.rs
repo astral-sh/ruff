@@ -776,7 +776,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     #[inline]
-    fn program(&self) -> Program<'db> {
+    fn program(&self) -> Program {
         self.context.program()
     }
 
@@ -9833,7 +9833,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 "`{id}` was added as a builtin in Python 3.{version_added_to_builtins}"
             ));
             add_inferred_python_version_hint_to_diagnostic(
-                self.db(),
+                self.semantic_environment(),
                 &mut diagnostic,
                 "resolving types",
             );
