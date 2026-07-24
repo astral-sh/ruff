@@ -66,29 +66,17 @@ pub fn goto_implementation(
         .collect();
     candidate_files.push(file);
 
-    // Project files have no guaranteed iteration order, so sort them to keep the returned targets
-    // deterministic after restoring the batch order below.
-    candidate_files.sort_by(|a, b| a.path(db).as_str().cmp(b.path(db).as_str()));
-
-    let mut batches = candidate_files
+    let batches = candidate_files
         .into_par_iter()
-        .enumerate()
-        .map_with_db(db, |db, (index, file)| {
+        .map_with_db(db, |db, file| {
             let definitions = finder.implementations_for_file(db, file);
-            (
-                index,
-                definitions_to_implementation_targets(db, definitions),
-            )
+            definitions_to_implementation_targets(db, definitions)
         })
         .collect::<Vec<_>>();
-    batches.sort_unstable_by_key(|(index, _)| *index);
 
-    // The returned implementation targets should start with those selected by MRO lookup or class roots.
     let mut implementation_targets =
         definitions_to_implementation_targets(db, finder.into_initial_definitions());
-
-    // Then, add all remaining targets.
-    implementation_targets.extend(batches.into_iter().flat_map(|(_, definitions)| definitions));
+    implementation_targets.extend(batches.into_iter().flatten());
 
     if implementation_targets.is_empty() {
         return None;

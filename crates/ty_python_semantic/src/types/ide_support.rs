@@ -603,6 +603,10 @@ fn class_implementations_for_file<'db>(
     file: File,
     roots: &FxHashSet<ClassLiteral<'db>>,
 ) -> Vec<ResolvedDefinition<'db>> {
+    if !contains_identifier(&source_text(db, file), "class") {
+        return Vec::new();
+    }
+
     let mut definitions = Vec::new();
 
     for candidate in reachable_class_literals_in_file(db, file) {
@@ -711,9 +715,10 @@ fn member_implementations_for_file<'db>(
 ) -> Vec<ResolvedDefinition<'db>> {
     let mut definitions = Vec::new();
 
-    // A subclass can only contribute an override if it spells the member name somewhere in its
-    // file, whether as a method name, a class-body target, or a `self.member` assignment.
-    if !contains_identifier(&source_text(db, file), member_name) {
+    // A file can only contribute an override if it contains a class and spells the member name,
+    // whether as a method name, a class-body target, or a `self.member` assignment.
+    let source = source_text(db, file);
+    if !contains_identifier(&source, "class") || !contains_identifier(&source, member_name) {
         return definitions;
     }
 
@@ -2656,13 +2661,18 @@ fn direct_subtypes<'db>(
             continue;
         }
 
+        let source = source_text(db, file);
+        if !contains_identifier(&source, "class") {
+            continue;
+        }
+
         // Keep the cheap name-based prefilter for non-first-party modules, which includes the
         // vendored stdlib. First-party modules may inherit through local import aliases, e.g.
         // `from a import Base as B; class Child(B): ...`, so they need semantic analysis even
         // when they do not mention the target class's original name.
         if is_non_first_party
             && !target_is_object
-            && !contains_identifier(&source_text(db, file), target_name.as_str())
+            && !contains_identifier(&source, target_name.as_str())
         {
             continue;
         }
