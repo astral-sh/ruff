@@ -801,6 +801,24 @@ def g(x: RecursiveList):
     reveal_type(x[0])  # revealed: list[RecursiveList]
 ```
 
+### Recursively growing non-union aliases
+
+```py
+from typing import Callable, cast
+
+type GrowingList[T] = list[GrowingList[list[T]]]
+
+# The type variable in the parameter's recursive specialization belongs to the function, so it
+# must not be moved to the returned callable's generic context.
+def growing_list_callable[T](x: GrowingList[T]) -> Callable[[], T]:
+    raise NotImplementedError
+
+reveal_type(growing_list_callable)  # revealed: def growing_list_callable[T](x: GrowingList[T]) -> (() -> T)
+
+def redundant_growing_list_cast(x: GrowingList[int]):
+    cast(GrowingList[int], x)  # error: [redundant-cast]
+```
+
 ### Invalid self-referential
 
 ```py
