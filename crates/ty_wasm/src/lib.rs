@@ -175,17 +175,18 @@ impl Workspace {
             .program(&self.db)
             .update_from_settings(&mut self.db, program_settings);
 
-        let (settings, settings_diagnostics) = merged_options
+        let (settings, mut settings_diagnostics) = merged_options
             .to_settings(&self.db, &FallibleStrategy)
             .map_err(into_error)?;
-
-        self.db.project().reload(
-            &mut self.db,
-            project,
-            Some(settings),
-            settings_diagnostics,
-            program_settings_diagnostics,
+        settings_diagnostics.extend(
+            program_settings_diagnostics
+                .into_iter()
+                .map(|diagnostic| diagnostic.into_diagnostic(&self.db)),
         );
+
+        self.db
+            .project()
+            .reload(&mut self.db, project, Some(settings), settings_diagnostics);
 
         Ok(())
     }

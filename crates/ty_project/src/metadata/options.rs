@@ -611,7 +611,7 @@ pub enum ProgramSettingsDiagnostic {
 
 impl ProgramSettingsDiagnostic {
     /// Convert this program-settings diagnostic into a diagnostic that can be stored on a project.
-    pub(crate) fn into_diagnostic(self, db: &dyn Db) -> OptionDiagnostic {
+    pub fn into_diagnostic(self, db: &dyn Db) -> OptionDiagnostic {
         match self {
             Self::UnsupportedInferredPythonVersion(python_version) => {
                 unsupported_inferred_python_version_diagnostic(db, &python_version)
