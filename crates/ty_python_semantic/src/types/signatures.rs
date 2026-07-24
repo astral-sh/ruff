@@ -430,33 +430,54 @@ impl<'db> CallableSignature<'db> {
         }
     }
 
-    /// Binds the first (presumably `self`) parameter of this signature. If a `self_type` is
-    /// provided, we will replace any occurrences of `typing.Self` in the parameter and return
-    /// annotations with that type.
-    pub(crate) fn bind_self(&self, db: &'db dyn Db, self_type: Option<Type<'db>>) -> Self {
-        self.bind_self_with_receiver(db, self_type, self_type)
-    }
-
-    /// Binds the receiver using its runtime type while using `typing_self_type` to replace
-    /// occurrences of `typing.Self`.
+    /// Binds the first (presumably `self`) parameter of this signature.
     ///
-    /// These differ for class methods: the runtime receiver is a class object, while
-    /// `typing.Self` denotes an instance of that class.
+    /// `receiver_type` is used to select overloads with compatible explicit receiver
+    /// annotations, while `typing_self_type` replaces occurrences of `typing.Self`. These types
+    /// differ for class methods: the receiver is a class object, but `Self` resolves to its
+    /// instance type.
     pub(crate) fn bind_self_with_receiver(
         &self,
         db: &'db dyn Db,
         receiver_type: Option<Type<'db>>,
         typing_self_type: Option<Type<'db>>,
     ) -> Self {
-        Self {
-            overloads: self
-                .overloads
-                .iter()
-                .map(|signature| {
-                    signature.bind_self_with_receiver(db, receiver_type, typing_self_type)
-                })
-                .collect(),
-        }
+        let [signature] = self.overloads.as_slice() else {
+            if let Some(receiver_type) = receiver_type
+                && self
+                    .overloads
+                    .iter()
+                    .any(Signature::has_explicit_positional_receiver_annotation)
+            {
+                let retained: Vec<_> = self
+                    .overloads
+                    .iter()
+                    .filter(|signature| signature.can_bind_self_to(db, receiver_type))
+                    .collect();
+
+                // A receiver that still contains a type variable (e.g. a constrained `TypeVar`, or a
+                // generic specialization such as `State[T]`) does not pin down a single concrete
+                // receiver, so receiver-based pruning cannot confidently reject an overload. When it
+                // would remove *every* overload we keep them all and defer to normal overload
+                // resolution, rather than exposing an empty (non-callable) `Overload[]`. Concrete
+                // receivers still prune to empty when nothing matches.
+                let overloads = if retained.is_empty() && receiver_type.has_typevar(db) {
+                    self.overloads.iter().collect()
+                } else {
+                    retained
+                };
+
+                return Self::from_overloads(overloads.into_iter().map(|signature| {
+                    signature.bind_self_with_receiver(db, Some(receiver_type), typing_self_type)
+                }));
+            }
+
+            return Self::from_overloads(self.overloads.iter().map(|signature| {
+                signature.bind_self_with_receiver(db, receiver_type, typing_self_type)
+            }));
+        };
+
+        Self::single(signature.bind_self_with_receiver(db, receiver_type, typing_self_type))
     }
 
     pub(crate) fn has_parameters(&self) -> bool {

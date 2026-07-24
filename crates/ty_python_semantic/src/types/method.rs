@@ -118,45 +118,11 @@ impl<'db> BoundMethodType<'db> {
         receiver_type: Type<'db>,
         typing_self_type: Type<'db>,
     ) -> CallableSignature<'db> {
-        let function_signature = self.function(db).signature(db);
-
-        let [signature] = function_signature.overloads.as_slice() else {
-            if !function_signature
-                .overloads
-                .iter()
-                .any(Signature::has_explicit_positional_receiver_annotation)
-            {
-                return CallableSignature::from_overloads(function_signature.overloads.iter().map(
-                    |signature| {
-                        signature.bind_self_with_receiver(
-                            db,
-                            Some(receiver_type),
-                            Some(typing_self_type),
-                        )
-                    },
-                ));
-            }
-
-            return CallableSignature::from_overloads(
-                function_signature
-                    .overloads
-                    .iter()
-                    .filter(|signature| signature.can_bind_self_to(db, receiver_type))
-                    .map(|signature| {
-                        signature.bind_self_with_receiver(
-                            db,
-                            Some(receiver_type),
-                            Some(typing_self_type),
-                        )
-                    }),
-            );
-        };
-
-        CallableSignature::single(signature.bind_self_with_receiver(
+        self.function(db).signature(db).bind_self_with_receiver(
             db,
             Some(receiver_type),
             Some(typing_self_type),
-        ))
+        )
     }
 
     pub(super) fn recursive_type_normalized_impl(

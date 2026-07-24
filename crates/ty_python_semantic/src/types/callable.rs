@@ -555,9 +555,28 @@ impl<'db> CallableType<'db> {
         ))
     }
 
+    /// Binds the first (presumably `self`) parameter of this callable.
+    ///
+    /// `self_type` is both used to select overloads with compatible explicit receiver annotations
+    /// and substituted for occurrences of `typing.Self`. Use [`Self::bind_self_with_receiver`] when
+    /// those types differ, as they do for classmethods.
     pub(crate) fn bind_self(
         self,
         db: &'db dyn Db,
+        self_type: Option<Type<'db>>,
+    ) -> CallableType<'db> {
+        self.bind_self_with_receiver(db, self_type, self_type)
+    }
+
+    /// Binds the first (presumably `self`) parameter of this callable.
+    ///
+    /// `receiver_type` is used to select overloads with compatible explicit receiver
+    /// annotations, while `self_type` replaces occurrences of `typing.Self`. These types differ
+    /// for classmethods: the receiver is a class object, but `Self` resolves to its instance type.
+    pub(crate) fn bind_self_with_receiver(
+        self,
+        db: &'db dyn Db,
+        receiver_type: Option<Type<'db>>,
         self_type: Option<Type<'db>>,
     ) -> CallableType<'db> {
         if self.is_dunder_paramspec(db) {
@@ -566,7 +585,8 @@ impl<'db> CallableType<'db> {
 
         CallableType::new(
             db,
-            self.signatures(db).bind_self(db, self_type),
+            self.signatures(db)
+                .bind_self_with_receiver(db, receiver_type, self_type),
             self.kind(db),
             self.provenance(db),
         )

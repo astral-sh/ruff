@@ -3355,9 +3355,18 @@ impl<'db> Type<'db> {
                             // For classmethod-like callables, bind to the owner class.
                             owner.to_instance_approximation(db).unwrap_or(owner)
                         });
+                        let receiver_type = if callable.is_classmethod_like(db) {
+                            owner
+                        } else {
+                            self_type
+                        };
 
                         Some((
-                            Type::Callable(callable.bind_self(db, Some(self_type))),
+                            Type::Callable(callable.bind_self_with_receiver(
+                                db,
+                                Some(receiver_type),
+                                Some(self_type),
+                            )),
                             AttributeKind::NormalOrNonDataDescriptor,
                         ))
                     };

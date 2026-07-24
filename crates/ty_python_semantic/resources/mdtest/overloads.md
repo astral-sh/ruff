@@ -163,6 +163,92 @@ reveal_type(Base().narrowed)  # revealed: bound method Base.narrowed(x: int) -> 
 reveal_type(Child().narrowed)  # revealed: Overload[(x: int) -> int, (x: str) -> str]
 ```
 
+## Class-level aliases
+
+### Bound method
+
+Accessing an overloaded method through a class-level alias (which is promoted to a `Callable`) must
+apply the same receiver-based overload pruning as accessing the original method.
+
+```py
+from typing import Awaitable, overload
+from typing_extensions import Literal, Protocol
+
+class SyncCommand(Protocol):
+    is_async: Literal[False]
+
+class AsyncCommand(Protocol):
+    is_async: Literal[True]
+
+class Command:
+    @overload
+    def execute(self: SyncCommand) -> int: ...
+    @overload
+    def execute(self: AsyncCommand) -> Awaitable[int]: ...
+    def execute(
+        self: SyncCommand | AsyncCommand,
+    ) -> int | Awaitable[int]:
+        raise NotImplementedError
+
+    alias = execute
+
+class ConcreteSyncCommand(Command):
+    is_async: Literal[False] = False
+
+class ConcreteAsyncCommand(Command):
+    is_async: Literal[True] = True
+
+reveal_type(ConcreteSyncCommand().alias())  # revealed: int
+reveal_type(ConcreteAsyncCommand().alias())  # revealed: Awaitable[int]
+```
+
+### `@classmethod`
+
+An aliased classmethod must use the owner class to filter explicit receiver annotations. This
+applies when the descriptor is accessed through either the class or an instance.
+
+```py
+from typing import Type, overload
+from typing_extensions import Self
+
+class Factory:
+    @overload
+    @classmethod
+    def create(cls: Type["Factory"], value: int) -> int: ...
+    @overload
+    @classmethod
+    def create(cls: Type["Factory"], value: str) -> str: ...
+    @classmethod
+    def create(cls, value: int | str) -> int | str:
+        return value
+
+    aliased = create
+
+class ChildFactory(Factory): ...
+
+# Direct classmethod access already preserves receiver filtering.
+reveal_type(Factory.create(1))  # revealed: int
+reveal_type(ChildFactory.create(""))  # revealed: str
+
+# Aliased classmethods must behave the same when accessed through a class or instance.
+reveal_type(Factory.aliased(1))  # revealed: int
+reveal_type(ChildFactory.aliased(""))  # revealed: str
+reveal_type(ChildFactory().aliased(1))  # revealed: int
+
+class SelfFactory:
+    @classmethod
+    def create(cls) -> Self:
+        return cls()
+
+    aliased = create
+
+class ChildSelfFactory(SelfFactory): ...
+
+# Classmethod binding must continue to use the instance type to resolve `Self`.
+reveal_type(SelfFactory.aliased())  # revealed: SelfFactory
+reveal_type(ChildSelfFactory.aliased())  # revealed: ChildSelfFactory
+```
+
 ## Specialized generic receivers
 
 An explicit receiver annotation can also select overloads based on a generic class specialization.
@@ -270,6 +356,105 @@ class Reader(Generic[T_co]):
 
 def union_receiver(reader: Reader[int | str]):
     reveal_type(reader.get)  # revealed: Overload[]
+```
+
+A concrete union that matches *neither* overload on any branch prunes to the same empty
+`Overload[]`: with no type variable in the receiver, pruning confidently rejects every overload, and
+calling the result reports `no-matching-overload`.
+
+```py
+def union_receiver_no_match(reader: Reader[bytes | float]):
+    reveal_type(reader.get)  # revealed: Overload[]
+    reader.get(0)  # error: [no-matching-overload]
+```
+
+## Constrained `TypeVar` receivers
+
+A `TypeVar` constrained to several types stands for exactly one of those constraints, but never for
+a single one on its own. Receiver-based overload pruning must not discard every overload just
+because the unresolved `TypeVar` matches no individual concrete receiver; each constraint here
+supports subscription, so `value["x"]` stays callable.
+
+```py
+from typing import TypedDict, TypeVar
+
+class A(TypedDict):
+    x: int
+
+class B(TypedDict):
+    x: str
+
+T = TypeVar("T", A, B)
+
+def get_x(value: T) -> int | str:
+    return value["x"]
+```
+
+The same guard applies to an overloaded method reached directly through a constrained `TypeVar`
+receiver. When none of the constraints matches any overload's explicit `self` annotation, pruning
+would remove every overload; because the receiver still contains a type variable, the overloads are
+kept instead of collapsing to a non-callable `Overload[]`, and normal overload resolution runs.
+
+```py
+from typing import TypeVar, overload
+
+class Widget:
+    @overload
+    def render(self: "Sub1") -> int: ...
+    @overload
+    def render(self: "Sub2") -> str: ...
+    def render(self) -> int | str:
+        return 0
+
+class Sub1(Widget): ...
+class Sub2(Widget): ...
+class OtherA(Widget): ...
+class OtherB(Widget): ...
+
+U = TypeVar("U", OtherA, OtherB)
+
+def constrained_no_match(widget: U):
+    reveal_type(widget.render)  # revealed: Overload[() -> int, () -> str]
+```
+
+## Aliased overloads through a union receiver
+
+Accessing an overloaded method through a class-level alias (promoted to a `Callable`) prunes
+overloads by receiver just like direct access. When the receiver is a union that still carries a
+type variable, no single overload's explicit `self` annotation accepts the whole union, but pruning
+must not collapse the overload set to an empty (non-callable) `Overload[]`. The overloads are
+retained and normal overload resolution runs, so the unsupported `_sync` keyword is reported as
+`no-matching-overload` rather than `call-non-callable`.
+
+```py
+from typing import Generic, Literal, TypeVar, overload
+
+T = TypeVar("T")
+
+class State(Generic[T]):
+    @overload
+    def _result(self: "State[T]", flag: Literal[True] = True) -> T: ...
+    @overload
+    def _result(self: "State[T]", flag: Literal[False]) -> T | Exception: ...
+    def _result(self, flag: bool = True) -> T | Exception:
+        raise NotImplementedError
+    result = _result
+
+class Future(Generic[T]):
+    def __init__(self, value: T) -> None:
+        self.state: State[T] | None = None
+        self.value = value
+
+    def get_result(self) -> T:
+        if not self.state:
+            value = self.value
+            if isinstance(value, State):
+                self.state = value
+            else:
+                return value
+        # error: [no-matching-overload]
+        # error: [no-matching-overload]
+        return self.state.result(_sync=True)
 ```
 
 ## Method type variables inferred from `self`
