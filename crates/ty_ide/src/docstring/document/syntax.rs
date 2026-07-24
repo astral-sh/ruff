@@ -73,33 +73,32 @@ pub(crate) fn is_wrapped_in_markdown_code_span(text: &str) -> bool {
 
 /// Emits non-overlapping tokens that completely span the source text.
 ///
-/// Currently supports `Code` for complete, unescaped backtick-delimited segments and `Text`
-/// for everything else.
+/// Supports complete backtick-delimited segments, reStructuredText prefix roles, and plain text.
 ///
 /// For example:
 ///
 /// ```text
-/// InlineMarkupScanner::new("before `code` after")
-///     => Text("before "), Code("code"), Text(" after")
+/// InlineMarkupScanner::new("before :class:`Value` and `code`")
+///     => Text("before "), RestPrefixRole("class", "Value"), Text(" and "), Code("code")
 /// ```
-struct InlineMarkupScanner<'a> {
+pub(crate) struct InlineMarkupScanner<'a> {
     /// The scanner used to find complete code spans.
     scanner: BacktickScanner<'a>,
     /// The end of the last token returned to the caller.
     last_token_end: TextSize,
-    /// A span saved while its preceding text is returned first.
-    pending_span: Option<BacktickSpan<'a>>,
+    /// A token saved while its preceding text is returned first.
+    pending_token: Option<InlineMarkupToken<'a>>,
 }
 
 impl<'a> InlineMarkupScanner<'a> {
-    /// Creates a lossless iterator over plain text and complete backtick-delimited code spans.
+    /// Creates a lossless iterator over plain text and complete inline markup.
     ///
     /// Escaped or unmatched backticks remain part of an [`InlineMarkupToken::Text`] token.
-    fn new(source: &'a str) -> Self {
+    pub(crate) fn new(source: &'a str) -> Self {
         Self {
             scanner: BacktickScanner::new(source),
             last_token_end: TextSize::ZERO,
-            pending_span: None,
+            pending_token: None,
         }
     }
 
@@ -115,43 +114,50 @@ impl<'a> Iterator for InlineMarkupScanner<'a> {
     type Item = InlineMarkupToken<'a>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let span = if let Some(span) = self.pending_span.take() {
-            // Emit the span saved while returning its preceding text on the previous call.
-            span
-        } else {
-            loop {
-                // Without another backtick run, the remaining source is all plain text.
-                let Some(opening) = self.scanner.next() else {
-                    return self.take_remaining_text();
-                };
-
-                // Escaped runs are literal source text, so continue looking for the next possible
-                // opening without emitting a token boundary.
-                if opening.is_escaped() {
-                    continue;
-                }
-
-                // Without a closing delimiter, callers cannot treat the opening or any later runs as
-                // structured markup. Emit the remainder as one text token.
-                let Some(span) = self.scanner.eat_span(opening) else {
-                    return self.take_remaining_text();
-                };
-                break span;
-            }
-        };
-
-        if self.last_token_end < span.start() {
-            let preceding_text = TextRange::new(self.last_token_end, span.start());
-            self.last_token_end = span.start();
-            self.pending_span = Some(span);
-            return Some(InlineMarkupToken::Text(
-                &self.scanner.source[preceding_text],
-            ));
+        if let Some(token) = self.pending_token.take() {
+            return Some(token);
         }
 
-        debug_assert_eq!(self.last_token_end, span.start());
+        let span = loop {
+            // Without another backtick run, the remaining source is all plain text.
+            let Some(opening) = self.scanner.next() else {
+                return self.take_remaining_text();
+            };
+
+            // Escaped runs are literal source text, so continue looking for the next possible
+            // opening without emitting a token boundary.
+            if opening.is_escaped() {
+                continue;
+            }
+
+            // Without a closing delimiter, callers cannot treat the opening or any later runs as
+            // structured markup. Emit the remainder as one text token.
+            let Some(span) = self.scanner.eat_span(opening) else {
+                return self.take_remaining_text();
+            };
+            break span;
+        };
+
+        let preceding_range = TextRange::new(self.last_token_end, span.start());
+        let preceding_text = &self.scanner.source[preceding_range];
+        let (preceding_text, token) = if span.is_single()
+            && let Some((preceding_text, name)) = split_trailing_rest_prefix_role(preceding_text)
+        {
+            (
+                preceding_text,
+                InlineMarkupToken::RestPrefixRole { name, span },
+            )
+        } else {
+            (preceding_text, InlineMarkupToken::Code(span))
+        };
+
         self.last_token_end = span.end();
-        Some(InlineMarkupToken::Code(span))
+        if preceding_text.is_empty() {
+            Some(token)
+        } else {
+            self.pending_token = Some(token);
+            Some(InlineMarkupToken::Text(preceding_text))
+        }
     }
 }
 
@@ -160,17 +166,62 @@ impl<'a> Iterator for InlineMarkupScanner<'a> {
 /// For example:
 ///
 /// ```text
-/// source      "before `code` after"
-/// tokens      Text("before "), Code("code"), Text(" after")
+/// source      "before :class:`Value` and `code`"
+/// tokens      Text("before "), RestPrefixRole("class", "Value"), Text(" and "), Code("code")
 /// ```
 ///
 /// Escaped and unmatched backticks remain text.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum InlineMarkupToken<'a> {
+pub(crate) enum InlineMarkupToken<'a> {
     /// Source text outside a complete, unescaped backtick span.
     Text(&'a str),
     /// A complete code span whose backtick delimiters have equal lengths.
     Code(BacktickSpan<'a>),
+    /// A reStructuredText prefix-role pattern and its single-backtick span.
+    RestPrefixRole {
+        /// The role name between the colons, for example `py:class`.
+        name: &'a str,
+        /// The complete single-backtick span following the role name.
+        span: BacktickSpan<'a>,
+    },
+}
+
+/// Splits a trailing reStructuredText prefix-role pattern from its preceding text.
+///
+/// This deliberately recognizes role-shaped markup common in docstrings
+/// (e.g. roles immediately after `=`, using a plural `s` immediately after a role)
+/// without enforcing reStructuredText's surrounding inline-markup boundaries.
+///
+/// For example, `"before :py:class:"` becomes `("before ", "py:class")`.
+fn split_trailing_rest_prefix_role(text: &str) -> Option<(&str, &str)> {
+    let without_closing_colon = text.strip_suffix(':')?;
+    let mut role_start = without_closing_colon.len();
+    let mut expects_alphanumeric = true;
+
+    // Walk `before :py:class` backwards; separators must be between alphanumeric components.
+    for (index, character) in without_closing_colon.char_indices().rev() {
+        if character.is_alphanumeric() {
+            expects_alphanumeric = false;
+            role_start = index;
+            continue;
+        }
+        if !matches!(character, '-' | '.' | '_' | '+' | ':') {
+            break;
+        }
+        if expects_alphanumeric {
+            break;
+        }
+
+        expects_alphanumeric = true;
+        role_start = index;
+    }
+
+    if !expects_alphanumeric {
+        return None;
+    }
+
+    let role_name = without_closing_colon[role_start..].strip_prefix(':')?;
+    Some((&without_closing_colon[..role_start], role_name))
 }
 
 /// Source text delimited by ordered backtick runs of equal length.
@@ -557,11 +608,38 @@ mod tests {
         assert_eq!(
             token_contents(source),
             vec![
-                ("text", "é :class:"),
-                ("code", "~pkg.Widget"),
+                ("text", "é "),
+                ("rest role", "~pkg.Widget"),
                 ("text", " or "),
                 ("code", "literal`tick"),
                 ("text", " β"),
+            ]
+        );
+    }
+
+    #[test]
+    fn separates_rest_prefix_roles_from_preceding_text() {
+        assert_eq!(
+            token_contents("int-:class:`pkg.Model`"),
+            vec![("text", "int-"), ("rest role", "pkg.Model")]
+        );
+    }
+
+    #[test]
+    fn recognizes_common_role_uses_outside_rest_boundaries() {
+        assert_eq!(
+            token_contents("callable, default=:func:`sklearn.covariance.empirical_covariance`"),
+            vec![
+                ("text", "callable, default="),
+                ("rest role", "sklearn.covariance.empirical_covariance"),
+            ]
+        );
+        assert_eq!(
+            token_contents("sequence of :class:`numpy.array`s"),
+            vec![
+                ("text", "sequence of "),
+                ("rest role", "numpy.array"),
+                ("text", "s"),
             ]
         );
     }
@@ -594,6 +672,29 @@ mod tests {
             ("value", false),
         ] {
             assert_eq!(is_wrapped_in_markdown_code_span(text), expected, "{text:?}");
+        }
+    }
+
+    #[test]
+    fn recognizes_rest_prefix_roles() {
+        for (source, expected) in [
+            (":class:`Value`", Some(("class", "Value"))),
+            (":py:class:`Value`", Some(("py:class", "Value"))),
+            (
+                ":external+python:py:class:`Value`",
+                Some(("external+python:py:class", "Value")),
+            ),
+            (":étiquette:`valeur`", Some(("étiquette", "valeur"))),
+            (":foo..bar:`Value`", None),
+        ] {
+            let actual = InlineMarkupScanner::new(source).next().and_then(|token| {
+                if let InlineMarkupToken::RestPrefixRole { name, span } = token {
+                    Some((name, span.content()))
+                } else {
+                    None
+                }
+            });
+            assert_eq!(actual, expected, "{source:?}");
         }
     }
 
@@ -710,6 +811,7 @@ mod tests {
             .map(|token| match token {
                 InlineMarkupToken::Text(text) => ("text", text),
                 InlineMarkupToken::Code(code) => ("code", code.content()),
+                InlineMarkupToken::RestPrefixRole { span, .. } => ("rest role", span.content()),
             })
             .collect()
     }
