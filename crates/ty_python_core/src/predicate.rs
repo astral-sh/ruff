@@ -9,12 +9,14 @@
 
 use ruff_db::files::File;
 use ruff_index::{FrozenIndexVec, Idx, IndexVec};
+use ruff_python_ast::MatchCase;
 use ruff_python_ast::{Singleton, name::Name};
 
 use crate::ast_ids::ExpressionNodeKey;
 use crate::db::Db;
 use crate::expression::Expression;
 use crate::global_scope;
+use crate::node_key::NodeKey;
 use crate::scope::{FileScopeId, ScopeId};
 use crate::symbol::ScopedSymbolId;
 
@@ -212,6 +214,17 @@ impl MappingPatternPredicateKind<'_> {
 pub struct MappingPatternEntryPredicateKind<'db> {
     pub key: Expression<'db>,
     pub pattern: PatternPredicateKind<'db>,
+}
+
+#[derive(
+    Copy, Clone, Eq, PartialEq, Hash, Debug, Ord, PartialOrd, get_size2::GetSize, salsa::SalsaValue,
+)]
+pub(crate) struct MatchCaseNodeKey(NodeKey);
+
+impl From<&MatchCase> for MatchCaseNodeKey {
+    fn from(node: &MatchCase) -> Self {
+        Self(NodeKey::from_node(node))
+    }
 }
 
 /// Pattern structure used for type narrowing, static reachability, and inferring the types of

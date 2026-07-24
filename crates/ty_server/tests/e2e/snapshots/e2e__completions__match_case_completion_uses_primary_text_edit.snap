@@ -1,0 +1,25 @@
+---
+source: crates/ty_server/tests/e2e/completions.rs
+expression: completions
+---
+[
+  {
+    "label": "BLUE",
+    "kind": 20,
+    "detail": "Literal[Color.BLUE]",
+    "sortText": " 0",
+    "textEdit": {
+      "range": {
+        "start": {
+          "line": 8,
+          "character": 25
+        },
+        "end": {
+          "line": 8,
+          "character": 32
+        }
+      },
+      "newText": "Color.BLUE"
+    }
+  }
+]

@@ -8,18 +8,20 @@ use ruff_db::source::{SourceText, source_text};
 use ruff_diagnostics::Edit;
 use ruff_python_ast::find_node::{CoveringNode, covering_node};
 use ruff_python_ast::name::{Name, UnqualifiedName};
-use ruff_python_ast::str::Quote;
+use ruff_python_ast::str::{Quote, TripleQuotes};
+use ruff_python_ast::str_prefix::{AnyStringPrefix, ByteStringPrefix, StringLiteralPrefix};
 use ruff_python_ast::token::{Token, TokenKind, Tokens};
-use ruff_python_ast::{self as ast, AnyNodeRef};
+use ruff_python_ast::{self as ast, AnyNodeRef, StringFlags};
 use ruff_python_codegen::Stylist;
-use ruff_python_literal::escape::{Escape, UnicodeEscape};
+use ruff_python_literal::escape::{AsciiEscape, Escape, UnicodeEscape};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 use rustc_hash::FxHashSet;
 use ty_module_resolver::{KnownModule, Module, ModuleName};
 use ty_python_semantic::HasType;
 use ty_python_semantic::types::{SpecialFormType, UnionType};
 use ty_python_semantic::{
-    Completion as SemanticCompletion, NameKind, SemanticModel,
+    Completion as SemanticCompletion, MatchCaseCompletion, MatchCaseCompletionKind,
+    MatchCaseCompletions, NameKind, SemanticModel,
     types::{CycleDetector, KnownClass, Type},
 };
 
@@ -43,19 +45,31 @@ pub fn completion<'db>(
         return vec![];
     };
     let model = SemanticModel::new(db, file);
+    let match_case_context = match_case_completion_context(&model, &context.cursor);
 
     if !matches!(context.kind, ContextKind::Keywords(_)) && context.cursor.is_in_string() {
-        let Some(string_expr) = context.cursor.enclosing_string_literal_expr() else {
+        let Some(literal_context) = context.cursor.string_literal_context() else {
             return vec![];
         };
 
         let mut completions =
             Completions::new(db, CollectionContext::none(), UserQuery::fuzzy(None));
 
-        add_string_literal_completions(
-            &model,
-            string_expr,
-            context.cursor.string_quote_style(),
+        if let Some(string_expr) = context.cursor.enclosing_string_literal_expr()
+            && let AnyStringPrefix::Regular(prefix) = literal_context.prefix
+        {
+            add_string_literal_completions(
+                &model,
+                string_expr,
+                literal_context.quote,
+                prefix,
+                literal_context.triple_quotes,
+                &mut completions,
+            );
+        }
+        add_match_case_string_literal_completions(
+            match_case_context.as_ref(),
+            literal_context,
             &mut completions,
         );
 
@@ -80,7 +94,13 @@ pub fn completion<'db>(
         }
         ContextKind::NonImport(ref non_import) => match non_import.target {
             CompletionTargetAst::ObjectDot { expr } => {
-                completions.extend(model.attribute_completions(expr));
+                add_attribute_completions(
+                    &model,
+                    expr,
+                    &context.cursor,
+                    match_case_context.as_ref(),
+                    &mut completions,
+                );
             }
             CompletionTargetAst::Scoped(scoped) => {
                 for semantic_completion in model.scoped_completions(scoped.node) {
@@ -94,8 +114,14 @@ pub fn completion<'db>(
                             .module_dependency_kind(module_dependency_kind),
                     );
                 }
-                add_keyword_completions(db, &mut completions);
+                add_keyword_completions(db, match_case_context.as_ref(), &mut completions);
                 add_argument_completions(db, &model, &context.cursor, &mut completions);
+                add_match_case_completions(
+                    &model,
+                    &context.cursor,
+                    match_case_context.as_ref(),
+                    &mut completions,
+                );
                 if settings.auto_import {
                     add_unimported_completions(
                         db,
@@ -328,6 +354,10 @@ pub struct Completion<'db> {
     /// An import statement to insert (or ensure is already
     /// present) when this completion is selected.
     pub import: Option<Edit>,
+    /// The primary text edit to apply when this completion is selected.
+    ///
+    /// When present, this is used instead of [`Self::insert`].
+    pub text_edit: Option<Edit>,
     /// Whether this suggestion came from builtins or not.
     ///
     /// At time of writing (2025-06-26), this information
@@ -378,12 +408,14 @@ struct CompletionBuilder<'db> {
     kind: Option<CompletionKind>,
     module_name: Option<&'db ModuleName>,
     import: Option<Edit>,
+    text_edit: Option<Edit>,
     builtin: bool,
     is_context_specific: bool,
     is_type_check_only: bool,
     documentation: Option<Docstring>,
     module_dependency_kind: Option<ModuleDependencyKind>,
     deprecated: bool,
+    source_order: Option<usize>,
 }
 
 impl<'db> CompletionBuilder<'db> {
@@ -401,12 +433,14 @@ impl<'db> CompletionBuilder<'db> {
             kind: None,
             module_name: None,
             import: None,
+            text_edit: None,
             builtin: false,
             is_context_specific: false,
             is_type_check_only: false,
             documentation: None,
             module_dependency_kind: None,
             deprecated: false,
+            source_order: None,
         }
     }
 
@@ -519,6 +553,7 @@ impl<'db> CompletionBuilder<'db> {
             module_name: self.module_name,
             module_dependency_kind: self.module_dependency_kind,
             import: self.import,
+            text_edit: self.text_edit,
             builtin: self.builtin,
             is_type_check_only: self.is_type_check_only,
             is_context_specific: self.is_context_specific,
@@ -557,6 +592,11 @@ impl<'db> CompletionBuilder<'db> {
         self
     }
 
+    fn text_edit(mut self, edit: Edit) -> CompletionBuilder<'db> {
+        self.text_edit = Some(edit);
+        self
+    }
+
     fn deprecated(mut self, deprecated: bool) -> CompletionBuilder<'db> {
         self.deprecated = deprecated;
         self
@@ -569,6 +609,11 @@ impl<'db> CompletionBuilder<'db> {
 
     fn context_specific(mut self, yes: bool) -> CompletionBuilder<'db> {
         self.is_context_specific = yes;
+        self
+    }
+
+    fn source_order(mut self, order: usize) -> CompletionBuilder<'db> {
+        self.source_order = Some(order);
         self
     }
 
@@ -823,6 +868,13 @@ struct ContextCursor<'m> {
     covering_node: CoveringNode<'m>,
 }
 
+#[derive(Copy, Clone)]
+struct StringLiteralContext {
+    prefix: AnyStringPrefix,
+    quote: Quote,
+    triple_quotes: TripleQuotes,
+}
+
 /// The cursor position relative to an AST range and its surrounding parentheses.
 enum RangeEndPosition {
     /// The cursor follows the complete range, including any surrounding parentheses.
@@ -955,11 +1007,26 @@ impl<'m> ContextCursor<'m> {
         }
     }
 
-    /// Returns the quote style of the string literal that the cursor is positioned within, if any.
-    fn string_quote_style(&self) -> Option<Quote> {
-        self.tokens_before
-            .last()
-            .map(|token| token.string_quote_style())
+    /// Returns the source spelling of the string or bytes literal containing the cursor.
+    fn string_literal_context(&self) -> Option<StringLiteralContext> {
+        let flags = self.tokens_before.last()?.string_flags()?;
+        let prefix = flags.prefix();
+        if matches!(
+            prefix,
+            AnyStringPrefix::Format(_) | AnyStringPrefix::Template(_)
+        ) {
+            return None;
+        }
+
+        Some(StringLiteralContext {
+            prefix,
+            quote: flags.quote_style(),
+            triple_quotes: if flags.is_triple_quoted() {
+                TripleQuotes::Yes
+            } else {
+                TripleQuotes::No
+            },
+        })
     }
 
     fn suppress_callable_parentheses(&self) -> bool {
@@ -1704,6 +1771,8 @@ struct Relevance {
     /// A coarse measure of how tightly the completion label matches
     /// the user's query.
     match_quality: MatchQuality,
+    /// Preserves the source order of candidates produced by the same contextual completion.
+    source_order: Option<usize>,
 }
 
 impl Relevance {
@@ -1762,6 +1831,7 @@ impl Relevance {
                 .module_dependency_kind
                 .map(ModuleDependencyKind::origin_rank),
             match_quality: query.match_quality(&c.name),
+            source_order: c.source_order,
         }
     }
 }
@@ -1937,6 +2007,272 @@ fn add_argument_completions<'db>(
     }
 }
 
+fn add_attribute_completions<'db>(
+    model: &SemanticModel<'db>,
+    expr: &ast::ExprAttribute,
+    cursor: &ContextCursor<'_>,
+    match_context: Option<&MatchCaseCompletionContext<'db>>,
+    completions: &mut Completions<'db>,
+) {
+    let (Some(match_context), Some(qualifier_ty)) =
+        (match_context, expr.value.inferred_type(model))
+    else {
+        completions.extend(model.attribute_completions(expr));
+        return;
+    };
+
+    let known_members = match_context
+        .candidates
+        .known
+        .iter()
+        .filter_map(|candidate| match &candidate.kind {
+            MatchCaseCompletionKind::EnumMember {
+                enum_class,
+                member_name,
+            } if *enum_class == qualifier_ty => Some(member_name.as_str()),
+            _ => None,
+        })
+        .collect::<FxHashSet<&str>>();
+
+    if known_members.is_empty() {
+        completions.extend(model.attribute_completions(expr));
+        return;
+    }
+
+    for candidate in model.attribute_completions(expr) {
+        if !known_members.contains(candidate.name.as_str()) {
+            completions.add_semantic(candidate);
+        }
+    }
+
+    let qualifier = &cursor.source[expr.value.range()];
+    for (source_order, candidate) in match_context.candidates.remaining.iter().enumerate() {
+        let MatchCaseCompletionKind::EnumMember {
+            enum_class,
+            member_name,
+        } = &candidate.kind
+        else {
+            continue;
+        };
+        if *enum_class != qualifier_ty {
+            continue;
+        }
+
+        let replacement = format!("{qualifier}.{member_name}");
+        completions.add(
+            Completion::builder(member_name.as_str())
+                .ty(candidate.ty)
+                .kind(CompletionKind::EnumMember)
+                .text_edit(Edit::replacement(
+                    replacement,
+                    match_context.replacement_range.start(),
+                    match_context.replacement_range.end(),
+                ))
+                .context_specific(true)
+                .source_order(source_order),
+        );
+    }
+}
+
+/// Detect and add completions for match pattern cases.
+fn add_match_case_completions<'db>(
+    model: &SemanticModel<'db>,
+    cursor: &ContextCursor<'_>,
+    context: Option<&MatchCaseCompletionContext<'db>>,
+    completions: &mut Completions<'db>,
+) {
+    let Some(context) = context else {
+        return;
+    };
+
+    let scope_node = cursor
+        .covering_node
+        .ancestors()
+        .find(|node| node.is_statement())
+        .unwrap_or_else(|| cursor.covering_node.node());
+
+    for (source_order, candidate) in context.candidates.remaining.iter().enumerate() {
+        let Some(value) = match_case_completion_value(model, scope_node, candidate) else {
+            continue;
+        };
+
+        let text_edit = Edit::replacement(
+            value.clone(),
+            context.replacement_range.start(),
+            context.replacement_range.end(),
+        );
+        completions.add_skip_query(
+            Completion::builder(value)
+                .ty(candidate.ty)
+                .text_edit(text_edit)
+                .context_specific(true)
+                .source_order(source_order),
+        );
+    }
+}
+
+fn match_case_completion_value<'db>(
+    model: &SemanticModel<'db>,
+    scope_node: ast::AnyNodeRef<'_>,
+    candidate: &MatchCaseCompletion<'db>,
+) -> Option<String> {
+    let MatchCaseCompletionKind::EnumMember {
+        enum_class,
+        member_name,
+    } = &candidate.kind
+    else {
+        return match_case_literal_source(&candidate.kind);
+    };
+
+    let qualifier = model.visible_qualifier_for_type(scope_node, *enum_class)?;
+    Some(format!("{qualifier}.{member_name}"))
+}
+
+fn match_case_literal_source(kind: &MatchCaseCompletionKind<'_>) -> Option<String> {
+    match kind {
+        MatchCaseCompletionKind::None => Some("None".to_string()),
+        MatchCaseCompletionKind::Bool(value) => {
+            Some(if *value { "True" } else { "False" }.to_string())
+        }
+        MatchCaseCompletionKind::Int(value) => Some(value.to_string()),
+        MatchCaseCompletionKind::String(value) => {
+            UnicodeEscape::with_preferred_quote(value, Quote::Double)
+                .str_repr(TripleQuotes::No)
+                .to_string()
+        }
+        MatchCaseCompletionKind::Bytes(value) => {
+            AsciiEscape::with_preferred_quote(value, Quote::Double)
+                .bytes_repr(TripleQuotes::No)
+                .to_string()
+        }
+        MatchCaseCompletionKind::EnumMember { .. } => None,
+    }
+}
+
+struct MatchCaseCompletionContext<'db> {
+    candidates: MatchCaseCompletions<'db>,
+    replacement_range: TextRange,
+}
+
+fn match_case_completion_context<'db>(
+    model: &SemanticModel<'db>,
+    cursor: &ContextCursor<'_>,
+) -> Option<MatchCaseCompletionContext<'db>> {
+    let mut current_case: Option<(&ast::MatchCase, MatchCaseCompletionPosition)> = None;
+
+    for node in cursor.covering_node.ancestors() {
+        match node {
+            ast::AnyNodeRef::StmtMatch(match_stmt) => {
+                if let Some((current_case, position)) = current_case {
+                    return Some(MatchCaseCompletionContext {
+                        candidates: model.match_case_completions(
+                            match_stmt,
+                            current_case,
+                            position.or_pattern_index(),
+                        ),
+                        replacement_range: position.replacement_range(),
+                    });
+                }
+
+                return None;
+            }
+            ast::AnyNodeRef::MatchCase(case) => {
+                if let Some(current_or_pattern_index) =
+                    match_case_completion_position(&case.pattern, cursor.range)
+                {
+                    current_case = Some((case, current_or_pattern_index));
+                }
+            }
+            _ => {}
+        }
+    }
+
+    None
+}
+
+#[derive(Copy, Clone)]
+enum MatchCaseCompletionPosition {
+    Pattern(TextRange),
+    OrArm { index: usize, range: TextRange },
+}
+
+impl MatchCaseCompletionPosition {
+    fn or_pattern_index(self) -> Option<usize> {
+        match self {
+            Self::Pattern(_) => None,
+            Self::OrArm { index, .. } => Some(index),
+        }
+    }
+
+    fn replacement_range(self) -> TextRange {
+        match self {
+            Self::Pattern(range) | Self::OrArm { range, .. } => range,
+        }
+    }
+}
+
+/// Classifies a supported pattern position under the cursor.
+///
+/// A standalone target such as `case C<CURSOR>` returns
+/// [`MatchCaseCompletionPosition::Pattern`]. An alternative such as
+/// `case "ready" | w<CURSOR>` returns [`MatchCaseCompletionPosition::OrArm`] with the active
+/// arm's index. Positions inside structural patterns return `None`.
+///
+/// Structural subpatterns are not supported.
+fn match_case_completion_position(
+    pattern: &ast::Pattern,
+    cursor_range: TextRange,
+) -> Option<MatchCaseCompletionPosition> {
+    // In `case ("ready" | w) as state`, the case root is `MatchAs`, but a cursor on `w`
+    // belongs to the inner `MatchOr`. A cursor on the bound name `state` does not.
+    fn unwrap_enclosing_as_patterns_at_cursor(
+        mut pattern: &ast::Pattern,
+        cursor_range: TextRange,
+    ) -> &ast::Pattern {
+        while let ast::Pattern::MatchAs(as_pattern) = pattern
+            && let Some(inner) = as_pattern.pattern.as_deref()
+            && inner.range().contains_range(cursor_range)
+        {
+            pattern = inner;
+        }
+        pattern
+    }
+
+    fn is_supported_completion_target(pattern: &ast::Pattern, cursor_range: TextRange) -> bool {
+        // A capture or wildcard is represented as `MatchAs` without an inner pattern. A `MatchAs`
+        // with an inner pattern is handled by `unwrap_enclosing_as_patterns_at_cursor` instead.
+        pattern.range().contains_range(cursor_range)
+            && matches!(
+                pattern,
+                ast::Pattern::MatchValue(_)
+                    | ast::Pattern::MatchSingleton(_)
+                    | ast::Pattern::MatchAs(ast::PatternMatchAs { pattern: None, .. })
+            )
+    }
+
+    let pattern = unwrap_enclosing_as_patterns_at_cursor(pattern, cursor_range);
+
+    if let ast::Pattern::MatchOr(or_pattern) = pattern {
+        // The semantic model uses this index to narrow candidates by all preceding alternatives.
+        let index = or_pattern
+            .patterns
+            .iter()
+            .position(|pattern| pattern.range().contains_range(cursor_range))?;
+
+        let arm = unwrap_enclosing_as_patterns_at_cursor(&or_pattern.patterns[index], cursor_range);
+
+        return is_supported_completion_target(arm, cursor_range).then_some(
+            MatchCaseCompletionPosition::OrArm {
+                index,
+                range: arm.range(),
+            },
+        );
+    }
+
+    is_supported_completion_target(pattern, cursor_range)
+        .then_some(MatchCaseCompletionPosition::Pattern(pattern.range()))
+}
+
 /// Detect and add completions for unset class arguments.
 ///
 /// Some arguments we know are always valid and thus they are easy
@@ -2109,13 +2445,34 @@ pub(crate) fn unresolved_fixes(
 /// This should generally only be used when offering "scoped" completions.
 /// This will include keywords corresponding to Python values (like `None`)
 /// and general language keywords (like `raise`).
-fn add_keyword_completions<'db>(db: &'db dyn Db, completions: &mut Completions<'db>) {
+fn add_keyword_completions<'db>(
+    db: &'db dyn Db,
+    match_context: Option<&MatchCaseCompletionContext<'db>>,
+    completions: &mut Completions<'db>,
+) {
     let keyword_values = [
-        ("None", Type::none(db)),
-        ("True", Type::bool_literal(true)),
-        ("False", Type::bool_literal(false)),
+        ("None", Type::none(db), MatchCaseCompletionKind::None),
+        (
+            "True",
+            Type::bool_literal(true),
+            MatchCaseCompletionKind::Bool(true),
+        ),
+        (
+            "False",
+            Type::bool_literal(false),
+            MatchCaseCompletionKind::Bool(false),
+        ),
     ];
-    for (name, ty) in keyword_values {
+    for (name, ty, kind) in keyword_values {
+        if match_context.is_some_and(|context| {
+            context
+                .candidates
+                .known
+                .iter()
+                .any(|candidate| candidate.kind == kind)
+        }) {
+            continue;
+        }
         completions.add(CompletionBuilder::keyword(name).ty(ty).builtin(true));
     }
 
@@ -2139,9 +2496,84 @@ fn add_keyword_completions<'db>(db: &'db dyn Db, completions: &mut Completions<'
 fn add_string_literal_completions<'db>(
     model: &SemanticModel<'db>,
     string_expr: &ast::ExprStringLiteral,
-    quote_style: Option<Quote>,
+    quote: Quote,
+    prefix: StringLiteralPrefix,
+    triple_quotes: TripleQuotes,
     completions: &mut Completions<'db>,
 ) {
+    let candidates = model.expected_string_literal_completions(string_expr);
+    if candidates.is_empty() {
+        return;
+    }
+
+    for candidate in candidates {
+        let Some(insert) =
+            escape_string_literal_for_quote(&candidate.value, quote, prefix, triple_quotes)
+        else {
+            continue;
+        };
+        completions.add_skip_query(
+            Completion::builder(candidate.value.as_str())
+                .insert(insert)
+                .ty(candidate.ty)
+                .context_specific(true),
+        );
+    }
+}
+
+fn add_match_case_string_literal_completions<'db>(
+    context: Option<&MatchCaseCompletionContext<'db>>,
+    literal_context: StringLiteralContext,
+    completions: &mut Completions<'db>,
+) {
+    let Some(context) = context else {
+        return;
+    };
+
+    for (source_order, candidate) in context.candidates.remaining.iter().enumerate() {
+        let (name, insert) = match (&candidate.kind, literal_context.prefix) {
+            (MatchCaseCompletionKind::String(value), AnyStringPrefix::Regular(prefix)) => {
+                let Some(insert) = escape_string_literal_for_quote(
+                    value,
+                    literal_context.quote,
+                    prefix,
+                    literal_context.triple_quotes,
+                ) else {
+                    continue;
+                };
+                (value.clone(), insert)
+            }
+            (MatchCaseCompletionKind::Bytes(value), AnyStringPrefix::Bytes(prefix)) => {
+                let Some(insert) = escape_bytes_literal_for_quote(
+                    value,
+                    literal_context.quote,
+                    prefix,
+                    literal_context.triple_quotes,
+                ) else {
+                    continue;
+                };
+                (insert.clone(), insert)
+            }
+            _ => continue,
+        };
+
+        completions.add_skip_query(
+            Completion::builder(name)
+                .insert(insert)
+                .ty(candidate.ty)
+                .context_specific(true)
+                .source_order(source_order),
+        );
+    }
+}
+
+/// Escapes a string-literal completion using the quote style of the surrounding literal.
+fn escape_string_literal_for_quote(
+    value: &str,
+    quote: Quote,
+    prefix: StringLiteralPrefix,
+    triple_quotes: TripleQuotes,
+) -> Option<String> {
     fn force_escape_quote(body: &str, quote: Quote) -> String {
         let quote_char = quote.as_char();
         let mut escaped = String::with_capacity(body.len());
@@ -2164,33 +2596,82 @@ fn add_string_literal_completions<'db>(
         escaped
     }
 
-    // When we insert a completion for a string literal, we need to make sure
-    // to properly escape any special characters in the completion value and
-    // to use the appropriate quote style.
-    fn escape_for_quote(value: &str, quote: Quote) -> Option<String> {
-        let escaped = UnicodeEscape::with_preferred_quote(value, quote);
-        let mut out = String::new();
-        escaped.write_body(&mut out).ok()?;
-        Some(force_escape_quote(&out, quote))
+    if matches!(prefix, StringLiteralPrefix::Raw { .. }) {
+        return raw_literal_body(value, quote, triple_quotes).then(|| value.to_string());
     }
 
-    let candidates = model.expected_string_literal_completions(string_expr);
-    if candidates.is_empty() {
-        return;
+    let escaped = UnicodeEscape::with_preferred_quote(value, quote);
+    let mut out = String::new();
+    escaped.write_body(&mut out).ok()?;
+    Some(force_escape_quote(&out, quote))
+}
+
+fn escape_bytes_literal_for_quote(
+    value: &[u8],
+    quote: Quote,
+    prefix: ByteStringPrefix,
+    triple_quotes: TripleQuotes,
+) -> Option<String> {
+    if prefix.is_raw() {
+        let value = std::str::from_utf8(value).ok()?;
+        return value
+            .is_ascii()
+            .then_some(value)
+            .filter(|value| raw_literal_body(value, quote, triple_quotes))
+            .map(ToString::to_string);
     }
 
-    let quote_style = quote_style.unwrap_or(Quote::Double);
-    for candidate in candidates {
-        let Some(insert) = escape_for_quote(&candidate.value, quote_style) else {
+    let escaped = AsciiEscape::with_preferred_quote(value, quote);
+    let mut out = String::new();
+    escaped.write_body(&mut out).ok()?;
+    Some(force_escape_literal_quote(&out, quote))
+}
+
+fn raw_literal_body(value: &str, quote: Quote, triple_quotes: TripleQuotes) -> bool {
+    let trailing_backslashes = value.chars().rev().take_while(|ch| *ch == '\\').count();
+    if !trailing_backslashes.is_multiple_of(2) {
+        return false;
+    }
+
+    if triple_quotes.is_yes() {
+        let delimiter = quote.as_char().to_string().repeat(3);
+        !value.contains(&delimiter)
+    } else {
+        let mut consecutive_backslashes = 0usize;
+        for ch in value.chars() {
+            if ch == '\\' {
+                consecutive_backslashes += 1;
+                continue;
+            }
+            if ch == quote.as_char() && consecutive_backslashes.is_multiple_of(2) {
+                return false;
+            }
+            consecutive_backslashes = 0;
+        }
+        true
+    }
+}
+
+fn force_escape_literal_quote(body: &str, quote: Quote) -> String {
+    let quote_char = quote.as_char();
+    let mut escaped = String::with_capacity(body.len());
+    let mut consecutive_backslashes = 0usize;
+
+    for ch in body.chars() {
+        if ch == '\\' {
+            consecutive_backslashes += 1;
+            escaped.push(ch);
             continue;
-        };
-        completions.add_skip_query(
-            Completion::builder(candidate.value.as_str())
-                .insert(insert)
-                .ty(candidate.ty)
-                .context_specific(true),
-        );
+        }
+
+        if ch == quote_char && consecutive_backslashes.is_multiple_of(2) {
+            escaped.push('\\');
+        }
+        consecutive_backslashes = 0;
+        escaped.push(ch);
     }
+
+    escaped
 }
 
 /// Adds completions not in scope.
@@ -3211,6 +3692,7 @@ mod tests {
     use ruff_python_ast::helpers::is_dunder;
     use ruff_python_ast::token::{TokenKind, Tokens};
     use ruff_python_parser::{Mode, ParseOptions};
+    use ruff_text_size::{Ranged, TextSize};
     use ty_module_resolver::ModuleName;
 
     use crate::CompletionCapabilities;
@@ -8370,6 +8852,1119 @@ match status:
             builder.build().snapshot(),
             @"<No completions found>",
         );
+    }
+
+    #[test]
+    fn match_pattern_suggests_cases() {
+        let source = "\
+from enum import Enum
+
+class Color(Enum):
+    RED = 1
+    BLUE = 2
+
+def handle(status: Color):
+    match status:
+        case C<CURSOR>:
+            pass
+    ";
+
+        let builder = completion_test_builder(source);
+        let test = builder.build();
+
+        test.contains("Color.RED");
+        test.contains("Color.BLUE");
+    }
+
+    #[test]
+    fn match_pattern_preserves_enum_member_definition_order() {
+        let source = "\
+from enum import Enum
+
+class Color(Enum):
+    ZEBRA = 1
+    ALPHA = 2
+    MIDDLE = 3
+
+def handle(status: Color):
+    match status:
+        case C<CURSOR>:
+            pass
+";
+
+        let builder = completion_test_builder(source)
+            .filter(|completion| completion.name.starts_with("Color."));
+        assert_eq!(
+            builder.build().snapshot(),
+            "Color.ZEBRA\nColor.ALPHA\nColor.MIDDLE"
+        );
+    }
+
+    #[test]
+    fn match_pattern_uses_scope_resolvable_enum_qualifier() {
+        const COLORS_SOURCE: &str = "\
+from enum import Enum
+
+class Color(Enum):
+    RED = 1
+    BLUE = 2
+";
+
+        let builder = CursorTest::builder()
+            .source(
+                "main.py",
+                "\
+import colors
+
+def handle(status: colors.Color):
+    match status:
+        case c<CURSOR>:
+            pass
+",
+            )
+            .source("colors.py", COLORS_SOURCE)
+            .completion_test_builder()
+            .filter(|completion| completion.name.starts_with("colors.Color."));
+        assert_eq!(
+            builder.build().snapshot(),
+            "colors.Color.RED\ncolors.Color.BLUE"
+        );
+
+        let builder = CursorTest::builder()
+            .source(
+                "main.py",
+                "\
+import colors as Palette
+
+def handle(status: Palette.Color):
+    match status:
+        case P<CURSOR>:
+            pass
+",
+            )
+            .source("colors.py", COLORS_SOURCE)
+            .completion_test_builder()
+            .filter(|completion| completion.name.starts_with("Palette.Color."));
+        assert_eq!(
+            builder.build().snapshot(),
+            "Palette.Color.RED\nPalette.Color.BLUE"
+        );
+
+        let builder = CursorTest::builder()
+            .source(
+                "main.py",
+                "\
+from colors import Color as Palette
+
+def handle(status: Palette):
+    match status:
+        case P<CURSOR>:
+            pass
+",
+            )
+            .source("colors.py", COLORS_SOURCE)
+            .completion_test_builder()
+            .filter(|completion| completion.name.starts_with("Palette."));
+        assert_eq!(builder.build().snapshot(), "Palette.RED\nPalette.BLUE");
+    }
+
+    #[test]
+    fn match_pattern_suggests_literal_values() {
+        let source = "\
+from typing import Literal
+
+def handle(status: Literal[\"ready\", \"waiting\", 1, -2, b\"bytes\"]):
+    match status:
+        case \"r<CURSOR>\":
+            pass
+";
+        completion_test_builder(source).build().contains("ready");
+
+        let source = "\
+from typing import Literal
+
+def handle(status: Literal[\"ready\", \"waiting\", 1, -2, b\"bytes\"]):
+    match status:
+        case \"w<CURSOR>\":
+            pass
+";
+        completion_test_builder(source).build().contains("waiting");
+
+        let source = "\
+from typing import Literal
+
+def handle(status: Literal[\"ready\", \"waiting\", 1, -2, b\"bytes\"]):
+    match status:
+        case 1<CURSOR>:
+            pass
+";
+        completion_test_builder(source).build().contains("1");
+
+        let source = "\
+from typing import Literal
+
+def handle(status: Literal[\"ready\", \"waiting\", 1, -2, b\"bytes\"]):
+    match status:
+        case -2<CURSOR>:
+            pass
+";
+        completion_test_builder(source).build().contains("-2");
+
+        let source = "\
+from typing import Literal
+
+def handle(status: Literal[\"ready\", \"waiting\", 1, -2, b\"bytes\"]):
+    match status:
+        case b<CURSOR>:
+            pass
+";
+        completion_test_builder(source)
+            .build()
+            .contains("b\"bytes\"");
+    }
+
+    #[test]
+    fn match_pattern_replaces_the_active_negative_literal() {
+        let source = "\
+from typing import Literal
+
+def handle(status: Literal[-2]):
+    match status:
+        case -<CURSOR>:
+            pass
+";
+        let builder = completion_test_builder(source);
+        let test = builder.build();
+        let matching = test
+            .completions()
+            .iter()
+            .filter(|completion| completion.name == "-2")
+            .collect::<Vec<_>>();
+        assert_eq!(matching.len(), 1, "expected one completion for `-2`");
+        if let [completion] = matching.as_slice() {
+            assert!(
+                completion.text_edit.is_some(),
+                "expected a primary replacement edit"
+            );
+            if let Some(edit) = completion.text_edit.as_ref() {
+                assert_eq!(edit.content(), Some("-2"));
+                assert_eq!(edit.range().len(), TextSize::new(1));
+            }
+        }
+
+        let source = "\
+from typing import Literal
+
+def handle(status: Literal[-2]):
+    match status:
+        case -2<CURSOR>:
+            pass
+";
+        let builder = completion_test_builder(source);
+        let test = builder.build();
+        let matching = test
+            .completions()
+            .iter()
+            .filter(|completion| completion.name == "-2")
+            .collect::<Vec<_>>();
+        assert_eq!(matching.len(), 1, "expected one completion for `-2`");
+        if let [completion] = matching.as_slice() {
+            assert!(
+                completion.text_edit.is_some(),
+                "expected a primary replacement edit"
+            );
+            if let Some(edit) = completion.text_edit.as_ref() {
+                assert_eq!(edit.content(), Some("-2"));
+                assert_eq!(edit.range().len(), TextSize::new(2));
+            }
+        }
+    }
+
+    #[test]
+    fn match_pattern_preserves_literal_definition_order() {
+        let source = "\
+from typing import Literal
+
+def handle(status: Literal[\"zebra\", \"alpha\", \"middle\"]):
+    match status:
+        case \"<CURSOR>\":
+            pass
+";
+
+        let builder =
+            completion_test_builder(source).filter(|completion| completion.is_context_specific);
+        assert_eq!(builder.build().snapshot(), "zebra\nalpha\nmiddle");
+    }
+
+    #[test]
+    fn match_pattern_suggests_string_literals_inside_string() {
+        let source = "\
+from typing import Literal
+
+def handle(status: Literal[\"ready\", \"waiting\"]):
+    match status:
+        case \"w<CURSOR>\":
+            pass
+    ";
+
+        let builder = completion_test_builder(source);
+        let test = builder.build();
+
+        assert_eq!(test.snapshot(), "ready\nwaiting");
+    }
+
+    #[test]
+    fn match_pattern_inside_string_omits_literal_matched_by_previous_case() {
+        let source = "\
+from typing import Literal
+
+def handle(status: Literal[\"ready\", \"waiting\"]):
+    match status:
+        case \"ready\":
+            pass
+        case \"w<CURSOR>\":
+            pass
+    ";
+
+        let builder = completion_test_builder(source);
+        let test = builder.build();
+
+        assert_eq!(test.snapshot(), "waiting");
+    }
+
+    #[test]
+    fn match_pattern_inside_string_uses_existing_quote_style() {
+        let source = "\
+from typing import Literal
+
+def handle(status: Literal[\"it's ready\"]):
+    match status:
+        case '<CURSOR>':
+            pass
+    ";
+
+        let builder = completion_test_builder(source);
+        let test = builder.build();
+        let insert = test
+            .completions()
+            .iter()
+            .find(|completion| completion.name == "it's ready")
+            .and_then(|completion| completion.insert.as_deref());
+
+        assert_eq!(insert, Some("it\\'s ready"));
+    }
+
+    #[test]
+    fn match_pattern_inside_raw_string_preserves_backslashes() {
+        let source = r#"
+from typing import Literal
+
+def handle(status: Literal[r"a\b"]):
+    match status:
+        case r"<CURSOR>":
+            pass
+"#;
+
+        let builder = completion_test_builder(source);
+        let test = builder.build();
+        let insert = test
+            .completions()
+            .iter()
+            .find(|completion| completion.name == r"a\b")
+            .and_then(|completion| completion.insert.as_deref());
+
+        assert_eq!(insert, Some(r"a\b"));
+    }
+
+    #[test]
+    fn match_pattern_inside_raw_string_omits_unrepresentable_value() {
+        let source = r#"
+from typing import Literal
+
+def handle(status: Literal['a"b']):
+    match status:
+        case r"<CURSOR>":
+            pass
+"#;
+
+        completion_test_builder(source).build().not_contains("a\"b");
+    }
+
+    #[test]
+    fn match_pattern_suggests_bytes_literals_inside_bytes() {
+        let source = r#"
+from typing import Literal
+
+def handle(status: Literal[b"ready", b"a'b", b"\xff"]):
+    match status:
+        case b"<CURSOR>":
+            pass
+"#;
+        let builder = completion_test_builder(source);
+        let test = builder.build();
+
+        test.contains("ready");
+        test.contains("a'b");
+        test.contains(r"\xff");
+    }
+
+    #[test]
+    fn match_pattern_inside_raw_bytes_preserves_representable_values() {
+        let source = r#"
+from typing import Literal
+
+def handle(status: Literal[b"a\\b", b'a"b', b"\xff"]):
+    match status:
+        case rb"<CURSOR>":
+            pass
+"#;
+        let builder = completion_test_builder(source);
+        let test = builder.build();
+
+        test.contains(r"a\b");
+        test.not_contains("a\"b");
+        test.not_contains(r"\xff");
+    }
+
+    #[test]
+    fn match_pattern_suggests_bytes_inside_triple_quoted_bytes() {
+        let source = r#"
+from typing import Literal
+
+def handle(status: Literal[b"line\nbreak", b"a'b"]):
+    match status:
+        case b'''<CURSOR>''':
+            pass
+"#;
+        let builder = completion_test_builder(source);
+        let test = builder.build();
+
+        test.contains(r"line\nbreak");
+        test.contains(r"a\'b");
+    }
+
+    #[test]
+    fn match_pattern_raw_triple_quoted_bytes_allow_single_quotes() {
+        let source = r#"
+from typing import Literal
+
+def handle(status: Literal[b'a"b']):
+    match status:
+        case rb"""<CURSOR>""":
+            pass
+"#;
+        let builder = completion_test_builder(source);
+        let test = builder.build();
+
+        test.contains("a\"b");
+    }
+
+    #[test]
+    fn match_pattern_suggests_boolean_literals() {
+        let source = "\
+def handle(status: bool):
+    match status:
+        case T<CURSOR>:
+            pass
+";
+        completion_test_builder(source).build().contains("True");
+
+        let source = "\
+def handle(status: bool):
+    match status:
+        case F<CURSOR>:
+            pass
+";
+        completion_test_builder(source).build().contains("False");
+    }
+
+    #[test]
+    fn match_pattern_recursively_expands_union_members() {
+        let source = "\
+def handle(status: bool | None):
+    match status:
+        case T<CURSOR>:
+            pass
+";
+        completion_test_builder(source).build().contains("True");
+
+        let source = "\
+def handle(status: bool | None):
+    match status:
+        case F<CURSOR>:
+            pass
+";
+        completion_test_builder(source).build().contains("False");
+
+        let source = "\
+def handle(status: bool | None):
+    match status:
+        case N<CURSOR>:
+            pass
+";
+        completion_test_builder(source).build().contains("None");
+    }
+
+    #[test]
+    fn match_pattern_ranks_literal_above_exact_scope_match() {
+        let source = "\
+def handle(status: bool | None):
+    match status:
+        case T<CURSOR>:
+            pass
+    ";
+
+        let builder = CursorTest::builder()
+            .source("main.py", source)
+            .source("package/__init__.py", "T = object()\n")
+            .completion_test_builder();
+        let test = builder.build();
+        let first_relevant = test
+            .completions()
+            .iter()
+            .find(|completion| matches!(completion.name.as_str(), "T" | "True"));
+
+        test.contains("T");
+        test.contains("True");
+        assert!(
+            first_relevant.is_some_and(|completion| {
+                completion.name == "True" && completion.is_context_specific
+            }),
+            "Expected the context-specific `True` completion to rank above the exact `T` match",
+        );
+    }
+
+    #[test]
+    fn match_pattern_suggests_none_literal() {
+        let source = "\
+from typing import Literal
+
+def handle(status: Literal[\"ready\"] | None):
+    match status:
+        case N<CURSOR>:
+            pass
+    ";
+
+        let builder = completion_test_builder(source);
+        let test = builder.build();
+
+        test.contains("None");
+    }
+
+    #[test]
+    fn match_pattern_deduplicates_and_exhausts_singletons() {
+        let source = "\
+def handle(status: bool | None):
+    match status:
+        case <CURSOR>:
+            pass
+";
+        let builder = completion_test_builder(source);
+        let test = builder.build();
+
+        assert_eq!(
+            test.completions()
+                .iter()
+                .filter(|completion| completion.name == "True")
+                .count(),
+            1,
+            "expected exactly one `True` completion",
+        );
+        assert_eq!(
+            test.completions()
+                .iter()
+                .filter(|completion| completion.name == "False")
+                .count(),
+            1,
+            "expected exactly one `False` completion",
+        );
+        assert_eq!(
+            test.completions()
+                .iter()
+                .filter(|completion| completion.name == "None")
+                .count(),
+            1,
+            "expected exactly one `None` completion",
+        );
+
+        let exhausted_builder = completion_test_builder(
+            "\
+def handle(status: bool | None):
+    match status:
+        case None:
+            pass
+        case N<CURSOR>:
+            pass
+",
+        );
+        let exhausted = exhausted_builder.build();
+        exhausted.not_contains("None");
+    }
+
+    #[test]
+    fn match_pattern_escapes_string_and_bytes_literals() {
+        let source = "\
+from typing import Literal
+
+def handle(status: Literal['say \"hello\"', \"line\\nbreak\", b\"\\x00\"]):
+    match status:
+        case s<CURSOR>:
+            pass
+";
+        completion_test_builder(source)
+            .build()
+            .contains("'say \"hello\"'");
+
+        let source = "\
+from typing import Literal
+
+def handle(status: Literal['say \"hello\"', \"line\\nbreak\", b\"\\x00\"]):
+    match status:
+        case l<CURSOR>:
+            pass
+";
+        completion_test_builder(source)
+            .build()
+            .contains("\"line\\nbreak\"");
+
+        let source = "\
+from typing import Literal
+
+def handle(status: Literal['say \"hello\"', \"line\\nbreak\", b\"\\x00\"]):
+    match status:
+        case b<CURSOR>:
+            pass
+";
+        completion_test_builder(source)
+            .build()
+            .contains("b\"\\x00\"");
+    }
+
+    #[test]
+    fn match_pattern_suggests_single_literal_value() {
+        let source = "\
+from typing import Literal
+
+def handle(status: Literal[\"ready\"]):
+    match status:
+        case r<CURSOR>:
+            pass
+    ";
+
+        completion_test_builder(source)
+            .build()
+            .contains("\"ready\"");
+    }
+
+    #[test]
+    fn match_pattern_omits_literal_matched_by_previous_case() {
+        let source = "\
+from typing import Literal
+
+def handle(status: Literal[\"ready\", \"waiting\"]):
+    match status:
+        case \"ready\":
+            pass
+        case w<CURSOR>:
+            pass
+    ";
+
+        let builder = completion_test_builder(source);
+        let test = builder.build();
+
+        test.not_contains("\"ready\"");
+        test.contains("\"waiting\"");
+    }
+
+    #[test]
+    fn match_pattern_omits_enum_members_matched_by_previous_case() {
+        let source = "\
+from enum import Enum
+
+class Color(Enum):
+    RED = 1
+    BLUE = 2
+
+def handle(status: Color):
+    match status:
+        case Color.RED:
+            pass
+        case C<CURSOR>:
+            pass
+    ";
+
+        let builder = completion_test_builder(source);
+        let test = builder.build();
+
+        test.not_contains("Color.RED");
+        test.contains("Color.BLUE");
+    }
+
+    #[test]
+    fn match_pattern_filters_qualified_enum_completions() {
+        let source = "\
+from enum import Enum
+
+class Color(Enum):
+    RED = 1
+    BLUE = 2
+
+def handle(status: Color):
+    match status:
+        case Color.RED:
+            pass
+        case Color.<CURSOR>:
+            pass
+";
+        let builder = completion_test_builder(source);
+        let test = builder.build();
+
+        test.not_contains("RED");
+        test.contains("BLUE");
+
+        let source = "\
+from enum import Enum
+
+class Color(Enum):
+    RED = 1
+    BLUE = 2
+
+def handle(status: Color):
+    match status:
+        case Color.RED | Color.<CURSOR>:
+            pass
+";
+        let builder = completion_test_builder(source);
+        let test = builder.build();
+
+        test.not_contains("RED");
+        test.contains("BLUE");
+    }
+
+    #[test]
+    fn match_pattern_qualified_completion_replaces_the_active_or_arm() {
+        let source = "\
+from enum import Enum
+
+class Color(Enum):
+    RED = 1
+    BLUE = 2
+
+def handle(status: Color):
+    match status:
+        case Color.RED | Color.B<CURSOR>:
+            pass
+";
+        let builder = completion_test_builder(source);
+        let test = builder.build();
+        let matching = test
+            .completions()
+            .iter()
+            .filter(|completion| completion.name == "BLUE")
+            .collect::<Vec<_>>();
+        assert_eq!(
+            matching.len(),
+            1,
+            "expected one completion for `Color.BLUE`"
+        );
+        if let [completion] = matching.as_slice() {
+            assert!(
+                completion.text_edit.is_some(),
+                "expected a primary replacement edit"
+            );
+            if let Some(edit) = completion.text_edit.as_ref() {
+                assert_eq!(edit.content(), Some("Color.BLUE"));
+                assert_eq!(edit.range().len(), TextSize::new(7));
+            }
+        }
+    }
+
+    #[test]
+    fn match_pattern_omits_exhausted_qualified_enum_members() {
+        let source = "\
+from enum import Enum
+
+class Color(Enum):
+    RED = 1
+    BLUE = 2
+
+def handle(status: Color):
+    match status:
+        case Color.RED:
+            pass
+        case Color.BLUE:
+            pass
+        case Color.<CURSOR>:
+            pass
+";
+        let builder = completion_test_builder(source);
+        let test = builder.build();
+
+        test.not_contains("RED");
+        test.not_contains("BLUE");
+    }
+
+    #[test]
+    fn match_pattern_suggests_nested_enum_members() {
+        let source = "\
+from enum import Enum
+
+class Palette:
+    class Color(Enum):
+        RED = 1
+        BLUE = 2
+
+def handle(status: Palette.Color):
+    match status:
+        case P<CURSOR>:
+            pass
+";
+
+        let builder = completion_test_builder(source);
+        let test = builder.build();
+        test.contains("Palette.Color.RED");
+        test.contains("Palette.Color.BLUE");
+    }
+
+    #[test]
+    fn match_pattern_uses_nested_enum_owner_alias() {
+        let source = "\
+from enum import Enum
+
+class Palette:
+    class Color(Enum):
+        RED = 1
+        BLUE = 2
+
+P = Palette
+
+def handle(status: P.Color):
+    match status:
+        case P<CURSOR>:
+            pass
+";
+
+        let builder = completion_test_builder(source);
+        let test = builder.build();
+        test.contains("P.Color.RED");
+        test.contains("P.Color.BLUE");
+    }
+
+    #[test]
+    fn match_pattern_filters_qualified_nested_enum_members() {
+        let source = "\
+from enum import Enum
+
+class Palette:
+    class Color(Enum):
+        RED = 1
+        BLUE = 2
+
+def handle(status: Palette.Color):
+    match status:
+        case Palette.Color.RED | Palette.Color.<CURSOR>:
+            pass
+";
+
+        let builder = completion_test_builder(source);
+        let test = builder.build();
+        test.not_contains("RED");
+        test.contains("BLUE");
+    }
+
+    #[test]
+    fn match_pattern_suggests_flag_members() {
+        let source = "\
+from enum import Flag, auto
+
+class Permission(Flag):
+    READ = auto()
+    WRITE = auto()
+
+def handle(permission: Permission):
+    match permission:
+        case Permission.READ:
+            pass
+        case P<CURSOR>:
+            pass
+";
+        let builder = completion_test_builder(source);
+        let test = builder.build();
+
+        test.not_contains("Permission.READ");
+        test.contains("Permission.WRITE");
+
+        let source = "\
+from enum import IntFlag, auto
+
+class Permission(IntFlag):
+    READ = auto()
+    WRITE = auto()
+
+def handle(permission: Permission):
+    match permission:
+        case Permission.READ:
+            pass
+        case P<CURSOR>:
+            pass
+";
+        let builder = completion_test_builder(source);
+        let test = builder.build();
+
+        test.not_contains("Permission.READ");
+        test.contains("Permission.WRITE");
+    }
+
+    #[test]
+    fn match_or_pattern_filters_flag_members() {
+        let source = "\
+from enum import Flag, auto
+
+class Permission(Flag):
+    READ = auto()
+    WRITE = auto()
+
+def handle(permission: Permission):
+    match permission:
+        case Permission.READ | P<CURSOR>:
+            pass
+";
+        let builder = completion_test_builder(source);
+        let test = builder.build();
+
+        test.not_contains("Permission.READ");
+        test.contains("Permission.WRITE");
+    }
+
+    #[test]
+    fn match_pattern_includes_enum_members_from_previous_guarded_case() {
+        let source = "\
+from enum import Enum
+
+class Color(Enum):
+    RED = 1
+    BLUE = 2
+
+def handle(status: Color, condition: bool):
+    match status:
+        case Color.RED if condition:
+            pass
+        case C<CURSOR>:
+            pass
+    ";
+
+        let builder = completion_test_builder(source);
+        let test = builder.build();
+
+        test.contains("Color.RED");
+        test.contains("Color.BLUE");
+    }
+
+    #[test]
+    fn match_or_pattern_omits_literal_matched_by_previous_alternative() {
+        let source = "\
+from typing import Literal
+
+def handle(status: Literal[\"ready\", \"waiting\"]):
+    match status:
+        case \"ready\" | w<CURSOR>:
+            pass
+    ";
+
+        let builder = completion_test_builder(source);
+        let test = builder.build();
+
+        test.not_contains("\"ready\"");
+        test.contains("\"waiting\"");
+    }
+
+    #[test]
+    fn match_or_pattern_inside_string_omits_literal_matched_by_previous_alternative() {
+        let source = "\
+from typing import Literal
+
+def handle(status: Literal[\"ready\", \"waiting\"]):
+    match status:
+        case \"ready\" | \"w<CURSOR>\":
+            pass
+    ";
+
+        let builder = completion_test_builder(source);
+        let test = builder.build();
+
+        assert_eq!(test.snapshot(), "waiting");
+    }
+
+    #[test]
+    fn match_or_pattern_wrapped_in_as_omits_literal_matched_by_previous_alternative() {
+        let source = "\
+from typing import Literal
+
+def handle(status: Literal[\"ready\", \"waiting\"]):
+    match status:
+        case (\"ready\" | w<CURSOR>) as state:
+            pass
+";
+
+        let builder = completion_test_builder(source);
+        let test = builder.build();
+
+        test.not_contains("\"ready\"");
+        test.contains("\"waiting\"");
+    }
+
+    #[test]
+    fn match_or_pattern_omits_enum_members_matched_by_previous_alternative() {
+        let source = "\
+from enum import Enum
+
+class Color(Enum):
+    RED = 1
+    BLUE = 2
+
+def handle(status: Color):
+    match status:
+        case Color.RED | C<CURSOR>:
+            pass
+    ";
+
+        let builder = completion_test_builder(source);
+        let test = builder.build();
+
+        test.not_contains("Color.RED");
+        test.contains("Color.BLUE");
+    }
+
+    #[test]
+    fn match_or_pattern_omits_all_enum_members_matched_by_previous_alternatives() {
+        let source = "\
+from enum import Enum
+
+class Color(Enum):
+    RED = 1
+    BLUE = 2
+
+def handle(status: Color):
+    match status:
+        case Color.RED | Color.BLUE | C<CURSOR>:
+            pass
+    ";
+
+        let builder = completion_test_builder(source);
+        let test = builder.build();
+
+        test.not_contains("Color.RED");
+        test.not_contains("Color.BLUE");
+    }
+
+    #[test]
+    fn match_or_pattern_includes_enum_members_matched_by_later_alternative() {
+        let source = "\
+from enum import Enum
+
+class Color(Enum):
+    RED = 1
+    BLUE = 2
+
+def handle(status: Color):
+    match status:
+        case C<CURSOR> | Color.RED:
+            pass
+    ";
+
+        let builder = completion_test_builder(source);
+        let test = builder.build();
+
+        test.contains("Color.RED");
+        test.contains("Color.BLUE");
+    }
+
+    #[test]
+    fn match_pattern_does_not_suggest_cases_outside_pattern() {
+        let source = "\
+from enum import Enum
+
+class Color(Enum):
+    RED = 1
+    BLUE = 2
+
+def handle(status: Color, condition: bool):
+    match status:
+        case _ if C<CURSOR>:
+            pass
+";
+        let builder = completion_test_builder(source);
+        let test = builder.build();
+
+        test.not_contains("Color.RED");
+        test.not_contains("Color.BLUE");
+
+        let source = "\
+from enum import Enum
+
+class Color(Enum):
+    RED = 1
+    BLUE = 2
+
+def handle(status: Color):
+    match status:
+        case _:
+            C<CURSOR>
+";
+        let builder = completion_test_builder(source);
+        let test = builder.build();
+
+        test.not_contains("Color.RED");
+        test.not_contains("Color.BLUE");
+    }
+
+    #[test]
+    fn match_pattern_nested_subpatterns_are_not_supported() {
+        let source = "\
+from typing import Literal
+
+def handle(status: Literal[\"not-a-list\"] | list[Literal[1]]):
+    match status:
+        case [1<CURSOR>]:
+            pass
+";
+        let builder = completion_test_builder(source);
+        let test = builder.build();
+
+        test.not_contains("\"not-a-list\"");
+        test.not_contains("1");
+
+        let source = "\
+from typing import Literal
+
+def handle(status: Literal[\"not-a-mapping\"] | dict[str, Literal[1]]):
+    match status:
+        case {\"key\": 1<CURSOR>}:
+            pass
+";
+        let builder = completion_test_builder(source);
+        let test = builder.build();
+
+        test.not_contains("\"not-a-mapping\"");
+        test.not_contains("1");
+
+        let source = "\
+from typing import Literal
+
+class Response:
+    __match_args__ = (\"status\",)
+    status: Literal[1]
+
+def handle(status: Literal[\"not-a-response\"] | Response):
+    match status:
+        case Response(1<CURSOR>):
+            pass
+";
+        let builder = completion_test_builder(source);
+        let test = builder.build();
+
+        test.not_contains("\"not-a-response\"");
+        test.not_contains("1");
     }
 
     #[test]

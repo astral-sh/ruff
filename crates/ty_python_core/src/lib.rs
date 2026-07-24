@@ -19,6 +19,7 @@ use ty_module_resolver::ModuleName;
 
 use crate::frozen::{FrozenMap, FrozenSet};
 use crate::place::ScopedPlaceId;
+use crate::predicate::{MatchCaseNodeKey, PatternPredicate};
 pub use crate::statement::{Statement, StatementNodeKey};
 use ast_ids::AstIds;
 pub use ast_ids::ExpressionNodeKey;
@@ -345,6 +346,9 @@ pub struct SemanticIndex<'db> {
     /// When a predicate references an alias variable (e.g., `is_none` from `is_none = x is None`),
     /// the alias Name node is mapped to its aliased expression for constraint-generation time.
     narrowing_alias_predicates: FrozenMap<ExpressionNodeKey, NarrowingAliasPredicate<'db>>,
+
+    /// Map of pattern predicates in the file, keyed by their match case node.
+    match_case_predicates: FrozenMap<MatchCaseNodeKey, PatternPredicate<'db>>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
@@ -757,6 +761,12 @@ impl<'db> SemanticIndex<'db> {
 
     pub fn semantic_syntax_errors(&self) -> &[SemanticSyntaxError] {
         &self.semantic_syntax_errors
+    }
+
+    pub fn try_match_case_predicate(&self, case: &ast::MatchCase) -> Option<PatternPredicate<'db>> {
+        self.match_case_predicates
+            .get(&MatchCaseNodeKey::from(case))
+            .copied()
     }
 }
 

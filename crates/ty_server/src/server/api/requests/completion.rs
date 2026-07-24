@@ -2,9 +2,9 @@ use std::borrow::Cow;
 use std::time::Instant;
 
 use lsp_types::{
-    CompletionItem, CompletionItemKind, CompletionItemLabelDetails, CompletionList,
-    CompletionParams, CompletionRequest, CompletionResponse, Documentation, InsertTextFormat,
-    TextEdit, Uri,
+    CompletionItem, CompletionItemKind, CompletionItemLabelDetails, CompletionItemTextEdit,
+    CompletionList, CompletionParams, CompletionRequest, CompletionResponse, Documentation,
+    InsertTextFormat, TextEdit, Uri,
 };
 use ruff_source_file::OneIndexed;
 use ruff_text_size::Ranged;
@@ -87,6 +87,16 @@ impl BackgroundDocumentRequestHandler for CompletionRequestHandler {
                         new_text: edit.content().map(ToString::to_string).unwrap_or_default(),
                     })
                 });
+                let text_edit = comp.text_edit.as_ref().and_then(|edit| {
+                    let range = edit
+                        .range()
+                        .to_lsp_range(db, file, snapshot.encoding())?
+                        .local_range();
+                    Some(CompletionItemTextEdit::TextEdit(TextEdit {
+                        range,
+                        new_text: edit.content().map(ToString::to_string).unwrap_or_default(),
+                    }))
+                });
 
                 let label = comp.label().to_string();
                 let import_suffix = comp
@@ -123,7 +133,10 @@ impl BackgroundDocumentRequestHandler for CompletionRequestHandler {
 
                     Documentation::MarkupContent(lsp_types::MarkupContent { kind, value })
                 });
-                let insert_text = comp.insert.map(String::from);
+                let insert_text = text_edit
+                    .is_none()
+                    .then(|| comp.insert.map(String::from))
+                    .flatten();
                 let insert_text_format = match comp.insert_text_format {
                     CompletionInsertTextFormat::PlainText => None,
                     CompletionInsertTextFormat::Snippet => Some(InsertTextFormat::Snippet),
@@ -137,6 +150,7 @@ impl BackgroundDocumentRequestHandler for CompletionRequestHandler {
                     label_details,
                     insert_text,
                     insert_text_format,
+                    text_edit,
                     additional_text_edits: import_edit.map(|edit| vec![edit]),
                     documentation,
                     ..Default::default()
