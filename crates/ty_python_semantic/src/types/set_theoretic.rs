@@ -55,10 +55,13 @@ impl<'db> UnionType<'db> {
 
         if let Some(first) = iter_elements.next() {
             if let Some(second) = iter_elements.next() {
-                let builder = UnionBuilder::new(db).add(first.into()).add(second.into());
-                iter_elements
-                    .fold(builder, |builder, element| builder.add(element.into()))
-                    .build()
+                let mut builder = UnionBuilder::new(db);
+                builder.add_in_place(first.into());
+                builder.add_in_place(second.into());
+                for element in iter_elements {
+                    builder.add_in_place(element.into());
+                }
+                builder.build()
             } else {
                 first.into()
             }
@@ -93,13 +96,11 @@ impl<'db> UnionType<'db> {
         I: IntoIterator<Item = T>,
         T: Into<Type<'db>>,
     {
-        elements
-            .into_iter()
-            .fold(
-                UnionBuilder::new(db).unpack_aliases(false),
-                |builder, element| builder.add(element.into()),
-            )
-            .build()
+        let mut builder = UnionBuilder::new(db).unpack_aliases(false);
+        for element in elements {
+            builder.add_in_place(element.into());
+        }
+        builder.build()
     }
 
     /// Returns `true` if any direct element of this union is a type alias.
@@ -122,13 +123,11 @@ impl<'db> UnionType<'db> {
         I: IntoIterator<Item = T>,
         T: Into<Type<'db>>,
     {
-        elements
-            .into_iter()
-            .fold(
-                UnionBuilder::new(db).cycle_recovery(true),
-                |builder, element| builder.add(element.into()),
-            )
-            .build()
+        let mut builder = UnionBuilder::new(db).cycle_recovery(true);
+        for element in elements {
+            builder.add_in_place(element.into());
+        }
+        builder.build()
     }
 
     /// A fallible version of [`UnionType::from_elements`].
@@ -143,7 +142,7 @@ impl<'db> UnionType<'db> {
     {
         let mut builder = UnionBuilder::new(db);
         for element in elements {
-            builder = builder.add(element?.into());
+            builder.add_in_place(element?.into());
         }
         Some(builder.build())
     }
@@ -173,11 +172,11 @@ impl<'db> UnionType<'db> {
             if &new_ty != ty {
                 let mut builder = UnionBuilder::new(db).unpack_aliases(false);
                 for prev in &elements[..i] {
-                    builder = builder.add(*prev);
+                    builder.add_in_place(*prev);
                 }
-                builder = builder.add(new_ty);
+                builder.add_in_place(new_ty);
                 for (_, element) in iter {
-                    builder = builder.add(transform_fn(element));
+                    builder.add_in_place(transform_fn(element));
                 }
                 return builder
                     .recursively_defined(self.recursively_defined(db))
@@ -214,13 +213,13 @@ impl<'db> UnionType<'db> {
         while let Some((i, ty)) = iter.next() {
             let new_ty = transform_fn(ty)?;
             if &new_ty != ty || matches!(new_ty, Type::TypeAlias(_)) {
-                let mut builder = elements[..i]
-                    .iter()
-                    .copied()
-                    .fold(UnionBuilder::new(db), UnionBuilder::add);
-                builder = builder.add(new_ty);
+                let mut builder = UnionBuilder::new(db);
+                for prev in &elements[..i] {
+                    builder.add_in_place(*prev);
+                }
+                builder.add_in_place(new_ty);
                 for (_, element) in iter {
-                    builder = builder.add(transform_fn(element)?);
+                    builder.add_in_place(transform_fn(element)?);
                 }
                 return Ok(builder
                     .recursively_defined(self.recursively_defined(db))
@@ -307,7 +306,7 @@ impl<'db> UnionType<'db> {
                     provenance = provenance.or(member_provenance);
 
                     all_unbound = false;
-                    builder = builder.add(ty_member);
+                    builder.add_in_place(ty_member);
                 }
             }
         }
@@ -367,7 +366,7 @@ impl<'db> UnionType<'db> {
                     provenance = provenance.or(member_provenance);
 
                     all_unbound = false;
-                    builder = builder.add(ty_member);
+                    builder.add_in_place(ty_member);
                 }
             }
         }
@@ -411,7 +410,7 @@ impl<'db> UnionType<'db> {
                 if ty.same_divergent_marker(div) {
                     return Some(ty);
                 }
-                builder = builder.add(ty);
+                builder.add_in_place(ty);
                 empty = false;
             } else {
                 // `Divergent` in a union type does not mean true divergence, so we skip it if not nested.
@@ -420,7 +419,7 @@ impl<'db> UnionType<'db> {
                     builder = builder.recursively_defined(RecursivelyDefined::Yes);
                     continue;
                 }
-                builder = builder.add(
+                builder.add_in_place(
                     ty.recursive_type_normalized_impl(db, div, nested)
                         .unwrap_or(div),
                 );
@@ -428,7 +427,7 @@ impl<'db> UnionType<'db> {
             }
         }
         if empty {
-            builder = builder.add(div);
+            builder.add_in_place(div);
         }
         Some(builder.build())
     }
@@ -768,13 +767,12 @@ impl<'db> IntersectionType<'db> {
 
         if let Some(first) = elements_iter.next() {
             if let Some(second) = elements_iter.next() {
-                let builder =
+                let mut builder =
                     IntersectionBuilder::new(db).positive_elements([first.into(), second.into()]);
-                elements_iter
-                    .fold(builder, |builder, element| {
-                        builder.add_positive(element.into())
-                    })
-                    .build()
+                for element in elements_iter {
+                    builder.add_positive_in_place(element.into());
+                }
+                builder.build()
             } else {
                 first.into()
             }
@@ -936,10 +934,10 @@ impl<'db> IntersectionType<'db> {
     ) -> Type<'db> {
         let mut builder = IntersectionBuilder::new(db);
         for ty in self.positive(db) {
-            builder = builder.add_positive(transform_fn(ty));
+            builder.add_positive_in_place(transform_fn(ty));
         }
         for ty in self.negative(db) {
-            builder = builder.add_negative(*ty);
+            builder.add_negative_in_place(*ty);
         }
         builder.build()
     }
@@ -959,13 +957,11 @@ impl<'db> IntersectionType<'db> {
             return None;
         }
 
-        Some(
-            self.iter_positive(db)
-                .fold(IntersectionBuilder::new(db), |builder, positive| {
-                    builder.add_positive(positive.dunder_class(db))
-                })
-                .build(),
-        )
+        let mut builder = IntersectionBuilder::new(db);
+        for positive in self.iter_positive(db) {
+            builder.add_positive_in_place(positive.dunder_class(db));
+        }
+        Some(builder.build())
     }
 
     pub(crate) fn map_with_boundness(
@@ -997,7 +993,7 @@ impl<'db> IntersectionType<'db> {
                     }
                     provenance = provenance.or(member_provenance);
 
-                    builder = builder.add_positive(ty_member);
+                    builder.add_positive_in_place(ty_member);
                 }
             }
         }
@@ -1053,7 +1049,7 @@ impl<'db> IntersectionType<'db> {
                     }
                     provenance = provenance.or(member_provenance);
 
-                    builder = builder.add_positive(ty_member);
+                    builder.add_positive_in_place(ty_member);
                 }
             }
         }
@@ -1127,7 +1123,7 @@ impl<'db> IntersectionType<'db> {
             if let Some(projection) = positive.to_instance(db) {
                 has_projected_positive = true;
                 is_exact &= projection.is_exact();
-                builder = builder.add_positive(projection.into_inner());
+                builder.add_positive_in_place(projection.into_inner());
             } else {
                 is_exact = false;
             }
@@ -1159,10 +1155,10 @@ fn expand_intersection_typevars_and_newtypes<'db>(
             Type::TypeVar(tvar) => {
                 match tvar.typevar(db).bound_or_constraints(db) {
                     Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
-                        builder = builder.add_positive(bound);
+                        builder.add_positive_in_place(bound);
                     }
                     Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
-                        builder = builder.add_positive(constraints.as_type(db));
+                        builder.add_positive_in_place(constraints.as_type(db));
                     }
                     // Type variables without bounds or constraints implicitly have `object`
                     // as their upper bound, and adding `object` to an intersection is always a no-op
@@ -1170,14 +1166,14 @@ fn expand_intersection_typevars_and_newtypes<'db>(
                 }
             }
             Type::NewTypeInstance(newtype) => {
-                builder = builder.add_positive(newtype.concrete_base_type(db));
+                builder.add_positive_in_place(newtype.concrete_base_type(db));
             }
-            _ => builder = builder.add_positive(element),
+            _ => builder.add_positive_in_place(element),
         }
     }
 
     for &element in negative {
-        builder = builder.add_negative(element);
+        builder.add_negative_in_place(element);
     }
 
     builder.build()
