@@ -55,7 +55,7 @@ pub(crate) use self::subclass_of::{SubclassOfInner, SubclassOfType};
 pub(crate) use self::type_expansion::expand_type;
 pub use crate::diagnostic::add_inferred_python_version_hint_to_diagnostic;
 use crate::place::{
-    DefinedPlace, Definedness, Place, PlaceAndQualifiers, Provenance, SymbolWithReExport,
+    DefinedPlace, Definedness, Place, PlaceAndQualifiers, Provenance, RequiresExplicitReExport,
     TypeOrigin, builtins_module_scope, imported_symbol, known_module_symbol, place_from_bindings,
 };
 use crate::suppression::check_suppressions;
@@ -8811,7 +8811,7 @@ impl<'db> ModuleLiteralType<'db> {
         if let Some(file) = self.module(db).file(db) {
             let getattr_symbol = imported_symbol(db, Some(file), "__getattr__", None);
             // If we found a __getattr__ function, try to call it with the name argument
-            if let Place::Defined(place) = getattr_symbol.place_and_qualifiers.place
+            if let Place::Defined(place) = getattr_symbol.place
                 && let Ok(outcome) = place.ty.try_call(
                     db,
                     &CallArguments::positional([Type::string_literal(db, name)]),
@@ -8831,16 +8831,41 @@ impl<'db> ModuleLiteralType<'db> {
         Place::Undefined.into()
     }
 
-    fn imported_member(self, db: &'db dyn Db, name: &str) -> SymbolWithReExport<'db> {
+    fn static_member(self, db: &'db dyn Db, name: &str) -> PlaceAndQualifiers<'db> {
+        self.static_member_with_reexport_requirement(db, name, None)
+    }
+
+    /// Returns `true` if requiring an explicit re-export makes this member less defined.
+    fn is_implicit_reexport(self, db: &'db dyn Db, name: &str) -> bool {
+        let runtime_member = self.static_member(db, name);
+        let explicitly_exported_member = self.static_member_with_reexport_requirement(
+            db,
+            name,
+            Some(RequiresExplicitReExport::Yes),
+        );
+
+        match (runtime_member.place, explicitly_exported_member.place) {
+            (Place::Defined(_), Place::Undefined) => true,
+            (Place::Defined(runtime), Place::Defined(explicit)) => {
+                runtime.is_definitely_defined() && !explicit.is_definitely_defined()
+            }
+            (Place::Undefined, _) => false,
+        }
+    }
+
+    fn static_member_with_reexport_requirement(
+        self,
+        db: &'db dyn Db,
+        name: &str,
+        requires_explicit_reexport: Option<RequiresExplicitReExport>,
+    ) -> PlaceAndQualifiers<'db> {
         // `__dict__` is a very special member that is never overridden by module globals;
         // we should always look it up directly as an attribute on `types.ModuleType`,
         // never in the global scope of the module.
         if name == "__dict__" {
-            return SymbolWithReExport::reexported(
-                KnownClass::ModuleType
-                    .to_instance(db)
-                    .member(db, "__dict__"),
-            );
+            return KnownClass::ModuleType
+                .to_instance(db)
+                .member(db, "__dict__");
         }
 
         // If the file that originally imported the module has also imported a submodule
@@ -8855,41 +8880,42 @@ impl<'db> ModuleLiteralType<'db> {
         if self.available_submodule_attributes(db).contains(name)
             && let Some(submodule) = self.resolve_submodule(db, name)
         {
-            return SymbolWithReExport::reexported(Place::bound(submodule).into());
+            return Place::bound(submodule).into();
         }
 
-        let mut imported = imported_symbol(db, self.module(db).file(db), name, None);
+        let place_and_qualifiers = imported_symbol(
+            db,
+            self.module(db).file(db),
+            name,
+            requires_explicit_reexport,
+        );
 
         // If the normal lookup failed, try to call the module's `__getattr__` function
-        if imported.place_and_qualifiers.place.is_undefined() {
-            return SymbolWithReExport::reexported(self.try_module_getattr(db, name));
+        if place_and_qualifiers.place.is_undefined() {
+            return self.try_module_getattr(db, name);
         }
 
         // typeshed re-exports some special forms across modules (e.g. `collections.abc.Callable`
         // is `from typing import Callable as Callable`). The resolved type still carries the
         // definition-site variant (`SpecialFormType::TypingCallable`), so we recover the
         // import-path identity here while it's still observable.
-        if let Place::Defined(defined) = imported.place_and_qualifiers.place
+        if let Place::Defined(defined) = place_and_qualifiers.place
             && let Type::SpecialForm(special) = defined.ty
             && let Some(import_module) = self.module(db).known(db)
         {
             let rewrapped = special.rewrap_for_import_module(name, import_module);
             if rewrapped != special {
-                imported.place_and_qualifiers = PlaceAndQualifiers {
+                return PlaceAndQualifiers {
                     place: Place::Defined(DefinedPlace {
                         ty: Type::SpecialForm(rewrapped),
                         ..defined
                     }),
-                    qualifiers: imported.place_and_qualifiers.qualifiers,
+                    qualifiers: place_and_qualifiers.qualifiers,
                 };
             }
         }
 
-        imported
-    }
-
-    fn static_member(self, db: &'db dyn Db, name: &str) -> PlaceAndQualifiers<'db> {
-        self.imported_member(db, name).place_and_qualifiers
+        place_and_qualifiers
     }
 }
 

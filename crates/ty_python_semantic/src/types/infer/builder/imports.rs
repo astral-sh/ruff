@@ -6,6 +6,7 @@ use ty_module_resolver::{
 
 use crate::{
     Program, TypeQualifiers, add_inferred_python_version_hint_to_diagnostic,
+    dunder_all::dunder_all_names,
     place::{DefinedPlace, Definedness, Place, PlaceAndQualifiers, TypeOrigin},
     types::{
         ModuleLiteralType, Type, TypeAndQualifiers,
@@ -272,6 +273,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return;
         };
         if module_file.is_stub(db)
+            || dunder_all_names(db, module_file).is_some()
             || (module_file == self.file() && self.scope().file_scope_id(db).is_global())
         {
             return;
@@ -289,11 +291,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .iter()
             .filter_map(|definition| definition.kind(db).as_star_import())
             .map(|star_import| place_table.symbol(star_import.symbol_id()).name())
-            .filter(|name| {
-                module_literal
-                    .imported_member(db, name)
-                    .contains_non_reexported_definition(db, module_file, name, true)
-            })
+            .filter(|name| module_literal.is_implicit_reexport(db, name))
             .collect::<Vec<_>>();
         implicit_names.sort_unstable();
 
@@ -442,7 +440,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         // First try loading the requested attribute from the module.
         if !skip_self_referential_member_lookup {
-            let imported_member = module_literal.imported_member(db, name);
+            let imported_member = module_literal.static_member(db, name);
             if let PlaceAndQualifiers {
                 place:
                     Place::Defined(DefinedPlace {
@@ -452,7 +450,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         ..
                     }),
                 qualifiers,
-            } = imported_member.place_and_qualifiers
+            } = imported_member
             {
                 if &alias.name != "*" && boundness == Definedness::PossiblyUndefined {
                     // TODO: Consider loading _both_ the attribute and any submodule and unioning them
@@ -470,12 +468,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     && self.context.is_lint_enabled(&IMPLICIT_REEXPORT)
                     && let Some(module_file) = module.file(db)
                     && !module_file.is_stub(db)
-                    && imported_member.contains_non_reexported_definition(
-                        db,
-                        module_file,
-                        name,
-                        false,
-                    )
+                    && module_literal.is_implicit_reexport(db, name)
                     && let Some(builder) = self
                         .context
                         .report_lint(&IMPLICIT_REEXPORT, ast::AnyNodeRef::Alias(alias))

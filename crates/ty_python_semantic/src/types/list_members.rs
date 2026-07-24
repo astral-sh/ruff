@@ -59,7 +59,6 @@ pub(crate) fn all_end_of_scope_members<'db>(
                 let PlaceWithDefinition {
                     place,
                     first_definition,
-                    ..
                 } = place_from_bindings(db, bindings);
 
                 let first_reachable_definition = first_definition?;
@@ -384,9 +383,7 @@ impl<'db> AllMembers<'db> {
                 for (symbol_id, _) in use_def_map.all_end_of_scope_symbol_declarations() {
                     let symbol_name = place_table.symbol(symbol_id).name();
                     let Place::Defined(DefinedPlace { ty, .. }) =
-                        imported_symbol(db, Some(file), symbol_name, None)
-                            .place_and_qualifiers
-                            .place
+                        imported_symbol(db, Some(file), symbol_name, None).place
                     else {
                         continue;
                     };

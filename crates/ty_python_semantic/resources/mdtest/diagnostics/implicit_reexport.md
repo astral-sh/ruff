@@ -8,24 +8,24 @@ implicit-reexport = "ignore"
 ```
 
 ```py
-from a import Answer
+from api import Answer
 
 reveal_type(Answer)  # revealed: Literal[42]
 ```
 
-`a.py`:
+`api.py`:
 
 ```py
-from b import Answer
+from models import Answer
 ```
 
-`b.py`:
+`models.py`:
 
 ```py
 Answer = 42
 ```
 
-## Implicit re-export from a runtime module
+## Named imports and attribute access
 
 ```toml
 [rules]
@@ -33,104 +33,44 @@ implicit-reexport = "error"
 ```
 
 ```py
-# error: [implicit-reexport] "Module `a` does not explicitly export attribute `Answer`"
-from a import Answer
+# error: [implicit-reexport] "Module `api` does not explicitly export attribute `Answer`"
+from api import Answer
+
+# error: [implicit-reexport] "Module `api` does not explicitly export attribute `PublicAnswer`"
+from api import PublicAnswer as Renamed
+from api import Direct, ExplicitAlias, ExportedInAll, helper
+import api
 
 reveal_type(Answer)  # revealed: Literal[42]
-```
-
-`a.py`:
-
-```py
-from b import Answer
-```
-
-`b.py`:
-
-```py
-Answer = 42
-```
-
-## Aliased import
-
-```toml
-[rules]
-implicit-reexport = "error"
-```
-
-```py
-# error: [implicit-reexport] "Module `a` does not explicitly export attribute `Answer`"
-from a import Answer as Renamed
-
 reveal_type(Renamed)  # revealed: Literal[42]
-```
-
-`a.py`:
-
-```py
-from b import Answer
-```
-
-`b.py`:
-
-```py
-Answer = 42
-```
-
-## Renamed source import
-
-```toml
-[rules]
-implicit-reexport = "error"
-```
-
-```py
-# error: [implicit-reexport] "Module `a` does not explicitly export attribute `PublicAnswer`"
-from a import PublicAnswer
-
-reveal_type(PublicAnswer)  # revealed: Literal[42]
-```
-
-`a.py`:
-
-```py
-from b import Answer as PublicAnswer
-```
-
-`b.py`:
-
-```py
-Answer = 42
-```
-
-## Explicit re-exports
-
-```toml
-[rules]
-implicit-reexport = "error"
-```
-
-```py
-from a import ExplicitAlias, ExportedInAll, helper
-
 reveal_type(ExplicitAlias)  # revealed: Literal[1]
 reveal_type(ExportedInAll)  # revealed: Literal[2]
+reveal_type(Direct)  # revealed: Literal[5]
 reveal_type(helper)  # revealed: <module 'helper'>
+
+# error: [implicit-reexport] "Module `api` does not explicitly export attribute `Answer`"
+reveal_type(api.Answer)  # revealed: Literal[42]
+reveal_type(api.ExplicitAlias)  # revealed: Literal[1]
+reveal_type(api.ExportedInAll)  # revealed: Literal[2]
 ```
 
-`a.py`:
+`api.py`:
 
 ```py
-from b import ExplicitAlias as ExplicitAlias
-from b import ExportedInAll
+from models import Answer
+from models import Answer as PublicAnswer
+from models import ExplicitAlias as ExplicitAlias
+from models import ExportedInAll
 import helper as helper
 
+Direct = 5
 __all__ = ["ExportedInAll"]
 ```
 
-`b.py`:
+`models.py`:
 
 ```py
+Answer = 42
 ExplicitAlias = 1
 ExportedInAll = 2
 ```
@@ -140,7 +80,7 @@ ExportedInAll = 2
 ```py
 ```
 
-## Direct definition
+## Stub files still hide implicit re-exports
 
 ```toml
 [rules]
@@ -148,44 +88,25 @@ implicit-reexport = "error"
 ```
 
 ```py
-from a import Answer
-
-reveal_type(Answer)  # revealed: Literal[42]
-```
-
-`a.py`:
-
-```py
-Answer = 42
-```
-
-## Stub files require explicit re-exports unconditionally
-
-```toml
-[rules]
-implicit-reexport = "error"
-```
-
-```py
-# error: [unresolved-import] "Module `a` has no member `Answer`"
-from a import Answer
+# error: [unresolved-import] "Module `api` has no member `Answer`"
+from api import Answer
 
 reveal_type(Answer)  # revealed: Unknown
 ```
 
-`a.pyi`:
+`api.pyi`:
 
 ```pyi
-from b import Answer
+from models import Answer
 ```
 
-`b.pyi`:
+`models.pyi`:
 
 ```pyi
 Answer: int
 ```
 
-## Star import with one implicit re-export
+## Wildcard imports
 
 ```toml
 [rules]
@@ -193,122 +114,54 @@ implicit-reexport = "error"
 ```
 
 ```py
-# error: [implicit-reexport] "Module `a` does not explicitly export attribute `Answer`"
-from a import *
+# error: [implicit-reexport] "Module `one` does not explicitly export attribute `One`"
+from one import *
 
-reveal_type(Answer)  # revealed: Literal[42]
+# error: [implicit-reexport] "Wildcard import from module `two` includes attributes `TwoA` and `TwoB` that are not explicitly exported"
+from two import *
+
+# error: [implicit-reexport] "Wildcard import from module `many` includes attributes `ManyA`, `ManyB`, and 3 more that are not explicitly exported"
+from many import *
+
+reveal_type(One)  # revealed: Literal[1]
+reveal_type(TwoA)  # revealed: Literal[2]
+reveal_type(TwoB)  # revealed: Literal[3]
+reveal_type(ManyA)  # revealed: Literal[4]
+reveal_type(ManyE)  # revealed: Literal[8]
 ```
 
-`a.py`:
+`one.py`:
 
 ```py
-from b import Answer
+from values import One
 ```
 
-`b.py`:
+`two.py`:
 
 ```py
-Answer = 42
+from values import TwoA, TwoB
 ```
 
-## Star import with more than two implicit re-exports
-
-```toml
-[rules]
-implicit-reexport = "error"
-```
+`many.py`:
 
 ```py
-# error: [implicit-reexport] "Wildcard import from module `a` includes attributes `Answer`, `Fifth`, and 3 more that are not explicitly exported"
-from a import *
-
-reveal_type(Answer)  # revealed: Literal[42]
-reveal_type(Other)  # revealed: Literal[43]
-reveal_type(Third)  # revealed: Literal[44]
-reveal_type(Fourth)  # revealed: Literal[45]
-reveal_type(Fifth)  # revealed: Literal[46]
+from values import ManyA, ManyB, ManyC, ManyD, ManyE
 ```
 
-`a.py`:
+`values.py`:
 
 ```py
-from b import Answer, Other, Third, Fourth, Fifth
+One = 1
+TwoA = 2
+TwoB = 3
+ManyA = 4
+ManyB = 5
+ManyC = 6
+ManyD = 7
+ManyE = 8
 ```
 
-`b.py`:
-
-```py
-Answer = 42
-Other = 43
-Third = 44
-Fourth = 45
-Fifth = 46
-```
-
-## Star import with two implicit re-exports
-
-```toml
-[rules]
-implicit-reexport = "error"
-```
-
-```py
-# error: [implicit-reexport] "Wildcard import from module `a` includes attributes `Answer` and `Other` that are not explicitly exported"
-from a import *
-
-reveal_type(Answer)  # revealed: Literal[42]
-reveal_type(Other)  # revealed: Literal[43]
-```
-
-`a.py`:
-
-```py
-from b import Answer, Other
-```
-
-`b.py`:
-
-```py
-Answer = 42
-Other = 43
-```
-
-## Attribute access
-
-```toml
-[rules]
-implicit-reexport = "error"
-```
-
-```py
-import a
-
-# error: [implicit-reexport] "Module `a` does not explicitly export attribute `Answer`"
-reveal_type(a.Answer)  # revealed: Literal[42]
-
-reveal_type(a.Explicit)  # revealed: Literal[43]
-reveal_type(a.ExportedInAll)  # revealed: Literal[44]
-```
-
-`a.py`:
-
-```py
-from b import Answer
-from b import Explicit as Explicit
-from b import ExportedInAll
-
-__all__ = ["ExportedInAll"]
-```
-
-`b.py`:
-
-```py
-Answer = 42
-Explicit = 43
-ExportedInAll = 44
-```
-
-## Package re-exports
+## Package and submodule re-exports
 
 ```toml
 [rules]
@@ -323,9 +176,14 @@ from package import Answer
 from package import nested
 from package import child
 
+# error: [implicit-reexport] "Module `q` does not explicitly export attribute `b`"
+from q import a, b
+
 reveal_type(Answer)  # revealed: Literal[42]
 reveal_type(nested)  # revealed: <module 'package.sub.nested'>
 reveal_type(child)  # revealed: <module 'package.child'>
+reveal_type(b.C)  # revealed: <class 'C'>
+reveal_type(a.b.C)  # revealed: <class 'C'>
 ```
 
 `package/__init__.py`:
@@ -351,24 +209,6 @@ Answer = 42
 ```py
 ```
 
-## Imported submodule alias
-
-```toml
-[rules]
-implicit-reexport = "error"
-```
-
-```py
-# error: [implicit-reexport] "Module `q` does not explicitly export attribute `b`"
-from q import a, b
-
-reveal_type(b)  # revealed: <module 'a.b'>
-reveal_type(b.C)  # revealed: <class 'C'>
-
-reveal_type(a.b)  # revealed: <module 'a.b'>
-reveal_type(a.b.C)  # revealed: <class 'C'>
-```
-
 `a/__init__.py`:
 
 ```py
@@ -387,7 +227,7 @@ import a as a
 import a.b as b
 ```
 
-## Star imports respect `__all__`
+## Wildcard imports respect `__all__`
 
 ```toml
 [rules]
@@ -395,27 +235,27 @@ implicit-reexport = "error"
 ```
 
 ```py
-from a import *
+from api import *
 
 reveal_type(Answer)  # revealed: Literal[42]
 ```
 
-`a.py`:
+`api.py`:
 
 ```py
-from b import Answer, Hidden
+from models import Answer, Hidden
 
 __all__ = ["Answer"]
 ```
 
-`b.py`:
+`models.py`:
 
 ```py
 Answer = 42
 Hidden = 43
 ```
 
-## Conditional implicit re-export
+## Control flow
 
 ```toml
 [rules]
@@ -423,148 +263,68 @@ implicit-reexport = "error"
 ```
 
 ```py
-# error: [implicit-reexport] "Module `a` does not explicitly export attribute `Answer`"
-from a import Answer
+# error: [implicit-reexport] "Module `flow` does not explicitly export attribute `Conditional`"
+from flow import Conditional
 
-reveal_type(Answer)  # revealed: Literal[1, 2]
+# error: [implicit-reexport] "Module `flow` does not explicitly export attribute `Mixed`"
+from flow import Mixed
+from flow import Explicit, Synthetic
+
+# error: [implicit-reexport] "Module `flow` does not explicitly export attribute `LoopImplicit`"
+from flow import LoopExplicit, LoopImplicit
+
+reveal_type(Conditional)  # revealed: Literal[1, 2]
+reveal_type(Mixed)  # revealed: Literal[42]
+reveal_type(Explicit)  # revealed: Literal[1, 2]
 ```
 
-`a.py`:
-
-```py
-from b import One, Two
-
-def coinflip() -> bool:
-    return True
-
-if coinflip():
-    from b import One as Answer
-else:
-    from b import Two as Answer
-```
-
-`b.py`:
-
-```py
-One = 1
-Two = 2
-```
-
-## Conditional explicit and implicit re-export
-
-```toml
-[rules]
-implicit-reexport = "error"
-```
-
-```py
-# error: [implicit-reexport] "Module `a` does not explicitly export attribute `Answer`"
-from a import Answer
-
-reveal_type(Answer)  # revealed: Literal[42]
-```
-
-`a.py`:
+`flow.py`:
 
 ```py
 def coinflip() -> bool:
     return True
 
 if coinflip():
-    from b import Answer
+    from left import Conditional
 else:
-    from b import Answer as Answer
-```
-
-`b.py`:
-
-```py
-Answer = 42
-```
-
-## Conditional explicit re-export
-
-```toml
-[rules]
-implicit-reexport = "error"
-```
-
-```py
-from a import Answer
-
-reveal_type(Answer)  # revealed: Literal[1, 2]
-```
-
-`a.py`:
-
-```py
-def coinflip() -> bool:
-    return True
+    from right import Conditional
 
 if coinflip():
-    from b import Answer as Answer
+    from left import Mixed
 else:
-    from c import Answer as Answer
-```
+    from left import Mixed as Mixed
 
-`b.py`:
+if coinflip():
+    from left import Explicit as Explicit
+else:
+    from right import Explicit as Explicit
 
-```py
-Answer = 1
-```
+Synthetic = 42
 
-`c.py`:
+def replace_synthetic() -> None:
+    global Synthetic
+    Synthetic = 43
 
-```py
-Answer = 2
-```
-
-## Synthetic bindings preserve direct exports
-
-```toml
-[rules]
-implicit-reexport = "error"
-```
-
-```py
-from a import Answer
-```
-
-`a.py`:
-
-```py
-Answer = 42
-
-def replace_answer() -> None:
-    global Answer
-    Answer = 43
-```
-
-## Loop re-export
-
-```toml
-[rules]
-implicit-reexport = "error"
-```
-
-```py
-# error: [implicit-reexport] "Module `a` does not explicitly export attribute `Answer`"
-from a import Answer, Explicit
-```
-
-`a.py`:
-
-```py
 while True:
-    from b import Answer
-    from b import Explicit as Explicit
+    from left import LoopExplicit as LoopExplicit
+    from left import LoopImplicit
 
     break
 ```
 
-`b.py`:
+`left.py`:
 
 ```py
-Answer = 42
-Explicit = 43
+Conditional = 1
+Explicit = 1
+LoopExplicit = 1
+LoopImplicit = 2
+Mixed = 42
+```
+
+`right.py`:
+
+```py
+Conditional = 2
+Explicit = 2
 ```

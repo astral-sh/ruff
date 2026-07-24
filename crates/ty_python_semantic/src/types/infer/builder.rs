@@ -10032,9 +10032,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             let module = module_literal.module(db);
             if let Some(module_file) = module.file(db)
                 && !module_file.is_stub(db)
-                && module_literal
-                    .imported_member(db, &attr.id)
-                    .contains_non_reexported_definition(db, module_file, &attr.id, false)
+                && module_literal.is_implicit_reexport(db, &attr.id)
                 && let Some(builder) = self.context.report_lint(&IMPLICIT_REEXPORT, attribute)
             {
                 builder.into_diagnostic(format_args!(
