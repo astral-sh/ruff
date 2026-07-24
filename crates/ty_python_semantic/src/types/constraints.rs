@@ -1040,6 +1040,20 @@ impl<'db> ConstraintSetBuilder<'db> {
             .source_order
             .expect("non-terminal BDD should have source_order");
 
+        // The source-order tree can retain repeated constraints from intermediate operations. If
+        // this constraint set participates in a Salsa cycle, retaining that construction history
+        // can make an otherwise stable result grow on every iteration and never converge.
+        let source_order = self
+            .calculate_source_orders(Some(source_order))
+            .into_iter()
+            .fold(None, |source_order, constraint| {
+                self.ordered_source_order(
+                    source_order,
+                    Some(self.constraint_source_order(constraint)),
+                )
+            })
+            .expect("non-terminal BDD should have source_order");
+
         let mut storage = self.storage.into_inner();
         let mut used_nodes = RankBitBox::bits_with_capacity(storage.nodes.len());
         let mut used_constraints = RankBitBox::bits_with_capacity(storage.constraints.len());
