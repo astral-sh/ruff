@@ -596,6 +596,51 @@ reveal_type(bound)  # revealed: partial[(cfg: Any) -> Any]
 reveal_type(bound({}))  # revealed: Any
 ```
 
+### Truthiness-narrowed gradual ParamSpec callable bound with `partial`
+
+A truthiness-narrowed gradual callable remains valid input to a `ParamSpec` wrapper. Binding the
+wrapper must produce a gradual callable that can be assigned to the original callback:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from functools import partial
+from typing import Any, Callable, ParamSpec
+
+P = ParamSpec("P")
+
+def legacy_wrapper(
+    original: Callable[P, dict[str, Any]],
+    state: str,
+    *args: P.args,
+    **kwargs: P.kwargs,
+) -> dict[str, Any]:
+    return original(*args, **kwargs)
+
+def pep695_wrapper[**P](
+    original: Callable[P, dict[str, Any]],
+    state: str,
+    *args: P.args,
+    **kwargs: P.kwargs,
+) -> dict[str, Any]:
+    return original(*args, **kwargs)
+
+class API:
+    callback: Callable[[str], dict[str, Any]]
+
+def patch(api: API, original: Callable[..., Any]) -> None:
+    if original:
+        legacy = partial(legacy_wrapper, original, "state")
+        reveal_type(legacy)  # revealed: partial[(...) -> dict[str, Any]]
+        api.callback = legacy
+        pep695 = partial(pep695_wrapper, original, "state")
+        reveal_type(pep695)  # revealed: partial[(...) -> dict[str, Any]]
+        api.callback = pep695
+```
+
 ### ParamSpec callable with keyword-bound wrapper parameters
 
 ```py
