@@ -2185,7 +2185,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         if generic_context
             .variables_inner(self.db)
             .values()
-            .any(|typevar| typevar.is_paramspec(self.db))
+            .any(|typevar| typevar.is_paramspec(self.db) || typevar.is_typevartuple(self.db))
         {
             return None;
         }
