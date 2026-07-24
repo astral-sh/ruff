@@ -1498,6 +1498,10 @@ impl<'db> BoundTypeVarIdentity<'db> {
         self.kind(db).is_paramspec()
     }
 
+    pub(crate) fn is_typevartuple(self, db: &'db dyn Db) -> bool {
+        self.kind(db).is_typevartuple()
+    }
+
     pub(crate) fn without_paramspec_attr(mut self, db: &'db dyn Db) -> Self {
         debug_assert!(
             self.is_paramspec(db),

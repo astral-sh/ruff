@@ -413,6 +413,42 @@ reveal_type(p)  # revealed: partial[() -> tuple[Literal[1], Literal[1]]]
 reveal_type(p())  # revealed: tuple[Literal[1], Literal[1]]
 ```
 
+### Intersected generic arguments
+
+Partial application does not yet preserve correlated inference paths from intersected arguments.
+
+```py
+from functools import partial
+from typing import Generic, TypeVar
+from ty_extensions import Intersection
+
+T_co = TypeVar("T_co", covariant=True)
+T = TypeVar("T")
+
+class Source(Generic[T_co]): ...
+class A: ...
+class B: ...
+
+def element(x: Source[T]) -> T:
+    raise NotImplementedError
+
+def correlated(x: Source[T], value: T) -> T:
+    raise NotImplementedError
+
+def _(x: Intersection[Source[A], Source[B]]) -> None:
+    element_partial = partial(element, x)
+    # TODO: revealed: partial[() -> A & B]
+    reveal_type(element_partial)  # revealed: partial[() -> A | B]
+    # TODO: revealed: A & B
+    reveal_type(element_partial())  # revealed: A | B
+
+    correlated_partial = partial(correlated, x)
+    # TODO: revealed: partial[Overload[(value: A) -> A, (value: B) -> B]]
+    reveal_type(correlated_partial)  # revealed: partial[(value: A | B) -> A | B]
+    # TODO: revealed: B
+    reveal_type(correlated_partial(B()))  # revealed: A | B
+```
+
 ### Generic constructors
 
 ```py
@@ -558,6 +594,51 @@ def pre(cfg: Any) -> Any:
 bound = partial(invoke, pre)
 reveal_type(bound)  # revealed: partial[(cfg: Any) -> Any]
 reveal_type(bound({}))  # revealed: Any
+```
+
+### Truthiness-narrowed gradual ParamSpec callable bound with `partial`
+
+A truthiness-narrowed gradual callable remains valid input to a `ParamSpec` wrapper. Binding the
+wrapper must produce a gradual callable that can be assigned to the original callback:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from functools import partial
+from typing import Any, Callable, ParamSpec
+
+P = ParamSpec("P")
+
+def legacy_wrapper(
+    original: Callable[P, dict[str, Any]],
+    state: str,
+    *args: P.args,
+    **kwargs: P.kwargs,
+) -> dict[str, Any]:
+    return original(*args, **kwargs)
+
+def pep695_wrapper[**P](
+    original: Callable[P, dict[str, Any]],
+    state: str,
+    *args: P.args,
+    **kwargs: P.kwargs,
+) -> dict[str, Any]:
+    return original(*args, **kwargs)
+
+class API:
+    callback: Callable[[str], dict[str, Any]]
+
+def patch(api: API, original: Callable[..., Any]) -> None:
+    if original:
+        legacy = partial(legacy_wrapper, original, "state")
+        reveal_type(legacy)  # revealed: partial[(...) -> dict[str, Any]]
+        api.callback = legacy
+        pep695 = partial(pep695_wrapper, original, "state")
+        reveal_type(pep695)  # revealed: partial[(...) -> dict[str, Any]]
+        api.callback = pep695
 ```
 
 ### ParamSpec callable with keyword-bound wrapper parameters

@@ -499,6 +499,15 @@ async def waiter[T](value: T, mapping: dict[T, int]) -> None: ...
 values: dict[int, int] = {}
 start(waiter, 1, values)
 
+async def forward[**P](
+    callback: Callable[P, Awaitable[object]],
+    *args: P.args,
+    **kwargs: P.kwargs,
+) -> None: ...
+async def one_arg(value: int) -> None: ...
+
+start(forward, one_arg, 1)
+
 def invoke[*Ts, R](callback: Callable[[*Ts], R], *args: *Ts) -> R:
     raise NotImplementedError
 
