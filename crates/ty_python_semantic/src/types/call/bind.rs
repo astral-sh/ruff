@@ -4706,7 +4706,7 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
                 variable_element: Option<Type<'db>>,
             },
             Other {
-                tuple: TupleSpec<'db>,
+                tuple: Cow<'db, TupleSpec<'db>>,
                 argument_types: Vec<Type<'db>>,
                 length: TupleLength,
                 variable_element: Option<Type<'db>>,
@@ -4796,7 +4796,7 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
                         }
                     }
                     _ => {
-                        let tuple = argument_type.iterate(db).into_owned();
+                        let tuple = argument_type.iterate(db);
                         VariadicArgumentType::Other {
                             argument_types: tuple.iter_element_types(db).collect(),
                             length: tuple.len(),
@@ -4924,10 +4924,10 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
                 .parameters
                 .iter()
                 .position(|matched| matched.index == parameter_index)
-            && let VariadicArgumentType::Other { tuple, .. } = &variadic_type
+            && let VariadicArgumentType::Other { tuple, .. } = variadic_type
         {
             let residual_tuple = if fixed_arguments_consumed == 0 {
-                Some(tuple.clone())
+                Some(tuple.into_owned())
             } else {
                 tuple
                     .py_slice_type(
@@ -6468,9 +6468,13 @@ pub struct MatchedArgument<'db> {
     pub matched: bool,
 }
 
+/// The portion of a single splatted argument that matches a variadic parameter.
 #[derive(Clone, Debug)]
 struct MatchedVariadicParameter<'db> {
+    /// The index of the matched variadic parameter.
     index: usize,
+
+    /// The residual tuple after preceding positional parameters consume their portion.
     tuple: TupleSpec<'db>,
 }
 
