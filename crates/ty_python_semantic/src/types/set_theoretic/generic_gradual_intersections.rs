@@ -1,5 +1,6 @@
 use crate::Db;
 use crate::types::generics::specialization_variance;
+use crate::types::tuple::TupleSpec;
 use crate::types::{
     ClassBase, ClassType, IntersectionType, KnownClass, MaterializationKind, Type, TypeVarVariance,
     UnionType,
@@ -164,8 +165,33 @@ fn dynamic_generalization_intersection<'db>(
     }
 
     if general_class.known(db) == Some(KnownClass::Tuple) {
-        let general_tuple = general_specialization.tuple(db)?.as_fixed_length()?;
-        let specific_tuple = specific_specialization.tuple(db)?.as_fixed_length()?;
+        let general_tuple = general_specialization.tuple(db)?;
+        let specific_tuple = specific_specialization.tuple(db)?;
+
+        if let (TupleSpec::Variable(general_variable), TupleSpec::Variable(specific_variable)) =
+            (general_tuple, specific_tuple)
+        {
+            if general_tuple.fixed_elements().next().is_some()
+                || specific_tuple.fixed_elements().next().is_some()
+                || specific.has_dynamic(db)
+            {
+                return None;
+            }
+
+            let general_element = general_variable.variable().homogeneous_type()?;
+            if !general_element.is_non_divergent_dynamic() {
+                return None;
+            }
+            let specific_element = specific_variable.variable().homogeneous_type()?;
+
+            return Some(Type::homogeneous_tuple(
+                db,
+                IntersectionType::from_two_elements(db, specific_element, general_element),
+            ));
+        }
+
+        let general_tuple = general_tuple.as_fixed_length()?;
+        let specific_tuple = specific_tuple.as_fixed_length()?;
         if general_tuple.len() != specific_tuple.len()
             || general_tuple
                 .iter_all_elements()

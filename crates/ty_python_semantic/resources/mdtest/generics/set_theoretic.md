@@ -507,6 +507,8 @@ class Q: ...
 static_assert(is_equivalent_to(tuple[P] & tuple[Any], tuple[P & Any]))
 static_assert(is_equivalent_to(tuple[Any] & tuple[P], tuple[P & Any]))
 
+static_assert(is_equivalent_to(tuple[P, ...] & tuple[Any, ...], tuple[P & Any, ...]))
+
 static_assert(is_equivalent_to(tuple[P, Q] & tuple[Any, Q], tuple[P & Any, Q]))
 static_assert(is_equivalent_to(tuple[Any, Q] & tuple[P, Q], tuple[P & Any, Q]))
 
