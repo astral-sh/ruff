@@ -38,6 +38,17 @@ pub(super) fn is_dotted_identifier(name: &str) -> bool {
     !name.is_empty() && name.split('.').all(is_identifier)
 }
 
+/// Returns whether `name` is a valid reStructuredText role name.
+///
+/// For example, this accepts `py:class` and `external+python:py:class`, but rejects `foo..bar`
+/// and `foo-`.
+pub(in crate::docstring) fn is_rest_role_name(name: &str) -> bool {
+    !name.is_empty()
+        && name
+            .split(['-', '.', '_', '+', ':'])
+            .all(|part| !part.is_empty() && part.chars().all(char::is_alphanumeric))
+}
+
 /// Returns whether `line` starts with a `CommonMark` list-item marker.
 ///
 /// `CommonMark` limits ordered-list markers to nine digits to avoid integer
@@ -58,11 +69,11 @@ pub(in crate::docstring) fn starts_with_markdown_list_item(line: &str) -> bool {
         && matches!(bytes.get(digits + 1), Some(b' ' | b'\t'))
 }
 
-/// Returns whether `text` consists of a complete Markdown code span.
+/// Returns whether `text` is wrapped in a Markdown code span.
 ///
 /// For example, this returns `true` for ``"`value`"`` and `false` for
 /// ``"`value` trailing"``.
-pub(crate) fn is_markdown_code_span(text: &str) -> bool {
+pub(crate) fn is_wrapped_in_markdown_code_span(text: &str) -> bool {
     let mut tokens = InlineMarkupScanner::new(text);
     let Some(InlineMarkupToken::Code(_)) = tokens.next() else {
         return false;
@@ -82,7 +93,7 @@ pub(crate) fn is_markdown_code_span(text: &str) -> bool {
 /// InlineMarkupScanner::new("before `code` after")
 ///     => Text("before "), Code("code"), Text(" after")
 /// ```
-struct InlineMarkupScanner<'a> {
+pub(crate) struct InlineMarkupScanner<'a> {
     /// The scanner used to find complete code spans.
     scanner: BacktickScanner<'a>,
     /// The end of the last token returned to the caller.
@@ -95,7 +106,7 @@ impl<'a> InlineMarkupScanner<'a> {
     /// Creates a lossless iterator over plain text and complete backtick-delimited code spans.
     ///
     /// Escaped or unmatched backticks remain part of an [`InlineMarkupToken::Text`] token.
-    fn new(source: &'a str) -> Self {
+    pub(crate) fn new(source: &'a str) -> Self {
         Self {
             scanner: BacktickScanner::new(source),
             last_token_end: TextSize::ZERO,
@@ -166,7 +177,7 @@ impl<'a> Iterator for InlineMarkupScanner<'a> {
 ///
 /// Escaped and unmatched backticks remain text.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum InlineMarkupToken<'a> {
+pub(crate) enum InlineMarkupToken<'a> {
     /// Source text outside a complete, unescaped backtick span.
     Text(&'a str),
     /// A complete code span whose backtick delimiters have equal lengths.
@@ -530,8 +541,9 @@ pub(super) fn indentation(line: &str) -> TextSize {
 #[cfg(test)]
 mod tests {
     use super::{
-        BacktickScanner, InlineMarkupScanner, InlineMarkupToken, TextSize, is_markdown_code_span,
-        split_once_at_top_level_colon, split_trailing_parenthetical,
+        BacktickScanner, InlineMarkupScanner, InlineMarkupToken, TextSize, is_rest_role_name,
+        is_wrapped_in_markdown_code_span, split_once_at_top_level_colon,
+        split_trailing_parenthetical,
     };
 
     #[test]
@@ -581,7 +593,7 @@ mod tests {
     }
 
     #[test]
-    fn recognizes_complete_markdown_code_spans() {
+    fn recognizes_wrapped_markdown_code_spans() {
         for (text, expected) in [
             ("`value`", true),
             ("``value`with:ticks``", true),
@@ -592,7 +604,20 @@ mod tests {
             ("``", false),
             ("value", false),
         ] {
-            assert_eq!(is_markdown_code_span(text), expected, "{text:?}");
+            assert_eq!(is_wrapped_in_markdown_code_span(text), expected, "{text:?}");
+        }
+    }
+
+    #[test]
+    fn recognizes_rest_role_names() {
+        for (name, expected) in [
+            ("class", true),
+            ("py:class", true),
+            ("external+python:py:class", true),
+            ("étiquette", true),
+            ("foo..bar", false),
+        ] {
+            assert_eq!(is_rest_role_name(name), expected, "{name:?}");
         }
     }
 

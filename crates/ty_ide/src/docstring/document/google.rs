@@ -37,7 +37,7 @@ use ruff_text_size::{TextRange, TextSize};
 use super::preformatted::PreformattedBlockScanner;
 use super::syntax::{
     ParsedLine, consume_quoted_string, container_block_end, indentation, is_dotted_identifier,
-    parsed_lines, split_once_at_top_level_colon, split_trailing_parenthetical,
+    is_rest_role_name, parsed_lines, split_once_at_top_level_colon, split_trailing_parenthetical,
 };
 use super::{DescriptionBuilder, HeaderKind, SectionKind};
 use crate::FxIndexMap;
@@ -849,32 +849,19 @@ fn split_once_at_field_delimiter(line: &str) -> Option<(&str, &str)> {
 fn consume_rest_prefix_role(cursor: &mut Cursor<'_>) -> bool {
     let mut role = cursor.clone();
 
-    // First, require the candidate delimiter to be the opening colon of a role.
-    if !role.eat_char(':') {
+    // Reject normal field delimiters cheaply; their descriptions start with whitespace.
+    if !role.eat_char(':') || !role.first().is_alphanumeric() {
         return false;
     }
 
-    // Role names start with a Unicode alphanumeric run. Rejecting punctuation here preserves the
-    // first colon in `value::class:` as the field delimiter.
-    if !role.eat_if(char::is_alphanumeric) {
+    // ":py:class:`ValueError`" -> name = "py:class", followed by the opening backtick.
+    let Some((name, _)) = role.as_str().split_once(":`") else {
+        return false;
+    };
+    if !is_rest_role_name(name) {
         return false;
     }
-
-    // Next, scan the rest of the role name until its closing colon and the opening content
-    // backtick.
-    loop {
-        role.eat_while(char::is_alphanumeric);
-        if role.eat_char2(':', '`') {
-            break;
-        }
-
-        // `-._+:` separators are allowed, but only internally to alphanumeric characters.
-        if !role.eat_if(|character| matches!(character, '-' | '.' | '_' | '+' | ':'))
-            || !role.eat_if(char::is_alphanumeric)
-        {
-            return false;
-        }
-    }
+    role.skip_bytes(name.len() + ":`".len());
 
     // Finally, skip the role content so delimiter scanning resumes after its closing backtick.
     role.eat_while(|character| character != '`');
