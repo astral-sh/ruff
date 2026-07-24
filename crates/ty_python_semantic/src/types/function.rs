@@ -517,12 +517,12 @@ impl<'db> OverloadLiteral<'db> {
     }
 
     /// Returns the effective signatures of this overload after applying decorators.
-    pub(crate) fn decorated_signatures(self, db: &'db dyn Db) -> Cow<'db, [Signature<'db>]> {
+    pub(crate) fn decorated_signatures(self, db: &'db dyn Db) -> Vec<Signature<'db>> {
         let Type::Callable(callable) = binding_type(db, self.definition(db)) else {
-            return Cow::Owned(vec![self.signature(db)]);
+            return vec![self.signature(db)];
         };
 
-        Cow::Borrowed(callable.signatures(db).overloads.as_slice())
+        callable.signatures(db).overloads.to_vec()
     }
 
     /// Typed internally-visible "raw" signature for this function.
@@ -907,7 +907,7 @@ impl<'db> FunctionLiteral<'db> {
             if *overload == self.last_definition {
                 vec![overload.signature(db)]
             } else {
-                overload.decorated_signatures(db).into_owned()
+                overload.decorated_signatures(db)
             }
         }))
     }
