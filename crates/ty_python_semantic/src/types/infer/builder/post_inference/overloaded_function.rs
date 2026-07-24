@@ -314,9 +314,13 @@ fn check_non_generic_overload_implementation_consistency<'db>(
         return;
     }
 
-    let overload_signatures = overloads
-        .iter()
-        .map(|overload| (overload, overload.signature(db)));
+    let overload_signatures = overloads.iter().flat_map(|overload| {
+        overload
+            .decorated_signatures(db)
+            .into_owned()
+            .into_iter()
+            .map(move |signature| (overload, signature))
+    });
 
     if overload_signatures
         .clone()

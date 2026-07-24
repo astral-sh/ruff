@@ -79,7 +79,7 @@ use crate::types::diagnostic::{
 };
 use crate::types::display::DisplaySettings;
 use crate::types::generics::{ApplySpecialization, GenericContext, typing_self};
-use crate::types::infer::{nearest_enclosing_class, original_class_type};
+use crate::types::infer::{infer_definition_types, nearest_enclosing_class, original_class_type};
 use crate::types::known_instance::DeprecatedInstance;
 use crate::types::list_members::all_members;
 use crate::types::narrow::ClassInfoConstraintFunction;
@@ -93,7 +93,7 @@ use crate::types::{
     CallableType, ClassBase, ClassLiteral, ClassType, FindLegacyTypeVarsVisitor,
     IntersectionBuilder, KnownClass, KnownInstanceType, SpecialFormType, SubclassOfInner,
     SubclassOfType, Truthiness, Type, TypeContext, TypeMapping, TypeVarBoundOrConstraints,
-    UnionBuilder, UnionType, definition_expression_type, walk_signature,
+    UnionBuilder, UnionType, binding_type, definition_expression_type, walk_signature,
 };
 use crate::{Db, FxOrderSet};
 use ty_python_core::ast_ids::HasScopedUseId;
@@ -452,15 +452,25 @@ impl<'db> OverloadLiteral<'db> {
             .scoped_use_id(db, self.file(db));
 
         let Place::Defined(DefinedPlace {
-            ty: Type::FunctionLiteral(previous_type),
+            ty: previous_type,
             definedness: Definedness::AlwaysDefined,
+            provenance,
             ..
         }) = place_from_bindings(db, use_def.bindings_at_use(use_id)).place
         else {
             return None;
         };
 
-        let previous_literal = previous_type.literal(db);
+        let previous_literal = match previous_type {
+            Type::FunctionLiteral(previous_type) => previous_type.literal(db),
+            Type::Callable(_) => {
+                let definition = provenance.definition()?;
+                infer_definition_types(db, definition)
+                    .function_type(definition)?
+                    .literal(db)
+            }
+            _ => return None,
+        };
         let previous_overload = previous_literal.last_definition;
         if !previous_overload.is_overload(db) {
             return None;
@@ -504,6 +514,15 @@ impl<'db> OverloadLiteral<'db> {
         }
 
         signature
+    }
+
+    /// Returns the effective signatures of this overload after applying decorators.
+    pub(crate) fn decorated_signatures(self, db: &'db dyn Db) -> Cow<'db, [Signature<'db>]> {
+        let Type::Callable(callable) = binding_type(db, self.definition(db)) else {
+            return Cow::Owned(vec![self.signature(db)]);
+        };
+
+        Cow::Borrowed(callable.signatures(db).overloads.as_slice())
     }
 
     /// Typed internally-visible "raw" signature for this function.
@@ -883,7 +902,14 @@ impl<'db> FunctionLiteral<'db> {
             return CallableSignature::single(implementation.signature(db));
         }
 
-        CallableSignature::from_overloads(overloads.iter().map(|overload| overload.signature(db)))
+        CallableSignature::from_overloads(overloads.iter().flat_map(|overload| {
+            // The last overload may still be inferred, so querying its binding would create a cycle.
+            if *overload == self.last_definition {
+                vec![overload.signature(db)]
+            } else {
+                overload.decorated_signatures(db).into_owned()
+            }
+        }))
     }
 
     /// Typed externally-visible signature of the last overload or implementation of this function.

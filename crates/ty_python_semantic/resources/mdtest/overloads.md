@@ -846,6 +846,34 @@ reveal_type(narrowed(1))  # revealed: int
 reveal_type(narrowed("one"))  # revealed: str
 ```
 
+### Decorated overload consistency
+
+Decorators on individual overloads transform those overload signatures before implementation
+consistency is checked. The transformed signatures remain visible to callers.
+
+```py
+from typing import Callable, overload
+
+def decorate_overload(func: Callable[..., object]) -> Callable[[int], int]:
+    raise NotImplementedError
+
+def decorate_implementation(func: Callable[..., object]) -> Callable[[int | str], int | str]:
+    raise NotImplementedError
+
+@overload
+@decorate_overload
+def decorated() -> None: ...
+@overload
+def decorated(x: str, /) -> str: ...
+@decorate_implementation
+def decorated(y: bytes, z: bytes) -> bytes:
+    raise NotImplementedError
+
+reveal_type(decorated)  # revealed: Overload[(int, /) -> int, (x: str, /) -> str]
+reveal_type(decorated(1))  # revealed: int
+reveal_type(decorated("one"))  # revealed: str
+```
+
 ### Decorated implementation replaced by a function
 
 A decorator can replace an overload implementation with another function. The overload set remains
