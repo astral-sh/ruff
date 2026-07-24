@@ -8,16 +8,16 @@ input_file: crates/ruff_python_parser/resources/invalid/statements/if_extra_inde
 Module(
     ModModule {
         node_index: NodeIndex(None),
-        range: 0..939,
+        range: 0..905,
         body: [
             If(
                 StmtIf {
                     node_index: NodeIndex(None),
-                    range: 103..134,
+                    range: 69..110,
                     test: BooleanLiteral(
                         ExprBooleanLiteral {
                             node_index: NodeIndex(None),
-                            range: 106..110,
+                            range: 72..76,
                             value: true,
                         },
                     ),
@@ -25,21 +25,21 @@ Module(
                         Pass(
                             StmtPass {
                                 node_index: NodeIndex(None),
-                                range: 116..120,
+                                range: 82..86,
                             },
                         ),
                         Expr(
                             StmtExpr {
                                 node_index: NodeIndex(None),
-                                range: 129..134,
+                                range: 95..100,
                                 value: BinOp(
                                     ExprBinOp {
                                         node_index: NodeIndex(None),
-                                        range: 129..134,
+                                        range: 95..100,
                                         left: Name(
                                             ExprName {
                                                 node_index: NodeIndex(None),
-                                                range: 129..130,
+                                                range: 95..96,
                                                 id: Name("a"),
                                                 ctx: Load,
                                             },
@@ -48,7 +48,7 @@ Module(
                                         right: Name(
                                             ExprName {
                                                 node_index: NodeIndex(None),
-                                                range: 133..134,
+                                                range: 99..100,
                                                 id: Name("b"),
                                                 ctx: Load,
                                             },
@@ -57,25 +57,25 @@ Module(
                                 ),
                             },
                         ),
+                        Pass(
+                            StmtPass {
+                                node_index: NodeIndex(None),
+                                range: 106..110,
+                            },
+                        ),
                     ],
                     elif_else_clauses: [],
-                },
-            ),
-            Pass(
-                StmtPass {
-                    node_index: NodeIndex(None),
-                    range: 140..144,
                 },
             ),
             Assign(
                 StmtAssign {
                     node_index: NodeIndex(None),
-                    range: 146..152,
+                    range: 112..118,
                     targets: [
                         Name(
                             ExprName {
                                 node_index: NodeIndex(None),
-                                range: 146..147,
+                                range: 112..113,
                                 id: Name("a"),
                                 ctx: Store,
                             },
@@ -84,7 +84,7 @@ Module(
                     value: NumberLiteral(
                         ExprNumberLiteral {
                             node_index: NodeIndex(None),
-                            range: 150..152,
+                            range: 116..118,
                             value: Int(
                                 10,
                             ),
@@ -95,11 +95,11 @@ Module(
             If(
                 StmtIf {
                     node_index: NodeIndex(None),
-                    range: 192..265,
+                    range: 158..248,
                     test: BooleanLiteral(
                         ExprBooleanLiteral {
                             node_index: NodeIndex(None),
-                            range: 195..199,
+                            range: 161..165,
                             value: true,
                         },
                     ),
@@ -107,11 +107,11 @@ Module(
                         Expr(
                             StmtExpr {
                                 node_index: NodeIndex(None),
-                                range: 205..218,
+                                range: 171..184,
                                 value: Name(
                                     ExprName {
                                         node_index: NodeIndex(None),
-                                        range: 205..218,
+                                        range: 171..184,
                                         id: Name("before_nested"),
                                         ctx: Load,
                                     },
@@ -121,11 +121,11 @@ Module(
                         Expr(
                             StmtExpr {
                                 node_index: NodeIndex(None),
-                                range: 227..239,
+                                range: 193..205,
                                 value: Name(
                                     ExprName {
                                         node_index: NodeIndex(None),
-                                        range: 227..239,
+                                        range: 193..205,
                                         id: Name("first_nested"),
                                         ctx: Load,
                                     },
@@ -135,12 +135,26 @@ Module(
                         Expr(
                             StmtExpr {
                                 node_index: NodeIndex(None),
-                                range: 252..265,
+                                range: 218..231,
                                 value: Name(
                                     ExprName {
                                         node_index: NodeIndex(None),
-                                        range: 252..265,
+                                        range: 218..231,
                                         id: Name("second_nested"),
+                                        ctx: Load,
+                                    },
+                                ),
+                            },
+                        ),
+                        Expr(
+                            StmtExpr {
+                                node_index: NodeIndex(None),
+                                range: 236..248,
+                                value: Name(
+                                    ExprName {
+                                        node_index: NodeIndex(None),
+                                        range: 236..248,
+                                        id: Name("after_nested"),
                                         ctx: Load,
                                     },
                                 ),
@@ -153,25 +167,11 @@ Module(
             Expr(
                 StmtExpr {
                     node_index: NodeIndex(None),
-                    range: 270..282,
+                    range: 250..264,
                     value: Name(
                         ExprName {
                             node_index: NodeIndex(None),
-                            range: 270..282,
-                            id: Name("after_nested"),
-                            ctx: Load,
-                        },
-                    ),
-                },
-            ),
-            Expr(
-                StmtExpr {
-                    node_index: NodeIndex(None),
-                    range: 284..298,
-                    value: Name(
-                        ExprName {
-                            node_index: NodeIndex(None),
-                            range: 284..298,
+                            range: 250..264,
                             id: Name("outside_nested"),
                             ctx: Load,
                         },
@@ -181,11 +181,11 @@ Module(
             If(
                 StmtIf {
                     node_index: NodeIndex(None),
-                    range: 359..464,
+                    range: 325..449,
                     test: BooleanLiteral(
                         ExprBooleanLiteral {
                             node_index: NodeIndex(None),
-                            range: 362..366,
+                            range: 328..332,
                             value: true,
                         },
                     ),
@@ -193,11 +193,11 @@ Module(
                         Expr(
                             StmtExpr {
                                 node_index: NodeIndex(None),
-                                range: 372..387,
+                                range: 338..353,
                                 value: Name(
                                     ExprName {
                                         node_index: NodeIndex(None),
-                                        range: 372..387,
+                                        range: 338..353,
                                         id: Name("before_compound"),
                                         ctx: Load,
                                     },
@@ -207,11 +207,11 @@ Module(
                         If(
                             StmtIf {
                                 node_index: NodeIndex(None),
-                                range: 396..437,
+                                range: 362..403,
                                 test: Name(
                                     ExprName {
                                         node_index: NodeIndex(None),
-                                        range: 399..408,
+                                        range: 365..374,
                                         id: Name("condition"),
                                         ctx: Load,
                                     },
@@ -220,11 +220,11 @@ Module(
                                     Expr(
                                         StmtExpr {
                                             node_index: NodeIndex(None),
-                                            range: 422..437,
+                                            range: 388..403,
                                             value: Name(
                                                 ExprName {
                                                     node_index: NodeIndex(None),
-                                                    range: 422..437,
+                                                    range: 388..403,
                                                     id: Name("nested_compound"),
                                                     ctx: Load,
                                                 },
@@ -238,12 +238,26 @@ Module(
                         Expr(
                             StmtExpr {
                                 node_index: NodeIndex(None),
-                                range: 446..464,
+                                range: 412..430,
                                 value: Name(
                                     ExprName {
                                         node_index: NodeIndex(None),
-                                        range: 446..464,
+                                        range: 412..430,
                                         id: Name("recovered_compound"),
+                                        ctx: Load,
+                                    },
+                                ),
+                            },
+                        ),
+                        Expr(
+                            StmtExpr {
+                                node_index: NodeIndex(None),
+                                range: 435..449,
+                                value: Name(
+                                    ExprName {
+                                        node_index: NodeIndex(None),
+                                        range: 435..449,
+                                        id: Name("after_compound"),
                                         ctx: Load,
                                     },
                                 ),
@@ -256,25 +270,11 @@ Module(
             Expr(
                 StmtExpr {
                     node_index: NodeIndex(None),
-                    range: 469..483,
+                    range: 451..467,
                     value: Name(
                         ExprName {
                             node_index: NodeIndex(None),
-                            range: 469..483,
-                            id: Name("after_compound"),
-                            ctx: Load,
-                        },
-                    ),
-                },
-            ),
-            Expr(
-                StmtExpr {
-                    node_index: NodeIndex(None),
-                    range: 485..501,
-                    value: Name(
-                        ExprName {
-                            node_index: NodeIndex(None),
-                            range: 485..501,
+                            range: 451..467,
                             id: Name("outside_compound"),
                             ctx: Load,
                         },
@@ -284,11 +284,11 @@ Module(
             If(
                 StmtIf {
                     node_index: NodeIndex(None),
-                    range: 570..618,
+                    range: 536..641,
                     test: BooleanLiteral(
                         ExprBooleanLiteral {
                             node_index: NodeIndex(None),
-                            range: 573..577,
+                            range: 539..543,
                             value: true,
                         },
                     ),
@@ -296,11 +296,11 @@ Module(
                         Expr(
                             StmtExpr {
                                 node_index: NodeIndex(None),
-                                range: 583..597,
+                                range: 549..563,
                                 value: Name(
                                     ExprName {
                                         node_index: NodeIndex(None),
-                                        range: 583..597,
+                                        range: 549..563,
                                         id: Name("before_regions"),
                                         ctx: Load,
                                     },
@@ -310,12 +310,54 @@ Module(
                         Expr(
                             StmtExpr {
                                 node_index: NodeIndex(None),
-                                range: 606..618,
+                                range: 572..584,
                                 value: Name(
                                     ExprName {
                                         node_index: NodeIndex(None),
-                                        range: 606..618,
+                                        range: 572..584,
                                         id: Name("first_region"),
+                                        ctx: Load,
+                                    },
+                                ),
+                            },
+                        ),
+                        Expr(
+                            StmtExpr {
+                                node_index: NodeIndex(None),
+                                range: 589..602,
+                                value: Name(
+                                    ExprName {
+                                        node_index: NodeIndex(None),
+                                        range: 589..602,
+                                        id: Name("middle_region"),
+                                        ctx: Load,
+                                    },
+                                ),
+                            },
+                        ),
+                        Expr(
+                            StmtExpr {
+                                node_index: NodeIndex(None),
+                                range: 611..624,
+                                value: Name(
+                                    ExprName {
+                                        node_index: NodeIndex(None),
+                                        range: 611..624,
+                                        id: Name("second_region"),
+                                        ctx: Load,
+                                    },
+                                ),
+                            },
+                        ),
+                        Expr(
+                            StmtExpr {
+                                node_index: NodeIndex(None),
+                                range: 629..641,
+                                value: Name(
+                                    ExprName {
+                                        node_index: NodeIndex(None),
+                                        range: 629..641,
+                                        id: Name("after_region"),
                                         ctx: Load,
                                     },
                                 ),
@@ -328,53 +370,11 @@ Module(
             Expr(
                 StmtExpr {
                     node_index: NodeIndex(None),
-                    range: 623..636,
+                    range: 643..658,
                     value: Name(
                         ExprName {
                             node_index: NodeIndex(None),
-                            range: 623..636,
-                            id: Name("middle_region"),
-                            ctx: Load,
-                        },
-                    ),
-                },
-            ),
-            Expr(
-                StmtExpr {
-                    node_index: NodeIndex(None),
-                    range: 645..658,
-                    value: Name(
-                        ExprName {
-                            node_index: NodeIndex(None),
-                            range: 645..658,
-                            id: Name("second_region"),
-                            ctx: Load,
-                        },
-                    ),
-                },
-            ),
-            Expr(
-                StmtExpr {
-                    node_index: NodeIndex(None),
-                    range: 663..675,
-                    value: Name(
-                        ExprName {
-                            node_index: NodeIndex(None),
-                            range: 663..675,
-                            id: Name("after_region"),
-                            ctx: Load,
-                        },
-                    ),
-                },
-            ),
-            Expr(
-                StmtExpr {
-                    node_index: NodeIndex(None),
-                    range: 677..692,
-                    value: Name(
-                        ExprName {
-                            node_index: NodeIndex(None),
-                            range: 677..692,
+                            range: 643..658,
                             id: Name("outside_regions"),
                             ctx: Load,
                         },
@@ -384,11 +384,11 @@ Module(
             If(
                 StmtIf {
                     node_index: NodeIndex(None),
-                    range: 768..811,
+                    range: 734..793,
                     test: BooleanLiteral(
                         ExprBooleanLiteral {
                             node_index: NodeIndex(None),
-                            range: 771..775,
+                            range: 737..741,
                             value: true,
                         },
                     ),
@@ -396,11 +396,11 @@ Module(
                         Expr(
                             StmtExpr {
                                 node_index: NodeIndex(None),
-                                range: 781..793,
+                                range: 747..759,
                                 value: Name(
                                     ExprName {
                                         node_index: NodeIndex(None),
-                                        range: 781..793,
+                                        range: 747..759,
                                         id: Name("before_error"),
                                         ctx: Load,
                                     },
@@ -410,25 +410,39 @@ Module(
                         Expr(
                             StmtExpr {
                                 node_index: NodeIndex(None),
-                                range: 802..811,
+                                range: 768..777,
                                 value: Call(
                                     ExprCall {
                                         node_index: NodeIndex(None),
-                                        range: 802..811,
+                                        range: 768..777,
                                         func: Name(
                                             ExprName {
                                                 node_index: NodeIndex(None),
-                                                range: 802..808,
+                                                range: 768..774,
                                                 id: Name("broken"),
                                                 ctx: Load,
                                             },
                                         ),
                                         arguments: Arguments {
-                                            range: 808..811,
+                                            range: 774..777,
                                             node_index: NodeIndex(None),
                                             args: [],
                                             keywords: [],
                                         },
+                                    },
+                                ),
+                            },
+                        ),
+                        Expr(
+                            StmtExpr {
+                                node_index: NodeIndex(None),
+                                range: 782..793,
+                                value: Name(
+                                    ExprName {
+                                        node_index: NodeIndex(None),
+                                        range: 782..793,
+                                        id: Name("after_error"),
+                                        ctx: Load,
                                     },
                                 ),
                             },
@@ -440,25 +454,11 @@ Module(
             Expr(
                 StmtExpr {
                     node_index: NodeIndex(None),
-                    range: 816..827,
+                    range: 795..808,
                     value: Name(
                         ExprName {
                             node_index: NodeIndex(None),
-                            range: 816..827,
-                            id: Name("after_error"),
-                            ctx: Load,
-                        },
-                    ),
-                },
-            ),
-            Expr(
-                StmtExpr {
-                    node_index: NodeIndex(None),
-                    range: 829..842,
-                    value: Name(
-                        ExprName {
-                            node_index: NodeIndex(None),
-                            range: 829..842,
+                            range: 795..808,
                             id: Name("outside_error"),
                             ctx: Load,
                         },
@@ -468,11 +468,11 @@ Module(
             If(
                 StmtIf {
                     node_index: NodeIndex(None),
-                    range: 897..938,
+                    range: 863..904,
                     test: BooleanLiteral(
                         ExprBooleanLiteral {
                             node_index: NodeIndex(None),
-                            range: 900..904,
+                            range: 866..870,
                             value: true,
                         },
                     ),
@@ -480,11 +480,11 @@ Module(
                         Expr(
                             StmtExpr {
                                 node_index: NodeIndex(None),
-                                range: 910..920,
+                                range: 876..886,
                                 value: Name(
                                     ExprName {
                                         node_index: NodeIndex(None),
-                                        range: 910..920,
+                                        range: 876..886,
                                         id: Name("before_eof"),
                                         ctx: Load,
                                     },
@@ -494,11 +494,11 @@ Module(
                         Expr(
                             StmtExpr {
                                 node_index: NodeIndex(None),
-                                range: 929..938,
+                                range: 895..904,
                                 value: Name(
                                     ExprName {
                                         node_index: NodeIndex(None),
-                                        range: 929..938,
+                                        range: 895..904,
                                         id: Name("final_eof"),
                                         ctx: Load,
                                     },
@@ -526,16 +526,6 @@ Module(
 
 
    |
- 6 |     pass
- 7 |
-   | ^ Syntax Error: Expected a statement
- 8 | a = 10
- 9 |
-10 | # Multiple nested unexpected indents.
-   |
-
-
-   |
 11 | if True:
 12 |     before_nested
 13 |         first_nested
@@ -555,42 +545,12 @@ Module(
 
 
    |
-13 |         first_nested
-14 |             second_nested
-15 |     after_nested
-   |     ^ Syntax Error: Expected a statement
-16 |
-17 | outside_nested
-   |
-
-
-   |
-15 |     after_nested
-16 |
-   | ^ Syntax Error: Expected a statement
-17 | outside_nested
-18 |
-19 | # A valid compound statement inside recovered indentation.
-   |
-
-
-   |
 20 | if True:
 21 |     before_compound
 22 |         if condition:
    | ^^^^^^^^ Syntax Error: Unexpected indentation
 23 |             nested_compound
 24 |         recovered_compound
-   |
-
-
-   |
-25 |     after_compound
-26 |
-   | ^ Syntax Error: Expected a statement
-27 | outside_compound
-28 |
-29 | # Multiple independent unexpected-indent regions in the same body.
    |
 
 
@@ -614,26 +574,6 @@ Module(
 
 
    |
-33 |     middle_region
-34 |         second_region
-35 |     after_region
-   |     ^ Syntax Error: Expected a statement
-36 |
-37 | outside_regions
-   |
-
-
-   |
-35 |     after_region
-36 |
-   | ^ Syntax Error: Expected a statement
-37 | outside_regions
-38 |
-39 | # An independent syntax error inside recovered indentation stays visible.
-   |
-
-
-   |
 40 | if True:
 41 |     before_error
 42 |         broken(,)
@@ -652,25 +592,8 @@ Module(
 
 
    |
-43 |     after_error
-44 |
-   | ^ Syntax Error: Expected a statement
-45 | outside_error
-46 |
-47 | # Outstanding unexpected indents are flushed at EOF.
-   |
-
-
-   |
 48 | if True:
 49 |     before_eof
 50 |         final_eof
    | ^^^^^^^^ Syntax Error: Unexpected indentation
-   |
-
-
-   |
-49 |     before_eof
-50 |         final_eof
-   |                  ^ Syntax Error: Expected a statement
    |

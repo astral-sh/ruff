@@ -17,16 +17,6 @@ invalid-syntax: Unexpected indentation
 2 |     multiline string with tab in it'''
   |
 
-invalid-syntax: Expected a statement
- --> W19.py:5:1
-  |
-4 | #: W191
-5 | if False:
-  | ^
-6 |     print  # indented with 1 tab
-7 | #:
-  |
-
 W191 Indentation contains tabs
  --> W19.py:6:1
   |

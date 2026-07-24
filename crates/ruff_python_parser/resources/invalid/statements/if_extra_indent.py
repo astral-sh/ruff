@@ -1,4 +1,4 @@
-# Improving the recovery would require changing the lexer to emit an extra dedent token after `a + b`.
+# On invalid indentation, recover as if the indentation wasn't there
 if True:
     pass
         a + b

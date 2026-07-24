@@ -33,7 +33,6 @@ position. The parser could do a better job in recovering from these errors.
 # error: [invalid-syntax]
 def foo[**P: int]() -> None:
     # error: [invalid-syntax]
-    # error: [invalid-syntax]
     pass
 ```
 
