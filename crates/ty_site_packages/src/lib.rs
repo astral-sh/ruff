@@ -685,7 +685,7 @@ impl PythonBuildVariant {
 #[derive(Debug)]
 pub struct VirtualEnvironment {
     root_path: SysPrefixPath,
-    base_executable_home_path: PythonHomePath,
+    base_executable_home_path: Option<PythonHomePath>,
     include_system_site_packages: bool,
 
     /// The version of the Python executable that was used to create this virtual environment.
@@ -746,10 +746,9 @@ impl VirtualEnvironment {
             parent_environment,
         } = parsed_pyvenv_cfg;
 
-        // The `home` key is read by the standard library's `site.py` module,
-        // so if it's missing from the `pyvenv.cfg` file
-        // (or the provided value is invalid),
-        // it's reasonable to consider the virtual environment irredeemably broken.
+        // The `home` key is read by the standard library's `site.py` module, so a missing
+        // key indicates an irredeemably broken virtual environment. An unresolvable value
+        // can still be tolerated when the base interpreter is not needed.
         let Some(base_executable_home_path) = base_executable_home_path else {
             return Err(SitePackagesDiscoveryError::PyvenvCfgParseError(
                 pyvenv_cfg_path,
@@ -757,13 +756,24 @@ impl VirtualEnvironment {
             ));
         };
 
-        let base_executable_home_path = PythonHomePath::new(base_executable_home_path, system)
-            .map_err(|io_err| {
-                SitePackagesDiscoveryError::PyvenvCfgParseError(
+        let base_executable_home_path = match PythonHomePath::new(base_executable_home_path, system)
+        {
+            Ok(home_path) => Some(home_path),
+            Err(io_err) if !include_system_site_packages => {
+                tracing::warn!(
+                    "Failed to resolve the `home` value in the `pyvenv.cfg` file at \
+                     `{pyvenv_cfg_path}`. System site-packages and the system stdlib will not be \
+                     used for module resolution. Underlying error: {io_err}"
+                );
+                None
+            }
+            Err(io_err) => {
+                return Err(SitePackagesDiscoveryError::PyvenvCfgParseError(
                     pyvenv_cfg_path.clone(),
                     PyvenvCfgParseErrorKind::InvalidHomeValue(io_err),
-                )
-            })?;
+                ));
+            }
+        };
 
         // Since the `extends-environment` key is nonstandard,
         // for now we only trust it if the virtual environment was created with `uv`.
@@ -853,8 +863,9 @@ impl VirtualEnvironment {
         }
 
         if *include_system_site_packages {
-            let system_sys_prefix =
-                SysPrefixPath::from_executable_home_path(base_executable_home_path);
+            let system_sys_prefix = base_executable_home_path
+                .as_ref()
+                .and_then(SysPrefixPath::from_executable_home_path);
 
             // If we fail to resolve the `sys.prefix` path from the base executable home path,
             // or if we fail to resolve the `site-packages` from the `sys.prefix` path,
@@ -909,8 +920,9 @@ System site-packages will not be used for module resolution.",
         // of the dir we're looking for.
         let version = version.as_ref().map(|v| v.version);
         let layout = PythonInterpreterLayout::unknown(*implementation, version);
-        if let Some(system_sys_prefix) =
-            SysPrefixPath::from_executable_home_path_real(system, base_executable_home_path)
+        if let Some(system_sys_prefix) = base_executable_home_path
+            .as_ref()
+            .and_then(|home_path| SysPrefixPath::from_executable_home_path_real(system, home_path))
         {
             let real_stdlib_directory =
                 real_stdlib_directory_from_sys_prefix(&system_sys_prefix, layout, system);
@@ -2467,7 +2479,10 @@ mod tests {
             } else {
                 SystemPathBuf::from(&*format!("/Python3.{}/bin", self.minor_version))
             };
-            assert_eq!(venv.base_executable_home_path, expected_home);
+            assert_eq!(
+                venv.base_executable_home_path.as_deref(),
+                Some(&*expected_home)
+            );
 
             let site_packages_directories = venv.site_packages_directories(&self.system).unwrap();
             let expected_venv_site_packages = if cfg!(target_os = "windows") {
@@ -2972,15 +2987,47 @@ mod tests {
     }
 
     #[test]
-    fn parsing_pyvenv_cfg_with_invalid_home_key_fails() {
+    fn unresolved_pyvenv_cfg_home_is_nonfatal_without_system_site_packages() {
         let system = TestSystem::default();
         let memory_fs = system.memory_file_system();
         let pyvenv_cfg_path = SystemPathBuf::from("/.venv/pyvenv.cfg");
         memory_fs
             .write_file_all(&pyvenv_cfg_path, "home = foo")
             .unwrap();
+        let site_packages = if cfg!(target_os = "windows") {
+            SystemPathBuf::from(r"\.venv\Lib\site-packages")
+        } else {
+            SystemPathBuf::from("/.venv/lib/python3.13/site-packages")
+        };
+        memory_fs.create_directory_all(&site_packages).unwrap();
+
+        let venv = PythonEnvironment::new("/.venv", SysPrefixPathOrigin::VirtualEnvVar, &system)
+            .unwrap()
+            .expect_venv();
+
+        assert_eq!(venv.base_executable_home_path, None);
+        let expected = [site_packages];
+        assert_eq!(
+            venv.site_packages_directories(&system).unwrap(),
+            &expected[..]
+        );
+    }
+
+    #[test]
+    fn unresolved_pyvenv_cfg_home_with_system_site_packages_fails() {
+        let system = TestSystem::default();
+        let memory_fs = system.memory_file_system();
+        let pyvenv_cfg_path = SystemPathBuf::from("/.venv/pyvenv.cfg");
+        memory_fs
+            .write_file_all(
+                &pyvenv_cfg_path,
+                "home = foo\ninclude-system-site-packages = true",
+            )
+            .unwrap();
+
         let venv_result =
             PythonEnvironment::new("/.venv", SysPrefixPathOrigin::VirtualEnvVar, &system);
+
         assert!(matches!(
             venv_result,
             Err(SitePackagesDiscoveryError::PyvenvCfgParseError(
