@@ -91,6 +91,52 @@ fn reflected_method_priority<'db>(
 }
 
 impl<'db> Type<'db> {
+    /// Return the result of dispatching a rich comparison method between two operands.
+    ///
+    /// A strict subclass on the right takes precedence over the normal method on the left.
+    /// The caller remains responsible for operator-specific fallbacks such as identity-based
+    /// equality when neither comparison method is available.
+    pub(super) fn try_call_rich_comparison_dunder(
+        db: &'db dyn Db,
+        left: Type<'db>,
+        right: Type<'db>,
+        dunder: &'static str,
+        reflected_dunder: &'static str,
+        policy: MemberLookupPolicy,
+    ) -> Option<Type<'db>> {
+        let call_dunder = |name, receiver: Type<'db>, argument: Type<'db>| {
+            receiver
+                .try_call_dunder_with_policy(
+                    db,
+                    name,
+                    &mut CallArguments::positional([argument]),
+                    TypeContext::default(),
+                    policy,
+                )
+                .map(|outcome| outcome.return_type(db))
+                .ok()
+        };
+
+        match reflected_method_priority(db, left, right) {
+            ReflectedMethodPriority::Never => call_dunder(dunder, left, right)
+                .or_else(|| call_dunder(reflected_dunder, right, left)),
+            ReflectedMethodPriority::Possibly => {
+                match (
+                    call_dunder(dunder, left, right),
+                    call_dunder(reflected_dunder, right, left),
+                ) {
+                    (Some(normal), Some(reflected)) => {
+                        Some(UnionType::from_two_elements(db, normal, reflected))
+                    }
+                    (Some(result), None) | (None, Some(result)) => Some(result),
+                    (None, None) => None,
+                }
+            }
+            ReflectedMethodPriority::Definitely => call_dunder(reflected_dunder, right, left)
+                .or_else(|| call_dunder(dunder, left, right)),
+        }
+    }
+
     /// Memoize the pure return-type part of binary dunder resolution so repeated identical
     /// expressions don't re-run overload selection at every call site.
     pub(crate) fn try_call_bin_op_return_type(
