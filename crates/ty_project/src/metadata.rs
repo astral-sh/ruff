@@ -46,8 +46,9 @@ pub struct ProjectMetadata {
     /// the file specified by [`Self::config_file_override`] if it is `Some` (e.g. when using `--config-file <path>`).
     pub(super) options: Options,
 
-    /// Options derived from the uv workspace, with higher precedence than project and user-level
-    /// configuration.
+    /// The Python version and interpreter path derived from uv workspace metadata.
+    ///
+    /// These options have higher precedence than project and user-level configuration.
     #[cfg_attr(test, serde(skip_serializing_if = "Option::is_none"))]
     uv_workspace_options: Option<Box<Options>>,
 
@@ -193,10 +194,17 @@ impl ProjectMetadata {
     ) -> Result<ProjectMetadata, ProjectMetadataError> {
         let uv_workspace = if matches!(system.env_var(EnvVars::TY_UV).as_deref(), Ok("1" | "true"))
         {
-            uv::UvWorkspace::discover(path, system)
+            match uv::UvWorkspace::discover(path, system) {
+                Ok(workspace) => Some(workspace),
+                Err(error) => {
+                    tracing::warn!("{error}");
+                    None
+                }
+            }
         } else {
             None
         };
+
         Self::discover_with_uv_workspace(path, system, uv_workspace)
     }
 
@@ -221,117 +229,49 @@ impl ProjectMetadata {
 
         let mut closest_project: Option<ProjectMetadata> = None;
         let mut uv_project: Option<ProjectMetadata> = None;
-        let uv_workspace_root = uv_workspace
-            .as_ref()
-            .map(|workspace| workspace.root().to_path_buf());
+        let uv_workspace_root = uv_workspace.as_ref().map(uv::UvWorkspace::root);
 
-        // Workspace members can live outside the workspace directory, for example when uv's
-        // members include `../external-package`. Include that root explicitly because walking
-        // the member's ancestors alone cannot discover its workspace configuration.
-        let external_uv_workspace_root = uv_workspace_root
-            .as_deref()
-            .filter(|root| !path.starts_with(root));
-
-        for project_root in path.ancestors().chain(external_uv_workspace_root) {
-            let is_uv_workspace_root = uv_workspace_root.as_deref() == Some(project_root);
-            let pyproject_path = project_root.join("pyproject.toml");
-
-            let pyproject = if let Ok(pyproject_str) = system.read_to_string(&pyproject_path) {
-                match PyProject::from_toml_str(
-                    &pyproject_str,
-                    ValueSource::File(Arc::new(pyproject_path.clone())),
-                ) {
-                    Ok(pyproject) => Some(pyproject),
-                    Err(error) => {
-                        return Err(ProjectMetadataError::InvalidPyProject {
-                            path: pyproject_path,
-                            source: Box::new(error),
-                        });
-                    }
+        for project_root in path.ancestors() {
+            let is_uv_workspace_root = uv_workspace_root == Some(project_root);
+            let Some((metadata, has_ty_configuration)) = Self::discover_in(project_root, system)?
+            else {
+                if is_uv_workspace_root {
+                    uv_project = Some(Self::new(
+                        project_root.file_name().unwrap_or("root"),
+                        project_root.to_path_buf(),
+                    ));
                 }
-            } else {
-                None
+                continue;
             };
 
-            // A `ty.toml` takes precedence over a `pyproject.toml`.
-            let ty_toml_path = project_root.join("ty.toml");
-            if let Ok(ty_str) = system.read_to_string(&ty_toml_path) {
-                let options = match Options::from_toml_str(
-                    &ty_str,
-                    ValueSource::File(Arc::new(ty_toml_path.clone())),
-                ) {
-                    Ok(options) => options,
-                    Err(error) => {
-                        return Err(ProjectMetadataError::InvalidTyToml {
-                            path: ty_toml_path,
-                            source: Box::new(error),
-                        });
-                    }
-                };
-
-                if pyproject
-                    .as_ref()
-                    .is_some_and(|project| project.ty().is_some())
-                {
-                    // TODO: Consider using a diagnostic here
-                    tracing::warn!(
-                        "Ignoring the `tool.ty` section in `{pyproject_path}` because `{ty_toml_path}` takes precedence."
-                    );
-                }
-
+            if has_ty_configuration {
                 tracing::debug!("Found project at '{}'", project_root);
-
-                let metadata = ProjectMetadata::from_options(
-                    options,
-                    project_root.to_path_buf(),
-                    pyproject
-                        .as_ref()
-                        .and_then(|pyproject| pyproject.project.as_ref()),
-                    &FallibleStrategy,
-                )
-                .map_err(|err| {
-                    ProjectMetadataError::InvalidRequiresPythonConstraint {
-                        source: err,
-                        path: pyproject_path,
-                    }
-                })?;
-
                 return Ok(metadata.with_uv_workspace(uv_workspace));
             }
 
-            if let Some(pyproject) = pyproject {
-                let has_ty_section = pyproject.ty().is_some();
-                let metadata =
-                    ProjectMetadata::from_pyproject(pyproject, project_root.to_path_buf())
-                        .map_err(
-                            |err| ProjectMetadataError::InvalidRequiresPythonConstraint {
-                                source: err,
-                                path: pyproject_path,
-                            },
-                        )?;
-
-                if has_ty_section {
-                    tracing::debug!("Found project at '{}'", project_root);
-
-                    return Ok(metadata.with_uv_workspace(uv_workspace));
-                }
-
-                if is_uv_workspace_root {
-                    uv_project = Some(metadata);
-                } else if closest_project.is_none() {
-                    // Not a project itself, keep looking for an enclosing project.
-                    closest_project = Some(metadata);
-                }
-            } else if is_uv_workspace_root {
-                uv_project = Some(Self::new(
-                    project_root.file_name().unwrap_or("root"),
-                    project_root.to_path_buf(),
-                ));
+            if is_uv_workspace_root {
+                uv_project = Some(metadata);
+            } else if closest_project.is_none() {
+                closest_project = Some(metadata);
             }
         }
 
-        // No explicitly configured project was found. Prefer the uv workspace over the closest
-        // plain `pyproject.toml`, if available.
+        // Workspace members can live outside the workspace directory, so their ancestor chain may
+        // never include the workspace root.
+        if let Some(workspace_root) = uv_workspace_root
+            && !path.starts_with(workspace_root)
+        {
+            let metadata = Self::discover_in(workspace_root, system)?
+                .map(|(metadata, _)| metadata)
+                .unwrap_or_else(|| {
+                    Self::new(
+                        workspace_root.file_name().unwrap_or("root"),
+                        workspace_root.to_path_buf(),
+                    )
+                });
+            uv_project = Some(metadata);
+        }
+
         let metadata = if let Some(uv_project) = uv_project {
             tracing::debug!("Using uv workspace at '{}'", uv_project.root());
 
@@ -353,6 +293,89 @@ impl ProjectMetadata {
         };
 
         Ok(metadata.with_uv_workspace(uv_workspace))
+    }
+
+    fn discover_in(
+        project_root: &SystemPath,
+        system: &dyn System,
+    ) -> Result<Option<(ProjectMetadata, bool)>, ProjectMetadataError> {
+        let pyproject_path = project_root.join("pyproject.toml");
+
+        let pyproject = if let Ok(pyproject_str) = system.read_to_string(&pyproject_path) {
+            match PyProject::from_toml_str(
+                &pyproject_str,
+                ValueSource::File(Arc::new(pyproject_path.clone())),
+            ) {
+                Ok(pyproject) => Some(pyproject),
+                Err(error) => {
+                    return Err(ProjectMetadataError::InvalidPyProject {
+                        path: pyproject_path,
+                        source: Box::new(error),
+                    });
+                }
+            }
+        } else {
+            None
+        };
+
+        // A `ty.toml` takes precedence over a `pyproject.toml`.
+        let ty_toml_path = project_root.join("ty.toml");
+        if let Ok(ty_str) = system.read_to_string(&ty_toml_path) {
+            let options = match Options::from_toml_str(
+                &ty_str,
+                ValueSource::File(Arc::new(ty_toml_path.clone())),
+            ) {
+                Ok(options) => options,
+                Err(error) => {
+                    return Err(ProjectMetadataError::InvalidTyToml {
+                        path: ty_toml_path,
+                        source: Box::new(error),
+                    });
+                }
+            };
+
+            if pyproject
+                .as_ref()
+                .is_some_and(|project| project.ty().is_some())
+            {
+                // TODO: Consider using a diagnostic here
+                tracing::warn!(
+                    "Ignoring the `tool.ty` section in `{pyproject_path}` because `{ty_toml_path}` takes precedence."
+                );
+            }
+
+            let metadata = ProjectMetadata::from_options(
+                options,
+                project_root.to_path_buf(),
+                pyproject
+                    .as_ref()
+                    .and_then(|pyproject| pyproject.project.as_ref()),
+                &FallibleStrategy,
+            )
+            .map_err(|source| {
+                ProjectMetadataError::InvalidRequiresPythonConstraint {
+                    source,
+                    path: pyproject_path,
+                }
+            })?;
+
+            return Ok(Some((metadata, true)));
+        }
+
+        let Some(pyproject) = pyproject else {
+            return Ok(None);
+        };
+
+        let has_ty_configuration = pyproject.ty().is_some();
+        let metadata = ProjectMetadata::from_pyproject(pyproject, project_root.to_path_buf())
+            .map_err(
+                |source| ProjectMetadataError::InvalidRequiresPythonConstraint {
+                    source,
+                    path: pyproject_path,
+                },
+            )?;
+
+        Ok(Some((metadata, has_ty_configuration)))
     }
 
     #[must_use]

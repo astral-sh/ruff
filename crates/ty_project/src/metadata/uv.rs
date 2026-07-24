@@ -2,7 +2,6 @@ use std::path::PathBuf;
 
 use pep440_rs::Version;
 use ruff_db::system::{System, SystemPath, SystemPathBuf};
-use ruff_python_ast::PythonVersion;
 use ruff_ranged_value::{RangedValue, ValueSource};
 use serde::Deserialize;
 use thiserror::Error;
@@ -18,41 +17,32 @@ pub(super) struct UvWorkspace {
 }
 
 impl UvWorkspace {
-    pub(super) fn discover(path: &SystemPath, system: &dyn System) -> Option<Self> {
+    pub(super) fn discover(
+        path: &SystemPath,
+        system: &dyn System,
+    ) -> Result<Self, UvWorkspaceError> {
         let uv = system
             .env_var(EnvVars::UV)
             .unwrap_or_else(|_| "uv".to_string());
 
         // `uv check` has already selected and synchronized the environment. Keep this query
         // read-only so package selection and `--isolated` aren't overwritten by a second sync.
-        let output = match system.run_command(
-            &uv,
-            &["workspace", "metadata", "--frozen", "--active"],
-            path,
-        ) {
-            Ok(output) => output,
-            Err(error) => {
-                tracing::debug!("Failed to invoke `uv workspace metadata`: {error}");
-                return None;
-            }
-        };
+        let output = system
+            .run_command(
+                &uv,
+                &["workspace", "metadata", "--frozen", "--active"],
+                path,
+            )
+            .map_err(UvWorkspaceError::Invocation)?;
 
         if !output.status.success() {
-            tracing::debug!(
-                "`uv workspace metadata` failed with status {}: {}",
-                output.status,
-                String::from_utf8_lossy(&output.stderr)
-            );
-            return None;
+            return Err(UvWorkspaceError::CommandFailed {
+                status: output.status,
+                stderr: String::from_utf8_lossy(&output.stderr).into_owned(),
+            });
         }
 
-        match Self::from_metadata(&output.stdout, system) {
-            Ok(workspace) => Some(workspace),
-            Err(error) => {
-                tracing::debug!("Failed to use `uv workspace metadata` output: {error}");
-                None
-            }
-        }
+        Self::from_metadata(&output.stdout, system)
     }
 
     pub(super) fn from_metadata(
@@ -99,22 +89,12 @@ impl UvWorkspace {
 fn resolve_python_version(
     version: &Version,
 ) -> Result<RangedValue<SupportedPythonVersion>, UvWorkspaceError> {
-    let mut release = version.release().iter().copied();
-    let Some(major) = release.next() else {
+    let [major, minor, ..] = version.release() else {
         return Err(UvWorkspaceError::InvalidPythonVersion(version.clone()));
     };
-    let Some(minor) = release.next() else {
-        return Err(UvWorkspaceError::InvalidPythonVersion(version.clone()));
-    };
-    let Ok(major) = u8::try_from(major) else {
-        return Err(UvWorkspaceError::InvalidPythonVersion(version.clone()));
-    };
-    let Ok(minor) = u8::try_from(minor) else {
-        return Err(UvWorkspaceError::InvalidPythonVersion(version.clone()));
-    };
-    let Ok(version) = SupportedPythonVersion::try_from(PythonVersion::from((major, minor))) else {
-        return Err(UvWorkspaceError::InvalidPythonVersion(version.clone()));
-    };
+    let version = format!("{major}.{minor}")
+        .parse::<SupportedPythonVersion>()
+        .map_err(|_| UvWorkspaceError::InvalidPythonVersion(version.clone()))?;
 
     Ok(RangedValue::new(version, ValueSource::UvWorkspace))
 }
@@ -138,6 +118,15 @@ fn existing_directory(
 
 #[derive(Debug, Error)]
 pub(super) enum UvWorkspaceError {
+    #[error("Failed to invoke `uv workspace metadata`: {0}")]
+    Invocation(#[source] std::io::Error),
+
+    #[error("`uv workspace metadata` failed with status {status}: {stderr}")]
+    CommandFailed {
+        status: std::process::ExitStatus,
+        stderr: String,
+    },
+
     #[error("invalid `uv workspace metadata` JSON: {0}")]
     InvalidMetadata(serde_json::Error),
 
