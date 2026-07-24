@@ -628,11 +628,11 @@ E = TypeVar("E", Literal[ReflexiveEnum.A], Literal[ReflexiveEnum.B])
 
 def reflexive_enum_literal_slot(x: Literal[ReflexiveEnum.A] | None, value: Literal[ReflexiveEnum.A]) -> None:
     if x not in (value,):
-        reveal_type(x)  # revealed: None
+        reveal_type(x)  # revealed: Never
 
 def reflexive_enum_typevar_slot(x: E | None, value: E) -> None:
     if x not in (value,):
-        reveal_type(x)  # revealed: None
+        reveal_type(x)  # revealed: Never
 
 def tuple_with_any_slot(x: str | None, missing: Any) -> None:
     if x not in (missing, None):

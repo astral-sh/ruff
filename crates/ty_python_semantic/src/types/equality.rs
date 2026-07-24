@@ -12,6 +12,7 @@ use super::{
     CallArguments, EnumLiteralType, IntersectionBuilder, KnownBoundMethodType, KnownClass,
     LiteralValueType, LiteralValueTypeKind, MemberLookupPolicy, Truthiness, Type, TypeContext,
     TypeVarBoundOrConstraints, UnionBuilder,
+    bool::BoolError,
     enums::{enum_member_literals, enum_metadata},
 };
 
@@ -293,14 +294,29 @@ impl<'db> TupleEqualityEvaluator<'db> {
         &mut self,
         left: Type<'db>,
         right: Type<'db>,
-        inferred_truthiness: Truthiness,
-    ) -> Truthiness {
-        // Identity can turn a false equality result true, but cannot turn a true result false.
-        if inferred_truthiness == Truthiness::AlwaysTrue {
-            return Truthiness::AlwaysTrue;
+    ) -> Result<Truthiness, BoolError<'db>> {
+        let db = self.evaluator.db;
+        let truthiness = evaluate_tuple_element_equality(&mut self.evaluator, left, right);
+        if !truthiness.is_ambiguous() {
+            return Ok(truthiness);
         }
 
-        evaluate_tuple_element_equality(&mut self.evaluator, left, right)
+        let Some(result) = Type::try_call_rich_comparison_dunder(
+            db,
+            left,
+            right,
+            "__eq__",
+            "__eq__",
+            MemberLookupPolicy::default(),
+        ) else {
+            return Ok(Truthiness::Ambiguous);
+        };
+
+        // Identity can turn a false equality result true, but cannot turn a true result false.
+        Ok(match result.try_bool(db)? {
+            Truthiness::AlwaysTrue => Truthiness::AlwaysTrue,
+            Truthiness::AlwaysFalse | Truthiness::Ambiguous => Truthiness::Ambiguous,
+        })
     }
 }
 

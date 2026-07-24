@@ -324,6 +324,96 @@ def _(n: int):
     reveal_type(a not in d)  # revealed: bool
 ```
 
+Membership in a fixed-length tuple compares each element with the needle, regardless of whether the
+needle is itself a tuple:
+
+```py
+from typing import Literal
+
+def scalar_membership(value: int, values: tuple[Literal[1], Literal[2]]):
+    reveal_type(1 in values)  # revealed: Literal[True]
+    reveal_type(3 in values)  # revealed: Literal[False]
+    reveal_type(value in values)  # revealed: bool
+
+    reveal_type(1 not in values)  # revealed: Literal[False]
+    reveal_type(3 not in values)  # revealed: Literal[True]
+    reveal_type(value not in values)  # revealed: bool
+
+def empty_tuple(value: object, values: tuple[()]):
+    reveal_type(value in values)  # revealed: Literal[False]
+    reveal_type(value not in values)  # revealed: Literal[True]
+```
+
+A variable-length tuple might be empty, even if all its possible elements would compare equal to the
+needle:
+
+```py
+from typing import Literal
+
+def variable_length(
+    nested: tuple[tuple[()], ...],
+    values: tuple[Literal[1], ...],
+):
+    reveal_type(() in nested)  # revealed: bool
+    reveal_type(() not in nested)  # revealed: bool
+
+    reveal_type(1 in values)  # revealed: bool
+    reveal_type(1 not in values)  # revealed: bool
+```
+
+Tuple membership checks whether the needle is the same object as an element before comparing the
+objects for equality. A non-reflexive equality method therefore cannot establish that membership is
+always false:
+
+```py
+from typing import Literal
+
+class NeverEqual:
+    def __eq__(self, other: object) -> Literal[False]:
+        return False
+
+class AlwaysEqual:
+    def __eq__(self, other: object) -> Literal[True]:
+        return True
+
+def identity_before_equality(value: NeverEqual):
+    reveal_type(value == value)  # revealed: Literal[False]
+    reveal_type(value in (value,))  # revealed: bool
+    reveal_type(value not in (value,))  # revealed: bool
+
+def custom_equality(value: AlwaysEqual):
+    reveal_type(value in (1,))  # revealed: bool
+    reveal_type(value not in (1,))  # revealed: bool
+    reveal_type((value,) == (1,))  # revealed: Literal[True]
+    reveal_type((value,) != (1,))  # revealed: Literal[False]
+
+def custom_equality_union(value: AlwaysEqual | None):
+    reveal_type(value in (1,))  # revealed: bool
+    reveal_type(value not in (1,))  # revealed: bool
+
+def custom_equality_union_member(value: AlwaysEqual | None, member: AlwaysEqual):
+    reveal_type(value.__eq__(member))  # revealed: bool
+    reveal_type(member.__eq__(value))  # revealed: Literal[True]
+    reveal_type(value in (member,))  # revealed: Literal[True]
+    reveal_type(value not in (member,))  # revealed: Literal[False]
+    reveal_type((value,) == (member,))  # revealed: bool
+    reveal_type((value,) != (member,))  # revealed: bool
+
+class Base:
+    def __eq__(self, other: object) -> bool:
+        return False
+
+class AlwaysEqualChild(Base):
+    def __eq__(self, other: object) -> Literal[True]:
+        return True
+
+def reflected_custom_equality(value: Base, child: AlwaysEqualChild):
+    reveal_type(value == child)  # revealed: bool
+    reveal_type(child == value)  # revealed: Literal[True]
+    reveal_type(value in (child,))  # revealed: Literal[True]
+    reveal_type(value not in (child,))  # revealed: Literal[False]
+```
+
 ### Identity Comparisons
 
 "Identity Comparisons" refers to `is` and `is not`.
