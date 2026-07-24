@@ -1,8 +1,8 @@
 use super::*;
-use crate::SemanticEnvironment;
 use crate::db::tests::{TestDbBuilder, setup_db};
 use crate::place::{typing_extensions_symbol, typing_symbol};
 use crate::types::type_alias::PEP695TypeAliasType;
+use crate::{SemanticEnvironment, SemanticTestDb as _};
 use ruff_db::system::DbWithWritableSystem as _;
 use ruff_python_ast as ast;
 use ruff_python_ast::PythonVersion;
@@ -69,7 +69,7 @@ fn oscillating_generic_alias_cycle_recover<'db>(
     cycle: &salsa::Cycle,
     previous: &Type<'db>,
     current: Type<'db>,
-    program: Program,
+    program: Program<'db>,
 ) -> Type<'db> {
     let env = SemanticEnvironment::from_program(db, program);
     current.cycle_normalized(&env, *previous, cycle)
@@ -80,7 +80,7 @@ fn oscillating_generic_alias_cycle_recover<'db>(
     cycle_initial=|_, id, _| Type::divergent(id),
     cycle_fn=oscillating_generic_alias_cycle_recover,
 )]
-fn oscillating_generic_alias(db: &dyn Db, program: Program) -> Type<'_> {
+fn oscillating_generic_alias<'db>(db: &'db dyn Db, program: Program<'db>) -> Type<'db> {
     let env = SemanticEnvironment::from_program(db, program);
     let previous = oscillating_generic_alias(db, program);
     let argument = if let Type::GenericAlias(alias) = previous

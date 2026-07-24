@@ -15,11 +15,11 @@ use std::borrow::Cow;
 use std::sync::Arc;
 use tempfile::TempDir;
 use ty_module_resolver::ModuleGlobSetBuilder;
-use ty_python_core::program::{Program, ProgramSettings};
+use ty_python_core::program::ProgramSettings;
 use ty_python_core::{Db as _, ProgramFile};
 use ty_python_semantic::lint::{LintRegistry, RuleSelection};
 use ty_python_semantic::{
-    AnalysisSettings, Db as SemanticDb, check_file_unwrap, default_lint_registry,
+    AnalysisSettings, Db as SemanticDb, SemanticTestDb, check_file_unwrap, default_lint_registry,
 };
 
 #[salsa::db]
@@ -30,11 +30,12 @@ pub(crate) struct Db {
     system: MdtestSystem,
     vendored: VendoredFileSystem,
     settings: Option<Settings>,
-    program: Option<Program>,
 }
 
 impl Db {
     pub(crate) fn setup() -> Self {
+        let vendored = ty_vendored::file_system().clone();
+        let program_settings = ProgramSettings::empty(&vendored);
         let mut db = Self {
             system: MdtestSystem::in_memory(),
             storage: salsa::Storage::new(Some(Box::new({
@@ -42,17 +43,12 @@ impl Db {
                     tracing::trace!("event: {:?}", event);
                 }
             }))),
-            vendored: ty_vendored::file_system().clone(),
+            vendored,
             files: Files::default(),
             settings: None,
-            program: None,
         };
 
-        db.settings = Some(Settings::new(&db));
-        db.program = Some(Program::from_settings(
-            &db,
-            ProgramSettings::empty(db.vendored()),
-        ));
+        db.settings = Some(Settings::new(&db, program_settings));
         db
     }
 
@@ -60,8 +56,12 @@ impl Db {
         self.settings.unwrap()
     }
 
-    pub(crate) fn program(&self) -> Program {
-        self.program.expect("the program should be initialized")
+    pub(crate) fn update_program(&mut self, settings: ProgramSettings) {
+        settings.search_paths.try_register_static_roots(self);
+        let db_settings = self.settings();
+        if db_settings.program(self) != &settings {
+            db_settings.set_program(self).to(settings);
+        }
     }
 
     pub(crate) fn set_verbosity(&mut self, verbose: bool) {
@@ -172,6 +172,13 @@ impl SemanticDb for Db {
 }
 
 #[salsa::db]
+impl SemanticTestDb for Db {
+    fn program_settings(&self) -> &ProgramSettings {
+        self.settings().program(self)
+    }
+}
+
+#[salsa::db]
 impl salsa::Database for Db {}
 
 impl DbWithWritableSystem for Db {
@@ -224,6 +231,8 @@ impl FileSettings {
 
 #[salsa::input(debug)]
 struct Settings {
+    #[returns(ref)]
+    program: ProgramSettings,
     #[default]
     #[returns(ref)]
     analysis: AnalysisSettings,

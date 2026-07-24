@@ -2044,7 +2044,7 @@ struct KnownClassArgument<'db> {
     class: KnownClass,
 
     #[returns(copy)]
-    program: Program,
+    program: Program<'db>,
 }
 
 /// Enumeration of ways in which looking up a [`KnownClass`] in its canonical module could fail.
@@ -2129,10 +2129,10 @@ impl<'db> KnownClassLookupError<'db> {
 mod tests {
     use super::*;
     use crate::db::tests::{TestDbBuilder, setup_db};
-    use crate::{PythonVersionSource, PythonVersionWithSource};
-    use salsa::Setter;
+    use crate::{PythonVersionSource, PythonVersionWithSource, SemanticTestDb as _};
     use strum::IntoEnumIterator;
     use ty_module_resolver::resolve_module_confident;
+    use ty_python_core::program::{Program, ProgramSettings};
 
     #[test]
     fn known_class_roundtrip_from_str() {
@@ -2197,7 +2197,7 @@ mod tests {
 
     #[test]
     fn known_class_doesnt_fallback_to_unknown_unexpectedly_on_low_python_version() {
-        let mut db = setup_db();
+        let db = setup_db();
 
         // First, collect the `KnownClass` variants
         // and sort them according to the version they were added in.
@@ -2227,22 +2227,27 @@ mod tests {
 
         classes.sort_unstable_by_key(|(_, version)| *version);
 
-        let program = db.program();
+        let mut program = db.program();
         let mut current_version = program.python_version(&db);
+        let python_platform = program.python_platform(&db).clone();
+        let search_paths = program.search_paths(&db).clone();
 
         for (class, version_added) in classes {
             if version_added != current_version {
-                program
-                    .set_python_version_with_source(&mut db)
-                    .to(PythonVersionWithSource {
+                let settings = ProgramSettings {
+                    python_version: PythonVersionWithSource {
                         version: version_added,
                         source: PythonVersionSource::default(),
-                    });
+                    },
+                    python_platform: python_platform.clone(),
+                    search_paths: search_paths.clone(),
+                };
+                program = Program::from_settings(&db, settings);
                 current_version = version_added;
             }
 
             // Check the class can be looked up successfully
-            let env = db.semantic_environment();
+            let env = SemanticEnvironment::from_program(&db, program);
             class.try_to_class_literal(&env).unwrap();
 
             // We can't call `KnownClass::Tuple.to_instance()`;

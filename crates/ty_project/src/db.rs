@@ -15,9 +15,7 @@ use ruff_db::system::System;
 use ruff_db::vendored::VendoredFileSystem;
 use salsa::{Database, Event, Setter};
 use ty_python_core::ProgramFile;
-use ty_python_core::program::{
-    FallibleStrategy, MisconfigurationStrategy, Program, UseDefaultStrategy,
-};
+use ty_python_core::program::{FallibleStrategy, MisconfigurationStrategy, UseDefaultStrategy};
 use ty_python_semantic::lint::{LintRegistry, RuleSelection};
 use ty_python_semantic::{AnalysisSettings, Db as SemanticDb};
 
@@ -83,7 +81,7 @@ impl ProjectDatabase {
 
     /// Permanently freezes the most heavily read inputs that are immutable during a one-shot check.
     ///
-    /// This is intentionally not exhaustive. It includes every program input, the most heavily
+    /// This is intentionally not exhaustive. It includes the program, the most heavily
     /// read immutable [`Project`] inputs, and every field on files created after this call. Existing
     /// files retain their durability. This must not be used by incremental consumers or checks that
     /// apply fixes.
@@ -137,12 +135,10 @@ impl ProjectDatabase {
         let (program_settings, program_settings_diagnostics) = strategy
             .to_anyhow(merged_options.to_program_settings(db.system(), db.vendored(), strategy))?;
 
-        // This must be called before `from_settings`, or the `SearchPath` root
+        // This must be called before `from_metadata`, or the `SearchPath` root
         // will take precedence over the `Project` root, resulting in
         // all project files having HIGH durability.
         project_metadata.try_add_project_root(&db);
-
-        let program = Program::from_settings(&db, program_settings);
 
         let (settings, mut settings_diagnostics) = strategy
             .map_err(merged_options.to_settings(&db, strategy), |error| {
@@ -158,7 +154,7 @@ impl ProjectDatabase {
             &db,
             project_metadata,
             settings,
-            program,
+            program_settings,
             settings_diagnostics,
         ));
 
@@ -643,11 +639,10 @@ pub(crate) mod testing {
     use ruff_db::system::{DbWithTestSystem, System, TestSystem};
     use ruff_db::vendored::VendoredFileSystem;
     use ruff_python_ast::PythonVersion;
-    use salsa::Setter;
     use ty_module_resolver::SearchPathSettings;
     use ty_python_core::ProgramFile;
     use ty_python_core::platform::PythonPlatform;
-    use ty_python_core::program::{FallibleStrategy, Program, ProgramSettings};
+    use ty_python_core::program::{FallibleStrategy, ProgramSettings};
     use ty_python_semantic::lint::{LintRegistry, RuleSelection};
     use ty_python_semantic::{AnalysisSettings, PythonVersionWithSource, SemanticEnvironment};
 
@@ -700,28 +695,33 @@ pub(crate) mod testing {
 
             db.files().try_add_root(&db, &root, FileRootKind::Project);
 
-            let program = Program::from_settings(
+            let program_settings = ProgramSettings {
+                python_version: PythonVersionWithSource::default(),
+                python_platform: PythonPlatform::default(),
+                search_paths,
+            };
+            let project = Project::from_metadata(
                 &db,
-                ProgramSettings {
-                    python_version: PythonVersionWithSource::default(),
-                    python_platform: PythonPlatform::default(),
-                    search_paths,
-                },
+                project,
+                settings,
+                program_settings,
+                settings_diagnostics,
             );
-            let project =
-                Project::from_metadata(&db, project, settings, program, settings_diagnostics);
             db.project = Some(project);
             db
         }
 
         pub fn set_python_version(&mut self, python_version: PythonVersion) {
             let program = self.project().program(self);
-            program
-                .set_python_version_with_source(self)
-                .to(PythonVersionWithSource {
+            let settings = ProgramSettings {
+                python_version: PythonVersionWithSource {
                     source: ty_python_semantic::PythonVersionSource::Default,
                     version: python_version,
-                });
+                },
+                python_platform: program.python_platform(self).clone(),
+                search_paths: program.search_paths(self).clone(),
+            };
+            self.project().update_program(self, settings);
         }
     }
 

@@ -16,9 +16,9 @@ use ruff_db::system::{
 use ruff_db::vendored::VendoredFileSystem;
 use ruff_python_parser::{Mode, ParseOptions, parse_unchecked};
 use ty_module_resolver::{Db as ModuleResolverDb, SearchPathSettings};
-use ty_python_core::{Db as _, ProgramFile};
 use ty_python_core::platform::PythonPlatform;
 use ty_python_core::program::{FallibleStrategy, Program, ProgramSettings};
+use ty_python_core::{Db as _, ProgramFile};
 use ty_python_semantic::lint::LintRegistry;
 use ty_python_semantic::types::check_types;
 use ty_python_semantic::{

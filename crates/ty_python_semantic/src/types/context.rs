@@ -46,7 +46,7 @@ impl<'db> SemanticEnvironment<'db> {
     }
 
     /// Creates an environment with an already-established program.
-    pub fn from_program(db: &'db dyn Db, program: Program) -> Self {
+    pub fn from_program(db: &'db dyn Db, program: Program<'db>) -> Self {
         Self {
             db,
             environment: Cell::new(ProgramSource::Program(program.as_id())),
@@ -61,7 +61,7 @@ impl<'db> SemanticEnvironment<'db> {
 
     /// Returns the program used by this operation.
     #[inline]
-    pub fn program(&self) -> Program {
+    pub fn program(&self) -> Program<'db> {
         match self.environment.get() {
             ProgramSource::Program(id) => Program::from_id(id),
             ProgramSource::File(file) => {
@@ -171,7 +171,7 @@ impl<'db, 'ast> InferContext<'db, 'ast> {
     }
 
     #[inline]
-    pub(crate) fn program(&self) -> Program {
+    pub(crate) fn program(&self) -> Program<'db> {
         self.semantic_environment.program()
     }
 

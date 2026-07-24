@@ -1086,7 +1086,7 @@ impl<'db> ProtocolInstanceType<'db> {
         #[salsa::tracked(returns(copy), cycle_initial=|_, _, _, _| true, heap_size=ruff_memory_usage::heap_size)]
         fn is_equivalent_to_object_inner<'db>(
             db: &'db dyn Db,
-            program: Program,
+            program: Program<'db>,
             protocol: ProtocolInstanceType<'db>,
         ) -> bool {
             let env = SemanticEnvironment::from_program(db, program);

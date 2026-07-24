@@ -69,7 +69,7 @@ impl<'db> StatementInner<'db> {
         self.file_scope(db).to_scope_id(db, self.program_file(db))
     }
 
-    pub fn program(self, db: &'db dyn Db) -> Program {
+    pub fn program(self, db: &'db dyn Db) -> Program<'db> {
         self.scope(db).program(db)
     }
 }

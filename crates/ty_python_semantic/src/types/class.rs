@@ -776,7 +776,7 @@ impl<'db> ClassLiteral<'db> {
         }
     }
 
-    pub(crate) fn program(self, db: &'db dyn Db) -> Program {
+    pub(crate) fn program(self, db: &'db dyn Db) -> Program<'db> {
         match self {
             Self::Static(class) => class.program(db),
             Self::Dynamic(class) => class.scope(db).program(db),

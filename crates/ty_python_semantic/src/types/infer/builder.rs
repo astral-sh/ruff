@@ -780,7 +780,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     #[inline]
-    fn program(&self) -> Program {
+    fn program(&self) -> Program<'db> {
         self.context.program()
     }
 

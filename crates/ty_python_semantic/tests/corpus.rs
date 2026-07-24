@@ -1,15 +1,16 @@
 use std::sync::Arc;
 
 use anyhow::{Context, anyhow};
-use ruff_db::Db;
 use ruff_db::files::{File, Files, system_path_to_file};
 use ruff_db::system::{DbWithTestSystem, System, SystemPath, SystemPathBuf, TestSystem};
 use ruff_db::vendored::VendoredFileSystem;
 
-use ty_python_core::program::{Program, ProgramSettings};
+use ty_python_core::program::ProgramSettings;
 use ty_python_semantic::lint::{LintRegistry, RuleSelection};
 use ty_python_semantic::pull_types::pull_types;
-use ty_python_semantic::{AnalysisSettings, check_file_unwrap, default_lint_registry};
+use ty_python_semantic::{
+    AnalysisSettings, SemanticTestDb, check_file_unwrap, default_lint_registry,
+};
 
 use ruff_db::diagnostic::Diagnostic;
 use test_case::test_case;
@@ -182,32 +183,23 @@ pub struct CorpusDb {
     system: TestSystem,
     vendored: VendoredFileSystem,
     analysis_settings: Arc<AnalysisSettings>,
-    program: Option<Program>,
+    program_settings: ProgramSettings,
 }
 
 impl CorpusDb {
     #[expect(clippy::new_without_default)]
     pub fn new() -> Self {
-        let mut db = Self {
+        let vendored = ty_vendored::file_system().clone();
+        let program_settings = ProgramSettings::empty(&vendored);
+        Self {
             storage: salsa::Storage::new(None),
             system: TestSystem::default(),
-            vendored: ty_vendored::file_system().clone(),
+            vendored,
             rule_selection: RuleSelection::from_registry(default_lint_registry()),
             files: Files::default(),
             analysis_settings: Arc::new(AnalysisSettings::default()),
-            program: None,
-        };
-
-        db.program = Some(Program::from_settings(
-            &db,
-            ProgramSettings::empty(db.vendored()),
-        ));
-
-        db
-    }
-
-    fn program(&self) -> Program {
-        self.program.expect("the program should be initialized")
+            program_settings,
+        }
     }
 }
 
@@ -243,6 +235,13 @@ impl ty_module_resolver::Db for CorpusDb {}
 impl ty_python_core::Db for CorpusDb {
     fn should_check_file(&self, file: File) -> bool {
         !file.path(self).is_vendored_path()
+    }
+}
+
+#[salsa::db]
+impl SemanticTestDb for CorpusDb {
+    fn program_settings(&self) -> &ProgramSettings {
+        &self.program_settings
     }
 }
 

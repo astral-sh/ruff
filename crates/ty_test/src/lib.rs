@@ -24,8 +24,8 @@ use ty_python_core::program::{FallibleStrategy, ProgramSettings};
 use ty_python_semantic::pull_types::pull_types;
 use ty_python_semantic::types::UNDEFINED_REVEAL;
 use ty_python_semantic::{
-    Db as _, PythonEnvironment, PythonVersionSource, PythonVersionWithSource, SysPrefixPathOrigin,
-    fix_all_diagnostics,
+    Db as _, PythonEnvironment, PythonVersionSource, PythonVersionWithSource, SemanticTestDb as _,
+    SysPrefixPathOrigin, fix_all_diagnostics,
 };
 
 mod config;
@@ -316,7 +316,7 @@ fn run_test(
         .expect("Failed to resolve search path settings"),
     };
 
-    db.program().update_from_settings(db, settings);
+    db.update_program(settings);
     db.update_analysis_options(configuration.analysis.as_ref());
     db.update_mdtest_rule_selection(configuration.rules.as_ref(), options.default_error_rule);
     db.set_verbosity(test.configuration().verbose());

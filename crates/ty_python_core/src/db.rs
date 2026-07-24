@@ -38,12 +38,14 @@ pub(crate) mod tests {
         files: Files,
         system: TestSystem,
         vendored: VendoredFileSystem,
-        program: Option<Program>,
+        program_settings: ProgramSettings,
     }
 
     impl TestDb {
         pub(crate) fn new() -> Self {
             let events = Events::default();
+            let vendored = ty_vendored::file_system().clone();
+            let program_settings = ProgramSettings::empty(&vendored);
             Self {
                 storage: salsa::Storage::new(Some(Box::new({
                     move |event| {
@@ -53,14 +55,10 @@ pub(crate) mod tests {
                     }
                 }))),
                 system: TestSystem::default(),
-                vendored: ty_vendored::file_system().clone(),
+                vendored,
                 files: Files::default(),
-                program: None,
+                program_settings,
             }
-        }
-
-        pub(crate) fn program(&self) -> Program {
-            self.program.expect("the program should be initialized")
         }
     }
 
@@ -98,6 +96,30 @@ pub(crate) mod tests {
 
     #[salsa::db]
     impl ModuleResolverDb for TestDb {}
+
+    #[salsa::db]
+    pub(crate) trait TestProgramDb: Db {
+        fn program_settings(&self) -> &ProgramSettings;
+
+        fn program(&self) -> Program<'_>
+        where
+            Self: Sized,
+        {
+            #[salsa::tracked(returns(copy), heap_size=ruff_memory_usage::heap_size)]
+            fn program_inner(db: &dyn TestProgramDb) -> Program<'_> {
+                Program::from_settings(db, db.program_settings().clone())
+            }
+
+            program_inner(self)
+        }
+    }
+
+    #[salsa::db]
+    impl TestProgramDb for TestDb {
+        fn program_settings(&self) -> &ProgramSettings {
+            &self.program_settings
+        }
+    }
 
     #[salsa::db]
     impl salsa::Database for TestDb {}
@@ -138,19 +160,16 @@ pub(crate) mod tests {
             db.write_files(self.files)
                 .context("Failed to write test files")?;
 
-            db.program = Some(Program::from_settings(
-                &db,
-                ProgramSettings {
-                    python_version: PythonVersionWithSource {
-                        version: self.python_version,
-                        source: PythonVersionSource::default(),
-                    },
-                    python_platform: self.python_platform,
-                    search_paths: SearchPathSettings::new(vec![src_root])
-                        .to_search_paths(db.system(), db.vendored(), &FallibleStrategy)
-                        .context("Invalid search path settings")?,
+            db.program_settings = ProgramSettings {
+                python_version: PythonVersionWithSource {
+                    version: self.python_version,
+                    source: PythonVersionSource::default(),
                 },
-            ));
+                python_platform: self.python_platform,
+                search_paths: SearchPathSettings::new(vec![src_root])
+                    .to_search_paths(db.system(), db.vendored(), &FallibleStrategy)
+                    .context("Invalid search path settings")?,
+            };
 
             Ok(db)
         }

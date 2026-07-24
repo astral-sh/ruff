@@ -28,7 +28,7 @@ use std::iter::FusedIterator;
 use std::panic::{AssertUnwindSafe, UnwindSafe};
 use std::sync::Arc;
 use ty_python_core::ProgramFile;
-use ty_python_core::program::Program;
+use ty_python_core::program::{Program, ProgramSettings};
 pub use ty_python_semantic::Db as SemanticDb;
 use ty_python_semantic::lint::RuleSelection;
 
@@ -80,12 +80,9 @@ pub struct Project {
     #[returns(deref)]
     pub settings: Box<Settings>,
 
-    /// The Python program used to analyze this project.
-    ///
-    /// This handle is stable for the lifetime of the project; program settings are updated in
-    /// place when the project configuration changes.
-    #[returns(copy)]
-    pub program: Program,
+    /// The settings used to construct the Python program for this project.
+    #[returns(ref)]
+    pub program_settings: ProgramSettings,
 
     /// The paths that should be included when checking this project.
     ///
@@ -187,17 +184,18 @@ impl Project {
         db: &dyn Db,
         metadata: ProjectMetadata,
         settings: Settings,
-        program: Program,
+        program_settings: ProgramSettings,
         settings_diagnostics: Vec<OptionDiagnostic>,
     ) -> Self {
+        program_settings.search_paths.try_register_static_roots(db);
+
         Project::builder(
             Box::new(metadata),
             Box::new(settings),
-            program,
+            program_settings,
             settings_diagnostics,
         )
         .durability(Durability::MEDIUM)
-        .program_durability(Durability::NEVER_CHANGE)
         .open_fileset_durability(Durability::LOW)
         .file_set_durability(Durability::LOW)
         .new(db)
@@ -207,9 +205,8 @@ impl Project {
     ///
     /// This is intentionally not exhaustive.
     pub(crate) fn freeze(self, db: &mut dyn Db) {
-        self.program(db).freeze(db);
-
         let durability = Durability::NEVER_CHANGE;
+        let program_settings = self.program_settings(db).clone();
         let metadata = Box::new(self.metadata(db).clone());
         let settings = Box::new(self.settings(db).clone());
         let included_paths = self.included_paths_list(db).to_vec();
@@ -223,6 +220,9 @@ impl Project {
         self.set_settings(db)
             .with_durability(durability)
             .to(settings);
+        self.set_program_settings(db)
+            .with_durability(durability)
+            .to(program_settings);
         self.set_included_paths_list(db)
             .with_durability(durability)
             .to(included_paths);
@@ -237,6 +237,18 @@ impl Project {
             .to(force_exclude);
 
         IndexedFiles::freeze(db, self);
+    }
+
+    #[salsa::tracked(returns(copy), heap_size=ruff_memory_usage::heap_size)]
+    pub fn program(self, db: &dyn Db) -> Program<'_> {
+        Program::from_settings(db, self.program_settings(db).clone())
+    }
+
+    pub fn update_program(self, db: &mut dyn Db, settings: ProgramSettings) {
+        if self.program_settings(db) != &settings {
+            settings.search_paths.try_register_static_roots(db);
+            self.set_program_settings(db).to(settings);
+        }
     }
 
     pub fn root(self, db: &dyn Db) -> &SystemPath {

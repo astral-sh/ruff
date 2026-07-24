@@ -16,7 +16,7 @@ pub struct ProgramFile<'db> {
     pub file: File,
 
     #[returns(copy)]
-    pub program: Program,
+    pub program: Program<'db>,
 }
 
 impl get_size2::GetSize for ProgramFile<'_> {}

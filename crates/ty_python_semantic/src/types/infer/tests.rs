@@ -1,4 +1,5 @@
 use super::builder::TypeInferenceBuilder;
+use crate::SemanticTestDb as _;
 use crate::db::tests::{TestDb, TestDbBuilder, setup_db};
 use crate::place::symbol;
 use crate::place::{ConsideredDefinitions, Place, PlaceAndQualifiers};
@@ -8,7 +9,6 @@ use ruff_db::files::{File, system_path_to_file};
 use ruff_db::system::DbWithWritableSystem as _;
 use ruff_db::testing::{assert_function_query_was_not_run, assert_function_query_was_run};
 use ruff_python_ast::PythonVersion;
-use salsa::Setter;
 use salsa::plumbing::AsId;
 use ty_python_core::definition::Definition;
 use ty_python_core::program::{Program, ProgramSettings};
@@ -187,8 +187,8 @@ fn same_file_at_different_python_versions() -> anyhow::Result<()> {
 }
 
 #[test]
-fn program_file_follows_python_version_updates() -> anyhow::Result<()> {
-    let mut db = TestDbBuilder::new()
+fn program_file_changes_with_python_version() -> anyhow::Result<()> {
+    let db = TestDbBuilder::new()
         .with_python_version(PythonVersion::PY311)
         .with_file("src/main.py", "type Alias = int")
         .build()?;
@@ -199,15 +199,34 @@ fn program_file_follows_python_version_updates() -> anyhow::Result<()> {
         (program_file.as_id(), program_file.python_file(&db).as_id())
     };
 
-    program
-        .set_python_version_with_source(&mut db)
-        .to(PythonVersionWithSource {
-            version: PythonVersion::PY312,
-            source: PythonVersionSource::Default,
-        });
+    let equivalent_program = Program::from_settings(
+        &db,
+        ProgramSettings {
+            python_version: program.python_version_with_source(&db).clone(),
+            python_platform: program.python_platform(&db).clone(),
+            search_paths: program.search_paths(&db).clone(),
+        },
+    );
+    assert_eq!(program, equivalent_program);
+    assert_eq!(
+        program_file_id,
+        equivalent_program.program_file(&db, file).as_id()
+    );
 
-    let program_file = program.program_file(&db, file);
-    assert_eq!(program_file_id, program_file.as_id());
+    let py312_program = Program::from_settings(
+        &db,
+        ProgramSettings {
+            python_version: PythonVersionWithSource {
+                version: PythonVersion::PY312,
+                source: PythonVersionSource::Default,
+            },
+            python_platform: program.python_platform(&db).clone(),
+            search_paths: program.search_paths(&db).clone(),
+        },
+    );
+
+    let program_file = py312_program.program_file(&db, file);
+    assert_ne!(program_file_id, program_file.as_id());
     assert_eq!(program_file.python_version(&db), PythonVersion::PY312);
     assert_ne!(py311, program_file.python_file(&db).as_id());
     Ok(())

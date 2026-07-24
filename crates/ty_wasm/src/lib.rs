@@ -172,8 +172,7 @@ impl Workspace {
             .map_err(into_error)?;
         self.db
             .project()
-            .program(&self.db)
-            .update_from_settings(&mut self.db, program_settings);
+            .update_program(&mut self.db, program_settings);
 
         let (settings, mut settings_diagnostics) = merged_options
             .to_settings(&self.db, &FallibleStrategy)

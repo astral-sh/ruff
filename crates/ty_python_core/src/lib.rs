@@ -1082,7 +1082,7 @@ mod tests {
 
     use crate::{
         ast_ids::{HasScopedUseId, ScopedUseId},
-        db::tests::{TestDb, TestDbBuilder},
+        db::tests::{TestDb, TestDbBuilder, TestProgramDb as _},
         definition::{
             DefinitionKind, LambdaParameterDefinitionNodeKind, ParameterDefinitionNodeKind,
         },
@@ -1862,7 +1862,7 @@ class C[T]:
             scopes: impl Iterator<Item = (FileScopeId, &'db Scope)>,
             db: &'db dyn Db,
             file: File,
-            program: Program,
+            program: Program<'db>,
             module: &'a ParsedModuleRef,
         ) -> Vec<&'a str> {
             scopes

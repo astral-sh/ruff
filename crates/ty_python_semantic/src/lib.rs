@@ -9,6 +9,8 @@ use crate::suppression::{
 };
 use crate::types::check_types;
 pub use db::Db;
+#[cfg(any(test, feature = "testing"))]
+pub use db::SemanticTestDb;
 pub use diagnostic::{
     add_inferred_python_version_hint_to_diagnostic, inferred_python_version_source_annotation,
 };

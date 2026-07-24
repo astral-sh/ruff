@@ -519,7 +519,7 @@ impl<'db> GenericContext<'db> {
         )]
         fn inferable_typevars_inner<'db>(
             db: &'db dyn Db,
-            program: Program,
+            program: Program<'db>,
             generic_context: GenericContext<'db>,
         ) -> InferableTypeVars<'db> {
             let env = &SemanticEnvironment::from_program(db, program);
@@ -2114,7 +2114,7 @@ pub(crate) struct SpecializationBuilder<'db, 'c> {
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub(crate) struct TypeVarInference<'db> {
     #[returns(copy)]
-    pub(crate) program: Program,
+    pub(crate) program: Program<'db>,
     #[returns(copy)]
     pub(crate) generic_context: GenericContext<'db>,
     #[returns(deref)]

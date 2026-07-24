@@ -31,7 +31,7 @@ impl<'db> ScopeId<'db> {
         self.program_file(db).python_file(db)
     }
 
-    pub fn program(self, db: &'db dyn Db) -> Program {
+    pub fn program(self, db: &'db dyn Db) -> Program<'db> {
         self.program_file(db).program(db)
     }
 

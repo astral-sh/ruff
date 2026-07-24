@@ -84,7 +84,7 @@ impl<'db> Expression<'db> {
         self.scope_id(db).program_file(db)
     }
 
-    pub fn program(self, db: &'db dyn Db) -> Program {
+    pub fn program(self, db: &'db dyn Db) -> Program<'db> {
         self.scope_id(db).program(db)
     }
 }
