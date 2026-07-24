@@ -615,25 +615,25 @@ def f():
     value = get_value()
     if result := is_str(value):
         reveal_type(value)  # revealed: str
-        reveal_type(result)  # revealed: TypeIs[str @ value] & ~AlwaysFalsy
+        reveal_type(result)  # revealed: TypeIs[str @ value]
     else:
         reveal_type(value)  # revealed: int
-        reveal_type(result)  # revealed: TypeIs[str @ value] & ~AlwaysTruthy
+        reveal_type(result)  # revealed: TypeIs[str @ value]
 
     other = get_value()
     if result := guard_str(other):
         reveal_type(other)  # revealed: str
-        reveal_type(result)  # revealed: TypeGuard[str @ other] & ~AlwaysFalsy
+        reveal_type(result)  # revealed: TypeGuard[str @ other]
     else:
         reveal_type(other)  # revealed: int | str
-        reveal_type(result)  # revealed: TypeGuard[str @ other] & ~AlwaysTruthy
+        reveal_type(result)  # revealed: TypeGuard[str @ other]
 
 def guard_list(value: object) -> TypeGuard[list[int]]:
     return isinstance(value, list)
 
 def overwritten_target(value: object):
     if value := guard_list(value):
-        reveal_type(value)  # revealed: TypeGuard[list[int] @ value] & ~AlwaysFalsy
+        reveal_type(value)  # revealed: TypeGuard[list[int] @ value]
     else:
-        reveal_type(value)  # revealed: TypeGuard[list[int] @ value] & ~AlwaysTruthy
+        reveal_type(value)  # revealed: TypeGuard[list[int] @ value]
 ```

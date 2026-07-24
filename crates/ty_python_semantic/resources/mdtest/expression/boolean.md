@@ -10,8 +10,28 @@ def _(foo: str):
     reveal_type(False or "z")  # revealed: Literal["z"]
     reveal_type(False or True)  # revealed: Literal[True]
     reveal_type(False or False)  # revealed: Literal[False]
-    reveal_type(foo or False)  # revealed: (str & ~AlwaysFalsy) | Literal[False]
-    reveal_type(foo or True)  # revealed: (str & ~AlwaysFalsy) | Literal[True]
+    reveal_type(foo or False)  # revealed: str | Literal[False]
+    reveal_type(foo or True)  # revealed: str | Literal[True]
+```
+
+## Falsy string fallback
+
+Falsy string fallbacks should not cause `str` methods to select a `LiteralString` overload.
+
+```py
+def get_str() -> str:
+    return "hello world"
+
+def get_optional_str() -> str | None:
+    return "hello world"
+
+reveal_type((get_str() or "").split())  # revealed: list[str]
+reveal_type((get_str() or "").rsplit())  # revealed: list[str]
+reveal_type((get_str() or "").splitlines())  # revealed: list[str]
+reveal_type((get_optional_str() or "").split())  # revealed: list[str]
+
+# A genuinely literal receiver still selects the `LiteralString` overload.
+reveal_type("".split())  # revealed: list[LiteralString]
 ```
 
 ## AND
@@ -20,8 +40,8 @@ def _(foo: str):
 def _(foo: str):
     reveal_type(True and False)  # revealed: Literal[False]
     reveal_type(False and True)  # revealed: Literal[False]
-    reveal_type(foo and False)  # revealed: (str & ~AlwaysTruthy) | Literal[False]
-    reveal_type(foo and True)  # revealed: (str & ~AlwaysTruthy) | Literal[True]
+    reveal_type(foo and False)  # revealed: str | Literal[False]
+    reveal_type(foo and True)  # revealed: str | Literal[True]
     reveal_type("x" and "y" and "z")  # revealed: Literal["z"]
     reveal_type("x" and "y" and "")  # revealed: Literal[""]
     reveal_type("" and "y")  # revealed: Literal[""]
