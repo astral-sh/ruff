@@ -13,10 +13,74 @@ use crate::types::equality::{
 use crate::types::tuple::TupleSpec;
 use crate::types::{
     DynamicType, IntersectionBuilder, IntersectionType, KnownClass, KnownInstanceType,
-    LiteralValueType, LiteralValueTypeKind, MemberLookupPolicy, Type, TypeContext,
+    LiteralValueType, LiteralValueTypeKind, MemberLookupPolicy, Type, TypeContext, TypeTransformer,
     TypeVarBoundOrConstraints, UnionBuilder,
 };
 use ty_python_core::Truthiness;
+
+impl<'db> Type<'db> {
+    /// Upcast `self` to a type that conservatively describes its possible runtime objects in an
+    /// identity comparison.
+    ///
+    /// A `NewType` wrapper is an identity function at runtime, so it contributes its concrete base
+    /// type here while remaining distinct for ordinary type relations and intersections.
+    ///
+    /// Negative intersection elements are generally omitted. A static exclusion does not imply a
+    /// runtime exclusion: `NewType("N", bool)(True)` can inhabit `~Literal[True]`, but evaluates
+    /// to the `True` singleton at runtime. However, excluding an entire nominal instance type is
+    /// stable under `NewType` erasure, so constraints such as `~None` and `~SomeClass` are
+    /// preserved.
+    pub(crate) fn identity_comparison_type(self, db: &'db dyn Db) -> Type<'db> {
+        struct IdentityComparisonUpcasting;
+
+        fn upcast<'db>(
+            db: &'db dyn Db,
+            ty: Type<'db>,
+            visitor: &TypeTransformer<'db, IdentityComparisonUpcasting>,
+        ) -> Type<'db> {
+            match ty {
+                Type::TypeAlias(alias) => {
+                    visitor.visit_type(db, ty, || upcast(db, alias.value_type(db), visitor))
+                }
+                Type::NewTypeInstance(newtype) => newtype.concrete_base_type(db),
+                Type::TypeVar(typevar) => visitor.visit_type(db, ty, || {
+                    match typevar.typevar(db).bound_or_constraints(db) {
+                        Some(bound_or_constraints) => {
+                            upcast(db, bound_or_constraints.as_type(db), visitor)
+                        }
+                        None => ty,
+                    }
+                }),
+                Type::Union(union) => union.map(db, |element| upcast(db, *element, visitor)),
+                Type::Intersection(intersection) => {
+                    let mut builder = IntersectionBuilder::new(db);
+                    for element in intersection.positive(db) {
+                        builder = builder.add_positive(upcast(db, *element, visitor));
+                    }
+                    for element in intersection.negative(db) {
+                        if element.resolve_type_alias(db).is_nominal_instance() {
+                            builder = builder.add_negative(*element);
+                        }
+                    }
+                    builder.build()
+                }
+                _ => ty,
+            }
+        }
+
+        upcast(
+            db,
+            self,
+            &TypeTransformer::<IdentityComparisonUpcasting>::default(),
+        )
+    }
+
+    /// Return `true` if `self` and `other` cannot describe the same runtime object.
+    pub(crate) fn is_disjoint_from_for_identity(self, db: &'db dyn Db, other: Type<'db>) -> bool {
+        self.identity_comparison_type(db)
+            .is_disjoint_from(db, other.identity_comparison_type(db))
+    }
+}
 
 /// Whether the intersection type is on the left or right side of the comparison.
 #[derive(Debug, Clone, Copy)]
@@ -132,10 +196,10 @@ pub(super) fn infer_binary_type_comparison<'db>(
 ) -> Result<Type<'db>, UnsupportedComparisonError<'db>> {
     let db = context.db();
 
-    // Note: identity (is, is not) for equal builtin types is unreliable and not part of the
-    // language spec.
-    // - `[ast::CompOp::Is]`: return `false` if unequal, `bool` if equal
-    // - `[ast::CompOp::IsNot]`: return `true` if unequal, `bool` if equal
+    // Identity comparisons between equal builtin types are unreliable and not guaranteed by the
+    // language specification:
+    // - `is` returns `false` if the types are disjoint and `bool` if they overlap.
+    // - `is not` returns `true` if the types are disjoint and `bool` if they overlap.
     let try_dunder = |policy: MemberLookupPolicy| {
         let rich_comparison = |op| infer_rich_comparison(db, left, right, op, policy);
         let membership_test_comparison = |op, range: TextRange| {
@@ -173,6 +237,44 @@ pub(super) fn infer_binary_type_comparison<'db>(
             }
         }
     };
+
+    // Keep two occurrences of the same `TypeVar` symbolic. Replacing them with their bounds or
+    // constraints would lose their shared specialization: a `TypeVar` constrained to `None` and
+    // `EllipsisType` chooses the same singleton for both operands, not independent alternatives.
+    if matches!(op, ast::CmpOp::Is | ast::CmpOp::IsNot)
+        && !matches!(
+            (
+                left.resolve_type_alias(db),
+                right.resolve_type_alias(db)
+            ),
+            (Type::TypeVar(left), Type::TypeVar(right)) if left.is_same_typevar_as(db, right)
+        )
+    {
+        // `NewType` is an identity function at runtime, so distinct NewTypes can still contain the
+        // same object:
+        //
+        // UserId = NewType("UserId", int)
+        // OrderId = NewType("OrderId", int)
+        // user_id is order_id  # possibly true
+        //
+        // Widen both operands to the types of their possible runtime objects before using the
+        // ordinary comparison logic. Keeping the usual recursive dispatch preserves facts carried
+        // by unions and intersections after widening.
+        let left_identity = left.identity_comparison_type(db);
+        let right_identity = right.identity_comparison_type(db);
+        if left_identity != left || right_identity != right {
+            return visitor.visit(db, (left, op, right), || {
+                infer_binary_type_comparison(
+                    context,
+                    left_identity,
+                    op,
+                    right_identity,
+                    range,
+                    visitor,
+                )
+            });
+        }
+    }
 
     let soundness_policy =
         ComparisonSoundnessPolicy::from_analysis_settings(db.analysis_settings(context.file()));
