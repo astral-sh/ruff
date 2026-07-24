@@ -1303,6 +1303,30 @@ reveal_type(flatten_covariant(b"abc"))  # revealed: tuple[int, ...]
 reveal_type(flatten_covariant(b"abc", ("x",)))  # revealed: tuple[int | Literal["x"], ...]
 ```
 
+## Single-path call inference
+
+A single inference path still specializes the return type and leaves ordinary argument checking in
+place. Gradual arguments can contribute to that specialization.
+
+```py
+from typing import Any, TypeVar
+
+T = TypeVar("T")
+U = TypeVar("U")
+
+def one_path(value: T, other: int) -> T:
+    return value
+
+# error: [invalid-argument-type]
+reveal_type(one_path("value", "bad"))  # revealed: Literal["value"]
+
+def with_gradual(value: T, other: U) -> tuple[T, U]:
+    return value, other
+
+def _(value: Any) -> None:
+    reveal_type(with_gradual("value", value))  # revealed: tuple[Literal["value"], Any]
+```
+
 ## Inferring typevars in intersections (formal type position)
 
 ```py

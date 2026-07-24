@@ -215,6 +215,27 @@ def f[T: A](x: P[T, T], value: T) -> None:
 f(Bad(), B())
 ```
 
+## Single-path call inference
+
+A single inference path still specializes the return type and leaves ordinary argument checking in
+place. Gradual arguments can contribute to that specialization.
+
+```py
+from typing import Any
+
+def one_path[T](value: T, other: int) -> T:
+    return value
+
+# error: [invalid-argument-type]
+reveal_type(one_path("value", "bad"))  # revealed: Literal["value"]
+
+def with_gradual[T, U](value: T, other: U) -> tuple[T, U]:
+    return value, other
+
+def _(value: Any) -> None:
+    reveal_type(with_gradual("value", value))  # revealed: tuple[Literal["value"], Any]
+```
+
 ## Inferring typevars in intersections (actual type position, multiple positive types)
 
 When an actual intersection provides multiple valid specializations of a generic call, inference

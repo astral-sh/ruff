@@ -5539,12 +5539,23 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             maybe_promote(typevar, bounds)
         };
         let original_return_ty = self.return_ty;
-        let can_refine_paths =
-            allow_path_return_inference && self.argument_relations_are_fully_static();
-        let path_result = can_refine_paths
+        let path_result = allow_path_return_inference
             .then(|| builder.build_inference_paths_with(generic_context, &mut choose))
             .flatten()
             .and_then(|paths| {
+                // A single specialization has nothing to intersect; normal argument checking
+                // remains authoritative for this call.
+                if let [inference] = paths.as_ref() {
+                    let specialization = inference.specialization(self.db);
+                    let return_ty =
+                        original_return_ty.apply_specialization(self.db, specialization);
+                    return Some((*inference, return_ty));
+                }
+
+                if !self.argument_relations_are_fully_static() {
+                    return None;
+                }
+
                 // Every retained path independently validates the entire call. For a static
                 // argument type `S`, parameter type `P`, and solution `T`, `S <= P[T]`
                 // establishes the instantiated return `R[T]`. The same call therefore satisfies
@@ -5581,9 +5592,9 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             });
 
         // Fall back to one merged specialization when path refinement is disabled, unsupported,
-        // contains an incomplete path, or produces no static, independently valid paths. If the
-        // combined constraints are unsatisfiable, infer each argument separately to preserve
-        // useful diagnostics.
+        // contains an incomplete path, or multiple paths produce no static, independently valid
+        // results. If the combined constraints are unsatisfiable, infer each argument separately
+        // to preserve useful diagnostics.
         // TODO: Limit this fallback to unconstrained calls and diagnostic recovery once path
         // inference tracks gradual evidence, supports ParamSpecs and recursive solutions, and
         // preserves callable-local generics and correlated partial applications.
