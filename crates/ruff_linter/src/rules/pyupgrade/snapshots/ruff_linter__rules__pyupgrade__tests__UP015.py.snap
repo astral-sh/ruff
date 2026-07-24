@@ -841,3 +841,81 @@ help: Remove mode argument
 77 + aiofiles.open("foo")
 78 |
    |
+
+UP015 [*] Unnecessary mode argument
+  --> UP015.py:88:5
+   |
+86 | open(
+87 |     "foo",  # path comment
+88 |     "r",
+   |     ^^^
+89 | )
+   |
+help: Remove mode argument
+   |
+86 | open(
+   -     "foo",  # path comment
+   -     "r",
+87 +     "foo",
+88 | )
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+UP015 [*] Unnecessary mode argument
+  --> UP015.py:93:10
+   |
+91 | open(
+92 |     "foo",  # path comment
+93 |     mode="r",
+   |          ^^^
+94 | )
+   |
+help: Remove mode argument
+   |
+91 | open(
+   -     "foo",  # path comment
+   -     mode="r",
+92 +     "foo",
+93 | )
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+UP015 [*] Unnecessary mode argument
+   --> UP015.py:98:10
+    |
+ 96 | open(
+ 97 |     # comment before redundant mode keyword
+ 98 |     mode="r",
+    |          ^^^
+ 99 |     file="foo",
+100 | )
+    |
+help: Remove mode argument
+   |
+95 |
+   - open(
+   -     # comment before redundant mode keyword
+   -     mode="r",
+   -     file="foo",
+96 + open(file="foo",
+97 | )
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+UP015 [*] Unnecessary mode argument
+   --> UP015.py:105:5
+    |
+103 | open(
+104 |     "foo",
+105 |     "r",  # trailing mode comment
+    |     ^^^
+106 | )
+    |
+help: Remove mode argument
+    |
+103 | open(
+    -     "foo",
+    -     "r",  # trailing mode comment
+104 +     "foo",  # trailing mode comment
+105 | )
+    |

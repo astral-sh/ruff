@@ -81,3 +81,26 @@ open("foo", "rb")
 open("foo", "r+b")
 open("foo", "UU")
 open("foo", "wtt")
+
+# Comments between arguments that would be deleted when removing the mode.
+open(
+    "foo",  # path comment
+    "r",
+)
+
+open(
+    "foo",  # path comment
+    mode="r",
+)
+
+open(
+    # comment before redundant mode keyword
+    mode="r",
+    file="foo",
+)
+
+# End-of-line comment after the mode argument (not in the deletion range).
+open(
+    "foo",
+    "r",  # trailing mode comment
+)

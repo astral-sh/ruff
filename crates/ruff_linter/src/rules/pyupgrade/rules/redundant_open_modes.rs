@@ -1,4 +1,5 @@
 use anyhow::Result;
+use ruff_diagnostics::Applicability;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::token::{TokenKind, Tokens};
 use ruff_python_ast::{self as ast, Expr};
@@ -26,6 +27,10 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// with open("foo.txt") as f:
 ///     ...
 /// ```
+///
+/// ## Fix safety
+/// This rule's fix is marked as unsafe if removing the mode argument would
+/// delete any comments within the edit range.
 ///
 /// ## References
 /// - [Python documentation: `open`](https://docs.python.org/3/library/functions.html#open)
@@ -96,7 +101,13 @@ fn create_diagnostic(call: &ast::ExprCall, mode_arg: &Expr, mode: OpenMode, chec
 
     if mode.is_empty() {
         diagnostic.try_set_fix(|| {
-            create_remove_argument_fix(call, mode_arg, checker.tokens()).map(Fix::safe_edit)
+            let edit = create_remove_argument_fix(call, mode_arg, checker.tokens())?;
+            let applicability = if checker.comment_ranges().intersects(edit.range()) {
+                Applicability::Unsafe
+            } else {
+                Applicability::Safe
+            };
+            Ok(Fix::applicable_edit(edit, applicability))
         });
     } else {
         let stylist = checker.stylist();
