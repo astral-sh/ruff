@@ -24,5 +24,8 @@ echo "Updating lockfiles..."
 cargo update -p ruff
 uv lock --no-config
 
+echo "Generating JSON schema..."
+cargo dev generate-json-schema
+
 echo "Checking crates.io publish setup..."
 uv run --no-config --script "$project_root/scripts/setup-crates-io-publish.py" --quiet

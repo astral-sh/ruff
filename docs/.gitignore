@@ -1,6 +1,9 @@
+# Generated documentation
 /contributing.md
 /default-rules.md
 /index.md
+
+# Generated reference docs (use `scripts/generate_mkdocs.py` to regenerate)
 /rules.md
 /rules/
 /settings.md

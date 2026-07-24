@@ -61,11 +61,11 @@ mod tests {
     use super::{Args, main};
 
     #[test]
-    fn test_generate_json_schema() -> Result<()> {
+    fn generate_json_schema() -> Result<()> {
         let mode = if env::var("RUFF_UPDATE_SCHEMA").as_deref() == Ok("1") {
             Mode::Write
         } else {
-            Mode::Check
+            Mode::DryRun
         };
         main(&Args { mode })
     }

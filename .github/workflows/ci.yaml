@@ -41,6 +41,8 @@ jobs:
       # Flag that is raised when any code is changed
       # This is superset of the linter and formatter
       code: ${{ steps.check_code.outputs.changed }}
+      # Flag that is raised when ruff.schema.json is changed (e.g., in a release PR)
+      schema: ${{ steps.check_schema.outputs.changed }}
       # Flag that is raised when any code that affects the fuzzer is changed
       fuzz: ${{ steps.check_fuzzer.outputs.changed }}
       # Flag that is set to "true" when code related to ty changes.
@@ -182,6 +184,17 @@ jobs:
             ':!docs/**' \
             ':!assets/**' \
           ; then
+              echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+              echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Check if the Ruff JSON schema changed
+        id: check_schema
+        env:
+          MERGE_BASE: ${{ steps.merge_base.outputs.sha }}
+        run: |
+          if git diff --quiet "${MERGE_BASE}...HEAD" -- ':ruff.schema.json'; then
               echo "changed=false" >> "$GITHUB_OUTPUT"
           else
               echo "changed=true" >> "$GITHUB_OUTPUT"
@@ -359,6 +372,9 @@ jobs:
         run: cargo test -p ty_python_semantic --test mdtest || true
       - name: "Run tests"
         run: cargo insta test --all-features --unreferenced reject --test-runner nextest --disable-nextest-doctest
+      - name: "Check Ruff JSON schema"
+        if: ${{ needs.determine_changes.outputs.schema == 'true' }}
+        run: cargo dev generate-json-schema --mode check
       - name: "Run doctests"
         run: cargo test --doc --all-features
       - name: Dogfood ty on py-fuzzer
