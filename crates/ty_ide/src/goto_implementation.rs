@@ -1962,6 +1962,134 @@ class MyClass:
         ");
     }
 
+    #[test]
+    fn implementation_attribute_unreachable_method_in_reachable_class_excluded() {
+        let test = cursor_test(
+            r#"
+            import sys
+
+            class Animal:
+                def speak(self): ...
+
+            class Dog(Animal):
+                if sys.version_info >= (3, 999):
+                    def speak(self): ...
+
+            def f(animal: Animal):
+                animal.spe<CURSOR>ak()
+            "#,
+        );
+
+        assert_snapshot!(test.goto_implementation(), @"
+        info[goto-implementation]: Go to implementation
+          --> main.py:12:12
+           |
+        12 |     animal.speak()
+           |            ^^^^^ Clicking here
+           |
+        info: Found 1 implementation
+         --> main.py:5:9
+          |
+        5 |     def speak(self): ...
+          |         -----
+          |
+        ");
+    }
+
+    #[test]
+    fn implementation_attribute_unreachable_data_in_reachable_class_excluded() {
+        let test = cursor_test(
+            r#"
+            import sys
+
+            class Animal:
+                sound: str = "generic"
+
+            class Dog(Animal):
+                def __init__(self):
+                    if sys.version_info >= (3, 999):
+                        self.sound = "woof"
+
+            def f(animal: Animal):
+                animal.so<CURSOR>und
+            "#,
+        );
+
+        assert_snapshot!(test.goto_implementation(), @r#"
+        info[goto-implementation]: Go to implementation
+          --> main.py:13:12
+           |
+        13 |     animal.sound
+           |            ^^^^^ Clicking here
+           |
+        info: Found 1 implementation
+         --> main.py:5:5
+          |
+        5 |     sound: str = "generic"
+          |     -----
+          |
+        "#);
+    }
+
+    #[test]
+    fn implementation_unreachable_class_declaration_is_unsupported() {
+        let test = cursor_test(
+            r#"
+            import sys
+
+            if sys.version_info >= (3, 999):
+                class Anim<CURSOR>al:
+                    pass
+
+                class Child(Animal):
+                    pass
+            "#,
+        );
+
+        assert_snapshot!(test.goto_implementation(), @"No goto target found");
+    }
+
+    #[test]
+    fn implementation_unreachable_class_reference_is_unsupported() {
+        let test = cursor_test(
+            r#"
+            import sys
+
+            if sys.version_info >= (3, 999):
+                class Animal:
+                    pass
+
+                class Child(Animal):
+                    pass
+
+                value: Anim<CURSOR>al
+            "#,
+        );
+
+        assert_snapshot!(test.goto_implementation(), @"No goto target found");
+    }
+
+    #[test]
+    fn implementation_unreachable_method_declaration_is_unsupported() {
+        let test = cursor_test(
+            r#"
+            import sys
+
+            class Animal:
+                def speak(self): ...
+
+            class Dog(Animal):
+                if sys.version_info >= (3, 999):
+                    def spe<CURSOR>ak(self): ...
+
+            class Pup(Dog):
+                def speak(self): ...
+            "#,
+        );
+
+        assert_snapshot!(test.goto_implementation(), @"No goto target found");
+    }
+
     impl CursorTest {
         fn goto_implementation(&self) -> String {
             let Some(targets) = salsa::attach(&self.db, || {

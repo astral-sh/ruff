@@ -490,6 +490,10 @@ impl<'db> ImplementationsFinder<'db> {
     pub fn for_method(model: &SemanticModel<'db>, function: &ast::StmtFunctionDef) -> Option<Self> {
         let db = model.db();
         let function_definition = function.definition(model);
+        if !is_reachable_implementation_definition(db, function_definition) {
+            return None;
+        }
+
         let containing_scope = function_definition.scope(db);
         let accessor_role = function
             .inferred_type(model)
@@ -525,7 +529,11 @@ impl<'db> ImplementationsFinder<'db> {
     /// returns that class and its own subclasses, not its parents.
     pub fn for_class(model: &SemanticModel<'db>, class: &ast::StmtClassDef) -> Option<Self> {
         let db = model.db();
-        let root = extract_class_literal(db, binding_type(db, class.definition(model)))?;
+        let class_definition = class.definition(model);
+        if !is_reachable_implementation_definition(db, class_definition) {
+            return None;
+        }
+        let root = extract_class_literal(db, binding_type(db, class_definition))?;
 
         Some(ImplementationsFinder::for_class_roots(db, vec![root]))
     }
@@ -561,6 +569,10 @@ impl<'db> ImplementationsFinder<'db> {
             let ResolvedDefinition::Definition(definition) = def else {
                 continue;
             };
+
+            if !is_reachable_implementation_definition(db, *definition) {
+                continue;
+            }
 
             // Declaration-only definitions such as a bare `sound: str` annotation have no binding
             // type and cannot refer to a class object.
@@ -816,7 +828,7 @@ fn own_member_definitions<'db>(
     let class_place_table = ty_python_core::place_table(db, class_scope);
     if let Some(place_id) = class_place_table.symbol_id(member_name) {
         let use_def = use_def_map(db, class_scope);
-        let definitions = reachable_definitions(
+        let definitions = reachable_implementation_definitions(
             db,
             use_def
                 .reachable_symbol_declarations(place_id)
@@ -863,7 +875,7 @@ fn own_member_definitions<'db>(
         );
     }
 
-    let instance_definitions = reachable_definitions(db, instance_definitions);
+    let instance_definitions = reachable_implementation_definitions(db, instance_definitions);
     if instance_definitions.is_empty() {
         return None;
     }
@@ -1003,6 +1015,28 @@ fn reachable_definitions<'db>(
         .into_iter()
         .filter(|definition| definition.kind(db).is_user_visible())
         .collect()
+}
+
+fn reachable_implementation_definitions<'db>(
+    db: &'db dyn Db,
+    definitions: impl IntoIterator<Item = Definition<'db>>,
+) -> FxIndexSet<Definition<'db>> {
+    definitions
+        .into_iter()
+        .filter(|definition| definition.kind(db).is_user_visible())
+        .filter(|definition| is_reachable_implementation_definition(db, *definition))
+        .collect()
+}
+
+fn is_reachable_implementation_definition(db: &dyn Db, definition: Definition<'_>) -> bool {
+    let file = definition.file(db);
+    let parsed = parsed_module(db, file).load(db);
+    is_range_reachable(
+        db,
+        semantic_index(db, file),
+        definition.file_scope(db),
+        definition.full_range(db, &parsed).range(),
+    )
 }
 
 /// Cheap text prefilter for identifier references before AST/semantic validation.
