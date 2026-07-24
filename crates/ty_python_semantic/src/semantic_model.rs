@@ -2,12 +2,12 @@ use compact_str::CompactString;
 use ruff_db::files::{File, FilePath};
 use ruff_db::parsed::{parsed_module, parsed_string_annotation};
 use ruff_db::source::{line_index, source_text};
-use ruff_python_ast::find_node::CoveringNode;
+use ruff_python_ast::find_node::{CoveringNode, covering_node};
 use ruff_python_ast::{self as ast, ExprStringLiteral, ModExpression};
 use ruff_python_ast::{Expr, ExprRef, name::Name};
 use ruff_python_parser::Parsed;
 use ruff_source_file::LineIndex;
-use ruff_text_size::Ranged;
+use ruff_text_size::{Ranged, TextRange, TextSize};
 use rustc_hash::FxHashMap;
 use ty_module_resolver::{
     KnownModule, Module, ModuleName, list_modules, resolve_module, resolve_real_shadowable_module,
@@ -385,6 +385,119 @@ impl<'db> SemanticModel<'db> {
         None
     }
 
+    /// Returns the inferred type of the semantic target at `range`.
+    ///
+    /// Unlike [`HasType`], this method can resolve locations represented by identifier nodes. For
+    /// example, the name bound by an exception handler has no type by itself, but its enclosing
+    /// handler introduces a definition whose binding has a type.
+    pub fn inferred_type_at(&self, range: TextRange) -> Option<Type<'db>> {
+        let parsed = parsed_module(self.db, self.file).load(self.db);
+        let target = covering_type_node(parsed.syntax().into(), range)?;
+        self.inferred_type_for_covering_node(&target, range)
+    }
+
+    /// Returns the inferred type for an already resolved covering node.
+    ///
+    /// `range` identifies the selected part of compound targets such as dotted module names and
+    /// string annotations, so it can be narrower than `target.node().range()`.
+    pub fn inferred_type_for_covering_node(
+        &self,
+        target: &CoveringNode<'_>,
+        range: TextRange,
+    ) -> Option<Type<'db>> {
+        match target.node() {
+            ast::AnyNodeRef::Identifier(identifier) => match target.parent() {
+                // Each component of a module path denotes the corresponding module prefix:
+                // ```py
+                // import foo.bar
+                //        ^^^  -> foo
+                //            ^^^  -> foo.bar
+                // ```
+                Some(ast::AnyNodeRef::Alias(alias))
+                    if identifier.range == alias.name.range
+                        && target
+                            .ancestors()
+                            .any(|node| matches!(node, ast::AnyNodeRef::StmtImport(_))) =>
+                {
+                    if let Some(module) = import_module_prefix_at(identifier, range) {
+                        return self.resolve_module_type(Some(module), 0);
+                    }
+                }
+                // A from-import module path has the same prefix semantics. Relative imports also
+                // need the statement's level:
+                // ```py
+                // from foo.bar import baz
+                //      ^^^  -> foo
+                //          ^^^  -> foo.bar
+                // ```
+                Some(ast::AnyNodeRef::StmtImportFrom(import_from))
+                    if import_from
+                        .module
+                        .as_ref()
+                        .is_some_and(|module| module.range == identifier.range) =>
+                {
+                    let module = import_module_prefix_at(identifier, range)?;
+                    return self.resolve_module_type(Some(module), import_from.level);
+                }
+                // A keyword label is not an expression. Its useful type is the type of the value:
+                // ```py
+                // test(argument=1)
+                //      ^^^^^^^^  -> Literal[1]
+                // ```
+                Some(ast::AnyNodeRef::Keyword(keyword))
+                    if keyword
+                        .arg
+                        .as_ref()
+                        .is_some_and(|argument| argument.range == identifier.range) =>
+                {
+                    return keyword.value.inferred_type(self);
+                }
+                _ => {}
+            },
+            // String annotations have their own parsed sub-AST. Reusing this method also handles
+            // nested string annotations:
+            // ```py
+            // value: "Outer.Inner"
+            //               ^^^^^
+            // ```
+            ast::AnyNodeRef::ExprStringLiteral(string_expr) => {
+                if let Some((parsed, model)) = self.enter_string_annotation(string_expr)
+                    && let Some(target) = covering_type_node(parsed.syntax().into(), range)
+                {
+                    return model.inferred_type_for_covering_node(&target, range);
+                }
+            }
+            _ => {}
+        }
+
+        // Identifier-only bindings get their type from the local definition associated with an
+        // ancestor node. This includes exception variables, pattern bindings, and type parameters:
+        // ```py
+        // except Exception as error:
+        //                     ^^^^^
+        // case {"key": value, **rest}:
+        //              ^^^^^    ^^^^
+        // type Alias[T] = list[T]
+        //            ^
+        // type Callback[**P] = Callable[P, int]
+        //                 ^
+        // type Tuple[*Ts] = tuple[*Ts]
+        //             ^^
+        // ```
+        if !target.node().is_expression()
+            && self.in_string_annotation_expr.is_none()
+            && let Some(definition) = self.first_local_definition(target)
+        {
+            return Some(binding_type(self.db, definition));
+        }
+
+        target
+            .node()
+            .as_expr_ref()
+            .or_else(|| target.parent().and_then(ast::AnyNodeRef::as_expr_ref))?
+            .inferred_type(self)
+    }
+
     /// Get a "safe" [`ast::AnyNodeRef`] to use for referring to the given (sub-)AST node.
     ///
     /// If we're analyzing a string annotation, it will return the string literal's node.
@@ -596,6 +709,47 @@ impl<'db> SemanticModel<'db> {
 
         infer_complete_scope_types(self.db, scope).try_expected_type(expr)
     }
+}
+
+fn covering_type_node(root: ast::AnyNodeRef<'_>, range: TextRange) -> Option<CoveringNode<'_>> {
+    if !root.range().contains_range(range) {
+        return None;
+    }
+
+    covering_node(root, range)
+        .find_first(|node| node.is_identifier() || node.is_expression())
+        .ok()
+}
+
+fn import_module_prefix_at(module: &ast::Identifier, range: TextRange) -> Option<&str> {
+    let module_name = module.as_str();
+
+    if module.range == range {
+        return Some(module_name);
+    }
+
+    let mut component_start = 0;
+
+    for component in module_name.split('.') {
+        let component_end = component_start + component.len();
+        let component_range = TextRange::new(
+            module.start() + TextSize::try_from(component_start).ok()?,
+            module.start() + TextSize::try_from(component_end).ok()?,
+        );
+        let contains_target = if range.is_empty() {
+            component_range.contains_inclusive(range.start())
+        } else {
+            component_range.contains_range(range)
+        };
+
+        if contains_target {
+            return Some(&module_name[..component_end]);
+        }
+
+        component_start = component_end + 1;
+    }
+
+    None
 }
 
 /// The type and definition of a symbol.
@@ -847,9 +1001,19 @@ impl HasType for ast::ExceptHandlerExceptHandler {
 #[cfg(test)]
 mod tests {
     use crate::db::tests::TestDbBuilder;
+    use crate::types::Type;
     use crate::{HasType, SemanticModel};
     use ruff_db::files::system_path_to_file;
     use ruff_db::parsed::parsed_module;
+    use ruff_text_size::{TextRange, TextSize};
+
+    fn range_of(source: &str, needle: &str) -> TextRange {
+        let start = source.find(needle).expect("needle should be in source");
+        TextRange::at(
+            TextSize::try_from(start).expect("source should fit in a TextSize"),
+            TextSize::try_from(needle.len()).expect("needle should fit in a TextSize"),
+        )
+    }
 
     #[test]
     fn function_type() -> anyhow::Result<()> {
@@ -906,6 +1070,73 @@ mod tests {
         let ty = alias.inferred_type(&model).unwrap();
 
         assert!(ty.is_class_literal());
+
+        Ok(())
+    }
+
+    #[test]
+    fn inferred_type_at_import_module_component() -> anyhow::Result<()> {
+        let source = "import package.submodule";
+        let db = TestDbBuilder::new()
+            .with_file("/src/package/__init__.py", "")
+            .with_file("/src/package/submodule.py", "")
+            .with_file("/src/main.py", source)
+            .build()?;
+        let file = system_path_to_file(&db, "/src/main.py").unwrap();
+        let model = SemanticModel::new(&db, file);
+
+        let ty = model.inferred_type_at(range_of(source, "package")).unwrap();
+        let Type::ModuleLiteral(module) = ty else {
+            panic!("expected a module-literal type, got {ty:?}");
+        };
+        assert_eq!(module.module(&db).name(&db).as_str(), "package");
+
+        let ty = model
+            .inferred_type_at(range_of(source, "submodule"))
+            .unwrap();
+        let Type::ModuleLiteral(module) = ty else {
+            panic!("expected a module-literal type, got {ty:?}");
+        };
+        assert_eq!(module.module(&db).name(&db).as_str(), "package.submodule");
+
+        Ok(())
+    }
+
+    #[test]
+    fn inferred_type_at_string_annotation_subexpression() -> anyhow::Result<()> {
+        let source = "class Outer:\n    class C: ...\nvalue: \"Outer.C\"";
+        let db = TestDbBuilder::new()
+            .with_file("/src/main.py", source)
+            .build()?;
+        let file = system_path_to_file(&db, "/src/main.py").unwrap();
+        let model = SemanticModel::new(&db, file);
+
+        let range = range_of(source, "Outer.C");
+        let c_range = TextRange::new(range.end() - TextSize::new(1), range.end());
+        let ty = model.inferred_type_at(c_range).unwrap();
+
+        assert_eq!(ty.display(&db).to_string(), "C");
+
+        Ok(())
+    }
+
+    #[test]
+    fn inferred_type_at_keyword_argument_name() -> anyhow::Result<()> {
+        let source = "def f(*, value: int) -> str: ...\nf(value=1)";
+        let db = TestDbBuilder::new()
+            .with_file("/src/main.py", source)
+            .build()?;
+        let file = system_path_to_file(&db, "/src/main.py").unwrap();
+        let model = SemanticModel::new(&db, file);
+
+        let keyword_start = source.rfind("value").unwrap();
+        let keyword_range = TextRange::at(
+            TextSize::try_from(keyword_start).unwrap(),
+            TextSize::try_from("value".len()).unwrap(),
+        );
+        let ty = model.inferred_type_at(keyword_range).unwrap();
+
+        assert_eq!(ty.as_int_literal(), Some(1));
 
         Ok(())
     }

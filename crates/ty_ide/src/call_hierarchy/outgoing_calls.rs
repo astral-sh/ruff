@@ -127,11 +127,7 @@ struct OutgoingCallsFinder<'a, 'db> {
 
 impl<'a> OutgoingCallsFinder<'a, '_> {
     fn record_callee(&mut self, leaf: CalleeLeaf<'a>) {
-        let Some((goto_target, call_site_range)) =
-            leaf.resolve(self.model, self.tokens, &self.ancestors)
-        else {
-            return;
-        };
+        let (goto_target, call_site_range) = leaf.resolve(self.model, self.tokens, &self.ancestors);
 
         let Some(definitions) = goto_target
             .definitions(self.model, ImportAliasResolution::ResolveAliases)

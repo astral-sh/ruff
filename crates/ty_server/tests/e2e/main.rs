@@ -37,6 +37,7 @@ mod hover;
 mod initialize;
 mod inlay_hints;
 mod notebook;
+mod provide_type;
 mod publish_diagnostics;
 mod pull_diagnostics;
 mod rename;

@@ -462,6 +462,13 @@ pub(crate) enum KnownUnion {
 }
 
 impl KnownUnion {
+    pub(crate) const fn name(self) -> &'static str {
+        match self {
+            Self::Float => "float",
+            Self::Complex => "complex",
+        }
+    }
+
     pub(crate) fn to_type(self, db: &dyn Db) -> Type<'_> {
         match self {
             KnownUnion::Float => UnionType::from_two_elements(

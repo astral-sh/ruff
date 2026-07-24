@@ -41,6 +41,7 @@ pub(crate) use self::match_pattern::{
     sequence_pattern_type_builder, singleton_pattern_type, starred_sequence_pattern_type,
     typed_dict_matches_class_pattern,
 };
+pub use self::provide_type::{PrintTypeError, UnsupportedTypeKind, print_type};
 pub(crate) use self::relation_error::{ErrorContext, ErrorContextTree, ParameterDescription};
 use self::set_theoretic::KnownUnion;
 pub(crate) use self::set_theoretic::builder::{
@@ -149,6 +150,7 @@ pub(crate) mod narrow;
 mod newtype;
 mod overrides;
 mod protocol_class;
+mod provide_type;
 pub(crate) mod relation;
 mod relation_error;
 mod set_theoretic;
