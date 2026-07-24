@@ -1237,7 +1237,7 @@ impl<'db> IntersectionBuilder<'db> {
         self.add_positive_impl(ty, &mut vec![]);
     }
 
-    pub(crate) fn add_positive_impl(&mut self, ty: Type<'db>, seen_aliases: &mut Vec<Type<'db>>) {
+    fn add_positive_impl(&mut self, ty: Type<'db>, seen_aliases: &mut Vec<Type<'db>>) {
         match ty {
             Type::TypeAlias(alias) => {
                 if seen_aliases.contains(&ty) {
@@ -1301,7 +1301,7 @@ impl<'db> IntersectionBuilder<'db> {
         self.add_negative_impl(ty, &mut vec![]);
     }
 
-    pub(crate) fn add_negative_impl(&mut self, ty: Type<'db>, seen_aliases: &mut Vec<Type<'db>>) {
+    fn add_negative_impl(&mut self, ty: Type<'db>, seen_aliases: &mut Vec<Type<'db>>) {
         // See comments above in `add_positive`; this is just the negated version.
         match ty {
             Type::TypeAlias(alias) => {
