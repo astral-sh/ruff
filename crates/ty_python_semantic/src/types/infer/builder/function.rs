@@ -5,11 +5,11 @@ use crate::{
         KnownClass, KnownInstanceType, ParamSpecAttrKind, SubclassOfInner, SubclassOfType, Type,
         TypeContext, TypeVarKind, UnionType,
         diagnostic::{
-            FINAL_ON_NON_METHOD, INVALID_PARAMETER_DEFAULT, INVALID_PARAMSPEC, INVALID_TYPE_FORM,
-            USELESS_OVERLOAD_BODY, add_type_expression_reference_link,
-            is_invalid_typed_dict_literal, report_implicit_return_type,
-            report_invalid_generator_function_return_type, report_invalid_return_type,
-            report_shadowed_type_variable,
+            ABSTRACT_AND_FINAL_METHOD, FINAL_ON_NON_METHOD, INVALID_PARAMETER_DEFAULT,
+            INVALID_PARAMSPEC, INVALID_TYPE_FORM, USELESS_OVERLOAD_BODY,
+            add_type_expression_reference_link, is_invalid_typed_dict_literal,
+            report_implicit_return_type, report_invalid_generator_function_return_type,
+            report_invalid_return_type, report_shadowed_type_variable,
         },
         function::{
             FunctionBodyKind, FunctionDecorators, FunctionLiteral, FunctionType, KnownFunction,
@@ -379,6 +379,20 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 "`@final` cannot be applied to non-method function `{name}`",
             ));
             diagnostic.info("`@final` is only meaningful on methods and classes");
+        }
+
+        if function_decorators
+            .contains(FunctionDecorators::ABSTRACT_METHOD | FunctionDecorators::FINAL)
+            && self
+                .index
+                .scope(self.scope().file_scope_id(db))
+                .kind()
+                .is_class()
+            && let Some(builder) = self.context.report_lint(&ABSTRACT_AND_FINAL_METHOD, name)
+        {
+            builder.into_diagnostic(format_args!(
+                "Method `{name}` cannot be both `@abstractmethod` and `@final`",
+            ));
         }
 
         let has_defaults = parameters

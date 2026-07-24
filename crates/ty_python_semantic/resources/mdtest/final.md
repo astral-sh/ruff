@@ -452,6 +452,65 @@ class F:
         def not_a_method(): ...
 ```
 
+## A method cannot be both abstract and final
+
+An abstract method must be overridden for a subclass to become concrete, but a final method cannot
+be overridden.
+
+```py
+from abc import abstractmethod
+from typing import final
+
+class A:
+    @final
+    @abstractmethod
+    def first(self) -> None: ...  # error: [abstract-and-final-method]
+
+    # Decorator order does not matter.
+    @abstractmethod
+    @final
+    def second(self) -> None: ...  # error: [abstract-and-final-method]
+    @abstractmethod
+    def abstract(self) -> None: ...
+    @final
+    def final(self) -> None: ...
+```
+
+## An overloaded method cannot be both abstract and final
+
+`runtime.py`:
+
+```py
+from abc import ABC, abstractmethod
+from typing import final, overload
+
+class A(ABC):
+    @overload
+    def method(self, value: int) -> int: ...
+    @overload
+    def method(self, value: str) -> str: ...
+    @final
+    @abstractmethod
+    def method(self, value: int | str) -> int | str:  # error: [abstract-and-final-method]
+        raise NotImplementedError
+```
+
+`stub.pyi`:
+
+```pyi
+from abc import abstractmethod
+from typing import final, overload
+
+class A:
+    @overload
+    @final
+    @abstractmethod
+    def method(self, value: int) -> int: ...  # error: [abstract-and-final-method]
+    @overload
+    @abstractmethod
+    def method(self, value: str) -> str: ...
+```
+
 ## An `@final` method is overridden by an implicit instance attribute
 
 ```py
