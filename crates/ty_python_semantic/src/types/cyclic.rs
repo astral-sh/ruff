@@ -34,14 +34,18 @@ use ty_python_core::definition::Definition;
 use crate::Db;
 use crate::types::function::FunctionLiteral;
 use crate::types::generics::Specialization;
+use crate::types::list_members::all_members;
 use crate::types::visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard};
-use crate::types::{ClassType, ProtocolInstanceType, Type, TypeAliasType, TypedDictType};
+use crate::types::{
+    ClassType, NominalInstanceType, ProtocolInstanceType, Type, TypeAliasType, TypedDictType,
+};
 
 /// The type identity used for recursive checks/transformations.
 #[derive(Debug, Clone, Copy, Eq, Hash, PartialEq)]
 pub enum TypeIdentity<'db> {
     FunctionLiteral(FunctionLiteral<'db>),
     NewTypeInstance(Definition<'db>),
+    RecursiveNominalInstance(Definition<'db>),
     RecursiveProtocol(Definition<'db>),
     RecursiveTypeAlias(Definition<'db>),
     RecursiveTypedDict(Definition<'db>),
@@ -67,6 +71,9 @@ impl<'db> Type<'db> {
             (Type::NewTypeInstance(a), Type::NewTypeInstance(b)) => {
                 a.definition(db) == b.definition(db)
             }
+            (Type::NominalInstance(a), Type::NominalInstance(b)) => {
+                a.definition(db) == b.definition(db)
+            }
             (Type::ProtocolInstance(a), Type::ProtocolInstance(b)) => {
                 a.definition(db) == b.definition(db)
             }
@@ -89,6 +96,9 @@ impl<'db> Type<'db> {
             Type::NewTypeInstance(newtype) => {
                 Some(TypeIdentity::NewTypeInstance(newtype.definition(db)))
             }
+            Type::NominalInstance(instance) if instance.is_recursive(db) => Some(
+                TypeIdentity::RecursiveNominalInstance(instance.definition(db)?),
+            ),
             // Type aliases can be self-referential: e.g. `type RecursiveT = int | tuple[RecursiveT, ...]`
             Type::TypeAlias(alias) if alias.is_recursive(db) => {
                 Some(TypeIdentity::RecursiveTypeAlias(alias.definition(db)))
@@ -138,6 +148,7 @@ impl<'db> DefinitionReferenceVisitor<'db> {
         }
 
         let class = match ty {
+            Type::NominalInstance(instance) => instance.class(db),
             Type::ProtocolInstance(protocol) => *protocol.class_origin()?,
             Type::TypedDict(typed_dict) => typed_dict.defining_class()?,
             _ => return None,
@@ -158,6 +169,7 @@ impl<'db> DefinitionReferenceVisitor<'db> {
     fn visit_definition_body(&self, db: &'db dyn Db, ty: Type<'db>) {
         match ty {
             Type::TypeAlias(alias) => self.visit_type_alias_type(db, alias),
+            Type::NominalInstance(instance) => self.visit_nominal_instance_type(db, instance),
             Type::ProtocolInstance(protocol) => self.visit_protocol_instance_type(db, protocol),
             Type::TypedDict(typed_dict) => self.visit_typed_dict_type(db, typed_dict),
             _ => {}
@@ -203,6 +215,20 @@ impl<'db> TypeVisitor<'db> for DefinitionReferenceVisitor<'db> {
         }
     }
 
+    fn visit_nominal_instance_type(&self, db: &'db dyn Db, nominal: NominalInstanceType<'db>) {
+        let mut members = all_members(db, Type::NominalInstance(nominal))
+            .into_iter()
+            .collect::<Vec<_>>();
+        members.sort_unstable();
+        for member in members {
+            match member.ty {
+                // Method relations have a separate declaration-based recursion guard.
+                Type::FunctionLiteral(_) | Type::BoundMethod(_) | Type::KnownBoundMethod(_) => {}
+                ty => self.visit_type(db, ty),
+            }
+        }
+    }
+
     fn visit_type_alias_type(&self, db: &'db dyn Db, alias: TypeAliasType<'db>) {
         self.visit_type(db, alias.raw_value_type(db));
     }
@@ -224,6 +250,25 @@ impl<'db> TypeAliasType<'db> {
             Type::TypeAlias(self.unspecialized(db)),
             self.definition(db),
         )
+    }
+}
+
+impl<'db> NominalInstanceType<'db> {
+    fn definition(self, db: &'db dyn Db) -> Option<Definition<'db>> {
+        self.class(db).definition(db)
+    }
+
+    fn is_recursive(self, db: &'db dyn Db) -> bool {
+        // Exact tuples carry element types directly and can only be recursive through an alias.
+        if self.own_tuple_spec(db).is_some() {
+            return false;
+        }
+        let Some((origin, _)) = self.class(db).static_class_literal(db) else {
+            return false;
+        };
+        let definition = origin.definition(db);
+        let unspecialized = Type::instance(db, ClassType::NonGeneric(origin.into()));
+        DefinitionReferenceVisitor::references(db, unspecialized, definition)
     }
 }
 

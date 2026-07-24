@@ -5409,6 +5409,30 @@ class NestedRightProtocol[T](Protocol):
 static_assert(not is_subtype_of(NestedLeftProtocol[int], NestedRightProtocol[int]))
 ```
 
+### Nominal implementations of recursively-specialized protocols
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from __future__ import annotations
+
+from typing import Protocol
+
+class Impl[T]:
+    child: Impl[list[T]]
+
+class Proto[T](Protocol):
+    child: Proto[list[T]]
+
+def assign(value: Impl[int]) -> Proto[int]:
+    # TODO: This should be accepted once recursive structural relations can represent an
+    # indeterminate result instead of conservatively rejecting the recursive pair.
+    return value  # error: [invalid-return-type]
+```
+
 ### Disjointness of recursive protocol and recursive final type
 
 ```py
