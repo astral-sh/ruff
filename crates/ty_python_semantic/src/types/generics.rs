@@ -2322,10 +2322,13 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         choose: &mut impl FnMut(BoundTypeVarInstance<'db>, Option<&PathBound<'db>>) -> Option<Type<'db>>,
     ) -> Result<FxHashMap<BoundTypeVarIdentity<'db>, Type<'db>>, ()> {
         // TODO: Move `ParamSpec` and `TypeVarTuple` handling to the new constraint solver.
-        let has_legacy_variadic = generic_context
+        if generic_context
             .variables_inner(self.db)
             .values()
-            .any(|typevar| typevar.is_paramspec(self.db) || typevar.is_typevartuple(self.db));
+            .any(|typevar| typevar.is_paramspec(self.db) || typevar.is_typevartuple(self.db))
+        {
+            return Ok(self.solve_hash_map_with(generic_context, choose));
+        }
 
         // TODO: This projection / solve can be expensive for large-union collection-literal type
         // contexts. During the pending-constraint-set migration, pydantic and hydra-zen regressed
@@ -2346,12 +2349,6 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             }
             Solutions::Constrained(solutions) => solutions,
         };
-
-        // Validate all pending constraints before falling back; variadic inference can still
-        // share a context with ordinary type variables whose bounds may be contradictory.
-        if has_legacy_variadic {
-            return Ok(self.solve_hash_map_with(generic_context, choose));
-        }
 
         let mut types = FxHashMap::default();
         for solution in solutions {
@@ -2793,7 +2790,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
 
     /// Records an actual-intersection constraint set and preserves one diagnostic for all failed
     /// positive elements. Lower-bound evidence meets across those elements; upper-bound evidence
-    /// joins.
+    /// joins. Valid paths also populate the legacy map when variadic inference may fall back to it.
     fn infer_from_intersection_constraint_set(
         &mut self,
         when: ConstraintSet<'db, 'c>,
@@ -2814,6 +2811,23 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             },
         );
         self.pending.intersect(self.db, self.constraints, when);
+
+        if self
+            .inferable
+            .iter(self.db)
+            .any(|typevar| typevar.is_paramspec(self.db) || typevar.is_typevartuple(self.db))
+            && let Solutions::Constrained(solutions) = &solutions
+        {
+            for solution in solutions {
+                for binding in solution {
+                    let solution = self.remove_inferable_typevar_artifacts_from_solution(
+                        binding.bound_typevar,
+                        binding.solution,
+                    );
+                    self.insert_hash_map_type_mapping(binding.bound_typevar, solution);
+                }
+            }
+        }
 
         if !matches!(solutions, Solutions::Unsatisfiable) {
             return Ok(());

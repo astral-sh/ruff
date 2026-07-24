@@ -71,6 +71,29 @@ reveal_type(invoke(format_value, 1, "value"))  # revealed: str
 reveal_type(invoke(format_value, 1))  # revealed: str
 ```
 
+A callable that forwards a `ParamSpec` can also be passed with its arguments to a callable whose
+parameters are described by a `TypeVarTuple`:
+
+```py
+from typing import Awaitable, Callable, ParamSpec, TypeVarTuple, Unpack
+
+P = ParamSpec("P")
+Ts = TypeVarTuple("Ts")
+
+def start_soon(
+    async_fn: Callable[[Unpack[Ts]], Awaitable[object]],
+    *args: Unpack[Ts],
+) -> None: ...
+async def forward(
+    async_fn: Callable[P, Awaitable[object]],
+    *args: P.args,
+    **kwargs: P.kwargs,
+) -> None: ...
+async def one_arg(value: int) -> None: ...
+
+start_soon(forward, one_arg, 1)
+```
+
 ## Type aliases
 
 A legacy alias can use `Unpack[Ts]` and accept either individual types or an unpacked tuple type.
