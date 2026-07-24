@@ -2,10 +2,11 @@ use itertools::Itertools;
 use ruff_python_ast::{self as ast, Expr};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_text_size::Ranged;
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::rules::pylint::rules::StripKind;
 
 /// ## What it does
 /// Checks for uses of multi-character strings in `.strip()`, `.lstrip()`, and
@@ -43,15 +44,18 @@ use crate::checkers::ast::Checker;
 /// ```
 ///
 /// ## References
-/// - [Python documentation: `str.strip`](https://docs.python.org/3/library/stdtypes.html#str.strip)
+/// - [Python documentation: `str.strip()`](https://docs.python.org/3/library/stdtypes.html#str.strip)
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.106")]
-pub(crate) struct StripWithMultiCharacters;
+pub(crate) struct StripWithMultiCharacters {
+    strip: StripKind,
+}
 
 impl Violation for StripWithMultiCharacters {
     #[derive_message_formats]
     fn message(&self) -> String {
-        "Using `.strip()` with multi-character strings is misleading".to_string()
+        let Self { strip } = self;
+        format!("Using `.{strip}()` with multi-character strings is misleading")
     }
 }
 
@@ -65,15 +69,18 @@ pub(crate) fn strip_with_multi_characters(
     let Expr::Attribute(ast::ExprAttribute { attr, .. }) = func else {
         return;
     };
-    if !matches!(attr.as_str(), "strip" | "lstrip" | "rstrip") {
+    let Some(strip) = StripKind::from_str(attr.as_str()) else {
         return;
-    }
+    };
 
     let [Expr::StringLiteral(ast::ExprStringLiteral { value, .. })] = args else {
         return;
     };
 
     if value.chars().count() > 1 && !value.chars().all_unique() {
-        checker.report_diagnostic(StripWithMultiCharacters, expr.range());
+        checker.report_diagnostic(
+            StripWithMultiCharacters { strip },
+            TextRange::new(attr.start(), expr.end()),
+        );
     }
 }
