@@ -913,7 +913,7 @@ impl Diagnostic {
 
                 SubDiagnostic {
                     severity: sub_diagnostic.severity().into(),
-                    message: sub_diagnostic.primary_message().to_string(),
+                    message: sub_diagnostic.headline_message().to_string(),
                     annotations,
                 }
             })

@@ -1289,7 +1289,7 @@ fn report_invalid_attribute_override<'db>(
 
     let mut diagnostic =
         builder.into_diagnostic(format_args!("Invalid override of attribute `{member}`"));
-    diagnostic.set_primary_message(format_args!(
+    diagnostic.set_primary_annotation_message(format_args!(
         "{subclass_kind} cannot override {superclass_kind} `{superclass_member}`"
     ));
     diagnostic.info("This violates the Liskov Substitution Principle");

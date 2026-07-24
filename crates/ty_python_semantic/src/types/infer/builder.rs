@@ -3627,7 +3627,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .report_lint(&INVALID_NEWTYPE, &arguments.args[1])
             {
                 let mut diag = builder.into_diagnostic("invalid base for `typing.NewType`");
-                diag.set_primary_message("A `NewType` base cannot be generic");
+                diag.set_primary_annotation_message("A `NewType` base cannot be generic");
             }
             return;
         }
@@ -3653,7 +3653,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .report_lint(&INVALID_NEWTYPE, &arguments.args[1])
         {
             let mut diag = builder.into_diagnostic("invalid base for `typing.NewType`");
-            diag.set_primary_message(format!("type `{}`", inferred.display(self.db())));
+            diag.set_primary_annotation_message(format!("type `{}`", inferred.display(self.db())));
             if matches!(inferred, Type::ProtocolInstance(_)) {
                 diag.info("The base of a `NewType` is not allowed to be a protocol class.");
             } else if matches!(inferred, Type::TypedDict(_)) {
@@ -4086,7 +4086,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 .secondary(annotation.as_ref())
                                 .message("Declared type"),
                         );
-                        diag.set_primary_message(format_args!(
+                        diag.set_primary_annotation_message(format_args!(
                             "Incompatible value of type `{}`",
                             value_ty.display(self.db()),
                         ));
@@ -4948,7 +4948,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             };
             let mut diag =
                 builder.into_diagnostic(format_args!("Invalid global declaration of `{name}`"));
-            diag.set_primary_message(format_args!(
+            diag.set_primary_annotation_message(format_args!(
                 "`{name}` has no declarations or bindings in the global scope"
             ));
             diag.info("This limits ty's ability to make accurate inferences about the boundness and types of global-scope symbols");
@@ -7276,7 +7276,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         let mut diag = builder
                             .into_diagnostic("Argument expression after ** must be a mapping type");
 
-                        diag.set_primary_message(format_args!(
+                        diag.set_primary_annotation_message(format_args!(
                             "Found `{}`",
                             unpack_ty.display(self.db())
                         ));
@@ -8256,7 +8256,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             builder
                 .into_diagnostic("Argument expression after ** must be a mapping type")
-                .set_primary_message(format_args!("Found `{}`", mapping_type.display(self.db())));
+                .set_primary_annotation_message(format_args!(
+                    "Found `{}`",
+                    mapping_type.display(self.db())
+                ));
         }
 
         call_arguments
@@ -9294,7 +9297,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             let mut diag =
                 builder.into_diagnostic(format_args!(r#"The class `{class_name}` is deprecated"#));
             if let Some(message) = deprecated.message {
-                diag.set_primary_message(message.value(self.db()));
+                diag.set_primary_annotation_message(message.value(self.db()));
             }
             diag.add_primary_tag(ruff_db::diagnostic::DiagnosticTag::Deprecated);
             return;
@@ -9326,7 +9329,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let mut diag =
             builder.into_diagnostic(format_args!(r#"The function `{func_name}` is deprecated"#));
         if let Some(message) = deprecated.message {
-            diag.set_primary_message(message.value(self.db()));
+            diag.set_primary_annotation_message(message.value(self.db()));
         }
         diag.add_primary_tag(ruff_db::diagnostic::DiagnosticTag::Deprecated);
     }
@@ -9878,7 +9881,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // because it's already caught by typing.Type.
         if Program::get(self.db()).python_version(self.db()) >= PythonVersion::PY39 {
             if let Some(("", builtin_name)) = as_pep_585_generic("typing", id) {
-                diagnostic.set_primary_message(format_args!("Did you mean `{builtin_name}`?"));
+                diagnostic
+                    .set_primary_annotation_message(format_args!("Did you mean `{builtin_name}`?"));
             }
         }
 
@@ -11969,7 +11973,7 @@ impl<'db, 'ast> AddBinding<'db, 'ast> {
                         "Reassignment of `Final` symbol `{place}` is not allowed"
                     ));
 
-                    diagnostic.set_primary_message("Reassignment of `Final` symbol");
+                    diagnostic.set_primary_annotation_message("Reassignment of `Final` symbol");
 
                     if let Some(previous_definition) = previous_definition {
                         // It is not very helpful to show the previous definition if it results from
@@ -11996,7 +12000,8 @@ impl<'db, 'ast> AddBinding<'db, 'ast> {
                                         .message("Symbol declared as `Final` here"),
                                 );
                             }
-                            diagnostic.set_primary_message("Symbol later reassigned here");
+                            diagnostic
+                                .set_primary_annotation_message("Symbol later reassigned here");
                         }
                     }
                 }

@@ -213,7 +213,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 "Cannot assign to final attribute `{attribute}` on type `{}`",
                 object_ty.display(db)
             ));
-            diagnostic.set_primary_message(if is_dataclass_like {
+            diagnostic.set_primary_annotation_message(if is_dataclass_like {
                 "`Final` attributes can only be assigned in the class body, `__init__`, or `__post_init__` on dataclass-like classes"
             } else {
                 "`Final` attributes can only be assigned in the class body or `__init__`"
@@ -262,7 +262,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 {
                     let mut diagnostic =
                         diag_builder.into_diagnostic("Invalid assignment to final attribute");
-                    diagnostic.set_primary_message(format_args!(
+                    diagnostic.set_primary_annotation_message(format_args!(
                         "`{attribute}` already has a value in the class body"
                     ));
                     if let Some(final_declaration) = final_declaration {
@@ -301,7 +301,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     "Cannot delete final attribute `{attribute}` on type `{}`",
                     object_ty.display(db)
                 ));
-                diagnostic.set_primary_message("`Final` attributes cannot be deleted");
+                diagnostic.set_primary_annotation_message("`Final` attributes cannot be deleted");
                 if let Some(final_declaration) = final_declaration {
                     self.annotate_final_declaration(&mut diagnostic, final_declaration);
                 }
