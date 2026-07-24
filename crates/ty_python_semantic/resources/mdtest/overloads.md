@@ -806,6 +806,173 @@ def generic_parameter_type(x: int) -> int | str:
     return x
 ```
 
+### Decorated implementation consistency
+
+Decorators on an overload implementation apply only to the implementation signature. The decorated
+signature is checked against the overloads, while callers continue to see only the overloads.
+
+```py
+from typing import Callable, overload
+
+def widen_return(func: Callable[[int | str], int]) -> Callable[[int | str], int | str]:
+    raise NotImplementedError
+
+@overload
+def widened(x: int, /) -> int: ...
+@overload
+def widened(x: str, /) -> str: ...
+@widen_return
+def widened(x: int | str) -> int:
+    return 1
+
+reveal_type(widened)  # revealed: Overload[(x: int, /) -> int, (x: str, /) -> str]
+reveal_type(widened(1))  # revealed: int
+reveal_type(widened("one"))  # revealed: str
+
+def narrow_parameter(func: Callable[[int | str], int | str]) -> Callable[[int], int | str]:
+    raise NotImplementedError
+
+@overload
+def narrowed(x: int, /) -> int: ...
+@overload
+# error: [invalid-overload] "Implementation does not accept all arguments of this overload"
+def narrowed(x: str, /) -> str: ...
+@narrow_parameter
+def narrowed(x: int | str) -> int | str:
+    return x
+
+reveal_type(narrowed)  # revealed: Overload[(x: int, /) -> int, (x: str, /) -> str]
+reveal_type(narrowed(1))  # revealed: int
+reveal_type(narrowed("one"))  # revealed: str
+```
+
+### Decorated implementation replaced by a function
+
+A decorator can replace an overload implementation with another function. The overload set remains
+visible to callers, the replacement signature is checked for consistency, and an outer `@deprecated`
+decorator still applies to the overload set.
+
+```py
+from collections.abc import Callable
+from typing import Any, TypeVar, overload
+from typing_extensions import deprecated
+
+R = TypeVar("R")
+
+def replacement(x: int, /) -> int:
+    return x
+
+def replace_with(value: R) -> Callable[[Callable[..., Any]], R]:
+    def decorator(_function: Callable[..., Any]) -> R:
+        return value
+    return decorator
+
+@overload
+def replaced(x: int, /) -> int: ...
+@overload
+# error: [invalid-overload] "Overload signature is not consistent with implementation"
+def replaced(x: str, /) -> str: ...
+@deprecated("use replacement directly")
+@replace_with(replacement)
+def replaced(x: int | str) -> int | str:
+    return x
+
+# error: [deprecated] "use replacement directly"
+reveal_type(replaced)  # revealed: Overload[(x: int, /) -> int, (x: str, /) -> str]
+# error: [deprecated] "use replacement directly"
+reveal_type(replaced("one"))  # revealed: str
+```
+
+### Decorated implementation with multiple callable signatures
+
+An overloaded callback protocol can provide one implementation signature for each overload. Every
+callable in a union must support every overload. A decorator that returns a non-callable cannot
+implement any overload.
+
+```py
+from typing import Callable, Protocol, overload
+
+class ValidCallback(Protocol):
+    @overload
+    def __call__(self, x: int, /) -> int: ...
+    @overload
+    def __call__(self, x: str, /) -> str: ...
+
+class NarrowCallback(Protocol):
+    @overload
+    def __call__(self, x: int, /) -> int: ...
+    @overload
+    def __call__(self, x: bytes, /) -> bytes: ...
+
+def valid_callback(func: Callable[[int | str], int | str]) -> ValidCallback:
+    raise NotImplementedError
+
+def narrow_callback(func: Callable[[int | str], int | str]) -> NarrowCallback:
+    raise NotImplementedError
+
+def valid_union(
+    func: Callable[[int | str], int | str],
+) -> Callable[[int | str], int | str] | Callable[[object], object]:
+    raise NotImplementedError
+
+def narrow_union(
+    func: Callable[[int | str], int | str],
+) -> Callable[[int | str], int | str] | Callable[[int], int]:
+    raise NotImplementedError
+
+def noncallable(func: Callable[[int | str], int | str]) -> int:
+    raise NotImplementedError
+
+@overload
+def callback_valid(x: int, /) -> int: ...
+@overload
+def callback_valid(x: str, /) -> str: ...
+@valid_callback
+def callback_valid(x: int | str) -> int | str:
+    return x
+
+@overload
+def callback_narrowed(x: int, /) -> int: ...
+@overload
+# error: [invalid-overload] "Overload signature is not consistent with implementation"
+def callback_narrowed(x: str, /) -> str: ...
+@narrow_callback
+def callback_narrowed(x: int | str) -> int | str:
+    return x
+
+@overload
+def union_valid(x: int, /) -> int: ...
+@overload
+def union_valid(x: str, /) -> str: ...
+@valid_union
+def union_valid(x: int | str) -> int | str:
+    return x
+
+@overload
+def union_narrowed(x: int, /) -> int: ...
+@overload
+# error: [invalid-overload] "Overload signature is not consistent with implementation"
+def union_narrowed(x: str, /) -> str: ...
+@narrow_union
+def union_narrowed(x: int | str) -> int | str:
+    return x
+
+@overload
+def not_callable(x: int, /) -> int: ...
+@overload
+def not_callable(x: str, /) -> str: ...
+@noncallable
+# error: [invalid-overload] "Overload implementation is not callable after applying decorators"
+def not_callable(x: int | str) -> int | str:
+    return x
+
+reveal_type(callback_valid)  # revealed: Overload[(x: int, /) -> int, (x: str, /) -> str]
+reveal_type(callback_narrowed)  # revealed: Overload[(x: int, /) -> int, (x: str, /) -> str]
+reveal_type(union_valid)  # revealed: Overload[(x: int, /) -> int, (x: str, /) -> str]
+reveal_type(union_narrowed)  # revealed: Overload[(x: int, /) -> int, (x: str, /) -> str]
+reveal_type(not_callable)  # revealed: Overload[(x: int, /) -> int, (x: str, /) -> str]
+```
+
 ### Implementation consistency parameter mismatch diagnostics
 
 Non-generic implementation checks require parameter names and positional-only forms to line up with
