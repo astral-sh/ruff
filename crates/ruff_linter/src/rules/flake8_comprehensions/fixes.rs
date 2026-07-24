@@ -254,8 +254,7 @@ pub(crate) fn fix_unnecessary_collection_call(
                 .as_ref()
                 .expect("Expected dictionary argument to be kwarg")
                 .value
-                .nfkc()
-                .collect::<String>(),
+                .nfkc(),
             quote,
         );
         arena.push(quoted);
