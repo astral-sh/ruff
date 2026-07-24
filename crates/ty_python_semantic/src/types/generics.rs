@@ -3412,6 +3412,17 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                     self.infer_map_impl(positive, actual, polarity, seen)?;
                 }
             }
+            (formal, Type::Intersection(actual_intersection))
+                if polarity.is_covariant()
+                    && actual_intersection.positive(self.db).len() == 1
+                    && let Some(positive) = actual_intersection.iter_positive(self.db).next() =>
+            {
+                // Discarding negative elements is an upcast in covariant position. In
+                // particular, keep truthiness-narrowed callables containing `ParamSpec` or
+                // `TypeVarTuple` on the legacy inference path, since the new solver does not yet
+                // support those variadics.
+                return self.infer_map_impl(formal, positive, polarity, seen);
+            }
             (formal, actual @ Type::Intersection(_)) => {
                 let when = self.when_assignable_with_polarity(formal, actual, polarity);
                 self.infer_from_intersection_constraint_set(when)?;
