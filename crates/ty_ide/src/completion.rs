@@ -96,6 +96,7 @@ pub fn completion<'db>(
                 }
                 add_keyword_completions(db, &mut completions);
                 add_argument_completions(db, &model, &context.cursor, &mut completions);
+                add_match_case_completions(db, &model, &context.cursor, &mut completions);
                 if settings.auto_import {
                     add_unimported_completions(
                         db,
@@ -1933,6 +1934,37 @@ fn add_argument_completions<'db>(
                     return;
                 }
             }
+        }
+    }
+}
+
+/// Detect and add completions for match pattern cases.
+fn add_match_case_completions<'db>(
+    _db: &'db dyn Db,
+    model: &SemanticModel<'db>,
+    cursor: &ContextCursor<'_>,
+    completions: &mut Completions<'db>,
+) {
+    let mut current_case = None;
+
+    for node in cursor.covering_node.ancestors() {
+        match node {
+            ast::AnyNodeRef::StmtMatch(match_stmt) => {
+                if let Some(current_case) = current_case {
+                    for candidate in model.match_case_completions(match_stmt, current_case) {
+                        completions
+                            .add(Completion::builder(candidate.value).context_specific(true));
+                    }
+                }
+
+                return;
+            }
+            ast::AnyNodeRef::MatchCase(case) => {
+                if case.pattern.range().contains_range(cursor.range) {
+                    current_case = Some(case);
+                }
+            }
+            _ => {}
         }
     }
 }
@@ -8370,6 +8402,55 @@ match status:
             builder.build().snapshot(),
             @"<No completions found>",
         );
+    }
+
+    #[test]
+    fn match_pattern_suggests_cases() {
+        let source = "\
+class Color(Enum):
+      RED = 1
+      BLUE = 2
+
+match status:
+    case C<CURSOR>:
+        pass
+    ";
+
+        let builder = completion_test_builder(source);
+        let test = builder.build();
+
+        test.contains("Color.RED");
+        test.contains("Color.BLUE");
+    }
+
+    #[test]
+    fn match_pattern_does_not_suggest_cases_outside_pattern() {
+        for source in [
+            "\
+class Color(Enum):
+        RED = 1
+        BLUE = 2
+
+match status:
+    case _ if C<CURSOR>:
+        pass
+",
+            "\
+class Color(Enum):
+        RED = 1
+        BLUE = 2
+
+match status:
+    case _:
+        C<CURSOR>
+",
+        ] {
+            let builder = completion_test_builder(source);
+            let test = builder.build();
+
+            test.not_contains("Color.RED");
+            test.not_contains("Color.BLUE");
+        }
     }
 
     #[test]
