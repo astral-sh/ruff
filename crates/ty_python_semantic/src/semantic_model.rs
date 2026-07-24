@@ -524,6 +524,22 @@ impl<'db> SemanticModel<'db> {
         }
     }
 
+    /// Returns completion candidates for a case in a `match` statement.
+    pub fn match_case_completions(
+        &self,
+        _match_stmt: &ast::StmtMatch,
+        _current_case: &ast::MatchCase,
+    ) -> Vec<MatchCaseCompletion> {
+        vec![
+            MatchCaseCompletion {
+                value: "Color.RED".into(),
+            },
+            MatchCaseCompletion {
+                value: "Color.BLUE".into(),
+            },
+        ]
+    }
+
     /// Returns completion candidates for a string-literal expression based on its expected type.
     pub fn expected_string_literal_completions(
         &self,
@@ -663,6 +679,11 @@ pub struct Completion<'db> {
 pub struct ExpectedStringLiteralCompletion<'db> {
     pub value: String,
     pub ty: Type<'db>,
+}
+
+#[derive(Clone, Debug)]
+pub struct MatchCaseCompletion {
+    pub value: String,
 }
 
 pub trait HasType {
