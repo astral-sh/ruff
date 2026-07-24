@@ -46,7 +46,8 @@ inline-quotes = "single"
     test.py:1:5: Q000 [*] Double quotes found but single quotes preferred
     test.py:1:5: B005 Using `.strip()` with multi-character strings is misleading
     test.py:1:19: Q000 [*] Double quotes found but single quotes preferred
-    Found 3 errors.
+    test.py:1:19: PLE1310 String `strip` call contains duplicate characters
+    Found 4 errors.
     [*] 2 fixable with the `--fix` option.
 
     ----- stderr -----
@@ -83,7 +84,8 @@ inline-quotes = "single"
     -:1:5: Q000 [*] Double quotes found but single quotes preferred
     -:1:5: B005 Using `.strip()` with multi-character strings is misleading
     -:1:19: Q000 [*] Double quotes found but single quotes preferred
-    Found 3 errors.
+    -:1:19: PLE1310 String `strip` call contains duplicate characters
+    Found 4 errors.
     [*] 2 fixable with the `--fix` option.
 
     ----- stderr -----
@@ -117,7 +119,8 @@ inline-quotes = "single"
     -:1:5: Q000 [*] Double quotes found but single quotes preferred
     -:1:5: B005 Using `.strip()` with multi-character strings is misleading
     -:1:19: Q000 [*] Double quotes found but single quotes preferred
-    Found 3 errors.
+    -:1:19: PLE1310 String `strip` call contains duplicate characters
+    Found 4 errors.
     [*] 2 fixable with the `--fix` option.
 
     ----- stderr -----
@@ -157,7 +160,8 @@ inline-quotes = "single"
     -:1:5: Q000 [*] Double quotes found but single quotes preferred
     -:1:5: B005 Using `.strip()` with multi-character strings is misleading
     -:1:19: Q000 [*] Double quotes found but single quotes preferred
-    Found 3 errors.
+    -:1:19: PLE1310 String `strip` call contains duplicate characters
+    Found 4 errors.
     [*] 2 fixable with the `--fix` option.
 
     ----- stderr -----
@@ -2610,7 +2614,6 @@ fn add_ignore() -> Result<()> {
         fixture
             .check_command()
             .arg("--select=RUF015")
-            .arg("--preview")
             .arg("--add-ignore"),
         @"
         success: true
@@ -2628,37 +2631,10 @@ fn add_ignore() -> Result<()> {
         test_code,
         @"
 
-        def first_square():
-            return [x * x for x in range(20)][0]  # ruff:ignore[unnecessary-iterable-allocation-for-first-element]
-        ",
+    def first_square():
+        return [x * x for x in range(20)][0]  # ruff: ignore[RUF015]
+    ",
     );
-
-    Ok(())
-}
-
-#[test]
-fn add_ignore_requires_preview() -> Result<()> {
-    let fixture = CliTest::new()?;
-    fixture.write_file("noqa.py", "import os\n")?;
-
-    assert_cmd_snapshot!(
-        fixture
-            .check_command()
-            .arg("--select=F401")
-            .arg("--add-ignore"),
-        @"
-        success: false
-        exit_code: 2
-        ----- stdout -----
-
-        ----- stderr -----
-        ruff failed
-          Cause: `--add-ignore` requires preview mode, but preview is disabled for `[TMP]/noqa.py`
-        ",
-    );
-
-    let test_code = fixture.read_file("noqa.py")?;
-    insta::assert_snapshot!(test_code, @"import os");
 
     Ok(())
 }
@@ -2685,7 +2661,6 @@ fn add_noqa_existing_ignore() -> Result<()> {
         ----- stdout -----
 
         ----- stderr -----
-        warning: #ruff:ignore comment found but not active, enable preview mode
         Added 1 noqa directive.
         ",
     );
@@ -2696,7 +2671,7 @@ fn add_noqa_existing_ignore() -> Result<()> {
         test_code,
         @"
 
-        def unused(x):  # ruff:ignore[ANN001, ARG001, D103]  # noqa: ANN001, ANN201, D103
+        def unused(x):  # ruff:ignore[ANN001, ARG001, D103]  # noqa: ANN201
             pass
         ",
     );
@@ -3744,18 +3719,18 @@ def foo():
             ])
             .pass_stdin(source),
         @"
-        success: true
-        exit_code: 0
-        ----- stdout -----
-        # ruff:file-ignore[unused-import]
-        import os
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    # ruff: file-ignore[unused-import]
+    import os
 
-        def foo():
-            value = 1  # ruff:ignore[unused-variable]
+    def foo():
+        value = 1  # ruff: ignore[unused-variable]
 
-        ----- stderr -----
-        Found 4 errors (4 fixed, 0 remaining).
-        ",
+    ----- stderr -----
+    Found 4 errors (4 fixed, 0 remaining).
+    ",
     );
 
     Ok(())
@@ -3981,7 +3956,7 @@ fn walrus_before_py38() {
         .args(["--stdin-filename", "test.py"])
         .arg("--target-version=py38")
         .arg("-")
-        .pass_stdin(r#"(x := 1)"#),
+        .pass_stdin(r#"if (x := 1): ..."#),
         @"
     success: true
     exit_code: 0
@@ -3998,12 +3973,12 @@ fn walrus_before_py38() {
         .args(["--stdin-filename", "test.py"])
         .arg("--target-version=py37")
         .arg("-")
-        .pass_stdin(r#"(x := 1)"#),
+        .pass_stdin(r#"if (x := 1): ..."#),
         @"
     success: false
     exit_code: 1
     ----- stdout -----
-    test.py:1:2: invalid-syntax: Cannot use named assignment expression (`:=`) on Python 3.7 (syntax was added in Python 3.8)
+    test.py:1:5: invalid-syntax: Cannot use named assignment expression (`:=`) on Python 3.7 (syntax was added in Python 3.8)
     Found 1 error.
 
     ----- stderr -----
@@ -4767,7 +4742,7 @@ fn supported_file_extensions_preview_enabled() -> Result<()> {
 }
 
 #[test]
-fn preview_default_rules() -> Result<()> {
+fn default_rules() -> Result<()> {
     let test = CliTest::with_settings(|_path, mut settings| {
         settings.add_filter(r"(?s).*(linter\.rules\.enabled[^]]+]).*", "$1");
         settings
@@ -4776,7 +4751,7 @@ fn preview_default_rules() -> Result<()> {
     test.write_file("try.py", "1")?;
 
     assert_cmd_snapshot!(
-        test.check_command().args(["--preview", "--show-settings"]),
+        test.check_command().arg("--show-settings"),
         @"
     linter.rules.enabled = [
     	sys-version-slice3 (YTT101),
@@ -4869,6 +4844,7 @@ fn preview_default_rules() -> Result<()> {
     	f-string-in-get-text-func-call (INT001),
     	format-in-get-text-func-call (INT002),
     	printf-in-get-text-func-call (INT003),
+    	implicit-string-concatenation-in-collection-literal (ISC004),
     	direct-logger-instantiation (LOG001),
     	invalid-get-logger-argument (LOG002),
     	undocumented-warn (LOG009),
@@ -5032,6 +5008,7 @@ fn preview_default_rules() -> Result<()> {
     	nonlocal-without-binding (PLE0117),
     	load-before-global-declaration (PLE0118),
     	invalid-length-return-type (PLE0303),
+    	invalid-bool-return-type (PLE0304),
     	invalid-index-return-type (PLE0305),
     	invalid-str-return-type (PLE0307),
     	invalid-bytes-return-type (PLE0308),
@@ -5062,6 +5039,7 @@ fn preview_default_rules() -> Result<()> {
     	property-with-parameters (PLR0206),
     	manual-from-import (PLR0402),
     	redefined-argument-from-local (PLR1704),
+    	stop-iteration-return (PLR1708),
     	useless-return (PLR1711),
     	boolean-chained-comparison (PLR1716),
     	sys-exit-alias (PLR1722),
@@ -5147,6 +5125,7 @@ fn preview_default_rules() -> Result<()> {
     	implicit-cwd (FURB177),
     	hashlib-digest-hex (FURB181),
     	slice-to-remove-prefix-or-suffix (FURB188),
+    	sorted-min-max (FURB192),
     	zip-instead-of-pairwise (RUF007),
     	mutable-dataclass-default (RUF008),
     	function-call-in-dataclass-default-argument (RUF009),
@@ -5178,6 +5157,8 @@ fn preview_default_rules() -> Result<()> {
     	unnecessary-round (RUF057),
     	starmap-zip (RUF058),
     	unused-unpacked-variable (RUF059),
+    	access-annotations-from-class-dict (RUF063),
+    	duplicate-entry-in-dunder-all (RUF068),
     	unused-noqa (RUF100),
     	redirected-noqa (RUF101),
     	invalid-pyproject-toml (RUF200),

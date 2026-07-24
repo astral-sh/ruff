@@ -51,16 +51,28 @@ fn default_files() -> Result<()> {
 
     assert_cmd_snapshot!(test.format_command()
         .arg("--isolated")
-        .arg("--check"), @"
+        .arg("--check"), @r#"
     success: false
     exit_code: 1
     ----- stdout -----
-    Would reformat: bar.py
-    Would reformat: foo.py
+    unformatted: File would be reformatted
+     --> bar.py:1:1
+      |
+      - bar =     "needs formatting"
+    1 + bar = "needs formatting"
+      |
+
+    unformatted: File would be reformatted
+     --> foo.py:1:1
+      |
+      - foo =     "needs formatting"
+    1 + foo = "needs formatting"
+      |
+
     2 files would be reformatted
 
     ----- stderr -----
-    ");
+    "#);
 
     Ok(())
 }
@@ -249,6 +261,9 @@ fn format_options() -> Result<()> {
         r#"
 indent-width = 8
 line-length = 84
+
+[lint]
+isort.split-on-trailing-comma = false
 
 [format]
 indent-style = "tab"
@@ -446,16 +461,30 @@ OTHER = "OTHER"
         // Explicitly pass test.py, should be formatted regardless of it being excluded by format.exclude
         .arg("test.py")
         // Format all other files in the directory, should respect the `exclude` and `format.exclude` options
-        .arg("."), @"
+        .arg("."), @r#"
     success: false
     exit_code: 1
     ----- stdout -----
-    Would reformat: main.py
-    Would reformat: test.py
+    unformatted: File would be reformatted
+     --> main.py:1:1
+      |
+      -
+    1 | from test import say_hy
+      |
+
+    unformatted: File would be reformatted
+     --> test.py:1:1
+      |
+      -
+    1 | def say_hy(name: str):
+      -         print(f"Hy {name}")
+    2 +     print(f"Hy {name}")
+      |
+
     2 files would be reformatted
 
     ----- stderr -----
-    ");
+    "#);
     Ok(())
 }
 
@@ -490,7 +519,13 @@ exclude = ["format_excluded.py"]
     success: false
     exit_code: 1
     ----- stdout -----
-    Would reformat: main.py
+    unformatted: File would be reformatted
+     --> main.py:1:1
+      |
+      - x    = 1
+    1 + x = 1
+      |
+
     1 file would be reformatted
 
     ----- stderr -----
@@ -512,7 +547,13 @@ fn deduplicate_directory_and_explicit_file() -> Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    Would reformat: main.py
+    unformatted: File would be reformatted
+     --> main.py:1:1
+      |
+      - x   = 1
+    1 + x = 1
+      |
+
     1 file would be reformatted
 
     ----- stderr -----
@@ -538,9 +579,15 @@ from module import =
     success: false
     exit_code: 2
     ----- stdout -----
+    invalid-syntax: Expected an import name
+     --> main.py:2:20
+      |
+    2 | from module import =
+      |                    ^
+      |
+
 
     ----- stderr -----
-    error: Failed to parse main.py:2:20: Expected an import name
     ");
 
     Ok(())
@@ -565,7 +612,13 @@ if __name__ == "__main__":
     success: false
     exit_code: 1
     ----- stdout -----
-    Would reformat: main.py
+    unformatted: File would be reformatted
+     --> main.py:1:1
+      |
+      -
+    1 | from test import say_hy
+      |
+
     1 file would be reformatted
 
     ----- stderr -----
@@ -628,13 +681,8 @@ if __name__ == "__main__":
 
     assert_cmd_snapshot!(
         snapshot,
-        test.format_command().args([
-            "--output-format",
-            output_format,
-            "--preview",
-            "--check",
-            "input.py",
-        ]),
+        test.format_command()
+            .args(["--output-format", output_format, "--check", "input.py",]),
     );
 
     Ok(())
@@ -646,7 +694,7 @@ fn output_format_notebook() -> Result<()> {
     let path = test.fixture_path("unformatted.ipynb");
 
     assert_cmd_snapshot!(
-        test.format_command().args(["--isolated", "--preview", "--check"]).arg(path),
+        test.format_command().args(["--isolated", "--check"]).arg(path),
         @"
     success: false
     exit_code: 1
@@ -786,7 +834,15 @@ fn check_quiet_mode_shows_diagnostics_only() -> Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    Would reformat: main.py
+    unformatted: File would be reformatted
+     --> main.py:1:1
+      |
+      - def     foo():
+      -                 pass
+    1 + def foo():
+    2 +     pass
+      |
+
 
     ----- stderr -----
     ");
@@ -802,7 +858,15 @@ fn check_default_mode_shows_diagnostics_and_summary() -> Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    Would reformat: main.py
+    unformatted: File would be reformatted
+     --> main.py:1:1
+      |
+      - def     foo():
+      -                 pass
+    1 + def foo():
+    2 +     pass
+      |
+
     1 file would be reformatted
 
     ----- stderr -----
@@ -859,7 +923,13 @@ OTHER = "OTHER"
     success: false
     exit_code: 1
     ----- stdout -----
-    Would reformat: main.py
+    unformatted: File would be reformatted
+     --> main.py:1:1
+      |
+      -
+    1 | from test import say_hy
+      |
+
     1 file would be reformatted
 
     ----- stderr -----
@@ -1881,9 +1951,8 @@ fn test_notebook_trailing_semicolon() -> Result<()> {
     Ok(())
 }
 
-#[test]
-fn syntax_error_in_notebooks() -> Result<()> {
-    let test = CliTest::with_files([
+fn notebook_with_syntax_error() -> Result<CliTest> {
+    CliTest::with_files([
         (
             "ruff.toml",
             r#"
@@ -1941,7 +2010,12 @@ include = ["*.ipy"]
    }
 "#,
         ),
-    ])?;
+    ])
+}
+
+#[test]
+fn syntax_error_in_notebooks() -> Result<()> {
+    let test = notebook_with_syntax_error()?;
 
     assert_cmd_snapshot!(test.format_command()
         .args(["--config", "ruff.toml"])
@@ -1954,6 +2028,36 @@ include = ["*.ipy"]
     ----- stderr -----
     error: Failed to parse main.ipy:2:3:24: Expected an expression
     ");
+    Ok(())
+}
+
+#[test]
+fn syntax_error_in_notebooks_check() -> Result<()> {
+    let test = notebook_with_syntax_error()?;
+
+    assert_cmd_snapshot!(
+        test.format_command()
+            .args(["--config", "ruff.toml"])
+            .args(["--extension", "ipy:ipynb"])
+            .arg("--check")
+            .arg("."),
+        @"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+    invalid-syntax: Expected an expression
+     --> main.ipy:cell 2:3:24
+      |
+    1 | for i in range(iterations):
+    2 |     # выберите случайный индекс в диапазон от 0 до len(X)-1 включительно при помощи функции random.randint
+    3 |     j = # ваш код здесь
+      |                        ^
+      |
+
+
+    ----- stderr -----
+    "
+    );
     Ok(())
 }
 
@@ -2441,50 +2545,12 @@ fn cookiecutter_globbing() -> Result<()> {
 }
 
 #[test]
-fn stable_output_format_warning() -> Result<()> {
-    let test = CliTest::new()?;
-    assert_cmd_snapshot!(
-        test.format_command()
-            .args(["--output-format=full", "-"])
-            .pass_stdin(""),
-        @"
-    success: true
-    exit_code: 0
-    ----- stdout -----
-
-    ----- stderr -----
-    warning: The --output-format flag for the formatter is unstable and requires preview mode to use.
-    ",
-    );
-    Ok(())
-}
-
-#[test]
-fn markdown_formatting_preview_disabled() -> Result<()> {
+fn markdown_formatting() -> Result<()> {
     let test = CliTest::new()?;
     let unformatted = test.fixture_path("unformatted.md");
 
     assert_cmd_snapshot!(test.format_command()
-        .args(["--isolated", "--no-preview", "--diff"])
-        .arg(unformatted),
-        @"
-    success: false
-    exit_code: 2
-    ----- stdout -----
-
-    ----- stderr -----
-    error: Failed to format CRATE_ROOT/resources/test/fixtures/unformatted.md: Markdown formatting is experimental, enable preview mode.
-    ");
-    Ok(())
-}
-
-#[test]
-fn markdown_formatting_preview_enabled() -> Result<()> {
-    let test = CliTest::new()?;
-    let unformatted = test.fixture_path("unformatted.md");
-
-    assert_cmd_snapshot!(test.format_command()
-        .args(["--isolated", "--preview", "--check"])
+        .args(["--isolated", "--check"])
         .arg(unformatted),
         @r#"
     success: false
@@ -2526,7 +2592,7 @@ fn markdown_formatting_stdin() -> Result<()> {
     let unformatted = fs::read(test.fixture_path("unformatted.md")).unwrap();
 
     assert_cmd_snapshot!(test.format_command()
-        .args(["--isolated", "--preview", "--stdin-filename", "unformatted.md"])
+        .args(["--isolated", "--stdin-filename", "unformatted.md"])
         .arg("-")
         .pass_stdin(unformatted), @r#"
     success: true
@@ -2569,7 +2635,7 @@ print( 'hello' )
     ])?;
 
     assert_cmd_snapshot!(
-        test.format_command().args(["--preview", "--diff", "test.qmd"]),
+        test.format_command().args(["--diff", "test.qmd"]),
         @r#"
     success: false
     exit_code: 1
@@ -2622,14 +2688,11 @@ print( 'hello' )
 
     assert_cmd_snapshot!(
             test.format_command()
-                .args(["format", "--preview", "--check", "."]),
+                .args(["--check", "."]),
             @r#"
     success: false
-    exit_code: 2
+    exit_code: 1
     ----- stdout -----
-    io: [TMP]/format: No such file or directory (os error 2)
-    --> format:1:1
-
     unformatted: File would be reformatted
      --> test.bar:1:1
       |

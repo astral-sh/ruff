@@ -19,7 +19,7 @@ use crate::checkers::ast::{DiagnosticGuard, LintContext};
 use crate::codes::Rule;
 use crate::comments::shebang::leading_shebang_range;
 use crate::fix::edits::delete_comment;
-use crate::preview::{is_human_readable_names_enabled, is_ruff_ignore_enabled};
+use crate::preview::is_human_readable_names_enabled;
 use crate::rule_redirects::get_redirect_target;
 use crate::rules::ruff::rules::{
     InvalidRuleCode, InvalidRuleCodeKind, InvalidSuppressionComment, InvalidSuppressionCommentKind,
@@ -28,17 +28,17 @@ use crate::rules::ruff::rules::{
 };
 use crate::settings::LinterSettings;
 use crate::settings::types::PreviewMode;
-use crate::{Locator, Violation, warn_user_once};
+use crate::{Locator, Violation};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, PartialOrd, Ord)]
 enum SuppressionAction {
-    /// # ruff:file-ignore[...] file level suppression
+    /// # ruff: file-ignore[...] file level suppression
     FileIgnore,
-    /// # ruff:disable[...] start of a block suppression
+    /// # ruff: disable[...] start of a block suppression
     Disable,
-    /// # ruff:enable[...] end of a block suppression
+    /// # ruff: enable[...] end of a block suppression
     Enable,
-    /// # ruff:ignore[...] ignore a single line or multi-line statement
+    /// # ruff: ignore[...] ignore a single line or multi-line statement
     Ignore,
 }
 
@@ -49,8 +49,8 @@ pub(crate) struct SuppressionComment {
     /// For example:
     ///
     /// ```py
-    /// import math  # start # ruff:ignore[F401] reason # end
-    ///                      ^^^^^^^^^^^^^^^^^^^^^^^^^^
+    /// import math  # start # ruff: ignore[F401] reason # end
+    ///                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^
     /// ```
     range: TextRange,
 
@@ -59,8 +59,8 @@ pub(crate) struct SuppressionComment {
     /// For example:
     ///
     /// ```py
-    /// import math  # start # ruff:ignore[F401] reason # end
-    ///              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    /// import math  # start # ruff: ignore[F401] reason # end
+    ///              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
     /// ```
     token_range: TextRange,
 
@@ -136,7 +136,7 @@ impl Suppression {
         &self.comments.first().codes
     }
 
-    /// Returns whether or not the suppression is a standalone `ruff:ignore` comment.
+    /// Returns whether or not the suppression is a standalone `ruff: ignore` comment.
     fn is_ignore(&self) -> bool {
         matches!(
             self.comments,
@@ -149,7 +149,7 @@ impl Suppression {
 
     /// Returns whether the suppression's range applies to a diagnostic.
     ///
-    /// `ruff:ignore` comments only need to contain the start of the diagnostic range (or its
+    /// `ruff: ignore` comments only need to contain the start of the diagnostic range (or its
     /// parent), while range suppression comments must contain the entire diagnostic range.
     fn applies_to_diagnostic(&self, range: TextRange, parent: Option<TextSize>) -> bool {
         if self.is_ignore() {
@@ -177,9 +177,9 @@ impl Suppression {
 
 #[derive(Debug)]
 pub(crate) enum SuppressionComments {
-    /// A #ruff:ignore comment, or #ruff:disable without a matching #ruff:enable
+    /// A # ruff: ignore comment, or # ruff: disable without a matching # ruff: enable
     Single(SuppressionComment),
-    /// A matching pair of #ruff:disable and #ruff:enable comments.
+    /// A matching pair of # ruff: disable and # ruff: enable comments.
     DisableEnable(SuppressionComment, SuppressionComment),
 }
 
@@ -309,28 +309,28 @@ impl Suppressions {
     /// the subscript expression:
     ///
     /// ```py
-    /// # ruff:disable[RUF015]
+    /// # ruff: disable[RUF015]
     /// value = [
     ///     *range(10)
     /// ][0]
-    /// # ruff:enable[RUF015]
+    /// # ruff: enable[RUF015]
     /// ```
     ///
     /// is suppressed, but
     ///
     /// ```py
-    /// # ruff:disable[RUF015]
+    /// # ruff: disable[RUF015]
     /// value = [
-    /// # ruff:enable[RUF015]
+    /// # ruff: enable[RUF015]
     ///     *range(10)
     /// ][0]
     /// ```
     ///
-    /// is not. For `ruff:ignore`, this rule is augmented to check whether the diagnostic's start
+    /// is not. For `ruff: ignore`, this rule is augmented to check whether the diagnostic's start
     /// offset is contained instead, meaning that this _will_ be suppressed:
     ///
     /// ```python
-    /// suppressed = [  # ruff:ignore[RUF015]
+    /// suppressed = [  # ruff: ignore[RUF015]
     ///     *range(10)
     /// ][0]
     /// ```
@@ -861,7 +861,7 @@ impl<'a> SuppressionsBuilder<'a> {
         }
     }
 
-    /// Handles a single-comment suppression like `ruff:ignore` or `ruff:file-ignore` and returns
+    /// Handles a single-comment suppression like `ruff: ignore` or `ruff: file-ignore` and returns
     /// `true` if such a comment was found.
     fn register_standalone_suppression(
         &mut self,
@@ -870,11 +870,9 @@ impl<'a> SuppressionsBuilder<'a> {
     ) -> bool {
         match suppression.action {
             SuppressionAction::Ignore => {
-                if is_ruff_ignore_enabled(self.settings) {
-                    let (before, after) = tokens.split_at(suppression.token_range.start());
-                    let range = if indentation_at_offset(suppression.range.start(), self.source)
-                        .is_some()
-                    {
+                let (before, after) = tokens.split_at(suppression.token_range.start());
+                let range =
+                    if indentation_at_offset(suppression.range.start(), self.source).is_some() {
                         // own-line ignore
                         let mut range =
                             Self::standalone_comment_range(suppression.range, before, after);
@@ -891,55 +889,44 @@ impl<'a> SuppressionsBuilder<'a> {
                         // trailing ignore
                         self.trailing_comment_range(suppression.token_range, before)
                     };
-                    for code in suppression.codes_as_str(self.source) {
-                        self.valid.push(Suppression {
-                            code: code.into(),
-                            range,
-                            used: false.into(),
-                            comments: SuppressionComments::Single(suppression.clone()),
-                        });
-                    }
-                } else {
-                    warn_user_once!(
-                        "#ruff:ignore comment found but not active, enable preview mode"
-                    );
+                for code in suppression.codes_as_str(self.source) {
+                    self.valid.push(Suppression {
+                        code: code.into(),
+                        range,
+                        used: false.into(),
+                        comments: SuppressionComments::Single(suppression.clone()),
+                    });
                 }
                 true
             }
             SuppressionAction::FileIgnore => {
-                if is_ruff_ignore_enabled(self.settings) {
-                    match indentation_at_offset(suppression.range.start(), self.source) {
-                        // Module scope
-                        Some("") => {
-                            let range = TextRange::up_to(self.source.text_len());
-                            for code in suppression.codes_as_str(self.source) {
-                                self.valid.push(Suppression {
-                                    code: code.into(),
-                                    range,
-                                    used: false.into(),
-                                    comments: SuppressionComments::Single(suppression.clone()),
-                                });
-                            }
-                        }
-                        // Indented/inside block
-                        Some(_) => {
-                            self.invalid.push(InvalidSuppression {
-                                kind: InvalidSuppressionKind::NotModuleScope,
-                                comment: suppression.clone(),
-                            });
-                        }
-                        // Trailing
-                        None => {
-                            self.invalid.push(InvalidSuppression {
-                                kind: InvalidSuppressionKind::Trailing,
-                                comment: suppression.clone(),
+                match indentation_at_offset(suppression.range.start(), self.source) {
+                    // Module scope
+                    Some("") => {
+                        let range = TextRange::up_to(self.source.text_len());
+                        for code in suppression.codes_as_str(self.source) {
+                            self.valid.push(Suppression {
+                                code: code.into(),
+                                range,
+                                used: false.into(),
+                                comments: SuppressionComments::Single(suppression.clone()),
                             });
                         }
                     }
-                } else {
-                    warn_user_once!(
-                        "#ruff:file-ignore comment found but not active, enable preview mode"
-                    );
+                    // Indented/inside block
+                    Some(_) => {
+                        self.invalid.push(InvalidSuppression {
+                            kind: InvalidSuppressionKind::NotModuleScope,
+                            comment: suppression.clone(),
+                        });
+                    }
+                    // Trailing
+                    None => {
+                        self.invalid.push(InvalidSuppression {
+                            kind: InvalidSuppressionKind::Trailing,
+                            comment: suppression.clone(),
+                        });
+                    }
                 }
                 true
             }
@@ -1021,7 +1008,7 @@ impl<'a> SuppressionsBuilder<'a> {
     /// ```py
     ///
     /// # V--- from here
-    /// # ruff:ignore[code]
+    /// # ruff: ignore[code]
     /// foo = [
     ///     1,
     ///     2,
@@ -1029,7 +1016,7 @@ impl<'a> SuppressionsBuilder<'a> {
     /// # ^--- to here
     ///
     /// # V--- from here
-    /// # ruff:ignore[code]
+    /// # ruff: ignore[code]
     /// def foo(
     ///     arg1,
     ///     arg2,
@@ -1047,7 +1034,7 @@ impl<'a> SuppressionsBuilder<'a> {
     ///
     /// foo = [
     ///     # V--- from here
-    ///     # ruff:ignore[code]
+    ///     # ruff: ignore[code]
     ///     1,
     ///     # ^--- to here
     ///     2,
@@ -1112,13 +1099,13 @@ impl<'a> SuppressionsBuilder<'a> {
     ///
     /// ```py
     /// # V-- from here
-    /// foo = 1  # ruff:ignore[code]
-    /// # to here -----------------^
+    /// foo = 1  # ruff: ignore[code]
+    /// # to here ------------------^
     ///
     /// foo = [
     ///     # V--- from here
-    ///     1,  # ruff:ignore[code]
-    ///     # to here ------------^
+    ///     1,  # ruff: ignore[code]
+    ///     # to here -------------^
     /// ]
     /// ```
     ///
@@ -1130,8 +1117,8 @@ impl<'a> SuppressionsBuilder<'a> {
     /// # V--- from here
     /// value = """
     ///     some text
-    /// """  # ruff:ignore[code]
-    /// # to here -------------^
+    /// """  # ruff: ignore[code]
+    /// # to here --------------^
     ///
     /// ```
     ///

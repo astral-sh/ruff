@@ -9,7 +9,9 @@ use ruff_python_ast as ast;
 mod arguments;
 pub(crate) mod bind;
 pub(super) use arguments::{Argument, CallArguments};
-pub(super) use bind::{Binding, Bindings, CallableBinding, MatchedArgument};
+pub(super) use bind::{
+    Binding, Bindings, CallDiagnosticOverride, CallableBinding, MatchedArgument,
+};
 
 /// Whether the right operand's reflected method has priority based on the possible runtime
 /// classes of both operands.
@@ -270,6 +272,16 @@ impl<'db> CallError<'db> {
                 BindingError::PropertyHasNoDeleter(property) => Some(*property),
                 _ => None,
             })
+    }
+
+    pub(crate) fn report_diagnostics_with_override(
+        &self,
+        context: &InferContext<'db, '_>,
+        node: ast::AnyNodeRef,
+        overrides: &CallDiagnosticOverride<'_>,
+    ) {
+        self.1
+            .report_diagnostics_with_override(context, node, overrides);
     }
 }
 

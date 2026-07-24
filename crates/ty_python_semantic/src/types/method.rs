@@ -224,6 +224,7 @@ pub enum KnownBoundMethodType<'db> {
     ConstraintSetNever,
     ConstraintSetImpliesSubtypeOf(InternedConstraintSet<'db>),
     ConstraintSetSatisfies(InternedConstraintSet<'db>),
+    ConstraintSetExists(InternedConstraintSet<'db>),
     ConstraintSetForAll(InternedConstraintSet<'db>),
     ConstraintSetSatisfiedByAllTypeVars(InternedConstraintSet<'db>),
     ConstraintSetSolutionsFor(InternedConstraintSet<'db>),
@@ -263,6 +264,7 @@ pub(super) fn walk_method_wrapper_type<'db, V: visitor::TypeVisitor<'db> + ?Size
         | KnownBoundMethodType::ConstraintSetNever
         | KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(_)
         | KnownBoundMethodType::ConstraintSetSatisfies(_)
+        | KnownBoundMethodType::ConstraintSetExists(_)
         | KnownBoundMethodType::ConstraintSetForAll(_)
         | KnownBoundMethodType::ConstraintSetSatisfiedByAllTypeVars(_)
         | KnownBoundMethodType::ConstraintSetSolutionsFor(_)
@@ -310,6 +312,7 @@ impl<'db> KnownBoundMethodType<'db> {
             | KnownBoundMethodType::ConstraintSetNever
             | KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(_)
             | KnownBoundMethodType::ConstraintSetSatisfies(_)
+            | KnownBoundMethodType::ConstraintSetExists(_)
             | KnownBoundMethodType::ConstraintSetForAll(_)
             | KnownBoundMethodType::ConstraintSetSatisfiedByAllTypeVars(_)
             | KnownBoundMethodType::ConstraintSetSolutionsFor(_)
@@ -332,6 +335,7 @@ impl<'db> KnownBoundMethodType<'db> {
             | KnownBoundMethodType::ConstraintSetNever
             | KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(_)
             | KnownBoundMethodType::ConstraintSetSatisfies(_)
+            | KnownBoundMethodType::ConstraintSetExists(_)
             | KnownBoundMethodType::ConstraintSetForAll(_)
             | KnownBoundMethodType::ConstraintSetSatisfiedByAllTypeVars(_)
             | KnownBoundMethodType::ConstraintSetSolutionsFor(_)
@@ -492,7 +496,8 @@ impl<'db> KnownBoundMethodType<'db> {
                 )))
             }
 
-            KnownBoundMethodType::ConstraintSetForAll(_) => {
+            KnownBoundMethodType::ConstraintSetExists(_)
+            | KnownBoundMethodType::ConstraintSetForAll(_) => {
                 Either::Right(std::iter::once(Signature::new(
                     Parameters::standard([Parameter::positional_only(Some(Name::new_static(
                         "typevars",
@@ -628,6 +633,10 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 KnownBoundMethodType::ConstraintSetSatisfies(_),
             )
             | (
+                KnownBoundMethodType::ConstraintSetExists(_),
+                KnownBoundMethodType::ConstraintSetExists(_),
+            )
+            | (
                 KnownBoundMethodType::ConstraintSetForAll(_),
                 KnownBoundMethodType::ConstraintSetForAll(_),
             )
@@ -660,6 +669,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 | KnownBoundMethodType::ConstraintSetNever
                 | KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(_)
                 | KnownBoundMethodType::ConstraintSetSatisfies(_)
+                | KnownBoundMethodType::ConstraintSetExists(_)
                 | KnownBoundMethodType::ConstraintSetForAll(_)
                 | KnownBoundMethodType::ConstraintSetSatisfiedByAllTypeVars(_)
                 | KnownBoundMethodType::ConstraintSetSolutionsFor(_)
@@ -676,6 +686,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 | KnownBoundMethodType::ConstraintSetNever
                 | KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(_)
                 | KnownBoundMethodType::ConstraintSetSatisfies(_)
+                | KnownBoundMethodType::ConstraintSetExists(_)
                 | KnownBoundMethodType::ConstraintSetForAll(_)
                 | KnownBoundMethodType::ConstraintSetSatisfiedByAllTypeVars(_)
                 | KnownBoundMethodType::ConstraintSetSolutionsFor(_)

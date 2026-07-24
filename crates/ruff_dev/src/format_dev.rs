@@ -40,7 +40,8 @@ fn parse_cli(dirs: &[PathBuf]) -> anyhow::Result<(FormatArguments, ConfigArgumen
     let args_matches = FormatCommand::command()
         .no_binary_name(true)
         .get_matches_from(dirs);
-    let arguments: FormatCommand = FormatCommand::from_arg_matches(&args_matches)?;
+    let mut arguments: FormatCommand = FormatCommand::from_arg_matches(&args_matches)?;
+    arguments.extend_exclude = Some(vec![FilePattern::Builtin("*.md")]);
     let (cli, config_arguments) = arguments.partition(GlobalConfigArgs::default())?;
     Ok((cli, config_arguments))
 }

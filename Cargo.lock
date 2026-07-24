@@ -3076,7 +3076,7 @@ dependencies = [
 
 [[package]]
 name = "ruff"
-version = "0.15.22"
+version = "0.16.0"
 dependencies = [
  "anyhow",
  "argfile",
@@ -3140,7 +3140,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_annotate_snippets"
-version = "0.0.5"
+version = "0.0.6"
 dependencies = [
  "anstream 1.0.0",
  "anstyle",
@@ -3181,7 +3181,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_cache"
-version = "0.0.5"
+version = "0.0.6"
 dependencies = [
  "char_str",
  "filetime",
@@ -3195,7 +3195,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_db"
-version = "0.0.5"
+version = "0.0.6"
 dependencies = [
  "anstyle",
  "arc-swap",
@@ -3286,7 +3286,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_diagnostics"
-version = "0.0.5"
+version = "0.0.6"
 dependencies = [
  "get-size2",
  "is-macro",
@@ -3296,7 +3296,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_formatter"
-version = "0.0.5"
+version = "0.0.6"
 dependencies = [
  "drop_bomb",
  "ruff_cache",
@@ -3312,7 +3312,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_graph"
-version = "0.0.5"
+version = "0.0.6"
 dependencies = [
  "anyhow",
  "clap",
@@ -3333,7 +3333,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_index"
-version = "0.0.5"
+version = "0.0.6"
 dependencies = [
  "get-size2",
  "ruff_macros",
@@ -3343,7 +3343,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_linter"
-version = "0.15.22"
+version = "0.16.0"
 dependencies = [
  "aho-corasick",
  "anyhow",
@@ -3406,7 +3406,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_macros"
-version = "0.0.5"
+version = "0.0.6"
 dependencies = [
  "heck",
  "itertools 0.15.0",
@@ -3419,7 +3419,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_markdown"
-version = "0.0.5"
+version = "0.0.6"
 dependencies = [
  "insta",
  "regex",
@@ -3450,14 +3450,14 @@ dependencies = [
 
 [[package]]
 name = "ruff_memory_usage"
-version = "0.0.5"
+version = "0.0.6"
 dependencies = [
  "get-size2",
 ]
 
 [[package]]
 name = "ruff_notebook"
-version = "0.0.5"
+version = "0.0.6"
 dependencies = [
  "anyhow",
  "rand 0.10.2",
@@ -3473,14 +3473,14 @@ dependencies = [
 
 [[package]]
 name = "ruff_options_metadata"
-version = "0.0.5"
+version = "0.0.6"
 dependencies = [
  "serde",
 ]
 
 [[package]]
 name = "ruff_python_ast"
-version = "0.0.5"
+version = "0.0.6"
 dependencies = [
  "aho-corasick",
  "arrayvec",
@@ -3517,7 +3517,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_python_codegen"
-version = "0.0.5"
+version = "0.0.6"
 dependencies = [
  "ruff_python_ast",
  "ruff_python_literal",
@@ -3529,7 +3529,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_python_formatter"
-version = "0.0.5"
+version = "0.0.6"
 dependencies = [
  "anyhow",
  "clap",
@@ -3562,7 +3562,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_python_importer"
-version = "0.0.5"
+version = "0.0.6"
 dependencies = [
  "anyhow",
  "insta",
@@ -3577,7 +3577,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_python_index"
-version = "0.0.5"
+version = "0.0.6"
 dependencies = [
  "ruff_python_ast",
  "ruff_python_parser",
@@ -3588,7 +3588,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_python_literal"
-version = "0.0.5"
+version = "0.0.6"
 dependencies = [
  "bitflags 2.13.0",
  "icu_properties",
@@ -3598,7 +3598,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_python_parser"
-version = "0.0.5"
+version = "0.0.6"
 dependencies = [
  "anyhow",
  "bitflags 2.13.0",
@@ -3627,7 +3627,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_python_semantic"
-version = "0.0.5"
+version = "0.0.6"
 dependencies = [
  "bitflags 2.13.0",
  "insta",
@@ -3648,7 +3648,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_python_stdlib"
-version = "0.0.5"
+version = "0.0.6"
 dependencies = [
  "bitflags 2.13.0",
  "unicode-ident",
@@ -3656,7 +3656,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_python_trivia"
-version = "0.0.5"
+version = "0.0.6"
 dependencies = [
  "itertools 0.15.0",
  "ruff_source_file",
@@ -3677,7 +3677,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_ranged_value"
-version = "0.0.5"
+version = "0.0.6"
 dependencies = [
  "get-size2",
  "ruff_db",
@@ -3689,7 +3689,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_server"
-version = "0.0.5"
+version = "0.0.6"
 dependencies = [
  "anyhow",
  "crossbeam",
@@ -3732,7 +3732,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_source_file"
-version = "0.0.5"
+version = "0.0.6"
 dependencies = [
  "get-size2",
  "memchr",
@@ -3742,7 +3742,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_text_size"
-version = "0.0.5"
+version = "0.0.6"
 dependencies = [
  "get-size2",
  "schemars",
@@ -3753,7 +3753,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_wasm"
-version = "0.15.22"
+version = "0.16.0"
 dependencies = [
  "console_error_panic_hook",
  "console_log",
@@ -3780,7 +3780,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_workspace"
-version = "0.0.5"
+version = "0.0.6"
 dependencies = [
  "anyhow",
  "colored",
@@ -4665,7 +4665,7 @@ dependencies = [
 
 [[package]]
 name = "ty_combine"
-version = "0.0.5"
+version = "0.0.6"
 dependencies = [
  "ordermap",
  "ruff_db",
@@ -4748,7 +4748,7 @@ dependencies = [
 
 [[package]]
 name = "ty_module_resolver"
-version = "0.0.5"
+version = "0.0.6"
 dependencies = [
  "anyhow",
  "camino",
@@ -4784,7 +4784,6 @@ dependencies = [
  "get-size2",
  "globset",
  "insta",
- "memchr",
  "notify",
  "ordermap",
  "parking_lot",
@@ -4822,7 +4821,7 @@ dependencies = [
 
 [[package]]
 name = "ty_python_core"
-version = "0.0.5"
+version = "0.0.6"
 dependencies = [
  "anyhow",
  "bitflags 2.13.0",
@@ -4856,7 +4855,7 @@ dependencies = [
 
 [[package]]
 name = "ty_python_semantic"
-version = "0.0.5"
+version = "0.0.6"
 dependencies = [
  "anyhow",
  "bitflags 2.13.0",
@@ -4950,7 +4949,7 @@ dependencies = [
 
 [[package]]
 name = "ty_site_packages"
-version = "0.0.5"
+version = "0.0.6"
 dependencies = [
  "camino",
  "colored",
@@ -4971,7 +4970,7 @@ dependencies = [
 
 [[package]]
 name = "ty_static"
-version = "0.0.5"
+version = "0.0.6"
 dependencies = [
  "ruff_macros",
 ]
@@ -5003,7 +5002,7 @@ dependencies = [
 
 [[package]]
 name = "ty_vendored"
-version = "0.0.5"
+version = "0.0.6"
 dependencies = [
  "path-slash",
  "ruff_db",

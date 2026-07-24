@@ -449,19 +449,34 @@ This attribute access desugars to
 ```py
 type(attr_property).__set__(attr_property, c, "a")
 
-# error: [call-non-callable] "Call of wrapper descriptor `property.__set__` failed: calling the setter failed"
+# snapshot: invalid-argument-type
 type(attr_property).__set__(attr_property, c, 1)
+```
+
+```snapshot
+error[invalid-argument-type]: Argument to function `C.attr` is incorrect
+  --> src/mdtest_snippet.py:31:47
+   |
+31 | type(attr_property).__set__(attr_property, c, 1)
+   |                                               ^ Expected `str`, found `Literal[1]`
+   |
+info: Function defined here
+  --> src/mdtest_snippet.py:10:9
+   |
+10 |     def attr(self, value: str) -> None:
+   |         ^^^^       ---------- Parameter declared here
+   |
 ```
 
 which is also equivalent to the following expressions:
 
 ```py
 attr_property.__set__(c, "a")
-# error: [call-non-callable]
+# error: [invalid-argument-type]
 attr_property.__set__(c, 1)
 
 C.attr.__set__(c, "a")
-# error: [call-non-callable]
+# error: [invalid-argument-type]
 C.attr.__set__(c, 1)
 ```
 

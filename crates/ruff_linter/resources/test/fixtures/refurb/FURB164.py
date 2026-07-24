@@ -75,3 +75,8 @@ _ = (
     # text
     .from_float(4.2)
 )
+
+_ = Decimal.from_float(
+    # keep this comment
+    float("inf")
+)

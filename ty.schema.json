@@ -335,6 +335,16 @@
     "Rules": {
       "type": "object",
       "properties": {
+        "abstract-and-final-method": {
+          "title": "detects methods that are both abstract and final",
+          "description": "## What it does\n\nChecks for methods decorated with both `@abstractmethod` and `@final`.\n\n## Why is this bad?\n\nAn abstract method must be overridden for a subclass to become concrete, but a final\nmethod cannot be overridden. Combining the decorators therefore makes it impossible\nfor a subclass to provide a concrete implementation.\n\n## Example\n\n```python\nfrom abc import ABC, abstractmethod\nfrom typing import final\n\n\nclass Base(ABC):\n    @final\n    @abstractmethod\n    def method(self) -> None: ...  # error\n```",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
         "abstract-method-in-final-class": {
           "title": "detects `@final` classes with unimplemented abstract methods",
           "description": "## What it does\n\nChecks for `@final` classes that have unimplemented abstract methods.\n\n## Why is this bad?\n\nA class decorated with `@final` cannot be subclassed. If such a class has abstract\nmethods that are not implemented, the class can never be properly instantiated, as\nthe abstract methods can never be implemented (since subclassing is prohibited).\n\nAt runtime, instantiation of classes with unimplemented abstract methods is only\nprevented for classes that have `ABCMeta` (or a subclass of it) as their metaclass.\nHowever, type checkers also enforce this for classes that do not use `ABCMeta`, since\nthe intent for the class to be abstract is clear from the use of `@abstractmethod`.\n\n## Example\n\n```python\nfrom abc import ABC, abstractmethod\nfrom typing import final\n\n\nclass Base(ABC):\n    @abstractmethod\n    def method(self) -> int: ...\n\n\n@final\n# `Derived` does not implement `method`\nclass Derived(Base):  # error\n    pass\n```",
@@ -966,7 +976,7 @@
         },
         "invalid-type-alias-type": {
           "title": "detects invalid TypeAliasType definitions",
-          "description": "## What it does\n\nChecks for the creation of invalid `TypeAliasType`s\n\n## Why is this bad?\n\nThere are several requirements that you must follow when creating a `TypeAliasType`.\n\n## Examples\n\n```toml\n[environment]\npython-version = \"3.12\"\n```\n\n```python\nfrom typing import TypeAliasType\n\n\ndef get_name() -> str:\n    return \"NewAlias\"\n\n\nIntOrStr = TypeAliasType(\"IntOrStr\", int | str)  # okay\n# TypeAliasType name must be a string literal\nNewAlias = TypeAliasType(get_name(), int)  # error\n```",
+          "description": "## What it does\n\nChecks for the creation of invalid `TypeAliasType`s\n\n## Why is this bad?\n\nThere are several requirements that you must follow when creating a `TypeAliasType`.\n\n## Examples\n\n```toml\n[environment]\npython-version = \"3.12\"\n```\n\n```python\nfrom typing import TypeAliasType, TypeVar\n\n\ndef get_name() -> str:\n    return \"NewAlias\"\n\n\nIntOrStr = TypeAliasType(\"IntOrStr\", int | str)  # okay\n# TypeAliasType name must be a string literal\nNewAlias = TypeAliasType(get_name(), int)  # error\n\nT = TypeVar(\"T\")\nGenericAlias = TypeAliasType(\"GenericAlias\", list[T], type_params=(T,))  # okay\n# TypeAliasType type parameters must be type variables\nInvalidAlias = TypeAliasType(\"InvalidAlias\", list[T], type_params=(list[T],))  # error\n```",
           "default": "error",
           "oneOf": [
             {

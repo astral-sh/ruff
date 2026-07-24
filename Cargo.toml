@@ -14,51 +14,51 @@ license = "MIT"
 
 [workspace.dependencies]
 char_str = { version = "0.0.2" }
-ruff = { version = "0.15.22", path = "crates/ruff" }
-ruff_annotate_snippets = { version = "0.0.5", path = "crates/ruff_annotate_snippets" }
-ruff_cache = { version = "0.0.5", path = "crates/ruff_cache" }
-ruff_db = { version = "0.0.5", path = "crates/ruff_db", default-features = false }
-ruff_diagnostics = { version = "0.0.5", path = "crates/ruff_diagnostics" }
-ruff_formatter = { version = "0.0.5", path = "crates/ruff_formatter" }
-ruff_graph = { version = "0.0.5", path = "crates/ruff_graph" }
-ruff_index = { version = "0.0.5", path = "crates/ruff_index" }
-ruff_linter = { version = "0.15.22", path = "crates/ruff_linter" }
-ruff_macros = { version = "0.0.5", path = "crates/ruff_macros" }
-ruff_markdown = { version = "0.0.5", path = "crates/ruff_markdown" }
-ruff_memory_usage = { version = "0.0.5", path = "crates/ruff_memory_usage" }
-ruff_notebook = { version = "0.0.5", path = "crates/ruff_notebook" }
-ruff_options_metadata = { version = "0.0.5", path = "crates/ruff_options_metadata" }
-ruff_python_ast = { version = "0.0.5", path = "crates/ruff_python_ast" }
-ruff_python_codegen = { version = "0.0.5", path = "crates/ruff_python_codegen" }
-ruff_python_formatter = { version = "0.0.5", path = "crates/ruff_python_formatter" }
-ruff_python_importer = { version = "0.0.5", path = "crates/ruff_python_importer" }
-ruff_python_index = { version = "0.0.5", path = "crates/ruff_python_index" }
-ruff_python_literal = { version = "0.0.5", path = "crates/ruff_python_literal" }
-ruff_python_parser = { version = "0.0.5", path = "crates/ruff_python_parser" }
-ruff_python_semantic = { version = "0.0.5", path = "crates/ruff_python_semantic" }
-ruff_python_stdlib = { version = "0.0.5", path = "crates/ruff_python_stdlib" }
-ruff_python_trivia = { version = "0.0.5", path = "crates/ruff_python_trivia" }
-ruff_server = { version = "0.0.5", path = "crates/ruff_server" }
-ruff_source_file = { version = "0.0.5", path = "crates/ruff_source_file" }
+ruff = { version = "0.16.0", path = "crates/ruff" }
+ruff_annotate_snippets = { version = "0.0.6", path = "crates/ruff_annotate_snippets" }
+ruff_cache = { version = "0.0.6", path = "crates/ruff_cache" }
+ruff_db = { version = "0.0.6", path = "crates/ruff_db", default-features = false }
+ruff_diagnostics = { version = "0.0.6", path = "crates/ruff_diagnostics" }
+ruff_formatter = { version = "0.0.6", path = "crates/ruff_formatter" }
+ruff_graph = { version = "0.0.6", path = "crates/ruff_graph" }
+ruff_index = { version = "0.0.6", path = "crates/ruff_index" }
+ruff_linter = { version = "0.16.0", path = "crates/ruff_linter" }
+ruff_macros = { version = "0.0.6", path = "crates/ruff_macros" }
+ruff_markdown = { version = "0.0.6", path = "crates/ruff_markdown" }
+ruff_memory_usage = { version = "0.0.6", path = "crates/ruff_memory_usage" }
+ruff_notebook = { version = "0.0.6", path = "crates/ruff_notebook" }
+ruff_options_metadata = { version = "0.0.6", path = "crates/ruff_options_metadata" }
+ruff_python_ast = { version = "0.0.6", path = "crates/ruff_python_ast" }
+ruff_python_codegen = { version = "0.0.6", path = "crates/ruff_python_codegen" }
+ruff_python_formatter = { version = "0.0.6", path = "crates/ruff_python_formatter" }
+ruff_python_importer = { version = "0.0.6", path = "crates/ruff_python_importer" }
+ruff_python_index = { version = "0.0.6", path = "crates/ruff_python_index" }
+ruff_python_literal = { version = "0.0.6", path = "crates/ruff_python_literal" }
+ruff_python_parser = { version = "0.0.6", path = "crates/ruff_python_parser" }
+ruff_python_semantic = { version = "0.0.6", path = "crates/ruff_python_semantic" }
+ruff_python_stdlib = { version = "0.0.6", path = "crates/ruff_python_stdlib" }
+ruff_python_trivia = { version = "0.0.6", path = "crates/ruff_python_trivia" }
+ruff_server = { version = "0.0.6", path = "crates/ruff_server" }
+ruff_source_file = { version = "0.0.6", path = "crates/ruff_source_file" }
 ruff_mdtest = { path = "crates/ruff_mdtest" }
-ruff_ranged_value = { version = "0.0.5", path = "crates/ruff_ranged_value" }
-ruff_text_size = { version = "0.0.5", path = "crates/ruff_text_size" }
-ruff_workspace = { version = "0.0.5", path = "crates/ruff_workspace" }
+ruff_ranged_value = { version = "0.0.6", path = "crates/ruff_ranged_value" }
+ruff_text_size = { version = "0.0.6", path = "crates/ruff_text_size" }
+ruff_workspace = { version = "0.0.6", path = "crates/ruff_workspace" }
 
 ty = { path = "crates/ty" }
-ty_combine = { version = "0.0.5", path = "crates/ty_combine" }
+ty_combine = { version = "0.0.6", path = "crates/ty_combine" }
 ty_completion_bench = { path = "crates/ty_completion_bench" }
 ty_completion_eval = { path = "crates/ty_completion_eval" }
 ty_ide = { path = "crates/ty_ide" }
-ty_module_resolver = { version = "0.0.5", path = "crates/ty_module_resolver" }
+ty_module_resolver = { version = "0.0.6", path = "crates/ty_module_resolver" }
 ty_project = { path = "crates/ty_project", default-features = false }
-ty_python_semantic = { version = "0.0.5", path = "crates/ty_python_semantic" }
-ty_python_core = { version = "0.0.5", path = "crates/ty_python_core" }
+ty_python_semantic = { version = "0.0.6", path = "crates/ty_python_semantic" }
+ty_python_core = { version = "0.0.6", path = "crates/ty_python_core" }
 ty_server = { path = "crates/ty_server" }
-ty_site_packages = { version = "0.0.5", path = "crates/ty_site_packages" }
-ty_static = { version = "0.0.5", path = "crates/ty_static" }
+ty_site_packages = { version = "0.0.6", path = "crates/ty_site_packages" }
+ty_static = { version = "0.0.6", path = "crates/ty_static" }
 ty_test = { path = "crates/ty_test" }
-ty_vendored = { version = "0.0.5", path = "crates/ty_vendored" }
+ty_vendored = { version = "0.0.6", path = "crates/ty_vendored" }
 
 mdtest = { path = "crates/mdtest" }
 

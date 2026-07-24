@@ -240,19 +240,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     );
                 }
             }
-            Type::KnownInstance(KnownInstanceType::TypeAliasType(TypeAliasType::ManualPEP695(
-                _,
-            ))) => {
-                let slice_ty = self.infer_expression(slice, TypeContext::default());
-                let mut variables = FxOrderSet::default();
-                slice_ty.bind_and_find_all_legacy_typevars(
-                    db,
-                    self.typevar_binding_context,
-                    &mut variables,
-                );
-                let generic_context = GenericContext::from_typevar_instances(db, variables);
-                return Type::Dynamic(DynamicType::UnknownGeneric(generic_context));
-            }
             Type::KnownInstance(KnownInstanceType::TypeAliasType(type_alias)) => {
                 if let Some(generic_context) = type_alias.generic_context(db) {
                     return self.infer_explicit_type_alias_type_specialization(

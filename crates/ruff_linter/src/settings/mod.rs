@@ -9,12 +9,11 @@ use std::path::{Path, PathBuf};
 use std::sync::LazyLock;
 use types::CompiledPerFileTargetVersionList;
 
-use crate::codes::RuleCodePrefix;
 use ruff_macros::CacheKey;
 use ruff_python_ast::PythonVersion;
 
 use crate::line_width::LineLength;
-use crate::registry::{Linter, Rule};
+use crate::registry::Rule;
 use crate::rules::{
     flake8_annotations, flake8_bandit, flake8_boolean_trap, flake8_bugbear, flake8_builtins,
     flake8_comprehensions, flake8_copyright, flake8_errmsg, flake8_gettext,
@@ -23,7 +22,7 @@ use crate::rules::{
     pep8_naming, pycodestyle, pydoclint, pydocstyle, pyflakes, pylint, pyupgrade, ruff,
 };
 use crate::settings::types::{CompiledPerFileIgnoreList, ExtensionMapping, FilePatternSet};
-use crate::{RuleSelector, codes, fs};
+use crate::{RuleSelector, fs};
 
 use super::line_width::IndentWidth;
 
@@ -354,25 +353,8 @@ impl Display for LinterSettings {
     }
 }
 
-pub const DEFAULT_SELECTORS: &[RuleSelector] = &[
-    RuleSelector::Linter(Linter::Pyflakes),
-    // Only include pycodestyle rules that do not overlap with the formatter
-    RuleSelector::Prefix {
-        prefix: RuleCodePrefix::Pycodestyle(codes::Pycodestyle::E4),
-        redirected_from: None,
-    },
-    RuleSelector::Prefix {
-        prefix: RuleCodePrefix::Pycodestyle(codes::Pycodestyle::E7),
-        redirected_from: None,
-    },
-    RuleSelector::Prefix {
-        prefix: RuleCodePrefix::Pycodestyle(codes::Pycodestyle::E9),
-        redirected_from: None,
-    },
-];
-
 #[rustfmt::skip]
-pub const PREVIEW_DEFAULT_SELECTORS: &[RuleSelector] = &[
+pub const DEFAULT_SELECTORS: &[RuleSelector] = &[
     RuleSelector::rule(Rule::CancelScopeNoCheckpoint), // ASYNC100
     RuleSelector::rule(Rule::TrioSyncCall), // ASYNC105
     RuleSelector::rule(Rule::AsyncZeroSleep), // ASYNC115
@@ -505,6 +487,7 @@ pub const PREVIEW_DEFAULT_SELECTORS: &[RuleSelector] = &[
     RuleSelector::rule(Rule::ImplicitCwd), // FURB177
     RuleSelector::rule(Rule::HashlibDigestHex), // FURB181
     RuleSelector::rule(Rule::SliceToRemovePrefixOrSuffix), // FURB188
+    RuleSelector::rule(Rule::SortedMinMax), // FURB192
     RuleSelector::rule(Rule::LoggingWarn), // G010
     RuleSelector::rule(Rule::LoggingExtraAttrClash), // G101
     RuleSelector::rule(Rule::LoggingExcInfo), // G201
@@ -513,6 +496,7 @@ pub const PREVIEW_DEFAULT_SELECTORS: &[RuleSelector] = &[
     RuleSelector::rule(Rule::FStringInGetTextFuncCall), // INT001
     RuleSelector::rule(Rule::FormatInGetTextFuncCall), // INT002
     RuleSelector::rule(Rule::PrintfInGetTextFuncCall), // INT003
+    RuleSelector::rule(Rule::ImplicitStringConcatenationInCollectionLiteral), // ISC004
     RuleSelector::rule(Rule::DirectLoggerInstantiation), // LOG001
     RuleSelector::rule(Rule::InvalidGetLoggerArgument), // LOG002
     RuleSelector::rule(Rule::UndocumentedWarn), // LOG009
@@ -546,6 +530,7 @@ pub const PREVIEW_DEFAULT_SELECTORS: &[RuleSelector] = &[
     RuleSelector::rule(Rule::NonlocalWithoutBinding), // PLE0117
     RuleSelector::rule(Rule::LoadBeforeGlobalDeclaration), // PLE0118
     RuleSelector::rule(Rule::InvalidLengthReturnType), // PLE0303
+    RuleSelector::rule(Rule::InvalidBoolReturnType), // PLE0304
     RuleSelector::rule(Rule::InvalidIndexReturnType), // PLE0305
     RuleSelector::rule(Rule::InvalidStrReturnType), // PLE0307
     RuleSelector::rule(Rule::InvalidBytesReturnType), // PLE0308
@@ -576,6 +561,7 @@ pub const PREVIEW_DEFAULT_SELECTORS: &[RuleSelector] = &[
     RuleSelector::rule(Rule::PropertyWithParameters), // PLR0206
     RuleSelector::rule(Rule::ManualFromImport), // PLR0402
     RuleSelector::rule(Rule::RedefinedArgumentFromLocal), // PLR1704
+    RuleSelector::rule(Rule::StopIterationReturn), // PLR1708
     RuleSelector::rule(Rule::UselessReturn), // PLR1711
     RuleSelector::rule(Rule::BooleanChainedComparison), // PLR1716
     RuleSelector::rule(Rule::SysExitAlias), // PLR1722
@@ -690,6 +676,8 @@ pub const PREVIEW_DEFAULT_SELECTORS: &[RuleSelector] = &[
     RuleSelector::rule(Rule::UnnecessaryRound), // RUF057
     RuleSelector::rule(Rule::StarmapZip), // RUF058
     RuleSelector::rule(Rule::UnusedUnpackedVariable), // RUF059
+    RuleSelector::rule(Rule::AccessAnnotationsFromClassDict), // RUF063
+    RuleSelector::rule(Rule::DuplicateEntryInDunderAll), // RUF068
     RuleSelector::rule(Rule::UnusedNOQA), // RUF100
     RuleSelector::rule(Rule::RedirectedNOQA), // RUF101
     RuleSelector::rule(Rule::InvalidPyprojectToml), // RUF200

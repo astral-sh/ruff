@@ -7,8 +7,7 @@ use ruff_text_size::Ranged;
 /// ## What it does
 /// Checks for uses of `foo.__dict__.get("__annotations__")` or
 /// `foo.__dict__["__annotations__"]` on Python 3.10+ and Python < 3.10 when
-/// [typing-extensions](https://docs.astral.sh/ruff/settings/#lint_typing-extensions)
-/// is enabled.
+/// [`lint.typing-extensions`] is enabled.
 ///
 /// ## Why is this bad?
 /// Starting with Python 3.14, directly accessing `__annotations__` via
@@ -74,7 +73,7 @@ use ruff_text_size::Ranged;
 /// ## References
 /// - [Python Annotations Best Practices](https://docs.python.org/3.14/howto/annotations.html)
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "0.12.1")]
+#[violation_metadata(stable_since = "0.16.0")]
 pub(crate) struct AccessAnnotationsFromClassDict {
     python_version: PythonVersion,
 }

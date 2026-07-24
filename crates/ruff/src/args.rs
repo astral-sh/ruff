@@ -467,9 +467,9 @@ pub struct CheckCommand {
         conflicts_with = "diff",
     )]
     pub add_noqa: Option<String>,
-    /// Enable automatic additions of `ruff:ignore` comments to failing lines.
-    /// Optionally provide a reason to append after the rule names.
-    /// Requires preview mode.
+    /// Enable automatic additions of `ruff: ignore` comments to failing lines.
+    /// Optionally provide a reason to append after the codes.
+    /// In preview, add suppression comments with rule names instead.
     #[arg(
         long,
         value_name = "REASON",
@@ -621,9 +621,6 @@ pub struct FormatCommand {
 
     /// Output serialization format for violations, when used with `--check`.
     /// The default serialization format is "full".
-    ///
-    /// Note that this option is currently only respected in preview mode. A warning will be emitted
-    /// if this flag is used on stable.
     #[arg(long, value_enum, env = "RUFF_OUTPUT_FORMAT")]
     pub output_format: Option<OutputFormat>,
 }

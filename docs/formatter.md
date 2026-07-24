@@ -227,8 +227,6 @@ def f(x):
 
 ## Markdown code formatting
 
-*This feature is currently only available in [preview mode](preview.md#preview).*
-
 The Ruff formatter can also format Python code blocks in Markdown files.
 In these files, Ruff will format any CommonMark [fenced code blocks][] with
 the following info strings: `python`, `py`, `python3`, `py3`, or `pyi`. The
@@ -306,7 +304,7 @@ support needs to be explicitly included by adding it to `types_or`:
 ```yaml title=".pre-commit-config.yaml"
 repos:
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.15.22
+    rev: v0.16.0
     hooks:
       - id: ruff-format
         types_or: [python, pyi, jupyter, markdown]

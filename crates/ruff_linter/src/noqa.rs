@@ -19,8 +19,10 @@ use rustc_hash::FxHashSet;
 use crate::Edit;
 use crate::Locator;
 use crate::fs::relativize_path;
+use crate::preview::is_human_readable_names_enabled;
 use crate::registry::Rule;
 use crate::rule_redirects::get_redirect_target;
+use crate::settings::types::PreviewMode;
 use crate::suppression::{self, Suppressions};
 
 /// Generates an array of edits that matches the length of `diagnostics`.
@@ -39,6 +41,7 @@ pub fn generate_suppression_edits(
     line_ending: LineEnding,
     suppressions: &Suppressions,
     suppression_kind: SuppressionKind,
+    preview: PreviewMode,
 ) -> Vec<Option<Edit>> {
     let file_directives = FileNoqaDirectives::extract(locator, comment_ranges, external, path);
     let exemption = FileExemption::from(&file_directives);
@@ -51,6 +54,7 @@ pub fn generate_suppression_edits(
         noqa_line_for,
         suppressions,
         suppression_kind,
+        preview,
     );
     build_suppression_edits_by_diagnostic(comments, locator, line_ending, None, suppression_kind)
 }
@@ -763,7 +767,7 @@ impl Error for LexicalError {}
 pub enum SuppressionKind {
     /// A `noqa` comment
     Noqa,
-    /// A `ruff:ignore` comment
+    /// A `ruff: ignore` comment
     Ignore,
 }
 
@@ -780,6 +784,7 @@ pub(crate) fn add_suppression(
     reason: Option<&str>,
     suppressions: &Suppressions,
     suppression_kind: SuppressionKind,
+    preview: PreviewMode,
 ) -> Result<usize> {
     let (count, output) = add_suppression_inner(
         path,
@@ -792,6 +797,7 @@ pub(crate) fn add_suppression(
         reason,
         suppressions,
         suppression_kind,
+        preview,
     );
 
     fs::write(path, output)?;
@@ -810,6 +816,7 @@ fn add_suppression_inner(
     reason: Option<&str>,
     suppressions: &Suppressions,
     suppression_kind: SuppressionKind,
+    preview: PreviewMode,
 ) -> (usize, String) {
     let mut count = 0;
 
@@ -827,6 +834,7 @@ fn add_suppression_inner(
         noqa_line_for,
         suppressions,
         suppression_kind,
+        preview,
     );
 
     let edits =
@@ -938,6 +946,7 @@ impl Ranged for ExistingDirective<'_> {
     }
 }
 
+#[expect(clippy::too_many_arguments)]
 fn find_suppression_comments<'a>(
     diagnostics: &'a [Diagnostic],
     locator: &'a Locator,
@@ -946,6 +955,7 @@ fn find_suppression_comments<'a>(
     noqa_line_for: &NoqaMapping,
     suppressions: &'a Suppressions,
     suppression_kind: SuppressionKind,
+    preview: PreviewMode,
 ) -> Vec<Option<SuppressionComment<'a>>> {
     // List of suppression comments, ordered to match up with `messages`
     let mut comments_by_line: Vec<Option<SuppressionComment<'a>>> = vec![];
@@ -1023,7 +1033,8 @@ fn find_suppression_comments<'a>(
 
         let identifier = match suppression_kind {
             SuppressionKind::Noqa => code.as_str(),
-            SuppressionKind::Ignore => message.name(),
+            SuppressionKind::Ignore if is_human_readable_names_enabled(preview) => message.name(),
+            SuppressionKind::Ignore => code.as_str(),
         };
 
         comments_by_line.push(Some(SuppressionComment {
@@ -1060,7 +1071,7 @@ impl SuppressionEdit<'_> {
         }
         match self.suppression_kind {
             SuppressionKind::Noqa => write!(writer, "# noqa: ").unwrap(),
-            SuppressionKind::Ignore => write!(writer, "# ruff:ignore[").unwrap(),
+            SuppressionKind::Ignore => write!(writer, "# ruff: ignore[").unwrap(),
         }
         push_codes(
             writer,
@@ -1107,7 +1118,7 @@ fn generate_suppression_edit<'a>(
             (edit_range, blank_line) = suppression_edit_range(locator, line_range, codes.start());
             existing_codes.extend(codes.iter().map(Code::as_str));
         }
-        // Add additional rule names to an existing `ruff:ignore` comment.
+        // Add additional rule names to an existing `ruff: ignore` comment.
         (Some(ExistingDirective::Ignore(comment)), SuppressionKind::Ignore) => {
             (edit_range, blank_line) = suppression_edit_range(locator, line_range, comment.start());
             existing_codes.extend(comment.codes_as_str(locator.contents()));
@@ -1368,6 +1379,7 @@ mod tests {
     use crate::rules::pycodestyle::rules::{AmbiguousVariableName, UselessSemicolon};
     use crate::rules::pyflakes::rules::UnusedVariable;
     use crate::rules::pyupgrade::rules::PrintfStringFormatting;
+    use crate::settings::types::PreviewMode;
     use crate::settings::{LinterSettings, flags};
     use crate::source_kind::SourceKind;
     use crate::suppression::Suppressions;
@@ -1423,6 +1435,7 @@ mod tests {
             None,
             &suppressions,
             suppression_kind,
+            settings.preview,
         )
     }
 
@@ -3070,7 +3083,7 @@ mod tests {
         ## Fixed source
 
         ```py
-        def unused(x):  # ruff:ignore[ANN001, ARG001, D103]  # noqa: ANN001, ANN201, D103
+        def unused(x):  # ruff:ignore[ANN001, ARG001, D103]  # noqa: ANN201
             pass
         ```
         "
@@ -3132,7 +3145,7 @@ mod tests {
         ## Fixed source
 
         ```py
-        def unused(x):  # noqa: ANN001, ARG001, D103  # ruff:ignore[missing-return-type-undocumented-public-function]
+        def unused(x):  # noqa: ANN001, ARG001, D103  # ruff: ignore[missing-return-type-undocumented-public-function]
             pass
         ```
         "
@@ -3182,7 +3195,7 @@ mod tests {
         ## Fixed source
 
         ```py
-        import math  # noqa: F401  # ruff:ignore[noqa-comments]
+        import math  # noqa: F401  # ruff: ignore[noqa-comments]
 
         ```
         "
@@ -3213,7 +3226,7 @@ mod tests {
         ## Fixed source
 
         ```py
-        def unused(x):  # ruff:ignore[ANN001, ARG001, D103, missing-return-type-undocumented-public-function]
+        def unused(x):  # ruff: ignore[ANN001, ARG001, D103, missing-return-type-undocumented-public-function]
             pass
         ```
         "
@@ -3243,7 +3256,7 @@ mod tests {
         ## Fixed source
 
         ```py
-        def unused(x):  # ruff:ignore[missing-return-type-undocumented-public-function, missing-type-function-argument, undocumented-public-function]
+        def unused(x):  # ruff: ignore[missing-return-type-undocumented-public-function, missing-type-function-argument, undocumented-public-function]
             pass
         ```
         "
@@ -3269,7 +3282,7 @@ mod tests {
         ## Fixed source
 
         ```py
-        import z  # ruff:ignore[unsorted-imports]
+        import z  # ruff: ignore[unsorted-imports]
         import c
         import a
         ```
@@ -3301,7 +3314,7 @@ mod tests {
         ## Fixed source
 
         ```py
-        # ruff:ignore[ANN001, missing-return-type-undocumented-public-function]
+        # ruff: ignore[ANN001, missing-return-type-undocumented-public-function]
         def public(x):
             """Return x."""
             return x
@@ -3328,6 +3341,7 @@ mod tests {
             None,
             &Suppressions::default(),
             SuppressionKind::Noqa,
+            PreviewMode::Disabled,
         );
         assert_eq!(count, 0);
         assert_eq!(output, format!("{contents}"));
@@ -3354,6 +3368,7 @@ mod tests {
             None,
             &Suppressions::default(),
             SuppressionKind::Noqa,
+            PreviewMode::Disabled,
         );
         assert_eq!(count, 1);
         assert_eq!(output, "x = 1  # noqa: F841\n");
@@ -3387,6 +3402,7 @@ mod tests {
             None,
             &Suppressions::default(),
             SuppressionKind::Noqa,
+            PreviewMode::Disabled,
         );
         assert_eq!(count, 1);
         assert_eq!(output, "x = 1  # noqa: E741, F841\n");
@@ -3420,6 +3436,7 @@ mod tests {
             None,
             &Suppressions::default(),
             SuppressionKind::Noqa,
+            PreviewMode::Disabled,
         );
         assert_eq!(count, 0);
         assert_eq!(output, "x = 1  # noqa");
@@ -3453,6 +3470,7 @@ print(
             LineEnding::Lf,
             &suppressions,
             SuppressionKind::Noqa,
+            PreviewMode::Disabled,
         );
         assert_eq!(
             edits,
@@ -3487,6 +3505,7 @@ bar =
             LineEnding::Lf,
             &suppressions,
             SuppressionKind::Noqa,
+            PreviewMode::Disabled,
         );
         assert_eq!(
             edits,

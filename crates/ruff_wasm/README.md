@@ -25,7 +25,7 @@ const exampleDocument = `print('hello'); print("world")`;
 
 await init(); // Initializes WASM module
 
-// These are default settings just to illustrate configuring Ruff
+// These settings illustrate configuring Ruff
 // Settings info: https://docs.astral.sh/ruff/settings
 const workspace = new Workspace(
   {
@@ -55,8 +55,8 @@ const formatted = workspace.format(exampleDocument);
 This crate is an internal component of [Ruff](https://crates.io/crates/ruff). The Rust API exposed
 here is unstable and will have frequent breaking changes.
 
-This version (0.15.22) is a component of [Ruff 0.15.22](https://crates.io/crates/ruff/0.15.22). The
-source can be found [here](https://github.com/astral-sh/ruff/blob/0.15.22/crates/ruff_wasm).
+This version (0.16.0) is a component of [Ruff 0.16.0](https://crates.io/crates/ruff/0.16.0). The
+source can be found [here](https://github.com/astral-sh/ruff/blob/0.16.0/crates/ruff_wasm).
 
 See Ruff's [crate versioning policy](https://docs.astral.sh/ruff/versioning/#crate-versioning) for
 details on versioning.

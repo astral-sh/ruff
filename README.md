@@ -152,8 +152,8 @@ curl -LsSf https://astral.sh/ruff/install.sh | sh
 powershell -c "irm https://astral.sh/ruff/install.ps1 | iex"
 
 # For a specific version.
-curl -LsSf https://astral.sh/ruff/0.15.22/install.sh | sh
-powershell -c "irm https://astral.sh/ruff/0.15.22/install.ps1 | iex"
+curl -LsSf https://astral.sh/ruff/0.16.0/install.sh | sh
+powershell -c "irm https://astral.sh/ruff/0.16.0/install.ps1 | iex"
 ```
 
 You can also install Ruff via [Homebrew](https://formulae.brew.sh/formula/ruff), [Conda](https://anaconda.org/conda-forge/ruff),
@@ -186,7 +186,7 @@ Ruff can also be used as a [pre-commit](https://pre-commit.com/) hook via [`ruff
 ```yaml
 - repo: https://github.com/astral-sh/ruff-pre-commit
   # Ruff version.
-  rev: v0.15.22
+  rev: v0.16.0
   hooks:
     # Run the linter.
     - id: ruff-check
@@ -216,6 +216,8 @@ jobs:
 Ruff can be configured through a `pyproject.toml`, `ruff.toml`, or `.ruff.toml` file (see:
 [_Configuration_](https://docs.astral.sh/ruff/configuration/), or [_Settings_](https://docs.astral.sh/ruff/settings/)
 for a complete list of all configuration options).
+
+For the complete list of enabled rules, see [_Default Rules_](https://docs.astral.sh/ruff/default-rules/).
 
 If left unspecified, Ruff's default configuration is equivalent to the following `ruff.toml` file:
 
@@ -258,8 +260,7 @@ indent-width = 4
 target-version = "py310"
 
 [lint]
-# Enable Pyflakes (`F`) and a subset of the pycodestyle (`E`) codes by default.
-select = ["E4", "E7", "E9", "F"]
+# select = [...]  # See the Default Rules page for the full listing.
 ignore = []
 
 # Allow fix for all enabled rules (when `--fix`) is provided.
@@ -315,18 +316,13 @@ for more on the linting and formatting commands, respectively.
 isort, pyupgrade, and others. Regardless of the rule's origin, Ruff re-implements every rule in
 Rust as a first-party feature.
 
-By default, Ruff enables Flake8's `F` rules, along with a subset of the `E` rules, omitting any
-stylistic rules that overlap with the use of a formatter, like `ruff format` or
-[Black](https://github.com/psf/black).
+By default, Ruff enables rules from the `F`, `E`, `B`, `UP`, and `RUF` categories,
+as well as many more, omitting any stylistic rules that overlap with the use of a formatter, like
+`ruff format` or [Black](https://github.com/psf/black).
 
 If you're just getting started with Ruff, **the default rule set is a great place to start**: it
-catches a wide variety of common errors (like unused imports) with zero configuration.
-
-In [preview](https://docs.astral.sh/ruff/preview/), Ruff enables an expanded set of default rules
-that includes rules from the `B`, `UP`, and `RUF` categories, as well as many more. If you give the
-new defaults a try, feel free to leave feedback in the [GitHub
-discussion](https://github.com/astral-sh/ruff/discussions/23203), where you can also find the new
-rule set listed in full.
+catches a wide variety of common errors (like unused imports) with zero configuration. See
+[_Default Rules_](https://docs.astral.sh/ruff/default-rules/) for the complete list.
 
 <!-- End section: Rules -->
 

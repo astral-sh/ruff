@@ -69,7 +69,7 @@ pub fn suppress_all(
     //
     // This is important because a suppression inserted at the end of a narrower range
     // can result in a start-line suppression for a wider range. In the example above,
-    // inserting a `ty:ignore` after `sorted(` suppresses the diagnostic with the narrower range
+    // inserting a `ty: ignore` after `sorted(` suppresses the diagnostic with the narrower range
     // but also the diagnostic with the wider range (because the suppression is on its start line).
     ids_with_suppression_range.sort_unstable_by_key(|(_, _, range)| (range.start(), range.end()));
 
@@ -242,7 +242,7 @@ fn add_end_of_line_suppression(source: &str, codes: &[LintName], line_end: TextS
     let trailing_whitespace_len = up_to_line_end.text_len() - up_to_first_content.text_len();
 
     let insertion = format!(
-        "  # ty:ignore[{codes}]",
+        "  # ty: ignore[{codes}]",
         codes = Codes(SuppressionKind::Ty, codes)
     );
 

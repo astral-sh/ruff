@@ -274,17 +274,27 @@ class C:
 instance = C()
 instance.attr = 1  # fine
 
-# TODO: ideally, we would mention why this is an invalid assignment (wrong argument type for `value` parameter)
 instance.attr = "wrong"  # snapshot: invalid-assignment
+
+# Check that the concise diagnostic retains the useful expected and provided types.
+# error: [invalid-assignment] "Expected `int`, found `Literal["also wrong"]`"
+instance.attr = "also wrong"
 ```
 
 ```snapshot
-error[invalid-assignment]: Invalid assignment to data descriptor attribute `attr` on type `C` with custom `__set__` method
-  --> src/mdtest_snippet.py:12:1
+error[invalid-assignment]: Invalid assignment to data descriptor attribute `attr` on type `C`
+  --> src/mdtest_snippet.py:11:17
    |
-12 | instance.attr = "wrong"  # snapshot: invalid-assignment
-   | ^^^^^^^^^^^^^
+11 | instance.attr = "wrong"  # snapshot: invalid-assignment
+   |                 ^^^^^^^ Expected `int`, found `Literal["wrong"]`
    |
+info: This assignment implicitly calls `__set__` on a descriptor of type `Descriptor`
+info: Function defined here
+ --> src/mdtest_snippet.py:2:9
+  |
+2 |     def __set__(self, instance: object, value: int) -> None:
+  |         ^^^^^^^                         ---------- Parameter declared here
+  |
 ```
 
 ### Invalid `__set__` method signature
@@ -299,17 +309,89 @@ class C:
 
 instance = C()
 
-# TODO: ideally, we would mention why this is an invalid assignment (wrong number of arguments for `__set__`)
 instance.attr = 1  # snapshot: invalid-assignment
 ```
 
 ```snapshot
-error[invalid-assignment]: Invalid assignment to data descriptor attribute `attr` on type `C` with custom `__set__` method
-  --> src/mdtest_snippet.py:11:1
+error[invalid-assignment]: Invalid assignment to data descriptor attribute `attr` on type `C`
+  --> src/mdtest_snippet.py:10:1
    |
-11 | instance.attr = 1  # snapshot: invalid-assignment
-   | ^^^^^^^^^^^^^
+10 | instance.attr = 1  # snapshot: invalid-assignment
+   | ^^^^^^^^^^^^^ No argument provided for required parameter `extra` of function `WrongDescriptor.__set__`
    |
+info: This assignment implicitly calls `__set__` on a descriptor of type `WrongDescriptor`
+info: Parameter declared here
+ --> src/mdtest_snippet.py:2:53
+  |
+2 |     def __set__(self, instance: object, value: int, extra: int) -> None:
+  |                                                     ^^^^^^^^^^
+  |
+```
+
+### Invalid property setter argument type
+
+```py
+class Document: ...
+
+class HasDocumentRef:
+    @property
+    def document(self) -> Document | None: ...
+    @document.setter
+    def document(self, document: Document) -> None: ...
+
+class Model(HasDocumentRef):
+    def detach(self) -> None:
+        self.document = None  # snapshot: invalid-assignment
+
+        # Check that the concise diagnostic identifies the actual setter argument mismatch.
+        # error: [invalid-assignment] "Expected `Document`, found `None`"
+        self.document = None
+```
+
+```snapshot
+error[invalid-assignment]: Invalid assignment to data descriptor attribute `document` on type `Self@detach`
+  --> src/mdtest_snippet.py:11:25
+   |
+11 |         self.document = None  # snapshot: invalid-assignment
+   |                         ^^^^ Expected `Document`, found `None`
+   |
+info: This assignment implicitly calls `__set__` on a descriptor of type `property`
+info: Function defined here
+ --> src/mdtest_snippet.py:7:9
+  |
+7 |     def document(self, document: Document) -> None: ...
+  |         ^^^^^^^^       ------------------ Parameter declared here
+  |
+```
+
+### Nested argument type
+
+```py
+class Descriptor:
+    def __set__(self, instance, value: tuple[int, str]) -> None: ...
+
+class C:
+    x = Descriptor()
+
+c = C()
+c.x = (1, b"")  # snapshot: invalid-assignment
+```
+
+```snapshot
+error[invalid-assignment]: Invalid assignment to data descriptor attribute `x` on type `C`
+ --> src/mdtest_snippet.py:8:7
+  |
+8 | c.x = (1, b"")  # snapshot: invalid-assignment
+  |       ^^^^^^^^ Expected `tuple[int, str]`, found `tuple[Literal[1], Literal[b""]]`
+  |
+info: This assignment implicitly calls `__set__` on a descriptor of type `Descriptor`
+info: the second tuple element is not compatible: `Literal[b""]` is not assignable to `str`
+info: Function defined here
+ --> src/mdtest_snippet.py:2:9
+  |
+2 |     def __set__(self, instance, value: tuple[int, str]) -> None: ...
+  |         ^^^^^^^                 ---------------------- Parameter declared here
+  |
 ```
 
 ## Setting attributes on union types

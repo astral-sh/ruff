@@ -309,7 +309,7 @@ impl<'db> KnownInstanceType<'db> {
                 KnownClass::TypeVarTuple
             }
             Self::TypeVar(_) => KnownClass::TypeVar,
-            Self::TypeAliasType(TypeAliasType::PEP695(alias)) if alias.is_specialized(db) => {
+            Self::TypeAliasType(alias) if alias.specialization(db).is_some() => {
                 KnownClass::GenericAlias
             }
             Self::TypeAliasType(_) => KnownClass::TypeAliasType,

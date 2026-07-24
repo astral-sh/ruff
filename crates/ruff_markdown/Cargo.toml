@@ -1,6 +1,6 @@
 [package]
 name = "ruff_markdown"
-version = "0.0.5"
+version = "0.0.6"
 description = "This is an internal component crate of Ruff"
 edition = { workspace = true }
 rust-version = { workspace = true }

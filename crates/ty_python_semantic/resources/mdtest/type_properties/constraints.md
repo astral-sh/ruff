@@ -861,10 +861,39 @@ def same_typevar[T]():
     static_assert(constraints == expected)
 ```
 
+## Existential quantification
+
+Existential quantification removes the listed typevars from a constraint set. Any constraints that
+do not involve those typevars must remain in the result. The result holds whenever _at least one_
+valid assignment to the quantified variables satisfies the expression being quantified over.
+
+```py
+from typing import Never
+from ty_extensions import static_assert
+from ty_extensions._internal import ConstraintSet
+
+def preserves_remaining_conjunct[T, U]() -> None:
+    t_int = ConstraintSet.range(int, T, int)
+    u_str = ConstraintSet.range(str, U, str)
+    quantified = (t_int & u_str).exists(tuple[U])
+    static_assert(quantified == t_int)
+
+def satisfies_uncertain_disjunct[T, U]() -> None:
+    t_int = ConstraintSet.range(int, T, int)
+    u_str = ConstraintSet.range(str, U, str)
+    quantified = (t_int | u_str).exists(tuple[U])
+    static_assert(quantified == ConstraintSet.always())
+
+def no_typevars_is_identity[T]() -> None:
+    constraints = ConstraintSet.range(Never, T, int)
+    static_assert(constraints.exists(tuple[()]) == constraints)
+```
+
 ## Universal quantification
 
 Universal quantification removes the listed typevars from a constraint set. Any constraints that do
-not involve those typevars must remain in the result, including constraints in an uncertain branch.
+not involve those typevars must remain in the result. The result holds whenever _every_ valid
+assignment to the quantified variables satisfies the expression being quantified over.
 
 ```py
 from typing import Never
@@ -901,13 +930,12 @@ def quantifier_order[S, T]() -> None:
     target_is_int = ConstraintSet.range(int, T, int)
     equal = source_is_int.satisfies(target_is_int) & target_is_int.satisfies(source_is_int)
 
-    # ∀T.∃S.equal(S, T) = ∀T.¬∀S.¬equal(S, T)
-    forall_target_exists_source = (~((~equal).for_all(tuple[S]))).for_all(tuple[T])
+    # ∀T.∃S.equal(S, T)
+    forall_target_exists_source = equal.exists(tuple[S]).for_all(tuple[T])
     static_assert(forall_target_exists_source == ConstraintSet.always())
 
-    # ∃S.∀T.equal(S, T) = ¬∀S.¬∀T.equal(S, T)
-    forall_target = equal.for_all(tuple[T])
-    exists_source_forall_target = ~((~forall_target).for_all(tuple[S]))
+    # ∃S.∀T.equal(S, T)
+    exists_source_forall_target = equal.for_all(tuple[T]).exists(tuple[S])
     static_assert(exists_source_forall_target == ConstraintSet.never())
 ```
 

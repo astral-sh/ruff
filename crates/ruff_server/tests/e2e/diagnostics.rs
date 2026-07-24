@@ -58,7 +58,7 @@ fn uses_human_readable_names_in_preview() -> Result<()> {
               }
             ],
             "noqa_edit": {
-              "newText": "  # ruff:ignore[unused-import]\n",
+              "newText": "  # ruff: ignore[unused-import]\n",
               "range": {
                 "end": {
                   "character": 0,
