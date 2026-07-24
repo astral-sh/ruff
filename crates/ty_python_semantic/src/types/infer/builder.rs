@@ -10162,7 +10162,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 "`{id}` was added as a builtin in Python 3.{version_added_to_builtins}"
             ));
             add_inferred_python_version_hint_to_diagnostic(
-                self.db(),
+                db,
+                self.program_environment(),
                 &mut diagnostic,
                 "resolving types",
             );

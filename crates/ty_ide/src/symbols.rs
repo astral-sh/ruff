@@ -604,7 +604,7 @@ impl<'db> Imports<'db> {
             ImportingFile::File(program_file.file(db), program_file.resolver_environment(db));
         let module_name = match module_kind {
             ImportModuleKind::Definitive(name) | ImportModuleKind::Possible(name) => {
-                name.to_module_name(db, importing_file)?
+                name.to_module_name(db, importing_file.resolver_file(db))?
             }
         };
         let module = resolve_module(db, importing_file, &module_name)?;
@@ -3229,8 +3229,7 @@ class C: ...
             let metadata = ProjectMetadata::new("test", SystemPathBuf::from("/"));
             let mut db = TestDb::new(metadata);
 
-            db.init_program_with_python_version(self.python_version.unwrap_or_default())
-                .unwrap();
+            db.set_python_version(self.python_version.unwrap_or_default());
 
             for Source { path, contents } in &self.sources {
                 db.write_file(path, contents)

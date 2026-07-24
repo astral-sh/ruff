@@ -2,7 +2,6 @@ use std::any::Any;
 
 use js_sys::{Error, JsString};
 use ruff_db::Db as _;
-use ruff_db::PythonFile;
 use ruff_db::diagnostic::{self, DisplayDiagnosticConfig};
 use ruff_db::files::{File, FilePath, FileRange, system_path_to_file, vendored_path_to_file};
 use ruff_db::source::{SourceText, line_index, source_text};
@@ -28,7 +27,7 @@ use ty_project::metadata::options::Options;
 use ty_project::watch::{ChangeEvent, ChangedKind, CreatedKind, DeletedKind};
 use ty_project::{CheckMode, ProjectMetadata};
 use ty_project::{Db, ProjectDatabase, SemanticDb as _};
-use ty_python_core::program::{FallibleStrategy, Program};
+use ty_python_core::program::FallibleStrategy;
 use ty_python_semantic::ProgramEnvironment;
 use wasm_bindgen::prelude::*;
 
@@ -171,19 +170,23 @@ impl Workspace {
         let (program_settings, program_settings_diagnostics) = merged_options
             .to_program_settings(&self.system, self.db.vendored(), &FallibleStrategy)
             .map_err(into_error)?;
-        Program::get(&self.db).update_from_settings(&mut self.db, program_settings);
+        self.db
+            .project()
+            .program(&self.db)
+            .update_from_settings(&mut self.db, program_settings);
 
-        let (settings, settings_diagnostics) = merged_options
+        let (settings, mut settings_diagnostics) = merged_options
             .to_settings(&self.db, &FallibleStrategy)
             .map_err(into_error)?;
-
-        self.db.project().reload(
-            &mut self.db,
-            project,
-            Some(settings),
-            settings_diagnostics,
-            program_settings_diagnostics,
+        settings_diagnostics.extend(
+            program_settings_diagnostics
+                .into_iter()
+                .map(|diagnostic| diagnostic.into_diagnostic(&self.db)),
         );
+
+        self.db
+            .project()
+            .reload(&mut self.db, project, Some(settings), settings_diagnostics);
 
         Ok(())
     }
@@ -294,7 +297,7 @@ impl Workspace {
     pub fn parsed(&self, file_id: &FileHandle) -> Result<String, Error> {
         let parsed = ruff_db::parsed::parsed_module(
             &self.db,
-            PythonFile::new(&self.db, file_id.file, self.db.python_version()),
+            self.db.program_file(file_id.file).python_file(&self.db),
         )
         .load(&self.db);
 
@@ -309,7 +312,7 @@ impl Workspace {
     pub fn tokens(&self, file_id: &FileHandle) -> Result<String, Error> {
         let parsed = ruff_db::parsed::parsed_module(
             &self.db,
-            PythonFile::new(&self.db, file_id.file, self.db.python_version()),
+            self.db.program_file(file_id.file).python_file(&self.db),
         )
         .load(&self.db);
 

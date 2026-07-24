@@ -5,11 +5,8 @@ use ruff_db::Db;
 use ruff_db::files::{File, Files, system_path_to_file};
 use ruff_db::system::{DbWithTestSystem, System, SystemPath, SystemPathBuf, TestSystem};
 use ruff_db::vendored::VendoredFileSystem;
-use ruff_python_ast::PythonVersion;
 
-use ty_module_resolver::SearchPathSettings;
-use ty_python_core::platform::PythonPlatform;
-use ty_python_core::program::{FallibleStrategy, Program, ProgramSettings};
+use ty_python_core::program::{Program, ProgramSettings};
 use ty_python_semantic::lint::{LintRegistry, RuleSelection};
 use ty_python_semantic::pull_types::pull_types;
 use ty_python_semantic::{AnalysisSettings, Db as _, check_file_unwrap, default_lint_registry};
@@ -149,35 +146,32 @@ pub struct CorpusDb {
     system: TestSystem,
     vendored: VendoredFileSystem,
     analysis_settings: Arc<AnalysisSettings>,
+    program: Option<Program>,
 }
 
 impl CorpusDb {
     #[expect(clippy::new_without_default)]
     pub fn new() -> Self {
-        let db = Self {
+        let mut db = Self {
             storage: salsa::Storage::new(None),
             system: TestSystem::default(),
             vendored: ty_vendored::file_system().clone(),
             rule_selection: RuleSelection::from_registry(default_lint_registry()),
             files: Files::default(),
             analysis_settings: Arc::new(AnalysisSettings::default()),
+            program: None,
         };
 
-        Program::from_settings(
+        db.program = Some(Program::from_settings(
             &db,
-            ProgramSettings {
-                python_version: PythonVersionWithSource {
-                    version: PythonVersion::latest_ty(),
-                    source: PythonVersionSource::default(),
-                },
-                python_platform: PythonPlatform::default(),
-                search_paths: SearchPathSettings::new(vec![])
-                    .to_search_paths(db.system(), db.vendored(), &FallibleStrategy)
-                    .unwrap(),
-            },
-        );
+            ProgramSettings::empty(db.vendored()),
+        ));
 
         db
+    }
+
+    fn program(&self) -> Program {
+        self.program.expect("the program should be initialized")
     }
 }
 
@@ -227,7 +221,7 @@ impl ty_python_semantic::Db for CorpusDb {
     }
 
     fn program_file(&self, file: File) -> ProgramFile<'_> {
-        Program::get(self).program_file(self, file)
+        self.program().program_file(self, file)
     }
 
     fn rule_selection(&self, _file: File) -> &RuleSelection {

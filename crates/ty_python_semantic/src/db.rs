@@ -64,6 +64,7 @@ pub(crate) mod tests {
         rule_selection: Arc<RuleSelection>,
         analysis_settings: Arc<AnalysisSettings>,
         open_files: rustc_hash::FxHashSet<File>,
+        program: Option<Program>,
     }
 
     impl TestDb {
@@ -85,15 +86,20 @@ pub(crate) mod tests {
                 rule_selection: Arc::new(RuleSelection::from_registry(default_lint_registry())),
                 analysis_settings: AnalysisSettings::default().into(),
                 open_files: rustc_hash::FxHashSet::default(),
+                program: None,
             }
         }
 
         pub(crate) fn python_version(&self) -> PythonVersion {
-            Program::get(self).python_version(self)
+            self.program().python_version(self)
         }
 
         pub(crate) fn program_environment(&self) -> ProgramEnvironment<'_> {
-            ProgramEnvironment::from_program(Program::get(self).resolver_environment(self))
+            ProgramEnvironment::from_program(self.program())
+        }
+
+        pub(crate) fn program(&self) -> Program {
+            self.program.expect("the program should be initialized")
         }
 
         /// Marks `file` as open in the editor.
@@ -162,7 +168,7 @@ pub(crate) mod tests {
         }
 
         fn program_file(&self, file: File) -> ProgramFile<'_> {
-            Program::get(self).program_file(self, file)
+            self.program().program_file(self, file)
         }
 
         fn rule_selection(&self, _file: File) -> &RuleSelection {
@@ -242,7 +248,7 @@ pub(crate) mod tests {
             db.write_files(self.files)
                 .context("Failed to write test files")?;
 
-            Program::from_settings(
+            db.program = Some(Program::from_settings(
                 &db,
                 ProgramSettings {
                     python_version: PythonVersionWithSource {
@@ -254,7 +260,7 @@ pub(crate) mod tests {
                         .to_search_paths(db.system(), db.vendored(), &FallibleStrategy)
                         .context("Invalid search path settings")?,
                 },
-            );
+            ));
 
             Ok(db)
         }

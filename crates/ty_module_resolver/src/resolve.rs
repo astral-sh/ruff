@@ -836,9 +836,8 @@ impl SearchPaths {
 
     /// Returns a new `SearchPaths` with no search paths configured.
     ///
-    /// This is primarily useful for testing.
-    #[cfg(test)]
-    pub(crate) fn empty(vendored: &VendoredFileSystem) -> Self {
+    /// The vendored standard library remains available.
+    pub fn empty(vendored: &VendoredFileSystem) -> Self {
         Self {
             static_paths: vec![],
             stdlib_path: Some(SearchPath::vendored_stdlib()),

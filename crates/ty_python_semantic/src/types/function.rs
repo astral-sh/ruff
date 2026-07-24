@@ -340,6 +340,10 @@ impl<'db> OverloadLiteral<'db> {
         self.body_scope(db).program_file(db)
     }
 
+    pub(crate) fn program(self, db: &'db dyn Db) -> Program {
+        self.body_scope(db).program(db)
+    }
+
     pub(crate) fn has_known_decorator(self, db: &dyn Db, decorator: FunctionDecorators) -> bool {
         self.decorators(db).contains(decorator)
     }
@@ -1352,6 +1356,10 @@ impl<'db> FunctionType<'db> {
 
     pub(crate) fn program_file(self, db: &'db dyn Db) -> ProgramFile<'db> {
         self.literal(db).last_definition.program_file(db)
+    }
+
+    pub(crate) fn program(self, db: &'db dyn Db) -> Program {
+        self.literal(db).last_definition.program(db)
     }
 
     /// Returns the AST node for this function.

@@ -3,7 +3,7 @@
     reason = "Prefer System trait methods over std methods in ty crates"
 )]
 use crate::glob::{GlobFilterCheckMode, IncludeResult};
-use crate::metadata::options::{OptionDiagnostic, ProgramSettingsDiagnostic};
+use crate::metadata::options::OptionDiagnostic;
 use crate::parallel::ParallelIteratorExt;
 use crate::walk::{ProjectFilesFilter, ProjectFilesWalker};
 #[cfg(feature = "testing")]
@@ -44,7 +44,7 @@ pub mod watch;
 /// ## How is a project different from a program?
 /// There are two (related) motivations:
 ///
-/// 1. Program is defined in `ruff_db` and it can't reference the settings types for the linter and formatter
+/// 1. Program is defined in `ty_python_core` and it can't reference the settings types for the linter and formatter
 ///    without introducing a cyclic dependency. The project is defined in a higher level crate
 ///    where it can reference these setting types.
 /// 2. Running `ruff check` with different target versions results in different programs (settings) but
@@ -78,6 +78,13 @@ pub struct Project {
     /// salsa allocated table for `Project`.
     #[returns(deref)]
     pub settings: Box<Settings>,
+
+    /// The Python program used to analyze this project.
+    ///
+    /// This handle is stable for the lifetime of the project; program settings are updated in
+    /// place when the project configuration changes.
+    #[returns(copy)]
+    pub program: Program,
 
     /// The paths that should be included when checking this project.
     ///
@@ -175,33 +182,32 @@ impl ProgressReporter for CollectReporter {
 #[salsa::tracked]
 impl Project {
     /// Create a project from resolved metadata and settings.
-    ///
-    /// Program-settings diagnostics are accepted separately so callers do not need to know how to
-    /// convert and merge them into the stored project settings diagnostics.
     fn from_metadata(
         db: &dyn Db,
         metadata: ProjectMetadata,
         settings: Settings,
+        program: Program,
         settings_diagnostics: Vec<OptionDiagnostic>,
-        program_settings_diagnostics: Vec<ProgramSettingsDiagnostic>,
     ) -> Self {
-        let diagnostics = Self::settings_diagnostics_with_program_diagnostics(
-            db,
+        Project::builder(
+            Box::new(metadata),
+            Box::new(settings),
+            program,
             settings_diagnostics,
-            program_settings_diagnostics,
-        );
-
-        Project::builder(Box::new(metadata), Box::new(settings), diagnostics)
-            .durability(Durability::MEDIUM)
-            .open_fileset_durability(Durability::LOW)
-            .file_set_durability(Durability::LOW)
-            .new(db)
+        )
+        .durability(Durability::MEDIUM)
+        .program_durability(Durability::NEVER_CHANGE)
+        .open_fileset_durability(Durability::LOW)
+        .file_set_durability(Durability::LOW)
+        .new(db)
     }
 
-    /// Permanently freezes the most heavily read immutable project inputs.
+    /// Permanently freezes the most heavily read immutable project and program inputs.
     ///
     /// This is intentionally not exhaustive.
     fn freeze(self, db: &mut dyn Db) {
+        self.program(db).freeze(db);
+
         let durability = Durability::NEVER_CHANGE;
         let metadata = Box::new(self.metadata(db).clone());
         let settings = Box::new(self.settings(db).clone());
@@ -270,25 +276,15 @@ impl Project {
     }
 
     /// Reload the project after its metadata or settings have changed.
-    ///
-    /// Program-settings diagnostics are converted and merged here to keep reload behavior
-    /// consistent with initial project creation.
     pub fn reload(
         self,
         db: &mut dyn Db,
         metadata: ProjectMetadata,
         settings: Option<Settings>,
         settings_diagnostics: Vec<OptionDiagnostic>,
-        program_settings_diagnostics: Vec<ProgramSettingsDiagnostic>,
     ) -> ProjectReloadResult {
         tracing::debug!("Reloading project");
         let metadata_changed = &metadata != self.metadata(db);
-        let settings_diagnostics = Self::settings_diagnostics_with_program_diagnostics(
-            db,
-            settings_diagnostics,
-            program_settings_diagnostics,
-        );
-
         let root_changed = metadata.root() != self.root(db);
         let (settings_changed, files_changed) = if let Some(settings) = settings
             && self.settings(db) != &settings
@@ -331,30 +327,10 @@ impl Project {
         self,
         db: &mut dyn Db,
         settings_diagnostics: Vec<OptionDiagnostic>,
-        program_settings_diagnostics: Vec<ProgramSettingsDiagnostic>,
     ) {
-        let settings_diagnostics = Self::settings_diagnostics_with_program_diagnostics(
-            db,
-            settings_diagnostics,
-            program_settings_diagnostics,
-        );
-
         if self.settings_diagnostics(db) != settings_diagnostics {
             self.set_settings_diagnostics(db).to(settings_diagnostics);
         }
-    }
-
-    fn settings_diagnostics_with_program_diagnostics(
-        db: &dyn Db,
-        mut settings_diagnostics: Vec<OptionDiagnostic>,
-        program_settings_diagnostics: Vec<ProgramSettingsDiagnostic>,
-    ) -> Vec<OptionDiagnostic> {
-        settings_diagnostics.extend(
-            program_settings_diagnostics
-                .into_iter()
-                .map(|diagnostic| diagnostic.into_diagnostic(db)),
-        );
-        settings_diagnostics
     }
 
     /// Checks the project and its dependencies according to the project's check mode.
@@ -906,7 +882,6 @@ mod tests {
     fn check_file_skips_type_checking_when_file_cant_be_read() -> ruff_db::system::Result<()> {
         let project = ProjectMetadata::new("test", SystemPathBuf::from("/"));
         let mut db = TestDb::new(project);
-        db.init_program().unwrap();
         let path = SystemPath::new("test.py");
 
         db.write_file(path, "x = 10")?;

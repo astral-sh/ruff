@@ -63,7 +63,7 @@ impl<'db> ProgramEnvironment<'db> {
     }
 
     /// Creates an environment with an already-established program.
-    pub fn from_program(program: Program<'db>) -> Self {
+    pub fn from_program(program: Program) -> Self {
         Self {
             environment: Cell::new(ProgramSource::Program(program.as_id())),
             lifetime: PhantomData,
@@ -72,9 +72,9 @@ impl<'db> ProgramEnvironment<'db> {
 
     /// Returns the program used by this operation.
     #[inline]
-    pub fn program(&self, db: &'db dyn Db) -> Program<'db> {
+    pub fn program(&self, db: &'db dyn Db) -> Program {
         let program = match self.environment.get() {
-            ProgramSource::Program(id) => return ResolverEnvironment::from_id(id),
+            ProgramSource::Program(id) => return Program::from_id(id),
             ProgramSource::File(file) => {
                 cold_path();
                 // The source handle and database share `'db`; re-wrapping the stored ingredient
@@ -109,7 +109,7 @@ impl<'db> ProgramEnvironment<'db> {
     /// Returns the resolver environment used by this operation.
     #[inline]
     pub fn resolver_environment(&self, db: &'db dyn Db) -> ResolverEnvironment<'db> {
-        self.program(db)
+        self.program(db).resolver_environment(db)
     }
 }
 
