@@ -2955,19 +2955,6 @@ impl NodeId {
         result
     }
 
-    fn remove_noninferable<'db>(
-        self,
-        db: &'db dyn Db,
-        builder: &ConstraintSetBuilder<'db>,
-        inferable: TypeVarSet<'db>,
-    ) -> Self {
-        match self.node() {
-            Node::AlwaysTrue => ALWAYS_TRUE,
-            Node::AlwaysFalse => ALWAYS_FALSE,
-            Node::Interior(interior) => interior.remove_noninferable(db, builder, inferable),
-        }
-    }
-
     /// Returns a new BDD that returns the same results as `self`, but with some inputs fixed to
     /// particular values. (Those variables will not be checked when evaluating the result, and
     /// will not be present in the result.)
@@ -4358,32 +4345,6 @@ impl InteriorNode {
                         .bounds
                         .upper
                         .is_some_and(|upper| any_over_type(db, upper, false, mentions_typevar))
-            },
-        )
-    }
-
-    fn remove_noninferable<'db>(
-        self,
-        db: &'db dyn Db,
-        builder: &ConstraintSetBuilder<'db>,
-        inferable: TypeVarSet<'db>,
-    ) -> NodeId {
-        self.abstract_inner(
-            db,
-            builder,
-            // We only want to keep constraints on inferable typevars. If the constraint's typevar
-            // is itself inferable, we keep it. We also need to keep some constraints in
-            // non-inferable typevars, if their lower or upper bound is a bare inferable typevar.
-            // This ensure that our quantification logic does not depend on typevar ordering.
-            //
-            // For example, `I ≤ N` (where I is inferable and N is non-inferable) could be encoded
-            // either as `Never ≤ I ≤ N` or `I ≤ N ≤ object`, depending on typevar ordering. If we
-            // only checked the inferability of the constrained typevar, we would keep the first
-            // encoding but remove the second.
-            &mut |constraint| {
-                !builder
-                    .constraint_data(constraint)
-                    .constrains_typevar_that(|typevar| typevar.is_inferable(db, inferable))
             },
         )
     }

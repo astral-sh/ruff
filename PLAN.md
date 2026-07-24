@@ -9,7 +9,7 @@
 - Phase 1 — characterize current behavior and agreed semantics: complete.
 - Phase 2 — inferability-aware path representation and solving: complete.
 - Phase 3 — extract directly from the original TDD: complete.
-- Phase 4 — remove dead projection code and finish validation: not started.
+- Phase 4 — remove dead projection code and finish validation: complete.
 - Existing constraint-set quantification work is out of scope unless this plan is
     explicitly revised.
 
@@ -120,9 +120,8 @@ in the repository's `AGENTS.md` files:
     non-inferable typevars remains intentionally out of scope.
 
 - `Constraint::constrains_typevar_that` applies a predicate to the constraint
-    subject and to any bare-typevar lower or upper bounds. Both path collection
-    and `remove_noninferable` use it to classify mixed constraints without
-    depending on typevar orientation.
+    subject and to any bare-typevar lower or upper bounds. Path collection uses
+    it to classify mixed constraints without depending on typevar orientation.
 
 - `PathVisitor<'db>` and `PathFold<'db>` carry the database lifetime, allowing
     `CollectVisitor<'db>` to retain the inferable `TypeVarSet` and classify
@@ -148,20 +147,21 @@ in the repository's `AGENTS.md` files:
     display-only DNF simplification. Do not reuse, generalize, or recreate that
     machinery for solution extraction.
 
-### Former projection
+### Removed projection and preserved quantification
 
-`NodeId::remove_noninferable` and `InteriorNode::remove_noninferable` remain in
-`crates/ty_python_semantic/src/types/constraints.rs`, but no solution-extraction
-path invokes them. Phase 4 will remove these now-unused methods and their
-resulting dead-code warnings; do not suppress those warnings temporarily.
+`NodeId::remove_noninferable` and `InteriorNode::remove_noninferable` were deleted
+after solution extraction switched to the original TDD. No production caller,
+projection-exclusive helper or cache, or stale performance comment remains.
 
-The former projection uses `abstract_inner` to remove constraints whose subject is
-non-inferable. However, it intentionally retains mixed constraints whose lower
-or upper bound is a bare inferable typevar so that `I <= N` has the same
-meaning regardless of whether the TDD encodes it as a constraint on `I` or on
-`N`.
+The former projection used `abstract_inner` to remove constraints whose subject
+was non-inferable while retaining mixed constraints with a bare inferable
+typevar bound. Removing that projection was not equivalent to only filtering
+output bindings: it also collapsed non-inferable-only branches, preserved
+relevant implications, and could change the resulting TDD's terminal
+classification.
 
-When removing a node, `abstract_inner`:
+`abstract_inner` remains in place for `InteriorNode::exists_inner` and explicit
+existential/universal quantification. When it removes a node, it:
 
 - still records its assignment in `PathAssignments`;
 - derives sequents from that assignment;
@@ -169,14 +169,7 @@ When removing a node, `abstract_inner`:
 - unions the true, uncertain, and false branches; and
 - rebuilds retained decisions with TDD-aware `ite` semantics.
 
-Consequently, removing the projection is not equivalent to only suppressing
-non-inferable output bindings: the projection also collapses non-inferable-only
-branches, preserves relevant implications, and can change the resulting TDD's
-terminal classification.
-
-The same `abstract_inner` machinery is also used by existential quantification;
-Phase 4 cleanup must preserve that shared behavior and delete only code that is
-genuinely exclusive to the removed projection.
+The cleanup changes none of this shared quantification behavior.
 
 ### Important consumers
 
@@ -193,9 +186,9 @@ genuinely exclusive to the removed projection.
     bounds.
 - Both paths currently post-process cross-typevar artifacts and merge solutions
     into specialization mappings.
-- A nearby performance note documents an earlier attempt to skip
-    `remove_noninferable`: it changed `LiteralString` precision and did not avoid
-    expensive path traversal.
+- A nearby performance note documents the remaining large-union path-traversal
+    cost and points to the focused pydantic microbenchmark without referring to
+    the removed projection.
 
 Direct `PathBounds::solve` / `solve_with` consumers include:
 
@@ -463,6 +456,49 @@ Validation after Phase 3:
     **[21.013 ms, 21.505 ms]**, using the same optimized development profile
     and Criterion settings. Criterion detected no material performance change;
     the benchmark log is under `$HOME/.pi/tmp/inferability-phase3`.
+
+## Phase 4 cleanup and final validation
+
+The unused `NodeId::remove_noninferable` and
+`InteriorNode::remove_noninferable` methods are deleted. The shared
+`InteriorNode::abstract_inner` implementation and its existential
+quantification caller remain unchanged. The historical projection-specific
+performance comment in `SpecializationBuilder` is replaced with a description
+of the remaining large-union path-traversal cost. Consequently,
+`rg -n 'remove_noninferable' crates/ty_python_semantic` finds no production
+implementation or obsolete comments.
+
+The existing `compute_simple_bound_conjunction` fast path is unchanged. All
+three dedicated concrete-conjunction tests still confirm that neither the
+single-constraint nor pair-constraint sequent cache is populated; explicit
+quantification, `LiteralString`, collection inference, correlated generic
+protocols, and non-inferable declaration validation retain their existing
+coverage and results.
+
+Final validation:
+
+- Focused fast-path, quantification, and inferability regressions: **8 passed**.
+- `ty_python_semantic`: **787 passed**, **35 skipped**.
+- Full workspace with documented snapshot-update settings: **8,576 passed**,
+    **45 skipped**. The same unrelated Windows-line-ending parser snapshots were
+    regenerated, reviewed, and restored; no `.pending-snap` files remain.
+- Normal-order mdtests: **479 passed**. Every reversed and XOR-masked ordering
+    retains exactly the Phase 3 failure counts and failing-file sets; logs are
+    under `$HOME/.pi/tmp/inferability-phase4-final-wobble`.
+- Pydantic microbenchmark: **20.954 ms**, confidence interval
+    **[20.744 ms, 21.179 ms]**, with the same optimized development profile,
+    20 samples, 1-second warmup, and 2-second measurement. Criterion detected
+    no performance change (**p = 0.09**); the benchmark log is under
+    `$HOME/.pi/tmp/inferability-phase4`.
+- Workspace Clippy with all targets and features, formatting checks, and
+    repository hooks pass.
+
+Remaining intentionally deferred limitations are unchanged: comprehensive
+reasoning about combinations of negative non-inferable constraints, existing
+explicit-quantification defects, and consistently selecting the tighter
+constrained specialization when alternatives occur on separate TDD paths.
+One-sided bounds and finite declarations alone still do not establish a fixed
+non-inferable binding.
 
 ## Required semantic cases
 
@@ -841,7 +877,7 @@ Exit criteria:
 - Projected terminal, disjunction, correlation, non-inferable declaration, and
     ordering tests pass with the agreed semantics.
 
-### [ ] Phase 4 — Preserve fast paths, remove dead projection code, and validate
+### [x] Phase 4 — Preserve fast paths, remove dead projection code, and validate
 
 Depends on completed Phase 3.
 

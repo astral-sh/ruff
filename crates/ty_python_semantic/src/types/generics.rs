@@ -2147,17 +2147,13 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             return Ok(self.solve_hash_map_with(generic_context, choose));
         }
 
-        // TODO: This projection / solve can be expensive for large-union collection-literal type
-        // contexts. During the pending-constraint-set migration, pydantic and hydra-zen regressed
-        // on empty dict literals with a context equivalent to
+        // TODO: Solving can be expensive for large-union collection-literal type contexts. During
+        // the pending-constraint-set migration, pydantic and hydra-zen regressed on empty dict
+        // literals with a context equivalent to
         // `dict[Hashable, pydantic_core.core_schema.CoreSchema]`. `CoreSchema` is a large union,
         // so the invariant `_VT@dict = CoreSchema` constraint expands to many lower-bound
         // constraints; combined with `_KT@dict = Hashable`, PathAssignments/SequentMap traversal
-        // derives cross-typevar facts such as `TypedDictSchema <= _VT@dict <= Hashable`.
-        //
-        // A naive fast path that skipped `remove_noninferable` when no constraint would be removed
-        // was not enough: `solutions_with` still performed the expensive path traversal, and the
-        // skipped projection changed precision in LiteralString tests. See the
+        // derives cross-typevar facts such as `TypedDictSchema <= _VT@dict <= Hashable`. See the
         // `ty_micro[pydantic_core_schema_dict]` benchmark for a minimized reproducer.
         let solutions = match self.pending.solutions_with(
             self.db,
