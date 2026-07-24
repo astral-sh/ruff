@@ -874,6 +874,40 @@ reveal_type(decorated(1))  # revealed: int
 reveal_type(decorated("one"))  # revealed: str
 ```
 
+### Decorated overloads with `Concatenate`
+
+Each decorated overload applies its decorator to its own signature, without including any preceding
+overloads in the decorator call.
+
+```py
+from collections.abc import Callable
+from typing import Any, Concatenate, ParamSpec, TypeVar, overload
+
+P = ParamSpec("P")
+A = TypeVar("A")
+R = TypeVar("R")
+
+def curry1(func: Callable[Concatenate[A, P], R]) -> Callable[[A], Callable[P, R]]:
+    raise NotImplementedError
+
+@curry1
+@overload
+def starmap(mapper: Callable[[int, int], int], parser: int) -> int: ...
+@curry1
+@overload
+def starmap(mapper: Callable[[str, str, str], str], parser: str) -> str: ...
+@curry1
+def starmap(mapper: Callable[..., Any], parser: Any) -> Any:
+    raise NotImplementedError
+
+def add(x: int, y: int) -> int:
+    return x + y
+
+# revealed: Overload[((int, int, /) -> int, /) -> ((parser: int) -> int), ((str, str, str, /) -> str, /) -> ((parser: str) -> str)]
+reveal_type(starmap)
+reveal_type(starmap(add))  # revealed: (parser: int) -> int
+```
+
 ### Decorated implementation replaced by a function
 
 A decorator can replace an overload implementation with another function. The overload set remains

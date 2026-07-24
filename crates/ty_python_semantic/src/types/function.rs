@@ -759,7 +759,7 @@ impl<'db> FunctionLiteral<'db> {
         }
     }
 
-    /// Ignore previous overloads when applying decorators to an implementation.
+    /// Ignore previous overloads when applying decorators to an individual definition.
     pub(super) const fn without_overloads(self) -> Self {
         Self {
             overloaded: false,
@@ -767,23 +767,23 @@ impl<'db> FunctionLiteral<'db> {
         }
     }
 
-    /// Preserve the overload set and implementation identity while updating decorator metadata.
+    /// Preserve the overload set and last-definition identity while updating decorator metadata.
     pub(super) fn with_last_definition_metadata(
         self,
         db: &'db dyn Db,
         decorated: OverloadLiteral<'db>,
     ) -> Self {
-        let implementation = self.last_definition;
+        let definition = self.last_definition;
         Self {
             last_definition: OverloadLiteral::new(
                 db,
-                implementation.name(db),
-                implementation.known(db),
-                implementation.body_scope(db),
-                implementation.decorators(db),
+                definition.name(db),
+                definition.known(db),
+                definition.body_scope(db),
+                definition.decorators(db),
                 decorated.deprecated(db),
                 decorated.dataclass_transformer_params(db),
-                implementation.has_explicit_return_annotation(db),
+                definition.has_explicit_return_annotation(db),
             ),
             ..self
         }

@@ -423,12 +423,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let function_type = FunctionType::new(db, function_literal, None);
         let is_decorated_overload_implementation = !decorator_types_and_nodes.is_empty()
             && function_literal.has_separate_implementation(db);
+        let is_decorated_overload =
+            !decorator_types_and_nodes.is_empty() && overload_literal.is_overload(db);
 
-        let mut inferred_ty = Type::FunctionLiteral(if is_decorated_overload_implementation {
-            FunctionType::new(db, function_literal.without_overloads(), None)
-        } else {
-            function_type
-        });
+        let mut inferred_ty = Type::FunctionLiteral(
+            if is_decorated_overload_implementation || is_decorated_overload {
+                FunctionType::new(db, function_literal.without_overloads(), None)
+            } else {
+                function_type
+            },
+        );
         if !decorator_list.is_empty() {
             self.undecorated_type = Some(inferred_ty);
         }
@@ -490,6 +494,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             inferred_ty = Type::FunctionLiteral(
                 function_type.with_implementation_callables(db, implementation_callables),
             );
+        } else if is_decorated_overload && let Type::FunctionLiteral(function) = inferred_ty {
+            inferred_ty = Type::FunctionLiteral(FunctionType::new(
+                db,
+                function_literal
+                    .with_last_definition_metadata(db, function.literal(db).last_definition),
+                None,
+            ));
         }
 
         self.add_declaration_with_binding(
