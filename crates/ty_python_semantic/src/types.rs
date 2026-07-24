@@ -1181,6 +1181,13 @@ impl<'db> Type<'db> {
         })
     }
 
+    pub(crate) const fn as_intersection(self) -> Option<IntersectionType<'db>> {
+        match self {
+            Type::Intersection(intersection) => Some(intersection),
+            _ => None,
+        }
+    }
+
     pub const fn is_unknown(&self) -> bool {
         matches!(
             self,
@@ -2521,16 +2528,9 @@ impl<'db> Type<'db> {
                 // our model due to [`UnionBuilder::build`].
                 false
             }
-            Type::Intersection(intersection)
-                if let Some(complement) = intersection.enum_complement(db) =>
-            {
-                complement.is_singleton(db)
-            }
-            // For example: `Unknown & None` is just as much a singleton as `None` is.
             Type::Intersection(intersection) => intersection
-                .positive(db)
-                .iter()
-                .any(|member| member.is_singleton(db)),
+                .enum_complement(db)
+                .is_some_and(|complement| complement.is_singleton(db)),
             Type::EnumComplement(complement) => complement.is_singleton(db),
             Type::AlwaysTruthy | Type::AlwaysFalsy => false,
             Type::TypeIs(type_is) => type_is.is_bound(db),

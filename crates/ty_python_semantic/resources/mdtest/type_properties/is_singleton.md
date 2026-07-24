@@ -190,15 +190,3 @@ static_assert(not is_singleton(Callable[[], None]))
 static_assert(not is_singleton(TypeOf[A().method]))
 static_assert(not is_singleton(TypeOf[A.method.__get__]))
 ```
-
-## Intersections
-
-An intersection that includes a singleton in its positive elements is still a singleton:
-
-```pyi
-from typing import Any
-from ty_extensions import static_assert
-from ty_extensions._internal import is_singleton
-
-static_assert(is_singleton(Any & None))
-```

@@ -224,13 +224,26 @@ pub(super) fn infer_binary_type_comparison<'db>(
         ast::CmpOp::Is | ast::CmpOp::IsNot => {
             let is_positive = op == ast::CmpOp::Is;
 
+            let is_singleton_or_intersection_with_singleton = |ty: Type<'db>| {
+                ty.is_singleton(db)
+                    || ty
+                        .resolve_type_alias(db)
+                        .as_intersection()
+                        .is_some_and(|intersection| {
+                            intersection
+                                .positive(db)
+                                .iter()
+                                .any(|ty| ty.is_singleton(db))
+                        })
+            };
+
             // Keep two occurrences of the same `TypeVar` symbolic. Replacing them with their bounds or
             // constraints would lose their shared specialization: a `TypeVar` constrained to `None` and
             // `EllipsisType` chooses the same singleton for both operands, not independent alternatives.
             if let Type::TypeVar(left) = left.resolve_type_alias(db)
                 && let Type::TypeVar(right) = right.resolve_type_alias(db)
                 && left.is_same_typevar_as(db, right)
-                && Type::TypeVar(left).is_singleton(db)
+                && is_singleton_or_intersection_with_singleton(Type::TypeVar(left))
             {
                 return Ok(Type::bool_literal(is_positive));
             }
@@ -261,8 +274,8 @@ pub(super) fn infer_binary_type_comparison<'db>(
             // `None` and `Unknown & None`.
             let result = if left_identity.is_disjoint_from(db, right_identity) {
                 Type::bool_literal(!is_positive)
-            } else if left_identity.is_singleton(db)
-                && right_identity.is_singleton(db)
+            } else if is_singleton_or_intersection_with_singleton(left_identity)
+                && is_singleton_or_intersection_with_singleton(right_identity)
                 && (left_identity.is_subtype_of(db, right_identity)
                     || right_identity.is_subtype_of(db, left_identity))
             {
