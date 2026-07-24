@@ -3814,6 +3814,17 @@ impl<'db> PathBounds<'db> {
         builder: &ConstraintSetBuilder<'db>,
         path_bound: &PathBound<'db>,
     ) -> Result<Option<Type<'db>>, ()> {
+        Self::default_solve_with_budget_tracking(db, builder, path_bound, &mut false)
+    }
+
+    /// Like [`Self::default_solve`], but records when an inferred upper-bound intersection
+    /// exceeds the solution budget and cannot be materialized.
+    pub(crate) fn default_solve_with_budget_tracking(
+        db: &'db dyn Db,
+        builder: &ConstraintSetBuilder<'db>,
+        path_bound: &PathBound<'db>,
+        exceeded_solution_budget: &mut bool,
+    ) -> Result<Option<Type<'db>>, ()> {
         // Choose a solution type that satisfies the constraints on this path, as well as any upper
         // bound or constraints of the typevar itself.
         // TODO: Handle the upper bound/constraints by conjoining them with the constraint set
@@ -3852,7 +3863,7 @@ impl<'db> PathBounds<'db> {
                 }
 
                 if path_bound.has_upper() {
-                    return Ok(IntersectionType::bounded_from_elements(
+                    let solution = IntersectionType::bounded_from_elements(
                         db,
                         path_bound
                             .upper
@@ -3860,7 +3871,9 @@ impl<'db> PathBounds<'db> {
                             .iter()
                             .copied()
                             .chain([declared_upper]),
-                    ));
+                    );
+                    *exceeded_solution_budget |= solution.is_none();
+                    return Ok(solution);
                 }
 
                 Ok(None)
@@ -3971,10 +3984,12 @@ impl<'db> PathBounds<'db> {
                     if let Some(lower) = path_bound.lower {
                         Ok(Some(lower))
                     } else if path_bound.has_upper() {
-                        Ok(IntersectionType::bounded_from_elements(
+                        let solution = IntersectionType::bounded_from_elements(
                             db,
                             path_bound.upper.clauses.iter().copied(),
-                        ))
+                        );
+                        *exceeded_solution_budget |= solution.is_none();
+                        Ok(solution)
                     } else {
                         Ok(None)
                     }

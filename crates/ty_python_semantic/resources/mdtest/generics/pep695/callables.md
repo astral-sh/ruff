@@ -447,6 +447,34 @@ def consume_right(value: A | B | F | G | H) -> None: ...
 reveal_type(infer_from_consumers(consume_left, consume_right))  # revealed: A | B
 ```
 
+## Non-disjoint inferred union upper bounds exceeding the solution budget
+
+When the inferred upper-bound intersection cannot be represented within the solution budget,
+inference should fall back to `Unknown`. It must not union the bounds and then reject otherwise
+valid callable arguments.
+
+```py
+from collections.abc import Callable
+
+class A: ...
+class B: ...
+class C: ...
+class D: ...
+class E: ...
+class F: ...
+
+def infer_from_consumers[T](
+    left: Callable[[T], None],
+    right: Callable[[T], None],
+) -> T:
+    raise NotImplementedError
+
+def consume_left(value: A | B | C) -> None: ...
+def consume_right(value: D | E | F) -> None: ...
+
+reveal_type(infer_from_consumers(consume_left, consume_right))  # revealed: Unknown
+```
+
 ## Contextual generic return exceeding the solution budget
 
 A generic call can receive an upper bound from the type context in which its return value is used.

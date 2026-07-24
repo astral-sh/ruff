@@ -2252,8 +2252,8 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
     ///
     /// Unlike [`Self::build_inference_with`], this preserves correlations between bindings on one
     /// path instead of unioning each type variable's solutions across independent paths. Returns
-    /// `None` for unsupported or unconstrained inference shapes so callers can retain the merged
-    /// fallback.
+    /// `None` for unsupported, unconstrained, or budget-exhausted inference shapes so callers can
+    /// retain the merged fallback.
     pub(crate) fn build_inference_paths_with(
         &mut self,
         generic_context: GenericContext<'db>,
@@ -2267,10 +2267,15 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             return None;
         }
 
-        let Solutions::Constrained(solutions) = self.solve_pending_constraints_with(&mut choose)
+        let (Solutions::Constrained(solutions), exceeded_solution_budget) =
+            self.solve_pending_constraints_with(&mut choose)
         else {
             return None;
         };
+
+        if exceeded_solution_budget {
+            return None;
+        }
 
         let fallback = self.solve_hash_map_with(generic_context, &mut choose);
         let mut inferences = Vec::with_capacity(solutions.len());
@@ -2303,17 +2308,25 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
     fn solve_pending_constraints_with(
         &self,
         choose: &mut impl FnMut(BoundTypeVarInstance<'db>, Option<&PathBound<'db>>) -> Option<Type<'db>>,
-    ) -> Solutions<'db> {
-        self.pending.solutions_with(
+    ) -> (Solutions<'db>, bool) {
+        let mut exceeded_solution_budget = false;
+        let solutions = self.pending.solutions_with(
             self.db,
             self.constraints,
             self.inferable,
             |_variance, path_bound| {
                 // A projection choice must not turn an invalid path into a satisfiable one.
-                let solution = PathBounds::default_solve(self.db, self.constraints, path_bound)?;
-                Ok(choose(path_bound.bound_typevar, Some(path_bound)).or(solution))
+                let solution = PathBounds::default_solve_with_budget_tracking(
+                    self.db,
+                    self.constraints,
+                    path_bound,
+                    &mut exceeded_solution_budget,
+                )?;
+                let solution = choose(path_bound.bound_typevar, Some(path_bound)).or(solution);
+                Ok(solution)
             },
-        )
+        );
+        (solutions, exceeded_solution_budget)
     }
 
     fn solve_pending_with(
@@ -2342,7 +2355,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         // was not enough: `solutions_with` still performed the expensive path traversal, and the
         // skipped projection changed precision in LiteralString tests. See the
         // `ty_micro[pydantic_core_schema_dict]` benchmark for a minimized reproducer.
-        let solutions = match self.solve_pending_constraints_with(choose) {
+        let solutions = match self.solve_pending_constraints_with(choose).0 {
             Solutions::Unsatisfiable => return Err(()),
             Solutions::Unconstrained => {
                 return Ok(self.solve_hash_map_with(generic_context, choose));
