@@ -2450,10 +2450,14 @@ impl NodeId {
                     return *result;
                 }
 
-                let mut path = interior.path_assignments(builder);
-                let result = path
-                    .visit(db, builder, self, &mut IsNeverSatisfiedVisitor)
-                    .is_continue();
+                let result = match self.simple_conjunction_is_never_satisfied(db, builder) {
+                    Some(result) => result,
+                    None => {
+                        let mut path = interior.path_assignments(builder);
+                        path.visit(db, builder, self, &mut IsNeverSatisfiedVisitor)
+                            .is_continue()
+                    }
+                };
                 builder
                     .storage
                     .borrow_mut()
@@ -2462,6 +2466,79 @@ impl NodeId {
                 result
             }
         }
+    }
+
+    /// Fast path for [`is_never_satisfied`][Self::is_never_satisfied]: decides satisfiability
+    /// directly when this BDD is a single all-positive conjunction of constraints whose bounds do
+    /// not mention typevars. Large literal unions produce exactly this shape — checking
+    /// `Literal["a", "b", ...] ≤ T` yields one constraint per union element — and the general
+    /// path walk discovers sequents for every pair of constraints, which is quadratic in the
+    /// number of constraints.
+    ///
+    /// With typevar-free bounds, `⋀ᵢ (Lᵢ ≤ T ≤ Uᵢ)` is satisfiable iff, for each constrained
+    /// typevar, `(L₁ | … | Lₙ) ≤ (U₁ & … & Uₙ)`. Assignability distributes over the union on the
+    /// left and the intersection clauses on the right, so this finds exactly the contradictions
+    /// that the walk's pairwise disjointness sequents detect.
+    ///
+    /// Returns `None` if the BDD does not have the required shape, in which case the caller falls
+    /// back to the general path walk.
+    fn simple_conjunction_is_never_satisfied<'db>(
+        self,
+        db: &'db dyn Db,
+        builder: &ConstraintSetBuilder<'db>,
+    ) -> Option<bool> {
+        let mut bounds: FxIndexMap<
+            BoundTypeVarInstance<'db>,
+            (FxIndexSet<Type<'db>>, UpperBound<'db>),
+        > = FxIndexMap::default();
+        let mut current = self;
+        loop {
+            match current.node() {
+                Node::AlwaysTrue => break,
+                Node::AlwaysFalse => return None,
+                Node::Interior(_) => {
+                    let interior = builder.interior_node_data(current);
+                    if interior.if_uncertain != ALWAYS_FALSE || interior.if_false != ALWAYS_FALSE {
+                        return None;
+                    }
+
+                    let constraint = builder.constraint_data(interior.constraint);
+                    if iter::chain(constraint.bounds.lower, constraint.bounds.upper)
+                        .any(|bound| bound.has_typevar(db) || bound.has_unspecialized_type_var(db))
+                    {
+                        return None;
+                    }
+
+                    let (lowers, uppers) = bounds.entry(constraint.typevar).or_default();
+                    if let Some(lower) = constraint.bounds.lower {
+                        lowers.insert(lower);
+                    }
+                    if let Some(upper) = constraint.bounds.upper {
+                        uppers.add_clause(db, upper);
+                    }
+                    current = interior.if_true;
+                }
+            }
+        }
+
+        for (lowers, uppers) in bounds.into_values() {
+            // Without an upper bound there is nothing the lower bounds could conflict with.
+            if uppers.is_empty() {
+                continue;
+            }
+            let lower = if lowers.is_empty() {
+                Type::Never
+            } else {
+                UnionType::from_elements(db, lowers)
+            };
+            if uppers
+                .when_satisfied_by(db, builder, lower)
+                .is_never_satisfied(db)
+            {
+                return Some(true);
+            }
+        }
+        Some(false)
     }
 
     fn solutions_with<'db>(
@@ -7738,6 +7815,102 @@ mod tests {
         let storage = builder.storage.borrow();
         assert_eq!(storage.single_sequent_cache.len(), single_sequents);
         assert_eq!(storage.pair_sequent_cache.len(), pair_sequents);
+    }
+
+    #[test]
+    fn simple_conjunction_satisfiability_skips_sequent_analysis() {
+        // (int ≤ T) ∧ (str ≤ T) is satisfiable, decided without pairwise sequent analysis.
+        let db = setup_db();
+        let t = create_typevar(&db, "T");
+        let builder = ConstraintSetBuilder::new();
+        let int = KnownClass::Int.to_instance(&db);
+        let str = KnownClass::Str.to_instance(&db);
+        let set = ConstraintSet::constrain_typevar_lower_bound(&db, &builder, t, int).and(
+            &db,
+            &builder,
+            || ConstraintSet::constrain_typevar_lower_bound(&db, &builder, t, str),
+        );
+        let (single_sequents, pair_sequents) = {
+            let storage = builder.storage.borrow();
+            (
+                storage.single_sequent_cache.len(),
+                storage.pair_sequent_cache.len(),
+            )
+        };
+
+        assert!(!set.is_never_satisfied(&db));
+
+        let storage = builder.storage.borrow();
+        assert_eq!(storage.single_sequent_cache.len(), single_sequents);
+        assert_eq!(storage.pair_sequent_cache.len(), pair_sequents);
+    }
+
+    #[test]
+    fn simple_conjunction_contradiction_skips_sequent_analysis() {
+        // (int ≤ T ≤ int) ∧ (str ≤ T ≤ str) is unsatisfiable, decided without pairwise
+        // sequent analysis.
+        let db = setup_db();
+        let t = create_typevar(&db, "T");
+        let builder = ConstraintSetBuilder::new();
+        let set = create_constraint(&db, &builder, t, KnownClass::Int).and(&db, &builder, || {
+            create_constraint(&db, &builder, t, KnownClass::Str)
+        });
+        let (single_sequents, pair_sequents) = {
+            let storage = builder.storage.borrow();
+            (
+                storage.single_sequent_cache.len(),
+                storage.pair_sequent_cache.len(),
+            )
+        };
+
+        assert!(set.is_never_satisfied(&db));
+
+        let storage = builder.storage.borrow();
+        assert_eq!(storage.single_sequent_cache.len(), single_sequents);
+        assert_eq!(storage.pair_sequent_cache.len(), pair_sequents);
+    }
+
+    #[test]
+    fn simple_conjunction_fast_path_matches_path_walk() {
+        let db = setup_db();
+        let t = create_typevar(&db, "T");
+        let builder = ConstraintSetBuilder::new();
+        let int = KnownClass::Int.to_instance(&db);
+        let str = KnownClass::Str.to_instance(&db);
+        let bool = KnownClass::Bool.to_instance(&db);
+
+        // (int ≤ T) ∧ (str ≤ T): satisfiable
+        let lower_bounds = ConstraintSet::constrain_typevar_lower_bound(&db, &builder, t, int).and(
+            &db,
+            &builder,
+            || ConstraintSet::constrain_typevar_lower_bound(&db, &builder, t, str),
+        );
+        // (bool ≤ T) ∧ (T ≤ int): satisfiable
+        let overlapping = ConstraintSet::constrain_typevar_lower_bound(&db, &builder, t, bool).and(
+            &db,
+            &builder,
+            || ConstraintSet::constrain_typevar_upper_bound(&db, &builder, t, int),
+        );
+        // (int ≤ T ≤ int) ∧ (str ≤ T ≤ str): unsatisfiable
+        let contradictory =
+            create_constraint(&db, &builder, t, KnownClass::Int).and(&db, &builder, || {
+                create_constraint(&db, &builder, t, KnownClass::Str)
+            });
+
+        for set in [lower_bounds, overlapping, contradictory] {
+            let Node::Interior(interior) = set.node.node() else {
+                panic!("expected an interior node");
+            };
+            let fast_path = set
+                .node
+                .simple_conjunction_is_never_satisfied(&db, &builder)
+                .expect("fast path should apply to a simple conjunction");
+            let mut path = interior.path_assignments(&builder);
+            let walked = path
+                .visit(&db, &builder, set.node, &mut IsNeverSatisfiedVisitor)
+                .is_continue();
+            assert_eq!(fast_path, walked);
+        }
     }
 
     #[test]
