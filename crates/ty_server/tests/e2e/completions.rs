@@ -145,7 +145,11 @@ complete_parenth
         "detail": "def complete_parentheses() -> None",
         "sortText": "0",
         "insertText": "complete_parentheses($0)",
-        "insertTextFormat": 2
+        "insertTextFormat": 2,
+        "command": {
+          "title": "",
+          "command": "editor.action.triggerParameterHints"
+        }
       }
     ]
     "#);
@@ -220,7 +224,11 @@ is_typedd
         "kind": 3,
         "sortText": "0",
         "insertText": "typing.is_typeddict($0)",
-        "insertTextFormat": 2
+        "insertTextFormat": 2,
+        "command": {
+          "title": "",
+          "command": "editor.action.triggerParameterHints"
+        }
       }
     ]
     "#);

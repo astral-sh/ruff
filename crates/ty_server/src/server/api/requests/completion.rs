@@ -2,13 +2,16 @@ use std::borrow::Cow;
 use std::time::Instant;
 
 use lsp_types::{
-    CompletionItem, CompletionItemKind, CompletionItemLabelDetails, CompletionList,
+    Command, CompletionItem, CompletionItemKind, CompletionItemLabelDetails, CompletionList,
     CompletionParams, CompletionRequest, CompletionResponse, Documentation, InsertTextFormat,
     TextEdit, Uri,
 };
 use ruff_source_file::OneIndexed;
 use ruff_text_size::Ranged;
-use ty_ide::{CompletionCapabilities, CompletionInsertTextFormat, CompletionKind, completion};
+use ty_ide::{
+    CompletionCapabilities, CompletionCommand, CompletionInsertTextFormat, CompletionKind,
+    completion,
+};
 use ty_project::ProjectDatabase;
 
 use crate::document::{PositionExt, ToRangeExt};
@@ -139,6 +142,7 @@ impl BackgroundDocumentRequestHandler for CompletionRequestHandler {
                     insert_text_format,
                     additional_text_edits: import_edit.map(|edit| vec![edit]),
                     documentation,
+                    command: comp.command.map(to_lsp),
                     ..Default::default()
                 }
             })
@@ -160,6 +164,22 @@ impl BackgroundDocumentRequestHandler for CompletionRequestHandler {
 
 impl RetriableRequestHandler for CompletionRequestHandler {
     const RETRY_ON_CANCELLATION: bool = true;
+}
+
+/// Maps an editor-neutral completion intent to the concrete LSP command the
+/// client should run after applying the completion.
+///
+/// The intent itself is decided in `ty_ide`; this is the single place that knows
+/// any editor-specific command identifiers.
+fn to_lsp(command: CompletionCommand) -> Command {
+    match command {
+        CompletionCommand::TriggerSignatureHelp => Command {
+            title: String::new(),
+            tooltip: None,
+            command: "editor.action.triggerParameterHints".into(),
+            arguments: None,
+        },
+    }
 }
 
 fn ty_kind_to_lsp_kind(kind: CompletionKind) -> CompletionItemKind {
