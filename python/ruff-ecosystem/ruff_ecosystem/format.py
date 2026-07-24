@@ -16,6 +16,7 @@ from unidiff import PatchSet
 
 from ruff_ecosystem import logger
 from ruff_ecosystem.markdown import markdown_project_section
+from ruff_ecosystem.projects import rule_name_to_code
 from ruff_ecosystem.types import Comparison, Diff, Result, ToolError
 
 if TYPE_CHECKING:
@@ -173,7 +174,12 @@ async def format_then_format(
     config_overrides: ConfigOverrides,
     cloned_repo: ClonedRepository,
 ) -> Sequence[str]:
-    with config_overrides.patch_config(cloned_repo.path, options.preview):
+    rule_names = (
+        rule_name_to_code(ruff_comparison_executable.resolve())
+        if not options.preview
+        else {}
+    )
+    with config_overrides.patch_config(cloned_repo.path, options.preview, rule_names):
         # Run format to get the baseline
         await format(
             formatter=baseline_formatter,
@@ -201,7 +207,12 @@ async def format_and_format(
     config_overrides: ConfigOverrides,
     cloned_repo: ClonedRepository,
 ) -> Sequence[str]:
-    with config_overrides.patch_config(cloned_repo.path, options.preview):
+    rule_names = (
+        rule_name_to_code(ruff_comparison_executable.resolve())
+        if not options.preview
+        else {}
+    )
+    with config_overrides.patch_config(cloned_repo.path, options.preview, rule_names):
         # Run format without diff to get the baseline
         await format(
             formatter=baseline_formatter,
@@ -218,7 +229,7 @@ async def format_and_format(
     # Then reset
     await cloned_repo.reset()
 
-    with config_overrides.patch_config(cloned_repo.path, options.preview):
+    with config_overrides.patch_config(cloned_repo.path, options.preview, rule_names):
         # Then run format again
         await format(
             formatter=Formatter.ruff,

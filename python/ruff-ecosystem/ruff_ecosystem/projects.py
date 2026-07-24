@@ -7,12 +7,13 @@ from __future__ import annotations
 import abc
 import contextlib
 import dataclasses
+import json
 from asyncio import create_subprocess_exec
 from dataclasses import dataclass, field
 from enum import Enum
 from functools import cache
 from pathlib import Path
-from subprocess import DEVNULL, PIPE
+from subprocess import DEVNULL, PIPE, check_output
 from typing import Any, Self
 
 import tomli
@@ -55,6 +56,60 @@ ALWAYS_CONFIG_OVERRIDES = {
     "required-version": None
 }
 
+RULE_SELECTOR_OPTIONS = (
+    "select",
+    "extend-select",
+    "ignore",
+    "extend-ignore",
+    "fixable",
+    "extend-fixable",
+    "unfixable",
+    "extend-unfixable",
+    "extend-safe-fixes",
+    "extend-unsafe-fixes",
+)
+
+
+@cache
+def rule_name_to_code(executable: Path) -> dict[str, str]:
+    rules = json.loads(
+        check_output(
+            [executable, "rule", "--all", "--output-format", "json"],
+            encoding="utf8",
+        )
+    )
+    return {rule["name"]: rule["code"] for rule in rules}
+
+
+def normalize_rule_selectors(
+    config: dict[str, Any], rule_names: dict[str, str]
+) -> None:
+    selector_lists: list[list[Any]] = []
+
+    for section in (config, config.get("lint")):
+        if not isinstance(section, dict):
+            continue
+
+        for option in RULE_SELECTOR_OPTIONS:
+            if isinstance(selectors := section.get(option), list):
+                selector_lists.append(selectors)
+
+        for option in ("per-file-ignores", "extend-per-file-ignores"):
+            if isinstance(per_file_ignores := section.get(option), dict):
+                selector_lists.extend(
+                    selectors
+                    for selectors in per_file_ignores.values()
+                    if isinstance(selectors, list)
+                )
+
+    for selectors in selector_lists:
+        selectors[:] = [
+            rule_names.get(selector, selector)
+            if isinstance(selector, str)
+            else selector
+            for selector in selectors
+        ]
+
 
 @dataclass(frozen=True)
 class ConfigOverrides(Serializable):
@@ -91,6 +146,7 @@ class ConfigOverrides(Serializable):
         self,
         dirpath: Path,
         preview: bool,
+        rule_names: dict[str, str],
     ) -> None:
         """
         Temporarily patch the Ruff configuration file in the given directory.
@@ -152,6 +208,12 @@ class ConfigOverrides(Serializable):
                 target.pop(names[-1], None)
             else:
                 target[names[-1]] = value
+
+        if not preview:
+            ruff_config = toml
+            for name in base:
+                ruff_config = ruff_config[name]
+            normalize_rule_selectors(ruff_config, rule_names)
 
         tomli_w.dump(toml, path.open("wb"))
 
