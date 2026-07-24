@@ -241,6 +241,7 @@ linter.flake8_bandit.check_typed_exception = false
 linter.flake8_bandit.extend_markup_names = []
 linter.flake8_bandit.allowed_markup_calls = []
 linter.flake8_bugbear.extend_immutable_calls = []
+linter.flake8_bugbear.strict_argument_defaults = false
 linter.flake8_builtins.allowed_modules = []
 linter.flake8_builtins.ignorelist = []
 linter.flake8_builtins.strict_checking = false

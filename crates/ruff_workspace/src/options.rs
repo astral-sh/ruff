@@ -1309,12 +1309,44 @@ pub struct Flake8BugbearOptions {
         "#
     )]
     pub extend_immutable_calls: Option<Vec<String>>,
+
+    /// By default, `function-call-in-default-argument` (`B008`) ignores
+    /// parameters whose type annotation is an immutable type (e.g., `int`,
+    /// `str`, or `Sequence[int]`), on the assumption that the call is unlikely
+    /// to mutate shared state. Set this option to `true` to flag function calls
+    /// in argument defaults regardless of the parameter's annotation, matching
+    /// the behavior of the original `flake8-bugbear` plugin.
+    ///
+    /// For example, with the default setting, `B008` will not flag the call to
+    /// `random.randint` below, because `num` is annotated as `int`:
+    ///
+    /// ```python
+    /// import random
+    ///
+    ///
+    /// def get_random_number(num: int = random.randint(1, 100)) -> int:
+    ///     return num
+    /// ```
+    ///
+    /// The default value is still only computed once, at function definition
+    /// time, so every call reuses the same "random" number. Setting this option
+    /// to `true` flags the call so that bugs like this are caught.
+    ///
+    /// Immutable calls (e.g., `tuple()` or `float("inf")`) and `NewType` calls
+    /// over immutable types remain exempt even when this option is enabled.
+    #[option(
+        default = "false",
+        value_type = "bool",
+        example = "strict-argument-defaults = true"
+    )]
+    pub strict_argument_defaults: Option<bool>,
 }
 
 impl Flake8BugbearOptions {
     pub fn into_settings(self) -> ruff_linter::rules::flake8_bugbear::settings::Settings {
         ruff_linter::rules::flake8_bugbear::settings::Settings {
             extend_immutable_calls: self.extend_immutable_calls.unwrap_or_default(),
+            strict_argument_defaults: self.strict_argument_defaults.unwrap_or_default(),
         }
     }
 }

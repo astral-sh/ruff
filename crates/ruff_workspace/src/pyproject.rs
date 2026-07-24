@@ -294,7 +294,9 @@ mod tests {
     use ruff_linter::settings::types::PatternPrefixPair;
     use ruff_ranged_value::{ValueSource, ValueSourceGuard};
 
-    use crate::options::{Flake8BuiltinsOptions, LintCommonOptions, LintOptions, Options};
+    use crate::options::{
+        Flake8BugbearOptions, Flake8BuiltinsOptions, LintCommonOptions, LintOptions, Options,
+    };
     use crate::pyproject::{Pyproject, Tools, find_settings_toml, parse_pyproject_toml};
 
     #[test]
@@ -456,6 +458,43 @@ strict-checking = false
             vec!["os".to_string(), "io".to_string()]
         );
         assert!(!settings.strict_checking);
+
+        let pyproject: Pyproject = toml::from_str(
+            r"
+[tool.ruff.lint.flake8-bugbear]
+extend-immutable-calls = ['fastapi.Depends']
+strict-argument-defaults = true
+",
+        )?;
+
+        let expected = Flake8BugbearOptions {
+            extend_immutable_calls: Some(vec!["fastapi.Depends".to_string()]),
+            strict_argument_defaults: Some(true),
+        };
+
+        assert_eq!(
+            pyproject.tool,
+            Some(Tools {
+                ruff: Some(Options {
+                    lint: Some(LintOptions {
+                        common: LintCommonOptions {
+                            flake8_bugbear: Some(expected.clone()),
+                            ..LintCommonOptions::default()
+                        },
+                        ..LintOptions::default()
+                    }),
+                    ..Options::default()
+                })
+            })
+        );
+
+        let settings = expected.into_settings();
+
+        assert_eq!(
+            settings.extend_immutable_calls,
+            vec!["fastapi.Depends".to_string()]
+        );
+        assert!(settings.strict_argument_defaults);
 
         assert!(
             toml::from_str::<Pyproject>(

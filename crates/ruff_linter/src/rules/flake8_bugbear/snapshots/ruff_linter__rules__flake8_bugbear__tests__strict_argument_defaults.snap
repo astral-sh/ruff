@@ -1,0 +1,28 @@
+---
+source: crates/ruff_linter/src/rules/flake8_bugbear/mod.rs
+---
+B008 Do not perform function call `random.randint` in argument defaults; instead, perform the call within the function, or read the default from a module-level singleton variable
+  --> B008_strict.py:22:34
+   |
+20 | # Errors: annotation is immutable, but the default is a (non-immutable) call.
+21 | # These are only flagged when `strict-argument-defaults` is enabled.
+22 | def get_random_number(num: int = random.randint(1, 100)) -> int:
+   |                                  ^^^^^^^^^^^^^^^^^^^^^^
+23 |     return num
+   |
+
+B008 Do not perform function call `get_current_username` in argument defaults; instead, perform the call within the function, or read the default from a module-level singleton variable
+  --> B008_strict.py:26:47
+   |
+26 | def log_message(message: str, username: str = get_current_username()):
+   |                                               ^^^^^^^^^^^^^^^^^^^^^^
+27 |     ...
+   |
+
+B008 Do not perform function call `foo` in argument defaults; instead, perform the call within the function, or read the default from a module-level singleton variable
+  --> B008_strict.py:30:54
+   |
+30 | def immutable_annotation_call(value: Sequence[int] = foo()):
+   |                                                      ^^^^^
+31 |     ...
+   |

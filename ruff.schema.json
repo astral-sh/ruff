@@ -1049,6 +1049,13 @@
           "items": {
             "type": "string"
           }
+        },
+        "strict-argument-defaults": {
+          "description": "By default, `function-call-in-default-argument` (`B008`) ignores\nparameters whose type annotation is an immutable type (e.g., `int`,\n`str`, or `Sequence[int]`), on the assumption that the call is unlikely\nto mutate shared state. Set this option to `true` to flag function calls\nin argument defaults regardless of the parameter's annotation, matching\nthe behavior of the original `flake8-bugbear` plugin.\n\nFor example, with the default setting, `B008` will not flag the call to\n`random.randint` below, because `num` is annotated as `int`:\n\n```python\nimport random\n\n\ndef get_random_number(num: int = random.randint(1, 100)) -> int:\n    return num\n```\n\nThe default value is still only computed once, at function definition\ntime, so every call reuses the same \"random\" number. Setting this option\nto `true` flags the call so that bugs like this are caught.\n\nImmutable calls (e.g., `tuple()` or `float(\"inf\")`) and `NewType` calls\nover immutable types remain exempt even when this option is enabled.",
+          "type": [
+            "boolean",
+            "null"
+          ]
         }
       },
       "additionalProperties": false
