@@ -552,9 +552,10 @@ fn predicate_scope<'db>(db: &'db dyn Db, predicate: &Predicate<'db>) -> ScopeId<
 /// accept the broader eager pass because it keeps the ordering simple, and checking a scope will
 /// typically exercise most of its predicates eventually.
 ///
-/// Reentrant analysis is handled by Salsa cycle recovery on the call and cached-range queries.
-/// Keeping the prefix pass unconditional ensures that tracked callers record the same dependencies
-/// on every thread.
+/// Reentrant analysis is handled by Salsa cycle recovery on the call and cached-range queries. For
+/// large scopes, keeping the prefix pass unconditional ensures that tracked callers record the same
+/// dependencies on every thread. Small scopes do not need prefix warming to bound the Salsa stack,
+/// and evaluating their call predicates on demand avoids introducing unnecessary inference cycles.
 fn analyze_non_terminal_call_prefix<'db>(
     db: &'db dyn Db,
     predicates: &IndexSlice<ScopedPredicateId, Predicate<'db>>,
@@ -568,11 +569,6 @@ fn analyze_non_terminal_call_prefix<'db>(
         .is_some();
 
     if !has_many_calls {
-        for predicate in &predicates.raw[..=root_predicate.index()] {
-            if matches!(predicate.node, PredicateNode::IsNonTerminalCall(_)) {
-                analyze_single(db, predicate);
-            }
-        }
         return false;
     }
 
@@ -597,7 +593,7 @@ fn analyze_non_terminal_call_prefix<'db>(
     let tail_start = call_count / NON_TERMINAL_CALL_CHUNK_SIZE * NON_TERMINAL_CALL_CHUNK_SIZE;
     analyze_non_terminal_calls(db, predicates, &call_predicates[tail_start..call_count]);
 
-    has_many_calls
+    true
 }
 
 /// Returns the statement-call predicates for `scope` in source order.
