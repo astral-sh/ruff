@@ -710,10 +710,6 @@ pub struct VirtualEnvironment {
     /// Whether uv guarantees that the installed contents of this cached environment will not
     /// change after it is published.
     immutable: bool,
-
-    /// Whether this is a per-script overlay whose dependencies are supplied by an immutable
-    /// parent environment.
-    shared_script_overlay: bool,
 }
 
 impl VirtualEnvironment {
@@ -752,7 +748,7 @@ impl VirtualEnvironment {
             implementation,
             created_with_uv,
             parent_environment,
-            shared_environment,
+            mutability,
         } = parsed_pyvenv_cfg;
 
         // The `home` key is read by the standard library's `site.py` module,
@@ -818,8 +814,7 @@ impl VirtualEnvironment {
             version,
             implementation,
             parent_environment,
-            immutable: created_with_uv && shared_environment.immutable,
-            shared_script_overlay: created_with_uv && shared_environment.script_overlay,
+            immutable: created_with_uv && mutability == EnvironmentMutability::Immutable,
         };
 
         tracing::trace!("Resolved metadata for virtual environment: {metadata:?}");
@@ -841,7 +836,6 @@ impl VirtualEnvironment {
             version,
             parent_environment,
             immutable: _,
-            shared_script_overlay,
         } = self;
 
         let version = version.as_ref().map(|v| v.version);
@@ -853,31 +847,28 @@ impl VirtualEnvironment {
         if let Some(parent_env_site_packages) = parent_environment.as_deref() {
             match parent_env_site_packages.site_packages_paths(system) {
                 Ok(parent_environment_site_packages) => {
-                    if *shared_script_overlay
-                        && matches!(
-                            parent_env_site_packages,
-                            PythonEnvironment::Virtual(parent) if parent.immutable
-                        )
-                        && site_packages_directories.0.iter().all(|directory| {
-                            system
-                                .read_directory(&directory.path)
-                                .is_ok_and(|mut entries| {
-                                    entries.all(|entry| {
-                                        entry.is_ok_and(|entry| {
-                                            matches!(
-                                                entry.path().file_name(),
-                                                Some(
-                                                    "_virtualenv.py"
-                                                        | "_virtualenv.pth"
-                                                        | "_uv_ephemeral_overlay.pth"
-                                                        | "__pycache__"
-                                                )
+                    if matches!(
+                        parent_env_site_packages,
+                        PythonEnvironment::Virtual(parent) if parent.immutable
+                    ) && site_packages_directories.0.iter().all(|directory| {
+                        system
+                            .read_directory(&directory.path)
+                            .is_ok_and(|mut entries| {
+                                entries.all(|entry| {
+                                    entry.is_ok_and(|entry| {
+                                        matches!(
+                                            entry.path().file_name(),
+                                            Some(
+                                                "_virtualenv.py"
+                                                    | "_virtualenv.pth"
+                                                    | "_uv_ephemeral_overlay.pth"
+                                                    | "__pycache__"
                                             )
-                                        })
+                                        )
                                     })
                                 })
-                        })
-                    {
+                            })
+                    }) {
                         site_packages_directories = SitePackagesPaths::default();
                     }
                     site_packages_directories.extend(parent_environment_site_packages);
@@ -943,7 +934,6 @@ System site-packages will not be used for module resolution.",
             // We don't need to inherit any info from the parent environment
             parent_environment: _,
             immutable: _,
-            shared_script_overlay: _,
         } = self;
 
         // Unconditionally follow the same logic that `site_packages_directories` uses when
@@ -1153,11 +1143,12 @@ impl<'s> PyvenvCfgParser<'s> {
             }
             "uv" => data.created_with_uv = true,
             "extends-environment" => data.parent_environment = Some(value),
-            "uv-immutable" => {
-                data.shared_environment.immutable = value.eq_ignore_ascii_case("true");
-            }
-            "uv-overlay" => {
-                data.shared_environment.script_overlay = value.eq_ignore_ascii_case("true");
+            "immutable" => {
+                data.mutability = if value.eq_ignore_ascii_case("true") {
+                    EnvironmentMutability::Immutable
+                } else {
+                    EnvironmentMutability::Mutable
+                };
             }
             "" => {
                 return Err(PyvenvCfgParseErrorKind::MalformedKeyValuePair { line_number });
@@ -1180,13 +1171,14 @@ struct RawPyvenvCfg<'s> {
     implementation: PythonImplementation,
     created_with_uv: bool,
     parent_environment: Option<&'s str>,
-    shared_environment: SharedEnvironmentMetadata,
+    mutability: EnvironmentMutability,
 }
 
-#[derive(Debug, Default)]
-struct SharedEnvironmentMetadata {
-    immutable: bool,
-    script_overlay: bool,
+#[derive(Debug, Default, PartialEq, Eq)]
+enum EnvironmentMutability {
+    #[default]
+    Mutable,
+    Immutable,
 }
 
 /// A Python environment that is _not_ a virtual environment.
@@ -3103,7 +3095,7 @@ mod tests {
             .write_file_all(
                 "/shared/pyvenv.cfg",
                 format!(
-                    "home = {python_home}\nuv = 1\nversion_info = 3.12\nuv-immutable = {immutable_parent}\n"
+                    "home = {python_home}\nuv = 1\nversion_info = 3.12\nimmutable = {immutable_parent}\n"
                 ),
             )
             .unwrap();
@@ -3111,7 +3103,7 @@ mod tests {
             .write_file_all(
                 overlay_root.join("pyvenv.cfg"),
                 format!(
-                    "home = {python_home}\nuv = 1\nversion_info = 3.12\nextends-environment = /shared\nuv-overlay = true\n"
+                    "home = {python_home}\nuv = 1\nversion_info = 3.12\nextends-environment = /shared\n"
                 ),
             )
             .unwrap();
@@ -3188,7 +3180,7 @@ mod tests {
             .memory_file_system()
             .write_file_all(
                 "/shared/pyvenv.cfg",
-                format!("home = {python_home}\nversion_info = 3.12\nuv-immutable = true\n"),
+                format!("home = {python_home}\nversion_info = 3.12\nimmutable = true\n"),
             )
             .unwrap();
         let environment = PythonEnvironment::new(
