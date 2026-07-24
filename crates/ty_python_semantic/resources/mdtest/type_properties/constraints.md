@@ -865,36 +865,36 @@ def same_typevar[T]():
 
 Solution extraction receives the type variables that it is allowed to infer. Other type variables
 may still restrict whether a path is feasible, but should not appear as top-level solution bindings.
-References to an ungrounded outer variable inside an inferable variable's solution must remain
+References to an unfixed outer variable inside an inferable variable's solution must remain
 symbolic.
 
-### Visible constraints and hidden-only alternatives
+### Inferable constraints and non-inferable-only alternatives
 
 ```py
 from ty_extensions._internal import ConstraintSet
 
-def visible_only[I, N]() -> None:
+def inferable_only[I, N]() -> None:
     constraints = ConstraintSet.range(int, I, int)
     reveal_type(constraints.solutions(inferable=tuple[I]))  # revealed: tuple[Solution[I=int]]
 
-def witness_only[I, N]() -> None:
+def noninferable_only[I, N]() -> None:
     constraints = ConstraintSet.range(int, N, int)
     reveal_type(constraints.solutions(inferable=tuple[I]))  # revealed: tuple[()]
 
-def independent_witness[I, N]() -> None:
+def independent_noninferable[I, N]() -> None:
     constraints = ConstraintSet.range(int, N, int) & ConstraintSet.range(str, I, str)
     reveal_type(constraints.solutions(inferable=tuple[I]))  # revealed: tuple[Solution[I=str]]
 
-def witness_alternative[I, N]() -> None:
+def noninferable_alternative[I, N]() -> None:
     constraints = ConstraintSet.range(int, N, int) | ConstraintSet.range(str, I, str)
     reveal_type(constraints.solutions(inferable=tuple[I]))  # revealed: tuple[()]
 ```
 
-### Symbolic relationships and grounded witnesses
+### Symbolic relationships and fixed non-inferable bindings
 
 A bare relationship must have the same meaning regardless of which type variable the TDD chooses as
-its constraint subject. An explicit exact witness constraint grounds that variable; a one-sided
-bound does not.
+its constraint subject. An explicit exact constraint fixes a non-inferable variable to a concrete
+type; a one-sided bound does not.
 
 ```py
 from typing import Never
@@ -910,66 +910,66 @@ def symbolic_relationship_reversed[N, I]() -> None:
     # revealed: tuple[Solution[I=N@symbolic_relationship_reversed]]
     reveal_type(constraints.solutions(inferable=tuple[I]))
 
-def exact_witness[I, N]() -> None:
+def fixed_noninferable[I, N]() -> None:
     constraints = ConstraintSet.range(int, N, int) & ConstraintSet.range(N, I, N)
     # revealed: tuple[Solution[I=int]]
     reveal_type(constraints.solutions(inferable=tuple[I]))
 
-def exact_nested_witness[I, N]() -> None:
+def fixed_nested_noninferable[I, N]() -> None:
     constraints = ConstraintSet.range(int, N, int) & ConstraintSet.range(list[N], I, list[N])
     # revealed: tuple[Solution[I=list[int]]]
     reveal_type(constraints.solutions(inferable=tuple[I]))
 
-def lower_bounded_witness[I, N]() -> None:
+def lower_bounded_noninferable[I, N]() -> None:
     constraints = ConstraintSet.range(int, N, object) & ConstraintSet.range(N, I, N)
-    # TODO: revealed: tuple[Solution[I=N@lower_bounded_witness]]
-    # revealed: tuple[Solution[I=int | N@lower_bounded_witness]]
+    # TODO: revealed: tuple[Solution[I=N@lower_bounded_noninferable]]
+    # revealed: tuple[Solution[I=int | N@lower_bounded_noninferable]]
     reveal_type(constraints.solutions_for(I, inferable=tuple[I]))
 
-def upper_bounded_witness[I, N]() -> None:
+def upper_bounded_noninferable[I, N]() -> None:
     constraints = ConstraintSet.range(Never, N, int) & ConstraintSet.range(N, I, N)
-    # revealed: tuple[Solution[I=N@upper_bounded_witness]]
+    # revealed: tuple[Solution[I=N@upper_bounded_noninferable]]
     reveal_type(constraints.solutions(inferable=tuple[I]))
 ```
 
-### Declared witness domains
+### Declared non-inferable domains
 
-A positive witness constraint must be compatible with the witness's declared upper bound or finite
-domain, even though the witness is not returned. Complete reasoning about combinations of negative
-hidden-witness constraints is intentionally deferred.
+A positive constraint on a non-inferable variable must be compatible with its declared upper bound
+or finite domain, even though that variable is not returned. Complete reasoning about combinations
+of negative non-inferable constraints is intentionally deferred.
 
 ```py
 from ty_extensions._internal import ConstraintSet
 
-def incompatible_finite_witness[I, N: (int, str)]() -> None:
+def incompatible_finite_noninferable[I, N: (int, str)]() -> None:
     constraints = ConstraintSet.range(bytes, N, bytes)
     # TODO: revealed: None
     reveal_type(constraints.solutions(inferable=tuple[I]))  # revealed: tuple[()]
 
-def incompatible_bounded_witness[I, N: str]() -> None:
+def incompatible_bounded_noninferable[I, N: str]() -> None:
     constraints = ConstraintSet.range(int, N, int)
     # TODO: revealed: None
     reveal_type(constraints.solutions(inferable=tuple[I]))  # revealed: tuple[()]
 
-def negative_finite_witness[I, N: (int, str)]() -> None:
+def negative_finite_noninferable[I, N: (int, str)]() -> None:
     constraints = ~ConstraintSet.range(int, N, int) & ~ConstraintSet.range(str, N, str)
-    # TODO: Complete hidden-negative-domain solving would reject this path; it is out of scope.
+    # TODO: Complete reasoning about negative non-inferable constraints would reject this path.
     reveal_type(constraints.solutions(inferable=tuple[I]))  # revealed: tuple[()]
 ```
 
-### Negative visible decisions and correlated outputs
+### Negative inferable decisions and correlated outputs
 
 A negative condition on an inferable type variable is different from an entirely unconstrained path.
-Distinct witness choices must not combine visible bindings from different alternatives.
+Different non-inferable values must not combine inferable bindings from different alternatives.
 
 ```py
 from ty_extensions._internal import ConstraintSet
 
-def negative_visible[I, N]() -> None:
+def negative_inferable[I, N]() -> None:
     constraints = ~ConstraintSet.range(int, I, int)
     reveal_type(constraints.solutions(inferable=tuple[I]))  # revealed: tuple[Solution[]]
 
-def correlated_witnesses[I, J, N]() -> None:
+def correlated_noninferable[I, J, N]() -> None:
     int_path = ConstraintSet.range(int, N, int) & ConstraintSet.range(int, I, int) & ConstraintSet.range(list[int], J, list[int])
     str_path = ConstraintSet.range(str, N, str) & ConstraintSet.range(str, I, str) & ConstraintSet.range(list[str], J, list[str])
     constraints = int_path | str_path

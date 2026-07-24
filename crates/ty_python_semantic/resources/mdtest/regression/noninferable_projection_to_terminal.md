@@ -93,9 +93,9 @@ bounded_identity(1)  # error: [invalid-argument-type]
 constrained_identity(b"invalid")  # error: [invalid-argument-type]
 ```
 
-## Grounded nested witness relationships
+## Fixed nested non-inferable relationships
 
-A concrete argument can ground the inner type variable while a second argument preserves a nested
+A concrete argument can fix the inner type variable while a second argument preserves a nested
 relationship to an outer type variable.
 
 ```py

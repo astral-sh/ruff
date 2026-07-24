@@ -773,9 +773,10 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
 
     /// Computes path solutions with a caller-provided hook for inferable typevars only.
     ///
-    /// Hidden witness bounds that survive path extraction are validated before the hook runs. For
+    /// Non-inferable bounds that survive path extraction are validated before the hook runs. For
     /// each inferable typevar, the hook returns `Ok(Some(ty))` to add a binding, `Ok(None)` to
-    /// reject the path. Callers combine solutions from different paths as appropriate.
+    /// leave it unsolved, or `Err(())` to reject the path. Callers combine solutions from
+    /// different paths as appropriate.
     pub(crate) fn solutions_with(
         self,
         db: &'db dyn Db,
@@ -3552,10 +3553,14 @@ fn is_possibly_constraint_set_assignable<'db>(db: &'db dyn Db, types: TypePair<'
 /// The bounds and builder-independent decision metadata for one constraint path.
 #[derive(Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) struct ConstraintPath<'db> {
+    /// Accumulated bounds for both inferable and non-inferable typevars on this path.
     bounds: Box<[PathBound<'db>]>,
-    grounded_witnesses: Box<[TypeVarSolution<'db>]>,
-    has_visible_decision: bool,
-    has_witness_bounds: bool,
+    /// Explicit positive equalities that fix non-inferable typevars to concrete types.
+    fixed_noninferable_bindings: Box<[TypeVarSolution<'db>]>,
+    /// Whether a positive or negative decision has an inferable subject or bare bound.
+    has_inferable_decision: bool,
+    /// Whether any accumulated bounds belong to a non-inferable typevar.
+    has_noninferable_bounds: bool,
 }
 
 /// Per-path bounds and the type variables whose bindings may appear in returned solutions.
@@ -3573,7 +3578,7 @@ impl<'db> PathBounds<'db> {
     /// Computes sorted BDD paths and accumulates per-typevar lower/upper bounds for each path.
     ///
     /// Positive exact constraints are recorded before reciprocal typevar relationships are folded
-    /// into those bounds, since the aggregate bounds no longer distinguish grounded witnesses.
+    /// into those bounds, since the aggregate bounds no longer identify fixed non-inferable values.
     fn compute(
         db: &'db dyn Db,
         builder: &ConstraintSetBuilder<'db>,
@@ -3688,7 +3693,7 @@ impl<'db> PathBounds<'db> {
         let mut mappings: FxIndexMap<BoundTypeVarInstance<'db>, ConstraintBoundsBuilder<'db>> =
             FxIndexMap::default();
 
-        let is_visible = |constraint| {
+        let is_inferable_constraint = |constraint| {
             let constraint = builder.constraint_data(constraint);
             constraint.typevar.is_inferable(db, inferable)
                 || iter::chain(constraint.bounds.lower, constraint.bounds.upper).any(|bound| {
@@ -3699,13 +3704,13 @@ impl<'db> PathBounds<'db> {
         };
 
         for path in collect_visitor.sorted_paths {
-            let has_visible_decision = path
+            let has_inferable_decision = path
                 .constraints
                 .iter()
                 .map(|(constraint, _)| *constraint)
                 .chain(path.negative_constraints.iter().copied())
-                .any(is_visible);
-            let mut grounded_witnesses = Vec::new();
+                .any(is_inferable_constraint);
+            let mut fixed_noninferable_bindings = Vec::new();
 
             mappings.clear();
             for (constraint, _) in path.constraints {
@@ -3718,7 +3723,7 @@ impl<'db> PathBounds<'db> {
                     && !lower.has_typevar(db)
                     && !lower.has_unspecialized_type_var(db)
                 {
-                    grounded_witnesses.push(TypeVarSolution {
+                    fixed_noninferable_bindings.push(TypeVarSolution {
                         bound_typevar: typevar,
                         solution: lower,
                     });
@@ -3744,19 +3749,19 @@ impl<'db> PathBounds<'db> {
                 }
             }
 
-            let mut has_witness_bounds = false;
+            let mut has_noninferable_bounds = false;
             let bounds = mappings
                 .drain(..)
                 .map(|(bound_typevar, bounds)| {
-                    has_witness_bounds |= !bound_typevar.is_inferable(db, inferable);
+                    has_noninferable_bounds |= !bound_typevar.is_inferable(db, inferable);
                     bounds.finish(db, bound_typevar)
                 })
                 .collect();
             result.push(ConstraintPath {
                 bounds,
-                grounded_witnesses: grounded_witnesses.into_boxed_slice(),
-                has_visible_decision,
-                has_witness_bounds,
+                fixed_noninferable_bindings: fixed_noninferable_bindings.into_boxed_slice(),
+                has_inferable_decision,
+                has_noninferable_bounds,
             });
         }
 
@@ -3838,9 +3843,9 @@ impl<'db> PathBounds<'db> {
             inferable,
             paths: Box::new([ConstraintPath {
                 bounds,
-                grounded_witnesses: Box::default(),
-                has_visible_decision: true,
-                has_witness_bounds: false,
+                fixed_noninferable_bindings: Box::default(),
+                has_inferable_decision: true,
+                has_noninferable_bounds: false,
             }]),
         })
     }
@@ -3855,9 +3860,9 @@ impl<'db> PathBounds<'db> {
         })
     }
 
-    /// Solves each path while keeping non-inferable witnesses private to the solver.
+    /// Solves each path while keeping non-inferable typevars private to the solver.
     ///
-    /// Witness bounds are validated before any caller-owned callback state can be changed. The
+    /// Non-inferable bounds are validated before caller-owned callback state can be changed. The
     /// callback receives only inferable typevars and returns:
     /// - `Ok(Some(solution))` to add a solution for this typevar on this path
     /// - `Ok(None)` to leave this typevar unsolved on this path
@@ -3876,7 +3881,7 @@ impl<'db> PathBounds<'db> {
 
         let mut solutions = Vec::with_capacity(paths.len());
         'paths: for path in paths {
-            if path.has_witness_bounds
+            if path.has_noninferable_bounds
                 && path
                     .bounds
                     .iter()
@@ -3888,18 +3893,19 @@ impl<'db> PathBounds<'db> {
 
             let mut solution = Vec::with_capacity(path.bounds.len());
             for path_bound in &path.bounds {
-                if path.has_witness_bounds && !path_bound.bound_typevar.is_inferable(db, inferable)
+                if path.has_noninferable_bounds
+                    && !path_bound.bound_typevar.is_inferable(db, inferable)
                 {
                     continue;
                 }
 
                 match choose(path_bound.variance(), path_bound) {
                     Ok(Some(mut ty)) => {
-                        for witness in &path.grounded_witnesses {
+                        for binding in &path.fixed_noninferable_bindings {
                             ty = ty.substitute_one_typevar(
                                 db,
-                                witness.bound_typevar,
-                                witness.solution,
+                                binding.bound_typevar,
+                                binding.solution,
                             );
                         }
                         solution.push(TypeVarSolution {
@@ -3912,7 +3918,7 @@ impl<'db> PathBounds<'db> {
                 }
             }
 
-            if !path.has_visible_decision {
+            if !path.has_inferable_decision {
                 return Solutions::Unconstrained;
             }
             solutions.push(solution);
@@ -7920,32 +7926,32 @@ mod tests {
     }
 
     #[test]
-    fn visible_exact_constraint_returns_only_the_inferable_binding() {
+    fn inferable_exact_constraint_returns_only_the_inferable_binding() {
         let db = setup_db();
-        let visible = create_typevar(&db, "I");
+        let inferable_typevar = create_typevar(&db, "I");
         let builder = ConstraintSetBuilder::new();
         let int = known_instance(&db, KnownClass::Int);
-        let set = ConstraintSet::constrain_typevar(&db, &builder, visible, int, int);
-        let inferable = TypeVarSet::from_typevars(&db, [visible]);
+        let set = ConstraintSet::constrain_typevar(&db, &builder, inferable_typevar, int, int);
+        let inferable = TypeVarSet::from_typevars(&db, [inferable_typevar]);
 
         assert_eq!(
             set.solutions(&db, &builder, inferable),
             Solutions::Constrained(vec![vec![TypeVarSolution {
-                bound_typevar: visible,
+                bound_typevar: inferable_typevar,
                 solution: int,
             }]])
         );
     }
 
     #[test]
-    fn witness_only_exact_constraint_is_unconstrained() {
+    fn noninferable_only_exact_constraint_is_unconstrained() {
         let db = setup_db();
-        let visible = create_typevar(&db, "I");
-        let witness = create_typevar(&db, "N");
+        let inferable_typevar = create_typevar(&db, "I");
+        let noninferable_typevar = create_typevar(&db, "N");
         let builder = ConstraintSetBuilder::new();
         let int = known_instance(&db, KnownClass::Int);
-        let set = ConstraintSet::constrain_typevar(&db, &builder, witness, int, int);
-        let inferable = TypeVarSet::from_typevars(&db, [visible]);
+        let set = ConstraintSet::constrain_typevar(&db, &builder, noninferable_typevar, int, int);
+        let inferable = TypeVarSet::from_typevars(&db, [inferable_typevar]);
 
         assert_eq!(
             set.solutions(&db, &builder, inferable),
@@ -7954,43 +7960,41 @@ mod tests {
     }
 
     #[test]
-    fn independent_witness_preserves_the_visible_binding() {
+    fn independent_noninferable_constraint_preserves_the_inferable_binding() {
         let db = setup_db();
-        let visible = create_typevar(&db, "I");
-        let witness = create_typevar(&db, "N");
+        let inferable_typevar = create_typevar(&db, "I");
+        let noninferable_typevar = create_typevar(&db, "N");
         let builder = ConstraintSetBuilder::new();
         let int = known_instance(&db, KnownClass::Int);
         let str = known_instance(&db, KnownClass::Str);
-        let set = ConstraintSet::constrain_typevar(&db, &builder, witness, int, int).and(
-            &db,
-            &builder,
-            || ConstraintSet::constrain_typevar(&db, &builder, visible, str, str),
-        );
-        let inferable = TypeVarSet::from_typevars(&db, [visible]);
+        let set = ConstraintSet::constrain_typevar(&db, &builder, noninferable_typevar, int, int)
+            .and(&db, &builder, || {
+                ConstraintSet::constrain_typevar(&db, &builder, inferable_typevar, str, str)
+            });
+        let inferable = TypeVarSet::from_typevars(&db, [inferable_typevar]);
 
         assert_eq!(
             set.solutions(&db, &builder, inferable),
             Solutions::Constrained(vec![vec![TypeVarSolution {
-                bound_typevar: visible,
+                bound_typevar: inferable_typevar,
                 solution: str,
             }]])
         );
     }
 
     #[test]
-    fn witness_only_alternative_makes_visible_constraints_optional() {
+    fn noninferable_only_alternative_makes_inferable_constraints_optional() {
         let db = setup_db();
-        let visible = create_typevar(&db, "I");
-        let witness = create_typevar(&db, "N");
+        let inferable_typevar = create_typevar(&db, "I");
+        let noninferable_typevar = create_typevar(&db, "N");
         let builder = ConstraintSetBuilder::new();
         let int = known_instance(&db, KnownClass::Int);
         let str = known_instance(&db, KnownClass::Str);
-        let set = ConstraintSet::constrain_typevar(&db, &builder, witness, int, int).or(
-            &db,
-            &builder,
-            || ConstraintSet::constrain_typevar(&db, &builder, visible, str, str),
-        );
-        let inferable = TypeVarSet::from_typevars(&db, [visible]);
+        let set = ConstraintSet::constrain_typevar(&db, &builder, noninferable_typevar, int, int)
+            .or(&db, &builder, || {
+                ConstraintSet::constrain_typevar(&db, &builder, inferable_typevar, str, str)
+            });
+        let inferable = TypeVarSet::from_typevars(&db, [inferable_typevar]);
 
         assert_eq!(
             set.solutions(&db, &builder, inferable),
@@ -8000,36 +8004,36 @@ mod tests {
 
     #[test]
     fn bare_typevar_relationship_is_preserved_in_either_orientation() {
-        for visible_first in [true, false] {
+        for inferable_first in [true, false] {
             let db = setup_db();
-            let (visible, witness) = if visible_first {
+            let (inferable_typevar, noninferable_typevar) = if inferable_first {
                 (create_typevar(&db, "I"), create_typevar(&db, "N"))
             } else {
-                let witness = create_typevar(&db, "N");
-                let visible = create_typevar(&db, "I");
-                (visible, witness)
+                let noninferable_typevar = create_typevar(&db, "N");
+                let inferable_typevar = create_typevar(&db, "I");
+                (inferable_typevar, noninferable_typevar)
             };
             let builder = ConstraintSetBuilder::new();
-            let inferable = TypeVarSet::from_typevars(&db, [visible]);
-            let visible_bound = ConstraintSet::constrain_typevar_upper_bound(
+            let inferable = TypeVarSet::from_typevars(&db, [inferable_typevar]);
+            let inferable_bound = ConstraintSet::constrain_typevar_upper_bound(
                 &db,
                 &builder,
-                visible,
-                Type::TypeVar(witness),
+                inferable_typevar,
+                Type::TypeVar(noninferable_typevar),
             );
-            let witness_bound = ConstraintSet::constrain_typevar_lower_bound(
+            let noninferable_bound = ConstraintSet::constrain_typevar_lower_bound(
                 &db,
                 &builder,
-                witness,
-                Type::TypeVar(visible),
+                noninferable_typevar,
+                Type::TypeVar(inferable_typevar),
             );
 
-            for set in [visible_bound, witness_bound] {
+            for set in [inferable_bound, noninferable_bound] {
                 assert_eq!(
                     set.solutions(&db, &builder, inferable),
                     Solutions::Constrained(vec![vec![TypeVarSolution {
-                        bound_typevar: visible,
-                        solution: Type::TypeVar(witness),
+                        bound_typevar: inferable_typevar,
+                        solution: Type::TypeVar(noninferable_typevar),
                     }]])
                 );
             }
@@ -8037,81 +8041,99 @@ mod tests {
     }
 
     #[test]
-    fn exact_witness_is_substituted_into_visible_solutions() {
+    fn fixed_noninferable_binding_is_substituted_into_inferable_solutions() {
         let db = setup_db();
-        let visible = create_typevar(&db, "I");
-        let witness = create_typevar(&db, "N");
+        let inferable_typevar = create_typevar(&db, "I");
+        let noninferable_typevar = create_typevar(&db, "N");
         let builder = ConstraintSetBuilder::new();
         let int = known_instance(&db, KnownClass::Int);
-        let witness_ty = Type::TypeVar(witness);
-        let set = ConstraintSet::constrain_typevar(&db, &builder, witness, int, int).and(
-            &db,
-            &builder,
-            || ConstraintSet::constrain_typevar(&db, &builder, visible, witness_ty, witness_ty),
-        );
-        let inferable = TypeVarSet::from_typevars(&db, [visible]);
+        let noninferable_ty = Type::TypeVar(noninferable_typevar);
+        let set = ConstraintSet::constrain_typevar(&db, &builder, noninferable_typevar, int, int)
+            .and(&db, &builder, || {
+                ConstraintSet::constrain_typevar(
+                    &db,
+                    &builder,
+                    inferable_typevar,
+                    noninferable_ty,
+                    noninferable_ty,
+                )
+            });
+        let inferable = TypeVarSet::from_typevars(&db, [inferable_typevar]);
 
         assert_eq!(
             set.solutions(&db, &builder, inferable),
             Solutions::Constrained(vec![vec![TypeVarSolution {
-                bound_typevar: visible,
+                bound_typevar: inferable_typevar,
                 solution: int,
             }]])
         );
     }
 
     #[test]
-    fn exact_witness_is_substituted_into_nested_visible_solutions() {
+    fn fixed_noninferable_binding_is_substituted_into_nested_inferable_solutions() {
         let db = setup_db();
-        let visible = create_typevar(&db, "I");
-        let witness = create_typevar(&db, "N");
+        let inferable_typevar = create_typevar(&db, "I");
+        let noninferable_typevar = create_typevar(&db, "N");
         let builder = ConstraintSetBuilder::new();
         let int = known_instance(&db, KnownClass::Int);
         let list_of_int = KnownClass::List.to_specialized_instance(&db, &[int]);
-        let list_of_witness =
-            KnownClass::List.to_specialized_instance(&db, &[Type::TypeVar(witness)]);
-        let set = ConstraintSet::constrain_typevar(&db, &builder, witness, int, int).and(
-            &db,
-            &builder,
-            || {
+        let list_of_noninferable =
+            KnownClass::List.to_specialized_instance(&db, &[Type::TypeVar(noninferable_typevar)]);
+        let set = ConstraintSet::constrain_typevar(&db, &builder, noninferable_typevar, int, int)
+            .and(&db, &builder, || {
                 ConstraintSet::constrain_typevar(
                     &db,
                     &builder,
-                    visible,
-                    list_of_witness,
-                    list_of_witness,
+                    inferable_typevar,
+                    list_of_noninferable,
+                    list_of_noninferable,
                 )
-            },
-        );
-        let inferable = TypeVarSet::from_typevars(&db, [visible]);
+            });
+        let inferable = TypeVarSet::from_typevars(&db, [inferable_typevar]);
 
         assert_eq!(
             set.solutions(&db, &builder, inferable),
             Solutions::Constrained(vec![vec![TypeVarSolution {
-                bound_typevar: visible,
+                bound_typevar: inferable_typevar,
                 solution: list_of_int,
             }]])
         );
     }
 
     #[test]
-    fn one_sided_witness_bounds_do_not_ground_symbolic_relationships() {
+    fn one_sided_noninferable_bounds_do_not_fix_symbolic_relationships() {
         for lower_bound in [true, false] {
             let db = setup_db();
-            let visible = create_typevar(&db, "I");
-            let witness = create_typevar(&db, "N");
+            let inferable_typevar = create_typevar(&db, "I");
+            let noninferable_typevar = create_typevar(&db, "N");
             let builder = ConstraintSetBuilder::new();
             let int = known_instance(&db, KnownClass::Int);
-            let witness_ty = Type::TypeVar(witness);
-            let witness_bound = if lower_bound {
-                ConstraintSet::constrain_typevar_lower_bound(&db, &builder, witness, int)
+            let noninferable_ty = Type::TypeVar(noninferable_typevar);
+            let noninferable_bound = if lower_bound {
+                ConstraintSet::constrain_typevar_lower_bound(
+                    &db,
+                    &builder,
+                    noninferable_typevar,
+                    int,
+                )
             } else {
-                ConstraintSet::constrain_typevar_upper_bound(&db, &builder, witness, int)
+                ConstraintSet::constrain_typevar_upper_bound(
+                    &db,
+                    &builder,
+                    noninferable_typevar,
+                    int,
+                )
             };
-            let set = witness_bound.and(&db, &builder, || {
-                ConstraintSet::constrain_typevar(&db, &builder, visible, witness_ty, witness_ty)
+            let set = noninferable_bound.and(&db, &builder, || {
+                ConstraintSet::constrain_typevar(
+                    &db,
+                    &builder,
+                    inferable_typevar,
+                    noninferable_ty,
+                    noninferable_ty,
+                )
             });
-            let inferable = TypeVarSet::from_typevars(&db, [visible]);
+            let inferable = TypeVarSet::from_typevars(&db, [inferable_typevar]);
 
             let solutions = set.solutions(&db, &builder, inferable);
             assert!(matches!(
@@ -8119,10 +8141,10 @@ mod tests {
                 Solutions::Constrained(paths)
                     if paths.len() == 1
                         && paths[0].iter().any(|binding| {
-                            binding.bound_typevar == visible
+                            binding.bound_typevar == inferable_typevar
                                 && binding.solution.references_typevar(
                                     &db,
-                                    witness.typevar(&db).identity(&db),
+                                    noninferable_typevar.typevar(&db).identity(&db),
                                 )
                         })
             ));
@@ -8130,14 +8152,14 @@ mod tests {
     }
 
     #[test]
-    fn witness_only_constraint_does_not_invoke_selection_hooks() {
+    fn noninferable_only_constraint_does_not_invoke_selection_hooks() {
         let db = setup_db();
-        let visible = create_typevar(&db, "I");
-        let witness = create_typevar(&db, "N");
+        let inferable_typevar = create_typevar(&db, "I");
+        let noninferable_typevar = create_typevar(&db, "N");
         let builder = ConstraintSetBuilder::new();
         let int = known_instance(&db, KnownClass::Int);
-        let set = ConstraintSet::constrain_typevar(&db, &builder, witness, int, int);
-        let inferable = TypeVarSet::from_typevars(&db, [visible]);
+        let set = ConstraintSet::constrain_typevar(&db, &builder, noninferable_typevar, int, int);
+        let inferable = TypeVarSet::from_typevars(&db, [inferable_typevar]);
         let mut invoked = false;
 
         let solutions = set.solutions_with(&db, &builder, inferable, |_variance, bound| {
@@ -8150,14 +8172,20 @@ mod tests {
     }
 
     #[test]
-    fn mixed_relationship_hides_the_witness_from_selection_hooks() {
+    fn mixed_relationship_excludes_noninferable_typevars_from_selection_hooks() {
         let db = setup_db();
-        let visible = create_typevar(&db, "I");
-        let witness = create_typevar(&db, "N");
+        let inferable_typevar = create_typevar(&db, "I");
+        let noninferable_typevar = create_typevar(&db, "N");
         let builder = ConstraintSetBuilder::new();
-        let witness_ty = Type::TypeVar(witness);
-        let set = ConstraintSet::constrain_typevar(&db, &builder, visible, witness_ty, witness_ty);
-        let inferable = TypeVarSet::from_typevars(&db, [visible]);
+        let noninferable_ty = Type::TypeVar(noninferable_typevar);
+        let set = ConstraintSet::constrain_typevar(
+            &db,
+            &builder,
+            inferable_typevar,
+            noninferable_ty,
+            noninferable_ty,
+        );
+        let inferable = TypeVarSet::from_typevars(&db, [inferable_typevar]);
         let mut observed = Vec::new();
 
         let _ = set.solutions_with(&db, &builder, inferable, |_variance, bound| {
@@ -8165,25 +8193,30 @@ mod tests {
             PathBounds::default_solve(&db, &builder, bound)
         });
 
-        assert_eq!(observed, vec![visible]);
+        assert_eq!(observed, vec![inferable_typevar]);
     }
 
     #[test]
-    fn retained_witness_upper_bound_is_validated_before_visible_selection_hooks() {
+    fn retained_noninferable_upper_bound_is_validated_before_inferable_selection_hooks() {
         let db = setup_db();
-        let visible = create_typevar(&db, "I");
+        let inferable_typevar = create_typevar(&db, "I");
         let int = known_instance(&db, KnownClass::Int);
         let str = known_instance(&db, KnownClass::Str);
-        let witness = create_typevar(&db, "N")
+        let noninferable_typevar = create_typevar(&db, "N")
             .map_bound_or_constraints(&db, |_| Some(TypeVarBoundOrConstraints::UpperBound(str)));
         let builder = ConstraintSetBuilder::new();
-        let witness_ty = Type::TypeVar(witness);
-        let set = ConstraintSet::constrain_typevar(&db, &builder, witness, int, int).and(
-            &db,
-            &builder,
-            || ConstraintSet::constrain_typevar(&db, &builder, visible, witness_ty, witness_ty),
-        );
-        let inferable = TypeVarSet::from_typevars(&db, [visible]);
+        let noninferable_ty = Type::TypeVar(noninferable_typevar);
+        let set = ConstraintSet::constrain_typevar(&db, &builder, noninferable_typevar, int, int)
+            .and(&db, &builder, || {
+                ConstraintSet::constrain_typevar(
+                    &db,
+                    &builder,
+                    inferable_typevar,
+                    noninferable_ty,
+                    noninferable_ty,
+                )
+            });
+        let inferable = TypeVarSet::from_typevars(&db, [inferable_typevar]);
         let mut observed = Vec::new();
 
         let solutions = set.solutions_with(&db, &builder, inferable, |_variance, bound| {
@@ -8196,25 +8229,31 @@ mod tests {
     }
 
     #[test]
-    fn retained_witness_finite_domain_is_validated_before_visible_selection_hooks() {
+    fn retained_noninferable_finite_domain_is_validated_before_inferable_selection_hooks() {
         let db = setup_db();
-        let visible = create_typevar(&db, "I");
+        let inferable_typevar = create_typevar(&db, "I");
         let int = known_instance(&db, KnownClass::Int);
         let str = known_instance(&db, KnownClass::Str);
         let bytes = known_instance(&db, KnownClass::Bytes);
-        let witness = create_typevar(&db, "N").map_bound_or_constraints(&db, |_| {
+        let noninferable_typevar = create_typevar(&db, "N").map_bound_or_constraints(&db, |_| {
             Some(TypeVarBoundOrConstraints::Constraints(
                 TypeVarConstraints::new(&db, [int, str].as_slice()),
             ))
         });
         let builder = ConstraintSetBuilder::new();
-        let witness_ty = Type::TypeVar(witness);
-        let set = ConstraintSet::constrain_typevar(&db, &builder, witness, bytes, bytes).and(
-            &db,
-            &builder,
-            || ConstraintSet::constrain_typevar(&db, &builder, visible, witness_ty, witness_ty),
-        );
-        let inferable = TypeVarSet::from_typevars(&db, [visible]);
+        let noninferable_ty = Type::TypeVar(noninferable_typevar);
+        let set =
+            ConstraintSet::constrain_typevar(&db, &builder, noninferable_typevar, bytes, bytes)
+                .and(&db, &builder, || {
+                    ConstraintSet::constrain_typevar(
+                        &db,
+                        &builder,
+                        inferable_typevar,
+                        noninferable_ty,
+                        noninferable_ty,
+                    )
+                });
+        let inferable = TypeVarSet::from_typevars(&db, [inferable_typevar]);
         let mut observed = Vec::new();
 
         let solutions = set.solutions_with(&db, &builder, inferable, |_variance, bound| {
@@ -8227,20 +8266,19 @@ mod tests {
     }
 
     #[test]
-    fn fully_projected_rejected_witness_still_reaches_the_visible_selection_hook() {
+    fn fully_projected_rejected_noninferable_still_reaches_the_inferable_selection_hook() {
         let db = setup_db();
-        let visible = create_typevar(&db, "I");
+        let inferable_typevar = create_typevar(&db, "I");
         let int = known_instance(&db, KnownClass::Int);
         let str = known_instance(&db, KnownClass::Str);
-        let witness = create_typevar(&db, "N")
+        let noninferable_typevar = create_typevar(&db, "N")
             .map_bound_or_constraints(&db, |_| Some(TypeVarBoundOrConstraints::UpperBound(str)));
         let builder = ConstraintSetBuilder::new();
-        let set = ConstraintSet::constrain_typevar(&db, &builder, witness, int, int).and(
-            &db,
-            &builder,
-            || ConstraintSet::constrain_typevar(&db, &builder, visible, str, str),
-        );
-        let inferable = TypeVarSet::from_typevars(&db, [visible]);
+        let set = ConstraintSet::constrain_typevar(&db, &builder, noninferable_typevar, int, int)
+            .and(&db, &builder, || {
+                ConstraintSet::constrain_typevar(&db, &builder, inferable_typevar, str, str)
+            });
+        let inferable = TypeVarSet::from_typevars(&db, [inferable_typevar]);
         let mut observed = Vec::new();
 
         let solutions = set.solutions_with(&db, &builder, inferable, |_variance, bound| {
@@ -8248,35 +8286,36 @@ mod tests {
             PathBounds::default_solve(&db, &builder, bound)
         });
 
-        // TODO: Phase 3 must retain the projected witness and reject this path before invoking
-        // any visible-variable hook.
-        assert_eq!(observed, vec![visible]);
+        // TODO: Phase 3 must retain the projected non-inferable typevar and reject this path
+        // before invoking any inferable-variable hook.
+        assert_eq!(observed, vec![inferable_typevar]);
         assert_eq!(
             solutions,
             Solutions::Constrained(vec![vec![TypeVarSolution {
-                bound_typevar: visible,
+                bound_typevar: inferable_typevar,
                 solution: str,
             }]])
         );
     }
 
     #[test]
-    fn incompatible_hidden_finite_domain_is_currently_projected_away() {
+    fn incompatible_noninferable_finite_domain_is_currently_projected_away() {
         let db = setup_db();
-        let visible = create_typevar(&db, "I");
+        let inferable_typevar = create_typevar(&db, "I");
         let int = known_instance(&db, KnownClass::Int);
         let str = known_instance(&db, KnownClass::Str);
         let bytes = known_instance(&db, KnownClass::Bytes);
-        let witness = create_typevar(&db, "N").map_bound_or_constraints(&db, |_| {
+        let noninferable_typevar = create_typevar(&db, "N").map_bound_or_constraints(&db, |_| {
             Some(TypeVarBoundOrConstraints::Constraints(
                 TypeVarConstraints::new(&db, [int, str].as_slice()),
             ))
         });
         let builder = ConstraintSetBuilder::new();
-        let set = ConstraintSet::constrain_typevar(&db, &builder, witness, bytes, bytes);
-        let inferable = TypeVarSet::from_typevars(&db, [visible]);
+        let set =
+            ConstraintSet::constrain_typevar(&db, &builder, noninferable_typevar, bytes, bytes);
+        let inferable = TypeVarSet::from_typevars(&db, [inferable_typevar]);
 
-        // TODO: A witness outside its declared finite domain must make this path unsatisfiable.
+        // TODO: A non-inferable typevar outside its finite domain must make this path unsatisfiable.
         assert_eq!(
             set.solutions(&db, &builder, inferable),
             Solutions::Unconstrained
@@ -8284,27 +8323,27 @@ mod tests {
     }
 
     #[test]
-    fn negative_hidden_finite_domain_reasoning_remains_deferred() {
+    fn negative_noninferable_finite_domain_reasoning_remains_deferred() {
         let db = setup_db();
-        let visible = create_typevar(&db, "I");
+        let inferable_typevar = create_typevar(&db, "I");
         let int = known_instance(&db, KnownClass::Int);
         let str = known_instance(&db, KnownClass::Str);
-        let witness = create_typevar(&db, "N").map_bound_or_constraints(&db, |_| {
+        let noninferable_typevar = create_typevar(&db, "N").map_bound_or_constraints(&db, |_| {
             Some(TypeVarBoundOrConstraints::Constraints(
                 TypeVarConstraints::new(&db, [int, str].as_slice()),
             ))
         });
         let builder = ConstraintSetBuilder::new();
-        let set = ConstraintSet::constrain_typevar(&db, &builder, witness, int, int)
+        let set = ConstraintSet::constrain_typevar(&db, &builder, noninferable_typevar, int, int)
             .negate(&db, &builder)
             .and(&db, &builder, || {
-                ConstraintSet::constrain_typevar(&db, &builder, witness, str, str)
+                ConstraintSet::constrain_typevar(&db, &builder, noninferable_typevar, str, str)
                     .negate(&db, &builder)
             });
-        let inferable = TypeVarSet::from_typevars(&db, [visible]);
+        let inferable = TypeVarSet::from_typevars(&db, [inferable_typevar]);
 
-        // Complete reasoning over combinations of negative hidden-witness constraints is
-        // deliberately outside the witness-aware solution-extraction work.
+        // Complete reasoning over combinations of negative non-inferable constraints is
+        // deliberately outside this solution-extraction work.
         assert_eq!(
             set.solutions(&db, &builder, inferable),
             Solutions::Unconstrained
@@ -8312,18 +8351,18 @@ mod tests {
     }
 
     #[test]
-    fn incompatible_hidden_upper_bound_is_currently_projected_away() {
+    fn incompatible_noninferable_upper_bound_is_currently_projected_away() {
         let db = setup_db();
-        let visible = create_typevar(&db, "I");
+        let inferable_typevar = create_typevar(&db, "I");
         let int = known_instance(&db, KnownClass::Int);
         let str = known_instance(&db, KnownClass::Str);
-        let witness = create_typevar(&db, "N")
+        let noninferable_typevar = create_typevar(&db, "N")
             .map_bound_or_constraints(&db, |_| Some(TypeVarBoundOrConstraints::UpperBound(str)));
         let builder = ConstraintSetBuilder::new();
-        let set = ConstraintSet::constrain_typevar(&db, &builder, witness, int, int);
-        let inferable = TypeVarSet::from_typevars(&db, [visible]);
+        let set = ConstraintSet::constrain_typevar(&db, &builder, noninferable_typevar, int, int);
+        let inferable = TypeVarSet::from_typevars(&db, [inferable_typevar]);
 
-        // TODO: A witness outside its declared upper bound must make this path unsatisfiable.
+        // TODO: A non-inferable typevar outside its upper bound must make this path unsatisfiable.
         assert_eq!(
             set.solutions(&db, &builder, inferable),
             Solutions::Unconstrained
@@ -8331,30 +8370,44 @@ mod tests {
     }
 
     #[test]
-    fn witness_dependent_alternatives_preserve_visible_correlations() {
+    fn noninferable_dependent_alternatives_preserve_inferable_correlations() {
         let db = setup_db();
         let first = create_typevar(&db, "I");
         let second = create_typevar(&db, "J");
-        let witness = create_typevar(&db, "N");
+        let noninferable_typevar = create_typevar(&db, "N");
         let builder = ConstraintSetBuilder::new();
         let int = known_instance(&db, KnownClass::Int);
         let str = known_instance(&db, KnownClass::Str);
         let list_of_int = KnownClass::List.to_specialized_instance(&db, &[int]);
         let list_of_str = KnownClass::List.to_specialized_instance(&db, &[str]);
-        let int_path = ConstraintSet::constrain_typevar(&db, &builder, witness, int, int)
-            .and(&db, &builder, || {
-                ConstraintSet::constrain_typevar(&db, &builder, first, int, int)
-            })
-            .and(&db, &builder, || {
-                ConstraintSet::constrain_typevar(&db, &builder, second, list_of_int, list_of_int)
-            });
-        let str_path = ConstraintSet::constrain_typevar(&db, &builder, witness, str, str)
-            .and(&db, &builder, || {
-                ConstraintSet::constrain_typevar(&db, &builder, first, str, str)
-            })
-            .and(&db, &builder, || {
-                ConstraintSet::constrain_typevar(&db, &builder, second, list_of_str, list_of_str)
-            });
+        let int_path =
+            ConstraintSet::constrain_typevar(&db, &builder, noninferable_typevar, int, int)
+                .and(&db, &builder, || {
+                    ConstraintSet::constrain_typevar(&db, &builder, first, int, int)
+                })
+                .and(&db, &builder, || {
+                    ConstraintSet::constrain_typevar(
+                        &db,
+                        &builder,
+                        second,
+                        list_of_int,
+                        list_of_int,
+                    )
+                });
+        let str_path =
+            ConstraintSet::constrain_typevar(&db, &builder, noninferable_typevar, str, str)
+                .and(&db, &builder, || {
+                    ConstraintSet::constrain_typevar(&db, &builder, first, str, str)
+                })
+                .and(&db, &builder, || {
+                    ConstraintSet::constrain_typevar(
+                        &db,
+                        &builder,
+                        second,
+                        list_of_str,
+                        list_of_str,
+                    )
+                });
         let set = int_path.or(&db, &builder, || str_path);
         let inferable = TypeVarSet::from_typevars(&db, [first, second]);
         assert_eq!(
@@ -8385,14 +8438,14 @@ mod tests {
     }
 
     #[test]
-    fn negative_visible_constraint_is_not_unconstrained() {
+    fn negative_inferable_constraint_is_not_unconstrained() {
         let db = setup_db();
-        let visible = create_typevar(&db, "I");
+        let inferable_typevar = create_typevar(&db, "I");
         let builder = ConstraintSetBuilder::new();
         let int = known_instance(&db, KnownClass::Int);
-        let set = ConstraintSet::constrain_typevar(&db, &builder, visible, int, int)
+        let set = ConstraintSet::constrain_typevar(&db, &builder, inferable_typevar, int, int)
             .negate(&db, &builder);
-        let inferable = TypeVarSet::from_typevars(&db, [visible]);
+        let inferable = TypeVarSet::from_typevars(&db, [inferable_typevar]);
 
         assert_eq!(
             set.solutions(&db, &builder, inferable),
@@ -8401,7 +8454,7 @@ mod tests {
     }
 
     #[test]
-    fn fresh_bound_occurrences_do_not_inherit_source_visibility() {
+    fn fresh_bound_occurrences_do_not_inherit_source_inferability() {
         let db = setup_db();
         let source = create_typevar(&db, "I");
         let fresh = BoundTypeVarInstance::new(

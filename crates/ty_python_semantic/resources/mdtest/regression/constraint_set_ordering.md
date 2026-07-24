@@ -213,33 +213,33 @@ def chain_uts[U, T, S]() -> None:
     reveal_type(constraints.solutions_for(U, inferable=tuple[S, T, U]))
 ```
 
-## Hidden witness source order and typevar orientation
+## Non-inferable constraint source order and typevar orientation
 
-The constraint on a hidden witness can appear before or after visible constraints, and a bare
-relationship can be encoded with either variable as its subject. None of those representation
-choices should change which type variables are returned.
+A non-inferable constraint can appear before or after inferable constraints, and a bare relationship
+can be encoded with either variable as its subject. None of those representation choices should
+change which type variables are returned.
 
 ```py
 from ty_extensions._internal import ConstraintSet
 
-def witness_before_visible[I, J, N]() -> None:
+def noninferable_constraint_first[I, J, N]() -> None:
     constraints = ConstraintSet.range(int, N, int) & ConstraintSet.range(str, I, str) & ConstraintSet.range(bytes, J, bytes)
     # revealed: tuple[Solution[I=str, J=bytes]]
     reveal_type(constraints.solutions(inferable=tuple[I, J]))
 
-def witness_after_visible[I, J, N]() -> None:
+def noninferable_constraint_last[I, J, N]() -> None:
     constraints = ConstraintSet.range(str, I, str) & ConstraintSet.range(bytes, J, bytes) & ConstraintSet.range(int, N, int)
     # revealed: tuple[Solution[I=str, J=bytes]]
     reveal_type(constraints.solutions(inferable=tuple[I, J]))
 
-def visible_before_hidden[I, N]() -> None:
+def inferable_subject[I, N]() -> None:
     constraints = ConstraintSet.range(N, I, N)
-    # revealed: tuple[Solution[I=N@visible_before_hidden]]
+    # revealed: tuple[Solution[I=N@inferable_subject]]
     reveal_type(constraints.solutions(inferable=tuple[I]))
 
-def hidden_before_visible[N, I]() -> None:
+def noninferable_subject[N, I]() -> None:
     constraints = ConstraintSet.range(I, N, I)
-    # revealed: tuple[Solution[I=N@hidden_before_visible]]
+    # revealed: tuple[Solution[I=N@noninferable_subject]]
     reveal_type(constraints.solutions(inferable=tuple[I]))
 ```
 
