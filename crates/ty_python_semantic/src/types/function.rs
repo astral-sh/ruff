@@ -340,7 +340,7 @@ impl<'db> OverloadLiteral<'db> {
         self.body_scope(db).program_file(db)
     }
 
-    pub(crate) fn program(self, db: &'db dyn Db) -> Program<'db> {
+    pub(crate) fn program(self, db: &'db dyn Db) -> Program {
         self.body_scope(db).program(db)
     }
 
@@ -1255,7 +1255,7 @@ impl<'db> FunctionType<'db> {
         self.literal(db).last_definition.program_file(db)
     }
 
-    pub(crate) fn program(self, db: &'db dyn Db) -> Program<'db> {
+    pub(crate) fn program(self, db: &'db dyn Db) -> Program {
         self.literal(db).last_definition.program(db)
     }
 

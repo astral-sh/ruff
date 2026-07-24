@@ -18,8 +18,7 @@ use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use ty_ide::{Hint, hints};
-use ty_project::{ProgressReporter, ProjectDatabase};
-use ty_python_core::program::Program;
+use ty_project::{ProgressReporter, ProjectDatabase, SemanticDb as _};
 
 use crate::PositionEncoding;
 use crate::capabilities::ResolvedClientCapabilities;
@@ -241,7 +240,7 @@ impl ProgressReporter for WorkspaceDiagnosticsProgressReporter<'_> {
     }
 
     fn report_checked_file(&self, db: &ProjectDatabase, file: File, diagnostics: &[Diagnostic]) {
-        let unnecessary_hints = hints(db, Program::get(db).program_file(db, file));
+        let unnecessary_hints = hints(db, db.program_file(file));
 
         // Another thread might have panicked at this point because of a salsa cancellation which
         // poisoned the result. If the response is poisoned, just don't report and wait for our thread
@@ -289,7 +288,7 @@ impl ProgressReporter for WorkspaceDiagnosticsProgressReporter<'_> {
         let response = &mut self.state.get_mut().unwrap().response;
 
         for (file, diagnostics) in by_file {
-            let unnecessary_hints = hints(db, Program::get(db).program_file(db, file));
+            let unnecessary_hints = hints(db, db.program_file(file));
             response.write_diagnostics_for_file(db, file, &diagnostics, &unnecessary_hints);
         }
         response.maybe_flush();

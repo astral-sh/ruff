@@ -8,7 +8,7 @@ use ruff_db::Db as _;
 use ruff_db::files::{File, Files, system_path_to_file};
 use ruff_db::system::{SystemPath, SystemPathBuf};
 use rustc_hash::FxHashSet;
-use ty_python_core::program::{FallibleStrategy, Program};
+use ty_python_core::program::FallibleStrategy;
 
 /// Represents the result of applying changes to the project database.
 pub struct ChangeResult {
@@ -34,7 +34,7 @@ impl ProjectDatabase {
         let project = self.project();
         let project_root = project.root(self).to_path_buf();
         let configuration_paths = ConfigurationPaths::from_metadata(project.metadata(self));
-        let program = Program::get(self);
+        let program = self.project().program(self);
         let custom_stdlib_versions_path = program
             .custom_stdlib_search_path(self)
             .map(|path| path.join("VERSIONS"));
@@ -253,7 +253,7 @@ impl ProjectDatabase {
                         &FallibleStrategy,
                     ) {
                         Ok((program_settings, diagnostics)) => {
-                            let program = Program::get(self);
+                            let program = self.project().program(self);
                             program.update_from_settings(self, program_settings);
                             diagnostics
                         }
@@ -265,7 +265,7 @@ impl ProjectDatabase {
                         }
                     };
 
-                    let (settings, settings_diagnostics) = match merged_options
+                    let (settings, mut settings_diagnostics) = match merged_options
                         .to_settings(self, &FallibleStrategy)
                     {
                         Ok((settings, diagnostics)) => (Some(settings), diagnostics),
@@ -276,15 +276,14 @@ impl ProjectDatabase {
                             (None, vec![error.into_diagnostic()])
                         }
                     };
+                    settings_diagnostics.extend(
+                        program_settings_diagnostics
+                            .into_iter()
+                            .map(|diagnostic| diagnostic.into_diagnostic(self)),
+                    );
 
                     tracing::debug!("Reloading project after structural change");
-                    match project.reload(
-                        self,
-                        metadata,
-                        settings,
-                        settings_diagnostics,
-                        program_settings_diagnostics,
-                    ) {
+                    match project.reload(self, metadata, settings, settings_diagnostics) {
                         ProjectReloadResult::Unchanged => {}
                         ProjectReloadResult::Changed { files_changed } => {
                             result.project_changed = true;
@@ -325,17 +324,18 @@ impl ProjectDatabase {
                 &FallibleStrategy,
             ) {
                 Ok((program_settings, program_settings_diagnostics)) => {
-                    let settings_diagnostics =
+                    let mut settings_diagnostics =
                         match merged_options.to_settings(self, &FallibleStrategy) {
                             Ok((_, diagnostics)) => diagnostics,
                             Err(error) => vec![error.into_diagnostic()],
                         };
                     program.update_from_settings(self, program_settings);
-                    project.update_settings_diagnostics(
-                        self,
-                        settings_diagnostics,
-                        program_settings_diagnostics,
+                    settings_diagnostics.extend(
+                        program_settings_diagnostics
+                            .into_iter()
+                            .map(|diagnostic| diagnostic.into_diagnostic(self)),
                     );
+                    project.update_settings_diagnostics(self, settings_diagnostics);
                 }
                 Err(error) => {
                     tracing::error!("Failed to resolve program settings: {error}");

@@ -76,7 +76,7 @@ impl<'db> Unpack<'db> {
             .to_scope_id(db, self.program_file(db))
     }
 
-    pub fn program(self, db: &'db dyn Db) -> Program<'db> {
+    pub fn program(self, db: &'db dyn Db) -> Program {
         self.target_scope(db).program(db)
     }
 

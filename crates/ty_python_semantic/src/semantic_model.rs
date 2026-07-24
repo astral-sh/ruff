@@ -23,12 +23,12 @@ use crate::types::{
     CycleDetector, SemanticEnvironment, SpecialFormType, Type, TypeQualifiers, binding_type,
     infer_complete_scope_types, inferred_declaration,
 };
-use ty_python_core::ProgramFile;
 use ty_python_core::definition::{Definition, DefinitionKind};
 use ty_python_core::place_table;
 use ty_python_core::scope::{FileScopeId, Scope};
 use ty_python_core::semantic_index;
 use ty_python_core::symbol::Symbol;
+use ty_python_core::{Program, ProgramFile};
 
 /// The primary interface the LSP should use for querying semantic information about a [`File`].
 ///
@@ -72,6 +72,10 @@ impl<'db> SemanticModel<'db> {
 
     pub fn program_file(&self) -> ProgramFile<'db> {
         self.file
+    }
+
+    pub fn program(&self) -> Program {
+        self.file.program(self.db)
     }
 
     pub fn semantic_environment(&self) -> SemanticEnvironment<'db> {

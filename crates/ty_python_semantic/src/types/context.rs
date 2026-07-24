@@ -46,7 +46,7 @@ impl<'db> SemanticEnvironment<'db> {
     }
 
     /// Creates an environment with an already-established program.
-    pub fn from_program(db: &'db dyn Db, program: Program<'db>) -> Self {
+    pub fn from_program(db: &'db dyn Db, program: Program) -> Self {
         Self {
             db,
             environment: Cell::new(ProgramSource::Program(program.as_id())),
@@ -61,14 +61,14 @@ impl<'db> SemanticEnvironment<'db> {
 
     /// Returns the program used by this operation.
     #[inline]
-    pub fn program(&self) -> Program<'db> {
+    pub fn program(&self) -> Program {
         match self.environment.get() {
-            ProgramSource::Program(id) => ResolverEnvironment::from_id(id),
+            ProgramSource::Program(id) => Program::from_id(id),
             ProgramSource::File(file) => {
                 cold_path();
                 // `from_file` paired this `Id` with `self.db` from the same `'db`; immediately
                 // re-wrapping it for this ingredient read restores that database lifetime.
-                let program = ProgramFile::from_id(file).resolver_environment(self.db);
+                let program = ProgramFile::from_id(file).program(self.db);
                 self.environment
                     .set(ProgramSource::Program(program.as_id()));
                 program
@@ -85,7 +85,7 @@ impl<'db> SemanticEnvironment<'db> {
     /// Returns the resolver environment used by this operation.
     #[inline]
     pub fn resolver_environment(&self) -> ResolverEnvironment<'db> {
-        self.program()
+        self.program().resolver_environment(self.db)
     }
 }
 
@@ -171,7 +171,7 @@ impl<'db, 'ast> InferContext<'db, 'ast> {
     }
 
     #[inline]
-    pub(crate) fn program(&self) -> Program<'db> {
+    pub(crate) fn program(&self) -> Program {
         self.semantic_environment.program()
     }
 

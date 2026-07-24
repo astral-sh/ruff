@@ -116,7 +116,7 @@ pub(crate) fn references(
     let is_parameter = parameter_owner_is_externally_visible(db, &target_definitions);
 
     if search_across_files && (is_parameter || is_externally_visible_symbol) {
-        let resolver_environment = model.semantic_environment().resolver_environment();
+        let program = model.program();
         let files = db.project().files(db);
         let files: Vec<_> = files
             .iter()
@@ -133,7 +133,7 @@ pub(crate) fn references(
                     return Vec::new();
                 }
 
-                let other_file = ProgramFile::new(db, other_file, resolver_environment);
+                let other_file = ProgramFile::new(db, other_file, program);
 
                 if is_externally_visible_symbol {
                     references_for_file(db, other_file, &target_definitions, &target_text, mode)

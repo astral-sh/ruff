@@ -143,7 +143,7 @@ fn create_bound_method<'db>(
     #[salsa::tracked(returns(copy), heap_size=ruff_memory_usage::heap_size)]
     fn create_bound_method_inner<'db>(
         db: &'db dyn Db,
-        program: Program<'db>,
+        program: Program,
         function: Type<'db>,
         builtins_class: Type<'db>,
     ) -> Type<'db> {

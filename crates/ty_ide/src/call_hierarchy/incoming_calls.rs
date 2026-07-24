@@ -76,7 +76,7 @@ pub fn incoming_calls(db: &dyn Db, file: ProgramFile<'_>, offset: TextSize) -> V
     let mut raw = call_sites_for_file(db, file, &target_definitions, target_role, needle);
 
     if is_externally_visible {
-        let resolver_environment = model.semantic_environment().resolver_environment();
+        let program = model.program();
         let files = db.project().files(db);
         let files: Vec<_> = files
             .iter()
@@ -104,7 +104,7 @@ pub fn incoming_calls(db: &dyn Db, file: ProgramFile<'_>, offset: TextSize) -> V
 
                 call_sites_for_file(
                     db,
-                    ProgramFile::new(db, other_file, resolver_environment),
+                    ProgramFile::new(db, other_file, program),
                     &target_definitions,
                     target_role,
                     needle,

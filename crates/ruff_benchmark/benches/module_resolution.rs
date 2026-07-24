@@ -12,8 +12,7 @@ use ty_module_resolver::{ImportingFile, ModuleName, resolve_module};
 use ty_project::metadata::options::{EnvironmentOptions, Options};
 use ty_project::metadata::python_version::SupportedPythonVersion;
 use ty_project::metadata::value::RelativePathBuf;
-use ty_project::{ProjectDatabase, ProjectMetadata};
-use ty_python_core::program::Program;
+use ty_project::{Db as _, ProjectDatabase, ProjectMetadata};
 
 const SEEDED_TARGETS: &[&str] = &["target_0", "target_1", "target_2", "target_3", "target_4"];
 // Exercise stub-overlay discovery followed by normal fallback.
@@ -94,7 +93,11 @@ fn ty_module_resolver<const PATHS: usize>(bencher: Bencher) {
     bencher
         .with_inputs(|| setup_case(PATHS))
         .bench_local_refs(|case| {
-            let environment = Program::get(&case.db).resolver_environment(&case.db);
+            let environment = case
+                .db
+                .project()
+                .program(&case.db)
+                .resolver_environment(&case.db);
             for name in &case.resolves {
                 black_box(resolve_module(
                     &case.db,
