@@ -51,14 +51,14 @@ TD003 Missing issue link for this TODO
 41 | # TODO: A todo with a random number, 5431
    |   ^^^^
 42 |
-43 | # TODO: here's a TODO on the last line with no link
+43 | # TODO: PROJ-123 a todo with a Jira-style code on the same line
    |
 
 TD003 Missing issue link for this TODO
-  --> TD003.py:43:3
+  --> TD003.py:47:3
    |
-41 | # TODO: A todo with a random number, 5431
-42 |
-43 | # TODO: here's a TODO on the last line with no link
+45 | # TODO: fix this TDO-3870
+46 |
+47 | # TODO: here's a TODO on the last line with no link
    |   ^^^^
    |

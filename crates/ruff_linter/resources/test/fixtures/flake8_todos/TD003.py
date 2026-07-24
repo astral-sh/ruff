@@ -40,4 +40,8 @@ def foo(x):
 
 # TODO: A todo with a random number, 5431
 
+# TODO: PROJ-123 a todo with a Jira-style code on the same line
+
+# TODO: fix this TDO-3870
+
 # TODO: here's a TODO on the last line with no link
