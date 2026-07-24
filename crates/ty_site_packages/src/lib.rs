@@ -762,8 +762,8 @@ impl VirtualEnvironment {
             Err(io_err) if !include_system_site_packages => {
                 tracing::warn!(
                     "Failed to resolve the `home` value in the `pyvenv.cfg` file at \
-                     `{pyvenv_cfg_path}`. System site-packages and the system stdlib will not be \
-                     used for module resolution. Underlying error: {io_err}"
+                     `{pyvenv_cfg_path}`. Goto-definition for stdlib-defined items will not \
+                     be able to jump to the real implementation. Underlying error: {io_err}"
                 );
                 None
             }
