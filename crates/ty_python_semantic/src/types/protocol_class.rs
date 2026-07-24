@@ -2044,7 +2044,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         value_ty,
                     );
                     result = result.and(db, self.constraints, || element_result);
-                    if result.is_never_satisfied(db) {
+                    if result.is_trivially_never_satisfied() {
                         break;
                     }
                 }
@@ -2061,7 +2061,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         value_ty,
                     );
                     result = result.or(db, self.constraints, || element_result);
-                    if result.is_always_satisfied(db) {
+                    if result.is_trivially_always_satisfied() {
                         break;
                     }
                 }
@@ -2152,7 +2152,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             ClassAttributeWriteMember::Explicit { member, fallback } => {
                 let member_result =
                     self.check_explicit_property_write(db, object_ty, member, value_ty);
-                if member_result.is_never_satisfied(db) {
+                if member_result.is_trivially_never_satisfied() {
                     return member_result;
                 }
                 if let Some(fallback) = fallback {

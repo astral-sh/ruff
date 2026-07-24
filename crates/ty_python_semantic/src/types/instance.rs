@@ -528,7 +528,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
 
             if result
                 .union(db, self.constraints, nominally_satisfied)
-                .is_always_satisfied(db)
+                .is_trivially_always_satisfied()
             {
                 return result;
             }
@@ -800,7 +800,7 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
             let compatible = self.check_tuple_spec_pair(db, &left_spec, &right_spec);
             if result
                 .union(db, self.constraints, compatible)
-                .is_always_satisfied(db)
+                .is_trivially_always_satisfied()
             {
                 return result;
             }

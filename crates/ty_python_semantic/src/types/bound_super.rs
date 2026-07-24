@@ -1009,7 +1009,7 @@ impl<'c, 'db> EquivalenceChecker<'_, 'c, 'db> {
             }
             (ClassBase::TypedDict(_), _) => self.never(),
         };
-        if class_equivalence.is_never_satisfied(db) {
+        if class_equivalence.is_trivially_never_satisfied() {
             return self.never();
         }
         let owner_equivalence = match (left.owner(db), right.owner(db)) {
