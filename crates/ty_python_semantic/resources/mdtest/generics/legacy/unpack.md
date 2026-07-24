@@ -35,14 +35,21 @@ arguments.
 from typing import TypeVarTuple, Unpack
 
 Ts = TypeVarTuple("Ts")
+Us = TypeVarTuple("Us")
 
 def collect(*args: Unpack[Ts]) -> tuple[Unpack[Ts]]:
     reveal_type(args)  # revealed: tuple[*Ts@collect]
     raise NotImplementedError
 
-# TODO: Infer the `TypeVarTuple` from arguments matched to the variadic parameter.
-reveal_type(collect())  # revealed: tuple[Unknown, ...]
-reveal_type(collect(1, "a"))  # revealed: tuple[Unknown, ...]
+def forward(*args: Unpack[Us]) -> tuple[Unpack[Us]]:
+    reveal_type(collect(*args))  # revealed: tuple[*Us@forward]
+    return collect(*args)
+
+reveal_type(collect())  # revealed: tuple[()]
+
+def check(i: int, s: str, fixed: tuple[int, str]) -> None:
+    reveal_type(collect(i, s))  # revealed: tuple[int, str]
+    reveal_type(collect(*fixed))  # revealed: tuple[int, str]
 ```
 
 ## Callable parameters
@@ -51,7 +58,7 @@ reveal_type(collect(1, "a"))  # revealed: tuple[Unknown, ...]
 can describe the arguments forwarded to that callable.
 
 ```py
-from typing import Callable, TypeVar, TypeVarTuple, Unpack
+from typing import Callable, TypeVar, TypeVarTuple, Unpack, overload
 
 R = TypeVar("R")
 Ts = TypeVarTuple("Ts")
@@ -66,9 +73,20 @@ def format_value(value: int, label: str, /) -> str:
     return f"{label}: {value}"
 
 reveal_type(invoke(format_value, 1, "value"))  # revealed: str
-# TODO: Validate arguments matched to the variadic parameter against the `TypeVarTuple` inferred
-# from the callback.
+# error: [invalid-argument-type]
 reveal_type(invoke(format_value, 1))  # revealed: str
+
+@overload
+def overloaded_value(value: int) -> str: ...
+@overload
+def overloaded_value(value: str) -> str: ...
+def overloaded_value(value: int | str) -> str:
+    return str(value)
+
+reveal_type(invoke(overloaded_value, 1))  # revealed: str
+reveal_type(invoke(overloaded_value, "value"))  # revealed: str
+# error: [invalid-argument-type]
+invoke(overloaded_value, 1.0)
 ```
 
 ## Type aliases
@@ -128,7 +146,7 @@ def accept(
 
 accept(True, "phase", "status", b"ok")
 accept(True, b"ok")
-# TODO: error: [invalid-argument-type] "Argument to function `accept` is incorrect: Expected `tuple[bool, *tuple[str, ...], bytes]`"
+# error: [invalid-argument-type] "Argument to function `accept` is incorrect: Expected `tuple[bool, *tuple[str, ...], bytes]`"
 accept(True, 1, b"bad")
 ```
 

@@ -17,14 +17,16 @@ def append_int(*args: *Ts) -> tuple[*Ts, int]:
 
     return (*args, 1)
 
-# TODO should be tuple[Literal[True], Literal["a"], int]
-reveal_type(append_int(True, "a"))  # revealed: tuple[*tuple[Unknown, ...], int]
-# TODO should be tuple[int]
-reveal_type(append_int())  # revealed: tuple[*tuple[Unknown, ...], int]
+reveal_type(append_int(True, "a"))  # revealed: tuple[Literal[True], Literal["a"], int]
+reveal_type(append_int())  # revealed: tuple[int]
 
 def first_arg_int(*args: *tuple[int, *tuple[str, ...]]): ...
 
 first_arg_int(42, "42", "42")  # fine
-first_arg_int("not an int", "42", "42")  # TODO: should error
-first_arg_int(56, "42", 56)  # TODO: should error
+# error: [invalid-argument-type]
+first_arg_int("not an int", "42", "42")
+# error: [invalid-argument-type]
+first_arg_int(56, "42", 56)
+# error: [invalid-argument-type]
+first_arg_int()
 ```
