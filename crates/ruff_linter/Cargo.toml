@@ -1,6 +1,6 @@
 [package]
 name = "ruff_linter"
-version = "0.15.21"
+version = "0.15.22"
 description = "This is an internal component crate of Ruff"
 authors = { workspace = true }
 edition = { workspace = true }
@@ -49,10 +49,7 @@ libcst = { workspace = true }
 log = { workspace = true }
 memchr = { workspace = true }
 natord = { workspace = true }
-path-absolutize = { workspace = true, features = [
-    "once_cell_cache",
-    "use_unix_paths_on_wasm",
-] }
+path-absolutize = { workspace = true, features = ["fixed_workdir"] }
 pep440_rs = { workspace = true }
 pyproject-toml = { workspace = true }
 regex = { workspace = true }

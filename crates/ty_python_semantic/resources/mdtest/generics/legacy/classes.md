@@ -38,11 +38,14 @@ reveal_type(generic_context(SingleParamSpec))
 # revealed: ty_extensions._internal.GenericContext[P@TypeVarAndParamSpec, T@TypeVarAndParamSpec]
 reveal_type(generic_context(TypeVarAndParamSpec))
 
-# TODO: support `TypeVarTuple` properly (these should not reveal `None`)
-reveal_type(generic_context(SingleTypeVarTuple))  # revealed: None
-reveal_type(generic_context(TypeVarAndTypeVarTuple))  # revealed: None
-reveal_type(generic_context(StarredSingleTypeVarTuple))  # revealed: None
-reveal_type(generic_context(StarredTypeVarAndTypeVarTuple))  # revealed: None
+# revealed: ty_extensions._internal.GenericContext[Ts@SingleTypeVarTuple]
+reveal_type(generic_context(SingleTypeVarTuple))
+# revealed: ty_extensions._internal.GenericContext[T@TypeVarAndTypeVarTuple, Ts@TypeVarAndTypeVarTuple]
+reveal_type(generic_context(TypeVarAndTypeVarTuple))
+# revealed: ty_extensions._internal.GenericContext[Ts@StarredSingleTypeVarTuple]
+reveal_type(generic_context(StarredSingleTypeVarTuple))
+# revealed: ty_extensions._internal.GenericContext[T@StarredTypeVarAndTypeVarTuple, Ts@StarredTypeVarAndTypeVarTuple]
+reveal_type(generic_context(StarredTypeVarAndTypeVarTuple))
 ```
 
 Inheriting from `Generic` multiple times yields a `duplicate-base` diagnostic, just like any other
@@ -60,11 +63,14 @@ You cannot use the same typevar more than once.
 class RepeatedTypevar(Generic[T, T]): ...
 ```
 
-You can only specialize `typing.Generic` with typevars (TODO: or param specs or typevar tuples).
+You can only specialize `typing.Generic` with typevars, param specs, or typevar tuples.
 
 ```py
 # error: [invalid-argument-type] "`<class 'int'>` is not a valid argument to `Generic`"
 class GenericOfType(Generic[int]): ...
+
+# error: [invalid-argument-type] "`<special-form 'typing.Unpack'>` is not a valid argument to `Generic`"
+class GenericOfInvalidUnpack(Generic[T, Unpack[int]]): ...
 ```
 
 You can also define a generic class by inheriting from some _other_ generic class, and specializing
@@ -111,12 +117,12 @@ class ParamSpecOuterClass(Generic[P]):
 
 ```snapshot
 error[shadowed-type-variable]: Generic class `InnerClass` uses ParamSpec `P` already bound by an enclosing scope
-  --> src/mdtest_snippet.py:64:7
+  --> src/mdtest_snippet.py:70:7
    |
-64 | class ParamSpecOuterClass(Generic[P]):
+70 | class ParamSpecOuterClass(Generic[P]):
    |       ------------------------------- ParamSpec `P` is bound in this enclosing scope
-65 |     # snapshot: shadowed-type-variable
-66 |     class InnerClass(SingleParamSpec[P]): ...
+71 |     # snapshot: shadowed-type-variable
+72 |     class InnerClass(SingleParamSpec[P]): ...
    |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `P` used in class definition here
    |
 ```
@@ -1162,7 +1168,8 @@ class Quux(Generic[Unpack[Ts], T]): ...
 # TODO: should emit [invalid-type-variable-default]
 class Corge(Generic[Unpack[Us], P]): ...
 
-# TODO: should emit [invalid-type-variable-default]
+# TODO: should also emit [invalid-type-variable-default]
+# error: [invalid-generic-class] "Only one `TypeVarTuple` parameter is allowed in a `Generic` subscription"
 class Grault(Generic[Unpack[Us], Unpack[Ts2]]): ...
 
 # These are fine:

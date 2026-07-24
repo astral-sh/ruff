@@ -1,6 +1,6 @@
 [package]
 name = "ruff"
-version = "0.15.21"
+version = "0.15.22"
 description = "An extremely fast Python linter and code formatter"
 authors = { workspace = true }
 edition = { workspace = true }
@@ -56,7 +56,7 @@ itertools = { workspace = true }
 jiff = { workspace = true }
 log = { workspace = true }
 notify = { workspace = true }
-path-absolutize = { workspace = true, features = ["once_cell_cache"] }
+path-absolutize = { workspace = true, features = ["fixed_workdir"] }
 rayon = { workspace = true }
 regex = { workspace = true }
 rustc-hash = { workspace = true }

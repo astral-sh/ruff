@@ -16,6 +16,7 @@ use crate::{
         infer::TypeInferenceBuilder,
     },
 };
+use char_str::format_char;
 use ruff_python_ast::{self as ast, name::Name};
 use ruff_python_stdlib::{identifiers::is_identifier, keyword::is_keyword};
 use rustc_hash::FxHashSet;
@@ -325,7 +326,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         // Extract name.
         let name = name_type
             .as_string_literal()
-            .map(|literal| Name::new(literal.value(db)));
+            .map(|literal| literal.value(db));
 
         if name.is_none()
             && !name_type.is_assignable_to(db, KnownClass::Str.to_instance(db))
@@ -338,7 +339,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 "Expected `str`, found `{}`",
                 name_type.display(db)
             ));
-        } else if let Some(actual_name) = name.as_deref()
+        } else if let Some(actual_name) = name
             && let Some(definition) = definition
             && let Some(assigned_name) = definition.name(db)
             && assigned_name.as_str() != actual_name
@@ -353,7 +354,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             );
         }
 
-        let name = name.unwrap_or_else(|| Name::new_static("<unknown>"));
+        let name = name.unwrap_or("<unknown>");
 
         // Handle fields based on which namedtuple variant.
         let anchor = match definition {
@@ -495,7 +496,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     || !is_identifier(name_str)
                     || seen_names.contains(name_str);
                 if needs_rename {
-                    *field_name = Name::new(format!("_{i}"));
+                    *field_name = Name::from(format_char!("_{i}"));
                 }
                 seen_names.insert(field_name.as_str());
             }

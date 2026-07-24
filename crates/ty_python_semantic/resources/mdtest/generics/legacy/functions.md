@@ -142,6 +142,26 @@ reveal_type(takes_in_protocol(ExplicitSub()))  # revealed: int
 reveal_type(takes_in_protocol(ExplicitGenericSub[str]()))  # revealed: str
 ```
 
+An overload is not a match if it requires a type-variable solution that violates the declared bound.
+Here, the first overload would require `T_str` to be `int`, which does not satisfy the bound `str`,
+so the second overload is selected.
+
+```py
+from collections.abc import Iterable
+from typing import TypeVar, overload
+
+T_str = TypeVar("T_str", bound=str)
+
+@overload
+def pick(x: Iterable[T_str]) -> T_str: ...
+@overload
+def pick(x: Iterable[int]) -> bool: ...
+def pick(x: object) -> str | bool:
+    raise NotImplementedError
+
+reveal_type(pick([1]))  # revealed: bool
+```
+
 ## Inferring tuple parameter types
 
 ```toml
@@ -216,6 +236,27 @@ info: Type variable defined here
 3 | T = TypeVar("T", bound=int)
   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^
   |
+```
+
+A bound can also be a union of protocols. If inference produces a union for the type variable, each
+member must satisfy at least one protocol in the bound. `int` supports ordering, but `None` does
+not, so `None | int` is invalid.
+
+```py
+from collections.abc import Iterable
+from typing import Any, Protocol, TypeVar
+
+class SupportsLT(Protocol):
+    def __lt__(self, other: Any, /) -> object: ...
+
+class SupportsGT(Protocol):
+    def __gt__(self, other: Any, /) -> object: ...
+
+ComparableT = TypeVar("ComparableT", bound=SupportsLT | SupportsGT)
+
+def consume_comparable(values: Iterable[ComparableT]) -> None: ...
+
+consume_comparable([None, 2])  # error: [invalid-argument-type]
 ```
 
 ## Inferring a constrained typevar
@@ -373,6 +414,64 @@ def unions_are_different(t1: int | str, t2: int | str) -> int | str:
     return t1 + t2
 ```
 
+## Constraints containing `Any`
+
+A heterogeneous collection can infer a union of tuple types. If every member of that union is
+compatible with `tuple[Any, ...]`, a constrained type variable can use that constraint.
+
+```py
+from collections.abc import Callable, Iterable
+from typing import Any, TypeVar
+
+Row = TypeVar("Row", list[Any], tuple[Any, ...])
+
+class Dense: ...
+class Sparse: ...
+
+def consume(rows: Iterable[Row]) -> Row:
+    raise NotImplementedError
+
+reveal_type(consume([(1.0, Dense()), (0.0, Sparse())]))  # revealed: tuple[Any, ...]
+
+def callback(row: tuple[int, ...]) -> None: ...
+def consume_callback(callback: Callable[[Row], None]) -> Row:
+    raise NotImplementedError
+
+reveal_type(consume_callback(callback))  # revealed: tuple[Any, ...]
+```
+
+## Gradual constraints can obscure a more specific constraint
+
+A gradual constraint that is compatible with a concrete argument can be selected before a more
+specific constraint. This makes inference depend on the order in which the constraints are declared.
+
+```py
+from typing import Any, TypeVar
+
+class Row(tuple[Any, ...]):
+    def asDict(self) -> dict[str, Any]:
+        raise NotImplementedError
+
+GradualFirst = TypeVar("GradualFirst", list[Any], tuple[Any, ...], Row)
+RowFirst = TypeVar("RowFirst", Row, tuple[Any, ...], list[Any])
+
+def gradual_first(row: GradualFirst) -> GradualFirst:
+    return row
+
+def row_first(row: RowFirst) -> RowFirst:
+    return row
+
+gradual = gradual_first(Row())
+# TODO: revealed: Row
+reveal_type(gradual)  # revealed: tuple[Any, ...]
+# error: [unresolved-attribute] "Object of type `tuple[Any, ...]` has no attribute `asDict`"
+gradual.asDict()
+
+specific = row_first(Row())
+reveal_type(specific)  # revealed: Row
+specific.asDict()
+```
+
 ## Typevar inference is a unification problem
 
 When inferring typevar assignments in a generic function call, we cannot simply solve constraints
@@ -508,6 +607,24 @@ def _(list_ofstr: list[str], list_of_int: list[int]):
     # TODO: the error message here could be improved by referring to the second union element
     # error: [invalid-argument-type] "Argument type `list[int]` does not satisfy upper bound `str` of type variable `T_str2`"
     reveal_type(accepts_t_or_list_of_t(list_of_int))  # revealed: Unknown
+```
+
+A union argument must not widen a bounded type variable with an incompatible union element:
+
+```py
+class MyClass: ...
+
+T_bounded = TypeVar("T_bounded", bound=MyClass)
+
+def accepts_instance_or_int(instance: T_bounded, x: T_bounded | int) -> T_bounded:
+    return instance
+
+def _(x: int | None, valid: MyClass | int) -> MyClass:
+    # error: [invalid-argument-type] "Argument type `None` does not satisfy upper bound `MyClass` of type variable `T_bounded`"
+    result = accepts_instance_or_int(MyClass(), x)
+    reveal_type(result)  # revealed: MyClass
+    reveal_type(accepts_instance_or_int(MyClass(), valid))  # revealed: MyClass
+    return result
 ```
 
 Here, we make sure that `S` is solved as `Literal[1]` instead of a union of the two literals, which

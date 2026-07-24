@@ -4,18 +4,18 @@ use ruff_db::{
     source::source_text,
 };
 use ruff_diagnostics::{Edit, Fix};
-use ruff_python_ast::{self as ast, name::Name};
+use ruff_python_ast::{self as ast, PythonVersion, name::Name};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 use rustc_hash::FxHashSet;
 
 use crate::{
-    Db, TypeQualifiers,
+    Db, Program, TypeQualifiers,
     diagnostic::format_enumeration,
     place::{DefinedPlace, Place, TypeOrigin, place_from_bindings, place_from_declarations},
     types::{
         CallArguments, ClassBase, ClassLiteral, ClassType, DataclassFlags, KnownClass,
         KnownInstanceType, MemberLookupPolicy, MetaclassCandidate, Parameters, Signature,
-        SpecialFormType, StaticClassLiteral, Type, TypeVarVariance, binding_type,
+        SpecialFormType, StaticClassLiteral, Type, TypeVarVariance, TypedDictModule, binding_type,
         call::Argument,
         class::{
             AbstractMethod, CodeGeneratorKind, FieldKind, MetaclassErrorKind,
@@ -444,6 +444,7 @@ pub(crate) fn check_static_class_definitions<'db>(
     }
 
     // Check that the class's MRO is resolvable
+    let mut inconsistent_generic_bases = false;
     match class.try_mro(db, None) {
         Err(mro_error) => match mro_error.reason() {
             StaticMroErrorKind::DuplicateBases(duplicates) => {
@@ -530,7 +531,7 @@ pub(crate) fn check_static_class_definitions<'db>(
             let base_nodes = (class_node.bases().len() == explicit_bases.len()
                 && !class_node.bases().iter().any(ast::Expr::is_starred_expr))
             .then_some(class_node.bases());
-            report_inconsistent_generic_bases(
+            inconsistent_generic_bases = report_inconsistent_generic_bases(
                 context,
                 class.header_range(db),
                 explicit_bases,
@@ -639,7 +640,20 @@ pub(crate) fn check_static_class_definitions<'db>(
     // base class `__init_subclass__` method.
     if let Some(args) = class_node.arguments.as_deref() {
         if class_kind == Some(CodeGeneratorKind::TypedDict) {
+            let supports_pep_728 = context.in_stub()
+                || class.typed_dict_module(db) == Some(TypedDictModule::TypingExtensions)
+                || Program::get(db).python_version(db) >= PythonVersion::PY315;
+
             for keyword in &args.keywords {
+                if !supports_pep_728
+                    && let Some(arg_name @ ("closed" | "extra_items")) = keyword.arg.as_deref()
+                    && let Some(builder) = context.report_lint(&UNKNOWN_ARGUMENT, keyword)
+                {
+                    builder.into_diagnostic(format_args!(
+                        "The `{arg_name}` parameter of `typing.TypedDict` was added in Python 3.15"
+                    ));
+                }
+
                 match keyword.arg.as_deref() {
                     Some(arg_name @ ("total" | "closed")) => {
                         let passed_type = file_expression_type(&keyword.value);
@@ -761,6 +775,11 @@ pub(crate) fn check_static_class_definitions<'db>(
     // This is prohibited by the typing spec because a TypeVarTuple consumes
     // all remaining positional type arguments.
     if let Some(type_params) = class_node.type_params.as_deref() {
+        super::type_param_validation::check_single_typevar_tuple_pep695(
+            context,
+            type_params,
+            super::type_param_validation::TypeParameterOwner::GenericClass(&class_node.name.id),
+        );
         super::type_param_validation::check_no_default_after_typevar_tuple_pep695(
             context,
             type_params,
@@ -986,7 +1005,7 @@ pub(crate) fn check_static_class_definitions<'db>(
 
     // (13) Check for violations of the Liskov Substitution Principle,
     // and for violations of other rules relating to invalid overrides of some sort.
-    overrides::check_class(context, class);
+    overrides::check_class(context, class, inconsistent_generic_bases);
 
     // (14) Check compatibility between class namespace values and metaclass-populated attributes.
     check_class_namespace_against_metaclass_members(context, class, index);
@@ -1027,7 +1046,7 @@ fn check_class_namespace_against_metaclass_members<'db>(
         return;
     }
 
-    let Some(metaclass_instance) = metaclass.to_instance(db) else {
+    let Some(metaclass_instance) = metaclass.to_instance_approximation(db) else {
         return;
     };
 

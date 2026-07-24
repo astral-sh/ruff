@@ -47,6 +47,61 @@ fn add_ignore() -> anyhow::Result<()> {
 }
 
 #[test]
+fn add_ignore_keeps_nested_blanket_suppression_used() -> anyhow::Result<()> {
+    let case = CliTest::with_file(
+        "nested.py",
+        r#"
+            def f(value: int) -> int:
+                return value
+
+            seen_code = True
+            # ty: ignore[]
+            values = [
+                # ty: ignore[blanket-ignore-comment]
+                # ty: ignore
+                f("bad"),
+                # ty: ignore
+                missing,
+            ]
+            "#,
+    )?;
+
+    assert_cmd_snapshot!(
+        case.command()
+            .arg("--add-ignore")
+            .arg("--warn")
+            .arg("blanket-ignore-comment"),
+        @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+    Added 1 ignore comment
+
+    ----- stderr -----
+    "
+    );
+
+    assert_snapshot!(fs::read_to_string(case.root().join("nested.py"))?, @r#"
+
+    def f(value: int) -> int:
+        return value
+
+    seen_code = True
+    # ty: ignore[blanket-ignore-comment]
+    values = [
+        # ty: ignore[blanket-ignore-comment]
+        # ty: ignore
+        f("bad"),
+        # ty: ignore
+        missing,
+    ]
+    "#);
+
+    Ok(())
+}
+
+#[test]
 fn add_ignore_unfixable() -> anyhow::Result<()> {
     let case = CliTest::with_files([
         ("has_syntax_error.py", r"print(x  # [unresolved-reference]"),
@@ -117,16 +172,20 @@ fn fix() -> anyhow::Result<()> {
         "unused_ignore.py",
         r#"
             x = 1  # ty: ignore[unresolved-reference]
+            values = [
+                # ty: ignore[]
+                1,
+            ]
             "#,
     )?;
 
     assert_cmd_snapshot!(
         case.command().arg("--fix").arg("--warn").arg("unused-ignore-comment"),
-        @r"
+        @"
     success: true
     exit_code: 0
     ----- stdout -----
-    Found 1 diagnostic (1 fixed, 0 remaining).
+    Found 2 diagnostics (2 fixed, 0 remaining).
 
     ----- stderr -----
     "
@@ -134,8 +193,12 @@ fn fix() -> anyhow::Result<()> {
 
     assert_snapshot!(
         fs::read_to_string(case.root().join("unused_ignore.py"))?,
-        @r"
+        @"
+
     x = 1
+    values = [
+        1,
+    ]
     "
     );
 

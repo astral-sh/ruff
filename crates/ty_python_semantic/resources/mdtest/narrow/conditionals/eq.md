@@ -85,12 +85,11 @@ def _(x: Single | int):
     if x != Single.VALUE:
         reveal_type(x)  # revealed: int
     else:
-        # `int` is not eliminated here because there could be subclasses of `int` with custom `__eq__`/`__ne__` methods
-        reveal_type(x)  # revealed: Single | int
+        reveal_type(x)  # revealed: Single
 
 def _(x: Single | int):
     if x == Single.VALUE:
-        reveal_type(x)  # revealed: Single | int
+        reveal_type(x)  # revealed: Single
     else:
         reveal_type(x)  # revealed: int
 
@@ -113,7 +112,7 @@ def after_excluding_red(x: Color | int):
         return
 
     if x == Color.GREEN:
-        reveal_type(x)  # revealed: Literal[Color.GREEN] | int
+        reveal_type(x)  # revealed: Literal[Color.GREEN]
     else:
         reveal_type(x)  # revealed: Literal[Color.BLUE] | int
 
@@ -1042,7 +1041,8 @@ Equality analysis expands the constraints of a constrained type variable in eith
 The resulting constraint is intersected with the type variable, preserving its identity:
 
 ```py
-from typing import TypeVar, final
+from enum import Enum
+from typing import Literal, TypeVar, final
 
 @final
 class ConstraintA: ...
@@ -1063,6 +1063,24 @@ def constrained_right(value: ConstraintA | None, other: T):
         pass
     else:
         reveal_type(value)  # revealed: ConstraintA
+
+class E(Enum):
+    A = 1
+    B = 2
+
+EnumT = TypeVar("EnumT", Literal[E.A], Literal[E.B])
+
+def correlated_typevar_eq(value: E, other: EnumT) -> EnumT:
+    if value == other:
+        reveal_type(value)  # revealed: EnumT@correlated_typevar_eq
+        return value
+    return other
+
+def correlated_typevar_ne(value: E, other: EnumT) -> EnumT:
+    if value != other:
+        return other
+    reveal_type(value)  # revealed: EnumT@correlated_typevar_ne
+    return value
 ```
 
 ## `LiteralString` and string-valued enums
@@ -1135,6 +1153,98 @@ def _(value: Right | None):
         reveal_type(value)  # revealed: Right | None
     else:
         reveal_type(value)  # revealed: Right | None
+```
+
+Custom comparison methods also remain visible when an `isinstance` check intersects a builtin type
+with a mixin. Ignoring the mixin would incorrectly treat the builtin comparison as authoritative:
+
+```py
+from typing import Literal
+
+class NeMixin:
+    def __ne__(self, other: object) -> bool:
+        return False
+
+class EqMixin:
+    def __eq__(self, other: object) -> bool:
+        return True
+
+def custom_intersection_inequality(value: Literal["x", 1], other: str):
+    if isinstance(other, NeMixin):
+        if value != other:
+            reveal_type(value)  # revealed: Literal["x", 1]
+        else:
+            reveal_type(value)  # revealed: Literal["x", 1]
+
+def custom_intersection_equality(value: Literal["x", 1], other: str):
+    if isinstance(other, EqMixin):
+        if value == other:
+            reveal_type(value)  # revealed: Literal["x", 1]
+        else:
+            reveal_type(value)  # revealed: Literal["x", 1]
+```
+
+## Narrowing unions and inferring comparisons against broad types
+
+When comparing against a broad type, we assume that its subclasses do not override equality. This
+allows union members with incompatible builtin comparison semantics to be removed:
+
+```py
+class Foo: ...
+
+class AlwaysEqual:
+    def __eq__(self, other: object) -> bool:
+        return True
+
+def strings(value: str | None, other: str):
+    reveal_type(None == other)  # revealed: Literal[False]
+    reveal_type(None != other)  # revealed: Literal[True]
+
+    if value == other:
+        reveal_type(value)  # revealed: str
+    else:
+        reveal_type(value)  # revealed: str | None
+
+    if value != other:
+        reveal_type(value)  # revealed: str | None
+    else:
+        reveal_type(value)  # revealed: str
+
+def classes(value: Foo | None, other: Foo):
+    reveal_type(None == other)  # revealed: Literal[False]
+    reveal_type(None != other)  # revealed: Literal[True]
+
+    if value == other:
+        reveal_type(value)  # revealed: Foo
+
+class Base: ...
+class Child(Base): ...
+
+def inherited_classes(value: Base | None, other: Child):
+    reveal_type(value == other)  # revealed: bool
+    reveal_type(value != other)  # revealed: bool
+
+    if value == other:
+        reveal_type(value)  # revealed: Base
+
+    if value != other:
+        reveal_type(value)  # revealed: Base | None
+    else:
+        reveal_type(value)  # revealed: Base
+
+class Left: ...
+class Right: ...
+class Shared(Left, Right): ...
+
+def overlapping_classes(value: Left | None, other: Right):
+    reveal_type(value == other)  # revealed: bool
+
+    if value == other:
+        reveal_type(value)  # revealed: Left
+
+def custom_equality(value: AlwaysEqual | None, other: AlwaysEqual):
+    if value == other:
+        reveal_type(value)  # revealed: AlwaysEqual | None
 ```
 
 ## Narrowing builtin types to literals
@@ -1299,6 +1409,27 @@ if (x := f()) != 1:
     reveal_type(x)  # revealed: Literal[2, 3]
 else:
     reveal_type(x)  # revealed: Literal[1]
+
+value = f()
+if result := (value == 1):
+    reveal_type(value)  # revealed: Literal[1]
+    reveal_type(result)  # revealed: Literal[True]
+else:
+    reveal_type(value)  # revealed: Literal[2, 3]
+    reveal_type(result)  # revealed: Literal[False]
+
+class A:
+    tag: Literal["a"]
+
+class B:
+    tag: Literal["b"]
+
+def overwritten_tagged_union(value: A | B | bool):
+    if isinstance(value, (A, B)):
+        if value := (value.tag == "a"):
+            reveal_type(value)  # revealed: Literal[True]
+        else:
+            reveal_type(value)  # revealed: Literal[False]
 ```
 
 ## Union with `Any`
@@ -1617,14 +1748,15 @@ def _(x: A | B):
         reveal_type(x)  # revealed: B
 ```
 
-## Enabling strict literal narrowing
+## Enabling strict equality narrowing
 
-The `strict-literal-narrowing` option can be enabled to preserve broad builtin types after equality
-comparisons. Narrowing types that are already literal unions remains safe and is unaffected.
+The `strict-equality-semantics` option can be enabled to preserve broad builtin types and union
+members that a subclass could compare equal to. Narrowing types that are already literal unions
+remains safe and is unaffected. This also applies to tuples, whose subclasses can override equality.
 
 ```toml
 [analysis]
-strict-literal-narrowing = true
+strict-equality-semantics = true
 ```
 
 ```py
@@ -1645,4 +1777,50 @@ def inequality(value: str):
 def literal(value: Literal["a", "b"]):
     if value == "a":
         reveal_type(value)  # revealed: Literal["a"]
+
+class Foo: ...
+
+def union(value: Foo | None, other: Foo):
+    reveal_type(None == other)  # revealed: bool
+    reveal_type(None != other)  # revealed: bool
+
+    if value == other:
+        reveal_type(value)  # revealed: Foo | None
+
+class EqualTuple(tuple[int, ...]):
+    def __eq__(self, other: object) -> bool:
+        return True
+
+def tuple_union(value: Foo | None, other: tuple[int, ...]):
+    reveal_type(None == other)  # revealed: bool
+    reveal_type(None != other)  # revealed: bool
+
+    if value == other:
+        reveal_type(value)  # revealed: Foo | None
+
+    if value != other:
+        reveal_type(value)  # revealed: Foo | None
+    else:
+        reveal_type(value)  # revealed: Foo | None
+```
+
+## The strict literal narrowing alias
+
+The `strict-literal-narrowing` option remains an alias for `strict-equality-semantics`.
+
+```toml
+[analysis]
+strict-literal-narrowing = true
+```
+
+```py
+class Foo: ...
+
+def union(value: Foo | None, other: Foo):
+    if value == other:
+        reveal_type(value)  # revealed: Foo | None
+
+def literal(value: str):
+    if value == "a":
+        reveal_type(value)  # revealed: str
 ```

@@ -94,9 +94,8 @@ pub struct AnalysisSettings {
     /// Whether narrowing with generic classes uses the top materialization.
     pub strict_generic_narrowing: bool,
 
-    /// Whether equality-based checks preserve broad builtin types rather than narrow them to
-    /// literal types.
-    pub strict_literal_narrowing: bool,
+    /// Whether ty should use conservative equality and inequality semantics.
+    pub strict_equality_semantics: bool,
 
     /// Whether errors can be suppressed with `type: ignore` comments.
     ///
@@ -116,7 +115,7 @@ impl Default for AnalysisSettings {
     fn default() -> Self {
         Self {
             strict_generic_narrowing: false,
-            strict_literal_narrowing: false,
+            strict_equality_semantics: false,
             respect_type_ignore_comments: true,
             allowed_unresolved_imports: ModuleGlobSet::empty(),
             replace_imports_with_any: ModuleGlobSet::empty(),

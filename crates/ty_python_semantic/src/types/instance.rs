@@ -1,6 +1,7 @@
 //! Instance types: both nominal and structural.
 
 use std::borrow::Cow;
+use std::cell::Cell;
 use std::marker::PhantomData;
 
 use ruff_python_ast::name::Name;
@@ -9,7 +10,7 @@ use ty_module_resolver::{ModuleName, file_to_module};
 use super::protocol_class::ProtocolInterface;
 use super::{
     BoundTypeVarIdentity, BoundTypeVarInstance, ClassType, DivergentType, KnownClass,
-    Materialization, MaterializationKind, SubclassOfType, Type, TypeVarVariance,
+    Materialization, MaterializationKind, SubclassOfType, Type, TypeAliasType, TypeVarVariance,
 };
 use crate::place::PlaceAndQualifiers;
 use crate::types::constraints::{
@@ -18,13 +19,16 @@ use crate::types::constraints::{
 use crate::types::enums::is_single_member_enum;
 use crate::types::generics::{InferableTypeVars, walk_specialization};
 use crate::types::protocol_class::{
-    ProtocolClass, has_all_protocol_members_defined, walk_protocol_interface,
+    ProtocolClass, has_all_protocol_members_defined, walk_protocol_instance_member,
+    walk_protocol_interface,
 };
 use crate::types::relation::{
-    DisjointnessChecker, HasRelationToVisitor, IsDisjointVisitor, TypeRelation, TypeRelationChecker,
+    DisjointnessChecker, HasRelationToVisitor, IsDisjointVisitor, TypeRelation,
+    TypeRelationChecker, TypeVarEvaluation,
 };
 use crate::types::signatures::SignatureRelationVisitor;
 use crate::types::tuple::{TupleSpec, TupleType, walk_tuple_type};
+use crate::types::visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard};
 use crate::types::{
     ApplyTypeMappingVisitor, CallableType, ClassBase, ClassLiteral, ErrorContext,
     FindLegacyTypeVarsVisitor, LiteralValueTypeKind, TypeContext, TypeMapping, VarianceInferable,
@@ -513,13 +517,14 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         let mut result = self.never();
 
         if let Some(nominal_instance) = protocol.to_nominal_instance() {
+            let source_protocol_as_nominal = ty
+                .as_protocol_instance()
+                .and_then(ProtocolInstanceType::to_nominal_instance);
             // if `ty` and `protocol` are *both* protocols, we also need to treat `ty` as if it
             // were a nominal type, or we won't consider a protocol `P` that explicitly inherits
             // from a protocol `Q` to be a subtype of `Q` to be a subtype of `Q` if it overrides
             // `Q`'s members in a Liskov-incompatible way.
-            let type_to_test = ty
-                .as_protocol_instance()
-                .and_then(ProtocolInstanceType::to_nominal_instance)
+            let type_to_test = source_protocol_as_nominal
                 .map(Type::NominalInstance)
                 .unwrap_or(ty);
 
@@ -531,6 +536,31 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 .is_always_satisfied(db)
             {
                 return result;
+            }
+
+            // `Generator` special case: compare the type parameters nominally. Prior to 3.13,
+            // its return type does not appear non-recursively in the protocol; from 3.13 onward,
+            // structurally inferring through `close() -> ReturnT | None` can spuriously infer
+            // `None`.
+            // TODO: Remove the Python 3.13+ extension of this special case once
+            // https://github.com/astral-sh/ty/issues/3596 is fixed.
+            if let Some(source_protocol) = ty.as_protocol_instance()
+                && let Protocol::FromClass(source_class) = source_protocol.inner
+                && let Protocol::FromClass(proto_class) = protocol.inner
+                && source_class.is_known(db, KnownClass::Generator)
+                && proto_class.is_known(db, KnownClass::Generator)
+            {
+                return result;
+            }
+
+            if let Some(structurally_satisfied) = self.try_check_non_recursive_protocol_members(
+                db,
+                ty,
+                protocol,
+                source_protocol_as_nominal,
+                nominal_instance,
+            ) {
+                return result.or(db, self.constraints, || structurally_satisfied);
             }
 
             // For union simplification, failing the nominal relation between two
@@ -549,20 +579,6 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             {
                 return nominally_satisfied;
             }
-        }
-
-        // `Generator` special case: compare the type parameters nominally. Prior to 3.13, its
-        // return type does not appear non-recursively in the protocol; from 3.13 onward,
-        // structurally inferring through `close() -> ReturnT | None` can spuriously infer `None`.
-        // TODO: Remove the Python 3.13+ extension of this special case once
-        // https://github.com/astral-sh/ty/issues/3596 is fixed.
-        if let Some(source_protocol) = ty.as_protocol_instance()
-            && let Protocol::FromClass(source_class) = source_protocol.inner
-            && let Protocol::FromClass(proto_class) = protocol.inner
-            && source_class.is_known(db, KnownClass::Generator)
-            && proto_class.is_known(db, KnownClass::Generator)
-        {
-            return result;
         }
 
         // Fast path: skip expensive per-member type comparisons when members are plainly
@@ -599,6 +615,59 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             });
         }
         result.or(db, self.constraints, || structurally_satisfied)
+    }
+
+    /// Tries to relate the finite members of two specializations of the same protocol.
+    ///
+    /// This retains structural solutions such as `T | int`, while recursive members are the
+    /// coinductive edge currently being proved. Returns `None` when the shortcut is inapplicable.
+    fn try_check_non_recursive_protocol_members(
+        &self,
+        db: &'db dyn Db,
+        ty: Type<'db>,
+        protocol: ProtocolInstanceType<'db>,
+        source_protocol_as_nominal: Option<NominalInstanceType<'db>>,
+        nominal_instance: NominalInstanceType<'db>,
+    ) -> Option<ConstraintSet<'db, 'c>> {
+        if self.typevar_evaluation != TypeVarEvaluation::Lazy
+            || self.is_context_collection_enabled()
+        {
+            return None;
+        }
+
+        let Type::ProtocolInstance(source_protocol) = ty else {
+            return None;
+        };
+        let source_instance = source_protocol_as_nominal?;
+        let (ClassType::Generic(source_alias), ClassType::Generic(target_alias)) =
+            (source_instance.class(db), nominal_instance.class(db))
+        else {
+            return None;
+        };
+        if source_alias.origin(db) != target_alias.origin(db) {
+            return None;
+        }
+        let identity_protocol = target_alias
+            .origin(db)
+            .identity_specialization(db)
+            .into_protocol_class(db)?;
+
+        let source_interface = source_protocol.interface(db);
+        let target_interface = protocol.interface(db);
+        let source_non_recursive =
+            non_recursive_protocol_interface(db, source_interface, identity_protocol, ty);
+        let target_non_recursive = non_recursive_protocol_interface(
+            db,
+            target_interface,
+            identity_protocol,
+            Type::ProtocolInstance(protocol),
+        );
+
+        if source_non_recursive == source_interface && target_non_recursive == target_interface {
+            return None;
+        }
+
+        Some(self.check_protocol_interface_pair(db, ty, source_non_recursive, target_non_recursive))
     }
 
     /// Return whether a class-object type inhabits `type[protocol]`.
@@ -645,6 +714,67 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
     }
 }
 
+/// Returns the finite members of a protocol interface, omitting members that refer back to its
+/// class-backed origin. Type aliases are expanded, but lazy protocol attributes are not visited.
+///
+/// For example, `value` is retained while `child` is omitted:
+///
+/// ```python
+/// class P[T](Protocol):
+///     def value(self) -> T | int: ...
+///     def child(self) -> P[list[T]]: ...
+/// ```
+#[salsa::tracked(returns(copy), heap_size=ruff_memory_usage::heap_size)]
+fn non_recursive_protocol_interface<'db>(
+    db: &'db dyn Db,
+    interface: ProtocolInterface<'db>,
+    protocol: ProtocolClass<'db>,
+    receiver_ty: Type<'db>,
+) -> ProtocolInterface<'db> {
+    struct ProtocolReferenceFinder<'db> {
+        origin: ClassLiteral<'db>,
+        found: Cell<bool>,
+        recursion_guard: TypeCollector<'db>,
+    }
+
+    impl<'db> TypeVisitor<'db> for ProtocolReferenceFinder<'db> {
+        fn should_visit_lazy_type_attributes(&self) -> bool {
+            false
+        }
+
+        fn visit_type_alias_type(&self, db: &'db dyn Db, type_alias: TypeAliasType<'db>) {
+            self.visit_type(db, type_alias.value_type(db));
+        }
+
+        fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
+            if self.found.get() {
+                return;
+            }
+
+            if ty
+                .as_protocol_instance()
+                .and_then(ProtocolInstanceType::to_nominal_instance)
+                .is_some_and(|instance| instance.class_literal(db) == self.origin)
+            {
+                self.found.set(true);
+                return;
+            }
+
+            walk_type_with_recursion_guard(db, ty, self, &self.recursion_guard);
+        }
+    }
+
+    interface.filter_members(db, |member| {
+        let visitor = ProtocolReferenceFinder {
+            origin: protocol.class_literal(db),
+            found: Cell::new(false),
+            recursion_guard: TypeCollector::default(),
+        };
+        walk_protocol_instance_member(db, member, receiver_ty, &visitor);
+        !visitor.found.get()
+    })
+}
+
 impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
     /// Return `true` if this protocol type is disjoint from the protocol `other`.
     ///
@@ -669,15 +799,15 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
         if left.is_object() || right.is_object() {
             return result;
         }
-        if let Some(left_spec) = left.tuple_spec(db) {
-            if let Some(right_spec) = right.tuple_spec(db) {
-                let compatible = self.check_tuple_spec_pair(db, &left_spec, &right_spec);
-                if result
-                    .union(db, self.constraints, compatible)
-                    .is_always_satisfied(db)
-                {
-                    return result;
-                }
+        if let Some(left_spec) = left.tuple_spec(db)
+            && let Some(right_spec) = right.tuple_spec(db)
+        {
+            let compatible = self.check_tuple_spec_pair(db, &left_spec, &right_spec);
+            if result
+                .union(db, self.constraints, compatible)
+                .is_always_satisfied(db)
+            {
+                return result;
             }
         }
 

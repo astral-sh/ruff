@@ -115,7 +115,7 @@ mod tests {
             };
             let diagnostics = LintContext::new(Path::new("<filename>"), line, &settings);
             check_physical_lines(&locator, &stylist, &indexer, &[], &settings, &diagnostics);
-            diagnostics.into_parts().0
+            diagnostics.into_diagnostics()
         };
         let line_length = LineLength::try_from(8).unwrap();
         assert_eq!(check_with_max_line_length(line_length), vec![]);

@@ -110,6 +110,7 @@ pub enum KnownClass {
     ParamSpecKwargs,
     ProtocolMeta,
     TypeVarTuple,
+    ExtensionsTypeVarTuple, // must be distinct from typing.TypeVarTuple, backports new features
     TypeAliasType,
     NoDefaultType,
     NewType,
@@ -147,6 +148,7 @@ pub enum KnownClass {
     FunctoolsPartial,
     // ty_extensions
     ConstraintSet,
+    ConstraintSetSolution,
     GenericContext,
     Specialization,
     TyExtensionsAsyncIterable,
@@ -197,6 +199,7 @@ impl KnownClass {
             | Self::ParamSpecArgs
             | Self::ParamSpecKwargs
             | Self::TypeVarTuple
+            | Self::ExtensionsTypeVarTuple
             | Self::Sentinel
             | Self::Super
             | Self::WrapperDescriptorType
@@ -280,6 +283,7 @@ impl KnownClass {
             | Self::NamedTupleFallback
             | Self::NamedTupleLike
             | Self::ConstraintSet
+            | Self::ConstraintSetSolution
             | Self::GenericContext
             | Self::Specialization
             | Self::ProtocolMeta
@@ -362,6 +366,7 @@ impl KnownClass {
             | KnownClass::ParamSpecArgs
             | KnownClass::ParamSpecKwargs
             | KnownClass::TypeVarTuple
+            | KnownClass::ExtensionsTypeVarTuple
             | KnownClass::Sentinel
             | KnownClass::TypeAliasType
             | KnownClass::NoDefaultType
@@ -390,6 +395,7 @@ impl KnownClass {
             | KnownClass::NamedTupleFallback
             | KnownClass::NamedTupleLike
             | KnownClass::ConstraintSet
+            | KnownClass::ConstraintSetSolution
             | KnownClass::GenericContext
             | KnownClass::Specialization
             | KnownClass::TypedDictFallback
@@ -472,6 +478,7 @@ impl KnownClass {
             | KnownClass::ParamSpecArgs
             | KnownClass::ParamSpecKwargs
             | KnownClass::TypeVarTuple
+            | KnownClass::ExtensionsTypeVarTuple
             | KnownClass::Sentinel
             | KnownClass::TypeAliasType
             | KnownClass::NoDefaultType
@@ -500,6 +507,7 @@ impl KnownClass {
             | KnownClass::NamedTupleFallback
             | KnownClass::NamedTupleLike
             | KnownClass::ConstraintSet
+            | KnownClass::ConstraintSetSolution
             | KnownClass::GenericContext
             | KnownClass::Specialization
             | KnownClass::TypedDictFallback
@@ -583,6 +591,7 @@ impl KnownClass {
             | KnownClass::ParamSpecArgs
             | KnownClass::ParamSpecKwargs
             | KnownClass::TypeVarTuple
+            | KnownClass::ExtensionsTypeVarTuple
             | KnownClass::Sentinel
             | KnownClass::TypeAliasType
             | KnownClass::NoDefaultType
@@ -612,6 +621,7 @@ impl KnownClass {
             | KnownClass::NamedTupleLike
             | KnownClass::NamedTupleFallback
             | KnownClass::ConstraintSet
+            | KnownClass::ConstraintSetSolution
             | KnownClass::GenericContext
             | KnownClass::Specialization
             | KnownClass::BuiltinFunctionType
@@ -700,6 +710,7 @@ impl KnownClass {
             | Self::ParamSpecArgs
             | Self::ParamSpecKwargs
             | Self::TypeVarTuple
+            | Self::ExtensionsTypeVarTuple
             | Self::Sentinel
             | Self::TypeAliasType
             | Self::NoDefaultType
@@ -730,6 +741,7 @@ impl KnownClass {
             | Self::KwOnly
             | Self::NamedTupleFallback
             | Self::ConstraintSet
+            | Self::ConstraintSetSolution
             | Self::GenericContext
             | Self::Specialization
             | Self::TypedDictFallback
@@ -822,6 +834,7 @@ impl KnownClass {
             | KnownClass::ParamSpecKwargs
             | KnownClass::ProtocolMeta
             | KnownClass::TypeVarTuple
+            | KnownClass::ExtensionsTypeVarTuple
             | KnownClass::Sentinel
             | KnownClass::TypeAliasType
             | KnownClass::NoDefaultType
@@ -850,6 +863,7 @@ impl KnownClass {
             | KnownClass::Path
             | KnownClass::FunctoolsPartial
             | KnownClass::ConstraintSet
+            | KnownClass::ConstraintSetSolution
             | KnownClass::GenericContext
             | KnownClass::Specialization
             | KnownClass::PydanticBaseModel
@@ -915,6 +929,7 @@ impl KnownClass {
             Self::ParamSpecArgs => "ParamSpecArgs",
             Self::ParamSpecKwargs => "ParamSpecKwargs",
             Self::TypeVarTuple => "TypeVarTuple",
+            Self::ExtensionsTypeVarTuple => "TypeVarTuple",
             Self::Sentinel => "sentinel",
             Self::TypeAliasType => "TypeAliasType",
             Self::NoDefaultType => "_NoDefaultType",
@@ -968,6 +983,7 @@ impl KnownClass {
             Self::NamedTupleFallback => "NamedTupleFallback",
             Self::NamedTupleLike => "NamedTupleLike",
             Self::ConstraintSet => "ConstraintSet",
+            Self::ConstraintSetSolution => "ConstraintSetSolution",
             Self::GenericContext => "GenericContext",
             Self::Specialization => "Specialization",
             Self::TypedDictFallback => "TypedDictFallback",
@@ -1125,7 +1141,7 @@ impl KnownClass {
             "Use `Type::heterogeneous_tuple` or `Type::homogeneous_tuple` to create `tuple` instances"
         );
         self.to_specialized_class_type(db, specialization)
-            .and_then(|class_type| Type::from(class_type).to_instance(db))
+            .and_then(|class_type| Type::from(class_type).to_instance_approximation(db))
             .unwrap_or_else(Type::unknown)
     }
 
@@ -1325,13 +1341,20 @@ impl KnownClass {
             | Self::SupportsIndex => KnownModule::Typing,
             Self::TypeAliasType
             | Self::ExtensionsTypeVar
-            | Self::TypeVarTuple
+            | Self::ExtensionsTypeVarTuple
             | Self::ExtensionsParamSpec
             | Self::ParamSpecArgs
             | Self::ParamSpecKwargs
             | Self::Deprecated
             | Self::ExtensionTypedDictFallback
             | Self::NewType => KnownModule::TypingExtensions,
+            Self::TypeVarTuple => {
+                if Program::get(db).python_version(db) >= PythonVersion::PY311 {
+                    KnownModule::Typing
+                } else {
+                    KnownModule::TypingExtensions
+                }
+            }
             Self::Sentinel => {
                 if Program::get(db).python_version(db) >= PythonVersion::PY315 {
                     KnownModule::Builtins
@@ -1360,6 +1383,7 @@ impl KnownClass {
             Self::NamedTupleFallback | Self::TypedDictFallback => KnownModule::TypeCheckerInternals,
             Self::NamedTupleLike => KnownModule::TyExtensions,
             Self::ConstraintSet
+            | Self::ConstraintSetSolution
             | Self::GenericContext
             | Self::Specialization
             | Self::TyExtensionsAsyncIterable
@@ -1443,6 +1467,7 @@ impl KnownClass {
             | Self::ParamSpecArgs
             | Self::ParamSpecKwargs
             | Self::TypeVarTuple
+            | Self::ExtensionsTypeVarTuple
             | Self::Sentinel
             | Self::Enum
             | Self::EnumProperty
@@ -1471,6 +1496,7 @@ impl KnownClass {
             | Self::NamedTupleFallback
             | Self::NamedTupleLike
             | Self::ConstraintSet
+            | Self::ConstraintSetSolution
             | Self::GenericContext
             | Self::Specialization
             | Self::TypedDictFallback
@@ -1558,6 +1584,7 @@ impl KnownClass {
             | Self::ParamSpecArgs
             | Self::ParamSpecKwargs
             | Self::TypeVarTuple
+            | Self::ExtensionsTypeVarTuple
             | Self::Sentinel
             | Self::Enum
             | Self::EnumProperty
@@ -1587,6 +1614,7 @@ impl KnownClass {
             | Self::NamedTupleFallback
             | Self::NamedTupleLike
             | Self::ConstraintSet
+            | Self::ConstraintSetSolution
             | Self::GenericContext
             | Self::Specialization
             | Self::TypedDictFallback
@@ -1666,7 +1694,9 @@ impl KnownClass {
             "ParamSpec" => &[Self::ParamSpec, Self::ExtensionsParamSpec],
             "ParamSpecArgs" => &[Self::ParamSpecArgs],
             "ParamSpecKwargs" => &[Self::ParamSpecKwargs],
-            "TypeVarTuple" => &[Self::TypeVarTuple],
+            // On Python 3.10, both candidates resolve to `typing_extensions`. Prefer the
+            // backport-aware variant so that we recognize features such as `default`.
+            "TypeVarTuple" => &[Self::ExtensionsTypeVarTuple, Self::TypeVarTuple],
             "sentinel" => &[Self::Sentinel],
             "ChainMap" => &[Self::ChainMap],
             "Counter" => &[Self::Counter],
@@ -1702,6 +1732,7 @@ impl KnownClass {
             "NamedTupleFallback" => &[Self::NamedTupleFallback],
             "NamedTupleLike" => &[Self::NamedTupleLike],
             "ConstraintSet" => &[Self::ConstraintSet],
+            "ConstraintSetSolution" => &[Self::ConstraintSetSolution],
             "GenericContext" => &[Self::GenericContext],
             "Specialization" => &[Self::Specialization],
             "TypedDictFallback" => &[Self::TypedDictFallback],
@@ -1796,9 +1827,12 @@ impl KnownClass {
             | Self::ExtensionsTypeVar
             | Self::ParamSpec
             | Self::ExtensionsParamSpec
+            | Self::TypeVarTuple
+            | Self::ExtensionsTypeVarTuple
             | Self::Sentinel
             | Self::NamedTupleLike
             | Self::ConstraintSet
+            | Self::ConstraintSetSolution
             | Self::GenericContext
             | Self::Specialization
             | Self::TyExtensionsAsyncIterable
@@ -1824,7 +1858,6 @@ impl KnownClass {
             | Self::SupportsIndex
             | Self::ParamSpecArgs
             | Self::ParamSpecKwargs
-            | Self::TypeVarTuple
             | Self::Iterable
             | Self::Iterator
             | Self::AsyncIterator
@@ -2145,6 +2178,7 @@ mod tests {
                     KnownClass::BaseExceptionGroup | KnownClass::ExceptionGroup => {
                         PythonVersion::PY311
                     }
+                    KnownClass::TypeVarTuple => PythonVersion::PY311,
                     KnownClass::GenericAlias => PythonVersion::PY39,
                     KnownClass::EnumProperty
                     | KnownClass::Member

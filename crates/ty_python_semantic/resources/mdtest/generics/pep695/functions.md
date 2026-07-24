@@ -186,6 +186,35 @@ def _(a: A, b: B, x: A | B):
     reveal_type(takes_in_supports_foo(x))  # revealed: A | B
 ```
 
+## Bound violations inferred through protocols
+
+If matching a protocol argument infers a type that violates a type variable's bound, the call should
+report that violation once. Another argument may independently infer a valid type for the same type
+variable, but should not cause a second error for the protocol argument.
+
+```py
+from typing import Protocol
+
+class A: ...
+class B(A): ...
+class C: ...
+
+class P[T, U](Protocol):
+    def put(self, value: T) -> None: ...
+    def get(self) -> U: ...
+
+class Bad:
+    def put(self, value: B) -> None: ...
+    def get(self) -> C:
+        return C()
+
+def f[T: A](x: P[T, T], value: T) -> None:
+    raise NotImplementedError
+
+# error: [invalid-argument-type] "Argument to function `f` is incorrect: Argument type `C` does not satisfy upper bound `A` of type variable `T`"
+f(Bad(), B())
+```
+
 ## Inferring tuple parameter types
 
 ```py
@@ -454,6 +483,22 @@ def _(list_ofstr: list[str], list_of_int: list[int]):
     # TODO: the error message here could be improved by referring to the second union element
     # error: [invalid-argument-type] "Argument type `list[int]` does not satisfy upper bound `str` of type variable `T`"
     reveal_type(accepts_t_or_list_of_t(list_of_int))  # revealed: Unknown
+```
+
+A union argument must not widen a bounded type variable with an incompatible union element:
+
+```py
+class MyClass: ...
+
+def accepts_instance_or_int[T: MyClass](instance: T, x: T | int) -> T:
+    return instance
+
+def _(x: int | None, valid: MyClass | int) -> MyClass:
+    # error: [invalid-argument-type] "Argument type `None` does not satisfy upper bound `MyClass` of type variable `T`"
+    result = accepts_instance_or_int(MyClass(), x)
+    reveal_type(result)  # revealed: MyClass
+    reveal_type(accepts_instance_or_int(MyClass(), valid))  # revealed: MyClass
+    return result
 ```
 
 Here, we make sure that `S` is solved as `Literal[1]` instead of a union of the two literals, which

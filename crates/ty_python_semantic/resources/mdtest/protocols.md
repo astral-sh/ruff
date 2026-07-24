@@ -2236,6 +2236,66 @@ int_value: JustInt = 1
 bool_value: JustInt = True  # error: [invalid-assignment]
 ```
 
+Explicitly specializing a protocol that directly declares a `__class__` write type of `type[T]` for
+one of its type parameters does not apply the `int`/`float` special case to its type arguments. This
+allows such protocols to distinguish an actual `float` from an `int`. This is a narrowly-focused
+special case to better support the `Just` type in pandas-stubs:
+
+```py
+from typing import Generic, TypeVar
+from typing_extensions import Self
+
+JustT = TypeVar("JustT")
+JustT_co = TypeVar("JustT_co", covariant=True)
+
+class Just(Protocol, Generic[JustT]):
+    @property
+    def __class__(self, /) -> type[JustT]: ...
+    @__class__.setter
+    def __class__(self, value: type[JustT], /) -> None: ...
+
+def takes_just_int(value: Just[int]) -> None: ...
+def takes_just_float(value: Just[float]) -> None: ...
+def takes_just_union(value: Just[int | float]) -> None: ...
+
+takes_just_int(1)
+takes_just_int(True)  # error: [invalid-argument-type]
+takes_just_int(1.0)  # error: [invalid-argument-type]
+
+takes_just_float(1.0)
+takes_just_float(1)  # error: [invalid-argument-type]
+takes_just_float(True)  # error: [invalid-argument-type]
+
+# An explicit union remains a union; disabling the special case must not erase its `int` member.
+takes_just_union(1)  # error: [invalid-argument-type]
+takes_just_union(1.0)  # error: [invalid-argument-type]
+
+class Timestamp:
+    def __mul__(self, other: Just[float], /) -> Self:
+        return self
+
+reveal_type(Timestamp() * 1.0)  # revealed: Timestamp
+
+class ReadClass(Protocol[JustT_co]):
+    @property
+    def __class__(self, /) -> type[JustT_co]: ...
+
+def takes_read_class(value: ReadClass[float]) -> None:
+    reveal_type(value)  # revealed: ReadClass[int | float]
+
+takes_read_class(1)
+takes_read_class(1.0)
+
+class WritableValue(Protocol[JustT]):
+    @property
+    def value(self) -> type[JustT]: ...
+    @value.setter
+    def value(self, value: type[JustT], /) -> None: ...
+
+def takes_writable_value(value: WritableValue[float]) -> None:
+    reveal_type(value)  # revealed: WritableValue[int | float]
+```
+
 A read/write property on a protocol, where the setter accepts a subtype of the type returned by the
 getter, can be satisfied by a mutable attribute of any type bounded by the upper bound of the
 getter-returned type and the lower bound of the setter-accepted type.
@@ -2448,10 +2508,103 @@ class HasSetAttrWithUnsuitableInput:
 
 static_assert(not is_subtype_of(HasSetAttrWithUnsuitableInput, HasMutableXProperty))
 static_assert(not is_assignable_to(HasSetAttrWithUnsuitableInput, HasMutableXProperty))
+```
 
-# For static checking, an explicit attribute declaration takes precedence over `__setattr__`.
-# This matches other type checkers and likely user intent, even though a custom `__setattr__`
-# intercepts every assignment at runtime.
+A class object should also satisfy a writable property protocol using `__getattr__` and
+`__setattr__` on its metaclass:
+
+```py
+class MetaWithGetAttrAndSetAttr(type):
+    def __getattr__(cls, attr: str) -> int:
+        return 1
+
+    def __setattr__(cls, attr: str, value: int) -> None: ...
+
+class ClassWithDynamicX(metaclass=MetaWithGetAttrAndSetAttr): ...
+
+ClassWithDynamicX.x = 1
+# TODO: this should pass once metaclass setters are considered for protocol writes.
+dynamic_x: HasMutableXProperty = ClassWithDynamicX  # error: [invalid-assignment]
+```
+
+Once metaclass setters are considered, one with an incompatible value type must still be rejected:
+
+```py
+class MetaWithUnsuitableSetAttr(type):
+    def __getattr__(cls, attr: str) -> int:
+        return 1
+
+    def __setattr__(cls, attr: str, value: str) -> None: ...
+
+class ClassWithUnsuitableSetAttr(metaclass=MetaWithUnsuitableSetAttr): ...
+
+unsuitable_x: HasMutableXProperty = ClassWithUnsuitableSetAttr  # error: [invalid-assignment]
+```
+
+A terminal metaclass setter should prevent a class object from satisfying a writable property
+protocol even when the attribute is declared:
+
+```py
+class MetaWithTerminalSetAttr(type):
+    def __setattr__(cls, attr: str, value: int) -> Never:
+        raise AttributeError("immutable")
+
+class ClassWithTerminalSetAttr(metaclass=MetaWithTerminalSetAttr):
+    x: int = 1
+
+# TODO: terminal setters should prevent all writes.
+terminal_x: HasMutableXProperty = ClassWithTerminalSetAttr
+```
+
+Once metaclass setters are considered, an overload for a different attribute must not make the class
+satisfy the protocol:
+
+```py
+from typing import Literal
+from ty_extensions._internal import TypeOf
+
+class MetaWithOverloadedSetAttr(type):
+    def __getattr__(cls, attr: str) -> int:
+        return 1
+
+    @overload
+    def __setattr__(cls, attr: Literal["x"], value: Any) -> None: ...
+    @overload
+    def __setattr__(cls, attr: Literal["y"], value: int) -> None: ...
+    # error: [invalid-method-override]
+    def __setattr__(cls, attr: str, value: object) -> None: ...
+
+class ClassWithOverloadedSetAttr(metaclass=MetaWithOverloadedSetAttr): ...
+
+ClassWithOverloadedSetAttr.x = 1
+static_assert(not is_subtype_of(TypeOf[ClassWithOverloadedSetAttr], HasMutableXProperty))
+```
+
+A generic metaclass setter can satisfy a writable property protocol:
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+
+class MetaWithGenericSetAttr(type):
+    def __getattr__(cls, attr: str) -> int:
+        return 1
+
+    def __setattr__(cls, attr: str, value: T) -> None: ...
+
+class ClassWithGenericSetAttr(metaclass=MetaWithGenericSetAttr): ...
+
+ClassWithGenericSetAttr.x = 1
+# TODO: this should pass once metaclass setters are considered for protocol writes.
+generic_x: HasMutableXProperty = ClassWithGenericSetAttr  # error: [invalid-assignment]
+```
+
+For static checking, an explicit attribute declaration takes precedence over `__setattr__`. This
+matches other type checkers and likely user intent, even though a custom `__setattr__` intercepts
+every assignment at runtime:
+
+```py
 class ExplicitXWithBroadSetAttr:
     x: int
 
@@ -3763,12 +3916,19 @@ class ReceiverOnly(Protocol):
     def method(self) -> None: ...
 
 class InvalidBoundedReceiver:
-    # TODO: Use `BoundTypeVarInstance::valid_specializations` to reject this receiver.
+    def method[T: int](self: T) -> None: ...
+
+class ValidBoundedReceiver(int):
     def method[T: int](self: T) -> None: ...
 
 class InvalidConstrainedReceiver:
-    # TODO: Use `BoundTypeVarInstance::valid_specializations` to reject this receiver.
     def method[T: (int, str)](self: T) -> None: ...
+
+class ValidConstrainedReceiver(str):
+    def method[T: (int, str)](self: T) -> None: ...
+
+class RecursiveReceiverBound:
+    def method[T: ReceiverOnly](self: T) -> None: ...
 
 static_assert(is_equivalent_to(LegacyFunctionScoped, NewStyleFunctionScoped))
 static_assert(is_assignable_to(NominalNewStyle, NewStyleFunctionScoped))
@@ -3821,10 +3981,19 @@ static_assert(is_subtype_of(StructuralExplicitReceiver, ExplicitReceiverProtocol
 static_assert(not is_assignable_to(OverloadedExplicitReceiverImplementation, OverloadedExplicitReceiverProtocol))
 static_assert(not is_subtype_of(OverloadedExplicitReceiverImplementation, OverloadedExplicitReceiverProtocol))
 
-static_assert(is_assignable_to(InvalidBoundedReceiver, ReceiverOnly))
-static_assert(is_subtype_of(InvalidBoundedReceiver, ReceiverOnly))
-static_assert(is_assignable_to(InvalidConstrainedReceiver, ReceiverOnly))
-static_assert(is_subtype_of(InvalidConstrainedReceiver, ReceiverOnly))
+# A bound receiver must choose a specialization within its declared domain.
+static_assert(not is_assignable_to(InvalidBoundedReceiver, ReceiverOnly))
+static_assert(not is_subtype_of(InvalidBoundedReceiver, ReceiverOnly))
+static_assert(is_assignable_to(ValidBoundedReceiver, ReceiverOnly))
+static_assert(is_subtype_of(ValidBoundedReceiver, ReceiverOnly))
+static_assert(not is_assignable_to(InvalidConstrainedReceiver, ReceiverOnly))
+static_assert(not is_subtype_of(InvalidConstrainedReceiver, ReceiverOnly))
+static_assert(is_assignable_to(ValidConstrainedReceiver, ReceiverOnly))
+static_assert(is_subtype_of(ValidConstrainedReceiver, ReceiverOnly))
+
+# Verifying the receiver's bound recurses into the protocol relation currently being checked.
+static_assert(is_assignable_to(RecursiveReceiverBound, ReceiverOnly))
+static_assert(is_subtype_of(RecursiveReceiverBound, ReceiverOnly))
 
 # These test cases are taken from the typing conformance suite:
 class ShapeProtocolImplicitSelf(Protocol):
@@ -5185,6 +5354,61 @@ class Bar(Protocol):
 static_assert(is_equivalent_to(Foo, Bar))
 ```
 
+### Recursively-specialized generic protocols
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from __future__ import annotations
+
+from typing import Protocol
+from ty_extensions import static_assert
+from ty_extensions._internal import is_subtype_of
+
+class LeftProtocol[T](Protocol):
+    child: LeftAlias[list[T]]
+
+class RightProtocol[T](Protocol):
+    child: RightAlias[list[T]]
+
+class DifferentProtocol[T](Protocol):
+    child: DifferentProtocol[set[T]]
+
+type LeftAlias[T] = LeftProtocol[T]
+type RightAlias[T] = RightProtocol[T]
+
+# TODO: These structurally equivalent protocols should be recognized as subtypes.
+static_assert(not is_subtype_of(LeftProtocol[int], RightProtocol[int]))
+static_assert(not is_subtype_of(LeftAlias[int], RightAlias[int]))
+# A conservative cycle fallback must not accept structurally different recursive protocols.
+static_assert(not is_subtype_of(LeftProtocol[int], DifferentProtocol[int]))
+
+class FiniteLeft[T](Protocol):
+    value: T
+
+class FiniteRight[T](Protocol):
+    value: T
+
+# Reusing a non-recursive protocol at a finite nesting depth is not a recursive definition.
+static_assert(is_subtype_of(FiniteLeft[FiniteLeft[int]], FiniteRight[FiniteRight[int]]))
+static_assert(not is_subtype_of(FiniteLeft[FiniteLeft[int]], FiniteRight[FiniteRight[str]]))
+
+class ProtocolBox[T](Protocol):
+    value: T
+
+class NestedLeftProtocol[T](Protocol):
+    child: ProtocolBox[ProtocolBox[NestedLeftProtocol[list[T]]]]
+
+class NestedRightProtocol[T](Protocol):
+    child: ProtocolBox[ProtocolBox[NestedRightProtocol[list[T]]]]
+
+# TODO: These structurally equivalent protocols should be recognized as subtypes.
+static_assert(not is_subtype_of(NestedLeftProtocol[int], NestedRightProtocol[int]))
+```
+
 ### Disjointness of recursive protocol and recursive final type
 
 ```py
@@ -5543,6 +5767,35 @@ def f(c: C[int]) -> None:
     # The cycle detection assumes compatibility when it detects potential
     # infinite recursion between protocol specializations.
     takes_c(c)
+
+class Left[T](Protocol):
+    @property
+    def value(self) -> T: ...
+    @property
+    def child(self) -> "Left[list[T]]": ...
+
+class Right1[T](Protocol):
+    @property
+    def value(self) -> T: ...
+    @property
+    def child(self) -> "RightAlias1[list[T]]": ...
+
+class Right2[T](Protocol):
+    @property
+    def value(self) -> T: ...
+    @property
+    def child(self) -> "RightAlias2[set[T]]": ...
+
+type RightAlias1[T] = Right1[T]
+type RightAlias2[T] = Right2[T]
+
+def expect_right1(value: RightAlias1[int]) -> None: ...
+def expect_right2(value: RightAlias2[int]) -> None: ...
+def check(value: Left[int]) -> None:
+    # TODO: no error
+    expect_right1(value)  # error: [invalid-argument-type]
+    # This should be an error
+    expect_right2(value)  # error: [invalid-argument-type]
 ```
 
 ### Recursive legacy generic protocol

@@ -58,7 +58,7 @@ use crate::{
 /// `unused-noqa` for a rule that will remove these and allow the remaining codes to be moved into a
 /// `ruff:ignore` comment.
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "NEXT_RUFF_VERSION")]
+#[violation_metadata(preview_since = "0.15.22")]
 pub(crate) struct NoqaComments {
     file_level: bool,
 }

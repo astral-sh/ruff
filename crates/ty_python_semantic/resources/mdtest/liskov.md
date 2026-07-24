@@ -635,6 +635,466 @@ class ProtocolWithClassVarImpl(ProtocolBase):
     instance_attr = 0
 ```
 
+## Inherited method conflicts in multiple inheritance
+
+The effective method definition in a class's resolved MRO must be compatible with the later
+definitions of that method. This matters even when the class does not define the method itself.
+
+### Basic conflicts
+
+`ReturnsStr.method` cannot satisfy the contract inherited from `ReturnsInt`. Returning `bool` is
+compatible because `bool` is a subtype of `int`.
+
+```pyi
+class ReturnsStr:
+    def method(self) -> str: ...
+
+class ReturnsInt:
+    def method(self) -> int: ...
+
+class ReturnsBool:
+    def method(self) -> bool: ...
+
+class BasicConflict(ReturnsStr, ReturnsInt): ...  # snapshot: invalid-method-override
+class Compatible(ReturnsBool, ReturnsInt): ...
+```
+
+```snapshot
+error[invalid-method-override]: Base classes for class `BasicConflict` define method `method` incompatibly
+  --> src/mdtest_snippet.pyi:2:9
+   |
+ 2 |     def method(self) -> str: ...
+   |         ------ `ReturnsStr.method` defined here
+ 3 |
+ 4 | class ReturnsInt:
+ 5 |     def method(self) -> int: ...
+   |         ------ `ReturnsInt.method` defined here
+ 6 |
+ 7 | class ReturnsBool:
+ 8 |     def method(self) -> bool: ...
+ 9 |
+10 | class BasicConflict(ReturnsStr, ReturnsInt): ...  # snapshot: invalid-method-override
+   |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `ReturnsStr.method` is incompatible with `ReturnsInt.method`
+   |
+info: incompatible return types: `str` is not assignable to `int`
+info: This violates the Liskov Substitution Principle
+```
+
+### Empty bases do not hide conflicts
+
+An empty base can appear before, between, or after the bases that define the conflicting methods.
+
+```pyi
+class Empty: ...
+
+class ReturnsStr:
+    def method(self) -> str: ...
+
+class ReturnsInt:
+    def method(self) -> int: ...
+
+class EmptyFirst(Empty, ReturnsStr, ReturnsInt): ...  # error: [invalid-method-override]
+class EmptyMiddle(ReturnsStr, Empty, ReturnsInt): ...  # error: [invalid-method-override]
+class EmptyLast(ReturnsStr, ReturnsInt, Empty): ...  # error: [invalid-method-override]
+```
+
+### An earlier compatible method satisfies both contracts
+
+`SatisfiesBoth.method` is compatible with both later definitions because it returns `NoReturn`. It
+is the effective method for `Compatible`, so the later definitions do not conflict.
+
+```pyi
+from typing import NoReturn
+
+class SatisfiesBoth:
+    def method(self) -> NoReturn: ...
+
+class ReturnsStr:
+    def method(self) -> str: ...
+
+class ReturnsInt:
+    def method(self) -> int: ...
+
+class Compatible(SatisfiesBoth, ReturnsStr, ReturnsInt): ...
+```
+
+### A compatible subclass override satisfies both contracts
+
+A subclass can provide an implementation that satisfies otherwise-incompatible base definitions.
+
+```pyi
+from typing import NoReturn
+
+class ReturnsStr:
+    def method(self) -> str: ...
+
+class ReturnsInt:
+    def method(self) -> int: ...
+
+class CompatibleReturn(ReturnsStr, ReturnsInt):
+    def method(self) -> NoReturn: ...
+
+class AcceptsStr:
+    def accepts(self, value: str) -> None: ...
+
+class AcceptsInt:
+    def accepts(self, value: int) -> None: ...
+
+class CompatibleParameter(AcceptsStr, AcceptsInt):
+    def accepts(self, value: str | int) -> None: ...
+```
+
+### An intermediate `Any` does not hide a conflict
+
+`AcceptsAny.accepts` can accept either parameter type, so it is compatible with both adjacent
+definitions. That does not allow `AcceptsStr.accepts` to accept the `int` values required by
+`AcceptsInt.accepts`.
+
+```pyi
+from typing import Any
+
+class AcceptsInt:
+    def accepts(self, value: int) -> None: ...
+
+class AcceptsAny(AcceptsInt):
+    def accepts(self, value: Any) -> None: ...
+
+class AcceptsStr:
+    def accepts(self, value: str) -> None: ...
+
+class AnyConflict(AcceptsStr, AcceptsAny): ...  # error: [invalid-method-override]
+```
+
+### Dynamic bases only hide later conflicts
+
+An intermediate `Any` base cannot hide a conflict when the effective method is already known. An
+earlier `Any` base can define the effective method, so later base definitions cannot be checked.
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+```pyi
+from typing import Any
+
+class ReturnsStr:
+    def method(self) -> str: ...
+
+class ReturnsInt:
+    def method(self) -> int: ...
+
+class DynamicMiddle(ReturnsStr, Any, ReturnsInt): ...  # error: [invalid-method-override]
+class DynamicFirst(Any, ReturnsStr, ReturnsInt): ...
+```
+
+### Generic bases
+
+A method inherited from `GenericReturn[int]` returns `int`. A plain `Generic[T]` base adds no
+method, but it must not prevent the remaining bases from being checked.
+
+```pyi
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+
+class ReturnsStr:
+    def method(self) -> str: ...
+
+class ReturnsInt:
+    def method(self) -> int: ...
+
+class GenericReturn(Generic[T]):
+    def method(self) -> T: ...
+
+class SpecializedConflict(ReturnsStr, GenericReturn[int]): ...  # error: [invalid-method-override]
+class GenericBaseConflict(Generic[T], ReturnsStr, ReturnsInt): ...  # error: [invalid-method-override]
+```
+
+### Methods inherited by a direct base
+
+A direct base can inherit the method from one of its own bases.
+
+```pyi
+class ReturnsStr:
+    def method(self) -> str: ...
+
+class Intermediate(ReturnsStr): ...
+
+class ReturnsInt:
+    def method(self) -> int: ...
+
+class IndirectConflict(Intermediate, ReturnsInt): ...  # error: [invalid-method-override]
+```
+
+### Properties
+
+Incompatible properties inherited from different bases are not yet checked.
+
+```pyi
+class ReturnsStr:
+    @property
+    def value(self) -> str: ...
+
+class ReturnsInt:
+    @property
+    def value(self) -> int: ...
+
+# TODO: Incompatible inherited properties should be reported here.
+class PropertyConflict(ReturnsStr, ReturnsInt): ...
+```
+
+### Synthesized members
+
+Methods synthesized on an earlier base can conflict with methods defined on a later base.
+
+```pyi
+from functools import total_ordering
+
+@total_ordering
+class Ordered:
+    def __lt__(self, other: Ordered) -> bool: ...
+
+class AcceptsObject:
+    def __gt__(self, other: object) -> bool: ...
+
+# TODO: The synthesized `Ordered.__gt__` method conflicts with `AcceptsObject.__gt__`.
+class SynthesizedConflict(Ordered, AcceptsObject): ...
+```
+
+### Enum mixins
+
+Ordinary mixin methods continue to contribute inherited contracts when the resulting class is an
+enum, including methods with names that `EnumType` can replace.
+
+```pyi
+from enum import Enum
+from typing import Literal
+
+class ReturnsStr:
+    def method(self) -> str: ...
+
+class ReturnsInt:
+    def method(self) -> int: ...
+
+class MixedEnum(ReturnsStr, ReturnsInt, Enum):  # error: [invalid-method-override]
+    MEMBER = 1
+
+class FirstString:
+    def __str__(self) -> Literal["first"]: ...
+
+class SecondString:
+    def __str__(self) -> Literal["second"]: ...
+
+class StringConflict(FirstString, SecondString, Enum):  # error: [invalid-method-override]
+    MEMBER = 1
+```
+
+### Instance, static, and class methods
+
+Instance methods, static methods, and class methods are bound differently. Each pair can therefore
+conflict even when the callable signatures look compatible.
+
+```pyi
+class InstanceMethod:
+    def kind(self, value: int) -> int: ...
+
+class StaticMethod:
+    @staticmethod
+    def kind(value: int) -> int: ...
+
+class ClassMethod:
+    @classmethod
+    def kind(cls, value: int) -> int: ...
+
+class InstanceStaticConflict(InstanceMethod, StaticMethod): ...  # error: [invalid-method-override]
+class ClassInstanceConflict(ClassMethod, InstanceMethod): ...  # snapshot: invalid-method-override
+class StaticClassConflict(StaticMethod, ClassMethod): ...  # error: [invalid-method-override]
+```
+
+```snapshot
+error[invalid-method-override]: Base classes for class `ClassInstanceConflict` define method `kind` incompatibly
+  --> src/mdtest_snippet.pyi:10:9
+   |
+10 |     def kind(cls, value: int) -> int: ...
+   |         ---- `ClassMethod.kind` defined here
+11 |
+12 | class InstanceStaticConflict(InstanceMethod, StaticMethod): ...  # error: [invalid-method-override]
+13 | class ClassInstanceConflict(ClassMethod, InstanceMethod): ...  # snapshot: invalid-method-override
+   |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `ClassMethod.kind` is incompatible with `InstanceMethod.kind`
+   |
+  ::: src/mdtest_snippet.pyi:2:9
+   |
+ 2 |     def kind(self, value: int) -> int: ...
+   |         ---- `InstanceMethod.kind` defined here
+   |
+info: `ClassMethod.kind` is a classmethod but `InstanceMethod.kind` is an instance method
+info: This violates the Liskov Substitution Principle
+```
+
+### Class methods use the subclass as their receiver
+
+The signature selected for a class method overload can depend on the class used as the receiver.
+Binding through `Combined` selects the `int` overload, which conflicts with `Right.selected`.
+Binding through `Compatible` selects the compatible `str` overload.
+
+```pyi
+from typing import overload
+
+class ReceiverBase:
+    @overload
+    @classmethod
+    def selected(cls: type[Combined]) -> int: ...
+    @overload
+    @classmethod
+    def selected(cls) -> str: ...
+
+class Left(ReceiverBase): ...
+
+class Right(ReceiverBase):
+    @classmethod
+    def selected(cls) -> str: ...
+
+class Combined(Left, Right): ...  # error: [invalid-method-override]
+class Compatible(Left, Right): ...
+```
+
+### Metaclass descriptors do not replace class method contracts
+
+Looking up a class method by name on a class object can invoke a same-named descriptor on its
+metaclass. The inherited contract still comes from the class method defined in the class body.
+
+```pyi
+from typing import Any
+
+class Meta(type):
+    @property
+    def class_method(cls) -> Any: ...
+
+class ReturnsInt(metaclass=Meta):
+    @classmethod
+    def class_method(cls) -> int: ...
+
+class ReturnsStr:
+    @classmethod
+    def class_method(cls) -> str: ...
+
+class MetaclassConflict(ReturnsInt, ReturnsStr): ...  # error: [invalid-method-override]
+```
+
+### The implicit `object` base does not repeat an existing error
+
+Every class eventually inherits from `object`. An otherwise empty base does not add another contract
+for `__str__`: `InvalidStr` receives the ordinary override error, and `Combined` receives no second
+error.
+
+```pyi
+class Empty: ...
+
+class InvalidStr:
+    def __str__(self) -> int: ...  # error: [invalid-method-override]
+
+class Combined(Empty, InvalidStr): ...
+```
+
+### Existing violations on generic parents are not repeated
+
+An invalid override on a generic parent is already reported at its definition. Specializing that
+parent and adding another base to a descendant must not report the same violation again.
+
+```toml
+[environment]
+python-version = "3.12"
+
+[rules]
+missing-type-argument = "ignore"
+```
+
+```pyi
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+
+class Base(Generic[T]):
+    def method(self, value: object) -> None: ...
+
+class Parent[U](Base):
+    def method(self, value: U) -> None: ...  # error: [invalid-method-override]
+
+class Child(Parent[str], object): ...
+```
+
+### Bases with the same name are distinguished
+
+When two bases have the same name, their qualified names make the incompatible methods clear in both
+the primary message and the definition annotations.
+
+`left.pyi`:
+
+```pyi
+class Base:
+    def method(self) -> str: ...
+```
+
+`right.pyi`:
+
+```pyi
+class Base:
+    def method(self) -> int: ...
+```
+
+`main.pyi`:
+
+```pyi
+from left import Base as LeftBase
+from right import Base as RightBase
+
+class Combined(LeftBase, RightBase): ...  # snapshot: invalid-method-override
+```
+
+```snapshot
+error[invalid-method-override]: Base classes for class `Combined` define method `method` incompatibly
+ --> src/main.pyi:4:7
+  |
+4 | class Combined(LeftBase, RightBase): ...  # snapshot: invalid-method-override
+  |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `left.Base.method` is incompatible with `right.Base.method`
+  |
+ ::: src/left.pyi:2:9
+  |
+2 |     def method(self) -> str: ...
+  |         ------ `left.Base.method` defined here
+  |
+ ::: src/right.pyi:2:9
+  |
+2 |     def method(self) -> int: ...
+  |         ------ `right.Base.method` defined here
+  |
+info: incompatible return types: `str` is not assignable to `int`
+info: This violates the Liskov Substitution Principle
+```
+
+### Inconsistent generic bases do not produce override errors
+
+The type arguments are already inconsistent, so there is no resolved generic MRO to check. The same
+is true for a descendant of the invalid class.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```pyi
+class User: ...
+class Member(User): ...
+
+class Base[T]:
+    def method(self) -> T: ...
+
+class UserBase(Base[User]): ...
+class MemberBase(UserBase, Base[Member]): ...  # error: [invalid-generic-class]
+class MemberChild(MemberBase, object): ...
+```
+
 ## The entire class hierarchy is checked
 
 If a child class's method definition is Liskov-compatible with the method definition on its parent
@@ -959,6 +1419,136 @@ class B4(A4):
     def method(self, x: int) -> int: ...
 ```
 
+## Protocol annotations on mixin receivers
+
+A mixin can annotate `self` with a protocol that the mixin itself does not implement. An override
+can keep that annotation or omit it:
+
+```pyi
+from typing import Protocol, overload
+
+class HasValue(Protocol):
+    value: int
+
+class Mixin:
+    def method(self: HasValue, argument: int) -> None: ...
+
+class SameReceiver(Mixin):
+    def method(self: HasValue, argument: int) -> None: ...
+
+class ImplicitReceiver(Mixin):
+    def method(self, argument: int) -> None: ...
+```
+
+A subclass that provides the required protocol member can call the annotated method normally:
+
+```pyi
+class ImplementsProtocol(Mixin):
+    value: int
+    def method(self: HasValue, argument: int) -> None: ...
+
+receiver: HasValue = ImplementsProtocol()
+ImplementsProtocol().method(1)
+```
+
+An override cannot require an unrelated protocol or change the type of an argument accepted by the
+mixin:
+
+```pyi
+class HasOtherValue(Protocol):
+    other_value: str
+
+class InvalidReceiver(Mixin):
+    def method(self: HasOtherValue, argument: int) -> None: ...  # error: [invalid-method-override]
+
+class InvalidArgument(Mixin):
+    value: int
+    def method(self: HasValue, argument: str) -> None: ...  # snapshot: invalid-method-override
+```
+
+```snapshot
+error[invalid-method-override]: Invalid override of method `method`
+  --> src/mdtest_snippet.pyi:28:9
+   |
+28 |     def method(self: HasValue, argument: str) -> None: ...  # snapshot: invalid-method-override
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `Mixin.method`
+   |
+  ::: src/mdtest_snippet.pyi:7:9
+   |
+ 7 |     def method(self: HasValue, argument: int) -> None: ...
+   |         --------------------------------------------- `Mixin.method` defined here
+   |
+info: parameter `argument` has an incompatible type: `int` is not assignable to `str`
+info: This violates the Liskov Substitution Principle
+```
+
+The receiver annotation can also accept more than one protocol:
+
+```pyi
+class UnionMixin:
+    def method(self: HasValue | HasOtherValue, argument: int) -> None: ...
+
+class SameUnionReceiver(UnionMixin):
+    def method(self: HasValue | HasOtherValue, argument: int) -> None: ...
+```
+
+Overloaded mixin methods need the same treatment for every receiver-specific overload:
+
+```pyi
+# TODO: We should emit an `invalid-method-override` diagnostic on the second
+# `InvalidOverloadedReceiver.method` overload. Both overload sets need to be
+# compared within the `HasValue` receiver domain instead of being filtered
+# against the concrete mixin subclass.
+class OverloadedMixin:
+    @overload
+    def method(self: HasValue, argument: int) -> None: ...
+    @overload
+    def method(self: HasValue, argument: str) -> None: ...
+
+class InvalidOverloadedReceiver(OverloadedMixin):
+    @overload
+    def method(self: HasValue, argument: int) -> None: ...
+    @overload
+    def method(self: HasValue, argument: bytes) -> None: ...
+```
+
+The protocol may include the overridden method itself. This must not cause a valid implementation to
+be rejected while checking the override:
+
+```pyi
+class Container(Protocol):
+    def __contains__(self, key: str) -> bool: ...
+    def method(self) -> None: ...
+
+class ContainerMixin:
+    def method(self: Container) -> None: ...
+
+class ImplementsContainer(ContainerMixin):
+    def __contains__(self, key: str) -> bool: ...
+    def method(self: Container) -> None: ...
+
+container: Container = ImplementsContainer()
+ImplementsContainer().method()
+```
+
+## Generic instance-method receivers
+
+An instance method can relate its receiver and return type using a bounded type variable. An
+override can express the same relationship with `Self`:
+
+```pyi
+from typing import TypeVar
+from typing_extensions import Self
+
+InstanceT = TypeVar("InstanceT", bound="InstanceBase")
+
+class InstanceBase:
+    def clone(self: InstanceT) -> InstanceT: ...
+
+class InstanceChild(InstanceBase):
+    def clone(self: Self) -> Self: ...
+```
+
 ## Generic methods on generic classes work as expected
 
 ```toml
@@ -1068,6 +1658,24 @@ class DataSub(DataSuper):
     def __post_init__(self, x: int, y: str) -> None:
         self.y = y
         super().__post_init__(x)
+```
+
+## Functions assigned in a class body
+
+A function assigned in a class body is bound as a method. It can conflict with a method definition
+in either base order.
+
+```pyi
+def returns_str(self) -> str: ...
+
+class Assigned:
+    method = returns_str
+
+class Defined:
+    def method(self) -> int: ...
+
+class AssignedFirst(Assigned, Defined): ...  # error: [invalid-method-override]
+class AssignedSecond(Defined, Assigned): ...  # error: [invalid-method-override]
 ```
 
 ## Edge case: function defined in another module and then assigned in a class body
@@ -1436,6 +2044,80 @@ error[invalid-method-override]: Invalid override of method `static_method`
    |
 info: `BadChild3B.static_method` is a classmethod but `Parent.static_method` is a staticmethod
 info: This violates the Liskov Substitution Principle
+```
+
+## Explicitly annotated classmethod receivers
+
+An explicitly annotated `cls` can specialize the class receiver and return type. A subclass can also
+replace a bounded type variable on the class receiver with `Self` while preserving compatible
+arguments:
+
+```pyi
+from typing import Any, TypeVar
+from typing_extensions import Self
+
+class Event:
+    @classmethod
+    def deserialize(cls: type[Event], data: dict[str, object]) -> Event: ...
+
+class SwapEvent(Event):
+    @classmethod
+    def deserialize(cls: type[SwapEvent], data: dict[str, object]) -> SwapEvent: ...
+
+class Context:
+    @classmethod
+    def get(cls: type[Self]) -> Self | None: ...
+
+class SettingsContext(Context):
+    @classmethod
+    def get(cls) -> SettingsContext | None: ...
+
+ItemT = TypeVar("ItemT", bound="Item")
+
+class Item:
+    @classmethod
+    def from_component(cls: type[ItemT], component: object) -> ItemT: ...
+
+class DynamicItem(Item):
+    @classmethod
+    def from_component(cls: type[Self], component: object) -> Self: ...
+```
+
+The override can also specialize a gradual parameter or accept additional keyword arguments:
+
+```pyi
+ModelT = TypeVar("ModelT", bound="BaseModel")
+
+class BaseModel:
+    @classmethod
+    def validate(cls: type[ModelT], value: Any) -> Any: ...
+    @classmethod
+    def strategy(cls: type[ModelT], *, size: int | None = None) -> Any: ...
+    @classmethod
+    def example(cls: type[ModelT], *, size: int | None = None) -> Any: ...
+
+class FrameModel(BaseModel):
+    @classmethod
+    def validate(cls: type[Self], value: int) -> Self: ...
+    @classmethod
+    def strategy(cls: type[Self], **kwargs: Any) -> Any: ...
+    @classmethod
+    def example(cls: type[Self], **kwargs: Any) -> Self: ...
+```
+
+Narrowing a non-gradual argument accepted by the superclass remains an invalid override for both
+generic and concrete class receivers:
+
+```pyi
+class InvalidDynamicItem(Item):
+    @classmethod
+    # error: [invalid-method-override]
+    def from_component(cls: type[Self], component: int) -> Self: ...
+
+class InvalidSwapEvent(Event):
+    @classmethod
+    # error: [invalid-method-override]
+    def deserialize(cls: type[InvalidSwapEvent], data: dict[str, int]) -> InvalidSwapEvent: ...
 ```
 
 ## Overloaded methods with positional-only parameters with defaults

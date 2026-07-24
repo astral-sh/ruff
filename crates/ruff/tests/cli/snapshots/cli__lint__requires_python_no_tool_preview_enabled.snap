@@ -63,6 +63,8 @@ file_resolver.include = [
 	"*.pyw",
 	"*.ipynb",
 	"**/pyproject.toml",
+	"**/ruff.toml",
+	"**/.ruff.toml",
 	"*.md",
 ]
 file_resolver.extend_include = []

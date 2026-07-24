@@ -188,7 +188,7 @@ impl<'db> SemanticModel<'db> {
         )]
         for Member { name, ty } in all_members(self.db, ty) {
             completions.push(Completion {
-                name: name.into(),
+                name: CompactString::new(name),
                 ty: Some(ty),
                 builtin,
             });
@@ -223,7 +223,7 @@ impl<'db> SemanticModel<'db> {
         all_members(self.db, ty)
             .into_iter()
             .map(|member| Completion {
-                name: member.name.into(),
+                name: CompactString::new(member.name),
                 ty: Some(member.ty),
                 builtin: false,
             })
@@ -245,7 +245,7 @@ impl<'db> SemanticModel<'db> {
             completions.extend(
                 all_reachable_members(self.db, file_scope.to_scope_id(self.db, self.file)).map(
                     |memberdef| Completion {
-                        name: memberdef.member.name.into(),
+                        name: CompactString::new(memberdef.member.name),
                         ty: Some(memberdef.member.ty),
                         builtin: false,
                     },
@@ -259,7 +259,7 @@ impl<'db> SemanticModel<'db> {
         // not `str | None`).
         completions.extend(
             all_implicit_module_globals(self.db, self.file).map(|(name, ty)| Completion {
-                name: name.into(),
+                name: CompactString::new(name),
                 ty: Some(ty),
                 builtin: true,
             }),
@@ -515,7 +515,7 @@ impl<'db> SemanticModel<'db> {
                 value_ty
                     .member_lookup_with_policy(
                         self.db,
-                        attr.attr.id.clone(),
+                        &attr.attr.id,
                         crate::types::MemberLookupPolicy::default(),
                     )
                     .qualifiers
@@ -531,6 +531,7 @@ impl<'db> SemanticModel<'db> {
     ) -> Vec<ExpectedStringLiteralCompletion<'db>> {
         struct StringLiteralCandidates;
         type StringLiteralCandidatesVisitor<'db> = CycleDetector<
+            'db,
             StringLiteralCandidates,
             Type<'db>,
             Vec<ExpectedStringLiteralCompletion<'db>>,
@@ -564,7 +565,7 @@ impl<'db> SemanticModel<'db> {
                     .flat_map(|element| collect(db, *element, visitor))
                     .collect(),
                 Type::TypeAlias(alias) => {
-                    visitor.visit(ty, || collect(db, alias.value_type(db), visitor))
+                    visitor.visit(db, ty, || collect(db, alias.value_type(db), visitor))
                 }
                 _ => Vec::new(),
             }

@@ -429,7 +429,7 @@ pub(super) fn member_lookup_for_enum_complement<'db>(
     } else {
         complement
             .remaining_literal_union(db)
-            .member_lookup_with_policy(db, name.into(), policy)
+            .member_lookup_with_policy(db, name, policy)
     }
 }
 
@@ -1152,7 +1152,7 @@ pub(crate) fn enum_metadata<'db>(
                         let dunder_get = ty
                             .member_lookup_with_policy(
                                 db,
-                                "__get__".into(),
+                                "__get__",
                                 MemberLookupPolicy::NO_INSTANCE_FALLBACK,
                             )
                             .place;

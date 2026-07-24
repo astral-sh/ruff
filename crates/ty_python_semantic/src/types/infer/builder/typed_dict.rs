@@ -1,11 +1,10 @@
 use ruff_python_ast::name::Name;
-use ruff_python_ast::{self as ast, AnyNodeRef, HasNodeIndex, NodeIndex};
+use ruff_python_ast::{self as ast, AnyNodeRef, HasNodeIndex, NodeIndex, PythonVersion};
 use rustc_hash::FxHashMap;
 use smallvec::SmallVec;
 use strum::IntoEnumIterator;
 
 use super::TypeInferenceBuilder;
-use crate::TypeQualifiers;
 use crate::types::class::{ClassLiteral, DynamicTypedDictAnchor, DynamicTypedDictLiteral};
 use crate::types::diagnostic::{
     INVALID_ARGUMENT_TYPE, INVALID_TYPE_FORM, MISSING_ARGUMENT, TOO_MANY_POSITIONAL_ARGUMENTS,
@@ -22,6 +21,7 @@ use crate::types::{
     IntersectionType, KnownClass, Type, TypeAndQualifiers, TypeContext, TypedDictModule,
     TypedDictType,
 };
+use crate::{Program, TypeQualifiers};
 use ty_python_core::definition::Definition;
 
 /// The shape of a `TypedDict` constructor call that affects how we prepare it for inference.
@@ -146,11 +146,23 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let mut total = true;
         let mut closed = false;
         let mut extra_items = None;
+        let supports_pep_728 = self.in_stub()
+            || typed_dict_module == TypedDictModule::TypingExtensions
+            || Program::get(db).python_version(db) >= PythonVersion::PY315;
 
         for kw in keywords {
             let Some(arg) = &kw.arg else {
                 continue;
             };
+
+            if !supports_pep_728
+                && matches!(&**arg, "closed" | "extra_items")
+                && let Some(builder) = self.context.report_lint(&UNKNOWN_ARGUMENT, kw)
+            {
+                builder.into_diagnostic(format_args!(
+                    "The `{arg}` parameter of `typing.TypedDict` was added in Python 3.15"
+                ));
+            }
 
             match &**arg {
                 arg_name @ ("total" | "closed") => {
@@ -254,7 +266,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
         let name = name_type
             .as_string_literal()
-            .map(|literal| Name::new(literal.value(db)));
+            .map(|literal| literal.value(db));
 
         if name.is_none()
             && !name_type.is_assignable_to(db, KnownClass::Str.to_instance(db))
@@ -269,19 +281,19 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             ));
         } else if let Some(definition) = definition
             && let Some(assigned_name) = definition.name(db)
-            && Some(assigned_name.as_str()) != name.as_deref()
+            && Some(assigned_name.as_str()) != name
         {
             report_mismatched_type_name(
                 &self.context,
                 name_arg,
                 "TypedDict",
                 &assigned_name,
-                name.as_deref(),
+                name,
                 name_type,
             );
         }
 
-        let name = name.unwrap_or_else(|| Name::new_static("<unknown>"));
+        let name = name.unwrap_or("<unknown>");
 
         self.validate_fields_arg(fields_arg);
 

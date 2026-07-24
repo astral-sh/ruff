@@ -711,9 +711,9 @@ def _(x: Sequence[int], y: object):
             reveal_type(item)  # revealed: Unknown
 
     if isinstance(x, list):
-        reveal_type(x)  # revealed: Sequence[int] & list[Unknown]
+        reveal_type(x)  # revealed: Top[list[Unknown & int]]
         for item in x:
-            reveal_type(item)  # revealed: int & Unknown
+            reveal_type(item)  # revealed: int
 ```
 
 ## Intersection where some elements are not iterable

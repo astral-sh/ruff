@@ -79,6 +79,9 @@ used by ty and cannot be used in annotations.
 # Constraints
 # -----------
 
+class ConstraintSetSolution:
+    """One solution path for a constraint set."""
+
 class ConstraintSet:
     @staticmethod
     def range(
@@ -127,6 +130,31 @@ class ConstraintSet:
         that it mentions. You must provide a tuple of the typevars that should
         be considered `inferable`. All other typevars mentioned in the
         constraint set will be considered non-inferable.
+        """
+
+    def solutions_for(
+        self,
+        typevar: TypeForm[object],
+        *,
+        inferable: TypeForm[tuple[object, ...]],
+    ) -> tuple[ConstraintSetSolution, ...] | None:
+        """
+        Returns the explicit solutions inferred for `typevar` across all paths.
+
+        `inferable` specifies all typevars that should be solved for. Every
+        solution path is preserved, with its bindings filtered to `typevar`.
+        Returns `None` if the constraint set is unsatisfiable.
+        """
+
+    def solutions(
+        self, *, inferable: TypeForm[tuple[object, ...]]
+    ) -> tuple[ConstraintSetSolution, ...] | None:
+        """
+        Returns all explicit solutions, preserving path and binding order.
+
+        `inferable` specifies all typevars that should be solved for. Each
+        solution contains the bindings inferred on one satisfying path.
+        Returns `None` if the constraint set is unsatisfiable.
         """
 
     def __bool__(self) -> bool: ...

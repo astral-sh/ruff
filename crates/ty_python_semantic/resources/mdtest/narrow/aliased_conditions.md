@@ -152,8 +152,11 @@ def _(x: int | None):
         # TODO: same as above
         reveal_type(x)  # revealed: int | None
     if y := is_none:
-        # TODO: same as above
-        reveal_type(x)  # revealed: int | None
+        reveal_type(x)  # revealed: None
+        reveal_type(y)  # revealed: Literal[True]
+    else:
+        reveal_type(x)  # revealed: int
+        reveal_type(y)  # revealed: Literal[False]
     if (lambda: is_none)():
         # TODO: same as above
         reveal_type(x)  # revealed: int | None

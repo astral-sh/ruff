@@ -402,7 +402,7 @@ fn class_attribute_write_requirement<'db>(
     let Some(members) = assignment_attribute_members(db, object_ty, attribute) else {
         return AttributeWriteRequirement::Unconstrained;
     };
-    let Some(class_attr_self_ty) = object_ty.to_instance(db) else {
+    let Some(class_attr_self_ty) = object_ty.to_instance_approximation(db) else {
         return AttributeWriteRequirement::Unconstrained;
     };
     let (type_member, receiver_fallback) = match members {
@@ -470,7 +470,7 @@ fn explicit_attribute_write_requirement<'db>(
     qualifiers: TypeQualifiers,
 ) -> ExplicitAttributeWriteRequirement<'db> {
     if let Place::Defined(DefinedPlace { ty: setter_ty, .. }) = attr_ty
-        .class_member_with_policy(db, "__set__".into(), MemberLookupPolicy::REQUIRE_CONCRETE)
+        .class_member_with_policy(db, "__set__", MemberLookupPolicy::REQUIRE_CONCRETE)
         .place
     {
         ExplicitAttributeWriteRequirement::Descriptor {
@@ -646,7 +646,7 @@ pub(super) fn assignment_attribute_members<'db>(
         ) {
         object_ty.member(db, attribute)
     } else {
-        object_ty.class_member(db, attribute.into())
+        object_ty.class_member(db, attribute)
     };
     if let Some(receiver_member) =
         class_member_preceding_non_data_metaclass_member(db, object_ty, attribute, type_member)

@@ -266,20 +266,13 @@ impl<'db> AllMembers<'db> {
                     self.extend_with_type(db, KnownClass::Type.to_instance(db));
                 }
                 _ => {
-                    if let Some(class_type) = subclass_of_type.subclass_of().into_class(db) {
-                        if let Some((class_literal, _)) = class_type.static_class_literal(db) {
-                            self.extend_with_class_members(
-                                db,
-                                ty,
-                                ClassLiteral::Static(class_literal),
-                            );
-                            self.extend_with_synthetic_members(
-                                db,
-                                ty,
-                                ClassLiteral::Static(class_literal),
-                            );
-                            self.extend_with_metaclass_members(db, ty, class_literal.metaclass(db));
-                        }
+                    if let Some(class_type) = subclass_of_type.subclass_of().into_class(db)
+                        && let Some((class_literal, _)) = class_type.static_class_literal(db)
+                    {
+                        let static_class = ClassLiteral::Static(class_literal);
+                        self.extend_with_class_members(db, ty, static_class);
+                        self.extend_with_synthetic_members(db, ty, static_class);
+                        self.extend_with_metaclass_members(db, ty, class_literal.metaclass(db));
                     }
                 }
             },
@@ -409,6 +402,7 @@ impl<'db> AllMembers<'db> {
                                     Some(
                                         KnownClass::TypeVar
                                             | KnownClass::TypeVarTuple
+                                            | KnownClass::ExtensionsTypeVarTuple
                                             | KnownClass::ParamSpec
                                             | KnownClass::UnionType
                                     )

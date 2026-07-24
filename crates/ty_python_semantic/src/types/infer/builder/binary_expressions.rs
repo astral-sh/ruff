@@ -23,7 +23,7 @@ enum BinaryExpressionOperandTypes<'db> {
 }
 
 type BinaryExpressionVisitor<'db> =
-    CycleDetector<ast::Operator, (Type<'db>, ast::Operator, Type<'db>), Option<Type<'db>>, 1>;
+    CycleDetector<'db, ast::Operator, (Type<'db>, ast::Operator, Type<'db>), Option<Type<'db>>, 1>;
 
 impl<'db> TypeInferenceBuilder<'db, '_> {
     pub(super) fn infer_binary_expression(
@@ -343,7 +343,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 )
             }),
 
-            (Type::TypeAlias(alias), rhs, _) => visitor.visit((left_ty, op, right_ty), || {
+            (Type::TypeAlias(alias), rhs, _) => visitor.visit(db, (left_ty, op, right_ty), || {
                 self.infer_binary_expression_type_impl(
                     node,
                     emitted_division_by_zero_diagnostic,
@@ -354,7 +354,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 )
             }),
 
-            (lhs, Type::TypeAlias(alias), _) => visitor.visit((left_ty, op, right_ty), || {
+            (lhs, Type::TypeAlias(alias), _) => visitor.visit(db, (left_ty, op, right_ty), || {
                 self.infer_binary_expression_type_impl(
                     node,
                     emitted_division_by_zero_diagnostic,
@@ -526,26 +526,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 })
             }
 
-            (
-                todo @ Type::Dynamic(
-                    DynamicType::Todo(_)
-                    | DynamicType::TodoUnpack
-                    | DynamicType::TodoStarredExpression
-                    | DynamicType::TodoTypeVarTuple,
-                ),
-                _,
-                _,
-            )
-            | (
-                _,
-                todo @ Type::Dynamic(
-                    DynamicType::Todo(_)
-                    | DynamicType::TodoUnpack
-                    | DynamicType::TodoStarredExpression
-                    | DynamicType::TodoTypeVarTuple,
-                ),
-                _,
-            ) => Some(todo),
+            (todo @ Type::Dynamic(DynamicType::Todo(_)), _, _)
+            | (_, todo @ Type::Dynamic(DynamicType::Todo(_)), _) => Some(todo),
 
             (Type::Never, _, _) | (_, Type::Never, _) => Some(Type::Never),
 

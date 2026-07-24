@@ -80,8 +80,11 @@ bitflags::bitflags! {
     /// Metadata for expressions inferred as type expressions.
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
     pub(crate) struct TypeExpressionFlags: u8 {
-        /// The expression is syntactically an `Unpack[...]` type expression.
+        /// The expression syntactically unpacks a type using either `Unpack[...]` or `*...`.
         const UNPACK = 1 << 0;
+
+        /// The operand of an `Unpack[...]` expression is neither a tuple nor a `TypeVarTuple`.
+        const INVALID_UNPACK = 1 << 1;
     }
 }
 
@@ -1873,13 +1876,16 @@ bitflags::bitflags! {
         /// Whether we're in a context where `Unpack` can be legal.
         const IN_VALID_UNPACK_CONTEXT = 1 << 10;
 
+        /// Whether to disable the `int`/`float` special case in a type expression.
+        const DISABLE_INT_FLOAT_SPECIAL_CASE = 1 << 11;
+
         /// Whether the visitor is currently visiting a type expression.
         const IN_TYPE_EXPRESSION = 1 << 12;
 
         /// Whether the visitor is currently visiting a nested position in a type expression.
         const IN_NESTED_TYPE_EXPRESSION = 1 << 13;
 
-        /// Whether the visitor is currently visiting the argument to `Unpack[...]`.
+        /// Whether the visitor is currently visiting the argument to `Unpack[...]` or `*`.
         const IN_UNPACK_TYPE_ARGUMENT = 1 << 14;
     }
 }

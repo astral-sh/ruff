@@ -1278,9 +1278,10 @@ def builtin_positional_pattern_refines_subject_alias(value: bool) -> Literal[Tru
 ## Overlapping class patterns
 
 Two unrelated non-final classes can have a common subclass through multiple inheritance. The
-successful pattern therefore preserves both class types. Attributes from both bases remain possible,
-even when one annotation is broader than the other. For a generic pattern class whose type arguments
-are not known from the subject, its attributes use `Unknown`.
+successful pattern therefore preserves both class types. Attributes defined on both classes use the
+intersection of their declared types, consistent with ordinary attribute access on an intersection.
+For a generic pattern class whose type arguments are not known from the subject, its attributes use
+`Unknown`.
 
 ```py
 from typing import Generic, TypeVar
@@ -1310,14 +1311,14 @@ class CompatibleOverlapMemberA:
     member: object = "x"
 
 class CompatibleOverlapMemberB:
-    member: int = 1
+    member: int | str = 1
 
-def test_match_class_capture_combines_overlapping_member_types(
+def match_class_capture_intersects_overlapping_member_types(
     value: OverlapMemberA,
 ) -> None:
     match value:
         case OverlapMemberB(member=item):
-            reveal_type(item)  # revealed: int | str
+            reveal_type(item)  # revealed: Never
 
 def test_match_class_capture_preserves_compatible_overlapping_member_types(
     value: CompatibleOverlapMemberA,
@@ -1325,6 +1326,27 @@ def test_match_class_capture_preserves_compatible_overlapping_member_types(
     match value:
         case CompatibleOverlapMemberB(member=str() as item):
             reveal_type(item)  # revealed: str
+
+class OverlapAParams:
+    a: str
+
+class OverlapBParams:
+    b: str
+
+class OverlapEventA:
+    params: OverlapAParams
+
+class OverlapEventB:
+    params: OverlapBParams
+
+def match_class_capture_filters_overlapping_union_members(
+    event: OverlapEventA | OverlapEventB,
+) -> None:
+    match event:
+        case OverlapEventA(params=params):
+            reveal_type(event)  # revealed: OverlapEventA
+            reveal_type(params)  # revealed: OverlapAParams
+            params.a
 
 class GenericOverlapA:
     member: int
@@ -1347,7 +1369,7 @@ def test_match_generic_class_capture_preserves_possible_multiple_inheritance(
 ) -> None:
     match value:
         case GenericOverlapB(member=str() as item):
-            reveal_type(item)  # revealed: str
+            reveal_type(item)  # revealed: Unknown & str
 
 def test_match_generic_container_member_keeps_loop_reachable(
     value: GenericListOverlapA,
@@ -2843,6 +2865,31 @@ def custom_comparison_pattern(value: str | AlwaysEqual):
             reveal_type(value)  # revealed: Literal["a"] | AlwaysEqual
 ```
 
+Classes that inherit identity-based equality can still compare equal when one is a subclass of the
+other, or when they can share a subclass through multiple inheritance:
+
+```py
+class Base: ...
+class Child(Base): ...
+class Left: ...
+class Right: ...
+class Shared(Left, Right): ...
+
+class Values:
+    CHILD = Child()
+    RIGHT = Right()
+
+def inherited_pattern(value: Base | None):
+    match value:
+        case Values.CHILD:
+            reveal_type(value)  # revealed: Base
+
+def overlapping_pattern(value: Left | None):
+    match value:
+        case Values.RIGHT:
+            reveal_type(value)  # revealed: Left
+```
+
 Consider the following example.
 
 ```py
@@ -2860,7 +2907,7 @@ def _(x: Literal["foo"] | int):
 
 In the first `match`, the broad `int` arm is assumed to use builtin equality and cannot compare
 equal to `"foo"`. In the second, neither arm can compare equal to `"bar"`. Enabling
-`strict-literal-narrowing` disables this optimistic treatment of broad builtin types.
+`strict-equality-semantics` disables this optimistic treatment of broad builtin types.
 
 A final subclass with inherited builtin equality can compare equal to a literal despite being
 disjoint from the literal's type. This applies both to literal patterns and dotted value patterns:
@@ -2993,6 +3040,7 @@ python-version = "3.11"
 ```py
 from enum import Enum, IntEnum, StrEnum, auto
 from typing import Literal, assert_never
+from ty_extensions import Unknown
 
 class Color(StrEnum):
     RED = "r"
@@ -3090,6 +3138,86 @@ def many_cross_enum_cases(value: Warning | Verdict) -> None:
             return
         case _:
             reveal_type(value)  # revealed: Warning | Literal[Verdict.V8, Verdict.V9, Verdict.V10, Verdict.V11]
+
+class EventType(StrEnum):
+    A00 = "event.00"
+    A01 = "event.01"
+    A02 = "event.02"
+    A03 = "event.03"
+    A04 = "event.04"
+    A05 = "event.05"
+    A06 = "event.06"
+    A07 = "event.07"
+    A08 = "event.08"
+    A09 = "event.09"
+    A10 = "event.10"
+    A11 = "event.11"
+    A12 = "event.12"
+    A13 = "event.13"
+    A14 = "event.14"
+    A15 = "event.15"
+    A16 = "event.16"
+    A17 = "event.17"
+    A18 = "event.18"
+    A19 = "event.19"
+    A20 = "event.20"
+    A21 = "event.21"
+    A22 = "event.22"
+    A23 = "event.23"
+
+def many_enum_value_patterns_with_dynamic_optional_subject(event: dict[str, Unknown]) -> str:
+    event_type = event.get("type")
+    match event_type:
+        case EventType.A00:
+            return "00"
+        case EventType.A01:
+            return "01"
+        case EventType.A02:
+            return "02"
+        case EventType.A03:
+            return "03"
+        case EventType.A04:
+            return "04"
+        case EventType.A05:
+            return "05"
+        case EventType.A06:
+            return "06"
+        case EventType.A07:
+            return "07"
+        case EventType.A08:
+            return "08"
+        case EventType.A09:
+            return "09"
+        case EventType.A10:
+            return "10"
+        case EventType.A11:
+            return "11"
+        case EventType.A12:
+            return "12"
+        case EventType.A13:
+            return "13"
+        case EventType.A14:
+            return "14"
+        case EventType.A15:
+            return "15"
+        case EventType.A16:
+            return "16"
+        case EventType.A17:
+            return "17"
+        case EventType.A18:
+            return "18"
+        case EventType.A19:
+            return "19"
+        case EventType.A20:
+            return "20"
+        case EventType.A21:
+            return "21"
+        case EventType.A22:
+            return "22"
+        case EventType.A23:
+            return "23"
+        case _:
+            return f"unknown: {event_type}"
 
 class Automatic(StrEnum):
     GENERATED = auto()

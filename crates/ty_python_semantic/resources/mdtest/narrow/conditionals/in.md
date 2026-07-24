@@ -44,6 +44,22 @@ def from_dict(value: str, valid_values: dict[MyType, int]) -> int | None:
     return None
 ```
 
+Explicitly annotated literals remain unpromotable through membership narrowing and inferred instance
+attributes:
+
+```py
+from typing import Literal
+
+class Backend:
+    def connect(self, mode: Literal["streaming", "batch"]) -> None:
+        if mode not in ("batch", "streaming"):
+            return
+        self._mode = mode
+
+    def mode(self) -> Literal["streaming", "batch"]:
+        return self._mode
+```
+
 ```py
 from typing import Literal
 
@@ -66,6 +82,84 @@ def _(x: Literal["a", "b", "c", 1]):
         reveal_type(x)  # revealed: Literal["a", "b", "c"]
     else:
         reveal_type(x)  # revealed: Literal[1]
+```
+
+## `in` for inline list and set literals
+
+Inline list and set literals are consumed immediately, so membership can use their precise element
+types without promoting them as mutable containers.
+
+```py
+from typing import Literal
+from typing_extensions import assert_never
+
+Choice = Literal["a", "b", "c"]
+
+def inline_list(value: Choice):
+    if value in ["a", "b"]:
+        reveal_type(value)  # revealed: Literal["a", "b"]
+    else:
+        reveal_type(value)  # revealed: Literal["c"]
+
+    if value not in ["a", "b"]:
+        reveal_type(value)  # revealed: Literal["c"]
+    else:
+        reveal_type(value)  # revealed: Literal["a", "b"]
+
+def inline_set(value: Choice):
+    if value in {"a", "b"}:
+        reveal_type(value)  # revealed: Literal["a", "b"]
+    else:
+        reveal_type(value)  # revealed: Literal["c"]
+
+    if value not in {"a", "b"}:
+        reveal_type(value)  # revealed: Literal["c"]
+    else:
+        reveal_type(value)  # revealed: Literal["a", "b"]
+
+def literal_locals(value: Choice):
+    a = "a"
+    b = "b"
+    if value in [a, b]:
+        reveal_type(value)  # revealed: Literal["a", "b"]
+    else:
+        reveal_type(value)  # revealed: Literal["c"]
+
+    if value in {a, b}:
+        reveal_type(value)  # revealed: Literal["a", "b"]
+    else:
+        reveal_type(value)  # revealed: Literal["c"]
+
+def mixed_literals(value: Literal["a", "b", 1, 2, b"x"] | None):
+    if value in ["a", 1, b"x", None]:
+        reveal_type(value)  # revealed: Literal["a", 1, b"x"] | None
+    else:
+        reveal_type(value)  # revealed: Literal["b", 2]
+
+    if value in {"a", 1, b"x", None}:
+        reveal_type(value)  # revealed: Literal["a", 1, b"x"] | None
+    else:
+        reveal_type(value)  # revealed: Literal["b", 2]
+
+def union_valued_slots(value: Choice, a: Literal["a", "b"], b: Literal["a", "b"]):
+    if value not in [a, b]:
+        reveal_type(value)  # revealed: Literal["a", "b", "c"]
+    if value not in {a, b}:
+        reveal_type(value)  # revealed: Literal["a", "b", "c"]
+
+def exhaustive_list(value: Choice):
+    if value in ["a", "b"]:
+        return
+    if value == "c":
+        return
+    assert_never(value)
+
+def exhaustive_set(value: Choice):
+    if value in {"a", "b"}:
+        return
+    if value == "c":
+        return
+    assert_never(value)
 ```
 
 ## `in` for PEP 695 aliases
@@ -123,17 +217,18 @@ def _(x: Foo):
         reveal_type(x)  # revealed: Literal["a", "c"]
 ```
 
-## Enabling strict literal narrowing for membership
+## Enabling strict equality narrowing for membership
 
-With strict literal narrowing enabled, a broad union arm is preserved when a membership test
-succeeds, while literal arms are still narrowed safely:
+With strict equality narrowing enabled, a broad union arm and a broad element type are preserved
+when a membership test succeeds, while literal arms are still narrowed safely. Tuple elements are
+also preserved because their subclasses can override equality:
 
 ```toml
 [environment]
 python-version = "3.12"
 
 [analysis]
-strict-literal-narrowing = true
+strict-equality-semantics = true
 ```
 
 ```py
@@ -144,6 +239,34 @@ type Foo = Literal["a", "b", "c"] | int
 def _(x: Foo):
     if x in ("a", "b"):
         reveal_type(x)  # revealed: Literal["a", "b"] | int
+
+def inline_list(x: str):
+    if x in ["a", "b"]:
+        reveal_type(x)  # revealed: str
+    else:
+        reveal_type(x)  # revealed: str & ~Literal["a"] & ~Literal["b"]
+
+def inline_set(x: str):
+    if x in {"a", "b"}:
+        reveal_type(x)  # revealed: str
+    else:
+        reveal_type(x)  # revealed: str & ~Literal["a"] & ~Literal["b"]
+
+class Bar: ...
+
+def broad_element(x: Bar | None, values: list[Bar]):
+    if x in values:
+        reveal_type(x)  # revealed: Bar | None
+
+class EqualTuple(tuple[int, ...]):
+    def __eq__(self, other: object) -> bool:
+        return True
+
+def broad_tuple_element(x: Bar | None, value: tuple[int, ...], values: list[tuple[int, ...]]):
+    if x in [value]:
+        reveal_type(x)  # revealed: Bar | None
+    if x in values:
+        reveal_type(x)  # revealed: Bar | None
 ```
 
 ## `in` for `str` and literal strings
@@ -240,6 +363,21 @@ def union_literal_haystack(x: Literal["a", "ab", "z"], flag: bool):
         reveal_type(x)  # revealed: Literal["a", "ab"]
     else:
         reveal_type(x)  # revealed: Literal["a", "ab", "z"]
+
+def literal_union_haystack(x: Literal["abc", "def"]):
+    if "a" in x:
+        # `x` could also be validly narrowed to `Literal["abc"]` here:
+        reveal_type(x)  # revealed: Literal["abc", "def"]
+    else:
+        # `x` could also be validly narrowed to `Literal["def"]` here:
+        reveal_type(x)  # revealed: Literal["abc", "def"]
+
+    if "a" not in x:
+        # `x` could also be validly narrowed to `Literal["def"]` here:
+        reveal_type(x)  # revealed: Literal["abc", "def"]
+    else:
+        # `x` could also be validly narrowed to `Literal["abc"]` here:
+        reveal_type(x)  # revealed: Literal["abc", "def"]
 
 def mixed_literal_union_haystack(
     x: Literal["a", "z", "missing"],
@@ -358,7 +496,7 @@ def broad_element_type(x: str | None, values: dict[str, int]):
 def broad_element_type_with_unknown(values: dict[str, int]):
     x = [None][0]
     if x in values:
-        reveal_type(x)  # revealed: Unknown
+        reveal_type(x)  # revealed: Unknown & ~None
     else:
         reveal_type(x)  # revealed: None | Unknown
 ```
@@ -486,6 +624,56 @@ compare equal to any item in the container. A `TypedDict` cannot compare equal t
 final class with the default identity-based equality cannot compare equal to an integer. We retain
 types such as `int` and classes with custom equality when they might still match an item.
 
+A non-final element type is assumed not to have a subclass that overrides equality, so membership
+can remove `None` just as an equality check does. Different classes can still compare equal by
+identity, however, if one inherits from the other or they share a subclass through multiple
+inheritance. Membership must preserve these overlapping class types:
+
+```py
+class Foo: ...
+
+def equality_and_membership(x: Foo | None, y: Foo, values: list[Foo]):
+    if x == y:
+        reveal_type(x)  # revealed: Foo
+    if x in [y]:
+        reveal_type(x)  # revealed: Foo
+    if x in values:
+        reveal_type(x)  # revealed: Foo
+
+class Base: ...
+class Child(Base): ...
+
+def inherited_membership(x: Base | None, y: Child, values: list[Child]):
+    if x in [y]:
+        reveal_type(x)  # revealed: Base
+    if x in values:
+        reveal_type(x)  # revealed: Base
+
+class Left: ...
+class Right: ...
+class Shared(Left, Right): ...
+
+def overlapping_membership(x: Left | None, y: Right, values: list[Right]):
+    if x in [y]:
+        reveal_type(x)  # revealed: Left
+    if x in values:
+        reveal_type(x)  # revealed: Left
+
+def builtin_equality_and_membership(x: str | None, y: str, values: list[str]):
+    if x == y:
+        reveal_type(x)  # revealed: str
+    if x in [y]:
+        reveal_type(x)  # revealed: str
+    if x in values:
+        reveal_type(x)  # revealed: str
+
+class C: ...
+
+def broad_union_membership(origin: C | int):
+    if origin in ("x",):
+        reveal_type(origin)  # revealed: Never
+```
+
 ```py
 from typing import Literal, TypedDict, final
 
@@ -510,7 +698,7 @@ def default_equality(x: Token | Literal[1]):
 
 def overlapping_union_member(x: int | Literal["missing"]):
     if x in ("missing", 1):
-        reveal_type(x)  # revealed: Literal["missing", 1, True]
+        reveal_type(x)  # revealed: Literal[1, True, "missing"]
 
 def custom_equality(x: AlwaysEqual | Literal[1]):
     if x in (1,):
@@ -988,34 +1176,28 @@ def range_membership(value: Literal["x", 1], values: range) -> None:
 
 ## `TypedDict` key membership
 
-Membership in a `TypedDict` checks its string keys, so the tested value can be narrowed to a
-possible key. We do not apply key-based narrowing to arbitrary values, because `in` may test
-substrings or elements instead:
+Membership in a closed `TypedDict` checks its finite set of literal string keys, so the tested value
+can be narrowed to a possible key. An open `TypedDict` can contain arbitrary additional string keys:
 
 ```py
-from typing import Literal, TypedDict
+from typing import Literal
+from typing_extensions import TypedDict
 
-class Values(TypedDict):
+class ClosedValues(TypedDict, closed=True):
     present: int
+    other: str
 
-def typed_dict_container(value: Literal["present", 1], values: Values) -> None:
+class OpenValues(TypedDict):
+    present: int
+    other: str
+
+def closed_typed_dict_container(value: Literal["present", "other", "missing", 1], values: ClosedValues) -> None:
     if value in values:
-        reveal_type(value)  # revealed: Literal["present"]
+        reveal_type(value)  # revealed: Literal["present", "other"]
 
-def f(x: Literal["abc", "def"]):
-    if "a" in x:
-        # `x` could also be validly narrowed to `Literal["abc"]` here:
-        reveal_type(x)  # revealed: Literal["abc", "def"]
-    else:
-        # `x` could also be validly narrowed to `Literal["def"]` here:
-        reveal_type(x)  # revealed: Literal["abc", "def"]
-
-    if "a" not in x:
-        # `x` could also be validly narrowed to `Literal["def"]` here:
-        reveal_type(x)  # revealed: Literal["abc", "def"]
-    else:
-        # `x` could also be validly narrowed to `Literal["abc"]` here:
-        reveal_type(x)  # revealed: Literal["abc", "def"]
+def open_typed_dict_container(value: Literal["present", "other", "missing", 1], values: OpenValues) -> None:
+    if value in values:
+        reveal_type(value)  # revealed: Literal["present", "other", "missing"]
 ```
 
 ## bool
@@ -1081,7 +1263,7 @@ def after_excluding_red_mixed(x: Color | int):
     if x is Color.RED:
         return
     if x in (Color.GREEN,):
-        reveal_type(x)  # revealed: Literal[Color.GREEN] | int
+        reveal_type(x)  # revealed: Literal[Color.GREEN]
     else:
         reveal_type(x)  # revealed: Literal[Color.BLUE] | int
 ```
@@ -1138,9 +1320,7 @@ class Status(Enum):
 
 def test(x: Status | int):
     if x in (Status.PENDING, Status.APPROVED):
-        # int is included because custom __eq__ methods could make
-        # an int equal to Status.PENDING or Status.APPROVED, so we can't eliminate it
-        reveal_type(x)  # revealed: Literal[Status.PENDING, Status.APPROVED] | int
+        reveal_type(x)  # revealed: Literal[Status.PENDING, Status.APPROVED]
     else:
         reveal_type(x)  # revealed: Literal[Status.REJECTED] | int
 ```

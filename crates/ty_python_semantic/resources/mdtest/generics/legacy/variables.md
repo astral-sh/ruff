@@ -765,10 +765,7 @@ reveal_type(f(B()))  # revealed: B
 reveal_type(g(C()))  # revealed: C
 reveal_type(g(D()))  # revealed: D
 
-# TODO: one diagnostic would probably be sufficient here...?
-#
 # error: [invalid-argument-type] "Argument type `C` does not satisfy upper bound `A` of type variable `T`"
-# error: [invalid-argument-type] "Argument to function `f` is incorrect: Expected `B`, found `C`"
 reveal_type(f(C()))  # revealed: B
 
 # error: [invalid-argument-type]

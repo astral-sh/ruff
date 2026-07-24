@@ -630,6 +630,134 @@ def _(x: C):
     reveal_type(x)  # revealed: () -> C | None
 ```
 
+### Growing recursive alias relations without unions
+
+```py
+from ty_extensions import static_assert
+from ty_extensions._internal import is_subtype_of
+
+type Left[T] = tuple[Left[list[T]]]
+type Right[T] = tuple[Right[list[T]]]
+
+# TODO: Left[int] should be equivalent to (subtype of) Right[int]
+static_assert(not is_subtype_of(Left[int], Right[int]))
+
+type Box[T] = list[T]
+type WrappedLeft[T] = tuple[Box[Box[WrappedLeft[list[T]]]]]
+type WrappedRight[T] = tuple[Box[Box[WrappedRight[list[T]]]]]
+
+# A repeated non-recursive alias must not hide the recursive reference in its type arguments.
+# TODO: WrappedLeft[int] should be equivalent to (subtype of) WrappedRight[int]
+static_assert(not is_subtype_of(WrappedLeft[int], WrappedRight[int]))
+```
+
+### Non-recursive nested generic aliases
+
+A repeated use of the same generic alias can be a finite alias application instead of recursion.
+
+```py
+from typing import Literal
+
+from ty_extensions import static_assert
+from ty_extensions._internal import is_subtype_of
+
+type NonRecursiveId[T] = T
+
+static_assert(is_subtype_of(NonRecursiveId[NonRecursiveId[int]], int))
+static_assert(not is_subtype_of(NonRecursiveId[NonRecursiveId[int]], str))
+
+truth: NonRecursiveId[NonRecursiveId[Literal[True]]] = True
+static_assert(truth)
+
+one: NonRecursiveId[NonRecursiveId[Literal[1]]] = 1
+reveal_type(one + 1)  # revealed: Literal[2]
+reveal_type(one == 1)  # revealed: Literal[True]
+
+def nested_union(
+    value: list[NonRecursiveId[NonRecursiveId[int]]] | list[int],
+):
+    reveal_type(value)  # revealed: list[NonRecursiveId[NonRecursiveId[int]]]
+
+# A finite nested application can also be hidden behind another named alias.
+type Intermediate[T] = T
+type LeftIntAlias = NonRecursiveId[int]
+type RightIntAlias = NonRecursiveId[int]
+
+def finite_alias_chain(x: NonRecursiveId[Intermediate[NonRecursiveId[int]]]):
+    reveal_type(x + 1)  # revealed: int
+    reveal_type(x == 1)  # revealed: bool
+    # error: [invalid-assignment]
+    invalid: str = x
+
+def equivalent_finite_aliases(x: NonRecursiveId[LeftIntAlias]):
+    valid: NonRecursiveId[RightIntAlias] = x
+
+type IntAlias = int
+
+def unchanged_alias_pair(x: NonRecursiveId[NonRecursiveId[bool]]):
+    # `bool` is a subtype of `int`. The unchanged target alias must not cause the finite source
+    # expansion to be treated as recursive.
+    valid: IntAlias = x
+
+type NoneAlias = NonRecursiveId[None]
+type NestedNoneAlias = NonRecursiveId[NoneAlias]
+
+def finite_alias_union(x: NonRecursiveId[NestedNoneAlias], condition: bool):
+    reveal_type(x if condition else 1)  # revealed: None | Literal[1]
+```
+
+### Generic self-recursive aliases with deeper specializations
+
+Regression test for <https://github.com/astral-sh/ty/issues/3452>.
+
+A recursive alias may refer to itself with a more deeply nested specialization. This should still
+terminate and preserve the alias at the recursive position.
+
+```py
+from typing import Callable, Concatenate
+
+type Recursive[T] = int | Recursive[list[T]]
+
+def _(value: Recursive[int]):
+    reveal_type(value + 1)  # revealed: int
+    reveal_type(1 + value)  # revealed: int
+
+type RecursiveParamspec[**P] = Callable[[], RecursiveParamspec[Concatenate[int, P]]]
+
+def paramspec_alias(func: RecursiveParamspec):
+    reveal_type(func)  # revealed: () -> RecursiveParamspec[(int, /, *args: Unknown, **kwargs: Unknown)]
+
+type RecursiveCallable[T] = Callable[[RecursiveCallable[T]], RecursiveCallable[T | RecursiveCallable[T]]]
+
+def callable_alias(x: RecursiveCallable[int]):
+    reveal_type(x)  # revealed: (RecursiveCallable[int], /) -> RecursiveCallable[int | RecursiveCallable[int]]
+
+type GrowingList[T] = list[GrowingList[T | GrowingList[T]]]
+
+def growing_list(x: GrowingList[int]):
+    reveal_type(x)  # revealed: list[GrowingList[int | GrowingList[int]]]
+
+type GrowingCallable[T] = Callable[[], GrowingCallable[T | GrowingCallable[T]] | None]
+
+def growing_callable(x: GrowingCallable[int]):
+    # revealed: (() -> GrowingCallable[int | GrowingCallable[int] | GrowingCallable[int | GrowingCallable[int]]] | None) | None
+    reveal_type(x())
+```
+
+Non-growing recursive aliases should continue to preserve distinct specializations.
+
+```py
+type StableWrapped[T] = list[StableWrapped[T]]
+
+def stable_wrapped(x: StableWrapped[int], y: StableWrapped[str]):
+    reveal_type(x)  # revealed: list[StableWrapped[int]]
+    reveal_type(y)  # revealed: list[StableWrapped[str]]
+    # error: [invalid-assignment] "Object of type `StableWrapped[str]` is not assignable to `StableWrapped[int]`"
+    x = y
+    # error: [invalid-assignment] "Object of type `StableWrapped[int]` is not assignable to `StableWrapped[str]`"
+    y = x
+```
+
 ### Subtyping of materializations of cyclic aliases
 
 ```py

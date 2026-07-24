@@ -6,6 +6,7 @@ mod fixes;
 mod python_environment;
 mod rule;
 mod rule_selection;
+mod scripts;
 
 use anyhow::Context as _;
 use insta::Settings;

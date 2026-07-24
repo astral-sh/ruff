@@ -411,7 +411,7 @@ impl<'db> EnumValueSet<'db> {
                     Type::EnumComplement(EnumComplementType::new(
                         db,
                         self.enum_class,
-                        complement.excluded_names(db).clone(),
+                        complement.excluded_names(db),
                         FxOrderSet::default(),
                     ))
                 }
@@ -445,11 +445,7 @@ impl<'db> EnumValueSet<'db> {
     }
 
     fn member_type(&self, db: &'db dyn Db, name: &Name, promotable: bool) -> Type<'db> {
-        LiteralValueType::new(
-            EnumLiteralType::new(db, self.enum_class, name.clone()),
-            promotable,
-        )
-        .into()
+        LiteralValueType::new(EnumLiteralType::new(db, self.enum_class, name), promotable).into()
     }
 }
 
@@ -809,7 +805,7 @@ fn enum_class_key_profile<'db>(
             (
                 name.clone(),
                 semantics.and_then(|semantics| {
-                    enum_literal_value(db, EnumLiteralType::new(db, enum_class, name.clone()))
+                    enum_literal_value(db, EnumLiteralType::new(db, enum_class, name))
                         .and_then(|value| enum_comparison_key(semantics, value))
                 }),
             )

@@ -70,12 +70,7 @@ impl<'db> ClassBase<'db> {
                 | DynamicType::AmbiguousOverload,
             ) => "Unknown",
             ClassBase::Dynamic(DynamicType::UnspecializedTypeVar) => "UnspecializedTypeVar",
-            ClassBase::Dynamic(
-                DynamicType::Todo(_)
-                | DynamicType::TodoUnpack
-                | DynamicType::TodoStarredExpression
-                | DynamicType::TodoTypeVarTuple,
-            ) => "@Todo",
+            ClassBase::Dynamic(DynamicType::Todo(_)) => "@Todo",
             ClassBase::Divergent(_) => "Divergent",
             ClassBase::Protocol => "Protocol",
             ClassBase::Generic => "Generic",
@@ -233,6 +228,7 @@ impl<'db> ClassBase<'db> {
                 | KnownInstanceType::Deprecated(_)
                 | KnownInstanceType::Field(_)
                 | KnownInstanceType::ConstraintSet(_)
+                | KnownInstanceType::ConstraintSetSolution(_)
                 | KnownInstanceType::Callable(_)
                 | KnownInstanceType::GenericContext(_)
                 | KnownInstanceType::Specialization(_)

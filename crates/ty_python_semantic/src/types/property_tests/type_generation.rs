@@ -142,7 +142,7 @@ fn create_bound_method<'db>(
     Type::BoundMethod(BoundMethodType::new(
         db,
         function.expect_function_literal(),
-        builtins_class.to_instance(db).unwrap(),
+        builtins_class.to_instance_approximation(db).unwrap(),
     ))
 }
 
@@ -182,12 +182,12 @@ impl Ty {
             Ty::BuiltinInstance(s) => builtins_symbol(db, s)
                 .place
                 .expect_type()
-                .to_instance(db)
+                .to_instance_approximation(db)
                 .unwrap(),
             Ty::AbcInstance(s) => known_module_symbol(db, KnownModule::Abc, s)
                 .place
                 .expect_type()
-                .to_instance(db)
+                .to_instance_approximation(db)
                 .unwrap(),
             Ty::AbcClassLiteral(s) => known_module_symbol(db, KnownModule::Abc, s)
                 .place
@@ -197,7 +197,7 @@ impl Ty {
                 .expect_type(),
             Ty::UnittestMockInstance => Ty::UnittestMockLiteral
                 .into_type(db)
-                .to_instance(db)
+                .to_instance_approximation(db)
                 .unwrap(),
             Ty::TypingLiteral => Type::SpecialForm(SpecialFormType::Literal),
             Ty::BuiltinClassLiteral(s) => builtins_symbol(db, s).place.expect_type(),
@@ -505,11 +505,7 @@ fn arbitrary_parameter_list(g: &mut Gen, size: u32, fully_static: bool) -> Vec<P
 }
 
 fn arbitrary_optional_type(g: &mut Gen, size: u32, fully_static: bool) -> Option<Ty> {
-    match u32::arbitrary(g) % 2 {
-        0 => None,
-        1 => Some(arbitrary_type(g, size, fully_static)),
-        _ => unreachable!(),
-    }
+    bool::arbitrary(g).then(|| arbitrary_type(g, size, fully_static))
 }
 
 fn arbitrary_name(g: &mut Gen) -> Name {
@@ -517,11 +513,7 @@ fn arbitrary_name(g: &mut Gen) -> Name {
 }
 
 fn arbitrary_optional_name(g: &mut Gen) -> Option<Name> {
-    match u32::arbitrary(g) % 2 {
-        0 => None,
-        1 => Some(arbitrary_name(g)),
-        _ => unreachable!(),
-    }
+    bool::arbitrary(g).then(|| arbitrary_name(g))
 }
 
 impl Arbitrary for Ty {

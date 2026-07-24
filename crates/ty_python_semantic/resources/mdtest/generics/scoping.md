@@ -289,6 +289,30 @@ def f[T](x: T, y: T) -> None:
     def bad[T](a: T, b: T) -> None: ...
 ```
 
+### Generic TypeVarTuple within generic function
+
+```py
+def outer[*Ts](*args: *Ts) -> None:
+    def ok[*Us](*ok_args: *Us) -> None: ...
+
+    # snapshot: shadowed-type-variable
+    def bad[*Ts](*bad_args: *Ts) -> None: ...
+```
+
+```snapshot
+error[shadowed-type-variable]: Generic function `bad` uses TypeVarTuple `Ts` already bound by an enclosing scope
+ --> src/mdtest_snippet.py:5:9
+  |
+5 |     def bad[*Ts](*bad_args: *Ts) -> None: ...
+  |         ^^^ `Ts` used in function definition here
+  |
+ ::: src/mdtest_snippet.py:1:5
+  |
+1 | def outer[*Ts](*args: *Ts) -> None:
+  |     ------------------------------ TypeVarTuple `Ts` is bound in this enclosing scope
+  |
+```
+
 ### Generic method within generic class
 
 <!-- snapshot-diagnostics -->

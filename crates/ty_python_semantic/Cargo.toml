@@ -1,6 +1,6 @@
 [package]
 name = "ty_python_semantic"
-version = "0.0.4"
+version = "0.0.5"
 description = "This is an internal component crate of Ruff"
 authors = { workspace = true }
 edition = { workspace = true }
@@ -26,8 +26,10 @@ ruff_text_size = { workspace = true }
 ty_module_resolver = { workspace = true }
 ty_site_packages = { workspace = true }
 ty_python_core = { workspace = true }
+ty_static = { workspace = true }
 
 bitflags = { workspace = true }
+char_str = { workspace = true }
 compact_str = { workspace = true }
 drop_bomb = { workspace = true }
 get-size2 = { workspace = true, features = ["indexmap", "ordermap"] }

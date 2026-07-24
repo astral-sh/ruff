@@ -13,51 +13,52 @@ authors = ["Charlie Marsh <charlie.r.marsh@gmail.com>"]
 license = "MIT"
 
 [workspace.dependencies]
-ruff = { version = "0.15.21", path = "crates/ruff" }
-ruff_annotate_snippets = { version = "0.0.4", path = "crates/ruff_annotate_snippets" }
-ruff_cache = { version = "0.0.4", path = "crates/ruff_cache" }
-ruff_db = { version = "0.0.4", path = "crates/ruff_db", default-features = false }
-ruff_diagnostics = { version = "0.0.4", path = "crates/ruff_diagnostics" }
-ruff_formatter = { version = "0.0.4", path = "crates/ruff_formatter" }
-ruff_graph = { version = "0.0.4", path = "crates/ruff_graph" }
-ruff_index = { version = "0.0.4", path = "crates/ruff_index" }
-ruff_linter = { version = "0.15.21", path = "crates/ruff_linter" }
-ruff_macros = { version = "0.0.4", path = "crates/ruff_macros" }
-ruff_markdown = { version = "0.0.4", path = "crates/ruff_markdown" }
-ruff_memory_usage = { version = "0.0.4", path = "crates/ruff_memory_usage" }
-ruff_notebook = { version = "0.0.4", path = "crates/ruff_notebook" }
-ruff_options_metadata = { version = "0.0.4", path = "crates/ruff_options_metadata" }
-ruff_python_ast = { version = "0.0.4", path = "crates/ruff_python_ast" }
-ruff_python_codegen = { version = "0.0.4", path = "crates/ruff_python_codegen" }
-ruff_python_formatter = { version = "0.0.4", path = "crates/ruff_python_formatter" }
-ruff_python_importer = { version = "0.0.4", path = "crates/ruff_python_importer" }
-ruff_python_index = { version = "0.0.4", path = "crates/ruff_python_index" }
-ruff_python_literal = { version = "0.0.4", path = "crates/ruff_python_literal" }
-ruff_python_parser = { version = "0.0.4", path = "crates/ruff_python_parser" }
-ruff_python_semantic = { version = "0.0.4", path = "crates/ruff_python_semantic" }
-ruff_python_stdlib = { version = "0.0.4", path = "crates/ruff_python_stdlib" }
-ruff_python_trivia = { version = "0.0.4", path = "crates/ruff_python_trivia" }
-ruff_server = { version = "0.0.4", path = "crates/ruff_server" }
-ruff_source_file = { version = "0.0.4", path = "crates/ruff_source_file" }
+char_str = { version = "0.0.2" }
+ruff = { version = "0.15.22", path = "crates/ruff" }
+ruff_annotate_snippets = { version = "0.0.5", path = "crates/ruff_annotate_snippets" }
+ruff_cache = { version = "0.0.5", path = "crates/ruff_cache" }
+ruff_db = { version = "0.0.5", path = "crates/ruff_db", default-features = false }
+ruff_diagnostics = { version = "0.0.5", path = "crates/ruff_diagnostics" }
+ruff_formatter = { version = "0.0.5", path = "crates/ruff_formatter" }
+ruff_graph = { version = "0.0.5", path = "crates/ruff_graph" }
+ruff_index = { version = "0.0.5", path = "crates/ruff_index" }
+ruff_linter = { version = "0.15.22", path = "crates/ruff_linter" }
+ruff_macros = { version = "0.0.5", path = "crates/ruff_macros" }
+ruff_markdown = { version = "0.0.5", path = "crates/ruff_markdown" }
+ruff_memory_usage = { version = "0.0.5", path = "crates/ruff_memory_usage" }
+ruff_notebook = { version = "0.0.5", path = "crates/ruff_notebook" }
+ruff_options_metadata = { version = "0.0.5", path = "crates/ruff_options_metadata" }
+ruff_python_ast = { version = "0.0.5", path = "crates/ruff_python_ast" }
+ruff_python_codegen = { version = "0.0.5", path = "crates/ruff_python_codegen" }
+ruff_python_formatter = { version = "0.0.5", path = "crates/ruff_python_formatter" }
+ruff_python_importer = { version = "0.0.5", path = "crates/ruff_python_importer" }
+ruff_python_index = { version = "0.0.5", path = "crates/ruff_python_index" }
+ruff_python_literal = { version = "0.0.5", path = "crates/ruff_python_literal" }
+ruff_python_parser = { version = "0.0.5", path = "crates/ruff_python_parser" }
+ruff_python_semantic = { version = "0.0.5", path = "crates/ruff_python_semantic" }
+ruff_python_stdlib = { version = "0.0.5", path = "crates/ruff_python_stdlib" }
+ruff_python_trivia = { version = "0.0.5", path = "crates/ruff_python_trivia" }
+ruff_server = { version = "0.0.5", path = "crates/ruff_server" }
+ruff_source_file = { version = "0.0.5", path = "crates/ruff_source_file" }
 ruff_mdtest = { path = "crates/ruff_mdtest" }
-ruff_ranged_value = { version = "0.0.4", path = "crates/ruff_ranged_value" }
-ruff_text_size = { version = "0.0.4", path = "crates/ruff_text_size" }
-ruff_workspace = { version = "0.0.4", path = "crates/ruff_workspace" }
+ruff_ranged_value = { version = "0.0.5", path = "crates/ruff_ranged_value" }
+ruff_text_size = { version = "0.0.5", path = "crates/ruff_text_size" }
+ruff_workspace = { version = "0.0.5", path = "crates/ruff_workspace" }
 
 ty = { path = "crates/ty" }
-ty_combine = { version = "0.0.4", path = "crates/ty_combine" }
+ty_combine = { version = "0.0.5", path = "crates/ty_combine" }
 ty_completion_bench = { path = "crates/ty_completion_bench" }
 ty_completion_eval = { path = "crates/ty_completion_eval" }
 ty_ide = { path = "crates/ty_ide" }
-ty_module_resolver = { version = "0.0.4", path = "crates/ty_module_resolver" }
+ty_module_resolver = { version = "0.0.5", path = "crates/ty_module_resolver" }
 ty_project = { path = "crates/ty_project", default-features = false }
-ty_python_semantic = { version = "0.0.4", path = "crates/ty_python_semantic" }
-ty_python_core = { version = "0.0.4", path = "crates/ty_python_core" }
+ty_python_semantic = { version = "0.0.5", path = "crates/ty_python_semantic" }
+ty_python_core = { version = "0.0.5", path = "crates/ty_python_core" }
 ty_server = { path = "crates/ty_server" }
-ty_site_packages = { version = "0.0.4", path = "crates/ty_site_packages" }
-ty_static = { version = "0.0.4", path = "crates/ty_static" }
+ty_site_packages = { version = "0.0.5", path = "crates/ty_site_packages" }
+ty_static = { version = "0.0.5", path = "crates/ty_static" }
 ty_test = { path = "crates/ty_test" }
-ty_vendored = { version = "0.0.4", path = "crates/ty_vendored" }
+ty_vendored = { version = "0.0.5", path = "crates/ty_vendored" }
 
 mdtest = { path = "crates/mdtest" }
 
@@ -82,7 +83,7 @@ clap_complete_command = { version = "0.6.0" }
 clearscreen = { version = "4.0.0" }
 codspeed-criterion-compat = { version = "5.0.0", default-features = false }
 colored = { version = "3.0.0" }
-compact_str = "0.9.0"
+compact_str = "0.10.0"
 console_error_panic_hook = { version = "0.1.7" }
 console_log = { version = "1.0.0" }
 countme = { version = "3.0.1" }
@@ -97,7 +98,7 @@ dunce = { version = "1.0.5" }
 etcetera = { version = "0.11.0" }
 fern = { version = "0.7.0" }
 filetime = { version = "0.2.23" }
-get-size2 = { version = "0.10.0", features = [
+get-size2 = { version = "0.10.3", features = [
     "derive",
     "smallvec",
     "hashbrown",
@@ -113,7 +114,7 @@ hashbrown = { version = "0.17.0", default-features = false, features = [
 ] }
 heck = "0.5.0"
 icu_properties = { version = "2.1.2" }
-ignore = { version = "0.4.24" }
+ignore = { version = "0.4.30" }
 imara-diff = { version = "0.2.0" }
 imperative = { version = "1.0.4" }
 indexmap = { version = "2.6.0" }
@@ -129,15 +130,16 @@ js-sys = { version = "0.3.69" }
 libc = { version = "0.2.153" }
 libcst = { version = "1.8.4", default-features = false }
 log = { version = "0.4.17" }
-lsp-server = { version = "0.8.0" }
-lsp-types = { package = "gen-lsp-types", version = "0.9.0", features = ["url"] }
+lsp-server = { version = "0.10.0" }
+lsp-types = { package = "gen-lsp-types", version = "0.10.0", features = ["url"] }
 matchit = { version = "0.9.0" }
 memchr = { version = "2.7.1" }
 mimalloc = { version = "0.1.49", features = ["v2"] }
 natord = { version = "1.0.9" }
 notify = { version = "8.0.0" }
 ordermap = { version = "1.0.0" }
-path-absolutize = { version = "3.1.1" }
+parking_lot = { version = "0.12.4" }
+path-absolutize = { version = "4.0.0" }
 path-slash = { version = "0.2.1" }
 pathdiff = { version = "0.2.1" }
 pep440_rs = { version = "0.7.1" }
@@ -156,7 +158,7 @@ regex-syntax = { version = "0.8.8" }
 rustc-hash = { version = "2.0.0" }
 rustc-stable-hash = { version = "0.1.2" }
 # When updating salsa, make sure to also update the version in `fuzz/Cargo.toml`
-salsa = { version = "0.28.0", default-features = false, features = [
+salsa = { version = "0.28.1", default-features = false, features = [
     "compact_str",
     "macros",
     "salsa_unstable",

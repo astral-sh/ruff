@@ -2792,34 +2792,7 @@ impl<'a> Checker<'a> {
             _ => {}
         }
 
-        let scope = self.semantic.current_scope();
-
-        if scope.kind.is_module()
-            && match parent {
-                Stmt::Assign(ast::StmtAssign { targets, .. }) => {
-                    if let Some(Expr::Name(ast::ExprName { id, .. })) = targets.first() {
-                        id == "__all__"
-                    } else {
-                        false
-                    }
-                }
-                Stmt::AugAssign(ast::StmtAugAssign { target, .. }) => {
-                    if let Expr::Name(ast::ExprName { id, .. }) = target.as_ref() {
-                        id == "__all__"
-                    } else {
-                        false
-                    }
-                }
-                Stmt::AnnAssign(ast::StmtAnnAssign { target, .. }) => {
-                    if let Expr::Name(ast::ExprName { id, .. }) = target.as_ref() {
-                        id == "__all__"
-                    } else {
-                        false
-                    }
-                }
-                _ => false,
-            }
-        {
+        if self.in_dunder_all_assignment(parent) {
             let (all_names, all_flags) = self.semantic.extract_dunder_all_names(parent);
 
             if all_flags.intersects(DunderAllFlags::INVALID_OBJECT) {
@@ -3284,6 +3257,41 @@ impl<'a> Checker<'a> {
         }
 
         self.semantic.restore(snapshot);
+    }
+
+    /// Report whether a module-level `__all__` assignment is being visited.
+    ///
+    /// This differs from [`SemanticModel::in_dunder_all_definition`], which is set only while
+    /// adding bindings for the entries in `__all__`.
+    pub(crate) fn in_dunder_all_assignment(&self, parent: &Stmt) -> bool {
+        if !self.semantic.current_scope().kind.is_module() {
+            return false;
+        }
+
+        match parent {
+            Stmt::Assign(ast::StmtAssign { targets, .. }) => {
+                if let Some(Expr::Name(ast::ExprName { id, .. })) = targets.first() {
+                    id == "__all__"
+                } else {
+                    false
+                }
+            }
+            Stmt::AugAssign(ast::StmtAugAssign { target, .. }) => {
+                if let Expr::Name(ast::ExprName { id, .. }) = target.as_ref() {
+                    id == "__all__"
+                } else {
+                    false
+                }
+            }
+            Stmt::AnnAssign(ast::StmtAnnAssign { target, .. }) => {
+                if let Expr::Name(ast::ExprName { id, .. }) = target.as_ref() {
+                    id == "__all__"
+                } else {
+                    false
+                }
+            }
+            _ => false,
+        }
     }
 }
 

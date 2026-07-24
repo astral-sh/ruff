@@ -291,7 +291,7 @@ impl<'db> SubclassOfType<'db> {
         // the upper bound `type[C]`, and transform that to the meta-type `type[M]`, which
         // `to_instance` then resolves to `M`.
         self.to_meta_type(db)
-            .to_instance(db)
+            .to_instance_approximation(db)
             .expect("the meta-type of a SubclassOf type should always be instantiable")
     }
 

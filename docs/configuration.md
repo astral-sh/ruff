@@ -516,6 +516,24 @@ which will similarly override the `line-length` setting from
 all configuration files detected by Ruff, regardless of where
 a specific configuration file is located.
 
+### Argfile support
+
+Ruff supports reading command-line arguments from a file, which is especially useful when passing a large number of file paths that might exceed your shell's command-line length limit. To use an argfile, prefix the file path with an `@` symbol:
+
+```console
+$ ruff check @path/to/args.txt
+```
+
+The arguments in the file must all be written on their own line. For example, `args.txt` might contain:
+
+```text
+--select
+F401
+--quiet
+path/to/code1/
+path/to/code2/
+```
+
 ### Full command-line interface
 
 See `ruff help` for the full list of Ruff's top-level commands:

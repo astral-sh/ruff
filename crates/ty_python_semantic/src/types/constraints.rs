@@ -88,11 +88,13 @@
 
 use std::cell::{Cell, Ref, RefCell};
 use std::cmp::Ordering;
+use std::collections::VecDeque;
+use std::convert::Infallible;
 use std::fmt::{Debug, Display};
 use std::iter;
 use std::marker::PhantomData;
-use std::ops::Range;
-use std::sync::Arc;
+use std::ops::{ControlFlow, Range};
+use std::sync::{Arc, LazyLock};
 
 use indexmap::map::Entry;
 use itertools::Itertools;
@@ -100,6 +102,7 @@ use ruff_index::{Idx, IndexVec, newtype_index};
 use rustc_hash::{FxHashMap, FxHashSet};
 use smallvec::SmallVec;
 use ty_python_core::rank::RankBitBox;
+use ty_static::EnvVars;
 
 use crate::types::class::GenericAlias;
 use crate::types::generics::InferableTypeVars;
@@ -111,7 +114,7 @@ use crate::types::visitor::{
 };
 use crate::types::{
     ApplyTypeMappingVisitor, BoundTypeVarInstance, IntersectionType, Type, TypeContext,
-    TypeMapping, TypeVarBoundOrConstraints, TypeVarVariance, UnionType,
+    TypeMapping, TypePair, TypeVarBoundOrConstraints, TypeVarVariance, UnionType,
 };
 use crate::{Db, FxIndexMap, FxIndexSet, FxOrderSet};
 
@@ -524,6 +527,7 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
     ///
     /// In the result, `self` will appear before `other` according to the `source_order` of the BDD
     /// nodes.
+    #[inline]
     pub(crate) fn and(
         mut self,
         db: &'db dyn Db,
@@ -824,7 +828,7 @@ pub(crate) struct ConstraintSetBuilder<'db> {
     storage: RefCell<ConstraintSetStorage<'db>>,
 }
 
-#[derive(Clone, Debug, Default, Eq, PartialEq, get_size2::GetSize)]
+#[derive(Debug, Default)]
 struct ConstraintSetStorage<'db> {
     /// Compacted owned storage overlaid onto this builder. This is used by
     /// [`OwnedConstraintSet::query`] to create a [`ConstraintSetBuilder`] that is initially a
@@ -868,7 +872,6 @@ struct ConstraintSetStorage<'db> {
     or_cache: FxHashMap<(NodeId, NodeId, usize), NodeId>,
     and_cache: FxHashMap<(NodeId, NodeId, usize), NodeId>,
     exists_cache: FxHashMap<(NodeId, InferableTypeVars<'db>), NodeId>,
-    retain_one_cache: FxHashMap<(NodeId, BoundTypeVarIdentity<'db>), NodeId>,
     restrict_one_cache: FxHashMap<(NodeId, ConstraintAssignment), (NodeId, bool)>,
     simplify_cache: FxHashMap<NodeId, NodeId>,
 
@@ -1337,7 +1340,45 @@ impl<'db> BoundTypeVarInstance<'db> {
         builder: &ConstraintSetBuilder<'db>,
         typevar: Self,
     ) -> bool {
-        builder.typevar_id(db, self).index() < builder.typevar_id(db, typevar).index()
+        wobble_index(builder.typevar_id(db, self).index())
+            < wobble_index(builder.typevar_id(db, typevar).index())
+    }
+}
+
+/// Optionally applies a transformation to a builder-local typevar or constraint ID, which lets us
+/// exercise different BDD variable orderings.
+///
+/// Under normal operation, the IDs won't be modified, and we will construct BDDs based on the
+/// (builder-local) source order that we encounter typevars and constraints.
+///
+/// Our results _shouldn't_ depend on the BDD variable ordering that we choose. You can use the
+/// `TY_CONSTRAINT_SET_ORDER` environment variable to artificially choose different permutations of
+/// the "natural" variable ordering, to ensure that results are consistent.
+fn wobble_index(index: usize) -> usize {
+    #[derive(Clone, Copy)]
+    enum Order {
+        Normal,
+        Reverse,
+        Xor(usize),
+    }
+
+    static ORDER: LazyLock<Order> = LazyLock::new(|| {
+        let Some(value) = std::env::var_os(EnvVars::TY_CONSTRAINT_SET_ORDER) else {
+            return Order::Normal;
+        };
+        if value == "reverse" {
+            return Order::Reverse;
+        }
+        value
+            .to_str()
+            .and_then(|value| value.parse::<usize>().ok())
+            .map_or(Order::Normal, Order::Xor)
+    });
+
+    match *ORDER {
+        Order::Normal => index,
+        Order::Reverse => !index,
+        Order::Xor(mask) => index ^ mask,
     }
 }
 
@@ -1964,7 +2005,7 @@ impl ConstraintId {
     /// empirically that we get smaller BDDs with an ordering that is more aligned with source
     /// order.
     fn ordering(self) -> impl Ord {
-        std::cmp::Reverse(self.index())
+        std::cmp::Reverse(wobble_index(self.index()))
     }
 
     /// Returns whether this constraint implies another — i.e., whether every type that
@@ -2367,67 +2408,6 @@ impl NodeId {
         }
     }
 
-    fn for_each_path<'db>(
-        self,
-        db: &'db dyn Db,
-        builder: &ConstraintSetBuilder<'db>,
-        mut f: impl FnMut(&PathAssignments),
-    ) {
-        match self.node() {
-            Node::AlwaysTrue => {}
-            Node::AlwaysFalse => {}
-            Node::Interior(interior) => {
-                let mut path = interior.path_assignments(builder);
-                self.for_each_path_inner(db, builder, &mut f, &mut path);
-            }
-        }
-    }
-
-    fn for_each_path_inner<'db>(
-        self,
-        db: &'db dyn Db,
-        builder: &ConstraintSetBuilder<'db>,
-        f: &mut dyn FnMut(&PathAssignments),
-        path: &mut PathAssignments,
-    ) {
-        match self.node() {
-            Node::AlwaysTrue => f(path),
-            Node::AlwaysFalse => {}
-            Node::Interior(_) => {
-                let interior = builder.interior_node_data(self);
-                path.walk_edge(
-                    db,
-                    builder,
-                    interior.constraint.when_true(),
-                    interior.source_order,
-                    |path, _| {
-                        interior.if_true.for_each_path_inner(db, builder, f, path);
-                    },
-                );
-                path.walk_edge(
-                    db,
-                    builder,
-                    interior.constraint.when_unconstrained(),
-                    interior.source_order,
-                    |path, _| {
-                        interior
-                            .if_uncertain
-                            .for_each_path_inner(db, builder, f, path);
-                    },
-                );
-                path.walk_edge(
-                    db,
-                    builder,
-                    interior.constraint.when_false(),
-                    interior.source_order,
-                    |path, _| {
-                        interior.if_false.for_each_path_inner(db, builder, f, path);
-                    },
-                );
-            }
-        }
-    }
-
     /// Returns whether this BDD represent the constant function `true`.
     fn is_always_satisfied<'db>(
         self,
@@ -2439,55 +2419,8 @@ impl NodeId {
             Node::AlwaysFalse => false,
             Node::Interior(interior) => {
                 let mut path = interior.path_assignments(builder);
-                self.is_always_satisfied_inner(db, builder, &mut path)
-            }
-        }
-    }
-
-    fn is_always_satisfied_inner<'db>(
-        self,
-        db: &'db dyn Db,
-        builder: &ConstraintSetBuilder<'db>,
-        path: &mut PathAssignments,
-    ) -> bool {
-        match self.node() {
-            Node::AlwaysTrue => true,
-            Node::AlwaysFalse => false,
-            Node::Interior(_) => {
-                // walk_edge will return None if this node's constraint (or anything we can derive
-                // from it) causes the if_true edge to become impossible. We want to ignore
-                // impossible paths, and so we treat them as passing the "always satisfied" check.
-                //
-                // Under TDD semantics, when the constraint holds the result is C ∨ U, and when it
-                // doesn't the result is D ∨ U. We fold the uncertain branch into both before
-                // checking, because "C ∨ U is always satisfied" cannot be decomposed into
-                // independent checks on C and U (it's a disjunction). This is zero-cost for binary
-                // BDDs since `C ∨ false = C`.
-                let interior = builder.interior_node_data(self);
-                let if_true_or_uncertain = interior.if_true.or(builder, interior.if_uncertain);
-                let true_always_satisfied = path
-                    .walk_edge(
-                        db,
-                        builder,
-                        interior.constraint.when_true(),
-                        interior.source_order,
-                        |path, _| if_true_or_uncertain.is_always_satisfied_inner(db, builder, path),
-                    )
-                    .unwrap_or(true);
-                if !true_always_satisfied {
-                    return false;
-                }
-
-                // Ditto for the if_false branch
-                let if_false_or_uncertain = interior.if_false.or(builder, interior.if_uncertain);
-                path.walk_edge(
-                    db,
-                    builder,
-                    interior.constraint.when_false(),
-                    interior.source_order,
-                    |path, _| if_false_or_uncertain.is_always_satisfied_inner(db, builder, path),
-                )
-                .unwrap_or(true)
+                path.visit_negated(db, builder, self, &mut IsNeverSatisfiedVisitor)
+                    .is_continue()
             }
         }
     }
@@ -2503,79 +2436,15 @@ impl NodeId {
                 }
 
                 let mut path = interior.path_assignments(builder);
-                let result = self.is_never_satisfied_inner(db, builder, &mut path);
+                let result = path
+                    .visit(db, builder, self, &mut IsNeverSatisfiedVisitor)
+                    .is_continue();
                 builder
                     .storage
                     .borrow_mut()
                     .never_satisfied_cache
                     .insert(self, result);
                 result
-            }
-        }
-    }
-
-    fn is_never_satisfied_inner<'db>(
-        self,
-        db: &'db dyn Db,
-        builder: &ConstraintSetBuilder<'db>,
-        path: &mut PathAssignments,
-    ) -> bool {
-        match self.node() {
-            Node::AlwaysTrue => false,
-            Node::AlwaysFalse => true,
-            Node::Interior(_) => {
-                // walk_edge will return None if this node's constraint (or anything we can derive
-                // from it) causes the if_true edge to become impossible. We want to ignore
-                // impossible paths, and so we treat them as passing the "never satisfied" check.
-                //
-                // Note that unlike `is_always_satisfied`, here we don't have to fold the uncertain
-                // branch into the true and false branches, since C ∨ U is only false when C and U
-                // are each independently false. That lets us check each branch in isolation.
-                let interior = builder.interior_node_data(self);
-                let true_never_satisfied = path
-                    .walk_edge(
-                        db,
-                        builder,
-                        interior.constraint.when_true(),
-                        interior.source_order,
-                        |path, _| interior.if_true.is_never_satisfied_inner(db, builder, path),
-                    )
-                    .unwrap_or(true);
-                if !true_never_satisfied {
-                    return false;
-                }
-
-                // Ditto for the if_uncertain branch
-                let uncertain_never_satisfied = path
-                    .walk_edge(
-                        db,
-                        builder,
-                        interior.constraint.when_unconstrained(),
-                        interior.source_order,
-                        |path, _| {
-                            interior
-                                .if_uncertain
-                                .is_never_satisfied_inner(db, builder, path)
-                        },
-                    )
-                    .unwrap_or(true);
-                if !uncertain_never_satisfied {
-                    return false;
-                }
-
-                // Ditto for the if_false branch
-                path.walk_edge(
-                    db,
-                    builder,
-                    interior.constraint.when_false(),
-                    interior.source_order,
-                    |path, _| {
-                        interior
-                            .if_false
-                            .is_never_satisfied_inner(db, builder, path)
-                    },
-                )
-                .unwrap_or(true)
             }
         }
     }
@@ -3055,26 +2924,11 @@ impl NodeId {
         }
         drop(storage);
 
-        let mut path = interior.path_assignments(builder);
-        let result = self.exists_inner(db, builder, bound_typevars, &mut path);
+        let result = interior.exists_inner(db, builder, bound_typevars);
 
         let mut storage = builder.storage.borrow_mut();
         storage.exists_cache.insert(key, result);
         result
-    }
-
-    fn exists_inner<'db>(
-        self,
-        db: &'db dyn Db,
-        builder: &ConstraintSetBuilder<'db>,
-        bound_typevars: InferableTypeVars<'db>,
-        path: &mut PathAssignments,
-    ) -> Self {
-        match self.node() {
-            Node::AlwaysTrue => ALWAYS_TRUE,
-            Node::AlwaysFalse => ALWAYS_FALSE,
-            Node::Interior(interior) => interior.exists_inner(db, builder, bound_typevars, path),
-        }
     }
 
     fn remove_noninferable<'db>(
@@ -3087,22 +2941,6 @@ impl NodeId {
             Node::AlwaysTrue => ALWAYS_TRUE,
             Node::AlwaysFalse => ALWAYS_FALSE,
             Node::Interior(interior) => interior.remove_noninferable(db, builder, inferable),
-        }
-    }
-
-    fn abstract_one_inner<'db>(
-        self,
-        db: &'db dyn Db,
-        builder: &ConstraintSetBuilder<'db>,
-        should_remove: &mut dyn FnMut(ConstraintId) -> bool,
-        path: &mut PathAssignments,
-    ) -> Self {
-        match self.node() {
-            Node::AlwaysTrue => ALWAYS_TRUE,
-            Node::AlwaysFalse => ALWAYS_FALSE,
-            Node::Interior(interior) => {
-                interior.abstract_one_inner(db, builder, should_remove, path)
-            }
         }
     }
 
@@ -3694,16 +3532,13 @@ impl<'db> Type<'db> {
 
 #[salsa::tracked(
     returns(copy),
-    cycle_initial = |_, _, _, _| true,
+    cycle_initial = |_, _, _| true,
     heap_size = get_size2::GetSize::get_heap_size
 )]
-fn is_possibly_constraint_set_assignable<'db>(
-    db: &'db dyn Db,
-    source: Type<'db>,
-    target: Type<'db>,
-) -> bool {
-    source
-        .when_constraint_set_assignable_to_owned(db, target)
+fn is_possibly_constraint_set_assignable<'db>(db: &'db dyn Db, types: TypePair<'db>) -> bool {
+    types
+        .first(db)
+        .when_constraint_set_assignable_to_owned(db, types.second(db))
         .query(|_builder, when| !when.is_never_satisfied(db))
 }
 
@@ -3726,6 +3561,57 @@ impl<'db> PathBounds<'db> {
         node: NodeId,
         inferable: InferableTypeVars<'db>,
     ) -> Self {
+        #[derive(Default)]
+        struct CollectVisitor {
+            sorted_paths: Vec<Vec<(ConstraintId, usize)>>,
+        }
+
+        impl PathFold for CollectVisitor {
+            type Result = ();
+            type Break = Infallible;
+
+            fn satisfied<'db>(
+                &mut self,
+                _db: &'db dyn Db,
+                _builder: &ConstraintSetBuilder<'db>,
+                path: &PathAssignments,
+            ) -> ControlFlow<Self::Break, Self::Result> {
+                let mut path: Vec<_> = path.positive_constraints().collect();
+                path.sort_by_key(|(_, source_order)| *source_order);
+                self.sorted_paths.push(path);
+                ControlFlow::Continue(())
+            }
+
+            fn unsatisfied<'db>(
+                &mut self,
+                _db: &'db dyn Db,
+                _builder: &ConstraintSetBuilder<'db>,
+                _path: &PathAssignments,
+            ) -> ControlFlow<Self::Break, Self::Result> {
+                ControlFlow::Continue(())
+            }
+
+            fn impossible<'db>(
+                &mut self,
+                _db: &'db dyn Db,
+                _builder: &ConstraintSetBuilder<'db>,
+                _path: &PathAssignments,
+            ) -> ControlFlow<Self::Break, Self::Result> {
+                ControlFlow::Continue(())
+            }
+
+            fn combine<'db>(
+                &mut self,
+                _db: &'db dyn Db,
+                _builder: &ConstraintSetBuilder<'db>,
+                _if_true: Self::Result,
+                _if_uncertain: Self::Result,
+                _if_false: Self::Result,
+            ) -> ControlFlow<Self::Break, Self::Result> {
+                ControlFlow::Continue(())
+            }
+        }
+
         if let Some(path_bounds) =
             Self::compute_simple_bound_conjunction(db, builder, node, inferable)
         {
@@ -3733,34 +3619,31 @@ impl<'db> PathBounds<'db> {
         }
 
         let node = node.remove_noninferable(db, builder, inferable);
-        match node.node() {
+        let interior = match node.node() {
             Node::AlwaysTrue => return PathBounds::Unconstrained,
             Node::AlwaysFalse => return PathBounds::Unsatisfiable,
-            Node::Interior(_) => {}
-        }
+            Node::Interior(interior) => interior,
+        };
 
         // Sort the constraints in each path by their `source_order`s, to ensure that we construct
         // any unions or intersections in our type mappings in a stable order. Constraints might
         // come out of `PathAssignment`s with identical `source_order`s, but if they do, those
         // "tied" constraints will still be ordered in a stable way. So we need a stable sort to
         // retain that stable per-tie ordering.
-        let mut sorted_paths = Vec::new();
-        node.for_each_path(db, builder, |path| {
-            let mut path: Vec<_> = path.positive_constraints().collect();
-            path.sort_by_key(|(_, source_order)| *source_order);
-            sorted_paths.push(path);
-        });
-        sorted_paths.sort_by(|path1, path2| {
+        let mut collect_visitor = CollectVisitor::default();
+        let mut path = interior.path_assignments(builder);
+        let _ = path.visit(db, builder, node, &mut collect_visitor);
+        collect_visitor.sorted_paths.sort_by(|path1, path2| {
             let source_orders1 = path1.iter().map(|(_, source_order)| *source_order);
             let source_orders2 = path2.iter().map(|(_, source_order)| *source_order);
             source_orders1.cmp(source_orders2)
         });
 
-        let mut result = Vec::with_capacity(sorted_paths.len());
-        let mut mappings: FxHashMap<BoundTypeVarInstance<'db>, ConstraintBoundsBuilder<'db>> =
-            FxHashMap::default();
+        let mut result = Vec::with_capacity(collect_visitor.sorted_paths.len());
+        let mut mappings: FxIndexMap<BoundTypeVarInstance<'db>, ConstraintBoundsBuilder<'db>> =
+            FxIndexMap::default();
 
-        for path in sorted_paths {
+        for path in collect_visitor.sorted_paths {
             mappings.clear();
             for (constraint, _) in path {
                 let constraint = builder.constraint_data(constraint);
@@ -3787,7 +3670,7 @@ impl<'db> PathBounds<'db> {
             }
 
             let path_bounds = mappings
-                .drain()
+                .drain(..)
                 .map(|(bound_typevar, bounds)| bounds.finish(db, bound_typevar))
                 .collect();
             result.push(path_bounds);
@@ -3847,8 +3730,8 @@ impl<'db> PathBounds<'db> {
             }
         }
 
-        let mut mappings: FxHashMap<BoundTypeVarInstance<'db>, ConstraintBoundsBuilder<'db>> =
-            FxHashMap::default();
+        let mut mappings: FxIndexMap<BoundTypeVarInstance<'db>, ConstraintBoundsBuilder<'db>> =
+            FxIndexMap::default();
         constraints.sort_by_key(|(_, _, source_order)| *source_order);
         for (typevar, constraint, _) in constraints {
             let bounds = mappings.entry(typevar).or_default();
@@ -3861,7 +3744,7 @@ impl<'db> PathBounds<'db> {
         }
 
         let path = mappings
-            .drain()
+            .drain(..)
             .map(|(bound_typevar, bounds)| bounds.finish(db, bound_typevar))
             .collect();
         Some(PathBounds::Constrained(Box::new([path])))
@@ -3954,7 +3837,10 @@ impl<'db> PathBounds<'db> {
                         }
                     }
 
-                    if !is_possibly_constraint_set_assignable(db, lower, declared_upper) {
+                    if !is_possibly_constraint_set_assignable(
+                        db,
+                        TypePair::new(db, lower, declared_upper),
+                    ) {
                         // This path does not satisfy the typevar's declared upper bound, and is
                         // therefore not a valid specialization.
                         return Err(());
@@ -4027,12 +3913,16 @@ impl<'db> PathBounds<'db> {
                 for constraint in constraints.elements(db).iter().copied() {
                     let constraint_lower = constraint.bottom_materialization(db);
                     let constraint_upper = constraint.top_materialization(db);
+                    // A gradual constraint can choose any materialization that satisfies this
+                    // path. Its top materialization is the most permissive target for lower-bound
+                    // evidence, while its bottom materialization is the most permissive source
+                    // for upper-bound evidence.
                     let when_lower =
-                        lower.when_constraint_set_assignable_to_owned(db, constraint_lower);
+                        lower.when_constraint_set_assignable_to_owned(db, constraint_upper);
                     let when_upper =
                         path_bound
                             .upper
-                            .when_satisfied_by(db, builder, constraint_upper);
+                            .when_satisfied_by(db, builder, constraint_lower);
                     let when = builder
                         .load(db, &when_lower)
                         .and(db, builder, || when_upper);
@@ -4303,13 +4193,12 @@ impl InteriorNode {
         db: &'db dyn Db,
         builder: &ConstraintSetBuilder<'db>,
         bound_typevars: InferableTypeVars<'db>,
-        path: &mut PathAssignments,
     ) -> NodeId {
         let mentions_typevar = |ty: Type<'db>| match ty {
             Type::TypeVar(typevar) => typevar.is_inferable(db, bound_typevars),
             _ => false,
         };
-        self.abstract_one_inner(
+        self.abstract_inner(
             db,
             builder,
             // Remove any node that constrains one of `bound_typevars`, or that has a lower/upper
@@ -4328,7 +4217,6 @@ impl InteriorNode {
                         .upper
                         .is_some_and(|upper| any_over_type(db, upper, false, mentions_typevar))
             },
-            path,
         )
     }
 
@@ -4338,12 +4226,11 @@ impl InteriorNode {
         builder: &ConstraintSetBuilder<'db>,
         inferable: InferableTypeVars<'db>,
     ) -> NodeId {
-        let mut path = self.path_assignments(builder);
         let is_bare_inferable_typevar = |ty: Type<'db>| {
             ty.as_typevar()
                 .is_some_and(|bound_typevar| bound_typevar.is_inferable(db, inferable))
         };
-        self.abstract_one_inner(
+        self.abstract_inner(
             db,
             builder,
             // We only want to keep constraints on inferable typevars. If the constraint's typevar
@@ -4367,189 +4254,165 @@ impl InteriorNode {
                         .upper
                         .is_some_and(is_bare_inferable_typevar)
             },
-            &mut path,
         )
     }
 
-    fn abstract_one_inner<'db>(
+    fn abstract_inner<'db, F>(
         self,
         db: &'db dyn Db,
         builder: &ConstraintSetBuilder<'db>,
-        should_remove: &mut dyn FnMut(ConstraintId) -> bool,
-        path: &mut PathAssignments,
-    ) -> NodeId {
-        let self_interior = builder.interior_node_data(self.node());
-        if should_remove(self_interior.constraint) {
-            // If we should remove constraints involving this typevar, then we replace this node
-            // with the OR of all of its outgoing edges. That is, the result is true if there's
-            // any assignment of this node's constraint that is true.
-            //
-            // We also have to check if there are any derived facts that depend on the constraint
-            // we're about to remove. If so, we need to "remember" them by AND-ing them in with the
-            // corresponding branch. We currently reuse the `source_order` of the constraint being
-            // removed when we add these derived facts.
-            //
-            // TODO: This might not be stable enough, if we add more than one derived fact for this
-            // constraint. If we still see inconsistent test output, we might need a more complex
-            // way of tracking source order for derived facts.
-            let if_true = path
-                .walk_edge(
-                    db,
-                    builder,
-                    self_interior.constraint.when_true(),
-                    self_interior.source_order,
-                    |path, new_range| {
-                        let branch = self_interior.if_true.abstract_one_inner(
-                            db,
-                            builder,
-                            should_remove,
-                            path,
-                        );
-                        path.assignments[new_range]
-                            .iter()
-                            .filter(|(assignment, _)| {
-                                // Don't add back any derived facts if they are ones that we would have
-                                // removed!
-                                !should_remove(assignment.constraint())
-                            })
-                            .fold(branch, |branch, (assignment, (source_order, _))| {
-                                branch.and(
-                                    builder,
-                                    Node::new_satisfied_constraint(
-                                        builder,
-                                        *assignment,
-                                        *source_order,
-                                    ),
-                                )
-                            })
-                    },
-                )
-                .unwrap_or(ALWAYS_FALSE);
-            let if_false = path
-                .walk_edge(
-                    db,
-                    builder,
-                    self_interior.constraint.when_false(),
-                    self_interior.source_order,
-                    |path, new_range| {
-                        let branch = self_interior.if_false.abstract_one_inner(
-                            db,
-                            builder,
-                            should_remove,
-                            path,
-                        );
-                        path.assignments[new_range]
-                            .iter()
-                            .filter(|(assignment, _)| {
-                                // Don't add back any derived facts if they are ones that we would have
-                                // removed!
-                                !should_remove(assignment.constraint())
-                            })
-                            .fold(branch, |branch, (assignment, (source_order, _))| {
-                                branch.and(
-                                    builder,
-                                    Node::new_satisfied_constraint(
-                                        builder,
-                                        *assignment,
-                                        *source_order,
-                                    ),
-                                )
-                            })
-                    },
-                )
-                .unwrap_or(ALWAYS_FALSE);
-            let if_uncertain = path
-                .walk_edge(
-                    db,
-                    builder,
-                    self_interior.constraint.when_unconstrained(),
-                    self_interior.source_order,
-                    |path, new_range| {
-                        let branch = self_interior.if_uncertain.abstract_one_inner(
-                            db,
-                            builder,
-                            should_remove,
-                            path,
-                        );
-                        path.assignments[new_range]
-                            .iter()
-                            .filter(|(assignment, _)| !should_remove(assignment.constraint()))
-                            .fold(branch, |branch, (assignment, (source_order, _))| {
-                                branch.and(
-                                    builder,
-                                    Node::new_satisfied_constraint(
-                                        builder,
-                                        *assignment,
-                                        *source_order,
-                                    ),
-                                )
-                            })
-                    },
-                )
-                .unwrap_or(ALWAYS_FALSE);
-            if_true.or(builder, if_uncertain).or(builder, if_false)
-        } else {
-            // Otherwise, we abstract the if_false/if_true edges recursively.
-            let if_true = path
-                .walk_edge(
-                    db,
-                    builder,
-                    self_interior.constraint.when_true(),
-                    self_interior.source_order,
-                    |path, _| {
-                        self_interior
-                            .if_true
-                            .abstract_one_inner(db, builder, should_remove, path)
-                    },
-                )
-                .unwrap_or(ALWAYS_FALSE);
-            let if_uncertain = path
-                .walk_edge(
-                    db,
-                    builder,
-                    self_interior.constraint.when_unconstrained(),
-                    self_interior.source_order,
-                    |path, _| {
-                        self_interior.if_uncertain.abstract_one_inner(
-                            db,
-                            builder,
-                            should_remove,
-                            path,
-                        )
-                    },
-                )
-                .unwrap_or(ALWAYS_FALSE);
-            let if_false = path
-                .walk_edge(
-                    db,
-                    builder,
-                    self_interior.constraint.when_false(),
-                    self_interior.source_order,
-                    |path, _| {
-                        self_interior
-                            .if_false
-                            .abstract_one_inner(db, builder, should_remove, path)
-                    },
-                )
-                .unwrap_or(ALWAYS_FALSE);
-            // Absorb the uncertain branch into both the true and false branches before
-            // constructing the ITE, matching TDD semantics: when the constraint holds the result
-            // is C ∨ U, and when it doesn't the result is D ∨ U.
-            //
-            // NB: We cannot use `Node::new` here, because the recursive calls might introduce new
-            // derived constraints into the result, and those constraints might appear before this
-            // one in the BDD ordering.
-            Node::new_constraint(
-                builder,
-                self_interior.constraint,
-                self_interior.source_order,
-            )
-            .ite(
-                builder,
-                if_true.or(builder, if_uncertain),
-                if_false.or(builder, if_uncertain),
-            )
+        should_remove: F,
+    ) -> NodeId
+    where
+        F: FnMut(ConstraintId) -> bool,
+    {
+        #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+        enum Disposition {
+            Keep,
+            Remove,
         }
+
+        struct AbstractVisitor<F> {
+            should_remove: F,
+        }
+
+        impl<F> PathVisitor for AbstractVisitor<F>
+        where
+            F: FnMut(ConstraintId) -> bool,
+        {
+            type Result = NodeId;
+            type Interior = (Disposition, ConstraintId, usize);
+            type Break = Infallible;
+
+            fn visit_satisfied<'db>(
+                &mut self,
+                _db: &'db dyn Db,
+                _builder: &ConstraintSetBuilder<'db>,
+                _path: &PathAssignments,
+            ) -> ControlFlow<Self::Break, Self::Result> {
+                ControlFlow::Continue(ALWAYS_TRUE)
+            }
+
+            fn visit_unsatisfied<'db>(
+                &mut self,
+                _db: &'db dyn Db,
+                _builder: &ConstraintSetBuilder<'db>,
+                _path: &PathAssignments,
+            ) -> ControlFlow<Self::Break, Self::Result> {
+                ControlFlow::Continue(ALWAYS_FALSE)
+            }
+
+            fn visit_impossible<'db>(
+                &mut self,
+                _db: &'db dyn Db,
+                _builder: &ConstraintSetBuilder<'db>,
+                _path: &PathAssignments,
+            ) -> ControlFlow<Self::Break, Self::Result> {
+                ControlFlow::Continue(ALWAYS_FALSE)
+            }
+
+            fn enter_interior<'db>(
+                &mut self,
+                _db: &'db dyn Db,
+                builder: &ConstraintSetBuilder<'db>,
+                interior: InteriorNode,
+            ) -> ControlFlow<Self::Break, Self::Interior> {
+                let interior = builder.interior_node_data(interior.node());
+                let disposition = if (self.should_remove)(interior.constraint) {
+                    Disposition::Remove
+                } else {
+                    Disposition::Keep
+                };
+                ControlFlow::Continue((disposition, interior.constraint, interior.source_order))
+            }
+
+            fn visit_edge<'db>(
+                &mut self,
+                _db: &'db dyn Db,
+                builder: &ConstraintSetBuilder<'db>,
+                interior: &Self::Interior,
+                subtree: Self::Result,
+                path: &PathAssignments,
+                new_range: Range<usize>,
+            ) -> ControlFlow<Self::Break, Self::Result> {
+                let (disposition, _, _) = interior;
+                match disposition {
+                    // If we are keeping this node, we don't need to add any derived facts to the
+                    // result; we can always re-derive them later.
+                    Disposition::Keep => ControlFlow::Continue(subtree),
+
+                    // If we are removing this node, we have to check if there are any derived facts
+                    // that depend on the constraint we're about to remove. If so, we need to
+                    // "remember" them by AND-ing them in with the corresponding branch. We currently
+                    // reuse the `source_order` of the constraint being removed when we add these
+                    // derived facts.
+                    Disposition::Remove => {
+                        ControlFlow::Continue(
+                            path.assignments[new_range]
+                                .iter()
+                                .filter(|(assignment, _)| {
+                                    // Don't add back any derived facts if they are ones that we would have
+                                    // removed!
+                                    !(self.should_remove)(assignment.constraint())
+                                })
+                                .fold(subtree, |subtree, (assignment, (source_order, _))| {
+                                    subtree.and(
+                                        builder,
+                                        Node::new_satisfied_constraint(
+                                            builder,
+                                            *assignment,
+                                            *source_order,
+                                        ),
+                                    )
+                                }),
+                        )
+                    }
+                }
+            }
+
+            fn leave_interior<'db>(
+                &mut self,
+                _db: &'db dyn Db,
+                builder: &ConstraintSetBuilder<'db>,
+                interior: &Self::Interior,
+                if_true: Self::Result,
+                if_uncertain: Self::Result,
+                if_false: Self::Result,
+            ) -> ControlFlow<Self::Break, Self::Result> {
+                let (disposition, constraint, source_order) = interior;
+                match disposition {
+                    // If we are keeping this node, absorb the uncertain branch into both the true
+                    // and false branches before constructing the ITE, matching TDD semantics: when
+                    // the constraint holds the result is C ∨ U, and when it doesn't the result is
+                    // D ∨ U.
+                    //
+                    // NB: We cannot use `Node::new` here, because the recursive calls might introduce new
+                    // derived constraints into the result, and those constraints might appear before this
+                    // one in the BDD ordering.
+                    Disposition::Keep => {
+                        let guard = Node::new_constraint(builder, *constraint, *source_order);
+                        ControlFlow::Continue(guard.ite(
+                            builder,
+                            if_true.or(builder, if_uncertain),
+                            if_false.or(builder, if_uncertain),
+                        ))
+                    }
+
+                    // If we are removing this node, then we replace it with the OR of all of its
+                    // outgoing edges. That is, the result is true if there's any assignment of
+                    // this node's constraint that is true. (We will have already added any
+                    // necessary derived facts in the `visit_edge` method.)
+                    Disposition::Remove => ControlFlow::Continue(
+                        if_true.or(builder, if_uncertain).or(builder, if_false),
+                    ),
+                }
+            }
+        }
+
+        let mut path = self.path_assignments(builder);
+        let mut visitor = AbstractVisitor { should_remove };
+        let ControlFlow::Continue(result) = path.visit(db, builder, self.node(), &mut visitor);
+        result
     }
 
     fn restrict_one<'db>(
@@ -5106,8 +4969,8 @@ pub(crate) enum Solutions<'db> {
 
 pub(crate) type Solution<'db> = Vec<TypeVarSolution<'db>>;
 
-#[derive(Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize)]
-pub(crate) struct TypeVarSolution<'db> {
+#[derive(Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
+pub struct TypeVarSolution<'db> {
     pub(crate) bound_typevar: BoundTypeVarInstance<'db>,
     pub(crate) solution: Type<'db>,
 }
@@ -5308,21 +5171,6 @@ impl ConstraintAssignment {
 /// pruned from the search), and new constraints that we can assume to be true even if we haven't
 /// seen them directly.
 ///
-/// We support several kinds of sequent:
-///
-/// - `¬C₁ → false`: This indicates that `C₁` is always true. Any path that assumes it is false is
-///   impossible and can be pruned.
-///
-/// - `C₁ ∧ C₂ → false`: This indicates that `C₁` and `C₂` are disjoint: it is not possible for
-///   both to hold. Any path that assumes both is impossible and can be pruned.
-///
-/// - `C₁ ∧ C₂ → D`: This indicates that the intersection of `C₁` and `C₂` can be simplified to
-///   `D`. Any path that assumes both `C₁` and `C₂` hold, but assumes `D` does _not_, is impossible
-///   and can be pruned.
-///
-/// - `C → D`: This indicates that `C` on its own is enough to imply `D`. Any path that assumes `C`
-///   holds but `D` does _not_ is impossible and can be pruned.
-///
 /// Sequent maps are primarily used when walking a BDD path with a [`PathAssignments`]. The
 /// `PathAssignments` will hold a sequent map containing all of the constraints that are
 /// encountered during the walk. It builds up its sequent map lazily, so that it only has to
@@ -5334,16 +5182,49 @@ impl ConstraintAssignment {
 /// new constraint, and then merges those cached sequents into its own sequent map. (That means we
 /// also share the work of calculating the sequent map across `PathAssignments` for _different_
 /// constraint sets.)
-#[derive(Clone, Debug, Default, Eq, PartialEq, get_size2::GetSize)]
+#[derive(Debug, Default)]
 struct SequentMap {
-    /// Sequents of the form `¬C₁ → false`
-    single_tautologies: FxHashSet<ConstraintId>,
-    /// Sequents of the form `C₁ ∧ C₂ → false`
-    pair_impossibilities: FxHashSet<(ConstraintId, ConstraintId)>,
-    /// Sequents of the form `C₁ ∧ C₂ → D`
-    pair_implications: FxIndexMap<(ConstraintId, ConstraintId), FxIndexSet<ConstraintId>>,
-    /// Sequents of the form `C → D`
-    single_implications: FxIndexMap<ConstraintId, FxIndexSet<ConstraintId>>,
+    sequents: Vec<Sequent>,
+}
+
+/// Describes one rule for deriving new implicit constraints from existing constraints in a BDD
+/// path.
+#[derive(Clone, Copy, Debug)]
+enum Sequent {
+    /// Sequent of the form `¬C → false`
+    ///
+    /// This indicates that `C` is always true. Any path that assumes it is false is impossible and
+    /// can be pruned.
+    SingleTautology { ante: ConstraintId },
+
+    /// Sequent of the form `C₁ ∧ C₂ → false`
+    ///
+    /// This indicates that `C₁` and `C₂` are disjoint: it is not possible for both to hold. Any
+    /// path that assumes both is impossible and can be pruned.
+    PairImpossibility {
+        ante1: ConstraintId,
+        ante2: ConstraintId,
+    },
+
+    /// Sequent of the form `C → D`
+    ///
+    /// This indicates that `C` on its own is enough to imply `D`. For any path that assumes `C`
+    /// holds, we can add `D` to the path even if it doesn't appear in the BDD.
+    SingleImplication {
+        ante: ConstraintId,
+        post: ConstraintId,
+    },
+
+    /// Sequent of the form `C₁ ∧ C₂ → D`
+    ///
+    /// This indicates that if `C₁` and `C₂` are both true, then `D` is guaranteed to be true as
+    /// well. For any path that assumes both `C₁` and `C₂` hold, we can add `D` to the path even if
+    /// it doesn't appear in the BDD.
+    PairImplication {
+        ante1: ConstraintId,
+        ante2: ConstraintId,
+        post: ConstraintId,
+    },
 }
 
 impl SequentMap {
@@ -5413,69 +5294,13 @@ impl SequentMap {
         Ref::map(storage, |storage| &storage.pair_sequent_cache[&key])
     }
 
-    /// Merges the sequents from another sequent map into this one.
-    fn merge(&mut self, other: &Self) {
-        self.single_tautologies.extend(&other.single_tautologies);
-        self.pair_impossibilities
-            .extend(&other.pair_impossibilities);
-        for ((ante1, ante2), post) in &other.pair_implications {
-            self.pair_implications
-                .entry(Self::pair_key(*ante1, *ante2))
-                .or_default()
-                .extend(post);
-        }
-        for (ante, post) in &other.single_implications {
-            self.single_implications
-                .entry(*ante)
-                .or_default()
-                .extend(post);
-        }
+    fn add_single_tautology(&mut self, ante: ConstraintId) {
+        self.sequents.push(Sequent::SingleTautology { ante });
     }
 
-    fn pair_key(ante1: ConstraintId, ante2: ConstraintId) -> (ConstraintId, ConstraintId) {
-        if ante1.ordering() < ante2.ordering() {
-            (ante1, ante2)
-        } else {
-            (ante2, ante1)
-        }
-    }
-
-    fn add_single_tautology<'db>(
-        &mut self,
-        db: &'db dyn Db,
-        builder: &ConstraintSetBuilder<'db>,
-        ante: ConstraintId,
-    ) {
-        if self.single_tautologies.insert(ante) {
-            tracing::trace!(
-                target: "ty_python_semantic::types::constraints::SequentMap",
-                sequent = %format_args!("¬{} → false", ante.display(db, builder)),
-                "add sequent",
-            );
-        }
-    }
-
-    fn add_pair_impossibility<'db>(
-        &mut self,
-        db: &'db dyn Db,
-        builder: &ConstraintSetBuilder<'db>,
-        ante1: ConstraintId,
-        ante2: ConstraintId,
-    ) {
-        if self
-            .pair_impossibilities
-            .insert(Self::pair_key(ante1, ante2))
-        {
-            tracing::trace!(
-                target: "ty_python_semantic::types::constraints::SequentMap",
-                sequent = %format_args!(
-                    "{} ∧ {} → false",
-                    ante1.display(db, builder),
-                    ante2.display(db, builder),
-                ),
-                "add sequent",
-            );
-        }
+    fn add_pair_impossibility(&mut self, ante1: ConstraintId, ante2: ConstraintId) {
+        self.sequents
+            .push(Sequent::PairImpossibility { ante1, ante2 });
     }
 
     fn add_pair_implication<'db>(
@@ -5496,7 +5321,7 @@ impl SequentMap {
                 .when_constraint_set_assignable_to_owned(db, post_data.bounds.materialized_upper()),
         );
         if when.is_never_satisfied(db) {
-            self.add_pair_impossibility(db, builder, ante1, ante2);
+            self.add_pair_impossibility(ante1, ante2);
             return;
         }
 
@@ -5504,51 +5329,18 @@ impl SequentMap {
         if ante1.implies(db, builder, post) || ante2.implies(db, builder, post) {
             return;
         }
-        if self
-            .pair_implications
-            .entry(Self::pair_key(ante1, ante2))
-            .or_default()
-            .insert(post)
-        {
-            tracing::trace!(
-                target: "ty_python_semantic::types::constraints::SequentMap",
-                sequent = %format_args!(
-                    "{} ∧ {} → {}",
-                    ante1.display(db, builder),
-                    ante2.display(db, builder),
-                    post.display(db, builder),
-                ),
-                "add sequent",
-            );
-        }
+
+        self.sequents
+            .push(Sequent::PairImplication { ante1, ante2, post });
     }
 
-    fn add_single_implication<'db>(
-        &mut self,
-        db: &'db dyn Db,
-        builder: &ConstraintSetBuilder<'db>,
-        ante: ConstraintId,
-        post: ConstraintId,
-    ) {
+    fn add_single_implication(&mut self, ante: ConstraintId, post: ConstraintId) {
         if ante == post {
             return;
         }
-        if self
-            .single_implications
-            .entry(ante)
-            .or_default()
-            .insert(post)
-        {
-            tracing::trace!(
-                target: "ty_python_semantic::types::constraints::SequentMap",
-                sequent = %format_args!(
-                    "{} → {}",
-                    ante.display(db, builder),
-                    post.display(db, builder),
-                ),
-                "add sequent",
-            );
-        }
+
+        self.sequents
+            .push(Sequent::SingleImplication { ante, post });
     }
 
     fn add_sequents_for_single<'db>(
@@ -5563,7 +5355,7 @@ impl SequentMap {
         let lower = constraint_data.bounds.materialized_lower();
         let upper = constraint_data.bounds.materialized_upper();
         if lower.is_never() && upper.is_object() {
-            self.add_single_tautology(db, builder, constraint);
+            self.add_single_tautology(constraint);
             return;
         }
 
@@ -5672,10 +5464,10 @@ impl SequentMap {
                 Node::Interior(interior) => {
                     let interior = builder.interior_node_data(interior.node());
                     if interior.if_true != ALWAYS_FALSE {
-                        self.add_single_implication(db, builder, constraint, interior.constraint);
+                        self.add_single_implication(constraint, interior.constraint);
                         node = interior.if_true;
                     } else {
-                        self.add_pair_impossibility(db, builder, constraint, interior.constraint);
+                        self.add_pair_impossibility(constraint, interior.constraint);
                         node = interior.if_false;
                     }
                 }
@@ -6390,7 +6182,7 @@ impl SequentMap {
                 right = %right_constraint.display(db, builder),
                 "left implies right",
             );
-            self.add_single_implication(db, builder, left_constraint, right_constraint);
+            self.add_single_implication(left_constraint, right_constraint);
         }
         if builder.cached_constraint_implies(db, right_constraint, left_constraint) {
             tracing::trace!(
@@ -6399,7 +6191,7 @@ impl SequentMap {
                 right = %right_constraint.display(db, builder),
                 "right implies left",
             );
-            self.add_single_implication(db, builder, right_constraint, left_constraint);
+            self.add_single_implication(right_constraint, left_constraint);
         }
 
         match left_constraint.intersect(db, builder, right_constraint) {
@@ -6420,8 +6212,8 @@ impl SequentMap {
                     right_constraint,
                     intersection_constraint,
                 );
-                self.add_single_implication(db, builder, intersection_constraint, left_constraint);
-                self.add_single_implication(db, builder, intersection_constraint, right_constraint);
+                self.add_single_implication(intersection_constraint, left_constraint);
+                self.add_single_implication(intersection_constraint, right_constraint);
             }
 
             // The sequent map only needs to include constraints that might appear in a BDD. If the
@@ -6436,7 +6228,7 @@ impl SequentMap {
                     right = %right_constraint.display(db, builder),
                     "left and right are disjoint",
                 );
-                self.add_pair_impossibility(db, builder, left_constraint, right_constraint);
+                self.add_pair_impossibility(left_constraint, right_constraint);
             }
         }
     }
@@ -6467,42 +6259,40 @@ impl SequentMap {
                     }
                 };
 
-                #[expect(
-                    clippy::iter_over_hash_type,
-                    reason = "this debug-only formatter has no stable ordering contract"
-                )]
-                for (ante1, ante2) in &self.map.pair_impossibilities {
-                    maybe_write_prefix(f)?;
-                    write!(
-                        f,
-                        "{} ∧ {} → false",
-                        ante1.display(self.db, self.builder),
-                        ante2.display(self.db, self.builder),
-                    )?;
-                }
+                for sequent in &self.map.sequents {
+                    match sequent {
+                        Sequent::SingleTautology { .. } => {}
 
-                for ((ante1, ante2), posts) in &self.map.pair_implications {
-                    for post in posts {
-                        maybe_write_prefix(f)?;
-                        write!(
-                            f,
-                            "{} ∧ {} → {}",
-                            ante1.display(self.db, self.builder),
-                            ante2.display(self.db, self.builder),
-                            post.display(self.db, self.builder),
-                        )?;
-                    }
-                }
+                        Sequent::PairImpossibility { ante1, ante2 } => {
+                            maybe_write_prefix(f)?;
+                            write!(
+                                f,
+                                "{} ∧ {} → false",
+                                ante1.display(self.db, self.builder),
+                                ante2.display(self.db, self.builder),
+                            )?;
+                        }
 
-                for (ante, posts) in &self.map.single_implications {
-                    for post in posts {
-                        maybe_write_prefix(f)?;
-                        write!(
-                            f,
-                            "{} → {}",
-                            ante.display(self.db, self.builder),
-                            post.display(self.db, self.builder)
-                        )?;
+                        Sequent::PairImplication { ante1, ante2, post } => {
+                            maybe_write_prefix(f)?;
+                            write!(
+                                f,
+                                "{} ∧ {} → {}",
+                                ante1.display(self.db, self.builder),
+                                ante2.display(self.db, self.builder),
+                                post.display(self.db, self.builder),
+                            )?;
+                        }
+
+                        Sequent::SingleImplication { ante, post } => {
+                            maybe_write_prefix(f)?;
+                            write!(
+                                f,
+                                "{} → {}",
+                                ante.display(self.db, self.builder),
+                                post.display(self.db, self.builder)
+                            )?;
+                        }
                     }
                 }
 
@@ -6519,6 +6309,274 @@ impl SequentMap {
             db,
             builder,
         }
+    }
+}
+
+/// A visitor for walking the paths of a BDD.
+///
+/// **NOTE**: This trait gives you full control over the walking process: in particular, you have
+/// more opportunities to abort the walk early. If you want to perform a simple "fold" over all of
+/// the paths, the [`PathFold`] trait is easier to implement, and can also be used as a
+/// `PathVisitor`.
+///
+/// Each path starts at the root node and ends at a terminal node, and represents one family of
+/// typevar assignments described by the BDD. Each path can be either _satisfied_, meaning that
+/// this family of assignments is accepted by the constraint set; _unsatisfied_, meaning that this
+/// family of assignments is _not_ accepted by the constraint set; or _impossible_, meaning that
+/// this family of assignments contains a contradiction, and cannot possibly ever occur.
+///
+/// To visit the BDD paths:
+///
+/// - We start at the root node.
+///
+/// - Each time we encounter an interior node, we call the visitor's `enter_interior` method. We
+///   then process walk the interior node's `true`, `uncertain`, and `false` outgoing edges.
+///
+/// - To process an edge, we recursively visit the node that the edge points to (getting a `Result`
+///   for that subtree), and then call the visitor's `visit_edge` method. This lets you modify the
+///   subtree's value based on the assignments that were added to the path by this edge. (This
+///   includes at least the constraint checked by the interior node containing this edge, and can
+///   also include any additional derived facts that we learn based on whatever other assignments
+///   currently hold on the path.)
+///
+/// - Once we have processed all of the edges for an interior node, we call the visitor's
+///   `leave_interior` method. This lets you combine the `Result`s from each outgoing edge into a
+///   single `Result` that represents the subtree rooted at this interior node.
+///
+/// Throughout this process, if any of your methods return [`ControlFlow::Break`], we will abort
+/// the path walk and immediately return that value.
+trait PathVisitor {
+    type Result;
+    type Interior;
+    type Break;
+
+    /// Called when we reach the end of a satisfied path. `path` will contain all of the
+    /// assignments on this path. The `Result` value that you return will be propagated back up as
+    /// we "unwind" this path.
+    fn visit_satisfied<'db>(
+        &mut self,
+        db: &'db dyn Db,
+        builder: &ConstraintSetBuilder<'db>,
+        path: &PathAssignments,
+    ) -> ControlFlow<Self::Break, Self::Result>;
+
+    /// Called when we reach the end of an unsatisfied path. `path` will contain all of the
+    /// assignments on this path. The `Result` value that you return will be propagated back up as
+    /// we "unwind" this path.
+    fn visit_unsatisfied<'db>(
+        &mut self,
+        db: &'db dyn Db,
+        builder: &ConstraintSetBuilder<'db>,
+        path: &PathAssignments,
+    ) -> ControlFlow<Self::Break, Self::Result>;
+
+    /// Called when we determine that a path is impossible, either because its assignments
+    /// contradict each other, or because an edge is structurally absent (such as the uncertain
+    /// edge when visiting a negated BDD). The `Result` value that you return will be propagated
+    /// back up as we "unwind" this path.
+    fn visit_impossible<'db>(
+        &mut self,
+        db: &'db dyn Db,
+        builder: &ConstraintSetBuilder<'db>,
+        path: &PathAssignments,
+    ) -> ControlFlow<Self::Break, Self::Result>;
+
+    /// Called on the way down as we enter each interior node. You can create a
+    /// [`Interior`][Self::Interior] value that will be passed to the
+    /// [`visit_edge`][Self::visit_edge] and [`leave_interior`][Self::leave_interior] methods
+    /// when we call them for this node.
+    fn enter_interior<'db>(
+        &mut self,
+        db: &'db dyn Db,
+        builder: &ConstraintSetBuilder<'db>,
+        interior_node: InteriorNode,
+    ) -> ControlFlow<Self::Break, Self::Interior>;
+
+    /// Called once for each edge in the BDD. You are given the [`Result`][Self::Result] value
+    /// of the subtree that the edge points to, as well as the origin and derived assignments that
+    /// are added by the edge.
+    fn visit_edge<'db>(
+        &mut self,
+        db: &'db dyn Db,
+        builder: &ConstraintSetBuilder<'db>,
+        interior_value: &Self::Interior,
+        subtree: Self::Result,
+        path: &PathAssignments,
+        new_range: Range<usize>,
+    ) -> ControlFlow<Self::Break, Self::Result>;
+
+    /// Called on the way back up as we leave each interior node in the BDD. Combines the
+    /// [`Result`][Self::Result] values for each of the interior node's subtrees.
+    fn leave_interior<'db>(
+        &mut self,
+        db: &'db dyn Db,
+        builder: &ConstraintSetBuilder<'db>,
+        interior_value: &Self::Interior,
+        if_true: Self::Result,
+        if_uncertain: Self::Result,
+        if_false: Self::Result,
+    ) -> ControlFlow<Self::Break, Self::Result>;
+}
+
+/// A visitor for "folding" over the paths in a BDD, producing a single value that summarizes all
+/// of them.
+///
+/// This is a simpler trait to implement when you don't need as much control over the path walk.
+/// Any type that implements this trait can also be used as a [`PathVisitor`].
+trait PathFold {
+    type Result;
+    type Break;
+
+    /// Returns the base case value that represents a satisfied path.
+    fn satisfied<'db>(
+        &mut self,
+        db: &'db dyn Db,
+        builder: &ConstraintSetBuilder<'db>,
+        path: &PathAssignments,
+    ) -> ControlFlow<Self::Break, Self::Result>;
+
+    /// Returns the base case value that represents an unsatisfied path.
+    fn unsatisfied<'db>(
+        &mut self,
+        db: &'db dyn Db,
+        builder: &ConstraintSetBuilder<'db>,
+        path: &PathAssignments,
+    ) -> ControlFlow<Self::Break, Self::Result>;
+
+    /// Returns the base case value that represents an impossible path.
+    fn impossible<'db>(
+        &mut self,
+        db: &'db dyn Db,
+        builder: &ConstraintSetBuilder<'db>,
+        path: &PathAssignments,
+    ) -> ControlFlow<Self::Break, Self::Result>;
+
+    /// Combines the values for each subtree of an interior node, returning a value that represents
+    /// the subtree rooted at that node.
+    fn combine<'db>(
+        &mut self,
+        db: &'db dyn Db,
+        builder: &ConstraintSetBuilder<'db>,
+        if_true: Self::Result,
+        if_uncertain: Self::Result,
+        if_false: Self::Result,
+    ) -> ControlFlow<Self::Break, Self::Result>;
+}
+
+impl<T> PathVisitor for T
+where
+    T: PathFold,
+{
+    type Result = <T as PathFold>::Result;
+    type Interior = ();
+    type Break = <T as PathFold>::Break;
+
+    fn visit_satisfied<'db>(
+        &mut self,
+        db: &'db dyn Db,
+        builder: &ConstraintSetBuilder<'db>,
+        path: &PathAssignments,
+    ) -> ControlFlow<Self::Break, Self::Result> {
+        PathFold::satisfied(self, db, builder, path)
+    }
+
+    fn visit_unsatisfied<'db>(
+        &mut self,
+        db: &'db dyn Db,
+        builder: &ConstraintSetBuilder<'db>,
+        path: &PathAssignments,
+    ) -> ControlFlow<Self::Break, Self::Result> {
+        PathFold::unsatisfied(self, db, builder, path)
+    }
+
+    fn visit_impossible<'db>(
+        &mut self,
+        db: &'db dyn Db,
+        builder: &ConstraintSetBuilder<'db>,
+        path: &PathAssignments,
+    ) -> ControlFlow<Self::Break, Self::Result> {
+        PathFold::impossible(self, db, builder, path)
+    }
+
+    fn enter_interior<'db>(
+        &mut self,
+        _db: &'db dyn Db,
+        _builder: &ConstraintSetBuilder<'db>,
+        _interior_node: InteriorNode,
+    ) -> ControlFlow<Self::Break, Self::Interior> {
+        ControlFlow::Continue(())
+    }
+
+    fn visit_edge<'db>(
+        &mut self,
+        _db: &'db dyn Db,
+        _builder: &ConstraintSetBuilder<'db>,
+        _interior_value: &Self::Interior,
+        subtree: Self::Result,
+        _path: &PathAssignments,
+        _new_range: Range<usize>,
+    ) -> ControlFlow<Self::Break, Self::Result> {
+        ControlFlow::Continue(subtree)
+    }
+
+    fn leave_interior<'db>(
+        &mut self,
+        db: &'db dyn Db,
+        builder: &ConstraintSetBuilder<'db>,
+        _interior_value: &Self::Interior,
+        if_true: Self::Result,
+        if_uncertain: Self::Result,
+        if_false: Self::Result,
+    ) -> ControlFlow<Self::Break, Self::Result> {
+        PathFold::combine(self, db, builder, if_true, if_uncertain, if_false)
+    }
+}
+
+/// A path visitor that breaks early if it encounters a satisfied path. When applying this visitor,
+/// a `Continue` result indicates that no satisfied path was found, and the BDD was therefore
+/// unsatisfiable. A `Break` result indicates the opposite.
+struct IsNeverSatisfiedVisitor;
+
+impl PathFold for IsNeverSatisfiedVisitor {
+    type Result = ();
+    type Break = ();
+
+    fn satisfied<'db>(
+        &mut self,
+        _db: &'db dyn Db,
+        _builder: &ConstraintSetBuilder<'db>,
+        _path: &PathAssignments,
+    ) -> ControlFlow<Self::Break, Self::Result> {
+        ControlFlow::Break(())
+    }
+
+    fn unsatisfied<'db>(
+        &mut self,
+        _db: &'db dyn Db,
+        _builder: &ConstraintSetBuilder<'db>,
+        _path: &PathAssignments,
+    ) -> ControlFlow<Self::Break, Self::Result> {
+        ControlFlow::Continue(())
+    }
+
+    fn impossible<'db>(
+        &mut self,
+        _db: &'db dyn Db,
+        _builder: &ConstraintSetBuilder<'db>,
+        _path: &PathAssignments,
+    ) -> ControlFlow<Self::Break, Self::Result> {
+        ControlFlow::Continue(())
+    }
+
+    fn combine<'db>(
+        &mut self,
+        _db: &'db dyn Db,
+        _builder: &ConstraintSetBuilder<'db>,
+        _if_true: Self::Result,
+        _if_uncertain: Self::Result,
+        _if_false: Self::Result,
+    ) -> ControlFlow<Self::Break, Self::Result> {
+        ControlFlow::Continue(())
     }
 }
 
@@ -6550,38 +6608,250 @@ impl SequentMap {
 /// constraint that we are currently considering.
 #[derive(Debug)]
 pub(crate) struct PathAssignments {
-    map: SequentMap,
+    /// All of the rules that we know for inferring derived constraints on the current path.
+    sequents: Vec<Sequent>,
     /// Each assignment's source order and the first per-path fuel value with which it was derived.
     assignments: FxIndexMap<ConstraintAssignment, (usize, u16)>,
     /// Additional per-path fuel values that can derive an assignment, keyed by its index in
     /// `assignments`. These are stored separately so that branch-local additions can be rolled
     /// back by truncating the set. Only the greatest fuel value participates in further
     /// derivation.
-    additional_fuels: FxIndexSet<(usize, u16)>,
+    additional_fuels: Vec<(usize, u16)>,
     /// The amount of global fuel that remains across all assignments and paths.
     remaining_overall_fuel: u16,
     /// Constraints that we have discovered, mapped to whether we have processed them yet. (This
     /// ensures a stable order for all of the derived constraints that we create, while still
     /// letting us create them lazily.)
     discovered: FxIndexMap<ConstraintId, bool>,
+
+    /// Derived assignments that have been queued up to be added to the current path.
+    assignment_queue: VecDeque<(ConstraintAssignment, AssignmentFuel)>,
+
+    /// The next chunk of derived assignments that have been queued up to add to the current path.
+    /// If we derive the same assignment multiple times, we keep the derivation that lets us make
+    /// the most additional progress (more remaining fuel for this derivation chain, less overall
+    /// fuel consumed).
+    new_assignments: FxIndexMap<ConstraintAssignment, AssignmentFuel>,
+}
+
+/// The total amount of fuel that we are willing to spend for this path traversal. This was
+/// chosen empirically, to balance performance with accurate ecosystem diagnostics.
+const OVERALL_FUEL_BUDGET: u16 = 256;
+
+/// The maximum number of "trips through the sequent map" that we are willing to take for a
+/// derived constraint. This records how far removed we are from a constraint that comes
+/// directly from the BDD.
+const PATH_FUEL_BUDGET: u16 = 8;
+
+/// The fuel cost of deriving a particular assignment during BDD path walking.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+struct AssignmentFuel {
+    /// The amount of fuel consumed when deriving the assignment, or None if this assignment came
+    /// directly from the BDD
+    consumed: Option<u16>,
+    /// The amount of fuel remaining on the derivation path after deriving this assignment
+    remaining: u16,
+}
+
+impl AssignmentFuel {
+    fn origin() -> AssignmentFuel {
+        AssignmentFuel {
+            consumed: None,
+            remaining: PATH_FUEL_BUDGET,
+        }
+    }
+
+    fn derived(consumed: u16, remaining: u16) -> AssignmentFuel {
+        AssignmentFuel {
+            consumed: Some(consumed),
+            remaining,
+        }
+    }
+
+    fn is_derived(self) -> bool {
+        self.consumed.is_some()
+    }
+}
+
+impl PartialOrd for AssignmentFuel {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for AssignmentFuel {
+    fn cmp(&self, other: &Self) -> Ordering {
+        let self_key = (self.remaining, std::cmp::Reverse(self.consumed));
+        let other_key = (other.remaining, std::cmp::Reverse(other.consumed));
+        self_key.cmp(&other_key)
+    }
 }
 
 impl PathAssignments {
     fn new(constraints: impl IntoIterator<Item = ConstraintId>) -> Self {
-        /// The total amount of fuel that we are willing to spend for this path traversal. This was
-        /// chosen empirically, to balance performance with accurate ecosystem diagnostics.
-        const OVERALL_FUEL_BUDGET: u16 = 256;
-
         let discovered = constraints
             .into_iter()
             .map(|constraint| (constraint, false))
             .collect();
         Self {
-            map: SequentMap::default(),
+            sequents: Vec::default(),
             assignments: FxIndexMap::default(),
-            additional_fuels: FxIndexSet::default(),
+            additional_fuels: Vec::default(),
             discovered,
             remaining_overall_fuel: OVERALL_FUEL_BUDGET,
+            assignment_queue: VecDeque::default(),
+            new_assignments: FxIndexMap::default(),
+        }
+    }
+
+    fn visit<'db, V>(
+        &mut self,
+        db: &'db dyn Db,
+        builder: &ConstraintSetBuilder<'db>,
+        node: NodeId,
+        visitor: &mut V,
+    ) -> ControlFlow<V::Break, V::Result>
+    where
+        V: PathVisitor,
+    {
+        self.visit_inner(db, builder, node, visitor, false)
+    }
+
+    /// Visits the paths of the negation of `node`, without constructing that negation eagerly.
+    fn visit_negated<'db, V>(
+        &mut self,
+        db: &'db dyn Db,
+        builder: &ConstraintSetBuilder<'db>,
+        node: NodeId,
+        visitor: &mut V,
+    ) -> ControlFlow<V::Break, V::Result>
+    where
+        V: PathVisitor,
+    {
+        self.visit_inner(db, builder, node, visitor, true)
+    }
+
+    fn visit_inner<'db, V>(
+        &mut self,
+        db: &'db dyn Db,
+        builder: &ConstraintSetBuilder<'db>,
+        node: NodeId,
+        visitor: &mut V,
+        negated: bool,
+    ) -> ControlFlow<V::Break, V::Result>
+    where
+        V: PathVisitor,
+    {
+        match node.node() {
+            Node::AlwaysTrue if negated => visitor.visit_unsatisfied(db, builder, self),
+            Node::AlwaysTrue => visitor.visit_satisfied(db, builder, self),
+
+            Node::AlwaysFalse if negated => visitor.visit_satisfied(db, builder, self),
+            Node::AlwaysFalse => visitor.visit_unsatisfied(db, builder, self),
+
+            Node::Interior(interior) => {
+                let interior_value = visitor.enter_interior(db, builder, interior)?;
+                let interior = builder.interior_node_data(node);
+
+                let true_subtree = if negated {
+                    interior.if_true.or(builder, interior.if_uncertain)
+                } else {
+                    interior.if_true
+                };
+                let if_true = self.walk_edge(
+                    db,
+                    builder,
+                    interior.constraint.when_true(),
+                    interior.source_order,
+                    |path, new_range, found_conflict| {
+                        let subtree = if found_conflict {
+                            visitor.visit_impossible(db, builder, path)
+                        } else {
+                            path.visit_inner(db, builder, true_subtree, visitor, negated)
+                        };
+                        match subtree {
+                            ControlFlow::Continue(subtree) => visitor.visit_edge(
+                                db,
+                                builder,
+                                &interior_value,
+                                subtree,
+                                path,
+                                new_range,
+                            ),
+                            ControlFlow::Break(b) => ControlFlow::Break(b),
+                        }
+                    },
+                )?;
+
+                let if_uncertain = if negated {
+                    let subtree = visitor.visit_impossible(db, builder, self)?;
+                    visitor.visit_edge(db, builder, &interior_value, subtree, self, 0..0)?
+                } else {
+                    self.walk_edge(
+                        db,
+                        builder,
+                        interior.constraint.when_unconstrained(),
+                        interior.source_order,
+                        |path, new_range, found_conflict| {
+                            let subtree = if found_conflict {
+                                visitor.visit_impossible(db, builder, path)
+                            } else {
+                                path.visit_inner(db, builder, interior.if_uncertain, visitor, false)
+                            };
+                            match subtree {
+                                ControlFlow::Continue(subtree) => visitor.visit_edge(
+                                    db,
+                                    builder,
+                                    &interior_value,
+                                    subtree,
+                                    path,
+                                    new_range,
+                                ),
+                                ControlFlow::Break(b) => ControlFlow::Break(b),
+                            }
+                        },
+                    )?
+                };
+
+                let false_subtree = if negated {
+                    interior.if_false.or(builder, interior.if_uncertain)
+                } else {
+                    interior.if_false
+                };
+                let if_false = self.walk_edge(
+                    db,
+                    builder,
+                    interior.constraint.when_false(),
+                    interior.source_order,
+                    |path, new_range, found_conflict| {
+                        let subtree = if found_conflict {
+                            visitor.visit_impossible(db, builder, path)
+                        } else {
+                            path.visit_inner(db, builder, false_subtree, visitor, negated)
+                        };
+                        match subtree {
+                            ControlFlow::Continue(subtree) => visitor.visit_edge(
+                                db,
+                                builder,
+                                &interior_value,
+                                subtree,
+                                path,
+                                new_range,
+                            ),
+                            ControlFlow::Break(b) => ControlFlow::Break(b),
+                        }
+                    },
+                )?;
+
+                visitor.leave_interior(
+                    db,
+                    builder,
+                    &interior_value,
+                    if_true,
+                    if_uncertain,
+                    if_false,
+                )
+            }
         }
     }
 
@@ -6613,13 +6883,8 @@ impl PathAssignments {
         builder: &ConstraintSetBuilder<'db>,
         assignment: ConstraintAssignment,
         source_order: usize,
-        f: impl FnOnce(&mut Self, Range<usize>) -> R,
-    ) -> Option<R> {
-        /// The maximum number of "trips through the sequent map" that we are willing to take for a
-        /// derived constraint. This records how far removed we are from a constraint that comes
-        /// directly from the BDD.
-        const PATH_FUEL_BUDGET: u16 = 8;
-
+        f: impl FnOnce(&mut Self, Range<usize>, bool) -> R,
+    ) -> R {
         // Record a snapshot of the assignments that we already knew held — both so that we can
         // pass along the range of which assignments are new, and so that we can reset back to this
         // point before returning.
@@ -6639,24 +6904,13 @@ impl PathAssignments {
             edge = %assignment.display(db, builder),
             "walk edge",
         );
-        let found_conflict = self.add_assignment(
-            db,
-            builder,
-            assignment,
-            source_order,
-            None,
-            PATH_FUEL_BUDGET,
-        );
-        let result = if found_conflict.is_err() {
-            // If that results in the path now being impossible due to a contradiction, return
-            // without invoking the callback.
-            None
-        } else {
-            // Otherwise invoke the callback to keep traversing the BDD. The callback will likely
-            // traverse additional edges, which might add more to our `assignments` set. But even
-            // if that happens, `start..end` will mark the assignments that were added by the
-            // `add_assignment` call above — that is, the new assignment for this edge along with
-            // the derived information we inferred from it.
+        debug_assert!(self.assignment_queue.is_empty());
+        self.assignment_queue
+            .push_back((assignment, AssignmentFuel::origin()));
+        let found_conflict = self
+            .drain_assignment_queue(db, builder, source_order)
+            .is_err();
+        if !found_conflict {
             tracing::trace!(
                 target: "ty_python_semantic::types::constraints::PathAssignment",
                 new = %format_args!(
@@ -6667,12 +6921,18 @@ impl PathAssignments {
                 ),
                 "new assignments",
             );
-            let end = self.assignments.len();
-            Some(f(self, start..end))
-        };
+        }
+        // Otherwise invoke the callback to keep traversing the BDD. The callback will likely
+        // traverse additional edges, which might add more to our `assignments` set. But even
+        // if that happens, `start..end` will mark the assignments that were added by the
+        // `add_assignment` call above — that is, the new assignment for this edge along with
+        // the derived information we inferred from it.
+        let end = self.assignments.len();
+        let result = f(self, start..end, found_conflict);
 
         // Reset back to where we were before following this edge, so that the caller can reuse a
         // single instance for the entire BDD traversal.
+        self.assignment_queue.clear();
         self.assignments.truncate(start);
         self.additional_fuels.truncate(additional_fuels_start);
         self.remaining_overall_fuel = previous_remaining_overall_fuel;
@@ -6699,7 +6959,7 @@ impl PathAssignments {
     }
 
     /// Returns the greatest remaining fuel for any derivation of `assignment` on this path.
-    fn fuel_for(&self, assignment: ConstraintAssignment) -> Option<u16> {
+    fn max_remaining_fuel_for(&self, assignment: ConstraintAssignment) -> Option<u16> {
         let (index, _, (_, first_fuel)) = self.assignments.get_full(&assignment)?;
         let max_fuel = self
             .additional_fuels
@@ -6729,13 +6989,25 @@ impl PathAssignments {
         }
 
         let single_map = SequentMap::for_constraint(db, builder, constraint);
-        self.map.merge(&single_map);
+        self.sequents.extend_from_slice(&single_map.sequents);
         drop(single_map);
 
         for existing in self.discovered.keys().dropping_back(1) {
             let pair_map = SequentMap::for_constraint_pair(db, builder, *existing, constraint);
-            self.map.merge(&pair_map);
+            self.sequents.extend_from_slice(&pair_map.sequents);
         }
+    }
+
+    fn drain_assignment_queue<'db>(
+        &mut self,
+        db: &'db dyn Db,
+        builder: &ConstraintSetBuilder<'db>,
+        source_order: usize,
+    ) -> Result<(), PathAssignmentConflict> {
+        while let Some((assignment, fuel)) = self.assignment_queue.pop_front() {
+            self.add_assignment(db, builder, assignment, source_order, fuel)?;
+        }
+        Ok(())
     }
 
     /// Adds a new assignment, along with any derived information that we can infer from the new
@@ -6747,8 +7019,7 @@ impl PathAssignments {
         builder: &ConstraintSetBuilder<'db>,
         assignment: ConstraintAssignment,
         source_order: usize,
-        derived_fuel_cost: Option<u16>,
-        path_fuel: u16,
+        fuel: AssignmentFuel,
     ) -> Result<(), PathAssignmentConflict> {
         if matches!(assignment, ConstraintAssignment::Unconstrained(_)) {
             // An `Unconstrained` assignment means "this constraint can go either way". If there is
@@ -6763,7 +7034,7 @@ impl PathAssignments {
             // assignment, but as an optimization we can return early without actually querying the
             // sequent map.
             self.assignments
-                .insert(assignment, (source_order, path_fuel));
+                .insert(assignment, (source_order, fuel.remaining));
             return Ok(());
         }
 
@@ -6785,14 +7056,14 @@ impl PathAssignments {
 
         match self.assignments.entry(assignment) {
             Entry::Vacant(entry) => {
-                if let Some(fuel_cost) = derived_fuel_cost {
+                if let Some(fuel_cost) = fuel.consumed {
                     self.remaining_overall_fuel =
                         match self.remaining_overall_fuel.checked_sub(fuel_cost) {
                             Some(updated_fuel) => updated_fuel,
                             None => return Ok(()),
                         };
                 }
-                entry.insert((source_order, path_fuel));
+                entry.insert((source_order, fuel.remaining));
             }
 
             Entry::Occupied(mut entry) => {
@@ -6803,7 +7074,7 @@ impl PathAssignments {
                 // the BDD structure) and as a "derived" constraint (we infer it from other
                 // constraints), we should prefer the origin source_order, regardless of which
                 // order we encounter the various constraints in the BDD.
-                if derived_fuel_cost.is_none() {
+                if !fuel.is_derived() {
                     *existing_source_order = source_order;
                 }
 
@@ -6818,12 +7089,12 @@ impl PathAssignments {
                 // There is another derivation of this assignment that already provides at least as
                 // much fuel as this constraint. That means replenishing the fuel won't have any
                 // effect.
-                if *existing_fuel >= path_fuel
+                if *existing_fuel >= fuel.remaining
                     || self
                         .additional_fuels
                         .iter()
                         .any(|(fuel_index, existing_fuel)| {
-                            *fuel_index == index && *existing_fuel >= path_fuel
+                            *fuel_index == index && *existing_fuel >= fuel.remaining
                         })
                 {
                     return Ok(());
@@ -6831,7 +7102,7 @@ impl PathAssignments {
 
                 // Record the replenished fuel separately so that `walk_edge` can restore the
                 // parent branch by truncating `additional_fuels`.
-                self.additional_fuels.insert((index, path_fuel));
+                self.additional_fuels.push((index, fuel.remaining));
             }
         }
 
@@ -6847,120 +7118,157 @@ impl PathAssignments {
         // don't anticipate the sequent maps to be very large. We might consider avoiding the
         // brute-force search.
 
+        self.new_assignments.clear();
         self.discover_constraint(db, builder, assignment.constraint());
 
-        #[expect(
-            clippy::iter_over_hash_type,
-            reason = "any matching tautology yields the same conflict result"
-        )]
-        for ante in &self.map.single_tautologies {
-            if self.assignment_holds(ante.when_false()) {
-                // The sequent map says (ante1) is always true, and the current path asserts that
-                // it's false.
-                tracing::trace!(
-                    target: "ty_python_semantic::types::constraints::PathAssignment",
-                    ante = %ante.display(db, builder),
-                    facts = %format_args!(
-                        "[{}]",
-                        self.assignments.iter().map(|(assignment, _)| {
-                            assignment.display(db, builder)
-                        }).format(", "),
-                    ),
-                    "found contradiction",
-                );
-                return Err(PathAssignmentConflict);
-            }
+        for i in 0..self.sequents.len() {
+            let sequent = self.sequents[i];
+            self.check_sequent(db, builder, sequent)?;
         }
 
-        #[expect(
-            clippy::iter_over_hash_type,
-            reason = "any matching impossibility yields the same conflict result"
-        )]
-        for (ante1, ante2) in &self.map.pair_impossibilities {
-            if self.assignment_holds(ante1.when_true()) && self.assignment_holds(ante2.when_true())
-            {
-                // The sequent map says (ante1 ∧ ante2) is an impossible combination, and the
-                // current path asserts that both are true.
-                tracing::trace!(
-                    target: "ty_python_semantic::types::constraints::PathAssignment",
-                    ante1 = %ante1.display(db, builder),
-                    ante2 = %ante2.display(db, builder),
-                    facts = %format_args!(
-                        "[{}]",
-                        self.assignments.iter().map(|(assignment, _)| {
-                            assignment.display(db, builder)
-                        }).format(", "),
-                    ),
-                    "found contradiction",
-                );
-                return Err(PathAssignmentConflict);
+        // If we were able to derive any new assignments from this one, add them to the processing
+        // queue.
+        self.assignment_queue.extend(self.new_assignments.drain(..));
+
+        Ok(())
+    }
+
+    fn enqueue_assignment(&mut self, assignment: ConstraintAssignment, new_fuel: AssignmentFuel) {
+        self.new_assignments
+            .entry(assignment)
+            .and_modify(|existing_fuel| {
+                *existing_fuel = std::cmp::max(*existing_fuel, new_fuel);
+            })
+            .or_insert(new_fuel);
+    }
+
+    fn check_sequent<'db>(
+        &mut self,
+        db: &'db dyn Db,
+        builder: &ConstraintSetBuilder<'db>,
+        sequent: Sequent,
+    ) -> Result<(), PathAssignmentConflict> {
+        match sequent {
+            Sequent::SingleTautology { ante } => self.check_single_tautology(db, builder, ante),
+            Sequent::PairImpossibility { ante1, ante2 } => {
+                self.check_pair_impossibility(db, builder, ante1, ante2)
+            }
+            Sequent::PairImplication { ante1, ante2, post } => {
+                self.check_pair_implication(db, builder, ante1, ante2, post);
+                Ok(())
+            }
+            Sequent::SingleImplication { ante, post } => {
+                self.check_single_implication(db, builder, ante, post);
+                Ok(())
             }
         }
+    }
 
-        let mut new_constraints: FxIndexMap<ConstraintId, (u16, u16)> = FxIndexMap::default();
-        let mut add_new_constraint = |constraint, available_fuel: u16, fuel_cost: u16| {
-            if let Some(post_fuel) = available_fuel.checked_sub(fuel_cost) {
-                let new_fuel = (post_fuel, fuel_cost);
-                new_constraints
-                    .entry(constraint)
-                    .and_modify(|existing_fuel| {
-                        *existing_fuel = std::cmp::max_by_key(
-                            *existing_fuel,
-                            new_fuel,
-                            |&(post_fuel, fuel_cost)| (post_fuel, std::cmp::Reverse(fuel_cost)),
-                        );
-                    })
-                    .or_insert(new_fuel);
-            }
-        };
-
-        for ((ante1, ante2), posts) in &self.map.pair_implications {
-            let Some(ante1_fuel) = self.fuel_for(ante1.when_true()) else {
-                continue;
-            };
-            let Some(ante2_fuel) = self.fuel_for(ante2.when_true()) else {
-                continue;
-            };
-            let available_fuel = ante1_fuel.min(ante2_fuel);
-            let (ante1_constructor_depth, _) = builder.cached_constraint_bound_depth(db, *ante1);
-            let (ante2_constructor_depth, _) = builder.cached_constraint_bound_depth(db, *ante2);
-            let antecedent_constructor_depth = ante1_constructor_depth.max(ante2_constructor_depth);
-            for post in posts {
-                let fuel_cost = builder.sequent_fuel_cost(db, *post, antecedent_constructor_depth);
-                add_new_constraint(*post, available_fuel, fuel_cost);
-            }
-        }
-
-        for (ante, posts) in &self.map.single_implications {
-            let Some(available_fuel) = self.fuel_for(ante.when_true()) else {
-                continue;
-            };
-            let ante_data = builder.constraint_data(*ante);
-            let (antecedent_constructor_depth, _) =
-                builder.cached_constraint_bound_depth(db, *ante);
-            for post in posts {
-                let post_data = builder.constraint_data(*post);
-                let fuel_cost = if post_data.is_bound_projection_of(db, ante_data) {
-                    1
-                } else {
-                    builder.sequent_fuel_cost(db, *post, antecedent_constructor_depth)
-                };
-                add_new_constraint(*post, available_fuel, fuel_cost);
-            }
-        }
-
-        for (new_constraint, (available_fuel, fuel_cost)) in new_constraints {
-            self.add_assignment(
-                db,
-                builder,
-                new_constraint.when_true(),
-                source_order,
-                Some(fuel_cost),
-                available_fuel,
-            )?;
+    fn check_single_tautology<'db>(
+        &mut self,
+        db: &'db dyn Db,
+        builder: &ConstraintSetBuilder<'db>,
+        ante: ConstraintId,
+    ) -> Result<(), PathAssignmentConflict> {
+        if self.assignment_holds(ante.when_false()) {
+            // The sequent map says (ante1) is always true, and the current path asserts that
+            // it's false.
+            tracing::trace!(
+                target: "ty_python_semantic::types::constraints::PathAssignment",
+                ante = %ante.display(db, builder),
+                facts = %format_args!(
+                    "[{}]",
+                    self.assignments.iter().map(|(assignment, _)| {
+                        assignment.display(db, builder)
+                    }).format(", "),
+                ),
+                "found contradiction",
+            );
+            return Err(PathAssignmentConflict);
         }
 
         Ok(())
+    }
+
+    fn check_pair_impossibility<'db>(
+        &mut self,
+        db: &'db dyn Db,
+        builder: &ConstraintSetBuilder<'db>,
+        ante1: ConstraintId,
+        ante2: ConstraintId,
+    ) -> Result<(), PathAssignmentConflict> {
+        if self.assignment_holds(ante1.when_true()) && self.assignment_holds(ante2.when_true()) {
+            // The sequent map says (ante1 ∧ ante2) is an impossible combination, and the
+            // current path asserts that both are true.
+            tracing::trace!(
+                target: "ty_python_semantic::types::constraints::PathAssignment",
+                ante1 = %ante1.display(db, builder),
+                ante2 = %ante2.display(db, builder),
+                facts = %format_args!(
+                    "[{}]",
+                    self.assignments.iter().map(|(assignment, _)| {
+                        assignment.display(db, builder)
+                    }).format(", "),
+                ),
+                "found contradiction",
+            );
+            return Err(PathAssignmentConflict);
+        }
+
+        Ok(())
+    }
+
+    fn check_pair_implication<'db>(
+        &mut self,
+        db: &'db dyn Db,
+        builder: &ConstraintSetBuilder<'db>,
+        ante1: ConstraintId,
+        ante2: ConstraintId,
+        post: ConstraintId,
+    ) {
+        let Some(ante1_fuel) = self.max_remaining_fuel_for(ante1.when_true()) else {
+            return;
+        };
+        let Some(ante2_fuel) = self.max_remaining_fuel_for(ante2.when_true()) else {
+            return;
+        };
+        let available_fuel = ante1_fuel.min(ante2_fuel);
+        let (ante1_constructor_depth, _) = builder.cached_constraint_bound_depth(db, ante1);
+        let (ante2_constructor_depth, _) = builder.cached_constraint_bound_depth(db, ante2);
+        let antecedent_constructor_depth = ante1_constructor_depth.max(ante2_constructor_depth);
+        let fuel_cost = builder.sequent_fuel_cost(db, post, antecedent_constructor_depth);
+        if let Some(post_fuel) = available_fuel.checked_sub(fuel_cost) {
+            self.enqueue_assignment(
+                post.when_true(),
+                AssignmentFuel::derived(fuel_cost, post_fuel),
+            );
+        }
+    }
+
+    fn check_single_implication<'db>(
+        &mut self,
+        db: &'db dyn Db,
+        builder: &ConstraintSetBuilder<'db>,
+        ante: ConstraintId,
+        post: ConstraintId,
+    ) {
+        let Some(available_fuel) = self.max_remaining_fuel_for(ante.when_true()) else {
+            return;
+        };
+        let ante_data = builder.constraint_data(ante);
+        let (antecedent_constructor_depth, _) = builder.cached_constraint_bound_depth(db, ante);
+        let post_data = builder.constraint_data(post);
+        let fuel_cost = if post_data.is_bound_projection_of(db, ante_data) {
+            1
+        } else {
+            builder.sequent_fuel_cost(db, post, antecedent_constructor_depth)
+        };
+        if let Some(post_fuel) = available_fuel.checked_sub(fuel_cost) {
+            self.enqueue_assignment(
+                post.when_true(),
+                AssignmentFuel::derived(fuel_cost, post_fuel),
+            );
+        }
     }
 }
 
@@ -7621,6 +7929,224 @@ mod tests {
         });
     }
 
+    #[derive(Clone, Copy)]
+    struct PermutedConstraint<'db>(
+        BoundTypeVarInstance<'db>,
+        Option<Type<'db>>,
+        Option<Type<'db>>,
+    );
+
+    impl<'db> PermutedConstraint<'db> {
+        fn node(self, db: &'db dyn Db, builder: &ConstraintSetBuilder<'db>) -> NodeId {
+            let PermutedConstraint(typevar, lower, upper) = self;
+            Constraint::new_node_with_bounds(db, builder, typevar, lower, upper)
+        }
+    }
+
+    /// Tests that we get the same set of solutions for a constraint set, regardless of the
+    /// variable ordering that is chosen for its "atoms" (the raw constraints that the constraint
+    /// set is built from).
+    ///
+    /// TODO: We _don't_ currently get a consistent result for each permutation. Right now,
+    /// `expected` is a list of all of the different results that we get. Once we solve all of the
+    /// sources of nondeterminism, `expected` should become a single string, and we should verify
+    /// that we get that specific result for each permutation.
+    #[track_caller]
+    fn check_solutions_for_constraint_orderings<'db>(
+        db: &'db dyn Db,
+        typevars: &[BoundTypeVarInstance<'db>],
+        atoms: &[PermutedConstraint<'db>],
+        build_bdd: impl Fn(&ConstraintSetBuilder<'db>) -> NodeId,
+        expected: impl IntoIterator<Item = &'static str>,
+    ) {
+        let inferable = InferableTypeVars::from_typevars(
+            db,
+            typevars
+                .iter()
+                .map(|typevar| typevar.identity(db))
+                .collect(),
+        );
+        let mut signatures = FxIndexSet::default();
+
+        for constraint_order in (0..atoms.len()).permutations(atoms.len()) {
+            let builder = ConstraintSetBuilder::new();
+            for typevar in typevars {
+                builder.intern_typevar(db, *typevar);
+            }
+            for index in constraint_order {
+                let PermutedConstraint(typevar, lower, upper) = atoms[index];
+                builder.intern_constraint(
+                    db,
+                    Constraint {
+                        typevar,
+                        bounds: ConstraintBounds::new(lower, upper),
+                    },
+                );
+            }
+
+            let set = ConstraintSet::from_node(&builder, build_bdd(&builder));
+            let solutions = set.solutions(db, &builder, inferable);
+            let mut merged = FxHashMap::default();
+            if let Solutions::Constrained(paths) = &solutions {
+                for path in paths {
+                    for binding in path {
+                        merged
+                            .entry(binding.bound_typevar)
+                            .and_modify(|existing| {
+                                *existing =
+                                    UnionType::from_two_elements(db, *existing, binding.solution);
+                            })
+                            .or_insert(binding.solution);
+                    }
+                }
+            }
+            let merged = typevars
+                .iter()
+                .filter_map(|typevar| {
+                    merged.get(typevar).map(|ty| {
+                        format!("{}={}", typevar.identity(db).display(db), ty.display(db))
+                    })
+                })
+                .join(", ");
+            let paths = match &solutions {
+                Solutions::Unsatisfiable => String::from("unsatisfiable"),
+                Solutions::Unconstrained => String::from("unconstrained"),
+                Solutions::Constrained(paths) => paths
+                    .iter()
+                    .map(|path| {
+                        path.iter()
+                            .map(|binding| {
+                                format!(
+                                    "{}={}",
+                                    binding.bound_typevar.identity(db).display(db),
+                                    binding.solution.display(db)
+                                )
+                            })
+                            .join(", ")
+                    })
+                    .join("; "),
+            };
+            signatures.insert(format!(
+                "never={} always={} merged=[{merged}] paths=[{paths}]",
+                set.is_never_satisfied(db),
+                set.is_always_satisfied(db),
+            ));
+        }
+
+        let expected: FxIndexSet<_> = expected.into_iter().map(String::from).collect();
+        assert_eq!(signatures, expected);
+    }
+
+    #[test]
+    fn constraint_ordering_changes_nested_transitive_solutions() {
+        let db = setup_db();
+        let t = create_typevar(&db, "T");
+        let u = create_typevar(&db, "U");
+        let v = create_typevar(&db, "V");
+        let int = KnownClass::Int.to_instance(&db);
+        let bytes = KnownClass::Bytes.to_instance(&db);
+        let list_u = KnownClass::List.to_specialized_instance(&db, &[Type::TypeVar(u)]);
+        let list_int = KnownClass::List.to_specialized_instance(&db, &[int]);
+        let atoms = [
+            PermutedConstraint(t, None, Some(list_u)),
+            PermutedConstraint(u, None, Some(int)),
+            PermutedConstraint(t, Some(list_int), None),
+            PermutedConstraint(v, Some(bytes), None),
+        ];
+
+        check_solutions_for_constraint_orderings(
+            &db,
+            &[t, u, v],
+            &atoms,
+            |builder| {
+                let [t_list_u, u_int, list_int_t, bytes_v] =
+                    atoms.map(|atom| atom.node(&db, builder));
+                t_list_u
+                    .and_with_offset(builder, u_int)
+                    .and_with_offset(builder, list_int_t)
+                    .or_with_offset(builder, bytes_v)
+            },
+            // TODO: All permutations should produce the first result. TDD traversal currently
+            // leaks irrelevant positive constraints onto the `V = bytes` alternative.
+            [
+                "never=false always=false merged=[T=list[int], U=int, V=bytes] paths=[T=list[int], U=int; V=bytes]",
+                "never=false always=false merged=[T=list[int], U=int, V=bytes] paths=[T=list[int], U=int; T=list[int], V=bytes; V=bytes]",
+                "never=false always=false merged=[T=list[int], U=int, V=bytes] paths=[T=list[int], U=int; U=int, V=bytes; V=bytes]",
+                "never=false always=false merged=[T=list[int] | list[U], U=int, V=bytes] paths=[T=list[int], U=int; T=list[U], V=bytes; V=bytes]",
+            ],
+        );
+    }
+
+    #[test]
+    fn constraint_ordering_changes_negated_alternative_solutions() {
+        let db = setup_db();
+        let t = create_typevar(&db, "T");
+        let u = create_typevar(&db, "U");
+        let int = KnownClass::Int.to_instance(&db);
+        let str = KnownClass::Str.to_instance(&db);
+        let bytes = KnownClass::Bytes.to_instance(&db);
+        let atoms = [
+            PermutedConstraint(t, None, Some(int)),
+            PermutedConstraint(t, None, Some(str)),
+            PermutedConstraint(u, Some(bytes), None),
+        ];
+
+        check_solutions_for_constraint_orderings(
+            &db,
+            &[t, u],
+            &atoms,
+            |builder| {
+                let [t_int, t_str, bytes_u] = atoms.map(|atom| atom.node(&db, builder));
+                t_int
+                    .or_with_offset(builder, t_str)
+                    .negate(builder)
+                    .or_with_offset(builder, bytes_u)
+            },
+            // TODO: All permutations should produce the first result. A satisfied alternative
+            // should not infer `T` from unrelated positive decisions made earlier in a BDD path.
+            [
+                "never=false always=false merged=[U=bytes] paths=[; U=bytes]",
+                "never=false always=false merged=[T=str, U=bytes] paths=[; T=str, U=bytes; U=bytes]",
+                "never=false always=false merged=[T=int, U=bytes] paths=[; T=int, U=bytes; U=bytes]",
+            ],
+        );
+    }
+
+    #[test]
+    fn constraint_ordering_changes_derived_upper_bound_display() {
+        let db = setup_db();
+        let t = create_typevar(&db, "T");
+        let u = create_typevar(&db, "U");
+        let int = KnownClass::Int.to_instance(&db);
+        let str = KnownClass::Str.to_instance(&db);
+        let atoms = [
+            PermutedConstraint(t, None, Some(int)),
+            PermutedConstraint(t, None, Some(str)),
+            PermutedConstraint(t, Some(int), None),
+            PermutedConstraint(u, None, Some(int)),
+        ];
+
+        check_solutions_for_constraint_orderings(
+            &db,
+            &[t, u],
+            &atoms,
+            |builder| {
+                let [t_int, t_str, int_t, u_int] = atoms.map(|atom| atom.node(&db, builder));
+                t_int
+                    .or_with_offset(builder, t_str)
+                    .and_with_offset(builder, int_t)
+                    .and_with_offset(builder, u_int)
+            },
+            // TODO: `SequentMap::for_constraint_pair` can receive its inputs in BDD order, not
+            // source order. That changes which equivalent upper-bound intersection is constructed
+            // first.
+            [
+                "never=false always=false merged=[T=int | U, U=T & int] paths=[T=int | U, U=T & int]",
+                "never=false always=false merged=[T=int | U, U=int & T] paths=[T=int | U, U=int & T]",
+            ],
+        );
+    }
+
     #[track_caller]
     fn check_display_graph<'db, 'c>(
         db: &'db dyn Db,
@@ -7806,6 +8332,232 @@ mod tests {
 
         // T ∨ ¬T == true
         assert!(tdd.or(&db, &builder, || negated).is_always_satisfied(&db));
+    }
+
+    #[test]
+    fn eager_and_lazy_negation_are_equivalent() {
+        let db = setup_db();
+        let t = create_typevar(&db, "T");
+        let u = create_typevar(&db, "U");
+        let builder = ConstraintSetBuilder::new();
+
+        let t_int = create_constraint(&db, &builder, t, KnownClass::Int);
+        let t_bool = create_constraint(&db, &builder, t, KnownClass::Bool);
+        let u_str = create_constraint(&db, &builder, u, KnownClass::Str);
+        let u_int = create_constraint(&db, &builder, u, KnownClass::Int);
+
+        let lhs = t_int.or(&db, &builder, || u_str);
+        let rhs = t_bool.or(&db, &builder, || u_int);
+        let intersection = lhs.and(&db, &builder, || rhs);
+        let tautology = lhs.or(&db, &builder, || lhs.negate(&db, &builder));
+
+        let t_bool_upper = ConstraintSet::constrain_typevar_upper_bound(
+            &db,
+            &builder,
+            t,
+            KnownClass::Bool.to_instance(&db),
+        );
+        let t_int_upper = ConstraintSet::constrain_typevar_upper_bound(
+            &db,
+            &builder,
+            t,
+            KnownClass::Int.to_instance(&db),
+        );
+        let implication = t_bool_upper
+            .negate(&db, &builder)
+            .or(&db, &builder, || t_int_upper);
+
+        for set in [lhs, rhs, intersection, tautology, implication] {
+            assert_eq!(
+                set.is_always_satisfied(&db),
+                set.negate(&db, &builder).is_never_satisfied(&db)
+            );
+        }
+    }
+
+    #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+    enum PathFoldBreak {
+        Satisfied,
+        Unsatisfied,
+        Impossible,
+        Combine,
+    }
+
+    /// A path fold that reconstructs a constraint set from its satisfied paths and can abort at
+    /// a specified callback.
+    struct ReconstructPathFold {
+        break_at: Option<PathFoldBreak>,
+    }
+
+    impl ReconstructPathFold {
+        fn result(&self, at: PathFoldBreak, result: NodeId) -> ControlFlow<PathFoldBreak, NodeId> {
+            if self.break_at == Some(at) {
+                ControlFlow::Break(at)
+            } else {
+                ControlFlow::Continue(result)
+            }
+        }
+    }
+
+    impl PathFold for ReconstructPathFold {
+        type Result = NodeId;
+        type Break = PathFoldBreak;
+
+        fn satisfied<'db>(
+            &mut self,
+            _db: &'db dyn Db,
+            builder: &ConstraintSetBuilder<'db>,
+            path: &PathAssignments,
+        ) -> ControlFlow<Self::Break, Self::Result> {
+            let result = path.assignments.iter().fold(
+                ALWAYS_TRUE,
+                |result, (assignment, (source_order, _))| {
+                    result.and(
+                        builder,
+                        Node::new_satisfied_constraint(builder, *assignment, *source_order),
+                    )
+                },
+            );
+            self.result(PathFoldBreak::Satisfied, result)
+        }
+
+        fn unsatisfied<'db>(
+            &mut self,
+            _db: &'db dyn Db,
+            _builder: &ConstraintSetBuilder<'db>,
+            _path: &PathAssignments,
+        ) -> ControlFlow<Self::Break, Self::Result> {
+            self.result(PathFoldBreak::Unsatisfied, ALWAYS_FALSE)
+        }
+
+        fn impossible<'db>(
+            &mut self,
+            _db: &'db dyn Db,
+            _builder: &ConstraintSetBuilder<'db>,
+            _path: &PathAssignments,
+        ) -> ControlFlow<Self::Break, Self::Result> {
+            self.result(PathFoldBreak::Impossible, ALWAYS_FALSE)
+        }
+
+        fn combine<'db>(
+            &mut self,
+            _db: &'db dyn Db,
+            builder: &ConstraintSetBuilder<'db>,
+            if_true: Self::Result,
+            if_uncertain: Self::Result,
+            if_false: Self::Result,
+        ) -> ControlFlow<Self::Break, Self::Result> {
+            let result = if_true.or(builder, if_uncertain).or(builder, if_false);
+            self.result(PathFoldBreak::Combine, result)
+        }
+    }
+
+    fn path_assignments_for(builder: &ConstraintSetBuilder<'_>, node: NodeId) -> PathAssignments {
+        match node.node() {
+            Node::AlwaysTrue | Node::AlwaysFalse => PathAssignments::new([]),
+            Node::Interior(interior) => interior.path_assignments(builder),
+        }
+    }
+
+    #[test]
+    fn path_fold_reconstructs_constraint_sets() {
+        let db = setup_db();
+        let t = create_typevar(&db, "T");
+        let u = create_typevar(&db, "U");
+        let v = create_typevar(&db, "V");
+        let builder = ConstraintSetBuilder::new();
+
+        let t_int = create_constraint(&db, &builder, t, KnownClass::Int);
+        let t_str = create_constraint(&db, &builder, t, KnownClass::Str);
+        let u_int = create_constraint(&db, &builder, u, KnownClass::Int);
+        let v_bytes = create_constraint(&db, &builder, v, KnownClass::Bytes);
+        let union = t_int.or(&db, &builder, || u_int);
+        let intersection = union.and(&db, &builder, || t_str.or(&db, &builder, || v_bytes));
+        let contradiction = t_int.and(&db, &builder, || t_str);
+        let tautology = union.or(&db, &builder, || union.negate(&db, &builder));
+
+        let t_u = ConstraintSet::constrain_typevar_upper_bound(&db, &builder, t, Type::TypeVar(u));
+        let u_int_upper = ConstraintSet::constrain_typevar_upper_bound(
+            &db,
+            &builder,
+            u,
+            KnownClass::Int.to_instance(&db),
+        );
+        let int_t = ConstraintSet::constrain_typevar_lower_bound(
+            &db,
+            &builder,
+            t,
+            KnownClass::Int.to_instance(&db),
+        );
+        let transitive = t_u
+            .and(&db, &builder, || u_int_upper)
+            .and(&db, &builder, || int_t)
+            .or(&db, &builder, || v_bytes);
+
+        for set in [
+            ConstraintSet::always(&builder),
+            ConstraintSet::never(&builder),
+            union,
+            intersection,
+            contradiction,
+            tautology,
+            transitive,
+        ] {
+            let mut path = path_assignments_for(&builder, set.node);
+            let mut fold = ReconstructPathFold { break_at: None };
+            let ControlFlow::Continue(reconstructed) =
+                path.visit(&db, &builder, set.node, &mut fold)
+            else {
+                panic!("reconstruction unexpectedly aborted");
+            };
+            let reconstructed = ConstraintSet::from_node(&builder, reconstructed);
+            assert!(
+                set.iff(&db, &builder, reconstructed)
+                    .is_always_satisfied(&db)
+            );
+        }
+    }
+
+    #[test]
+    fn path_fold_break_restores_path_assignments() {
+        let db = setup_db();
+        let t = create_typevar(&db, "T");
+        let u = create_typevar(&db, "U");
+        let builder = ConstraintSetBuilder::new();
+        let t_int = create_constraint(&db, &builder, t, KnownClass::Int);
+        let t_str = create_constraint(&db, &builder, t, KnownClass::Str);
+        let u_int = create_constraint(&db, &builder, u, KnownClass::Int);
+        let set = t_int
+            .and(&db, &builder, || t_str)
+            .or(&db, &builder, || u_int);
+
+        for break_at in [
+            PathFoldBreak::Satisfied,
+            PathFoldBreak::Unsatisfied,
+            PathFoldBreak::Impossible,
+            PathFoldBreak::Combine,
+        ] {
+            let mut path = path_assignments_for(&builder, set.node);
+            let mut aborting_fold = ReconstructPathFold {
+                break_at: Some(break_at),
+            };
+            assert_eq!(
+                path.visit(&db, &builder, set.node, &mut aborting_fold),
+                ControlFlow::Break(break_at)
+            );
+
+            let mut completing_fold = ReconstructPathFold { break_at: None };
+            let ControlFlow::Continue(reconstructed) =
+                path.visit(&db, &builder, set.node, &mut completing_fold)
+            else {
+                panic!("reconstruction unexpectedly aborted after {break_at:?}");
+            };
+            let reconstructed = ConstraintSet::from_node(&builder, reconstructed);
+            assert!(
+                set.iff(&db, &builder, reconstructed)
+                    .is_always_satisfied(&db)
+            );
+        }
     }
 
     /// Double negation of a TDD with uncertain branches is semantically equivalent to the

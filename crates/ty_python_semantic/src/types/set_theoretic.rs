@@ -7,11 +7,12 @@ use crate::place::{
 };
 use crate::types::class::KnownClass;
 use crate::types::enums::EnumComplement;
-use crate::types::{Type, TypeQualifiers};
+use crate::types::{InstanceProjection, Type, TypePair, TypeQualifiers};
 use crate::types::{TypeVarBoundOrConstraints, visitor};
 use crate::{Db, FxOrderSet};
 
 pub(crate) mod builder;
+mod generic_gradual_intersections;
 
 pub(crate) use builder::{IntersectionBuilder, UnionBuilder};
 
@@ -68,16 +69,23 @@ impl<'db> UnionType<'db> {
     }
 
     /// Create a union type `A | B` from two elements `A` and `B`.
-    #[salsa::tracked(
-        returns(copy),
-        cycle_initial=|_, id, _, _| Type::divergent(id),
-        cycle_fn=|db, cycle, previous: &Type<'db>, result: Type<'db>, _, _| {
-            result.cycle_normalized(db, *previous, cycle)
-        },
-        heap_size=ruff_memory_usage::heap_size
-    )]
     pub fn from_two_elements(db: &'db dyn Db, a: Type<'db>, b: Type<'db>) -> Type<'db> {
-        UnionBuilder::new(db).add(a).add(b).build()
+        #[salsa::tracked(
+            returns(copy),
+            cycle_initial=|_, id, _| Type::divergent(id),
+            cycle_fn=|db, cycle, previous: &Type<'db>, result: Type<'db>, _| {
+                result.cycle_normalized(db, *previous, cycle)
+            },
+            heap_size=ruff_memory_usage::heap_size
+        )]
+        fn union_from_two_elements<'db>(db: &'db dyn Db, types: TypePair<'db>) -> Type<'db> {
+            UnionBuilder::new(db)
+                .add(types.first(db))
+                .add(types.second(db))
+                .build()
+        }
+
+        union_from_two_elements(db, TypePair::new(db, a, b))
     }
 
     /// Create a union from a list of elements without unpacking type aliases.
@@ -224,8 +232,14 @@ impl<'db> UnionType<'db> {
         Ok(Type::Union(self))
     }
 
-    pub(crate) fn to_instance(self, db: &'db dyn Db) -> Option<Type<'db>> {
-        self.try_map(db, |element| element.to_instance(db))
+    pub(crate) fn to_instance(self, db: &'db dyn Db) -> Option<InstanceProjection<Type<'db>>> {
+        let mut is_exact = true;
+        let instance = self.try_map(db, |element| {
+            let projection = element.to_instance(db)?;
+            is_exact &= projection.is_exact();
+            Some(projection.into_inner())
+        })?;
+        Some(InstanceProjection::new(instance, is_exact))
     }
 
     /// Returns a shared fully static supertype for a union of literal-value types.
@@ -848,18 +862,22 @@ impl<'db> IntersectionType<'db> {
     }
 
     /// Create an intersection type `A & B` from two elements `A` and `B`.
-    #[salsa::tracked(
-        returns(copy),
-        cycle_initial=|_, id, _, _| Type::divergent(id),
-        cycle_fn=|db, cycle, previous: &Type<'db>, result: Type<'db>, _, _| {
-            result.cycle_normalized(db, *previous, cycle)
-        },
-        heap_size=ruff_memory_usage::heap_size
-    )]
     pub(crate) fn from_two_elements(db: &'db dyn Db, a: Type<'db>, b: Type<'db>) -> Type<'db> {
-        IntersectionBuilder::new(db)
-            .positive_elements([a, b])
-            .build()
+        #[salsa::tracked(
+            returns(copy),
+            cycle_initial=|_, id, _| Type::divergent(id),
+            cycle_fn=|db, cycle, previous: &Type<'db>, result: Type<'db>, _| {
+                result.cycle_normalized(db, *previous, cycle)
+            },
+            heap_size=ruff_memory_usage::heap_size
+        )]
+        fn intersection_from_two_elements<'db>(db: &'db dyn Db, types: TypePair<'db>) -> Type<'db> {
+            IntersectionBuilder::new(db)
+                .positive_elements([types.first(db), types.second(db)])
+                .build()
+        }
+
+        intersection_from_two_elements(db, TypePair::new(db, a, b))
     }
 
     pub(crate) fn recursive_type_normalized_impl(
@@ -1074,6 +1092,52 @@ impl<'db> IntersectionType<'db> {
 
     pub fn iter_negative(self, db: &'db dyn Db) -> impl Iterator<Item = Type<'db>> {
         self.negative(db).iter().copied()
+    }
+
+    /// Project an intersection containing class-object types into the corresponding instance types.
+    ///
+    /// A projected positive element supplies a sound instance-space over-approximation for the
+    /// whole intersection. Other positive elements can constrain class objects in a domain with no
+    /// instance-space projection, so omitting them is also a sound over-approximation. Negative
+    /// elements cannot be projected: a class object excluded by an exact-class negative can still
+    /// have subclasses whose instances inhabit the excluded class's instance type. Without a
+    /// projected positive element, we cannot tell whether the intersection contains class objects
+    /// at all. The result is exact only when every positive element projects exactly and there are
+    /// no negative elements.
+    ///
+    /// For example, Python narrowing can produce `type[Base] & ~TypeOf[Base]`:
+    ///
+    /// ```py
+    /// class Base: ...
+    /// class Child(Base): ...
+    ///
+    /// def make(cls: type[Base]) -> Base:
+    ///     if cls is not Base:
+    ///         return cls()  # `cls` can be `Child`, so this can return a `Child` instance.
+    ///     return Base()
+    /// ```
+    ///
+    /// Projecting only the positive `type[Base]` is an over-approximation, since we have no
+    /// representation of an exact instance type excluding subclasses, and projecting the negative
+    /// `~TypeOf[Base]` to `~Base` would incorrectly exclude `Child` instances too.
+    pub(crate) fn to_instance(self, db: &'db dyn Db) -> Option<InstanceProjection<Type<'db>>> {
+        let mut builder = IntersectionBuilder::new(db);
+        let mut has_projected_positive = false;
+        let mut is_exact = self.negative(db).is_empty();
+        for positive in self.iter_positive(db) {
+            if let Some(projection) = positive.to_instance(db) {
+                has_projected_positive = true;
+                is_exact &= projection.is_exact();
+                builder = builder.add_positive(projection.into_inner());
+            } else {
+                is_exact = false;
+            }
+        }
+        if !has_projected_positive {
+            return None;
+        }
+
+        Some(InstanceProjection::new(builder.build(), is_exact))
     }
 
     pub(crate) fn has_one_element(self, db: &'db dyn Db) -> bool {

@@ -586,6 +586,7 @@ def _(x: object):
 ## Narrowing with named expressions (walrus operator)
 
 When a type guard is used with a named expression, the target of the named expression should be
+narrowed. When a type guard is the value of a named expression, its argument should also be
 narrowed.
 
 ```py
@@ -610,4 +611,29 @@ def f():
         reveal_type(y)  # revealed: str
     else:
         reveal_type(y)  # revealed: int | str
+
+    value = get_value()
+    if result := is_str(value):
+        reveal_type(value)  # revealed: str
+        reveal_type(result)  # revealed: TypeIs[str @ value] & ~AlwaysFalsy
+    else:
+        reveal_type(value)  # revealed: int
+        reveal_type(result)  # revealed: TypeIs[str @ value] & ~AlwaysTruthy
+
+    other = get_value()
+    if result := guard_str(other):
+        reveal_type(other)  # revealed: str
+        reveal_type(result)  # revealed: TypeGuard[str @ other] & ~AlwaysFalsy
+    else:
+        reveal_type(other)  # revealed: int | str
+        reveal_type(result)  # revealed: TypeGuard[str @ other] & ~AlwaysTruthy
+
+def guard_list(value: object) -> TypeGuard[list[int]]:
+    return isinstance(value, list)
+
+def overwritten_target(value: object):
+    if value := guard_list(value):
+        reveal_type(value)  # revealed: TypeGuard[list[int] @ value] & ~AlwaysFalsy
+    else:
+        reveal_type(value)  # revealed: TypeGuard[list[int] @ value] & ~AlwaysTruthy
 ```

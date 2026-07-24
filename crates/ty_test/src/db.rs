@@ -1,8 +1,9 @@
-use crate::config::{Analysis, Rules};
+use crate::config::{Analysis, Rules, ScriptOptions};
 use camino::{Utf8Component, Utf8PathBuf};
 use ruff_db::Db as SourceDb;
 use ruff_db::diagnostic::{Diagnostic, Severity};
 use ruff_db::files::{File, Files};
+use ruff_db::source::source_text;
 use ruff_db::system::{
     DbWithWritableSystem, InMemorySystem, OsSystem, System, SystemPath, SystemPathBuf, WhichResult,
     WritableSystem,
@@ -58,59 +59,7 @@ impl Db {
     }
 
     pub(crate) fn update_analysis_options(&mut self, options: Option<&Analysis>) {
-        let analysis = if let Some(options) = options {
-            let AnalysisSettings {
-                strict_generic_narrowing: strict_generic_narrowing_default,
-                strict_literal_narrowing: strict_literal_narrowing_default,
-                respect_type_ignore_comments: respect_type_ignore_comments_default,
-                allowed_unresolved_imports: allowed_unresolved_imports_default,
-                replace_imports_with_any: replace_imports_with_any_default,
-            } = AnalysisSettings::default();
-
-            let allowed_unresolved_imports = if let Some(allowed_unresolved_imports) =
-                options.allowed_unresolved_imports.as_deref()
-            {
-                let mut builder = ModuleGlobSetBuilder::new();
-                for pattern in allowed_unresolved_imports {
-                    builder
-                        .add(pattern)
-                        .expect("Invalid `allowed-unresolved-imports` pattern `{pattern}");
-                }
-                builder.build().unwrap()
-            } else {
-                allowed_unresolved_imports_default
-            };
-
-            let replace_imports_with_any = if let Some(replace_imports_with_any) =
-                options.replace_imports_with_any.as_deref()
-            {
-                let mut builder = ModuleGlobSetBuilder::new();
-                for pattern in replace_imports_with_any {
-                    builder
-                        .add(pattern)
-                        .expect("Invalid `replace-imports-with-any` pattern `{pattern}");
-                }
-                builder.build().unwrap()
-            } else {
-                replace_imports_with_any_default
-            };
-
-            AnalysisSettings {
-                strict_generic_narrowing: options
-                    .strict_generic_narrowing
-                    .unwrap_or(strict_generic_narrowing_default),
-                strict_literal_narrowing: options
-                    .strict_literal_narrowing
-                    .unwrap_or(strict_literal_narrowing_default),
-                respect_type_ignore_comments: options
-                    .respect_type_ignore_comments
-                    .unwrap_or(respect_type_ignore_comments_default),
-                allowed_unresolved_imports,
-                replace_imports_with_any,
-            }
-        } else {
-            AnalysisSettings::default()
-        };
+        let analysis = mdtest_analysis_settings(options);
 
         let settings = self.settings();
         if settings.analysis(self) != &analysis {
@@ -191,8 +140,8 @@ impl SemanticDb for Db {
         check_file_unwrap(self, file)
     }
 
-    fn rule_selection(&self, _file: File) -> &RuleSelection {
-        self.settings().rule_selection(self)
+    fn rule_selection(&self, file: File) -> &RuleSelection {
+        file_settings(self, file).rules(self)
     }
 
     fn lint_registry(&self) -> &LintRegistry {
@@ -203,8 +152,12 @@ impl SemanticDb for Db {
         self.settings().verbose(self)
     }
 
-    fn analysis_settings(&self, _file: File) -> &AnalysisSettings {
-        self.settings().analysis(self)
+    fn is_open_file(&self, _file: File) -> bool {
+        false
+    }
+
+    fn analysis_settings(&self, file: File) -> &AnalysisSettings {
+        file_settings(self, file).analysis(self)
     }
 
     fn dyn_clone(&self) -> Box<dyn SemanticDb> {
@@ -219,6 +172,47 @@ impl DbWithWritableSystem for Db {
     type System = MdtestSystem;
     fn writable_system(&self) -> &Self::System {
         &self.system
+    }
+}
+
+#[salsa::tracked(returns(ref))]
+fn file_settings(db: &dyn SemanticDb, file: File) -> FileSettings {
+    let source = source_text(db, file);
+    if source.is_notebook() {
+        return FileSettings::Global;
+    }
+    let Some(options) = ScriptOptions::from_source(&source) else {
+        return FileSettings::Global;
+    };
+
+    FileSettings::File {
+        rules: MdtestRuleSelection(mdtest_rule_selection(options.rules.as_ref(), None)),
+        analysis: mdtest_analysis_settings(options.analysis.as_ref()),
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+enum FileSettings {
+    Global,
+    File {
+        rules: MdtestRuleSelection,
+        analysis: AnalysisSettings,
+    },
+}
+
+impl FileSettings {
+    fn rules<'db>(&'db self, db: &'db Db) -> &'db RuleSelection {
+        match self {
+            Self::Global => db.settings().rule_selection(db),
+            Self::File { rules, .. } => rules,
+        }
+    }
+
+    fn analysis<'db>(&'db self, db: &'db Db) -> &'db AnalysisSettings {
+        match self {
+            Self::Global => db.settings().analysis(db),
+            Self::File { analysis, .. } => analysis,
+        }
     }
 }
 
@@ -249,6 +243,60 @@ impl std::ops::Deref for MdtestRuleSelection {
 
     fn deref(&self) -> &Self::Target {
         &self.0
+    }
+}
+
+fn mdtest_analysis_settings(options: Option<&Analysis>) -> AnalysisSettings {
+    let Some(options) = options else {
+        return AnalysisSettings::default();
+    };
+
+    let AnalysisSettings {
+        strict_generic_narrowing: strict_generic_narrowing_default,
+        strict_equality_semantics: strict_equality_semantics_default,
+        respect_type_ignore_comments: respect_type_ignore_comments_default,
+        allowed_unresolved_imports: allowed_unresolved_imports_default,
+        replace_imports_with_any: replace_imports_with_any_default,
+    } = AnalysisSettings::default();
+
+    let allowed_unresolved_imports =
+        if let Some(allowed_unresolved_imports) = options.allowed_unresolved_imports.as_deref() {
+            let mut builder = ModuleGlobSetBuilder::new();
+            for pattern in allowed_unresolved_imports {
+                builder
+                    .add(pattern)
+                    .expect("Invalid `allowed-unresolved-imports` pattern `{pattern}`");
+            }
+            builder.build().unwrap()
+        } else {
+            allowed_unresolved_imports_default
+        };
+
+    let replace_imports_with_any =
+        if let Some(replace_imports_with_any) = options.replace_imports_with_any.as_deref() {
+            let mut builder = ModuleGlobSetBuilder::new();
+            for pattern in replace_imports_with_any {
+                builder
+                    .add(pattern)
+                    .expect("Invalid `replace-imports-with-any` pattern `{pattern}`");
+            }
+            builder.build().unwrap()
+        } else {
+            replace_imports_with_any_default
+        };
+
+    AnalysisSettings {
+        strict_generic_narrowing: options
+            .strict_generic_narrowing
+            .unwrap_or(strict_generic_narrowing_default),
+        strict_equality_semantics: options
+            .strict_equality_semantics
+            .unwrap_or(strict_equality_semantics_default),
+        respect_type_ignore_comments: options
+            .respect_type_ignore_comments
+            .unwrap_or(respect_type_ignore_comments_default),
+        allowed_unresolved_imports,
+        replace_imports_with_any,
     }
 }
 

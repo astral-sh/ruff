@@ -68,22 +68,45 @@ accepts_object: Callable[[object], object] = receiver.method
 accepts_int: Callable[[int], int] = receiver.method  # error: [invalid-assignment]
 ```
 
-Declared bounds and constraints on receiver TypeVars are not yet enforced when comparing a bound
-method with another callable:
+The receiver must also satisfy a method type variable's declared bound or constraints:
 
 ```py
 from typing import Callable
 
 class InvalidBoundedReceiver:
-    # TODO: Binding should reject this method because the receiver is outside `T`'s declared bound.
+    def method[T: int](self: T) -> None: ...
+
+class ValidBoundedReceiver(int):
     def method[T: int](self: T) -> None: ...
 
 class InvalidConstrainedReceiver:
-    # TODO: Binding should reject this method because the receiver is outside `T`'s constraints.
     def method[T: (int, str)](self: T) -> None: ...
 
-invalid_bound: Callable[[], None] = InvalidBoundedReceiver().method
-invalid_constraints: Callable[[], None] = InvalidConstrainedReceiver().method
+class ValidConstrainedReceiver(str):
+    def method[T: (int, str)](self: T) -> None: ...
+
+type ReceiverAlias[T] = T
+
+class InvalidAliasedBoundedReceiver:
+    def method[T: int](self: ReceiverAlias[T]) -> None: ...
+
+class InvalidNestedBoundedReceiver(list[str]):
+    def method[T: int](self: list[T]) -> None: ...
+
+class InvalidUnionConstrainedReceiver:
+    def method[T: (int, str)](self: T | None) -> None: ...
+
+invalid_bound: Callable[[], None] = InvalidBoundedReceiver().method  # error: [invalid-assignment]
+valid_bound: Callable[[], None] = ValidBoundedReceiver().method
+
+invalid_constraints: Callable[[], None] = InvalidConstrainedReceiver().method  # error: [invalid-assignment]
+valid_constraints: Callable[[], None] = ValidConstrainedReceiver().method
+
+invalid_aliased_bound: Callable[[], None] = InvalidAliasedBoundedReceiver().method  # error: [invalid-assignment]
+
+# TODO: Enforce valid specializations for TypeVars nested inside receiver annotations.
+invalid_nested_bound: Callable[[], None] = InvalidNestedBoundedReceiver().method  # TODO: error: [invalid-assignment]
+invalid_union_constraints: Callable[[], None] = InvalidUnionConstrainedReceiver().method  # TODO: error: [invalid-assignment]
 ```
 
 When we coerce a generic callable into a `Callable` type, it remembers that it is generic:
@@ -577,6 +600,26 @@ class B: ...
 def consume_b(value: B) -> None: ...
 
 infer_with_consumer(A(), consume_b)  # error: [invalid-argument-type]
+```
+
+A callable argument can make a call invalid even when another argument satisfies the declared
+type-variable bound. The diagnostic should describe the incompatible callable rather than claim that
+`Base` violates its own bound.
+
+```py
+from typing import Callable
+
+class Base: ...
+class Input: ...
+
+def call[T: Base](callback: Callable[[T], T], value: T) -> None:
+    raise NotImplementedError
+
+def callback(value: Input) -> Base:
+    raise NotImplementedError
+
+# error: [invalid-argument-type] "Argument to function `call` is incorrect: Expected `(Base, /) -> Base`, found `def callback(value: Input) -> Base`"
+call(callback, Base())
 ```
 
 ## Combined upper bounds uses redundancy

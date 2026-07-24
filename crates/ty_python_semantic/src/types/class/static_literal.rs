@@ -1,4 +1,3 @@
-use compact_str::CompactString;
 use itertools::{Either, Itertools};
 use ruff_db::{
     diagnostic::Span,
@@ -814,30 +813,28 @@ impl<'db> StaticClassLiteral<'db> {
                 });
 
         // Dataclass transformer flags can be overwritten using class arguments.
-        if let Some(transformer_params) = transformer_params.as_mut() {
-            if let Some(class_def) = self.definition(db).kind(db).as_class() {
-                let module = parsed_module(db, self.file(db)).load(db);
+        if let Some(transformer_params) = transformer_params.as_mut()
+            && let Some(class_def) = self.definition(db).kind(db).as_class()
+        {
+            let module = parsed_module(db, self.file(db)).load(db);
 
-                if let Some(arguments) = &class_def.node(&module).arguments {
-                    let mut flags = transformer_params.flags(db);
+            if let Some(arguments) = &class_def.node(&module).arguments {
+                let mut flags = transformer_params.flags(db);
 
-                    for keyword in &arguments.keywords {
-                        if let Some(arg_name) = &keyword.arg {
-                            if let Some(is_set) =
-                                keyword.value.as_boolean_literal_expr().map(|b| b.value)
-                            {
-                                for (flag_name, flag) in DATACLASS_FLAGS {
-                                    if arg_name.as_str() == *flag_name {
-                                        flags.set(*flag, is_set);
-                                    }
-                                }
+                for ast::Keyword { arg, value, .. } in &arguments.keywords {
+                    if let Some(arg_name) = arg
+                        && let ast::Expr::BooleanLiteral(is_set) = value
+                    {
+                        for (flag_name, flag) in DATACLASS_FLAGS {
+                            if arg_name == *flag_name {
+                                flags.set(*flag, is_set.value);
                             }
                         }
                     }
-
-                    *transformer_params =
-                        DataclassParams::new(db, flags, transformer_params.field_specifiers(db));
                 }
+
+                *transformer_params =
+                    DataclassParams::new(db, flags, transformer_params.field_specifiers(db));
             }
         }
 
@@ -1306,12 +1303,11 @@ impl<'db> StaticClassLiteral<'db> {
         // For enum classes, `nonmember(value)` creates a non-member attribute.
         // At runtime, the enum metaclass unwraps the value, so accessing the attribute
         // returns the inner value, not the `nonmember` wrapper.
-        if let Some(ty) = member.inner.place.raw_type() {
-            if let Some(value_ty) = try_unwrap_nonmember_value(db, ty) {
-                if is_enum_class_by_inheritance(db, self) {
-                    return Member::definitely_declared(value_ty);
-                }
-            }
+        if let Some(ty) = member.inner.place.raw_type()
+            && let Some(value_ty) = try_unwrap_nonmember_value(db, ty)
+            && is_enum_class_by_inheritance(db, self)
+        {
+            return Member::definitely_declared(value_ty);
         }
 
         member
@@ -1402,6 +1398,10 @@ impl<'db> StaticClassLiteral<'db> {
             Type::instance(db, self.apply_optional_specialization(db, specialization));
 
         let signature_from_fields = |mut parameters: Vec<_>, return_ty: Type<'db>| {
+            if name == "__init__" && field_policy.is_pydantic() {
+                pydantic::extend_settings_constructor_parameters(db, self, &mut parameters);
+            }
+
             for (field_name, field) in self.fields(db, specialization, field_policy) {
                 let (init, mut default_ty, kw_only, alias, converter, strict) = match &field.kind {
                     FieldKind::NamedTuple { default_ty } => (
@@ -1449,7 +1449,7 @@ impl<'db> StaticClassLiteral<'db> {
                     continue;
                 }
 
-                let dunder_set = field_ty.class_member(db, "__set__".into());
+                let dunder_set = field_ty.class_member(db, "__set__");
                 if let Place::Defined(DefinedPlace {
                     ty: dunder_set,
                     definedness: Definedness::AlwaysDefined,
@@ -1509,7 +1509,9 @@ impl<'db> StaticClassLiteral<'db> {
                 if name == "__init__"
                     && let Some(metadata) = field_policy.pydantic_metadata()
                 {
-                    field_ty = pydantic::constructor_parameter_type(db, field_ty, strict, metadata);
+                    field_ty = pydantic::constructor_parameter_type(
+                        db, self, field_name, field_ty, strict, metadata,
+                    );
                 }
 
                 if pydantic_constructor_fields_are_optional && default_ty.is_none() {
@@ -1608,7 +1610,7 @@ impl<'db> StaticClassLiteral<'db> {
 
         match (field_policy, name) {
             (field_policy, "__init__")
-                if field_policy.synthesizes_constructor_signature_from_fields() =>
+                if field_policy.synthesizes_constructor_signature_from_fields(db, self) =>
             {
                 if field_policy.is_dataclass_like()
                     && !self.has_dataclass_param(db, field_policy, DataclassFlags::INIT)
@@ -2367,16 +2369,20 @@ impl<'db> StaticClassLiteral<'db> {
     ) -> Member<'db> {
         // Collect names in a tracked query so unrelated edits can preserve dependent member
         // lookups, and avoid retaining query entries for names that no method can define.
-        if implicit_attribute_names(db, class_body_scope)
-            .binary_search_by(|candidate| candidate.as_str().cmp(name))
-            .is_err()
-        {
+        let names = implicit_attribute_names(db, class_body_scope);
+        let Ok(name_index) = names.binary_search_by(|candidate| candidate.as_str().cmp(name))
+        else {
             return Member::unbound();
-        }
+        };
 
         Self::implicit_attribute_inner(
             db,
-            ImplicitAttributeName::new(db, class_body_scope, name, target_method_decorator),
+            ImplicitAttributeName::new(
+                db,
+                class_body_scope,
+                &names[name_index],
+                target_method_decorator,
+            ),
         )
     }
 
@@ -2393,7 +2399,7 @@ impl<'db> StaticClassLiteral<'db> {
         attribute: ImplicitAttributeName<'db>,
     ) -> Member<'db> {
         let class_body_scope = attribute.class_body_scope(db);
-        let name = attribute.name(db);
+        let name = attribute.name(db).as_str();
         let target_method_decorator = attribute.target_method_decorator(db);
 
         // If we do not see any declarations of an attribute, neither in the class body nor in
@@ -2813,10 +2819,7 @@ impl<'db> StaticClassLiteral<'db> {
                                 }
                             }
                         } else if self.is_own_dataclass_instance_field(db, name)
-                            && declared_ty
-                                .class_member(db, "__get__".into())
-                                .place
-                                .is_undefined()
+                            && declared_ty.class_member(db, "__get__").place.is_undefined()
                         {
                             // For dataclass-like classes, declared fields are assigned
                             // by the synthesized `__init__`, so they are instance
@@ -3160,8 +3163,7 @@ fn expanded_fixed_length_starred_class_base_tuple<'db>(
     };
 
     let starred_ty = definition_expression_type(db, class_definition, &starred.value);
-    let tuple_spec = starred_ty.tuple_instance_spec(db)?;
-    let Tuple::Fixed(tuple) = tuple_spec.into_owned() else {
+    let Tuple::Fixed(tuple) = starred_ty.tuple_instance_spec(db)?.into_owned() else {
         return None;
     };
     Some(tuple)
@@ -3362,8 +3364,8 @@ fn explicit_bases_cycle_fn<'db>(
 struct ImplicitAttributeName<'db> {
     #[returns(copy)]
     class_body_scope: ScopeId<'db>,
-    #[returns(deref)]
-    name: CompactString,
+    #[returns(ref)]
+    name: Name,
     #[returns(copy)]
     target_method_decorator: MethodDecorator,
 }

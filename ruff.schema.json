@@ -465,7 +465,7 @@
       "deprecated": true
     },
     "include": {
-      "description": "A list of file patterns to include when linting.\n\nInclusion are based on globs, and should be single-path patterns, like\n`*.pyw`, to include any file with the `.pyw` extension. `pyproject.toml` is\nincluded here not for configuration but because we lint whether e.g. the\n`[project]` matches the schema.\n\nNotebook files (`.ipynb` extension) are included by default on Ruff 0.6.0+.\n\nFor more information on the glob syntax, refer to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).",
+      "description": "A list of file patterns to include when linting.\n\nInclusion are based on globs, and should be single-path patterns, like\n`*.pyw`, to include any file with the `.pyw` extension.\n`pyproject.toml`, `ruff.toml`, and `.ruff.toml` are included here not for\nconfiguration but because we lint whether e.g. the `[project]` matches\nthe schema in `pyproject.toml` or that rule names are used as selectors.\n\nNotebook files (`.ipynb` extension) are included by default on Ruff 0.6.0+.\n\nFor more information on the glob syntax, refer to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).",
       "type": [
         "array",
         "null"
@@ -1188,7 +1188,7 @@
             "null"
           ],
           "items": {
-            "type": "string"
+            "$ref": "#/definitions/Name"
           }
         },
         "function-names": {
@@ -1198,7 +1198,7 @@
             "null"
           ],
           "items": {
-            "type": "string"
+            "$ref": "#/definitions/Name"
           }
         }
       },
@@ -1418,7 +1418,7 @@
             "null"
           ],
           "items": {
-            "type": "string"
+            "$ref": "#/definitions/Name"
           }
         },
         "ignore-names": {
@@ -1428,7 +1428,7 @@
             "null"
           ],
           "items": {
-            "type": "string"
+            "$ref": "#/definitions/Name"
           }
         }
       },
@@ -2666,6 +2666,10 @@
         }
       },
       "additionalProperties": false
+    },
+    "Name": {
+      "description": "An immutable name.\n\n# Choosing a string representation\n\nOn 64-bit targets, [`CharStr`] occupies 16 bytes and stores up to 16 UTF-8 bytes inline. Longer\nvalues use an exactly-sized, reference-counted allocation, so cloning a heap-backed value\nreuses its allocation. [`compact_str::CompactString`] occupies 24 bytes, stores up to 24 bytes\ninline, and remains mutable; cloning a heap-backed value copies its contents into a new\nallocation.\n\nPrefer `CharStr` for immutable text that is retained densely or passed between owners, when\neither the smaller handle or structural sharing offsets the extra heap allocations for values\nbetween 17 and 24 bytes. Prefer `CompactString` for uniquely owned text, especially when it is\nbuilt incrementally, mutated, or commonly falls in that 17-to-24-byte range.\n\n`Name` uses `CharStr` because names appear throughout the AST and repeated heap-backed parser\nnames share an allocation. By contrast, [`crate::DebugText`] uses `CompactString` because it\nbuilds a uniquely owned buffer incrementally, and `ty_module_resolver::ModuleName` uses\n`CompactString` because module names can be extended in place.\n\nConverting a borrowed `&str` into `CharStr` creates a new value and does not preserve structural\nsharing. When an API retains text already held in a `CharStr` (including a `Name`), pass or clone\nthe owned value rather than converting it through `&str`. This is especially relevant at Salsa\ninterning boundaries.",
+      "type": "string"
     },
     "NameImports": {
       "type": "string"
@@ -4270,6 +4274,7 @@
         "RUF2",
         "RUF20",
         "RUF200",
+        "RUF201",
         "S",
         "S1",
         "S10",
@@ -5209,6 +5214,7 @@
         "return-outside-function",
         "reuse-of-groupby-generator",
         "root-logger-call",
+        "rule-codes-in-selectors",
         "rule-codes-in-suppression-comments",
         "run-process-in-async-function",
         "runtime-cast-value",

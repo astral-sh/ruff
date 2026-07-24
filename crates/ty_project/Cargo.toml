@@ -38,10 +38,12 @@ camino = { workspace = true }
 colored = { workspace = true }
 compact_str = { workspace = true, features = ["serde"] }
 crossbeam = { workspace = true }
-get-size2 = { workspace = true, features = ["ordermap"] }
+get-size2 = { workspace = true, features = ["ordermap", "parking_lot"] }
 globset = { workspace = true }
+memchr = { workspace = true }
 notify = { workspace = true }
 ordermap = { workspace = true, features = ["serde"] }
+parking_lot = { workspace = true }
 pep440_rs = { workspace = true, features = ["version-ranges"] }
 rayon = { workspace = true }
 regex = { workspace = true }

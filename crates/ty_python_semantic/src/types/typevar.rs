@@ -14,9 +14,9 @@ use crate::{
     },
     types::{
         ApplySpecialization, ApplyTypeMappingVisitor, CycleDetector, DynamicType, GenericContext,
-        KnownClass, KnownInstanceType, Materialization, Parameter, Parameters, Type, TypeAliasType,
-        TypeContext, TypeMapping, TypeVarVariance, UnionBuilder, UnionType, any_over_type,
-        binding_type, definition_expression_type,
+        InstanceProjection, KnownClass, KnownInstanceType, Materialization, Parameter, Parameters,
+        Type, TypeAliasType, TypeContext, TypeMapping, TypeVarVariance, UnionBuilder, UnionType,
+        any_over_type, binding_type, definition_expression_type,
         tuple::Tuple,
         variance::VarianceInferable,
         visitor::{self, TypeCollector, TypeVisitor, walk_type_with_recursion_guard},
@@ -225,6 +225,10 @@ impl<'db> TypeVarInstance<'db> {
         self.kind(db).is_paramspec()
     }
 
+    pub(crate) fn is_typevartuple(self, db: &'db dyn Db) -> bool {
+        self.kind(db).is_typevartuple()
+    }
+
     pub(crate) fn upper_bound(self, db: &'db dyn Db) -> Option<Type<'db>> {
         if let Some(TypeVarBoundOrConstraints::UpperBound(ty)) = self.bound_or_constraints(db) {
             Some(ty)
@@ -278,7 +282,7 @@ impl<'db> TypeVarInstance<'db> {
         db: &'db dyn Db,
         visitor: &TypeVarDefaultVisitor<'db>,
     ) -> Option<Type<'db>> {
-        visitor.visit(self, || {
+        visitor.visit(db, self, || {
             self._default(db).and_then(|default| match default {
                 TypeVarDefaultEvaluation::Eager(ty) => Some(ty),
                 TypeVarDefaultEvaluation::Lazy => self.lazy_default_impl(db, visitor),
@@ -329,28 +333,30 @@ impl<'db> TypeVarInstance<'db> {
         )
     }
 
-    fn to_instance(self, db: &'db dyn Db) -> Option<Self> {
+    fn to_instance(self, db: &'db dyn Db) -> Option<InstanceProjection<Self>> {
         let bound_or_constraints = match self.bound_or_constraints(db)? {
-            TypeVarBoundOrConstraints::UpperBound(upper_bound) => {
-                TypeVarBoundOrConstraints::UpperBound(upper_bound.to_instance(db)?)
-            }
-            TypeVarBoundOrConstraints::Constraints(constraints) => {
-                TypeVarBoundOrConstraints::Constraints(constraints.to_instance(db)?)
-            }
+            TypeVarBoundOrConstraints::UpperBound(upper_bound) => upper_bound
+                .to_instance(db)?
+                .map(TypeVarBoundOrConstraints::UpperBound),
+            TypeVarBoundOrConstraints::Constraints(constraints) => constraints
+                .to_instance(db)?
+                .map(TypeVarBoundOrConstraints::Constraints),
         };
         let identity = TypeVarIdentity::new(
             db,
-            Name::new(format!("{}'instance", self.name(db))),
+            Name::concat(&[self.name(db).as_str(), "'instance"]),
             None, // definition
             self.kind(db),
         );
-        Some(Self::new(
-            db,
-            identity,
-            Some(bound_or_constraints.into()),
-            self.explicit_variance(db),
-            None, // _default
-        ))
+        Some(bound_or_constraints.map(|bound_or_constraints| {
+            Self::new(
+                db,
+                identity,
+                Some(bound_or_constraints.into()),
+                self.explicit_variance(db),
+                None, // _default
+            )
+        }))
     }
 
     fn type_is_self_referential(
@@ -359,7 +365,7 @@ impl<'db> TypeVarInstance<'db> {
         ty: Type<'db>,
         visitor: &TypeVarDefaultVisitor<'db>,
     ) -> bool {
-        type SeenTypeAliases<'db> = SmallVec<[TypeAliasType<'db>; 1]>;
+        type SeenTypeAliases<'db> = SmallVec<[Definition<'db>; 1]>;
 
         #[derive(Copy, Clone)]
         struct State<'db, 'a> {
@@ -396,10 +402,13 @@ impl<'db> TypeVarInstance<'db> {
         ) -> bool {
             {
                 let mut seen_type_aliases = state.seen_type_aliases.borrow_mut();
-                if seen_type_aliases.contains(&type_alias) {
+                let definition = type_alias.definition(state.db);
+                // A recursive alias can produce a new specialization every time its body is
+                // expanded, so use its definition as the stable recursion key.
+                if seen_type_aliases.contains(&definition) {
                     return false;
                 }
-                seen_type_aliases.push(type_alias);
+                seen_type_aliases.push(definition);
             }
 
             let value_type = if let Some(specialization) = type_alias.specialization(state.db) {
@@ -521,14 +530,13 @@ impl<'db> TypeVarInstance<'db> {
                 let typevar_node = typevar.node(&module);
                 let bound =
                     definition_expression_type(db, definition, typevar_node.bound.as_ref()?);
-                let constraints = if let Some(tuple) = bound.tuple_instance_spec(db)
+                if let Some(tuple) = bound.tuple_instance_spec(db)
                     && let Tuple::Fixed(tuple) = tuple.into_owned()
                 {
-                    tuple.owned_elements()
+                    TypeVarConstraints::new(db, tuple.owned_elements())
                 } else {
-                    vec![Type::unknown()].into_boxed_slice()
-                };
-                TypeVarConstraints::new(db, constraints)
+                    TypeVarConstraints::new(db, [Type::unknown()].as_slice())
+                }
             }
             // legacy typevar
             DefinitionKind::Assignment(assignment) => {
@@ -578,17 +586,19 @@ impl<'db> TypeVarInstance<'db> {
                 Type::NominalInstance(nominal_instance) => nominal_instance
                     .own_tuple_spec(db)
                     .map_or_else(Parameters::unknown, |tuple_spec| {
-                        Parameters::standard(
-                            tuple_spec
-                                .iter_all_elements()
-                                .map(|ty| Parameter::positional_only(None).with_annotated_type(ty)),
-                        )
+                        match tuple_spec.as_ref() {
+                            Tuple::Fixed(tuple) => {
+                                Parameters::standard(tuple.iter_all_elements().map(|ty| {
+                                    Parameter::positional_only(None).with_annotated_type(ty)
+                                }))
+                            }
+                            // A `ParamSpec` default cannot contain a variable-length tuple, so this
+                            // branch only recovers from an invalid type expression.
+                            Tuple::Variable(_) => Parameters::unknown(),
+                        }
                     }),
                 Type::Dynamic(dynamic) => match dynamic {
-                    DynamicType::Todo(_)
-                    | DynamicType::TodoUnpack
-                    | DynamicType::TodoStarredExpression
-                    | DynamicType::TodoTypeVarTuple => Parameters::todo(),
+                    DynamicType::Todo(_) => Parameters::todo(),
                     DynamicType::Any
                     | DynamicType::Unknown
                     | DynamicType::UnknownGeneric(_)
@@ -640,6 +650,11 @@ impl<'db> TypeVarInstance<'db> {
                 let default_ty =
                     definition_expression_type(db, definition, paramspec_node.default.as_ref()?);
                 convert_type_to_paramspec_value(db, default_ty)
+            }
+            // PEP 695 TypeVarTuple
+            DefinitionKind::TypeVarTuple(typevartuple) => {
+                let typevartuple_node = typevartuple.node(&module);
+                definition_expression_type(db, definition, typevartuple_node.default.as_ref()?)
             }
             _ => return None,
         };
@@ -926,6 +941,10 @@ impl<'db> BoundTypeVarInstance<'db> {
 
     pub(crate) fn is_paramspec(self, db: &'db dyn Db) -> bool {
         self.kind(db).is_paramspec()
+    }
+
+    pub(crate) fn is_typevartuple(self, db: &'db dyn Db) -> bool {
+        self.kind(db).is_typevartuple()
     }
 
     /// Returns a new bound typevar instance with the given `ParamSpec` attribute set.
@@ -1286,14 +1305,16 @@ impl<'db> BoundTypeVarInstance<'db> {
         )
     }
 
-    pub(super) fn to_instance(self, db: &'db dyn Db) -> Option<Self> {
-        Some(Self::new(
-            db,
-            self.typevar(db).to_instance(db)?,
-            self.binding_context(db),
-            self.paramspec_attr(db),
-            self.freshness(db),
-        ))
+    pub(super) fn to_instance(self, db: &'db dyn Db) -> Option<InstanceProjection<Self>> {
+        Some(self.typevar(db).to_instance(db)?.map(|typevar| {
+            Self::new(
+                db,
+                typevar,
+                self.binding_context(db),
+                self.paramspec_attr(db),
+                self.freshness(db),
+            )
+        }))
     }
 }
 
@@ -1311,6 +1332,10 @@ pub enum TypeVarKind {
     LegacyParamSpec,
     /// `def foo[**P]() -> None: ...`
     Pep695ParamSpec,
+    /// `Ts = TypeVarTuple("Ts")`
+    LegacyTypeVarTuple,
+    /// `def foo[*Ts]() -> None: ...`
+    Pep695TypeVarTuple,
     /// `Alias: typing.TypeAlias = T`
     Pep613Alias,
 }
@@ -1318,6 +1343,10 @@ pub enum TypeVarKind {
 impl TypeVarKind {
     pub(super) const fn is_paramspec(self) -> bool {
         matches!(self, Self::LegacyParamSpec | Self::Pep695ParamSpec)
+    }
+
+    pub(super) const fn is_typevartuple(self) -> bool {
+        matches!(self, Self::LegacyTypeVarTuple | Self::Pep695TypeVarTuple)
     }
 }
 
@@ -1345,8 +1374,8 @@ impl get_size2::GetSize for TypeVarIdentity<'_> {}
 
 impl<'db> TypeVarIdentity<'db> {
     fn with_name_suffix(self, db: &'db dyn Db, suffix: &str) -> Self {
-        let name = format!("{}'{}", self.name(db), suffix);
-        Self::new(db, Name::from(name), self.definition(db), self.kind(db))
+        let name = Name::concat(&[self.name(db).as_str(), "'", suffix]);
+        Self::new(db, name, self.definition(db), self.kind(db))
     }
 }
 
@@ -1574,14 +1603,17 @@ impl<'db> TypeVarConstraints<'db> {
         UnionType::from_elements(db, self.elements(db))
     }
 
-    fn to_instance(self, db: &'db dyn Db) -> Option<TypeVarConstraints<'db>> {
+    fn to_instance(self, db: &'db dyn Db) -> Option<InstanceProjection<TypeVarConstraints<'db>>> {
         let mut instance_elements = Vec::new();
+        let mut is_exact = true;
         for ty in self.elements(db) {
-            instance_elements.push(ty.to_instance(db)?);
+            let projection = ty.to_instance(db)?;
+            is_exact &= projection.is_exact();
+            instance_elements.push(projection.into_inner());
         }
-        Some(TypeVarConstraints::new(
-            db,
-            instance_elements.into_boxed_slice(),
+        Some(InstanceProjection::new(
+            TypeVarConstraints::new(db, instance_elements.into_boxed_slice()),
+            is_exact,
         ))
     }
 
@@ -1784,5 +1816,13 @@ impl<'db> TypeVarBoundOrConstraints<'db> {
 
 /// A [`CycleDetector`] that is used in `TypeVarInstance::default_type`.
 pub(crate) type TypeVarDefaultVisitor<'db> =
-    CycleDetector<VisitTypeVarDefault, TypeVarInstance<'db>, Option<Type<'db>>, 6>;
+    CycleDetector<'db, VisitTypeVarDefault, TypeVarInstance<'db>, Option<Type<'db>>, 6>;
 pub(crate) struct VisitTypeVarDefault;
+
+impl<'db> super::cyclic::HasIdentity<'db> for TypeVarInstance<'db> {
+    type Id = Self;
+
+    fn to_identity(&self, _db: &'db dyn Db) -> Self::Id {
+        *self
+    }
+}

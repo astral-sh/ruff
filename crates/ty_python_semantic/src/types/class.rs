@@ -298,8 +298,16 @@ impl<'db> CodeGeneratorKind<'db> {
     ///
     /// C(value=42)
     /// ```
-    pub(super) const fn synthesizes_constructor_signature_from_fields(self) -> bool {
-        matches!(self, Self::DataclassLike(_) | Self::Pydantic(_))
+    pub(super) fn synthesizes_constructor_signature_from_fields(
+        self,
+        db: &'db dyn Db,
+        class: StaticClassLiteral<'db>,
+    ) -> bool {
+        match self {
+            Self::DataclassLike(_) => true,
+            Self::Pydantic(_) => pydantic::synthesizes_constructor_signature_from_fields(db, class),
+            Self::NamedTuple | Self::TypedDict => false,
+        }
     }
 
     pub(super) const fn pydantic_metadata(self) -> Option<pydantic::ModelMetadata<'db>> {
@@ -693,7 +701,7 @@ impl<'db> ClassLiteral<'db> {
     /// Return a type representing "the set of all instances of the metaclass of this class".
     pub(crate) fn metaclass_instance_type(self, db: &'db dyn Db) -> Type<'db> {
         self.metaclass(db)
-            .to_instance(db)
+            .to_instance_approximation(db)
             .expect("`Type::to_instance()` should always return `Some()` when called on the type of a metaclass")
     }
 
@@ -1614,10 +1622,10 @@ impl<'db> ClassType<'db> {
         if other_metaclass == type_class {
             return true;
         }
-        let Some(self_metaclass_instance) = self_metaclass.to_instance(db) else {
+        let Some(self_metaclass_instance) = self_metaclass.to_instance_approximation(db) else {
             return true;
         };
-        let Some(other_metaclass_instance) = other_metaclass.to_instance(db) else {
+        let Some(other_metaclass_instance) = other_metaclass.to_instance_approximation(db) else {
             return true;
         };
         if types_are_disjoint(self_metaclass_instance, other_metaclass_instance) {
@@ -1631,7 +1639,7 @@ impl<'db> ClassType<'db> {
     pub(super) fn metaclass_instance_type(self, db: &'db dyn Db) -> Type<'db> {
         self
             .metaclass(db)
-            .to_instance(db)
+            .to_instance_approximation(db)
             .expect("`Type::to_instance()` should always return `Some()` when called on the type of a metaclass")
     }
 
@@ -1703,6 +1711,8 @@ impl<'db> ClassType<'db> {
         };
 
         let fallback_member_lookup = || {
+            let specialization = specialization
+                .map(|specialization| specialization.tuple_runtime_element_specialization(db));
             class_literal
                 .own_class_member(db, inherited_generic_context, specialization, name)
                 .map_type(|ty| ty.apply_optional_specialization(db, specialization))
@@ -1782,13 +1792,15 @@ impl<'db> ClassType<'db> {
                                     ) {
                                         let overload_return = UnionType::from_elements(
                                             db,
-                                            std::iter::once(variable_length_tuple.variable())
-                                                .chain(
-                                                    variable_length_tuple
-                                                        .iter_prefix_elements()
-                                                        .rev()
-                                                        .take(one_based_index),
-                                                ),
+                                            std::iter::once(
+                                                variable_length_tuple.variable().element_type(db),
+                                            )
+                                            .chain(
+                                                variable_length_tuple
+                                                    .iter_prefix_elements()
+                                                    .rev()
+                                                    .take(one_based_index),
+                                            ),
                                         );
                                         element_type_to_indices
                                             .entry(overload_return)
@@ -1816,12 +1828,14 @@ impl<'db> ClassType<'db> {
                                     ) {
                                         let overload_return = UnionType::from_elements(
                                             db,
-                                            std::iter::once(variable_length_tuple.variable())
-                                                .chain(
-                                                    variable_length_tuple
-                                                        .iter_suffix_elements()
-                                                        .take(index + 1),
-                                                ),
+                                            std::iter::once(
+                                                variable_length_tuple.variable().element_type(db),
+                                            )
+                                            .chain(
+                                                variable_length_tuple
+                                                    .iter_suffix_elements()
+                                                    .take(index + 1),
+                                            ),
                                         );
                                         element_type_to_indices
                                             .entry(overload_return)
@@ -1832,8 +1846,7 @@ impl<'db> ClassType<'db> {
                             }
                         }
 
-                        let all_elements_unioned =
-                            UnionType::from_elements(db, tuple.all_elements());
+                        let all_elements_unioned = tuple.homogeneous_element_type(db);
 
                         let mut overload_signatures =
                             Vec::with_capacity(element_type_to_indices.len().saturating_add(2));
@@ -1922,15 +1935,16 @@ impl<'db> ClassType<'db> {
                         if tuple_len.minimum() == 0 && tuple_len.maximum().is_none() {
                             // If the tuple has no length restrictions,
                             // any iterable is allowed as long as the iterable has the correct element type.
-                            let mut tuple_elements = tuple.iter_all_elements();
-                            iterable_parameter = iterable_parameter.with_annotated_type(
-                                KnownClass::Iterable
-                                    .to_specialized_instance(db, &[tuple_elements.next().unwrap()]),
-                            );
                             assert_eq!(
-                                tuple_elements.next(),
-                                None,
-                                "Tuple specialization should not have more than one element when it has no length restriction"
+                                tuple.iter_element_types(db).count(),
+                                1,
+                                "Tuple specialization should have exactly one element when it has no length restriction"
+                            );
+                            iterable_parameter = iterable_parameter.with_annotated_type(
+                                KnownClass::Iterable.to_specialized_instance(
+                                    db,
+                                    &[tuple.homogeneous_element_type(db)],
+                                ),
                             );
                         } else {
                             // But if the tuple is of a fixed length, or has a minimum length, we require a tuple rather
@@ -2079,7 +2093,7 @@ impl<'db> ClassType<'db> {
         let metaclass_dunder_call_function_symbol = self_ty
             .member_lookup_with_policy(
                 db,
-                "__call__".into(),
+                "__call__",
                 MemberLookupPolicy::NO_INSTANCE_FALLBACK
                     | MemberLookupPolicy::META_CLASS_NO_TYPE_FALLBACK,
             )
@@ -2123,7 +2137,7 @@ impl<'db> ClassType<'db> {
                 !signature.return_ty.is_assignable_to(
                     db,
                     self_ty
-                        .to_instance(db)
+                        .to_instance_approximation(db)
                         .expect("ClassType should be instantiable"),
                 )
             });
@@ -2148,13 +2162,15 @@ impl<'db> ClassType<'db> {
         let dunder_init_function_symbol = self_ty
             .member_lookup_with_policy(
                 db,
-                "__init__".into(),
+                "__init__",
                 MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK
                     | MemberLookupPolicy::META_CLASS_NO_TYPE_FALLBACK,
             )
             .place;
 
-        let correct_return_type = self_ty.to_instance(db).unwrap_or_else(Type::unknown);
+        let correct_return_type = self_ty
+            .to_instance_approximation(db)
+            .unwrap_or_else(Type::unknown);
 
         // If the class defines an `__init__` method, then we synthesize a callable type with the
         // same parameters as the `__init__` method after it is bound, and with the return type of
@@ -2235,7 +2251,7 @@ impl<'db> ClassType<'db> {
                 let new_function_symbol = self_ty
                     .member_lookup_with_policy(
                         db,
-                        "__new__".into(),
+                        "__new__",
                         MemberLookupPolicy::META_CLASS_NO_TYPE_FALLBACK,
                     )
                     .place;

@@ -1,6 +1,6 @@
 [package]
 name = "ty_python_core"
-version = "0.0.4"
+version = "0.0.5"
 description = "This is an internal component crate of Ruff"
 authors = { workspace = true }
 edition = { workspace = true }
@@ -24,6 +24,7 @@ ty_combine = { workspace = true }
 
 bitflags = { workspace = true }
 bitvec = { workspace = true }
+char_str = { workspace = true, features = ["get-size"] }
 get-size2 = { workspace = true, features = ["indexmap", "ordermap", "thin-vec"] }
 hashbrown = { workspace = true }
 itertools = { workspace = true }

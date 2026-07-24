@@ -27,7 +27,7 @@ use crate::types::generics::{GenericContext, Specialization};
 use crate::types::signatures::{
     CallableSignature, Parameter, Parameters, ParametersKind, Signature,
 };
-use crate::types::tuple::TupleSpec;
+use crate::types::tuple::{TupleSpec, VariableSegment};
 use crate::types::typevar::BoundTypeVarIdentity;
 use crate::types::visitor::TypeVisitor;
 use crate::types::{
@@ -1226,6 +1226,12 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                         return f
                             .write_str("bound method `ConstraintSet.satisfied_by_all_typevars`");
                     }
+                    KnownBoundMethodType::ConstraintSetSolutionsFor(_) => {
+                        return f.write_str("bound method `ConstraintSet.solutions_for`");
+                    }
+                    KnownBoundMethodType::ConstraintSetSolutions(_) => {
+                        return f.write_str("bound method `ConstraintSet.solutions`");
+                    }
                     KnownBoundMethodType::ConstraintSetWithDetailedDisplay(_) => {
                         return f.write_str("bound method `ConstraintSet.with_detailed_display`");
                     }
@@ -1535,20 +1541,33 @@ impl<'db> FmtDetailed<'db> for DisplayTuple<'_, 'db> {
                         .fmt_detailed(f)?;
                     f.write_str(", ")?;
                 }
-                if !tuple.prefix_elements().is_empty() || !tuple.suffix_elements().is_empty() {
-                    f.write_char('*')?;
-                    // Might as well link the type again here too
-                    f.with_type(KnownClass::Tuple.to_class_literal(self.db))
-                        .write_str("tuple")?;
-                    f.write_char('[')?;
-                }
-                tuple
-                    .variable()
-                    .display_with(self.db, self.settings.singleline())
-                    .fmt_detailed(f)?;
-                f.write_str(", ...")?;
-                if !tuple.prefix_elements().is_empty() || !tuple.suffix_elements().is_empty() {
-                    f.write_str("]")?;
+                match tuple.variable() {
+                    VariableSegment::TypeVarTuple(typevar) => {
+                        f.write_char('*')?;
+                        Type::TypeVar(typevar)
+                            .display_with(self.db, self.settings.singleline())
+                            .fmt_detailed(f)?;
+                    }
+                    VariableSegment::Homogeneous(variable) => {
+                        if !tuple.prefix_elements().is_empty()
+                            || !tuple.suffix_elements().is_empty()
+                        {
+                            f.write_char('*')?;
+                            // Might as well link the type again here too
+                            f.with_type(KnownClass::Tuple.to_class_literal(self.db))
+                                .write_str("tuple")?;
+                            f.write_char('[')?;
+                        }
+                        variable
+                            .display_with(self.db, self.settings.singleline())
+                            .fmt_detailed(f)?;
+                        f.write_str(", ...")?;
+                        if !tuple.prefix_elements().is_empty()
+                            || !tuple.suffix_elements().is_empty()
+                        {
+                            f.write_str("]")?;
+                        }
+                    }
                 }
                 if !tuple.suffix_elements().is_empty() {
                     f.write_str(", ")?;
@@ -1890,6 +1909,8 @@ impl<'db> DisplayGenericContext<'_, 'db> {
             let typevar = bound_typevar.typevar(self.db);
             if typevar.is_paramspec(self.db) {
                 f.write_str("**")?;
+            } else if typevar.is_typevartuple(self.db) {
+                f.write_char('*')?;
             }
             write!(
                 f.with_type(Type::TypeVar(bound_typevar)),
@@ -1975,13 +1996,64 @@ struct DisplaySpecialization<'db> {
 impl<'db> DisplaySpecialization<'db> {
     fn fmt_normal(&self, f: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result {
         f.write_char('[')?;
+        let variables = self
+            .specialization
+            .generic_context(self.db)
+            .variables(self.db)
+            .collect::<Vec<_>>();
         let types = self.specialization.types(self.db);
-        for (idx, ty) in types.iter().enumerate() {
-            if idx > 0 {
+        let mut wrote_any = false;
+        for (typevar, ty) in variables.iter().zip(types) {
+            if typevar.is_typevartuple(self.db) {
+                let Some(tuple) = ty.exact_tuple_instance_spec(self.db) else {
+                    if wrote_any {
+                        f.write_str(", ")?;
+                    }
+                    ty.display_with(self.db, self.settings.clone())
+                        .fmt_detailed(f)?;
+                    wrote_any = true;
+                    continue;
+                };
+                match tuple.as_ref() {
+                    TupleSpec::Fixed(fixed) if fixed.elements_slice().is_empty() => {
+                        if variables.len() == 1 {
+                            if wrote_any {
+                                f.write_str(", ")?;
+                            }
+                            f.write_str("()")?;
+                            wrote_any = true;
+                        }
+                    }
+                    TupleSpec::Fixed(fixed) => {
+                        for element in fixed.elements_slice() {
+                            if wrote_any {
+                                f.write_str(", ")?;
+                            }
+                            element
+                                .display_with(self.db, self.settings.clone())
+                                .fmt_detailed(f)?;
+                            wrote_any = true;
+                        }
+                    }
+                    TupleSpec::Variable(_) => {
+                        if wrote_any {
+                            f.write_str(", ")?;
+                        }
+                        f.write_char('*')?;
+                        ty.display_with(self.db, self.settings.clone())
+                            .fmt_detailed(f)?;
+                        wrote_any = true;
+                    }
+                }
+                continue;
+            }
+
+            if wrote_any {
                 f.write_str(", ")?;
             }
             ty.display_with(self.db, self.settings.clone())
                 .fmt_detailed(f)?;
+            wrote_any = true;
         }
         if self.tuple_specialization.is_yes() {
             f.write_str(", ...")?;
@@ -2312,11 +2384,16 @@ impl<'db> FmtDetailed<'db> for DisplayParameters<'_, 'db> {
         ) -> fmt::Result {
             let mut star_added = false;
             let mut needs_slash = false;
+            let mut after_synthetic_unpack = false;
             let mut first = true;
 
             for parameter in parameters {
+                let is_synthetic_unpack = parameter.definition().is_none()
+                    && parameter.is_variadic()
+                    && parameter.has_starred_annotation();
+
                 // Handle special separators
-                if parameter.is_positional_only() {
+                if parameter.is_positional_only() && !after_synthetic_unpack {
                     needs_slash = true;
                 } else if needs_slash {
                     if !first {
@@ -2349,6 +2426,7 @@ impl<'db> FmtDetailed<'db> for DisplayParameters<'_, 'db> {
                     .display_with(display.db, display.settings.singleline())
                     .fmt_detailed(&mut f.with_detail(TypeDetail::Parameter(param_name)))?;
 
+                after_synthetic_unpack |= is_synthetic_unpack;
                 first = false;
             }
 
@@ -2461,6 +2539,18 @@ struct DisplayParameter<'a, 'db> {
 
 impl<'db> FmtDetailed<'db> for DisplayParameter<'_, 'db> {
     fn fmt_detailed(&self, f: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result {
+        if self.param.definition().is_none()
+            && self.param.is_variadic()
+            && self.param.has_starred_annotation()
+        {
+            f.write_str("*")?;
+            self.param
+                .annotated_type()
+                .display_with(self.db, self.settings.clone())
+                .fmt_detailed(f)?;
+            return Ok(());
+        }
+
         if let Some(name) = self.param.display_name() {
             write!(f, "{name}")?;
             if self.param.should_annotation_be_displayed() {
@@ -3136,17 +3226,19 @@ impl Display for DisplayStringLiteralType<'_> {
 pub(crate) struct DisplayKnownInstanceRepr<'db> {
     pub(crate) known_instance: KnownInstanceType<'db>,
     pub(crate) db: &'db dyn Db,
+    pub(crate) settings: DisplaySettings<'db>,
 }
 
 impl<'db> KnownInstanceType<'db> {
     pub(crate) fn display_with(
         self,
         db: &'db dyn Db,
-        _settings: DisplaySettings<'db>,
+        settings: DisplaySettings<'db>,
     ) -> DisplayKnownInstanceRepr<'db> {
         DisplayKnownInstanceRepr {
             known_instance: self,
             db,
+            settings,
         }
     }
 }
@@ -3196,6 +3288,8 @@ impl<'db> FmtDetailed<'db> for DisplayKnownInstanceRepr<'db> {
             KnownInstanceType::TypeVar(typevar_instance) => {
                 if typevar_instance.kind(self.db).is_paramspec() {
                     f.with_type(ty).write_str("ParamSpec")
+                } else if typevar_instance.kind(self.db).is_typevartuple() {
+                    f.with_type(ty).write_str("TypeVarTuple")
                 } else {
                     f.with_type(ty).write_str("TypeVar")
                 }
@@ -3229,6 +3323,21 @@ impl<'db> FmtDetailed<'db> for DisplayKnownInstanceRepr<'db> {
                 } else {
                     f.write_str("[bool]")
                 }
+            }
+            KnownInstanceType::ConstraintSetSolution(solution) => {
+                f.set_invalid_type_annotation();
+                f.with_type(ty).write_str("Solution[")?;
+                for (index, binding) in solution.bindings(self.db).iter().enumerate() {
+                    if index > 0 {
+                        f.write_str(", ")?;
+                    }
+                    write!(f, "{}=", binding.bound_typevar.name(self.db))?;
+                    binding
+                        .solution
+                        .display_with(self.db, self.settings.clone())
+                        .fmt_detailed(f)?;
+                }
+                f.write_char(']')
             }
             KnownInstanceType::GenericContext(generic_context) => {
                 f.with_type(ty)

@@ -1,14 +1,14 @@
 use ruff_python_ast as ast;
 use ruff_text_size::Ranged;
 
-use super::{MultiInferenceGuard, TypeInferenceBuilder};
+use super::{ArgumentsIter, MultiInferenceGuard, TypeInferenceBuilder};
 use crate::place::{DefinedPlace, Place, PlaceAndQualifiers};
 use crate::types::attribute_write::{
     AttributeWriteRequirement, ClassAttributeWriteMember, ExplicitAttributeWriteRequirement,
     FallbackAttributeWriteRequirement, InstanceAttributeWriteMember,
     ProtocolMemberWriteRequirement, attribute_write_requirement, property_setter_returns_never,
 };
-use crate::types::call::{CallArguments, CallError};
+use crate::types::call::{Bindings, CallArguments, CallError};
 use crate::types::diagnostic::{
     INVALID_ASSIGNMENT, INVALID_ATTRIBUTE_ACCESS, UNRESOLVED_ATTRIBUTE, report_bad_dunder_set_call,
     report_invalid_attribute_assignment, report_possibly_missing_attribute,
@@ -19,11 +19,12 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     /// Make sure that the attribute assignment `obj.attribute = value` is valid.
     ///
     /// `target` is the node for the left-hand side, `object_ty` is the type of `obj`, `attribute` is
-    /// the name of the attribute being assigned, and `value_ty` is the type of the right-hand side of
-    /// the assignment. If the assignment is invalid, emit diagnostics.
+    /// the name of the attribute being assigned, `value` is the right-hand side, and `infer_value_ty`
+    /// infers its type with the supplied context. If the assignment is invalid, emit diagnostics.
     pub(super) fn validate_attribute_assignment(
         &mut self,
         target: &ast::ExprAttribute,
+        value: &ast::Expr,
         object_ty: Type<'db>,
         attribute: &str,
         infer_value_ty: &mut dyn FnMut(&mut Self, TypeContext<'db>) -> Type<'db>,
@@ -33,6 +34,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let mut evaluator = AssignmentAttributeWriteEvaluator {
             builder: self,
             target,
+            value,
             object_ty,
             attribute,
             infer_value_ty: MultiInferenceGuard::new(infer_value_ty),
@@ -73,6 +75,7 @@ enum ContextualInference {
 struct AssignmentAttributeWriteEvaluator<'a, 'db, 'ast, 'infer> {
     builder: &'a mut TypeInferenceBuilder<'db, 'ast>,
     target: &'a ast::ExprAttribute,
+    value: &'a ast::Expr,
     object_ty: Type<'db>,
     attribute: &'a str,
     infer_value_ty: MultiInferenceGuard<'db, 'ast, 'infer>,
@@ -92,6 +95,50 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
     /// The earlier inference was only a trial, so its result was not saved.
     fn infer_with_last_context(&mut self, emit_diagnostics: bool) -> Type<'db> {
         self.infer_value(self.infer_value_ty.last_tcx(), emit_diagnostics)
+    }
+
+    /// Infer an attribute-assignment value using the context provided by `__setattr__`, then
+    /// validate the synthesized setter call and return both its result and the inferred value type.
+    ///
+    /// ```python
+    /// from collections.abc import Callable
+    ///
+    /// class Custom:
+    ///     def __setattr__(self, name: str, value: Callable[[int], int]) -> None: ...
+    ///
+    /// instance = Custom()
+    /// instance.callback = lambda value: value + 1  # `value` is inferred as `int`.
+    /// ```
+    fn infer_and_try_call_setattr(
+        &mut self,
+        object_ty: Type<'db>,
+        emit_diagnostics: bool,
+    ) -> (Result<Bindings<'db>, CallDunderError<'db>>, Type<'db>) {
+        let db = self.builder.db();
+        let name_ty = Type::string_literal(db, self.attribute);
+        let ast_arguments = [
+            ast::ArgOrKeyword::Arg(self.target.value.as_ref()),
+            ast::ArgOrKeyword::Arg(self.value),
+        ];
+        let mut call_arguments = CallArguments::positional([name_ty, Type::unknown()]);
+        let setattr_result = self.builder.infer_and_try_call_dunder(
+            db,
+            object_ty,
+            "__setattr__",
+            MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK | MemberLookupPolicy::NO_INSTANCE_FALLBACK,
+            ArgumentsIter::synthesized(&ast_arguments),
+            &mut call_arguments,
+            &mut |builder, (argument_index, _, tcx)| {
+                if argument_index == 0 {
+                    name_ty
+                } else {
+                    self.infer_value_ty.infer_silent(builder, tcx)
+                }
+            },
+            TypeContext::default(),
+        );
+        let value_ty = self.infer_with_last_context(emit_diagnostics);
+        (setattr_result, value_ty)
     }
 
     fn evaluate(
@@ -291,16 +338,25 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
         emit_diagnostics: bool,
     ) -> bool {
         let db = self.builder.db();
-        let value_ty = self.infer_value(TypeContext::default(), emit_diagnostics);
+        let (setattr_result, value_ty) = if matches!(member, InstanceAttributeWriteMember::SetAttr)
+        {
+            self.infer_and_try_call_setattr(object_ty, emit_diagnostics)
+        } else {
+            let value_ty = self.infer_value(TypeContext::default(), emit_diagnostics);
+            let setattr_result = object_ty.try_call_dunder_with_policy(
+                db,
+                "__setattr__",
+                &mut CallArguments::positional([
+                    Type::string_literal(db, self.attribute),
+                    value_ty,
+                ]),
+                TypeContext::default(),
+                MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
+            );
+            (setattr_result, value_ty)
+        };
 
         // A terminal `__setattr__` blocks even explicitly declared attributes.
-        let setattr_result = object_ty.try_call_dunder_with_policy(
-            db,
-            "__setattr__",
-            &mut CallArguments::positional([Type::string_literal(db, self.attribute), value_ty]),
-            TypeContext::default(),
-            MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
-        );
         let setattr_returns_never = match &setattr_result {
             Ok(bindings) => bindings.return_type(db).is_never(),
             Err(error) => error.return_type(db).is_some_and(|ty| ty.is_never()),
@@ -309,7 +365,7 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
             if emit_diagnostics {
                 let is_setattr_synthesized = match object_ty.class_member_with_policy(
                     db,
-                    "__setattr__".into(),
+                    "__setattr__",
                     MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
                 ) {
                     PlaceAndQualifiers {
@@ -409,15 +465,44 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
             ClassAttributeWriteMember::Unresolved {
                 has_instance_attribute,
             } => {
-                self.infer_value(TypeContext::default(), emit_diagnostics);
-                if emit_diagnostics {
-                    self.report(if *has_instance_attribute {
-                        AssignmentAttributeWriteDiagnostic::CannotAssignToInstanceAttribute
-                    } else {
-                        AssignmentAttributeWriteDiagnostic::Unresolved { with_period: true }
-                    });
+                let db = self.builder.db();
+                let (setattr_result, value_ty) =
+                    self.infer_and_try_call_setattr(object_ty, emit_diagnostics);
+                let setattr_returns_never = match &setattr_result {
+                    Ok(bindings) => bindings.return_type(db).is_never(),
+                    Err(error) => error.return_type(db).is_some_and(|ty| ty.is_never()),
+                };
+                if setattr_returns_never {
+                    if emit_diagnostics {
+                        self.report(AssignmentAttributeWriteDiagnostic::TerminalSetAttr {
+                            member_exists: false,
+                            is_setattr_synthesized: false,
+                        });
+                    }
+                    return false;
                 }
-                false
+
+                match setattr_result {
+                    Ok(_) | Err(CallDunderError::PossiblyUnbound { .. }) => true,
+                    Err(CallDunderError::CallError(..)) => {
+                        if emit_diagnostics {
+                            self.report(AssignmentAttributeWriteDiagnostic::BadSetAttr {
+                                value_ty,
+                            });
+                        }
+                        false
+                    }
+                    Err(CallDunderError::MethodNotAvailable) => {
+                        if emit_diagnostics {
+                            self.report(if *has_instance_attribute {
+                                AssignmentAttributeWriteDiagnostic::CannotAssignToInstanceAttribute
+                            } else {
+                                AssignmentAttributeWriteDiagnostic::Unresolved { with_period: true }
+                            });
+                        }
+                        false
+                    }
+                }
             }
         }
     }

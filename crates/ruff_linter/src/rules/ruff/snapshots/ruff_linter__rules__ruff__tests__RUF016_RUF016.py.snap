@@ -442,4 +442,15 @@ RUF016 Indexed access to type `list` uses type `generator` instead of an integer
 129 | # Should emit for invalid access using generator
 130 | var = [1, 2, 3][(x for x in ())]
     |                 ^^^^^^^^^^^^^^^
+131 |
+132 | # Should still emit for a later invalid bound, even if an earlier bound is unrecognized
+    |
+
+RUF016 Slice in indexed access to type `list` uses type `str` instead of an integer
+   --> RUF016.py:134:19
+    |
+132 | # Should still emit for a later invalid bound, even if an earlier bound is unrecognized
+133 | x = "x"
+134 | var = [1, 2, 3][x:"y"]
+    |                   ^^^
     |

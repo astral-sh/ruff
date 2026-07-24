@@ -1,6 +1,6 @@
 [package]
 name = "ruff_python_ast"
-version = "0.0.4"
+version = "0.0.5"
 description = "This is an internal component crate of Ruff"
 authors = { workspace = true }
 edition = { workspace = true }
@@ -26,6 +26,7 @@ ruff_text_size = { workspace = true }
 aho-corasick = { workspace = true }
 arrayvec = { workspace = true }
 bitflags = { workspace = true }
+char_str = { workspace = true }
 compact_str = { workspace = true }
 get-size2 = { workspace = true, optional = true }
 is-macro = { workspace = true }
@@ -45,10 +46,12 @@ serde = [
     "dep:serde",
     "ruff_text_size/serde",
     "dep:ruff_cache",
+    "char_str/serde",
     "compact_str/serde",
     "thin-vec/serde",
 ]
-get-size = ["dep:get-size2", "ruff_text_size/get-size"]
+get-size = ["dep:get-size2", "char_str/get-size", "ruff_text_size/get-size"]
+salsa = ["dep:salsa"]
 
 [lints]
 workspace = true

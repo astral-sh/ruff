@@ -300,9 +300,7 @@ impl<'a, 'db> CallArguments<'a, 'db> {
             match argument {
                 Argument::Variadic => {
                     if !matches!(
-                        argument_ty
-                            .as_nominal_instance()
-                            .and_then(|nominal| nominal.tuple_spec(db)),
+                        argument_ty.tuple_instance_spec(db),
                         Some(spec) if spec.as_fixed_length().is_some()
                     ) {
                         return None;
@@ -541,14 +539,18 @@ pub(crate) fn is_expandable_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
         Type::Intersection(intersection) => intersection.finite_alternatives(db).is_some(),
         Type::NominalInstance(instance) => {
             let class = instance.class(db);
-            class.is_known(db, KnownClass::Bool)
-                || instance.tuple_spec(db).is_some_and(|spec| match &*spec {
-                    Tuple::Fixed(fixed_length_tuple) => fixed_length_tuple
-                        .iter_all_elements()
-                        .any(|element| is_expandable_type(db, element)),
-                    Tuple::Variable(_) => false,
-                })
-                || enum_metadata(db, class.class_literal(db)).is_some()
+            if class.is_known(db, KnownClass::Bool) {
+                return true;
+            }
+            if let Some(tuple_spec) = instance.tuple_spec(db)
+                && let Tuple::Fixed(fixed_length_tuple) = &*tuple_spec
+                && fixed_length_tuple
+                    .iter_all_elements()
+                    .any(|element| is_expandable_type(db, element))
+            {
+                return true;
+            }
+            enum_metadata(db, class.class_literal(db)).is_some()
         }
         Type::Union(_) => true,
         Type::TypeAlias(alias) => is_expandable_type(db, alias.value_type(db)),

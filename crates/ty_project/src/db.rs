@@ -30,6 +30,13 @@ pub trait Db: SemanticDb {
     fn dyn_clone(&self) -> Box<dyn Db>;
 }
 
+/// Tracked so that a change to the open-file set only invalidates queries
+/// for files whose open state actually changed.
+#[salsa::tracked(heap_size=ruff_memory_usage::heap_size, returns(copy))]
+fn is_open_file_impl(db: &dyn Db, file: File) -> bool {
+    db.project().open_files(db).contains(&file)
+}
+
 #[salsa::db]
 #[derive(Clone)]
 pub struct ProjectDatabase {
@@ -87,6 +94,12 @@ impl ProjectDatabase {
         program.freeze(self);
         project.freeze(self);
         self.files.freeze();
+    }
+
+    /// See [`Project::freeze_open_files`].
+    pub fn freeze_open_files(&mut self) {
+        let project = self.project();
+        project.freeze_open_files(self);
     }
 
     fn new<S, Strategy: MisconfigurationStrategy>(
@@ -551,6 +564,10 @@ impl SemanticDb for ProjectDatabase {
         self.project().verbose(self)
     }
 
+    fn is_open_file(&self, file: File) -> bool {
+        is_open_file_impl(self, file)
+    }
+
     fn dyn_clone(&self) -> Box<dyn SemanticDb> {
         Box::new(self.clone())
     }
@@ -783,6 +800,10 @@ pub(crate) mod testing {
 
         fn verbose(&self) -> bool {
             false
+        }
+
+        fn is_open_file(&self, file: File) -> bool {
+            super::is_open_file_impl(self, file)
         }
 
         fn dyn_clone(&self) -> Box<dyn ty_python_semantic::Db> {

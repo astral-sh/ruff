@@ -71,6 +71,48 @@ if (foo1 := Foo()).val:
     reveal_type(foo1.val)  # revealed: int & ~AlwaysFalsy
 ```
 
+## Narrowing tagged unions of nominal classes by attribute truthiness
+
+```py
+from typing import Literal
+
+class Success:
+    success: Literal[True]
+    result: int
+
+class Failure:
+    success: Literal[False]
+    errors: list[str]
+
+def _(response: Success | Failure):
+    if response.success:
+        reveal_type(response)  # revealed: Success
+        reveal_type(response.result)  # revealed: int
+    else:
+        reveal_type(response)  # revealed: Failure
+        reveal_type(response.errors)  # revealed: list[str]
+
+    if not response.success:
+        reveal_type(response)  # revealed: Failure
+    else:
+        reveal_type(response)  # revealed: Success
+
+class TruthyIntTag:
+    success: Literal[1]
+
+class FalsyIntTag:
+    success: Literal[0]
+
+class AmbiguousTag:
+    success: bool
+
+def _(response: Success | Failure | TruthyIntTag | FalsyIntTag | AmbiguousTag):
+    if response.success:
+        reveal_type(response)  # revealed: Success | TruthyIntTag | AmbiguousTag
+    else:
+        reveal_type(response)  # revealed: Failure | FalsyIntTag | AmbiguousTag
+```
+
 ## Function Literals
 
 Basically functions are always truthy.

@@ -232,6 +232,7 @@ pub(super) fn walk_type_alias_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
     }
 }
 
+#[salsa::tracked]
 impl<'db> TypeAliasType<'db> {
     pub(crate) fn name(self, db: &'db dyn Db) -> &'db str {
         match self {
@@ -261,6 +262,19 @@ impl<'db> TypeAliasType<'db> {
         }
     }
 
+    /// Returns the alias without an applied specialization.
+    pub(super) fn unspecialized(self, db: &'db dyn Db) -> Self {
+        match self {
+            TypeAliasType::PEP695(alias) => TypeAliasType::PEP695(PEP695TypeAliasType::new(
+                db,
+                alias.name(db),
+                alias.rhs_scope(db),
+                None,
+            )),
+            TypeAliasType::ManualPEP695(_) => self,
+        }
+    }
+
     pub(crate) fn as_pep_695_type_alias(self) -> Option<PEP695TypeAliasType<'db>> {
         match self {
             TypeAliasType::PEP695(type_alias) => Some(type_alias),
@@ -280,13 +294,6 @@ impl<'db> TypeAliasType<'db> {
         match self {
             TypeAliasType::PEP695(type_alias) => type_alias.specialization(db),
             TypeAliasType::ManualPEP695(_) => None,
-        }
-    }
-
-    pub(super) fn apply_function_specialization(self, db: &'db dyn Db, ty: Type<'db>) -> Type<'db> {
-        match self {
-            TypeAliasType::PEP695(type_alias) => type_alias.apply_function_specialization(db, ty),
-            TypeAliasType::ManualPEP695(_) => ty,
         }
     }
 
@@ -317,7 +324,35 @@ impl<'db> VarianceInferable<'db> for TypeAliasType<'db> {
         heap_size=ruff_memory_usage::heap_size
     )]
     fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarIdentity<'db>) -> TypeVarVariance {
-        self.value_type(db).variance_of(db, typevar)
+        let Some(generic_context) = self.generic_context(db) else {
+            return self.value_type(db).variance_of(db, typevar);
+        };
+
+        // Infer an alias's own type-parameter variance from the raw RHS. Applying specialization
+        // here would recursively request the same `variance_of` query.
+        if generic_context
+            .variables(db)
+            .any(|alias_typevar| alias_typevar.identity(db) == typevar)
+        {
+            return self.raw_value_type(db).variance_of(db, typevar);
+        }
+
+        let raw_value_type = self.raw_value_type(db);
+        let specialization = self
+            .specialization(db)
+            .unwrap_or_else(|| generic_context.default_specialization(db, None));
+
+        // For external typevars, variance flows through the specialization arguments. Expanding
+        // the specialized alias body here can create ever-larger recursive alias applications.
+        generic_context
+            .variables(db)
+            .zip(specialization.types(db))
+            .map(|(alias_typevar, argument_ty)| {
+                raw_value_type
+                    .variance_of(db, alias_typevar.identity(db))
+                    .compose_thunk(|| argument_ty.variance_of(db, typevar))
+            })
+            .collect()
     }
 }
 

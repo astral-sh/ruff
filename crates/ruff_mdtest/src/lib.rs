@@ -10,9 +10,9 @@ use ruff_db::diagnostic::{Annotation, Diagnostic, Span};
 use ruff_db::files::{File, system_path_to_file};
 use ruff_db::source::source_text;
 use ruff_db::system::{DbWithWritableSystem as _, SystemPathBuf};
-use ruff_linter::pyproject_toml::lint_pyproject_toml;
 use ruff_linter::source_kind::SourceKind;
 use ruff_linter::test::test_contents;
+use ruff_linter::toml::lint_toml;
 use ruff_python_ast::SourceType;
 use ruff_ranged_value::{ValueSource, ValueSourceGuard};
 use ruff_workspace::configuration::Configuration;
@@ -126,10 +126,10 @@ fn run_test(
                             };
                             test_contents(&source_kind, path, &settings.linter).0
                         }
-                        SourceType::Toml(source_type) if source_type.is_pyproject() => {
-                            lint_pyproject_toml(path, source.as_str(), &settings.linter)
+                        SourceType::Toml(source_type) => {
+                            lint_toml(path, source.as_str(), &settings.linter, source_type)
                         }
-                        SourceType::Toml(_) | SourceType::Markdown => Vec::new(),
+                        SourceType::Markdown => Vec::new(),
                     }
                 },
                 test_file,

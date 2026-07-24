@@ -38,7 +38,7 @@ DEFAULT_TARGETS = [
     Project(repo=Repository(owner="binary-husky", name="gpt_academic", ref="master")),
     Project(repo=Repository(owner="bloomberg", name="pytest-memray", ref="main")),
     Project(
-        repo=Repository(owner="bokeh", name="bokeh", ref="branch-3.3"),
+        repo=Repository(owner="bokeh", name="bokeh", ref="branch-3.10"),
         check_options=CheckOptions(select="ALL"),
     ),
     # Disabled due to use of explicit `select` with `E999`, which has been removed.
@@ -56,7 +56,7 @@ DEFAULT_TARGETS = [
     Project(repo=Repository(owner="fronzbot", name="blinkpy", ref="dev")),
     Project(repo=Repository(owner="ibis-project", name="ibis", ref="main")),
     Project(repo=Repository(owner="ing-bank", name="probatus", ref="main")),
-    Project(repo=Repository(owner="jrnl-org", name="jrnl", ref="develop")),
+    Project(repo=Repository(owner="jrnl-org", name="jrnl", ref="main")),
     Project(repo=Repository(owner="langchain-ai", name="langchain", ref="master")),
     Project(repo=Repository(owner="latchbio", name="latch", ref="main")),
     Project(repo=Repository(owner="lnbits", name="lnbits", ref="main")),

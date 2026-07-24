@@ -1,13 +1,14 @@
 use ruff_db::source::source_text;
 use ruff_diagnostics::{Edit, Fix};
 use ruff_python_trivia::indentation_at_offset;
+use ruff_source_file::LineRanges;
 use ruff_text_size::{TextLen, TextRange, TextSize};
 use std::fmt::Write as _;
 
 use crate::lint::LintId;
 use crate::suppression::{
     CheckSuppressionsContext, Suppression, SuppressionKind, SuppressionTarget,
-    UNUSED_IGNORE_COMMENT, UNUSED_TYPE_IGNORE_COMMENT,
+    UNUSED_IGNORE_COMMENT, UNUSED_TYPE_IGNORE_COMMENT, select_preferred_suppression,
 };
 
 /// Checks for unused suppression comments in `file` and
@@ -40,16 +41,17 @@ pub(super) fn check_unused_suppressions(context: &mut CheckSuppressionsContext) 
         // `unused-ignore-comment` diagnostics can only be suppressed by specifying a
         // code. This is necessary because every `type: ignore` would implicitly also
         // suppress its own unused-ignore-comment diagnostic.
-        if let Some(unused_suppression) = all
-            .lint_suppressions(suppression.range, LintId::of(&UNUSED_IGNORE_COMMENT))
-            .find(|unused_ignore_suppression| unused_ignore_suppression.target.is_lint())
-        {
-            // A `unused-ignore-comment` suppression can't ignore itself.
-            // It can only ignore other suppressions.
-            if unused_suppression.id() != suppression.id() {
-                diagnostics.mark_used(unused_suppression.id());
-                continue;
-            }
+        // An `unused-ignore-comment` suppression can't ignore itself. It can only ignore other
+        // suppressions, so exclude the suppression whose diagnostic we're checking.
+        if let Some(unused_suppression) = select_preferred_suppression(
+            all.lint_suppressions(suppression.range, LintId::of(&UNUSED_IGNORE_COMMENT))
+                .filter(|candidate| {
+                    candidate.target.is_lint() && candidate.id() != suppression.id()
+                }),
+            suppression.range,
+        ) {
+            diagnostics.mark_used(unused_suppression.id());
+            continue;
         }
 
         unused.push(suppression);
@@ -221,6 +223,10 @@ fn remove_comment_fix(suppression: &Suppression, source: &str) -> Fix {
         }
 
         return Fix::safe_edit(edit);
+    }
+
+    if indentation_at_offset(comment_start, source).is_some() {
+        return Fix::safe_edit(Edit::range_deletion(source.full_line_range(comment_start)));
     }
 
     // Remove any leading whitespace before the comment

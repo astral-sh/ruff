@@ -11,6 +11,7 @@ use ruff_python_ast::{
 };
 use ruff_python_trivia::is_python_whitespace;
 use ruff_text_size::{Ranged, TextRange, TextSize};
+use rustc_hash::FxHashSet;
 use thin_vec::ThinVec;
 use unicode_normalization::UnicodeNormalization;
 
@@ -37,12 +38,40 @@ mod statement;
 #[cfg(test)]
 mod tests;
 
+#[derive(Debug, Default)]
+struct NameInterner {
+    names: FxHashSet<Name>,
+}
+
+impl NameInterner {
+    /// Returns an inline name directly, or a shared clone of a heap-allocated name.
+    fn intern(&mut self, text: &str) -> Name {
+        if let Some(name) = Name::new_inline(text) {
+            return name;
+        }
+
+        if let Some(name) = self.names.get(text) {
+            return name.clone();
+        }
+
+        let name = Name::new_heap(text);
+        self.names.insert(name.clone());
+        name
+    }
+}
+
 #[derive(Debug)]
 pub(crate) struct Parser<'src> {
     source: &'src str,
 
     /// Token source for the parser that skips over any non-trivia token.
     tokens: TokenSource<'src>,
+
+    /// Deduplicates the backing allocations for repeated names that do not fit inline.
+    name_interner: NameInterner,
+
+    /// Reusable storage for names that need to be constructed by the parser.
+    name_buffer: String,
 
     /// Stores all the syntax errors found during the parsing.
     errors: Vec<ParseError>,
@@ -113,6 +142,8 @@ impl<'src> Parser<'src> {
             errors: Vec::new(),
             unsupported_syntax_errors: Vec::new(),
             tokens,
+            name_interner: NameInterner::default(),
+            name_buffer: String::new(),
             recovery_context: RecoveryContext::empty(),
             prev_token_end: TextSize::new(0),
             start_offset,
@@ -421,11 +452,25 @@ impl<'src> Parser<'src> {
     fn bump_name(&mut self) -> Name {
         let text = self.current_token_text();
         let name = if !self.tokens.current_flags().is_non_ascii_name() {
-            Name::new(text)
+            self.intern_name(text)
         } else {
-            normalize_name(text)
+            self.intern_normalized_name(text)
         };
         self.bump(TokenKind::Name);
+        name
+    }
+
+    fn intern_name(&mut self, text: &str) -> Name {
+        self.name_interner.intern(text)
+    }
+
+    fn intern_normalized_name(&mut self, text: &str) -> Name {
+        let snapshot = self.name_buffer.len();
+        self.name_buffer.extend(text.nfkc());
+
+        let name = self.name_interner.intern(&self.name_buffer[snapshot..]);
+
+        self.name_buffer.truncate(snapshot);
         name
     }
 
@@ -928,11 +973,6 @@ fn strip_underscores(text: &str) -> Cow<'_, str> {
     } else {
         Cow::Borrowed(text)
     }
-}
-
-#[cold]
-fn normalize_name(text: &str) -> Name {
-    text.nfkc().collect::<Name>()
 }
 
 #[derive(Copy, Clone)]

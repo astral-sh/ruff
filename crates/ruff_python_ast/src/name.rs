@@ -4,10 +4,35 @@ use std::hash::{Hash, Hasher};
 use std::ops::Deref;
 
 use arrayvec::ArrayVec;
+use char_str::{CharStr, CharString};
 
 use crate::Expr;
 use crate::generated::ExprName;
 
+/// An immutable name.
+///
+/// # Choosing a string representation
+///
+/// On 64-bit targets, [`CharStr`] occupies 16 bytes and stores up to 16 UTF-8 bytes inline. Longer
+/// values use an exactly-sized, reference-counted allocation, so cloning a heap-backed value
+/// reuses its allocation. [`compact_str::CompactString`] occupies 24 bytes, stores up to 24 bytes
+/// inline, and remains mutable; cloning a heap-backed value copies its contents into a new
+/// allocation.
+///
+/// Prefer `CharStr` for immutable text that is retained densely or passed between owners, when
+/// either the smaller handle or structural sharing offsets the extra heap allocations for values
+/// between 17 and 24 bytes. Prefer `CompactString` for uniquely owned text, especially when it is
+/// built incrementally, mutated, or commonly falls in that 17-to-24-byte range.
+///
+/// `Name` uses `CharStr` because names appear throughout the AST and repeated heap-backed parser
+/// names share an allocation. By contrast, [`crate::DebugText`] uses `CompactString` because it
+/// builds a uniquely owned buffer incrementally, and `ty_module_resolver::ModuleName` uses
+/// `CompactString` because module names can be extended in place.
+///
+/// Converting a borrowed `&str` into `CharStr` creates a new value and does not preserve structural
+/// sharing. When an API retains text already held in a `CharStr` (including a `Name`), pass or clone
+/// the owned value rather than converting it through `&str`. This is especially relevant at Salsa
+/// interning boundaries.
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
 #[cfg_attr(feature = "salsa", derive(salsa::SalsaValue))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -18,47 +43,64 @@ use crate::generated::ExprName;
     derive(schemars::JsonSchema),
     schemars(with = "String")
 )]
-pub struct Name(compact_str::CompactString);
+pub struct Name(CharStr);
 
 impl Name {
     #[inline]
     pub fn empty() -> Self {
-        Self(compact_str::CompactString::default())
+        Self(CharStr::new())
     }
 
     #[inline]
     pub fn new(name: impl AsRef<str>) -> Self {
-        Self(compact_str::CompactString::new(name))
+        Self(CharStr::from(name.as_ref()))
+    }
+
+    /// Creates an inline name, returning `None` if `name` does not fit inline.
+    #[inline]
+    pub fn new_inline(name: impl AsRef<str>) -> Option<Self> {
+        CharStr::new_inline(name.as_ref()).map(Self)
+    }
+
+    /// Creates an exactly-sized, heap-allocated name.
+    #[inline]
+    pub fn new_heap(name: impl AsRef<str>) -> Self {
+        Self(CharStr::new_heap(name.as_ref()))
     }
 
     #[inline]
     pub const fn new_static(name: &'static str) -> Self {
-        Self(compact_str::CompactString::const_new(name))
+        Self(CharStr::from_static_str(name))
     }
 
-    pub fn shrink_to_fit(&mut self) {
-        self.0.shrink_to_fit();
+    /// Creates an exactly-sized name by concatenating string slices.
+    ///
+    /// The combined length is computed up front, so heap storage is allocated at most once.
+    #[inline]
+    pub fn concat<T: AsRef<str>>(slices: &[T]) -> Self {
+        Self(CharStr::concat(slices))
     }
 
+    /// Creates an exactly-sized name by joining string slices with a separator.
+    ///
+    /// Like [`Name::concat`], this computes the combined length up front, so heap storage is
+    /// allocated at most once. For dynamically formatted names, use [`Name::from`] with
+    /// [`format_char!`](char_str::format_char). If a [`CharStr`] is sufficient, use
+    /// [`format_char_str!`](char_str::format_char_str) instead.
+    #[inline]
+    pub fn join<T: AsRef<str>>(slices: &[T], separator: &str) -> Self {
+        Self(CharStr::join(slices, separator))
+    }
+
+    #[inline]
     pub fn as_str(&self) -> &str {
         self.0.as_str()
-    }
-
-    pub fn push_str(&mut self, s: &str) {
-        self.0.push_str(s);
     }
 }
 
 impl Debug for Name {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "Name({:?})", self.as_str())
-    }
-}
-
-impl std::fmt::Write for Name {
-    fn write_str(&mut self, s: &str) -> std::fmt::Result {
-        self.0.push_str(s);
-        Ok(())
     }
 }
 
@@ -88,7 +130,7 @@ impl Borrow<str> for Name {
 impl<'a> From<&'a str> for Name {
     #[inline]
     fn from(s: &'a str) -> Self {
-        Name(s.into())
+        Name::new(s)
     }
 }
 
@@ -102,7 +144,7 @@ impl From<String> for Name {
 impl<'a> From<&'a String> for Name {
     #[inline]
     fn from(s: &'a String) -> Self {
-        Name(s.into())
+        Name::new(s)
     }
 }
 
@@ -120,14 +162,35 @@ impl From<Box<str>> for Name {
     }
 }
 
-impl From<compact_str::CompactString> for Name {
+#[cfg(feature = "salsa")]
+impl salsa::Lookup<Name> for &str {
     #[inline]
-    fn from(value: compact_str::CompactString) -> Self {
-        Self(value)
+    fn into_owned(self) -> Name {
+        Name::new(self)
     }
 }
 
-impl From<Name> for compact_str::CompactString {
+#[cfg(feature = "salsa")]
+impl salsa::HashEqLike<&str> for Name {
+    #[inline]
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.as_str().hash(state);
+    }
+
+    #[inline]
+    fn eq(&self, data: &&str) -> bool {
+        self.as_str() == *data
+    }
+}
+
+impl From<Name> for String {
+    #[inline]
+    fn from(name: Name) -> Self {
+        name.0.into()
+    }
+}
+
+impl From<Name> for CharStr {
     #[inline]
     fn from(name: Name) -> Self {
         name.0
@@ -138,7 +201,7 @@ impl From<Name> for compact_str::CompactString {
 impl salsa::Lookup<compact_str::CompactString> for Name {
     #[inline]
     fn into_owned(self) -> compact_str::CompactString {
-        self.0
+        compact_str::CompactString::new(self.as_str())
     }
 }
 
@@ -146,7 +209,7 @@ impl salsa::Lookup<compact_str::CompactString> for Name {
 impl salsa::Lookup<compact_str::CompactString> for &Name {
     #[inline]
     fn into_owned(self) -> compact_str::CompactString {
-        self.0.clone()
+        compact_str::CompactString::new(self.as_str())
     }
 }
 
@@ -154,12 +217,12 @@ impl salsa::Lookup<compact_str::CompactString> for &Name {
 impl salsa::HashEqLike<Name> for compact_str::CompactString {
     #[inline]
     fn hash<H: Hasher>(&self, state: &mut H) {
-        std::hash::Hash::hash(self, state);
+        Hash::hash(self, state);
     }
 
     #[inline]
     fn eq(&self, data: &Name) -> bool {
-        self == data.as_str()
+        self.as_str() == data.as_str()
     }
 }
 
@@ -167,19 +230,19 @@ impl salsa::HashEqLike<Name> for compact_str::CompactString {
 impl salsa::HashEqLike<&Name> for compact_str::CompactString {
     #[inline]
     fn hash<H: Hasher>(&self, state: &mut H) {
-        std::hash::Hash::hash(self, state);
+        Hash::hash(self, state);
     }
 
     #[inline]
     fn eq(&self, data: &&Name) -> bool {
-        self == data.as_str()
+        self.as_str() == data.as_str()
     }
 }
 
-impl From<Name> for String {
+impl From<CharString> for Name {
     #[inline]
-    fn from(name: Name) -> Self {
-        name.as_str().into()
+    fn from(name: CharString) -> Self {
+        Self(name.freeze())
     }
 }
 
@@ -801,7 +864,28 @@ type SegmentsStack<'a> = ArrayVec<&'a str, SMALL_LEN>;
 
 #[cfg(test)]
 mod tests {
+    #[cfg(feature = "salsa")]
+    use std::hash::{DefaultHasher, Hash, Hasher};
+
+    #[cfg(feature = "salsa")]
+    use crate::name::Name;
     use crate::name::SegmentsVec;
+
+    #[cfg(feature = "salsa")]
+    #[test]
+    fn salsa_lookup_name_from_str() {
+        let name = Name::new("member");
+        let lookup = "member";
+
+        let mut name_hasher = DefaultHasher::new();
+        salsa::HashEqLike::<&str>::hash(&name, &mut name_hasher);
+        let mut lookup_hasher = DefaultHasher::new();
+        lookup.hash(&mut lookup_hasher);
+
+        assert_eq!(name_hasher.finish(), lookup_hasher.finish());
+        assert!(salsa::HashEqLike::<&str>::eq(&name, &lookup));
+        assert_eq!(salsa::Lookup::<Name>::into_owned(lookup), name);
+    }
 
     #[test]
     fn empty_vec() {

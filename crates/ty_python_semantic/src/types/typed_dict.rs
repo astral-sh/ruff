@@ -715,7 +715,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         // This should be cheaper in many cases, and also helps us avoid some cycles.
         if let Some(defining_class) = source.defining_class()
             && let Some(target_defining_class) = target.defining_class()
-            && defining_class.is_subclass_of(db, target_defining_class)
+            && self.is_class_subtype(db, defining_class, target_defining_class)
         {
             return self.always();
         }

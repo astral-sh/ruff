@@ -468,7 +468,6 @@ ignore = ["D203", "D212"]
     All checks passed!
 
     ----- stderr -----
-    warning: No Python files found under the given path(s)
     ");
 
     Ok(())
@@ -5190,5 +5189,44 @@ fn preview_default_rules() -> Result<()> {
     ]
     ",
     );
+    Ok(())
+}
+
+#[test]
+fn ruff_toml_is_linted() -> Result<()> {
+    let test = CliTest::with_file("ruff.toml", r#"lint.select = ["F401"]"#)?;
+
+    assert_cmd_snapshot!(
+        test.command().args([
+            "check",
+            "--no-cache",
+            "--isolated",
+            "--preview",
+            "--select",
+            "RUF201",
+        ]),
+        @r#"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    rule-codes-in-selectors: [*] Rule code used instead of name in `lint.select`
+     --> ruff.toml:1:17
+      |
+    1 | lint.select = ["F401"]
+      |                 ^^^^
+      |
+    help: Replace rule code with `unused-import`
+      |
+      - lint.select = ["F401"]
+    1 + lint.select = ["unused-import"]
+      |
+
+    Found 1 error.
+    [*] 1 fixable with the `--fix` option.
+
+    ----- stderr -----
+    "#,
+    );
+
     Ok(())
 }

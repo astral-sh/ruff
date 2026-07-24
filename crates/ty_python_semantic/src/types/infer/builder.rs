@@ -100,7 +100,7 @@ use crate::types::signatures::{CallableSignature, ReturnCallableTypeVarScope};
 use crate::types::special_form::TypeQualifier;
 use crate::types::subclass_of::SubclassOfInner;
 use crate::types::tuple::promotion::TupleSizePromotionConstraints;
-use crate::types::tuple::{Tuple, TupleLength, TupleSpecBuilder, TupleType};
+use crate::types::tuple::{Tuple, TupleLength, TupleSpecBuilder, TupleType, VariableSegment};
 use crate::types::type_alias::{ManualPEP695TypeAliasType, PEP695TypeAliasType};
 use crate::types::typed_dict::{TypedDictAssignmentKind, TypedDictKeyAssignment};
 use crate::types::typevar::{BoundTypeVarIdentity, TypeVarConstraints, TypeVarIdentity};
@@ -108,13 +108,13 @@ use crate::types::unpacker::UnpackResult;
 use crate::types::{
     BoundTypeVarInstance, CallDunderError, CallableBinding, CallableType, CallableTypes, ClassType,
     DynamicType, InferenceFlags, InternedConstraintSet, InternedType, IntersectionBuilder,
-    IntersectionType, KnownClass, KnownInstanceType, KnownUnion, LiteralValueTypeKind,
-    MemberLookupPolicy, ParamSpecAttrKind, Parameter, Parameters, SentinelInstance, Signature,
-    SpecialFormType, SubclassOfType, Type, TypeAliasType, TypeAndQualifiers, TypeContext,
-    TypeQualifiers, TypeVarBoundOrConstraints, TypeVarKind, TypeVarVariance, TypedDictModule,
-    TypedDictType, UnionAccumulator, UnionBuilder, UnionType, any_over_type, binding_type,
-    extract_fixed_length_iterable_element_types, infer_complete_scope_types, infer_scope_types,
-    is_discarded_dict_key_assignment, todo_type,
+    IntersectionType, KnownClass, KnownInstanceType, KnownUnion, LiteralValueType,
+    LiteralValueTypeKind, MemberLookupPolicy, ParamSpecAttrKind, Parameter, Parameters,
+    SentinelInstance, Signature, SpecialFormType, SubclassOfType, Type, TypeAliasType,
+    TypeAndQualifiers, TypeContext, TypeQualifiers, TypeVarBoundOrConstraints, TypeVarKind,
+    TypeVarVariance, TypedDictModule, TypedDictType, UnionAccumulator, UnionBuilder, UnionType,
+    any_over_type, binding_type, extract_fixed_length_iterable_element_types,
+    infer_complete_scope_types, infer_scope_types, is_discarded_dict_key_assignment, todo_type,
 };
 use crate::{AnalysisSettings, Db, FxIndexSet, Program};
 use ty_python_core::ast_ids::ScopedUseId;
@@ -1333,6 +1333,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             DefinitionKind::ParamSpec(paramspec) => {
                 self.infer_paramspec_deferred(paramspec.node(self.module()));
             }
+            DefinitionKind::TypeVarTuple(typevartuple) => {
+                self.infer_typevartuple_deferred(typevartuple.node(self.module()));
+            }
             DefinitionKind::Assignment(assignment) => {
                 self.infer_assignment_deferred(
                     assignment.target(self.module()),
@@ -2014,9 +2017,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         type_alias: &ast::StmtTypeAlias,
         definition: Definition<'db>,
     ) {
+        let alias_name = &type_alias.name.as_name_expr().unwrap().id;
+
         // Check that no type parameter with a default follows a TypeVarTuple
         // in the type alias's PEP 695 type parameter list.
         if let Some(type_params) = type_alias.type_params.as_deref() {
+            post_inference::type_param_validation::check_single_typevar_tuple_pep695(
+                &self.context,
+                type_params,
+                post_inference::type_param_validation::TypeParameterOwner::TypeAlias(alias_name),
+            );
             post_inference::type_param_validation::check_no_default_after_typevar_tuple_pep695(
                 &self.context,
                 type_params,
@@ -2028,14 +2038,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .node_scope(NodeWithScopeRef::TypeAlias(type_alias))
             .to_scope_id(self.db(), self.file());
 
-        let type_alias_ty = Type::KnownInstance(KnownInstanceType::TypeAliasType(
-            TypeAliasType::PEP695(PEP695TypeAliasType::new(
-                self.db(),
-                &type_alias.name.as_name_expr().unwrap().id,
-                rhs_scope,
-                None,
-            )),
-        ));
+        let type_alias_ty =
+            Type::KnownInstance(KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(
+                PEP695TypeAliasType::new(self.db(), alias_name, rhs_scope, None),
+            )));
 
         self.store_expression_type(&type_alias.name, type_alias_ty);
 
@@ -2227,10 +2233,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             let mut builder = UnionBuilder::new(self.db());
             let mut invalid_elements = vec![];
 
-            for (index, element) in tuple_spec.all_elements().iter().enumerate() {
+            for (index, element) in tuple_spec.iter_element_types(self.db()).enumerate() {
                 builder = builder.add(
                     if element.is_assignable_to(self.db(), type_base_exception) {
-                        element.to_instance(self.db()).expect(
+                        element.to_instance_approximation(self.db()).expect(
                             "`Type::to_instance()` should always return `Some()` \
                                 if called on a type assignable to `type[BaseException]`",
                         )
@@ -2250,7 +2256,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 {
                     let invalid_elements = invalid_elements
                         .iter()
-                        .map(|(index, ty)| (&tuple.elts[*index], **ty));
+                        .map(|(index, ty)| (&tuple.elts[*index], *ty));
 
                     report_invalid_exception_tuple_caught(
                         &self.context,
@@ -2309,9 +2315,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // `except (ValueError, TypeError) as e:`
             UnionType::try_from_elements(
                 self.db(),
-                tuple_spec.all_elements().iter().map(|element| {
+                tuple_spec.iter_element_types(self.db()).map(|element| {
                     if element.is_assignable_to(self.db(), type_base_exception) {
-                        Some(element.to_instance(self.db()).expect(
+                        Some(element.to_instance_approximation(self.db()).expect(
                             "`Type::to_instance()` should always return `Some()` \
                                 if called on a type assignable to `type[BaseException]`",
                         ))
@@ -2322,7 +2328,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             )
         } else if ty.is_assignable_to(self.db(), type_base_exception) {
             // `except ValueError as e:`
-            Some(ty.to_instance(self.db()).expect(
+            Some(ty.to_instance_approximation(self.db()).expect(
                 "`Type::to_instance()` should always return `Some()` \
                     if called on a type assignable to `type[BaseException]`",
             ))
@@ -2337,7 +2343,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     .and_then(|spec| {
                         let specialization = spec
                             .homogeneous_element_type(self.db())
-                            .to_instance(self.db());
+                            .to_instance_approximation(self.db());
 
                         debug_assert!(specialization.is_some_and(|specialization_type| {
                             specialization_type.is_assignable_to(
@@ -3064,7 +3070,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 if let Some(tuple_spec) =
                     assigned_ty.and_then(|ty| ty.tuple_instance_spec(self.db()))
                 {
-                    let assigned_tys = tuple_spec.all_elements().to_vec();
+                    let assigned_tys = tuple_spec.iter_element_types(self.db()).collect::<Vec<_>>();
 
                     for (i, element) in elts.iter().enumerate() {
                         match assigned_tys.get(i).copied() {
@@ -3098,6 +3104,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                     self.validate_attribute_assignment(
                         attr_expr,
+                        value,
                         object_ty,
                         attr.id(),
                         infer_assigned_ty,
@@ -3233,6 +3240,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 call_expr,
                                 definition,
                                 paramspec_class,
+                            ),
+                            Some(
+                                typevartuple_class @ (KnownClass::TypeVarTuple
+                                | KnownClass::ExtensionsTypeVarTuple),
+                            ) => self.infer_legacy_typevartuple(
+                                target,
+                                call_expr,
+                                definition,
+                                typevartuple_class,
                             ),
                             Some(KnownClass::NewType) => {
                                 self.infer_newtype_expression(target, call_expr, definition)
@@ -3387,10 +3403,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.deferred.insert(definition);
 
         Type::KnownInstance(KnownInstanceType::NewType(NewType::new(
-            db,
-            ast::name::Name::from(name),
-            definition,
-            None,
+            db, name, definition, None,
         )))
     }
 
@@ -3564,6 +3577,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         if let Some(default) = arguments.find_keyword("default") {
             if matches!(
                 known_class,
+                Some(KnownClass::TypeVarTuple | KnownClass::ExtensionsTypeVarTuple)
+            ) {
+                self.infer_typevartuple_default(&default.value, None);
+            } else if matches!(
+                known_class,
                 Some(KnownClass::ParamSpec | KnownClass::ExtensionsParamSpec)
             ) {
                 // Pass `None` for the name: the outer-scope typevar check inside
@@ -3723,11 +3741,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.deferred.insert(definition);
 
         Type::KnownInstance(KnownInstanceType::TypeAliasType(
-            TypeAliasType::ManualPEP695(ManualPEP695TypeAliasType::new(
-                db,
-                ast::name::Name::new(name),
-                definition,
-            )),
+            TypeAliasType::ManualPEP695(ManualPEP695TypeAliasType::new(db, name, definition)),
         ))
     }
 
@@ -4428,6 +4442,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     db,
                     target_type,
                     op.in_place_dunder(),
+                    MemberLookupPolicy::NO_INSTANCE_FALLBACK,
                     ArgumentsIter::synthesized(&ast_arguments),
                     &mut call_arguments,
                     &mut |builder, (_, _, tcx)| infer_value_ty(builder, tcx),
@@ -4970,13 +4985,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         db: &'db dyn Db,
         object: Type<'db>,
         name: &str,
+        lookup_policy: MemberLookupPolicy,
         ast_arguments: ArgumentsIter<'_>,
         argument_types: &mut CallArguments<'_, 'db>,
         infer_argument_ty: &mut dyn FnMut(&mut Self, ArgExpr<'db, '_>) -> Type<'db>,
         call_expression_tcx: TypeContext<'db>,
     ) -> Result<Bindings<'db>, CallDunderError<'db>> {
         match object
-            .member_lookup_with_policy(db, name.into(), MemberLookupPolicy::NO_INSTANCE_FALLBACK)
+            .member_lookup_with_policy(db, name, lookup_policy)
             .place
         {
             Place::Defined(DefinedPlace {
@@ -6152,11 +6168,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         assert_eq!(previous, None);
     }
 
+    /// Whether this region's inference should record expected types for string-literal
+    /// completions. They're only ever read for files open in the editor.
+    fn collects_expected_types(&self) -> bool {
+        self.db().is_open_file(self.file())
+    }
+
     fn store_maybe_expected_type(
         &mut self,
         expression: impl Into<ExpressionNodeKey>,
         ty: Type<'db>,
     ) {
+        // Cheaper check first so most queries never depend on the open-file state
         if !self.has_string_literal_completion_candidates(ty) {
             return;
         }
@@ -6165,6 +6188,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     fn store_expected_type(&mut self, expression: impl Into<ExpressionNodeKey>, ty: Type<'db>) {
+        if !self.collects_expected_types() {
+            return;
+        }
+
         self.expected_types.insert(expression.into(), ty);
     }
 
@@ -6184,6 +6211,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     fn union_expected_types(&mut self, expected_types: &FxHashMap<ExpressionNodeKey, Type<'db>>) {
+        // Non-empty only if the producing inference collected, i.e. the file is open
+        if expected_types.is_empty() {
+            return;
+        }
+
         let db = self.db();
         #[expect(
             clippy::iter_over_hash_type,
@@ -6404,6 +6436,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 if let Tuple::Variable(tuple) = spec
                     && tuple.prefix_elements().is_empty()
                     && tuple.suffix_elements().is_empty()
+                    && matches!(tuple.variable(), VariableSegment::Homogeneous(_))
                 {
                     is_homogeneous_tuple_annotation = true;
                 }
@@ -6419,12 +6452,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let can_use_type_context =
             is_homogeneous_tuple_annotation || elts.iter().all(|elt| !elt.is_starred_expr());
 
-        let mut annotated_elt_tys = annotated_tuple
+        let annotated_elt_tys = annotated_tuple
             .as_ref()
-            .map(Tuple::all_elements)
-            .unwrap_or_default()
-            .iter()
-            .copied();
+            .map(|tuple| tuple.iter_element_types(self.db()).collect::<Vec<_>>())
+            .unwrap_or_default();
+        let mut annotated_elt_tys = annotated_elt_tys.into_iter();
 
         let db = self.db();
 
@@ -7002,7 +7034,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             .specialize_recursive(self.db(), specialization.into_iter().map(Some))
                     },
                 );
-                return Type::from(class_type).to_instance(self.db());
+                return Type::from(class_type).to_instance_approximation(self.db());
             }
 
             pre_inferred_elt_tys = Some(inferred_elts);
@@ -7241,7 +7273,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 })
             });
 
-        Type::from(class_type).to_instance(self.db())
+        Type::from(class_type).to_instance_approximation(self.db())
     }
 
     /// Infer the type of the `iter` expression of the first comprehension.
@@ -8633,6 +8665,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         );
                     }
                 }
+                Some(KnownClass::TypeVarTuple | KnownClass::ExtensionsTypeVarTuple) => {
+                    if let Some(builder) = self
+                        .context
+                        .report_lint(&INVALID_LEGACY_TYPE_VARIABLE, call_expression)
+                    {
+                        builder.into_diagnostic(
+                            "A `TypeVarTuple` definition must be a simple variable assignment",
+                        );
+                    }
+                }
                 Some(KnownClass::NewType) => {
                     if let Some(builder) =
                         self.context.report_lint(&INVALID_NEWTYPE, call_expression)
@@ -8847,6 +8889,29 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let db = self.db();
         let iterable_type = self.infer_expression(value, tcx);
+        let typevartuple = match iterable_type {
+            Type::KnownInstance(KnownInstanceType::TypeVar(typevar))
+                if typevar.is_typevartuple(db) =>
+            {
+                bind_typevar(
+                    db,
+                    self.index,
+                    self.scope().file_scope_id(db),
+                    self.typevar_binding_context,
+                    typevar,
+                )
+            }
+            Type::TypeVar(typevar) if typevar.is_typevartuple(db) => Some(typevar),
+            _ => None,
+        };
+        if let Some(typevartuple) = typevartuple {
+            return Type::tuple(TupleType::new(
+                db,
+                &TupleSpecBuilder::with_capacity(0)
+                    .concat_variadic_typevar(db, typevartuple)
+                    .build(),
+            ));
+        }
         iterable_type
             .try_iterate(db)
             .map(|spec| Type::tuple(TupleType::new(db, &spec)))
@@ -9717,7 +9782,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let attribute_exists = match MethodDecorator::try_from_fn_type(self.db(), function_type) {
             Some(MethodDecorator::ClassMethod) => !Type::instance(self.db(), class)
-                .class_member(self.db(), id.clone())
+                .class_member(self.db(), id)
                 .place
                 .is_undefined(),
             Some(MethodDecorator::None) => !Type::instance(self.db(), class)
@@ -11559,7 +11624,9 @@ impl StringPartsCollector {
         } else if let Some(concatenated) = self.concatenated {
             Type::string_literal(db, &concatenated)
         } else {
-            Type::literal_string()
+            Type::LiteralValue(LiteralValueType::promotable(
+                LiteralValueTypeKind::LiteralString,
+            ))
         }
     }
 }
@@ -11825,7 +11892,7 @@ impl<'db, 'ast> AddBinding<'db, 'ast> {
             });
             // If the member is a data descriptor, the RHS value may differ from the value actually assigned.
             if value_ty
-                .class_member(db, attr.id.clone())
+                .class_member(db, &attr.id)
                 .place
                 .ignore_possibly_undefined()
                 .is_some_and(|ty| ty.may_be_data_descriptor(db))

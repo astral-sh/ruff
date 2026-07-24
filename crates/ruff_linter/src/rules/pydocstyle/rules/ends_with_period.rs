@@ -35,6 +35,11 @@ use crate::rules::pydocstyle::helpers::logical_line;
 ///     """Return the mean of the given values."""
 /// ```
 ///
+/// ## Fix safety
+/// This fix is marked as unsafe, as it may alter the intended formatting of the
+/// docstring, or affect tools that parse docstrings and rely on specific
+/// formatting.
+///
 /// ## Options
 /// - `lint.pydocstyle.convention`
 ///

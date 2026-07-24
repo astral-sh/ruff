@@ -4,7 +4,7 @@ build-backend = "maturin"
 
 [project]
 name = "ruff"
-version = "0.15.21"
+version = "0.15.22"
 description = "An extremely fast Python linter and code formatter, written in Rust."
 authors = [{ name = "Astral Software Inc.", email = "hey@astral.sh" }]
 readme = "README.md"
@@ -57,7 +57,7 @@ exclude = [
 
 [dependency-groups]
 dev = [
-    "prek==0.4.8",
+    "prek==0.4.9",
 ]
 release = [
     "rooster==0.1.1",

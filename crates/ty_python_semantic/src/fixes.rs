@@ -818,6 +818,7 @@ mod tests {
     use crate::Db;
     use crate::db::tests::TestDbBuilder;
     use crate::fixes::{FixMode, fix_all};
+    use crate::is_unused_ignore_comment_lint;
 
     #[test]
     fn simple_suppression() {
@@ -1020,6 +1021,50 @@ mod tests {
     }
 
     #[test]
+    fn add_ignore_deduplicates_existing_edit_against_planned_start_line() {
+        assert_snapshot!(
+            suppress_all_in(r#"
+                from typing import TypeAlias
+
+                JsonValue: TypeAlias = dict[str, "JsonValue"] | list["JsonValue"] | int
+
+
+                def get_data() -> dict[str, JsonValue]:
+                    return {"home_assistant": {"entities": [{"entity_id": "sensor.test"}]}}
+
+
+                def f() -> None:
+                    diag = get_data()
+                    diag["home_assistant"]["entities"] = sorted(
+                        diag["home_assistant"]["entities"], key=lambda ent: ent["entity_id"]
+                    ); missing  # ty: ignore[unresolved-reference]
+                "#),
+            @r#"
+        Added 4 suppressions
+
+        ## Fixed source
+
+        ```py
+        from typing import TypeAlias
+
+        JsonValue: TypeAlias = dict[str, "JsonValue"] | list["JsonValue"] | int
+
+
+        def get_data() -> dict[str, JsonValue]:
+            return {"home_assistant": {"entities": [{"entity_id": "sensor.test"}]}}
+
+
+        def f() -> None:
+            diag = get_data()
+            diag["home_assistant"]["entities"] = sorted(  # ty:ignore[invalid-assignment]
+                diag["home_assistant"]["entities"], key=lambda ent: ent["entity_id"]  # ty:ignore[invalid-argument-type, not-subscriptable]
+            ); missing  # ty: ignore[unresolved-reference]
+        ```
+        "#
+        );
+    }
+
+    #[test]
     fn return_type() {
         assert_snapshot!(
             suppress_all_in(r#"class A:
@@ -1102,6 +1147,485 @@ class B(A):
           |
         help: Remove the unused suppression code
         "#);
+    }
+
+    #[test]
+    fn add_ignore_updates_empty_same_line_suppression() {
+        assert_snapshot!(
+            suppress_all_in(r#"
+                value = missing  # ty: ignore[]
+                "#),
+            @"
+        Added 1 suppressions
+
+        ## Fixed source
+
+        ```py
+        value = missing  # ty: ignore[unresolved-reference]
+        ```
+        "
+        );
+    }
+
+    #[test]
+    fn add_ignore_does_not_append_to_trailing_reason() {
+        assert_snapshot!(
+            suppress_all_in(r#"
+                value = missing  # ty: ignore[] tracked by [123]
+                "#),
+            @"
+        Added 1 suppressions
+
+        ## Fixed source
+
+        ```py
+        value = missing  # ty: ignore[] tracked by [123]  # ty:ignore[unresolved-reference]
+        ```
+
+        ## Diagnostics after applying fixes
+
+        warning[unused-ignore-comment]: Unused `ty: ignore` without a code
+         --> test.py:1:18
+          |
+        1 | value = missing  # ty: ignore[] tracked by [123]  # ty:ignore[unresolved-reference]
+          |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+          |
+        help: Remove the unused suppression comment
+        "
+        );
+    }
+
+    #[test]
+    fn add_ignore_prefers_editable_outer_suppression_over_inner_with_reason() {
+        assert_snapshot!(
+            suppress_all_in(r#"
+                seen_code = True
+                # ty: ignore[]
+                values = [
+                    # ty: ignore[] tracked by [123]
+                    missing,
+                ]
+                "#),
+            @"
+        Added 1 suppressions
+
+        ## Fixed source
+
+        ```py
+        seen_code = True
+        # ty: ignore[unresolved-reference]
+        values = [
+            # ty: ignore[] tracked by [123]
+            missing,
+        ]
+        ```
+
+        ## Diagnostics after applying fixes
+
+        warning[unused-ignore-comment]: Unused `ty: ignore` without a code
+         --> test.py:4:5
+          |
+        2 | # ty: ignore[unresolved-reference]
+        3 | values = [
+        4 |     # ty: ignore[] tracked by [123]
+          |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        5 |     missing,
+        6 | ]
+          |
+        help: Remove the unused suppression comment
+        "
+        );
+    }
+
+    #[test]
+    fn add_ignore_matches_existing_suppression_against_diagnostic_range() {
+        // The first suppression is intentional: `not-a-rule` has no indexed suppression, and
+        // repeatedly extending the final suppression can't suppress a diagnostic before it.
+        assert_snapshot!(
+            suppress_all_in(r#"
+                seen_code = True
+                # ty: ignore[] # ty: ignore[not-a-rule] # ty: ignore[division-by-zero]
+                value = 1 / 0
+                "#),
+            @"
+        Added 1 suppressions
+
+        ## Fixed source
+
+        ```py
+        seen_code = True
+        # ty: ignore[ignore-comment-unknown-rule] # ty: ignore[not-a-rule] # ty: ignore[division-by-zero]
+        value = 1 / 0
+        ```
+
+        ## Diagnostics after applying fixes
+
+        warning[unused-ignore-comment]: Unused `ty: ignore` directive
+         --> test.py:2:68
+          |
+        1 | seen_code = True
+        2 | # ty: ignore[ignore-comment-unknown-rule] # ty: ignore[not-a-rule] # ty: ignore[division-by-zero]
+          |                                                                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        3 | value = 1 / 0
+          |
+        help: Remove the unused suppression comment
+        "
+        );
+    }
+
+    #[test]
+    fn add_ignore_prefers_same_line_suppression_over_outer_own_line() {
+        assert_snapshot!(
+            suppress_all_in(r#"
+                # ty: ignore[invalid-assignment]
+                values: tuple[int] = [missing]  # ty: ignore[]
+                "#),
+            @"
+        Added 1 suppressions
+
+        ## Fixed source
+
+        ```py
+        # ty: ignore[invalid-assignment]
+        values: tuple[int] = [missing]  # ty: ignore[unresolved-reference]
+        ```
+        "
+        );
+    }
+
+    #[test]
+    fn add_ignore_groups_diagnostics_for_same_line_suppression() {
+        assert_snapshot!(
+            suppress_all_in(r#"
+                def f() -> str: return ""
+
+                result: int = f(missing)  # ty: ignore[division-by-zero]
+                "#),
+            @r#"
+        Added 3 suppressions
+
+        ## Fixed source
+
+        ```py
+        def f() -> str: return ""
+
+        result: int = f(missing)  # ty: ignore[division-by-zero, invalid-assignment, too-many-positional-arguments, unresolved-reference]
+        ```
+
+        ## Diagnostics after applying fixes
+
+        warning[unused-ignore-comment]: Unused `ty: ignore` directive: 'division-by-zero'
+         --> test.py:3:40
+          |
+        1 | def f() -> str: return ""
+        2 |
+        3 | result: int = f(missing)  # ty: ignore[division-by-zero, invalid-assignment, too-many-positional-arguments, unresolved-reference]
+          |                                        ^^^^^^^^^^^^^^^^
+          |
+        help: Remove the unused suppression code
+        "#
+        );
+    }
+
+    #[test]
+    fn add_ignore_groups_suppression_matched_at_start_and_end() {
+        assert_snapshot!(
+            suppress_all_in(r#"
+                def f(a: int, b: int, c: int) -> None: ...
+
+                f(
+                    "a" +
+                    # ty: ignore[]
+                    "b", "c", missing
+                )
+                "#),
+            @r#"
+        Added 3 suppressions
+
+        ## Fixed source
+
+        ```py
+        def f(a: int, b: int, c: int) -> None: ...
+
+        f(
+            "a" +
+            # ty: ignore[invalid-argument-type, unresolved-reference]
+            "b", "c", missing
+        )
+        ```
+        "#
+        );
+    }
+
+    #[test]
+    fn add_ignore_updates_inner_own_line_suppression() {
+        assert_snapshot!(
+            suppress_all_in(r#"
+                seen_code = True
+                values = [
+                    # ty: ignore[]
+                    missing,
+                ]
+                "#),
+            @"
+        Added 1 suppressions
+
+        ## Fixed source
+
+        ```py
+        seen_code = True
+        values = [
+            # ty: ignore[unresolved-reference]
+            missing,
+        ]
+        ```
+        "
+        );
+    }
+
+    #[test]
+    fn add_ignore_updates_preceding_own_line_suppressions() {
+        assert_snapshot!(
+            suppress_all_in(r#"
+                seen_code = True
+                # ty: ignore[]
+                value = missing
+
+                def f(a: int, b: int) -> list[int]: return []
+
+                # ty: ignore[invalid-assignment]
+                values: tuple[int] = f(
+                    missing,
+                    "bad",
+                )
+                "#),
+            @r#"
+        Added 3 suppressions
+
+        ## Fixed source
+
+        ```py
+        seen_code = True
+        # ty: ignore[unresolved-reference]
+        value = missing
+
+        def f(a: int, b: int) -> list[int]: return []
+
+        # ty: ignore[invalid-assignment, invalid-argument-type, unresolved-reference]
+        values: tuple[int] = f(
+            missing,
+            "bad",
+        )
+        ```
+        "#
+        );
+    }
+
+    #[test]
+    fn add_ignore_does_not_make_nested_suppression_unused() {
+        assert_snapshot!(
+            suppress_all_in(r#"
+                seen_code = True
+                # ty: ignore[]
+                values = [
+                    # ty: ignore[unresolved-reference]
+                    missing,
+                    absent,
+                ]
+                "#),
+            @"
+        Added 1 suppressions
+
+        ## Fixed source
+
+        ```py
+        seen_code = True
+        # ty: ignore[unresolved-reference]
+        values = [
+            # ty: ignore[unresolved-reference]
+            missing,
+            absent,
+        ]
+        ```
+        "
+        );
+    }
+
+    #[test]
+    fn add_ignore_keeps_disjoint_start_suppression_used() {
+        assert_snapshot!(
+            suppress_all_in(r#"
+                def f(a: int, b: int) -> None: pass
+                def g(a: int, b: int) -> int: return 0
+
+                f(  # ty: ignore[missing-argument]
+                    g(missing))  # ty: ignore[unresolved-reference]
+                "#),
+            @"
+        Added 1 suppressions
+
+        ## Fixed source
+
+        ```py
+        def f(a: int, b: int) -> None: pass
+        def g(a: int, b: int) -> int: return 0
+
+        f(  # ty: ignore[missing-argument]
+            g(missing))  # ty: ignore[unresolved-reference, missing-argument]
+        ```
+        "
+        );
+    }
+
+    #[test]
+    fn add_ignore_reconciles_nested_same_code_edits() {
+        assert_snapshot!(
+            suppress_all_in(r#"
+                def f(a: int, b: int, c: int) -> None: pass
+                def g(a: int, b: int) -> int: return 0
+
+                seen_code = True
+                # ty: ignore[unresolved-reference]
+                f(
+                    missing,
+                    g("bad"))  # ty: ignore[invalid-argument-type]
+                "#),
+            @r#"
+        Added 2 suppressions
+
+        ## Fixed source
+
+        ```py
+        def f(a: int, b: int, c: int) -> None: pass
+        def g(a: int, b: int) -> int: return 0
+
+        seen_code = True
+        # ty: ignore[unresolved-reference]
+        f(
+            missing,
+            g("bad"))  # ty: ignore[invalid-argument-type, missing-argument]
+        ```
+        "#
+        );
+    }
+
+    #[test]
+    fn add_ignore_updates_nested_and_outer_suppressions() {
+        assert_snapshot!(
+            suppress_all_in(r#"
+                seen_code = True
+                # ty: ignore[too-many-positional-arguments]
+                values = [
+                    # ty: ignore[invalid-argument-type]
+                    missing,
+                    absent,
+                ]
+                "#),
+            @"
+        Added 2 suppressions
+
+        ## Fixed source
+
+        ```py
+        seen_code = True
+        # ty: ignore[too-many-positional-arguments, unresolved-reference]
+        values = [
+            # ty: ignore[invalid-argument-type, unresolved-reference]
+            missing,
+            absent,
+        ]
+        ```
+
+        ## Diagnostics after applying fixes
+
+        warning[unused-ignore-comment]: Unused `ty: ignore` directive: 'too-many-positional-arguments'
+         --> test.py:2:14
+          |
+        1 | seen_code = True
+        2 | # ty: ignore[too-many-positional-arguments, unresolved-reference]
+          |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        3 | values = [
+        4 |     # ty: ignore[invalid-argument-type, unresolved-reference]
+          |
+        help: Remove the unused suppression code
+
+        warning[unused-ignore-comment]: Unused `ty: ignore` directive: 'invalid-argument-type'
+         --> test.py:4:18
+          |
+        2 | # ty: ignore[too-many-positional-arguments, unresolved-reference]
+        3 | values = [
+        4 |     # ty: ignore[invalid-argument-type, unresolved-reference]
+          |                  ^^^^^^^^^^^^^^^^^^^^^
+        5 |     missing,
+        6 |     absent,
+          |
+        help: Remove the unused suppression code
+        "
+        );
+    }
+
+    #[test]
+    fn add_ignore_reuses_outer_suppression_with_nested_blanket() {
+        assert_snapshot!(
+            suppress_all_in(r#"
+                def f(value: int) -> int: return value
+
+                seen_code = True
+                # ty: ignore[invalid-assignment]
+                values: tuple[int] = [
+                    # ty: ignore
+                    f("bad"),
+                    absent,
+                ]
+                "#),
+            @r#"
+        Added 1 suppressions
+
+        ## Fixed source
+
+        ```py
+        def f(value: int) -> int: return value
+
+        seen_code = True
+        # ty: ignore[invalid-assignment, unresolved-reference]
+        values: tuple[int] = [
+            # ty: ignore
+            f("bad"),
+            absent,
+        ]
+        ```
+        "#
+        );
+    }
+
+    #[test]
+    fn add_ignore_keeps_nested_blanket_used_for_same_code() {
+        assert_snapshot!(
+            suppress_all_in(r#"
+                seen_code = True
+                # ty: ignore[]
+                values = [
+                    # ty: ignore
+                    missing,
+                    absent,
+                ]
+                "#),
+            @"
+        Added 1 suppressions
+
+        ## Fixed source
+
+        ```py
+        seen_code = True
+        # ty: ignore[unresolved-reference]
+        values = [
+            # ty: ignore
+            missing,
+            absent,
+        ]
+        ```
+        "
+        );
     }
 
     /// Tests that the `fix_all` doesn't end up in an infinite loop
@@ -1439,12 +1963,47 @@ class B(A):
 
         let diagnostics = db.check_file(file);
         let total_diagnostics = diagnostics.len();
+        let suppressible_diagnostics = diagnostics
+            .iter()
+            .filter(|diagnostic| FixMode::Suppress.is_fixable(diagnostic))
+            .count();
+        let unsuppressible_diagnostics: Vec<_> = diagnostics
+            .iter()
+            .filter(|diagnostic| !FixMode::Suppress.is_fixable(diagnostic))
+            .cloned()
+            .collect();
         let cancellation_token_source = CancellationTokenSource::new();
         let fixes =
             suppress_all_diagnostics(&mut db, diagnostics, &cancellation_token_source.token())
                 .expect("operation never gets cancelled");
 
-        assert_eq!(fixes.count, total_diagnostics - fixes.diagnostics.len());
+        if had_syntax_errors {
+            assert_eq!(fixes.count, 0);
+            assert_eq!(fixes.diagnostics.len(), total_diagnostics);
+        } else {
+            assert_eq!(fixes.count, suppressible_diagnostics);
+            assert!(
+                fixes
+                    .diagnostics
+                    .iter()
+                    .all(|diagnostic| !FixMode::Suppress.is_fixable(diagnostic))
+            );
+
+            let unexpected_diagnostics =
+                diff_diagnostics(&unsuppressible_diagnostics, &fixes.diagnostics);
+            assert!(unexpected_diagnostics.is_empty());
+
+            let incidentally_fixed_diagnostics =
+                diff_diagnostics(&fixes.diagnostics, &unsuppressible_diagnostics);
+            // Adding a code to an empty suppression also resolves its
+            // `unused-ignore-comment`, without adding another suppression.
+            assert!(incidentally_fixed_diagnostics.iter().all(|diagnostic| {
+                diagnostic
+                    .id()
+                    .as_lint()
+                    .is_some_and(is_unused_ignore_comment_lint)
+            }));
+        }
 
         File::sync_path(&mut db, SystemPath::new("test.py"));
 

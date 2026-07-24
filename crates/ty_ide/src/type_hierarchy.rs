@@ -1,9 +1,11 @@
 use crate::Db;
 use crate::goto::find_goto_target;
+use rayon::prelude::*;
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::name::Name;
 use ruff_text_size::{TextRange, TextSize};
+use ty_project::parallel::ParallelIteratorExt;
 use ty_python_semantic::SemanticModel;
 use ty_python_semantic::TypeHierarchyClass;
 use ty_python_semantic::types::Type;
@@ -56,6 +58,8 @@ pub fn type_hierarchy_supertypes(
 }
 
 /// Get the subtypes (derived classes) of a type hierarchy item.
+///
+/// This scans all available modules and can be expensive in large projects.
 pub fn type_hierarchy_subtypes(
     db: &dyn Db,
     file: File,
@@ -64,9 +68,16 @@ pub fn type_hierarchy_subtypes(
     let Some(ty) = resolve_type_at(db, file, offset) else {
         return vec![];
     };
-    ty_python_semantic::type_hierarchy_subtypes(db, ty)
-        .into_iter()
-        .map(|c| type_hierarchy_class_to_item(db, c))
+
+    ty_module_resolver::all_modules(db)
+        .into_par_iter()
+        .map_with_db(db, |db, module| {
+            ty_python_semantic::type_hierarchy_subtypes(db, ty, &[module])
+                .into_iter()
+                .map(|class| type_hierarchy_class_to_item(db, class))
+                .collect::<Vec<_>>()
+        })
+        .flat_map_iter(|items| items)
         .collect()
 }
 
