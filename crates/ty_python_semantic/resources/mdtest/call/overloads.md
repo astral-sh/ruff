@@ -1710,7 +1710,80 @@ def _(a_int: A[int], a_str: A[str], a_any: A[Any]):
 def _(b_int: B[int], b_str: B[str], b_any: B[Any]):
     reveal_type(b_int.method())  # revealed: int
     reveal_type(b_str.method())  # revealed: str
-    reveal_type(b_any.method())  # revealed: Unknown
+    reveal_type(b_any.method())  # revealed: int
+```
+
+### Gradual bound receiver
+
+A gradual type argument in a bound receiver can make multiple receiver-specialized overloads
+applicable. For compatibility with other type checkers, the synthetic receiver does not participate
+in step 5, so the first applicable overload is selected. Gradual arguments supplied explicitly at
+the call site still participate and can make the result ambiguous.
+
+`overloaded.pyi`:
+
+```pyi
+from typing import Generic, TypeVar, overload
+
+T = TypeVar("T")
+
+class Timestamp: ...
+class Timedelta: ...
+
+class Series(Generic[T]):
+    @overload
+    def __sub__(self: "Series[Timestamp]", other: Timedelta) -> "Series[Timestamp]": ...
+    @overload
+    def __sub__(self: "Series[Timedelta]", other: Timedelta) -> "Series[Timedelta]": ...
+    @overload
+    def sub(self: "Series[Timestamp]", other: Timedelta) -> "Series[Timestamp]": ...
+    @overload
+    def sub(self: "Series[Timedelta]", other: Timedelta) -> "Series[Timedelta]": ...
+    @overload
+    def ambiguous(self: "Series[Timestamp]", other: "Series[Timestamp]") -> Timestamp: ...
+    @overload
+    def ambiguous(self: "Series[Timedelta]", other: "Series[Timedelta]") -> Timedelta: ...
+
+class ReversedSeries(Generic[T]):
+    @overload
+    def sub(self: "ReversedSeries[Timedelta]", other: Timedelta) -> "ReversedSeries[Timedelta]": ...
+    @overload
+    def sub(self: "ReversedSeries[Timestamp]", other: Timedelta) -> "ReversedSeries[Timestamp]": ...
+
+@overload
+def free_sub(series: Series[Timestamp], other: Timedelta) -> Series[Timestamp]: ...
+@overload
+def free_sub(series: Series[Timedelta], other: Timedelta) -> Series[Timedelta]: ...
+```
+
+```py
+from typing import Any
+from ty_extensions import Unknown
+
+from overloaded import ReversedSeries, Series, Timedelta, Timestamp, free_sub
+
+def gradual_receiver(
+    any_series: Series[Any],
+    unknown_series: Series[Unknown],
+    reversed_series: ReversedSeries[Any],
+    delta: Timedelta,
+):
+    reveal_type(any_series - delta)  # revealed: Series[Timestamp]
+    reveal_type(any_series.__sub__(delta))  # revealed: Series[Timestamp]
+    reveal_type(any_series.sub(delta))  # revealed: Series[Timestamp]
+    reveal_type(unknown_series.sub(delta))  # revealed: Series[Timestamp]
+    reveal_type(reversed_series.sub(delta))  # revealed: ReversedSeries[Timedelta]
+
+    # The receiver is explicit in these calls and therefore still participates in step 5.
+    reveal_type(Series.sub(any_series, delta))  # revealed: Unknown
+    reveal_type(free_sub(any_series, delta))  # revealed: Unknown
+
+    # A gradual non-receiver argument can still make a bound-method call ambiguous.
+    reveal_type(any_series.ambiguous(any_series))  # revealed: Unknown
+
+def concrete_receiver(timestamps: Series[Timestamp], timedeltas: Series[Timedelta], delta: Timedelta):
+    reveal_type(timestamps.sub(delta))  # revealed: Series[Timestamp]
+    reveal_type(timedeltas.sub(delta))  # revealed: Series[Timedelta]
 ```
 
 ### Variadic argument
