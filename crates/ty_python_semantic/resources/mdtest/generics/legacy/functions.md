@@ -1510,9 +1510,12 @@ def f(x: IntSource) -> None:
     if isinstance(x, StrSource):
         reveal_type(x)  # revealed: IntSource & StrSource
         reveal_type(element(x))  # revealed: Never
+```
 
-# A constructor's synthetic `cls` argument can contain an inferable class type variable even
-# when its declared `cls` parameter is specialized to a concrete type.
+A constructor's synthetic `cls` argument can contain an inferable class type variable even when its
+declared `cls` parameter is specialized to a concrete type:
+
+```py
 class ConcreteElement: ...
 
 class FixedReceiverConstructor(Generic[ElementT]):
@@ -1554,7 +1557,7 @@ handles values that are both `A` and `B`, as `F[A & B]` would allow. Thus `F` is
 meet-preserving, and inferring `F[A & B]` from `F[A] & F[B]` would be unsound:
 
 ```py
-from typing import Callable, Generic, TypeVar
+from typing import Any, Callable, Generic, TypeVar
 from ty_extensions import Intersection
 
 FSourceT = TypeVar("FSourceT", covariant=True)
@@ -1574,6 +1577,18 @@ def _(x: Intersection[F[A], F[B]]) -> None:
     takes_f_intersection(x)
     # This cannot safely be `F[A & B]`.
     reveal_type(return_f(x))  # revealed: F[A] & F[B]
+```
+
+A gradual return component unrelated to inference does not invalidate either static path:
+
+```py
+from typing import Any
+
+def element_with_any(x: Source[ElementT]) -> tuple[ElementT, Any]:
+    return x.get(), None
+
+def _(x: Intersection[Source[A], Source[B]]) -> None:
+    reveal_type(element_with_any(x))  # revealed: tuple[A, Any] & tuple[B, Any]
 ```
 
 Constraints from every argument are solved together before each valid call specialization is
