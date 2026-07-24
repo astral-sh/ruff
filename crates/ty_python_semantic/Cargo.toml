@@ -29,7 +29,7 @@ ty_python_core = { workspace = true }
 ty_static = { workspace = true }
 
 bitflags = { workspace = true }
-char_str = { workspace = true }
+char_str = { workspace = true, features = ["get-size"] }
 compact_str = { workspace = true }
 drop_bomb = { workspace = true }
 get-size2 = { workspace = true, features = ["indexmap", "ordermap"] }
