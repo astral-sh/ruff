@@ -285,40 +285,22 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             module.kind(db).is_package().then_some(self.file()),
         );
         let place_table = self.index.place_table(self.scope().file_scope_id(db));
-        let mut implicit_names = self
+        let has_implicit_reexports = self
             .index
             .definitions(alias)
             .iter()
             .filter_map(|definition| definition.kind(db).as_star_import())
             .map(|star_import| place_table.symbol(star_import.symbol_id()).name())
-            .filter(|name| module_literal.is_implicit_reexport(db, name))
-            .collect::<Vec<_>>();
-        implicit_names.sort_unstable();
-
-        if implicit_names.is_empty() {
+            .any(|name| self.is_implicit_reexport(module_literal, name));
+        if !has_implicit_reexports {
             return;
         }
         let Some(builder) = self.context.report_lint(&IMPLICIT_REEXPORT, alias) else {
             return;
         };
-        if implicit_names.len() == 1 {
-            builder.into_diagnostic(format_args!(
-                "Module `{module_name}` does not explicitly export attribute `{}`",
-                implicit_names[0]
-            ));
-        } else if implicit_names.len() == 2 {
-            builder.into_diagnostic(format_args!(
-                "Wildcard import from module `{module_name}` includes attributes `{}` and `{}` that are not explicitly exported",
-                implicit_names[0], implicit_names[1]
-            ));
-        } else {
-            builder.into_diagnostic(format_args!(
-                "Wildcard import from module `{module_name}` includes attributes `{}`, `{}`, and {} more that are not explicitly exported",
-                implicit_names[0],
-                implicit_names[1],
-                implicit_names.len() - 2
-            ));
-        }
+        builder.into_diagnostic(format_args!(
+            "Wildcard import from module `{module_name}` includes names that are not explicitly exported"
+        ));
     }
 
     /// Resolve the [`ModuleName`], and the type of the module, being referred to by an
@@ -466,9 +448,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
                 if &alias.name != "*"
                     && self.context.is_lint_enabled(&IMPLICIT_REEXPORT)
-                    && let Some(module_file) = module.file(db)
-                    && !module_file.is_stub(db)
-                    && module_literal.is_implicit_reexport(db, name)
+                    && self.is_implicit_reexport(module_literal, name)
                     && let Some(builder) = self
                         .context
                         .report_lint(&IMPLICIT_REEXPORT, ast::AnyNodeRef::Alias(alias))

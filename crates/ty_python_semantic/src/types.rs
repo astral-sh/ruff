@@ -55,8 +55,8 @@ pub(crate) use self::subclass_of::{SubclassOfInner, SubclassOfType};
 pub(crate) use self::type_expansion::expand_type;
 pub use crate::diagnostic::add_inferred_python_version_hint_to_diagnostic;
 use crate::place::{
-    DefinedPlace, Definedness, Place, PlaceAndQualifiers, Provenance, RequiresExplicitReExport,
-    TypeOrigin, builtins_module_scope, imported_symbol, known_module_symbol, place_from_bindings,
+    DefinedPlace, Definedness, Place, PlaceAndQualifiers, Provenance, TypeOrigin,
+    builtins_module_scope, imported_symbol, known_module_symbol, place_from_bindings,
 };
 use crate::suppression::check_suppressions;
 use crate::types::bound_super::BoundSuperType;
@@ -8832,33 +8832,6 @@ impl<'db> ModuleLiteralType<'db> {
     }
 
     fn static_member(self, db: &'db dyn Db, name: &str) -> PlaceAndQualifiers<'db> {
-        self.static_member_with_reexport_requirement(db, name, None)
-    }
-
-    /// Returns `true` if requiring an explicit re-export makes this member less defined.
-    fn is_implicit_reexport(self, db: &'db dyn Db, name: &str) -> bool {
-        let runtime_member = self.static_member(db, name);
-        let explicitly_exported_member = self.static_member_with_reexport_requirement(
-            db,
-            name,
-            Some(RequiresExplicitReExport::Yes),
-        );
-
-        match (runtime_member.place, explicitly_exported_member.place) {
-            (Place::Defined(_), Place::Undefined) => true,
-            (Place::Defined(runtime), Place::Defined(explicit)) => {
-                runtime.is_definitely_defined() && !explicit.is_definitely_defined()
-            }
-            (Place::Undefined, _) => false,
-        }
-    }
-
-    fn static_member_with_reexport_requirement(
-        self,
-        db: &'db dyn Db,
-        name: &str,
-        requires_explicit_reexport: Option<RequiresExplicitReExport>,
-    ) -> PlaceAndQualifiers<'db> {
         // `__dict__` is a very special member that is never overridden by module globals;
         // we should always look it up directly as an attribute on `types.ModuleType`,
         // never in the global scope of the module.
@@ -8883,12 +8856,7 @@ impl<'db> ModuleLiteralType<'db> {
             return Place::bound(submodule).into();
         }
 
-        let place_and_qualifiers = imported_symbol(
-            db,
-            self.module(db).file(db),
-            name,
-            requires_explicit_reexport,
-        );
+        let place_and_qualifiers = imported_symbol(db, self.module(db).file(db), name, None);
 
         // If the normal lookup failed, try to call the module's `__getattr__` function
         if place_and_qualifiers.place.is_undefined() {

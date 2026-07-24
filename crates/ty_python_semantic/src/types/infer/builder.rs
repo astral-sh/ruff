@@ -35,7 +35,7 @@ use crate::diagnostic::format_enumeration;
 use crate::place::{
     ConsideredDefinitions, DefinedPlace, Definedness, LookupError, Place, PlaceAndQualifiers,
     RequiresExplicitReExport, TypeOrigin, builtins_module_scope, builtins_symbol,
-    class_body_implicit_symbol, explicit_global_symbol, loop_header_reachability,
+    class_body_implicit_symbol, explicit_global_symbol, imported_symbol, loop_header_reachability,
     module_type_implicit_global_declaration, module_type_implicit_global_symbol, place_by_id,
     place_from_bindings_with_reachability_cache, place_from_declarations_with_reachability_cache,
     typing_extensions_symbol,
@@ -113,7 +113,8 @@ use crate::types::{
     BindingContext, BoundTypeVarInstance, CallDunderError, CallableBinding, CallableType,
     CallableTypes, ClassType, DynamicType, InferenceFlags, InternedConstraintSet, InternedType,
     IntersectionBuilder, IntersectionType, KnownClass, KnownInstanceType, KnownUnion,
-    LiteralValueType, LiteralValueTypeKind, MemberLookupPolicy, ParamSpecAttrKind, Parameter,
+    LiteralValueType, LiteralValueTypeKind, MemberLookupPolicy, ModuleLiteralType, ParamSpecAttrKind,
+    Parameter,
     Parameters, SentinelInstance, Signature, SpecialFormType, SubclassOfType, Type, TypeAliasType,
     TypeAndQualifiers, TypeContext, TypeQualifiers, TypeVarBoundOrConstraints, TypeVarKind,
     TypeVarVariance, TypedDictModule, TypedDictType, UnionAccumulator, UnionBuilder, UnionType,
@@ -9964,6 +9965,36 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     /// Infer the type of a [`ast::ExprAttribute`] expression, assuming a load context.
+    /// Returns `true` if requiring an explicit re-export makes this member less defined.
+    fn is_implicit_reexport(&self, module_literal: ModuleLiteralType<'db>, name: &str) -> bool {
+        let db = self.db();
+        let runtime_member = module_literal.static_member(db, name);
+        if runtime_member
+            .qualifiers
+            .contains(TypeQualifiers::FROM_MODULE_GETATTR)
+            || (module_literal
+                .available_submodule_attributes(db)
+                .contains(name)
+                && module_literal.resolve_submodule(db, name).is_some())
+        {
+            return false;
+        }
+
+        let explicitly_exported_member = imported_symbol(
+            db,
+            module_literal.module(db).file(db),
+            name,
+            Some(RequiresExplicitReExport::Yes),
+        );
+        match (runtime_member.place, explicitly_exported_member.place) {
+            (Place::Defined(_), Place::Undefined) => true,
+            (Place::Defined(runtime), Place::Defined(explicit)) => {
+                runtime.is_definitely_defined() && !explicit.is_definitely_defined()
+            }
+            (Place::Undefined, _) => false,
+        }
+    }
+
     fn infer_attribute_load(&mut self, attribute: &ast::ExprAttribute) -> Type<'db> {
         let value_type =
             self.infer_maybe_standalone_expression(&attribute.value, TypeContext::default());
@@ -10030,9 +10061,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             && self.context.is_lint_enabled(&IMPLICIT_REEXPORT)
         {
             let module = module_literal.module(db);
-            if let Some(module_file) = module.file(db)
-                && !module_file.is_stub(db)
-                && module_literal.is_implicit_reexport(db, &attr.id)
+            if self.is_implicit_reexport(module_literal, &attr.id)
                 && let Some(builder) = self.context.report_lint(&IMPLICIT_REEXPORT, attribute)
             {
                 builder.into_diagnostic(format_args!(
