@@ -234,14 +234,12 @@ def witness_after_visible[I, J, N]() -> None:
 
 def visible_before_hidden[I, N]() -> None:
     constraints = ConstraintSet.range(N, I, N)
-    # TODO: revealed: tuple[Solution[I=N@visible_before_hidden]]
-    # revealed: tuple[Solution[I=N@visible_before_hidden, N=I@visible_before_hidden]]
+    # revealed: tuple[Solution[I=N@visible_before_hidden]]
     reveal_type(constraints.solutions(inferable=tuple[I]))
 
 def hidden_before_visible[N, I]() -> None:
     constraints = ConstraintSet.range(I, N, I)
-    # TODO: revealed: tuple[Solution[I=N@hidden_before_visible]]
-    # revealed: tuple[Solution[N=I@hidden_before_visible, I=N@hidden_before_visible]]
+    # revealed: tuple[Solution[I=N@hidden_before_visible]]
     reveal_type(constraints.solutions(inferable=tuple[I]))
 ```
 
@@ -262,10 +260,9 @@ def noninferable_nested[T, U, V]() -> None:
     ) | ConstraintSet.range(bytes, V, object)
 
     # `U` is deliberately non-inferable here.
-    # TODO: We should not include a solution for non-inferable U.
-    # TODO: sometimes: revealed tuple[Solution[T=list[int], U=int], Solution[T=Never, V=bytes], Solution[V=bytes]]
-    # TODO: sometimes: revealed tuple[Solution[T=list[int], U=int], Solution[T=list[int], V=bytes], Solution[V=bytes]]
-    # revealed: tuple[Solution[T=list[int], U=int], Solution[V=bytes]]
+    # TODO: sometimes: revealed tuple[Solution[T=list[int]], Solution[T=Never, V=bytes], Solution[V=bytes]]
+    # TODO: sometimes: revealed tuple[Solution[T=list[int]], Solution[T=list[int], V=bytes], Solution[V=bytes]]
+    # revealed: tuple[Solution[T=list[int]], Solution[V=bytes]]
     reveal_type(constraints.solutions(inferable=tuple[T, V]))
     # TODO: sometimes: revealed tuple[Solution[T=list[int]], Solution[T=Never], Solution[]]
     # TODO: sometimes: revealed tuple[Solution[T=list[int]], Solution[T=list[int]], Solution[]]

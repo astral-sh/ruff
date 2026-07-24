@@ -5237,14 +5237,15 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                 // lower/upper bounds on each BDD path.
                 let mut variance_map: FxHashMap<BoundTypeVarIdentity<'_>, TypeVarVariance> =
                     FxHashMap::default();
-                let solutions = path_bounds.solve_with(|variance, path_bound| {
-                    let identity = path_bound.bound_typevar.identity(self.db);
-                    variance_map
-                        .entry(identity)
-                        .and_modify(|current| *current = current.join(variance))
-                        .or_insert(variance);
-                    PathBounds::default_solve(self.db, constraints, path_bound)
-                });
+                let solutions =
+                    path_bounds.solve_with(self.db, constraints, |variance, path_bound| {
+                        let identity = path_bound.bound_typevar.identity(self.db);
+                        variance_map
+                            .entry(identity)
+                            .and_modify(|current| *current = current.join(variance))
+                            .or_insert(variance);
+                        PathBounds::default_solve(self.db, constraints, path_bound)
+                    });
 
                 let Solutions::Constrained(solutions) = solutions else {
                     return None;

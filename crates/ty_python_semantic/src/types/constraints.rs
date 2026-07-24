@@ -759,15 +759,7 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         )
     }
 
-    /// Computes solutions for each BDD path, using a caller-provided hook to select solutions.
-    ///
-    /// The `choose` hook is called for each typevar on each BDD path with the typevar's variance
-    /// and explicit lower and upper bounds. It returns:
-    /// - `Some(ty)` to use `ty` as the solution for this typevar on this path
-    /// - `None` to fall back to the default solution selection logic
-    ///
-    /// For multi-path BDDs, the hook is called per-path. The caller is responsible for combining
-    /// results across paths (typically via union).
+    /// Computes default solutions for each BDD path, returning only inferable typevars.
     pub(crate) fn solutions(
         self,
         db: &'db dyn Db,
@@ -779,6 +771,11 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         })
     }
 
+    /// Computes path solutions with a caller-provided hook for inferable typevars only.
+    ///
+    /// Hidden witness bounds that survive path extraction are validated before the hook runs. For
+    /// each inferable typevar, the hook returns `Ok(Some(ty))` to add a binding, `Ok(None)` to
+    /// reject the path. Callers combine solutions from different paths as appropriate.
     pub(crate) fn solutions_with(
         self,
         db: &'db dyn Db,
@@ -2472,7 +2469,7 @@ impl NodeId {
         choose: impl FnMut(TypeVarVariance, &PathBound<'db>) -> Result<Option<Type<'db>>, ()>,
     ) -> Solutions<'db> {
         let path_bounds = PathBounds::compute(db, builder, self, inferable);
-        path_bounds.solve_with(choose)
+        path_bounds.solve_with(db, builder, choose)
     }
 
     /// Returns the negation of this BDD.
@@ -3552,28 +3549,45 @@ fn is_possibly_constraint_set_assignable<'db>(db: &'db dyn Db, types: TypePair<'
         .query(|_builder, when| !when.is_never_satisfied(db))
 }
 
-/// Per-path bounds for all typevars. Each element is the set of typevar bounds for one BDD path.
+/// The bounds and builder-independent decision metadata for one constraint path.
+#[derive(Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
+pub(crate) struct ConstraintPath<'db> {
+    bounds: Box<[PathBound<'db>]>,
+    grounded_witnesses: Box<[TypeVarSolution<'db>]>,
+    has_visible_decision: bool,
+    has_witness_bounds: bool,
+}
+
+/// Per-path bounds and the type variables whose bindings may appear in returned solutions.
 #[derive(Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) enum PathBounds<'db> {
     Unsatisfiable,
     Unconstrained,
-    Constrained(Box<[Box<[PathBound<'db>]>]>),
+    Constrained {
+        inferable: TypeVarSet<'db>,
+        paths: Box<[ConstraintPath<'db>]>,
+    },
 }
 
 impl<'db> PathBounds<'db> {
     /// Computes sorted BDD paths and accumulates per-typevar lower/upper bounds for each path.
     ///
-    /// Returns a list of paths, where each path contains the explicit lower/upper bounds for each
-    /// typevar that appears in the path's constraints.
+    /// Positive exact constraints are recorded before reciprocal typevar relationships are folded
+    /// into those bounds, since the aggregate bounds no longer distinguish grounded witnesses.
     fn compute(
         db: &'db dyn Db,
         builder: &ConstraintSetBuilder<'db>,
         node: NodeId,
         inferable: TypeVarSet<'db>,
     ) -> Self {
+        struct CollectedPath {
+            constraints: Vec<(ConstraintId, usize)>,
+            negative_constraints: Vec<ConstraintId>,
+        }
+
         #[derive(Default)]
         struct CollectVisitor {
-            sorted_paths: Vec<Vec<(ConstraintId, usize)>>,
+            sorted_paths: Vec<CollectedPath>,
         }
 
         impl PathFold for CollectVisitor {
@@ -3586,9 +3600,24 @@ impl<'db> PathBounds<'db> {
                 _builder: &ConstraintSetBuilder<'db>,
                 path: &PathAssignments,
             ) -> ControlFlow<Self::Break, Self::Result> {
-                let mut path: Vec<_> = path.positive_constraints().collect();
-                path.sort_by_key(|(_, source_order)| *source_order);
-                self.sorted_paths.push(path);
+                let mut constraints: Vec<_> = path.positive_constraints().collect();
+                constraints.sort_by_key(|(_, source_order)| *source_order);
+                let negative_constraints = if path.assignments.len() == constraints.len() {
+                    Vec::new()
+                } else {
+                    path.assignments
+                        .keys()
+                        .filter_map(|assignment| match assignment {
+                            ConstraintAssignment::Negative(constraint) => Some(*constraint),
+                            ConstraintAssignment::Positive(_)
+                            | ConstraintAssignment::Unconstrained(_) => None,
+                        })
+                        .collect()
+                };
+                self.sorted_paths.push(CollectedPath {
+                    constraints,
+                    negative_constraints,
+                });
                 ControlFlow::Continue(())
             }
 
@@ -3644,8 +3673,14 @@ impl<'db> PathBounds<'db> {
         let mut path = interior.path_assignments(builder);
         let _ = path.visit(db, builder, node, &mut collect_visitor);
         collect_visitor.sorted_paths.sort_by(|path1, path2| {
-            let source_orders1 = path1.iter().map(|(_, source_order)| *source_order);
-            let source_orders2 = path2.iter().map(|(_, source_order)| *source_order);
+            let source_orders1 = path1
+                .constraints
+                .iter()
+                .map(|(_, source_order)| *source_order);
+            let source_orders2 = path2
+                .constraints
+                .iter()
+                .map(|(_, source_order)| *source_order);
             source_orders1.cmp(source_orders2)
         });
 
@@ -3653,11 +3688,41 @@ impl<'db> PathBounds<'db> {
         let mut mappings: FxIndexMap<BoundTypeVarInstance<'db>, ConstraintBoundsBuilder<'db>> =
             FxIndexMap::default();
 
+        let is_visible = |constraint| {
+            let constraint = builder.constraint_data(constraint);
+            constraint.typevar.is_inferable(db, inferable)
+                || iter::chain(constraint.bounds.lower, constraint.bounds.upper).any(|bound| {
+                    bound
+                        .as_typevar()
+                        .is_some_and(|typevar| typevar.is_inferable(db, inferable))
+                })
+        };
+
         for path in collect_visitor.sorted_paths {
+            let has_visible_decision = path
+                .constraints
+                .iter()
+                .map(|(constraint, _)| *constraint)
+                .chain(path.negative_constraints.iter().copied())
+                .any(is_visible);
+            let mut grounded_witnesses = Vec::new();
+
             mappings.clear();
-            for (constraint, _) in path {
+            for (constraint, _) in path.constraints {
                 let constraint = builder.constraint_data(constraint);
                 let typevar = constraint.typevar;
+                if let (Some(lower), Some(upper)) =
+                    (constraint.bounds.lower, constraint.bounds.upper)
+                    && lower == upper
+                    && !typevar.is_inferable(db, inferable)
+                    && !lower.has_typevar(db)
+                    && !lower.has_unspecialized_type_var(db)
+                {
+                    grounded_witnesses.push(TypeVarSolution {
+                        bound_typevar: typevar,
+                        solution: lower,
+                    });
+                }
                 if let Some(lower) = constraint.bounds.lower {
                     let bounds = mappings.entry(typevar).or_default();
                     bounds.add_lower(db, lower);
@@ -3679,14 +3744,26 @@ impl<'db> PathBounds<'db> {
                 }
             }
 
-            let path_bounds = mappings
+            let mut has_witness_bounds = false;
+            let bounds = mappings
                 .drain(..)
-                .map(|(bound_typevar, bounds)| bounds.finish(db, bound_typevar))
+                .map(|(bound_typevar, bounds)| {
+                    has_witness_bounds |= !bound_typevar.is_inferable(db, inferable);
+                    bounds.finish(db, bound_typevar)
+                })
                 .collect();
-            result.push(path_bounds);
+            result.push(ConstraintPath {
+                bounds,
+                grounded_witnesses: grounded_witnesses.into_boxed_slice(),
+                has_visible_decision,
+                has_witness_bounds,
+            });
         }
 
-        PathBounds::Constrained(result.into_boxed_slice())
+        PathBounds::Constrained {
+            inferable,
+            paths: result.into_boxed_slice(),
+        }
     }
 
     /// Accumulates a conjunction of concrete bound constraints without constructing a
@@ -3753,11 +3830,19 @@ impl<'db> PathBounds<'db> {
             }
         }
 
-        let path = mappings
+        let bounds = mappings
             .drain(..)
             .map(|(bound_typevar, bounds)| bounds.finish(db, bound_typevar))
             .collect();
-        Some(PathBounds::Constrained(Box::new([path])))
+        Some(PathBounds::Constrained {
+            inferable,
+            paths: Box::new([ConstraintPath {
+                bounds,
+                grounded_witnesses: Box::default(),
+                has_visible_decision: true,
+                has_witness_bounds: false,
+            }]),
+        })
     }
 
     pub(crate) fn solve(
@@ -3765,39 +3850,70 @@ impl<'db> PathBounds<'db> {
         db: &'db dyn Db,
         builder: &ConstraintSetBuilder<'db>,
     ) -> Solutions<'db> {
-        self.solve_with(|_variance, path_bound| PathBounds::default_solve(db, builder, path_bound))
+        self.solve_with(db, builder, |_variance, path_bound| {
+            PathBounds::default_solve(db, builder, path_bound)
+        })
     }
 
-    /// Solves each path by applying a per-typevar solver function, collecting valid solutions.
+    /// Solves each path while keeping non-inferable witnesses private to the solver.
     ///
-    /// The solver receives the path's explicit lower/upper bounds and their variance, and returns:
+    /// Witness bounds are validated before any caller-owned callback state can be changed. The
+    /// callback receives only inferable typevars and returns:
     /// - `Ok(Some(solution))` to add a solution for this typevar on this path
     /// - `Ok(None)` to leave this typevar unsolved on this path
     /// - `Err(())` to invalidate the entire path
     pub(crate) fn solve_with(
         &self,
+        db: &'db dyn Db,
+        builder: &ConstraintSetBuilder<'db>,
         mut choose: impl FnMut(TypeVarVariance, &PathBound<'db>) -> Result<Option<Type<'db>>, ()>,
     ) -> Solutions<'db> {
-        let paths = match self {
+        let (inferable, paths) = match self {
             PathBounds::Unsatisfiable => return Solutions::Unsatisfiable,
             PathBounds::Unconstrained => return Solutions::Unconstrained,
-            PathBounds::Constrained(paths) => paths,
+            PathBounds::Constrained { inferable, paths } => (*inferable, paths),
         };
 
         let mut solutions = Vec::with_capacity(paths.len());
         'paths: for path in paths {
-            let mut solution = Vec::with_capacity(path.len());
-            for path_bound in path {
-                let variance = path_bound.variance();
+            if path.has_witness_bounds
+                && path
+                    .bounds
+                    .iter()
+                    .filter(|bound| !bound.bound_typevar.is_inferable(db, inferable))
+                    .any(|bound| Self::default_solve(db, builder, bound).is_err())
+            {
+                continue;
+            }
 
-                match choose(variance, path_bound) {
-                    Ok(Some(ty)) => solution.push(TypeVarSolution {
-                        bound_typevar: path_bound.bound_typevar,
-                        solution: ty,
-                    }),
+            let mut solution = Vec::with_capacity(path.bounds.len());
+            for path_bound in &path.bounds {
+                if path.has_witness_bounds && !path_bound.bound_typevar.is_inferable(db, inferable)
+                {
+                    continue;
+                }
+
+                match choose(path_bound.variance(), path_bound) {
+                    Ok(Some(mut ty)) => {
+                        for witness in &path.grounded_witnesses {
+                            ty = ty.substitute_one_typevar(
+                                db,
+                                witness.bound_typevar,
+                                witness.solution,
+                            );
+                        }
+                        solution.push(TypeVarSolution {
+                            bound_typevar: path_bound.bound_typevar,
+                            solution: ty,
+                        });
+                    }
                     Ok(None) => {}
                     Err(()) => continue 'paths,
                 }
+            }
+
+            if !path.has_visible_decision {
+                return Solutions::Unconstrained;
             }
             solutions.push(solution);
         }
@@ -7918,32 +8034,19 @@ mod tests {
             );
 
             for set in [visible_bound, witness_bound] {
-                let solutions = set.solutions(&db, &builder, inferable);
-                assert!(matches!(
-                    &solutions,
-                    Solutions::Constrained(paths)
-                        if paths.len() == 1
-                            && paths[0].iter().any(|binding| {
-                                binding.bound_typevar == visible
-                                    && binding.solution == Type::TypeVar(witness)
-                            })
-                ));
-                // TODO: Mixed constraints currently leak the non-inferable witness as a
-                // top-level binding. Phase 3 must retain only the visible binding.
-                assert!(matches!(
-                    &solutions,
-                    Solutions::Constrained(paths)
-                        if paths[0].iter().any(|binding| {
-                            binding.bound_typevar == witness
-                                && binding.solution == Type::TypeVar(visible)
-                        })
-                ));
+                assert_eq!(
+                    set.solutions(&db, &builder, inferable),
+                    Solutions::Constrained(vec![vec![TypeVarSolution {
+                        bound_typevar: visible,
+                        solution: Type::TypeVar(witness),
+                    }]])
+                );
             }
         }
     }
 
     #[test]
-    fn exact_witness_currently_leaves_reciprocal_typevars_in_solutions() {
+    fn exact_witness_is_substituted_into_visible_solutions() {
         let db = setup_db();
         let visible = create_typevar(&db, "I");
         let witness = create_typevar(&db, "N");
@@ -7957,25 +8060,17 @@ mod tests {
         );
         let inferable = TypeVarSet::from_typevars(&db, [visible]);
 
-        // TODO: The explicit `N = int` fact grounds the witness, so Phase 3 must return only
-        // `I = int` instead of retaining reciprocal type-variable artifacts.
         assert_eq!(
             set.solutions(&db, &builder, inferable),
-            Solutions::Constrained(vec![vec![
-                TypeVarSolution {
-                    bound_typevar: visible,
-                    solution: UnionType::from_elements(&db, [witness_ty, int]),
-                },
-                TypeVarSolution {
-                    bound_typevar: witness,
-                    solution: UnionType::from_elements(&db, [Type::TypeVar(visible), int]),
-                },
-            ]])
+            Solutions::Constrained(vec![vec![TypeVarSolution {
+                bound_typevar: visible,
+                solution: int,
+            }]])
         );
     }
 
     #[test]
-    fn exact_witness_currently_remains_in_nested_visible_solutions() {
+    fn exact_witness_is_substituted_into_nested_visible_solutions() {
         let db = setup_db();
         let visible = create_typevar(&db, "I");
         let witness = create_typevar(&db, "N");
@@ -7999,19 +8094,12 @@ mod tests {
         );
         let inferable = TypeVarSet::from_typevars(&db, [visible]);
 
-        // TODO: Grounded witness substitution must also rewrite nested types to `list[int]`.
         assert_eq!(
             set.solutions(&db, &builder, inferable),
-            Solutions::Constrained(vec![vec![
-                TypeVarSolution {
-                    bound_typevar: visible,
-                    solution: UnionType::from_elements(&db, [list_of_int, list_of_witness]),
-                },
-                TypeVarSolution {
-                    bound_typevar: witness,
-                    solution: int,
-                },
-            ]])
+            Solutions::Constrained(vec![vec![TypeVarSolution {
+                bound_typevar: visible,
+                solution: list_of_int,
+            }]])
         );
     }
 
@@ -8071,7 +8159,7 @@ mod tests {
     }
 
     #[test]
-    fn mixed_relationship_currently_exposes_the_witness_to_selection_hooks() {
+    fn mixed_relationship_hides_the_witness_from_selection_hooks() {
         let db = setup_db();
         let visible = create_typevar(&db, "I");
         let witness = create_typevar(&db, "N");
@@ -8086,14 +8174,69 @@ mod tests {
             PathBounds::default_solve(&db, &builder, bound)
         });
 
-        assert!(observed.contains(&visible));
-        // TODO: Selection hooks must never observe witness-only type variables once Phase 2
-        // moves witness validation into PathBounds::solve_with.
-        assert!(observed.contains(&witness));
+        assert_eq!(observed, vec![visible]);
     }
 
     #[test]
-    fn rejected_witness_currently_reaches_the_visible_selection_hook() {
+    fn retained_witness_upper_bound_is_validated_before_visible_selection_hooks() {
+        let db = setup_db();
+        let visible = create_typevar(&db, "I");
+        let int = known_instance(&db, KnownClass::Int);
+        let str = known_instance(&db, KnownClass::Str);
+        let witness = create_typevar(&db, "N")
+            .map_bound_or_constraints(&db, |_| Some(TypeVarBoundOrConstraints::UpperBound(str)));
+        let builder = ConstraintSetBuilder::new();
+        let witness_ty = Type::TypeVar(witness);
+        let set = ConstraintSet::constrain_typevar(&db, &builder, witness, int, int).and(
+            &db,
+            &builder,
+            || ConstraintSet::constrain_typevar(&db, &builder, visible, witness_ty, witness_ty),
+        );
+        let inferable = TypeVarSet::from_typevars(&db, [visible]);
+        let mut observed = Vec::new();
+
+        let solutions = set.solutions_with(&db, &builder, inferable, |_variance, bound| {
+            observed.push(bound.bound_typevar);
+            PathBounds::default_solve(&db, &builder, bound)
+        });
+
+        assert_eq!(solutions, Solutions::Unsatisfiable);
+        assert!(observed.is_empty());
+    }
+
+    #[test]
+    fn retained_witness_finite_domain_is_validated_before_visible_selection_hooks() {
+        let db = setup_db();
+        let visible = create_typevar(&db, "I");
+        let int = known_instance(&db, KnownClass::Int);
+        let str = known_instance(&db, KnownClass::Str);
+        let bytes = known_instance(&db, KnownClass::Bytes);
+        let witness = create_typevar(&db, "N").map_bound_or_constraints(&db, |_| {
+            Some(TypeVarBoundOrConstraints::Constraints(
+                TypeVarConstraints::new(&db, [int, str].as_slice()),
+            ))
+        });
+        let builder = ConstraintSetBuilder::new();
+        let witness_ty = Type::TypeVar(witness);
+        let set = ConstraintSet::constrain_typevar(&db, &builder, witness, bytes, bytes).and(
+            &db,
+            &builder,
+            || ConstraintSet::constrain_typevar(&db, &builder, visible, witness_ty, witness_ty),
+        );
+        let inferable = TypeVarSet::from_typevars(&db, [visible]);
+        let mut observed = Vec::new();
+
+        let solutions = set.solutions_with(&db, &builder, inferable, |_variance, bound| {
+            observed.push(bound.bound_typevar);
+            PathBounds::default_solve(&db, &builder, bound)
+        });
+
+        assert_eq!(solutions, Solutions::Unsatisfiable);
+        assert!(observed.is_empty());
+    }
+
+    #[test]
+    fn fully_projected_rejected_witness_still_reaches_the_visible_selection_hook() {
         let db = setup_db();
         let visible = create_typevar(&db, "I");
         let int = known_instance(&db, KnownClass::Int);
@@ -8114,7 +8257,8 @@ mod tests {
             PathBounds::default_solve(&db, &builder, bound)
         });
 
-        // TODO: Phase 2 must reject this path before invoking any visible-variable hook.
+        // TODO: Phase 3 must retain the projected witness and reject this path before invoking
+        // any visible-variable hook.
         assert_eq!(observed, vec![visible]);
         assert_eq!(
             solutions,
@@ -8222,22 +8366,9 @@ mod tests {
             });
         let set = int_path.or(&db, &builder, || str_path);
         let inferable = TypeVarSet::from_typevars(&db, [first, second]);
-        let solutions = set.solutions(&db, &builder, inferable);
-        let projected = match solutions {
-            Solutions::Constrained(paths) => paths
-                .into_iter()
-                .map(|path| {
-                    path.into_iter()
-                        .filter(|binding| binding.bound_typevar.is_inferable(&db, inferable))
-                        .collect::<Vec<_>>()
-                })
-                .collect::<Vec<_>>(),
-            Solutions::Unsatisfiable | Solutions::Unconstrained => Vec::new(),
-        };
-
         assert_eq!(
-            projected,
-            vec![
+            set.solutions(&db, &builder, inferable),
+            Solutions::Constrained(vec![
                 vec![
                     TypeVarSolution {
                         bound_typevar: first,
@@ -8258,7 +8389,7 @@ mod tests {
                         solution: list_of_str,
                     },
                 ],
-            ]
+            ])
         );
     }
 

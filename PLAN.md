@@ -7,7 +7,7 @@
     minimal path handling, and the simplest-first performance strategy are
     agreed.
 - Phase 1 — characterize current behavior and agreed semantics: complete.
-- Phase 2 — witness-aware path representation and solving: not started.
+- Phase 2 — witness-aware path representation and solving: complete.
 - Phases 3–4: not started.
 - Existing constraint-set quantification work is out of scope unless this plan is
     explicitly revised.
@@ -102,21 +102,24 @@ in the repository's `AGENTS.md` files:
     concrete bounds on inferable type variables and avoids constructing
     `PathAssignments` or sequent maps.
 
-- `PathBounds` stores only `Unsatisfiable`, `Unconstrained`, or boxed path
-    bounds. The inferable `TypeVarSet` is not retained after `compute` returns.
+- Constrained `PathBounds` retain the authoritative inferable `TypeVarSet` and
+    builder-independent `ConstraintPath` values. Each path contains its
+    accumulated bounds, explicit concrete grounded-witness facts, and compact
+    visibility/witness-presence flags; terminal variants retain no domain.
 
-- `PathBounds::solve_with` presently invokes its callback for every stored
-    `PathBound`, invalidates a path when the callback returns `Err(())`, and emits
-    a `TypeVarSolution` for each returned `Some(Type)`.
+- `PathBounds::solve_with(db, builder, choose)` validates surviving hidden
+    witnesses before invoking the callback, invokes the callback only for
+    inferable bounds, substitutes explicitly grounded witnesses into visible
+    solutions, and never emits hidden top-level bindings.
 
 - `PathBounds::default_solve` checks declared upper bounds and finite
     constraints, but only for type variables whose path bounds actually reach the
     solver.
 
-- `PathAssignments::positive_constraints` discards negative and uncertain
-    decisions. That is sufficient for the current positive-bound selection model,
-    but may be insufficient to prove that a hidden witness can satisfy the whole
-    path.
+- `PathAssignments::positive_constraints` still supplies bound evidence; path
+    extraction separately records whether positive or negative assignments
+    impose a visible condition. Comprehensive reasoning about negative hidden
+    witnesses remains intentionally out of scope.
 
 - Bare typevar-to-typevar bounds are represented by constraining whichever
     typevar comes first in the builder-local ordering. `PathBounds::compute`
@@ -203,9 +206,9 @@ variables remain present in the unprojected TDD.
     negative visible decisions, and correlated visible outputs.
 - `crates/ty_python_semantic/resources/mdtest/regression/constraint_set_ordering.md`
     contains source-order, bare-typevar orientation, transitivity, hidden-output,
-    negation, uncertain-branch, derived-fuel, and generic-callable regressions. Its
-    `noninferable_nested` section explicitly documents the existing bug where
-    non-inferable `U` appears in a returned solution.
+    negation, uncertain-branch, derived-fuel, and generic-callable regressions.
+    Its `noninferable_nested` section verifies that non-inferable `U` does not
+    appear in a returned solution.
 - `crates/ty_python_semantic/resources/mdtest/regression/noninferable_projection_to_terminal.md`
     protects a real-world call-inference case where eliminating hidden constraints
     currently produces the `always` terminal.
@@ -308,6 +311,58 @@ Baseline before the characterization changes:
     snapshot-updating full-workspace command also regenerated two unrelated
     existing Windows-line-ending parser snapshots; their diffs were reviewed
     and restored rather than included in this revision.
+
+## Phase 2 implementation and validation
+
+Constrained `PathBounds` now retain their inferable `TypeVarSet` and an ordered
+boxed slice of `ConstraintPath` values. A path stores its accumulated bounds,
+explicit concrete grounded-witness facts, whether a positive or negative
+assignment is visible, and whether its bounds include a hidden witness. The
+representation contains no builder-local `ConstraintId`, so
+`Type::assignable_solutions_with_inferable` remains safely Salsa-cached.
+
+`PathBounds::solve_with(db, builder, choose)` now validates all surviving
+hidden positive bounds with the existing `default_solve` logic before invoking
+any caller callback. The callback sees only inferable variables, and returned
+bindings contain only those variables. Explicit concrete witness equalities
+that survive projection are collected before reciprocal bound aggregation and
+substituted through bare and nested visible solution types. One-sided bounds
+retain symbolic outer variables. Negative visible conditions remain distinct
+from a genuinely unconstrained witness-only path.
+
+The direct `solve_with` users in call binding, collection inference, and class
+pattern narrowing now provide their database and builder. The concrete
+conjunction fast path still skips sequent construction and marks its paths as
+having no hidden witness, avoiding additional visibility checks while solving.
+A small targeted fast-path improvement was justified by an initially noisy
+benchmark regression; no duplicate traversal or alternate TDD representation
+was introduced.
+
+Phase 2 also resolves the hidden top-level output leak previously assigned to
+Phase 3 because callback isolation and output filtering share the same
+inferable-domain check. The existing ordering and direct-solution mdtests now
+assert the corrected output. Two additional unit tests verify that retained
+witness upper-bound and finite-domain violations invalidate their path before
+visible selection callbacks run. A witness constraint that the still-active
+`remove_noninferable` projection erases entirely remains invisible to the
+solver and is explicitly deferred to Phase 3.
+
+Validation after Phase 2:
+
+- `ty_python_semantic`: **787 passed**, **35 skipped**.
+- Full workspace with documented snapshot-update settings: **8,576 passed**,
+    **45 skipped**. As in Phase 1, the same two unrelated Windows-line-ending
+    parser snapshots were regenerated, reviewed, and restored.
+- Normal-order mdtests: **479 passed**. Every reversed and XOR-masked run
+    retained exactly the Phase 1 failing-file set and pass/fail counts; logs
+    are under `$HOME/.pi/tmp/witness-aware-phase2-final-wobble`.
+- Pydantic microbenchmark: **21.729 ms**, confidence interval
+    **[21.460 ms, 22.106 ms]**, using the same optimized development profile
+    and Criterion settings. Host contention made isolated runs misleading;
+    paired, alternating executables averaged **22.055 ms** for the Phase 1
+    parent and **21.480 ms** for Phase 2 under the same conditions, showing no
+    material regression. Benchmark logs are under
+    `$HOME/.pi/tmp/witness-aware-phase2`.
 
 ## Required semantic cases
 
@@ -575,7 +630,7 @@ Exit criteria:
 - Existing unrelated quantifier failures are clearly identified.
 - Baseline correctness and performance are documented.
 
-### [ ] Phase 2 — Introduce witness-aware path representation and solving
+### [x] Phase 2 — Introduce witness-aware path representation and solving
 
 Depends on completed Phase 1 and the agreed decisions D1–D6.
 
@@ -640,7 +695,8 @@ Depends on completed Phase 2.
     correlations without introducing general DNF simplification or implication-
     aware subsumption. Deduplicate identical outputs only if a regression
     demonstrates that it is necessary.
-1. Correct the existing non-inferable `U` output leak and update its mdtest TODO.
+1. Preserve Phase 2's non-inferable-output filtering while updating remaining
+    TODO expectations for witness facts that the old projection erased.
 1. Preserve both mixed-constraint orientations under normal/reversed/XOR-masked
     orderings.
 1. Update `noninferable_projection_to_terminal.md` only to reflect the new

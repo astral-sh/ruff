@@ -902,26 +902,22 @@ from ty_extensions._internal import ConstraintSet
 
 def symbolic_relationship[I, N]() -> None:
     constraints = ConstraintSet.range(N, I, N)
-    # TODO: revealed: tuple[Solution[I=N@symbolic_relationship]]
-    # revealed: tuple[Solution[I=N@symbolic_relationship, N=I@symbolic_relationship]]
+    # revealed: tuple[Solution[I=N@symbolic_relationship]]
     reveal_type(constraints.solutions(inferable=tuple[I]))
 
 def symbolic_relationship_reversed[N, I]() -> None:
     constraints = ConstraintSet.range(I, N, I)
-    # TODO: revealed: tuple[Solution[I=N@symbolic_relationship_reversed]]
-    # revealed: tuple[Solution[N=I@symbolic_relationship_reversed, I=N@symbolic_relationship_reversed]]
+    # revealed: tuple[Solution[I=N@symbolic_relationship_reversed]]
     reveal_type(constraints.solutions(inferable=tuple[I]))
 
 def exact_witness[I, N]() -> None:
     constraints = ConstraintSet.range(int, N, int) & ConstraintSet.range(N, I, N)
-    # TODO: revealed: tuple[Solution[I=int]]
-    # revealed: tuple[Solution[I=N@exact_witness | int, N=I@exact_witness | int]]
+    # revealed: tuple[Solution[I=int]]
     reveal_type(constraints.solutions(inferable=tuple[I]))
 
 def exact_nested_witness[I, N]() -> None:
     constraints = ConstraintSet.range(int, N, int) & ConstraintSet.range(list[N], I, list[N])
-    # TODO: revealed: tuple[Solution[I=list[int]]]
-    # revealed: tuple[Solution[I=list[int] | list[N@exact_nested_witness], N=int]]
+    # revealed: tuple[Solution[I=list[int]]]
     reveal_type(constraints.solutions(inferable=tuple[I]))
 
 def lower_bounded_witness[I, N]() -> None:
@@ -932,8 +928,7 @@ def lower_bounded_witness[I, N]() -> None:
 
 def upper_bounded_witness[I, N]() -> None:
     constraints = ConstraintSet.range(Never, N, int) & ConstraintSet.range(N, I, N)
-    # TODO: revealed: tuple[Solution[I=N@upper_bounded_witness]]
-    # revealed: tuple[Solution[I=N@upper_bounded_witness, N=I@upper_bounded_witness]]
+    # revealed: tuple[Solution[I=N@upper_bounded_witness]]
     reveal_type(constraints.solutions(inferable=tuple[I]))
 ```
 

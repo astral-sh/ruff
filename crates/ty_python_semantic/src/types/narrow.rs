@@ -1876,7 +1876,7 @@ impl<'db> PatternSuccessAnalyzer<'db> {
                 Type::instance(self.db, subject_class),
                 generic_context.inferable_typevars(self.db),
             )
-            .solve_with(|variance, path_bound| {
+            .solve_with(self.db, &constraints, |variance, path_bound| {
                 let Some(lower) = path_bound.lower else {
                     return Ok(None);
                 };
