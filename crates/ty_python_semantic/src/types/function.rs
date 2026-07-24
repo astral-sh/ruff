@@ -49,7 +49,7 @@
 //! the public type of `f` is resolved at position 3, correctly giving you all of the overloads
 //! (and the implementation).
 
-use std::str::FromStr;
+use std::{borrow::Cow, str::FromStr};
 
 use bitflags::bitflags;
 use ruff_db::diagnostic::{Annotation, DiagnosticId, Severity, Span};
@@ -79,7 +79,7 @@ use crate::types::diagnostic::{
 };
 use crate::types::display::DisplaySettings;
 use crate::types::generics::{ApplySpecialization, GenericContext, typing_self};
-use crate::types::infer::{nearest_enclosing_class, original_class_type};
+use crate::types::infer::{infer_definition_types, nearest_enclosing_class, original_class_type};
 use crate::types::known_instance::DeprecatedInstance;
 use crate::types::list_members::all_members;
 use crate::types::narrow::ClassInfoConstraintFunction;
@@ -93,7 +93,7 @@ use crate::types::{
     CallableType, ClassBase, ClassLiteral, ClassType, FindLegacyTypeVarsVisitor,
     IntersectionBuilder, KnownClass, KnownInstanceType, SpecialFormType, SubclassOfInner,
     SubclassOfType, Truthiness, Type, TypeContext, TypeMapping, TypeVarBoundOrConstraints,
-    UnionBuilder, UnionType, definition_expression_type, walk_signature,
+    UnionBuilder, UnionType, binding_type, definition_expression_type, walk_signature,
 };
 use crate::{Db, FxOrderSet};
 use ty_python_core::ast_ids::HasScopedUseId;
@@ -452,15 +452,25 @@ impl<'db> OverloadLiteral<'db> {
             .scoped_use_id(db, self.file(db));
 
         let Place::Defined(DefinedPlace {
-            ty: Type::FunctionLiteral(previous_type),
+            ty: previous_type,
             definedness: Definedness::AlwaysDefined,
+            provenance,
             ..
         }) = place_from_bindings(db, use_def.bindings_at_use(use_id)).place
         else {
             return None;
         };
 
-        let previous_literal = previous_type.literal(db);
+        let previous_literal = match previous_type {
+            Type::FunctionLiteral(previous_type) => previous_type.literal(db),
+            Type::Callable(_) => {
+                let definition = provenance.definition()?;
+                infer_definition_types(db, definition)
+                    .function_type(definition)?
+                    .literal(db)
+            }
+            _ => return None,
+        };
         let previous_overload = previous_literal.last_definition;
         if !previous_overload.is_overload(db) {
             return None;
@@ -504,6 +514,15 @@ impl<'db> OverloadLiteral<'db> {
         }
 
         signature
+    }
+
+    /// Returns the effective signatures of this overload after applying decorators.
+    pub(crate) fn decorated_signatures(self, db: &'db dyn Db) -> Vec<Signature<'db>> {
+        let Type::Callable(callable) = binding_type(db, self.definition(db)) else {
+            return vec![self.signature(db)];
+        };
+
+        callable.signatures(db).overloads.to_vec()
     }
 
     /// Typed internally-visible "raw" signature for this function.
@@ -740,6 +759,36 @@ impl<'db> FunctionLiteral<'db> {
         }
     }
 
+    /// Ignore previous overloads when applying decorators to an individual definition.
+    pub(super) const fn without_overloads(self) -> Self {
+        Self {
+            overloaded: false,
+            ..self
+        }
+    }
+
+    /// Preserve the overload set and last-definition identity while updating decorator metadata.
+    pub(super) fn with_last_definition_metadata(
+        self,
+        db: &'db dyn Db,
+        decorated: OverloadLiteral<'db>,
+    ) -> Self {
+        let definition = self.last_definition;
+        Self {
+            last_definition: OverloadLiteral::new(
+                db,
+                definition.name(db),
+                definition.known(db),
+                definition.body_scope(db),
+                definition.decorators(db),
+                decorated.deprecated(db),
+                decorated.dataclass_transformer_params(db),
+                definition.has_explicit_return_annotation(db),
+            ),
+            ..self
+        }
+    }
+
     fn name(self, db: &'db dyn Db) -> &'db ast::name::Name {
         // All of the overloads of a function literal should have the same name.
         self.last_definition.name(db)
@@ -820,9 +869,8 @@ impl<'db> FunctionLiteral<'db> {
         (overloads.as_ref(), *implementation)
     }
 
-    fn has_separate_implementation(self, db: &'db dyn Db) -> bool {
-        !self.last_definition.is_overload(db)
-            && self.last_definition.previous_overload(db).is_some()
+    pub(super) fn has_separate_implementation(self, db: &'db dyn Db) -> bool {
+        self.overloaded && !self.last_definition.is_overload(db)
     }
 
     fn iter_overloads_and_implementation(
@@ -854,7 +902,14 @@ impl<'db> FunctionLiteral<'db> {
             return CallableSignature::single(implementation.signature(db));
         }
 
-        CallableSignature::from_overloads(overloads.iter().map(|overload| overload.signature(db)))
+        CallableSignature::from_overloads(overloads.iter().flat_map(|overload| {
+            // The last overload may still be inferred, so querying its binding would create a cycle.
+            if *overload == self.last_definition {
+                vec![overload.signature(db)]
+            } else {
+                overload.decorated_signatures(db)
+            }
+        }))
     }
 
     /// Typed externally-visible signature of the last overload or implementation of this function.
@@ -1013,22 +1068,23 @@ pub struct UpdatedFunctionSignatures<'db> {
     /// See also: [`FunctionLiteral::signature`].
     signature: Option<CallableSignature<'db>>,
 
-    /// Contains a potentially modified signature for the implementation of an overloaded function,
-    /// in case certain operations (like type mappings) have been applied to it.
+    /// Contains the potentially modified callables for the implementation of an overloaded
+    /// function, in case decorators or type mappings have been applied to it. Each callable can
+    /// itself be overloaded.
     ///
     /// See also: [`FunctionLiteral::last_definition_signature`].
-    implementation_signature: Option<Signature<'db>>,
+    implementation_callables: Option<Box<[CallableType<'db>]>>,
 }
 
 impl<'db> UpdatedFunctionSignatures<'db> {
     fn new(
         signature: Option<CallableSignature<'db>>,
-        implementation_signature: Option<Signature<'db>>,
+        implementation_callables: Option<Box<[CallableType<'db>]>>,
     ) -> Option<Box<Self>> {
-        (signature.is_some() || implementation_signature.is_some()).then(|| {
+        (signature.is_some() || implementation_callables.is_some()).then(|| {
             Box::new(Self {
                 signature,
-                implementation_signature,
+                implementation_callables,
             })
         })
     }
@@ -1058,8 +1114,10 @@ pub(super) fn walk_function_type<'db, V: super::visitor::TypeVisitor<'db> + ?Siz
             walk_signature(db, signature, visitor);
         }
     }
-    if let Some(signature) = function.updated_implementation_signature(db) {
-        walk_signature(db, signature, visitor);
+    if let Some(callables) = function.updated_implementation_callables(db) {
+        for callable in callables {
+            visitor.visit_callable_type(db, *callable);
+        }
     }
 }
 
@@ -1072,9 +1130,48 @@ impl<'db> FunctionType<'db> {
     }
 
     fn updated_implementation_signature(self, db: &'db dyn Db) -> Option<&'db Signature<'db>> {
+        let [callable] = self.updated_implementation_callables(db)? else {
+            return None;
+        };
+        let [signature] = callable.signatures(db).overloads.as_slice() else {
+            return None;
+        };
+        Some(signature)
+    }
+
+    fn updated_implementation_callables(self, db: &'db dyn Db) -> Option<&'db [CallableType<'db>]> {
         self.updated_signatures(db)
             .as_deref()
-            .and_then(|updated| updated.implementation_signature.as_ref())
+            .and_then(|updated| updated.implementation_callables.as_deref())
+    }
+
+    /// Return all effective implementation callables, falling back to the raw implementation.
+    pub(super) fn implementation_callables(self, db: &'db dyn Db) -> Cow<'db, [CallableType<'db>]> {
+        self.updated_implementation_callables(db).map_or_else(
+            || {
+                Cow::Owned(vec![CallableType::single(
+                    db,
+                    self.last_definition_signature(db).clone(),
+                )])
+            },
+            Cow::Borrowed,
+        )
+    }
+
+    /// Retain decorated implementation callables without changing the caller-visible overloads.
+    pub(super) fn with_implementation_callables(
+        self,
+        db: &'db dyn Db,
+        implementation_callables: Box<[CallableType<'db>]>,
+    ) -> Self {
+        Self::new(
+            db,
+            self.literal(db),
+            UpdatedFunctionSignatures::new(
+                self.updated_signature(db).cloned(),
+                Some(implementation_callables),
+            ),
+        )
     }
 
     pub(crate) fn with_inherited_generic_context(
@@ -1086,17 +1183,27 @@ impl<'db> FunctionType<'db> {
             .signature(db)
             .with_inherited_generic_context(db, inherited_generic_context);
         let literal = self.literal(db);
-        let updated_implementation_signature = literal.has_separate_implementation(db).then(|| {
-            self.last_definition_signature(db)
-                .clone()
-                .with_inherited_generic_context(db, inherited_generic_context)
+        let updated_implementation_callables = literal.has_separate_implementation(db).then(|| {
+            self.implementation_callables(db)
+                .iter()
+                .map(|callable| {
+                    CallableType::new(
+                        db,
+                        callable
+                            .signatures(db)
+                            .with_inherited_generic_context(db, inherited_generic_context),
+                        callable.kind(db),
+                        callable.provenance(db),
+                    )
+                })
+                .collect()
         });
         Self::new(
             db,
             literal,
             UpdatedFunctionSignatures::new(
                 Some(updated_signature),
-                updated_implementation_signature,
+                updated_implementation_callables,
             ),
         )
     }
@@ -1111,7 +1218,7 @@ impl<'db> FunctionType<'db> {
         // Returned-callable rescoping and type-alias specialization should not rebuild signatures from the
         // function literal; doing so can re-enter recursive `TypeOf` evaluation.
         let literal = self.literal(db);
-        let (updated_signature, updated_implementation_signature) = if matches!(
+        let (updated_signature, updated_implementation_callables) = if matches!(
             type_mapping,
             TypeMapping::ApplySpecialization(
                 ApplySpecialization::ReturnCallables(_) | ApplySpecialization::TypeAlias(_)
@@ -1125,8 +1232,13 @@ impl<'db> FunctionType<'db> {
                 self.updated_signature(db).map(|signature| {
                     signature.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
                 }),
-                self.updated_implementation_signature(db).map(|signature| {
-                    signature.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
+                self.updated_implementation_callables(db).map(|callables| {
+                    callables
+                        .iter()
+                        .map(|callable| {
+                            callable.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
+                        })
+                        .collect()
                 }),
             )
         } else {
@@ -1136,23 +1248,23 @@ impl<'db> FunctionType<'db> {
                         .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
                 ),
                 literal.has_separate_implementation(db).then(|| {
-                    self.last_definition_signature(db).apply_type_mapping_impl(
-                        db,
-                        type_mapping,
-                        tcx,
-                        visitor,
-                    )
+                    self.implementation_callables(db)
+                        .iter()
+                        .map(|callable| {
+                            callable.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
+                        })
+                        .collect()
                 }),
             )
         };
 
-        if updated_signature.is_none() && updated_implementation_signature.is_none() {
+        if updated_signature.is_none() && updated_implementation_callables.is_none() {
             self
         } else {
             Self::new(
                 db,
                 literal,
-                UpdatedFunctionSignatures::new(updated_signature, updated_implementation_signature),
+                UpdatedFunctionSignatures::new(updated_signature, updated_implementation_callables),
             )
         }
     }
@@ -1524,11 +1636,16 @@ impl<'db> FunctionType<'db> {
                     }
                     None => None,
                 };
-                let updated_implementation_signature =
-                    match self.updated_implementation_signature(db) {
-                        Some(signature) => {
-                            Some(signature.recursive_type_normalized_impl(db, div, nested)?)
-                        }
+                let updated_implementation_callables =
+                    match self.updated_implementation_callables(db) {
+                        Some(callables) => Some(
+                            callables
+                                .iter()
+                                .map(|callable| {
+                                    callable.recursive_type_normalized_impl(db, div, nested)
+                                })
+                                .collect::<Option<Box<_>>>()?,
+                        ),
                         None => None,
                     };
                 Some(Self::new(
@@ -1536,7 +1653,7 @@ impl<'db> FunctionType<'db> {
                     literal,
                     UpdatedFunctionSignatures::new(
                         updated_signature,
-                        updated_implementation_signature,
+                        updated_implementation_callables,
                     ),
                 ))
             },

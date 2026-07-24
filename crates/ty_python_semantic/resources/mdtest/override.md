@@ -783,6 +783,7 @@ class Spam:
 
     @overload
     @override
+    # error: [invalid-overload] "`@override` decorator should be applied only to the overload implementation"
     def quux(self, x: str) -> str: ...
     @overload
     def quux(self, x: int) -> int: ...

@@ -649,12 +649,11 @@ def remove_param[**P, R](func: Callable[Concatenate[int, P], R]) -> Callable[P, 
 def f1(x: int, y: str) -> str: ...
 @overload
 def f1(x: int, y: int) -> int: ...
-@remove_param
 def f1(x: int, y: str | int) -> str | int:
     return y
 
 # TODO: Should reveal `Overloaded[(y: str) -> str, (y: int) -> int]`
-reveal_type(f1)  # revealed: (y: str) -> str | int
+reveal_type(remove_param(f1))  # revealed: (y: str) -> str | int
 ```
 
 But, it's not possible to _add_ a parameter to an overloaded function using `Concatenate` because
@@ -666,18 +665,17 @@ def add_param[**P, R](func: Callable[P, R]) -> Callable[Concatenate[int, P], R]:
         return func(*args, **kwargs)
     return wrapper
 
-# TODO: Raise a diagnostic stating that the signature of the implementation doesn't match the
-# overloads because the overloads don't have the extra `int` parameter.
 @overload
+# error: [invalid-overload] "Implementation does not accept all arguments of this overload"
 def f2(y: str) -> str: ...
 @overload
+# error: [invalid-overload] "Implementation does not accept all arguments of this overload"
 def f2(y: int) -> int: ...
 @add_param
 def f2(y: str | int) -> str | int:
     return y
 
-# TODO: Should this reveal `Overloaded[(int, /, y: str) -> str, (int, /, y: int) -> int]` ?
-reveal_type(f2)  # revealed: Overload[(int, /, y: str) -> str | int, (int, /, y: int) -> str | int]
+reveal_type(f2)  # revealed: Overload[(y: str) -> str, (y: int) -> int]
 ```
 
 But, it's possible to add the additional parameter just to the overload signatures and not the
@@ -692,8 +690,7 @@ def f3(x: int, /, y: int) -> int: ...
 def f3(y: str | int) -> str | int:
     return y
 
-# TODO: Should reveal `Overloaded[(int, /, y: str) -> str, (int, /, y: int) -> int]`
-reveal_type(f3)  # revealed: Overload[(int, x: int, /, y: str) -> str | int, (int, x: int, /, y: int) -> str | int]
+reveal_type(f3)  # revealed: Overload[(x: int, /, y: str) -> str, (x: int, /, y: int) -> int]
 ```
 
 ## `Concatenate` with protocol classes
