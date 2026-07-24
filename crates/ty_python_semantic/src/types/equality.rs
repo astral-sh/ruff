@@ -17,7 +17,7 @@ use super::{
 
 mod enums;
 
-use self::enums::evaluate_enum_domains;
+use self::enums::{evaluate_enum_domains, evaluate_partitioned_enum_domains};
 
 /// The result of evaluating a runtime comparison between two types.
 ///
@@ -168,6 +168,16 @@ pub(super) fn evaluate_type_equality<'db>(
     .or_else(|| {
         evaluate_enum_domains(db, left, right, branch, ComparisonOperator::Equality)
             .and_then(|result| result.constraint(branch))
+    })
+    .or_else(|| {
+        evaluate_partitioned_enum_domains(
+            &mut ComparisonEvaluator::new(db, soundness_policy),
+            left,
+            right,
+            branch,
+            ComparisonOperator::Equality,
+        )
+        .and_then(|result| result.constraint(branch))
     })
     .or_else(|| {
         if comparison_domain(
@@ -490,6 +500,39 @@ fn evaluate_comparison_once<'db>(
         return result;
     }
 
+    if let Some(result) =
+        evaluate_partitioned_enum_domains(evaluator, left, right, branch, operator)
+    {
+        return result;
+    }
+
+    match (left, right) {
+        (Type::Dynamic(_), other) => {
+            return if !operator.condition_expects_equality(branch)
+                && all_values_compare_equal(evaluator, other, operator)
+            {
+                let excluded = if other.is_enum(db)
+                    && let Some(alternatives) = finite_alternatives(db, other, operator)
+                    && let [alternative] = alternatives.as_slice()
+                {
+                    *alternative
+                } else {
+                    other
+                };
+                ComparisonResult::CanNarrow(
+                    IntersectionBuilder::new(db)
+                        .add_positive(left)
+                        .add_negative(excluded)
+                        .build(),
+                )
+            } else {
+                ComparisonResult::Ambiguous
+            };
+        }
+        (_, Type::Dynamic(_)) => return ComparisonResult::Ambiguous,
+        _ => {}
+    }
+
     if let Some(alternatives) = finite_alternatives(db, left, operator) {
         return evaluate_union_left(evaluator, &alternatives, right, branch, operator);
     }
@@ -520,22 +563,6 @@ fn evaluate_comparison_once<'db>(
             | Type::TypeGuard(_)
             | Type::TypeIs(_),
         ) => ComparisonResult::Ambiguous,
-
-        (Type::Dynamic(_), other) => {
-            if !operator.condition_expects_equality(branch)
-                && all_values_compare_equal(evaluator, other, operator)
-            {
-                ComparisonResult::CanNarrow(
-                    IntersectionBuilder::new(db)
-                        .add_positive(left)
-                        .add_negative(other)
-                        .build(),
-                )
-            } else {
-                ComparisonResult::Ambiguous
-            }
-        }
-        (_, Type::Dynamic(_)) => ComparisonResult::Ambiguous,
 
         (Type::TypeVar(var), other) => match var.typevar(db).bound_or_constraints(db) {
             None => ComparisonResult::Ambiguous,

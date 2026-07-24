@@ -12,8 +12,9 @@ use crate::types::{
 use crate::{Db, FxOrderMap, FxOrderSet};
 
 use super::{
-    ComparisonBranch, ComparisonOperator, ComparisonResult, KnownComparisonSemantics,
-    enum_literal_value,
+    ComparisonBranch, ComparisonEvaluator, ComparisonGoal, ComparisonOperator, ComparisonResult,
+    KnownComparisonSemantics, combine_definite_truthiness, enum_literal_value,
+    evaluate_against_results, evaluate_target_union,
 };
 
 /// Compare two enum value domains without comparing every pair of members.
@@ -39,6 +40,118 @@ pub(super) fn evaluate_enum_domains<'db>(
     }
 
     ProjectedEnumComparison::new(db, target, &other, operator)?.evaluate(db, branch, operator)
+}
+
+/// Compare unions that contain both enum domains and unrelated alternatives.
+///
+/// Enum alternatives retain their compact comparison domains, while residual alternatives are
+/// evaluated through the ordinary comparison evaluator. In particular, a gradual or scalar
+/// residual on either side can still satisfy the comparison and prevent the opposite operand from
+/// being narrowed to the enum domains' shared members.
+///
+/// ```python
+/// from enum import StrEnum
+///
+/// class Left(StrEnum):
+///     SHARED = "shared"
+///     LEFT = "left"
+///
+/// class Right(StrEnum):
+///     SHARED = "shared"
+///     RIGHT = "right"
+///
+/// def compare(left: Left | None, right: Right | None):
+///     if left == right:
+///         reveal_type(left)   # Literal[Left.SHARED] | None
+///         reveal_type(right)  # Literal[Right.SHARED] | None
+/// ```
+///
+/// Returns `None` when either operand lacks an enum domain, neither operand has a residual, or an
+/// enum has unmodeled comparison semantics.
+pub(super) fn evaluate_partitioned_enum_domains<'db>(
+    evaluator: &mut ComparisonEvaluator<'db>,
+    target: Type<'db>,
+    other: Type<'db>,
+    branch: ComparisonBranch,
+    operator: ComparisonOperator,
+) -> Option<ComparisonResult<'db>> {
+    let db = evaluator.db;
+
+    if !matches!(target.resolve_type_alias(db), Type::Union(_))
+        && !matches!(other.resolve_type_alias(db), Type::Union(_))
+    {
+        return None;
+    }
+
+    let EnumDomainPartition {
+        enum_type: target_enum,
+        alternatives: target_alternatives,
+        has_residual: target_has_residual,
+    } = EnumDomainPartition::from_type(db, target)?;
+    let EnumDomainPartition {
+        enum_type: other_enum,
+        alternatives: other_alternatives,
+        has_residual: other_has_residual,
+    } = EnumDomainPartition::from_type(db, other)?;
+
+    if !target_has_residual && !other_has_residual {
+        return None;
+    }
+
+    // Partitioning is only useful when the enum domains themselves have modeled comparison
+    // semantics. Custom comparison methods must retain the ordinary evaluator's fallback.
+    let enum_result = evaluate_enum_domains(db, target_enum, other_enum, branch, operator)?;
+
+    let evaluate_alternative =
+        |evaluator: &mut ComparisonEvaluator<'db>, target: Type<'db>, other: Type<'db>| {
+            if target == target_enum && other == other_enum {
+                enum_result
+            } else {
+                evaluator.evaluate(target, other, branch, operator)
+            }
+        };
+
+    let evaluate_against_other = |evaluator: &mut ComparisonEvaluator<'db>, target: Type<'db>| {
+        if let [other] = other_alternatives.as_slice() {
+            return evaluate_alternative(evaluator, target, *other);
+        }
+
+        if evaluator.goal == ComparisonGoal::Truthiness {
+            return combine_definite_truthiness(
+                other_alternatives
+                    .iter()
+                    .map(|other| evaluate_alternative(evaluator, target, *other)),
+            );
+        }
+
+        evaluate_against_results(
+            db,
+            target,
+            branch,
+            other_alternatives
+                .iter()
+                .map(|other| evaluate_alternative(evaluator, target, *other)),
+        )
+    };
+
+    if let [target] = target_alternatives.as_slice() {
+        return Some(evaluate_against_other(evaluator, *target));
+    }
+
+    if evaluator.goal == ComparisonGoal::Truthiness {
+        return Some(combine_definite_truthiness(
+            target_alternatives
+                .iter()
+                .map(|target| evaluate_against_other(evaluator, *target)),
+        ));
+    }
+
+    Some(evaluate_target_union(
+        db,
+        &target_alternatives,
+        branch,
+        |target| evaluate_against_other(evaluator, target),
+    ))
 }
 
 /// Two non-empty value domains from the same enum and the semantics used to compare them.
@@ -446,6 +559,87 @@ impl<'db> EnumValueSet<'db> {
 
     fn member_type(&self, db: &'db dyn Db, name: &Name, promotable: bool) -> Type<'db> {
         LiteralValueType::new(EnumLiteralType::new(db, self.enum_class, name), promotable).into()
+    }
+}
+
+/// Enum domains and original non-enum alternatives extracted from an operand.
+///
+/// Original enum alternatives are grouped at the first enum position. Residual alternatives keep
+/// their union order, while all enum classes can share one compact comparison-key projection.
+struct EnumDomainPartition<'db> {
+    enum_type: Type<'db>,
+    alternatives: Vec<Type<'db>>,
+    has_residual: bool,
+}
+
+impl<'db> EnumDomainPartition<'db> {
+    /// Group structural enum alternatives at their first position and retain residual order.
+    ///
+    /// Returns `None` when no enum domain can be extracted or a recursive alias cannot be
+    /// partitioned safely.
+    fn from_type(db: &'db dyn Db, ty: Type<'db>) -> Option<Self> {
+        fn collect<'db>(
+            db: &'db dyn Db,
+            ty: Type<'db>,
+            enum_types: &mut Vec<Type<'db>>,
+            alternatives: &mut Vec<Type<'db>>,
+            enum_position: &mut Option<usize>,
+            active_types: &mut FxHashSet<Type<'db>>,
+        ) -> Option<()> {
+            if EnumValueSet::from_type(db, ty, active_types).is_some() {
+                enum_position.get_or_insert(alternatives.len());
+                enum_types.push(ty);
+                return Some(());
+            }
+
+            let Type::Union(union) = ty.resolve_type_alias(db) else {
+                alternatives.push(ty);
+                return Some(());
+            };
+
+            if !active_types.insert(ty) {
+                return None;
+            }
+
+            let result = union.elements(db).iter().try_for_each(|element| {
+                collect(
+                    db,
+                    *element,
+                    enum_types,
+                    alternatives,
+                    enum_position,
+                    active_types,
+                )
+            });
+            active_types.remove(&ty);
+            result
+        }
+
+        let mut enum_types = Vec::new();
+        let mut alternatives = Vec::new();
+        let mut enum_position = None;
+        let mut active_types = FxHashSet::default();
+        collect(
+            db,
+            ty,
+            &mut enum_types,
+            &mut alternatives,
+            &mut enum_position,
+            &mut active_types,
+        )?;
+        let enum_position = enum_position?;
+        let enum_type = enum_types
+            .into_iter()
+            .fold(UnionBuilder::new(db), UnionBuilder::add)
+            .build();
+        let has_residual = !alternatives.is_empty();
+        alternatives.insert(enum_position, enum_type);
+
+        Some(Self {
+            enum_type,
+            alternatives,
+            has_residual,
+        })
     }
 }
 
