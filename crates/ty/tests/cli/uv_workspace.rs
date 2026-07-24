@@ -336,7 +336,10 @@ fn uv_workspace_discovery_is_opt_in() -> anyhow::Result<()> {
 /// Failures to invoke uv are visible by default instead of silently disabling integration.
 #[test]
 fn warns_when_uv_workspace_metadata_cannot_be_loaded() -> anyhow::Result<()> {
-    let case = workspace_case()?;
+    let case = workspace_case()?.with_filter(
+        "program not found",
+        "No such file or directory (os error 2)",
+    );
     case.write_file("packages/member/member.py", "value: int = 1")?;
 
     let mut command = case.command();
