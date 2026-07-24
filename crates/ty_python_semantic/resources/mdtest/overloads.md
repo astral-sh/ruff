@@ -1401,7 +1401,7 @@ python-version = "3.12"
 ```
 
 ```pyi
-from typing import Any, Generic, Protocol, TypeVar, assert_type, overload
+from typing import Any, Generic, Protocol, TypeVar, assert_type, overload, reveal_type
 
 class ScalarBase: ...
 class Scalar(ScalarBase): ...
@@ -1413,17 +1413,27 @@ class HasPhantom[T](Protocol):
     def phantom(self) -> T: ...
 
 class Phantom(Generic[ShapeCo, ScalarCo]):
+    # An empty shape selects the scalar overload and relates its return type to the receiver.
     @overload
     def phantom[T: ScalarBase](self: "Phantom[tuple[()], T]") -> T: ...
+    # A non-empty shape selects the list-valued overload instead.
     @overload
     def phantom[Shape: tuple[int, *tuple[int, ...]], T: ScalarBase](
         self: "Phantom[Shape, T]",
     ) -> list[T]: ...
 
 class Normal(Phantom[ShapeCo, ScalarCo], Generic[ShapeCo, ScalarCo]):
+    # Matching this protocol receiver requires binding the inherited `phantom` overloads.
     @property
     def value[T](self: "HasPhantom[T]") -> T: ...
 
+# The empty shape selects `phantom() -> Scalar`, so the protocol and property type is `Scalar`.
 normal: Normal[tuple[()], Scalar]
 assert_type(normal.value, Scalar)
+
+# A non-empty shape selects `phantom() -> list[Scalar]`, so the property type is `list[Scalar]`.
+shaped: Normal[tuple[int], Scalar]
+assert_type(shaped.phantom(), list[Scalar])
+# TODO: The receiver constraint `Scalar <: T` should propagate through invariant `list[T]`.
+reveal_type(shaped.value)  # revealed: Unknown
 ```
