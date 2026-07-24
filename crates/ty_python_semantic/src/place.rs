@@ -2214,7 +2214,7 @@ pub(crate) mod implicit_globals {
     #[salsa::tracked(returns(copy), heap_size=ruff_memory_usage::heap_size)]
     fn module_type_body_scope_inner<'db>(
         db: &'db dyn Db,
-        program: Program,
+        program: Program<'db>,
     ) -> Option<ScopeId<'db>> {
         let env = ProgramEnvironment::from_program(program);
         let module_scope = core_module_scope(db, &env, KnownModule::Types)?;
@@ -2399,7 +2399,7 @@ pub(crate) mod implicit_globals {
     )]
     fn module_type_symbols_inner<'db>(
         db: &'db dyn Db,
-        program: Program,
+        program: Program<'db>,
     ) -> smallvec::SmallVec<[ast::name::Name; 8]> {
         let env = ProgramEnvironment::from_program(program);
         let Some(module_type_scope) = module_type_body_scope(db, &env) else {

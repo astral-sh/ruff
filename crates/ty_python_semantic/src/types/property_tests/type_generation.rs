@@ -141,7 +141,7 @@ enum ParamKind {
 #[salsa::tracked(returns(copy), heap_size=ruff_memory_usage::heap_size)]
 fn create_bound_method<'db>(
     db: &'db dyn Db,
-    program: Program,
+    program: Program<'db>,
     function: Type<'db>,
     builtins_class: Type<'db>,
 ) -> Type<'db> {

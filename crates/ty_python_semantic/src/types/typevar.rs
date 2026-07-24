@@ -1597,7 +1597,7 @@ pub enum BindingContext<'db> {
     /// The typevar is synthesized internally, and is not associated with a particular definition
     /// in the source, but is still bound and eligible for specialization inference. Its program
     /// identifies the environment that cannot otherwise be recovered from a source definition.
-    Synthetic(Program),
+    Synthetic(Program<'db>),
 }
 
 impl<'db> From<Definition<'db>> for BindingContext<'db> {
@@ -1614,7 +1614,7 @@ impl<'db> BindingContext<'db> {
         }
     }
 
-    pub(crate) fn program(self, db: &'db dyn Db) -> Program {
+    pub(crate) fn program(self, db: &'db dyn Db) -> Program<'db> {
         match self {
             Self::Definition(definition) => definition.program(db),
             Self::Synthetic(program) => program,

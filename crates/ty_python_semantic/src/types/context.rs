@@ -63,7 +63,7 @@ impl<'db> ProgramEnvironment<'db> {
     }
 
     /// Creates an environment with an already-established program.
-    pub fn from_program(program: Program) -> Self {
+    pub fn from_program(program: Program<'db>) -> Self {
         Self {
             environment: Cell::new(ProgramSource::Program(program.as_id())),
             lifetime: PhantomData,
@@ -72,7 +72,7 @@ impl<'db> ProgramEnvironment<'db> {
 
     /// Returns the program used by this operation.
     #[inline]
-    pub fn program(&self, db: &'db dyn Db) -> Program {
+    pub fn program(&self, db: &'db dyn Db) -> Program<'db> {
         let program = match self.environment.get() {
             ProgramSource::Program(id) => return Program::from_id(id),
             ProgramSource::File(file) => {

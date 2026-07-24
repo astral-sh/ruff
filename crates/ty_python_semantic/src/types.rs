@@ -637,7 +637,7 @@ impl Default for MemberLookupPolicy {
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 struct MemberLookupKey<'db> {
     #[returns(copy)]
-    program: Program,
+    program: Program<'db>,
     #[returns(copy)]
     ty: Type<'db>,
     #[returns(ref)]
@@ -1191,7 +1191,7 @@ impl<T> InstanceProjection<T> {
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 struct TypePair<'db> {
     #[returns(copy)]
-    program: Program,
+    program: Program<'db>,
     #[returns(copy)]
     first: Type<'db>,
     #[returns(copy)]
@@ -1693,7 +1693,7 @@ impl<'db> Type<'db> {
     fn cached_materialization(
         self,
         db: &'db dyn Db,
-        program: Program,
+        program: Program<'db>,
         materialization_kind: MaterializationKind,
     ) -> Type<'db> {
         let env = &ProgramEnvironment::from_program(program);
@@ -2872,7 +2872,7 @@ impl<'db> Type<'db> {
         #[salsa::tracked(returns(copy), cycle_initial=|_, _, _, _| None, heap_size=ruff_memory_usage::heap_size)]
         fn lookup_dunder_new_inner<'db>(
             db: &'db dyn Db,
-            program: Program,
+            program: Program<'db>,
             ty: Type<'db>,
         ) -> Option<PlaceAndQualifiers<'db>> {
             let env = &ProgramEnvironment::from_program(program);
@@ -3462,7 +3462,7 @@ impl<'db> Type<'db> {
         #[salsa::tracked(returns(copy), cycle_initial=|_, _, _, _, _, _| None, heap_size=ruff_memory_usage::heap_size)]
         fn try_call_dunder_get_inner<'db>(
             db: &'db dyn Db,
-            program: Program,
+            program: Program<'db>,
             ty: Type<'db>,
             instance: Option<Type<'db>>,
             owner: Type<'db>,
@@ -3797,7 +3797,11 @@ impl<'db> Type<'db> {
         cycle_initial=|_, _, _, _| true,
         heap_size=ruff_memory_usage::heap_size
     )]
-    fn is_definitely_non_data_descriptor_impl(self, db: &'db dyn Db, program: Program) -> bool {
+    fn is_definitely_non_data_descriptor_impl(
+        self,
+        db: &'db dyn Db,
+        program: Program<'db>,
+    ) -> bool {
         let env = &ProgramEnvironment::from_program(program);
         match self {
             Type::Dynamic(_) | Type::Divergent(_) | Type::TypeVar(_) => false,
@@ -3825,7 +3829,7 @@ impl<'db> Type<'db> {
     fn is_data_descriptor_impl(
         self,
         db: &'db dyn Db,
-        program: Program,
+        program: Program<'db>,
         any_of_union: bool,
     ) -> bool {
         let env = &ProgramEnvironment::from_program(program);
@@ -7646,7 +7650,7 @@ impl<'db> Type<'db> {
         },
         heap_size=ruff_memory_usage::heap_size
     )]
-    fn expand_eagerly_(self, db: &'db dyn Db, program: Program) -> Type<'db> {
+    fn expand_eagerly_(self, db: &'db dyn Db, program: Program<'db>) -> Type<'db> {
         let env = &ProgramEnvironment::from_program(program);
         self.apply_type_mapping(
             db,

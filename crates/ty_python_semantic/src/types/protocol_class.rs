@@ -330,7 +330,7 @@ impl<'db> From<ProtocolClass<'db>> for Type<'db> {
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub(super) struct ProtocolInterface<'db> {
     #[returns(copy)]
-    pub(super) program: Program,
+    pub(super) program: Program<'db>,
 
     #[returns(ref)]
     inner: BTreeMap<Name, ProtocolMemberData<'db>>,
@@ -3580,7 +3580,7 @@ fn proto_interface_cycle_recover<'db>(
 #[salsa::tracked(returns(copy), heap_size=ruff_memory_usage::heap_size)]
 fn protocol_bind_self<'db>(
     db: &'db dyn Db,
-    program: Program,
+    program: Program<'db>,
     callable: CallableType<'db>,
     self_type: Option<Type<'db>>,
 ) -> CallableType<'db> {
@@ -3596,7 +3596,7 @@ fn protocol_bind_self<'db>(
 )]
 fn protocol_apply_self_with_receiver<'db>(
     db: &'db dyn Db,
-    program: Program,
+    program: Program<'db>,
     callable: CallableType<'db>,
     receiver_type: Type<'db>,
     self_type: Type<'db>,

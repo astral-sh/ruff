@@ -344,7 +344,7 @@ pub(crate) fn typing_self<'db>(
 #[salsa::interned(debug, constructor=new_internal, heap_size=ruff_memory_usage::heap_size)]
 pub struct GenericContext<'db> {
     #[returns(copy)]
-    pub(crate) program: Program,
+    pub(crate) program: Program<'db>,
 
     #[returns(ref)]
     variables_inner: FxOrderMap<BoundTypeVarIdentity<'db>, BoundTypeVarInstance<'db>>,
@@ -437,7 +437,7 @@ impl<'db> GenericContext<'db> {
 
     fn from_typevar_instances_in_program(
         db: &'db dyn Db,
-        program: Program,
+        program: Program<'db>,
         type_params: impl IntoIterator<Item = BoundTypeVarInstance<'db>>,
     ) -> Self {
         Self::new_internal(

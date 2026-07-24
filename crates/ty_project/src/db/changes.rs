@@ -253,8 +253,7 @@ impl ProjectDatabase {
                         &FallibleStrategy,
                     ) {
                         Ok((program_settings, diagnostics)) => {
-                            let program = self.project().program(self);
-                            program.update_from_settings(self, program_settings);
+                            project.update_program(self, program_settings);
                             diagnostics
                         }
                         Err(error) => {
@@ -329,7 +328,7 @@ impl ProjectDatabase {
                             Ok((_, diagnostics)) => diagnostics,
                             Err(error) => vec![error.into_diagnostic()],
                         };
-                    program.update_from_settings(self, program_settings);
+                    project.update_program(self, program_settings);
                     settings_diagnostics.extend(
                         program_settings_diagnostics
                             .into_iter()

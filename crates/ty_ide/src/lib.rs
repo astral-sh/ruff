@@ -676,8 +676,7 @@ mod tests {
             .to_search_paths(db.system(), db.vendored(), &FallibleStrategy)
             .expect("valid search paths");
 
-            let program = db.project().program(&db);
-            program.update_from_settings(
+            db.project().update_program(
                 &mut db,
                 ProgramSettings {
                     python_version: PythonVersionWithSource::default(),

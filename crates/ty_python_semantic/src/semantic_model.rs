@@ -74,7 +74,7 @@ impl<'db> SemanticModel<'db> {
         self.file
     }
 
-    pub fn program(&self) -> Program {
+    pub fn program(&self) -> Program<'db> {
         self.file.program(self.db)
     }
 
