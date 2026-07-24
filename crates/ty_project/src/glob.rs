@@ -38,7 +38,7 @@ impl IncludeExcludeFilter {
     pub(crate) fn is_directory_maybe_included(
         &self,
         path: &SystemPath,
-        mode: GlobFilterCheckMode,
+        mode: GlobFilterCheckMode<'_>,
     ) -> IncludeResult {
         if self.exclude.match_directory(path, mode) {
             IncludeResult::Excluded
@@ -54,7 +54,7 @@ impl IncludeExcludeFilter {
     pub(crate) fn is_file_included(
         &self,
         path: &SystemPath,
-        mode: GlobFilterCheckMode,
+        mode: GlobFilterCheckMode<'_>,
     ) -> IncludeResult {
         if self.exclude.match_file(path, mode) {
             IncludeResult::Excluded
@@ -113,7 +113,7 @@ impl std::fmt::Display for IncludeExcludeFilter {
 }
 
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
-pub(crate) enum GlobFilterCheckMode {
+pub(crate) enum GlobFilterCheckMode<'a> {
     /// The paths are checked top-to-bottom and inclusion is determined
     /// for each path during the traversal.
     TopDown,
@@ -122,8 +122,8 @@ pub(crate) enum GlobFilterCheckMode {
     ///
     /// This is more expensive than a [`Self::TopDown`] check
     /// because it may require testing every ancestor path in addition to the
-    /// path itself to ensure no ancestor path matches an exclude rule.
-    Adhoc,
+    /// path itself to ensure no ancestor path below `stop_at` matches an exclude rule.
+    Adhoc { stop_at: Option<&'a SystemPath> },
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]

@@ -564,11 +564,18 @@ fn explicit_path_overrides_exclude() -> anyhow::Result<()> {
             print(other_undefined_var)  # error: unresolved-reference
             "#,
         ),
+        ("dist/generated/direct.py", "print(direct_undefined_var)"),
+        (
+            "dist/generated/nested/module.py",
+            "print(nested_undefined_var)",
+        ),
+        ("dist/not-included.py", "print(not_included_undefined_var)"),
         (
             "ty.toml",
             r#"
             [src]
-            exclude = ["tests/generated.py"]
+            include = ["src/main.py", "dist/other.py", "dist/generated/**"]
+            exclude = ["tests/generated.py", "dist/generated/direct.py", "dist/generated/nested"]
             "#,
         ),
     ])?;
@@ -607,7 +614,7 @@ fn explicit_path_overrides_exclude() -> anyhow::Result<()> {
     ----- stderr -----
     ");
 
-    // Explicitly checking the entire excluded directory should check all files in it
+    // Explicitly checking an excluded directory still applies its include and descendant exclude filters.
     assert_cmd_snapshot!(case.command().arg("dist/"), @"
     success: false
     exit_code: 1

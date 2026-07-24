@@ -1820,7 +1820,7 @@ impl<'a> ProjectBenchmark<'a> {
             self.project
                 .check_paths()
                 .iter()
-                .map(|path| SystemPathBuf::from(*path))
+                .map(|path| SystemPath::absolute(path, src_root))
                 .collect(),
         );
 
@@ -1847,15 +1847,15 @@ fn bench_project_named(
         let result = db.check();
         let diagnostics = result.len();
 
-        if diagnostics > max_diagnostics {
+        if diagnostics <= 1 || diagnostics > max_diagnostics {
             let details = result
                 .into_iter()
                 .map(|diagnostic| diagnostic.concise_message().to_string())
                 .collect::<Vec<_>>()
                 .join("\n  ");
             assert!(
-                diagnostics <= max_diagnostics,
-                "{project_name}: Expected <={max_diagnostics} diagnostics but got {diagnostics}:\n  {details}",
+                diagnostics > 1 && diagnostics <= max_diagnostics,
+                "{project_name}: Expected between 2 and {max_diagnostics} diagnostics but got {diagnostics}:\n  {details}",
             );
         }
     }
