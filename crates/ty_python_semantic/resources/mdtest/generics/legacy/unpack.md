@@ -58,7 +58,7 @@ def check(i: int, s: str, fixed: tuple[int, str]) -> None:
 can describe the arguments forwarded to that callable.
 
 ```py
-from typing import Callable, TypeVar, TypeVarTuple, Unpack
+from typing import Callable, TypeVar, TypeVarTuple, Unpack, overload
 
 R = TypeVar("R")
 Ts = TypeVarTuple("Ts")
@@ -75,6 +75,18 @@ def format_value(value: int, label: str, /) -> str:
 reveal_type(invoke(format_value, 1, "value"))  # revealed: str
 # error: [invalid-argument-type]
 reveal_type(invoke(format_value, 1))  # revealed: str
+
+@overload
+def overloaded_value(value: int) -> str: ...
+@overload
+def overloaded_value(value: str) -> str: ...
+def overloaded_value(value: int | str) -> str:
+    return str(value)
+
+reveal_type(invoke(overloaded_value, 1))  # revealed: str
+reveal_type(invoke(overloaded_value, "value"))  # revealed: str
+# error: [invalid-argument-type]
+invoke(overloaded_value, 1.0)
 ```
 
 ## Type aliases

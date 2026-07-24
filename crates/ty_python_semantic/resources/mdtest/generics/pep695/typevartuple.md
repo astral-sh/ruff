@@ -703,6 +703,123 @@ def invalid_wrapper[T](value: T) -> str:
 invalid_wrapper(1.0)
 ```
 
+### Callable forwarding through a sub-call
+
+Forwarded positional arguments are checked against the callback's actual overloads. This preserves overload correlations without expanding every combination of constrained outer type variables, and a splat that first fills a wrapper parameter forwards only its residual tuple.
+
+```py
+from collections.abc import Callable
+from typing import overload
+
+def invoke[*Ts, R](callback: Callable[[*Ts], R], *args: *Ts) -> R:
+    raise NotImplementedError
+
+def invoke_str[*Ts](callback: Callable[[*Ts], str], *args: *Ts) -> str:
+    raise NotImplementedError
+
+def invoke_after_header[*Ts](
+    callback: Callable[[*Ts], str], header: int, *args: *Ts
+) -> str:
+    raise NotImplementedError
+
+@overload
+def correlated(left: str, right: str) -> str: ...
+@overload
+def correlated(left: bytes, right: bytes) -> bytes: ...
+def correlated(left: str | bytes, right: str | bytes) -> str | bytes:
+    return left
+
+reveal_type(invoke(correlated, "left", "right"))  # revealed: str
+reveal_type(invoke(correlated, b"left", b"right"))  # revealed: bytes
+# error: [invalid-argument-type]
+invoke(correlated, "left", b"right")
+
+def correlated_constraint[T: (str, bytes)](left: T, right: T) -> str | bytes:
+    reveal_type(invoke(correlated, left, right))  # revealed: str | bytes
+    return invoke(correlated, left, right)
+
+def uncovered_constraint[T: (str, bytes)](value: T) -> str | bytes:
+    return invoke(
+        correlated,
+        "left",
+        value,  # error: [invalid-argument-type]
+    )
+
+@overload
+def out_of_domain_return(value: bytes) -> int: ...
+@overload
+def out_of_domain_return(value: int) -> str: ...
+@overload
+def out_of_domain_return(value: str) -> str: ...
+def out_of_domain_return(value: bytes | int | str) -> int | str:
+    return len(value) if isinstance(value, bytes) else str(value)
+
+def exclude_out_of_domain_return[T: (int, str)](value: T) -> str:
+    reveal_type(invoke(out_of_domain_return, value))  # revealed: str
+    return invoke_str(out_of_domain_return, value)
+
+@overload
+def accepts_string_or_bytes(value: str) -> str: ...
+@overload
+def accepts_string_or_bytes(value: bytes) -> str: ...
+def accepts_string_or_bytes(value: str | bytes) -> str:
+    return str(value)
+
+def split_splat(values: tuple[int, str], invalid: tuple[int, int]) -> None:
+    reveal_type(invoke_after_header(accepts_string_or_bytes, *values))  # revealed: str
+    invoke_after_header(
+        accepts_string_or_bytes,
+        *invalid,  # error: [invalid-argument-type]
+    )
+
+@overload
+def optional_arity() -> str: ...
+@overload
+def optional_arity(value: str) -> str: ...
+def optional_arity(value: str | None = None) -> str:
+    return "empty" if value is None else value
+
+reveal_type(invoke_str(optional_arity))  # revealed: str
+reveal_type(invoke_str(optional_arity, "value"))  # revealed: str
+
+@overload
+def wrong_return(value: int) -> int: ...
+@overload
+def wrong_return(value: str) -> int: ...
+def wrong_return(value: int | str) -> int:
+    return 1
+
+invoke_str(
+    wrong_return,  # error: [invalid-argument-type]
+    1,
+)
+
+@overload
+def broadly_correlated(first: int, *remaining: object) -> str: ...
+@overload
+def broadly_correlated(first: str, *remaining: object) -> str: ...
+def broadly_correlated(first: int | str, *remaining: object) -> str:
+    return str(first)
+
+def seven_constrained_arguments[
+    A: (int, str),
+    B: (int, str),
+    C: (int, str),
+    D: (int, str),
+    E: (int, str),
+    F: (int, str),
+    G: (int, str),
+](a: A, b: B, c: C, d: D, e: E, f: F, g: G) -> str:
+    return invoke_str(broadly_correlated, a, b, c, d, e, f, g)
+
+def infer_from_callback[*Ts](callback: Callable[[*Ts], None]) -> tuple[*Ts]:
+    raise NotImplementedError
+
+def accepts_int(value: int, /) -> None: ...
+
+reveal_type(infer_from_callback(accepts_int))  # revealed: tuple[int]
+```
+
 ### Callable inference with fixed positional parameters
 
 Fixed positional parameters surrounding an unpacked `TypeVarTuple` are excluded from the inferred

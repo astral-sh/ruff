@@ -207,49 +207,6 @@ fn freshen_generic_contexts_in_type<'db>(
         })
 }
 
-/// Maximum number of constrained-`TypeVar` specializations checked when validating an overloaded
-/// callback against a `TypeVarTuple` parameter.
-///
-/// Above this limit, the overload-specific workaround declines to accept the callback and leaves
-/// the normal argument-type diagnostic in place. This mirrors the expansion limit used by
-/// `type_expansion` and prevents compact overload sets from causing exponential call-checking work.
-const MAX_TYPEVARTUPLE_OVERLOAD_SPECIALIZATIONS: usize = 64;
-
-fn all_cartesian_product_satisfies<T: Copy>(
-    factors: &[&[T]],
-    selected: &mut Vec<T>,
-    predicate: &mut impl FnMut(&[T]) -> bool,
-) -> bool {
-    fn visit<T: Copy>(
-        factors: &[&[T]],
-        selected: &mut Vec<T>,
-        predicate: &mut impl FnMut(&[T]) -> bool,
-    ) -> bool {
-        let Some((factor, remaining)) = factors.split_first() else {
-            return predicate(selected);
-        };
-
-        for &element in *factor {
-            selected.push(element);
-            let satisfies = visit(remaining, selected, predicate);
-            selected.pop();
-            if !satisfies {
-                return false;
-            }
-        }
-        true
-    }
-
-    let product_size = factors
-        .iter()
-        .try_fold(1usize, |acc, factor| acc.checked_mul(factor.len()))
-        .unwrap_or(usize::MAX);
-    if product_size > MAX_TYPEVARTUPLE_OVERLOAD_SPECIALIZATIONS {
-        return false;
-    }
-    visit(factors, selected, predicate)
-}
-
 fn inferable_typevars_from_tuple<'db>(
     db: &'db dyn Db,
     instance: &NominalInstanceType<'db>,
@@ -5154,6 +5111,18 @@ struct StarredParameterArguments<'db> {
     diagnostic_argument_index: Option<usize>,
 }
 
+/// A positional callback sub-call and its mapping back to the outer call.
+struct ForwardedCallableSubCall<'db> {
+    /// Overload bindings produced from the exact forwarded positional arguments.
+    bindings: Bindings<'db>,
+    /// The callback return type declared by the outer callable parameter.
+    expected_return_ty: Type<'db>,
+    /// The selected return type, or its symbolic union when every constrained choice is covered.
+    provided_return_ty: Option<Type<'db>>,
+    /// Outer source argument indices corresponding to the forwarded sub-call arguments.
+    argument_indices: SmallVec<[Option<usize>; 2]>,
+}
+
 #[derive(Default)]
 struct StarredConstraintInference {
     owned_parameters: FxHashSet<usize>,
@@ -5616,6 +5585,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
 
         let mut specialization_errors = Vec::new();
         let (assignable_to_declared_type, mut starred_inference) = self.infer_argument_constraints(
+            constraints,
             &mut builder,
             &preferred_type_mappings,
             &partially_specialized_declared_type,
@@ -5633,6 +5603,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             self.constraint_set_errors.fill(false);
 
             (_, starred_inference) = self.infer_argument_constraints(
+                constraints,
                 &mut builder,
                 &FxHashMap::default(),
                 &FxHashSet::default(),
@@ -5743,30 +5714,12 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
 
     fn infer_argument_constraints<'c>(
         &mut self,
+        constraints: &ConstraintSetBuilder<'db>,
         builder: &mut SpecializationBuilder<'db, 'c>,
         preferred_type_mappings: &FxHashMap<BoundTypeVarIdentity<'db>, Type<'db>>,
         partially_specialized_declared_type: &FxHashSet<BoundTypeVarIdentity<'_>>,
         specialization_errors: &mut Vec<BindingError<'db>>,
     ) -> (bool, StarredConstraintInference) {
-        let starred_inference = self.add_argument_constraints(builder, specialization_errors, None);
-
-        let assignable_to_declared_type =
-            preferred_type_mappings
-                .iter()
-                .all(|(&identity, &preferred_ty)| {
-                    partially_specialized_declared_type.contains(&identity)
-                        || builder.inferred_type_is_assignable_to(identity, preferred_ty)
-                });
-
-        (assignable_to_declared_type, starred_inference)
-    }
-
-    fn add_argument_constraints<'c>(
-        &self,
-        builder: &mut SpecializationBuilder<'db, 'c>,
-        specialization_errors: &mut Vec<BindingError<'db>>,
-        excluded_match: Option<(usize, usize)>,
-    ) -> StarredConstraintInference {
         let parameters = self.signature.parameters();
         let mut starred_inference =
             self.infer_starred_typevartuple_constraints(builder, specialization_errors);
@@ -5775,9 +5728,6 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         {
             for matched_parameter in self.argument_matches[argument_index].iter() {
                 let parameter_index = matched_parameter.index;
-                if excluded_match == Some((argument_index, parameter_index)) {
-                    continue;
-                }
                 let parameter = &parameters[parameter_index];
                 let declared_type = parameter.annotated_type();
                 if starred_inference
@@ -5791,10 +5741,17 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                 }
 
                 let argument_type = argument_types.get_for_declared_type(declared_type);
-                let specialization_result = builder.infer(
-                    declared_type,
-                    matched_parameter.argument_type.unwrap_or(argument_type),
-                );
+                let argument_type = matched_parameter.argument_type.unwrap_or(argument_type);
+                let specialization_result = if let Some(sub_call) =
+                    self.typevartuple_forwarded_sub_call(constraints, declared_type, argument_type)
+                {
+                    let Some(provided_return_ty) = sub_call.provided_return_ty else {
+                        continue;
+                    };
+                    builder.infer(sub_call.expected_return_ty, provided_return_ty)
+                } else {
+                    builder.infer(declared_type, argument_type)
+                };
 
                 if let Err(error) = specialization_result {
                     starred_inference.failed_arguments.insert(argument_index);
@@ -5806,7 +5763,15 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             }
         }
 
-        starred_inference
+        let assignable_to_declared_type =
+            preferred_type_mappings
+                .iter()
+                .all(|(&identity, &preferred_ty)| {
+                    partially_specialized_declared_type.contains(&identity)
+                        || builder.inferred_type_is_assignable_to(identity, preferred_ty)
+                });
+
+        (assignable_to_declared_type, starred_inference)
     }
 
     fn check_starred_parameter_arguments(&mut self, constraints: &ConstraintSetBuilder<'db>) {
@@ -5918,12 +5883,10 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             && argument_type
                 .when_assignable_to(self.db, expected_ty, constraints, self.inferable_typevars)
                 .is_never_satisfied(self.db)
-            && !self.overloaded_callable_satisfies_typevartuple_parameter(
-                argument_index,
-                parameter_index,
+            && !self.check_typevartuple_forwarded_sub_call(
+                constraints,
                 parameter.annotated_type(),
                 argument_type,
-                constraints,
             )
         {
             let positional = matches!(argument, Argument::Positional | Argument::Synthetic)
@@ -5978,136 +5941,213 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             && (parameter.is_variadic() || parameter.is_keyword_variadic())
     }
 
-    fn overloaded_callable_satisfies_typevartuple_parameter(
+    /// Bind an overloaded callback against the positional arguments forwarded by its
+    /// `TypeVarTuple`, preserving the residual shape and source index of each splat.
+    fn typevartuple_forwarded_sub_call(
         &self,
-        argument_index: usize,
-        parameter_index: usize,
+        constraints: &ConstraintSetBuilder<'db>,
         declared_type: Type<'db>,
         argument_type: Type<'db>,
-        constraints: &ConstraintSetBuilder<'db>,
-    ) -> bool {
-        let Some(argument_callables) = argument_type.try_upcast_to_callable(self.db) else {
-            return false;
-        };
-        if !argument_callables
-            .iter()
-            .any(|callable| callable.signatures(self.db).overloads.len() > 1)
+    ) -> Option<ForwardedCallableSubCall<'db>> {
+        let (variadic_index, variadic_parameter) = self.signature.parameters().variadic()?;
+        let arguments =
+            self.collect_starred_parameter_arguments(variadic_index, variadic_parameter)?;
+        if arguments.contributing_argument_indices.is_empty()
+            && self.has_unmatched_explicit_argument()
         {
-            return false;
+            return None;
         }
 
-        let Some(declared_callables) = declared_type.try_upcast_to_callable(self.db) else {
-            return false;
+        let declared_tuple = arguments
+            .declared_tuple
+            .exact_tuple_instance_spec(self.db)?;
+        let TupleSpec::Variable(variable) = declared_tuple.as_ref() else {
+            return None;
         };
-        let contains_typevartuple = declared_callables.iter().any(|callable| {
-            callable.signatures(self.db).iter().any(|signature| {
-                signature.parameters().iter().any(|parameter| {
-                    any_over_type(self.db, parameter.annotated_type(), false, |ty| {
-                        matches!(
-                            ty,
-                            Type::TypeVar(typevar) if typevar.is_typevartuple(self.db)
-                        )
-                    })
-                })
-            })
-        });
-        if !contains_typevartuple {
-            return false;
+        if !variable.prefix_elements().is_empty() || !variable.suffix_elements().is_empty() {
+            return None;
+        }
+        let typevartuple = variable.variable().typevartuple()?;
+
+        let declared_callable = declared_type
+            .try_upcast_to_callable(self.db)?
+            .exactly_one()?;
+        let [declared_signature] = declared_callable.signatures(self.db).overloads.as_slice()
+        else {
+            return None;
+        };
+        let [declared_variadic] = declared_signature.parameters().as_slice() else {
+            return None;
+        };
+        if !declared_variadic.is_variadic() {
+            return None;
+        }
+        if !any_over_type(self.db, declared_variadic.annotated_type(), false, |ty| {
+            matches!(
+                ty,
+                Type::TypeVar(callback_typevartuple)
+                    if callback_typevartuple.is_same_typevar_as(self.db, typevartuple)
+            )
+        }) {
+            return None;
         }
 
-        // The final specialization includes constraints inferred from the overloaded callback and
-        // can therefore widen the pack beyond the arguments that will actually be passed to it.
-        // Rebuild the specialization without this callback match, then require the overload set to
-        // accept every concrete alternative of any outer constrained type variable.
-        let Some(generic_context) = self.signature.generic_context else {
-            return false;
-        };
-        let mut builder = SpecializationBuilder::new(self.db, constraints, self.inferable_typevars);
-        let mut errors = Vec::new();
-        self.add_argument_constraints(
-            &mut builder,
-            &mut errors,
-            Some((argument_index, parameter_index)),
-        );
-        if !errors.is_empty() {
-            return false;
+        let argument_callable = argument_type
+            .try_upcast_to_callable(self.db)?
+            .exactly_one()?;
+        let signatures = &argument_callable.signatures(self.db).overloads;
+        if signatures.len() <= 1 {
+            return None;
         }
-        let final_specialization = self.specialization();
-        let Ok(inference) = builder.build_inference_with(generic_context, |_, _| None) else {
-            return false;
-        };
-        let specialization = inference.specialization_with(self.db, |typevar, inferred| {
-            if inferred.is_some() {
-                None
-            } else {
-                final_specialization
-                    .and_then(|specialization| specialization.get(self.db, typevar))
-                    .or(Some(Type::TypeVar(typevar)))
+
+        let mut sub_arguments = self
+            .arguments
+            .select(&arguments.contributing_argument_indices);
+        let mut argument_indices = SmallVec::new();
+        let mut outer_arguments = self.enumerate_argument_types();
+        for (sub_argument_index, &argument_index) in
+            arguments.contributing_argument_indices.iter().enumerate()
+        {
+            if let Some(matched_variadic) =
+                &self.argument_matches[argument_index].variadic_parameter
+                && matched_variadic.index == variadic_index
+            {
+                sub_arguments.clear_types(sub_argument_index);
+                sub_arguments.insert_type(
+                    sub_argument_index,
+                    TypeContext::default(),
+                    Type::tuple(TupleType::new(self.db, &matched_variadic.tuple)),
+                );
             }
-        });
-        let expected_type = declared_type.apply_specialization(self.db, specialization);
 
-        self.overloaded_callable_satisfies_constrained_typevars(
-            argument_type,
-            expected_type,
-            constraints,
-        )
+            argument_indices.push(
+                outer_arguments
+                    .find_map(|(index, adjusted_index, _, _)| {
+                        (index == argument_index).then_some(adjusted_index)
+                    })
+                    .flatten(),
+            );
+        }
+
+        let bindings =
+            self.bind_forwarded_callable(constraints, argument_type, signatures, &sub_arguments);
+        let callable_binding = bindings.single_element()?;
+        let provided_return_ty = if callable_binding.matching_overloads().next().is_some() {
+            Some(callable_binding.return_type())
+        } else {
+            self.forwarded_callable_covers_constrained_typevars(constraints, callable_binding)
+        };
+
+        Some(ForwardedCallableSubCall {
+            bindings,
+            expected_return_ty: declared_signature.return_ty,
+            provided_return_ty,
+            argument_indices,
+        })
     }
 
-    fn overloaded_callable_satisfies_constrained_typevars(
+    /// Cover constrained outer type variables symbolically instead of materializing their
+    /// Cartesian product. The same constraint applies to every occurrence of a type variable.
+    fn forwarded_callable_covers_constrained_typevars(
         &self,
-        argument_type: Type<'db>,
-        expected_type: Type<'db>,
         constraints: &ConstraintSetBuilder<'db>,
-    ) -> bool {
-        let mut constrained_typevars = FxOrderSet::default();
-        expected_type.visit_specialization(self.db, |nested, _| {
-            if let Type::TypeVar(typevar) = nested
-                && !typevar.is_inferable(self.db, self.inferable_typevars)
-                && matches!(
-                    typevar.typevar(self.db).bound_or_constraints(self.db),
-                    Some(TypeVarBoundOrConstraints::Constraints(_))
-                )
-            {
-                constrained_typevars.insert(typevar);
-            }
-        });
-        let constrained_typevars: Vec<_> = constrained_typevars
-            .into_iter()
-            .filter_map(|typevar| {
-                let TypeVarBoundOrConstraints::Constraints(typevar_constraints) =
-                    typevar.typevar(self.db).bound_or_constraints(self.db)?
-                else {
-                    return None;
-                };
-                Some((typevar, typevar_constraints.elements(self.db).as_ref()))
-            })
-            .collect();
-        let factors: Vec<_> = constrained_typevars
-            .iter()
-            .map(|(_, constraints)| *constraints)
-            .collect();
+        callable_binding: &CallableBinding<'db>,
+    ) -> Option<Type<'db>> {
+        let mut covered = ConstraintSet::from_bool(constraints, false);
+        let mut return_types = UnionBuilder::new(self.db);
 
-        all_cartesian_product_satisfies(
-            &factors,
-            &mut Vec::with_capacity(factors.len()),
-            &mut |selected| {
-                let expected_type = constrained_typevars.iter().zip(selected).fold(
-                    expected_type,
-                    |expected_type, ((typevar, _), constraint)| {
-                        expected_type.substitute_one_typevar(self.db, *typevar, *constraint)
-                    },
-                );
-                !argument_type
-                    .when_assignable_to(
+        for overload in callable_binding.overloads() {
+            let mut overload_constraints = ConstraintSet::from_bool(constraints, true);
+            let mut constrained_typevars = FxOrderSet::default();
+            for error in &overload.errors {
+                let BindingError::InvalidArgumentType {
+                    expected_ty,
+                    provided_ty: Type::TypeVar(typevar),
+                    ..
+                } = error
+                else {
+                    overload_constraints = ConstraintSet::from_bool(constraints, false);
+                    break;
+                };
+                if typevar.is_inferable(self.db, self.inferable_typevars)
+                    || typevar.typevar(self.db).constraints(self.db).is_none()
+                {
+                    overload_constraints = ConstraintSet::from_bool(constraints, false);
+                    break;
+                }
+
+                constrained_typevars.insert(typevar.identity(self.db));
+                overload_constraints = overload_constraints.and(self.db, constraints, || {
+                    ConstraintSet::constrain_typevar_upper_bound(
                         self.db,
-                        expected_type,
                         constraints,
-                        self.inferable_typevars,
+                        *typevar,
+                        *expected_ty,
                     )
-                    .is_never_satisfied(self.db)
-            },
-        )
+                });
+            }
+
+            // Treat these outer type variables as inferable only for this reachability query: an
+            // overload contributes if some declared-valid specialization can select it. The final
+            // coverage query keeps them non-inferable and therefore requires every specialization.
+            let constrained_typevars =
+                InferableTypeVars::from_typevars(self.db, constrained_typevars);
+            if !overload_constraints.satisfied_by_all_typevars(
+                self.db,
+                constraints,
+                constrained_typevars,
+            ) {
+                continue;
+            }
+
+            return_types.add_in_place(overload.return_type());
+            covered = covered.or(self.db, constraints, || overload_constraints);
+        }
+
+        covered
+            .satisfied_by_all_typevars(self.db, constraints, self.inferable_typevars)
+            .then(|| return_types.build())
+    }
+
+    /// Apply forwarded-call diagnostics to the outer call when the callback cannot accept its
+    /// forwarded arguments; leave return incompatibilities on the callback argument.
+    fn check_typevartuple_forwarded_sub_call(
+        &mut self,
+        constraints: &ConstraintSetBuilder<'db>,
+        declared_type: Type<'db>,
+        argument_type: Type<'db>,
+    ) -> bool {
+        let Some(sub_call) =
+            self.typevartuple_forwarded_sub_call(constraints, declared_type, argument_type)
+        else {
+            return false;
+        };
+        let Some(provided_return_ty) = sub_call.provided_return_ty else {
+            let Some(callable_binding) = sub_call.bindings.single_element() else {
+                return false;
+            };
+            self.propagate_forwarded_callable_errors(
+                callable_binding,
+                Some(&sub_call.argument_indices),
+            );
+            return true;
+        };
+
+        let expected_return_ty =
+            self.specialization()
+                .map_or(sub_call.expected_return_ty, |specialization| {
+                    sub_call
+                        .expected_return_ty
+                        .apply_specialization(self.db, specialization)
+                });
+        !provided_return_ty
+            .when_assignable_to(
+                self.db,
+                expected_return_ty,
+                constraints,
+                self.inferable_typevars,
+            )
+            .is_never_satisfied(self.db)
     }
 
     fn check_argument_types(&mut self, constraints: &ConstraintSetBuilder<'db>) {
@@ -6213,6 +6253,69 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         }
     }
 
+    /// Bind forwarded arguments to the actual callback with normal overload resolution.
+    fn bind_forwarded_callable(
+        &self,
+        constraints: &ConstraintSetBuilder<'db>,
+        signature_type: Type<'db>,
+        signatures: &[Signature<'db>],
+        arguments: &CallArguments<'_, 'db>,
+    ) -> Bindings<'db> {
+        let callable_binding =
+            CallableBinding::from_overloads(signature_type, signatures.iter().cloned());
+        match Bindings::from(callable_binding)
+            .match_parameters(self.db, arguments)
+            .check_types(
+                self.db,
+                constraints,
+                arguments,
+                self.call_expression_tcx,
+                &[],
+            ) {
+            Ok(bindings) => bindings,
+            Err(CallError(_, bindings)) => *bindings,
+        }
+    }
+
+    /// Remap the selected forwarded-call diagnostics to the outer source arguments.
+    fn propagate_forwarded_callable_errors(
+        &mut self,
+        callable_binding: &CallableBinding<'db>,
+        argument_indices: Option<&[Option<usize>]>,
+    ) {
+        let mut extend_errors = |errors: &[BindingError<'db>]| {
+            self.errors.extend(
+                errors
+                    .iter()
+                    .cloned()
+                    .map(|error| error.maybe_remap_argument_indices(argument_indices)),
+            );
+        };
+
+        let mut matching_overloads = callable_binding.matching_overloads();
+        match (matching_overloads.next(), matching_overloads.next()) {
+            (None, _) => {
+                if let Some(binding) = callable_binding
+                    .best_failing_overload()
+                    .or_else(|| callable_binding.overloads().first())
+                {
+                    extend_errors(&binding.errors);
+                }
+            }
+            (Some((_, binding)), None) => {
+                extend_errors(&binding.errors);
+            }
+            (Some(_), Some(_)) => {
+                if !matches!(
+                    callable_binding.overload_call_return_type,
+                    Some(OverloadCallReturnType::ArgumentTypeExpansion(_))
+                ) {
+                    extend_errors(&callable_binding.overloads()[0].errors);
+                }
+            }
+        }
+    }
+
     /// Invoke a sub-call for the given `ParamSpec` type variable, using the forwarded arguments.
     ///
     /// The forwarded arguments are those matched to the `ParamSpec` components if provided,
@@ -6265,69 +6368,18 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             };
         let error_argument_indices = error_argument_indices.as_deref();
 
-        // Create Bindings with all overloads and perform full overload resolution
-        let callable_binding =
-            CallableBinding::from_overloads(self.signature_type, signatures.iter().cloned());
-        let bindings = match Bindings::from(callable_binding)
-            .match_parameters(self.db, &sub_arguments)
-            .check_types(
-                self.db,
-                constraints,
-                &sub_arguments,
-                self.call_expression_tcx,
-                &[],
-            ) {
-            Ok(bindings) => bindings,
-            Err(CallError(_, bindings)) => *bindings,
+        let bindings = self.bind_forwarded_callable(
+            constraints,
+            self.signature_type,
+            signatures,
+            &sub_arguments,
+        );
+        let Some(callable_binding) = bindings.single_element() else {
+            return false;
         };
 
-        // SAFETY: `bindings` was created from a single `CallableBinding` above.
-        let callable_binding = bindings
-            .single_element()
-            .expect("ParamSpec sub-call should only contain a single CallableBinding");
-
-        let mut extend_errors = |errors: &[BindingError<'db>]| {
-            self.errors.extend(
-                errors
-                    .iter()
-                    .cloned()
-                    .map(|err| err.maybe_remap_argument_indices(error_argument_indices)),
-            );
-        };
-
-        let mut matching_overloads = callable_binding.matching_overloads();
-        match (matching_overloads.next(), matching_overloads.next()) {
-            (None, _) => {
-                if let [binding] = callable_binding.overloads() {
-                    // This is not an overloaded function, so we can propagate its errors to the
-                    // outer bindings.
-                    extend_errors(&binding.errors);
-                } else {
-                    let index = callable_binding
-                        .best_failing_overload_index(
-                            FailingOverloadSelection::AffectsOverloadResolution,
-                        )
-                        .unwrap_or(0);
-                    // TODO: We should also update the specialization for the `ParamSpec` to reflect
-                    // the matching overload here.
-                    extend_errors(&callable_binding.overloads()[index].errors);
-                }
-            }
-            (Some((_, binding)), None) => {
-                // TODO: We should also update the specialization for the `ParamSpec` to reflect the
-                // matching overload here.
-                extend_errors(&binding.errors);
-            }
-            (Some(_), Some(_)) => {
-                if !matches!(
-                    callable_binding.overload_call_return_type,
-                    Some(OverloadCallReturnType::ArgumentTypeExpansion(_))
-                ) {
-                    extend_errors(&callable_binding.overloads()[0].errors);
-                }
-            }
-        }
-
+        // TODO: Update the `ParamSpec` specialization to reflect the matching overload.
+        self.propagate_forwarded_callable_errors(callable_binding, error_argument_indices);
         true
     }
 
@@ -8907,41 +8959,4 @@ fn all_arguments_range(node: AnyNodeRef) -> TextRange {
             )
         })
         .unwrap_or(node.range())
-}
-
-#[cfg(test)]
-mod tests {
-    use super::all_cartesian_product_satisfies;
-
-    #[test]
-    fn cartesian_product_short_circuits() {
-        let factor = [0, 1];
-        let factors = [factor.as_slice(); 6];
-        let mut selected = Vec::new();
-        let mut visited = 0;
-
-        let satisfies = all_cartesian_product_satisfies(&factors, &mut selected, &mut |_| {
-            visited += 1;
-            visited < 2
-        });
-
-        assert!(!satisfies);
-        assert_eq!(visited, 2);
-    }
-
-    #[test]
-    fn cartesian_product_respects_budget() {
-        let factor = [0, 1];
-        let factors = [factor.as_slice(); 16];
-        let mut selected = Vec::new();
-        let mut visited = 0;
-
-        let satisfies = all_cartesian_product_satisfies(&factors, &mut selected, &mut |_| {
-            visited += 1;
-            true
-        });
-
-        assert_eq!(visited, 0);
-        assert!(!satisfies);
-    }
 }
