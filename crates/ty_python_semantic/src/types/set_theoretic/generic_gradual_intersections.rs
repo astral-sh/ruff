@@ -1,9 +1,10 @@
-use crate::Db;
 use crate::types::generics::specialization_variance;
+use crate::types::tuple::TupleSpec;
 use crate::types::{
     ClassBase, ClassType, IntersectionType, KnownClass, MaterializationKind, Type, TypeVarVariance,
     UnionType,
 };
+use crate::{Db, ProgramEnvironment};
 
 /// Simplify the intersection of two generic specializations when one is a gradual
 /// generalization of the other.
@@ -12,13 +13,14 @@ use crate::types::{
 /// `Sequence[int] & Sequence[Any]` simplifies to `Sequence[int & Any]`.
 pub(super) fn generic_gradual_intersection<'db>(
     db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
     left: Type<'db>,
     right: Type<'db>,
 ) -> Option<Type<'db>> {
-    dynamic_generalization_intersection(db, left, right)
-        .or_else(|| dynamic_generalization_intersection(db, right, left))
-        .or_else(|| nominal_top_intersection(db, left, right))
-        .or_else(|| nominal_top_intersection(db, right, left))
+    dynamic_generalization_intersection(db, env, left, right)
+        .or_else(|| dynamic_generalization_intersection(db, env, right, left))
+        .or_else(|| nominal_top_intersection(db, env, left, right))
+        .or_else(|| nominal_top_intersection(db, env, right, left))
 }
 
 /// Intersect a fully static nominal base with a top-materialized generic subclass.
@@ -29,15 +31,16 @@ pub(super) fn generic_gradual_intersection<'db>(
 /// `Sequence[int] & Top[list[Any]]` to `list[int]`.
 fn nominal_top_intersection<'db>(
     db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
     base: Type<'db>,
     subclass: Type<'db>,
 ) -> Option<Type<'db>> {
-    if !base.is_nominal_instance() || !subclass.is_nominal_instance() || base.has_dynamic(db) {
+    if !base.is_nominal_instance() || !subclass.is_nominal_instance() || base.has_dynamic(db, env) {
         return None;
     }
 
-    let (base_class, base_specialization) = base.class_specialization(db)?;
-    let (subclass_class, subclass_specialization) = subclass.class_specialization(db)?;
+    let (base_class, base_specialization) = base.class_specialization(db, env)?;
+    let (subclass_class, subclass_specialization) = subclass.class_specialization(db, env)?;
 
     if base_class == subclass_class
         || base_specialization.materialization_kind(db).is_some()
@@ -94,10 +97,10 @@ fn nominal_top_intersection<'db>(
 
         types[subclass_index] = match specialization_variance(db, base_typevar) {
             TypeVarVariance::Covariant => {
-                IntersectionType::from_two_elements(db, subclass_type, *base_type)
+                IntersectionType::from_two_elements(db, env, subclass_type, *base_type)
             }
             TypeVarVariance::Contravariant => {
-                UnionType::from_two_elements(db, subclass_type, *base_type)
+                UnionType::from_two_elements(db, env, subclass_type, *base_type)
             }
             TypeVarVariance::Invariant => *base_type,
             TypeVarVariance::Bivariant => return None,
@@ -113,16 +116,17 @@ fn nominal_top_intersection<'db>(
         subclass_specialization
             .tuple(db)?
             .variable_element_type(db)?;
-        return Some(Type::homogeneous_tuple(db, types[0]));
+        return Some(Type::homogeneous_tuple(db, env, types[0]));
     }
 
     let specialization = subclass_context.specialize(db, types);
     Some(
         Type::instance(
             db,
+            env,
             subclass_class.apply_optional_specialization(db, Some(specialization)),
         )
-        .top_materialization(db),
+        .top_materialization(db, env),
     )
 }
 
@@ -132,11 +136,12 @@ fn nominal_top_intersection<'db>(
 /// For example, `list[Any]` dynamically generalizes `list[int]`, while `list[str]` does not.
 fn dynamic_generalization_intersection<'db>(
     db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
     general: Type<'db>,
     specific: Type<'db>,
 ) -> Option<Type<'db>> {
     // Fast path to avoid performance regressions.
-    if !general.has_dynamic(db)
+    if !general.has_dynamic(db, env)
         || matches!(general, Type::TypeVar(_) | Type::NewTypeInstance(_))
         || matches!(specific, Type::TypeVar(_) | Type::NewTypeInstance(_))
     {
@@ -147,8 +152,8 @@ fn dynamic_generalization_intersection<'db>(
         Some((general_class, general_specialization)),
         Some((specific_class, specific_specialization)),
     ) = (
-        general.class_specialization(db),
-        specific.class_specialization(db),
+        general.class_specialization(db, env),
+        specific.class_specialization(db, env),
     )
     else {
         return None;
@@ -164,8 +169,34 @@ fn dynamic_generalization_intersection<'db>(
     }
 
     if general_class.known(db) == Some(KnownClass::Tuple) {
-        let general_tuple = general_specialization.tuple(db)?.as_fixed_length()?;
-        let specific_tuple = specific_specialization.tuple(db)?.as_fixed_length()?;
+        let general_tuple = general_specialization.tuple(db)?;
+        let specific_tuple = specific_specialization.tuple(db)?;
+
+        if let (TupleSpec::Variable(general_variable), TupleSpec::Variable(specific_variable)) =
+            (general_tuple, specific_tuple)
+        {
+            if general_tuple.fixed_elements().next().is_some()
+                || specific_tuple.fixed_elements().next().is_some()
+                || specific.has_dynamic(db, env)
+            {
+                return None;
+            }
+
+            let general_element = general_variable.variable().homogeneous_type()?;
+            if !general_element.is_non_divergent_dynamic() {
+                return None;
+            }
+            let specific_element = specific_variable.variable().homogeneous_type()?;
+
+            return Some(Type::homogeneous_tuple(
+                db,
+                env,
+                IntersectionType::from_two_elements(db, env, specific_element, general_element),
+            ));
+        }
+
+        let general_tuple = general_tuple.as_fixed_length()?;
+        let specific_tuple = specific_tuple.as_fixed_length()?;
         if general_tuple.len() != specific_tuple.len()
             || general_tuple
                 .iter_all_elements()
@@ -176,17 +207,18 @@ fn dynamic_generalization_intersection<'db>(
         {
             return None;
         }
-        if specific.has_dynamic(db) {
+        if specific.has_dynamic(db, env) {
             return None;
         }
 
         return Some(Type::heterogeneous_tuple(
             db,
+            env,
             specific_tuple
                 .iter_all_elements()
                 .zip(general_tuple.iter_all_elements())
                 .map(|(specific, general)| {
-                    IntersectionType::from_two_elements(db, specific, general)
+                    IntersectionType::from_two_elements(db, env, specific, general)
                 }),
         ));
     }
@@ -217,7 +249,7 @@ fn dynamic_generalization_intersection<'db>(
         return Some(specific);
     }
 
-    if specific.has_dynamic(db) {
+    if specific.has_dynamic(db, env) {
         return None;
     }
 
@@ -231,10 +263,10 @@ fn dynamic_generalization_intersection<'db>(
             }
             match specialization_variance(db, typevar) {
                 TypeVarVariance::Covariant => {
-                    IntersectionType::from_two_elements(db, *specific, *general)
+                    IntersectionType::from_two_elements(db, env, *specific, *general)
                 }
                 TypeVarVariance::Contravariant => {
-                    UnionType::from_two_elements(db, *specific, *general)
+                    UnionType::from_two_elements(db, env, *specific, *general)
                 }
                 TypeVarVariance::Invariant | TypeVarVariance::Bivariant => *specific,
             }
@@ -244,6 +276,7 @@ fn dynamic_generalization_intersection<'db>(
 
     Some(Type::instance(
         db,
+        env,
         general_class.apply_optional_specialization(db, Some(specialization)),
     ))
 }
