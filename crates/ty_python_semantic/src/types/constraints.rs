@@ -105,6 +105,7 @@ use ty_python_core::rank::RankBitBox;
 use ty_static::EnvVars;
 
 use crate::types::class::GenericAlias;
+use crate::types::generics::ApplySpecialization;
 use crate::types::typevar::{BoundTypeVarIdentity, TypeVarSet, walk_bound_type_var_type};
 use crate::types::variance::VarianceInferable;
 use crate::types::visitor::{
@@ -3910,11 +3911,13 @@ impl<'db> PathBounds<'db> {
 
                 match choose(path_bound.variance(), path_bound) {
                     Ok(Some(mut ty)) => {
-                        for binding in &path.fixed_noninferable_bindings {
-                            ty = ty.substitute_one_typevar(
+                        if !path.fixed_noninferable_bindings.is_empty() {
+                            ty = ty.apply_type_mapping(
                                 db,
-                                binding.bound_typevar,
-                                binding.solution,
+                                &TypeMapping::ApplySpecialization(ApplySpecialization::Bindings(
+                                    &path.fixed_noninferable_bindings,
+                                )),
+                                TypeContext::default(),
                             );
                         }
                         solution.push(TypeVarSolution {
@@ -7715,7 +7718,6 @@ mod tests {
     use pretty_assertions::assert_eq;
 
     use crate::db::tests::setup_db;
-    use crate::types::generics::ApplySpecialization;
     use crate::types::typevar::TypeVarConstraints;
     use crate::types::{
         BindingContext, BoundTypeVarInstance, KnownClass, TypeVarNonce, TypeVarVariance,

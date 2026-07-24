@@ -11,7 +11,7 @@ use crate::types::class::ClassType;
 use crate::types::class_base::ClassBase;
 use crate::types::constraints::{
     ConstraintBounds, ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension, PathBound,
-    PathBounds, Solutions,
+    PathBounds, Solutions, TypeVarSolution,
 };
 use crate::types::infer::original_class_type;
 use crate::types::relation::{
@@ -1857,6 +1857,8 @@ pub enum ApplySpecialization<'a, 'db> {
     /// Maps a single typevar to a concrete type. Used by the constraint set's sequent map to
     /// substitute a typevar nested inside another constraint's bound.
     Single(BoundTypeVarInstance<'db>, Type<'db>),
+    /// Maps a small set of typevars to their inferred solution types.
+    Bindings(&'a [TypeVarSolution<'db>]),
 }
 
 impl<'db> ApplySpecialization<'_, 'db> {
@@ -1895,6 +1897,11 @@ impl<'db> ApplySpecialization<'_, 'db> {
                     None
                 }
             }
+            ApplySpecialization::Bindings(bindings) => bindings.iter().find_map(|binding| {
+                bound_typevar
+                    .is_same_typevar_as(db, binding.bound_typevar)
+                    .then_some(binding.solution)
+            }),
         }
     }
 
@@ -1927,7 +1934,9 @@ impl<'db> ApplySpecialization<'_, 'db> {
                         .collect::<Vec<_>>(),
                 ),
             ),
-            ApplySpecialization::ReturnCallables(_) | ApplySpecialization::Single(_, _) => None,
+            ApplySpecialization::ReturnCallables(_)
+            | ApplySpecialization::Single(_, _)
+            | ApplySpecialization::Bindings(_) => None,
         }
     }
 }
