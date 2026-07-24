@@ -215,10 +215,10 @@ def f[T: A](x: P[T, T], value: T) -> None:
 f(Bad(), B())
 ```
 
-## Single-path call inference
+## Simple generic calls
 
-A single inference path still specializes the return type and leaves ordinary argument checking in
-place. Gradual arguments can contribute to that specialization.
+Arguments to a generic function determine its return type without bypassing ordinary argument
+checking. Gradual arguments can also affect the inferred return type.
 
 ```py
 from typing import Any
@@ -554,25 +554,26 @@ def _(x: Intersection[Source[A], Source[B]], value: D, values: tuple[D, ...]) ->
     reveal_type(with_starred(x, *values))  # revealed: (A & B) | D
 ```
 
-PEP 695 can infer a bivariant class parameter when it is unused. Such a parameter should remain
-unsolved without preventing independent covariant parameters from being merged:
+PEP 695 treats an otherwise unused class parameter as covariant. Both class parameters can then
+contribute independent intersection constraints: the source's element type becomes `A & B`, while
+the unused parameter's `int` and `str` specializations intersect to `Never`:
 
 ```py
-class SourceWithBivariant[T, Unused]:
+class SourceWithUnused[T, Unused]:
     def get(self) -> T:
         raise NotImplementedError
 
-def element_with_bivariant[T, Unused](x: SourceWithBivariant[T, Unused]) -> T:
+def element_with_unused[T, Unused](x: SourceWithUnused[T, Unused]) -> T:
     return x.get()
 
-def unused_type[T, Unused](x: SourceWithBivariant[T, Unused]) -> Unused:
+def unused_type[T, Unused](x: SourceWithUnused[T, Unused]) -> Unused:
     raise NotImplementedError
 
 def _(
-    x: Intersection[SourceWithBivariant[A, int], SourceWithBivariant[B, str]],
+    x: Intersection[SourceWithUnused[A, int], SourceWithUnused[B, str]],
 ) -> None:
-    reveal_type(element_with_bivariant(x))  # revealed: A & B
-    reveal_type(unused_type(x))  # revealed: Unknown
+    reveal_type(element_with_unused(x))  # revealed: A & B
+    reveal_type(unused_type(x))  # revealed: Never
 ```
 
 Generic protocol intersections still consider structural implementations that do not appear in an
