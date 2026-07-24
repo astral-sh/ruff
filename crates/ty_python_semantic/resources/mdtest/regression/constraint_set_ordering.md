@@ -213,6 +213,38 @@ def chain_uts[U, T, S]() -> None:
     reveal_type(constraints.solutions_for(U, inferable=tuple[S, T, U]))
 ```
 
+## Hidden witness source order and typevar orientation
+
+The constraint on a hidden witness can appear before or after visible constraints, and a bare
+relationship can be encoded with either variable as its subject. None of those representation
+choices should change which type variables are returned.
+
+```py
+from ty_extensions._internal import ConstraintSet
+
+def witness_before_visible[I, J, N]() -> None:
+    constraints = ConstraintSet.range(int, N, int) & ConstraintSet.range(str, I, str) & ConstraintSet.range(bytes, J, bytes)
+    # revealed: tuple[Solution[I=str, J=bytes]]
+    reveal_type(constraints.solutions(inferable=tuple[I, J]))
+
+def witness_after_visible[I, J, N]() -> None:
+    constraints = ConstraintSet.range(str, I, str) & ConstraintSet.range(bytes, J, bytes) & ConstraintSet.range(int, N, int)
+    # revealed: tuple[Solution[I=str, J=bytes]]
+    reveal_type(constraints.solutions(inferable=tuple[I, J]))
+
+def visible_before_hidden[I, N]() -> None:
+    constraints = ConstraintSet.range(N, I, N)
+    # TODO: revealed: tuple[Solution[I=N@visible_before_hidden]]
+    # revealed: tuple[Solution[I=N@visible_before_hidden, N=I@visible_before_hidden]]
+    reveal_type(constraints.solutions(inferable=tuple[I]))
+
+def hidden_before_visible[N, I]() -> None:
+    constraints = ConstraintSet.range(I, N, I)
+    # TODO: revealed: tuple[Solution[I=N@hidden_before_visible]]
+    # revealed: tuple[Solution[N=I@hidden_before_visible, I=N@hidden_before_visible]]
+    reveal_type(constraints.solutions(inferable=tuple[I]))
+```
+
 ## Abstraction and non-inferable typevars
 
 Removing non-inferable typevars rebuilds the TDD with `ite`; irrelevant positive decisions must not

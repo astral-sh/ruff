@@ -861,6 +861,129 @@ def same_typevar[T]():
     static_assert(constraints == expected)
 ```
 
+## Solutions with inferable and non-inferable typevars
+
+Solution extraction receives the type variables that it is allowed to infer. Other type variables
+may still restrict whether a path is feasible, but should not appear as top-level solution bindings.
+References to an ungrounded outer variable inside an inferable variable's solution must remain
+symbolic.
+
+### Visible constraints and hidden-only alternatives
+
+```py
+from ty_extensions._internal import ConstraintSet
+
+def visible_only[I, N]() -> None:
+    constraints = ConstraintSet.range(int, I, int)
+    reveal_type(constraints.solutions(inferable=tuple[I]))  # revealed: tuple[Solution[I=int]]
+
+def witness_only[I, N]() -> None:
+    constraints = ConstraintSet.range(int, N, int)
+    reveal_type(constraints.solutions(inferable=tuple[I]))  # revealed: tuple[()]
+
+def independent_witness[I, N]() -> None:
+    constraints = ConstraintSet.range(int, N, int) & ConstraintSet.range(str, I, str)
+    reveal_type(constraints.solutions(inferable=tuple[I]))  # revealed: tuple[Solution[I=str]]
+
+def witness_alternative[I, N]() -> None:
+    constraints = ConstraintSet.range(int, N, int) | ConstraintSet.range(str, I, str)
+    reveal_type(constraints.solutions(inferable=tuple[I]))  # revealed: tuple[()]
+```
+
+### Symbolic relationships and grounded witnesses
+
+A bare relationship must have the same meaning regardless of which type variable the TDD chooses as
+its constraint subject. An explicit exact witness constraint grounds that variable; a one-sided
+bound does not.
+
+```py
+from typing import Never
+from ty_extensions._internal import ConstraintSet
+
+def symbolic_relationship[I, N]() -> None:
+    constraints = ConstraintSet.range(N, I, N)
+    # TODO: revealed: tuple[Solution[I=N@symbolic_relationship]]
+    # revealed: tuple[Solution[I=N@symbolic_relationship, N=I@symbolic_relationship]]
+    reveal_type(constraints.solutions(inferable=tuple[I]))
+
+def symbolic_relationship_reversed[N, I]() -> None:
+    constraints = ConstraintSet.range(I, N, I)
+    # TODO: revealed: tuple[Solution[I=N@symbolic_relationship_reversed]]
+    # revealed: tuple[Solution[N=I@symbolic_relationship_reversed, I=N@symbolic_relationship_reversed]]
+    reveal_type(constraints.solutions(inferable=tuple[I]))
+
+def exact_witness[I, N]() -> None:
+    constraints = ConstraintSet.range(int, N, int) & ConstraintSet.range(N, I, N)
+    # TODO: revealed: tuple[Solution[I=int]]
+    # revealed: tuple[Solution[I=N@exact_witness | int, N=I@exact_witness | int]]
+    reveal_type(constraints.solutions(inferable=tuple[I]))
+
+def exact_nested_witness[I, N]() -> None:
+    constraints = ConstraintSet.range(int, N, int) & ConstraintSet.range(list[N], I, list[N])
+    # TODO: revealed: tuple[Solution[I=list[int]]]
+    # revealed: tuple[Solution[I=list[int] | list[N@exact_nested_witness], N=int]]
+    reveal_type(constraints.solutions(inferable=tuple[I]))
+
+def lower_bounded_witness[I, N]() -> None:
+    constraints = ConstraintSet.range(int, N, object) & ConstraintSet.range(N, I, N)
+    # TODO: revealed: tuple[Solution[I=N@lower_bounded_witness]]
+    # revealed: tuple[Solution[I=int | N@lower_bounded_witness]]
+    reveal_type(constraints.solutions_for(I, inferable=tuple[I]))
+
+def upper_bounded_witness[I, N]() -> None:
+    constraints = ConstraintSet.range(Never, N, int) & ConstraintSet.range(N, I, N)
+    # TODO: revealed: tuple[Solution[I=N@upper_bounded_witness]]
+    # revealed: tuple[Solution[I=N@upper_bounded_witness, N=I@upper_bounded_witness]]
+    reveal_type(constraints.solutions(inferable=tuple[I]))
+```
+
+### Declared witness domains
+
+A positive witness constraint must be compatible with the witness's declared upper bound or finite
+domain, even though the witness is not returned. Complete reasoning about combinations of negative
+hidden-witness constraints is intentionally deferred.
+
+```py
+from ty_extensions._internal import ConstraintSet
+
+def incompatible_finite_witness[I, N: (int, str)]() -> None:
+    constraints = ConstraintSet.range(bytes, N, bytes)
+    # TODO: revealed: None
+    reveal_type(constraints.solutions(inferable=tuple[I]))  # revealed: tuple[()]
+
+def incompatible_bounded_witness[I, N: str]() -> None:
+    constraints = ConstraintSet.range(int, N, int)
+    # TODO: revealed: None
+    reveal_type(constraints.solutions(inferable=tuple[I]))  # revealed: tuple[()]
+
+def negative_finite_witness[I, N: (int, str)]() -> None:
+    constraints = ~ConstraintSet.range(int, N, int) & ~ConstraintSet.range(str, N, str)
+    # TODO: Complete hidden-negative-domain solving would reject this path; it is out of scope.
+    reveal_type(constraints.solutions(inferable=tuple[I]))  # revealed: tuple[()]
+```
+
+### Negative visible decisions and correlated outputs
+
+A negative condition on an inferable type variable is different from an entirely unconstrained path.
+Distinct witness choices must not combine visible bindings from different alternatives.
+
+```py
+from ty_extensions._internal import ConstraintSet
+
+def negative_visible[I, N]() -> None:
+    constraints = ~ConstraintSet.range(int, I, int)
+    reveal_type(constraints.solutions(inferable=tuple[I]))  # revealed: tuple[Solution[]]
+
+def correlated_witnesses[I, J, N]() -> None:
+    int_path = ConstraintSet.range(int, N, int) & ConstraintSet.range(int, I, int) & ConstraintSet.range(list[int], J, list[int])
+    str_path = ConstraintSet.range(str, N, str) & ConstraintSet.range(str, I, str) & ConstraintSet.range(list[str], J, list[str])
+    constraints = int_path | str_path
+    # revealed: tuple[Solution[I=int], Solution[I=str]]
+    reveal_type(constraints.solutions_for(I, inferable=tuple[I, J]))
+    # revealed: tuple[Solution[J=list[int]], Solution[J=list[str]]]
+    reveal_type(constraints.solutions_for(J, inferable=tuple[I, J]))
+```
+
 ## Existential quantification
 
 Existential quantification removes the listed typevars from a constraint set. Any constraints that

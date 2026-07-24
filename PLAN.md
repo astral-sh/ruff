@@ -6,7 +6,9 @@
 - Design decisions: complete; witness semantics, solver APIs, grounding rules,
     minimal path handling, and the simplest-first performance strategy are
     agreed.
-- Implementation phases: not started.
+- Phase 1 — characterize current behavior and agreed semantics: complete.
+- Phase 2 — witness-aware path representation and solving: not started.
+- Phases 3–4: not started.
 - Existing constraint-set quantification work is out of scope unless this plan is
     explicitly revised.
 
@@ -195,6 +197,10 @@ variables remain present in the unprojected TDD.
 
 ### Existing tests and benchmark
 
+- `crates/ty_python_semantic/resources/mdtest/type_properties/constraints.md`
+    now characterizes visible-only and witness-only paths, mixed relationships,
+    exact and one-sided witness bounds, finite/upper-bound witness declarations,
+    negative visible decisions, and correlated visible outputs.
 - `crates/ty_python_semantic/resources/mdtest/regression/constraint_set_ordering.md`
     contains source-order, bare-typevar orientation, transitivity, hidden-output,
     negation, uncertain-branch, derived-fuel, and generic-callable regressions. Its
@@ -219,6 +225,89 @@ variables remain present in the unprojected TDD.
     `.agents/skills/wobbling-ty-constraint-order/SKILL.md` workflow runs mdtests
     under normal, reversed, and several XOR-masked orderings. Wobble runs must
     never update snapshots.
+
+## Phase 1 characterization and baseline
+
+Seventeen focused solver unit tests and expanded mdtest coverage confirm the
+following current behavior:
+
+- A visible concrete constraint returns its visible binding; a satisfiable
+    witness-only path and a witness-only disjunct both become `Unconstrained`.
+- Independent witness constraints preserve visible bindings and their source
+    order. Bare mixed relationships retain the symbolic outer typevar in either
+    orientation, but incorrectly emit the hidden witness as another binding and
+    invoke caller selection hooks for that witness.
+- `N = int and I = N` currently returns
+    `{I = N | int, N = I | int}`. An explicitly grounded nested relationship
+    currently returns `{I = list[int] | list[N], N = int}`. Both cases must
+    instead return only the visible binding with `N` substituted by `int`.
+- A one-sided lower or upper bound retains a symbolic reference to `N`; it must
+    not be mistaken for evidence that `N = int`.
+- A positive witness constraint incompatible with the witness's declared upper
+    bound or finite domain is currently projected away. A visible callback may
+    therefore run even though the original path has no valid witness.
+- Complete hidden-negative finite-domain reasoning remains deliberately
+    deferred. Negative visible decisions still produce a constrained empty
+    binding path rather than `Unconstrained`.
+- Fresh occurrences use their full `BoundTypeVarIdentity`, not the source-level
+    identity. Witness-dependent alternatives retain the original visible
+    pairings. Nested calls preserve rigid, bounded, constrained, and nested
+    outer-scope typevars, and the existing projected-terminal regression remains
+    unchanged.
+
+A sequencing constraint exposed by these characterization tests: while Phase 2
+still calls `remove_noninferable`, witness-only positive constraints that the
+projection completely removes are no longer available to `PathBounds`. Phase 2
+can filter hooks and validate only hidden bounds that survive that projection;
+full declared-witness validation, rejected-path callback isolation, and
+recovery of all explicit exact-grounding facts necessarily become observable in
+Phase 3 after traversal switches to the original TDD. Do not introduce a second
+pre-projection path traversal merely to force those checks into Phase 2.
+
+Baseline before the characterization changes:
+
+- Normal-order mdtests: **479 passed**.
+
+- Focused existing solver/mdtest checks: **8 passed**.
+
+- Optimized debug-profile pydantic microbenchmark:
+    **20.338 ms** point estimate; confidence interval
+    **[20.027 ms, 20.761 ms]**, using 20 samples, 1 second of warmup, and
+    2 seconds of measurement. Reuse the same profile and Criterion settings
+    when comparing later phases.
+
+- Existing perturbed-order failures, unchanged after the new tests:
+
+    | Ordering | Passed | Failed | Existing failing mdtest files                                                                          |
+    | -------- | -----: | -----: | ------------------------------------------------------------------------------------------------------ |
+    | normal   |    479 |      0 | —                                                                                                      |
+    | reverse  |    473 |      6 | ordering, recursive protocol, constraint properties, quantification, implication properties, TypedDict |
+    | 1        |    474 |      5 | ordering, recursive protocol, constraint properties, quantification, TypedDict                         |
+    | 2        |    476 |      3 | ordering, recursive protocol, quantification                                                           |
+    | 3        |    473 |      6 | ordering, recursive protocol, constraint properties, quantification, implication properties, TypedDict |
+    | 4        |    477 |      2 | ordering, quantification                                                                               |
+    | 7        |    473 |      6 | ordering, recursive protocol, constraint properties, quantification, implication properties, TypedDict |
+    | 8        |    478 |      1 | ordering                                                                                               |
+    | 15       |    473 |      6 | ordering, recursive protocol, constraint properties, quantification, implication properties, TypedDict |
+
+    Here “ordering” means
+    `regression/constraint_set_ordering.md`; “recursive protocol” means
+    `regression/3954_recursive_protocol_structural_relation.md`; “constraint
+    properties” means `type_properties/constraints.md`; “quantification” means
+    `type_properties/quantification.md`; “implication properties” means
+    `type_properties/implies_subtype_of.md`; and “TypedDict” means
+    `typed_dict.md`. None of these pre-existing failures should be silently
+    corrected or absorbed into this feature. Baseline and final Phase 1 wobble
+    logs are under `$HOME/.pi/tmp/witness-aware-phase1-baseline` and
+    `$HOME/.pi/tmp/witness-aware-phase1-final-wobble`, respectively.
+
+- After adding the characterization coverage, the `ty_python_semantic` crate
+    passes **785 tests**, with **35 skipped**, and the full workspace passes
+    **8,574 tests**, with **45 skipped**. The normal-order mdtest count remains
+    **479**, because additional cases were added to existing files. The
+    snapshot-updating full-workspace command also regenerated two unrelated
+    existing Windows-line-ending parser snapshots; their diffs were reviewed
+    and restored rather than included in this revision.
 
 ## Required semantic cases
 
@@ -459,7 +548,7 @@ introducing generalized entailment machinery preemptively.
 Every phase below requires its own revision, focused tests/docs in that same
 revision, and a passing full test suite before continuing.
 
-### [ ] Phase 1 — Characterize current behavior and agreed semantics
+### [x] Phase 1 — Characterize current behavior and agreed semantics
 
 1. Add focused constraint-solver unit tests for visible-only paths,
     witness-only paths, mixed paths, both orientations of bare relationships,
@@ -499,14 +588,18 @@ Depends on completed Phase 1 and the agreed decisions D1–D6.
     `solve(db, builder)`, and make the selection hook observable only for
     inferable path bounds.
 1. Validate positive witness bounds against declared upper bounds and finite
-    domains, without introducing comprehensive hidden-negative-domain reasoning.
-    Record explicit positive exact witness constraints before reciprocal bound
-    aggregation, preserve cross-typevar relationships, and use existing type
-    substitution utilities for those grounded witness values only.
-1. Validate all hidden witnesses before invoking any visible-variable callback;
-    errors must invalidate only the corresponding original path, avoid
+    domains when those bounds survive the existing preliminary projection,
+    without introducing comprehensive hidden-negative-domain reasoning. Use
+    explicit positive exact witness facts that remain available before
+    reciprocal bound aggregation, preserve cross-typevar relationships, and
+    use existing type substitution utilities for those grounded values only.
+    Fully projected witness facts remain deferred to Phase 3; do not introduce
+    a duplicate pre-projection traversal or alternate TDD representation.
+1. Validate surviving hidden witnesses before invoking any visible-variable
+    callback; errors must invalidate only the corresponding path, avoid
     misleading visible-typevar declaration diagnostics, and leave caller-owned
-    callback state unchanged for rejected paths.
+    callback state unchanged for rejected paths. A witness removed entirely by
+    the still-active projection cannot be rejected until Phase 3.
 1. Preserve fresh bound identity membership, source-order stability, and
     Salsa-cached `PathBounds` compatibility.
 1. Migrate `NodeId::solutions_with` and the direct `solve_with` consumers in
@@ -519,7 +612,8 @@ Exit criteria:
 - Every constrained `PathBounds` carries its authoritative inferable domain;
     terminal variants remain minimal.
 - All solution entry points understand visible versus witness-only bounds.
-- Hidden witnesses are never passed to visible-variable hooks.
+- Hidden witnesses are never passed to visible-variable hooks. Witness facts
+    completely erased by the still-active projection remain deferred to Phase 3.
 - Existing behavior is preserved while preliminary projection is still present,
     apart from any explicitly agreed visible-binding filtering introduced here.
 
@@ -532,6 +626,10 @@ Depends on completed Phase 2.
 1. Walk the original TDD and retain the positive witness information plus any
     visible negative/uncertain decisions required for projected-path semantics;
     do not expand the work to comprehensive hidden-negative-domain solving.
+    Validate every original positive witness against its declaration before any
+    visible callback, and record explicit positive exact-grounding facts before
+    reciprocal bound aggregation. Update the Phase 1 TODO expectations for
+    impossible standalone witnesses and rejected-path callback isolation.
 1. Preserve sequent-derived visible facts without reconstructing the original
     projected diagram.
 1. Solve hidden witnesses jointly with visible path bounds as required; retain
@@ -643,8 +741,11 @@ check for `.pending-snap` files.
 Relevant performance benchmark:
 
 ```sh
-cargo bench -p ruff_benchmark --bench ty -- \
-  'ty_micro\[pydantic_core_schema_dict\]'
+CARGO_PROFILE_DEV_OPT_LEVEL=1 \
+CARGO_PROFILE_DEV_DEBUG=line-tables-only \
+cargo bench --profile dev -p ruff_benchmark --bench ty -- \
+  'ty_micro\[pydantic_core_schema_dict\]' \
+  --sample-size 20 --warm-up-time 1 --measurement-time 2
 ```
 
 For ordering perturbation, follow
