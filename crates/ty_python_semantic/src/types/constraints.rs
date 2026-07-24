@@ -1692,6 +1692,21 @@ fn max_constructor_and_typevar_depth<'db>(db: &'db dyn Db, ty: Type<'db>) -> (u1
 }
 
 impl<'db> Constraint<'db> {
+    /// Returns whether this constraint constrains a typevar that satisfies a predicate.
+    ///
+    /// Because of typevar ordering, in a constraint like `S ≤ T`, either `S` or `T` might be the
+    /// subject of the constraint. That means we also have to check whether the lower or upper is a
+    /// bare typevar, and if so, whether it satisfies the predicate.
+    fn constrains_typevar_that(
+        self,
+        mut predicate: impl FnMut(BoundTypeVarInstance<'db>) -> bool,
+    ) -> bool {
+        predicate(self.typevar)
+            || iter::chain(self.bounds.lower, self.bounds.upper)
+                .filter_map(Type::as_typevar)
+                .any(predicate)
+    }
+
     fn bound_depth(self, db: &'db dyn Db) -> (u16, u16) {
         let both_bounds = iter::chain(self.bounds.lower, self.bounds.upper);
         both_bounds.fold((0, 0), |(constructor_depth, typevar_depth), bound| {
@@ -3693,23 +3708,17 @@ impl<'db> PathBounds<'db> {
         let mut mappings: FxIndexMap<BoundTypeVarInstance<'db>, ConstraintBoundsBuilder<'db>> =
             FxIndexMap::default();
 
-        let is_inferable_constraint = |constraint| {
-            let constraint = builder.constraint_data(constraint);
-            constraint.typevar.is_inferable(db, inferable)
-                || iter::chain(constraint.bounds.lower, constraint.bounds.upper).any(|bound| {
-                    bound
-                        .as_typevar()
-                        .is_some_and(|typevar| typevar.is_inferable(db, inferable))
-                })
-        };
-
         for path in collect_visitor.sorted_paths {
             let has_inferable_decision = path
                 .constraints
                 .iter()
                 .map(|(constraint, _)| *constraint)
                 .chain(path.negative_constraints.iter().copied())
-                .any(is_inferable_constraint);
+                .any(|constraint| {
+                    builder
+                        .constraint_data(constraint)
+                        .constrains_typevar_that(|typevar| typevar.is_inferable(db, inferable))
+                });
             let mut fixed_noninferable_bindings = Vec::new();
 
             mappings.clear();
@@ -4358,10 +4367,6 @@ impl InteriorNode {
         builder: &ConstraintSetBuilder<'db>,
         inferable: TypeVarSet<'db>,
     ) -> NodeId {
-        let is_bare_inferable_typevar = |ty: Type<'db>| {
-            ty.as_typevar()
-                .is_some_and(|bound_typevar| bound_typevar.is_inferable(db, inferable))
-        };
         self.abstract_inner(
             db,
             builder,
@@ -4375,16 +4380,9 @@ impl InteriorNode {
             // only checked the inferability of the constrained typevar, we would keep the first
             // encoding but remove the second.
             &mut |constraint| {
-                let constraint = builder.constraint_data(constraint);
-                !constraint.typevar.is_inferable(db, inferable)
-                    && !constraint
-                        .bounds
-                        .lower
-                        .is_some_and(is_bare_inferable_typevar)
-                    && !constraint
-                        .bounds
-                        .upper
-                        .is_some_and(is_bare_inferable_typevar)
+                !builder
+                    .constraint_data(constraint)
+                    .constrains_typevar_that(|typevar| typevar.is_inferable(db, inferable))
             },
         )
     }
