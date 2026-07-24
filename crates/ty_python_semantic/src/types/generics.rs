@@ -2267,15 +2267,11 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             return None;
         }
 
-        let (Solutions::Constrained(solutions), exceeded_solution_budget) =
+        let (Solutions::Constrained(solutions), false) =
             self.solve_pending_constraints_with(&mut choose)
         else {
             return None;
         };
-
-        if exceeded_solution_budget {
-            return None;
-        }
 
         let fallback = self.solve_hash_map_with(generic_context, &mut choose);
         let mut inferences = Vec::with_capacity(solutions.len());
@@ -2322,8 +2318,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                     path_bound,
                     &mut exceeded_solution_budget,
                 )?;
-                let solution = choose(path_bound.bound_typevar, Some(path_bound)).or(solution);
-                Ok(solution)
+                Ok(choose(path_bound.bound_typevar, Some(path_bound)).or(solution))
             },
         );
         (solutions, exceeded_solution_budget)
@@ -2851,19 +2846,18 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         };
         if typevar_errors.len() < 2
             || typevar_errors.iter().any(|(error, variance)| {
-                error.bound_typevar() != first.bound_typevar() || variance != first_variance
-            })
-            || typevar_errors.iter().any(|(error, _)| {
-                !matches!(
-                    (first, error),
-                    (
-                        SpecializationError::MismatchedBound { .. },
-                        SpecializationError::MismatchedBound { .. }
-                    ) | (
-                        SpecializationError::MismatchedConstraint { .. },
-                        SpecializationError::MismatchedConstraint { .. }
+                error.bound_typevar() != first.bound_typevar()
+                    || variance != first_variance
+                    || !matches!(
+                        (first, error),
+                        (
+                            SpecializationError::MismatchedBound { .. },
+                            SpecializationError::MismatchedBound { .. }
+                        ) | (
+                            SpecializationError::MismatchedConstraint { .. },
+                            SpecializationError::MismatchedConstraint { .. }
+                        )
                     )
-                )
             })
         {
             return Err(first.clone());
