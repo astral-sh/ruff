@@ -3600,20 +3600,20 @@ impl<'db> PathBounds<'db> {
                 _builder: &ConstraintSetBuilder<'db>,
                 path: &PathAssignments,
             ) -> ControlFlow<Self::Break, Self::Result> {
-                let mut constraints: Vec<_> = path.positive_constraints().collect();
+                let mut constraints = Vec::new();
+                let mut negative_constraints = Vec::new();
+                for (assignment, (source_order, _)) in &path.assignments {
+                    match assignment {
+                        ConstraintAssignment::Positive(constraint) => {
+                            constraints.push((*constraint, *source_order));
+                        }
+                        ConstraintAssignment::Negative(constraint) => {
+                            negative_constraints.push(*constraint);
+                        }
+                        ConstraintAssignment::Unconstrained(_) => {}
+                    }
+                }
                 constraints.sort_by_key(|(_, source_order)| *source_order);
-                let negative_constraints = if path.assignments.len() == constraints.len() {
-                    Vec::new()
-                } else {
-                    path.assignments
-                        .keys()
-                        .filter_map(|assignment| match assignment {
-                            ConstraintAssignment::Negative(constraint) => Some(*constraint),
-                            ConstraintAssignment::Positive(_)
-                            | ConstraintAssignment::Unconstrained(_) => None,
-                        })
-                        .collect()
-                };
                 self.sorted_paths.push(CollectedPath {
                     constraints,
                     negative_constraints,
@@ -7063,15 +7063,6 @@ impl PathAssignments {
         self.additional_fuels.truncate(additional_fuels_start);
         self.remaining_overall_fuel = previous_remaining_overall_fuel;
         result
-    }
-
-    pub(crate) fn positive_constraints(&self) -> impl Iterator<Item = (ConstraintId, usize)> + '_ {
-        self.assignments
-            .iter()
-            .filter_map(|(assignment, (source_order, _))| match assignment {
-                ConstraintAssignment::Positive(constraint) => Some((*constraint, *source_order)),
-                ConstraintAssignment::Negative(_) | ConstraintAssignment::Unconstrained(_) => None,
-            })
     }
 
     fn assignment_holds(&self, assignment: ConstraintAssignment) -> bool {

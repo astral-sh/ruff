@@ -116,9 +116,9 @@ in the repository's `AGENTS.md` files:
     constraints, but only for type variables whose path bounds actually reach the
     solver.
 
-- `PathAssignments::positive_constraints` still supplies bound evidence; path
-    extraction separately records whether positive or negative assignments
-    impose a visible condition. Comprehensive reasoning about negative hidden
+- Path extraction partitions positive and negative assignments in one pass,
+    using positive assignments for bound evidence and both polarities to
+    detect visible conditions. Comprehensive reasoning about negative hidden
     witnesses remains intentionally out of scope.
 
 - Bare typevar-to-typevar bounds are represented by constraining whichever
