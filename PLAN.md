@@ -103,23 +103,34 @@ in the repository's `AGENTS.md` files:
     `PathAssignments` or sequent maps.
 
 - Constrained `PathBounds` retain the authoritative inferable `TypeVarSet` and
-    builder-independent `ConstraintPath` values. Each path contains its
-    accumulated bounds, explicit fixed non-inferable bindings, and compact
-    inferability flags; terminal variants retain no domain.
+    builder-independent `ConstraintPath` values. Each path contains exactly
+    its accumulated `bounds`, its `fixed_noninferable_bindings`, and its
+    `has_inferable_decision` flag; terminal variants retain no domain.
 
-- `PathBounds::solve_with(db, builder, choose)` validates surviving
-    non-inferable typevars before invoking the callback, invokes the callback
-    only for inferable bounds, substitutes fixed non-inferable bindings into
-    inferable solutions, and never emits non-inferable top-level bindings.
+- `PathBounds::solve_with(db, builder, choose)` first validates surviving
+    non-inferable bounds with `default_solve`, then invokes the callback only
+    for inferable bounds. These are disjoint groups, so a bound is not solved
+    twice. Fixed non-inferable bindings are substituted into inferable
+    solutions, and non-inferable top-level bindings are never emitted.
 
 - `PathBounds::default_solve` checks declared upper bounds and finite
     constraints, but only for type variables whose path bounds actually reach the
     solver.
 
-- Path extraction partitions positive and negative assignments in one pass,
-    using positive assignments for bound evidence and both polarities to detect
-    inferable conditions. Comprehensive reasoning about negative constraints on
+- Path extraction visits positive, negative, and uncertain assignments once.
+    Positive assignments provide bound evidence; positive and negative
+    assignments determine `has_inferable_decision`; uncertain assignments
+    impose no decision. Comprehensive reasoning about negative constraints on
     non-inferable typevars remains intentionally out of scope.
+
+- `Constraint::constrains_typevar_that` applies a predicate to the constraint
+    subject and to any bare-typevar lower or upper bounds. Both path collection
+    and `remove_noninferable` use it to classify mixed constraints without
+    depending on typevar orientation.
+
+- `PathVisitor<'db>` and `PathFold<'db>` carry the database lifetime, allowing
+    `CollectVisitor<'db>` to retain the inferable `TypeVarSet` and classify
+    decisions while visiting assignments instead of traversing them again.
 
 - Bare typevar-to-typevar bounds are represented by constraining whichever
     typevar comes first in the builder-local ordering. `PathBounds::compute`
@@ -174,6 +185,10 @@ exclusive to that operation.
 
 `crates/ty_python_semantic/src/types/generics.rs`:
 
+- `ApplySpecialization::Bindings` applies a small slice of typevar bindings in
+    one traversal, using a linear scan for each lookup. Concrete fixed
+    non-inferable bindings are independent, so applying them together preserves
+    the semantics of the former one-at-a-time substitution.
 - `SpecializationBuilder::solve_pending_with` solves a call-wide pending
     constraint set with a caller-supplied selection hook.
 - `SpecializationBuilder::add_type_mappings_from_constraint_set` solves
@@ -204,8 +219,7 @@ variables remain present in the unprojected TDD.
     now characterizes inferable-only and non-inferable-only paths, mixed
     relationships, exact and one-sided non-inferable bounds, finite-domain
     declarations and declared upper bounds, negative inferable decisions, and
-    correlated
-    inferable outputs.
+    correlated inferable outputs.
 - `crates/ty_python_semantic/resources/mdtest/regression/constraint_set_ordering.md`
     contains source-order, bare-typevar orientation, transitivity,
     non-inferable-output, negation, uncertain-branch, derived-fuel, and
@@ -320,30 +334,50 @@ Baseline before the characterization changes:
 
 ## Phase 2 implementation and validation
 
-Constrained `PathBounds` now retain their inferable `TypeVarSet` and an ordered
-boxed slice of `ConstraintPath` values. A path stores its accumulated bounds,
-fixed non-inferable bindings, whether a positive or negative assignment is
-inferable, and whether its bounds include a non-inferable typevar. The
-representation contains no builder-local `ConstraintId`, so
-`Type::assignable_solutions_with_inferable` remains safely Salsa-cached.
+Constrained `PathBounds` retain their inferable `TypeVarSet` and an ordered
+boxed slice of `ConstraintPath` values. Each path stores:
 
-`PathBounds::solve_with(db, builder, choose)` now validates all surviving
-positive non-inferable bounds with the existing `default_solve` logic before
-invoking any caller callback. The callback sees only inferable variables, and
-returned bindings contain only those variables. Concrete non-inferable typevar
-equalities that survive projection are collected before reciprocal bound
-aggregation and substituted through bare and nested inferable solution types.
-One-sided bounds retain symbolic outer variables. Negative inferable conditions
-remain distinct from a genuinely unconstrained non-inferable-only path.
+- `bounds`: accumulated lower and upper bounds for both inferable and
+    non-inferable typevars;
+- `fixed_noninferable_bindings`: explicit positive equalities that fix
+    non-inferable typevars to concrete types; and
+- `has_inferable_decision`: whether a positive or negative constraint on the
+    path involves an inferable subject or bare inferable typevar bound.
+
+The representation contains no builder-local `ConstraintId`, so
+`Type::assignable_solutions_with_inferable` remains safely Salsa-cached. No
+`has_noninferable_bounds` flag or other speculative guard is retained: there is
+no isolated performance evidence supporting it, and filtering already prevents
+`default_solve` from running for inferable bounds during validation.
+
+`PathBounds::solve_with(db, builder, choose)` validates all surviving positive
+non-inferable bounds with the existing `default_solve` logic before invoking
+any caller callback. Inferable bounds are then passed exclusively to `choose`;
+the two solving passes cover disjoint typevars, so this does not duplicate
+`default_solve` work. Validating the non-inferable bounds first prevents a
+rejected path from mutating caller-owned callback state. Concrete
+non-inferable equalities that survive projection are collected before
+reciprocal bound aggregation, then substituted simultaneously through bare and
+nested inferable solution types using `ApplySpecialization::Bindings`. Its
+linear binding lookup is appropriate because each path's fixed-binding slice
+is expected to be small, and simultaneous substitution is equivalent because
+all replacements are concrete. One-sided bounds retain symbolic outer
+variables. Negative inferable conditions remain distinct from a genuinely
+unconstrained non-inferable-only path.
+
+`Constraint::constrains_typevar_that` defines when a constraint involves a
+matching typevar: its subject matches, or its lower or upper bound is a bare
+typevar that matches. The path collector and preliminary projection both use
+this definition, preserving both orientations of `I <= N`. `PathVisitor` and
+`PathFold` now carry the database lifetime so the collector can hold its
+inferable domain, partition assignments, and compute
+`has_inferable_decision` in one traversal.
 
 The direct `solve_with` users in call binding, collection inference, and class
 pattern narrowing now provide their database and builder. The concrete
-conjunction fast path still skips sequent construction and marks its paths as
-having no non-inferable bounds, avoiding additional inferability checks while
-solving. A small targeted fast-path improvement was justified by an initially
-noisy
-benchmark regression; no duplicate traversal or alternate TDD representation
-was introduced.
+conjunction fast path still skips sequent construction. No duplicate traversal,
+alternate TDD representation, or unmeasured fast-path optimization was
+introduced.
 
 Phase 2 also resolves the non-inferable top-level output leak previously
 assigned to Phase 3 because callback isolation and output filtering share the
@@ -535,10 +569,12 @@ bugs and require an agreed decision before their expected behavior is changed.
     nevertheless retain their existing semantics.
 - **D2, fixed non-inferable binding substitution:** preserve symbolic
     references to non-inferable outer-scope variables unless the current path
-    actually fixes one to a concrete value. Substitute path-fixed values
-    through bare and nested inferable solution types, preserving the original
-    path's correlations. Do not pick an arbitrary member of a declared finite
-    domain merely to eliminate a symbolic reference.
+    actually fixes one to a concrete value. Apply all fixed bindings in one
+    `ApplySpecialization::Bindings` traversal; their concrete replacements
+    make simultaneous substitution equivalent to sequential substitution.
+    Preserve each path's correlations, including through nested types. Do not
+    pick an arbitrary member of a declared finite domain merely to eliminate a
+    symbolic reference.
 - **D3, inferability and solving API:** retain the authoritative inferable
     `TypeVarSet` in the extracted `PathBounds` representation instead of
     repeating it at every solve call or tagging each individual bound. Change
@@ -558,17 +594,19 @@ bugs and require an agreed decision before their expected behavior is changed.
     distinguishing negative inferable conditions from genuinely
     non-inferable-only paths, and, only if a focused regression requires it,
     removing exactly identical inferable outputs without changing source order
-    or path correlations. Prefer compact
-    builder-independent path metadata, such as whether a path has any inferable
-    positive or negative decisions, over storing a full inferable DNF. A mixed
-    constraint is inferable if its subject is inferable **or** a bare lower/upper
-    bound is inferable; testing only the subject would make inferability depend on
-    typevar orientation and would misclassify `I = N` as non-inferable-only.
+    or path correlations. Prefer compact, builder-independent path metadata,
+    such as `has_inferable_decision`, over storing a full inferable DNF. A
+    mixed constraint is inferable if its subject is inferable **or** a bare
+    lower/upper bound is inferable; use `constrains_typevar_that` so
+    classification does not depend on typevar orientation or misclassify
+    `I = N` as non-inferable-only.
 - **D5, performance and implementation strategy:** start with the simplest
     correct implementation throughout the project. Preserve the existing
     concrete-conjunction fast path and cache-behavior tests; do not proactively
     extend the fast path to non-inferable-only constraints or add speculative
-    optimizations. Measure the pydantic benchmark before and after the
+    optimizations. In particular, do not add a `has_noninferable_bounds` guard
+    without isolated benchmark evidence: filtering already avoids unnecessary
+    `default_solve` calls. Measure the pydantic benchmark before and after the
     migration, then introduce the smallest targeted improvement only if a
     concrete correctness or performance regression demonstrates that it is
     necessary.
@@ -600,9 +638,11 @@ fixed.
 Record explicit positive exact constraints whose lower and upper bounds are the
 same concrete type, including exact facts already derived by existing sequent
 reasoning, before reciprocal typevar bounds obscure that evidence. Apply those
-recorded substitutions to inferable solution types using existing type-mapping
-utilities. Do not treat an arbitrary `default_solve` selection, a one-sided
-bound, or declared-domain compatibility as proof of a fixed binding.
+recorded substitutions together using `ApplySpecialization::Bindings`; the
+bindings are path-local and concrete, so applying them in one traversal
+preserves correlations and cannot introduce order-dependent substitutions. Do
+not treat an arbitrary `default_solve` selection, a one-sided bound, or
+declared-domain compatibility as proof of a fixed binding.
 
 This deliberately does not infer concrete non-inferable bindings by combining
 one-sided bounds, finite declarations, dependency chains, or custom solver
@@ -649,8 +689,15 @@ Depends on completed Phase 1 and the agreed decisions D1–D6.
 1. Store the inferable `TypeVarSet` alongside constrained paths in `PathBounds`
     without changing the existing `remove_noninferable` call yet; terminal
     variants need no domain. Keep the cached representation independent of
-    builder-local constraint IDs. Add only compact path metadata needed to
-    distinguish non-inferable-only paths from negative inferable conditions.
+    builder-local constraint IDs. Each `ConstraintPath` contains only its
+    accumulated `bounds`, `fixed_noninferable_bindings`, and
+    `has_inferable_decision`; do not add an unsupported
+    `has_noninferable_bounds` optimization.
+1. Give `PathVisitor` and `PathFold` a database lifetime so the collector can
+    retain the inferable domain. Classify positive and negative decisions
+    during its single assignment traversal using
+    `Constraint::constrains_typevar_that`; reuse that helper for preliminary
+    projection.
 1. Add `db` and a constraint builder to `PathBounds::solve_with`, preserve
     `solve(db, builder)`, and make the selection hook observable only for
     inferable path bounds.
@@ -659,14 +706,17 @@ Depends on completed Phase 1 and the agreed decisions D1–D6.
     projection, without introducing comprehensive negative-domain reasoning.
     Use explicit positive exact non-inferable bindings that remain available
     before reciprocal bound aggregation, preserve cross-typevar relationships,
-    and use existing type substitution utilities for those fixed values only.
-    Fully projected non-inferable facts remain deferred to Phase 3; do not
-    introduce a duplicate pre-projection traversal or alternate TDD
+    and substitute fixed values together with
+    `ApplySpecialization::Bindings`, using a linear scan for its small binding
+    slice. Fully projected non-inferable facts remain deferred to Phase 3;
+    do not introduce a duplicate pre-projection traversal or alternate TDD
     representation.
 1. Validate surviving non-inferable typevars before invoking any
-    inferable-variable callback; errors must invalidate only the corresponding
-    path, avoid misleading inferable-typevar declaration diagnostics, and
-    leave caller-owned callback state unchanged for rejected paths. A
+    inferable-variable callback; the validation and selection passes cover
+    disjoint typevars, so neither invokes `default_solve` twice for the same
+    bound. Errors must invalidate only the corresponding path, avoid
+    misleading inferable-typevar declaration diagnostics, and leave
+    caller-owned callback state unchanged for rejected paths. A
     non-inferable typevar removed entirely by the still-active projection cannot
     be rejected until Phase 3.
 1. Preserve fresh bound identity membership, source-order stability, and
