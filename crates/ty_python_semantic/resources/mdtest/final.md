@@ -476,6 +476,41 @@ class A:
     def final(self) -> None: ...
 ```
 
+## An overloaded method cannot be both abstract and final
+
+`runtime.py`:
+
+```py
+from abc import ABC, abstractmethod
+from typing import final, overload
+
+class A(ABC):
+    @overload
+    def method(self, value: int) -> int: ...
+    @overload
+    def method(self, value: str) -> str: ...
+    @final
+    @abstractmethod
+    def method(self, value: int | str) -> int | str:  # error: [abstract-and-final-method]
+        raise NotImplementedError
+```
+
+`stub.pyi`:
+
+```pyi
+from abc import abstractmethod
+from typing import final, overload
+
+class A:
+    @overload
+    @final
+    @abstractmethod
+    def method(self, value: int) -> int: ...  # error: [abstract-and-final-method]
+    @overload
+    @abstractmethod
+    def method(self, value: str) -> str: ...
+```
+
 ## An `@final` method is overridden by an implicit instance attribute
 
 ```py

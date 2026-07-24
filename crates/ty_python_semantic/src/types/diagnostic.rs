@@ -964,7 +964,7 @@ declare_lint! {
     #[doc = include_str!("../../resources/lint_docs/abstract-and-final-method.md")]
     pub(crate) static ABSTRACT_AND_FINAL_METHOD = {
         summary: "detects methods that are both abstract and final",
-        status: LintStatus::stable("0.0.61"),
+        status: LintStatus::stable("0.0.64"),
         default_level: Level::Error,
     }
 }
