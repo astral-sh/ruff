@@ -3585,11 +3585,6 @@ pub(crate) struct ConstraintPath<'db> {
     /// This distinguishes genuinely unconstrained paths from paths whose inferable variables are
     /// restricted but have no positive solution bindings.
     has_inferable_decision: bool,
-
-    /// Whether any accumulated bounds belong to a non-inferable typevar. This activates a
-    /// potential optimization: for paths containing only inferable bounds, we can skip
-    /// non-inferable validation and repeated inferability checks during solution extraction.
-    has_noninferable_bounds: bool,
 }
 
 /// Per-path bounds and the type variables whose bindings may appear in returned solutions.
@@ -3769,20 +3764,14 @@ impl<'db> PathBounds<'db> {
                 }
             }
 
-            let mut has_noninferable_bounds = false;
             let bounds = mappings
                 .drain(..)
-                .map(|(bound_typevar, bounds)| {
-                    has_noninferable_bounds =
-                        has_noninferable_bounds || !bound_typevar.is_inferable(db, inferable);
-                    bounds.finish(db, bound_typevar)
-                })
+                .map(|(bound_typevar, bounds)| bounds.finish(db, bound_typevar))
                 .collect();
             result.push(ConstraintPath {
                 bounds,
                 fixed_noninferable_bindings: fixed_noninferable_bindings.into_boxed_slice(),
                 has_inferable_decision: path.has_inferable_decision,
-                has_noninferable_bounds,
             });
         }
 
@@ -3866,7 +3855,6 @@ impl<'db> PathBounds<'db> {
                 bounds,
                 fixed_noninferable_bindings: Box::default(),
                 has_inferable_decision: true,
-                has_noninferable_bounds: false,
             }]),
         })
     }
@@ -3905,21 +3893,18 @@ impl<'db> PathBounds<'db> {
             // If this path provides an lower or upper bound on any non-inferable typevars, we have
             // to make sure those bounds are valid. We do that by "solving" the non-inferable
             // typevar, and throwing away the result, other than to make sure that it succeeds.
-            if path.has_noninferable_bounds
-                && path
-                    .bounds
-                    .iter()
-                    .filter(|bound| !bound.bound_typevar.is_inferable(db, inferable))
-                    .any(|bound| Self::default_solve(db, builder, bound).is_err())
+            if path
+                .bounds
+                .iter()
+                .filter(|bound| !bound.bound_typevar.is_inferable(db, inferable))
+                .any(|bound| Self::default_solve(db, builder, bound).is_err())
             {
                 continue;
             }
 
             let mut solution = Vec::with_capacity(path.bounds.len());
             for path_bound in &path.bounds {
-                if path.has_noninferable_bounds
-                    && !path_bound.bound_typevar.is_inferable(db, inferable)
-                {
+                if !path_bound.bound_typevar.is_inferable(db, inferable) {
                     continue;
                 }
 
