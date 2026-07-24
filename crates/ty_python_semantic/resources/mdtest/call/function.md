@@ -140,6 +140,22 @@ dynamic: Any = []
 reveal_type(map(operator.add, ints, dynamic))  # revealed: map[Unknown]
 ```
 
+## Generic overloaded callable constraints in constructors
+
+An overloaded callback with callable-local type variables can leave legacy mappings from an
+alternative that is absent from the final constraint set. Those mappings must not specialize a
+constrained path and cause a valid callback to be rejected.
+
+```py
+import re
+
+patterns = map(re.compile, [r"a", r"b"])
+# TODO: revealed: map[Pattern[str]]
+reveal_type(patterns)  # revealed: map[Unknown]
+for pattern in patterns:
+    pattern.search("text")
+```
+
 ## Decorated
 
 ```py
