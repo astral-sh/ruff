@@ -17,10 +17,9 @@ use crate::types::signatures::{ParametersKind, SignatureRelationVisitor};
 use crate::types::tuple::TupleType;
 use crate::types::{
     ApplyTypeMappingVisitor, CallableType, ClassBase, ClassLiteral, ClassType, CycleDetector,
-    IntersectionBuilder, IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType,
-    LiteralValueTypeKind, MemberLookupPolicy, PropertyInstanceType, ProtocolInstanceType,
-    SubclassOfInner, SubclassOfType, TypeTransformer, TypeVarBoundOrConstraints, UnionType,
-    UpcastPolicy,
+    IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType, LiteralValueTypeKind,
+    MemberLookupPolicy, PropertyInstanceType, ProtocolInstanceType, SubclassOfInner,
+    SubclassOfType, TypeVarBoundOrConstraints, UnionType, UpcastPolicy,
 };
 use crate::{
     Db,
@@ -690,68 +689,6 @@ impl<'db> Type<'db> {
         let constraints = ConstraintSetBuilder::new();
         self.when_disjoint_from(db, other, &constraints, InferableTypeVars::None)
             .is_always_satisfied(db)
-    }
-
-    /// Widen `self` to a type that conservatively describes its possible runtime objects in an
-    /// identity comparison.
-    ///
-    /// A `NewType` wrapper is an identity function at runtime, so it contributes its concrete base
-    /// type here while remaining distinct for ordinary type relations and intersections.
-    ///
-    /// Negative intersection elements are generally omitted. A static exclusion does not imply a
-    /// runtime exclusion: `NewType("N", bool)(True)` can inhabit `~Literal[True]`, but evaluates
-    /// to the `True` singleton at runtime. However, excluding an entire nominal instance type is
-    /// stable under `NewType` erasure, so constraints such as `~None` and `~SomeClass` are
-    /// preserved.
-    pub(crate) fn identity_comparison_type(self, db: &'db dyn Db) -> Type<'db> {
-        struct IdentityComparisonWidening;
-
-        fn widen<'db>(
-            db: &'db dyn Db,
-            ty: Type<'db>,
-            visitor: &TypeTransformer<'db, IdentityComparisonWidening>,
-        ) -> Type<'db> {
-            match ty {
-                Type::TypeAlias(alias) => {
-                    visitor.visit_type(db, ty, || widen(db, alias.value_type(db), visitor))
-                }
-                Type::NewTypeInstance(newtype) => newtype.concrete_base_type(db),
-                Type::TypeVar(typevar) => visitor.visit_type(db, ty, || {
-                    match typevar.typevar(db).bound_or_constraints(db) {
-                        Some(bound_or_constraints) => {
-                            widen(db, bound_or_constraints.as_type(db), visitor)
-                        }
-                        None => ty,
-                    }
-                }),
-                Type::Union(union) => union.map(db, |element| widen(db, *element, visitor)),
-                Type::Intersection(intersection) => {
-                    let mut builder = IntersectionBuilder::new(db);
-                    for element in intersection.positive(db) {
-                        builder = builder.add_positive(widen(db, *element, visitor));
-                    }
-                    for element in intersection.negative(db) {
-                        if element.resolve_type_alias(db).is_nominal_instance() {
-                            builder = builder.add_negative(*element);
-                        }
-                    }
-                    builder.build()
-                }
-                _ => ty,
-            }
-        }
-
-        widen(
-            db,
-            self,
-            &TypeTransformer::<IdentityComparisonWidening>::default(),
-        )
-    }
-
-    /// Return `true` if `self` and `other` cannot describe the same runtime object.
-    pub(crate) fn is_disjoint_from_for_identity(self, db: &'db dyn Db, other: Type<'db>) -> bool {
-        self.identity_comparison_type(db)
-            .is_disjoint_from(db, other.identity_comparison_type(db))
     }
 
     pub(crate) fn when_disjoint_from<'c>(
