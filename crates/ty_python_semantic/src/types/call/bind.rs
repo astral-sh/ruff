@@ -5768,7 +5768,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         excluded_match: Option<(usize, usize)>,
     ) -> StarredConstraintInference {
         let parameters = self.signature.parameters();
-        let starred_inference =
+        let mut starred_inference =
             self.infer_starred_typevartuple_constraints(builder, specialization_errors);
         for (argument_index, adjusted_argument_index, _, argument_types) in
             self.enumerate_argument_types()
@@ -5797,7 +5797,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                 );
 
                 if let Err(error) = specialization_result {
-                    self.constraint_set_errors[argument_index] = true;
+                    starred_inference.failed_arguments.insert(argument_index);
                     specialization_errors.push(BindingError::SpecializationError {
                         error,
                         argument_index: adjusted_argument_index,
@@ -6033,17 +6033,18 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             return false;
         }
         let final_specialization = self.specialization();
-        let specialization = builder
-            .build_inference_with(generic_context, |_, _| None)
-            .specialization_with(self.db, |typevar, inferred| {
-                if inferred.is_some() {
-                    None
-                } else {
-                    final_specialization
-                        .and_then(|specialization| specialization.get(self.db, typevar))
-                        .or(Some(Type::TypeVar(typevar)))
-                }
-            });
+        let Ok(inference) = builder.build_inference_with(generic_context, |_, _| None) else {
+            return false;
+        };
+        let specialization = inference.specialization_with(self.db, |typevar, inferred| {
+            if inferred.is_some() {
+                None
+            } else {
+                final_specialization
+                    .and_then(|specialization| specialization.get(self.db, typevar))
+                    .or(Some(Type::TypeVar(typevar)))
+            }
+        });
         let expected_type = declared_type.apply_specialization(self.db, specialization);
 
         self.overloaded_callable_satisfies_constrained_typevars(
