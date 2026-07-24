@@ -28,3 +28,20 @@ finally:
 match 0:
     case {**name_0}:
         pass
+
+# Together with the two calls above, keep this scope just above the prefix-warming threshold.
+extra_00()
+extra_01()
+extra_02()
+extra_03()
+extra_04()
+extra_05()
+extra_06()
+extra_07()
+extra_08()
+extra_09()
+extra_10()
+extra_11()
+extra_12()
+extra_13()
+extra_14()

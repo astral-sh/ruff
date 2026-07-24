@@ -538,7 +538,7 @@ fn predicate_scope<'db>(db: &'db dyn Db, predicate: &Predicate<'db>) -> ScopeId<
     }
 }
 
-/// Infers preceding call predicates in source order.
+/// Infers complete preceding blocks of call predicates in source order.
 ///
 /// Predicate IDs are assigned in source order, but the decision diagrams intentionally order
 /// predicates in reverse to reduce their size. Inferring a later call can depend on the
@@ -552,10 +552,12 @@ fn predicate_scope<'db>(db: &'db dyn Db, predicate: &Predicate<'db>) -> ScopeId<
 /// accept the broader eager pass because it keeps the ordering simple, and checking a scope will
 /// typically exercise most of its predicates eventually.
 ///
-/// Reentrant analysis is handled by Salsa cycle recovery on the call and cached-range queries. For
-/// large scopes, keeping the prefix pass unconditional ensures that tracked callers record the same
-/// dependencies on every thread. Small scopes do not need prefix warming to bound the Salsa stack,
-/// and evaluating their call predicates on demand avoids introducing unnecessary inference cycles.
+/// Reentrant analysis is handled by Salsa cycle recovery on the cached-range queries. The final
+/// incomplete block is left for the reachability walk: it can add at most 15 nested call queries,
+/// and analyzing it eagerly would bypass the range query's cycle recovery and could introduce a
+/// divergent inference cycle. For large scopes, keeping the complete-block pass unconditional
+/// ensures that tracked callers record the same dependencies on every thread. Small scopes do not
+/// need prefix warming to bound the Salsa stack, so their calls are evaluated entirely on demand.
 fn analyze_non_terminal_call_prefix<'db>(
     db: &'db dyn Db,
     predicates: &IndexSlice<ScopedPredicateId, Predicate<'db>>,
@@ -574,12 +576,9 @@ fn analyze_non_terminal_call_prefix<'db>(
 
     let call_predicates = non_terminal_call_predicates(db, scope);
     let call_count = call_predicates.partition_point(|predicate| *predicate <= root_predicate);
-    if call_count <= NON_TERMINAL_CALL_CHUNK_SIZE {
-        analyze_non_terminal_calls(db, predicates, &call_predicates[..call_count]);
-        return true;
-    }
-
     let mut start = 0;
+    // Leave the incomplete final block demand-driven. Its reverse dependency chain is bounded by
+    // the block size, and every eagerly analyzed call remains behind a recoverable range query.
     let mut remaining = call_count / NON_TERMINAL_CALL_CHUNK_SIZE;
 
     while remaining > 0 {
@@ -589,9 +588,6 @@ fn analyze_non_terminal_call_prefix<'db>(
         start += length;
         remaining -= length;
     }
-
-    let tail_start = call_count / NON_TERMINAL_CALL_CHUNK_SIZE * NON_TERMINAL_CALL_CHUNK_SIZE;
-    analyze_non_terminal_calls(db, predicates, &call_predicates[tail_start..call_count]);
 
     true
 }
