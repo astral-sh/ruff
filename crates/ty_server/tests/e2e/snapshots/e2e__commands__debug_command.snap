@@ -180,6 +180,7 @@ Settings: Settings {
 Memory report:
 =======SALSA STRUCTS=======
 `Program`                                          metadata=[X.XXMB]   fields=[X.XXMB]   count=1
+`ResolverEnvironment`                              metadata=[X.XXMB]   fields=[X.XXMB]   count=1
 `Project`                                          metadata=[X.XXMB]   fields=[X.XXMB]   count=1
 `FileRoot`                                         metadata=[X.XXMB]   fields=[X.XXMB]   count=1
 `ModuleResolveModeIngredient`                      metadata=[X.XXMB]   fields=[X.XXMB]   count=1

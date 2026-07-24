@@ -2693,7 +2693,11 @@ with open("file.txt") as f:
 
     impl CursorTest {
         fn folding_ranges(&self) -> String {
-            let ranges = folding_ranges(&self.db, self.python_file(self.cursor.file), None);
+            let ranges = folding_ranges(
+                &self.db,
+                self.program_file(self.cursor.file).python_file(&self.db),
+                None,
+            );
 
             if ranges.is_empty() {
                 return "No folding ranges found".to_string();

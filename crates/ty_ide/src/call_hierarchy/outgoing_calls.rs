@@ -3,7 +3,6 @@ use std::collections::hash_map::Entry;
 use crate::call_hierarchy::CalleeLeaf;
 use crate::goto::find_goto_target;
 use crate::{CallHierarchyItem, Db};
-use ruff_db::PythonFile;
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::token::Tokens;
@@ -16,6 +15,7 @@ use ruff_python_ast::{
 };
 use ruff_text_size::{Ranged, TextRange, TextSize};
 use rustc_hash::FxHashMap;
+use ty_python_core::ProgramFile;
 use ty_python_core::definition::DefinitionKind;
 use ty_python_semantic::{ImportAliasResolution, SemanticModel};
 
@@ -30,8 +30,8 @@ use ty_python_semantic::{ImportAliasResolution, SemanticModel};
 /// are reported when the nested callable is expanded separately. Declaration
 /// expressions attached to a nested callable are still included while
 /// traversing the containing item's body.
-pub fn outgoing_calls(db: &dyn Db, file: PythonFile<'_>, offset: TextSize) -> Vec<OutgoingCall> {
-    let module = parsed_module(db, file).load(db);
+pub fn outgoing_calls(db: &dyn Db, file: ProgramFile<'_>, offset: TextSize) -> Vec<OutgoingCall> {
+    let module = parsed_module(db, file.python_file(db)).load(db);
     let model = SemanticModel::new(db, file);
     let Some(goto_target) = find_goto_target(&model, &module, offset) else {
         return Vec::new();
@@ -54,7 +54,7 @@ pub fn outgoing_calls(db: &dyn Db, file: PythonFile<'_>, offset: TextSize) -> Ve
         };
         let parsed = parsed_module(db, def.python_file(db)).load(db);
 
-        let model = SemanticModel::new(db, def.python_file(db));
+        let model = SemanticModel::new(db, def.program_file(db));
         let mut finder = OutgoingCallsFinder {
             db,
             model: &model,
@@ -306,7 +306,7 @@ mod tests {
             };
             let calls = outgoing_calls(
                 &self.db,
-                self.python_file(target.file),
+                self.program_file(target.file),
                 target.selection_range.start(),
             );
             if calls.is_empty() {

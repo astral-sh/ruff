@@ -329,7 +329,7 @@ fn enum_class_literal_inner<'db>(
     db: &'db dyn Db,
     class: ClassLiteral<'db>,
 ) -> Option<EnumClassLiteral<'db>> {
-    let env = SemanticEnvironment::from_file(db, class.python_file(db));
+    let env = SemanticEnvironment::from_file(db, class.program_file(db));
     let metadata = enum_metadata(&env, class)?;
     let members = metadata
         .members
@@ -921,7 +921,7 @@ fn enum_ignored_names_inner<'db>(db: &'db dyn Db, scope_id: ScopeId<'db>) -> FxH
     };
 
     let ignore_bindings = use_def_map.reachable_symbol_bindings(ignore);
-    let env = SemanticEnvironment::from_file(db, scope_id.python_file(db));
+    let env = SemanticEnvironment::from_file(db, scope_id.program_file(db));
     let ignore_place = place_from_bindings(&env, ignore_bindings).place;
 
     match ignore_place {
@@ -1004,7 +1004,7 @@ fn enum_metadata_inner<'db>(
             if !spec.has_known_members(db) {
                 return None;
             }
-            let env = SemanticEnvironment::from_file(db, enum_lit.scope(db).python_file(db));
+            let env = SemanticEnvironment::from_file(db, enum_lit.scope(db).program_file(db));
             let value_construction = EnumValueConstruction {
                 data_type: inherited_enum_data_type(&env, ClassLiteral::DynamicEnum(enum_lit)),
                 ..EnumValueConstruction::default()
@@ -1048,7 +1048,7 @@ fn enum_metadata_inner<'db>(
         return None;
     }
 
-    let env = SemanticEnvironment::from_file(db, class.python_file(db));
+    let env = SemanticEnvironment::from_file(db, class.program_file(db));
 
     if !is_enum_class_by_inheritance(&env, class) {
         return None;

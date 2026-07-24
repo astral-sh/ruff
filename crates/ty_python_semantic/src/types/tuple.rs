@@ -248,7 +248,7 @@ impl<'db> TupleType<'db> {
     // `static-frame` as part of the ecosystem analysis. This is because it's called
     // from `NominalInstanceType::class()`, which is a very hot method.
     #[salsa::tracked(returns(copy), cycle_initial=to_class_type_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
-    pub(crate) fn to_class_type(self, db: &'db dyn Db, program: Program) -> ClassType<'db> {
+    pub(crate) fn to_class_type(self, db: &'db dyn Db, program: Program<'db>) -> ClassType<'db> {
         let env = &SemanticEnvironment::from_program(db, program);
         let tuple_class = KnownClass::Tuple
             .try_to_class_literal(env)
@@ -743,7 +743,7 @@ fn to_class_type_cycle_initial<'db>(
     db: &'db dyn Db,
     id: salsa::Id,
     self_: TupleType<'db>,
-    program: Program,
+    program: Program<'db>,
 ) -> ClassType<'db> {
     let env = &SemanticEnvironment::from_program(db, program);
     let tuple_class = KnownClass::Tuple

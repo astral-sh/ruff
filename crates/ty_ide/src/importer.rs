@@ -20,7 +20,6 @@ use rustc_hash::FxHashMap;
 
 use ruff_db::parsed::ParsedModuleRef;
 
-use ruff_db::PythonFile;
 use ruff_db::source::source_text;
 use ruff_diagnostics::Edit;
 use ruff_python_ast as ast;
@@ -30,8 +29,9 @@ use ruff_python_ast::visitor::source_order::{SourceOrderVisitor, TraversalSignal
 use ruff_python_codegen::Stylist;
 use ruff_python_importer::Insertion;
 use ruff_text_size::{Ranged, TextRange, TextSize};
-use ty_module_resolver::ModuleName;
+use ty_module_resolver::{ImportingFile, ModuleName, ResolverFile};
 use ty_project::Db;
+use ty_python_core::ProgramFile;
 use ty_python_core::definition::DefinitionKind;
 use ty_python_semantic::types::Type;
 use ty_python_semantic::{MemberDefinition, SemanticModel};
@@ -41,7 +41,7 @@ pub(crate) struct Importer<'a> {
     db: &'a dyn Db,
     /// The file corresponding to the module that
     /// we want to insert an import statement into.
-    file: PythonFile<'a>,
+    file: ProgramFile<'a>,
     /// The parsed module ref.
     parsed: &'a ParsedModuleRef,
     /// The tokens representing the Python AST.
@@ -74,7 +74,7 @@ impl<'a> Importer<'a> {
     pub(crate) fn new(
         db: &'a dyn Db,
         stylist: &'a Stylist<'a>,
-        file: PythonFile<'a>,
+        file: ProgramFile<'a>,
         source: &'a str,
         parsed: &'a ParsedModuleRef,
     ) -> Self {
@@ -146,7 +146,7 @@ impl<'a> Importer<'a> {
         request: ImportRequest<'_>,
         members: &MembersInScope,
     ) -> ImportAction {
-        let request = request.avoid_conflicts(self.db, self.file, members);
+        let request = request.avoid_conflicts(self.db, self.file.resolver_file(self.db), members);
         let mut symbol_text: Box<str> = request.member.unwrap_or(request.module).into();
         let Some(response) = self.find(&request, members.at) else {
             let insertion = if let Some(future) = self.find_last_future_import(members.at) {
@@ -248,7 +248,9 @@ impl<'a> Importer<'a> {
                 return choice;
             }
 
-            if let Some(response) = import.satisfies(self.db, self.file, request) {
+            if let Some(response) =
+                import.satisfies(self.db, self.file.resolver_file(self.db), request)
+            {
                 let partial = matches!(response.kind, ImportResponseKind::Partial { .. });
 
                 // The LSP doesn't support edits across cell boundaries.
@@ -331,7 +333,7 @@ pub struct MembersInScope<'ast> {
 impl<'ast> MembersInScope<'ast> {
     fn new(
         db: &'ast dyn Db,
-        file: PythonFile<'ast>,
+        file: ProgramFile<'ast>,
         parsed: &'ast ParsedModuleRef,
         node: ast::AnyNodeRef<'_>,
         at: TextSize,
@@ -376,7 +378,7 @@ impl<'ast> MembersInScope<'ast> {
     pub(crate) fn satisfies(
         &self,
         db: &dyn Db,
-        importing_file: PythonFile<'_>,
+        importing_file: ResolverFile<'_>,
         request: &ImportRequest<'_>,
     ) -> bool {
         let symbol_text = request.member.unwrap_or(request.module);
@@ -412,7 +414,7 @@ impl<'ast> MemberInScope<'ast> {
     fn satisfies_anywhere(
         &self,
         db: &dyn Db,
-        importing_file: PythonFile<'_>,
+        importing_file: ResolverFile<'_>,
         request: &ImportRequest<'_>,
     ) -> bool {
         let MemberImportKind::Imported(ref ast_import) = self.kind else {
@@ -484,7 +486,7 @@ impl<'ast> AstImport<'ast> {
     fn satisfies<'importer>(
         &'importer self,
         db: &'_ dyn Db,
-        importing_file: PythonFile<'_>,
+        importing_file: ResolverFile<'_>,
         request: &ImportRequest<'_>,
     ) -> Option<ImportResponse<'importer, 'ast>> {
         self.kind
@@ -515,7 +517,7 @@ impl<'ast> AstImportKind<'ast> {
     fn satisfies<'importer>(
         &'importer self,
         db: &'_ dyn Db,
-        importing_file: PythonFile<'_>,
+        importing_file: ResolverFile<'_>,
         request: &ImportRequest<'_>,
     ) -> Option<ImportResponseKind<'ast>> {
         match *self {
@@ -545,7 +547,12 @@ impl<'ast> AstImportKind<'ast> {
                     return None;
                 }
 
-                let module = ModuleName::from_import_statement(db, importing_file, ast).ok()?;
+                let module = ModuleName::from_import_statement(
+                    db,
+                    ImportingFile::ResolverFile(importing_file),
+                    ast,
+                )
+                .ok()?;
                 if module.as_str() != request.module {
                     return None;
                 }
@@ -642,7 +649,7 @@ impl<'a> ImportRequest<'a> {
     fn avoid_conflicts(
         self,
         db: &dyn Db,
-        importing_file: PythonFile<'_>,
+        importing_file: ResolverFile<'_>,
         members: &MembersInScope,
     ) -> Self {
         let Some(member) = self.member else {
@@ -982,7 +989,11 @@ mod tests {
             Importer::new(
                 &self.db,
                 &self.cursor.stylist,
-                PythonFile::new(&self.db, self.cursor.file, self.db.python_version()),
+                ProgramFile::new(
+                    &self.db,
+                    self.cursor.file,
+                    self.db.semantic_environment().program(),
+                ),
                 self.cursor.source.as_str(),
                 &self.cursor.parsed,
             )

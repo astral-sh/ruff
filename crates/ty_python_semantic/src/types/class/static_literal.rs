@@ -59,7 +59,7 @@ use crate::{
 };
 use crate::{attribute_assignments, attribute_declarations};
 use ty_python_core::{
-    attribute_scopes,
+    ProgramFile, attribute_scopes,
     definition::{Definition, DefinitionKind, DefinitionState, TargetKind},
     place_table,
     scope::{Scope, ScopeId},
@@ -201,7 +201,7 @@ impl<'db> StaticClassLiteral<'db> {
     #[salsa::tracked(returns(copy))]
     fn has_own_ordering_method_inner(self, db: &'db dyn Db) -> bool {
         let body_scope = self.body_scope(db);
-        let env = SemanticEnvironment::from_file(db, body_scope.python_file(db));
+        let env = SemanticEnvironment::from_file(db, body_scope.program_file(db));
         ["__lt__", "__le__", "__gt__", "__ge__"]
             .iter()
             .any(|method| !class_member(&env, body_scope, method).is_undefined())
@@ -216,7 +216,7 @@ impl<'db> StaticClassLiteral<'db> {
     #[salsa::tracked(returns(copy))]
     fn has_own_comparison_methods_inner(self, db: &'db dyn Db) -> bool {
         let body_scope = self.body_scope(db);
-        let env = SemanticEnvironment::from_file(db, body_scope.python_file(db));
+        let env = SemanticEnvironment::from_file(db, body_scope.program_file(db));
         ["__lt__", "__le__", "__gt__", "__ge__"]
             .iter()
             .all(|method| !class_member(&env, body_scope, method).is_undefined())
@@ -301,7 +301,7 @@ impl<'db> StaticClassLiteral<'db> {
         heap_size=ruff_memory_usage::heap_size,
     )]
     fn generic_context_inner(self, db: &'db dyn Db) -> Option<GenericContext<'db>> {
-        let env = SemanticEnvironment::from_file(db, self.python_file(db));
+        let env = SemanticEnvironment::from_file(db, self.program_file(db));
         // Several typeshed definitions examine `sys.version_info`. To break cycles, we hard-code
         // the knowledge that this class is not generic.
         if self.is_known(db, KnownClass::VersionInfo) {
@@ -342,11 +342,12 @@ impl<'db> StaticClassLiteral<'db> {
     )]
     fn pep695_generic_context_inner(self, db: &'db dyn Db) -> Option<GenericContext<'db>> {
         let scope = self.body_scope(db);
-        let env = SemanticEnvironment::from_file(db, scope.python_file(db));
+        let program_file = scope.program_file(db);
+        let env = SemanticEnvironment::from_file(db, program_file);
         let parsed = parsed_module(db, scope.python_file(db)).load(db);
         let class_def_node = scope.node(db).expect_class().node(&parsed);
         class_def_node.type_params.as_ref().map(|type_params| {
-            let index = semantic_index(db, scope.python_file(db));
+            let index = semantic_index(db, program_file);
             let definition = index.expect_single_definition(class_def_node);
             GenericContext::from_type_params(&env, index, definition, type_params)
         })
@@ -378,7 +379,7 @@ impl<'db> StaticClassLiteral<'db> {
             db: &'db dyn Db,
             class: StaticClassLiteral<'db>,
         ) -> Option<GenericContext<'db>> {
-            let env = SemanticEnvironment::from_file(db, class.python_file(db));
+            let env = SemanticEnvironment::from_file(db, class.program_file(db));
             GenericContext::from_base_classes(
                 &env,
                 class.definition(db),
@@ -465,7 +466,11 @@ impl<'db> StaticClassLiteral<'db> {
         self.body_scope(db).python_file(db)
     }
 
-    pub(crate) fn program(self, db: &'db dyn Db) -> Program {
+    pub(crate) fn program_file(self, db: &'db dyn Db) -> ProgramFile<'db> {
+        self.body_scope(db).program_file(db)
+    }
+
+    pub(crate) fn program(self, db: &'db dyn Db) -> Program<'db> {
         self.body_scope(db).program(db)
     }
 
@@ -480,7 +485,7 @@ impl<'db> StaticClassLiteral<'db> {
 
     pub(crate) fn definition(self, db: &'db dyn Db) -> Definition<'db> {
         let body_scope = self.body_scope(db);
-        let index = semantic_index(db, body_scope.python_file(db));
+        let index = semantic_index(db, body_scope.program_file(db));
         index.expect_single_definition(body_scope.node(db).expect_class())
     }
 
@@ -577,14 +582,14 @@ impl<'db> StaticClassLiteral<'db> {
                 class.name(db)
             );
 
-            let python_file = class.python_file(db);
-            let module = parsed_module(db, python_file).load(db);
+            let program_file = class.program_file(db);
+            let module = parsed_module(db, program_file.python_file(db)).load(db);
             let class_stmt = class.node(db, &module);
 
             let class_definition =
-                semantic_index(db, python_file).expect_single_definition(class_stmt);
+                semantic_index(db, program_file).expect_single_definition(class_stmt);
             expanded_class_base_entries(
-                &SemanticEnvironment::from_file(db, python_file),
+                &SemanticEnvironment::from_file(db, program_file),
                 class.known(db),
                 class_stmt,
                 class_definition,
@@ -684,9 +689,9 @@ impl<'db> StaticClassLiteral<'db> {
     fn decorators_inner(self, db: &'db dyn Db) -> Box<[Type<'db>]> {
         tracing::trace!("StaticClassLiteral::decorators: {}", self.name(db));
 
-        let python_file = self.python_file(db);
-        let env = SemanticEnvironment::from_file(db, python_file);
-        let module = parsed_module(db, python_file).load(db);
+        let program_file = self.program_file(db);
+        let env = SemanticEnvironment::from_file(db, program_file);
+        let module = parsed_module(db, program_file.python_file(db)).load(db);
 
         let class_stmt = self.node(db, &module);
         if class_stmt.decorator_list.is_empty() {
@@ -694,7 +699,7 @@ impl<'db> StaticClassLiteral<'db> {
         }
 
         let class_definition =
-            semantic_index(db, self.python_file(db)).expect_single_definition(class_stmt);
+            semantic_index(db, self.program_file(db)).expect_single_definition(class_stmt);
 
         class_stmt
             .decorator_list
@@ -727,7 +732,7 @@ impl<'db> StaticClassLiteral<'db> {
         let module = parsed_module(db, python_file).load(db);
         let class_stmt = self.node(db, &module);
         let class_definition =
-            semantic_index(db, self.python_file(db)).expect_single_definition(class_stmt);
+            semantic_index(db, self.program_file(db)).expect_single_definition(class_stmt);
 
         class_stmt.decorator_list.iter().position(|decorator| {
             let decorator_callable = decorator
@@ -770,7 +775,7 @@ impl<'db> StaticClassLiteral<'db> {
     #[salsa::tracked(
         returns(as_ref),
         cycle_initial=|db, _, self_: StaticClassLiteral<'db>, specialization| {
-            let env = SemanticEnvironment::from_file(db, self_.python_file(db));
+            let env = SemanticEnvironment::from_file(db, self_.program_file(db));
             Err(StaticMroError::cycle(
                 &env,
                 self_.apply_optional_specialization(&env, specialization),
@@ -783,7 +788,7 @@ impl<'db> StaticClassLiteral<'db> {
         db: &'db dyn Db,
         specialization: Option<Specialization<'db>>,
     ) -> Result<Mro<'db>, StaticMroError<'db>> {
-        let env = SemanticEnvironment::from_file(db, self.python_file(db));
+        let env = SemanticEnvironment::from_file(db, self.program_file(db));
         tracing::trace!("StaticClassLiteral::try_mro: {}", self.name(db));
         Mro::of_static_class(&env, self, specialization)
     }
@@ -828,7 +833,7 @@ impl<'db> StaticClassLiteral<'db> {
             db: &'db dyn Db,
             class: StaticClassLiteral<'db>,
         ) -> ClassInstanceFlags {
-            let env = SemanticEnvironment::from_file(db, class.python_file(db));
+            let env = SemanticEnvironment::from_file(db, class.program_file(db));
             let mut flags = ClassInstanceFlags::empty();
             for base in class.iter_mro(&env, None) {
                 if base.is_typed_dict() {
@@ -869,7 +874,7 @@ impl<'db> StaticClassLiteral<'db> {
 
     #[salsa::tracked(returns(copy), cycle_initial=|_, _, _| None, heap_size=ruff_memory_usage::heap_size)]
     fn typed_dict_module_inner(self, db: &'db dyn Db) -> Option<TypedDictModule> {
-        let env = SemanticEnvironment::from_file(db, self.python_file(db));
+        let env = SemanticEnvironment::from_file(db, self.program_file(db));
         self.iter_mro(&env, None)
             .find_map(ClassBase::typed_dict_module)
     }
@@ -1081,8 +1086,8 @@ impl<'db> StaticClassLiteral<'db> {
             db: &'db dyn Db,
             class: StaticClassLiteral<'db>,
         ) -> Result<(Type<'db>, Option<MetaclassTransformInfo<'db>>), MetaclassError<'db>> {
-            let python_file = class.python_file(db);
-            let env = SemanticEnvironment::from_file(db, python_file);
+            let program_file = class.program_file(db);
+            let env = SemanticEnvironment::from_file(db, program_file);
             tracing::trace!("StaticClassLiteral::try_metaclass: {}", class.name(db));
 
             // Identify the class's own metaclass (or take the first base class's metaclass).
@@ -1101,7 +1106,7 @@ impl<'db> StaticClassLiteral<'db> {
                 return Ok((SubclassOfType::subclass_of_unknown(), None));
             }
 
-            let module = parsed_module(db, python_file).load(db);
+            let module = parsed_module(db, program_file.python_file(db)).load(db);
 
             let explicit_metaclass = class.explicit_metaclass(&env, &module);
 
@@ -2139,7 +2144,7 @@ impl<'db> StaticClassLiteral<'db> {
             DynamicTypedDict(DynamicTypedDictLiteral<'db>),
         }
 
-        let env = SemanticEnvironment::from_file(db, self.python_file(db));
+        let env = SemanticEnvironment::from_file(db, self.program_file(db));
         debug_assert_ne!(
             field_policy,
             CodeGeneratorKind::NamedTuple,
@@ -2305,7 +2310,7 @@ impl<'db> StaticClassLiteral<'db> {
         specialization: Option<Specialization<'db>>,
         field_policy: CodeGeneratorKind<'db>,
     ) -> FxIndexMap<Name, Field<'db>> {
-        let env = SemanticEnvironment::from_file(db, self.python_file(db));
+        let env = SemanticEnvironment::from_file(db, self.program_file(db));
         let class_body_scope = self.body_scope(db);
         let table = place_table(db, class_body_scope);
 
@@ -2572,8 +2577,8 @@ impl<'db> StaticClassLiteral<'db> {
         let class_body_scope = attribute.class_body_scope(db);
         let name = attribute.name(db).as_str();
         let target_method_decorator = attribute.target_method_decorator(db);
-        let python_file = class_body_scope.python_file(db);
-        let env = &SemanticEnvironment::from_file(db, python_file);
+        let program_file = class_body_scope.program_file(db);
+        let env = &SemanticEnvironment::from_file(db, program_file);
 
         // If we do not see any declarations of an attribute, neither in the class body nor in
         // any method, we build a union of the raw types inferred from all bindings of that
@@ -2584,8 +2589,8 @@ impl<'db> StaticClassLiteral<'db> {
         let mut is_attribute_bound = false;
         let mut provenance = Provenance::Unknown;
 
-        let module = parsed_module(db, python_file).load(db);
-        let index = semantic_index(db, python_file);
+        let module = parsed_module(db, program_file.python_file(db)).load(db);
+        let index = semantic_index(db, program_file);
         let class_map = use_def_map(db, class_body_scope);
         let class_table = place_table(db, class_body_scope);
         let is_valid_scope = |method_scope: &Scope| {
@@ -3200,7 +3205,7 @@ impl<'db> StaticClassLiteral<'db> {
             }
 
             tracing::trace!("Class::inheritance_cycle: {}", class.name(db));
-            let env = SemanticEnvironment::from_file(db, class.python_file(db));
+            let env = SemanticEnvironment::from_file(db, class.program_file(db));
 
             let visited_classes = &mut FxIndexSet::default();
             if !is_cyclically_defined_recursive(
@@ -3377,7 +3382,7 @@ impl<'db> StaticClassLiteral<'db> {
         db: &'db dyn Db,
         typevar: BoundTypeVarIdentity<'db>,
     ) -> TypeVarVariance {
-        let env = SemanticEnvironment::from_file(db, self.python_file(db));
+        let env = SemanticEnvironment::from_file(db, self.program_file(db));
         let typevar_in_generic_context = self
             .generic_context(&env)
             .is_some_and(|generic_context| generic_context.contains(db, typevar));
@@ -3386,10 +3391,10 @@ impl<'db> StaticClassLiteral<'db> {
             return TypeVarVariance::Bivariant;
         }
         let class_body_scope = self.body_scope(db);
-        let python_file = class_body_scope.python_file(db);
+        let program_file = class_body_scope.program_file(db);
         let python_version = env.python_version();
 
-        let index = semantic_index(db, python_file);
+        let index = semantic_index(db, program_file);
 
         let explicit_bases_variances = self
             .explicit_bases(&env)
@@ -3549,7 +3554,7 @@ fn explicit_bases_cycle_fn<'db>(
     literal: StaticClassLiteral<'db>,
 ) -> Box<[Type<'db>]> {
     if previous.len() == current.len() {
-        let env = SemanticEnvironment::from_file(db, literal.python_file(db));
+        let env = SemanticEnvironment::from_file(db, literal.program_file(db));
         // As long as the length of bases hasn't changed, use the same "monotonic widening"
         // strategy that we use with most types, to avoid oscillations.
         current
@@ -3581,7 +3586,7 @@ impl get_size2::GetSize for ImplicitAttributeName<'_> {}
 
 #[salsa::tracked(returns(deref), heap_size=ruff_memory_usage::heap_size)]
 fn implicit_attribute_names<'db>(db: &'db dyn Db, class_body_scope: ScopeId<'db>) -> Box<[Name]> {
-    let index = semantic_index(db, class_body_scope.python_file(db));
+    let index = semantic_index(db, class_body_scope.program_file(db));
     let mut names = Vec::new();
 
     for function_scope_id in attribute_scopes(db, class_body_scope) {
@@ -3605,7 +3610,7 @@ fn implicit_attribute_cycle_recover<'db>(
     member: Member<'db>,
     attribute: ImplicitAttributeName<'db>,
 ) -> Member<'db> {
-    let env = SemanticEnvironment::from_file(db, attribute.class_body_scope(db).python_file(db));
+    let env = SemanticEnvironment::from_file(db, attribute.class_body_scope(db).program_file(db));
     let inner = member
         .inner
         .cycle_normalized(&env, previous_member.inner, cycle);

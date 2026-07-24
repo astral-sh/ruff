@@ -63,7 +63,7 @@ impl<'db> NewType<'db> {
     #[salsa::tracked(
         returns(copy),
         cycle_initial=|db, _, self_: NewType<'db>| NewTypeBase::ClassType(ClassType::object(
-            &SemanticEnvironment::from_file(db, self_.definition(db).python_file(db)),
+            &SemanticEnvironment::from_file(db, self_.definition(db).program_file(db)),
         )),
         heap_size=ruff_memory_usage::heap_size
     )]
@@ -72,7 +72,7 @@ impl<'db> NewType<'db> {
         // in assignments, but invalid definitions still get here, and also `NewType` might show up
         // in places that aren't definitions at all. Fall back to `object` in all error cases.
         let definition = self.definition(db);
-        let env = SemanticEnvironment::from_file(db, definition.python_file(db));
+        let env = SemanticEnvironment::from_file(db, definition.program_file(db));
         let object_fallback = NewTypeBase::ClassType(ClassType::object(&env));
         let module = parsed_module(db, definition.python_file(db)).load(db);
         let DefinitionKind::Assignment(assignment) = definition.kind(db) else {

@@ -3563,7 +3563,7 @@ impl<'db> Type<'db> {
         )]
         fn assignable_solutions_impl<'db>(
             db: &'db dyn Db,
-            program: Program,
+            program: Program<'db>,
             source: Type<'db>,
             target: Type<'db>,
             inferable: InferableTypeVars<'db>,
@@ -3574,8 +3574,7 @@ impl<'db> Type<'db> {
         }
 
         let db = env.db();
-        let program = env.program();
-        assignable_solutions_impl(db, program, self, target, inferable)
+        assignable_solutions_impl(db, env.program(), self, target, inferable)
     }
 }
 
@@ -3585,8 +3584,7 @@ impl<'db> Type<'db> {
     heap_size = get_size2::GetSize::get_heap_size
 )]
 fn is_possibly_constraint_set_assignable<'db>(db: &'db dyn Db, types: TypePair<'db>) -> bool {
-    let program = types.program(db);
-    let env = &SemanticEnvironment::from_program(db, program);
+    let env = &SemanticEnvironment::from_program(db, types.program(db));
     types
         .first(db)
         .when_constraint_set_assignable_to_owned(env, types.second(db))

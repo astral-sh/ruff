@@ -28,7 +28,6 @@
 
 use crate::Db;
 use bitflags::bitflags;
-use ruff_db::PythonFile;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::visitor::source_order::{
     SourceOrderVisitor, TraversalSignal, walk_arguments, walk_expr,
@@ -40,6 +39,7 @@ use ruff_python_ast::{
 };
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 use std::ops::Deref;
+use ty_python_core::ProgramFile;
 use ty_python_core::definition::{Definition, DefinitionKind, ParameterDefinitionNodeKind};
 use ty_python_semantic::{
     HasType, ImportAliasResolution, ResolvedDefinition, SemanticModel, definitions_for_attribute,
@@ -185,10 +185,10 @@ impl Deref for SemanticTokens {
 /// Pass None to get tokens for the entire file.
 pub fn semantic_tokens(
     db: &dyn Db,
-    file: PythonFile<'_>,
+    file: ProgramFile<'_>,
     range: Option<TextRange>,
 ) -> SemanticTokens {
-    let parsed = parsed_module(db, file).load(db);
+    let parsed = parsed_module(db, file.python_file(db)).load(db);
     let model = SemanticModel::new(db, file);
 
     let mut visitor = SemanticTokenVisitor::new(&model, range);
@@ -303,7 +303,7 @@ impl<'db> SemanticTokenVisitor<'db> {
     ) -> Option<(SemanticTokenType, SemanticTokenModifier)> {
         let mut modifiers = SemanticTokenModifier::empty();
         let db = self.model.db();
-        let model = SemanticModel::new(db, definition.python_file(db));
+        let model = SemanticModel::new(db, definition.program_file(db));
 
         if model.is_type_alias_definition(definition) {
             return Some((SemanticTokenType::Class, modifiers));
@@ -4716,7 +4716,11 @@ from pathlib import Missing as Alias
         fn highlight_file(&self) -> SemanticTokens {
             semantic_tokens(
                 &self.db,
-                PythonFile::new(&self.db, self.file, self.db.python_version()),
+                ProgramFile::new(
+                    &self.db,
+                    self.file,
+                    self.db.semantic_environment().program(),
+                ),
                 None,
             )
         }
@@ -4725,7 +4729,11 @@ from pathlib import Missing as Alias
         fn highlight_range(&self, range: TextRange) -> SemanticTokens {
             semantic_tokens(
                 &self.db,
-                PythonFile::new(&self.db, self.file, self.db.python_version()),
+                ProgramFile::new(
+                    &self.db,
+                    self.file,
+                    self.db.semantic_environment().program(),
+                ),
                 Some(range),
             )
         }

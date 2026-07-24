@@ -7,12 +7,12 @@ use mdtest::parser::{self};
 use mdtest::{
     Failures, FileFailures, MarkdownEdit, OutputFormat, TestFile, TestOutcome, attempt_test,
 };
+use ruff_db::Db;
 use ruff_db::cancellation::CancellationTokenSource;
 use ruff_db::diagnostic::DiagnosticId;
 use ruff_db::files::{FileRootKind, system_path_to_file};
 use ruff_db::system::{DbWithWritableSystem as _, SystemPath, SystemPathBuf};
 use ruff_db::testing::{setup_logging, setup_logging_with_filter};
-use ruff_db::{Db, PythonFile};
 use ruff_diagnostics::Applicability;
 use ruff_source_file::OneIndexed;
 use std::fmt::Write;
@@ -374,7 +374,7 @@ fn run_test(
             all_diagnostics.extend(diagnostics);
 
             let pull_types_result = attempt_test(
-                |file| pull_types(db, PythonFile::new(db, file, python_version)),
+                |file| pull_types(db, Program::get(db).program_file(db, file)),
                 test_file,
             );
             match pull_types_result {
@@ -508,12 +508,12 @@ struct ModuleInconsistency<'db> {
 /// `list_module`.
 fn run_module_resolution_consistency_test(db: &db::Db) -> Result<(), Vec<ModuleInconsistency<'_>>> {
     let mut errs = vec![];
-    let python_version = db.python_version();
-    for from_list in list_modules(db, python_version).iter().copied() {
+    let environment = Program::get(db).resolver_environment(db);
+    for from_list in list_modules(db, environment).iter().copied() {
         // TODO: For now list_modules does not partake in desperate module resolution so
         // only compare against confident module resolution.
         errs.push(
-            match resolve_module_confident(db, python_version, from_list.name(db)) {
+            match resolve_module_confident(db, environment, from_list.name(db)) {
                 None => ModuleInconsistency {
                     db,
                     from_list,

@@ -810,7 +810,7 @@ fn enum_class_key_profile_inner<'db>(
     enum_class: EnumClassLiteral<'db>,
     operator: ComparisonOperator,
 ) -> EnumClassKeyProfile<'db> {
-    let env = SemanticEnvironment::from_file(db, enum_class.class_literal(db).python_file(db));
+    let env = SemanticEnvironment::from_file(db, enum_class.class_literal(db).program_file(db));
     let semantics = KnownComparisonSemantics::of_instance(
         &env,
         enum_class.class_literal(db).to_non_generic_instance(&env),
@@ -869,7 +869,7 @@ fn same_enum_comparison_profile_inner<'db>(
     enum_class: EnumClassLiteral<'db>,
     operator: ComparisonOperator,
 ) -> SameEnumComparisonProfile {
-    let env = SemanticEnvironment::from_file(db, enum_class.class_literal(db).python_file(db));
+    let env = SemanticEnvironment::from_file(db, enum_class.class_literal(db).program_file(db));
     let profile = enum_class_key_profile(&env, enum_class, operator);
     let (comparison_keys, members_compare_by_identity) = match profile.semantics {
         None => (None, false),

@@ -209,9 +209,9 @@ impl<'db> DynamicClassLiteral<'db> {
             db: &'db dyn Db,
             definition: Definition<'db>,
         ) -> Box<[Type<'db>]> {
-            let python_file = definition.python_file(db);
-            let env = SemanticEnvironment::from_file(db, python_file);
-            let module = parsed_module(db, python_file).load(db);
+            let program_file = definition.program_file(db);
+            let env = SemanticEnvironment::from_file(db, program_file);
+            let module = parsed_module(db, program_file.python_file(db)).load(db);
 
             let value = definition
                 .kind(db)
@@ -494,13 +494,13 @@ impl<'db> DynamicClassLiteral<'db> {
         cycle_initial=|db, _, self_: DynamicClassLiteral<'db>| {
             Ok(Mro::from([
                 ClassBase::Class(ClassType::NonGeneric(ClassLiteral::Dynamic(self_))),
-                ClassBase::object(&SemanticEnvironment::from_file(db, self_.scope(db).python_file(db))),
+                ClassBase::object(&SemanticEnvironment::from_file(db, self_.scope(db).program_file(db))),
             ]))
         },
         heap_size=ruff_memory_usage::heap_size
     )]
     fn try_mro_inner(self, db: &'db dyn Db) -> Result<Mro<'db>, DynamicMroError<'db>> {
-        let env = SemanticEnvironment::from_file(db, self.scope(db).python_file(db));
+        let env = SemanticEnvironment::from_file(db, self.scope(db).program_file(db));
         Mro::of_dynamic_class(&env, self)
     }
 

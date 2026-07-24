@@ -52,14 +52,13 @@ use crate::{
     },
     types::{MetaclassCandidate, TypeDefinition, UnionType},
 };
-use ruff_db::PythonFile;
 use ruff_db::diagnostic::Span;
 use ruff_db::files::File;
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast};
 use ruff_text_size::TextRange;
 use ty_python_core::definition::Definition;
-use ty_python_core::{place_table, use_def_map};
+use ty_python_core::{ProgramFile, place_table, use_def_map};
 
 mod dynamic_literal;
 mod enum_literal;
@@ -138,7 +137,7 @@ impl<'db> CodeGeneratorKind<'db> {
             db: &'db dyn Db,
             class: StaticClassLiteral<'db>,
         ) -> Option<CodeGeneratorKind<'db>> {
-            let env = SemanticEnvironment::from_file(db, class.python_file(db));
+            let env = SemanticEnvironment::from_file(db, class.program_file(db));
             // If a class is directly decorated as a dataclass, it's a dataclass.
             // If a class' metaclass is a dataclass transformer, it's a dataclass.
             // If a class inherits from a base class that is a dataclass
@@ -228,7 +227,7 @@ impl<'db> CodeGeneratorKind<'db> {
             }
 
             // Dynamic classes can also inherit from classes with dataclass_transform.
-            let env = SemanticEnvironment::from_file(db, class.scope(db).python_file(db));
+            let env = SemanticEnvironment::from_file(db, class.scope(db).program_file(db));
             class.iter_mro(&env).skip(1).find_map(|base| {
                 base.into_class().and_then(|class| {
                     class
@@ -468,7 +467,7 @@ impl<'db> GenericAlias<'db> {
         typevar: BoundTypeVarIdentity<'db>,
     ) -> TypeVarVariance {
         let origin = self.origin(db);
-        let env = SemanticEnvironment::from_file(db, origin.python_file(db));
+        let env = SemanticEnvironment::from_file(db, origin.program_file(db));
 
         let specialization = self.specialization(db);
 
@@ -767,17 +766,17 @@ impl<'db> ClassLiteral<'db> {
         }
     }
 
-    pub(crate) fn python_file(self, db: &'db dyn Db) -> PythonFile<'db> {
+    pub(crate) fn program_file(self, db: &'db dyn Db) -> ProgramFile<'db> {
         match self {
-            Self::Static(class) => class.python_file(db),
-            Self::Dynamic(class) => class.scope(db).python_file(db),
-            Self::DynamicNamedTuple(class) => class.scope(db).python_file(db),
-            Self::DynamicTypedDict(class) => class.scope(db).python_file(db),
-            Self::DynamicEnum(enum_lit) => enum_lit.scope(db).python_file(db),
+            Self::Static(class) => class.program_file(db),
+            Self::Dynamic(class) => class.scope(db).program_file(db),
+            Self::DynamicNamedTuple(class) => class.scope(db).program_file(db),
+            Self::DynamicTypedDict(class) => class.scope(db).program_file(db),
+            Self::DynamicEnum(enum_lit) => enum_lit.scope(db).program_file(db),
         }
     }
 
-    pub(crate) fn program(self, db: &'db dyn Db) -> Program {
+    pub(crate) fn program(self, db: &'db dyn Db) -> Program<'db> {
         match self {
             Self::Static(class) => class.program(db),
             Self::Dynamic(class) => class.scope(db).program(db),
@@ -1386,7 +1385,7 @@ impl<'db> ClassType<'db> {
         }
 
         let mut abstract_methods: FxIndexMap<Name, _> = FxIndexMap::default();
-        let env = &SemanticEnvironment::from_file(db, self.class_literal(db).python_file(db));
+        let env = &SemanticEnvironment::from_file(db, self.class_literal(db).program_file(db));
 
         // Iterate through the MRO in reverse order,
         // skipping `object` (we know it doesn't define any abstract methods)
@@ -1519,7 +1518,7 @@ impl<'db> ClassType<'db> {
         heap_size=ruff_memory_usage::heap_size
     )]
     fn nearest_disjoint_base_inner(self, db: &'db dyn Db) -> Option<DisjointBase<'db>> {
-        let env = SemanticEnvironment::from_file(db, self.class_literal(db).python_file(db));
+        let env = SemanticEnvironment::from_file(db, self.class_literal(db).program_file(db));
         self.iter_mro(&env)
             .filter_map(ClassBase::into_class)
             .find_map(|base| base.as_disjoint_base(&env))
@@ -2186,7 +2185,7 @@ impl<'db> ClassType<'db> {
         heap_size=ruff_memory_usage::heap_size
     )]
     fn into_callable_inner(self, db: &'db dyn Db) -> CallableTypes<'db> {
-        let env = &SemanticEnvironment::from_file(db, self.class_literal(db).python_file(db));
+        let env = &SemanticEnvironment::from_file(db, self.class_literal(db).program_file(db));
         // TODO: This mimics a lot of the logic in Type::try_call_from_constructor. Can we
         // consolidate the two? Can we invoke a class by upcasting the class into a Callable, and
         // then relying on the call binding machinery to Just Work™?
@@ -2956,7 +2955,7 @@ impl<'db> QualifiedClassName<'db> {
                 let body_scope = class.body_scope(self.db);
                 // Skip the class body scope itself.
                 (
-                    body_scope.python_file(self.db),
+                    body_scope.program_file(self.db),
                     body_scope.file_scope_id(self.db),
                     1,
                 )
@@ -2964,20 +2963,20 @@ impl<'db> QualifiedClassName<'db> {
             ClassLiteral::Dynamic(class) => {
                 // Dynamic classes don't have a body scope; start from the enclosing scope.
                 let scope = class.scope(self.db);
-                (scope.python_file(self.db), scope.file_scope_id(self.db), 0)
+                (scope.program_file(self.db), scope.file_scope_id(self.db), 0)
             }
             ClassLiteral::DynamicNamedTuple(namedtuple) => {
                 // Dynamic namedtuples don't have a body scope; start from the enclosing scope.
                 let scope = namedtuple.scope(self.db);
-                (scope.python_file(self.db), scope.file_scope_id(self.db), 0)
+                (scope.program_file(self.db), scope.file_scope_id(self.db), 0)
             }
             ClassLiteral::DynamicTypedDict(typeddict) => {
                 let scope = typeddict.scope(self.db);
-                (scope.python_file(self.db), scope.file_scope_id(self.db), 0)
+                (scope.program_file(self.db), scope.file_scope_id(self.db), 0)
             }
             ClassLiteral::DynamicEnum(enum_lit) => {
                 let scope = enum_lit.scope(self.db);
-                (scope.python_file(self.db), scope.file_scope_id(self.db), 0)
+                (scope.program_file(self.db), scope.file_scope_id(self.db), 0)
             }
         };
 

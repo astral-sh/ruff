@@ -3,11 +3,11 @@ use crate::types::function::FunctionDecorators;
 use crate::types::infer::function_known_decorator_flags;
 use crate::{Db, SemanticEnvironment};
 use get_size2::GetSize;
-use ruff_db::PythonFile;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::name::Name;
 use ruff_text_size::TextRange;
 use rustc_hash::FxHashSet;
+use ty_python_core::ProgramFile;
 use ty_python_core::definition::{DefinitionCategory, DefinitionKind, DefinitionState};
 use ty_python_core::place::ScopedPlaceId;
 use ty_python_core::scope::{FileScopeId, ScopeKind};
@@ -73,9 +73,9 @@ pub struct UnusedBinding {
 /// without broader reference analysis. Bare local annotations (`x: int`) are also
 /// reported, but only if the symbol is neither bound nor used elsewhere in the scope.
 #[salsa::tracked(returns(deref), heap_size=ruff_memory_usage::heap_size)]
-pub fn unused_bindings(db: &dyn Db, file: PythonFile<'_>) -> Box<[UnusedBinding]> {
+pub fn unused_bindings(db: &dyn Db, file: ProgramFile<'_>) -> Box<[UnusedBinding]> {
     let source_file = file.file(db);
-    let parsed = parsed_module(db, file).load(db);
+    let parsed = parsed_module(db, file.python_file(db)).load(db);
     let is_stub_file = source_file.is_stub(db);
     let index = semantic_index(db, file);
     let mut unused = Vec::new();
@@ -191,11 +191,11 @@ pub fn unused_bindings(db: &dyn Db, file: PythonFile<'_>) -> Box<[UnusedBinding]
 mod tests {
     use super::{UnusedBinding, unused_bindings};
     use crate::db::tests::TestDbBuilder;
-    use ruff_db::PythonFile;
     use ruff_db::files::system_path_to_file;
     use ruff_python_ast::name::Name;
     use ruff_python_trivia::textwrap::dedent;
     use ruff_text_size::{TextRange, TextSize};
+    use ty_python_core::ProgramFile;
 
     fn collect_unused_bindings_in_file(
         path: &str,
@@ -203,8 +203,11 @@ mod tests {
     ) -> anyhow::Result<Vec<UnusedBinding>> {
         let db = TestDbBuilder::new().with_file(path, source).build()?;
         let file = system_path_to_file(&db, path).unwrap();
-        let mut bindings =
-            unused_bindings(&db, PythonFile::new(&db, file, db.python_version())).to_vec();
+        let mut bindings = unused_bindings(
+            &db,
+            ProgramFile::new(&db, file, db.semantic_environment().program()),
+        )
+        .to_vec();
         bindings.sort_unstable_by_key(|binding| (binding.range.start(), binding.range.end()));
         Ok(bindings)
     }

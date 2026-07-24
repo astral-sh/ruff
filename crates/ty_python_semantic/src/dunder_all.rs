@@ -1,23 +1,23 @@
-use ruff_db::PythonFile;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::name::Name;
 use ruff_python_ast::statement_visitor::{StatementVisitor, walk_stmt};
 use ruff_python_ast::{self as ast};
 use rustc_hash::FxHashSet;
-use ty_module_resolver::{ModuleName, resolve_module};
+use ty_module_resolver::{ImportingFile, ModuleName, resolve_module};
 
 use crate::types::{Type, TypeContext, infer_expression_types};
 use crate::{Db, SemanticEnvironment};
+use ty_python_core::ProgramFile;
 use ty_python_core::{SemanticIndex, Truthiness, semantic_index};
 
 /// Returns a set of names in the `__all__` variable for `file`, [`None`] if it is not defined or
 /// if it contains invalid elements.
 #[salsa::tracked(returns(as_ref), cycle_initial=|_, _, _| None, heap_size=ruff_memory_usage::heap_size)]
-pub(crate) fn dunder_all_names(db: &dyn Db, file: PythonFile<'_>) -> Option<FxHashSet<Name>> {
+pub(crate) fn dunder_all_names(db: &dyn Db, file: ProgramFile<'_>) -> Option<FxHashSet<Name>> {
     let source_file = file.file(db);
     let _span = tracing::trace_span!("dunder_all_names", file=?source_file.path(db)).entered();
 
-    let module = parsed_module(db, file).load(db);
+    let module = parsed_module(db, file.python_file(db)).load(db);
     let index = semantic_index(db, file);
     let mut collector = DunderAllNamesCollector::new(db, file, index);
     collector.visit_body(module.suite());
@@ -27,7 +27,7 @@ pub(crate) fn dunder_all_names(db: &dyn Db, file: PythonFile<'_>) -> Option<FxHa
 /// A visitor that collects the names in the `__all__` variable of a module.
 struct DunderAllNamesCollector<'db> {
     env: SemanticEnvironment<'db>,
-    file: PythonFile<'db>,
+    file: ProgramFile<'db>,
 
     /// The semantic index for the module.
     index: &'db SemanticIndex<'db>,
@@ -44,7 +44,7 @@ struct DunderAllNamesCollector<'db> {
 }
 
 impl<'db> DunderAllNamesCollector<'db> {
-    fn new(db: &'db dyn Db, file: PythonFile<'db>, index: &'db SemanticIndex<'db>) -> Self {
+    fn new(db: &'db dyn Db, file: ProgramFile<'db>, index: &'db SemanticIndex<'db>) -> Self {
         Self {
             env: SemanticEnvironment::from_file(db, file),
             file,
@@ -91,7 +91,8 @@ impl<'db> DunderAllNamesCollector<'db> {
                 };
                 let Some(module_dunder_all_names) = module_literal
                     .module(db)
-                    .python_file(db)
+                    .file(db)
+                    .map(|file| ProgramFile::new(db, file, self.env.program()))
                     .and_then(|file| dunder_all_names(db, file))
                 else {
                     // The module either does not have a `__all__` variable or it is invalid.
@@ -159,9 +160,23 @@ impl<'db> DunderAllNamesCollector<'db> {
         import_from: &ast::StmtImportFrom,
     ) -> Option<&'db FxHashSet<Name>> {
         let db = self.env.db();
-        let module_name = ModuleName::from_import_statement(db, self.file, import_from).ok()?;
-        let module = resolve_module(db, self.file, &module_name)?;
-        dunder_all_names(db, module.python_file(db)?)
+        let file = self.file.file(db);
+        let resolver_environment = self.env.resolver_environment();
+        let module_name = ModuleName::from_import_statement(
+            db,
+            ImportingFile::File(file, resolver_environment),
+            import_from,
+        )
+        .ok()?;
+        let module = resolve_module(
+            db,
+            ImportingFile::File(file, resolver_environment),
+            &module_name,
+        )?;
+        dunder_all_names(
+            db,
+            ProgramFile::new(db, module.file(db)?, resolver_environment),
+        )
     }
 
     /// Infer the type of a standalone expression.

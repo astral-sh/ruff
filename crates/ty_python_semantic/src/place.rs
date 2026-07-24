@@ -1,6 +1,5 @@
 use crate::SemanticEnvironment;
 use itertools::Either;
-use ruff_db::PythonFile;
 use ruff_index::IndexSlice;
 use ruff_python_ast::PythonVersion;
 use ty_module_resolver::{
@@ -17,6 +16,7 @@ use crate::types::{
     UnionBuilder, UnionType, binding_type, inferred_declaration, is_discarded_dict_key_assignment,
 };
 use crate::{Db, FxIndexSet, FxOrderSet};
+use ty_python_core::ProgramFile;
 use ty_python_core::definition::{Definition, DefinitionKind, DefinitionState};
 use ty_python_core::narrowing_constraints::ScopedNarrowingConstraint;
 use ty_python_core::place::ScopedPlaceId;
@@ -484,7 +484,7 @@ pub(crate) fn symbol<'db>(
 /// Use [`imported_symbol`] to perform the lookup as seen from outside the file (e.g. via imports).
 pub(crate) fn explicit_global_symbol<'db>(
     env: &SemanticEnvironment<'db>,
-    file: PythonFile<'db>,
+    file: ProgramFile<'db>,
     name: &str,
 ) -> PlaceAndQualifiers<'db> {
     let db = env.db();
@@ -507,7 +507,7 @@ pub(crate) fn explicit_global_symbol<'db>(
 #[allow(unused)]
 pub(crate) fn global_symbol<'db>(
     env: &SemanticEnvironment<'db>,
-    file: PythonFile<'db>,
+    file: ProgramFile<'db>,
     name: &str,
 ) -> PlaceAndQualifiers<'db> {
     explicit_global_symbol(env, file, name)
@@ -522,13 +522,13 @@ pub(crate) fn global_symbol<'db>(
 /// `None` should be passed for the `file` parameter if looking up a symbol on a namespace package.
 pub(crate) fn imported_symbol<'db>(
     env: &SemanticEnvironment<'db>,
-    file: Option<PythonFile<'db>>,
+    file: Option<ProgramFile<'db>>,
     name: &str,
     requires_explicit_reexport: Option<RequiresExplicitReExport>,
 ) -> PlaceAndQualifiers<'db> {
     let db = env.db();
     if let Some(file) = file {
-        debug_assert_eq!(file.python_version(db), env.python_version());
+        debug_assert_eq!(file.program(db), env.program());
     }
 
     // If it's not found in the global scope, check if it's present as an instance on
@@ -605,12 +605,12 @@ pub(crate) fn builtins_symbol<'db>(
     symbol: &str,
 ) -> PlaceAndQualifiers<'db> {
     let db = env.db();
-    let python_version = env.python_version();
+    let resolver_environment = env.resolver_environment();
     let resolver = |module: Module<'db>| {
-        let python_file = module.python_file(db)?;
+        let program_file = ProgramFile::new(db, module.file(db)?, resolver_environment);
         let found_symbol = symbol_impl(
             env,
-            global_scope(db, python_file),
+            global_scope(db, program_file),
             symbol,
             RequiresExplicitReExport::Yes,
             ConsideredDefinitions::EndOfScope,
@@ -619,7 +619,7 @@ pub(crate) fn builtins_symbol<'db>(
             // We're looking up in the builtins namespace and not the module, so we should
             // do the normal lookup in `types.ModuleType` and not the special one as in
             // `imported_symbol`.
-            module_type_implicit_global_symbol(env, python_file, symbol)
+            module_type_implicit_global_symbol(env, program_file, symbol)
         });
         // If this symbol is not present in project-level builtins, search in the default ones.
         found_symbol
@@ -628,12 +628,12 @@ pub(crate) fn builtins_symbol<'db>(
     };
     resolve_module_confident(
         db,
-        python_version,
+        resolver_environment,
         &ModuleName::new_static("__builtins__").unwrap(),
     )
     .and_then(&resolver)
     .or_else(|| {
-        resolve_module_confident(db, python_version, &KnownModule::Builtins.name())
+        resolve_module_confident(db, resolver_environment, &KnownModule::Builtins.name())
             .and_then(resolver)
     })
     .unwrap_or_default()
@@ -648,9 +648,9 @@ pub(crate) fn known_module_symbol<'db>(
     symbol: &str,
 ) -> PlaceAndQualifiers<'db> {
     let db = env.db();
-    resolve_module_confident(db, env.python_version(), &known_module.name())
+    resolve_module_confident(db, env.resolver_environment(), &known_module.name())
         .and_then(|module| {
-            let file = module.python_file(db)?;
+            let file = ProgramFile::new(db, module.file(db)?, env.program());
             Some(imported_symbol(env, Some(file), symbol, None))
         })
         .unwrap_or_default()
@@ -694,8 +694,11 @@ fn core_module_scope<'db>(
     core_module: KnownModule,
 ) -> Option<ScopeId<'db>> {
     let db = env.db();
-    let module = resolve_module_confident(db, env.python_version(), &core_module.name())?;
-    Some(global_scope(db, module.python_file(db)?))
+    let module = resolve_module_confident(db, env.resolver_environment(), &core_module.name())?;
+    Some(global_scope(
+        db,
+        ProgramFile::new(db, module.file(db)?, env.program()),
+    ))
 }
 
 /// Infer the combined type from an iterator of bindings, and return it
@@ -1038,7 +1041,7 @@ pub(crate) fn place_by_id<'db>(
     returns(copy),
     cycle_initial=|_, id, _, _, _, _| Place::bound(Type::divergent(id)).into(),
     cycle_fn=|db, cycle, previous: &PlaceAndQualifiers<'db>, place: PlaceAndQualifiers<'db>, scope: ScopeId<'db>, _, _, _| {
-        let env = SemanticEnvironment::from_file(db, scope.python_file(db));
+        let env = SemanticEnvironment::from_file(db, scope.program_file(db));
         place.cycle_normalized(&env, *previous, cycle)
     },
     heap_size=ruff_memory_usage::heap_size
@@ -1051,7 +1054,7 @@ fn place_by_id_inner<'db>(
     considered_definitions: ConsideredDefinitions,
 ) -> PlaceAndQualifiers<'db> {
     let use_def = use_def_map(db, scope);
-    let env = SemanticEnvironment::from_file(db, scope.python_file(db));
+    let env = SemanticEnvironment::from_file(db, scope.program_file(db));
 
     // If the place is declared, the public type is based on declarations; otherwise, it's based
     // on inference from bindings.
@@ -1346,7 +1349,7 @@ fn symbol_impl<'db>(
     let _span = tracing::trace_span!("symbol", ?name).entered();
 
     let is_known_module = |known_module| {
-        file_to_module(db, scope.python_file(db))
+        file_to_module(db, scope.program_file(db).resolver_file(db))
             .is_some_and(|module| module.is_known(db, known_module))
     };
 
@@ -1408,7 +1411,7 @@ pub(crate) fn loop_header_reachability<'db>(
 #[salsa::tracked(
     returns(clone),
     cycle_initial=|db, _, definition: Definition<'db>| {
-        let env = SemanticEnvironment::from_file(db, definition.python_file(db));
+        let env = SemanticEnvironment::from_file(db, definition.program_file(db));
         loop_header_reachability_impl(&env, definition, true)
     },
     cycle_fn=loop_header_reachability_cycle_recover,
@@ -1418,7 +1421,7 @@ fn loop_header_reachability_inner<'db>(
     db: &'db dyn Db,
     definition: Definition<'db>,
 ) -> LoopHeaderReachability<'db> {
-    let env = SemanticEnvironment::from_file(db, definition.python_file(db));
+    let env = SemanticEnvironment::from_file(db, definition.program_file(db));
     loop_header_reachability_impl(&env, definition, false)
 }
 
@@ -2065,7 +2068,7 @@ fn is_reexported(db: &dyn Db, definition: Definition<'_>) -> bool {
     // At this point, the definition should either be an `import` or `from ... import` statement.
     // This is because the default value of `is_reexported` is `true` for any other kind of
     // definition.
-    let Some(all_names) = dunder_all_names(db, definition.python_file(db)) else {
+    let Some(all_names) = dunder_all_names(db, definition.program_file(db)) else {
         return false;
     };
     let table = place_table(db, definition.scope(db));
@@ -2075,10 +2078,10 @@ fn is_reexported(db: &dyn Db, definition: Definition<'_>) -> bool {
 }
 
 pub(crate) mod implicit_globals {
-    use ruff_db::PythonFile;
     use ruff_python_ast as ast;
     use ruff_python_ast::name::Name;
 
+    use crate::Program;
     use crate::db::Db;
     use crate::module_docstring;
     use crate::place::{Definedness, PlaceAndQualifiers};
@@ -2088,7 +2091,7 @@ pub(crate) mod implicit_globals {
     };
     use ruff_python_ast::PythonVersion;
     use ty_python_core::symbol::Symbol;
-    use ty_python_core::{place_table, use_def_map};
+    use ty_python_core::{ProgramFile, place_table, use_def_map};
 
     use super::{DefinedPlace, Place, place_from_declarations};
 
@@ -2138,7 +2141,7 @@ pub(crate) mod implicit_globals {
     /// global scope if they're being imported **from a different file**.
     pub(crate) fn module_type_implicit_global_symbol<'db>(
         env: &SemanticEnvironment<'db>,
-        file: PythonFile<'db>,
+        file: ProgramFile<'db>,
         name: &str,
     ) -> PlaceAndQualifiers<'db> {
         let db = env.db();
@@ -2151,7 +2154,7 @@ pub(crate) mod implicit_globals {
             // We special-case `__doc__` because a module with a literal docstring has `__doc__`
             // set to that string at runtime. We only narrow when a docstring is present: `__doc__`
             // may be set dynamically, so we fall back to the typeshed's `str | None`.
-            "__doc__" if module_docstring(db, file).is_some() => {
+            "__doc__" if module_docstring(db, file.python_file(db)).is_some() => {
                 // Docstrings are stripped in `-OO` optimized mode, but here we assume that the
                 // existence of an actual docstring AND the usage of `__doc__` is reason enough to
                 // believe that it will exist at runtime.
@@ -2232,13 +2235,12 @@ pub(crate) mod implicit_globals {
     fn module_type_symbols<'db>(env: &SemanticEnvironment<'db>) -> &'db [ast::name::Name] {
         #[salsa::tracked(
             returns(deref),
-            cycle_initial=|_, _, _, ()| smallvec::SmallVec::default(),
+            cycle_initial=|_, _, _| smallvec::SmallVec::default(),
             heap_size=ruff_memory_usage::heap_size
         )]
-        fn module_type_symbols_inner(
-            db: &dyn Db,
-            program: ty_python_core::Program,
-            _: (), // TODO: Remove once this is a query over `Program`.
+        fn module_type_symbols_inner<'db>(
+            db: &'db dyn Db,
+            program: Program<'db>,
         ) -> smallvec::SmallVec<[ast::name::Name; 8]> {
             let env = SemanticEnvironment::from_program(db, program);
             let Some(module_type) = KnownClass::ModuleType
@@ -2269,7 +2271,7 @@ pub(crate) mod implicit_globals {
                 .collect()
         }
 
-        module_type_symbols_inner(env.db(), env.program(), ())
+        module_type_symbols_inner(env.db(), env.program())
     }
 
     /// Returns an iterator over all implicit module global symbols and their types.
@@ -2279,7 +2281,7 @@ pub(crate) mod implicit_globals {
     /// for the current module, not `str | None`).
     pub(crate) fn all_implicit_module_globals<'db>(
         db: &'db dyn Db,
-        file: PythonFile<'db>,
+        file: ProgramFile<'db>,
     ) -> impl Iterator<Item = (Name, Type<'db>)> + 'db {
         // Special-cased implicit globals that are not in `module_type_symbols`
         let special_cased = ["__builtins__", "__debug__", "__warningregistry__"]

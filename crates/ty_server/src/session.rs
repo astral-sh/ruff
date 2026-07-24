@@ -27,7 +27,7 @@ use ty_project::watch::{ChangeEvent, CreatedKind};
 use ty_project::{ChangeResult, Db as _, ProjectDatabase, ProjectMetadata};
 
 use index::DocumentError;
-use ty_python_core::program::UseDefaultStrategy;
+use ty_python_core::program::{Program, UseDefaultStrategy};
 
 pub(crate) use self::options::InitializationOptions;
 pub use self::options::{ClientOptions, DiagnosticMode, GlobalOptions, WorkspaceOptions};
@@ -1090,7 +1090,11 @@ impl Session {
             let paths = self
                 .project_dbs()
                 .flat_map(|db| {
-                    ty_module_resolver::system_module_search_paths(db).map(move |path| (db, path))
+                    ty_module_resolver::system_module_search_paths(
+                        db,
+                        Program::get(db).resolver_environment(db),
+                    )
+                    .map(move |path| (db, path))
                 })
                 .filter(|(db, path)| !path.starts_with(db.project().root(*db)))
                 .map(|(_, path)| path)

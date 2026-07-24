@@ -37,14 +37,14 @@ pub(crate) mod tests {
     use ty_python_core::platform::PythonPlatform;
 
     use crate::{SemanticEnvironment, check_file_unwrap, default_lint_registry};
+    use ruff_db::Db as SourceDb;
     use ruff_db::files::Files;
     use ruff_db::system::{
         DbWithTestSystem, DbWithWritableSystem as _, System, SystemPath, SystemPathBuf, TestSystem,
     };
     use ruff_db::vendored::VendoredFileSystem;
-    use ruff_db::{Db as SourceDb, PythonFile};
     use ruff_python_ast::PythonVersion;
-    use ty_module_resolver::{Db as ModuleResolverDb, SearchPathSettings, SearchPaths};
+    use ty_module_resolver::{Db as ModuleResolverDb, SearchPathSettings};
     use ty_python_core::program::{FallibleStrategy, Program, ProgramSettings};
     use ty_site_packages::{PythonVersionSource, PythonVersionWithSource};
 
@@ -90,7 +90,7 @@ pub(crate) mod tests {
         }
 
         pub(crate) fn semantic_environment(&self) -> SemanticEnvironment<'_> {
-            SemanticEnvironment::from_program(self, self.python_version())
+            SemanticEnvironment::from_program(self, Program::get(self).resolver_environment(self))
         }
 
         /// Marks `file` as open in the editor.
@@ -155,7 +155,7 @@ pub(crate) mod tests {
                 return Vec::new();
             }
 
-            check_file_unwrap(self, PythonFile::new(self, file, self.python_version()))
+            check_file_unwrap(self, Program::get(self).program_file(self, file))
         }
 
         fn rule_selection(&self, _file: File) -> &RuleSelection {
@@ -184,11 +184,7 @@ pub(crate) mod tests {
     }
 
     #[salsa::db]
-    impl ModuleResolverDb for TestDb {
-        fn search_paths(&self) -> &SearchPaths {
-            Program::get(self).search_paths(self)
-        }
-    }
+    impl ModuleResolverDb for TestDb {}
 
     #[salsa::db]
     impl salsa::Database for TestDb {}

@@ -1120,7 +1120,7 @@ fn effective_superclass_variable_kind_inner<'db>(
     superclass: ClassType<'db>,
     name: Name,
 ) -> Option<VariableKind> {
-    let env = &SemanticEnvironment::from_file(db, superclass.class_literal(db).python_file(db));
+    let env = &SemanticEnvironment::from_file(db, superclass.class_literal(db).program_file(db));
     let inherited_variable_kind = || {
         superclass
             .iter_mro(env)

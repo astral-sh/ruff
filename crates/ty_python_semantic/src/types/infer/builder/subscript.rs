@@ -219,10 +219,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         let tuple_generic_alias =
-            |env: &SemanticEnvironment<'db>, tuple: Option<TupleType<'db>>| {
-                let db = env.db();
+            |db: &'db dyn Db, resolver_environment, tuple: Option<TupleType<'db>>| {
                 let tuple = tuple.unwrap_or_else(|| TupleType::homogeneous(db, Type::unknown()));
-                Type::from(tuple.to_class_type(db, env.program()))
+                Type::from(tuple.to_class_type(db, resolver_environment))
             };
 
         match value_ty {
@@ -234,7 +233,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 // updating all of the subscript logic below to use custom callables for all of the _other_
                 // special cases, too.
                 if class.is_tuple(db) {
-                    return tuple_generic_alias(env, self.infer_tuple_type_expression(subscript));
+                    return tuple_generic_alias(
+                        db,
+                        self.semantic_environment().resolver_environment(),
+                        self.infer_tuple_type_expression(subscript),
+                    );
                 } else if class.is_known(db, KnownClass::Type) {
                     let argument_ty = self.infer_type_expression(slice);
                     return Type::KnownInstance(KnownInstanceType::TypeGenericAlias(
@@ -265,7 +268,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
             Type::SpecialForm(special_form) => match special_form {
                 SpecialFormType::Tuple => {
-                    return tuple_generic_alias(env, self.infer_tuple_type_expression(subscript));
+                    return tuple_generic_alias(
+                        db,
+                        self.semantic_environment().resolver_environment(),
+                        self.infer_tuple_type_expression(subscript),
+                    );
                 }
                 SpecialFormType::Literal => match self.infer_literal_parameter_type(slice) {
                     Ok(result) => {
@@ -2039,7 +2046,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 .as_nominal_instance()
                                 .and_then(|instance| instance.class(env).static_class_literal(db))
                                 .and_then(|(class_literal, _)| {
-                                    file_to_module(db, class_literal.python_file(db))
+                                    let file = class_literal.program_file(db);
+                                    file_to_module(db, file.resolver_file(db))
                                 })
                                 .and_then(|module| module.search_path(db))
                                 .is_some_and(ty_module_resolver::SearchPath::is_first_party)

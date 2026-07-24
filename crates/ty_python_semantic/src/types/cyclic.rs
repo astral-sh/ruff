@@ -708,11 +708,11 @@ mod tests {
     use crate::db::tests::setup_db;
     use crate::place::global_symbol;
     use crate::types::Type;
-    use ruff_db::PythonFile;
     use ruff_db::files::system_path_to_file;
     use ruff_db::system::DbWithWritableSystem;
     use std::cell::Cell;
     use std::hash::{Hash, Hasher};
+    use ty_python_core::ProgramFile;
 
     struct TestVisit;
 
@@ -780,7 +780,7 @@ mod tests {
     fn global_instance_type<'db>(env: &SemanticEnvironment<'db>, name: &str) -> Type<'db> {
         let db = env.db();
         let file = system_path_to_file(db, "/src/a.py").unwrap();
-        let file = PythonFile::new(db, file, env.python_version());
+        let file = ProgramFile::new(db, file, env.program());
         global_symbol(env, file, name)
             .place
             .expect_type()
