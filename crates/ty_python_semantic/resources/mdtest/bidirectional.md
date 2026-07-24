@@ -1820,6 +1820,8 @@ def _(dtype: FloatDtype):
     reveal_type(x)  # revealed: int | float
 ```
 
+Intersection bindings are similarly evaluated under fixpoint iteration:
+
 ```py
 from typing import Protocol, runtime_checkable
 
@@ -1850,6 +1852,21 @@ def _(callback: TakesInt) -> None:
         # TODO: Perform fixpoint iteration when evaluating callable intersections.
         x2 = callback("str", lambda value: reveal_type(value) + "!")  # revealed: Unknown
         reveal_type(x2)  # revealed: str
+```
+
+Type context specialized to a gradual type should not be ignored:
+
+```py
+from ty_extensions import Unknown
+
+def merge[K, V](*maps: dict[K, V]) -> tuple[K, V]:
+    raise NotImplementedError
+
+def _(dynamic: Unknown):
+    # TODO: This should not error.
+    # error: [invalid-argument-type]
+    # error: [invalid-argument-type]
+    reveal_type(merge({"a": 1}, {2: "b"}, dynamic))  # revealed: tuple[str | int | Unknown, int | str | Unknown]
 ```
 
 Note that long chains of callables with constraint dependencies in reverse source-order may require

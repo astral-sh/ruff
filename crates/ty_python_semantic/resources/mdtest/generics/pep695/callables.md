@@ -627,6 +627,9 @@ call(callback, Base())
 When solving an upper bound involving a union, we should use the same typing relation to look for
 redundant elements as we use for unions in general.
 
+For a gradual target range, only the top endpoint constrains an inferred type variable. The static
+lower endpoint can be omitted by a wider materialization and is therefore not retained here.
+
 ```py
 from typing import Any, Callable, final
 
@@ -638,7 +641,7 @@ class A: ...
 
 def callback(value: A | Any) -> None: ...
 
-reveal_type(infer(callback))  # revealed: A | Any
+reveal_type(infer(callback))  # revealed: Any
 ```
 
 ## Overloaded callable as generic `Callable` argument

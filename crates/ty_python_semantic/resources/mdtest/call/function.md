@@ -127,8 +127,8 @@ reveal_type(cn)  # revealed: (int, /) -> int
 ## Recursive callable constraints in constructors
 
 When inferring the generic constructor for `map`, an overloaded callable together with a gradual
-iterable can produce expanding recursive constraints. We should fall back rather than repeatedly
-substituting those constraints.
+iterable can produce recursive constraints. The gradual lower bound should propagate through those
+constraints without repeatedly expanding them.
 
 ```py
 import operator
@@ -137,7 +137,130 @@ from typing import Any
 ints: list[int] = []
 dynamic: Any = []
 
-reveal_type(map(operator.add, ints, dynamic))  # revealed: map[Unknown]
+reveal_type(map(operator.add, ints, dynamic))  # revealed: map[int | Any]
+```
+
+## Gradual constraints for generic parameters
+
+When a gradual type is assigned to a type such as `tuple[T]`, we assume that the gradual type
+materializes to some tuple type `tuple[Any]`, and so infer a lower bound `Any <: T`, preserving
+graduality.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from collections.abc import Iterable
+from typing import Any, Callable, Protocol
+from typing_extensions import TypeVar
+from ty_extensions import Unknown
+
+DefaultFloat = TypeVar("DefaultFloat", bound=float, default=float)
+
+def g[T](x: tuple[T]) -> T:
+    raise NotImplementedError
+
+def f[T: int](x: T) -> T:
+    return x
+
+def f_tuple[T: tuple[int]](x: T) -> T:
+    return x
+
+def g_with_fallback[T](x: tuple[T], fallback: T) -> T:
+    return fallback
+
+def g_with_upper[T](x: tuple[T], upper: Callable[[T], None]) -> T:
+    raise NotImplementedError
+
+def g_union[T, U](x: tuple[T | U]) -> tuple[T, U]:
+    raise NotImplementedError
+
+def g_union_arms[T, U](x: T | tuple[U]) -> tuple[T, U]:
+    raise NotImplementedError
+
+def g_default(x: DefaultFloat | tuple[DefaultFloat]) -> DefaultFloat:
+    raise NotImplementedError
+
+def g_optional(x: DefaultFloat | None) -> DefaultFloat:
+    raise NotImplementedError
+
+def g_iterable[T](x: T | Iterable[T]) -> T:
+    raise NotImplementedError
+
+class RecursiveProtocol[T](Protocol):
+    def item(self) -> T | "RecursiveProtocol[T]": ...
+
+def recursive_protocol[T](value: RecursiveProtocol[T]) -> T:
+    raise NotImplementedError
+
+class Box[T](Protocol):
+    @property
+    def value(self) -> T: ...
+
+class AnyBox:
+    value: Any
+
+def unbox[T](value: Box[T]) -> T:
+    raise NotImplementedError
+
+class Invariant[T]:
+    value: T
+
+def invariant[T](x: Invariant[T]) -> T:
+    raise NotImplementedError
+
+def consume[T](callback: Callable[[T], int], value: T) -> T:
+    return value
+
+def produce[T](callback: Callable[[], T], fallback: T) -> T:
+    return fallback
+
+def _(x: Any):
+    reveal_type(g(x))  # revealed: Any
+    reveal_type(f(g(x)))  # revealed: Any
+    reveal_type(f_tuple(g(x)))  # revealed: Any
+    reveal_type(g_with_fallback(x, 1))  # revealed: Any | Literal[1]
+    reveal_type(g_union(x))  # revealed: tuple[Any, Any]
+    reveal_type(g_union_arms(x))  # revealed: tuple[Any, Any]
+    reveal_type(g_default(x))  # revealed: Any
+    reveal_type(g_optional(x))  # revealed: Any
+    reveal_type(g_iterable(x))  # revealed: Any
+    # Recursive protocol expansion may still fall back to `Unknown`.
+    # TODO: This should reveal `Any`.
+    reveal_type(recursive_protocol(x))  # revealed: Unknown
+    reveal_type(unbox(AnyBox()))  # revealed: Any
+    reveal_type(invariant(x))  # revealed: Any
+    reveal_type(consume(x, 1))  # revealed: Literal[1]
+    reveal_type(produce(x, 1))  # revealed: Any | Literal[1]
+
+def _(x: Unknown):
+    reveal_type(g(x))  # revealed: Unknown
+    reveal_type(f(g(x)))  # revealed: Unknown
+    reveal_type(f_tuple(g(x)))  # revealed: Unknown
+    reveal_type(g_with_fallback(x, 1))  # revealed: Unknown | Literal[1]
+    reveal_type(g_union(x))  # revealed: tuple[Unknown, Unknown]
+    reveal_type(g_union_arms(x))  # revealed: tuple[Unknown, Unknown]
+    reveal_type(g_default(x))  # revealed: Unknown
+    reveal_type(g_optional(x))  # revealed: Unknown
+    reveal_type(g_iterable(x))  # revealed: Unknown
+    reveal_type(recursive_protocol(x))  # revealed: Unknown
+    reveal_type(invariant(x))  # revealed: Unknown
+    reveal_type(consume(x, 1))  # revealed: Literal[1]
+    reveal_type(produce(x, 1))  # revealed: Unknown | Literal[1]
+
+def _(x: Any, upper: Callable[[int], None]):
+    reveal_type(g_with_upper(x, upper))  # revealed: Any
+
+def _(x: Unknown, upper: Callable[[int], None]):
+    reveal_type(g_with_upper(x, upper))  # revealed: Unknown
+
+def outer[S](callback: Any, value: S):
+    def inner[T](callback: Callable[[T], S], value: T) -> tuple[T, S]:
+        raise NotImplementedError
+
+    reveal_type(inner(callback, value))  # revealed: tuple[Any | S@outer, S@outer]
 ```
 
 ## Decorated
