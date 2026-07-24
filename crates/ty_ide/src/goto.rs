@@ -246,7 +246,7 @@ pub(crate) enum GotoTarget<'a> {
 pub(crate) struct Definitions<'db>(Vec<ResolvedDefinition<'db>>);
 
 impl<'db> Definitions<'db> {
-    fn new(mut resolved: Vec<ResolvedDefinition<'db>>) -> Self {
+    pub(crate) fn new(mut resolved: Vec<ResolvedDefinition<'db>>) -> Self {
         for index in (1..resolved.len()).rev() {
             if resolved[..index].contains(&resolved[index]) {
                 resolved.remove(index);
@@ -339,8 +339,43 @@ impl<'db> Definitions<'db> {
         goto_target: &GotoTarget<'_>,
     ) -> Option<Definitions<'db>> {
         let definitions = self.goto_declaration(model, goto_target)?;
-        let resolved = StubMapper::new(model.db()).map_definitions(definitions.0);
-        Some(Self::new(resolved))
+        Some(definitions.map_stubs(model.db()))
+    }
+
+    /// Map definitions from stub files to corresponding source implementations.
+    pub(crate) fn map_stubs(self, db: &'db dyn ty_python_semantic::Db) -> Definitions<'db> {
+        let resolved = StubMapper::new(db).map_definitions(self.0);
+        Self::new(resolved)
+    }
+
+    /// Map stub definitions to corresponding source implementations for implementation lookup.
+    ///
+    /// Stub definitions without source mappings are discarded. Returns `None` if no definitions
+    /// remain.
+    pub(crate) fn map_stubs_for_implementation(
+        self,
+        db: &'db dyn ty_python_semantic::Db,
+    ) -> Option<Definitions<'db>> {
+        let stub_mapper = StubMapper::new(db);
+        let resolved: Vec<_> = self
+            .0
+            .into_iter()
+            .flat_map(|definition| {
+                if definition.focus_range(db).file().is_stub(db) {
+                    stub_mapper
+                        .map_definition_to_source(&definition)
+                        .unwrap_or_default()
+                } else {
+                    vec![definition]
+                }
+            })
+            .collect();
+
+        if resolved.is_empty() {
+            None
+        } else {
+            Some(Self::new(resolved))
+        }
     }
 
     /// Convert these semantic definitions to editor-facing navigation targets.

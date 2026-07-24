@@ -34,6 +34,7 @@ mod completions;
 mod configuration;
 mod folding_range;
 mod hover;
+mod implementation;
 mod initialize;
 mod inlay_hints;
 mod notebook;
@@ -1380,6 +1381,17 @@ impl TestServerBuilder {
         self.client_capabilities.experimental = Some(serde_json::json!({
             "fullDiagnosticOutput": true,
         }));
+        self
+    }
+
+    /// Enable or disable location link support for goto implementations
+    pub(crate) fn enable_implementations_link_support(mut self, enabled: bool) -> Self {
+        self.client_capabilities
+            .text_document
+            .get_or_insert_default()
+            .implementation
+            .get_or_insert_default()
+            .link_support = Some(enabled);
         self
     }
 
