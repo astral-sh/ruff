@@ -2281,9 +2281,11 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     parameter,
                 });
             }
+            // Continuing past a nonterminal contradiction can bind later `ParamSpec`s or
+            // replace the diagnostic context that explains the incompatible parameter.
             !result
                 .intersect(db, self.constraints, constraint_set)
-                .is_trivially_never_satisfied()
+                .is_never_satisfied(db)
         };
 
         if self.typevar_evaluation == TypeVarEvaluation::Lazy {

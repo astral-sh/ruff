@@ -880,7 +880,9 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 }
             };
             result.intersect(db, self.constraints, field_constraints);
-            if result.is_trivially_never_satisfied() {
+            if result.is_trivially_never_satisfied()
+                || (self.is_context_collection_enabled() && result.is_never_satisfied(db))
+            {
                 if let Some(context) = self.report_context()
                     && let Some(source_item_field) = source_items.get(target_item_name)
                 {
