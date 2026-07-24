@@ -943,13 +943,11 @@ from ty_extensions._internal import ConstraintSet
 
 def incompatible_finite_noninferable[I, N: (int, str)]() -> None:
     constraints = ConstraintSet.range(bytes, N, bytes)
-    # TODO: revealed: None
-    reveal_type(constraints.solutions(inferable=tuple[I]))  # revealed: tuple[()]
+    reveal_type(constraints.solutions(inferable=tuple[I]))  # revealed: None
 
 def incompatible_bounded_noninferable[I, N: str]() -> None:
     constraints = ConstraintSet.range(int, N, int)
-    # TODO: revealed: None
-    reveal_type(constraints.solutions(inferable=tuple[I]))  # revealed: tuple[()]
+    reveal_type(constraints.solutions(inferable=tuple[I]))  # revealed: None
 
 def negative_finite_noninferable[I, N: (int, str)]() -> None:
     constraints = ~ConstraintSet.range(int, N, int) & ~ConstraintSet.range(str, N, str)

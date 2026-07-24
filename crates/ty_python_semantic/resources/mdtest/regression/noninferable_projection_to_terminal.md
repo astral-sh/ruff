@@ -1,16 +1,16 @@
-# Non-inferable constraint projection to a terminal
+# Non-inferable constraints and unconstrained solution paths
 
 When inferring the inner `T` for the call to `cast_to_call`, the outer `T` from `wait` is
-non-inferable. Projecting its constraint out of the constraint set produces the `always` terminal.
-That terminal must be recognized before enumerating the remaining BDD paths; otherwise, the empty
-path list is interpreted as unsatisfiable and the inferred specialization degrades to `Unknown`.
+non-inferable. A satisfiable path constraining only that outer type variable must be recognized as
+unconstrained for the inferable domain; otherwise, the inferred specialization degrades to
+`Unknown`.
 
 ```toml
 [environment]
 python-version = "3.11"
 ```
 
-## Existing projected terminal
+## Existing non-inferable-only path
 
 ```py
 from collections.abc import Awaitable

@@ -3690,7 +3690,6 @@ impl<'db> PathBounds<'db> {
             return path_bounds;
         }
 
-        let node = node.remove_noninferable(db, builder, inferable);
         let interior = match node.node() {
             Node::AlwaysTrue => return PathBounds::Unconstrained,
             Node::AlwaysFalse => return PathBounds::Unsatisfiable,
@@ -8265,7 +8264,7 @@ mod tests {
     }
 
     #[test]
-    fn fully_projected_rejected_noninferable_still_reaches_the_inferable_selection_hook() {
+    fn rejected_noninferable_does_not_invoke_inferable_selection_hooks() {
         let db = setup_db();
         let inferable_typevar = create_typevar(&db, "I");
         let int = known_instance(&db, KnownClass::Int);
@@ -8285,20 +8284,12 @@ mod tests {
             PathBounds::default_solve(&db, &builder, bound)
         });
 
-        // TODO: Phase 3 must retain the projected non-inferable typevar and reject this path
-        // before invoking any inferable-variable hook.
-        assert_eq!(observed, vec![inferable_typevar]);
-        assert_eq!(
-            solutions,
-            Solutions::Constrained(vec![vec![TypeVarSolution {
-                bound_typevar: inferable_typevar,
-                solution: str,
-            }]])
-        );
+        assert!(observed.is_empty());
+        assert_eq!(solutions, Solutions::Unsatisfiable);
     }
 
     #[test]
-    fn incompatible_noninferable_finite_domain_is_currently_projected_away() {
+    fn incompatible_noninferable_finite_domain_is_unsatisfiable() {
         let db = setup_db();
         let inferable_typevar = create_typevar(&db, "I");
         let int = known_instance(&db, KnownClass::Int);
@@ -8314,10 +8305,9 @@ mod tests {
             ConstraintSet::constrain_typevar(&db, &builder, noninferable_typevar, bytes, bytes);
         let inferable = TypeVarSet::from_typevars(&db, [inferable_typevar]);
 
-        // TODO: A non-inferable typevar outside its finite domain must make this path unsatisfiable.
         assert_eq!(
             set.solutions(&db, &builder, inferable),
-            Solutions::Unconstrained
+            Solutions::Unsatisfiable
         );
     }
 
@@ -8350,7 +8340,7 @@ mod tests {
     }
 
     #[test]
-    fn incompatible_noninferable_upper_bound_is_currently_projected_away() {
+    fn incompatible_noninferable_upper_bound_is_unsatisfiable() {
         let db = setup_db();
         let inferable_typevar = create_typevar(&db, "I");
         let int = known_instance(&db, KnownClass::Int);
@@ -8361,10 +8351,9 @@ mod tests {
         let set = ConstraintSet::constrain_typevar(&db, &builder, noninferable_typevar, int, int);
         let inferable = TypeVarSet::from_typevars(&db, [inferable_typevar]);
 
-        // TODO: A non-inferable typevar outside its upper bound must make this path unsatisfiable.
         assert_eq!(
             set.solutions(&db, &builder, inferable),
-            Solutions::Unconstrained
+            Solutions::Unsatisfiable
         );
     }
 
@@ -8828,7 +8817,7 @@ mod tests {
     }
 
     #[test]
-    fn constraint_ordering_changes_nested_transitive_solutions() {
+    fn constraint_ordering_preserves_nested_transitive_solutions() {
         let db = setup_db();
         let t = create_typevar(&db, "T");
         let u = create_typevar(&db, "U");
@@ -8856,19 +8845,14 @@ mod tests {
                     .and_with_offset(builder, list_int_t)
                     .or_with_offset(builder, bytes_v)
             },
-            // TODO: All permutations should produce the first result. TDD traversal currently
-            // leaks irrelevant positive constraints onto the `V = bytes` alternative.
             [
                 "never=false always=false merged=[T=list[int], U=int, V=bytes] paths=[T=list[int], U=int; V=bytes]",
-                "never=false always=false merged=[T=list[int], U=int, V=bytes] paths=[T=list[int], U=int; T=list[int], V=bytes; V=bytes]",
-                "never=false always=false merged=[T=list[int], U=int, V=bytes] paths=[T=list[int], U=int; U=int, V=bytes; V=bytes]",
-                "never=false always=false merged=[T=list[int] | list[U], U=int, V=bytes] paths=[T=list[int], U=int; T=list[U], V=bytes; V=bytes]",
             ],
         );
     }
 
     #[test]
-    fn constraint_ordering_changes_negated_alternative_solutions() {
+    fn constraint_ordering_preserves_negated_alternative_solutions() {
         let db = setup_db();
         let t = create_typevar(&db, "T");
         let u = create_typevar(&db, "U");
@@ -8892,13 +8876,7 @@ mod tests {
                     .negate(builder)
                     .or_with_offset(builder, bytes_u)
             },
-            // TODO: All permutations should produce the first result. A satisfied alternative
-            // should not infer `T` from unrelated positive decisions made earlier in a BDD path.
-            [
-                "never=false always=false merged=[U=bytes] paths=[; U=bytes]",
-                "never=false always=false merged=[T=str, U=bytes] paths=[; T=str, U=bytes; U=bytes]",
-                "never=false always=false merged=[T=int, U=bytes] paths=[; T=int, U=bytes; U=bytes]",
-            ],
+            ["never=false always=false merged=[U=bytes] paths=[; U=bytes]"],
         );
     }
 

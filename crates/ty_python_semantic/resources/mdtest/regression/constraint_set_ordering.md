@@ -353,8 +353,10 @@ def get_value(value: GetValue[ConstrainedValue]) -> ConstrainedValue:
     raise NotImplementedError
 
 def typed_dict_union(value: ValueA | ValueB) -> None:
-    # TODO: sometimes: revealed object
-    # revealed: int
+    # TODO: Unlike constrained alternatives within one BDD path, separate paths do not prefer the
+    # TODO: tighter valid specialization.
+    # TODO: revealed: int
+    # revealed: object
     reveal_type(get_value(value))
 ```
 

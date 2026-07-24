@@ -8,7 +8,8 @@
     performance strategy are agreed.
 - Phase 1 — characterize current behavior and agreed semantics: complete.
 - Phase 2 — inferability-aware path representation and solving: complete.
-- Phases 3–4: not started.
+- Phase 3 — extract directly from the original TDD: complete.
+- Phase 4 — remove dead projection code and finish validation: not started.
 - Existing constraint-set quantification work is out of scope unless this plan is
     explicitly revised.
 
@@ -89,14 +90,9 @@ in the repository's `AGENTS.md` files:
     solved directly by several other callers.
 
 - `PathBounds::compute` first attempts
-    `compute_simple_bound_conjunction`, then currently executes:
-
-    ```rust
-    let node = node.remove_noninferable(db, builder, inferable);
-    ```
-
-    before handling terminal nodes, walking paths, deriving sequent-map facts,
-    sorting constraints by source order, and accumulating lower/upper bounds.
+    `compute_simple_bound_conjunction`, then walks the original constraint-set
+    TDD directly. Its original positive non-inferable decisions therefore remain
+    available for declaration validation and fixed-binding substitution.
 
 - `compute_simple_bound_conjunction` currently accepts only conjunctions of
     concrete bounds on inferable type variables and avoids constructing
@@ -152,12 +148,14 @@ in the repository's `AGENTS.md` files:
     display-only DNF simplification. Do not reuse, generalize, or recreate that
     machinery for solution extraction.
 
-### Existing projection
+### Former projection
 
-`NodeId::remove_noninferable` and `InteriorNode::remove_noninferable` live in
-`crates/ty_python_semantic/src/types/constraints.rs`.
+`NodeId::remove_noninferable` and `InteriorNode::remove_noninferable` remain in
+`crates/ty_python_semantic/src/types/constraints.rs`, but no solution-extraction
+path invokes them. Phase 4 will remove these now-unused methods and their
+resulting dead-code warnings; do not suppress those warnings temporarily.
 
-The projection uses `abstract_inner` to remove constraints whose subject is
+The former projection uses `abstract_inner` to remove constraints whose subject is
 non-inferable. However, it intentionally retains mixed constraints whose lower
 or upper bound is a bare inferable typevar so that `I <= N` has the same
 meaning regardless of whether the TDD encodes it as a constraint on `I` or on
@@ -177,9 +175,8 @@ branches, preserves relevant implications, and can change the resulting TDD's
 terminal classification.
 
 The same `abstract_inner` machinery is also used by existential quantification;
-any cleanup must preserve that shared behavior. Once the last
-`remove_noninferable` caller is removed, delete only code that is genuinely
-exclusive to that operation.
+Phase 4 cleanup must preserve that shared behavior and delete only code that is
+genuinely exclusive to the removed projection.
 
 ### Important consumers
 
@@ -227,8 +224,8 @@ variables remain present in the unprojected TDD.
     Its `noninferable_nested` section verifies that non-inferable `U` does not
     appear in a returned solution.
 - `crates/ty_python_semantic/resources/mdtest/regression/noninferable_projection_to_terminal.md`
-    protects a real-world call-inference case where eliminating non-inferable
-    constraints currently produces the `always` terminal.
+    protects a real-world call-inference case where a satisfiable original path
+    constraining only non-inferable typevars must produce `Unconstrained`.
 - `crates/ty_python_semantic/resources/mdtest/regression/2799_constraint_correlation.md`
     covers correlated generic-protocol overload solutions.
 - `crates/ty_python_semantic/resources/mdtest/type_properties/quantification.md`
@@ -404,6 +401,68 @@ Validation after Phase 2:
     parent and **21.480 ms** for Phase 2 under the same conditions, showing no
     material regression. Benchmark logs are under
     `$HOME/.pi/tmp/witness-aware-phase2`.
+
+## Phase 3 implementation and validation
+
+`PathBounds::compute` now traverses the original TDD without invoking
+`remove_noninferable`. The existing Phase 2 representation and solver retain
+all original positive non-inferable bounds, validate their declared upper
+bounds and finite domains before any inferable selection hook, and substitute
+explicit positive exact non-inferable bindings into inferable results. Invalid
+standalone non-inferable constraints now produce `Unsatisfiable`, and invalid
+mixed paths leave caller-owned callback state unchanged. Non-inferable-only
+alternatives still produce `Unconstrained`; negative inferable decisions,
+correlated alternatives, symbolic unfixed references, source order, and the
+concrete-conjunction fast path remain intact.
+
+Walking the original TDD also removes the unnecessary reconstruction previously
+performed even when every variable was inferable. Two ordering unit tests now
+produce one stable solution family across all tested constraint permutations
+instead of multiple representation-dependent alternatives.
+
+One existing TypedDict/protocol inference result intentionally changes from
+`int` to `object` and is recorded as an expected failure in
+`regression/constraint_set_ordering.md` and `typed_dict.md`. The underlying
+constrained typevar admits both `int` and `object`. `PathBounds::default_solve`
+prefers the tighter `int` when both choices occur within one path, but
+`SpecializationBuilder` currently unions them when the same valid choices
+appear on separate TDD paths. Its existing TODO explains that this
+disambiguation should eventually happen consistently across paths. Fixing it
+would require work outside this feature; do not add an ad hoc TDD reduction,
+path subsumption algorithm, or alternate projection to hide it.
+
+Validation after Phase 3:
+
+- `ty_python_semantic`: **787 passed**, **35 skipped**.
+
+- Full workspace with documented snapshot-update settings: **8,576 passed**,
+    **45 skipped**. The same unrelated Windows-line-ending parser snapshots
+    were regenerated, reviewed, and restored.
+
+- Normal-order mdtests: **479 passed**. Perturbed-order failures remain
+    confined to pre-existing failing files. The previous `typed_dict.md`
+    ordering failure disappears because its newly documented `object` result
+    is stable under those orderings:
+
+    | Ordering | Passed | Failed | Existing failing mdtest files                                                               |
+    | -------- | -----: | -----: | ------------------------------------------------------------------------------------------- |
+    | normal   |    479 |      0 | —                                                                                           |
+    | reverse  |    474 |      5 | ordering, recursive protocol, constraint properties, quantification, implication properties |
+    | 1        |    475 |      4 | ordering, recursive protocol, constraint properties, quantification                         |
+    | 2        |    476 |      3 | ordering, recursive protocol, quantification                                                |
+    | 3        |    474 |      5 | ordering, recursive protocol, constraint properties, quantification, implication properties |
+    | 4        |    477 |      2 | ordering, quantification                                                                    |
+    | 7        |    474 |      5 | ordering, recursive protocol, constraint properties, quantification, implication properties |
+    | 8        |    478 |      1 | ordering                                                                                    |
+    | 15       |    474 |      5 | ordering, recursive protocol, constraint properties, quantification, implication properties |
+
+    Final Phase 3 wobble logs are under
+    `$HOME/.pi/tmp/inferability-phase3-final-wobble`.
+
+- Pydantic microbenchmark: **21.252 ms**, confidence interval
+    **[21.013 ms, 21.505 ms]**, using the same optimized development profile
+    and Criterion settings. Criterion detected no material performance change;
+    the benchmark log is under `$HOME/.pi/tmp/inferability-phase3`.
 
 ## Required semantic cases
 
@@ -617,6 +676,12 @@ bugs and require an agreed decision before their expected behavior is changed.
     finite declaration alone, generalized entailment, or a new dependency
     solver. Reconsider this limitation only if a focused test or real-world
     regression demonstrates that it produces an incorrect result.
+- **D7, constrained alternatives across paths:** consistently preferring the
+    tighter specialization when a constrained typevar has valid solutions on
+    separate TDD paths is outside this feature. Record the current `object`
+    result with a `TODO` for the desired `int` result in the affected TypedDict
+    mdtests instead of introducing an ad hoc TDD reduction, projected-path
+    subsumption, or a separate solution-selection mechanism.
 
 ## Recognizing fixed non-inferable bindings
 
@@ -736,7 +801,7 @@ Exit criteria:
 - Existing behavior is preserved while preliminary projection is still present,
     apart from any explicitly agreed inferable-binding filtering introduced here.
 
-### [ ] Phase 3 — Extract directly from the original TDD
+### [x] Phase 3 — Extract directly from the original TDD
 
 Depends on completed Phase 2.
 
@@ -762,6 +827,8 @@ Depends on completed Phase 2.
     demonstrates that it is necessary.
 1. Preserve Phase 2's non-inferable-output filtering while updating remaining
     TODO expectations for non-inferable facts that the old projection erased.
+    Document the independently deferred tighter-constrained-specialization
+    behavior when valid alternatives occur on separate TDD paths.
 1. Preserve both mixed-constraint orientations under normal/reversed/XOR-masked
     orderings.
 1. Update `noninferable_projection_to_terminal.md` only to reflect the new
