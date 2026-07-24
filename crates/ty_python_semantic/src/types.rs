@@ -1181,6 +1181,13 @@ impl<'db> Type<'db> {
         })
     }
 
+    pub(crate) const fn as_intersection(self) -> Option<IntersectionType<'db>> {
+        match self {
+            Type::Intersection(intersection) => Some(intersection),
+            _ => None,
+        }
+    }
+
     pub const fn is_unknown(&self) -> bool {
         matches!(
             self,
