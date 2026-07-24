@@ -5539,20 +5539,39 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             return;
         }
 
-        // The synthetic `cls` already carries the constructor's identity specialization.
-        // For example, typeshed's `map` constructor is roughly:
+        // Constraint inference has already checked the synthetic `cls`. For example:
         //
         // ```py
-        // class map[S]:
-        //     def __new__[T](cls, callback: Callable[[T], S], values: Iterable[T], /) -> Self: ...
+        // from collections.abc import Callable
+        // from typing import Any, Self, overload
         //
-        // map(os.path.abspath, list_fonts("fonts"))
+        // @overload
+        // def callback[T](value: frozenset[T]) -> T: ...
+        // @overload
+        // def callback[T](value: T) -> T: ...
+        //
+        // class Mapper[R]:
+        //     def __new__[T](cls, callback: Callable[[T], R], values: list[T]) -> Self: ...
+        //
+        // values: Any
+        // Mapper(callback, values)
         // ```
         //
-        // Once the call specializes `S` to `PathLike[Never]`, applying that specialization to
-        // `cls` again produces `map[PathLike[PathLike[Never]]]` instead of
-        // `map[PathLike[Never]]`, causing a spurious argument error. Decorators can also
-        // re-express the `cls` annotation using their own TypeVar, possibly through a type alias.
+        // The overloads provide alternative, correlated solutions for `T` and `R`. The current
+        // solver merges each TypeVar's solutions separately, losing that correlation. Applying
+        // the merged specialization to `cls` a second time then changes the receiver from
+        // `type[Mapper[frozenset[Never]]]` to
+        // `type[Mapper[frozenset[frozenset[Never]]]]`, incorrectly rejecting the valid call.
+        //
+        // A decorator using `Concatenate[type[U], P]` can also replace the inferred `type[Self]`
+        // receiver with its own `type[U]`, possibly through a type alias. Constraint inference has
+        // already checked the actual class against `type[U]`. If the other arguments cannot solve
+        // `U`, independently checking the class against `type[U]` again would reject the call
+        // solely because `U` remains unsolved.
+        //
+        // TODO: Remove this special case once solution extraction preserves correlations between
+        // TypeVars across alternative inference paths and constructor calls are solved in a single
+        // constraint set, so decorator-scoped receiver variables are not rechecked independently.
         let constructor_receiver = matches!(argument, Argument::Synthetic)
             && self.constructor_kind == Some(ConstructorCallableKind::New)
             && matches!(
