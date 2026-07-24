@@ -1881,7 +1881,7 @@ class MetaWithIntReturn(type):
 
 class F(metaclass=MetaWithIntReturn):
     def __new__(cls) -> str:
-        return super().__new__(cls)
+        return ""
 
 class Returns[T](Protocol):
     def __call__(self) -> T: ...
@@ -1960,7 +1960,7 @@ static_assert(not is_subtype_of(TypeOf[A], Returns[A]))
 
 class B:
     def __new__(cls, a: int) -> int:
-        return super().__new__(cls)
+        return 0
 
     def __init__(self, a: str) -> None: ...
 
@@ -2031,7 +2031,7 @@ class MetaWithIntReturn(type):
 
 class F(metaclass=MetaWithIntReturn):
     def __new__(cls) -> str:
-        return super().__new__(cls)
+        return ""
 
     def __init__(self, x: int) -> None: ...
 

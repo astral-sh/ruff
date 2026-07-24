@@ -277,6 +277,119 @@ class Foo:
 reveal_type(Foo(1))  # revealed: Foo
 ```
 
+## Implicit `__new__` receivers
+
+Adding an implicit `type[Self]` annotation for `cls` must not cause valid constructor calls to be
+rejected when a generic callback determines the class's type argument. These calls already pass on
+`main`; they guard against regressions when the implicit `__new__` receiver is added. The overloaded
+callback, protocol, and `Any` argument exercise the nested specialization that previously caused the
+synthetic `cls` argument to be specialized twice.
+
+```pyi
+from collections.abc import Callable
+from typing import Any, Generic, Protocol, TypeVar, overload
+from typing_extensions import Self
+
+R_co = TypeVar("R_co", covariant=True)
+T = TypeVar("T")
+
+class Box(Protocol[R_co]):
+    def get(self) -> R_co: ...
+
+@overload
+def callback(value: Box[T]) -> T: ...
+@overload
+def callback(value: T) -> T: ...
+
+class Mapper(Generic[R_co]):
+    def __new__(cls, callback: Callable[[T], R_co], values: list[T], /) -> Self: ...
+
+values: Any
+
+# TODO: The doubled `Box` and `Never` are likely over-inferred, but the valid call must not be
+# rejected.
+reveal_type(Mapper(callback, values))  # revealed: Mapper[Box[Box[Never]]]
+```
+
+A signature-preserving decorator can turn `__new__` into a `Callable`:
+
+```pyi
+from typing import ParamSpec
+
+P = ParamSpec("P")
+
+def wrap(function: Callable[P, R_co]) -> Callable[P, R_co]: ...
+
+class Wrapped(Generic[R_co]):
+    @wrap
+    def __new__(cls, callback: Callable[[T], R_co], values: list[T]) -> Self: ...
+
+# TODO: The doubled `Box` and `Never` are likely over-inferred, but the valid call must not be
+# rejected.
+reveal_type(Wrapped(callback, values))  # revealed: Wrapped[Box[Box[Never]]]
+```
+
+A decorator can preserve `cls` explicitly with `Concatenate`. Inferred and explicit specializations
+are both valid:
+
+```pyi
+from typing_extensions import Concatenate
+
+def wrap_cls(function: Callable[Concatenate[type[T], P], R_co]) -> Callable[Concatenate[type[T], P], R_co]: ...
+
+class WrappedCls(Generic[R_co]):
+    @wrap_cls
+    def __new__(cls, callback: Callable[[T], R_co], values: list[T]) -> Self: ...
+
+# TODO: `Concatenate` loses constructor inference, even for a concrete callback and argument.
+reveal_type(WrappedCls(callback, values))  # revealed: WrappedCls[Unknown]
+reveal_type(WrappedCls[str](callback, values))  # revealed: WrappedCls[str]
+
+def concrete_callback(value: int) -> str: ...
+
+int_values: list[int]
+reveal_type(WrappedCls(concrete_callback, int_values))  # revealed: WrappedCls[Unknown]
+```
+
+A decorator can return a callback protocol instead of `Callable`:
+
+```pyi
+class CallableObject(Protocol[P, R_co]):
+    def __call__(self, *args: P.args, **kwargs: P.kwargs) -> R_co: ...
+
+def wrap_object(function: Callable[P, R_co]) -> CallableObject[P, R_co]: ...
+
+class WrappedObject(Generic[R_co]):
+    @wrap_object
+    def __new__(cls, callback: Callable[[T], R_co], values: list[T]) -> Self: ...
+
+# TODO: The doubled `Box` and `Never` are likely over-inferred, but the valid call must not be
+# rejected.
+reveal_type(WrappedObject(callback, values))  # revealed: WrappedObject[Box[Box[Never]]]
+```
+
+The explicit `cls` type in a signature-preserving decorator can also be expressed with a generic
+type alias:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```pyi
+type Receiver[X] = type[X]
+
+def preserve[U, **P, R](
+    function: Callable[Concatenate[Receiver[U], P], R],
+) -> Callable[Concatenate[Receiver[U], P], R]: ...
+
+class Simple:
+    @preserve
+    def __new__(cls) -> Self: ...
+
+reveal_type(Simple())  # revealed: Simple
+```
+
 ## `__new__` defined as a classmethod
 
 Marking it as a classmethod, on the other hand, breaks at runtime.
@@ -762,7 +875,7 @@ class C[T]:
     x: T
 
     def __new__[S](cls, x: S) -> "C[tuple[S, S]]":
-        return object.__new__(cls)
+        raise NotImplementedError()
 
 reveal_type(C(1))  # revealed: C[tuple[int, int]]
 reveal_type(C("hello"))  # revealed: C[tuple[str, str]]
