@@ -170,8 +170,8 @@ pub(crate) trait IteratorConstraintsExtension<T> {
     /// Returns the constraints under which any element of the iterator holds.
     ///
     /// This method short-circuits; if we encounter any element that
-    /// [`is_always_satisfied`][ConstraintSet::is_always_satisfied], then the overall result
-    /// must be as well, and we stop consuming elements from the iterator.
+    /// [`is_trivially_always_satisfied`][ConstraintSet::is_trivially_always_satisfied], then the
+    /// overall result must be as well, and we stop consuming elements from the iterator.
     fn when_any<'db, 'c>(
         self,
         db: &'db dyn Db,
@@ -182,8 +182,8 @@ pub(crate) trait IteratorConstraintsExtension<T> {
     /// Returns the constraints under which every element of the iterator holds.
     ///
     /// This method short-circuits; if we encounter any element that
-    /// [`is_never_satisfied`][ConstraintSet::is_never_satisfied], then the overall result
-    /// must be as well, and we stop consuming elements from the iterator.
+    /// [`is_trivially_never_satisfied`][ConstraintSet::is_trivially_never_satisfied], then the
+    /// overall result must be as well, and we stop consuming elements from the iterator.
     fn when_all<'db, 'c>(
         self,
         db: &'db dyn Db,
@@ -198,12 +198,11 @@ where
 {
     fn when_any<'db, 'c>(
         self,
-        db: &'db dyn Db,
+        _db: &'db dyn Db,
         builder: &'c ConstraintSetBuilder<'db>,
         mut f: impl FnMut(T) -> ConstraintSet<'db, 'c>,
     ) -> ConstraintSet<'db, 'c> {
         let node = NodeId::distributed_or(
-            db,
             builder,
             self.map(|element| {
                 let constraint = f(element);
@@ -216,12 +215,11 @@ where
 
     fn when_all<'db, 'c>(
         self,
-        db: &'db dyn Db,
+        _db: &'db dyn Db,
         builder: &'c ConstraintSetBuilder<'db>,
         mut f: impl FnMut(T) -> ConstraintSet<'db, 'c>,
     ) -> ConstraintSet<'db, 'c> {
         let node = NodeId::distributed_and(
-            db,
             builder,
             self.map(|element| {
                 let constraint = f(element);
@@ -437,14 +435,32 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         debug_assert!(std::ptr::eq(self.builder, builder));
     }
 
-    /// Returns whether this constraint set never holds
+    /// Returns whether this constraint set never holds.
     pub(crate) fn is_never_satisfied(self, db: &'db dyn Db) -> bool {
         self.node.is_never_satisfied(db, self.builder)
     }
 
-    /// Returns whether this constraint set always holds
+    /// Returns whether this constraint set is the `never` terminal.
+    ///
+    /// A nonterminal constraint set can also never be satisfied, so `false` does not prove that
+    /// the set is satisfiable. Use [`Self::is_never_satisfied`] when false negatives are not
+    /// acceptable.
+    pub(crate) fn is_trivially_never_satisfied(self) -> bool {
+        self.node == ALWAYS_FALSE
+    }
+
+    /// Returns whether this constraint set always holds.
     pub(crate) fn is_always_satisfied(self, db: &'db dyn Db) -> bool {
         self.node.is_always_satisfied(db, self.builder)
+    }
+
+    /// Returns whether this constraint set is the `always` terminal.
+    ///
+    /// A nonterminal constraint set can also always be satisfied, so `false` does not prove that
+    /// the set is not always satisfied. Use [`Self::is_always_satisfied`] when false negatives are
+    /// not acceptable.
+    pub(crate) fn is_trivially_always_satisfied(self) -> bool {
+        self.node == ALWAYS_TRUE
     }
 
     /// Returns the constraints under which `lhs` is a subtype of `rhs`, assuming that the
@@ -535,7 +551,7 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         other: impl FnOnce() -> Self,
     ) -> Self {
         self.verify_builder(builder);
-        if !self.is_never_satisfied(db) {
+        if !self.is_trivially_never_satisfied() {
             let other = other();
             other.verify_builder(builder);
             self.intersect(db, builder, other);
@@ -556,7 +572,7 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         other: impl FnOnce() -> Self,
     ) -> Self {
         self.verify_builder(builder);
-        if !self.is_always_satisfied(db) {
+        if !self.is_trivially_always_satisfied() {
             let other = other();
             other.verify_builder(builder);
             self.union(db, builder, other);
@@ -2548,14 +2564,13 @@ impl NodeId {
     /// You must also provide the "zero" and "one" units of the operator. The "zero" is the value
     /// that has no effect (`0 ∨ a = a`). It is returned if the iterator is empty. The "one" is the
     /// value that saturates (`1 ∨ a = 1`). We use this to short-circuit; if any element BDD or any
-    /// intermediate result evaluates to "one", we can return early.
-    fn tree_fold<'db>(
-        db: &'db dyn Db,
-        builder: &ConstraintSetBuilder<'db>,
+    /// intermediate result is the "one" terminal, we can return early.
+    fn tree_fold(
+        builder: &ConstraintSetBuilder<'_>,
         nodes: impl Iterator<Item = Self>,
         zero: Self,
-        is_one: impl Fn(Self, &'db dyn Db, &ConstraintSetBuilder<'db>) -> bool,
-        mut combine: impl FnMut(Self, &ConstraintSetBuilder<'db>, Self) -> Self,
+        one: Self,
+        mut combine: impl FnMut(Self, &ConstraintSetBuilder<'_>, Self) -> Self,
     ) -> Self {
         // To implement the "linear" shape described above, we could collect the iterator elements
         // into a vector, and then use the fold at the bottom of this method to combine the
@@ -2583,7 +2598,7 @@ impl NodeId {
         // until the iterator passes 256 elements.
         let mut accumulator: SmallVec<[(NodeId, u8); 8]> = SmallVec::default();
         for node in nodes {
-            if is_one(node, db, builder) {
+            if node == one {
                 return node;
             }
 
@@ -2594,7 +2609,7 @@ impl NodeId {
             {
                 let (existing, _) = accumulator.pop().expect("accumulator should not be empty");
                 node = combine(existing, builder, node);
-                if is_one(node, db, builder) {
+                if node == one {
                     return node;
                 }
                 depth += 1;
@@ -2610,32 +2625,28 @@ impl NodeId {
             .fold(zero, |result, (node, _)| combine(result, builder, node))
     }
 
-    fn distributed_or<'db>(
-        db: &'db dyn Db,
-        builder: &ConstraintSetBuilder<'db>,
+    fn distributed_or(
+        builder: &ConstraintSetBuilder<'_>,
         nodes: impl Iterator<Item = NodeId>,
     ) -> Self {
         Self::tree_fold(
-            db,
             builder,
             nodes,
             ALWAYS_FALSE,
-            Self::is_always_satisfied,
+            ALWAYS_TRUE,
             Self::or_with_offset,
         )
     }
 
-    fn distributed_and<'db>(
-        db: &'db dyn Db,
-        builder: &ConstraintSetBuilder<'db>,
+    fn distributed_and(
+        builder: &ConstraintSetBuilder<'_>,
         nodes: impl Iterator<Item = NodeId>,
     ) -> Self {
         Self::tree_fold(
-            db,
             builder,
             nodes,
             ALWAYS_TRUE,
-            Self::is_never_satisfied,
+            ALWAYS_FALSE,
             Self::and_with_offset,
         )
     }
@@ -7886,6 +7897,126 @@ mod tests {
             Some(&false)
         );
         assert_eq!(storage.constraint_implication_cache.len(), 2);
+    }
+
+    #[test]
+    fn trivial_satisfaction_only_recognizes_terminals() {
+        let db = setup_db();
+        let t = create_typevar(&db, "T");
+        let builder = ConstraintSetBuilder::new();
+        let t_int = create_constraint(&db, &builder, t, KnownClass::Int);
+        let t_str = create_constraint(&db, &builder, t, KnownClass::Str);
+        let impossible = t_int.and(&db, &builder, || t_str);
+
+        assert!(ConstraintSet::always(&builder).is_trivially_always_satisfied());
+        assert!(!ConstraintSet::always(&builder).is_trivially_never_satisfied());
+        assert!(ConstraintSet::never(&builder).is_trivially_never_satisfied());
+        assert!(!ConstraintSet::never(&builder).is_trivially_always_satisfied());
+        assert!(!t_int.is_trivially_always_satisfied());
+        assert!(!t_int.is_trivially_never_satisfied());
+        assert!(impossible.is_never_satisfied(&db));
+        assert!(!impossible.is_trivially_never_satisfied());
+
+        let t_bool_upper = ConstraintSet::constrain_typevar_upper_bound(
+            &db,
+            &builder,
+            t,
+            KnownClass::Bool.to_instance(&db),
+        );
+        let t_int_upper = ConstraintSet::constrain_typevar_upper_bound(
+            &db,
+            &builder,
+            t,
+            KnownClass::Int.to_instance(&db),
+        );
+        let tautology = t_bool_upper
+            .negate(&db, &builder)
+            .or(&db, &builder, || t_int_upper);
+
+        assert!(tautology.is_always_satisfied(&db));
+        assert!(!tautology.is_trivially_always_satisfied());
+    }
+
+    #[test]
+    fn combinators_only_short_circuit_on_terminal_saturation() {
+        let db = setup_db();
+        let t = create_typevar(&db, "T");
+        let builder = ConstraintSetBuilder::new();
+        let t_int = create_constraint(&db, &builder, t, KnownClass::Int);
+        let t_str = create_constraint(&db, &builder, t, KnownClass::Str);
+        let impossible = t_int.and(&db, &builder, || t_str);
+        let t_bool_upper = ConstraintSet::constrain_typevar_upper_bound(
+            &db,
+            &builder,
+            t,
+            KnownClass::Bool.to_instance(&db),
+        );
+        let t_int_upper = ConstraintSet::constrain_typevar_upper_bound(
+            &db,
+            &builder,
+            t,
+            KnownClass::Int.to_instance(&db),
+        );
+        let tautology = t_bool_upper
+            .negate(&db, &builder)
+            .or(&db, &builder, || t_int_upper);
+
+        let forced = Cell::new(0);
+        ConstraintSet::never(&builder).and(&db, &builder, || {
+            forced.set(forced.get() + 1);
+            t_int
+        });
+        ConstraintSet::always(&builder).or(&db, &builder, || {
+            forced.set(forced.get() + 1);
+            t_int
+        });
+        assert_eq!(forced.get(), 0);
+
+        impossible.and(&db, &builder, || {
+            forced.set(forced.get() + 1);
+            t_int
+        });
+        tautology.or(&db, &builder, || {
+            forced.set(forced.get() + 1);
+            t_int
+        });
+        assert_eq!(forced.get(), 2);
+
+        let visited = Cell::new(0);
+        [impossible, t_int]
+            .into_iter()
+            .when_all(&db, &builder, |set| {
+                visited.set(visited.get() + 1);
+                set
+            });
+        assert_eq!(visited.get(), 2);
+
+        visited.set(0);
+        [tautology, t_int]
+            .into_iter()
+            .when_any(&db, &builder, |set| {
+                visited.set(visited.get() + 1);
+                set
+            });
+        assert_eq!(visited.get(), 2);
+
+        visited.set(0);
+        [ConstraintSet::never(&builder), t_int]
+            .into_iter()
+            .when_all(&db, &builder, |set| {
+                visited.set(visited.get() + 1);
+                set
+            });
+        assert_eq!(visited.get(), 1);
+
+        visited.set(0);
+        [ConstraintSet::always(&builder), t_int]
+            .into_iter()
+            .when_any(&db, &builder, |set| {
+                visited.set(visited.get() + 1);
+                set
+            });
+        assert_eq!(visited.get(), 1);
     }
 
     #[test]

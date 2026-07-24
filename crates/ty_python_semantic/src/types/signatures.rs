@@ -2283,7 +2283,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             }
             !result
                 .intersect(db, self.constraints, constraint_set)
-                .is_never_satisfied(db)
+                .is_trivially_never_satisfied()
         };
 
         if self.typevar_evaluation == TypeVarEvaluation::Lazy {

@@ -661,7 +661,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     self.check_type_pair(db, source_item_field.declared_ty, target_ty),
                 );
 
-                if result.is_never_satisfied(db) {
+                if result.is_trivially_never_satisfied() {
                     return result;
                 }
             }
@@ -685,7 +685,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             target_item_field.declared_ty,
                         ),
                     );
-                    if result.is_never_satisfied(db) {
+                    if result.is_trivially_never_satisfied() {
                         return result;
                     }
                 }
@@ -880,7 +880,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 }
             };
             result.intersect(db, self.constraints, field_constraints);
-            if result.is_never_satisfied(db) {
+            if result.is_trivially_never_satisfied() {
                 if let Some(context) = self.report_context()
                     && let Some(source_item_field) = source_items.get(target_item_name)
                 {
