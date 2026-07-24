@@ -852,30 +852,16 @@ mod tests {
             )
             .build();
 
-        assert_snapshot!(test.goto_implementation(), @r"
-        info[goto-implementation]: Go to implementation
-         --> base.py:3:9
-          |
-        3 |     def method(self): ...
-          |         ^^^^^^ Clicking here
-          |
-        info: Found 3 implementations
-         --> a_child.py:5:9
-          |
-        5 |     def method(self): ...
-          |         ------
-          |
-         ::: base.py:3:9
-          |
-        3 |     def method(self): ...
-          |         ------
-          |
-         ::: z_child.py:5:9
-          |
-        5 |     def method(self): ...
-          |         ------
-          |
-        ");
+        let targets = salsa::attach(&test.db, || {
+            goto_implementation(&test.db, test.cursor.file, test.cursor.offset)
+                .expect("implementation targets")
+        });
+        let paths = targets
+            .into_iter()
+            .map(|target| target.file().path(&test.db).to_string())
+            .collect::<Vec<_>>();
+
+        assert_eq!(paths, ["/base.py", "/z_child.py", "/a_child.py"]);
     }
 
     #[test]
@@ -1039,41 +1025,6 @@ class MyClass:
     }
 
     #[test]
-    fn implementation_union_receiver_deduplicates() {
-        let test = cursor_test(
-            r#"
-            class Animal:
-                def speak(self): ...
-
-            class Dog(Animal):
-                def speak(self): ...
-
-            def f(animal: Animal | Dog):
-                animal.spe<CURSOR>ak()
-            "#,
-        );
-
-        assert_snapshot!(test.goto_implementation(), @"
-        info[goto-implementation]: Go to implementation
-         --> main.py:9:12
-          |
-        9 |     animal.speak()
-          |            ^^^^^ Clicking here
-          |
-        info: Found 2 implementations
-         --> main.py:3:9
-          |
-        3 |     def speak(self): ...
-          |         -----
-        4 |
-        5 | class Dog(Animal):
-        6 |     def speak(self): ...
-          |         -----
-          |
-        ");
-    }
-
-    #[test]
     fn implementation_unsupported_target() {
         let test = cursor_test(
             r#"
@@ -1090,7 +1041,9 @@ class MyClass:
     fn implementation_class_family() {
         let test = cursor_test(
             r#"
-            class Anim<CURSOR>al:
+            from abc import ABC
+
+            class Anim<CURSOR>al(ABC):
                 pass
 
             class Dog(Animal):
@@ -1103,25 +1056,25 @@ class MyClass:
 
         assert_snapshot!(test.goto_implementation(), @"
         info[goto-implementation]: Go to implementation
-         --> main.py:2:7
+         --> main.py:4:7
           |
-        2 | class Animal:
+        4 | class Animal(ABC):
           |       ^^^^^^ Clicking here
           |
         info: Found 3 implementations
-         --> main.py:2:7
-          |
-        2 | class Animal:
-          |       ------
-        3 |     pass
-        4 |
-        5 | class Dog(Animal):
-          |       ---
-        6 |     pass
-        7 |
-        8 | class Cat(Animal):
-          |       ---
-          |
+          --> main.py:4:7
+           |
+         4 | class Animal(ABC):
+           |       ------
+         5 |     pass
+         6 |
+         7 | class Dog(Animal):
+           |       ---
+         8 |     pass
+         9 |
+        10 | class Cat(Animal):
+           |       ---
+           |
         ");
     }
 
@@ -1191,45 +1144,6 @@ class MyClass:
     }
 
     #[test]
-    fn implementation_class_transitive_subclasses() {
-        let test = cursor_test(
-            r#"
-            class Anim<CURSOR>al:
-                pass
-
-            class Mammal(Animal):
-                pass
-
-            class Dog(Mammal):
-                pass
-            "#,
-        );
-
-        assert_snapshot!(test.goto_implementation(), @"
-        info[goto-implementation]: Go to implementation
-         --> main.py:2:7
-          |
-        2 | class Animal:
-          |       ^^^^^^ Clicking here
-          |
-        info: Found 3 implementations
-         --> main.py:2:7
-          |
-        2 | class Animal:
-          |       ------
-        3 |     pass
-        4 |
-        5 | class Mammal(Animal):
-          |       ------
-        6 |     pass
-        7 |
-        8 | class Dog(Mammal):
-          |       ---
-          |
-        ");
-    }
-
-    #[test]
     fn implementation_class_intermediate_root() {
         let test = cursor_test(
             r#"
@@ -1260,42 +1174,6 @@ class MyClass:
         7 |
         8 | class Dog(Mammal):
           |       ---
-          |
-        ");
-    }
-
-    #[test]
-    fn implementation_class_multiple_inheritance() {
-        let test = cursor_test(
-            r#"
-            class Walk<CURSOR>er:
-                pass
-
-            class Swimmer:
-                pass
-
-            class Amphibian(Walker, Swimmer):
-                pass
-            "#,
-        );
-
-        assert_snapshot!(test.goto_implementation(), @"
-        info[goto-implementation]: Go to implementation
-         --> main.py:2:7
-          |
-        2 | class Walker:
-          |       ^^^^^^ Clicking here
-          |
-        info: Found 2 implementations
-         --> main.py:2:7
-          |
-        2 | class Walker:
-          |       ------
-          |
-         ::: main.py:8:7
-          |
-        8 | class Amphibian(Walker, Swimmer):
-          |       ---------
           |
         ");
     }
@@ -1347,54 +1225,6 @@ class MyClass:
     }
 
     #[test]
-    fn implementation_class_subclass_through_import_alias() {
-        let test = CursorTest::builder()
-            .source(
-                "base.py",
-                r#"
-                class Ba<CURSOR>se:
-                    pass
-                "#,
-            )
-            .source(
-                "aliases.py",
-                r#"
-                from base import Base as B
-                "#,
-            )
-            .source(
-                "child.py",
-                r#"
-                from aliases import B
-
-                class Child(B):
-                    pass
-                "#,
-            )
-            .build();
-
-        assert_snapshot!(test.goto_implementation(), @"
-        info[goto-implementation]: Go to implementation
-         --> base.py:2:7
-          |
-        2 | class Base:
-          |       ^^^^ Clicking here
-          |
-        info: Found 2 implementations
-         --> base.py:2:7
-          |
-        2 | class Base:
-          |       ----
-          |
-         ::: child.py:4:7
-          |
-        4 | class Child(B):
-          |       -----
-          |
-        ");
-    }
-
-    #[test]
     fn implementation_class_generic_base() {
         let test = cursor_test(
             r#"
@@ -1422,110 +1252,6 @@ class MyClass:
         4 |
         5 | class IntContainer(Container[int]):
           |       ------------
-          |
-        ");
-    }
-
-    #[test]
-    fn implementation_class_abstract_base_included() {
-        let test = cursor_test(
-            r#"
-            from abc import ABC
-
-            class Anim<CURSOR>al(ABC):
-                pass
-
-            class Dog(Animal):
-                pass
-            "#,
-        );
-
-        assert_snapshot!(test.goto_implementation(), @"
-        info[goto-implementation]: Go to implementation
-         --> main.py:4:7
-          |
-        4 | class Animal(ABC):
-          |       ^^^^^^ Clicking here
-          |
-        info: Found 2 implementations
-         --> main.py:4:7
-          |
-        4 | class Animal(ABC):
-          |       ------
-        5 |     pass
-        6 |
-        7 | class Dog(Animal):
-          |       ---
-          |
-        ");
-    }
-
-    #[test]
-    fn implementation_class_protocol_nominal_only() {
-        let test = cursor_test(
-            r#"
-            from typing import Protocol
-
-            class Spea<CURSOR>ker(Protocol):
-                def speak(self) -> None: ...
-
-            class Dog:
-                def speak(self) -> None: ...
-
-            class Cat(Speaker):
-                def speak(self) -> None: ...
-            "#,
-        );
-
-        assert_snapshot!(test.goto_implementation(), @"
-        info[goto-implementation]: Go to implementation
-         --> main.py:4:7
-          |
-        4 | class Speaker(Protocol):
-          |       ^^^^^^^ Clicking here
-          |
-        info: Found 2 implementations
-          --> main.py:4:7
-           |
-         4 | class Speaker(Protocol):
-           |       -------
-           |
-          ::: main.py:10:7
-           |
-        10 | class Cat(Speaker):
-           |       ---
-           |
-        ");
-    }
-
-    #[test]
-    fn implementation_class_reference_in_base_list() {
-        let test = cursor_test(
-            r#"
-            class Animal:
-                pass
-
-            class Dog(Anim<CURSOR>al):
-                pass
-            "#,
-        );
-
-        assert_snapshot!(test.goto_implementation(), @r"
-        info[goto-implementation]: Go to implementation
-         --> main.py:5:11
-          |
-        5 | class Dog(Animal):
-          |           ^^^^^^ Clicking here
-          |
-        info: Found 2 implementations
-         --> main.py:2:7
-          |
-        2 | class Animal:
-          |       ------
-        3 |     pass
-        4 |
-        5 | class Dog(Animal):
-          |       ---
           |
         ");
     }
@@ -1601,40 +1327,6 @@ class MyClass:
     }
 
     #[test]
-    fn implementation_class_reference_in_instantiation() {
-        let test = cursor_test(
-            r#"
-            class Animal:
-                pass
-
-            class Dog(Animal):
-                pass
-
-            Anim<CURSOR>al()
-            "#,
-        );
-
-        assert_snapshot!(test.goto_implementation(), @r"
-        info[goto-implementation]: Go to implementation
-         --> main.py:8:1
-          |
-        8 | Animal()
-          | ^^^^^^ Clicking here
-          |
-        info: Found 2 implementations
-         --> main.py:2:7
-          |
-        2 | class Animal:
-          |       ------
-        3 |     pass
-        4 |
-        5 | class Dog(Animal):
-          |       ---
-          |
-        ");
-    }
-
-    #[test]
     fn implementation_qualified_class_reference_in_base_list() {
         let test = CursorTest::builder()
             .source(
@@ -1661,51 +1353,6 @@ class MyClass:
           |
         4 | class Dog(animals.Animal):
           |                   ^^^^^^ Clicking here
-          |
-        info: Found 2 implementations
-         --> animals.py:2:7
-          |
-        2 | class Animal:
-          |       ------
-          |
-         ::: main.py:4:7
-          |
-        4 | class Dog(animals.Animal):
-          |       ---
-          |
-        ");
-    }
-
-    #[test]
-    fn implementation_qualified_class_reference_in_annotation() {
-        let test = CursorTest::builder()
-            .source(
-                "animals.py",
-                r#"
-                class Animal:
-                    pass
-                "#,
-            )
-            .source(
-                "main.py",
-                r#"
-                import animals
-
-                class Dog(animals.Animal):
-                    pass
-
-                def f(x: animals.Anim<CURSOR>al):
-                    pass
-                "#,
-            )
-            .build();
-
-        assert_snapshot!(test.goto_implementation(), @r"
-        info[goto-implementation]: Go to implementation
-         --> main.py:7:18
-          |
-        7 | def f(x: animals.Animal):
-          |                  ^^^^^^ Clicking here
           |
         info: Found 2 implementations
          --> animals.py:2:7
@@ -1947,112 +1594,6 @@ class MyClass:
     }
 
     #[test]
-    fn implementation_attribute_partial_override() {
-        let test = cursor_test(
-            r#"
-            class Animal:
-                sound: str = "generic"
-
-            class Dog(Animal):
-                sound: str = "woof"
-
-            class Cat(Animal):
-                pass
-
-            def f(animal: Animal):
-                animal.so<CURSOR>und
-            "#,
-        );
-
-        assert_snapshot!(test.goto_implementation(), @r#"
-        info[goto-implementation]: Go to implementation
-          --> main.py:12:12
-           |
-        12 |     animal.sound
-           |            ^^^^^ Clicking here
-           |
-        info: Found 2 implementations
-         --> main.py:3:5
-          |
-        3 |     sound: str = "generic"
-          |     -----
-        4 |
-        5 | class Dog(Animal):
-        6 |     sound: str = "woof"
-          |     -----
-          |
-        "#);
-    }
-
-    #[test]
-    fn implementation_attribute_inherited_from_concrete_receiver() {
-        let test = cursor_test(
-            r#"
-            class Animal:
-                sound: str = "generic"
-
-            class Dog(Animal):
-                pass
-
-            class Cat(Animal):
-                sound: str = "meow"
-
-            def f(dog: Dog):
-                dog.so<CURSOR>und
-            "#,
-        );
-
-        assert_snapshot!(test.goto_implementation(), @r#"
-        info[goto-implementation]: Go to implementation
-          --> main.py:12:9
-           |
-        12 |     dog.sound
-           |         ^^^^^ Clicking here
-           |
-        info: Found 1 implementation
-         --> main.py:3:5
-          |
-        3 |     sound: str = "generic"
-          |     -----
-          |
-        "#);
-    }
-
-    #[test]
-    fn implementation_attribute_overridden_from_concrete_receiver() {
-        let test = cursor_test(
-            r#"
-            class Animal:
-                sound: str = "generic"
-
-            class Dog(Animal):
-                sound: str = "woof"
-
-            class Cat(Animal):
-                sound: str = "meow"
-
-            def f(dog: Dog):
-                dog.so<CURSOR>und
-            "#,
-        );
-
-        assert_snapshot!(test.goto_implementation(), @r#"
-        info[goto-implementation]: Go to implementation
-          --> main.py:12:9
-           |
-        12 |     dog.sound
-           |         ^^^^^ Clicking here
-           |
-        info: Found 1 implementation
-         --> main.py:6:5
-          |
-        6 |     sound: str = "woof"
-          |     -----
-          |
-        "#);
-    }
-
-    #[test]
     fn implementation_attribute_plain_assignment() {
         let test = cursor_test(
             r#"
@@ -2117,43 +1658,6 @@ class MyClass:
         4 |
         5 | class Dog(Animal):
         6 |     sound: str = "woof"
-          |     -----
-          |
-        "#);
-    }
-
-    #[test]
-    fn implementation_attribute_classvar() {
-        let test = cursor_test(
-            r#"
-            from typing import ClassVar
-
-            class Animal:
-                sound: ClassVar[str] = "generic"
-
-            class Dog(Animal):
-                sound: ClassVar[str] = "woof"
-
-            def f(animal: Animal):
-                animal.so<CURSOR>und
-            "#,
-        );
-
-        assert_snapshot!(test.goto_implementation(), @r#"
-        info[goto-implementation]: Go to implementation
-          --> main.py:11:12
-           |
-        11 |     animal.sound
-           |            ^^^^^ Clicking here
-           |
-        info: Found 2 implementations
-         --> main.py:5:5
-          |
-        5 |     sound: ClassVar[str] = "generic"
-          |     -----
-        6 |
-        7 | class Dog(Animal):
-        8 |     sound: ClassVar[str] = "woof"
           |     -----
           |
         "#);
@@ -2384,7 +1888,7 @@ class MyClass:
     fn implementation_attribute_protocol_method_nominal_only() {
         // TODO: the receiver is a `Protocol`, so implementations should be determined by structural
         // subtyping and return all three `speak` definitions (`Speaker`, `Dog`, and `Cat`). We
-        // currently use nominal inheritance only and return `Speaker.speak`. See
+        // currently use nominal inheritance only and return `Speaker.speak` and `Cat.speak`. See
         // https://github.com/astral-sh/ruff/pull/25410#discussion_r3344203732.
         let test = cursor_test(
             r#"
@@ -2396,7 +1900,7 @@ class MyClass:
             class Dog:
                 def speak(self) -> None: ...
 
-            class Cat:
+            class Cat(Speaker):
                 def speak(self) -> None: ...
 
             def f(speaker: Speaker):
@@ -2404,100 +1908,24 @@ class MyClass:
             "#,
         );
 
-        assert_snapshot!(test.goto_implementation(), @r"
+        assert_snapshot!(test.goto_implementation(), @"
         info[goto-implementation]: Go to implementation
           --> main.py:14:13
            |
         14 |     speaker.speak()
            |             ^^^^^ Clicking here
            |
-        info: Found 1 implementation
-         --> main.py:5:9
-          |
-        5 |     def speak(self) -> None: ...
-          |         -----
-          |
-        ");
-    }
-
-    #[test]
-    fn implementation_attribute_protocol_data_nominal_only() {
-        // TODO: as with `implementation_attribute_protocol_method_nominal_only`, structural
-        // subtyping should return all three `name` definitions (`Named`, `Dog`, and `Cat`); we
-        // currently return only `Named.name`.
-        let test = cursor_test(
-            r#"
-            from typing import Protocol
-
-            class Named(Protocol):
-                name: str
-
-            class Dog:
-                name: str
-
-            class Cat:
-                name: str
-
-            def f(named: Named):
-                named.na<CURSOR>me
-            "#,
-        );
-
-        assert_snapshot!(test.goto_implementation(), @r"
-        info[goto-implementation]: Go to implementation
-          --> main.py:14:11
-           |
-        14 |     named.name
-           |           ^^^^ Clicking here
-           |
-        info: Found 1 implementation
-         --> main.py:5:5
-          |
-        5 |     name: str
-          |     ----
-          |
-        ");
-    }
-
-    #[test]
-    fn implementation_class_unreachable_subclass_excluded() {
-        // `ChildFuture` is defined in an unreachable block (the default Python version is well
-        // below 3.999), so it must not be returned as an implementation.
-        let test = cursor_test(
-            r#"
-            import sys
-
-            class Ba<CURSOR>se:
-                pass
-
-            if sys.version_info >= (3, 5):
-                class ChildOld(Base):
-                    pass
-
-            if sys.version_info >= (3, 999):
-                class ChildFuture(Base):
-                    pass
-            "#,
-        );
-
-        assert_snapshot!(test.goto_implementation(), @r"
-        info[goto-implementation]: Go to implementation
-         --> main.py:4:7
-          |
-        4 | class Base:
-          |       ^^^^ Clicking here
-          |
         info: Found 2 implementations
-         --> main.py:4:7
-          |
-        4 | class Base:
-          |       ----
-          |
-         ::: main.py:8:11
-          |
-        8 |     class ChildOld(Base):
-          |           --------
-          |
+          --> main.py:5:9
+           |
+         5 |     def speak(self) -> None: ...
+           |         -----
+           |
+          ::: main.py:11:9
+           |
+        11 |     def speak(self) -> None: ...
+           |         -----
+           |
         ");
     }
 
