@@ -427,20 +427,6 @@ impl<'db> NominalInstanceType<'db> {
         }
     }
 
-    pub(super) fn is_single_valued(self, db: &'db dyn Db) -> bool {
-        match self.0 {
-            NominalInstanceInner::ExactTuple(tuple) => tuple.is_single_valued(db),
-            NominalInstanceInner::Object => false,
-            NominalInstanceInner::SysVersionInfo => true,
-            NominalInstanceInner::NonTuple(class) => class
-                .class(db)
-                .known(db)
-                .and_then(KnownClass::is_single_valued)
-                .or_else(|| Some(self.tuple_spec(db)?.is_single_valued(db)))
-                .unwrap_or_else(|| is_single_member_enum(db, class.class(db).class_literal(db))),
-        }
-    }
-
     pub(super) fn to_meta_type(self, db: &'db dyn Db) -> Type<'db> {
         SubclassOfType::from(db, self.class(db))
     }

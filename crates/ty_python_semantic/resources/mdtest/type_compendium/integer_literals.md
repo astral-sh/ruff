@@ -50,22 +50,9 @@ def f(x: int):
         reveal_type(x)  # revealed: int
 ```
 
-## Integer `Literal`s are single-valued types
+## Equality narrowing for integer `Literal`s
 
-There is a slightly weaker property that integer literals have. They are single-valued types, which
-means that all objects of the type have the same value, i.e. they compare equal to each other:
-
-```py
-from ty_extensions import static_assert
-from ty_extensions._internal import is_single_valued
-from typing import Literal
-
-static_assert(is_single_valued(Literal[0]))
-static_assert(is_single_valued(Literal[1]))
-static_assert(is_single_valued(Literal[54165]))
-```
-
-And this can be used for type-narrowing using equality comparisons:
+Integer literals can narrow types in equality comparisons:
 
 ```py
 def f(x: int):

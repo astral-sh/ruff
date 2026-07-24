@@ -2857,10 +2857,9 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                 !left_sentinel.is_same_sentinel(db, right_sentinel),
             ),
 
-            // any single-valued type is disjoint from another single-valued type
-            // iff the two types are nonequal
+            // These types are disjoint whenever their represented objects differ.
             (
-                // note `LiteralString` is not single-valued, but we handle the special case above
+                // `LiteralString` can represent different strings and is handled above.
                 left @ (Type::FunctionLiteral(..)
                 | Type::KnownBoundMethod(..)
                 | Type::WrapperDescriptor(..)

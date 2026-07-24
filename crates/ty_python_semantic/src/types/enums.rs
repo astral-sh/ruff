@@ -734,18 +734,6 @@ impl<'db> EnumComplementType<'db> {
         self.rest(db).is_empty() && self.remaining_member_count(db) == 1
     }
 
-    /// Return `true` when this complement is a single value under equality narrowing.
-    ///
-    /// Enums that override equality are excluded because one remaining enum literal can still
-    /// compare equal to non-identical values.
-    pub(crate) fn is_single_valued(self, db: &'db dyn Db) -> bool {
-        self.is_singleton(db)
-            && !self
-                .enum_class(db)
-                .to_non_generic_instance(db)
-                .overrides_equality(db)
-    }
-
     /// Expand this complement to the enum literals that remain possible.
     pub fn remaining_literal_types(self, db: &'db dyn Db) -> Vec<Type<'db>> {
         self.remaining_member_names(db)

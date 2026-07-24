@@ -543,7 +543,8 @@ def unrelated_typevar(x: AlwaysEqual, y: U) -> U:
 ## Direct `not in` conditional
 
 ```py
-from typing import Any, Literal, TypeVar
+from enum import Enum
+from typing import Any, Literal, NewType, TypeVar
 
 T = TypeVar("T", Literal[1], Literal[2])
 
@@ -595,6 +596,44 @@ def correlated_typevar(x: T | None, y: T) -> None:
     if x not in (y,):
         reveal_type(x)  # revealed: None
 
+def empty_tuple_slot(x: tuple[()] | None) -> None:
+    if x not in ((),):
+        reveal_type(x)  # revealed: None
+
+def fixed_tuple_slot(x: tuple[Literal[1], Literal["x"]] | None) -> None:
+    if x not in ((1, "x"),):
+        reveal_type(x)  # revealed: None
+
+# We optimistically assume that an unseen runtime subclass does not override `tuple.__eq__`.
+class OpenTupleSubclass(tuple[Literal[1], Literal["x"]]): ...
+
+def tuple_subclass_slot(x: OpenTupleSubclass | None, value: OpenTupleSubclass) -> None:
+    if x not in (value,):
+        reveal_type(x)  # revealed: None
+
+WrappedTuple = NewType("WrappedTuple", tuple[Literal[1], Literal["x"]])
+
+def newtype_tuple_slot(x: WrappedTuple | None, value: WrappedTuple) -> None:
+    if x not in (value,):
+        reveal_type(x)  # revealed: None
+
+class ReflexiveEnum(Enum):
+    A = 1
+    B = 2
+
+    def __eq__(self, other: object) -> Literal[True]:
+        return True
+
+E = TypeVar("E", Literal[ReflexiveEnum.A], Literal[ReflexiveEnum.B])
+
+def reflexive_enum_literal_slot(x: Literal[ReflexiveEnum.A] | None, value: Literal[ReflexiveEnum.A]) -> None:
+    if x not in (value,):
+        reveal_type(x)  # revealed: None
+
+def reflexive_enum_typevar_slot(x: E | None, value: E) -> None:
+    if x not in (value,):
+        reveal_type(x)  # revealed: None
+
 def tuple_with_any_slot(x: str | None, missing: Any) -> None:
     if x not in (missing, None):
         reveal_type(x)  # revealed: str
@@ -615,6 +654,21 @@ def mutable_global_rhs(x: str | None, unavailable: set[str | None]) -> None:
         reveal_type(x)  # revealed: str | None
     else:
         reveal_type(x)  # revealed: str | None
+```
+
+## Recursive tuple slots
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+type Recursive = tuple[Recursive, int]
+
+def recursive_tuple_slot(x: Recursive | None, value: Recursive) -> None:
+    if x not in (value,):
+        reveal_type(x)  # revealed: tuple[Recursive, int] | None
 ```
 
 ## Membership and equality
@@ -707,6 +761,15 @@ def custom_equality(x: AlwaysEqual | Literal[1]):
 def empty_tuple(x: Payload | Literal["missing"], values: tuple[()]):
     if x in values:
         reveal_type(x)  # revealed: Never
+
+def incompatible_tuple_key(
+    key: tuple[str, bool, bool],
+    values: dict[tuple[str, bool], int],
+) -> int | None:
+    if key in values:
+        reveal_type(key)  # revealed: Never
+        return values[key]
+    return None
 ```
 
 ## Custom containment methods

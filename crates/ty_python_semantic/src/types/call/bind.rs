@@ -2133,14 +2133,6 @@ impl<'db> Bindings<'db> {
                             }
                         }
 
-                        Some(KnownFunction::IsSingleValued) => {
-                            if let [Some(ty)] = overload.parameter_types() {
-                                overload.set_return_type(Type::bool_literal(
-                                    ty.project_type_form(db).is_single_valued(db),
-                                ));
-                            }
-                        }
-
                         Some(KnownFunction::GenericContext) => {
                             if let [Some(ty)] = overload.parameter_types() {
                                 let wrap_generic_context = |generic_context| {

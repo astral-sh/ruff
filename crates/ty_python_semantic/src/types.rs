@@ -1324,34 +1324,6 @@ impl<'db> Type<'db> {
         matches!(self, Type::SpecialForm(SpecialFormType::TypeAlias))
     }
 
-    /// Return true if this type overrides __eq__ or __ne__ methods
-    fn overrides_equality(&self, db: &'db dyn Db) -> bool {
-        let check_dunder = |dunder_name, allowed_return_value| {
-            // Note that we do explicitly exclude dunder methods on `object`, `int` and `str` here.
-            // The reason for this is that we know that these dunder methods behave in a predictable way.
-            // Only custom dunder methods need to be examined here, as they might break single-valuedness
-            // by always returning `False`, for example.
-            let call_result = self.try_call_dunder_with_policy(
-                db,
-                dunder_name,
-                &mut CallArguments::positional([Type::unknown()]),
-                TypeContext::default(),
-                MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK
-                    | MemberLookupPolicy::MRO_NO_INT_OR_STR_LOOKUP,
-            );
-            let call_result = call_result.as_ref();
-            call_result.is_ok_and(|bindings| {
-                bindings
-                    .return_type(db)
-                    .as_literal_value()
-                    .and_then(literal::LiteralValueType::as_bool)
-                    == Some(allowed_return_value)
-            }) || call_result.is_err_and(|err| matches!(err, CallDunderError::MethodNotAvailable))
-        };
-
-        !(check_dunder("__eq__", true) && check_dunder("__ne__", false))
-    }
-
     pub fn is_notimplemented(&self, db: &'db dyn Db) -> bool {
         self.is_instance_of(db, KnownClass::NotImplementedType)
     }
@@ -2496,7 +2468,7 @@ impl<'db> Type<'db> {
                 false
             }
             Type::BoundMethod(..) => {
-                // `BoundMethod` types are single-valued types, but not singleton types:
+                // `BoundMethod` types are not singleton types:
                 // ```pycon
                 // >>> class Foo:
                 // ...     def bar(self): pass
@@ -2531,102 +2503,6 @@ impl<'db> Type<'db> {
             Type::TypedDict(_) => false,
             Type::TypeAlias(alias) => alias.value_type(db).is_singleton(db),
             Type::NewTypeInstance(newtype) => newtype.concrete_base_type(db).is_singleton(db),
-        }
-    }
-
-    /// Return true if this type is non-empty and all inhabitants of this type compare equal.
-    pub(crate) fn is_single_valued(self, db: &'db dyn Db) -> bool {
-        match self {
-            Type::KnownInstance(KnownInstanceType::Sentinel(_)) => true,
-            Type::SpecialForm(special_form) => special_form.is_guaranteed_singleton(),
-
-            // It's tempting to add extensive special casing here, but it would be very error-prone,
-            // and there's no known use case. For example, `Annotated[int, ""]` does not compare
-            // equal to `Annotated[int, "fooo"]` (but for us they have identical types); `list[int]`
-            // does not compare equal to `typing.List[int]` (but for us they have identical types);
-            // `typing.Literal` will not necessarily be the same object as `typing_extensions.Literal`
-            // even on Python versions where typeshed says they are the same symbol; etc. etc.
-            Type::KnownInstance(_) | Type::GenericAlias(_) => false,
-
-            Type::FunctionLiteral(..)
-            | Type::WrapperDescriptor(_)
-            | Type::KnownBoundMethod(_)
-            | Type::ModuleLiteral(..)
-            | Type::ClassLiteral(..) => true,
-
-            Type::LiteralValue(literal) => match literal.kind() {
-                LiteralValueTypeKind::Enum(..) => !self.overrides_equality(db),
-
-                LiteralValueTypeKind::Int(..)
-                | LiteralValueTypeKind::String(..)
-                | LiteralValueTypeKind::Bytes(..)
-                | LiteralValueTypeKind::Bool(_) => true,
-
-                LiteralValueTypeKind::LiteralString => false,
-            },
-
-            Type::ProtocolInstance(..) => {
-                // See comment in the `Type::ProtocolInstance` branch for `Type::is_singleton`.
-                false
-            }
-
-            // An unbounded, unconstrained typevar is not single-valued, because it can be
-            // specialized to a multiple-valued type. A bounded typevar is not single-valued, even
-            // if the bound is a final single-valued class, since it can still be specialized to
-            // `Never`. A constrained typevar is single-valued if all of its constraints are
-            // single-valued. (Note that you cannot specialize a constrained typevar to a subtype
-            // of a constraint.)
-            Type::TypeVar(bound_typevar) => {
-                match bound_typevar.typevar(db).bound_or_constraints(db) {
-                    None => false,
-                    Some(TypeVarBoundOrConstraints::UpperBound(_)) => false,
-                    Some(TypeVarBoundOrConstraints::Constraints(constraints)) => constraints
-                        .elements(db)
-                        .iter()
-                        .all(|constraint| constraint.is_single_valued(db)),
-                }
-            }
-
-            Type::SubclassOf(..) => {
-                // TODO: Same comment as above for `is_singleton`
-                false
-            }
-
-            Type::NominalInstance(instance) => instance.is_single_valued(db),
-            Type::NewTypeInstance(newtype) => newtype.concrete_base_type(db).is_single_valued(db),
-
-            Type::BoundSuper(_) => {
-                // At runtime two super instances never compare equal, even if their arguments are identical.
-                false
-            }
-
-            Type::BoundMethod(_) => {
-                // Binding the same method to different instances yields different objects: `[].sort != [].sort`
-                false
-            }
-
-            Type::TypeIs(type_is) => type_is.is_bound(db),
-            Type::TypeGuard(type_guard) => type_guard.is_bound(db),
-            Type::TypeForm(_) => false,
-
-            Type::TypeAlias(alias) => alias.value_type(db).is_single_valued(db),
-
-            Type::Dynamic(_)
-            | Type::Divergent(_)
-            | Type::Never
-            | Type::Union(..)
-            | Type::AlwaysTruthy
-            | Type::AlwaysFalsy
-            | Type::Callable(_)
-            | Type::PropertyInstance(_)
-            | Type::DataclassDecorator(_)
-            | Type::DataclassTransformer(_)
-            | Type::TypedDict(_) => false,
-
-            Type::Intersection(intersection) => intersection
-                .enum_complement(db)
-                .is_some_and(|complement| complement.is_single_valued(db)),
-            Type::EnumComplement(complement) => complement.is_single_valued(db),
         }
     }
 

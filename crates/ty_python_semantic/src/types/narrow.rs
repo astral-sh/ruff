@@ -2975,7 +2975,11 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
         // `not in` negates equality with every element; it does not use `__ne__`. Only add an
         // exclusion when every value represented by a slot is known to compare equal.
         for element_ty in fixed_length.all_elements().iter().copied() {
-            if let Some(constraint) = equality_exclusion_constraint(self.db, element_ty) {
+            if let Some(constraint) = equality_exclusion_constraint(
+                self.db,
+                element_ty,
+                self.comparison_soundness_policy(),
+            ) {
                 builder = builder.add_positive(constraint);
                 constrained = true;
             }

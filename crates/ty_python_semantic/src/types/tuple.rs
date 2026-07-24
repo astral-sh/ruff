@@ -297,10 +297,6 @@ impl<'db> TupleType<'db> {
         self.tuple(db)
             .find_legacy_typevars_impl(db, binding_context, typevars, visitor);
     }
-
-    pub(crate) fn is_single_valued(self, db: &'db dyn Db) -> bool {
-        self.tuple(db).is_single_valued(db)
-    }
 }
 
 impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
@@ -941,10 +937,6 @@ impl<'db> FixedLengthTuple<Type<'db>> {
         for ty in &self.0 {
             ty.find_legacy_typevars_impl(db, binding_context, typevars, visitor);
         }
-    }
-
-    fn is_single_valued(&self, db: &'db dyn Db) -> bool {
-        self.0.iter().all(|ty| ty.is_single_valued(db))
     }
 }
 
@@ -2428,13 +2420,6 @@ impl<'db> Tuple<Type<'db>, VariableSegment<'db>> {
             Tuple::Variable(tuple) => {
                 tuple.find_legacy_typevars_impl(db, binding_context, typevars, visitor);
             }
-        }
-    }
-
-    pub(crate) fn is_single_valued(&self, db: &'db dyn Db) -> bool {
-        match self {
-            Tuple::Fixed(tuple) => tuple.is_single_valued(db),
-            Tuple::Variable(_) => false,
         }
     }
 
