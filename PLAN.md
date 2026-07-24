@@ -10,6 +10,11 @@
 - Phase 2 — inferability-aware path representation and solving: complete.
 - Phase 3 — extract directly from the original TDD: complete.
 - Phase 4 — remove dead projection code and finish validation: complete.
+- PR #27173 ecosystem changes: reproduced and classified; 14 changes are
+    correct, 22 are in-scope regressions, and 26 expose independently existing
+    issues that remain out of scope.
+- Phase 5 — correct in-scope ecosystem regressions: not started. The feature is
+    not ready to merge until those regressions are fixed and validated.
 - Existing constraint-set quantification work is out of scope unless this plan is
     explicitly revised.
 
@@ -500,6 +505,232 @@ constrained specialization when alternatives occur on separate TDD paths.
 One-sided bounds and finite declarations alone still do not establish a fixed
 non-inferable binding.
 
+## PR #27173 ecosystem investigation
+
+The ecosystem report for PR #27173 contains **62 non-flaky diagnostic
+changes** across **13 projects**. Every reported change was reproduced against
+freshly built binaries and fresh source snapshots at the report's exact project
+revisions. The Actions run is
+`https://github.com/astral-sh/ruff/actions/runs/30126610127`.
+
+The exact comparison inputs are:
+
+- Ruff merge base: `8d865dee042b351f8f4f0fe2214784cee2838fdd`.
+- Ruff PR merge revision: `76a690b8c07267f9eeb3fa7d9ee793c4caa79cc3`.
+- Ruff PR head: `ab645e8270688b11b316b6a0dc1da3f527dd09a5`. The PR head
+    and synthetic merge revision have the same Git tree, so building the local
+    PR head reproduces the merge revision's executable without fetching it.
+- Ecosystem analyzer: `263b5500881186e8c918193577c23b341e5b7237`.
+- mypy-primer: `eb1c48d6db2984f5ab083b8355f3647cb4d167a5`.
+- Project Python version: **3.11** for all 13 affected projects.
+- Dependency cutoff used for local reproduction:
+    `2026-07-24T21:07:16Z`.
+- Detailed report: `https://c865b502.ty-ecosystem-ext.pages.dev/diff`.
+- Reproduction binaries, exact project source snapshots, per-project output,
+    minimized cases, and trace logs are under
+    `$HOME/.pi/tmp/pr27173-ecosystem`.
+
+The 62 changes divide into **14 correct changes**, **22 regressions that must be
+fixed in this PR**, and **26 independently existing problems that remain outside
+this feature's scope**. Diagnostic counts below are report-level changes, not
+the number of lines in its raw before/after diff.
+
+### Correct changes to preserve — 14
+
+- **dulwich, 2 removed:** `dulwich/config.py:309`. Constructing
+    `_UniqueKeysView(unique_keys)` correctly preserves the outer bounded key
+    typevar `K`; the previous constructor and return errors were false positives.
+- **pip, 2 removed:**
+    `src/pip/_vendor/resolvelib/structs.py:206`. After narrowing or converting
+    the input into a sequence, `_SequenceIterableView[CT]` is a valid argument
+    and return value.
+- **pandas, 2 changes:** `pandas/core/common.py:316`. `list(obj)` accepts the
+    value after it is narrowed to `Iterable`, so removing the argument error is
+    correct. The remaining return error is justified: the bare `T` alternative
+    can itself be an iterable with elements other than `T`. Describing its
+    result conservatively as `list[object]` is preferable to leaking `_T@list`.
+- **rotki, 2 changes:** `rotkehlchen/chain/decoding/tools.py:44,101`. A
+    `frozenset` built from concrete blockchain addresses does not contain the
+    unrelated outer typevar `A`; removing `A` from the inferred element union
+    makes the still-valid assignment diagnostics more precise.
+- **jax, 4 changes:** `jax/_src/checkify.py:1301`,
+    `jax/_src/lax/control_flow/solves.py:202-203`, and
+    `jax/_src/lax/convolution.py:846`. Three callable expectations retain
+    additional `_SupportsShape[...]` information; the remaining change only
+    reorders union elements.
+- **hydpy, 1 change:** `hydpy/auxs/interptools.py:166`. This only reorders
+    equivalent union elements.
+- **spark, 1 change:** `python/pyspark/pandas/groupby.py:2260`. The existing
+    callback diagnostic gains its variadic parameters without changing its
+    substantive conclusion.
+
+### In-scope regressions to correct — 22
+
+**Bounded, defaulted, covariant typevars lose contextual specializations:**
+
+- **discord.py, 2 added:** `discord/client.py:369` and
+    `discord/interactions.py:405` incorrectly infer `Client` instead of the
+    rigid outer `Self` or `ClientT`.
+- **steam.py, 6 added:** `steam/abc.py:572-579` incorrectly defaults a
+    profile-item typevar to `User` instead of retaining the outer `Self`,
+    producing one false-positive return error and five false-positive argument
+    errors.
+
+The smallest reproduced discord.py case is:
+
+```python
+from __future__ import annotations
+from typing import Generic
+from typing_extensions import Self, TypeVar
+
+class Client:
+    def method(self) -> Box[Self]:
+        return Box()
+
+T = TypeVar("T", bound=Client, default=Client, covariant=True)
+
+class Box(Generic[T]):
+    def __init__(self) -> None:
+        pass
+```
+
+The merge base accepts this program. The PR reports:
+
+```text
+error[invalid-return-type] Return type does not match returned value:
+expected `Box[Self@method]`, found `Box[Client]`
+```
+
+A constructor that receives the outer relationship also regresses:
+
+```python
+class Holder(Generic[T]):
+    def method(self) -> Box[T]:
+        return Box(self)
+
+class Box(Generic[T]):
+    def __init__(self, value: Holder[T]) -> None:
+        self.value = value
+```
+
+The PR reports `Box[Client]` instead of `Box[T@Holder]`. A matrix of minimized
+cases confirms that removing any one of the **bound**, **default**, or
+**covariance** avoids this regression. Assigning the constructor result to a
+local before returning it also changes contextual inference, so direct-return
+regressions must remain direct returns in the eventual mdtests.
+
+The steam.py variant additionally needs a typevar default narrower than its
+bound and an optional constructor argument:
+
+```python
+from __future__ import annotations
+from dataclasses import dataclass
+from typing import Generic
+from typing_extensions import Self, TypeVar
+
+class PartialUser:
+    def equipped(self, present: bool) -> Equipped[Self]:
+        return Equipped(first=Item(self) if present else None)
+
+class User(PartialUser):
+    pass
+
+UserT = TypeVar("UserT", bound=PartialUser, default=User, covariant=True)
+
+class Item(Generic[UserT]):
+    def __init__(self, owner: UserT) -> None:
+        self.owner = owner
+
+@dataclass
+class Equipped(Generic[UserT]):
+    first: Item[UserT] | None
+```
+
+The merge base accepts this program. The PR rejects both the return value and
+its `Item[Self] | None` argument after incorrectly expecting `Item[User] | None`.
+
+**Previously retained outer-typevar relationships degrade to `Unknown`:**
+
+- **Expression, 6 changes:** `expression/collections/maptree.py:112-141`.
+    Returned `MapTreeLeaf[Key, object]` becomes
+    `MapTreeLeaf[Unknown, object]`. Four argument errors disappear only because
+    `Unknown` hides the mismatch; these removals are not genuine improvements.
+- **aiohttp, 1 change:** `aiohttp/client.py:1481`. An existing result of
+    `ClientResponse | _RetType_co` becomes `ClientResponse | Unknown`, losing
+    a legitimate symbolic reference to the bounded outer typevar.
+- **pip, 1 change:** `src/pip/_vendor/resolvelib/structs.py:203`. The expected
+    factory return changes from `Iterable[CT]` to `Iterable[Unknown]`.
+- **static-frame, 6 changes:** `static_frame/core/node_selector.py:452-536`.
+    Expected callback result types that previously retained `TVContainer_co`
+    become `Unknown`.
+
+These are in scope even when an existing diagnostic remains: this feature
+explicitly promises not to discard legitimate non-inferable references inside
+inferable solution types, and loss of precision can silently suppress other
+errors. Existing coverage for bounded non-inferable variables inside invariant
+solutions passes, but does **not** cover bounded/defaulted/covariant contextual
+constructor inference or these callback and nested-relationship failures.
+
+Trace comparison for the minimal discord.py example shows the merge-base
+projection deriving `(Self@method = T@Box)`, while the PR's direct traversal
+does not show that equality before the constructor defaults to `Client`. This
+is evidence to investigate, not a settled root-cause diagnosis or permission
+to restore the deleted projection.
+
+### Incorrect but intentionally out of scope — 26
+
+- **prefect, 24 changed:** existing return and attribute errors change from
+    `CoroutineType[Any, Any, T] | T` to
+    `Awaitable[CoroutineType[Any, Any, T] | T] | T`.
+    `Call[T]` is itself callable, so it matches multiple union alternatives;
+    the solver already selects and combines those alternative paths
+    incorrectly. Correcting that general cross-path selection problem is
+    independently deferred by D7, and the PR does not add new diagnostics.
+- **static-frame, 1 added:**
+    `static_frame/core/series_mapping.py:60`. `series.values` is already typed
+    as `ndarray[Any, Any]` on both revisions, losing its relationship to
+    `TVValues`. The newly exposed `Iterator[Any | ndarray[...]]` return error
+    requires better ndarray/Series element-type propagation, not a change to
+    non-inferable projection.
+- **static-frame, 1 removed warning:** `static_frame/core/bus.py:680`. The
+    existing `type: ignore` becomes used because selecting among overloaded
+    callback alternatives incorrectly infers
+    `InterGetItemLocReduces[Frame, Frame]` instead of
+    `InterGetItemLocReduces[Bus, Frame]`. This is the separately deferred
+    cross-path specialization-selection problem from D7.
+
+The prefect behavior is reproduced without third-party imports:
+
+```python
+from collections.abc import Awaitable, Callable
+from typing import Any, Coroutine, Generic, TypeVar
+
+T = TypeVar("T")
+
+class Call(Generic[T]):
+    def __call__(self) -> T | Awaitable[T]:
+        raise NotImplementedError
+
+    def result(self) -> T:
+        raise NotImplementedError
+
+def schedule(call: Callable[[], T | Awaitable[T]] | Call[T]) -> Call[T]:
+    raise NotImplementedError
+
+def run(call: Call[Coroutine[Any, Any, int] | int]) -> int:
+    return schedule(call).result()
+```
+
+The merge base already rejects this with found type
+`Coroutine[Any, Any, int] | int`; the PR rejects it with found type
+`Awaitable[Coroutine[Any, Any, int] | int] | int`. Neither result is the desired
+`int`, so treating the changed diagnostic as a new feature-scoped bug would
+silently expand the work into general alternative-path selection.
+
+Two `unsupported-base` changes in `steam/user.py` are explicitly marked flaky
+in the HTML report and excluded from the 62-change PR summary. Do not absorb
+that unrelated nondeterminism into this feature.
+
 ## Required semantic cases
 
 Characterize and validate each of the following. Some cases document current
@@ -642,6 +873,32 @@ bugs and require an agreed decision before their expected behavior is changed.
     invariant class-pattern narrowing. A non-inferable typevar must not trigger
     an inferable-variable callback or pollute a variance map.
 
+1. **Contextual bounded/defaulted/covariant specialization**
+
+    ```text
+    T: Client = Client, covariant
+    contextual target = Box[Self]
+    Box() => Box[Self], not Box[Client]
+    ```
+
+    Check both constructors without a typevar-bearing argument and constructors
+    whose argument directly relates `T` to an outer `Self` or typevar. Include a
+    narrower declared default, dataclass-generated constructors, and optional
+    `Item[Self] | None` arguments. Preserve direct-return contextual inference;
+    introducing an intermediate local can hide this regression.
+
+1. **Preserved symbolic outer-variable precision**
+
+    ```text
+    bounded outer N and visible I = N => I = N, not Unknown
+    callback returning outer N => callback returns N, not Unknown
+    ```
+
+    Cover nested generic tree values, bounded-union `Self` methods, callable
+    factories, and callbacks whose bound refers to an outer constrained
+    variable. Removing a diagnostic by replacing a legitimate outer typevar
+    with `Unknown` is not a valid fix.
+
 ## Agreed decisions
 
 - The operation to eliminate is `remove_noninferable`, not
@@ -718,6 +975,16 @@ bugs and require an agreed decision before their expected behavior is changed.
     result with a `TODO` for the desired `int` result in the affected TypedDict
     mdtests instead of introducing an ad hoc TDD reduction, projected-path
     subsumption, or a separate solution-selection mechanism.
+- **D8, ecosystem follow-up scope:** fix regressions that discard an outer
+    symbolic relationship, replace it with a declared default or `Unknown`, or
+    create the corresponding discord.py/steam.py false positives. Preserve all
+    14 correct ecosystem improvements. Do not broaden this work to prefect's
+    existing callable-union path selection, static-frame's ndarray element
+    tracking or overloaded cross-path specialization, flaky `unsupported-base`
+    diagnostics, explicit quantification, or complete hidden-negative-domain
+    reasoning. If preserving symbolic relationships requires restoring the old
+    projection, generalized cross-path ranking, new dependency-solving
+    machinery, or any comparably broad change, stop and ask for guidance.
 
 ## Recognizing fixed non-inferable bindings
 
@@ -906,6 +1173,70 @@ Exit criteria:
     independently pre-existing failures.
 - The full suite and repository hooks pass.
 
+### [ ] Phase 5 — Correct in-scope ecosystem regressions
+
+Depends on completed Phase 4 and the ecosystem classification above. As with
+earlier implementation phases, create a dedicated Jujutsu revision, add tests
+and documentation in that revision, and finish with a passing full test suite.
+
+1. Add focused mdtests in existing files for the two minimized discord.py
+    cases, the steam.py optional dataclass-constructor case, bounded-union
+    `Self` methods, callable-factory relationships, and outer constrained
+    callback return types. Prefer `annotations/self.md`, relevant generic-call
+    files, `regression/noninferable_projection_to_terminal.md`, and
+    `type_properties/constraints.md` as appropriate. Keep constructor calls in
+    direct-return position when contextual typing is part of the reproducer.
+1. Characterize the relevant original-TDD paths and their sequent-derived
+    relationships with focused solver unit tests before selecting a fix.
+    Investigate why the merge-base projection derived
+    `(Self@method = T@Box)` in the minimal defaulted/covariant case while
+    direct extraction does not retain the same usable relationship. Do not
+    assume that every affected ecosystem project shares one root cause before
+    the focused tests establish it.
+1. Preserve valid symbolic non-inferable relationships during contextual
+    constructor inference and callback solving. A declared bound or default
+    must not replace an available outer `Self`/typevar, and a surviving
+    relationship must not degrade to `Unknown`. Reuse existing path traversal,
+    sequent facts, solution selection, and type mapping before introducing new
+    representation or algorithms.
+1. Correct all 22 category-B changes: both discord.py diagnostics, all six
+    steam.py diagnostics, all six Expression changes, the aiohttp precision
+    loss, the pip factory precision loss, and all six static-frame selector
+    regressions. Verify that removed Expression diagnostics are not merely
+    hidden by an `Unknown` specialization.
+1. Preserve the 14 category-A improvements, especially valid dulwich and pip
+    sequence calls, pandas's valid iterable conversion, removal of unrelated
+    outer typevars from rotki unions, and existing jax/hydpy/spark behavior.
+1. Keep the 26 category-C differences outside the implementation scope.
+    Preserve the existing documented D7 TypedDict expectations; do not add
+    general union-path ranking or subsumption to eliminate prefect's changed
+    diagnostics or static-frame's overloaded-callback issue, and do not expand
+    the task to ndarray typing or flaky ecosystem warnings.
+1. Rerun the 13 affected ecosystem projects against the exact source revisions,
+    Python 3.11 environments, PR ecosystem config, and freshly built
+    comparison binaries. Confirm that category-B regressions disappear,
+    category-A improvements remain, and no newly worsened out-of-scope behavior
+    is introduced.
+1. Run focused solver/mdtests, the complete semantic crate, the full workspace,
+    normal and perturbed-order mdtests, the pydantic microbenchmark, and prek
+    for every changed path. Update this plan with the actual implementation,
+    ecosystem comparison, remaining deferred limitations, and validation.
+
+Exit criteria:
+
+- Existing direct-return contextual specialization retains outer `Self` and
+    outer typevar relationships even when the inner typevar is bounded,
+    defaulted, and covariant.
+- The Expression, aiohttp, pip, and static-frame cases retain their symbolic
+    outer typevars instead of defaulting or degrading to `Unknown`.
+- All 22 in-scope ecosystem regressions are removed without losing the 14
+    correct changes or widening scope to the 26 independently existing issues.
+- `remove_noninferable` remains absent, explicit quantification and the
+    concrete-conjunction fast path remain intact, and pre-existing perturbed
+    ordering failures are not changed silently.
+- The full workspace, relevant benchmark, ordering validation, and repository
+    hooks pass.
+
 ## Validation commands
 
 Normal targeted semantic tests:
@@ -977,6 +1308,52 @@ For ordering perturbation, follow
 `INSTA_FORCE_PASS`, set `INSTA_UPDATE=no` and `MDTEST_UPDATE_SNAPSHOTS=0`, and
 run the normal, `reverse`, `1`, `2`, `3`, `4`, `7`, `8`, and `15` orderings
 sequentially.
+
+Existing minimized ecosystem reproducers can be checked against freshly built
+merge-base and PR binaries without editing the Ruff checkout:
+
+```sh
+work="$HOME/.pi/tmp/pr27173-ecosystem"
+export TY_CONFIG_FILE="$work/bin/ty-ecosystem.toml"
+
+for revision in base pr; do
+    "$work/bin/ty-$revision" check \
+        "$work/repros/matrix/self_context_bound1_default1_cov1.py" \
+        --python "$work/.venv" \
+        --python-version 3.11 \
+        --output-format concise
+
+done
+```
+
+Run each affected project from its exact source snapshot with its project-
+specific Python 3.11 environment. For example:
+
+```sh
+work="$HOME/.pi/tmp/pr27173-ecosystem"
+export TY_CONFIG_FILE="$work/bin/ty-ecosystem.toml"
+
+for project in discord.py steam.py prefect; do
+    case "$project" in
+        discord.py) path=discord ;;
+        steam.py) path=steam ;;
+        prefect) path=src ;;
+    esac
+
+    for revision in base pr; do
+        (
+            cd "$work/projects/$project" &&
+            "$work/bin/ty-$revision" check "$path" \
+                --python "$work/projects/$project/.venv" \
+                --output-format concise
+        ) || true
+    done
+done
+```
+
+Existing base/PR binaries reproduce the published comparison. After production
+changes, build and copy a new candidate binary before claiming the ecosystem
+regressions are fixed; do not overwrite the known-good comparison artifacts.
 
 Before completing any changed revision:
 
