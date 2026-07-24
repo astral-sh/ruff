@@ -607,7 +607,7 @@ pub(crate) fn builtins_symbol<'db>(
     let db = env.db();
     let resolver_environment = env.resolver_environment();
     let resolver = |module: Module<'db>| {
-        let program_file = ProgramFile::new(db, module.file(db)?, resolver_environment);
+        let program_file = ProgramFile::new(db, module.file(db)?, env.program());
         let found_symbol = symbol_impl(
             env,
             global_scope(db, program_file),
@@ -1359,7 +1359,7 @@ fn symbol_impl<'db>(
             "version_info" => {
                 return Place::bound(Type::sys_version_info()).into();
             }
-            "platform" => match ty_python_core::program::Program::get(db).python_platform(db) {
+            "platform" => match env.program().python_platform(db) {
                 crate::PythonPlatform::Identifier(platform) => {
                     return Place::bound(Type::string_literal(db, platform.as_str())).into();
                 }
@@ -1372,7 +1372,7 @@ fn symbol_impl<'db>(
     }
 
     if name == "name" && is_known_module(KnownModule::Os) {
-        match ty_python_core::program::Program::get(db).python_platform(db) {
+        match env.program().python_platform(db) {
             crate::PythonPlatform::Identifier(platform) => {
                 // In CPython, `os.name` is `"nt"` on Windows and `"posix"` otherwise.
                 let os_name = if platform == "win32" { "nt" } else { "posix" };
@@ -2238,9 +2238,9 @@ pub(crate) mod implicit_globals {
             cycle_initial=|_, _, _| smallvec::SmallVec::default(),
             heap_size=ruff_memory_usage::heap_size
         )]
-        fn module_type_symbols_inner<'db>(
-            db: &'db dyn Db,
-            program: Program<'db>,
+        fn module_type_symbols_inner(
+            db: &dyn Db,
+            program: Program,
         ) -> smallvec::SmallVec<[ast::name::Name; 8]> {
             let env = SemanticEnvironment::from_program(db, program);
             let Some(module_type) = KnownClass::ModuleType

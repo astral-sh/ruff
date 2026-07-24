@@ -273,7 +273,7 @@ impl<'db> Visitor<'db> for ExportFinder<'db> {
                                     .map(|file| {
                                         exported_names(
                                             db,
-                                            ProgramFile::new(db, file, resolver_environment),
+                                            ProgramFile::new(db, file, program_file.program(db)),
                                         )
                                     })
                                     .unwrap_or_default()

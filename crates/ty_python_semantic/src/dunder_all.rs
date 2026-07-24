@@ -175,7 +175,7 @@ impl<'db> DunderAllNamesCollector<'db> {
         )?;
         dunder_all_names(
             db,
-            ProgramFile::new(db, module.file(db)?, resolver_environment),
+            ProgramFile::new(db, module.file(db)?, self.env.program()),
         )
     }
 

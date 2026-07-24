@@ -2,7 +2,7 @@ use compact_str::CompactString;
 use rayon::prelude::*;
 use ruff_db::files::File;
 use ty_module_resolver::{
-    ImportingFile, Module, ModuleName, ResolverFile, all_modules, resolve_real_shadowable_module,
+    ImportingFile, Module, ModuleName, all_modules, resolve_real_shadowable_module,
 };
 use ty_project::{Db, parallel::ParallelIteratorExt};
 use ty_python_core::ProgramFile;
@@ -18,7 +18,7 @@ use crate::{
 /// by the query.
 pub fn all_symbols<'db>(
     db: &'db dyn Db,
-    importing_from: ResolverFile<'db>,
+    importing_from: ProgramFile<'db>,
     query: &QueryPattern,
 ) -> Vec<AllSymbolInfo<'db>> {
     // If the query is empty, return immediately to avoid expensive file scanning
@@ -30,11 +30,13 @@ pub fn all_symbols<'db>(
     let _span = all_symbols_span.enter();
 
     let typing_extensions = ModuleName::new_static("typing_extensions").unwrap();
-    let resolver_environment = importing_from.environment(db);
+    let program = importing_from.program(db);
+    let resolver_file = importing_from.resolver_file(db);
+    let resolver_environment = importing_from.resolver_environment(db);
     let is_typing_extensions_available = importing_from.file(db).is_stub(db)
         || resolve_real_shadowable_module(
             db,
-            ImportingFile::ResolverFile(importing_from),
+            ImportingFile::ResolverFile(resolver_file),
             &typing_extensions,
         )
         .is_some();
@@ -67,7 +69,7 @@ pub fn all_symbols<'db>(
             let Some(file) = module.file(db) else {
                 return Vec::new();
             };
-            let program_file = ProgramFile::new(db, file, resolver_environment);
+            let program_file = ProgramFile::new(db, file, program);
 
             let symbols_for_file_span = tracing::debug_span!(
                 parent: &all_symbols_span,
@@ -722,7 +724,7 @@ def zqzqzq():
 
         let symbols = all_symbols(
             &test.db,
-            test.program_file(test.cursor.file).resolver_file(&test.db),
+            test.program_file(test.cursor.file),
             &QueryPattern::fuzzy("zqzqzq"),
         );
         let symbol = symbols
@@ -1143,7 +1145,7 @@ def test_helper_xyzxyzxyz():
         fn all_symbols(&self, query: &str) -> String {
             let symbols = all_symbols(
                 &self.db,
-                self.program_file(self.cursor.file).resolver_file(&self.db),
+                self.program_file(self.cursor.file),
                 &QueryPattern::fuzzy(query),
             );
 

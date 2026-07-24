@@ -817,8 +817,6 @@ mod tests {
         let mut db =
             ty_project::TestDb::new(ProjectMetadata::new("test", SystemPathBuf::from("/")));
 
-        db.init_program().unwrap();
-
         let source = dedent(source);
 
         let start = source.find(START);

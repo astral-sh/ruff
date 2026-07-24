@@ -393,7 +393,7 @@ pub(crate) fn symbols_for_file(db: &dyn Db, file: ProgramFile<'_>) -> FlatSymbol
     let parsed = parsed_module(db, file.python_file(db));
     let module = parsed.load(db);
 
-    let mut visitor = SymbolVisitor::tree(db, file.resolver_file(db));
+    let mut visitor = SymbolVisitor::tree(db, file);
     visitor.visit_body(&module.syntax().body);
     visitor.into_flat_symbols()
 }
@@ -413,7 +413,7 @@ pub(crate) fn symbols_for_file_global_only(db: &dyn Db, file: ProgramFile<'_>) -
     let parsed = parsed_module(db, file.python_file(db));
     let module = parsed.load(db);
 
-    let mut visitor = SymbolVisitor::globals(db, file.resolver_file(db));
+    let mut visitor = SymbolVisitor::globals(db, file);
     visitor.visit_body(&module.syntax().body);
 
     if source_file
@@ -595,23 +595,23 @@ impl<'db> Imports<'db> {
     fn get_module_symbols(
         &self,
         db: &'db dyn Db,
-        importing_file: ResolverFile<'db>,
+        importing_file: ProgramFile<'db>,
         name: &ModuleName,
     ) -> Option<&'db FlatSymbols> {
         let module_kind = self.module_names.get(name.as_str())?;
         let module_name = match module_kind {
             ImportModuleKind::Definitive(name) | ImportModuleKind::Possible(name) => {
-                name.to_module_name(db, importing_file)?
+                name.to_module_name(db, importing_file.resolver_file(db))?
             }
         };
         let module = resolve_module(
             db,
-            ImportingFile::ResolverFile(importing_file),
+            ImportingFile::ResolverFile(importing_file.resolver_file(db)),
             &module_name,
         )?;
         Some(symbols_for_file_global_only(
             db,
-            ProgramFile::new(db, module.file(db)?, importing_file.environment(db)),
+            ProgramFile::new(db, module.file(db)?, importing_file.program(db)),
         ))
     }
 }
@@ -705,7 +705,7 @@ impl Ranged for AstImport<'_> {
 #[expect(clippy::struct_excessive_bools)]
 struct SymbolVisitor<'db> {
     db: &'db dyn Db,
-    file: ResolverFile<'db>,
+    file: ProgramFile<'db>,
     symbols: IndexVec<SymbolId, SymbolTree>,
     symbol_stack: Vec<SymbolId>,
     /// Track if we're currently inside a function at any point.
@@ -739,7 +739,7 @@ struct SymbolVisitor<'db> {
 }
 
 impl<'db> SymbolVisitor<'db> {
-    fn tree(db: &'db dyn Db, file: ResolverFile<'db>) -> Self {
+    fn tree(db: &'db dyn Db, file: ProgramFile<'db>) -> Self {
         Self {
             db,
             file,
@@ -755,7 +755,7 @@ impl<'db> SymbolVisitor<'db> {
         }
     }
 
-    fn globals(db: &'db dyn Db, file: ResolverFile<'db>) -> Self {
+    fn globals(db: &'db dyn Db, file: ProgramFile<'db>) -> Self {
         Self {
             exports_only: true,
             ..Self::tree(db, file)
@@ -905,9 +905,12 @@ impl<'db> SymbolVisitor<'db> {
         let full_range = import.range();
         let Some(imported_from) = (match import {
             AstImport::Import(_) => ImportedFrom::import(alias, import_kind),
-            AstImport::ImportFrom(ast) => {
-                ImportedFrom::import_from(self.db, self.file, ast, import_kind)
-            }
+            AstImport::ImportFrom(ast) => ImportedFrom::import_from(
+                self.db,
+                self.file.resolver_file(self.db),
+                ast,
+                import_kind,
+            ),
         }) else {
             tracing::debug!(
                 "Dropping imported symbol {name} since its module name could not be discovered",
@@ -1087,7 +1090,7 @@ impl<'db> SymbolVisitor<'db> {
                 }
                 let Some(imported_from) = ImportedFrom::import_from(
                     self.db,
-                    self.file,
+                    self.file.resolver_file(self.db),
                     import_from,
                     ImportKind::Wildcard,
                 ) else {
@@ -1132,7 +1135,7 @@ impl<'db> SymbolVisitor<'db> {
         &self,
         import_from: &ast::StmtImportFrom,
     ) -> Option<&'db FlatSymbols> {
-        let resolver_file = self.file;
+        let resolver_file = self.file.resolver_file(self.db);
         let module_name = ModuleName::from_import_statement(
             self.db,
             ImportingFile::ResolverFile(resolver_file),
@@ -1146,11 +1149,7 @@ impl<'db> SymbolVisitor<'db> {
         )?;
         Some(symbols_for_file_global_only(
             self.db,
-            ProgramFile::new(
-                self.db,
-                module.file(self.db)?,
-                self.file.environment(self.db),
-            ),
+            ProgramFile::new(self.db, module.file(self.db)?, self.file.program(self.db)),
         ))
     }
 
@@ -3019,8 +3018,7 @@ class C: ...
             let metadata = ProjectMetadata::new("test", SystemPathBuf::from("/"));
             let mut db = TestDb::new(metadata);
 
-            db.init_program_with_python_version(self.python_version.unwrap_or_default())
-                .unwrap();
+            db.set_python_version(self.python_version.unwrap_or_default());
 
             for Source { path, contents } in &self.sources {
                 db.write_file(path, contents)

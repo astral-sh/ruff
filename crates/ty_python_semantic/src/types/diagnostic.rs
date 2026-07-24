@@ -4632,11 +4632,12 @@ pub(super) fn report_invalid_total_ordering_call(
 ///
 /// The function returns `true` if a hint was added, `false` otherwise.
 pub(super) fn hint_if_stdlib_submodule_exists_on_other_versions(
-    db: &dyn Db,
+    env: &SemanticEnvironment<'_>,
     diagnostic: &mut Diagnostic,
     full_submodule_name: &ModuleName,
     parent_module: Module,
 ) -> bool {
+    let db = env.db();
     let Some(search_path) = parent_module.search_path(db) else {
         return false;
     };
@@ -4667,7 +4668,7 @@ pub(super) fn hint_if_stdlib_submodule_exists_on_other_versions(
         version_range = version_range.diagnostic_display(),
     ));
 
-    add_inferred_python_version_hint_to_diagnostic(db, diagnostic, "resolving modules");
+    add_inferred_python_version_hint_to_diagnostic(env, diagnostic, "resolving modules");
 
     true
 }
@@ -4724,7 +4725,7 @@ pub(super) fn hint_if_stdlib_attribute_exists_on_other_versions(
     // TODO: determine what version they need to be on
     // TODO: also mention the platform we're assuming
     // TODO: determine what platform they need to be on
-    add_inferred_python_version_hint_to_diagnostic(db, &mut diagnostic, action);
+    add_inferred_python_version_hint_to_diagnostic(env, &mut diagnostic, action);
 }
 
 pub(super) fn report_invalid_concatenate_last_arg<'db>(

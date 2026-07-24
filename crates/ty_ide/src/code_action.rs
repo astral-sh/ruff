@@ -928,8 +928,6 @@ mod tests {
             let mut db =
                 ty_project::TestDb::new(ProjectMetadata::new("test", SystemPathBuf::from("/")));
 
-            db.init_program().unwrap();
-
             let mut cleansed = dedent(source).to_string();
 
             let start = cleansed

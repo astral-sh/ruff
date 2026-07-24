@@ -470,7 +470,7 @@ impl<'db> StaticClassLiteral<'db> {
         self.body_scope(db).program_file(db)
     }
 
-    pub(crate) fn program(self, db: &'db dyn Db) -> Program<'db> {
+    pub(crate) fn program(self, db: &'db dyn Db) -> Program {
         self.body_scope(db).program(db)
     }
 

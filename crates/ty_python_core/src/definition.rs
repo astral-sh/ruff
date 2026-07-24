@@ -92,7 +92,7 @@ impl<'db> Definition<'db> {
         self.scope_id(db).program_file(db)
     }
 
-    pub fn program(self, db: &'db dyn Db) -> Program<'db> {
+    pub fn program(self, db: &'db dyn Db) -> Program {
         self.scope_id(db).program(db)
     }
 

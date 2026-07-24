@@ -11,7 +11,6 @@ use ruff_db::{
     source::source_text,
 };
 use ruff_diagnostics::{Applicability, Edit, Fix, IsolationLevel, SourceMap};
-use ruff_python_ast::PythonVersion;
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 use rustc_hash::{FxHashMap, FxHashSet};
 use salsa::Setter as _;
@@ -39,13 +38,11 @@ pub struct FixAllResults {
 /// If the `db`'s system isn't [writable](WritableSystem).
 pub fn suppress_all_diagnostics(
     db: &mut dyn Db,
-    python_version: PythonVersion,
     diagnostics: Vec<Diagnostic>,
     cancellation_token: &CancellationToken,
 ) -> Result<FixAllResults, Canceled> {
     fix_all(
         db,
-        python_version,
         diagnostics,
         FixMode::Suppress,
         cancellation_token,
@@ -61,14 +58,12 @@ pub fn suppress_all_diagnostics(
 /// If the `db`'s system isn't [writable](WritableSystem).
 pub fn fix_all_diagnostics(
     db: &mut dyn Db,
-    python_version: PythonVersion,
     diagnostics: Vec<Diagnostic>,
     applicability: Applicability,
     cancellation_token: &CancellationToken,
 ) -> Result<FixAllResults, Canceled> {
     fix_all(
         db,
-        python_version,
         diagnostics,
         FixMode::ApplyFixes(applicability),
         cancellation_token,
@@ -83,7 +78,6 @@ const MAX_ITERATIONS: usize = 10;
 /// `check_file` is a separate parameter so that tests can easily mock out a file's diagnostics.
 fn fix_all<F>(
     db: &mut dyn Db,
-    python_version: PythonVersion,
     mut diagnostics: Vec<Diagnostic>,
     fix_mode: FixMode,
     cancellation_token: &CancellationToken,
@@ -135,7 +129,7 @@ where
             continue;
         };
 
-        let python_file = PythonFile::new(db, file, python_version);
+        let python_file = db.program_file(file).python_file(db);
         let parsed = parsed_module(db, python_file);
         if parsed.load(db).has_syntax_errors() {
             tracing::warn!("Skipping file `{path}` with syntax errors");
@@ -184,7 +178,6 @@ where
         // This is done outside the above loop so that it can run in parallel.
         let check_results = recheck_files(
             &*db,
-            python_version,
             unstaged_fixes,
             fix_mode,
             cancellation_token,
@@ -757,7 +750,6 @@ enum CheckResult<'a> {
 
 fn recheck_files<'a, F>(
     db: &dyn Db,
-    python_version: PythonVersion,
     changes: Vec<(QueuedFile<'a>, usize)>,
     fix_mode: FixMode,
     cancellation_token: &CancellationToken,
@@ -783,7 +775,7 @@ where
 
                     let db = &*db;
 
-                    let python_file = PythonFile::new(db, file.file, python_version);
+                    let python_file = db.program_file(file.file).python_file(db);
                     let parsed = parsed_module(db, python_file);
                     let parsed = parsed.load(db);
 
@@ -814,7 +806,6 @@ where
 #[cfg(test)]
 mod tests {
     use insta::assert_snapshot;
-    use ruff_db::PythonFile;
     use ruff_db::cancellation::CancellationTokenSource;
     use ruff_db::diagnostic::{
         Annotation, Diagnostic, DiagnosticId, DisplayDiagnosticConfig, DisplayDiagnostics,
@@ -1730,12 +1721,10 @@ class B(A):
         };
 
         let initial_diagnostics = check_file(&db, file);
-        let python_version = db.python_version();
 
         let cancellation_token_source = CancellationTokenSource::new();
         let fixes = fix_all(
             &mut db,
-            python_version,
             initial_diagnostics,
             FixMode::ApplyFixes(Applicability::Safe),
             &cancellation_token_source.token(),
@@ -1809,12 +1798,10 @@ class B(A):
         };
 
         let initial_diagnostics = check_file(&db, file);
-        let python_version = db.python_version();
 
         let cancellation_token_source = CancellationTokenSource::new();
         let fixes = fix_all(
             &mut db,
-            python_version,
             initial_diagnostics,
             FixMode::ApplyFixes(Applicability::Safe),
             &cancellation_token_source.token(),
@@ -1886,10 +1873,8 @@ class B(A):
             create_diagnostics(file)
         };
 
-        let python_version = db.python_version();
         let result = fix_all(
             &mut db,
-            python_version,
             initial_diagnostics,
             FixMode::ApplyFixes(Applicability::Safe),
             &cancellation_token_source.token(),
@@ -1988,12 +1973,10 @@ class B(A):
         };
 
         let initial_diagnostics = check_file(&db, file);
-        let python_version = db.python_version();
 
         let cancellation_token_source = CancellationTokenSource::new();
         let fixes = fix_all(
             &mut db,
-            python_version,
             initial_diagnostics,
             FixMode::ApplyFixes(Applicability::Safe),
             &cancellation_token_source.token(),
@@ -2025,8 +2008,7 @@ class B(A):
 
         let file = system_path_to_file(&db, "test.py").unwrap();
 
-        let python_version = db.python_version();
-        let parsed_before = parsed_module(&db, PythonFile::new(&db, file, python_version));
+        let parsed_before = parsed_module(&db, db.program_file(file).python_file(&db));
         let had_syntax_errors = parsed_before.load(&db).has_syntax_errors();
 
         let diagnostics = db.check_file(file);
@@ -2041,13 +2023,9 @@ class B(A):
             .cloned()
             .collect();
         let cancellation_token_source = CancellationTokenSource::new();
-        let fixes = suppress_all_diagnostics(
-            &mut db,
-            python_version,
-            diagnostics,
-            &cancellation_token_source.token(),
-        )
-        .expect("operation never gets cancelled");
+        let fixes =
+            suppress_all_diagnostics(&mut db, diagnostics, &cancellation_token_source.token())
+                .expect("operation never gets cancelled");
 
         if had_syntax_errors {
             assert_eq!(fixes.count, 0);
@@ -2081,7 +2059,7 @@ class B(A):
 
         let fixed = source_text(&db, file);
 
-        let parsed = parsed_module(&db, PythonFile::new(&db, file, python_version));
+        let parsed = parsed_module(&db, db.program_file(file).python_file(&db));
         let parsed = parsed.load(&db);
 
         let diagnostics_after_applying_fixes = db.check_file(file);

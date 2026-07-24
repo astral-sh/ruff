@@ -204,7 +204,11 @@ pub fn check_file(db: &dyn Db, file: ProgramFile<'_>) -> Result<Box<[Diagnostic]
 
     diagnostics.extend(parsed_ref.unsupported_syntax_errors().iter().map(|error| {
         let mut error = Diagnostic::invalid_syntax(source_file, error, error);
-        add_inferred_python_version_hint_to_diagnostic(db, &mut error, "parsing syntax");
+        add_inferred_python_version_hint_to_diagnostic(
+            &SemanticEnvironment::from_file(db, file),
+            &mut error,
+            "parsing syntax",
+        );
         error
     }));
 

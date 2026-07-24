@@ -8,7 +8,7 @@ use ruff_python_ast as ast;
 use ruff_python_ast::PythonVersion;
 use test_case::test_case;
 use ty_python_core::ProgramFile;
-use ty_python_core::program::Program as ProjectProgram;
+use ty_python_core::program::Program;
 
 /// Explicitly test for Python version <3.13 and >=3.13, to ensure that
 /// the fallback to `typing_extensions` is working correctly.
@@ -69,21 +69,20 @@ fn oscillating_generic_alias_cycle_recover<'db>(
     cycle: &salsa::Cycle,
     previous: &Type<'db>,
     current: Type<'db>,
+    program: Program,
 ) -> Type<'db> {
-    let env =
-        SemanticEnvironment::from_program(db, ProjectProgram::get(db).resolver_environment(db));
+    let env = SemanticEnvironment::from_program(db, program);
     current.cycle_normalized(&env, *previous, cycle)
 }
 
 #[salsa::tracked(
     returns(copy),
-    cycle_initial=|_, id| Type::divergent(id),
+    cycle_initial=|_, id, _| Type::divergent(id),
     cycle_fn=oscillating_generic_alias_cycle_recover,
 )]
-fn oscillating_generic_alias(db: &dyn Db) -> Type<'_> {
-    let env =
-        SemanticEnvironment::from_program(db, ProjectProgram::get(db).resolver_environment(db));
-    let previous = oscillating_generic_alias(db);
+fn oscillating_generic_alias(db: &dyn Db, program: Program) -> Type<'_> {
+    let env = SemanticEnvironment::from_program(db, program);
+    let previous = oscillating_generic_alias(db, program);
     let argument = if let Type::GenericAlias(alias) = previous
         && alias.specialization(db).types(db) == [Type::unknown()]
     {
@@ -98,7 +97,7 @@ fn oscillating_generic_alias(db: &dyn Db) -> Type<'_> {
 #[test]
 fn generic_alias_cycle_recovery_normalizes_same_origin_unknown_oscillation() {
     let db = setup_db();
-    let Type::GenericAlias(alias) = oscillating_generic_alias(&db) else {
+    let Type::GenericAlias(alias) = oscillating_generic_alias(&db, db.program()) else {
         panic!("cycle recovery should preserve the generic alias");
     };
 

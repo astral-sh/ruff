@@ -8,17 +8,15 @@ use std::sync::{Arc, Mutex, OnceLock};
 use libfuzzer_sys::{Corpus, fuzz_target};
 
 use ruff_db::Db as SourceDb;
-use ruff_db::PythonFile;
 use ruff_db::diagnostic::Diagnostic;
 use ruff_db::files::{File, Files, system_path_to_file};
 use ruff_db::system::{
     DbWithTestSystem, DbWithWritableSystem as _, System, SystemPathBuf, TestSystem,
 };
 use ruff_db::vendored::VendoredFileSystem;
-use ruff_python_ast::PythonVersion;
 use ruff_python_parser::{Mode, ParseOptions, parse_unchecked};
 use ty_module_resolver::{Db as ModuleResolverDb, SearchPathSettings};
-use ty_python_core::Db as _;
+use ty_python_core::{Db as _, ProgramFile};
 use ty_python_core::platform::PythonPlatform;
 use ty_python_core::program::{FallibleStrategy, Program, ProgramSettings};
 use ty_python_semantic::lint::LintRegistry;
@@ -40,11 +38,12 @@ struct TestDb {
     vendored: VendoredFileSystem,
     rule_selection: Arc<RuleSelection>,
     analysis_settings: Arc<AnalysisSettings>,
+    program: Option<Program>,
 }
 
 impl TestDb {
     fn new() -> Self {
-        Self {
+        let mut db = Self {
             storage: salsa::Storage::new(Some(Box::new({
                 move |event| {
                     tracing::trace!("event: {:?}", event);
@@ -55,11 +54,30 @@ impl TestDb {
             files: Files::default(),
             rule_selection: RuleSelection::from_registry(default_lint_registry()).into(),
             analysis_settings: AnalysisSettings::default().into(),
-        }
+            program: None,
+        };
+
+        let src_root = SystemPathBuf::from("/src");
+        db.memory_file_system()
+            .create_directory_all(&src_root)
+            .unwrap();
+
+        db.program = Some(Program::from_settings(
+            &db,
+            ProgramSettings {
+                python_version: PythonVersionWithSource::default(),
+                python_platform: PythonPlatform::default(),
+                search_paths: SearchPathSettings::new(vec![src_root])
+                    .to_search_paths(db.system(), db.vendored(), &FallibleStrategy)
+                    .expect("Valid search path settings"),
+            },
+        ));
+
+        db
     }
 
-    fn python_version(&self) -> PythonVersion {
-        Program::get(self).python_version(self)
+    fn program(&self) -> Program {
+        self.program.expect("the program should be initialized")
     }
 }
 
@@ -89,11 +107,7 @@ impl DbWithTestSystem for TestDb {
 }
 
 #[salsa::db]
-impl ModuleResolverDb for TestDb {
-    fn search_paths(&self) -> &ty_module_resolver::SearchPaths {
-        Program::get(self).search_paths(self)
-    }
-}
+impl ModuleResolverDb for TestDb {}
 
 #[salsa::db]
 impl ty_python_core::Db for TestDb {
@@ -106,11 +120,14 @@ impl ty_python_core::Db for TestDb {
 impl SemanticDb for TestDb {
     fn check_file(&self, file: File) -> Vec<Diagnostic> {
         if self.should_check_file(file) {
-            let python_file = PythonFile::new(self, file, self.python_version());
-            ty_python_semantic::check_file_unwrap(self, python_file)
+            ty_python_semantic::check_file_unwrap(self, self.program_file(file))
         } else {
             Vec::new()
         }
+    }
+
+    fn program_file(&self, file: File) -> ProgramFile<'_> {
+        self.program().program_file(self, file)
     }
 
     fn rule_selection(&self, _file: File) -> &RuleSelection {
@@ -141,28 +158,6 @@ impl SemanticDb for TestDb {
 #[salsa::db]
 impl salsa::Database for TestDb {}
 
-fn setup_db() -> TestDb {
-    let db = TestDb::new();
-
-    let src_root = SystemPathBuf::from("/src");
-    db.memory_file_system()
-        .create_directory_all(&src_root)
-        .unwrap();
-
-    Program::from_settings(
-        &db,
-        ProgramSettings {
-            python_version: PythonVersionWithSource::default(),
-            python_platform: PythonPlatform::default(),
-            search_paths: SearchPathSettings::new(vec![src_root])
-                .to_search_paths(db.system(), db.vendored(), &FallibleStrategy)
-                .expect("Valid search path settings"),
-        },
-    );
-
-    db
-}
-
 static TEST_DB: OnceLock<Mutex<TestDb>> = OnceLock::new();
 
 fn do_fuzz(case: &[u8]) -> Corpus {
@@ -176,14 +171,14 @@ fn do_fuzz(case: &[u8]) -> Corpus {
     }
 
     let mut db = TEST_DB
-        .get_or_init(|| Mutex::new(setup_db()))
+        .get_or_init(|| Mutex::new(TestDb::new()))
         .lock()
         .unwrap();
 
     for path in &["/src/a.py", "/src/a.pyi"] {
         db.write_file(path, code).unwrap();
         let file = system_path_to_file(&*db, path).unwrap();
-        check_types(&*db, PythonFile::new(&*db, file, db.python_version()));
+        check_types(&*db, db.program().program_file(&*db, file));
         db.memory_file_system().remove_file(path).unwrap();
         file.sync(&mut *db);
     }

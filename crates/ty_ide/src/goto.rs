@@ -1395,11 +1395,7 @@ fn definitions_for_module<'db>(
     level: u32,
 ) -> Option<Vec<ResolvedDefinition<'db>>> {
     let module = model.resolve_module(module, level)?;
-    let file = ProgramFile::new(
-        model.db(),
-        module.file(model.db())?,
-        model.semantic_environment().program(),
-    );
+    let file = ProgramFile::new(model.db(), module.file(model.db())?, model.program());
     Some(vec![ResolvedDefinition::Module(file)])
 }
 

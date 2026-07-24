@@ -15,8 +15,8 @@ use std::borrow::Cow;
 use std::sync::Arc;
 use tempfile::TempDir;
 use ty_module_resolver::ModuleGlobSetBuilder;
-use ty_python_core::Db as _;
-use ty_python_core::program::Program;
+use ty_python_core::program::{Program, ProgramSettings};
+use ty_python_core::{Db as _, ProgramFile};
 use ty_python_semantic::lint::{LintRegistry, RuleSelection};
 use ty_python_semantic::{
     AnalysisSettings, Db as SemanticDb, check_file_unwrap, default_lint_registry,
@@ -30,6 +30,7 @@ pub(crate) struct Db {
     system: MdtestSystem,
     vendored: VendoredFileSystem,
     settings: Option<Settings>,
+    program: Option<Program>,
 }
 
 impl Db {
@@ -44,14 +45,23 @@ impl Db {
             vendored: ty_vendored::file_system().clone(),
             files: Files::default(),
             settings: None,
+            program: None,
         };
 
         db.settings = Some(Settings::new(&db));
+        db.program = Some(Program::from_settings(
+            &db,
+            ProgramSettings::empty(db.vendored()),
+        ));
         db
     }
 
     fn settings(&self) -> Settings {
         self.settings.unwrap()
+    }
+
+    pub(crate) fn program(&self) -> Program {
+        self.program.expect("the program should be initialized")
     }
 
     pub(crate) fn set_verbosity(&mut self, verbose: bool) {
@@ -129,7 +139,11 @@ impl SemanticDb for Db {
             return Vec::new();
         }
 
-        check_file_unwrap(self, Program::get(self).program_file(self, file))
+        check_file_unwrap(self, self.program_file(file))
+    }
+
+    fn program_file(&self, file: File) -> ProgramFile<'_> {
+        self.program().program_file(self, file)
     }
 
     fn rule_selection(&self, file: File) -> &RuleSelection {
