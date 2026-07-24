@@ -2759,12 +2759,25 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             return self.never();
         }
 
+        // Both interfaces store their members in name order. Pair them before sorting target
+        // members by structural priority to avoid a separate tree lookup for every target member.
+        let mut source_members = source.members(db).peekable();
+
         target
             .members(db)
-            .sorted_by_cached_key(|member| member.structural_member_priority(db))
-            .when_all(db, self.constraints, |target_member| {
-                let source_member = source.member_by_name(db, target_member.name);
-
+            .map(|target_member| {
+                while source_members
+                    .peek()
+                    .is_some_and(|source_member| source_member.name < target_member.name)
+                {
+                    source_members.next();
+                }
+                let source_member = source_members
+                    .next_if(|source_member| source_member.name == target_member.name);
+                (target_member, source_member)
+            })
+            .sorted_by_cached_key(|(member, _)| member.structural_member_priority(db))
+            .when_all(db, self.constraints, |(target_member, source_member)| {
                 if let Some(context) = self.report_context()
                     && source_member.is_none()
                 {
