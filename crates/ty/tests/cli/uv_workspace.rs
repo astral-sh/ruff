@@ -142,6 +142,86 @@ fn explicit_file_path_disables_uv_workspace_discovery() -> anyhow::Result<()> {
     Ok(())
 }
 
+/// Scripts discovered under a selected directory are independent uv projects and must not be
+/// analyzed as part of that directory's workspace member.
+#[cfg(feature = "test-uv")]
+#[test]
+fn implicitly_discovered_scripts_are_not_checked() -> anyhow::Result<()> {
+    let case = workspace_case()?;
+    case.write_file(
+        "packages/member/script.py",
+        r#"
+        # /// script
+        # dependencies = []
+        # ///
+
+        value: int = "ignored-script"
+        "#,
+    )?;
+    case.write_file(
+        "packages/member/nested/script.py",
+        r#"
+        # /// script
+        # dependencies = []
+        # ///
+
+        value: int = "ignored-nested-script"
+        "#,
+    )?;
+
+    let mut command = command_with_uv(&case, None)?;
+    command
+        .current_dir(case.root().join("packages/member"))
+        .arg(".");
+
+    assert_cmd_snapshot!(command, @r#"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    member.py:1:14: error[invalid-assignment] Object of type `Literal["selected-member"]` is not assignable to `int`
+    Found 1 diagnostic
+
+    ----- stderr -----
+    "#);
+
+    Ok(())
+}
+
+/// Selecting a script itself explicitly opts into checking that script even in uv integration
+/// mode.
+#[cfg(feature = "test-uv")]
+#[test]
+fn explicitly_selected_script_is_checked() -> anyhow::Result<()> {
+    let case = workspace_case()?;
+    case.write_file(
+        "packages/member/script.py",
+        r#"
+        # /// script
+        # dependencies = []
+        # ///
+
+        value: int = "selected-script"
+        "#,
+    )?;
+
+    let mut command = command_with_uv(&case, None)?;
+    command
+        .current_dir(case.root().join("packages/member"))
+        .arg("script.py");
+
+    assert_cmd_snapshot!(command, @r#"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    script.py:6:14: error[invalid-assignment] Object of type `Literal["selected-script"]` is not assignable to `int`
+    Found 1 diagnostic
+
+    ----- stderr -----
+    "#);
+
+    Ok(())
+}
+
 /// An explicitly selected member inherits ty rule configuration from the uv workspace root.
 #[cfg(feature = "test-uv")]
 #[test]

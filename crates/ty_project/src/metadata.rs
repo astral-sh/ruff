@@ -24,7 +24,7 @@ mod configuration_file;
 pub mod options;
 pub mod pyproject;
 pub mod python_version;
-mod script;
+pub(crate) mod script;
 pub mod settings;
 mod uv;
 pub mod value;

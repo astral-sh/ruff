@@ -1,4 +1,5 @@
 use crate::glob::IncludeExcludeFilter;
+use crate::metadata::script::script_metadata;
 use crate::{Db, GlobFilterCheckMode, IncludeResult, Project};
 use ruff_db::diagnostic::{Diagnostic, DiagnosticId, Severity};
 use ruff_db::files::{File, system_path_to_file};
@@ -167,6 +168,7 @@ impl ProjectFilesWalker {
         };
 
         let filter = ProjectFilesFilter::from_project(db, project);
+        let skip_implicit_scripts = project.metadata(db).has_uv_workspace();
         let files = std::sync::Mutex::new(Vec::new());
         let diagnostics = std::sync::Mutex::new(Vec::new());
 
@@ -259,6 +261,18 @@ impl ProjectFilesWalker {
                             // If this returns `Err`, then the file was deleted between now and when the walk callback was called.
                             // We can ignore this.
                             if let Ok(file) = system_path_to_file(&*db, entry.path()) {
+                                if entry.depth() > 0
+                                    && skip_implicit_scripts
+                                    && script_metadata(&*db, file).is_some()
+                                {
+                                    tracing::debug!(
+                                        "Ignoring implicitly discovered PEP 723 script `{path}` \
+                                        while uv integration is enabled.",
+                                        path = entry.path()
+                                    );
+                                    return WalkState::Skip;
+                                }
+
                                 files.lock().unwrap().push(file);
                             }
                         }
