@@ -93,6 +93,11 @@ fn render_with_indentation_mode(
         // First things first, prepare the prefix for the new line.
         renderer.prepare_line(first_line);
         first_line = false;
+        let rendered_indent = if matches!(leading_indentation, LeadingIndentation::MarkdownSyntax) {
+            renderer.prose_directive_indent(line_indent, rendered_line.is_empty())
+        } else {
+            line_indent
+        };
 
         // If we're in a literal block and we find a non-empty dedented line, end the block
         // TODO: we should remove all the trailing blank lines
@@ -200,6 +205,9 @@ fn render_with_indentation_mode(
                     // A directive starts a new block and cannot continue a
                     // pending hyperlink from the previous line.
                     renderer.flush_pending_link();
+                    if matches!(leading_indentation, LeadingIndentation::MarkdownSyntax) {
+                        renderer.start_prose_directive(line_indent);
+                    }
 
                     // Map version directives to human-readable phrases (matching Sphinx output)
                     let pretty_directive = match directive {
@@ -243,7 +251,7 @@ fn render_with_indentation_mode(
         // Add this line's indentation.
         // We could subtract the literal block's indentation here but in practice it's uglier
         // TODO: should we not do this if the `line.is_empty()`? When would it matter?
-        renderer.push_indentation(line_indent, leading_indentation);
+        renderer.push_indentation(rendered_indent, leading_indentation);
 
         if renderer.block_state.is_doctest() && rendered_line.is_empty() {
             renderer.finish_doctest();
@@ -252,12 +260,12 @@ fn render_with_indentation_mode(
 
         let is_indented_markdown_code =
             matches!(leading_indentation, LeadingIndentation::MarkdownSyntax)
-                && line_indent >= TextSize::from(4)
+                && rendered_indent >= TextSize::from(4)
                 && !renderer.inline.has_pending_link();
 
         renderer.render_line(
             rendered_line,
-            line_indent.to_usize(),
+            rendered_indent.to_usize(),
             !is_indented_markdown_code,
         );
     }
@@ -277,8 +285,15 @@ enum LeadingIndentation {
 struct Renderer<'source, 'output> {
     line_prefix: LinePrefix,
     block_state: BlockState<'source>,
+    prose_directive: Option<ProseDirective>,
     inline: inline::Renderer,
     output: &'output mut String,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct ProseDirective {
+    marker_indent: TextSize,
+    body_indent: Option<TextSize>,
 }
 
 impl<'source, 'output> Renderer<'source, 'output> {
@@ -286,6 +301,7 @@ impl<'source, 'output> Renderer<'source, 'output> {
         Self {
             line_prefix: LinePrefix::default(),
             block_state: BlockState::default(),
+            prose_directive: None,
             inline: inline::Renderer::default(),
             output,
         }
@@ -301,6 +317,35 @@ impl<'source, 'output> Renderer<'source, 'output> {
             &self.block_state,
             leading_indentation,
         );
+    }
+
+    fn start_prose_directive(&mut self, marker_indent: TextSize) {
+        self.prose_directive = Some(ProseDirective {
+            marker_indent,
+            body_indent: None,
+        });
+    }
+
+    /// Removes the indentation that reStructuredText requires for prose directive bodies.
+    fn prose_directive_indent(&mut self, source_indent: TextSize, line_is_empty: bool) -> TextSize {
+        let Some(directive) = &mut self.prose_directive else {
+            return source_indent;
+        };
+        if line_is_empty {
+            return TextSize::ZERO;
+        }
+        if source_indent <= directive.marker_indent {
+            self.prose_directive = None;
+            return source_indent;
+        }
+
+        let body_indent = *directive.body_indent.get_or_insert(source_indent);
+        let indentation_to_remove = body_indent - directive.marker_indent;
+        if source_indent >= body_indent {
+            source_indent - indentation_to_remove
+        } else {
+            directive.marker_indent
+        }
     }
 
     /// Flushes content buffered for the current line.
@@ -511,5 +556,73 @@ impl<'docstring> BlockState<'docstring> {
 
     fn markdown_fence_is_closed_by(&self, line: &str) -> bool {
         matches!(self, Self::MarkdownFence(fence) if fence.is_closed_by(line))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::FENCE;
+
+    #[test]
+    fn dedents_prose_directive_bodies_in_fragments() {
+        let rendered = render_fragment(
+            "\
+.. deprecated:: 3.0
+
+    This option is deprecated. See the `user guide
+    <https://example.com/guide>`__ for details.
+
+After the directive.",
+        );
+
+        assert!(rendered.contains("**Deprecated since version 3.0:**"));
+        assert!(rendered.contains("[user guide](https://example.com/guide)"));
+        assert!(!rendered.contains("\n    This option is deprecated"));
+        assert!(rendered.ends_with("After the directive."));
+    }
+
+    #[test]
+    fn preserves_code_directive_body_indentation_in_fragments() {
+        let rendered = render_fragment(
+            "\
+.. code-block:: python
+
+    value = 1",
+        );
+
+        assert!(rendered.contains(&format!("{FENCE}python\n    value = 1\n{FENCE}")));
+    }
+
+    #[test]
+    fn preserves_prose_directive_marker_indentation() {
+        let rendered = render_fragment("  .. note::\n\n      Nested prose.");
+
+        assert!(
+            rendered.contains("\n  Nested prose."),
+            "unexpected rendering: {rendered:?}"
+        );
+        assert!(
+            !rendered.contains("\n      Nested prose."),
+            "unexpected rendering: {rendered:?}"
+        );
+    }
+
+    #[test]
+    fn preserves_prose_directive_body_indentation_in_full_docstrings() {
+        let rendered = render_docstring(".. note::\n\n    Indented prose.");
+
+        assert!(rendered.contains("\n&nbsp;&nbsp;&nbsp;&nbsp;Indented prose."));
+    }
+
+    fn render_fragment(source: &str) -> String {
+        let mut output = String::new();
+        super::render_fragment_into(&mut output, source);
+        output
+    }
+
+    fn render_docstring(source: &str) -> String {
+        let mut output = String::new();
+        super::render_into(&mut output, source);
+        output
     }
 }
