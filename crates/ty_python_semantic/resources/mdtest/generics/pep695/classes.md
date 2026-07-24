@@ -934,6 +934,44 @@ reveal_type(generic_context(A.merge))  # revealed: ty_extensions._internal.Gener
 reveal_type(generic_context(Impl.foo))  # revealed: ty_extensions._internal.GenericContext[Self@foo]
 ```
 
+## Subscripting non-generic classes
+
+Subscripting a non-generic class in a type expression is an error. The invalid type expression
+recovers to `Unknown`.
+
+```py
+class NonGeneric: ...
+
+# error: [not-subscriptable] "Cannot subscript non-generic type `<class 'NonGeneric'>`"
+def direct(value: NonGeneric[int]) -> None:
+    reveal_type(value)  # revealed: Unknown
+```
+
+The same diagnostic applies when the specialization is nested inside `type[...]`.
+
+```py
+# error: [not-subscriptable] "Cannot subscript non-generic type `<class 'NonGeneric'>`"
+def nested(value: type[NonGeneric[int]]) -> None:
+    reveal_type(value)  # revealed: Unknown
+```
+
+Inheriting from a non-generic class, or from a specialization of a generic class, does not make the
+subclass generic.
+
+```py
+class Child(NonGeneric): ...
+class Generic[T]: ...
+class SpecializedChild(Generic[int]): ...
+
+# error: [not-subscriptable] "Cannot subscript non-generic type `<class 'Child'>`"
+def child(value: Child[str]) -> None:
+    reveal_type(value)  # revealed: Unknown
+
+# error: [not-subscriptable] "Cannot subscript non-generic type `<class 'SpecializedChild'>`"
+def specialized_child(value: SpecializedChild[bytes]) -> None:
+    reveal_type(value)  # revealed: Unknown
+```
+
 ## Tuple as a PEP-695 generic class
 
 Our special handling for `tuple` does not break if `tuple` is defined as a PEP-695 generic class in

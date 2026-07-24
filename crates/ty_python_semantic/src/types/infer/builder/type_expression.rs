@@ -1340,9 +1340,16 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                                     )
                                 }
                                 None => {
-                                    // TODO: emit a diagnostic if you try to specialize a non-generic class.
                                     self.infer_expression(parameters, TypeContext::default());
-                                    todo_type!("specialized non-generic class")
+                                    if let Some(builder) =
+                                        self.context.report_lint(&NOT_SUBSCRIPTABLE, subscript)
+                                    {
+                                        builder.into_diagnostic(format_args!(
+                                            "Cannot subscript non-generic type `{}`",
+                                            value_ty.display(self.db())
+                                        ));
+                                    }
+                                    Type::unknown()
                                 }
                             }
                         }
@@ -1772,9 +1779,16 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             .unwrap_or(Type::unknown())
                     }
                     _ => {
-                        // TODO: emit a diagnostic if you try to specialize a non-generic class.
                         self.infer_expression(slice, TypeContext::default());
-                        todo_type!("specialized non-generic class")
+                        if let Some(builder) =
+                            self.context.report_lint(&NOT_SUBSCRIPTABLE, subscript)
+                        {
+                            builder.into_diagnostic(format_args!(
+                                "Cannot subscript non-generic type `{}`",
+                                value_ty.display(self.db())
+                            ));
+                        }
+                        Type::unknown()
                     }
                 }
             }

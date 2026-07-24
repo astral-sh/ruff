@@ -159,6 +159,116 @@ reveal_type(generic_context(ExplicitInheritedGenericPartiallySpecialized))
 reveal_type(generic_context(ExplicitInheritedGenericPartiallySpecializedExtraTypevar))
 ```
 
+## Specializing classes with unavailable generic context
+
+When an earlier error prevents ty from determining a class's generic context, specializing the class
+can emit a cascading `not-subscriptable` diagnostic.
+
+### Conditional typing compatibility imports
+
+Libraries support multiple Python versions by importing generic machinery from either
+`typing_extensions` or `typing`. ty does not yet recognize the resulting union as the corresponding
+typing special form.
+
+```py
+try:
+    import typing_extensions as typing
+except ImportError:
+    import typing
+
+T = typing.TypeVar("T")
+
+# TODO: Fix the conditional typing import in https://github.com/astral-sh/ty/issues/1585.
+# error: [invalid-argument-type] "`typing_extensions.TypeVar | typing.TypeVar` is not a valid argument to `Generic`"
+class Parser(typing.Generic[T]): ...
+
+# TODO: Remove this cascading error when https://github.com/astral-sh/ty/issues/1585 is fixed.
+parser: Parser[int]  # error: [not-subscriptable] "Cannot subscript non-generic type `<class 'Parser'>`"
+```
+
+### Decorated generic bases
+
+A decorator that ty cannot fully understand can obscure the generic context of a base class. A
+subclass that forwards type variables to that base remains possibly generic.
+
+```py
+import collections.abc
+from typing import Generic, TypeVar
+from ty_extensions._internal import generic_context
+
+K = TypeVar("K")
+V = TypeVar("V")
+
+# error: [unresolved-attribute] "Class `Mapping` has no attribute `register`"
+@collections.abc.Mapping.register
+class Mapping(Generic[K, V]): ...
+
+# TODO: Invalid decorator causes us to lose the generic context from the class...
+reveal_type(generic_context(Mapping))  # revealed: None
+
+class FrozenDict(Mapping[K, V]): ...
+
+# TODO: ...which then causes us to emit this
+# error: [not-subscriptable] "Cannot subscript non-generic type `<class 'FrozenDict'>`"
+mapping: FrozenDict[str, int]
+```
+
+### Unresolved generic bases
+
+```py
+from typing import TypeVar
+
+from missing import Base  # error: [unresolved-import]
+
+reveal_type(Base)  # revealed: Unknown
+
+T = TypeVar("T")
+
+class Child(Base[T]): ...
+
+# error: [not-subscriptable] "Cannot subscript non-generic type `<class 'Child'>`"
+child: Child[int]
+```
+
+### Conditional generic bases
+
+`base1.py`:
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+
+class Base(Generic[T]): ...
+```
+
+`base2.py`:
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+
+class Base(Generic[T]): ...
+```
+
+```py
+from typing import TypeVar
+
+try:
+    from base1 import Base
+except ImportError:
+    from base2 import Base
+
+T = TypeVar("T")
+
+# error: [unsupported-base]
+class Child(Base[T]): ...
+
+# error: [not-subscriptable] "Cannot subscript non-generic type `<class 'Child'>`"
+child: Child[int]
+```
+
 ## Errors for inconsistent type arguments
 
 <!-- snapshot-diagnostics -->
