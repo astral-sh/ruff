@@ -367,6 +367,24 @@ fn in_nested_context(checker: &Checker) -> bool {
         .any(|stmt| matches!(stmt, Stmt::ClassDef(_) | Stmt::FunctionDef(_)))
 }
 
+/// Returns `true` if a type variable without a default follows a type variable with a default.
+///
+/// In a PEP 695 type parameter list this is a syntax error:
+///
+/// ```python
+/// type Pair[T = int, S] = tuple[T, S]  # non-default type parameter `S` follows default type parameter
+/// ```
+///
+/// Reordering the parameters to make the list valid would not be an equivalent fix because the
+/// parameter order determines how positional arguments are bound when subscripting the alias,
+/// class, or function.
+fn non_default_follows_default(type_vars: &[TypeVar]) -> bool {
+    type_vars
+        .iter()
+        .skip_while(|tv| tv.default.is_none())
+        .any(|tv| tv.default.is_none())
+}
+
 /// Deduplicate `vars`, returning `None` if `vars` is empty or any duplicates are found.
 /// Also returns `None` if any `TypeVar` has a default value and the target Python version
 /// is below 3.13 or preview mode is not enabled. Note that `typing_extensions` backports
@@ -382,6 +400,13 @@ fn check_type_vars<'a>(vars: Vec<TypeVar<'a>>, checker: &Checker) -> Option<Vec<
         && (checker.target_version() < PythonVersion::PY313
             || !is_type_var_default_enabled(checker.settings()))
     {
+        return None;
+    }
+
+    // If a type variable without a default follows one with a default, there is no valid,
+    // equivalent PEP 695 type parameter list, so bail out instead of emitting an invalid fix.
+    // See https://github.com/astral-sh/ruff/issues/27021.
+    if non_default_follows_default(&vars) {
         return None;
     }
 

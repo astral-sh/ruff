@@ -7,7 +7,7 @@ source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
 
 --- Summary ---
 Removed: 0
-Added: 2
+Added: 3
 
 --- Added ---
 UP046 [*] Generic class `DefaultTypeVar` uses `Generic` subclass instead of type parameters
@@ -40,5 +40,24 @@ help: Use type parameters
     - class DefaultOnlyTypeVar(Generic[W]):  # -> [W = int]
 137 + class DefaultOnlyTypeVar[W = int]:  # -> [W = int]
 138 |     var: W
+    |
+note: This is an unsafe fix and may change runtime behavior
+
+
+UP046 [*] Generic class `NonDefaultBeforeDefault` uses `Generic` subclass instead of type parameters
+   --> UP046_0.py:161:31
+    |
+160 | # OK (in preview): the non-defaulted TypeVar comes first
+161 | class NonDefaultBeforeDefault(Generic[Y, X]):
+    |                               ^^^^^^^^^^^^^
+162 |     x: X
+163 |     y: Y
+    |
+help: Use type parameters
+    |
+160 | # OK (in preview): the non-defaulted TypeVar comes first
+    - class NonDefaultBeforeDefault(Generic[Y, X]):
+161 + class NonDefaultBeforeDefault[Y, X = int]:
+162 |     x: X
     |
 note: This is an unsafe fix and may change runtime behavior

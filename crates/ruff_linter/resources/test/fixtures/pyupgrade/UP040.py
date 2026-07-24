@@ -132,3 +132,23 @@ T: TypeAlias = ( # comment0
 # Test case for TypeVar with default - should be converted when preview mode is enabled
 T_default = TypeVar("T_default", default=int)
 DefaultList: TypeAlias = list[T_default]
+
+# https://github.com/astral-sh/ruff/issues/27021
+# No fix if a defaulted TypeVar precedes a non-defaulted TypeVar: a non-default
+# type parameter can't follow a default type parameter in a PEP 695 type
+# parameter list, and reordering would change the meaning of subscriptions.
+T_with_default = TypeVar("T_with_default", default=int)
+S_no_default = TypeVar("S_no_default")
+BadPair: TypeAlias = tuple[T_with_default, S_no_default]
+BadPairAliasType = TypeAliasType(
+    "BadPairAliasType",
+    tuple[T_with_default, S_no_default],
+    type_params=(T_with_default, S_no_default),
+)
+
+# OK (in preview): the non-defaulted TypeVar comes first
+GoodPair: TypeAlias = tuple[S_no_default, T_with_default]
+
+# OK (in preview): all TypeVars have defaults
+S_with_default = TypeVar("S_with_default", default=str)
+AllDefaults: TypeAlias = tuple[T_with_default, S_with_default]

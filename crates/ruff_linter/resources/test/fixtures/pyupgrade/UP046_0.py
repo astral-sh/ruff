@@ -142,3 +142,22 @@ class DefaultOnlyTypeVar(Generic[W]):  # -> [W = int]
 class Outer:
     class Inner(Generic[T]):
         var: T
+
+
+# https://github.com/astral-sh/ruff/issues/27021
+# No diagnostic if a defaulted TypeVar precedes a non-defaulted TypeVar: a
+# non-default type parameter can't follow a default type parameter in a PEP 695
+# type parameter list, and reordering would change the meaning of subscriptions.
+X = TypeVar("X", default=int)
+Y = TypeVar("Y")
+
+
+class DefaultBeforeNonDefault(Generic[X, Y]):
+    x: X
+    y: Y
+
+
+# OK (in preview): the non-defaulted TypeVar comes first
+class NonDefaultBeforeDefault(Generic[Y, X]):
+    x: X
+    y: Y

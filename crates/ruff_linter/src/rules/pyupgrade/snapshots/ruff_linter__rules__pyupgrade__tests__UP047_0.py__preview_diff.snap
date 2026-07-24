@@ -7,7 +7,7 @@ source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
 
 --- Summary ---
 Removed: 0
-Added: 1
+Added: 2
 
 --- Added ---
 UP047 [*] Generic function `default_var` should use type parameters
@@ -23,5 +23,23 @@ help: Use type parameters
    - def default_var(v: V) -> V:
 51 + def default_var[V: str = Any](v: V) -> V:
 52 |     return v
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+
+UP047 [*] Generic function `non_default_before_default` should use type parameters
+  --> UP047_0.py:74:5
+   |
+73 | # OK (in preview): the non-defaulted TypeVar comes first
+74 | def non_default_before_default(y: Y, x: X) -> tuple[Y, X]:
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+75 |     return (y, x)
+   |
+help: Use type parameters
+   |
+73 | # OK (in preview): the non-defaulted TypeVar comes first
+   - def non_default_before_default(y: Y, x: X) -> tuple[Y, X]:
+74 + def non_default_before_default[Y, X = int](y: Y, x: X) -> tuple[Y, X]:
+75 |     return (y, x)
    |
 note: This is an unsafe fix and may change runtime behavior

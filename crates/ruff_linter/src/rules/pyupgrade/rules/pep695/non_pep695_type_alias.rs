@@ -14,6 +14,7 @@ use ruff_python_ast::PythonVersion;
 
 use super::{
     DisplayTypeVars, TypeParamKind, TypeVar, TypeVarReferenceVisitor, expr_name_to_type_var,
+    non_default_follows_default,
 };
 
 /// ## What it does
@@ -263,6 +264,13 @@ fn create_diagnostic(
         || !is_type_var_default_enabled(checker.settings()))
         && type_vars.iter().any(|type_var| type_var.default.is_some())
     {
+        return;
+    }
+
+    // If a type variable without a default follows one with a default, there is no valid,
+    // equivalent PEP 695 type parameter list, so bail out instead of emitting an invalid fix.
+    // See https://github.com/astral-sh/ruff/issues/27021.
+    if non_default_follows_default(type_vars) {
         return;
     }
 
