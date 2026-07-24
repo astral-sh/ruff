@@ -12,6 +12,7 @@ use crate::types::attribute_write::{
     ProtocolMemberWriteRequirement, attribute_write_requirement,
 };
 use crate::types::call::{CallArguments, CallDunderError};
+use crate::types::callable::CallableTypes;
 use crate::types::relation::{DisjointnessChecker, TypeRelationChecker};
 use crate::types::visitor::any_over_type;
 use crate::types::{TypeContext, UpcastPolicy};
@@ -934,17 +935,22 @@ impl<'db> ProtocolMemberType<'db> {
     fn resolve(self, db: &'db dyn Db) -> Option<Self> {
         match self {
             Self::Value { .. } => Some(self),
-            Self::PropertyGetter(getter) => property_get_member_type(db, getter),
-            Self::PropertySetter(setter) => property_set_member_type(db, setter),
+            Self::PropertyGetter(getter) => property_get_member_type(db, getter, None),
+            Self::PropertySetter(setter) => property_set_member_type(db, setter, None),
         }
     }
 
     /// Resolves this member type and binds member-local `Self` occurrences to `self_type`.
     fn bind_self(self, db: &'db dyn Db, self_type: Type<'db>) -> Option<Type<'db>> {
+        let resolved = match self {
+            Self::PropertyGetter(getter) => property_get_member_type(db, getter, Some(self_type)),
+            Self::PropertySetter(setter) => property_set_member_type(db, setter, Some(self_type)),
+            value @ Self::Value { .. } => Some(value),
+        }?;
         let Self::Value {
             ty,
             self_binding_context,
-        } = self.resolve(db)?
+        } = resolved
         else {
             return None;
         };
@@ -1690,10 +1696,39 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
 fn property_get_member_type<'db>(
     db: &'db dyn Db,
     getter: Type<'db>,
+    receiver_ty: Option<Type<'db>>,
 ) -> Option<ProtocolMemberType<'db>> {
+    let callables = getter.try_upcast_to_callable(db)?;
+
+    if let Some(receiver_ty) = receiver_ty
+        && property_accessor_has_generic_receiver(db, &callables)
+    {
+        if receiver_ty.as_protocol_instance().is_some() {
+            return None;
+        }
+
+        let callable = callables.exactly_one()?;
+        let [signature] = callable.signatures(db).overloads.as_slice() else {
+            return None;
+        };
+        let self_typevar = property_accessor_receiver_annotation(signature)?.as_typevar()?;
+        if self_typevar.typevar(db).bound_or_constraints(db).is_some()
+            || self_typevar.binding_context(db).definition() != signature.definition()
+        {
+            return None;
+        }
+
+        return Some(ProtocolMemberType::with_definition(
+            signature
+                .return_ty
+                .substitute_one_typevar(db, self_typevar, receiver_ty),
+            signature.definition(),
+        ));
+    }
+
     let mut get_types = Vec::new();
     let mut definition = None;
-    for callable in &getter.try_upcast_to_callable(db)? {
+    for callable in &callables {
         for signature in callable.signatures(db) {
             get_types.push(signature.return_ty);
             definition = definition.or(signature.definition());
@@ -1708,10 +1743,16 @@ fn property_get_member_type<'db>(
 fn property_set_member_type<'db>(
     db: &'db dyn Db,
     setter: Type<'db>,
+    receiver_ty: Option<Type<'db>>,
 ) -> Option<ProtocolMemberType<'db>> {
+    let callables = setter.try_upcast_to_callable(db)?;
+    if receiver_ty.is_some() && property_accessor_has_generic_receiver(db, &callables) {
+        return None;
+    }
+
     let mut set_types = Vec::new();
     let mut definition = None;
-    for callable in &setter.try_upcast_to_callable(db)? {
+    for callable in &callables {
         for signature in callable.signatures(db) {
             set_types.push(signature.parameters().get_positional(1)?.annotated_type());
             definition = definition.or(signature.definition());
@@ -1941,12 +1982,33 @@ fn contains_signature_typevar<'db>(
     })
 }
 
+fn property_accessor_receiver_annotation<'db>(signature: &Signature<'db>) -> Option<Type<'db>> {
+    if !signature.has_explicit_positional_receiver_annotation() {
+        return None;
+    }
+    Some(signature.parameters().get_positional(0)?.annotated_type())
+}
+
+fn property_accessor_has_generic_receiver<'db>(
+    db: &'db dyn Db,
+    callables: &CallableTypes<'db>,
+) -> bool {
+    callables
+        .iter()
+        .flat_map(|callable| callable.signatures(db))
+        .any(|signature| {
+            property_accessor_receiver_annotation(signature)
+                .is_some_and(|annotation| annotation.has_non_self_typevar(db))
+        })
+}
+
 fn property_set_type<'db>(
     db: &'db dyn Db,
     property: PropertyInstanceType<'db>,
     receiver_ty: Type<'db>,
 ) -> Option<Type<'db>> {
-    property_set_member_type(db, property.setter(db)?)?.bind_self(db, receiver_ty)
+    property_set_member_type(db, property.setter(db)?, Some(receiver_ty))?
+        .bind_self(db, receiver_ty)
 }
 
 fn is_class_object_type(ty: Type<'_>) -> bool {
@@ -2691,9 +2753,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             (Some(source), Some(target)) => {
                 let bind_read = |member_type: ProtocolMemberType<'db>,
                                  member: &ProtocolMember<'_, 'db>| {
-                    let member_type = member_type.resolve(db)?;
                     if member.is_method()
-                        && let Type::Callable(callable) = member_type.ty()
+                        && let Type::Callable(callable) = member_type.resolve(db)?.ty()
                     {
                         Some(Type::Callable(callable.apply_self(db, source_type)))
                     } else {

@@ -2088,6 +2088,32 @@ static_assert(not is_assignable_to(HasStrXProperty, HasXProperty))
 static_assert(not is_assignable_to(HasXProperty, HasStrXProperty))
 ```
 
+A property getter whose receiver is a bare, unbounded type variable binds that variable to the
+implementing instance:
+
+```py
+from typing import Protocol, TypeVar
+
+PropertySelfT = TypeVar("PropertySelfT")
+
+class HasGenericSelfProperty(Protocol):
+    @property
+    def value(self: PropertySelfT) -> PropertySelfT: ...
+
+class GenericSelfProperty:
+    @property
+    def value(self) -> "GenericSelfProperty":
+        return self
+
+class IntProperty:
+    @property
+    def value(self) -> int:
+        return 1
+
+static_assert(is_assignable_to(GenericSelfProperty, HasGenericSelfProperty))
+static_assert(not is_assignable_to(IntProperty, HasGenericSelfProperty))
+```
+
 A read-only property on a protocol, unlike a mutable attribute, is covariant: `XSub` in the below
 example satisfies the `HasXProperty` interface even though the type of the `x` attribute on `XSub`
 is a subtype of `int` rather than being exactly `int`.
