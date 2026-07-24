@@ -1627,7 +1627,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
                 let mut replacement = None;
                 for (index, existing_positive) in self.positive.iter().enumerate() {
                     if let Some(merged) =
-                        generic_gradual_intersection(db, new_positive, *existing_positive)
+                        generic_gradual_intersection(db, env, new_positive, *existing_positive)
                     {
                         if merged == *existing_positive {
                             return;
