@@ -2610,7 +2610,9 @@ python-version = "3.12"
 ```
 
 ```py
-from typing import Literal, TypedDict
+from collections import OrderedDict
+from collections.abc import Mapping, MutableMapping
+from typing import Any, Literal, TypedDict
 
 A = TypedDict("A", {"type": Literal["a"]})
 B = TypedDict("B", {"type": Literal["b"]})
@@ -2648,7 +2650,44 @@ def _(item: Item) -> None:
 def _(item: Item | str) -> None:
     if isinstance(item, dict):
         reveal_type(dict(item))  # revealed: dict[str, object]
+```
 
+Adding a regular dictionary to the union should not make copying it slow:
+
+```py
+def _(item: Item | dict[str, Any]) -> None:
+    reveal_type(dict(item))  # revealed: dict[str, object]
+    if isinstance(item, dict):
+        dict(item)
+```
+
+An unrelated `Any` field on a `TypedDict` should not disable this optimization:
+
+```py
+class ItemWithAny(TypedDict):
+    type: Literal["any"]
+    other: Any
+
+def _(item: Item | ItemWithAny | dict[str, Any]) -> None:
+    dict(item)
+```
+
+`Mapping`, `MutableMapping`, and `OrderedDict` should also be copied efficiently:
+
+```py
+def _(item: Item | Mapping[str, Any]) -> None:
+    dict(item)
+
+def _(item: Item | MutableMapping[str, Any]) -> None:
+    dict(item)
+
+def _(item: Item | OrderedDict[str, Any]) -> None:
+    dict(item)
+```
+
+The union can also be assembled from type aliases:
+
+```py
 type FirstGroup = A | B | C | D | E | F | G | H
 type SecondGroup = I | J | K | L | M | N | O | P
 type AliasedItem = FirstGroup | SecondGroup | Q | R | S | T | U | V | W | X
@@ -2760,6 +2799,64 @@ def _(value: ClearA | ClearB) -> None:
         # Preserve the protocol constraints added by narrowing instead of extracting only the
         # positive `TypedDict` elements from these intersections.
         reveal_type(clear_result(value))  # revealed: None
+```
+
+An `isinstance()` check against a protocol can establish that `__getitem__()` returns `Any`. That
+return type must be preserved for unions containing a `TypedDict`:
+
+```py
+from typing import Any, Literal, Protocol, TypeVar, TypedDict, runtime_checkable
+
+ValueT = TypeVar("ValueT", covariant=True)
+
+class GetValue(Protocol[ValueT]):
+    def __getitem__(self, key: Literal["value"], /) -> ValueT: ...
+
+class StringValue(TypedDict):
+    value: str
+
+@runtime_checkable
+class GetAnyValue(Protocol):
+    def __getitem__(self, key: Literal["value"], /) -> Any: ...
+
+def get_value(value: GetValue[ValueT]) -> ValueT:
+    raise NotImplementedError
+
+def _(value: StringValue | dict[str, Any]) -> None:
+    if isinstance(value, GetAnyValue):
+        reveal_type(get_value(value))  # revealed: Any
+```
+
+The same `Any` result must remain valid when the mapping protocol uses a bounded type variable:
+
+```py
+from _typeshed import SupportsKeysAndGetItem
+from collections.abc import Iterable
+
+BoundedValueT = TypeVar("BoundedValueT", bound=str)
+
+@runtime_checkable
+class AnyValueMapping(Protocol):
+    def keys(self) -> Iterable[str]: ...
+    def __getitem__(self, key: str, /) -> Any: ...
+
+def get_bounded_mapping(value: SupportsKeysAndGetItem[str, BoundedValueT]) -> BoundedValueT:
+    raise NotImplementedError
+
+def _(value: StringValue | dict[str, Any]) -> None:
+    if isinstance(value, AnyValueMapping):
+        reveal_type(get_bounded_mapping(value))  # revealed: Any
+```
+
+A `TypedDict` that permits extra items of type `Any` keeps that type when copied:
+
+```py
+from typing_extensions import TypedDict as ExtensionsTypedDict
+
+class AnyExtraItems(ExtensionsTypedDict, extra_items=Any): ...
+
+def _(value: AnyExtraItems | dict[str, str]) -> None:
+    reveal_type(dict(value))  # revealed: dict[str, Any | str]
 ```
 
 Rejected common-constraint probes must not affect fallback protocol inference:

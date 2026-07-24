@@ -95,6 +95,7 @@ pub enum KnownClass {
     EllipsisType,
     // Typeshed
     NoneType, // Part of `types` for Python >= 3.10
+    SupportsKeysAndGetItem,
     // Typing
     Awaitable,
     Generator,
@@ -121,6 +122,7 @@ pub enum KnownClass {
     AsyncIterator,
     Sequence,
     Mapping,
+    MutableMapping,
     // typing_extensions
     ExtensionsTypeVar, // must be distinct from typing.TypeVar, backports new features
     ExtensionTypedDictFallback,
@@ -268,6 +270,8 @@ impl KnownClass {
             | Self::AsyncIterator
             | Self::Sequence
             | Self::Mapping
+            | Self::MutableMapping
+            | Self::SupportsKeysAndGetItem
             // Evaluating `NotImplementedType` in a boolean context was deprecated in Python 3.9
             // and raises a `TypeError` in Python >=3.14
             // (see https://docs.python.org/3/library/constants.html#NotImplemented)
@@ -382,6 +386,8 @@ impl KnownClass {
             | KnownClass::AsyncIterator
             | KnownClass::Sequence
             | KnownClass::Mapping
+            | KnownClass::MutableMapping
+            | KnownClass::SupportsKeysAndGetItem
             | KnownClass::ChainMap
             | KnownClass::Counter
             | KnownClass::DefaultDict
@@ -494,6 +500,8 @@ impl KnownClass {
             | KnownClass::AsyncIterator
             | KnownClass::Sequence
             | KnownClass::Mapping
+            | KnownClass::MutableMapping
+            | KnownClass::SupportsKeysAndGetItem
             | KnownClass::ChainMap
             | KnownClass::Counter
             | KnownClass::DefaultDict
@@ -607,6 +615,8 @@ impl KnownClass {
             | KnownClass::AsyncIterator
             | KnownClass::Sequence
             | KnownClass::Mapping
+            | KnownClass::MutableMapping
+            | KnownClass::SupportsKeysAndGetItem
             | KnownClass::ChainMap
             | KnownClass::Counter
             | KnownClass::DefaultDict
@@ -653,6 +663,7 @@ impl KnownClass {
         match self {
             Self::Hashable
             | Self::SupportsIndex
+            | Self::SupportsKeysAndGetItem
             | Self::Iterable
             | Self::TyExtensionsAsyncIterable
             | Self::TyExtensionsAsyncIterator
@@ -752,6 +763,7 @@ impl KnownClass {
             | Self::Path
             | Self::FunctoolsPartial
             | Self::Mapping
+            | Self::MutableMapping
             | Self::Sequence
             | Self::PydanticBaseModel
             | Self::PydanticBaseSettings
@@ -850,6 +862,8 @@ impl KnownClass {
             | KnownClass::AsyncIterator
             | KnownClass::Sequence
             | KnownClass::Mapping
+            | KnownClass::MutableMapping
+            | KnownClass::SupportsKeysAndGetItem
             | KnownClass::ChainMap
             | KnownClass::Counter
             | KnownClass::DefaultDict
@@ -921,6 +935,7 @@ impl KnownClass {
             Self::AsyncGeneratorType => "AsyncGeneratorType",
             Self::CoroutineType => "CoroutineType",
             Self::NoneType => "NoneType",
+            Self::SupportsKeysAndGetItem => "SupportsKeysAndGetItem",
             Self::SpecialForm => "_SpecialForm",
             Self::TypeVar => "TypeVar",
             Self::ExtensionsTypeVar => "TypeVar",
@@ -968,6 +983,7 @@ impl KnownClass {
             Self::AsyncIterator => "AsyncIterator",
             Self::Sequence => "Sequence",
             Self::Mapping => "Mapping",
+            Self::MutableMapping => "MutableMapping",
             // For example, `typing.List` is defined as `List = _Alias()` in typeshed
             Self::StdlibAlias => "_Alias",
             // This is the name the type of `sys.version_info` has in typeshed,
@@ -1323,7 +1339,7 @@ impl KnownClass {
             | Self::EllipsisType
             | Self::NotImplementedType
             | Self::WrapperDescriptorType => KnownModule::Types,
-            Self::NoneType => KnownModule::Typeshed,
+            Self::NoneType | Self::SupportsKeysAndGetItem => KnownModule::Typeshed,
             Self::Awaitable
             | Self::Generator
             | Self::AsyncGenerator
@@ -1335,6 +1351,7 @@ impl KnownClass {
             | Self::AsyncIterator
             | Self::Sequence
             | Self::Mapping
+            | Self::MutableMapping
             | Self::ProtocolMeta
             | Self::ParamSpec
             | Self::Hashable
@@ -1493,6 +1510,8 @@ impl KnownClass {
             | Self::AsyncIterator
             | Self::Sequence
             | Self::Mapping
+            | Self::MutableMapping
+            | Self::SupportsKeysAndGetItem
             | Self::NamedTupleFallback
             | Self::NamedTupleLike
             | Self::ConstraintSet
@@ -1611,6 +1630,8 @@ impl KnownClass {
             | Self::AsyncIterator
             | Self::Sequence
             | Self::Mapping
+            | Self::MutableMapping
+            | Self::SupportsKeysAndGetItem
             | Self::NamedTupleFallback
             | Self::NamedTupleLike
             | Self::ConstraintSet
@@ -1672,6 +1693,7 @@ impl KnownClass {
             "deprecated" => &[Self::Deprecated],
             "GenericAlias" => &[Self::GenericAlias],
             "NoneType" => &[Self::NoneType],
+            "SupportsKeysAndGetItem" => &[Self::SupportsKeysAndGetItem],
             "ModuleType" => &[Self::ModuleType],
             "GeneratorType" => &[Self::GeneratorType],
             "AsyncGeneratorType" => &[Self::AsyncGeneratorType],
@@ -1691,6 +1713,7 @@ impl KnownClass {
             "AsyncIterator" => &[Self::AsyncIterator, Self::TyExtensionsAsyncIterator],
             "Sequence" => &[Self::Sequence],
             "Mapping" => &[Self::Mapping],
+            "MutableMapping" => &[Self::MutableMapping],
             "ParamSpec" => &[Self::ParamSpec, Self::ExtensionsParamSpec],
             "ParamSpecArgs" => &[Self::ParamSpecArgs],
             "ParamSpecKwargs" => &[Self::ParamSpecKwargs],
@@ -1821,6 +1844,7 @@ impl KnownClass {
             | Self::Field
             | Self::KwOnly
             | Self::NamedTupleFallback
+            | Self::SupportsKeysAndGetItem
             | Self::TypedDictFallback
             | Self::ExtensionTypedDictFallback
             | Self::TypeVar
@@ -1863,6 +1887,7 @@ impl KnownClass {
             | Self::AsyncIterator
             | Self::Sequence
             | Self::Mapping
+            | Self::MutableMapping
             | Self::ProtocolMeta
             | Self::NewType => matches!(module, KnownModule::Typing | KnownModule::TypingExtensions),
             Self::Deprecated => matches!(module, KnownModule::Warnings | KnownModule::TypingExtensions),

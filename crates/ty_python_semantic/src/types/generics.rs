@@ -2651,7 +2651,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         }
     }
 
-    /// Returns common protocol constraints for a union containing only `TypedDict`s when every
+    /// Returns common protocol constraints for the `TypedDict` members of a union when every such
     /// member has the same constraints as their shared `Mapping[str, object]` fallback.
     fn common_typed_dict_protocol_constraints(
         &self,
@@ -2664,6 +2664,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             resolving: &mut FxHashSet<Type<'db>>,
             completed: &mut FxHashMap<Type<'db>, bool>,
             typed_dicts: &mut FxHashSet<Type<'db>>,
+            other_types: &mut FxOrderSet<Type<'db>>,
         ) -> bool {
             let ty = ty.resolve_type_alias(db);
             if let Some(result) = completed.get(&ty) {
@@ -2680,20 +2681,52 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                         return false;
                     }
                     let result = union.elements(db).iter().all(|element| {
-                        collect_typed_dicts(db, *element, resolving, completed, typed_dicts)
+                        collect_typed_dicts(
+                            db,
+                            *element,
+                            resolving,
+                            completed,
+                            typed_dicts,
+                            other_types,
+                        )
                     });
                     resolving.remove(&ty);
                     result
                 }
                 Type::Intersection(intersection)
-                    if intersection
-                        .iter_positive(db)
-                        .any(|element| element.resolve_type_alias(db).is_typed_dict()) =>
+                    if intersection.negative(db).is_empty()
+                        && intersection
+                            .iter_positive(db)
+                            .any(|element| element.resolve_type_alias(db).is_typed_dict())
+                        && intersection.iter_positive(db).all(|element| {
+                            let element = element.resolve_type_alias(db);
+                            element.is_typed_dict()
+                                || element
+                                    == KnownClass::Dict
+                                        .to_instance_unknown(db)
+                                        .top_materialization(db)
+                        }) =>
                 {
                     // `isinstance(value, dict)` narrows a `TypedDict` to an intersection with
-                    // `Top[dict[Unknown, Unknown]]`. Keep the full intersection so the normal
-                    // constraint-equivalence check below remains authoritative.
+                    // `Top[dict[Unknown, Unknown]]`. Other conjuncts may contribute gradual
+                    // constraints that the shared mapping would erase.
                     typed_dicts.insert(ty);
+                    true
+                }
+                Type::NominalInstance(instance)
+                    if matches!(
+                        instance.class(db).known(db),
+                        Some(
+                            KnownClass::Dict
+                                | KnownClass::Mapping
+                                | KnownClass::MutableMapping
+                                | KnownClass::OrderedDict
+                        )
+                    ) && let Some(alias) = instance.class(db).into_generic_alias()
+                        && let [key, _] = alias.specialization(db).types(db)
+                        && key.resolve_type_alias(db) == KnownClass::Str.to_instance(db) =>
+                {
+                    other_types.insert(ty);
                     true
                 }
                 _ => false,
@@ -2705,6 +2738,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         let mut resolving = FxHashSet::default();
         let mut completed = FxHashMap::default();
         let mut typed_dicts = FxHashSet::default();
+        let mut other_types = FxOrderSet::default();
         if !actual.elements(self.db).iter().all(|element| {
             collect_typed_dicts(
                 self.db,
@@ -2712,8 +2746,22 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 &mut resolving,
                 &mut completed,
                 &mut typed_dicts,
+                &mut other_types,
             )
         }) {
+            return None;
+        }
+        if typed_dicts.is_empty() {
+            return None;
+        }
+        // Other protocols can observe key-specific or gradual evidence that the shared mapping
+        // fallback erases; restrict mixed unions to the protocol used by dictionary constructors.
+        if !other_types.is_empty()
+            && !matches!(formal, Type::ProtocolInstance(protocol)
+            if protocol.class_origin().is_some_and(|class| {
+                class.is_known(self.db, KnownClass::SupportsKeysAndGetItem)
+            }))
+        {
             return None;
         }
 
@@ -2724,18 +2772,37 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         let mapping = KnownClass::Mapping.to_specialized_instance(self.db, spec);
         let mapping_when = mapping.when_constraint_set_assignable_to_owned(self.db, formal);
         let mapping_when = self.constraints.load(self.db, &mapping_when);
-        typed_dicts
-            .into_iter()
-            .all(|element| {
-                let element_when = self.constraints.load(
-                    self.db,
-                    &element.when_constraint_set_assignable_to_owned(self.db, formal),
-                );
-                element_when
-                    .iff(self.db, self.constraints, mapping_when)
-                    .is_always_satisfied(self.db)
-            })
-            .then_some(mapping_when)
+        // Logically equivalent constraints can still infer different solutions, such as `Any`
+        // instead of `object`; preserve the original constraints when gradual evidence differs.
+        let mapping_solutions = (!other_types.is_empty())
+            .then(|| mapping_when.solutions(self.db, self.constraints, self.inferable));
+        if !typed_dicts.into_iter().all(|element| {
+            let element_when = self.constraints.load(
+                self.db,
+                &element.when_constraint_set_assignable_to_owned(self.db, formal),
+            );
+            element_when
+                .iff(self.db, self.constraints, mapping_when)
+                .is_always_satisfied(self.db)
+                && mapping_solutions.as_ref().is_none_or(|solutions| {
+                    &element_when.solutions(self.db, self.constraints, self.inferable) == solutions
+                })
+        }) {
+            return None;
+        }
+
+        // Reuse one constraint for all equivalent TypedDicts, but retain each mapping arm's
+        // original constraints.
+        Some(mapping_when.and(self.db, self.constraints, || {
+            other_types
+                .into_iter()
+                .when_all(self.db, self.constraints, |element| {
+                    self.constraints.load(
+                        self.db,
+                        &element.when_constraint_set_assignable_to_owned(self.db, formal),
+                    )
+                })
+        }))
     }
 
     /// Infer type mappings by comparing formal callable signatures against actual callables.
