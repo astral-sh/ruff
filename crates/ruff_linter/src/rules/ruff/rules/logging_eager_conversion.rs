@@ -127,6 +127,7 @@ pub(crate) fn logging_eager_conversion(checker: &Checker, call: &ast::ExprCall) 
         return;
     };
 
+    // Iterate over % placeholders in format string and zip with logging statement arguments
     for (spec, arg) in format_string
         .iter()
         .filter_map(|(_, part)| {
