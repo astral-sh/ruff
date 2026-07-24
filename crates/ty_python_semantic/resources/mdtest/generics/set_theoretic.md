@@ -155,7 +155,7 @@ This result highlights a tension between a naive "replace `Any` with a more prec
 understanding of materialization, and the "interval" representation of gradual types. The type
 `Co[P] | Co[Any]` clearly has something like `Co[P] | Co[Q]` as a possible materialization. However,
 this is much less clear for `Co[P | Any]`. Following a strict "gradual types are intervals"
-approach, `Co[P | Any]` also needs to be able to materialize to to `Co[P] | Co[Q]`, though. It is a
+approach, `Co[P | Any]` also needs to be able to materialize to `Co[P] | Co[Q]`, though. It is a
 supertype of the bottom materialization `Co[P | Never] = Co[P]`, and a subtype of the top
 materialization `Co[P | object] = Co[object]`. See
 [this discussion](https://github.com/astral-sh/ruff/pull/26054/changes#r3429787797) for more
@@ -351,13 +351,12 @@ class Sub[T](CoBase[T]): ...  # covariant or invariant
 ```
 
 Since `CoBase` is a nominal type, inhabitants of the intersection `CoBase[P] & Top[Sub[Any]]` need
-to have a consistent specialization of `CoBase` in their MRO. This implies that subtypes of that
-intersection must be of the form `CoBase[X] & Sub[X] = Sub[X]` (or unions/intersections of such
-types). In addition, since `Sub[X]` must be a subtype of `CoBase[P]`, we also need `X` to be a
-subtype of `P`.
-
-The whole intersection `CoBase[P] & Top[Sub[Any]]` can therefore be seen as the union of all these
-subtypes, which can be expressed as `Top[Sub[P & Any]]`:
+to have a consistent specialization of `CoBase` in their MRO. Inhabitants of that intersection are
+therefore instances of `Sub[P']` which cannot further (multiply) inherit from a `CoBase`
+specialization that is not `CoBase[P']`. Since these inhabitants further need to be a subtype of
+`CoBase[P]`, covariance requires `P' <: P`. Therefore the intersection consists of the possible
+`Sub` specializations whose type argument is upper-bounded by `P`. This type can be succinctly
+expressed as `Top[Sub[P & Any]]`:
 
 ```ignore
 CoBase[P] & Top[Sub[Any]] = Top[Sub[P & Any]]    (7a)
@@ -376,6 +375,15 @@ Sequence[int] & Top[tuple[Any, ...]] = tuple[int, ...]    (covariant base, covar
 Sequence[int] & Top[list[Any]] = Top[list[int & Any]]     (covariant base, invariant subtype)
 ```
 
+The latter example is illustrative: When you have a `Sequence[int]` and narrow using
+`isinstance(.., list)`, you end up with the type `Top[list[int & Any]]`. When iterating over that
+type, we get elements of `Top[int & Any] = int`, which is what we expect by starting from
+`Sequence[int]`. However, if we try to `append` an element to that list, since the element type
+appears in contravariant position, we get `Bottom[int & Any] = Never`. This means that we cannot
+append any elements to that list. This is expected, since we could be dealing with a `list[int]` or
+a `list[bool]`, or a `list[Literal[False]]`, and so on. So whatever we want to append needs to be
+compatible with all of those types, which is impossible.
+
 We can encode these relations in ty assertions:
 
 ```pyi
@@ -392,24 +400,33 @@ static_assert(is_equivalent_to(Sequence[int] & Top[tuple[Any, ...]], tuple[int, 
 static_assert(is_equivalent_to(Sequence[int] & Top[list[Any]], Top[list[int & Any]]))
 ```
 
-Next, we look at the contravariant `Base` case (items 3 and 4). The reasoning is similar, but now we
-need `X` to be a supertype of `P`:
+Next, we look at the contravariant `Base` case (items 3 and 4). The reasoning is similar: subtypes
+of `ContraBase[P] & Top[Sub[Any]]` must be of the form `Sub[P']`, but now, `P'` needs to be a
+*supertype* of `P`. The intersection therefore consists of all `Sub` specializations whose type
+argument is lower-bounded by `P`:
 
 ```ignore
 ContraBase[P] & Top[Sub[Any]] = Top[Sub[P | Any]]    (8a)
 ```
 
-If `Sub` is contravariant, this relation further simplifies:
+Again, this makes intuitive sense: If we have a `ContraBase[P]` and narrow using
+`isinstance(.., Sub)`, we can still `push` any elements of type `Bottom[P | Any] = P`, but we can
+only `get` out elements of type `Top[P | Any] = object`, which is what we would have expected from
+the `Top[Sub[Any]]` type that contributes the `get` method.
+
+If `Sub` is contravariant, (8a) further simplifies to:
 
 ```ignore
 ContraBase[P] & Top[ContraSub[Any]] = ContraSub[P | Never] = ContraSub[P]    (8b)
 ```
 
-An example of this relation for contravariant base and contravariant subclass would be:
+An example of this relation would be:
 
 ```ignore
 Coroutine[str, int, bytes] & Top[CoroutineType[str, Any, bytes]] = CoroutineType[str, int, bytes]    
 ```
+
+where both `Coroutine` and `CoroutineType` are contravariant in their "Send" type parameter.
 
 Again, we can encode the results in ty assertions:
 
@@ -426,8 +443,8 @@ static_assert(is_equivalent_to(Top[InvariantSubOfContraBase[Any]] & ContraBase[P
 static_assert(is_equivalent_to(Coroutine[str, int, bytes] & Top[CoroutineType[str, Any, bytes]], CoroutineType[str, int, bytes]))
 ```
 
-Finally, we look at the invariant `Base` case (item 5). Here, we need `X` to be equal to `P`, and so
-we immediately get:
+Finally, we look at the invariant `Base` case (item 5). Here, we need `P'` to be equal to `P`, and
+so we immediately get:
 
 ```ignore
 InvariantBase[P] & Top[Sub[Any]] = Sub[P]    (9)
@@ -440,6 +457,14 @@ class InvariantSubOfInvariantBase[T](InvariantBase[T]): ...
 
 static_assert(is_equivalent_to(InvariantBase[P] & Top[InvariantSubOfInvariantBase[Any]], InvariantSubOfInvariantBase[P]))
 static_assert(is_equivalent_to(Top[InvariantSubOfInvariantBase[Any]] & InvariantBase[P], InvariantSubOfInvariantBase[P]))
+```
+
+In summary, we have:
+
+```ignore
+Base[P] & Top[Sub[Any]] = Sub[P]               (Base and Sub have the same variance)
+Base[P] & Top[Sub[Any]] = Top[Sub[P & Any]]    (Base: covariant, Sub: invariant)
+Base[P] & Top[Sub[Any]] = Top[Sub[P | Any]]    (Base: contravariant, Sub: invariant)
 ```
 
 ## Edge cases
@@ -511,7 +536,7 @@ static_assert(is_equivalent_to(type[P] & type[Any], type[P & Any]))
 
 ### Type var bounds and `NewTypes`
 
-The simplification preserve the identities of type variables and `NewType` instances:
+The simplification preserves the identities of type variables and `NewType` instances:
 
 ```pyi
 from typing import Any, NewType
