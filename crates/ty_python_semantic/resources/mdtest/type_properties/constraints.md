@@ -932,6 +932,36 @@ def upper_bounded_noninferable[I, N]() -> None:
     reveal_type(constraints.solutions(inferable=tuple[I]))
 ```
 
+### Invariant classes containing bounded non-inferable typevars
+
+A non-inferable typevar can appear inside an invariant generic class in an inferable typevar's
+bounds. Here `list[N] ≤ I ≤ list[int]` forces `N = int`: invariance does not permit a wider or
+narrower list element type. That derived exact binding must be substituted into `I`, rather than
+leaving `list[N] | list[int]` in its solution. Using `solutions_for` filters the non-inferable
+binding independently, so these cases specifically verify the specialization of `I`.
+
+```py
+from typing import Never
+from ty_extensions._internal import ConstraintSet
+
+def invariant_declared_upper[I, N: int]() -> None:
+    constraints = ConstraintSet.range(list[N], I, list[int])
+    reveal_type(constraints.solutions_for(I, inferable=tuple[I]))  # revealed: tuple[Solution[I=list[int]]]
+
+def invariant_explicit_upper[I, N]() -> None:
+    constraints = ConstraintSet.range(Never, N, int) & ConstraintSet.range(list[N], I, list[int])
+    reveal_type(constraints.solutions_for(I, inferable=tuple[I]))  # revealed: tuple[Solution[I=list[int]]]
+
+def invariant_finite_domain[I, N: (int, str)]() -> None:
+    constraints = ConstraintSet.range(list[N], I, list[int])
+    reveal_type(constraints.solutions_for(I, inferable=tuple[I]))  # revealed: tuple[Solution[I=list[int]]]
+
+def invariant_unfixed_declared_upper[I, N: int]() -> None:
+    constraints = ConstraintSet.range(list[N], I, object)
+    # revealed: tuple[Solution[I=list[N@invariant_unfixed_declared_upper]]]
+    reveal_type(constraints.solutions_for(I, inferable=tuple[I]))
+```
+
 ### Declared non-inferable domains
 
 A positive constraint on a non-inferable variable must be compatible with its declared upper bound
