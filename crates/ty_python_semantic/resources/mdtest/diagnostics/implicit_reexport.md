@@ -39,7 +39,10 @@ from api import Answer
 # error: [implicit-reexport] "Module `api` does not explicitly export attribute `PublicAnswer`"
 from api import PublicAnswer as Renamed
 from api import Direct, ExplicitAlias, ExportedInAll, helper
+from dynamic import generated
 import api
+import dynamic
+import package.child
 
 reveal_type(Answer)  # revealed: Literal[42]
 reveal_type(Renamed)  # revealed: Literal[42]
@@ -47,11 +50,14 @@ reveal_type(ExplicitAlias)  # revealed: Literal[1]
 reveal_type(ExportedInAll)  # revealed: Literal[2]
 reveal_type(Direct)  # revealed: Literal[5]
 reveal_type(helper)  # revealed: <module 'helper'>
+reveal_type(generated)  # revealed: int
 
 # error: [implicit-reexport] "Module `api` does not explicitly export attribute `Answer`"
 reveal_type(api.Answer)  # revealed: Literal[42]
 reveal_type(api.ExplicitAlias)  # revealed: Literal[1]
 reveal_type(api.ExportedInAll)  # revealed: Literal[2]
+reveal_type(dynamic.generated)  # revealed: int
+reveal_type(package.child)  # revealed: <module 'package.child'>
 ```
 
 `api.py`:
@@ -76,6 +82,23 @@ ExportedInAll = 2
 ```
 
 `helper.py`:
+
+```py
+```
+
+`dynamic.py`:
+
+```py
+def __getattr__(name: str) -> int:
+    return 1
+```
+
+`package/__init__.py`:
+
+```py
+```
+
+`package/child.py`:
 
 ```py
 ```
