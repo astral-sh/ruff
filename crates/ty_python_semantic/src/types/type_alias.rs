@@ -264,11 +264,11 @@ fn apply_type_alias_specialization<'db>(
 
     let specialization =
         specialization.unwrap_or_else(|| generic_context.default_specialization(db, None));
-    let type_mapping = match specialization.materialization_kind(db) {
+    let type_mapping = match specialization.materialization(db) {
         None => TypeMapping::ApplySpecialization(ApplySpecialization::TypeAlias(specialization)),
-        Some(materialization_kind) => TypeMapping::ApplySpecializationWithMaterialization {
+        Some(materialization) => TypeMapping::ApplySpecializationWithMaterialization {
             specialization: ApplySpecialization::TypeAlias(specialization),
-            materialization_kind,
+            materialization,
         },
     };
 

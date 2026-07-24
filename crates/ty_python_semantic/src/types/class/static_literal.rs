@@ -20,10 +20,10 @@ use crate::{
         ApplyTypeMappingVisitor, BoundTypeVarIdentity, BoundTypeVarInstance, CallArguments,
         CallableType, ClassBase, ClassLiteral, ClassType, DATACLASS_FLAGS, DataclassFlags,
         DataclassParams, GenericAlias, GenericContext, KnownClass, KnownInstanceType,
-        MaterializationKind, MemberLookupPolicy, MetaclassCandidate, MetaclassTransformInfo,
-        Parameter, Parameters, PropertyInstanceType, Signature, SpecialFormType, StaticMroError,
-        SubclassOfType, Truthiness, Type, TypeContext, TypeMapping, TypeVarVariance,
-        TypedDictModule, UnionBuilder, UnionType,
+        Materialization, MaterializationKind, MemberLookupPolicy, MetaclassCandidate,
+        MetaclassTransformInfo, Parameter, Parameters, PropertyInstanceType, Signature,
+        SpecialFormType, StaticMroError, SubclassOfType, Truthiness, Type, TypeContext,
+        TypeMapping, TypeVarVariance, TypedDictModule, UnionBuilder, UnionType,
         call::{CallError, CallErrorKind},
         callable::{CallableFunctionProvenance, CallableTypeKind},
         class::{
@@ -459,7 +459,7 @@ impl<'db> StaticClassLiteral<'db> {
                 .default_specialization(db, self.known(db))
                 .materialize_impl(
                     db,
-                    MaterializationKind::Top,
+                    Materialization::new(MaterializationKind::Top),
                     &ApplyTypeMappingVisitor::default(),
                 )
         })
@@ -1369,6 +1369,7 @@ impl<'db> StaticClassLiteral<'db> {
                     signatures,
                     CallableTypeKind::FunctionLike,
                     CallableFunctionProvenance::None,
+                    false,
                 )
             });
 
@@ -1875,6 +1876,7 @@ impl<'db> StaticClassLiteral<'db> {
             CallableSignature::from_overloads(overloads),
             CallableTypeKind::FunctionLike,
             CallableFunctionProvenance::None,
+            false,
         )))
     }
 

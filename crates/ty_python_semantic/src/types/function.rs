@@ -1481,6 +1481,7 @@ impl<'db> FunctionType<'db> {
             CallableFunctionProvenance::from_function_return_annotation(
                 self.has_explicit_return_annotation(db),
             ),
+            false,
         )
     }
 

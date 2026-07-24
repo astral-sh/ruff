@@ -6,8 +6,8 @@ use crate::types::known_instance::KnownInstanceType;
 use crate::types::tuple::TupleType;
 use crate::types::{
     ApplyTypeMappingVisitor, BoundMethodType, EnumLiteralType, IntersectionBuilder,
-    IntersectionType, KnownClass, MaterializationKind, Parameter, Parameters, Signature,
-    SpecialFormType, SubclassOfType, Type, UnionType,
+    IntersectionType, KnownClass, Materialization, MaterializationKind, Parameter, Parameters,
+    Signature, SpecialFormType, SubclassOfType, Type, UnionType,
 };
 use quickcheck::{Arbitrary, Gen};
 use ruff_db::files::system_path_to_file;
@@ -272,7 +272,7 @@ fn divergent(db: &TestDb, id_bits: u64, materialization: Option<MaterializationK
     match materialization {
         Some(materialization_kind) => divergent.materialize(
             db,
-            materialization_kind,
+            Materialization::new(materialization_kind),
             &ApplyTypeMappingVisitor::default(),
         ),
         None => divergent,

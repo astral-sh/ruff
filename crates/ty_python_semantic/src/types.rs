@@ -327,14 +327,31 @@ impl<'db> ApplyTypeMappingVisitor<'db> {
         func: impl FnOnce() -> Type<'db>,
     ) -> Type<'db> {
         let type_transformer = match type_mapping {
-            TypeMapping::Materialize(MaterializationKind::Top) => &self.top_materialization,
-            TypeMapping::Materialize(MaterializationKind::Bottom) => &self.bottom_materialization,
+            TypeMapping::Materialize(Materialization {
+                kind: MaterializationKind::Top,
+                transient: false,
+            }) => &self.top_materialization,
+            TypeMapping::Materialize(Materialization {
+                kind: MaterializationKind::Bottom,
+                transient: false,
+            }) => &self.bottom_materialization,
+            TypeMapping::Materialize(Materialization {
+                transient: true, ..
+            }) => &self.default,
             TypeMapping::ApplySpecializationWithMaterialization {
-                materialization_kind: MaterializationKind::Top,
+                materialization:
+                    Materialization {
+                        kind: MaterializationKind::Top,
+                        ..
+                    },
                 ..
             } => &self.top_specialization_materialization,
             TypeMapping::ApplySpecializationWithMaterialization {
-                materialization_kind: MaterializationKind::Bottom,
+                materialization:
+                    Materialization {
+                        kind: MaterializationKind::Bottom,
+                        ..
+                    },
                 ..
             } => &self.bottom_specialization_materialization,
             TypeMapping::Promote(PromotionMode::On, _) => &self.promotion,
@@ -387,7 +404,7 @@ pub(crate) struct VisitSpecialization;
 ///
 /// This matters only if there is at least one invariant type parameter.
 /// For example, we represent `Top[list[Any]]` as a `GenericAlias` with
-/// `MaterializationKind` set to Top, which we denote as `Top[list[Any]]`.
+/// its materialization kind set to Top, which we denote as `Top[list[Any]]`.
 /// A type `Top[list[T]]` includes all fully static list types `list[U]` where `U` is
 /// a supertype of `Bottom[T]` and a subtype of `Top[T]`.
 ///
@@ -400,14 +417,50 @@ pub enum MaterializationKind {
     Bottom,
 }
 
-impl MaterializationKind {
+/// A top or bottom materialization, optionally transient until a type relation is evaluated.
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, get_size2::GetSize)]
+pub struct Materialization {
+    kind: MaterializationKind,
+    /// Whether application is transient. This is used for non-strict/unsound `isinstance` checks
+    /// with generic classes. For example, `isinstance(x, Sequence)` intersects the type of `x`
+    /// with `TransientTop[Sequence[Unknown]]`, which is not eagerly evaluated to `Sequence[object]`,
+    /// so that it can be erased after the intersection has been computed.
+    transient: bool,
+}
+
+impl Materialization {
+    const fn new(kind: MaterializationKind) -> Self {
+        Self {
+            kind,
+            transient: false,
+        }
+    }
+
+    const fn transient(kind: MaterializationKind) -> Self {
+        Self {
+            kind,
+            transient: true,
+        }
+    }
+
     /// Flip the materialization type: `Top` becomes `Bottom` and vice versa.
     #[must_use]
     pub const fn flip(self) -> Self {
-        match self {
-            Self::Top => Self::Bottom,
-            Self::Bottom => Self::Top,
+        Self {
+            kind: match self.kind {
+                MaterializationKind::Top => MaterializationKind::Bottom,
+                MaterializationKind::Bottom => MaterializationKind::Top,
+            },
+            transient: self.transient,
         }
+    }
+
+    const fn is_transient(self) -> bool {
+        self.transient
+    }
+
+    const fn is_top(self) -> bool {
+        matches!(self.kind, MaterializationKind::Top)
     }
 }
 
@@ -1160,9 +1213,9 @@ impl<'db> Type<'db> {
             return None;
         };
 
-        match divergent.materialization_kind() {
-            Some(MaterializationKind::Top) => Some(Type::object()),
-            Some(MaterializationKind::Bottom) => Some(Type::Never),
+        match divergent.materialization() {
+            Some(kind) if kind.is_top() => Some(Type::object()),
+            Some(_) => Some(Type::Never),
             None => None,
         }
     }
@@ -1173,9 +1226,9 @@ impl<'db> Type<'db> {
             return None;
         };
 
-        Some(match divergent.materialization_kind() {
-            Some(materialization_kind) => {
-                Type::Divergent(divergent.materialized(materialization_kind.flip()))
+        Some(match divergent.materialization() {
+            Some(materialization) => {
+                Type::Divergent(divergent.materialized(materialization.flip()))
             }
             None => Type::Divergent(divergent),
         })
@@ -1204,7 +1257,10 @@ impl<'db> Type<'db> {
             self,
             Type::Never
                 | Type::Divergent(DivergentType {
-                    materialization: Some(MaterializationKind::Bottom),
+                    materialization: Some(Materialization {
+                        kind: MaterializationKind::Bottom,
+                        ..
+                    }),
                     ..
                 })
         )
@@ -1537,6 +1593,29 @@ impl<'db> Type<'db> {
         (*self).cached_materialization(db, MaterializationKind::Top)
     }
 
+    /// Returns a specially marked top materialization whose application is transient.
+    /// The tag survives set-theoretic simplification and can be removed by
+    /// [`Type::erase_transient_materialization`] immediately afterwards.
+    #[must_use]
+    pub(crate) fn transient_top_materialization(&self, db: &'db dyn Db) -> Type<'db> {
+        self.materialize(
+            db,
+            Materialization::transient(MaterializationKind::Top),
+            &ApplyTypeMappingVisitor::default(),
+        )
+    }
+
+    /// Erases only the materialization tag introduced by
+    /// [`Type::transient_top_materialization`].
+    #[must_use]
+    pub(crate) fn erase_transient_materialization(self, db: &'db dyn Db) -> Type<'db> {
+        self.apply_type_mapping(
+            db,
+            &TypeMapping::EraseTransientMaterialization,
+            TypeContext::default(),
+        )
+    }
+
     /// Returns the bottom materialization (or lower bound materialization) of this type, which is
     /// the most specific form of the type that is fully static.
     #[must_use]
@@ -1547,7 +1626,9 @@ impl<'db> Type<'db> {
     #[salsa::tracked(
         returns(copy),
         cycle_initial=|_, id, _, materialization_kind| {
-            Type::Divergent(DivergentType::new(id).materialized(materialization_kind))
+            Type::Divergent(
+                DivergentType::new(id).materialized(Materialization::new(materialization_kind))
+            )
         },
         cycle_fn=|db, cycle, previous: &Type<'db>, value: Type<'db>, _, _| {
             value.cycle_normalized(db, *previous, cycle)
@@ -1561,7 +1642,7 @@ impl<'db> Type<'db> {
     ) -> Type<'db> {
         self.materialize(
             db,
-            materialization_kind,
+            Materialization::new(materialization_kind),
             &ApplyTypeMappingVisitor::default(),
         )
     }
@@ -1610,12 +1691,12 @@ impl<'db> Type<'db> {
     pub(crate) fn materialize(
         &self,
         db: &'db dyn Db,
-        materialization_kind: MaterializationKind,
+        materialization: Materialization,
         visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> Type<'db> {
         self.apply_type_mapping_impl(
             db,
-            &TypeMapping::Materialize(materialization_kind),
+            &TypeMapping::Materialize(materialization),
             TypeContext::default(),
             visitor,
         )
@@ -6580,13 +6661,13 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         specialization: Specialization<'db>,
     ) -> Type<'db> {
-        let type_mapping = match specialization.materialization_kind(db) {
+        let type_mapping = match specialization.materialization(db) {
             None => TypeMapping::ApplySpecialization(ApplySpecialization::Specialization(
                 specialization,
             )),
-            Some(materialization_kind) => TypeMapping::ApplySpecializationWithMaterialization {
+            Some(materialization) => TypeMapping::ApplySpecializationWithMaterialization {
                 specialization: ApplySpecialization::Specialization(specialization),
-                materialization_kind,
+                materialization,
             },
         };
 
@@ -6640,8 +6721,9 @@ impl<'db> Type<'db> {
             Type::TypeVar(bound_typevar) => bound_typevar.apply_type_mapping_impl(db, type_mapping, visitor),
             Type::KnownInstance(known_instance) => known_instance.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
 
-            Type::FunctionLiteral(function) => visitor.visit(db, self, type_mapping, || {
-                match type_mapping {
+            Type::FunctionLiteral(function) => match type_mapping {
+                TypeMapping::EraseTransientMaterialization => self,
+                _ => visitor.visit(db, self, type_mapping, || match type_mapping {
                     // Promote the types within the signature before promoting the signature to its
                     // callable form.
                     TypeMapping::Promote(PromotionMode::On, PromotionKind::Regular) => {
@@ -6659,8 +6741,8 @@ impl<'db> Type<'db> {
                         tcx,
                         visitor,
                     )),
-                }
-            }),
+                }),
+            },
 
             Type::BoundMethod(method) => Type::BoundMethod(BoundMethodType::new(
                 db,
@@ -6828,12 +6910,12 @@ impl<'db> Type<'db> {
                     {
                         let mut current_specialization = specialization.as_specialization(db).unwrap();
                         if let TypeMapping::ApplySpecializationWithMaterialization {
-                            materialization_kind,
+                            materialization,
                             ..
                         } = type_mapping
                         {
                             current_specialization = current_specialization
-                                .with_materialization_kind(db, Some(*materialization_kind));
+                                .with_materialization(db, Some(*materialization));
                         }
                         Type::TypeAlias(alias.apply_specialization(
                             db,
@@ -6872,6 +6954,7 @@ impl<'db> Type<'db> {
                 TypeMapping::BindSelf { .. } |
                 TypeMapping::ReplaceSelf { .. } |
                 TypeMapping::Materialize(_) |
+                TypeMapping::EraseTransientMaterialization |
                 TypeMapping::ReplaceParameterDefaults |
                 TypeMapping::EagerExpansion |
                 TypeMapping::RescopeReturnCallables(_) |
@@ -6894,17 +6977,25 @@ impl<'db> Type<'db> {
                 TypeMapping::ReplaceParameterDefaults |
                 TypeMapping::EagerExpansion |
                 TypeMapping::RescopeReturnCallables(_) => self,
-                TypeMapping::Materialize(materialization_kind) => match materialization_kind {
+                TypeMapping::Materialize(materialization) => match materialization.kind {
                     MaterializationKind::Top => Type::object(),
                     MaterializationKind::Bottom => Type::Never,
-                }
+                },
+                TypeMapping::EraseTransientMaterialization => self,
             }
             // `Divergent` is an internal cycle marker rather than a gradual type like `Any` or
             // `Unknown`. Preserve the marker across materialization, while recording whether this
             // occurrence should behave like the top (`object`) or bottom (`Never`) bound.
             Type::Divergent(divergent) => match type_mapping {
-                TypeMapping::Materialize(materialization_kind) => {
-                    Type::Divergent(divergent.materialized(*materialization_kind))
+                TypeMapping::Materialize(materialization) => {
+                    Type::Divergent(divergent.materialized(*materialization))
+                }
+                TypeMapping::EraseTransientMaterialization
+                    if divergent
+                        .materialization()
+                        .is_some_and(Materialization::is_transient) =>
+                {
+                    Type::Divergent(DivergentType::new(divergent.id))
                 }
                 _ => self,
             },
@@ -7945,10 +8036,10 @@ pub enum TypeMapping<'a, 'db> {
     ApplySpecialization(ApplySpecialization<'a, 'db>),
     /// Applies a specialization and materializes only substituted typevars.
     ///
-    /// The `materialization_kind` is flipped in contravariant positions.
+    /// The materialization kind is flipped in contravariant positions.
     ApplySpecializationWithMaterialization {
         specialization: ApplySpecialization<'a, 'db>,
-        materialization_kind: MaterializationKind,
+        materialization: Materialization,
     },
     /// Replaces any literal types with their corresponding promoted type form (e.g. `Literal["string"]`
     /// to `str`, or `def _() -> int` to `Callable[[], int]`).
@@ -7966,7 +8057,9 @@ pub enum TypeMapping<'a, 'db> {
     /// Replaces occurrences of `typing.Self` with a new `Self` type variable with the given upper bound.
     ReplaceSelf { new_upper_bound: Type<'db> },
     /// Create the top or bottom materialization of a type.
-    Materialize(MaterializationKind),
+    Materialize(Materialization),
+    /// Remove a transient materialization tag, restoring its gradual specialization.
+    EraseTransientMaterialization,
     /// Replace default types in parameters of callables with `Unknown`. This is used to avoid infinite
     /// recursion when the type of the default value of a parameter depends on the callable itself.
     ReplaceParameterDefaults,
@@ -8018,6 +8111,7 @@ impl<'db> TypeMapping<'_, 'db> {
             TypeMapping::Promote(..)
             | TypeMapping::BindLegacyTypevars(_)
             | TypeMapping::Materialize(_)
+            | TypeMapping::EraseTransientMaterialization
             | TypeMapping::ReplaceParameterDefaults
             | TypeMapping::EagerExpansion
             | TypeMapping::RescopeReturnCallables(_) => context,
@@ -8048,15 +8142,15 @@ impl<'db> TypeMapping<'_, 'db> {
     /// Returns a new `TypeMapping` that should be applied in contravariant positions.
     pub(crate) fn flip(&self) -> Self {
         match self {
-            TypeMapping::Materialize(materialization_kind) => {
-                TypeMapping::Materialize(materialization_kind.flip())
+            TypeMapping::Materialize(materialization) => {
+                TypeMapping::Materialize(materialization.flip())
             }
             TypeMapping::ApplySpecializationWithMaterialization {
                 specialization,
-                materialization_kind,
+                materialization,
             } => TypeMapping::ApplySpecializationWithMaterialization {
                 specialization: *specialization,
-                materialization_kind: materialization_kind.flip(),
+                materialization: materialization.flip(),
             },
             TypeMapping::Promote(mode, kind) => TypeMapping::Promote(mode.flip(), *kind),
             TypeMapping::ApplySpecialization(_)
@@ -8064,6 +8158,7 @@ impl<'db> TypeMapping<'_, 'db> {
             | TypeMapping::FreshenBoundTypeVars { .. }
             | TypeMapping::BindSelf(..)
             | TypeMapping::ReplaceSelf { .. }
+            | TypeMapping::EraseTransientMaterialization
             | TypeMapping::ReplaceParameterDefaults
             | TypeMapping::EagerExpansion
             | TypeMapping::RescopeReturnCallables(_) => self.clone(),
@@ -8082,7 +8177,7 @@ pub struct DivergentType {
     id: salsa::Id,
     /// If this divergent marker has been materialized, preserve whether it should behave like the
     /// top (`object`) or bottom (`Never`) bound while still remaining recognizable as divergent.
-    materialization: Option<MaterializationKind>,
+    materialization: Option<Materialization>,
 }
 
 // The Salsa heap is tracked separately.
@@ -8100,14 +8195,14 @@ impl DivergentType {
         self.id == other.id
     }
 
-    const fn materialized(self, kind: MaterializationKind) -> Self {
+    const fn materialized(self, materialization: Materialization) -> Self {
         Self {
             id: self.id,
-            materialization: Some(kind),
+            materialization: Some(materialization),
         }
     }
 
-    const fn materialization_kind(self) -> Option<MaterializationKind> {
+    const fn materialization(self) -> Option<Materialization> {
         self.materialization
     }
 }
@@ -8943,7 +9038,7 @@ impl<'db> TypeIsType<'db> {
     /// Construct an unbound `TypeIs` return type from the user-written type expression.
     ///
     /// The user-written type is preserved for `TypeIs` invariance checks, while the return type
-    /// used for narrowing applies the top materialization on demand.
+    /// used during narrowing applies the top materialization on demand.
     ///
     /// ```python
     /// from typing import TypeIs

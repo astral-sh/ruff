@@ -1038,6 +1038,28 @@ impl<'db> ClassType<'db> {
         }
     }
 
+    /// Applies a generic class's transient materialization: `TransientTop[..]` becomes `Top[..]`,
+    /// and `TransientBottom[..]` becomes `Bottom[..]`.
+    pub(crate) fn apply_transient_materialization(
+        self,
+        db: &'db dyn Db,
+        visitor: &ApplyTypeMappingVisitor<'db>,
+    ) -> Self {
+        match self {
+            Self::NonGeneric(_) => self,
+            Self::Generic(alias) => {
+                let original_specialization = alias.specialization(db);
+                let specialization =
+                    original_specialization.apply_transient_materialization(db, visitor);
+                if specialization == original_specialization {
+                    self
+                } else {
+                    Self::Generic(GenericAlias::new(db, alias.origin(db), specialization))
+                }
+            }
+        }
+    }
+
     pub(super) fn recursive_type_normalized_impl(
         self,
         db: &'db dyn Db,
@@ -1884,6 +1906,7 @@ impl<'db> ClassType<'db> {
                             getitem_signature,
                             CallableTypeKind::FunctionLike,
                             CallableFunctionProvenance::None,
+                            false,
                         ));
                         Member::definitely_declared(getitem_type)
                     })
@@ -2125,6 +2148,7 @@ impl<'db> ClassType<'db> {
                 dunder_new_signature.bind_self_with_receiver(db, Some(self_ty), Some(instance_ty)),
                 CallableTypeKind::Regular,
                 CallableFunctionProvenance::None,
+                false,
             );
 
             if returns_non_subclass {
@@ -2202,6 +2226,7 @@ impl<'db> ClassType<'db> {
                     synthesized_dunder_init_signature,
                     CallableTypeKind::Regular,
                     CallableFunctionProvenance::None,
+                    false,
                 ))
             } else {
                 None
