@@ -8,7 +8,7 @@ input_file: crates/ruff_python_parser/resources/invalid/statements/if_extra_inde
 Module(
     ModModule {
         node_index: NodeIndex(None),
-        range: 0..153,
+        range: 0..939,
         body: [
             If(
                 StmtIf {
@@ -92,6 +92,423 @@ Module(
                     ),
                 },
             ),
+            If(
+                StmtIf {
+                    node_index: NodeIndex(None),
+                    range: 192..265,
+                    test: BooleanLiteral(
+                        ExprBooleanLiteral {
+                            node_index: NodeIndex(None),
+                            range: 195..199,
+                            value: true,
+                        },
+                    ),
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                node_index: NodeIndex(None),
+                                range: 205..218,
+                                value: Name(
+                                    ExprName {
+                                        node_index: NodeIndex(None),
+                                        range: 205..218,
+                                        id: Name("before_nested"),
+                                        ctx: Load,
+                                    },
+                                ),
+                            },
+                        ),
+                        Expr(
+                            StmtExpr {
+                                node_index: NodeIndex(None),
+                                range: 227..239,
+                                value: Name(
+                                    ExprName {
+                                        node_index: NodeIndex(None),
+                                        range: 227..239,
+                                        id: Name("first_nested"),
+                                        ctx: Load,
+                                    },
+                                ),
+                            },
+                        ),
+                        Expr(
+                            StmtExpr {
+                                node_index: NodeIndex(None),
+                                range: 252..265,
+                                value: Name(
+                                    ExprName {
+                                        node_index: NodeIndex(None),
+                                        range: 252..265,
+                                        id: Name("second_nested"),
+                                        ctx: Load,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                    elif_else_clauses: [],
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    node_index: NodeIndex(None),
+                    range: 270..282,
+                    value: Name(
+                        ExprName {
+                            node_index: NodeIndex(None),
+                            range: 270..282,
+                            id: Name("after_nested"),
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    node_index: NodeIndex(None),
+                    range: 284..298,
+                    value: Name(
+                        ExprName {
+                            node_index: NodeIndex(None),
+                            range: 284..298,
+                            id: Name("outside_nested"),
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            If(
+                StmtIf {
+                    node_index: NodeIndex(None),
+                    range: 359..464,
+                    test: BooleanLiteral(
+                        ExprBooleanLiteral {
+                            node_index: NodeIndex(None),
+                            range: 362..366,
+                            value: true,
+                        },
+                    ),
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                node_index: NodeIndex(None),
+                                range: 372..387,
+                                value: Name(
+                                    ExprName {
+                                        node_index: NodeIndex(None),
+                                        range: 372..387,
+                                        id: Name("before_compound"),
+                                        ctx: Load,
+                                    },
+                                ),
+                            },
+                        ),
+                        If(
+                            StmtIf {
+                                node_index: NodeIndex(None),
+                                range: 396..437,
+                                test: Name(
+                                    ExprName {
+                                        node_index: NodeIndex(None),
+                                        range: 399..408,
+                                        id: Name("condition"),
+                                        ctx: Load,
+                                    },
+                                ),
+                                body: [
+                                    Expr(
+                                        StmtExpr {
+                                            node_index: NodeIndex(None),
+                                            range: 422..437,
+                                            value: Name(
+                                                ExprName {
+                                                    node_index: NodeIndex(None),
+                                                    range: 422..437,
+                                                    id: Name("nested_compound"),
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                        },
+                                    ),
+                                ],
+                                elif_else_clauses: [],
+                            },
+                        ),
+                        Expr(
+                            StmtExpr {
+                                node_index: NodeIndex(None),
+                                range: 446..464,
+                                value: Name(
+                                    ExprName {
+                                        node_index: NodeIndex(None),
+                                        range: 446..464,
+                                        id: Name("recovered_compound"),
+                                        ctx: Load,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                    elif_else_clauses: [],
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    node_index: NodeIndex(None),
+                    range: 469..483,
+                    value: Name(
+                        ExprName {
+                            node_index: NodeIndex(None),
+                            range: 469..483,
+                            id: Name("after_compound"),
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    node_index: NodeIndex(None),
+                    range: 485..501,
+                    value: Name(
+                        ExprName {
+                            node_index: NodeIndex(None),
+                            range: 485..501,
+                            id: Name("outside_compound"),
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            If(
+                StmtIf {
+                    node_index: NodeIndex(None),
+                    range: 570..618,
+                    test: BooleanLiteral(
+                        ExprBooleanLiteral {
+                            node_index: NodeIndex(None),
+                            range: 573..577,
+                            value: true,
+                        },
+                    ),
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                node_index: NodeIndex(None),
+                                range: 583..597,
+                                value: Name(
+                                    ExprName {
+                                        node_index: NodeIndex(None),
+                                        range: 583..597,
+                                        id: Name("before_regions"),
+                                        ctx: Load,
+                                    },
+                                ),
+                            },
+                        ),
+                        Expr(
+                            StmtExpr {
+                                node_index: NodeIndex(None),
+                                range: 606..618,
+                                value: Name(
+                                    ExprName {
+                                        node_index: NodeIndex(None),
+                                        range: 606..618,
+                                        id: Name("first_region"),
+                                        ctx: Load,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                    elif_else_clauses: [],
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    node_index: NodeIndex(None),
+                    range: 623..636,
+                    value: Name(
+                        ExprName {
+                            node_index: NodeIndex(None),
+                            range: 623..636,
+                            id: Name("middle_region"),
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    node_index: NodeIndex(None),
+                    range: 645..658,
+                    value: Name(
+                        ExprName {
+                            node_index: NodeIndex(None),
+                            range: 645..658,
+                            id: Name("second_region"),
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    node_index: NodeIndex(None),
+                    range: 663..675,
+                    value: Name(
+                        ExprName {
+                            node_index: NodeIndex(None),
+                            range: 663..675,
+                            id: Name("after_region"),
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    node_index: NodeIndex(None),
+                    range: 677..692,
+                    value: Name(
+                        ExprName {
+                            node_index: NodeIndex(None),
+                            range: 677..692,
+                            id: Name("outside_regions"),
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            If(
+                StmtIf {
+                    node_index: NodeIndex(None),
+                    range: 768..811,
+                    test: BooleanLiteral(
+                        ExprBooleanLiteral {
+                            node_index: NodeIndex(None),
+                            range: 771..775,
+                            value: true,
+                        },
+                    ),
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                node_index: NodeIndex(None),
+                                range: 781..793,
+                                value: Name(
+                                    ExprName {
+                                        node_index: NodeIndex(None),
+                                        range: 781..793,
+                                        id: Name("before_error"),
+                                        ctx: Load,
+                                    },
+                                ),
+                            },
+                        ),
+                        Expr(
+                            StmtExpr {
+                                node_index: NodeIndex(None),
+                                range: 802..811,
+                                value: Call(
+                                    ExprCall {
+                                        node_index: NodeIndex(None),
+                                        range: 802..811,
+                                        func: Name(
+                                            ExprName {
+                                                node_index: NodeIndex(None),
+                                                range: 802..808,
+                                                id: Name("broken"),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                        arguments: Arguments {
+                                            range: 808..811,
+                                            node_index: NodeIndex(None),
+                                            args: [],
+                                            keywords: [],
+                                        },
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                    elif_else_clauses: [],
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    node_index: NodeIndex(None),
+                    range: 816..827,
+                    value: Name(
+                        ExprName {
+                            node_index: NodeIndex(None),
+                            range: 816..827,
+                            id: Name("after_error"),
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    node_index: NodeIndex(None),
+                    range: 829..842,
+                    value: Name(
+                        ExprName {
+                            node_index: NodeIndex(None),
+                            range: 829..842,
+                            id: Name("outside_error"),
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            If(
+                StmtIf {
+                    node_index: NodeIndex(None),
+                    range: 897..938,
+                    test: BooleanLiteral(
+                        ExprBooleanLiteral {
+                            node_index: NodeIndex(None),
+                            range: 900..904,
+                            value: true,
+                        },
+                    ),
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                node_index: NodeIndex(None),
+                                range: 910..920,
+                                value: Name(
+                                    ExprName {
+                                        node_index: NodeIndex(None),
+                                        range: 910..920,
+                                        id: Name("before_eof"),
+                                        ctx: Load,
+                                    },
+                                ),
+                            },
+                        ),
+                        Expr(
+                            StmtExpr {
+                                node_index: NodeIndex(None),
+                                range: 929..938,
+                                value: Name(
+                                    ExprName {
+                                        node_index: NodeIndex(None),
+                                        range: 929..938,
+                                        id: Name("final_eof"),
+                                        ctx: Load,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                    elif_else_clauses: [],
+                },
+            ),
         ],
     },
 )
@@ -108,9 +525,152 @@ Module(
   |
 
 
-  |
-6 |     pass
-7 |
-  | ^ Syntax Error: Expected a statement
-8 | a = 10
-  |
+   |
+ 6 |     pass
+ 7 |
+   | ^ Syntax Error: Expected a statement
+ 8 | a = 10
+ 9 |
+10 | # Multiple nested unexpected indents.
+   |
+
+
+   |
+11 | if True:
+12 |     before_nested
+13 |         first_nested
+   | ^^^^^^^^ Syntax Error: Unexpected indentation
+14 |             second_nested
+15 |     after_nested
+   |
+
+
+   |
+12 |     before_nested
+13 |         first_nested
+14 |             second_nested
+   | ^^^^^^^^^^^^ Syntax Error: Unexpected indentation
+15 |     after_nested
+   |
+
+
+   |
+13 |         first_nested
+14 |             second_nested
+15 |     after_nested
+   |     ^ Syntax Error: Expected a statement
+16 |
+17 | outside_nested
+   |
+
+
+   |
+15 |     after_nested
+16 |
+   | ^ Syntax Error: Expected a statement
+17 | outside_nested
+18 |
+19 | # A valid compound statement inside recovered indentation.
+   |
+
+
+   |
+20 | if True:
+21 |     before_compound
+22 |         if condition:
+   | ^^^^^^^^ Syntax Error: Unexpected indentation
+23 |             nested_compound
+24 |         recovered_compound
+   |
+
+
+   |
+25 |     after_compound
+26 |
+   | ^ Syntax Error: Expected a statement
+27 | outside_compound
+28 |
+29 | # Multiple independent unexpected-indent regions in the same body.
+   |
+
+
+   |
+30 | if True:
+31 |     before_regions
+32 |         first_region
+   | ^^^^^^^^ Syntax Error: Unexpected indentation
+33 |     middle_region
+34 |         second_region
+   |
+
+
+   |
+32 |         first_region
+33 |     middle_region
+34 |         second_region
+   | ^^^^^^^^ Syntax Error: Unexpected indentation
+35 |     after_region
+   |
+
+
+   |
+33 |     middle_region
+34 |         second_region
+35 |     after_region
+   |     ^ Syntax Error: Expected a statement
+36 |
+37 | outside_regions
+   |
+
+
+   |
+35 |     after_region
+36 |
+   | ^ Syntax Error: Expected a statement
+37 | outside_regions
+38 |
+39 | # An independent syntax error inside recovered indentation stays visible.
+   |
+
+
+   |
+40 | if True:
+41 |     before_error
+42 |         broken(,)
+   | ^^^^^^^^ Syntax Error: Unexpected indentation
+43 |     after_error
+   |
+
+
+   |
+40 | if True:
+41 |     before_error
+42 |         broken(,)
+   |                ^ Syntax Error: Expected an expression or a ')'
+43 |     after_error
+   |
+
+
+   |
+43 |     after_error
+44 |
+   | ^ Syntax Error: Expected a statement
+45 | outside_error
+46 |
+47 | # Outstanding unexpected indents are flushed at EOF.
+   |
+
+
+   |
+48 | if True:
+49 |     before_eof
+50 |         final_eof
+   | ^^^^^^^^ Syntax Error: Unexpected indentation
+   |
+
+
+   |
+49 |     before_eof
+50 |         final_eof
+   |                  ^ Syntax Error: Expected a statement
+   |
