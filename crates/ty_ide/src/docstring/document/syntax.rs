@@ -425,22 +425,24 @@ pub(super) fn split_once_at_top_level_colon(line: &str) -> Option<(&str, &str)> 
     None
 }
 
+/// Tracks bracket nesting while scanning docstring syntax.
 #[derive(Default)]
-struct BracketNesting {
+pub(in crate::docstring) struct BracketNesting {
     parentheses: usize,
     square: usize,
     curly: usize,
 }
 
 impl BracketNesting {
-    fn is_top_level(&self) -> bool {
+    /// Returns whether the current position is outside all bracket groups.
+    pub(in crate::docstring) fn is_top_level(&self) -> bool {
         self.parentheses == 0 && self.square == 0 && self.curly == 0
     }
 
     /// Updates the nesting depth while tolerating unmatched closing brackets.
     ///
     /// For example, `'('` increments the parenthesis depth and a later `')'` decrements it.
-    fn update(&mut self, character: char) {
+    pub(in crate::docstring) fn update(&mut self, character: char) {
         match character {
             '(' => self.parentheses += 1,
             ')' => self.parentheses = self.parentheses.saturating_sub(1),
@@ -457,7 +459,7 @@ impl BracketNesting {
 ///
 /// For example, after the opening quote in `"value" trailing` has been consumed, a cursor over
 /// `value" trailing` with `quote` set to `'"'` advances to ` trailing`.
-pub(super) fn consume_quoted_string(cursor: &mut Cursor<'_>, quote: char) {
+pub(in crate::docstring) fn consume_quoted_string(cursor: &mut Cursor<'_>, quote: char) {
     while let Some(character) = cursor.bump() {
         if character == '\\' {
             cursor.bump();
