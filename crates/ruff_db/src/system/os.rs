@@ -15,6 +15,7 @@ use crate::system::{
 use filetime::FileTime;
 use ruff_notebook::{Notebook, NotebookError};
 use std::num::NonZeroUsize;
+use std::process::{Command, Output};
 use std::sync::Arc;
 use std::{any::Any, path::PathBuf};
 
@@ -127,6 +128,18 @@ impl System for OsSystem {
             Ok(path) => Ok(path),
             Err(_) => Err(WhichError::NonUtf8Path),
         }
+    }
+
+    fn run_command(
+        &self,
+        program: &str,
+        args: &[&str],
+        current_directory: &SystemPath,
+    ) -> Result<Output> {
+        Command::new(program)
+            .args(args)
+            .current_dir(current_directory.as_std_path())
+            .output()
     }
 
     fn current_directory(&self) -> &SystemPath {

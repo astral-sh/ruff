@@ -106,6 +106,7 @@ impl std::fmt::Display for RuleResolutionError {
             ValueSource::File(path) => format_args!("`{}`", path.as_path()),
             ValueSource::Cli => format_args!("the CLI"),
             ValueSource::Editor => format_args!("the editor configuration"),
+            ValueSource::UvWorkspace => format_args!("uv workspace metadata"),
         };
         match kind {
             RuleResolutionErrorKind::Removed => {

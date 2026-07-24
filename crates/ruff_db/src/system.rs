@@ -12,6 +12,7 @@ use ruff_python_ast::PySourceType;
 use std::error::Error;
 use std::fmt;
 use std::fmt::Debug;
+use std::process::Output;
 pub use test::{DbWithTestSystem, DbWithWritableSystem, InMemorySystem, TestSystem};
 use walk_directory::WalkDirectoryBuilder;
 
@@ -99,6 +100,20 @@ pub trait System: Debug + Sync + Send {
 
     /// Find an executable binary's path by name.
     fn which(&self, binary_name: &str) -> WhichResult;
+
+    /// Runs a command in the given working directory, returning its output.
+    fn run_command(
+        &self,
+        program: &str,
+        args: &[&str],
+        current_directory: &SystemPath,
+    ) -> Result<Output> {
+        let _ = (program, args, current_directory);
+        Err(std::io::Error::new(
+            std::io::ErrorKind::Unsupported,
+            "running commands is not supported by this system",
+        ))
+    }
 
     /// Reads the content of the file at `path` into a [`String`].
     fn read_to_string(&self, path: &SystemPath) -> Result<String>;
