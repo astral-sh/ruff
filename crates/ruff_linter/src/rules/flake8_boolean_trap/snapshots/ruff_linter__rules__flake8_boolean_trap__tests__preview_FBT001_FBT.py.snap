@@ -1,0 +1,47 @@
+---
+source: crates/ruff_linter/src/rules/flake8_boolean_trap/mod.rs
+---
+--- Linter settings ---
+-linter.preview = disabled
++linter.preview = enabled
+
+--- Summary ---
+Removed: 0
+Added: 4
+
+--- Added ---
+FBT001 Boolean-typed positional argument in function definition
+   --> FBT.py:183:23
+    |
+182 | # check literal
+183 | def func_literal_both(flag: Literal[True, False]):
+    |                       ^^^^
+184 |     pass
+    |
+
+
+FBT001 Boolean-typed positional argument in function definition
+   --> FBT.py:187:23
+    |
+187 | def func_literal_true(flag: Literal[True]):
+    |                       ^^^^
+188 |     pass
+    |
+
+
+FBT001 Boolean-typed positional argument in function definition
+   --> FBT.py:191:24
+    |
+191 | def func_literal_false(flag: Literal[False]):
+    |                        ^^^^
+192 |     pass
+    |
+
+
+FBT001 Boolean-typed positional argument in function definition
+   --> FBT.py:195:27
+    |
+195 | def func_literal_optional(flag: Literal[True, False, None]):
+    |                           ^^^^
+196 |     pass
+    |
