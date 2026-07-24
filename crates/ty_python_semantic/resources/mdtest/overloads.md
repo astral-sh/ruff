@@ -368,9 +368,13 @@ class ProducerImplementation(BaseWithProducer):
     def get(self) -> str:
         return ""
 
+# `Producer` is covariant, so binding records `str <: S` without specializing `S` to `str`.
 reveal_type(ProducerImplementation().method)  # revealed: Overload[[S](value: S) -> S, (value: bytes) -> bytes]
+# `S = object` satisfies the receiver constraint.
 producer_callback: Callable[[object], object] = ProducerImplementation().method
+# `S = int` violates the receiver constraint, and the `bytes` overload is also incompatible.
 bad_producer_callback: Callable[[int], int] = ProducerImplementation().method  # error: [invalid-assignment]
+# The argument adds `Literal[1] <: S`, so the combined lower bound is `str | Literal[1]`.
 reveal_type(ProducerImplementation().method(1))  # revealed: str | Literal[1]
 ```
 
