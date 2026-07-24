@@ -46,9 +46,9 @@ error[invalid-typed-dict-header]: TypedDict class `Foo` can only inherit from Ty
   3 | class Foo(TypedDict, int): ...  # error: [invalid-typed-dict-header]
     |                      ^^^ `int` is not a `TypedDict` class
     |
-   ::: stdlib/builtins.pyi:349:7
+   ::: stdlib/builtins.pyi:350:7
     |
-349 | class int:
+350 | class int:
     |       --- `int` defined here
     |
 
@@ -61,9 +61,9 @@ error[invalid-typed-dict-header]: TypedDict class `Foo2` can only inherit from T
   6 | class Foo2(TypedDict, object): ...  # error: [invalid-typed-dict-header]
     |                       ^^^^^^ `object` is not a `TypedDict` class
     |
-   ::: stdlib/builtins.pyi:113:7
+   ::: stdlib/builtins.pyi:114:7
     |
-113 | class object:
+114 | class object:
     |       ------ `object` defined here
     |
 

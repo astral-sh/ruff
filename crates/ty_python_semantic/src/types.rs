@@ -8935,9 +8935,6 @@ impl<'db> TypeIsType<'db> {
 
     /// Construct an unbound `TypeIs` return type from the user-written type expression.
     ///
-    /// The user-written type is preserved for `TypeIs` invariance checks, while the return type
-    /// used for narrowing applies the top materialization on demand.
-    ///
     /// ```python
     /// from typing import TypeIs
     ///
@@ -8949,12 +8946,7 @@ impl<'db> TypeIsType<'db> {
     }
 
     pub(crate) fn return_type(self, db: &'db dyn Db) -> Type<'db> {
-        // N.B. Using the top materialization here is a pragmatic decision that
-        // makes us produce more intuitive results given how `TypeIs` is used in
-        // the real world (in particular, in typeshed). However, there's some
-        // debate about whether this is really fully correct. See
-        // <https://github.com/astral-sh/ruff/pull/20591> for more discussion.
-        self.type_argument(db).top_materialization(db)
+        self.type_argument(db)
     }
 
     #[must_use]
