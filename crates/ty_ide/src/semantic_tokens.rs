@@ -30,6 +30,7 @@ use crate::Db;
 use bitflags::bitflags;
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
+use ruff_db::source::{line_index, source_text};
 use ruff_python_ast::visitor::source_order::{
     SourceOrderVisitor, TraversalSignal, walk_arguments, walk_expr,
     walk_interpolated_string_element, walk_stmt,
@@ -38,6 +39,7 @@ use ruff_python_ast::{
     self as ast, AnyNodeRef, ArgOrKeyword, BytesLiteral, Expr, InterpolatedStringElement, Stmt,
     StringLiteral, TypeParam,
 };
+use ruff_source_file::{OneIndexed, PositionEncoding, SourceLocation};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 use std::ops::Deref;
 use ty_python_core::definition::{Definition, DefinitionKind, ParameterDefinitionNodeKind};
@@ -192,6 +194,193 @@ pub fn semantic_tokens(db: &dyn Db, file: File, range: Option<TextRange>) -> Sem
     visitor.visit_body(parsed.suite());
 
     SemanticTokens::new(visitor.tokens)
+}
+
+/// An LSP-compatible semantic token encoded relative to the previous token.
+///
+/// Mirrors `lsp_types::SemanticToken` but in ty's domain types — the LSP-layer
+/// conversion happens in `ty_server`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct EncodedSemanticToken {
+    pub delta_line: u32,
+    pub delta_start: u32,
+    pub length: u32,
+    pub token_type: u32,
+    pub token_modifiers_bitset: u32,
+}
+
+impl EncodedSemanticToken {
+    pub const LEN: usize = 5;
+
+    pub const fn as_u32_array(self) -> [u32; Self::LEN] {
+        [
+            self.delta_line,
+            self.delta_start,
+            self.length,
+            self.token_type,
+            self.token_modifiers_bitset,
+        ]
+    }
+}
+
+/// Generates LSP-compatible semantic tokens for a Python file within the specified range.
+///
+/// The encoded tokens use zero-based line and character offsets relative to the start of the
+/// source text. For regular files, this directly corresponds to LSP positions.
+pub fn encoded_semantic_tokens(
+    db: &dyn Db,
+    file: File,
+    range: Option<TextRange>,
+    encoding: PositionEncoding,
+    multiline_token_support: bool,
+) -> Vec<EncodedSemanticToken> {
+    let source = source_text(db, file);
+    let line_index = line_index(db, file);
+    let semantic_token_data = semantic_tokens(db, file, range);
+
+    let mut encoder = Encoder {
+        tokens: Vec::with_capacity(semantic_token_data.len()),
+        prev_line: 0,
+        prev_start: 0,
+    };
+
+    for token in &*semantic_token_data {
+        let start = line_index.source_location(token.range().start(), source.as_str(), encoding);
+        let end = line_index.source_location(token.range().end(), source.as_str(), encoding);
+
+        let Some(start) = source_location_to_position(&start) else {
+            continue;
+        };
+        let Some(end) = source_location_to_position(&end) else {
+            continue;
+        };
+
+        if start.line == end.line {
+            let len = end.character - start.character;
+            encoder.push(start, len, token.token_type, token.modifiers);
+        } else if multiline_token_support {
+            let Some(len) = multiline_length(start, end, &line_index, source.as_str(), encoding)
+            else {
+                continue;
+            };
+            encoder.push(start, len, token.token_type, token.modifiers);
+        } else {
+            for line in start.line..=end.line {
+                let start_character = if line == start.line {
+                    start.character
+                } else {
+                    0
+                };
+
+                let end_character = if line == end.line {
+                    end.character
+                } else {
+                    let line_len = line_index.line_len(
+                        OneIndexed::from_zero_indexed(line as usize),
+                        source.as_str(),
+                        encoding,
+                    );
+                    let Ok(line_len) = u32::try_from(line_len) else {
+                        continue;
+                    };
+                    line_len
+                };
+
+                let Some(len) = end_character.checked_sub(start_character) else {
+                    continue;
+                };
+
+                if len == 0 {
+                    continue;
+                }
+
+                encoder.push(
+                    EncodedSemanticTokenPosition {
+                        line,
+                        character: start_character,
+                    },
+                    len,
+                    token.token_type,
+                    token.modifiers,
+                );
+            }
+        }
+    }
+
+    encoder.tokens
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct EncodedSemanticTokenPosition {
+    line: u32,
+    character: u32,
+}
+
+fn source_location_to_position(location: &SourceLocation) -> Option<EncodedSemanticTokenPosition> {
+    Some(EncodedSemanticTokenPosition {
+        line: u32::try_from(location.line.to_zero_indexed()).ok()?,
+        character: u32::try_from(location.character_offset.to_zero_indexed()).ok()?,
+    })
+}
+
+fn multiline_length(
+    start: EncodedSemanticTokenPosition,
+    end: EncodedSemanticTokenPosition,
+    line_index: &ruff_source_file::LineIndex,
+    source: &str,
+    encoding: PositionEncoding,
+) -> Option<u32> {
+    let mut length = 0u32;
+
+    for line in start.line..end.line {
+        let line_len = line_index.line_len(
+            OneIndexed::from_zero_indexed(line as usize),
+            source,
+            encoding,
+        );
+        length = length.checked_add(u32::try_from(line_len).ok()?)?;
+    }
+
+    length = length.checked_sub(start.character)?;
+    length.checked_add(end.character)
+}
+
+struct Encoder {
+    tokens: Vec<EncodedSemanticToken>,
+    prev_line: u32,
+    prev_start: u32,
+}
+
+impl Encoder {
+    fn push(
+        &mut self,
+        start: EncodedSemanticTokenPosition,
+        length: u32,
+        ty: SemanticTokenType,
+        modifiers: SemanticTokenModifier,
+    ) {
+        let Some(delta_line) = start.line.checked_sub(self.prev_line) else {
+            return;
+        };
+        let Some(delta_start) = (if delta_line == 0 {
+            start.character.checked_sub(self.prev_start)
+        } else {
+            Some(start.character)
+        }) else {
+            return;
+        };
+
+        self.tokens.push(EncodedSemanticToken {
+            delta_line,
+            delta_start,
+            length,
+            token_type: ty as u32,
+            token_modifiers_bitset: modifiers.bits(),
+        });
+
+        self.prev_line = start.line;
+        self.prev_start = start.character;
+    }
 }
 
 /// AST visitor that collects semantic tokens.
@@ -4760,5 +4949,19 @@ from pathlib import Missing as Alias
 
             result
         }
+    }
+
+    #[test]
+    fn encoded_semantic_tokens_basic() {
+        let test = SemanticTokenTest::new("def foo():\n    foo()\n");
+
+        let tokens =
+            encoded_semantic_tokens(&test.db, test.file, None, PositionEncoding::Utf16, true);
+        let data = tokens
+            .iter()
+            .flat_map(|token| token.as_u32_array())
+            .collect::<Vec<_>>();
+
+        assert_eq!(data, vec![0, 4, 3, 7, 1, 1, 4, 3, 7, 0]);
     }
 }

@@ -54,7 +54,8 @@ pub use references::ReferencesMode;
 pub use rename::{can_rename, rename};
 pub use selection_range::selection_range;
 pub use semantic_tokens::{
-    SemanticToken, SemanticTokenModifier, SemanticTokenType, SemanticTokens, semantic_tokens,
+    EncodedSemanticToken, SemanticToken, SemanticTokenModifier, SemanticTokenType, SemanticTokens,
+    encoded_semantic_tokens, semantic_tokens,
 };
 pub use signature_help::{ParameterDetails, SignatureDetails, SignatureHelpInfo, signature_help};
 pub use symbols::{FlatSymbols, HierarchicalSymbols, SymbolId, SymbolInfo, SymbolKind};
