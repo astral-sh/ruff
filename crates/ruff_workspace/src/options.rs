@@ -549,6 +549,18 @@ pub struct LintOptions {
     )]
     pub preview: Option<bool>,
 
+    /// Whether to prefer rule codes over human-readable rule names in diagnostic output, even
+    /// when preview mode is enabled.
+    #[option(
+        default = "false",
+        value_type = "bool",
+        example = r#"
+            # Display rule codes instead of human-readable rule names.
+            prefer-rule-codes-in-output = true
+        "#
+    )]
+    pub prefer_rule_codes_in_output: Option<bool>,
+
     /// Whether to allow imports from the third-party `typing_extensions` module for Python versions
     /// before a symbol was added to the first-party `typing` module.
     ///
@@ -4275,6 +4287,7 @@ pub struct LintOptionsWire {
     pydoclint: Option<PydoclintOptions>,
     ruff: Option<RuffOptions>,
     preview: Option<bool>,
+    prefer_rule_codes_in_output: Option<bool>,
     typing_extensions: Option<bool>,
     future_annotations: Option<bool>,
 }
@@ -4331,6 +4344,7 @@ impl From<LintOptionsWire> for LintOptions {
             pydoclint,
             ruff,
             preview,
+            prefer_rule_codes_in_output,
             typing_extensions,
             future_annotations,
         } = value;
@@ -4388,6 +4402,7 @@ impl From<LintOptionsWire> for LintOptions {
             pydoclint,
             ruff,
             preview,
+            prefer_rule_codes_in_output,
             typing_extensions,
             future_annotations,
         }
