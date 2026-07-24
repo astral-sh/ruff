@@ -136,6 +136,21 @@ pub struct TupleType<'db> {
     pub(crate) tuple: TupleSpec<'db>,
 }
 
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize)]
+enum TupleClassTypeContext {
+    General,
+    TypeRelation,
+}
+
+impl TupleClassTypeContext {
+    fn union_builder(self, db: &dyn Db) -> UnionBuilder<'_> {
+        match self {
+            Self::General => UnionBuilder::new(db),
+            Self::TypeRelation => UnionBuilder::structural(db),
+        }
+    }
+}
+
 pub(super) fn walk_tuple_type<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
     db: &'db dyn Db,
     tuple: TupleType<'db>,
@@ -240,18 +255,30 @@ impl<'db> TupleType<'db> {
         )
     }
 
-    // N.B. If this method is not Salsa-tracked, we take 10 minutes to check
+    pub(crate) fn to_class_type(self, db: &'db dyn Db) -> ClassType<'db> {
+        self.to_class_type_with_context(db, TupleClassTypeContext::General)
+    }
+
+    pub(super) fn to_class_type_for_relation(self, db: &'db dyn Db) -> ClassType<'db> {
+        self.to_class_type_with_context(db, TupleClassTypeContext::TypeRelation)
+    }
+
+    // N.B. If this computation is not Salsa-tracked, we take 10 minutes to check
     // `static-frame` as part of the ecosystem analysis. This is because it's called
     // from `NominalInstanceType::class()`, which is a very hot method.
     #[salsa::tracked(returns(copy), cycle_initial=to_class_type_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
-    pub(crate) fn to_class_type(self, db: &'db dyn Db) -> ClassType<'db> {
+    fn to_class_type_with_context(
+        self,
+        db: &'db dyn Db,
+        context: TupleClassTypeContext,
+    ) -> ClassType<'db> {
         let tuple_class = KnownClass::Tuple
             .try_to_class_literal(db)
             .expect("Typeshed should always have a `tuple` class in `builtins.pyi`");
 
         tuple_class.apply_specialization(db, |generic_context| {
             if generic_context.variables(db).len() == 1 {
-                let element_type = self.tuple(db).tuple_class_type(db);
+                let element_type = self.tuple(db).tuple_class_type_with_context(db, context);
                 generic_context.specialize_tuple(db, element_type, self)
             } else {
                 generic_context.default_specialization(db, Some(KnownClass::Tuple))
@@ -726,6 +753,7 @@ fn to_class_type_cycle_initial<'db>(
     db: &'db dyn Db,
     id: salsa::Id,
     self_: TupleType<'db>,
+    _context: TupleClassTypeContext,
 ) -> ClassType<'db> {
     let tuple_class = KnownClass::Tuple
         .try_to_class_literal(db)
@@ -2317,19 +2345,27 @@ impl<'db> Tuple<Type<'db>, VariableSegment<'db>> {
         }
     }
 
-    fn tuple_class_type(&self, db: &'db dyn Db) -> Type<'db> {
-        match self {
-            Tuple::Fixed(tuple) => {
-                UnionType::from_elements_leave_aliases(db, tuple.iter_all_elements())
-            }
-            Tuple::Variable(tuple) => UnionType::from_elements_leave_aliases(
-                db,
+    fn tuple_class_type_with_context(
+        &self,
+        db: &'db dyn Db,
+        context: TupleClassTypeContext,
+    ) -> Type<'db> {
+        let elements = match self {
+            Tuple::Fixed(tuple) => Either::Left(tuple.iter_all_elements()),
+            Tuple::Variable(tuple) => Either::Right(
                 tuple
                     .iter_prefix_elements()
                     .chain(std::iter::once(tuple.variable().tuple_class_type()))
                     .chain(tuple.iter_suffix_elements()),
             ),
-        }
+        };
+
+        elements
+            .fold(
+                context.union_builder(db).unpack_aliases(false),
+                UnionBuilder::add,
+            )
+            .build()
     }
 
     pub(crate) fn variable_element_type(&self, db: &'db dyn Db) -> Option<Type<'db>> {

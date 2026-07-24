@@ -113,8 +113,20 @@ impl<'db> UnionType<'db> {
     ///
     /// Aliases nested inside non-union elements remain part of those elements.
     pub(crate) fn expand_aliases(self, db: &'db dyn Db) -> Type<'db> {
-        // Rebuild the union so that `UnionBuilder` simplifies any redundancies exposed.
         Self::from_elements(db, self.elements(db).iter().copied())
+    }
+
+    /// Expands top-level aliases without starting a nested type-relation query.
+    pub(crate) fn expand_aliases_structurally(
+        self,
+        db: &'db dyn Db,
+        is_redundant: impl FnMut(Type<'db>, Type<'db>) -> bool,
+    ) -> Type<'db> {
+        self.elements(db)
+            .iter()
+            .copied()
+            .fold(UnionBuilder::structural(db), UnionBuilder::add)
+            .build_with_recursive_alias_remainder_check(is_redundant)
     }
 
     pub(crate) fn from_elements_cycle_recovery<I, T>(db: &'db dyn Db, elements: I) -> Type<'db>
