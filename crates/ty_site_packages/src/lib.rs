@@ -706,6 +706,14 @@ pub struct VirtualEnvironment {
     /// we'll want to add the `site-packages` directories of the parent environment
     /// as search paths as well as the `site-packages` directories of this virtual environment.
     parent_environment: Option<Box<PythonEnvironment>>,
+
+    /// Whether uv guarantees that the installed contents of this cached environment will not
+    /// change after it is published.
+    immutable: bool,
+
+    /// Whether this is a per-script overlay whose dependencies are supplied by an immutable
+    /// parent environment.
+    shared_script_overlay: bool,
 }
 
 impl VirtualEnvironment {
@@ -744,6 +752,7 @@ impl VirtualEnvironment {
             implementation,
             created_with_uv,
             parent_environment,
+            shared_environment,
         } = parsed_pyvenv_cfg;
 
         // The `home` key is read by the standard library's `site.py` module,
@@ -809,6 +818,8 @@ impl VirtualEnvironment {
             version,
             implementation,
             parent_environment,
+            immutable: created_with_uv && shared_environment.immutable,
+            shared_script_overlay: created_with_uv && shared_environment.script_overlay,
         };
 
         tracing::trace!("Resolved metadata for virtual environment: {metadata:?}");
@@ -829,6 +840,8 @@ impl VirtualEnvironment {
             implementation,
             version,
             parent_environment,
+            immutable: _,
+            shared_script_overlay,
         } = self;
 
         let version = version.as_ref().map(|v| v.version);
@@ -840,6 +853,33 @@ impl VirtualEnvironment {
         if let Some(parent_env_site_packages) = parent_environment.as_deref() {
             match parent_env_site_packages.site_packages_paths(system) {
                 Ok(parent_environment_site_packages) => {
+                    if *shared_script_overlay
+                        && matches!(
+                            parent_env_site_packages,
+                            PythonEnvironment::Virtual(parent) if parent.immutable
+                        )
+                        && site_packages_directories.0.iter().all(|directory| {
+                            system
+                                .read_directory(&directory.path)
+                                .is_ok_and(|mut entries| {
+                                    entries.all(|entry| {
+                                        entry.is_ok_and(|entry| {
+                                            matches!(
+                                                entry.path().file_name(),
+                                                Some(
+                                                    "_virtualenv.py"
+                                                        | "_virtualenv.pth"
+                                                        | "_uv_ephemeral_overlay.pth"
+                                                        | "__pycache__"
+                                                )
+                                            )
+                                        })
+                                    })
+                                })
+                        })
+                    {
+                        site_packages_directories = SitePackagesPaths::default();
+                    }
                     site_packages_directories.extend(parent_environment_site_packages);
                 }
                 Err(err) => {
@@ -902,6 +942,8 @@ System site-packages will not be used for module resolution.",
             include_system_site_packages: _,
             // We don't need to inherit any info from the parent environment
             parent_environment: _,
+            immutable: _,
+            shared_script_overlay: _,
         } = self;
 
         // Unconditionally follow the same logic that `site_packages_directories` uses when
@@ -1111,6 +1153,12 @@ impl<'s> PyvenvCfgParser<'s> {
             }
             "uv" => data.created_with_uv = true,
             "extends-environment" => data.parent_environment = Some(value),
+            "uv-immutable" => {
+                data.shared_environment.immutable = value.eq_ignore_ascii_case("true");
+            }
+            "uv-overlay" => {
+                data.shared_environment.script_overlay = value.eq_ignore_ascii_case("true");
+            }
             "" => {
                 return Err(PyvenvCfgParseErrorKind::MalformedKeyValuePair { line_number });
             }
@@ -1132,6 +1180,13 @@ struct RawPyvenvCfg<'s> {
     implementation: PythonImplementation,
     created_with_uv: bool,
     parent_environment: Option<&'s str>,
+    shared_environment: SharedEnvironmentMetadata,
+}
+
+#[derive(Debug, Default)]
+struct SharedEnvironmentMetadata {
+    immutable: bool,
+    script_overlay: bool,
 }
 
 /// A Python environment that is _not_ a virtual environment.
@@ -3014,6 +3069,139 @@ mod tests {
         assert_eq!(version.0, "3.13");
         assert_eq!(&pyvenv_cfg[version.1], version.0);
         assert_eq!(parsed.implementation, PythonImplementation::PyPy);
+    }
+
+    fn shared_script_environment(
+        system: &TestSystem,
+        name: &str,
+        immutable_parent: bool,
+        populated_overlay: bool,
+    ) -> (PythonEnvironment, SystemPathBuf, SystemPathBuf) {
+        let memory_fs = system.memory_file_system();
+        let package_suffix = if cfg!(windows) {
+            "Lib/site-packages"
+        } else {
+            "lib/python3.12/site-packages"
+        };
+        let python_home = if cfg!(windows) {
+            SystemPathBuf::from("/python")
+        } else {
+            SystemPathBuf::from("/python/bin")
+        };
+        let parent_site_packages = SystemPathBuf::from("/shared").join(package_suffix);
+        let overlay_root = SystemPathBuf::from(&*format!("/{name}"));
+        let overlay_site_packages = overlay_root.join(package_suffix);
+
+        memory_fs.create_directory_all(&python_home).unwrap();
+        memory_fs
+            .create_directory_all(&parent_site_packages)
+            .unwrap();
+        memory_fs
+            .create_directory_all(&overlay_site_packages)
+            .unwrap();
+        memory_fs
+            .write_file_all(
+                "/shared/pyvenv.cfg",
+                format!(
+                    "home = {python_home}\nuv = 1\nversion_info = 3.12\nuv-immutable = {immutable_parent}\n"
+                ),
+            )
+            .unwrap();
+        memory_fs
+            .write_file_all(
+                overlay_root.join("pyvenv.cfg"),
+                format!(
+                    "home = {python_home}\nuv = 1\nversion_info = 3.12\nextends-environment = /shared\nuv-overlay = true\n"
+                ),
+            )
+            .unwrap();
+        memory_fs
+            .write_file_all(overlay_site_packages.join("_uv_ephemeral_overlay.pth"), "")
+            .unwrap();
+
+        if populated_overlay {
+            memory_fs
+                .write_file_all(overlay_site_packages.join("script_only.py"), "")
+                .unwrap();
+        }
+
+        let environment =
+            PythonEnvironment::new(overlay_root, SysPrefixPathOrigin::PythonCliFlag, system)
+                .unwrap();
+
+        (environment, overlay_site_packages, parent_site_packages)
+    }
+
+    #[test]
+    fn empty_script_overlays_share_immutable_parent_search_paths() {
+        let system = TestSystem::default();
+        let (first, first_overlay, parent_site_packages) =
+            shared_script_environment(&system, "first", true, false);
+        let (second, second_overlay, _) = shared_script_environment(&system, "second", true, false);
+
+        assert_ne!(first_overlay, second_overlay);
+        assert_eq!(
+            first.site_packages_paths(&system).unwrap(),
+            std::slice::from_ref(&parent_site_packages)
+        );
+        assert_eq!(
+            second.site_packages_paths(&system).unwrap(),
+            std::slice::from_ref(&parent_site_packages)
+        );
+    }
+
+    #[test]
+    fn populated_script_overlay_retains_its_own_search_path() {
+        let system = TestSystem::default();
+        let (environment, overlay_site_packages, parent_site_packages) =
+            shared_script_environment(&system, "populated", true, true);
+
+        assert_eq!(
+            environment.site_packages_paths(&system).unwrap(),
+            [overlay_site_packages, parent_site_packages].as_slice()
+        );
+    }
+
+    #[test]
+    fn script_overlay_does_not_share_mutable_parent_search_paths() {
+        let system = TestSystem::default();
+        let (environment, overlay_site_packages, parent_site_packages) =
+            shared_script_environment(&system, "mutable-parent", false, false);
+
+        assert_eq!(
+            environment.site_packages_paths(&system).unwrap(),
+            [overlay_site_packages, parent_site_packages].as_slice()
+        );
+    }
+
+    #[test]
+    fn script_overlay_does_not_trust_immutable_marker_from_other_tools() {
+        let system = TestSystem::default();
+        let (environment, overlay_site_packages, parent_site_packages) =
+            shared_script_environment(&system, "untrusted-parent", true, false);
+        let python_home = if cfg!(windows) {
+            "/python"
+        } else {
+            "/python/bin"
+        };
+        system
+            .memory_file_system()
+            .write_file_all(
+                "/shared/pyvenv.cfg",
+                format!("home = {python_home}\nversion_info = 3.12\nuv-immutable = true\n"),
+            )
+            .unwrap();
+        let environment = PythonEnvironment::new(
+            environment.pyvenv_cfg_path().unwrap().parent().unwrap(),
+            SysPrefixPathOrigin::PythonCliFlag,
+            &system,
+        )
+        .unwrap();
+
+        assert_eq!(
+            environment.site_packages_paths(&system).unwrap(),
+            [overlay_site_packages, parent_site_packages].as_slice()
+        );
     }
 
     #[test]
