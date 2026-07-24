@@ -1758,6 +1758,43 @@ def perform(rows: Rows) -> AllResults:
     });
 }
 
+fn benchmark_sequence_literal_union_access(criterion: &mut Criterion) {
+    const NUM_LITERALS: usize = 1_200;
+
+    setup_rayon();
+
+    // Regression benchmark for https://github.com/astral-sh/ty/issues/4089.
+    let mut code = String::from(
+        "from collections.abc import Sequence\nfrom typing import Literal\n\nItem = Literal[\n",
+    );
+    for i in 0..NUM_LITERALS {
+        writeln!(&mut code, "    'value-{i}',").ok();
+    }
+    code.push_str(
+        r#"]
+
+def iterate(items: Sequence[Item]) -> None:
+    for item in items:
+        pass
+
+def access(items: Sequence[Item]) -> None:
+    items[0]
+"#,
+    );
+
+    criterion.bench_function("ty_micro[sequence_literal_union_access]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(&code),
+            |case| {
+                let Case { db, .. } = case;
+                let result = db.check();
+                assert_eq!(result.len(), 0);
+            },
+            BatchSize::SmallInput,
+        );
+    });
+}
+
 fn benchmark_invariant_generic_union_bound(criterion: &mut Criterion) {
     const NUM_ALIASES: usize = 64;
 
@@ -2093,6 +2130,7 @@ criterion_group!(
     benchmark_mixed_typed_dict_union_copy,
     benchmark_recursive_typed_dict_union_contextual_inference,
     benchmark_invariant_generic_return_union,
+    benchmark_sequence_literal_union_access,
     benchmark_invariant_generic_union_bound,
     benchmark_many_invariant_typevars,
     benchmark_pydantic_core_schema_dict,
