@@ -331,6 +331,8 @@ pub(crate) const fn is_pep604_future_annotations_fix_enabled(settings: &LinterSe
 }
 
 // https://github.com/astral-sh/ruff/pull/25614
+// TODO(brent) Remove ecosystem selector normalization when stabilizing human-readable rule names:
+// https://github.com/astral-sh/ruff/pull/27158
 pub const fn is_human_readable_names_enabled(preview: PreviewMode) -> bool {
     preview.is_enabled()
 }
