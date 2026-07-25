@@ -2222,16 +2222,7 @@ pub(crate) mod implicit_globals {
         heap_size=ruff_memory_usage::heap_size
     )]
     fn module_type_symbols(db: &dyn Db) -> smallvec::SmallVec<[ast::name::Name; 8]> {
-        let Some(module_scope) = core_module_scope(db, KnownModule::Types) else {
-            return smallvec::SmallVec::default();
-        };
-        let module_type_scope =
-            try_vendored_class_scope(db, module_scope, "ModuleType").or_else(|| {
-                KnownClass::ModuleType
-                    .try_to_class_literal(db)
-                    .map(|class| class.body_scope(db))
-            });
-        let Some(module_type_scope) = module_type_scope else {
+        let Some(module_type_scope) = module_type_body_scope(db) else {
             // The most likely way we get here is if a user specified a `--custom-typeshed-dir`
             // without a resolvable `ModuleType` class in the `stdlib/types.pyi` stub.
             return smallvec::SmallVec::default();
