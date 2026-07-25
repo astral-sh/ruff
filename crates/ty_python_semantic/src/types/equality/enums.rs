@@ -118,7 +118,7 @@ impl<'db> PartitionedEnumComparison<'db> {
         let other_type = other;
         let other = EnumDomainPartition::from_type(db, other)?;
 
-        if !target.has_residual() && !other.has_residual() {
+        if !target.has_other_values() && !other.has_other_values() {
             return None;
         }
 
@@ -242,27 +242,12 @@ impl<'db> PartitionedEnumComparison<'db> {
                 })
                 .build();
             if !excluded.is_never() {
-                let exclude = |alternative: Type<'db>| {
-                    if alternative.is_disjoint_from(evaluator.db, excluded) {
-                        alternative
-                    } else {
-                        IntersectionBuilder::new(evaluator.db)
-                            .add_positive(alternative)
-                            .add_negative(excluded)
-                            .build()
-                    }
-                };
-                let narrowed = match narrowed {
-                    Type::Union(union) => union
-                        .elements(evaluator.db)
-                        .iter()
-                        .fold(UnionBuilder::new(evaluator.db), |builder, alternative| {
-                            builder.add(exclude(*alternative))
-                        })
+                return ComparisonResult::CanNarrow(
+                    IntersectionBuilder::new(evaluator.db)
+                        .add_positive(narrowed)
+                        .add_negative(excluded)
                         .build(),
-                    alternative => exclude(alternative),
-                };
-                return ComparisonResult::CanNarrow(narrowed);
+                );
             }
         }
 
@@ -753,7 +738,7 @@ impl<'db> EnumDomainPartition<'db> {
         })
     }
 
-    fn has_residual(&self) -> bool {
+    fn has_other_values(&self) -> bool {
         self.alternatives.len() > 1
     }
 }
