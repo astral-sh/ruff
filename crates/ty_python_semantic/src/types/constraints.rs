@@ -2487,18 +2487,23 @@ impl NodeId {
     }
 
     fn bound_requires_sequent_analysis<'db>(db: &'db dyn Db, bound: Type<'db>) -> bool {
-        // Type aliases and protocols can hide typevars in lazy attributes. Do not expand those
-        // attributes here: a recursively specialized alias can produce a different type at every
-        // level, defeating the normal recursion guard. Their presence is enough to make the fast
-        // path unsafe, so fall back to sequent analysis.
+        // A bound that contains a typevar (specialized or not) is not concrete, so the fast paths
+        // that rely on concrete bounds cannot reason about it.
+        //
+        // Type aliases, protocols, and class-based TypedDicts can additionally hide typevars in
+        // lazy attributes. Do not expand those attributes here: a recursively specialized alias
+        // can produce a different type at every level, defeating the normal recursion guard.
+        // Their presence alone is enough to make the fast path unsafe, so fall back to sequent
+        // analysis.
         any_over_type(db, bound, false, |ty| {
-            ty.is_type_var()
-                || matches!(
-                    ty,
-                    Type::Dynamic(DynamicType::UnspecializedTypeVar)
-                        | Type::TypeAlias(_)
-                        | Type::ProtocolInstance(_)
-                )
+            matches!(
+                ty,
+                Type::TypeVar(_)
+                    | Type::Dynamic(DynamicType::UnspecializedTypeVar)
+                    | Type::TypeAlias(_)
+                    | Type::ProtocolInstance(_)
+                    | Type::TypedDict(_)
+            )
         })
     }
 
