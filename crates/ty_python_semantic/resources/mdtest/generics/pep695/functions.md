@@ -1269,6 +1269,22 @@ def check(
     reveal_type(ensure_box_reversed(box_first))  # revealed: Box[str]
 ```
 
+### Gradual container constraints preserve inference evidence
+
+`Collection` inherits from `Container[Any]`, so inferring a type variable from a collection passed
+to a contravariant `Container` must preserve the gradual constraint.
+
+```py
+from collections.abc import Container
+from typing import Any
+
+def value[T](items: Container[T]) -> T:
+    raise NotImplementedError
+
+items: list[str] = []
+reveal_type(value(items))  # revealed: Any
+```
+
 ### Don't include identical lower/upper bounds in type mapping multiple times
 
 This is was a performance regression reported in

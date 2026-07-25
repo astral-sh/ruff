@@ -1234,6 +1234,24 @@ def check(
     reveal_type(ensure_box_reversed(box_first))  # revealed: Box[str]
 ```
 
+## Gradual container constraints preserve inference evidence
+
+`Collection` inherits from `Container[Any]`, so inferring a type variable from a collection passed
+to a contravariant `Container` must preserve the gradual constraint.
+
+```py
+from collections.abc import Container
+from typing import Any, TypeVar
+
+T = TypeVar("T")
+
+def value(items: Container[T]) -> T:
+    raise NotImplementedError
+
+items: list[str] = []
+reveal_type(value(items))  # revealed: Any
+```
+
 ## Passing a constrained TypeVar to a function expecting a compatible constrained TypeVar
 
 A constrained TypeVar should be assignable to a different constrained TypeVar if each constraint of

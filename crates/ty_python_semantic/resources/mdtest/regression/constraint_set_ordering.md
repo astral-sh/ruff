@@ -220,7 +220,7 @@ def chain_stu[S, T, U]() -> None:
     # TODO: sometimes: revealed tuple[Solution[S=int | U@chain_stu | T@chain_stu]]
     # revealed: tuple[Solution[S=int | T@chain_stu | U@chain_stu]]
     reveal_type(constraints.solutions_for(S, inferable=tuple[S, T, U]))
-    # revealed: tuple[Solution[T=S@chain_stu | U@chain_stu | int]]
+    # revealed: tuple[Solution[T=S@chain_stu | int | U@chain_stu]]
     reveal_type(constraints.solutions_for(T, inferable=tuple[S, T, U]))
     # revealed: tuple[Solution[U=S@chain_stu | int | T@chain_stu]]
     reveal_type(constraints.solutions_for(U, inferable=tuple[S, T, U]))
@@ -236,7 +236,7 @@ def chain_uts[U, T, S]() -> None:
     # TODO: sometimes: revealed tuple[Solution[S=int | U@chain_uts | T@chain_uts]]
     # revealed: tuple[Solution[S=int | T@chain_uts | U@chain_uts]]
     reveal_type(constraints.solutions_for(S, inferable=tuple[S, T, U]))
-    # revealed: tuple[Solution[T=S@chain_uts | U@chain_uts | int]]
+    # revealed: tuple[Solution[T=S@chain_uts | int | U@chain_uts]]
     reveal_type(constraints.solutions_for(T, inferable=tuple[S, T, U]))
     # revealed: tuple[Solution[U=S@chain_uts | int | T@chain_uts]]
     reveal_type(constraints.solutions_for(U, inferable=tuple[S, T, U]))

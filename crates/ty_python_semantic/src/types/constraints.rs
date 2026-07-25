@@ -3676,7 +3676,10 @@ impl<'db> PathBounds<'db> {
             source_orders: &source_orders,
             sorted_paths: Vec::new(),
         };
-        let mut path = interior.path_assignments(builder);
+        // Sequent discovery must also happen in source order. Sorting the collected paths below
+        // is too late: sequent pairs are not commutative, and TDD traversal order can otherwise
+        // discard gradual evidence before solution extraction.
+        let mut path = interior.path_assignments_in_source_order(builder, &source_orders);
         let _ = path.visit(db, builder, node, &mut collect_visitor);
         collect_visitor.sorted_paths.sort_by(|path1, path2| {
             let source_orders1 = path1.iter().map(|(_, source_order)| *source_order);
@@ -4530,6 +4533,25 @@ impl InteriorNode {
             .for_each_unique_constraint(builder, &mut |constraint| {
                 constraints.push(constraint);
             });
+        PathAssignments::new(constraints)
+    }
+
+    fn path_assignments_in_source_order(
+        self,
+        builder: &ConstraintSetBuilder<'_>,
+        source_orders: &FxIndexSet<ConstraintId>,
+    ) -> PathAssignments {
+        let mut constraints: SmallVec<[_; 8]> = SmallVec::new();
+        self.node()
+            .for_each_unique_constraint(builder, &mut |constraint| {
+                constraints.push(constraint);
+            });
+        // `PathAssignments` seeds its insertion-ordered discovered-constraint map from this list,
+        // and uses that order when constructing non-commutative sequent pairs. Do not replace this
+        // with TDD traversal order: doing so can change inference and lose gradual constraints.
+        // Keep any constraint absent from the sidecar in its stable traversal order after the rest.
+        constraints
+            .sort_by_key(|constraint| source_orders.get_index_of(constraint).unwrap_or(usize::MAX));
         PathAssignments::new(constraints)
     }
 
