@@ -1560,7 +1560,10 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
     /// Records an already-created definition in the current scope.
     ///
-    /// `previous_definitions` overrides the ordinary assignment behavior for synthetic bindings.
+    /// `previous_definitions` controls whether a new binding replaces earlier bindings. By
+    /// default, ordinary assignments replace them and loop headers keep them. Comprehension
+    /// bindings choose explicitly because an assignment that only runs on some paths must keep
+    /// the earlier binding.
     fn record_definition(
         &mut self,
         place: ScopedPlaceId,
