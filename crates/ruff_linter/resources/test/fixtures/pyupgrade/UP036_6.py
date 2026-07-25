@@ -50,12 +50,25 @@ if foo:
 elif bar and sys.version_info < (3, 8):
     print(2)
 
-# Each link of a chained comparison is evaluated separately, and no link on its own
-# makes the branch removable.
+# Every link of the chain is a version check, so the whole branch can go.
 if (3, 8) <= sys.version_info < (3, 10):
     print("3.8 or 3.9")
 
+# Outside of a branch test there is nothing to remove, so each link is reported on its own.
 is_38_or_39 = (3, 8) <= sys.version_info < (3, 10)
+
+# Only the first link is outdated; the branch is still reachable, so it stays.
+if (3, 8) <= sys.version_info < (3, 15):
+    print("at most 3.14")
+
+# `foo` is not a version check, so the branch is left alone even though the second link
+# is always false.
+if foo < sys.version_info < (3, 10):
+    print("unreachable")
+
+# The second link cannot be resolved, so the branch is left alone.
+if (3, 8) <= sys.version_info <= (3, 13, foo):
+    print("maybe")
 
 
 ###

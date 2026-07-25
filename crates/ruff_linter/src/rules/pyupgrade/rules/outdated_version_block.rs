@@ -62,11 +62,13 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// - `target-version`
 ///
 /// ## Fix availability
-/// A fix is only offered when a single comparison makes up the entire test of an `if`
-/// or `elif` branch, since only then is it clear which code is unreachable. Elsewhere,
-/// such as in an assignment or as one operand of a boolean expression, replacing the
-/// comparison with `True` or `False` would be sound, but it would defeat the purpose
-/// of flagging obsolete code that can be migrated.
+/// A fix is only offered when the entire test of an `if` or `elif` branch is made up of
+/// `sys.version_info` comparisons, since only then is it clear which code is
+/// unreachable. This includes chained comparisons such as
+/// `if (3, 8) <= sys.version_info < (3, 10)`, as long as every link is a version check.
+/// Elsewhere, such as in an assignment or alongside an unrelated condition, replacing
+/// the comparison with `True` or `False` would be sound, but it would defeat the
+/// purpose of flagging obsolete code that can be migrated.
 ///
 /// ## Fix safety
 /// This rule's fix is marked as unsafe because it will remove all code,
@@ -119,84 +121,154 @@ enum Reason {
     Invalid,
 }
 
-/// UP036
-pub(crate) fn outdated_version_block(checker: &Checker, expr: &Expr, compare: &ast::ExprCompare) {
-    // A comparison that makes up the _entire_ test of an `if` or `elif` branch gates the whole
-    // branch, which is what makes the branch itself removable. Chained comparisons are excluded:
-    // each link is reported on its own, and an outdated link does not necessarily make the branch
-    // outdated. For example, in `if (3, 8) <= sys.version_info < (3, 10)`, the `(3, 8) <=` link is
-    // always true on Python 3.8+, but the branch is still only taken on Python 3.8 and 3.9.
-    let is_chained = compare.ops.len() > 1;
-    let branch = if is_chained {
-        None
-    } else {
-        gated_branch(checker.semantic(), expr)
-    };
+/// One adjacent pair of a (possibly chained) comparison, normalized to the
+/// `sys.version_info <op> <version>` form.
+struct Link {
+    /// Why the check is outdated, or `None` if this pair is not a decidable version check.
+    reason: Option<Reason>,
+    /// Where to report: the version operand for an invalid specifier, the whole pair otherwise.
+    range: TextRange,
+    /// Whether `sys.version_info` was written on the left-hand side.
+    version_info_on_left: bool,
+}
 
-    // `a < b < c` is equivalent to `a < b and b < c`, so evaluate each adjacent pair separately.
-    for (index, (op, right)) in compare.ops.iter().zip(&compare.comparators).enumerate() {
-        let left = if index == 0 {
-            &*compare.left
-        } else {
-            &compare.comparators[index - 1]
-        };
+/// Whether an entire branch test is known to evaluate the same way on every supported version.
+#[derive(Debug, Copy, Clone)]
+enum BranchVerdict {
+    AlwaysTrue,
+    AlwaysFalse,
+}
 
-        // Normalize to `sys.version_info <op> <version>`, mirroring the operator when the check is
-        // written the other way around (e.g., `(3, 0) > sys.version_info`).
-        let (op, comparison, version_info_on_left) =
-            if is_valid_version_info(checker.semantic(), left) {
-                (*op, right, true)
-            } else if is_valid_version_info(checker.semantic(), right) {
-                let Some(op) = mirror(*op) else {
-                    continue;
-                };
-                (op, left, false)
-            } else {
-                continue;
-            };
-
-        // Outside of preview, the rule is limited to the canonical `sys.version_info <op>
-        // <version>` form gating an entire branch.
-        let reportable = (version_info_on_left && branch.is_some())
-            || is_outdated_version_check_enabled(checker.settings());
-        if !reportable {
-            continue;
-        }
-
-        let Some(reason) = version_check_reason(op, comparison, checker.target_version()) else {
-            continue;
-        };
-
-        let range = match reason {
-            Reason::Invalid => comparison.range(),
-            Reason::AlwaysTrue | Reason::AlwaysFalse => {
-                if is_chained {
-                    TextRange::new(left.start(), right.end())
-                } else {
-                    compare.range()
-                }
-            }
-        };
-
-        let mut diagnostic = checker.report_diagnostic(
-            OutdatedVersionBlock {
-                reason,
-                is_block: branch.is_some(),
-            },
-            range,
-        );
-
-        if let Some((stmt_if, branch)) = &branch {
-            let fix = match reason {
-                Reason::AlwaysFalse => fix_always_false_branch(checker, stmt_if, branch),
-                Reason::AlwaysTrue => fix_always_true_branch(checker, stmt_if, branch),
-                Reason::Invalid => None,
-            };
-            if let Some(fix) = fix {
-                diagnostic.set_fix(fix);
-            }
+impl From<BranchVerdict> for Reason {
+    fn from(verdict: BranchVerdict) -> Self {
+        match verdict {
+            BranchVerdict::AlwaysTrue => Reason::AlwaysTrue,
+            BranchVerdict::AlwaysFalse => Reason::AlwaysFalse,
         }
     }
+}
+
+/// UP036
+pub(crate) fn outdated_version_block(checker: &Checker, expr: &Expr, compare: &ast::ExprCompare) {
+    let branch = gated_branch(checker.semantic(), expr);
+    let is_chained = compare.ops.len() > 1;
+
+    // `a < b < c` is equivalent to `a < b and b < c`, so judge each adjacent pair on its own.
+    let links: Vec<Link> = compare
+        .ops
+        .iter()
+        .zip(&compare.comparators)
+        .enumerate()
+        .map(|(index, (op, right))| {
+            let left = if index == 0 {
+                &*compare.left
+            } else {
+                &compare.comparators[index - 1]
+            };
+            // For a lone comparison, prefer the range of the comparison itself, so that any
+            // parentheses around the left operand are covered.
+            let link_range = if is_chained {
+                TextRange::new(left.start(), right.end())
+            } else {
+                compare.range()
+            };
+
+            // Normalize to `sys.version_info <op> <version>`, mirroring the operator when the
+            // check is written the other way around (e.g., `(3, 0) > sys.version_info`).
+            let (op, comparison, version_info_on_left) =
+                if is_valid_version_info(checker.semantic(), left) {
+                    (*op, right, true)
+                } else if is_valid_version_info(checker.semantic(), right)
+                    && let Some(mirrored) = mirror(*op)
+                {
+                    (mirrored, left, false)
+                } else {
+                    return Link {
+                        reason: None,
+                        range: link_range,
+                        version_info_on_left: false,
+                    };
+                };
+
+            let reason = version_check_reason(op, comparison, checker.target_version());
+            Link {
+                reason,
+                range: if reason == Some(Reason::Invalid) {
+                    comparison.range()
+                } else {
+                    link_range
+                },
+                version_info_on_left,
+            }
+        })
+        .collect();
+
+    // Outside of preview, the rule is limited to a single canonical
+    // `sys.version_info <op> <version>` comparison gating an entire branch.
+    let stable_shape = branch.is_some()
+        && !is_chained
+        && links.first().is_some_and(|link| link.version_info_on_left);
+    if !stable_shape && !is_outdated_version_check_enabled(checker.settings()) {
+        return;
+    }
+
+    // When the comparison is the entire test of a branch and every link is a decidable version
+    // check, the branch as a whole is either dead or unconditional, so it can be removed. Report
+    // it once, against the whole test, rather than once per outdated link.
+    if let Some((stmt_if, branch)) = &branch
+        && let Some(verdict) = branch_verdict(&links)
+    {
+        let mut diagnostic = checker.report_diagnostic(
+            OutdatedVersionBlock {
+                reason: verdict.into(),
+                is_block: true,
+            },
+            compare.range(),
+        );
+        let fix = match verdict {
+            BranchVerdict::AlwaysFalse => fix_always_false_branch(checker, stmt_if, branch),
+            BranchVerdict::AlwaysTrue => fix_always_true_branch(checker, stmt_if, branch),
+        };
+        if let Some(fix) = fix {
+            diagnostic.set_fix(fix);
+        }
+        return;
+    }
+
+    // Otherwise the branch (if any) survives, so only the individual outdated links are at fault.
+    for link in &links {
+        let Some(reason) = link.reason else {
+            continue;
+        };
+        checker.report_diagnostic(
+            OutdatedVersionBlock {
+                reason,
+                is_block: !is_chained && branch.is_some(),
+            },
+            link.range,
+        );
+    }
+}
+
+/// Determine whether every link of a comparison gating a branch resolves the same way.
+///
+/// Returns `None` unless *all* links are decidable version checks. A branch guarded by anything
+/// else may still be reachable, and removing it would drop a condition that matters at runtime.
+fn branch_verdict(links: &[Link]) -> Option<BranchVerdict> {
+    if links.is_empty() {
+        return None;
+    }
+    // The links of a chain are joined by `and`, so one always-false link is enough to make the
+    // whole test always false, while an always-true test needs every link to be always true.
+    let mut verdict = BranchVerdict::AlwaysTrue;
+    for link in links {
+        match link.reason? {
+            Reason::Invalid => return None,
+            Reason::AlwaysFalse => verdict = BranchVerdict::AlwaysFalse,
+            Reason::AlwaysTrue => {}
+        }
+    }
+    Some(verdict)
 }
 
 /// If `expr` is the entire test of an `if` or `elif` branch, return that branch along with the
