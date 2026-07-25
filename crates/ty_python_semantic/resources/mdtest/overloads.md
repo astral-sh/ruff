@@ -304,6 +304,133 @@ def use_generic_receiver[T](value: ReceiverGeneric[T]) -> None:
     takes_callable(value.method)
 ```
 
+## Constrained method type variables inferred from `self`
+
+Matching a receiver against a value-constrained method type variable must reject values outside that
+variable's constraints. A subclass of an allowed value must be promoted to the declared constraint
+rather than appearing as the specialized return type.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Callable, Generic, TypeVar, overload
+
+BoxT = TypeVar("BoxT", covariant=True)
+Constrained = TypeVar("Constrained", str, bytes)
+
+class ConstrainedReceiverBox(Generic[BoxT]):
+    @overload
+    def method(self: "ConstrainedReceiverBox[Constrained]", value: Constrained) -> Constrained: ...
+    @overload
+    def method(self: "ConstrainedReceiverBox[Constrained]", value: Constrained, repeat: int = ...) -> Constrained: ...
+    def method(self, value: str | bytes, repeat: int = 1) -> str | bytes:
+        return value
+
+invalid_receiver = ConstrainedReceiverBox[int]()
+invalid_method = invalid_receiver.method
+reveal_type(invalid_method)  # revealed: Overload[]
+
+# error: [no-matching-overload]
+reveal_type(invalid_method(1))  # revealed: Unknown
+
+# error: [invalid-assignment]
+invalid_callback: Callable[[int], int] = invalid_method
+
+class SubStr(str): ...
+
+subclass_receiver = ConstrainedReceiverBox[SubStr]()
+reveal_type(subclass_receiver.method(SubStr()))  # revealed: str
+promoted_callback: Callable[[SubStr], str] = subclass_receiver.method
+```
+
+## Disjunctive generic receivers
+
+A receiver may satisfy both sides of a union without constraining both sides' type variables on the
+same path. In particular, matching `Left[int]` leaves the `Right` type variable available to
+specialize from the method arguments.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Callable, overload
+
+class Left[T]:
+    left: T
+
+class Right[T]:
+    right: T
+
+class BaseWithDisjunctiveReceiver:
+    @overload
+    def method[S, U](self: "Left[S] | Right[U]", first: S, second: U) -> tuple[S, U]: ...
+    @overload
+    def method(self, first: bytes, second: bytes) -> tuple[bytes, bytes]: ...
+    def method(self, first: object, second: object) -> tuple[object, object]:
+        return first, second
+
+class Both(BaseWithDisjunctiveReceiver, Left[int], Right[str]): ...
+
+receiver = Both()
+receiver.method(1, b"value")
+valid_callback: Callable[[int, bytes], tuple[int, bytes]] = receiver.method
+```
+
+## Receiver type variables alongside variadic type parameters
+
+A method's `ParamSpec` or `TypeVarTuple` must not prevent an ordinary type variable from being
+specialized by its receiver. The variadic parameters remain available for argument inference;
+neither method can be converted into a callback with a return type incompatible with the receiver.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Callable, overload
+
+class VariadicReceiverBox[T]:
+    value: T
+
+    @overload
+    def with_paramspec[**P, S](self: "VariadicReceiverBox[S]", callback: Callable[P, object]) -> S: ...
+    @overload
+    def with_paramspec(self, callback: bytes) -> bytes: ...
+    def with_paramspec(self, callback: object) -> object:
+        return callback
+
+    @overload
+    def with_typevartuple[*Ts, S](self: "VariadicReceiverBox[S]", first: int, *values: *Ts) -> S: ...
+    @overload
+    def with_typevartuple(self, first: bytes) -> bytes: ...
+    def with_typevartuple(self, first: object, *values: object) -> object:
+        return first
+
+def accepts_int(value: int) -> object:
+    return value
+
+receiver = VariadicReceiverBox[str]()
+
+# revealed: Overload[[**P](callback: (**P) -> object) -> str, (callback: bytes) -> bytes]
+reveal_type(receiver.with_paramspec)
+reveal_type(receiver.with_paramspec(accepts_int))  # revealed: str
+
+# error: [invalid-assignment]
+bad_paramspec_callback: Callable[[Callable[[int], object]], int] = receiver.with_paramspec
+
+reveal_type(receiver.with_typevartuple(1, b"value"))  # revealed: str
+typevartuple_callback: Callable[[int, bytes], str] = receiver.with_typevartuple
+
+# error: [invalid-assignment]
+bad_typevartuple_callback: Callable[[int, bytes], int] = receiver.with_typevartuple
+```
+
 ## Structural protocol receivers
 
 Checking a generic protocol receiver requires solving all uses of its type variable together. Here

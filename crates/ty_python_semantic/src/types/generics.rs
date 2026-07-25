@@ -2123,9 +2123,13 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         }
     }
 
-    /// Adds a constraint set to the specialization that this builder is building up.
-    pub(crate) fn add_constraint_set(&mut self, set: ConstraintSet<'db, 'c>) {
-        self.pending.intersect(self.db, self.constraints, set);
+    /// Adds a constraint set to the pending specialization and projects its valid solutions into
+    /// the legacy type mappings.
+    pub(crate) fn add_constraint_set(
+        &mut self,
+        set: ConstraintSet<'db, 'c>,
+    ) -> Result<(), SpecializationError<'db>> {
+        self.infer_from_constraint_set(set)
     }
 
     /// Build a specialization, using a caller-provided hook to select the solution for each

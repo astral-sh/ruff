@@ -2163,7 +2163,9 @@ class MaybeEqWhile:
 ## Overloaded generic receivers remain visible to override checks
 
 An override must still be checked against every applicable receiver-specialized overload when the
-subclass retains a covariant type parameter.
+subclass retains a covariant type parameter. A `str` receiver matches both the `str` and `object`
+overloads, so accepting only `str` is invalid. A two-item receiver excludes the one-item overload,
+so matching only that excluded overload is also invalid.
 
 ```toml
 [environment]
@@ -2171,28 +2173,26 @@ python-version = "3.12"
 ```
 
 ```pyi
-from typing import Any, Generic, Never, TypeVar, overload
+from typing import Any, Generic, TypeVar, overload
 
-ScalarCo = TypeVar("ScalarCo", covariant=True)
+ValueCo = TypeVar("ValueCo", covariant=True)
 ShapeCo = TypeVar("ShapeCo", covariant=True)
 
-class Poly(Generic[ScalarCo, ShapeCo]):
+class Receiver(Generic[ValueCo, ShapeCo]):
     @overload
-    def extend(self: "Poly[float, Any]", value: float) -> None: ...
+    def by_value(self: "Receiver[str, Any]", value: str) -> None: ...
     @overload
-    def extend(self: "Poly[complex, Any]", value: complex) -> None: ...
+    def by_value(self: "Receiver[object, Any]", value: object) -> None: ...
+    @overload
+    def by_shape(self: "Receiver[Any, tuple[str]]", value: str) -> None: ...
+    @overload
+    def by_shape(self: "Receiver[Any, tuple[str, str]]", value: bytes) -> None: ...
 
-class Akima(Poly[float, ShapeCo], Generic[ShapeCo]):
-    def extend(self, value: Never) -> Never: ...  # error: [invalid-method-override]
+class NarrowValueOverride(Receiver[str, ShapeCo], Generic[ShapeCo]):
+    def by_value(self, value: str) -> None: ...  # error: [invalid-method-override]
 
-class Index(Generic[ScalarCo, ShapeCo]):
-    @overload
-    def set(self: "Index[Any, tuple[int]]", key: int, value: int) -> None: ...
-    @overload
-    def set(self: "Index[Any, tuple[int, int]]", key: str, value: int) -> None: ...
-
-class Matrix(Index[ScalarCo, tuple[int, int]], Generic[ScalarCo]):
-    def set(self, key: Never, value: Any) -> Never: ...  # error: [invalid-method-override]
+class WrongShapeOverride(Receiver[ValueCo, tuple[str, str]], Generic[ValueCo]):
+    def by_shape(self, value: str) -> None: ...  # error: [invalid-method-override]
 ```
 
 ## Equivalent overloaded protocol receivers are valid overrides

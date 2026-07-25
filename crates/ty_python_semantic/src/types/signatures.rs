@@ -22,7 +22,7 @@ use super::{DynamicType, Type, TypeVarVariance, UnionType, semantic_index};
 use crate::types::callable::{CallableFunctionProvenance, CallableTypeKind};
 use crate::types::constraints::{
     ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension, OwnedConstraintSet,
-    PathBounds,
+    PathBounds, Solutions,
 };
 use crate::types::cyclic::ActiveRecursionDetector;
 use crate::types::generics::{
@@ -1176,10 +1176,16 @@ impl<'db> Signature<'db> {
         let constraints = ConstraintSetBuilder::new();
         let when = constraints.load(db, receiver_constraints);
         let inferable = self.inferable_typevars(db);
-        // Structural receiver checks can produce an unsatisfiable constraint set even when the
-        // eager applicability check above cannot rule out the overload.
-        if when.is_never_satisfied(db) {
-            return None;
+
+        match when.solutions(db, &constraints, inferable) {
+            Solutions::Unsatisfiable => return None,
+            Solutions::Unconstrained => return Some(bound_signature),
+            // Each receiver path can leave a different type variable unconstrained. Preserve the
+            // original relation instead of combining those independent solutions.
+            Solutions::Constrained(solutions) if solutions.len() > 1 => {
+                return Some(bound_signature);
+            }
+            Solutions::Constrained(_) => {}
         }
 
         let Some(generic_context) = self.generic_context else {
@@ -1187,7 +1193,7 @@ impl<'db> Signature<'db> {
         };
 
         let mut builder = SpecializationBuilder::new(db, &constraints, inferable);
-        builder.add_constraint_set(when);
+        builder.add_constraint_set(when).ok()?;
         let concrete_class_receiver =
             matches!(receiver_type, Type::ClassLiteral(_) | Type::GenericAlias(_));
         let specialization = builder.build_with(generic_context, |typevar, bounds| {
@@ -1195,8 +1201,9 @@ impl<'db> Signature<'db> {
                 && let Some(lower) = bounds.lower
                 && let Some(upper) = bounds.upper.as_single_bound()
                 && lower.is_equivalent_to(db, upper)
+                && let Ok(Some(solution)) = PathBounds::default_solve(db, &constraints, bounds)
             {
-                return Some(lower);
+                return Some(solution);
             }
 
             if let Some(bounds) = bounds
