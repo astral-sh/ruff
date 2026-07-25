@@ -2202,6 +2202,63 @@ mod tests {
     }
 
     #[test]
+    fn adding_cycle_recovery_union_rechecks_elements_after_relation_change() {
+        fn class_instance<'db>(db: &'db TestDb, name: &str) -> Type<'db> {
+            let module = ruff_db::files::system_path_to_file(db, "/src/a.py").unwrap();
+            global_symbol(db, module, name)
+                .place
+                .expect_type()
+                .to_instance_approximation(db)
+                .unwrap()
+        }
+
+        let mut db = setup_db();
+        db.write_dedented(
+            "/src/a.py",
+            "
+            class A: ...
+            class Base: ...
+            class B(Base): ...
+            ",
+        )
+        .unwrap();
+
+        {
+            let a = class_instance(&db, "A");
+            let b = class_instance(&db, "B");
+            UnionType::from_elements(&db, [a, b]).expect_union();
+        }
+
+        // Change the relationship transitively so that `A` and `B` retain the stable identities
+        // used by the existing interned union.
+        db.write_dedented(
+            "/src/a.py",
+            "
+            class A: ...
+            class Base(A): ...
+            class B(Base): ...
+            ",
+        )
+        .unwrap();
+
+        let a = class_instance(&db, "A");
+        let b = class_instance(&db, "B");
+        let cycle_recovery_union = UnionBuilder::new(&db)
+            .cycle_recovery(true)
+            .add(a)
+            .add(b)
+            .build()
+            .expect_union();
+
+        assert_eq!(
+            UnionBuilder::new(&db)
+                .add(Type::Union(cycle_recovery_union))
+                .build(),
+            a
+        );
+    }
+
+    #[test]
     fn union_common_literal_supertype() {
         let db = setup_db();
 

@@ -1,8 +1,8 @@
 use itertools::Either;
+use salsa::plumbing::{AtomicRevision, Revision, current_revision};
 
 use std::convert::Infallible;
 use std::hash::{Hash, Hasher};
-use std::sync::atomic::{AtomicBool, Ordering};
 
 use crate::place::{
     DefinedPlace, Definedness, Place, PlaceAndQualifiers, Provenance, PublicTypePolicy, TypeOrigin,
@@ -46,32 +46,37 @@ impl get_size2::GetSize for UnionType<'_> {}
 /// Non-semantic simplification metadata for an interned union.
 ///
 /// All instances compare and hash equally: once any construction proves that an element set is
-/// simplified, the proof is atomically shared by every occurrence of that same union without
-/// changing its Salsa identity.
+/// simplified, the proof is atomically shared by every occurrence of that same union in the
+/// current Salsa revision without changing its identity.
 ///
-/// Salsa does not track mutations to this bit. It must only select optimizations whose result is
-/// identical to the conservative path.
+/// Proofs are revision-scoped because relationships between otherwise-stable type identities can
+/// change after an edit. Salsa does not track mutations to this metadata, so it must only select
+/// optimizations whose result is identical to the conservative path.
 #[doc(hidden)]
 #[derive(Debug)]
-pub struct UnionSimplificationProof(AtomicBool);
+pub struct UnionSimplificationProof(AtomicRevision);
 
 impl UnionSimplificationProof {
-    fn new(simplified: bool) -> Self {
-        Self(AtomicBool::new(simplified))
+    fn new_proven(db: &dyn Db) -> Self {
+        Self(AtomicRevision::new(current_revision(db)))
     }
 
-    fn mark_simplified(&self) {
-        self.0.store(true, Ordering::Relaxed);
+    fn new_unproven() -> Self {
+        Self(AtomicRevision::new(Revision::max()))
     }
 
-    fn is_proven(&self) -> bool {
-        self.0.load(Ordering::Relaxed)
+    fn mark_simplified(&self, db: &dyn Db) {
+        self.0.store(current_revision(db));
+    }
+
+    fn is_proven(&self, db: &dyn Db) -> bool {
+        self.0.load() == current_revision(db)
     }
 }
 
 impl Clone for UnionSimplificationProof {
     fn clone(&self) -> Self {
-        Self(AtomicBool::new(self.0.load(Ordering::Relaxed)))
+        Self(self.0.clone())
     }
 }
 
@@ -99,9 +104,9 @@ impl<'db> UnionType<'db> {
             db,
             elements,
             recursively_defined,
-            UnionSimplificationProof::new(true),
+            UnionSimplificationProof::new_proven(db),
         );
-        union.simplification(db).mark_simplified();
+        union.simplification(db).mark_simplified(db);
         union
     }
 
@@ -114,12 +119,12 @@ impl<'db> UnionType<'db> {
             db,
             elements,
             recursively_defined,
-            UnionSimplificationProof::new(false),
+            UnionSimplificationProof::new_unproven(),
         )
     }
 
     pub(crate) fn is_known_simplified(self, db: &'db dyn Db) -> bool {
-        self.simplification(db).is_proven()
+        self.simplification(db).is_proven(db)
     }
 }
 
