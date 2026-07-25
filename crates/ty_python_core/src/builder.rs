@@ -2037,6 +2037,18 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 .symbol_mut(symbol)
                 .mark_global();
         } else {
+            let (containing_symbol, added) =
+                self.place_tables[containing_scope_id].add_symbol(Symbol::new(name.clone()));
+            if added {
+                self.use_def_maps[containing_scope_id].add_place(containing_symbol.into());
+            }
+
+            let containing_symbol =
+                self.place_tables[containing_scope_id].symbol_mut(containing_symbol);
+            if !containing_symbol.is_nonlocal() && !containing_symbol.is_bound() {
+                containing_symbol.mark_bound();
+            }
+
             self.current_place_table_mut()
                 .symbol_mut(symbol)
                 .mark_nonlocal();

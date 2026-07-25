@@ -204,6 +204,30 @@ def read_local_target():
     local_target  # error: [unresolved-reference]
 ```
 
+A walrus also makes its target local before the first iteration. Its first assignment must not read
+a global with the same name. Explicit `global` and `nonlocal` declarations still refer to the
+existing outer variable:
+
+```py
+total = 0
+
+def sums(values: list[int]) -> list[int]:
+    return [total := total + value for value in values]  # error: [unresolved-reference]
+
+def sums_global(values: list[int]) -> list[int]:
+    global total
+    return [total := total + value for value in values]
+
+def sums_nonlocal(values: list[int]) -> list[int]:
+    total = 0
+
+    def add_values() -> list[int]:
+        nonlocal total
+        return [total := total + value for value in values]
+
+    return add_values()
+```
+
 ### Nested comprehensions
 
 An assignment in an inner comprehension still binds outside the outermost comprehension. A later
