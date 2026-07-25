@@ -459,7 +459,8 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
 
     /// Returns whether this constraint set never holds.
     pub(crate) fn is_never_satisfied(self, db: &'db dyn Db) -> bool {
-        self.node.is_never_satisfied(db, self.builder)
+        self.node
+            .is_never_satisfied(db, self.builder, self.source_order)
     }
 
     /// Returns whether this constraint set is the `never` terminal.
@@ -473,7 +474,8 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
 
     /// Returns whether this constraint set always holds.
     pub(crate) fn is_always_satisfied(self, db: &'db dyn Db) -> bool {
-        self.node.is_always_satisfied(db, self.builder)
+        self.node
+            .is_always_satisfied(db, self.builder, self.source_order)
     }
 
     /// Returns whether this constraint set is the `always` terminal.
@@ -522,7 +524,8 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         inferable: TypeVarSet<'db>,
     ) -> bool {
         self.verify_builder(builder);
-        self.node.satisfied_by_all_typevars(db, builder, inferable)
+        self.node
+            .satisfied_by_all_typevars(db, builder, inferable, self.source_order)
     }
 
     /// Updates this constraint set to hold the union of itself and another constraint set.
@@ -646,7 +649,8 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         to_remove: TypeVarSet<'db>,
     ) -> Self {
         self.verify_builder(builder);
-        let (node, derived_source_order) = self.node.exists(db, builder, to_remove);
+        let (node, derived_source_order) =
+            self.node.exists(db, builder, to_remove, self.source_order);
         let source_order = builder.ordered_source_order(self.source_order, derived_source_order);
         Self::from_node(builder, node, source_order)
     }
@@ -800,7 +804,10 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
 
         // Universal and existential quantification are duals. Reusing existential abstraction
         // also keeps this operation on its cached, single-pass implementation.
-        let (node, derived_source_order) = self.node.negate(builder).exists(db, builder, to_remove);
+        let (node, derived_source_order) =
+            self.node
+                .negate(builder)
+                .exists(db, builder, to_remove, self.source_order);
         let source_order = builder.ordered_source_order(self.source_order, derived_source_order);
         Self::from_node(builder, node.negate(builder), source_order)
     }
@@ -890,6 +897,8 @@ pub(crate) struct ConstraintSetBuilder<'db> {
     storage: RefCell<ConstraintSetStorage<'db>>,
 }
 
+type ExistsCacheKey<'db> = (NodeId, TypeVarSet<'db>, Option<SourceOrderId>);
+
 #[derive(Debug, Default)]
 struct ConstraintSetStorage<'db> {
     /// Compacted owned storage overlaid onto this builder. This is used by
@@ -937,13 +946,16 @@ struct ConstraintSetStorage<'db> {
     source_order_cache: FxHashMap<SourceOrder, SourceOrderId>,
     constraint_implication_cache: FxHashMap<(ConstraintId, ConstraintId), bool>,
     /// Only caches completed top-level results. Recursive results depend on active path
-    /// assignments and must not use this cache.
-    never_satisfied_cache: FxHashMap<NodeId, bool>,
+    /// assignments and must not use this cache. Source order is part of the key because the same
+    /// TDD node can be traversed with different sidecar orderings, which changes sequent discovery.
+    never_satisfied_cache: FxHashMap<(NodeId, Option<SourceOrderId>), bool>,
 
     negate_cache: FxHashMap<NodeId, NodeId>,
     or_cache: FxHashMap<(NodeId, NodeId), NodeId>,
     and_cache: FxHashMap<(NodeId, NodeId), NodeId>,
-    exists_cache: FxHashMap<(NodeId, TypeVarSet<'db>), (NodeId, Option<SourceOrderId>)>,
+    /// Abstraction also constructs sequents while traversing the TDD, so its cache key must retain
+    /// the sidecar source order for the same reason.
+    exists_cache: FxHashMap<ExistsCacheKey<'db>, (NodeId, Option<SourceOrderId>)>,
     restrict_one_cache: FxHashMap<(NodeId, ConstraintAssignment), (NodeId, bool)>,
     simplify_cache: FxHashMap<NodeId, NodeId>,
 
@@ -2574,12 +2586,13 @@ impl NodeId {
         self,
         db: &'db dyn Db,
         builder: &ConstraintSetBuilder<'db>,
+        source_order: Option<SourceOrderId>,
     ) -> bool {
         match self.node() {
             Node::AlwaysTrue => true,
             Node::AlwaysFalse => false,
             Node::Interior(interior) => {
-                let mut path = interior.path_assignments(builder);
+                let mut path = interior.path_assignments(builder, source_order);
                 path.visit_negated(db, builder, self, &mut IsNeverSatisfiedVisitor)
                     .is_continue()
             }
@@ -2587,16 +2600,22 @@ impl NodeId {
     }
 
     /// Returns whether this BDD represent the constant function `false`.
-    fn is_never_satisfied<'db>(self, db: &'db dyn Db, builder: &ConstraintSetBuilder<'db>) -> bool {
+    fn is_never_satisfied<'db>(
+        self,
+        db: &'db dyn Db,
+        builder: &ConstraintSetBuilder<'db>,
+        source_order: Option<SourceOrderId>,
+    ) -> bool {
         match self.node() {
             Node::AlwaysTrue => false,
             Node::AlwaysFalse => true,
             Node::Interior(interior) => {
-                if let Some(result) = builder.storage.borrow().never_satisfied_cache.get(&self) {
+                let key = (self, source_order);
+                if let Some(result) = builder.storage.borrow().never_satisfied_cache.get(&key) {
                     return *result;
                 }
 
-                let mut path = interior.path_assignments(builder);
+                let mut path = interior.path_assignments(builder, source_order);
                 let result = path
                     .visit(db, builder, self, &mut IsNeverSatisfiedVisitor)
                     .is_continue();
@@ -2604,7 +2623,7 @@ impl NodeId {
                     .storage
                     .borrow_mut()
                     .never_satisfied_cache
-                    .insert(self, result);
+                    .insert(key, result);
                 result
             }
         }
@@ -2879,6 +2898,7 @@ impl NodeId {
         db: &'db dyn Db,
         builder: &ConstraintSetBuilder<'db>,
         inferable: TypeVarSet<'db>,
+        source_order: Option<SourceOrderId>,
     ) -> bool {
         match self.node() {
             Node::AlwaysTrue => return true,
@@ -2897,7 +2917,7 @@ impl NodeId {
             let when_satisfied = specializations
                 .implies(builder, self)
                 .and(builder, specializations);
-            !when_satisfied.is_never_satisfied(db, builder)
+            !when_satisfied.is_never_satisfied(db, builder, source_order)
         };
 
         // Returns if all specializations satisfy this constraint set.
@@ -2907,7 +2927,7 @@ impl NodeId {
                 .and(builder, specializations);
             when_satisfied
                 .iff(builder, specializations)
-                .is_always_satisfied(db, builder)
+                .is_always_satisfied(db, builder, source_order)
         };
 
         #[expect(
@@ -2958,6 +2978,7 @@ impl NodeId {
         db: &'db dyn Db,
         builder: &ConstraintSetBuilder<'db>,
         bound_typevars: TypeVarSet<'db>,
+        source_order: Option<SourceOrderId>,
     ) -> (Self, Option<SourceOrderId>) {
         if bound_typevars == TypeVarSet::None {
             return (self, None);
@@ -2967,14 +2988,14 @@ impl NodeId {
             return (self, None);
         };
 
-        let key = (self, bound_typevars);
+        let key = (self, bound_typevars, source_order);
         let storage = builder.storage.borrow();
         if let Some(result) = storage.exists_cache.get(&key) {
             return *result;
         }
         drop(storage);
 
-        let result = interior.exists_inner(db, builder, bound_typevars);
+        let result = interior.exists_inner(db, builder, bound_typevars, source_order);
 
         let mut storage = builder.storage.borrow_mut();
         storage.exists_cache.insert(key, result);
@@ -2986,11 +3007,14 @@ impl NodeId {
         db: &'db dyn Db,
         builder: &ConstraintSetBuilder<'db>,
         inferable: TypeVarSet<'db>,
+        source_order: Option<SourceOrderId>,
     ) -> (Self, Option<SourceOrderId>) {
         match self.node() {
             Node::AlwaysTrue => (ALWAYS_TRUE, None),
             Node::AlwaysFalse => (ALWAYS_FALSE, None),
-            Node::Interior(interior) => interior.remove_noninferable(db, builder, inferable),
+            Node::Interior(interior) => {
+                interior.remove_noninferable(db, builder, inferable, source_order)
+            }
         }
     }
 
@@ -3659,7 +3683,8 @@ impl<'db> PathBounds<'db> {
             return path_bounds;
         }
 
-        let (node, derived_source_order) = node.remove_noninferable(db, builder, inferable);
+        let (node, derived_source_order) =
+            node.remove_noninferable(db, builder, inferable, source_order);
         source_orders.extend(builder.calculate_source_orders(derived_source_order));
         let interior = match node.node() {
             Node::AlwaysTrue => return PathBounds::Unconstrained,
@@ -3679,7 +3704,8 @@ impl<'db> PathBounds<'db> {
         // Sequent discovery must also happen in source order. Sorting the collected paths below
         // is too late: sequent pairs are not commutative, and TDD traversal order can otherwise
         // discard gradual evidence before solution extraction.
-        let mut path = interior.path_assignments_in_source_order(builder, &source_orders);
+        let path_source_order = builder.ordered_source_order(source_order, derived_source_order);
+        let mut path = interior.path_assignments(builder, path_source_order);
         let _ = path.visit(db, builder, node, &mut collect_visitor);
         collect_visitor.sorted_paths.sort_by(|path1, path2| {
             let source_orders1 = path1.iter().map(|(_, source_order)| *source_order);
@@ -4205,6 +4231,7 @@ impl InteriorNode {
         db: &'db dyn Db,
         builder: &ConstraintSetBuilder<'db>,
         bound_typevars: TypeVarSet<'db>,
+        source_order: Option<SourceOrderId>,
     ) -> (NodeId, Option<SourceOrderId>) {
         let mentions_typevar = |ty: Type<'db>| match ty {
             Type::TypeVar(typevar) => typevar.is_inferable(db, bound_typevars),
@@ -4213,6 +4240,7 @@ impl InteriorNode {
         self.abstract_inner(
             db,
             builder,
+            source_order,
             // Remove any node that constrains one of `bound_typevars`, or that has a lower/upper
             // bound that mentions one of them. Removed constraints are still added to `path`, so
             // the sequent map can propagate any derived constraints that do not mention the
@@ -4237,6 +4265,7 @@ impl InteriorNode {
         db: &'db dyn Db,
         builder: &ConstraintSetBuilder<'db>,
         inferable: TypeVarSet<'db>,
+        source_order: Option<SourceOrderId>,
     ) -> (NodeId, Option<SourceOrderId>) {
         let is_bare_inferable_typevar = |ty: Type<'db>| {
             ty.as_typevar()
@@ -4245,6 +4274,7 @@ impl InteriorNode {
         self.abstract_inner(
             db,
             builder,
+            source_order,
             // We only want to keep constraints on inferable typevars. If the constraint's typevar
             // is itself inferable, we keep it. We also need to keep some constraints in
             // non-inferable typevars, if their lower or upper bound is a bare inferable typevar.
@@ -4273,6 +4303,7 @@ impl InteriorNode {
         self,
         db: &'db dyn Db,
         builder: &ConstraintSetBuilder<'db>,
+        source_order: Option<SourceOrderId>,
         should_remove: F,
     ) -> (NodeId, Option<SourceOrderId>)
     where
@@ -4446,7 +4477,7 @@ impl InteriorNode {
             }
         }
 
-        let mut path = self.path_assignments(builder);
+        let mut path = self.path_assignments(builder, source_order);
         let mut visitor = AbstractVisitor { should_remove };
         let ControlFlow::Continue(result) = path.visit(db, builder, self.node(), &mut visitor);
         result
@@ -4527,31 +4558,28 @@ impl InteriorNode {
         result
     }
 
-    fn path_assignments(self, builder: &ConstraintSetBuilder<'_>) -> PathAssignments {
-        let mut constraints: SmallVec<[_; 8]> = SmallVec::new();
-        self.node()
-            .for_each_unique_constraint(builder, &mut |constraint| {
-                constraints.push(constraint);
-            });
-        PathAssignments::new(constraints)
-    }
-
-    fn path_assignments_in_source_order(
+    fn path_assignments(
         self,
         builder: &ConstraintSetBuilder<'_>,
-        source_orders: &FxIndexSet<ConstraintId>,
+        source_order: Option<SourceOrderId>,
     ) -> PathAssignments {
         let mut constraints: SmallVec<[_; 8]> = SmallVec::new();
         self.node()
             .for_each_unique_constraint(builder, &mut |constraint| {
                 constraints.push(constraint);
             });
+        let source_orders = builder.calculate_source_orders(source_order);
         // `PathAssignments` seeds its insertion-ordered discovered-constraint map from this list,
         // and uses that order when constructing non-commutative sequent pairs. Do not replace this
         // with TDD traversal order: doing so can change inference and lose gradual constraints.
-        // Keep any constraint absent from the sidecar in its stable traversal order after the rest.
-        constraints
-            .sort_by_key(|constraint| source_orders.get_index_of(constraint).unwrap_or(usize::MAX));
+        // Keep synthetic constraints absent from the sidecar after the rest, using their stable
+        // creation order rather than the perturbed TDD traversal order.
+        constraints.sort_by_key(|constraint| {
+            (
+                source_orders.get_index_of(constraint).unwrap_or(usize::MAX),
+                constraint.index(),
+            )
+        });
         PathAssignments::new(constraints)
     }
 
@@ -7995,9 +8023,16 @@ mod tests {
 
         {
             let storage = builder.storage.borrow();
-            assert_eq!(storage.never_satisfied_cache.get(&t_int.node), Some(&false));
             assert_eq!(
-                storage.never_satisfied_cache.get(&impossible.node),
+                storage
+                    .never_satisfied_cache
+                    .get(&(t_int.node, t_int.source_order)),
+                Some(&false)
+            );
+            assert_eq!(
+                storage
+                    .never_satisfied_cache
+                    .get(&(impossible.node, impossible.source_order)),
                 Some(&true)
             );
             assert_eq!(storage.never_satisfied_cache.len(), 2);
@@ -8012,7 +8047,7 @@ mod tests {
                     .storage
                     .borrow()
                     .never_satisfied_cache
-                    .get(&set.node),
+                    .get(&(set.node, set.source_order)),
                 Some(&false)
             );
         });
@@ -8663,11 +8698,35 @@ mod tests {
         }
     }
 
-    fn path_assignments_for(builder: &ConstraintSetBuilder<'_>, node: NodeId) -> PathAssignments {
+    fn path_assignments_for(
+        builder: &ConstraintSetBuilder<'_>,
+        node: NodeId,
+        source_order: Option<SourceOrderId>,
+    ) -> PathAssignments {
         match node.node() {
             Node::AlwaysTrue | Node::AlwaysFalse => PathAssignments::new([]),
-            Node::Interior(interior) => interior.path_assignments(builder),
+            Node::Interior(interior) => interior.path_assignments(builder, source_order),
         }
+    }
+
+    #[test]
+    fn path_assignments_follow_constraint_source_order() {
+        let db = setup_db();
+        let t = create_typevar(&db, "T");
+        let u = create_typevar(&db, "U");
+        let builder = ConstraintSetBuilder::new();
+        let t_int = create_constraint(&db, &builder, t, KnownClass::Int);
+        let u_str = create_constraint(&db, &builder, u, KnownClass::Str);
+
+        // Construct the set in the opposite order from constraint creation. This ensures the
+        // initializer follows the sidecar rather than either TDD traversal or constraint IDs.
+        let set = u_str.and(&db, &builder, || t_int);
+        let path = path_assignments_for(&builder, set.node, set.source_order);
+        let expected =
+            [u_str.node, t_int.node].map(|node| builder.interior_node_data(node).constraint);
+        let actual: Vec<_> = path.discovered.keys().copied().collect();
+
+        assert_eq!(actual, expected);
     }
 
     #[test]
@@ -8714,7 +8773,7 @@ mod tests {
             tautology,
             transitive,
         ] {
-            let mut path = path_assignments_for(&builder, set.node);
+            let mut path = path_assignments_for(&builder, set.node, set.source_order);
             let mut fold = ReconstructPathFold { break_at: None };
             let ControlFlow::Continue(reconstructed) =
                 path.visit(&db, &builder, set.node, &mut fold)
@@ -8748,7 +8807,7 @@ mod tests {
             PathFoldBreak::Impossible,
             PathFoldBreak::Combine,
         ] {
-            let mut path = path_assignments_for(&builder, set.node);
+            let mut path = path_assignments_for(&builder, set.node, set.source_order);
             let mut aborting_fold = ReconstructPathFold {
                 break_at: Some(break_at),
             };
