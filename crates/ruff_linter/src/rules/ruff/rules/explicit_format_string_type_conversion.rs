@@ -25,21 +25,22 @@ use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 /// more succinct and idiomatic: `%r` and `!r` for `repr()`, `%a` and `!a` for `ascii()`,
 /// and `%s` and `!s` for `str()`.
 ///
-/// A `%s` conversion already converts its value with `str()`, so an explicit `str()` call
-/// is redundant there and can be dropped entirely.
+/// A `%s` or `!r` conversion already converts its value with `str()`, so an explicit `str()` call
+/// is redundant there and can be dropped entirely in many cases. The notable exception being for
+/// classes that implement a custom `__format__` method.
 ///
 /// f-strings are covered by [`explicit-f-string-type-conversion`][RUF010] instead.
 ///
 /// ## Example
 /// ```python
-/// "%s %s" % (repr(foo), bar)
-/// "{} {}".format(repr(foo), bar)
+/// "%s %s %s" % (repr(foo), str(bar), baz)
+/// "{} {} {}".format(repr(foo), str(bar), baz)
 /// ```
 ///
 /// Use instead:
 /// ```python
-/// "%r %s" % (foo, bar)
-/// "{!r} {}".format(foo, bar)
+/// "%r %s %s" % (foo, bar, baz)
+/// "{!r} {!s} {}".format(foo, bar, baz)
 /// ```
 ///
 /// ## Known problems
