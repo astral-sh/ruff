@@ -1542,6 +1542,79 @@ fn benchmark_pandas_tdd(criterion: &mut Criterion) {
     });
 }
 
+fn benchmark_mixed_typed_dict_union_copy(criterion: &mut Criterion) {
+    const NUM_VARIANTS: usize = 12;
+
+    setup_rayon();
+
+    let mut code = concat!(
+        "from collections import ChainMap, OrderedDict, defaultdict\n",
+        "from collections.abc import Mapping, MutableMapping\n",
+        "from typing import Any, Literal, TypedDict\n\n",
+    )
+    .to_string();
+
+    for i in 0..NUM_VARIANTS {
+        writeln!(
+            &mut code,
+            "class Item{i}(TypedDict):\n    type: Literal[{i}]"
+        )
+        .ok();
+        if i == 0 {
+            code.push_str("    other: Any\n");
+        }
+        code.push('\n');
+    }
+
+    code.push_str("type Item = ");
+    for i in 0..NUM_VARIANTS {
+        if i > 0 {
+            code.push_str(" | ");
+        }
+        write!(&mut code, "Item{i}").ok();
+    }
+
+    code.push_str(
+        r#"
+
+def copy_dict(value: Item | dict[str, Any]) -> dict[str, object]:
+    return dict(value)
+
+def copy_mapping(value: Item | Mapping[str, Any]) -> dict[str, object]:
+    return dict(value)
+
+def copy_mutable_mapping(value: Item | MutableMapping[str, Any]) -> dict[str, object]:
+    return dict(value)
+
+def copy_ordered_dict(value: Item | OrderedDict[str, Any]) -> dict[str, object]:
+    return dict(value)
+
+def copy_default_dict(value: Item | defaultdict[str, Any]) -> dict[str, object]:
+    return dict(value)
+
+def copy_chain_map(value: Item | ChainMap[str, Any]) -> dict[str, object]:
+    return dict(value)
+
+def copy_narrowed_mapping(value: Item | Mapping[str, Any]) -> dict[str, object] | None:
+    if isinstance(value, dict):
+        return dict(value)
+    return None
+"#,
+    );
+
+    criterion.bench_function("ty_micro[mixed_typed_dict_union_copy]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(&code),
+            |case| {
+                let Case { db, .. } = case;
+                let result = db.check();
+                assert_eq!(result.len(), 0);
+            },
+            BatchSize::SmallInput,
+        );
+    });
+}
+
 fn benchmark_recursive_typed_dict_union_contextual_inference(criterion: &mut Criterion) {
     const NUM_BRANCHES: usize = 11;
 
@@ -1978,6 +2051,7 @@ criterion_group!(
     benchmark_repeated_statement_calls,
     benchmark_factored_upper_bounds,
     benchmark_pandas_tdd,
+    benchmark_mixed_typed_dict_union_copy,
     benchmark_recursive_typed_dict_union_contextual_inference,
     benchmark_invariant_generic_return_union,
     benchmark_invariant_generic_union_bound,

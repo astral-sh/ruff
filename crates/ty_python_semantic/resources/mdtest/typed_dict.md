@@ -2610,7 +2610,7 @@ python-version = "3.12"
 ```
 
 ```py
-from collections import OrderedDict
+from collections import ChainMap, OrderedDict, defaultdict
 from collections.abc import Mapping, MutableMapping
 from typing import Any, Literal, TypedDict
 
@@ -2672,7 +2672,7 @@ def _(item: Item | ItemWithAny | dict[str, Any]) -> None:
     reveal_type(dict(item))  # revealed: dict[str, object]
 ```
 
-`Mapping`, `MutableMapping`, and `OrderedDict` should also be copied efficiently:
+`Mapping`, `MutableMapping`, and other standard-library mappings should also be copied efficiently:
 
 ```py
 def _(item: Item | Mapping[str, Any]) -> None:
@@ -2682,6 +2682,12 @@ def _(item: Item | MutableMapping[str, Any]) -> None:
     reveal_type(dict(item))  # revealed: dict[str, object]
 
 def _(item: Item | OrderedDict[str, Any]) -> None:
+    reveal_type(dict(item))  # revealed: dict[str, object]
+
+def _(item: Item | defaultdict[str, Any]) -> None:
+    reveal_type(dict(item))  # revealed: dict[str, object]
+
+def _(item: Item | ChainMap[str, Any]) -> None:
     reveal_type(dict(item))  # revealed: dict[str, object]
 ```
 

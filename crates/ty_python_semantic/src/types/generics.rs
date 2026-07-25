@@ -2669,6 +2669,8 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                     KnownClass::Dict
                         | KnownClass::Mapping
                         | KnownClass::MutableMapping
+                        | KnownClass::DefaultDict
+                        | KnownClass::ChainMap
                         | KnownClass::OrderedDict
                 )
             ) && instance
