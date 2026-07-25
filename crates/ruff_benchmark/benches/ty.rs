@@ -1551,6 +1551,41 @@ fn benchmark_factored_upper_bounds(criterion: &mut Criterion) {
     });
 }
 
+/// Guards against quadratic pruning when contravariant callbacks contribute many upper-only bounds.
+fn benchmark_many_upper_bound_callbacks(criterion: &mut Criterion) {
+    const NUM_CALLBACKS: usize = 1_200;
+
+    setup_rayon();
+
+    let mut code = String::from(
+        "from collections.abc import Callable\nfrom typing import Literal\n\ndef accepts[T](\n",
+    );
+    for i in 0..NUM_CALLBACKS {
+        writeln!(&mut code, "    cb{i}: Callable[[T], None],").ok();
+    }
+    code.push_str(") -> None: ...\n\ndef call_many(\n");
+    for i in 0..NUM_CALLBACKS {
+        writeln!(&mut code, "    cb{i}: Callable[[Literal[{i}]], None],").ok();
+    }
+    code.push_str(") -> None:\n    accepts(\n");
+    for i in 0..NUM_CALLBACKS {
+        writeln!(&mut code, "        cb{i},").ok();
+    }
+    code.push_str("    )\n");
+
+    criterion.bench_function("ty_micro[many_upper_bound_callbacks]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(&code),
+            |case| {
+                let Case { db, .. } = case;
+                let result = db.check();
+                assert_eq!(result.len(), 0);
+            },
+            BatchSize::SmallInput,
+        );
+    });
+}
+
 fn benchmark_pandas_tdd(criterion: &mut Criterion) {
     setup_rayon();
     let venv_path = setup_micro_case_venv("pandas_tdd", &["pandas-stubs"]);
@@ -2126,6 +2161,7 @@ criterion_group!(
     benchmark_typeis_narrowing,
     benchmark_repeated_statement_calls,
     benchmark_factored_upper_bounds,
+    benchmark_many_upper_bound_callbacks,
     benchmark_pandas_tdd,
     benchmark_mixed_typed_dict_union_copy,
     benchmark_recursive_typed_dict_union_contextual_inference,

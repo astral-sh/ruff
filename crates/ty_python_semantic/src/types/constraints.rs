@@ -112,8 +112,8 @@ use crate::types::visitor::{
     walk_type_with_recursion_guard,
 };
 use crate::types::{
-    ApplyTypeMappingVisitor, BoundTypeVarInstance, IntersectionType, Type, TypeContext,
-    TypeMapping, TypePair, TypeVarBoundOrConstraints, TypeVarVariance, UnionType,
+    ApplyTypeMappingVisitor, BoundTypeVarInstance, DynamicType, IntersectionType, Type,
+    TypeContext, TypeMapping, TypePair, TypeVarBoundOrConstraints, TypeVarVariance, UnionType,
 };
 use crate::{Db, FxIndexMap, FxIndexSet, FxOrderSet};
 
@@ -1566,6 +1566,24 @@ impl<'db> UpperBound<'db> {
         self.clauses.insert(clause);
     }
 
+    /// Adds a clause without checking whether it is redundant with any existing clauses.
+    ///
+    /// This is useful for upper-only bounds: their solution is the intersection of all clauses,
+    /// so pruning them one at a time only adds quadratic work before that intersection is built.
+    fn add_clause_without_pruning(&mut self, clause: Type<'db>) {
+        if self.is_never() {
+            return;
+        }
+
+        if clause.is_never() {
+            self.clauses.clear();
+            self.clauses.insert(Type::Never);
+            return;
+        }
+
+        self.clauses.insert(clause);
+    }
+
     pub(crate) fn shrink_to_fit(&mut self) {
         self.clauses.shrink_to_fit();
     }
@@ -2468,6 +2486,22 @@ impl NodeId {
         }
     }
 
+    fn bound_requires_sequent_analysis<'db>(db: &'db dyn Db, bound: Type<'db>) -> bool {
+        // Type aliases and protocols can hide typevars in lazy attributes. Do not expand those
+        // attributes here: a recursively specialized alias can produce a different type at every
+        // level, defeating the normal recursion guard. Their presence is enough to make the fast
+        // path unsafe, so fall back to sequent analysis.
+        any_over_type(db, bound, false, |ty| {
+            ty.is_type_var()
+                || matches!(
+                    ty,
+                    Type::Dynamic(DynamicType::UnspecializedTypeVar)
+                        | Type::TypeAlias(_)
+                        | Type::ProtocolInstance(_)
+                )
+        })
+    }
+
     /// Fast path for [`is_never_satisfied`][Self::is_never_satisfied]: decides satisfiability
     /// directly when this BDD is a single all-positive conjunction of constraints whose bounds do
     /// not mention typevars. Large literal unions produce exactly this shape — checking
@@ -2488,8 +2522,8 @@ impl NodeId {
         builder: &ConstraintSetBuilder<'db>,
     ) -> Option<bool> {
         let mut bounds: FxIndexMap<
-            BoundTypeVarInstance<'db>,
-            (FxIndexSet<Type<'db>>, UpperBound<'db>),
+            BoundTypeVarIdentity<'db>,
+            (FxIndexSet<Type<'db>>, FxIndexSet<Type<'db>>),
         > = FxIndexMap::default();
         let mut current = self;
         loop {
@@ -2504,17 +2538,18 @@ impl NodeId {
 
                     let constraint = builder.constraint_data(interior.constraint);
                     if iter::chain(constraint.bounds.lower, constraint.bounds.upper)
-                        .any(|bound| bound.has_typevar(db) || bound.has_unspecialized_type_var(db))
+                        .any(|bound| Self::bound_requires_sequent_analysis(db, bound))
                     {
                         return None;
                     }
 
-                    let (lowers, uppers) = bounds.entry(constraint.typevar).or_default();
+                    let (lowers, uppers) =
+                        bounds.entry(constraint.typevar.identity(db)).or_default();
                     if let Some(lower) = constraint.bounds.lower {
                         lowers.insert(lower);
                     }
                     if let Some(upper) = constraint.bounds.upper {
-                        uppers.add_clause(db, upper);
+                        uppers.insert(upper);
                     }
                     current = interior.if_true;
                 }
@@ -2522,19 +2557,17 @@ impl NodeId {
         }
 
         for (lowers, uppers) in bounds.into_values() {
-            // Without an upper bound there is nothing the lower bounds could conflict with.
-            if uppers.is_empty() {
+            // Without both lower and upper bounds, there is nothing that could conflict.
+            if lowers.is_empty() || uppers.is_empty() {
                 continue;
             }
-            let lower = if lowers.is_empty() {
-                Type::Never
-            } else {
-                UnionType::from_elements(db, lowers)
-            };
-            if uppers
-                .when_satisfied_by(db, builder, lower)
-                .is_never_satisfied(db)
-            {
+
+            let lower = UnionType::from_elements(db, lowers);
+            let when = uppers.iter().when_all(db, builder, |upper| {
+                let when = lower.when_constraint_set_assignable_to_owned(db, *upper);
+                builder.load(db, &when)
+            });
+            if when.is_never_satisfied(db) {
                 return Some(true);
             }
         }
@@ -3529,6 +3562,11 @@ impl<'db> ConstraintBoundsBuilder<'db> {
         self.upper.add_clause(db, ty);
     }
 
+    fn add_upper_without_pruning(&mut self, db: &'db dyn Db, ty: Type<'db>) {
+        self.classify_evidence(db, ty);
+        self.upper.add_clause_without_pruning(ty);
+    }
+
     fn finish(self, db: &'db dyn Db, bound_typevar: BoundTypeVarInstance<'db>) -> PathBound<'db> {
         let Self {
             lower,
@@ -3802,7 +3840,7 @@ impl<'db> PathBounds<'db> {
                     }
 
                     if iter::chain(constraint.bounds.lower, constraint.bounds.upper)
-                        .any(|bound| bound.has_typevar(db) || bound.has_unspecialized_type_var(db))
+                        .any(|bound| NodeId::bound_requires_sequent_analysis(db, bound))
                     {
                         return None;
                     }
@@ -3817,22 +3855,36 @@ impl<'db> PathBounds<'db> {
             }
         }
 
-        let mut mappings: FxIndexMap<BoundTypeVarInstance<'db>, ConstraintBoundsBuilder<'db>> =
-            FxIndexMap::default();
+        let typevars_with_lower: FxIndexSet<BoundTypeVarIdentity<'db>> = constraints
+            .iter()
+            .filter(|(_, bounds, _)| bounds.lower.is_some())
+            .map(|(typevar, _, _)| typevar.identity(db))
+            .collect();
+        let mut mappings: FxIndexMap<
+            BoundTypeVarIdentity<'db>,
+            (BoundTypeVarInstance<'db>, ConstraintBoundsBuilder<'db>),
+        > = FxIndexMap::default();
         constraints.sort_by_key(|(_, _, source_order)| *source_order);
         for (typevar, constraint, _) in constraints {
-            let bounds = mappings.entry(typevar).or_default();
+            let identity = typevar.identity(db);
+            let (_, bounds) = mappings
+                .entry(identity)
+                .or_insert_with(|| (typevar, ConstraintBoundsBuilder::default()));
             if let Some(lower) = constraint.lower {
                 bounds.add_lower(db, lower);
             }
             if let Some(upper) = constraint.upper {
-                bounds.add_upper(db, upper);
+                if typevars_with_lower.contains(&identity) {
+                    bounds.add_upper(db, upper);
+                } else {
+                    bounds.add_upper_without_pruning(db, upper);
+                }
             }
         }
 
         let path = mappings
             .drain(..)
-            .map(|(bound_typevar, bounds)| bounds.finish(db, bound_typevar))
+            .map(|(_, (bound_typevar, bounds))| bounds.finish(db, bound_typevar))
             .collect();
         Some(PathBounds::Constrained(Box::new([path])))
     }
@@ -7679,11 +7731,15 @@ mod tests {
 
     use indoc::indoc;
     use pretty_assertions::assert_eq;
+    use ruff_db::system::DbWithWritableSystem as _;
+    use ruff_python_ast::name::Name;
 
     use crate::db::tests::setup_db;
+    use crate::place::global_symbol;
     use crate::types::generics::ApplySpecialization;
-    use crate::types::{BoundTypeVarInstance, KnownClass, TypeVarVariance};
-    use ruff_python_ast::name::Name;
+    use crate::types::{
+        BoundTypeVarInstance, KnownClass, KnownInstanceType, TypeAliasType, TypeVarVariance,
+    };
 
     fn create_typevar<'db>(db: &'db dyn Db, name: &'static str) -> BoundTypeVarInstance<'db> {
         BoundTypeVarInstance::synthetic(db, Name::new_static(name), TypeVarVariance::Invariant)
@@ -7846,6 +7902,46 @@ mod tests {
     }
 
     #[test]
+    fn simple_upper_bound_conjunction_skips_sequent_analysis() {
+        let db = setup_db();
+        let t = create_typevar(&db, "T");
+        let builder = ConstraintSetBuilder::new();
+        let mut set = ConstraintSet::always(&builder);
+        for value in 0..512 {
+            set = set.and(&db, &builder, || {
+                ConstraintSet::constrain_typevar_upper_bound(
+                    &db,
+                    &builder,
+                    t,
+                    Type::int_literal(value),
+                )
+            });
+        }
+        let inferable =
+            InferableTypeVars::from_typevars(&db, std::iter::once(t.identity(&db)).collect());
+        let (single_sequents, pair_sequents) = {
+            let storage = builder.storage.borrow();
+            (
+                storage.single_sequent_cache.len(),
+                storage.pair_sequent_cache.len(),
+            )
+        };
+
+        assert!(!set.is_never_satisfied(&db));
+        assert_eq!(
+            set.solutions(&db, &builder, inferable),
+            Solutions::Constrained(vec![vec![TypeVarSolution {
+                bound_typevar: t,
+                solution: Type::Never,
+            }]])
+        );
+
+        let storage = builder.storage.borrow();
+        assert_eq!(storage.single_sequent_cache.len(), single_sequents);
+        assert_eq!(storage.pair_sequent_cache.len(), pair_sequents);
+    }
+
+    #[test]
     fn simple_conjunction_contradiction_skips_sequent_analysis() {
         // (int ≤ T ≤ int) ∧ (str ≤ T ≤ str) is unsatisfiable, decided without pairwise
         // sequent analysis.
@@ -7911,6 +8007,111 @@ mod tests {
                 .is_continue();
             assert_eq!(fast_path, walked);
         }
+    }
+
+    #[test]
+    fn simple_conjunction_groups_materialized_typevar_by_identity() {
+        let db = setup_db();
+        let t = create_typevar(&db, "T");
+        let int = KnownClass::Int.to_instance(&db);
+        let str = KnownClass::Str.to_instance(&db);
+        let materialized_t =
+            t.map_bound_or_constraints(&db, |_| Some(TypeVarBoundOrConstraints::UpperBound(str)));
+        assert_ne!(t, materialized_t);
+        assert!(t.is_same_typevar_as(&db, materialized_t));
+
+        let builder = ConstraintSetBuilder::new();
+        let set = ConstraintSet::constrain_typevar_lower_bound(&db, &builder, t, int).and(
+            &db,
+            &builder,
+            || ConstraintSet::constrain_typevar_upper_bound(&db, &builder, materialized_t, str),
+        );
+        let Node::Interior(interior) = set.node.node() else {
+            panic!("expected an interior node");
+        };
+
+        let fast_path = set
+            .node
+            .simple_conjunction_is_never_satisfied(&db, &builder)
+            .expect("fast path should apply to concrete bounds");
+        let walked = interior
+            .path_assignments(&builder)
+            .visit(&db, &builder, set.node, &mut IsNeverSatisfiedVisitor)
+            .is_continue();
+
+        assert!(walked);
+        assert_eq!(fast_path, walked);
+
+        let inferable =
+            InferableTypeVars::from_typevars(&db, std::iter::once(t.identity(&db)).collect());
+        assert_eq!(
+            set.solutions(&db, &builder, inferable),
+            Solutions::Unsatisfiable
+        );
+    }
+
+    #[test]
+    fn simple_conjunction_rejects_typevar_in_lazy_alias() {
+        let mut db = setup_db();
+        db.write_dedented(
+            "/src/lazy_alias.py",
+            "from collections.abc import Sequence\ntype Alias[X] = Sequence[X]\n",
+        )
+        .expect("write source");
+        let file = ruff_db::files::system_path_to_file(&db, "/src/lazy_alias.py")
+            .expect("source should exist");
+        let alias = global_symbol(&db, file, "Alias").place.expect_type();
+        let Type::KnownInstance(KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(alias))) =
+            alias
+        else {
+            panic!("expected a PEP-695 type alias");
+        };
+
+        let t = create_typevar(&db, "T");
+        let s = create_typevar(&db, "S");
+        let int = KnownClass::Int.to_instance(&db);
+        let str = KnownClass::Str.to_instance(&db);
+        let alias_of_s = Type::TypeAlias(TypeAliasType::PEP695(
+            alias.apply_specialization(&db, |context| {
+                context.specialize(&db, &[Type::TypeVar(s)][..])
+            }),
+        ));
+        let alias_of_int = Type::TypeAlias(TypeAliasType::PEP695(
+            alias.apply_specialization(&db, |context| context.specialize(&db, &[int][..])),
+        ));
+        assert!(!alias_of_s.has_typevar(&db));
+        assert!(NodeId::bound_requires_sequent_analysis(&db, alias_of_s));
+
+        let builder = ConstraintSetBuilder::new();
+        let set = ConstraintSet::constrain_typevar(&db, &builder, t, alias_of_s, alias_of_int).and(
+            &db,
+            &builder,
+            || ConstraintSet::constrain_typevar_lower_bound(&db, &builder, s, str),
+        );
+        let Node::Interior(interior) = set.node.node() else {
+            panic!("expected an interior node");
+        };
+
+        assert!(
+            set.node
+                .simple_conjunction_is_never_satisfied(&db, &builder)
+                .is_none()
+        );
+        let walked = interior
+            .path_assignments(&builder)
+            .visit(&db, &builder, set.node, &mut IsNeverSatisfiedVisitor)
+            .is_continue();
+        assert!(walked);
+        assert!(set.is_never_satisfied(&db));
+
+        let inferable = InferableTypeVars::from_typevars(
+            &db,
+            [t.identity(&db), s.identity(&db)].into_iter().collect(),
+        );
+        assert_eq!(
+            set.solutions(&db, &builder, inferable),
+            Solutions::Unsatisfiable
+        );
     }
 
     #[test]
