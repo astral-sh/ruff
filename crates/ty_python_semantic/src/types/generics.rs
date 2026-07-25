@@ -2658,6 +2658,30 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         formal: Type<'db>,
         actual: UnionType<'db>,
     ) -> Option<ConstraintSet<'db, 'c>> {
+        fn is_string_keyed_mapping<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
+            let Type::NominalInstance(instance) = ty.resolve_type_alias(db) else {
+                return false;
+            };
+
+            matches!(
+                instance.class(db).known(db),
+                Some(
+                    KnownClass::Dict
+                        | KnownClass::Mapping
+                        | KnownClass::MutableMapping
+                        | KnownClass::OrderedDict
+                )
+            ) && instance
+                .class(db)
+                .into_generic_alias()
+                .is_some_and(|alias| {
+                    matches!(
+                        alias.specialization(db).types(db),
+                        [key, _] if key.resolve_type_alias(db) == KnownClass::Str.to_instance(db)
+                    )
+                })
+        }
+
         fn collect_typed_dicts<'db>(
             db: &'db dyn Db,
             ty: Type<'db>,
@@ -2713,19 +2737,27 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                     typed_dicts.insert(ty);
                     true
                 }
-                Type::NominalInstance(instance)
-                    if matches!(
-                        instance.class(db).known(db),
-                        Some(
-                            KnownClass::Dict
-                                | KnownClass::Mapping
-                                | KnownClass::MutableMapping
-                                | KnownClass::OrderedDict
-                        )
-                    ) && let Some(alias) = instance.class(db).into_generic_alias()
-                        && let [key, _] = alias.specialization(db).types(db)
-                        && key.resolve_type_alias(db) == KnownClass::Str.to_instance(db) =>
+                Type::Intersection(intersection)
+                    if intersection.negative(db).is_empty()
+                        && intersection
+                            .iter_positive(db)
+                            .any(|element| is_string_keyed_mapping(db, element))
+                        && intersection.iter_positive(db).all(|element| {
+                            let element = element.resolve_type_alias(db);
+                            is_string_keyed_mapping(db, element)
+                                || element
+                                    == KnownClass::Dict
+                                        .to_instance_unknown(db)
+                                        .top_materialization(db)
+                        }) =>
                 {
+                    // `isinstance(value, dict)` can also narrow a mapping to an intersection with
+                    // `Top[dict[Unknown, Unknown]]`. Retain the full intersection so its original
+                    // key and value constraints are preserved.
+                    other_types.insert(ty);
+                    true
+                }
+                Type::NominalInstance(_) if is_string_keyed_mapping(db, ty) => {
                     other_types.insert(ty);
                     true
                 }

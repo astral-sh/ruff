@@ -2658,7 +2658,7 @@ Adding a regular dictionary to the union should not make copying it slow:
 def _(item: Item | dict[str, Any]) -> None:
     reveal_type(dict(item))  # revealed: dict[str, object]
     if isinstance(item, dict):
-        dict(item)
+        reveal_type(dict(item))  # revealed: dict[str, object]
 ```
 
 An unrelated `Any` field on a `TypedDict` should not disable this optimization:
@@ -2669,20 +2669,28 @@ class ItemWithAny(TypedDict):
     other: Any
 
 def _(item: Item | ItemWithAny | dict[str, Any]) -> None:
-    dict(item)
+    reveal_type(dict(item))  # revealed: dict[str, object]
 ```
 
 `Mapping`, `MutableMapping`, and `OrderedDict` should also be copied efficiently:
 
 ```py
 def _(item: Item | Mapping[str, Any]) -> None:
-    dict(item)
+    reveal_type(dict(item))  # revealed: dict[str, object]
 
 def _(item: Item | MutableMapping[str, Any]) -> None:
-    dict(item)
+    reveal_type(dict(item))  # revealed: dict[str, object]
 
 def _(item: Item | OrderedDict[str, Any]) -> None:
-    dict(item)
+    reveal_type(dict(item))  # revealed: dict[str, object]
+```
+
+A mapping should still be copied efficiently after `isinstance()` narrows it to a dictionary:
+
+```py
+def _(item: Item | Mapping[str, Any]) -> None:
+    if isinstance(item, dict):
+        reveal_type(dict(item))  # revealed: dict[str, object]
 ```
 
 The union can also be assembled from type aliases:
