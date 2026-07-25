@@ -2774,8 +2774,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         let mapping_when = self.constraints.load(self.db, &mapping_when);
         // Logically equivalent constraints can still infer different solutions, such as `Any`
         // instead of `object`; preserve the original constraints when gradual evidence differs.
-        let mapping_solutions = (!other_types.is_empty())
-            .then(|| mapping_when.solutions(self.db, self.constraints, self.inferable));
+        let mapping_solutions = mapping_when.solutions(self.db, self.constraints, self.inferable);
         if !typed_dicts.into_iter().all(|element| {
             let element_when = self.constraints.load(
                 self.db,
@@ -2784,9 +2783,8 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             element_when
                 .iff(self.db, self.constraints, mapping_when)
                 .is_always_satisfied(self.db)
-                && mapping_solutions.as_ref().is_none_or(|solutions| {
-                    &element_when.solutions(self.db, self.constraints, self.inferable) == solutions
-                })
+                && element_when.solutions(self.db, self.constraints, self.inferable)
+                    == mapping_solutions
         }) {
             return None;
         }

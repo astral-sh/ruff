@@ -2859,6 +2859,18 @@ def _(value: AnyExtraItems | dict[str, str]) -> None:
     reveal_type(dict(value))  # revealed: dict[str, Any | str]
 ```
 
+A union of two such `TypedDict`s must also preserve `Any` when copied or passed to a mapping
+protocol with a bounded type variable:
+
+```py
+class OtherAnyExtraItems(ExtensionsTypedDict, extra_items=Any): ...
+
+def _(value: AnyExtraItems | OtherAnyExtraItems) -> None:
+    reveal_type(dict(value))  # revealed: dict[str, Any]
+    dict(value)["x"].strip()
+    reveal_type(get_bounded_mapping(value))  # revealed: Any
+```
+
 Rejected common-constraint probes must not affect fallback protocol inference:
 
 ```py
