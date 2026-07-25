@@ -480,7 +480,10 @@ impl<'db> ComparisonEvaluator<'db> {
     }
 }
 
-/// Evaluate a comparison whose aliases are resolved and whose key is registered as active.
+/// Evaluate one comparison after resolving aliases and checking for recursion.
+///
+/// Handle enums and dynamic values such as `Any` before checking individual enum members.
+/// Otherwise, checking each member separately can incorrectly narrow `Any`.
 ///
 /// Recursive comparisons must use [`ComparisonEvaluator::evaluate`] so cycles are detected.
 fn evaluate_comparison_once<'db>(
@@ -496,7 +499,10 @@ fn evaluate_comparison_once<'db>(
         .unwrap_or_else(|| evaluate_structural_comparison(evaluator, left, right, branch, operator))
 }
 
-/// Evaluate dynamic operands before finite expansion can narrow them member by member.
+/// Handle dynamic values such as `Any` before checking individual enum members.
+///
+/// A one-member enum can exclude that member from `Any`. An enum with several members must not
+/// exclude all of its members one at a time.
 fn evaluate_dynamic_comparison<'db>(
     evaluator: &mut ComparisonEvaluator<'db>,
     left: Type<'db>,
@@ -506,34 +512,33 @@ fn evaluate_dynamic_comparison<'db>(
 ) -> Option<ComparisonResult<'db>> {
     let db = evaluator.db;
     match (left, right) {
-        (Type::Dynamic(_), other) => Some(
+        (Type::Dynamic(_), other)
             if !operator.condition_expects_equality(branch)
-                && all_values_compare_equal(evaluator, other, operator)
+                && all_values_compare_equal(evaluator, other, operator) =>
+        {
+            let excluded = if other.is_enum(db)
+                && let Some(alternatives) = finite_alternatives(db, other, operator)
+                && let [alternative] = alternatives.as_slice()
             {
-                let excluded = if other.is_enum(db)
-                    && let Some(alternatives) = finite_alternatives(db, other, operator)
-                    && let [alternative] = alternatives.as_slice()
-                {
-                    *alternative
-                } else {
-                    other
-                };
-                ComparisonResult::CanNarrow(
-                    IntersectionBuilder::new(db)
-                        .add_positive(left)
-                        .add_negative(excluded)
-                        .build(),
-                )
+                *alternative
             } else {
-                ComparisonResult::Ambiguous
-            },
-        ),
-        (_, Type::Dynamic(_)) => Some(ComparisonResult::Ambiguous),
+                other
+            };
+            Some(ComparisonResult::CanNarrow(
+                IntersectionBuilder::new(db)
+                    .add_positive(left)
+                    .add_negative(excluded)
+                    .build(),
+            ))
+        }
+        (Type::Dynamic(_), _) | (_, Type::Dynamic(_)) => Some(ComparisonResult::Ambiguous),
         _ => None,
     }
 }
 
-/// Expand finite alternatives in target-first order after handling dynamic operands.
+/// Compare finite sets of values after handling enums and dynamic values.
+///
+/// Start with the side being narrowed so its restrictions are not applied to the other side.
 fn evaluate_finite_comparison<'db>(
     evaluator: &mut ComparisonEvaluator<'db>,
     left: Type<'db>,
@@ -551,7 +556,7 @@ fn evaluate_finite_comparison<'db>(
         })
 }
 
-/// Compare the remaining operand kinds using their structural comparison semantics.
+/// Compare values not handled by the enum, dynamic, or finite-value stages.
 fn evaluate_structural_comparison<'db>(
     evaluator: &mut ComparisonEvaluator<'db>,
     left: Type<'db>,

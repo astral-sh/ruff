@@ -170,7 +170,7 @@ def compare_non_overlapping_literal_unions(
     reveal_type(left == right)  # revealed: Literal[False]
 ```
 
-Adding `None` to either operand must not change how equality narrows the enum:
+Adding `None` to either side must not change which enum values can match:
 
 ```py
 def compare_optional_left(left: Choice | None, right: Choice):
@@ -473,8 +473,7 @@ def compare_subsets(
         reveal_type(right)  # revealed: Literal[Right.SHARED]
 ```
 
-When only one operand can be `None`, equality still narrows both enums to their shared value. This
-works whichever operand contains `None`:
+When only one side can be `None`, equality still narrows both enums to their shared value:
 
 ```py
 def compare_optional_cross_enum_left(left: Left | None, right: Right):
@@ -488,7 +487,7 @@ def compare_optional_cross_enum_right(left: Left, right: Right | None):
         reveal_type(right)  # revealed: Literal[Right.SHARED]
 ```
 
-When both operands can be `None`, equality can match either `None` or the shared string value:
+When both sides can be `None`, equality can match `None` or the shared string:
 
 ```py
 def compare_both_optional_cross_enums(left: Left | None, right: Right | None):
@@ -497,8 +496,8 @@ def compare_both_optional_cross_enums(left: Left | None, right: Right | None):
         reveal_type(right)  # revealed: Literal[Right.SHARED] | None
 ```
 
-An unrelated integer must not prevent the matching enum members from being found. This must work
-whether the condition uses equality or inequality:
+An unrelated integer must not change which enum members match, whether the condition uses `==` or
+`!=`:
 
 ```py
 def compare_cross_enums_with_integer(left: Left | None, right: Right | int):
@@ -538,7 +537,7 @@ def compare_cross_enum_with_dictionary(left: Left | dict[str, Any], right: Right
         reveal_type(right)  # revealed: Literal[Right.SHARED]
 ```
 
-By contrast, `Any` can match any enum member. It must not exclude `None` from the other operand:
+By contrast, `Any` can match any enum member. It must not exclude `None` from the other side:
 
 ```py
 def compare_optional_enum_against_any(left: Left | None, right: Right | Any):
@@ -552,8 +551,8 @@ def compare_any_against_optional_enum(left: Left | Any, right: Right | None):
         reveal_type(right)  # revealed: Right | None
 ```
 
-When no alternatives can match, equality is always false and inequality is always true. A shared
-`None` makes equality uncertain:
+If the two sides have no matching values, `==` is always false and `!=` is always true. A shared
+`None` makes `==` uncertain:
 
 ```py
 def compare_disjoint_cross_enum_alternatives(
@@ -566,7 +565,7 @@ def compare_disjoint_cross_enum_alternatives(
     reveal_type(left == overlapping)  # revealed: bool
 ```
 
-When all alternatives have the same value, equality is always true:
+When all possible values match, `==` is always true:
 
 ```py
 def compare_matching_cross_enum_alternatives(
@@ -1730,8 +1729,7 @@ def _(x: Any):
         reveal_type(x)  # revealed: Any & ~TypeVar
 ```
 
-Comparing an enum with `Any` must not narrow `Any` by considering each enum member separately. This
-applies whichever operand contains `Any`:
+`Any` must stay `Any` when compared with an enum, on either side of the comparison:
 
 ```py
 def enum_against_any(value: Color, other: Any):
@@ -1745,7 +1743,7 @@ def any_against_enum(value: Any, other: Color):
         assert_type(value, Any)
 ```
 
-Adding `None` to the enum must not change how `Any` is preserved:
+`Any` must also stay `Any` when the enum can be `None`:
 
 ```py
 def optional_enum_against_any(value: Color | None, other: Any):
@@ -1759,7 +1757,7 @@ def any_against_optional_enum(value: Any, other: Color | None):
         assert_type(value, Any)
 ```
 
-Preserving `Any` in enum comparisons must not change how `Any` behaves with an optional boolean:
+`Any` must also stay `Any` when compared with `bool | None`:
 
 ```py
 def optional_bool_against_any(value: bool | None, other: Any):
@@ -1768,8 +1766,7 @@ def optional_bool_against_any(value: bool | None, other: Any):
         assert_type(other, Any)
 ```
 
-When an enum is combined with `Any`, comparing against an optional enum must retain both
-alternatives:
+Comparing `Color | Any` with `Color | None` must keep both `Color` and `Any`:
 
 ```py
 def gradual_enum_union(value: Color | Any, other: Color | None):
@@ -1778,7 +1775,7 @@ def gradual_enum_union(value: Color | Any, other: Color | None):
         assert_type(value, Color | Any)
 ```
 
-The same union must also remain unchanged after either an equality or inequality check:
+`Color | Any` must also stay unchanged after either `==` or `!=`:
 
 ```py
 def gradual_enum_union_against_enum(value: Color | Any, other: Color):

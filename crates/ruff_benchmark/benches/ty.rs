@@ -665,7 +665,10 @@ fn benchmark_narrowed_str_enum_comparison(criterion: &mut Criterion) {
     benchmark_enum_comparison(criterion, "ty_micro[narrowed_str_enum_comparison]", &code);
 }
 
-/// Ensure enum unions are decomposed without expanding the enum into all of its members.
+/// Regression benchmark for <https://github.com/astral-sh/ty/issues/4069>.
+///
+/// Compare a large enum with unions containing `None`, an integer, a dictionary containing `Any`,
+/// or `Any`, without checking every enum member separately.
 fn benchmark_union_str_enum_comparison(criterion: &mut Criterion) {
     const NUM_ENUM_MEMBERS: usize = 256;
 

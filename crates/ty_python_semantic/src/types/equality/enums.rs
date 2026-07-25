@@ -17,10 +17,11 @@ use super::{
     evaluate_against_results, evaluate_target_union,
 };
 
-/// Compare enum operands without expanding every pair of members.
+/// Compare enum values without checking every pair of members.
 ///
-/// Enum-only operands are compared using compact member sets and runtime comparison keys. Mixed
-/// enum unions retain the ordinary comparison semantics of their non-enum alternatives.
+/// If either side also contains other values, compare those values normally.
+///
+/// Return `None` when the enum comparison does not apply.
 pub(super) fn evaluate_enum_comparison<'db>(
     evaluator: &mut ComparisonEvaluator<'db>,
     target: Type<'db>,
@@ -29,16 +30,15 @@ pub(super) fn evaluate_enum_comparison<'db>(
     operator: ComparisonOperator,
 ) -> Option<ComparisonResult<'db>> {
     evaluate_enum_domains(evaluator.db, target, other, branch, operator).or_else(|| {
-        let comparison =
-            PartitionedEnumComparison::new(evaluator.db, target, other, branch, operator)?;
-        Some(comparison.evaluate(evaluator, branch, operator))
+        PartitionedEnumComparison::new(evaluator.db, target, other, branch, operator)
+            .map(|comparison| comparison.evaluate(evaluator, branch, operator))
     })
 }
 
-/// Compare two enum-only domains using compact member sets or runtime comparison keys.
+/// Compare values that are all enum members.
 ///
-/// The resulting constraint contains only enum-membership facts. Equality never transfers gradual
-/// or nominal intersection state between operands.
+/// Describe the result using enum members only. Do not copy other restrictions from one side to
+/// the other.
 fn evaluate_enum_domains<'db>(
     db: &'db dyn Db,
     target: Type<'db>,
@@ -58,12 +58,12 @@ fn evaluate_enum_domains<'db>(
     ProjectedEnumComparison::new(db, target, &other, operator)?.evaluate(db, branch, operator)
 }
 
-/// Compare unions that contain both enum domains and unrelated alternatives.
+/// Compare unions that contain enums and other values.
 ///
-/// Enum alternatives retain their compact comparison domains, while residual alternatives are
-/// evaluated through the ordinary comparison evaluator. In particular, a gradual or scalar
-/// residual on either side can still satisfy the comparison and prevent the opposite operand from
-/// being narrowed to the enum domains' shared members.
+/// Compare enum members together and compare other values normally. Values such as `None`,
+/// `Any`, or a matching string can also affect which values match.
+///
+/// Compare the enum members only once.
 ///
 /// ```python
 /// from enum import StrEnum
@@ -88,7 +88,10 @@ struct PartitionedEnumComparison<'db> {
 }
 
 impl<'db> PartitionedEnumComparison<'db> {
-    /// Extract a mixed comparison only when its enum domains have modeled semantics.
+    /// Prepare a comparison when both sides contain enums and at least one side also contains
+    /// another value.
+    ///
+    /// Return `None` if either enum has unsupported comparison behavior.
     fn new(
         db: &'db dyn Db,
         target: Type<'db>,
@@ -119,7 +122,7 @@ impl<'db> PartitionedEnumComparison<'db> {
         })
     }
 
-    /// Reuse the compact enum result while evaluating residual pairs normally.
+    /// Reuse the saved enum result and compare all other values normally.
     fn evaluate_pair(
         &self,
         evaluator: &mut ComparisonEvaluator<'db>,
@@ -135,7 +138,9 @@ impl<'db> PartitionedEnumComparison<'db> {
         }
     }
 
-    /// Combine one target alternative against the non-target alternatives.
+    /// Compare one possible value with every value on the other side.
+    ///
+    /// Return whether the result is certain or which values can still match.
     fn evaluate_against_other(
         &self,
         evaluator: &mut ComparisonEvaluator<'db>,
@@ -167,7 +172,9 @@ impl<'db> PartitionedEnumComparison<'db> {
         )
     }
 
-    /// Preserve the caller's truthiness goal or target-specific narrowing.
+    /// Compare all possible values.
+    ///
+    /// Return whether the result is certain or which values can still match.
     fn evaluate(
         &self,
         evaluator: &mut ComparisonEvaluator<'db>,
@@ -600,20 +607,18 @@ impl<'db> EnumValueSet<'db> {
     }
 }
 
-/// Enum domains and original non-enum alternatives extracted from an operand.
+/// The enum members and other values on one side of a comparison.
 ///
-/// Original enum alternatives are grouped at the first enum position. Residual alternatives keep
-/// their union order, while all enum classes can share one compact comparison-key projection.
+/// Place enum members at the first enum's position and keep other values in their original order.
 struct EnumDomainPartition<'db> {
     enum_type: Type<'db>,
     alternatives: Vec<Type<'db>>,
 }
 
 impl<'db> EnumDomainPartition<'db> {
-    /// Group structural enum alternatives at their first position and retain residual order.
+    /// Combine enum values while keeping other values in their original order.
     ///
-    /// Returns `None` when no enum domain can be extracted or a recursive alias cannot be
-    /// partitioned safely.
+    /// Return `None` when there is no enum or a type alias refers to itself.
     fn from_type(db: &'db dyn Db, ty: Type<'db>) -> Option<Self> {
         fn collect<'db>(
             db: &'db dyn Db,
@@ -677,7 +682,6 @@ impl<'db> EnumDomainPartition<'db> {
         })
     }
 
-    /// Return whether the partition contains non-enum alternatives.
     fn has_residual(&self) -> bool {
         self.alternatives.len() > 1
     }
