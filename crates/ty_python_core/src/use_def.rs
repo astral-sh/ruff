@@ -2495,25 +2495,18 @@ impl<'db> UseDefMapBuilder<'db> {
         &mut self,
         symbol: ScopedSymbolId,
     ) -> LiveBindingStatus {
-        let pending = self.pending_reachability.current;
-        let bindings = self
-            .pending_reachability
-            .materialize_ref(
-                &mut self.symbol_states[symbol],
-                pending,
-                &mut self.reachability_constraints,
-            )
-            .bindings();
-
         let mut has_binding = false;
         let mut has_unbound = false;
-        for binding in bindings.iter() {
+
+        for binding in self.current_bindings(symbol.into()) {
             if binding.reachability_constraint() == ScopedReachabilityConstraintId::ALWAYS_FALSE {
                 continue;
             }
-            match self.all_definitions[binding.binding()] {
-                DefinitionState::Defined(_) => has_binding = true,
-                DefinitionState::Undefined | DefinitionState::Deleted => has_unbound = true,
+
+            if binding.binding().is_unbound() {
+                has_unbound = true;
+            } else {
+                has_binding = true;
             }
         }
 
