@@ -65,12 +65,7 @@ def outer():
 ",
         );
 
-        let output = test.goto_definition();
-        assert!(
-            !output.contains("last := global_item"),
-            "a module-global writer must not define a function-local variable: {output}"
-        );
-        assert_snapshot!(output, @"
+        assert_snapshot!(test.goto_definition(), @"
         info[goto-definition]: Go to definition
           --> main.py:17:12
            |

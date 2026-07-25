@@ -188,12 +188,7 @@ def outer():
 ",
         );
 
-        let output = test.rename("result");
-        assert!(
-            !output.contains("last := global_item"),
-            "renaming a function-local variable must not rename a global walrus: {output}"
-        );
-        assert_snapshot!(output, @"
+        assert_snapshot!(test.rename("result"), @"
         info[rename]: Rename symbol (found 4 locations)
           --> main.py:5:5
            |

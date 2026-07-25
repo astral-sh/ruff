@@ -112,12 +112,7 @@ def outer():
 ",
         );
 
-        let output = test.references();
-        assert!(
-            !output.contains("last := global_item"),
-            "references to a function-local variable must exclude a global walrus: {output}"
-        );
-        assert_snapshot!(output, @"
+        assert_snapshot!(test.references(), @"
         info[references]: Found 4 references
           --> main.py:5:5
            |

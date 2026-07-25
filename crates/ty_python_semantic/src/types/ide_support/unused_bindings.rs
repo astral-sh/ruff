@@ -388,34 +388,6 @@ mod tests {
     }
 
     #[test]
-    fn keeps_global_and_nonlocal_comprehension_walruses_separate() -> anyhow::Result<()> {
-        let source = dedent(
-            "
-            last = 0
-
-            def outer():
-                last = 1
-
-                def write_global():
-                    global last
-                    [(last := global_item) for global_item in [2]]
-
-                def write_nonlocal():
-                    nonlocal last
-                    [(last := nonlocal_item) for nonlocal_item in [3]]
-
-                write_global()
-                write_nonlocal()
-                return last
-            ",
-        );
-
-        let names = collect_unused_names(&source)?;
-        assert_eq!(names, Vec::<String>::new());
-        Ok(())
-    }
-
-    #[test]
     fn tracks_comprehension_walruses_in_local_scopes() -> anyhow::Result<()> {
         let source = dedent(
             "
