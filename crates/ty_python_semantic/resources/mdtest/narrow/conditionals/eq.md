@@ -1627,8 +1627,10 @@ def tagged_union_with_unrelated_assignment(value: A | B):
 ```py
 import sys
 from enum import Enum, IntEnum
-from typing import Any, Literal, TypeVar
-from typing_extensions import assert_type
+from typing import Any, Literal, TypeAlias, TypeVar
+
+from ty_extensions import Unknown
+from typing_extensions import assert_never, assert_type
 
 T = TypeVar("T", bound=object)
 U = TypeVar("U")
@@ -1638,6 +1640,9 @@ RUNTIME_TYPE_VAR = TypeVar("RUNTIME_TYPE_VAR")
 class Color(Enum):
     RED = 1
     BLUE = 2
+
+class OtherColor(Enum):
+    RED = 1
 
 class NonReflexive(Enum):
     VALUE = 1
@@ -1735,12 +1740,10 @@ def _(x: Any):
 def enum_against_any(value: Color, other: Any):
     if value != other:
         reveal_type(other)  # revealed: Any
-        assert_type(other, Any)
 
 def any_against_enum(value: Any, other: Color):
     if value != other:
         reveal_type(value)  # revealed: Any
-        assert_type(value, Any)
 ```
 
 `Any` must also stay `Any` when the enum can be `None`:
@@ -1749,12 +1752,10 @@ def any_against_enum(value: Any, other: Color):
 def optional_enum_against_any(value: Color | None, other: Any):
     if value != other:
         reveal_type(other)  # revealed: Any
-        assert_type(other, Any)
 
 def any_against_optional_enum(value: Any, other: Color | None):
     if value != other:
         reveal_type(value)  # revealed: Any
-        assert_type(value, Any)
 ```
 
 `Any` must also stay `Any` when compared with `bool | None`:
@@ -1763,7 +1764,6 @@ def any_against_optional_enum(value: Any, other: Color | None):
 def optional_bool_against_any(value: bool | None, other: Any):
     if value != other:
         reveal_type(other)  # revealed: Any
-        assert_type(other, Any)
 ```
 
 Comparing `Color | Any` with `Color | None` must keep both `Color` and `Any`:
@@ -1772,7 +1772,95 @@ Comparing `Color | Any` with `Color | None` must keep both `Color` and `Any`:
 def gradual_enum_union(value: Color | Any, other: Color | None):
     if value != other:
         reveal_type(value)  # revealed: Color | Any
+```
+
+`Color | Any` must stay unchanged when the other value can be an enum member or `None`. This applies
+to `!=` and the false branch of `==`:
+
+```py
+def any_union_against_optional_enum_member(value: Color | Any, other: Literal[Color.RED] | None):
+    if value != other:
+        reveal_type(value)  # revealed: Color | Any
         assert_type(value, Color | Any)
+
+def any_union_against_optional_enum_member_equality_else(value: Color | Any, other: Literal[Color.RED] | None):
+    if value == other:
+        return
+    reveal_type(value)  # revealed: Color | Any
+```
+
+An alias for `Any` must preserve the same result:
+
+```py
+AnyAlias: TypeAlias = Any
+
+def any_alias_union_against_optional_enum_member(value: Color | AnyAlias, other: Literal[Color.RED] | None):
+    if value != other:
+        reveal_type(value)  # revealed: Color | Any
+```
+
+The same comparisons also preserve `Unknown`:
+
+```py
+def unknown_union_against_optional_enum_member(value: Color | Unknown, other: Literal[Color.RED] | None):
+    if value != other:
+        reveal_type(value)  # revealed: Color | Unknown
+        assert_type(value, Color | Unknown)
+
+def unknown_union_against_optional_enum_member_equality_else(value: Color | Unknown, other: Literal[Color.RED] | None):
+    if value == other:
+        return
+    reveal_type(value)  # revealed: Color | Unknown
+```
+
+When an enum check and a comparison are combined with `and`, either condition can be false. The
+original union must therefore be preserved:
+
+```py
+def any_union_after_enum_check(value: Color | Any, other: Color | Any):
+    if isinstance(value, Color) and value == other:
+        return
+    reveal_type(value)  # revealed: Color | Any
+    assert_type(value, Color | Any)
+
+def unknown_union_after_enum_check(value: Color | Unknown, other: Color | Unknown):
+    if isinstance(value, Color) and value == other:
+        return
+    reveal_type(value)  # revealed: Color | Unknown
+    assert_type(value, Color | Unknown)
+```
+
+The second comparison can fail even when the first one matches, so both possible types must remain:
+
+```py
+def any_union_after_failed_comparisons(value: Color | Any, other: OtherColor | None):
+    if value == Color.RED and value == other:
+        return
+    reveal_type(value)  # revealed: Color | Any
+    assert_type(value, Color | Any)
+
+def unknown_union_after_failed_comparisons(value: Color | Unknown, other: OtherColor | None):
+    if value == Color.RED and value == other:
+        return
+    reveal_type(value)  # revealed: Color | Unknown
+    assert_type(value, Color | Unknown)
+```
+
+These `Enum` classes compare by identity, so their members are not equal even when their underlying
+values match. Comparing with `OtherColor.RED` must therefore exclude every `Color` member:
+
+```py
+def any_comparison_with_other_enum(value: Color | OtherColor | Any):
+    if value == OtherColor.RED:
+        reveal_type(value)  # revealed: OtherColor | (Any & ~Color)
+        if isinstance(value, Color):
+            assert_never(value)
+
+def unknown_comparison_with_other_enum(value: Color | OtherColor | Unknown):
+    if value == OtherColor.RED:
+        reveal_type(value)  # revealed: OtherColor | (Unknown & ~Color)
+        if isinstance(value, Color):
+            assert_never(value)
 ```
 
 `Color | Any` must also stay unchanged after either `==` or `!=`:
@@ -1781,12 +1869,10 @@ def gradual_enum_union(value: Color | Any, other: Color | None):
 def gradual_enum_union_against_enum(value: Color | Any, other: Color):
     if value == other:
         reveal_type(value)  # revealed: Color | Any
-        assert_type(value, Color | Any)
 
 def gradual_enum_union_inequality(value: Color | Any, other: Color):
     if value != other:
         reveal_type(value)  # revealed: Color | Any
-        assert_type(value, Color | Any)
 ```
 
 ## Booleans and integers

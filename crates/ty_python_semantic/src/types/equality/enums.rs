@@ -30,8 +30,16 @@ pub(super) fn evaluate_enum_comparison<'db>(
     operator: ComparisonOperator,
 ) -> Option<ComparisonResult<'db>> {
     evaluate_enum_domains(evaluator.db, target, other, branch, operator).or_else(|| {
-        PartitionedEnumComparison::new(evaluator.db, target, other, branch, operator)
-            .map(|comparison| comparison.evaluate(evaluator, branch, operator))
+        PartitionedEnumComparison::new(evaluator.db, target, other, branch, operator).map(
+            |comparison| match comparison.evaluate(evaluator, branch, operator) {
+                ComparisonResult::CanNarrow(narrowed)
+                    if narrowed == target.resolve_type_alias(evaluator.db) =>
+                {
+                    ComparisonResult::Ambiguous
+                }
+                result => result,
+            },
+        )
     })
 }
 
@@ -84,6 +92,7 @@ fn evaluate_enum_domains<'db>(
 struct PartitionedEnumComparison<'db> {
     target: EnumDomainPartition<'db>,
     other: EnumDomainPartition<'db>,
+    other_type: Type<'db>,
     enum_result: ComparisonResult<'db>,
 }
 
@@ -106,6 +115,7 @@ impl<'db> PartitionedEnumComparison<'db> {
         }
 
         let target = EnumDomainPartition::from_type(db, target)?;
+        let other_type = other;
         let other = EnumDomainPartition::from_type(db, other)?;
 
         if !target.has_residual() && !other.has_residual() {
@@ -118,6 +128,7 @@ impl<'db> PartitionedEnumComparison<'db> {
         Some(Self {
             target,
             other,
+            other_type,
             enum_result,
         })
     }
@@ -138,7 +149,9 @@ impl<'db> PartitionedEnumComparison<'db> {
         }
     }
 
-    /// Compare one possible value with every value on the other side.
+    /// Compare one possible value with the other side.
+    ///
+    /// Compare `Any` and `Unknown` with the whole union so neither is narrowed by separate values.
     ///
     /// Return whether the result is certain or which values can still match.
     fn evaluate_against_other(
@@ -161,6 +174,10 @@ impl<'db> PartitionedEnumComparison<'db> {
             );
         }
 
+        if matches!(target.resolve_type_alias(evaluator.db), Type::Dynamic(_)) {
+            return evaluator.evaluate(target, self.other_type, branch, operator);
+        }
+
         evaluate_against_results(
             evaluator.db,
             target,
@@ -173,6 +190,8 @@ impl<'db> PartitionedEnumComparison<'db> {
     }
 
     /// Compare all possible values.
+    ///
+    /// If no member of an enum can match, exclude it from the other possible values.
     ///
     /// Return whether the result is certain or which values can still match.
     fn evaluate(
@@ -193,9 +212,61 @@ impl<'db> PartitionedEnumComparison<'db> {
             );
         }
 
-        evaluate_target_union(evaluator.db, &self.target.alternatives, branch, |target| {
-            self.evaluate_against_other(evaluator, target, branch, operator)
-        })
+        let mut narrowed_enum = None;
+        let result =
+            evaluate_target_union(evaluator.db, &self.target.alternatives, branch, |target| {
+                let result = self.evaluate_against_other(evaluator, target, branch, operator);
+                if target == self.target.enum_type
+                    && let ComparisonResult::CanNarrow(narrowed) = result
+                    && narrowed != target
+                {
+                    narrowed_enum = Some(narrowed);
+                }
+                result
+            });
+
+        if let ComparisonResult::CanNarrow(narrowed) = result
+            && let Some(narrowed_enum) = narrowed_enum
+            && let Some(domains) = EnumDomainSet::from_type(evaluator.db, self.target.enum_type)
+        {
+            let excluded = domains
+                .domains
+                .iter()
+                .fold(UnionBuilder::new(evaluator.db), |builder, domain| {
+                    let domain_type = domain.restriction_type(evaluator.db);
+                    if domain_type.is_disjoint_from(evaluator.db, narrowed_enum) {
+                        builder.add(domain_type)
+                    } else {
+                        builder
+                    }
+                })
+                .build();
+            if !excluded.is_never() {
+                let exclude = |alternative: Type<'db>| {
+                    if alternative.is_disjoint_from(evaluator.db, excluded) {
+                        alternative
+                    } else {
+                        IntersectionBuilder::new(evaluator.db)
+                            .add_positive(alternative)
+                            .add_negative(excluded)
+                            .build()
+                    }
+                };
+                let narrowed = match narrowed {
+                    Type::Union(union) => union
+                        .elements(evaluator.db)
+                        .iter()
+                        .fold(UnionBuilder::new(evaluator.db), |builder, alternative| {
+                            builder.add(exclude(*alternative))
+                        })
+                        .build(),
+                    alternative => exclude(alternative),
+                };
+                return ComparisonResult::CanNarrow(narrowed);
+            }
+        }
+
+        result
     }
 }
 
