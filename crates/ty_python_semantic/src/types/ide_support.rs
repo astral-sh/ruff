@@ -1034,7 +1034,9 @@ fn collect_implementation_root_classes<'db>(
 /// ```
 ///
 /// The binding for the use in `print` is synthetic, so follow it into the comprehension's
-/// end-of-scope bindings. Nested comprehensions can produce a chain of these proxies.
+/// end-of-scope bindings. Nested comprehensions can produce a chain of these proxies. Only
+/// follow sources that resolve to the same variable, so `global` and `nonlocal` writes do not
+/// become definitions of each other.
 fn user_visible_definitions<'db>(
     db: &'db dyn Db,
     definitions: impl IntoIterator<Item = Definition<'db>>,
@@ -1051,25 +1053,8 @@ fn user_visible_definitions<'db>(
         match definition.kind(db) {
             DefinitionKind::NestedBindings(nested) => {
                 let index = semantic_index(db, definition.file(db));
-                let Some(symbol_id) = definition.place(db).as_symbol() else {
-                    continue;
-                };
-                let scope_id = definition.file_scope(db);
-                let this_scope_sees_global_bindings =
-                    index.symbol_resolves_to_global_scope(symbol_id, scope_id);
-                let this_scope_sees_nonlocal_bindings = !(this_scope_sees_global_bindings
-                    || (index.scope(scope_id).kind().is_class()
-                        && index.place_table(scope_id).symbol(symbol_id).is_local()));
                 let sources = nested
-                    .binding_sources(index)
-                    .filter_map(|(is_global, bindings)| {
-                        (if is_global {
-                            this_scope_sees_global_bindings
-                        } else {
-                            this_scope_sees_nonlocal_bindings
-                        })
-                        .then_some(bindings)
-                    })
+                    .visible_binding_sources(index, definition.file_scope(db))
                     .flatten()
                     .filter_map(|binding| binding.binding.definition());
                 // A lazy function proxy can lead to an eager comprehension proxy. Follow that

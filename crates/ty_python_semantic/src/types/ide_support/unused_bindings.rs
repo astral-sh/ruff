@@ -44,7 +44,16 @@ fn should_consider_definition(kind: &DefinitionKind<'_>) -> bool {
     }
 }
 
-/// Returns whether a comprehension walrus belongs to the nearest enclosing local scope.
+/// Returns whether a comprehension walrus belongs to an enclosing function or lambda.
+///
+/// ```python
+/// def last_item(items):
+///     [(last := item) for item in items]
+///     return last
+/// ```
+///
+/// A module-level walrus, or one declared `global` or `nonlocal` in its containing
+/// function, is not a local binding and must not receive an unused-binding diagnostic.
 fn comprehension_named_expression_is_local(
     index: &SemanticIndex<'_>,
     comprehension_scope: FileScopeId,

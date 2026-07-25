@@ -1603,7 +1603,9 @@ pub struct NestedBindingsDefinitionKind {
 }
 
 impl NestedBindingsDefinitionKind {
-    /// Returns the binding source for each nested declaration, along with whether it is global.
+    /// Returns every nested binding source and whether it was declared `global`.
+    ///
+    /// Use [`Self::visible_binding_sources`] when resolving the binding in a particular scope.
     pub fn binding_sources<'index, 'db>(
         &'index self,
         index: &'index SemanticIndex<'db>,
@@ -1620,6 +1622,53 @@ impl NestedBindingsDefinitionKind {
             };
             Some((declaration.is_global(), bindings))
         })
+    }
+
+    /// Returns nested binding sources that can update the same variable as `scope`.
+    ///
+    /// A synthetic binding can collect both `global` and `nonlocal` writes to one name:
+    ///
+    /// ```python
+    /// x = 0
+    ///
+    /// def outer():
+    ///     x = 1
+    ///
+    ///     def change_global():
+    ///         global x
+    ///         x = 2
+    ///
+    ///     def change_nonlocal():
+    ///         nonlocal x
+    ///         x = 3
+    /// ```
+    ///
+    /// Only `change_nonlocal` can update `outer`'s local `x`. Nested functions also cannot
+    /// capture a class-local variable, so class scopes do not see nonlocal writes to their
+    /// own bindings.
+    pub fn visible_binding_sources<'index, 'db>(
+        &'index self,
+        index: &'index SemanticIndex<'db>,
+        scope: FileScopeId,
+    ) -> impl Iterator<Item = BindingWithConstraintsIterator<'index, 'db>> + 'index {
+        let symbol_id = index.place_table(scope).symbol_id(&self.name);
+        let sees_global = symbol_id
+            .is_some_and(|symbol_id| index.symbol_resolves_to_global_scope(symbol_id, scope));
+        let sees_nonlocal = !sees_global
+            && symbol_id.is_some_and(|symbol_id| {
+                !(index.scope(scope).kind().is_class()
+                    && index.place_table(scope).symbol(symbol_id).is_local())
+            });
+
+        self.binding_sources(index)
+            .filter_map(move |(is_global, bindings)| {
+                (if is_global {
+                    sees_global
+                } else {
+                    sees_nonlocal
+                })
+                .then_some(bindings)
+            })
     }
 }
 

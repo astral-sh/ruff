@@ -33,7 +33,7 @@ pub fn goto_definition(
 #[cfg(test)]
 pub(super) mod test {
 
-    use crate::tests::{CursorTest, IntoDiagnostic};
+    use crate::tests::{CursorTest, IntoDiagnostic, cursor_test};
     use crate::{NavigationTargets, RangedValue, goto_definition};
     use insta::assert_snapshot;
     use ruff_db::diagnostic::{
@@ -44,10 +44,8 @@ pub(super) mod test {
 
     #[test]
     fn goto_definition_does_not_mix_global_and_nonlocal_comprehension_walruses() {
-        let test = CursorTest::builder()
-            .source(
-                "main.py",
-                "
+        let test = cursor_test(
+            "
 last = 0
 
 def outer():
@@ -65,8 +63,7 @@ def outer():
     write_nonlocal()
     return la<CURSOR>st
 ",
-            )
-            .build();
+        );
 
         let output = test.goto_definition();
         assert!(
@@ -96,16 +93,13 @@ def outer():
 
     #[test]
     fn goto_definition_comprehension_walrus_in_function() {
-        let test = CursorTest::builder()
-            .source(
-                "main.py",
-                "
+        let test = cursor_test(
+            "
 def f(items):
     [(last := item) for item in items]
     return la<CURSOR>st
 ",
-            )
-            .build();
+        );
 
         assert_snapshot!(test.goto_definition(), @"
         info[goto-definition]: Go to definition
@@ -125,16 +119,13 @@ def f(items):
 
     #[test]
     fn goto_definition_nested_comprehension_walrus_in_function() {
-        let test = CursorTest::builder()
-            .source(
-                "main.py",
-                "
+        let test = cursor_test(
+            "
 def f(items):
     [[(last := item) for item in items] for _ in [1]]
     return la<CURSOR>st
 ",
-            )
-            .build();
+        );
 
         assert_snapshot!(test.goto_definition(), @"
         info[goto-definition]: Go to definition
@@ -177,10 +168,8 @@ def f(items):
 
     #[test]
     fn goto_definition_nonlocal_comprehension_walrus() {
-        let test = CursorTest::builder()
-            .source(
-                "main.py",
-                "
+        let test = cursor_test(
+            "
 def outer(items):
     last = 0
 
@@ -191,8 +180,7 @@ def outer(items):
 
     return inner()
 ",
-            )
-            .build();
+        );
 
         assert_snapshot!(test.goto_definition(), @"
         info[goto-definition]: Go to definition
