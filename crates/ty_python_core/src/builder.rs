@@ -10,7 +10,7 @@ use ruff_db::files::File;
 use ruff_db::parsed::ParsedModuleRef;
 use ruff_db::source::{SourceText, source_text};
 use ruff_index::IndexVec;
-use ruff_python_ast::name::Name;
+use ruff_python_ast::name::{Name, UnqualifiedName};
 use ruff_python_ast::visitor::{Visitor, walk_expr, walk_keyword, walk_pattern, walk_stmt};
 use ruff_python_ast::{self as ast, AtomicNodeIndex, NodeIndex, PySourceType, PythonVersion};
 use ruff_python_parser::semantic_errors::{
@@ -28,12 +28,12 @@ use crate::ast_node_ref::AstNodeRef;
 use crate::definition::{
     AnnotatedAssignmentDefinitionNodeRef, AssignmentDefinitionNodeRef,
     ComprehensionDefinitionNodeRef, Definition, DefinitionCategory, DefinitionKind,
-    DefinitionNodeKey, DefinitionNodeRef, Definitions, DictKeyAssignmentNodeRef,
+    DefinitionNodeKey, DefinitionNodeRef, DefinitionState, Definitions, DictKeyAssignmentNodeRef,
     ExceptHandlerDefinitionNodeRef, ForStmtDefinitionNodeRef, ImportDefinitionNodeRef,
     ImportFromDefinitionNodeRef, ImportFromSubmoduleDefinitionNodeRef,
     LambdaParameterDefinitionNodeRef, LoopHeaderDefinitionNodeRef, LoopStmtRef,
     MatchPatternDefinitionNodeRef, NestedBindingsDefinitionKind, ParameterDefinitionNodeRef,
-    StarImportDefinitionNodeRef, WithItemDefinitionNodeRef,
+    StarImportDefinitionNodeRef, WithItemDefinitionNodeRef, dotted_starts_with,
 };
 use crate::expression::{Expression, ExpressionKind};
 use crate::frozen::{FrozenMap, FrozenSet};
@@ -136,9 +136,15 @@ struct ScopeInfo<'ast> {
     this_scope_global_or_nonlocal_declarations: FxHashMap<Name, TextRange>,
     /// Free symbol uses from nested scopes that may resolve to this scope.
     pending_captures: PendingCaptures,
+    /// Dotted uses whose root had no live local binding when visited, keyed by root.
+    deferred_multipart_uses: DeferredMultipartUses,
 }
 
 type NestedGlobalOrNonlocalDeclarations = FxHashMap<Name, SmallVec<[NestedDeclaration; 1]>>;
+
+type MultipartUses = SmallVec<[Box<str>; 1]>;
+
+type DeferredMultipartUses = FxHashMap<Name, MultipartUses>;
 
 /// Captures cannot be resolved until the enclosing scope is complete because a later binding can
 /// make the name local. For example, `inner` captures `outer`'s local `value`, even though the
@@ -161,6 +167,8 @@ struct PendingCapture {
     nested_scope: FileScopeId,
     laziness: ScopeLaziness,
     binding_definition_ids: SmallVec<[ScopedDefinitionId; 2]>,
+    /// Dotted uses rooted at this capture's name, matched when the capture resolves.
+    multipart_uses: MultipartUses,
 }
 
 #[derive(Debug)]
@@ -170,6 +178,7 @@ struct UnresolvedCapture {
     nested_scope: FileScopeId,
     name: Name,
     laziness: ScopeLaziness,
+    multipart_uses: MultipartUses,
 }
 
 impl UnresolvedCapture {
@@ -283,6 +292,8 @@ pub(super) struct SemanticIndexBuilder<'db, 'ast> {
     condition_flow_snapshots_by_node: FxHashMap<ExpressionNodeKey, ConditionFlowSnapshots>,
     statements_by_node: FxHashMap<StatementNodeKey, Statement<'db>>,
     imported_modules: FxHashSet<ModuleName>,
+    /// Root names of unaliased multipart imports seen so far (`import a.b` adds `a`).
+    multipart_import_roots: FxHashSet<Name>,
     seen_submodule_imports: FxHashSet<String>,
     // A map from a lambda expression to its enclosing statement.
     enclosing_lambda_statements: FxHashMap<ExpressionNodeKey, Statement<'db>>,
@@ -345,6 +356,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
             seen_submodule_imports: FxHashSet::default(),
             imported_modules: FxHashSet::default(),
+            multipart_import_roots: FxHashSet::default(),
             generator_functions: FxHashSet::default(),
             async_comprehensions: FxHashSet::default(),
 
@@ -539,6 +551,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             nested_global_or_nonlocal_declarations: FxHashMap::default(),
             this_scope_global_or_nonlocal_declarations: FxHashMap::default(),
             pending_captures: FxHashMap::default(),
+            deferred_multipart_uses: FxHashMap::default(),
         });
     }
 
@@ -638,6 +651,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             pending
                 .binding_definition_ids
                 .extend(binding_definition_ids);
+            pending.multipart_uses.extend(capture.multipart_uses);
             if capture.laziness.is_lazy() {
                 pending.laziness = ScopeLaziness::Lazy;
             }
@@ -646,6 +660,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 nested_scope: capture.nested_scope,
                 laziness: capture.laziness,
                 binding_definition_ids,
+                multipart_uses: capture.multipart_uses,
             });
         }
     }
@@ -669,9 +684,30 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             return;
         };
 
+        let mut capturing_scopes = SmallVec::<[FileScopeId; 1]>::new();
         for capture in captures {
             if capture.laziness.is_lazy() {
                 capture.binding_definition_ids.push(definition_id);
+                capturing_scopes.push(capture.nested_scope);
+            }
+        }
+
+        // The import was not known when the nested scope was visited, so no multipart
+        // use was deferred. Recover it from the capturing scope's member places.
+        if !capturing_scopes.is_empty()
+            && let Some(imported_name) =
+                self.unaliased_multipart_import_name_of(current_scope, definition_id)
+            && let Some((_, submodule_path)) = imported_name.split_once('.')
+        {
+            let is_used = capturing_scopes.into_iter().any(|capturing_scope| {
+                self.place_tables[capturing_scope].members().any(|member| {
+                    member.symbol_name() == name.as_str()
+                        && dotted_starts_with(member.leading_attribute_segments(), submodule_path)
+                })
+            });
+            if is_used {
+                self.use_def_maps[current_scope]
+                    .mark_multipart_import_definition_used(definition_id);
             }
         }
     }
@@ -681,6 +717,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         popped_scope_id: FileScopeId,
         popped_scope_laziness: ScopeLaziness,
         pending_captures: PendingCaptures,
+        mut deferred_multipart_uses: DeferredMultipartUses,
     ) -> Vec<UnresolvedCapture> {
         let mut unresolved = Vec::new();
 
@@ -693,6 +730,11 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 if self.resolve_nested_reference_scope(capture.nested_scope, &name)
                     == Some(popped_scope_id)
                 {
+                    self.mark_deferred_multipart_uses(
+                        popped_scope_id,
+                        &name,
+                        &capture.multipart_uses,
+                    );
                     self.use_def_maps[popped_scope_id]
                         .mark_binding_definitions_used(capture.binding_definition_ids);
                 } else {
@@ -701,6 +743,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                             nested_scope: capture.nested_scope,
                             name: name.clone(),
                             laziness: capture.laziness,
+                            multipart_uses: capture.multipart_uses,
                         }
                         .through_scope(popped_scope_laziness),
                     );
@@ -714,6 +757,11 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     nested_scope: popped_scope_id,
                     name: symbol.name().clone(),
                     laziness: popped_scope_laziness,
+                    // Entries for roots that became local stay in the map and are
+                    // dropped, those uses were unbound.
+                    multipart_uses: deferred_multipart_uses
+                        .remove(symbol.name())
+                        .unwrap_or_default(),
                 });
             }
         }
@@ -736,7 +784,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 // be modified from elsewhere, the snapshot will not be recorded.
                 // (In the case of class scopes, class variables can be modified from elsewhere, but this has no effect in nested scopes,
                 // as class variables are not visible to them)
-                if self.scopes[enclosing_scope_id].kind().is_module() {
+                if enclosing_scope_kind.is_module() {
                     continue;
                 }
 
@@ -910,6 +958,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             mut nested_global_or_nonlocal_declarations,
             this_scope_global_or_nonlocal_declarations,
             pending_captures,
+            deferred_multipart_uses,
             ..
         } = self
             .scope_stack
@@ -931,8 +980,12 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             self.record_lazy_snapshots(popped_scope_id);
         }
 
-        let unresolved_captures =
-            self.finish_pending_captures(popped_scope_id, popped_scope_laziness, pending_captures);
+        let unresolved_captures = self.finish_pending_captures(
+            popped_scope_id,
+            popped_scope_laziness,
+            pending_captures,
+            deferred_multipart_uses,
+        );
         if !self.scope_stack.is_empty() {
             for capture in unresolved_captures {
                 self.register_pending_capture(capture);
@@ -2900,7 +2953,11 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                             .record_expression(asname, self.current_scope());
                         (asname.id.clone(), asname.id == alias.name.id)
                     } else {
-                        (Name::new(alias.name.id.split('.').next().unwrap()), false)
+                        let root = Name::new(alias.name.id.split('.').next().unwrap());
+                        if alias.name.contains('.') {
+                            self.multipart_import_roots.insert(root.clone());
+                        }
+                        (root, false)
                     };
 
                     let symbol = self.add_symbol(symbol_name);
@@ -4225,6 +4282,145 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     }
 }
 
+/// Tracks uses of unaliased multipart imports such as `import a.b`.
+///
+/// Python binds only the root name (`a`), so use-def tracking alone cannot
+/// distinguish a use of `a.b` from any other use of `a`. Dotted uses are matched
+/// eagerly against live bindings where possible, otherwise deferred
+/// ([`ScopeInfo::deferred_multipart_uses`]) and resolved through pending captures.
+/// An import recorded after the use is matched against the capturing scope's
+/// member places (see `record_pending_capture_binding`).
+impl SemanticIndexBuilder<'_, '_> {
+    fn record_multipart_import_use(&mut self, expr: &ast::Expr) {
+        if self.multipart_import_roots.is_empty() {
+            return;
+        }
+        let Some(dotted_name) = UnqualifiedName::from_expr(expr) else {
+            return;
+        };
+        let segments = dotted_name.segments();
+        let [imported_root, ..] = segments else {
+            return;
+        };
+        if !self.multipart_import_roots.contains(*imported_root) {
+            return;
+        }
+
+        let current_scope = self.current_scope();
+        let place_table = &self.place_tables[current_scope];
+        if let Some(symbol_id) = place_table.symbol_id(imported_root) {
+            let symbol = place_table.symbol(symbol_id);
+            if symbol.is_local() {
+                self.mark_matching_multipart_imports(current_scope, symbol_id, segments);
+                return;
+            }
+            if symbol.is_global() {
+                // A `global` declaration precedes the use, so resolution forwards
+                // directly to the module scope.
+                let global_scope = FileScopeId::global();
+                if let Some(global_symbol_id) =
+                    self.place_tables[global_scope].symbol_id(imported_root)
+                    && self.place_tables[global_scope]
+                        .symbol(global_symbol_id)
+                        .is_local()
+                {
+                    self.mark_matching_multipart_imports(global_scope, global_symbol_id, segments);
+                }
+                return;
+            }
+        }
+
+        // The root has no live local binding, so resolution must wait for the
+        // complete place table (see `PendingCaptures`).
+        self.current_scope_info_mut()
+            .deferred_multipart_uses
+            .entry(Name::new(*imported_root))
+            .or_default()
+            .push(dotted_name.to_string().into_boxed_str());
+    }
+
+    fn mark_matching_multipart_imports(
+        &mut self,
+        scope_id: FileScopeId,
+        symbol_id: ScopedSymbolId,
+        segments: &[&str],
+    ) {
+        let use_def = &self.use_def_maps[scope_id];
+        let mut all_live_definitions_are_multipart_imports = true;
+        let mut matching_definitions = SmallVec::<[ScopedDefinitionId; 4]>::new();
+        for definition_id in use_def.symbol_binding_definition_ids(symbol_id) {
+            match self.multipart_import_matches(scope_id, definition_id, segments) {
+                None => all_live_definitions_are_multipart_imports = false,
+                Some(true) => matching_definitions.push(definition_id),
+                Some(false) => {}
+            }
+        }
+
+        // When every live definition is a multipart import, also match reachable
+        // sibling imports of the same root (`import a.b, a.c` used as `a.b.x`).
+        if all_live_definitions_are_multipart_imports {
+            matching_definitions = self.use_def_maps[scope_id]
+                .reachable_symbol_binding_definition_ids(symbol_id)
+                .into_iter()
+                .filter(|definition_id| {
+                    self.multipart_import_matches(scope_id, *definition_id, segments) == Some(true)
+                })
+                .collect();
+        }
+
+        for definition_id in matching_definitions {
+            self.use_def_maps[scope_id].mark_multipart_import_definition_used(definition_id);
+        }
+    }
+
+    /// Returns `None` if the definition is not an unaliased multipart import, otherwise
+    /// whether the dotted use `segments` goes through the imported submodule.
+    fn multipart_import_matches(
+        &self,
+        scope_id: FileScopeId,
+        definition_id: ScopedDefinitionId,
+        segments: &[&str],
+    ) -> Option<bool> {
+        let imported_name = self.unaliased_multipart_import_name_of(scope_id, definition_id)?;
+        Some(dotted_starts_with(segments.iter().copied(), imported_name))
+    }
+
+    fn unaliased_multipart_import_name_of(
+        &self,
+        scope_id: FileScopeId,
+        definition_id: ScopedDefinitionId,
+    ) -> Option<&str> {
+        let DefinitionState::Defined(definition) =
+            self.use_def_maps[scope_id].definition(definition_id)
+        else {
+            return None;
+        };
+
+        definition
+            .kind(self.db)
+            .unaliased_multipart_import_name(self.module)
+    }
+
+    fn mark_deferred_multipart_uses(
+        &mut self,
+        scope_id: FileScopeId,
+        name: &Name,
+        multipart_uses: &[Box<str>],
+    ) {
+        if multipart_uses.is_empty() {
+            return;
+        }
+        let Some(symbol_id) = self.place_tables[scope_id].symbol_id(name) else {
+            return;
+        };
+
+        for dotted in multipart_uses {
+            let segments: SmallVec<[&str; 8]> = dotted.split('.').collect();
+            self.mark_matching_multipart_imports(scope_id, symbol_id, &segments);
+        }
+    }
+}
+
 impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
     fn visit_stmt(&mut self, stmt: &'ast ast::Stmt) {
         self.push_statement(CurrentStatement::default());
@@ -4419,6 +4615,9 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
 
                     if is_use {
                         self.record_place_use(place_id, expr);
+                        if matches!(expr, ast::Expr::Attribute(_)) {
+                            self.record_multipart_import_use(expr);
+                        }
 
                         // Keep track of any uses of unannotated collection initializers.
                         if let Some(collection_def) =

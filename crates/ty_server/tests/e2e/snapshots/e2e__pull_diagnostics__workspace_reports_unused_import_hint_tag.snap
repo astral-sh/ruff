@@ -1,0 +1,34 @@
+---
+source: crates/ty_server/tests/e2e/pull_diagnostics.rs
+expression: diagnostics
+---
+{
+  "items": [
+    {
+      "uri": "file://<temp_dir>/src/foo.py",
+      "version": null,
+      "resultId": "[RESULT_ID]",
+      "items": [
+        {
+          "range": {
+            "start": {
+              "line": 0,
+              "character": 7
+            },
+            "end": {
+              "line": 0,
+              "character": 9
+            }
+          },
+          "severity": 4,
+          "source": "ty",
+          "message": "Import `os` is unused",
+          "tags": [
+            1
+          ]
+        }
+      ],
+      "kind": "full"
+    }
+  ]
+}
