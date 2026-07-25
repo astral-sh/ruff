@@ -1546,7 +1546,20 @@ mod tests {
             "#,
         );
 
-        assert_snapshot!(test.goto_type_definition(), @"No goto target found");
+        assert_snapshot!(test.goto_type_definition(), @"
+        info[goto-type definition]: Go to type definition
+         --> main.py:3:15
+          |
+        3 | type Alias2[**AB = [int, str]] = Callable[AB, tuple[AB]]
+          |               ^^ Clicking here
+          |
+        info: Found 1 type definition
+         --> main.py:3:15
+          |
+        3 | type Alias2[**AB = [int, str]] = Callable[AB, tuple[AB]]
+          |               --
+          |
+        ");
     }
 
     #[test]

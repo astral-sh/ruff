@@ -460,6 +460,7 @@ impl GotoTarget<'_> {
             // (i.e. the type of `MyClass` in `MyClass()` is `<class MyClass>` and not `() -> MyClass`)
             GotoTarget::Call { callable, .. } => callable.inferred_type(model),
             GotoTarget::TypeParamTypeVarName(typevar) => typevar.inferred_type(model),
+            GotoTarget::TypeParamParamSpecName(typevar) => typevar.inferred_type(model),
             GotoTarget::ImportModuleComponent {
                 module_name,
                 component_index,
@@ -521,7 +522,6 @@ impl GotoTarget<'_> {
             | GotoTarget::PatternKeywordArgument(_)
             | GotoTarget::PatternMatchStarName(_)
             | GotoTarget::PatternMatchAsName(_)
-            | GotoTarget::TypeParamParamSpecName(_)
             | GotoTarget::TypeParamTypeVarTupleName(_)
             | GotoTarget::NonLocal { .. }
             | GotoTarget::Globals { .. } => None,
