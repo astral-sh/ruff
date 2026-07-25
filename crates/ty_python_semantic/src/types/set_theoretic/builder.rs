@@ -737,7 +737,7 @@ impl<'db> UnionBuilder<'db> {
                 let new_elements = union.elements(self.db);
                 self.elements.reserve(new_elements.len());
                 let mut union_batch = (!self.cycle_recovery
-                    && union.is_known_simplified(self.db)
+                    && union.is_simplified(self.db)
                     && !(self.unpack_aliases && union.has_aliases(self.db)))
                 .then(|| SimplifiedUnionBatch::new(self.elements.len()));
                 for element in new_elements {
@@ -2066,7 +2066,7 @@ mod tests {
         let union = UnionType::from_elements(&db, [t0, t1]).expect_union();
 
         assert_eq!(union.elements(&db), &[t0, t1]);
-        assert!(union.is_known_simplified(&db));
+        assert!(union.is_simplified(&db));
     }
 
     #[test]
@@ -2138,7 +2138,7 @@ mod tests {
                     .expect_union();
                 assert!(union.elements(&db).contains(&left));
                 assert!(union.elements(&db).contains(&right));
-                assert!(!union.is_known_simplified(&db));
+                assert!(!union.is_simplified(&db));
             }
         }
     }
@@ -2158,12 +2158,12 @@ mod tests {
             .build()
             .expect_union();
 
-        assert!(!unsimplified.is_known_simplified(&db));
+        assert!(!unsimplified.is_simplified(&db));
         assert!(
             !unsimplified
                 .filter(&db, |element| *element != int)
                 .expect_union()
-                .is_known_simplified(&db)
+                .is_simplified(&db)
         );
         assert_eq!(
             UnionBuilder::new(&db)
@@ -2174,7 +2174,7 @@ mod tests {
     }
 
     #[test]
-    fn simplification_proof_does_not_change_union_identity() {
+    fn simplification_state_does_not_change_union_identity() {
         let db = setup_db();
 
         let first = Type::int_literal(1);
@@ -2185,11 +2185,11 @@ mod tests {
             .add(second)
             .build()
             .expect_union();
-        assert!(!union_from_cycle_recovery.is_known_simplified(&db));
+        assert!(!union_from_cycle_recovery.is_simplified(&db));
 
         let simplified = UnionType::from_elements(&db, [first, second]).expect_union();
         assert_eq!(union_from_cycle_recovery, simplified);
-        assert!(union_from_cycle_recovery.is_known_simplified(&db));
+        assert!(union_from_cycle_recovery.is_simplified(&db));
 
         let union_from_later_cycle_recovery = UnionBuilder::new(&db)
             .cycle_recovery(true)
@@ -2198,7 +2198,7 @@ mod tests {
             .build()
             .expect_union();
         assert_eq!(union_from_later_cycle_recovery, simplified);
-        assert!(union_from_later_cycle_recovery.is_known_simplified(&db));
+        assert!(union_from_later_cycle_recovery.is_simplified(&db));
     }
 
     #[test]
@@ -2346,7 +2346,7 @@ mod tests {
         let int_instance = KnownClass::Int.to_instance(&db);
         let alias_and_int =
             UnionType::from_elements_leave_aliases(&db, [alias, int_instance]).expect_union();
-        assert!(alias_and_int.is_known_simplified(&db));
+        assert!(alias_and_int.is_simplified(&db));
         assert_eq!(
             UnionBuilder::new(&db)
                 .add(Type::Union(alias_and_int))

@@ -27,7 +27,7 @@ pub struct UnionType<'db> {
     #[returns(copy)]
     pub(crate) recursively_defined: RecursivelyDefined,
     #[returns(ref)]
-    simplification: UnionSimplificationProof,
+    simplification_state: UnionSimplificationState,
 }
 
 pub(crate) fn walk_union<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
@@ -45,23 +45,23 @@ impl get_size2::GetSize for UnionType<'_> {}
 
 /// Non-semantic simplification metadata for an interned union.
 ///
-/// All instances compare and hash equally: once any construction proves that an element set is
-/// simplified, the proof is atomically shared by every occurrence of that same union in the
-/// current Salsa revision without changing its identity.
+/// All instances compare and hash equally: once any construction simplifies an element set, this
+/// state is atomically shared by every occurrence of that same union in the current Salsa revision
+/// without changing its identity.
 ///
-/// Proofs are revision-scoped because relationships between otherwise-stable type identities can
-/// change after an edit. Salsa does not track mutations to this metadata, so it must only select
-/// optimizations whose result is identical to the conservative path.
+/// Simplification is revision-scoped because relationships between otherwise-stable type identities
+/// can change after an edit. Salsa does not track mutations to this metadata, so it must only
+/// select optimizations whose result is identical to the conservative path.
 #[doc(hidden)]
 #[derive(Debug)]
-pub struct UnionSimplificationProof(AtomicRevision);
+pub struct UnionSimplificationState(AtomicRevision);
 
-impl UnionSimplificationProof {
-    fn new_proven(db: &dyn Db) -> Self {
+impl UnionSimplificationState {
+    fn new_simplified(db: &dyn Db) -> Self {
         Self(AtomicRevision::new(current_revision(db)))
     }
 
-    fn new_unproven() -> Self {
+    fn new_unsimplified() -> Self {
         Self(AtomicRevision::new(Revision::max()))
     }
 
@@ -69,30 +69,30 @@ impl UnionSimplificationProof {
         self.0.store(current_revision(db));
     }
 
-    fn is_proven(&self, db: &dyn Db) -> bool {
+    fn is_simplified(&self, db: &dyn Db) -> bool {
         self.0.load() == current_revision(db)
     }
 }
 
-impl Clone for UnionSimplificationProof {
+impl Clone for UnionSimplificationState {
     fn clone(&self) -> Self {
         Self(self.0.clone())
     }
 }
 
-impl PartialEq for UnionSimplificationProof {
+impl PartialEq for UnionSimplificationState {
     fn eq(&self, _other: &Self) -> bool {
         true
     }
 }
 
-impl Eq for UnionSimplificationProof {}
+impl Eq for UnionSimplificationState {}
 
-impl Hash for UnionSimplificationProof {
+impl Hash for UnionSimplificationState {
     fn hash<H: Hasher>(&self, _state: &mut H) {}
 }
 
-impl get_size2::GetSize for UnionSimplificationProof {}
+impl get_size2::GetSize for UnionSimplificationState {}
 
 impl<'db> UnionType<'db> {
     pub(crate) fn new_simplified(
@@ -104,9 +104,9 @@ impl<'db> UnionType<'db> {
             db,
             elements,
             recursively_defined,
-            UnionSimplificationProof::new_proven(db),
+            UnionSimplificationState::new_simplified(db),
         );
-        union.simplification(db).mark_simplified(db);
+        union.simplification_state(db).mark_simplified(db);
         union
     }
 
@@ -119,12 +119,12 @@ impl<'db> UnionType<'db> {
             db,
             elements,
             recursively_defined,
-            UnionSimplificationProof::new_unproven(),
+            UnionSimplificationState::new_unsimplified(),
         )
     }
 
-    pub(crate) fn is_known_simplified(self, db: &'db dyn Db) -> bool {
-        self.simplification(db).is_proven(db)
+    pub(crate) fn is_simplified(self, db: &'db dyn Db) -> bool {
+        self.simplification_state(db).is_simplified(db)
     }
 }
 
@@ -360,7 +360,7 @@ impl<'db> UnionType<'db> {
             [] => Type::Never,
             [single] => *single,
             _ if new.len() == current.len() => Type::Union(self),
-            _ if self.is_known_simplified(db) => Type::Union(UnionType::new_simplified(
+            _ if self.is_simplified(db) => Type::Union(UnionType::new_simplified(
                 db,
                 new,
                 self.recursively_defined(db),
