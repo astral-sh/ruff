@@ -667,37 +667,40 @@ fn benchmark_narrowed_str_enum_comparison(criterion: &mut Criterion) {
 
 /// Regression benchmark for <https://github.com/astral-sh/ty/issues/4069>.
 ///
-/// Compare a large enum with unions containing `None`, an integer, a dictionary containing `Any`,
-/// or `Any`, without checking every enum member separately.
-fn benchmark_union_str_enum_comparison(criterion: &mut Criterion) {
+/// Compare a large enum with optional enum fields in a chain of conditions.
+fn benchmark_optional_str_enum_comparison(criterion: &mut Criterion) {
     const NUM_ENUM_MEMBERS: usize = 256;
 
     let mut code =
-        "from enum import StrEnum\nfrom typing import Any\n\nclass LargeEnum(StrEnum):\n"
+        "from dataclasses import dataclass\nfrom enum import StrEnum\n\nclass ModelSlug(StrEnum):\n"
             .to_string();
     for index in 0..NUM_ENUM_MEMBERS {
-        writeln!(&mut code, "    VALUE_{index} = \"value_{index}\"").ok();
+        writeln!(&mut code, "    M{index} = \"m{index}\"").ok();
     }
     code.push_str(
-        "\n\ndef compare(\n    slug: LargeEnum,\n    first: LargeEnum | None,\n    second: LargeEnum | None,\n    third: LargeEnum | None,\n    fourth: LargeEnum | None,\n    fifth: LargeEnum | None,\n) -> bool:\n    return first == slug or second == slug or third == slug or fourth == slug or fifth == slug\n",
+        r#"
+
+@dataclass
+class Category:
+    default_model: ModelSlug | None = None
+    browsing_model: ModelSlug | None = None
+    code_interpreter_model: ModelSlug | None = None
+    plugins_model: ModelSlug | None = None
+    dalle_model: ModelSlug | None = None
+
+
+def belongs(slug: ModelSlug, category: Category) -> bool:
+    return (
+        category.default_model == slug
+        or category.browsing_model == slug
+        or category.code_interpreter_model == slug
+        or category.plugins_model == slug
+        or category.dalle_model == slug
+    )
+"#,
     );
 
     benchmark_enum_comparison(criterion, "ty_micro[optional_str_enum_comparison]", &code);
-
-    for (name, replacement) in [
-        (
-            "ty_micro[mixed_union_str_enum_comparison]",
-            "LargeEnum | int",
-        ),
-        (
-            "ty_micro[nested_dynamic_str_enum_comparison]",
-            "LargeEnum | dict[str, Any]",
-        ),
-        ("ty_micro[dynamic_str_enum_comparison]", "LargeEnum | Any"),
-    ] {
-        let code = code.replace("LargeEnum | None", replacement);
-        benchmark_enum_comparison(criterion, name, &code);
-    }
 }
 
 /// Ensure explicit enum-literal unions are compared as value sets, not member pairs.
@@ -756,27 +759,6 @@ fn benchmark_cross_str_enum_comparison(criterion: &mut Criterion) {
     );
 
     benchmark_enum_comparison(criterion, "ty_micro[cross_str_enum_comparison]", &code);
-
-    let optional_code = code.replace("left: Left,", "left: Left | None,");
-    benchmark_enum_comparison(
-        criterion,
-        "ty_micro[optional_cross_str_enum_comparison]",
-        &optional_code,
-    );
-
-    for (name, replacement) in [
-        (
-            "ty_micro[both_optional_cross_str_enum_comparison]",
-            "right: Right | None",
-        ),
-        (
-            "ty_micro[mixed_cross_str_enum_comparison]",
-            "right: Right | int",
-        ),
-    ] {
-        let code = optional_code.replace("right: Right", replacement);
-        benchmark_enum_comparison(criterion, name, &code);
-    }
 }
 
 /// Ensure comparisons of unions spanning several scalar enum classes avoid member-pair expansion.
@@ -803,30 +785,15 @@ fn benchmark_mixed_str_enum_comparison(criterion: &mut Criterion) {
             .collect::<Vec<_>>()
             .join(" | ")
     };
-    let left_union = class_union("Left");
-    let right_union = class_union("Right");
     writeln!(
         &mut code,
-        "\ndef compare(left: {left_union}, right: {right_union}):\n    if left != right:\n        return\n    return left == right",
+        "\ndef compare(left: {}, right: {}):\n    if left != right:\n        return\n    return left == right",
+        class_union("Left"),
+        class_union("Right"),
     )
     .ok();
 
     benchmark_enum_comparison(criterion, "ty_micro[mixed_str_enum_comparison]", &code);
-
-    let optional_code = code
-        .replace(
-            &format!("left: {left_union},"),
-            &format!("left: {left_union} | None,"),
-        )
-        .replace(
-            &format!("right: {right_union}):"),
-            &format!("right: {right_union} | None):"),
-        );
-    benchmark_enum_comparison(
-        criterion,
-        "ty_micro[optional_mixed_str_enum_comparison]",
-        &optional_code,
-    );
 }
 
 /// Micro-benchmark that tests our performance when slicing and unpacking
@@ -2102,7 +2069,7 @@ criterion_group!(
     benchmark_large_enum_membership,
     benchmark_many_enum_members,
     benchmark_narrowed_str_enum_comparison,
-    benchmark_union_str_enum_comparison,
+    benchmark_optional_str_enum_comparison,
     benchmark_enum_literal_union_comparison,
     benchmark_repeated_str_enum_comparisons,
     benchmark_cross_str_enum_comparison,
