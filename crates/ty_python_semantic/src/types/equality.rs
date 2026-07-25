@@ -17,7 +17,7 @@ use super::{
 
 mod enums;
 
-use self::enums::{evaluate_enum_domains, evaluate_partitioned_enum_domains};
+use self::enums::evaluate_enum_comparison;
 
 /// The result of evaluating a runtime comparison between two types.
 ///
@@ -166,11 +166,7 @@ pub(super) fn evaluate_type_equality<'db>(
         )
     })
     .or_else(|| {
-        evaluate_enum_domains(db, left, right, branch, ComparisonOperator::Equality)
-            .and_then(|result| result.constraint(branch))
-    })
-    .or_else(|| {
-        evaluate_partitioned_enum_domains(
+        evaluate_enum_comparison(
             &mut ComparisonEvaluator::new(db, soundness_policy),
             left,
             right,
@@ -494,21 +490,24 @@ fn evaluate_comparison_once<'db>(
     branch: ComparisonBranch,
     operator: ComparisonOperator,
 ) -> ComparisonResult<'db> {
+    evaluate_enum_comparison(evaluator, left, right, branch, operator)
+        .or_else(|| evaluate_dynamic_comparison(evaluator, left, right, branch, operator))
+        .or_else(|| evaluate_finite_comparison(evaluator, left, right, branch, operator))
+        .unwrap_or_else(|| evaluate_structural_comparison(evaluator, left, right, branch, operator))
+}
+
+/// Evaluate dynamic operands before finite expansion can narrow them member by member.
+fn evaluate_dynamic_comparison<'db>(
+    evaluator: &mut ComparisonEvaluator<'db>,
+    left: Type<'db>,
+    right: Type<'db>,
+    branch: ComparisonBranch,
+    operator: ComparisonOperator,
+) -> Option<ComparisonResult<'db>> {
     let db = evaluator.db;
-
-    if let Some(result) = evaluate_enum_domains(db, left, right, branch, operator) {
-        return result;
-    }
-
-    if let Some(result) =
-        evaluate_partitioned_enum_domains(evaluator, left, right, branch, operator)
-    {
-        return result;
-    }
-
     match (left, right) {
-        (Type::Dynamic(_), other) => {
-            return if !operator.condition_expects_equality(branch)
+        (Type::Dynamic(_), other) => Some(
+            if !operator.condition_expects_equality(branch)
                 && all_values_compare_equal(evaluator, other, operator)
             {
                 let excluded = if other.is_enum(db)
@@ -527,19 +526,40 @@ fn evaluate_comparison_once<'db>(
                 )
             } else {
                 ComparisonResult::Ambiguous
-            };
-        }
-        (_, Type::Dynamic(_)) => return ComparisonResult::Ambiguous,
-        _ => {}
+            },
+        ),
+        (_, Type::Dynamic(_)) => Some(ComparisonResult::Ambiguous),
+        _ => None,
     }
+}
 
-    if let Some(alternatives) = finite_alternatives(db, left, operator) {
-        return evaluate_union_left(evaluator, &alternatives, right, branch, operator);
-    }
-    if let Some(alternatives) = finite_alternatives(db, right, operator) {
-        return evaluate_union_right(evaluator, left, &alternatives, branch, operator);
-    }
+/// Expand finite alternatives in target-first order after handling dynamic operands.
+fn evaluate_finite_comparison<'db>(
+    evaluator: &mut ComparisonEvaluator<'db>,
+    left: Type<'db>,
+    right: Type<'db>,
+    branch: ComparisonBranch,
+    operator: ComparisonOperator,
+) -> Option<ComparisonResult<'db>> {
+    let db = evaluator.db;
+    finite_alternatives(db, left, operator)
+        .map(|alternatives| evaluate_union_left(evaluator, &alternatives, right, branch, operator))
+        .or_else(|| {
+            finite_alternatives(db, right, operator).map(|alternatives| {
+                evaluate_union_right(evaluator, left, &alternatives, branch, operator)
+            })
+        })
+}
 
+/// Compare the remaining operand kinds using their structural comparison semantics.
+fn evaluate_structural_comparison<'db>(
+    evaluator: &mut ComparisonEvaluator<'db>,
+    left: Type<'db>,
+    right: Type<'db>,
+    branch: ComparisonBranch,
+    operator: ComparisonOperator,
+) -> ComparisonResult<'db> {
+    let db = evaluator.db;
     match (left, right) {
         (
             Type::Never

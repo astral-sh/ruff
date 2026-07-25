@@ -17,13 +17,29 @@ use super::{
     evaluate_against_results, evaluate_target_union,
 };
 
-/// Compare two enum value domains without comparing every pair of members.
+/// Compare enum operands without expanding every pair of members.
 ///
-/// Any narrowing constraint produced here contains only enum-membership facts. In particular,
-/// equality never transfers gradual or nominal intersection state from one operand to the other.
-/// Same-class domains compare compact member sets directly, while comparisons spanning multiple
-/// classes project their members onto runtime comparison keys.
-pub(super) fn evaluate_enum_domains<'db>(
+/// Enum-only operands are compared using compact member sets and runtime comparison keys. Mixed
+/// enum unions retain the ordinary comparison semantics of their non-enum alternatives.
+pub(super) fn evaluate_enum_comparison<'db>(
+    evaluator: &mut ComparisonEvaluator<'db>,
+    target: Type<'db>,
+    other: Type<'db>,
+    branch: ComparisonBranch,
+    operator: ComparisonOperator,
+) -> Option<ComparisonResult<'db>> {
+    evaluate_enum_domains(evaluator.db, target, other, branch, operator).or_else(|| {
+        let comparison =
+            PartitionedEnumComparison::new(evaluator.db, target, other, branch, operator)?;
+        Some(comparison.evaluate(evaluator, branch, operator))
+    })
+}
+
+/// Compare two enum-only domains using compact member sets or runtime comparison keys.
+///
+/// The resulting constraint contains only enum-membership facts. Equality never transfers gradual
+/// or nominal intersection state between operands.
+fn evaluate_enum_domains<'db>(
     db: &'db dyn Db,
     target: Type<'db>,
     other: Type<'db>,
@@ -65,93 +81,115 @@ pub(super) fn evaluate_enum_domains<'db>(
 ///         reveal_type(left)   # Literal[Left.SHARED] | None
 ///         reveal_type(right)  # Literal[Right.SHARED] | None
 /// ```
-///
-/// Returns `None` when either operand lacks an enum domain, neither operand has a residual, or an
-/// enum has unmodeled comparison semantics.
-pub(super) fn evaluate_partitioned_enum_domains<'db>(
-    evaluator: &mut ComparisonEvaluator<'db>,
-    target: Type<'db>,
-    other: Type<'db>,
-    branch: ComparisonBranch,
-    operator: ComparisonOperator,
-) -> Option<ComparisonResult<'db>> {
-    let db = evaluator.db;
+struct PartitionedEnumComparison<'db> {
+    target: EnumDomainPartition<'db>,
+    other: EnumDomainPartition<'db>,
+    enum_result: ComparisonResult<'db>,
+}
 
-    if !matches!(target.resolve_type_alias(db), Type::Union(_))
-        && !matches!(other.resolve_type_alias(db), Type::Union(_))
-    {
-        return None;
+impl<'db> PartitionedEnumComparison<'db> {
+    /// Extract a mixed comparison only when its enum domains have modeled semantics.
+    fn new(
+        db: &'db dyn Db,
+        target: Type<'db>,
+        other: Type<'db>,
+        branch: ComparisonBranch,
+        operator: ComparisonOperator,
+    ) -> Option<Self> {
+        if !matches!(target.resolve_type_alias(db), Type::Union(_))
+            && !matches!(other.resolve_type_alias(db), Type::Union(_))
+        {
+            return None;
+        }
+
+        let target = EnumDomainPartition::from_type(db, target)?;
+        let other = EnumDomainPartition::from_type(db, other)?;
+
+        if !target.has_residual() && !other.has_residual() {
+            return None;
+        }
+
+        let enum_result =
+            evaluate_enum_domains(db, target.enum_type, other.enum_type, branch, operator)?;
+
+        Some(Self {
+            target,
+            other,
+            enum_result,
+        })
     }
 
-    let EnumDomainPartition {
-        enum_type: target_enum,
-        alternatives: target_alternatives,
-        has_residual: target_has_residual,
-    } = EnumDomainPartition::from_type(db, target)?;
-    let EnumDomainPartition {
-        enum_type: other_enum,
-        alternatives: other_alternatives,
-        has_residual: other_has_residual,
-    } = EnumDomainPartition::from_type(db, other)?;
-
-    if !target_has_residual && !other_has_residual {
-        return None;
+    /// Reuse the compact enum result while evaluating residual pairs normally.
+    fn evaluate_pair(
+        &self,
+        evaluator: &mut ComparisonEvaluator<'db>,
+        target: Type<'db>,
+        other: Type<'db>,
+        branch: ComparisonBranch,
+        operator: ComparisonOperator,
+    ) -> ComparisonResult<'db> {
+        if target == self.target.enum_type && other == self.other.enum_type {
+            self.enum_result
+        } else {
+            evaluator.evaluate(target, other, branch, operator)
+        }
     }
 
-    // Partitioning is only useful when the enum domains themselves have modeled comparison
-    // semantics. Custom comparison methods must retain the ordinary evaluator's fallback.
-    let enum_result = evaluate_enum_domains(db, target_enum, other_enum, branch, operator)?;
-
-    let evaluate_alternative =
-        |evaluator: &mut ComparisonEvaluator<'db>, target: Type<'db>, other: Type<'db>| {
-            if target == target_enum && other == other_enum {
-                enum_result
-            } else {
-                evaluator.evaluate(target, other, branch, operator)
-            }
-        };
-
-    let evaluate_against_other = |evaluator: &mut ComparisonEvaluator<'db>, target: Type<'db>| {
-        if let [other] = other_alternatives.as_slice() {
-            return evaluate_alternative(evaluator, target, *other);
+    /// Combine one target alternative against the non-target alternatives.
+    fn evaluate_against_other(
+        &self,
+        evaluator: &mut ComparisonEvaluator<'db>,
+        target: Type<'db>,
+        branch: ComparisonBranch,
+        operator: ComparisonOperator,
+    ) -> ComparisonResult<'db> {
+        if let [other] = self.other.alternatives.as_slice() {
+            return self.evaluate_pair(evaluator, target, *other, branch, operator);
         }
 
         if evaluator.goal == ComparisonGoal::Truthiness {
             return combine_definite_truthiness(
-                other_alternatives
+                self.other
+                    .alternatives
                     .iter()
-                    .map(|other| evaluate_alternative(evaluator, target, *other)),
+                    .map(|other| self.evaluate_pair(evaluator, target, *other, branch, operator)),
             );
         }
 
         evaluate_against_results(
-            db,
+            evaluator.db,
             target,
             branch,
-            other_alternatives
+            self.other
+                .alternatives
                 .iter()
-                .map(|other| evaluate_alternative(evaluator, target, *other)),
+                .map(|other| self.evaluate_pair(evaluator, target, *other, branch, operator)),
         )
-    };
-
-    if let [target] = target_alternatives.as_slice() {
-        return Some(evaluate_against_other(evaluator, *target));
     }
 
-    if evaluator.goal == ComparisonGoal::Truthiness {
-        return Some(combine_definite_truthiness(
-            target_alternatives
-                .iter()
-                .map(|target| evaluate_against_other(evaluator, *target)),
-        ));
-    }
+    /// Preserve the caller's truthiness goal or target-specific narrowing.
+    fn evaluate(
+        &self,
+        evaluator: &mut ComparisonEvaluator<'db>,
+        branch: ComparisonBranch,
+        operator: ComparisonOperator,
+    ) -> ComparisonResult<'db> {
+        if let [target] = self.target.alternatives.as_slice() {
+            return self.evaluate_against_other(evaluator, *target, branch, operator);
+        }
 
-    Some(evaluate_target_union(
-        db,
-        &target_alternatives,
-        branch,
-        |target| evaluate_against_other(evaluator, target),
-    ))
+        if evaluator.goal == ComparisonGoal::Truthiness {
+            return combine_definite_truthiness(
+                self.target.alternatives.iter().map(|target| {
+                    self.evaluate_against_other(evaluator, *target, branch, operator)
+                }),
+            );
+        }
+
+        evaluate_target_union(evaluator.db, &self.target.alternatives, branch, |target| {
+            self.evaluate_against_other(evaluator, target, branch, operator)
+        })
+    }
 }
 
 /// Two non-empty value domains from the same enum and the semantics used to compare them.
@@ -569,7 +607,6 @@ impl<'db> EnumValueSet<'db> {
 struct EnumDomainPartition<'db> {
     enum_type: Type<'db>,
     alternatives: Vec<Type<'db>>,
-    has_residual: bool,
 }
 
 impl<'db> EnumDomainPartition<'db> {
@@ -632,14 +669,17 @@ impl<'db> EnumDomainPartition<'db> {
             .into_iter()
             .fold(UnionBuilder::new(db), UnionBuilder::add)
             .build();
-        let has_residual = !alternatives.is_empty();
         alternatives.insert(enum_position, enum_type);
 
         Some(Self {
             enum_type,
             alternatives,
-            has_residual,
         })
+    }
+
+    /// Return whether the partition contains non-enum alternatives.
+    fn has_residual(&self) -> bool {
+        self.alternatives.len() > 1
     }
 }
 
