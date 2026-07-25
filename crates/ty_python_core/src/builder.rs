@@ -1997,7 +1997,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             matches!(
                 error.kind,
                 SemanticSyntaxErrorKind::ReboundComprehensionVariable
-            ) && error.range == range
+                    | SemanticSyntaxErrorKind::NamedExpressionInComprehensionIterable
+            ) && error.range.contains_range(range)
         }) {
             return;
         }
