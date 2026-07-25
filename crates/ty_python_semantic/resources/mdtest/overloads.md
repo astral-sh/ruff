@@ -275,9 +275,7 @@ def union_receiver(reader: Reader[int | str]):
 ## Method type variables inferred from `self`
 
 Binding an overload whose explicit receiver introduces a method type variable should infer that
-variable from the concrete receiver and apply it to the remainder of the signature. At present,
-receiver matching retains the overload, but does not yet apply the inferred `S = str`
-specialization.
+variable from the concrete receiver and apply it to the remainder of the signature.
 
 ```toml
 [environment]
@@ -285,9 +283,11 @@ python-version = "3.12"
 ```
 
 ```py
-from typing import overload
+from typing import Any, Callable, overload
 
 class ReceiverGeneric[T]:
+    value: T
+
     @overload
     def method[S](self: "ReceiverGeneric[S]", value: S) -> S: ...
     @overload
@@ -295,18 +295,147 @@ class ReceiverGeneric[T]:
     def method(self, value: object) -> object:
         return value
 
-# Receiver constraints are preserved for later relation checks, but are not yet solved into the
-# displayed bound signature.
-# TODO: revealed: Overload[(value: str) -> str, (value: bytes) -> bytes]
-reveal_type(ReceiverGeneric[str]().method)  # revealed: Overload[[S](value: S) -> S, (value: bytes) -> bytes]
+reveal_type(ReceiverGeneric[str]().method)  # revealed: Overload[(value: str) -> str, (value: bytes) -> bytes]
+
+def takes_callable(fn: Callable[..., Any]) -> None: ...
+def use_generic_receiver[T](value: ReceiverGeneric[T]) -> None:
+    # revealed: Overload[(value: T@use_generic_receiver) -> T@use_generic_receiver, (value: bytes) -> bytes]
+    reveal_type(value.method)
+    takes_callable(value.method)
+```
+
+## Constrained method type variables inferred from `self`
+
+Matching a receiver against a value-constrained method type variable must reject values outside that
+variable's constraints. A subclass of an allowed value must be promoted to the declared constraint
+rather than appearing as the specialized return type.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Callable, Generic, TypeVar, overload
+
+BoxT = TypeVar("BoxT", covariant=True)
+Constrained = TypeVar("Constrained", str, bytes)
+
+class ConstrainedReceiverBox(Generic[BoxT]):
+    @overload
+    def method(self: "ConstrainedReceiverBox[Constrained]", value: Constrained) -> Constrained: ...
+    @overload
+    def method(self: "ConstrainedReceiverBox[Constrained]", value: Constrained, repeat: int = ...) -> Constrained: ...
+    def method(self, value: str | bytes, repeat: int = 1) -> str | bytes:
+        return value
+
+invalid_receiver = ConstrainedReceiverBox[int]()
+invalid_method = invalid_receiver.method
+reveal_type(invalid_method)  # revealed: Overload[]
+
+# error: [no-matching-overload]
+reveal_type(invalid_method(1))  # revealed: Unknown
+
+# error: [invalid-assignment]
+invalid_callback: Callable[[int], int] = invalid_method
+
+class SubStr(str): ...
+
+subclass_receiver = ConstrainedReceiverBox[SubStr]()
+reveal_type(subclass_receiver.method(SubStr()))  # revealed: str
+promoted_callback: Callable[[SubStr], str] = subclass_receiver.method
+```
+
+## Disjunctive generic receivers
+
+A receiver may satisfy both sides of a union without constraining both sides' type variables on the
+same path. In particular, matching `Left[int]` leaves the `Right` type variable available to
+specialize from the method arguments.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Callable, overload
+
+class Left[T]:
+    left: T
+
+class Right[T]:
+    right: T
+
+class BaseWithDisjunctiveReceiver:
+    @overload
+    def method[S, U](self: "Left[S] | Right[U]", first: S, second: U) -> tuple[S, U]: ...
+    @overload
+    def method(self, first: bytes, second: bytes) -> tuple[bytes, bytes]: ...
+    def method(self, first: object, second: object) -> tuple[object, object]:
+        return first, second
+
+class Both(BaseWithDisjunctiveReceiver, Left[int], Right[str]): ...
+
+receiver = Both()
+receiver.method(1, b"value")
+valid_callback: Callable[[int, bytes], tuple[int, bytes]] = receiver.method
+```
+
+## Receiver type variables alongside variadic type parameters
+
+A method's `ParamSpec` or `TypeVarTuple` must not prevent an ordinary type variable from being
+specialized by its receiver. The variadic parameters remain available for argument inference;
+neither method can be converted into a callback with a return type incompatible with the receiver.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Callable, overload
+
+class VariadicReceiverBox[T]:
+    value: T
+
+    @overload
+    def with_paramspec[**P, S](self: "VariadicReceiverBox[S]", callback: Callable[P, object]) -> S: ...
+    @overload
+    def with_paramspec(self, callback: bytes) -> bytes: ...
+    def with_paramspec(self, callback: object) -> object:
+        return callback
+
+    @overload
+    def with_typevartuple[*Ts, S](self: "VariadicReceiverBox[S]", first: int, *values: *Ts) -> S: ...
+    @overload
+    def with_typevartuple(self, first: bytes) -> bytes: ...
+    def with_typevartuple(self, first: object, *values: object) -> object:
+        return first
+
+def accepts_int(value: int) -> object:
+    return value
+
+receiver = VariadicReceiverBox[str]()
+
+# revealed: Overload[[**P](callback: (**P) -> object) -> str, (callback: bytes) -> bytes]
+reveal_type(receiver.with_paramspec)
+reveal_type(receiver.with_paramspec(accepts_int))  # revealed: str
+
+# error: [invalid-assignment]
+bad_paramspec_callback: Callable[[Callable[[int], object]], int] = receiver.with_paramspec
+
+reveal_type(receiver.with_typevartuple(1, b"value"))  # revealed: str
+typevartuple_callback: Callable[[int, bytes], str] = receiver.with_typevartuple
+
+# error: [invalid-assignment]
+bad_typevartuple_callback: Callable[[int, bytes], int] = receiver.with_typevartuple
 ```
 
 ## Structural protocol receivers
 
 Checking a generic protocol receiver requires solving all uses of its type variable together. Here
 `get()` would require `int` to be assignable to `T`, while `put()` would require `T` to be
-assignable to `str`, so no `T` can satisfy `ProtocolSelf[T]`. At present, the incompatible overload
-is retained because structural receiver specialization is not yet supported.
+assignable to `str`, so no `T` can satisfy `ProtocolSelf[T]`.
 
 ```py
 from typing import Callable, Protocol, TypeVar, overload
@@ -331,12 +460,49 @@ class ProtocolSelfImplementation(BaseWithProtocolSelf):
 
     def put(self, x: str) -> None: ...
 
-# TODO: The first overload should be eliminated, leaving `bound method
-# BaseWithProtocolSelf.method() -> bytes`.
-reveal_type(ProtocolSelfImplementation().method)  # revealed: Overload[[ProtocolSelfT]() -> ProtocolSelfT, () -> bytes]
+reveal_type(ProtocolSelfImplementation().method)  # revealed: bound method ProtocolSelfImplementation.method() -> bytes
 
 good_protocol_receiver: Callable[[], bytes] = ProtocolSelfImplementation().method
 bad_protocol_receiver: Callable[[], int] = ProtocolSelfImplementation().method  # error: [invalid-assignment]
+```
+
+## One-sided constraints from protocol receivers
+
+An explicit protocol receiver can constrain a method type variable without determining an exact
+specialization. Keep that type variable generic so that compatible callbacks remain valid while the
+receiver constraint rejects incompatible ones.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Callable, Protocol, overload
+
+class Producer[T](Protocol):
+    def get(self) -> T: ...
+
+class BaseWithProducer:
+    @overload
+    def method[S](self: Producer[S], value: S) -> S: ...
+    @overload
+    def method(self, value: bytes) -> bytes: ...
+    def method(self, value: object) -> object:
+        return value
+
+class ProducerImplementation(BaseWithProducer):
+    def get(self) -> str:
+        return ""
+
+# `Producer` is covariant, so binding records `str <: S` without specializing `S` to `str`.
+reveal_type(ProducerImplementation().method)  # revealed: Overload[[S](value: S) -> S, (value: bytes) -> bytes]
+# `S = object` satisfies the receiver constraint.
+producer_callback: Callable[[object], object] = ProducerImplementation().method
+# `S = int` violates the receiver constraint, and the `bytes` overload is also incompatible.
+bad_producer_callback: Callable[[int], int] = ProducerImplementation().method  # error: [invalid-assignment]
+# The argument adds `Literal[1] <: S`, so the combined lower bound is `str | Literal[1]`.
+reveal_type(ProducerImplementation().method(1))  # revealed: str | Literal[1]
 ```
 
 ## Constructor
@@ -1349,4 +1515,52 @@ def baz(x, y, z=None) -> bytes | list[str]:
 
 # revealed: Overload[(x, y) -> bytes, (x, y, z) -> list[str]]
 reveal_type(baz)
+```
+
+## Generic overloaded protocol members preserve receiver relationships
+
+An overloaded method used to satisfy a protocol receiver can relate a method-scoped type variable to
+a concrete generic receiver. Binding that member must retain the scalar return type.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```pyi
+from typing import Any, Generic, Protocol, TypeVar, assert_type, overload, reveal_type
+
+class ScalarBase: ...
+class Scalar(ScalarBase): ...
+
+ScalarCo = TypeVar("ScalarCo", bound=ScalarBase, covariant=True, default=ScalarBase)
+ShapeCo = TypeVar("ShapeCo", bound=tuple[int, ...], covariant=True, default=tuple[Any, ...])
+
+class HasPhantom[T](Protocol):
+    def phantom(self) -> T: ...
+
+class Phantom(Generic[ShapeCo, ScalarCo]):
+    # An empty shape selects the scalar overload and relates its return type to the receiver.
+    @overload
+    def phantom[T: ScalarBase](self: "Phantom[tuple[()], T]") -> T: ...
+    # A non-empty shape selects the list-valued overload instead.
+    @overload
+    def phantom[Shape: tuple[int, *tuple[int, ...]], T: ScalarBase](
+        self: "Phantom[Shape, T]",
+    ) -> list[T]: ...
+
+class Normal(Phantom[ShapeCo, ScalarCo], Generic[ShapeCo, ScalarCo]):
+    # Matching this protocol receiver requires binding the inherited `phantom` overloads.
+    @property
+    def value[T](self: "HasPhantom[T]") -> T: ...
+
+# The empty shape selects `phantom() -> Scalar`, so the protocol and property type is `Scalar`.
+normal: Normal[tuple[()], Scalar]
+assert_type(normal.value, Scalar)
+
+# A non-empty shape selects `phantom() -> list[Scalar]`, so the property type is `list[Scalar]`.
+shaped: Normal[tuple[int], Scalar]
+assert_type(shaped.phantom(), list[Scalar])
+# TODO: The receiver constraint `Scalar <: T` should propagate through invariant `list[T]`.
+reveal_type(shaped.value)  # revealed: Unknown
 ```
