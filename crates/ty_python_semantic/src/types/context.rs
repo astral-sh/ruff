@@ -365,14 +365,14 @@ impl Drop for LintDiagnosticGuard<'_, '_> {
         let mut diag = self.diag.take().unwrap();
 
         if let Some(message_override) = self.message_override.take() {
-            let original_message = diag
+            let primary_annotation_has_message = diag
                 .primary_annotation()
                 .and_then(Annotation::get_message)
-                .is_none_or(str::is_empty)
-                .then(|| diag.headline_message().to_string());
-            if let Some(original_message) = original_message
-                && let Some(annotation) = diag.primary_annotation_mut()
-            {
+                .is_some_and(|message| !message.is_empty());
+            let original_message = diag.headline_message().to_string();
+            if primary_annotation_has_message {
+                diag.prepend_info(original_message);
+            } else if let Some(annotation) = diag.primary_annotation_mut() {
                 annotation.set_message(original_message);
             }
 
@@ -532,8 +532,8 @@ impl<'db, 'ctx> LintDiagnosticGuardBuilder<'db, 'ctx> {
     /// impl to `Diagnostic`.
     ///
     /// If a message override is present, it is applied when the diagnostic is finalized. `message`
-    /// is retained on the primary annotation if the annotation has no message, and any custom
-    /// concise message is discarded.
+    /// is retained on the primary annotation if the annotation has no message, or as an info
+    /// sub-diagnostic otherwise. Any custom concise message is discarded.
     pub(super) fn into_diagnostic(
         self,
         message: impl std::fmt::Display,
@@ -559,7 +559,7 @@ impl<'db, 'ctx> LintDiagnosticGuardBuilder<'db, 'ctx> {
 
     /// Replace the headline message when the diagnostic is finalized and add an info
     /// sub-diagnostic. The original message is retained on the primary annotation if it has no
-    /// message.
+    /// message, or as an info sub-diagnostic otherwise.
     pub(super) fn with_message_override(mut self, message: String, info: &str) -> Self {
         self.message_override = Some((message, info.to_string()));
         self

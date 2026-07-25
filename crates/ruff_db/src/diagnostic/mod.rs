@@ -169,6 +169,13 @@ impl Diagnostic {
         self.sub(SubDiagnostic::new(SubDiagnosticSeverity::Info, message));
     }
 
+    /// Adds an "info" sub-diagnostic before any existing sub-diagnostics.
+    pub fn prepend_info<'a>(&mut self, message: impl IntoDiagnosticMessage + 'a) {
+        Arc::make_mut(&mut self.inner)
+            .subs
+            .insert(0, SubDiagnostic::new(SubDiagnosticSeverity::Info, message));
+    }
+
     /// Adds a "help" sub-diagnostic with the given message.
     ///
     /// See the closely related [`Diagnostic::info`] method for more details.
