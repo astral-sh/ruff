@@ -1051,9 +1051,26 @@ fn user_visible_definitions<'db>(
         match definition.kind(db) {
             DefinitionKind::NestedBindings(nested) => {
                 let index = semantic_index(db, definition.file(db));
+                let Some(symbol_id) = definition.place(db).as_symbol() else {
+                    continue;
+                };
+                let scope_id = definition.file_scope(db);
+                let this_scope_sees_global_bindings =
+                    index.symbol_resolves_to_global_scope(symbol_id, scope_id);
+                let this_scope_sees_nonlocal_bindings = !(this_scope_sees_global_bindings
+                    || (index.scope(scope_id).kind().is_class()
+                        && index.place_table(scope_id).symbol(symbol_id).is_local()));
                 let sources = nested
                     .binding_sources(index)
-                    .flat_map(|(_, bindings)| bindings)
+                    .filter_map(|(is_global, bindings)| {
+                        (if is_global {
+                            this_scope_sees_global_bindings
+                        } else {
+                            this_scope_sees_nonlocal_bindings
+                        })
+                        .then_some(bindings)
+                    })
+                    .flatten()
                     .filter_map(|binding| binding.binding.definition());
                 // A lazy function proxy can lead to an eager comprehension proxy. Follow that
                 // proxy-only chain without exposing ordinary lazy nested assignments.

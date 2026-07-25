@@ -44,6 +44,27 @@ fn should_consider_definition(kind: &DefinitionKind<'_>) -> bool {
     }
 }
 
+/// Returns whether a comprehension walrus belongs to the nearest enclosing local scope.
+fn comprehension_named_expression_is_local(
+    index: &SemanticIndex<'_>,
+    comprehension_scope: FileScopeId,
+    name: &str,
+) -> bool {
+    index
+        .ancestor_scopes(comprehension_scope)
+        .skip(1)
+        .find(|(_, scope)| scope.kind() != ScopeKind::Comprehension)
+        .is_some_and(|(scope_id, scope)| {
+            matches!(scope.kind(), ScopeKind::Function | ScopeKind::Lambda)
+                && index
+                    .place_table(scope_id)
+                    .symbol_id(name)
+                    .is_some_and(|symbol_id| {
+                        index.place_table(scope_id).symbol(symbol_id).is_local()
+                    })
+        })
+}
+
 fn function_scope_is_overload_declaration(
     db: &dyn Db,
     index: &SemanticIndex<'_>,
@@ -167,9 +188,12 @@ pub fn unused_bindings(db: &dyn Db, file: ruff_db::files::File) -> Box<[UnusedBi
 
             // Global and nonlocal assignments target bindings from outer scopes.
             // Treat them as externally managed to avoid false positives here.
-            let is_comprehension_named_expression = scope_kind == ScopeKind::Comprehension
-                && matches!(kind, DefinitionKind::NamedExpression(_));
-            if (symbol.is_global() || symbol.is_nonlocal()) && !is_comprehension_named_expression {
+            let is_local_comprehension_named_expression = scope_kind == ScopeKind::Comprehension
+                && matches!(kind, DefinitionKind::NamedExpression(_))
+                && comprehension_named_expression_is_local(index, file_scope_id, name);
+            if (symbol.is_global() || symbol.is_nonlocal())
+                && !is_local_comprehension_named_expression
+            {
                 continue;
             }
 
@@ -289,6 +313,8 @@ mod tests {
         let source = dedent(
             "
             module_dead = 1
+            [(module_walrus := item) for item in [1]]
+            [[(nested_module_walrus := item) for item in [1]] for _ in [1]]
 
             class C:
                 class_dead = 1
@@ -331,6 +357,7 @@ mod tests {
             def mutate_global():
                 global global_value
                 global_value = 1
+                [(global_value := item) for item in [1]]
                 local_dead = 1
 
             def outer():
@@ -339,6 +366,7 @@ mod tests {
                 def inner():
                     nonlocal captured
                     captured = 1
+                    [(captured := item) for item in [1]]
 
                 inner()
                 return captured
@@ -347,6 +375,72 @@ mod tests {
 
         let names = collect_unused_names(&source)?;
         assert_eq!(names, vec!["local_dead"]);
+        Ok(())
+    }
+
+    #[test]
+    fn keeps_global_and_nonlocal_comprehension_walruses_separate() -> anyhow::Result<()> {
+        let source = dedent(
+            "
+            last = 0
+
+            def outer():
+                last = 1
+
+                def write_global():
+                    global last
+                    [(last := global_item) for global_item in [2]]
+
+                def write_nonlocal():
+                    nonlocal last
+                    [(last := nonlocal_item) for nonlocal_item in [3]]
+
+                write_global()
+                write_nonlocal()
+                return last
+            ",
+        );
+
+        let names = collect_unused_names(&source)?;
+        assert_eq!(names, Vec::<String>::new());
+        Ok(())
+    }
+
+    #[test]
+    fn tracks_comprehension_walruses_in_local_scopes() -> anyhow::Result<()> {
+        let source = dedent(
+            "
+            def used(items):
+                [(used_walrus := item) for item in items]
+                return used_walrus
+
+            def unused(items):
+                [(unused_walrus := item) for item in items]
+
+            def nested_used(items):
+                [[(nested_used_walrus := item) for item in items] for _ in [1]]
+                return nested_used_walrus
+
+            def nested_unused(items):
+                [[(nested_unused_walrus := item) for item in items] for _ in [1]]
+
+            used_lambda = lambda items: (
+                [(used_lambda_walrus := item) for item in items],
+                used_lambda_walrus,
+            )
+            unused_lambda = lambda items: [(unused_lambda_walrus := item) for item in items]
+            ",
+        );
+
+        let names = collect_unused_names(&source)?;
+        assert_eq!(
+            names,
+            vec![
+                "nested_unused_walrus",
+                "unused_lambda_walrus",
+                "unused_walrus",
+            ]
+        );
         Ok(())
     }
 

@@ -43,6 +43,179 @@ pub(super) mod test {
     use ruff_text_size::Ranged;
 
     #[test]
+    fn goto_definition_does_not_mix_global_and_nonlocal_comprehension_walruses() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                "
+last = 0
+
+def outer():
+    last = 1
+
+    def write_global():
+        global last
+        [(last := global_item) for global_item in [2]]
+
+    def write_nonlocal():
+        nonlocal last
+        [(last := nonlocal_item) for nonlocal_item in [3]]
+
+    write_global()
+    write_nonlocal()
+    return la<CURSOR>st
+",
+            )
+            .build();
+
+        let output = test.goto_definition();
+        assert!(
+            !output.contains("last := global_item"),
+            "a module-global writer must not define a function-local variable: {output}"
+        );
+        assert_snapshot!(output, @"
+        info[goto-definition]: Go to definition
+          --> main.py:17:12
+           |
+        17 |     return last
+           |            ^^^^ Clicking here
+           |
+        info: Found 2 definitions
+          --> main.py:5:5
+           |
+         5 |     last = 1
+           |     ----
+           |
+          ::: main.py:13:11
+           |
+        13 |         [(last := nonlocal_item) for nonlocal_item in [3]]
+           |           ----
+           |
+        ");
+    }
+
+    #[test]
+    fn goto_definition_comprehension_walrus_in_function() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                "
+def f(items):
+    [(last := item) for item in items]
+    return la<CURSOR>st
+",
+            )
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @"
+        info[goto-definition]: Go to definition
+         --> main.py:4:12
+          |
+        4 |     return last
+          |            ^^^^ Clicking here
+          |
+        info: Found 1 definition
+         --> main.py:3:7
+          |
+        3 |     [(last := item) for item in items]
+          |       ----
+          |
+        ");
+    }
+
+    #[test]
+    fn goto_definition_nested_comprehension_walrus_in_function() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                "
+def f(items):
+    [[(last := item) for item in items] for _ in [1]]
+    return la<CURSOR>st
+",
+            )
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @"
+        info[goto-definition]: Go to definition
+         --> main.py:4:12
+          |
+        4 |     return last
+          |            ^^^^ Clicking here
+          |
+        info: Found 1 definition
+         --> main.py:3:8
+          |
+        3 |     [[(last := item) for item in items] for _ in [1]]
+          |        ----
+          |
+        ");
+    }
+
+    #[test]
+    fn goto_definition_imported_comprehension_walrus() {
+        let test = CursorTest::builder()
+            .source("lib.py", "[(last := item) for item in [1]]\n")
+            .source("main.py", "from lib import last\nprint(la<CURSOR>st)\n")
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @"
+        info[goto-definition]: Go to definition
+         --> main.py:2:7
+          |
+        2 | print(last)
+          |       ^^^^ Clicking here
+          |
+        info: Found 1 definition
+         --> lib.py:1:3
+          |
+        1 | [(last := item) for item in [1]]
+          |   ----
+          |
+        ");
+    }
+
+    #[test]
+    fn goto_definition_nonlocal_comprehension_walrus() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                "
+def outer(items):
+    last = 0
+
+    def inner():
+        nonlocal last
+        [(last := item) for item in items]
+        return la<CURSOR>st
+
+    return inner()
+",
+            )
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @"
+        info[goto-definition]: Go to definition
+         --> main.py:8:16
+          |
+        8 |         return last
+          |                ^^^^ Clicking here
+          |
+        info: Found 2 definitions
+         --> main.py:3:5
+          |
+        3 |     last = 0
+          |     ----
+        4 |
+        5 |     def inner():
+        6 |         nonlocal last
+        7 |         [(last := item) for item in items]
+          |           ----
+          |
+        ");
+    }
+
+    #[test]
     fn goto_definition_relative_import() {
         let test = CursorTest::builder()
             .source("mypackage/__init__.py", "from . import module_a<CURSOR>")

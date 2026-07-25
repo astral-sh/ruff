@@ -166,6 +166,102 @@ mod tests {
     }
 
     #[test]
+    fn rename_does_not_mix_global_and_nonlocal_comprehension_walruses() {
+        let test = cursor_test(
+            "
+last = 0
+
+def outer():
+    last = 1
+
+    def write_global():
+        global last
+        [(last := global_item) for global_item in [2]]
+
+    def write_nonlocal():
+        nonlocal last
+        [(last := nonlocal_item) for nonlocal_item in [3]]
+
+    write_global()
+    write_nonlocal()
+    return la<CURSOR>st
+",
+        );
+
+        let output = test.rename("result");
+        assert!(
+            !output.contains("last := global_item"),
+            "renaming a function-local variable must not rename a global walrus: {output}"
+        );
+        assert_snapshot!(output, @"
+        info[rename]: Rename symbol (found 4 locations)
+          --> main.py:5:5
+           |
+         5 |     last = 1
+           |     ^^^^
+           |
+          ::: main.py:12:18
+           |
+        12 |         nonlocal last
+           |                  ----
+        13 |         [(last := nonlocal_item) for nonlocal_item in [3]]
+           |           ----
+        14 |
+        15 |     write_global()
+        16 |     write_nonlocal()
+        17 |     return last
+           |            ----
+           |
+        ");
+    }
+
+    #[test]
+    fn rename_comprehension_walrus_in_function() {
+        let test = cursor_test(
+            "
+def f(items):
+    [(la<CURSOR>st := item) for item in items]
+    return last
+",
+        );
+
+        assert_snapshot!(test.rename("result"), @"
+        info[rename]: Rename symbol (found 2 locations)
+         --> main.py:3:7
+          |
+        3 |     [(last := item) for item in items]
+          |       ^^^^
+        4 |     return last
+          |            ----
+          |
+        ");
+    }
+
+    #[test]
+    fn rename_comprehension_walrus_across_files() {
+        let test = CursorTest::builder()
+            .source("lib.py", "[(la<CURSOR>st := item) for item in [1]]\n")
+            .source("main.py", "from lib import last\nprint(last)\n")
+            .build();
+
+        assert_snapshot!(test.rename("result"), @"
+        info[rename]: Rename symbol (found 3 locations)
+         --> lib.py:1:3
+          |
+        1 | [(last := item) for item in [1]]
+          |   ^^^^
+          |
+         ::: main.py:1:17
+          |
+        1 | from lib import last
+          |                 ----
+        2 | print(last)
+          |       ----
+          |
+        ");
+    }
+
+    #[test]
     fn prepare_rename_parameter() {
         let test = cursor_test(
             "
