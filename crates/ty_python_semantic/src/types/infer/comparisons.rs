@@ -75,10 +75,56 @@ impl<'db> Type<'db> {
         )
     }
 
-    /// Return `true` if `self` and `other` cannot describe the same runtime object.
-    pub(crate) fn is_disjoint_from_for_identity(self, db: &'db dyn Db, other: Type<'db>) -> bool {
-        self.identity_comparison_type(db)
-            .is_disjoint_from(db, other.identity_comparison_type(db))
+    /// Return whether values of these types always, never, or possibly identify the same object.
+    pub(crate) fn identity_comparison_truthiness(
+        self,
+        db: &'db dyn Db,
+        other: Type<'db>,
+    ) -> Truthiness {
+        let is_singleton_or_intersection_with_singleton = |ty: Type<'db>| {
+            ty.is_singleton(db)
+                || ty
+                    .resolve_type_alias(db)
+                    .as_intersection()
+                    .is_some_and(|intersection| {
+                        intersection
+                            .positive(db)
+                            .iter()
+                            .any(|ty| ty.is_singleton(db))
+                    })
+        };
+
+        // Two occurrences of the same constrained `TypeVar` require separate handling. Although
+        // different specializations can choose different singleton constraints, every occurrence in
+        // one specialization shares the same selected constraint and therefore the same object.
+        if let Type::TypeVar(left) = self.resolve_type_alias(db)
+            && let Type::TypeVar(right) = other.resolve_type_alias(db)
+            && left.is_same_typevar_as(db, right)
+            && is_singleton_or_intersection_with_singleton(Type::TypeVar(left))
+        {
+            return Truthiness::AlwaysTrue;
+        }
+
+        // `NewType` instances are identity functions at runtime, so distinct static types can still
+        // identify the same object. Compare the types of their possible runtime objects instead.
+        let left_identity = self.identity_comparison_type(db);
+        let right_identity = other.identity_comparison_type(db);
+
+        // Non-disjoint singleton types do not necessarily identify the same object: disjointness can
+        // be inconclusive, for example when aliases between enum members cannot be determined.
+        // Require one singleton type to be a subtype of the other before concluding that they are
+        // definitely identical.
+        if left_identity.is_disjoint_from(db, right_identity) {
+            Truthiness::AlwaysFalse
+        } else if is_singleton_or_intersection_with_singleton(left_identity)
+            && is_singleton_or_intersection_with_singleton(right_identity)
+            && (left_identity.is_subtype_of(db, right_identity)
+                || right_identity.is_subtype_of(db, left_identity))
+        {
+            Truthiness::AlwaysTrue
+        } else {
+            Truthiness::Ambiguous
+        }
     }
 }
 
@@ -222,69 +268,10 @@ pub(super) fn infer_binary_type_comparison<'db>(
 
     let op = match op {
         ast::CmpOp::Is | ast::CmpOp::IsNot => {
-            let is_positive = op == ast::CmpOp::Is;
-
-            let is_singleton_or_intersection_with_singleton = |ty: Type<'db>| {
-                ty.is_singleton(db)
-                    || ty
-                        .resolve_type_alias(db)
-                        .as_intersection()
-                        .is_some_and(|intersection| {
-                            intersection
-                                .positive(db)
-                                .iter()
-                                .any(|ty| ty.is_singleton(db))
-                        })
-            };
-
-            // Keep two occurrences of the same `TypeVar` symbolic. Replacing them with their bounds or
-            // constraints would lose their shared specialization: a `TypeVar` constrained to `None` and
-            // `EllipsisType` chooses the same singleton for both operands, not independent alternatives.
-            if let Type::TypeVar(left) = left.resolve_type_alias(db)
-                && let Type::TypeVar(right) = right.resolve_type_alias(db)
-                && left.is_same_typevar_as(db, right)
-                && is_singleton_or_intersection_with_singleton(Type::TypeVar(left))
-            {
-                return Ok(Type::bool_literal(is_positive));
-            }
-
-            // `NewType` is an identity function at runtime, so distinct NewTypes can still contain the
-            // same object:
-            //
-            // UserId = NewType("UserId", int)
-            // OrderId = NewType("OrderId", int)
-            // UserId(1) is OrderId(1)  # true, even though the two NewTypes are disjoint types!
-            //
-            // Widen both operands to the types of their possible runtime objects before using the
-            // ordinary comparison logic.
-            let left_identity = left.identity_comparison_type(db);
-            let right_identity = right.identity_comparison_type(db);
-
-            // If the identity types are disjoint, the operands cannot refer to the same
-            // runtime object.
-            //
-            // Otherwise, knowing that both types are non-disjoint singletons is still not enough
-            // to establish that they refer to the *same* singleton: `is_disjoint_from` can return
-            // false when disjointness cannot be proven. For example, two enum-literal types will
-            // always both be singletons, but if their aliases are unknown, we cannot tell whether
-            // they denote the same member or distinct members (one might be an alias to the other).
-            //
-            // We therefore require one singleton type to be a subtype of the other before inferring
-            // definite identity. Either direction suffices, which also handles cases like
-            // `None` and `Unknown & None`.
-            let result = if left_identity.is_disjoint_from(db, right_identity) {
-                Type::bool_literal(!is_positive)
-            } else if is_singleton_or_intersection_with_singleton(left_identity)
-                && is_singleton_or_intersection_with_singleton(right_identity)
-                && (left_identity.is_subtype_of(db, right_identity)
-                    || right_identity.is_subtype_of(db, left_identity))
-            {
-                Type::bool_literal(is_positive)
-            } else {
-                KnownClass::Bool.to_instance(db)
-            };
-
-            return Ok(result);
+            let truthiness = left
+                .identity_comparison_truthiness(db, right)
+                .negate_if(op == ast::CmpOp::IsNot);
+            return Ok(Type::from_truthiness(db, truthiness));
         }
         ast::CmpOp::Eq => NonIdentityOperator::Rich(RichCompareOperator::Eq),
         ast::CmpOp::NotEq => NonIdentityOperator::Rich(RichCompareOperator::Ne),
