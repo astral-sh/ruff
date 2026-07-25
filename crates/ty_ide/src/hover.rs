@@ -4272,10 +4272,10 @@ def function():
 
         // TODO: Should this be constravariant instead?
         assert_snapshot!(test.hover(), @"
-        P@Alias (bivariant)
+        P@Alias (covariant)
         ---------------------------------------------
         ```python
-        P@Alias (bivariant)
+        P@Alias (covariant)
         ```
         ---------------------------------------------
         info[hover]: Hovered content is
