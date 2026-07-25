@@ -2056,7 +2056,11 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                             .iter()
                             .map(|c| Type::single_char_string_literal(db, *c))
                             .collect();
-                        Type::Union(UnionType::new(db, union_elements, RecursivelyDefined::No))
+                        Type::Union(UnionType::new_simplified(
+                            db,
+                            union_elements,
+                            RecursivelyDefined::No,
+                        ))
                     }
                 };
 
@@ -2102,7 +2106,11 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                     _ => {
                         let union_elements: Box<[Type<'db>]> =
                             ints.iter().map(|int| Type::int_literal(*int)).collect();
-                        Type::Union(UnionType::new(db, union_elements, RecursivelyDefined::No))
+                        Type::Union(UnionType::new_simplified(
+                            db,
+                            union_elements,
+                            RecursivelyDefined::No,
+                        ))
                     }
                 };
 

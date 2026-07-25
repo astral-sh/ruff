@@ -380,6 +380,7 @@ impl<'db> UnionElement<'db> {
         db: &'db dyn Db,
         other_type: Type<'db>,
         cycle_recovery: bool,
+        skip_redundancy_checks: bool,
     ) -> ReduceResult<'db> {
         if cycle_recovery {
             // A widened literal group must absorb matching literals from later iterations for
@@ -400,6 +401,16 @@ impl<'db> UnionElement<'db> {
                         .as_nominal_instance()
                         .is_none_or(|instance| instance.class_literal(db) != *enum_class),
                 ),
+            };
+        }
+
+        if skip_redundancy_checks {
+            return match self {
+                UnionElement::Type(existing) => ReduceResult::Type(*existing),
+                UnionElement::IntLiterals(_)
+                | UnionElement::StringLiterals(_)
+                | UnionElement::BytesLiterals(_)
+                | UnionElement::EnumLiterals { .. } => ReduceResult::KeepIf(true),
             };
         }
 
@@ -530,6 +541,37 @@ const MAX_RECURSIVE_UNION_LITERALS: usize = 5;
 /// Huge enums and string literal sets are not uncommon (especially in generated code), and it's annoying
 /// if reachability analysis etc. fails when analysing these enums.
 const MAX_NON_RECURSIVE_UNION_LITERALS: usize = 8192;
+
+/// Identifies elements originating from the same already-simplified sub-union.
+///
+/// Elements at or above `start` do not need redundancy checks against later elements from that
+/// sub-union. Transformations invalidate the batch because the replacement type was not part of the
+/// original simplified union.
+struct SimplifiedUnionBatch {
+    start: usize,
+    valid: bool,
+}
+
+impl SimplifiedUnionBatch {
+    fn new(start: usize) -> Self {
+        Self { start, valid: true }
+    }
+
+    fn invalidate(&mut self) {
+        self.valid = false;
+    }
+
+    fn contains(&self, index: usize) -> bool {
+        self.valid && index >= self.start
+    }
+}
+
+fn invalidate_batch(batch: &mut Option<&mut SimplifiedUnionBatch>) {
+    if let Some(batch) = batch.as_deref_mut() {
+        batch.invalidate();
+    }
+}
+
 pub(crate) struct UnionBuilder<'db> {
     elements: Vec<UnionElement<'db>>,
     db: &'db dyn Db,
@@ -656,7 +698,7 @@ impl<'db> UnionBuilder<'db> {
             }
         }
         for ty in replace_with {
-            self.add_in_place_impl(ty, seen_aliases);
+            self.add_in_place_impl(ty, seen_aliases, None);
         }
     }
 
@@ -668,10 +710,15 @@ impl<'db> UnionBuilder<'db> {
 
     /// Adds a type to this union.
     pub(crate) fn add_in_place(&mut self, ty: Type<'db>) {
-        self.add_in_place_impl(ty, &mut vec![]);
+        self.add_in_place_impl(ty, &mut vec![], None);
     }
 
-    pub(crate) fn add_in_place_impl(&mut self, ty: Type<'db>, seen_aliases: &mut Vec<Type<'db>>) {
+    fn add_in_place_impl(
+        &mut self,
+        ty: Type<'db>,
+        seen_aliases: &mut Vec<Type<'db>>,
+        mut batch: Option<&mut SimplifiedUnionBatch>,
+    ) {
         let cycle_recovery = self.cycle_recovery;
         let should_widen = |literals, recursively_defined: RecursivelyDefined| {
             if recursively_defined.is_yes() && cycle_recovery {
@@ -686,10 +733,15 @@ impl<'db> UnionBuilder<'db> {
 
         match ty {
             Type::Union(union) => {
+                invalidate_batch(&mut batch);
                 let new_elements = union.elements(self.db);
                 self.elements.reserve(new_elements.len());
+                let mut union_batch = (!self.cycle_recovery
+                    && union.is_known_simplified(self.db)
+                    && !(self.unpack_aliases && union.has_aliases(self.db)))
+                .then(|| SimplifiedUnionBatch::new(self.elements.len()));
                 for element in new_elements {
-                    self.add_in_place_impl(*element, seen_aliases);
+                    self.add_in_place_impl(*element, seen_aliases, union_batch.as_mut());
                 }
                 self.recursively_defined = self
                     .recursively_defined
@@ -715,7 +767,8 @@ impl<'db> UnionBuilder<'db> {
                     // leave out the recursive alias. TODO surface this error.
                 } else {
                     seen_aliases.push(ty);
-                    self.add_in_place_impl(alias.value_type(self.db), seen_aliases);
+                    invalidate_batch(&mut batch);
+                    self.add_in_place_impl(alias.value_type(self.db), seen_aliases, None);
                 }
             }
             Type::LiteralValue(literal) => {
@@ -734,7 +787,8 @@ impl<'db> UnionBuilder<'db> {
                                 UnionElement::StringLiterals(literals) => {
                                     if should_widen(literals.len(), self.recursively_defined) {
                                         let replace_with = KnownClass::Str.to_instance(self.db);
-                                        self.add_in_place_impl(replace_with, seen_aliases);
+                                        invalidate_batch(&mut batch);
+                                        self.add_in_place_impl(replace_with, seen_aliases, None);
                                         return;
                                     }
                                     found = Some(literals);
@@ -747,6 +801,9 @@ impl<'db> UnionBuilder<'db> {
                                     return;
                                 }
                                 UnionElement::Type(existing) if !cycle_recovery => {
+                                    if batch.as_deref().is_some_and(|batch| batch.contains(index)) {
+                                        continue;
+                                    }
                                     // e.g. `existing` could be `Literal[""] & Any`,
                                     // and `ty` could be `Literal[""]`
                                     if ty.is_redundant_with(self.db, *existing) {
@@ -759,6 +816,7 @@ impl<'db> UnionBuilder<'db> {
                                     if ty_negated().is_subtype_of(self.db, *existing) {
                                         // The type that includes both this new element, and its negation
                                         // (or a supertype of its negation), must be simply `object`.
+                                        invalidate_batch(&mut batch);
                                         self.collapse_to_object();
                                         return;
                                     }
@@ -787,7 +845,8 @@ impl<'db> UnionBuilder<'db> {
                                 UnionElement::BytesLiterals(literals) => {
                                     if should_widen(literals.len(), self.recursively_defined) {
                                         let replace_with = KnownClass::Bytes.to_instance(self.db);
-                                        self.add_in_place_impl(replace_with, seen_aliases);
+                                        invalidate_batch(&mut batch);
+                                        self.add_in_place_impl(replace_with, seen_aliases, None);
                                         return;
                                     }
                                     found = Some(literals);
@@ -800,6 +859,9 @@ impl<'db> UnionBuilder<'db> {
                                     return;
                                 }
                                 UnionElement::Type(existing) if !cycle_recovery => {
+                                    if batch.as_deref().is_some_and(|batch| batch.contains(index)) {
+                                        continue;
+                                    }
                                     if ty.is_redundant_with(self.db, *existing) {
                                         return;
                                     }
@@ -812,6 +874,7 @@ impl<'db> UnionBuilder<'db> {
                                     if ty_negated().is_subtype_of(self.db, *existing) {
                                         // The type that includes both this new element, and its negation
                                         // (or a supertype of its negation), must be simply `object`.
+                                        invalidate_batch(&mut batch);
                                         self.collapse_to_object();
                                         return;
                                     }
@@ -842,7 +905,8 @@ impl<'db> UnionBuilder<'db> {
                                 UnionElement::IntLiterals(literals) => {
                                     if should_widen(literals.len(), self.recursively_defined) {
                                         let replace_with = KnownClass::Int.to_instance(self.db);
-                                        self.add_in_place_impl(replace_with, seen_aliases);
+                                        invalidate_batch(&mut batch);
+                                        self.add_in_place_impl(replace_with, seen_aliases, None);
                                         return;
                                     }
                                     found = Some(literals);
@@ -855,6 +919,9 @@ impl<'db> UnionBuilder<'db> {
                                     return;
                                 }
                                 UnionElement::Type(existing) if !cycle_recovery => {
+                                    if batch.as_deref().is_some_and(|batch| batch.contains(index)) {
+                                        continue;
+                                    }
                                     if ty.is_redundant_with(self.db, *existing) {
                                         return;
                                     }
@@ -867,6 +934,7 @@ impl<'db> UnionBuilder<'db> {
                                     if ty_negated().is_subtype_of(self.db, *existing) {
                                         // The type that includes both this new element, and its negation
                                         // (or a supertype of its negation), must be simply `object`.
+                                        invalidate_batch(&mut batch);
                                         self.collapse_to_object();
                                         return;
                                     }
@@ -897,9 +965,11 @@ impl<'db> UnionBuilder<'db> {
                             enum_class_literal.members_are_exhaustive(self.db);
 
                         if members_are_exhaustive && enum_member_count == 1 {
+                            invalidate_batch(&mut batch);
                             self.add_in_place_impl(
                                 enum_member_to_add.enum_class_instance(self.db),
                                 seen_aliases,
+                                None,
                             );
                             return;
                         }
@@ -918,7 +988,8 @@ impl<'db> UnionBuilder<'db> {
                                     if should_widen(literals.len(), self.recursively_defined) {
                                         let (literal, _) = literals.first().unwrap();
                                         let replace_with = literal.enum_class_instance(self.db);
-                                        self.add_in_place_impl(replace_with, seen_aliases);
+                                        invalidate_batch(&mut batch);
+                                        self.add_in_place_impl(replace_with, seen_aliases, None);
                                         return;
                                     }
                                     found = Some(literals);
@@ -931,6 +1002,9 @@ impl<'db> UnionBuilder<'db> {
                                     return;
                                 }
                                 UnionElement::Type(existing) if !cycle_recovery => {
+                                    if batch.as_deref().is_some_and(|batch| batch.contains(index)) {
+                                        continue;
+                                    }
                                     if ty.is_redundant_with(self.db, *existing) {
                                         return;
                                     }
@@ -943,6 +1017,7 @@ impl<'db> UnionBuilder<'db> {
                                     if ty_negated().is_subtype_of(self.db, *existing) {
                                         // The type that includes both this new element, and its negation
                                         // (or a supertype of its negation), must be simply `object`.
+                                        invalidate_batch(&mut batch);
                                         self.collapse_to_object();
                                         return;
                                     }
@@ -956,9 +1031,11 @@ impl<'db> UnionBuilder<'db> {
                                     entry.insert(literal.is_promotable());
 
                                     if members_are_exhaustive && found.len() == enum_member_count {
+                                        invalidate_batch(&mut batch);
                                         self.add_in_place_impl(
                                             enum_member_to_add.enum_class_instance(self.db),
                                             seen_aliases,
+                                            None,
                                         );
                                         return;
                                     }
@@ -980,16 +1057,24 @@ impl<'db> UnionBuilder<'db> {
                             self.elements.swap_remove(index);
                         }
                     }
-                    _ => self.push_type(ty, seen_aliases),
+                    _ => self.push_type(ty, seen_aliases, batch),
                 }
             }
             // Adding `object` to a union results in `object`.
-            ty if ty.is_object() && !cycle_recovery => self.collapse_to_object(),
-            _ => self.push_type(ty, seen_aliases),
+            ty if ty.is_object() && !cycle_recovery => {
+                invalidate_batch(&mut batch);
+                self.collapse_to_object();
+            }
+            _ => self.push_type(ty, seen_aliases, batch),
         }
     }
 
-    fn push_type(&mut self, ty: Type<'db>, seen_aliases: &mut Vec<Type<'db>>) {
+    fn push_type(
+        &mut self,
+        ty: Type<'db>,
+        seen_aliases: &mut Vec<Type<'db>>,
+        mut batch: Option<&mut SimplifiedUnionBatch>,
+    ) {
         let mut ty = ty;
         let bool_pair = |ty: Type<'db>| {
             if let Some(LiteralValueTypeKind::Bool(b)) = ty.as_literal_value_kind() {
@@ -1008,7 +1093,13 @@ impl<'db> UnionBuilder<'db> {
         let mut to_remove = SmallVec::<[usize; 2]>::new();
 
         for (i, element) in self.elements.iter_mut().enumerate() {
-            let element_type = match element.try_reduce(self.db, ty, self.cycle_recovery) {
+            let skip_redundancy_checks = batch.as_deref().is_some_and(|batch| batch.contains(i));
+            let element_type = match element.try_reduce(
+                self.db,
+                ty,
+                self.cycle_recovery,
+                skip_redundancy_checks,
+            ) {
                 ReduceResult::KeepIf(keep) => {
                     if !keep {
                         to_remove.push(i);
@@ -1017,6 +1108,7 @@ impl<'db> UnionBuilder<'db> {
                 }
                 ReduceResult::Type(ty) => ty,
                 ReduceResult::CollapseToObject => {
+                    invalidate_batch(&mut batch);
                     self.collapse_to_object();
                     return;
                 }
@@ -1050,6 +1142,7 @@ impl<'db> UnionBuilder<'db> {
             {
                 to_remove.push(i);
                 ty = KnownClass::Range.to_instance(self.db);
+                invalidate_batch(&mut batch);
                 continue;
             }
 
@@ -1059,6 +1152,7 @@ impl<'db> UnionBuilder<'db> {
             {
                 to_remove.push(i);
                 ty = merged_type;
+                invalidate_batch(&mut batch);
                 continue;
             }
 
@@ -1068,7 +1162,8 @@ impl<'db> UnionBuilder<'db> {
                     .zip(bool_pair(ty))
                     .is_some_and(|(element, pair)| element == pair)
             {
-                self.add_in_place_impl(KnownClass::Bool.to_instance(self.db), seen_aliases);
+                invalidate_batch(&mut batch);
+                self.add_in_place_impl(KnownClass::Bool.to_instance(self.db), seen_aliases, None);
                 return;
             }
 
@@ -1080,7 +1175,10 @@ impl<'db> UnionBuilder<'db> {
                 continue;
             }
 
-            if should_simplify_full && !matches!(element_type, Type::TypeAlias(_)) {
+            if should_simplify_full
+                && !skip_redundancy_checks
+                && !matches!(element_type, Type::TypeAlias(_))
+            {
                 if ty.is_redundant_with(self.db, element_type) {
                     return;
                 }
@@ -1100,6 +1198,7 @@ impl<'db> UnionBuilder<'db> {
                     // supertypes). This means we can simplify the whole union to just
                     // `object`, since all other potential elements would also be subtypes of
                     // `object`.
+                    invalidate_batch(&mut batch);
                     self.collapse_to_object();
                     return;
                 }
@@ -1182,7 +1281,12 @@ impl<'db> UnionBuilder<'db> {
         match types.len() {
             0 => None,
             1 => Some(types[0]),
-            _ => Some(Type::Union(UnionType::new(
+            _ if cycle_recovery => Some(Type::Union(UnionType::new_unsimplified(
+                db,
+                types.into_boxed_slice(),
+                recursively_defined,
+            ))),
+            _ => Some(Type::Union(UnionType::new_simplified(
                 db,
                 types.into_boxed_slice(),
                 recursively_defined,
@@ -1962,6 +2066,7 @@ mod tests {
         let union = UnionType::from_elements(&db, [t0, t1]).expect_union();
 
         assert_eq!(union.elements(&db), &[t0, t1]);
+        assert!(union.is_known_simplified(&db));
     }
 
     #[test]
@@ -2033,8 +2138,67 @@ mod tests {
                     .expect_union();
                 assert!(union.elements(&db).contains(&left));
                 assert!(union.elements(&db).contains(&right));
+                assert!(!union.is_known_simplified(&db));
             }
         }
+    }
+
+    #[test]
+    fn adding_cycle_recovery_union_rechecks_its_elements() {
+        let db = setup_db();
+
+        let literal = Type::string_literal(&db, "literal");
+        let literal_string = Type::literal_string();
+        let int = KnownClass::Int.to_instance(&db);
+        let unsimplified = UnionBuilder::new(&db)
+            .cycle_recovery(true)
+            .add(literal)
+            .add(literal_string)
+            .add(int)
+            .build()
+            .expect_union();
+
+        assert!(!unsimplified.is_known_simplified(&db));
+        assert!(
+            !unsimplified
+                .filter(&db, |element| *element != int)
+                .expect_union()
+                .is_known_simplified(&db)
+        );
+        assert_eq!(
+            UnionBuilder::new(&db)
+                .add(Type::Union(unsimplified))
+                .build(),
+            UnionType::from_elements(&db, [literal_string, int])
+        );
+    }
+
+    #[test]
+    fn simplification_proof_does_not_change_union_identity() {
+        let db = setup_db();
+
+        let first = Type::int_literal(1);
+        let second = Type::int_literal(2);
+        let union_from_cycle_recovery = UnionBuilder::new(&db)
+            .cycle_recovery(true)
+            .add(first)
+            .add(second)
+            .build()
+            .expect_union();
+        assert!(!union_from_cycle_recovery.is_known_simplified(&db));
+
+        let simplified = UnionType::from_elements(&db, [first, second]).expect_union();
+        assert_eq!(union_from_cycle_recovery, simplified);
+        assert!(union_from_cycle_recovery.is_known_simplified(&db));
+
+        let union_from_later_cycle_recovery = UnionBuilder::new(&db)
+            .cycle_recovery(true)
+            .add(first)
+            .add(second)
+            .build()
+            .expect_union();
+        assert_eq!(union_from_later_cycle_recovery, simplified);
+        assert!(union_from_later_cycle_recovery.is_known_simplified(&db));
     }
 
     #[test]
@@ -2121,6 +2285,17 @@ mod tests {
         assert_eq!(union.map(&db, |ty| *ty), unpacked);
         assert_eq!(union.try_map(&db, |ty| Some(*ty)), Some(unpacked));
         assert_eq!(union.map_leave_aliases(&db, |ty| *ty), union_ty);
+
+        let int_instance = KnownClass::Int.to_instance(&db);
+        let alias_and_int =
+            UnionType::from_elements_leave_aliases(&db, [alias, int_instance]).expect_union();
+        assert!(alias_and_int.is_known_simplified(&db));
+        assert_eq!(
+            UnionBuilder::new(&db)
+                .add(Type::Union(alias_and_int))
+                .build(),
+            int_instance
+        );
     }
 
     #[test]
