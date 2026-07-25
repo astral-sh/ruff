@@ -28,6 +28,9 @@ use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 /// to a string automatically, the notable exception being for classes that
 /// implement a custom `__format__` method.
 ///
+/// `%`-style format strings and `str.format` calls are covered by
+/// [`explicit-format-string-type-conversion`][RUF077] instead.
+///
 /// ## Example
 /// ```python
 /// a = "some string"
@@ -44,6 +47,12 @@ use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 ///
 /// This rule's fix is marked as unsafe if the call expression contains
 /// comments that would be deleted by applying the fix.
+///
+/// ## References
+/// - [Python documentation: Format String Syntax](https://docs.python.org/3/library/string.html#format-string-syntax)
+/// - [`explicit-format-string-type-conversion` (`RUF077`)][RUF077]
+///
+/// [RUF077]: https://docs.astral.sh/ruff/rules/explicit-format-string-type-conversion/
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.267")]
 pub(crate) struct ExplicitFStringTypeConversion;

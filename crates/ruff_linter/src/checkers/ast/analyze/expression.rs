@@ -561,13 +561,17 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                 Rule::HashlibDigestHex,
                 // flake8-simplify
                 Rule::SplitStaticString,
+                // ruff
+                Rule::ExplicitFormatStringTypeConversion,
             ]) {
                 if let Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = func.as_ref() {
                     let attr = attr.as_str();
-                    if let Expr::StringLiteral(ast::ExprStringLiteral {
-                        value: string_value,
-                        ..
-                    }) = value.as_ref()
+                    if let Expr::StringLiteral(
+                        format_string @ ast::ExprStringLiteral {
+                            value: string_value,
+                            ..
+                        },
+                    ) = value.as_ref()
                     {
                         if attr == "join" {
                             // "...".join(...) call
@@ -643,6 +647,13 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                                     checker,
                                     string_value.to_str(),
                                     location,
+                                );
+                            }
+                            if checker.is_rule_enabled(Rule::ExplicitFormatStringTypeConversion) {
+                                ruff::rules::format_call_type_conversion(
+                                    checker,
+                                    call,
+                                    format_string,
                                 );
                             }
                         }
@@ -1547,6 +1558,9 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                 }
                 if checker.is_rule_enabled(Rule::HardcodedSQLExpression) {
                     flake8_bandit::rules::hardcoded_sql_expression(checker, expr);
+                }
+                if checker.is_rule_enabled(Rule::ExplicitFormatStringTypeConversion) {
+                    ruff::rules::percent_format_type_conversion(checker, bin_op, format_string);
                 }
             }
             if checker.is_rule_enabled(Rule::FStringPercentFormat) {
