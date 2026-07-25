@@ -530,8 +530,7 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
 
     /// Updates this constraint set to hold the union of itself and another constraint set.
     ///
-    /// In the result, `self` will appear before `other` according to the `source_order` of the BDD
-    /// nodes.
+    /// In the result's source order, `self` will appear before `other`.
     pub(crate) fn union(
         &mut self,
         _db: &'db dyn Db,
@@ -546,8 +545,7 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
 
     /// Updates this constraint set to hold the intersection of itself and another constraint set.
     ///
-    /// In the result, `self` will appear before `other` according to the `source_order` of the BDD
-    /// nodes.
+    /// In the result's source order, `self` will appear before `other`.
     pub(crate) fn intersect(
         &mut self,
         _db: &'db dyn Db,
@@ -570,8 +568,7 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
     /// provided as a thunk, to implement short-circuiting: the thunk is not forced if the
     /// constraint set is already saturated.
     ///
-    /// In the result, `self` will appear before `other` according to the `source_order` of the BDD
-    /// nodes.
+    /// In the result's source order, `self` will appear before `other`.
     #[inline]
     pub(crate) fn and(
         mut self,
@@ -592,8 +589,7 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
     /// as a thunk, to implement short-circuiting: the thunk is not forced if the constraint set is
     /// already saturated.
     ///
-    /// In the result, `self` will appear before `other` according to the `source_order` of the BDD
-    /// nodes.
+    /// In the result's source order, `self` will appear before `other`.
     pub(crate) fn or(
         mut self,
         db: &'db dyn Db,
@@ -611,8 +607,7 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
 
     /// Returns a constraint set encoding that this constraint set implies another.
     ///
-    /// In the result, `self` will appear before `other` according to the `source_order` of the BDD
-    /// nodes.
+    /// In the result's source order, `self` will appear before `other`.
     pub(crate) fn implies(
         self,
         db: &'db dyn Db,
@@ -624,8 +619,7 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
 
     /// Returns a constraint set encoding that this constraint set is equivalent to another.
     ///
-    /// In the result, `self` will appear before `other` according to the `source_order` of the BDD
-    /// nodes.
+    /// In the result's source order, `self` will appear before `other`.
     pub(crate) fn iff(
         self,
         _db: &'db dyn Db,
@@ -932,8 +926,8 @@ struct ConstraintSetStorage<'db> {
     /// appear in the source code. This ensures that any union and intersections types that appear
     /// in solutions are constructed in a stable (and source-consistent) order.
     ///
-    /// This is encoded as a binary tree over [`ConstraintId`]s. The pre-walk of that tree defines
-    /// the ordering.
+    /// This is encoded as a binary tree over [`ConstraintId`]s. A preorder traversal of that tree
+    /// defines the ordering.
     source_orders: IndexVec<SourceOrderId, SourceOrder>,
 
     // Everything below are the memoization tables for the arenas and for our BDD operations.
@@ -2466,42 +2460,23 @@ impl Node {
         builder: &ConstraintSetBuilder<'_>,
         constraint: ConstraintAssignment,
     ) -> (NodeId, Option<SourceOrderId>) {
-        match constraint {
-            ConstraintAssignment::Positive(constraint) => (
-                NodeId::with_uncertain(
-                    builder,
-                    constraint,
-                    ALWAYS_TRUE,
-                    ALWAYS_FALSE,
-                    ALWAYS_FALSE,
-                ),
-                Some(builder.constraint_source_order(constraint)),
-            ),
-            ConstraintAssignment::Negative(constraint) => (
-                NodeId::with_uncertain(
-                    builder,
-                    constraint,
-                    ALWAYS_FALSE,
-                    ALWAYS_FALSE,
-                    ALWAYS_TRUE,
-                ),
-                Some(builder.constraint_source_order(constraint)),
-            ),
+        let constraint_id = constraint.constraint();
+        let node = match constraint {
+            ConstraintAssignment::Positive(constraint) => {
+                NodeId::with_uncertain(builder, constraint, ALWAYS_TRUE, ALWAYS_FALSE, ALWAYS_FALSE)
+            }
+            ConstraintAssignment::Negative(constraint) => {
+                NodeId::with_uncertain(builder, constraint, ALWAYS_FALSE, ALWAYS_FALSE, ALWAYS_TRUE)
+            }
             // The result holds regardless of the constraint's truth value, so only
             // `if_uncertain` needs to be `ALWAYS_TRUE` — `n? 0: 1: 0`. It would also be
             // correct to use `n? 1: 1: 1` (i.e., `ALWAYS_TRUE` for all outgoing edges), but
             // that would throw away some of the efficiency gains this representation gives us.
-            ConstraintAssignment::Unconstrained(constraint) => (
-                NodeId::with_uncertain(
-                    builder,
-                    constraint,
-                    ALWAYS_FALSE,
-                    ALWAYS_TRUE,
-                    ALWAYS_FALSE,
-                ),
-                Some(builder.constraint_source_order(constraint)),
-            ),
-        }
+            ConstraintAssignment::Unconstrained(constraint) => {
+                NodeId::with_uncertain(builder, constraint, ALWAYS_FALSE, ALWAYS_TRUE, ALWAYS_FALSE)
+            }
+        };
+        (node, Some(builder.constraint_source_order(constraint_id)))
     }
 }
 
@@ -2651,9 +2626,6 @@ impl NodeId {
     }
 
     /// Returns the `or` or union of two BDDs.
-    ///
-    /// In the result, `self` will appear before `other` according to the `source_order` of the BDD
-    /// nodes.
     fn or(self, builder: &ConstraintSetBuilder<'_>, other: Self) -> Self {
         match (self.node(), other.node()) {
             (Node::AlwaysTrue, _) | (_, Node::AlwaysTrue) => ALWAYS_TRUE,
@@ -2785,9 +2757,6 @@ impl NodeId {
 
     /// Returns a new BDD that evaluates to `true` when both input BDDs evaluate to the same
     /// result.
-    ///
-    /// In the result, `self` will appear before `other` according to the `source_order` of the BDD
-    /// nodes.
     fn iff(self, builder: &ConstraintSetBuilder<'_>, other: Self) -> Self {
         // iff(a, b) = (a ∧ b) ∨ (¬a ∧ ¬b)
         let a_and_b = self.and(builder, other);
@@ -4386,9 +4355,7 @@ impl InteriorNode {
 
                     // If we are removing this node, we have to check if there are any derived facts
                     // that depend on the constraint we're about to remove. If so, we need to
-                    // "remember" them by AND-ing them in with the corresponding branch. We currently
-                    // reuse the `source_order` of the constraint being removed when we add these
-                    // derived facts.
+                    // "remember" them by AND-ing them in with the corresponding branch.
                     Disposition::Remove => {
                         ControlFlow::Continue(
                             path.assignments[new_range]
@@ -8385,9 +8352,8 @@ mod tests {
                     .and(builder, int_t)
                     .and(builder, u_int)
             },
-            // TODO: `SequentMap::for_constraint_pair` can receive its inputs in BDD order, not
-            // source order. That changes which equivalent upper-bound intersection is constructed
-            // first.
+            // TODO: Constraint-ID permutations can still change which equivalent upper-bound
+            // intersection is constructed first.
             [
                 "never=false always=false merged=[T=int | U, U=T & int] paths=[T=int | U, U=T & int]",
                 "never=false always=false merged=[T=int | U, U=int & T] paths=[T=int | U, U=int & T]",
