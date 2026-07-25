@@ -5877,10 +5877,10 @@ impl<'db> Type<'db> {
                 // Flatten each positive element and rebuild through the intersection builder.
                 let mut builder = IntersectionBuilder::new(db);
                 for pos in intersection.positive(db) {
-                    builder = builder.add_positive(pos.flatten_typevars(db));
+                    builder.add_positive_in_place(pos.flatten_typevars(db));
                 }
                 for neg in intersection.negative(db) {
-                    builder = builder.add_negative(neg.flatten_typevars(db));
+                    builder.add_negative_in_place(neg.flatten_typevars(db));
                 }
                 builder.build()
             }
@@ -6758,8 +6758,12 @@ impl<'db> Type<'db> {
             Type::Intersection(intersection) => {
                 let mut builder = IntersectionBuilder::new(db);
                 for positive in intersection.positive(db) {
-                    builder =
-                        builder.add_positive(positive.apply_type_mapping_impl(db, type_mapping, tcx, visitor));
+                    builder.add_positive_in_place(positive.apply_type_mapping_impl(
+                        db,
+                        type_mapping,
+                        tcx,
+                        visitor,
+                    ));
                 }
                 // Regular promotion should remove negative contributions from intersections,
                 // so we don't preserve them here when regular promotion is enabled.
@@ -6768,7 +6772,7 @@ impl<'db> Type<'db> {
                     TypeMapping::Promote(PromotionMode::On, PromotionKind::Regular)
                 ) {
                     for negative in intersection.negative(db) {
-                        builder = builder.add_negative(
+                        builder.add_negative_in_place(
                             negative.apply_type_mapping_impl(db, &type_mapping.flip(), tcx, visitor),
                         );
                     }

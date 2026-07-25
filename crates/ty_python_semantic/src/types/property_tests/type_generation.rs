@@ -208,10 +208,10 @@ impl Ty {
             Ty::Intersection { pos, neg } => {
                 let mut builder = IntersectionBuilder::new(db);
                 for p in pos {
-                    builder = builder.add_positive(p.into_type(db));
+                    builder.add_positive_in_place(p.into_type(db));
                 }
                 for n in neg {
-                    builder = builder.add_negative(n.into_type(db));
+                    builder.add_negative_in_place(n.into_type(db));
                 }
                 builder.build()
             }
