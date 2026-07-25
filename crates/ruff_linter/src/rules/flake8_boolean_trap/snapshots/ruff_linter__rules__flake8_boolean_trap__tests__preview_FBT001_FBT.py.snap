@@ -7,7 +7,7 @@ source: crates/ruff_linter/src/rules/flake8_boolean_trap/mod.rs
 
 --- Summary ---
 Removed: 0
-Added: 4
+Added: 3
 
 --- Added ---
 FBT001 Boolean-typed positional argument in function definition
@@ -21,27 +21,20 @@ FBT001 Boolean-typed positional argument in function definition
 
 
 FBT001 Boolean-typed positional argument in function definition
-   --> FBT.py:187:23
+   --> FBT.py:197:27
     |
-187 | def func_literal_true(flag: Literal[True]):
-    |                       ^^^^
-188 |     pass
-    |
-
-
-FBT001 Boolean-typed positional argument in function definition
-   --> FBT.py:191:24
-    |
-191 | def func_literal_false(flag: Literal[False]):
-    |                        ^^^^
-192 |     pass
-    |
-
-
-FBT001 Boolean-typed positional argument in function definition
-   --> FBT.py:195:27
-    |
-195 | def func_literal_optional(flag: Literal[True, False, None]):
+196 | # ignore other literals
+197 | def func_literal_optional(flag: Literal[True, False, None, "hello"]):
     |                           ^^^^
-196 |     pass
+198 |     pass
+    |
+
+
+FBT001 Boolean-typed positional argument in function definition
+   --> FBT.py:202:39
+    |
+201 | # collect `bool` from two separate literals
+202 | def func_literal_split_union_optional(flag: Literal[True] | Literal[False] | None):
+    |                                       ^^^^
+203 |     pass
     |

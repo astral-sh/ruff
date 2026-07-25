@@ -184,6 +184,7 @@ def func_literal_both(flag: Literal[True, False]):
     pass
 
 
+# ignore single literals
 def func_literal_true(flag: Literal[True]):
     pass
 
@@ -192,5 +193,11 @@ def func_literal_false(flag: Literal[False]):
     pass
 
 
-def func_literal_optional(flag: Literal[True, False, None]):
+# ignore other literals
+def func_literal_optional(flag: Literal[True, False, None, "hello"]):
+    pass
+
+
+# collect `bool` from two separate literals
+def func_literal_split_union_optional(flag: Literal[True] | Literal[False] | None):
     pass

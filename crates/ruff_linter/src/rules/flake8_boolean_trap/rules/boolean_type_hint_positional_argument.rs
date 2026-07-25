@@ -1,3 +1,4 @@
+use bitflags::bitflags;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::name::UnqualifiedName;
@@ -96,7 +97,8 @@ use crate::settings::LinterSettings;
 ///
 /// ## Preview
 /// When [preview] is enabled, this rule also flags `typing.Literal` annotations that
-/// include a boolean literal as a variant - e.g. `Literal[True, False]`.
+/// include both `True` and `False` as variants - e.g. `Literal[True, False]`.
+/// A `Literal` containing only `True` or only `False` is not flagged.
 ///
 /// ## References
 /// - [Python documentation: Calls](https://docs.python.org/3/reference/expressions.html#calls)
@@ -135,7 +137,13 @@ pub(crate) fn boolean_type_hint_positional_argument(
         let Some(annotation) = parameter.annotation() else {
             continue;
         };
-        if !match_annotation_to_complex_bool(annotation, checker.semantic(), checker.settings()) {
+        let mut seen = SeenBoolLiterals::empty();
+        if !match_annotation_to_complex_bool(
+            annotation,
+            checker.semantic(),
+            checker.settings(),
+            &mut seen,
+        ) {
             continue;
         }
 
@@ -165,29 +173,43 @@ pub(crate) fn boolean_type_hint_positional_argument(
     }
 }
 
+bitflags! {
+    struct SeenBoolLiterals: u8 {
+        const TRUE = 1 << 0;
+        const FALSE = 1 << 1;
+    }
+}
+
+impl SeenBoolLiterals {
+    fn from_value(value: bool) -> Self {
+        if value { Self::TRUE } else { Self::FALSE }
+    }
+}
+
 /// Returns `true` if the annotation is a boolean type hint (e.g., `bool`), or a type hint that
 /// includes boolean as a variant (e.g., `bool | int`).
 fn match_annotation_to_complex_bool(
     annotation: &Expr,
     semantic: &SemanticModel,
     settings: &LinterSettings,
+    seen: &mut SeenBoolLiterals,
 ) -> bool {
     match annotation {
         // Ex) `bool`
         Expr::Name(name) => &name.id == "bool",
         // Ex) `"bool"`
         Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => value == "bool",
-        // Ex) `bool | int`
+        // Ex) `bool | int` or `Literal[True] | Literal[False] | int`
         Expr::BinOp(ast::ExprBinOp {
             left,
             op: ast::Operator::BitOr,
             right,
             ..
         }) => {
-            match_annotation_to_complex_bool(left, semantic, settings)
-                || match_annotation_to_complex_bool(right, semantic, settings)
+            match_annotation_to_complex_bool(left, semantic, settings, seen)
+                || match_annotation_to_complex_bool(right, semantic, settings, seen)
         }
-        // Ex) `typing.Union[bool, int]`
+        // Ex) `typing.Union[bool, int]` or `Literal[True] | Literal[False] | int`
         Expr::Subscript(ast::ExprSubscript { value, slice, .. }) => {
             // If the typing modules were never imported, we'll never match below.
             if !semantic.seen_typing() {
@@ -200,7 +222,7 @@ fn match_annotation_to_complex_bool(
             }) {
                 if let Expr::Tuple(ast::ExprTuple { elts, .. }) = slice.as_ref() {
                     elts.iter()
-                        .any(|elt| match_annotation_to_complex_bool(elt, semantic, settings))
+                        .any(|elt| match_annotation_to_complex_bool(elt, semantic, settings, seen))
                 } else {
                     // Union with a single type is an invalid type annotation
                     false
@@ -208,28 +230,28 @@ fn match_annotation_to_complex_bool(
             } else if qualified_name.as_ref().is_some_and(|qualified_name| {
                 semantic.match_typing_qualified_name(qualified_name, "Optional")
             }) {
-                match_annotation_to_complex_bool(slice, semantic, settings)
+                match_annotation_to_complex_bool(slice, semantic, settings, seen)
             } else if is_boolean_type_hint_pos_arg_literal_enabled(settings)
                 && qualified_name.as_ref().is_some_and(|qualified_name| {
                     semantic.match_typing_qualified_name(qualified_name, "Literal")
                 })
             {
-                // Ex) `typing.Literal[True, False]`, `typing.Literal[True, None]`
+                // Mark seen literals until we've confirmed the full bool (True and False).
                 match slice.as_ref() {
                     Expr::Tuple(ast::ExprTuple { elts, .. }) => {
-                        let mut seen_bool = false;
                         for elt in elts {
-                            match elt {
-                                Expr::BooleanLiteral(_) => seen_bool = true,
-                                Expr::NoneLiteral(_) => {}
-                                _ => return false,
+                            if let Expr::BooleanLiteral(ast::ExprBooleanLiteral { value, .. }) = elt
+                            {
+                                *seen |= SeenBoolLiterals::from_value(*value);
                             }
                         }
-                        seen_bool
                     }
-                    Expr::BooleanLiteral(_) => true,
-                    _ => false,
+                    Expr::BooleanLiteral(ast::ExprBooleanLiteral { value, .. }) => {
+                        *seen |= SeenBoolLiterals::from_value(*value);
+                    }
+                    _ => {}
                 }
+                seen.is_all()
             } else {
                 false
             }
