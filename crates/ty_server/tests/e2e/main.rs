@@ -1376,10 +1376,32 @@ impl TestServerBuilder {
     }
 
     /// Advertise support for ty's fully rendered diagnostic output.
-    pub(crate) fn with_full_diagnostic_output(mut self) -> Self {
-        self.client_capabilities.experimental = Some(serde_json::json!({
-            "fullDiagnosticOutput": true,
-        }));
+    pub(crate) fn with_full_diagnostic_output(self) -> Self {
+        self.with_experimental_capability("fullDiagnosticOutput")
+    }
+
+    /// Advertise support for ty's auto-import completion command.
+    pub(crate) fn with_auto_import_completion_command(self) -> Self {
+        self.with_experimental_capability("autoImportCompletionCommand")
+    }
+
+    fn with_experimental_capability(mut self, capability: &str) -> Self {
+        let experimental = self
+            .client_capabilities
+            .experimental
+            .get_or_insert_with(|| serde_json::json!({}));
+
+        match experimental {
+            serde_json::Value::Object(capabilities) => {
+                capabilities.insert(capability.to_string(), true.into());
+            }
+            experimental => {
+                let mut capabilities = serde_json::Map::new();
+                capabilities.insert(capability.to_string(), true.into());
+                *experimental = serde_json::Value::Object(capabilities);
+            }
+        }
+
         self
     }
 

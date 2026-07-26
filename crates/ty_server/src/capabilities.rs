@@ -36,6 +36,7 @@ bitflags::bitflags! {
         const PREFER_MARKDOWN_IN_COMPLETION = 1 << 18;
         const COMPLETION_ITEM_SNIPPET_SUPPORT = 1 << 19;
         const FULL_DIAGNOSTIC_OUTPUT = 1 << 20;
+        const AUTO_IMPORT_COMPLETION_COMMAND = 1 << 21;
     }
 }
 
@@ -180,6 +181,11 @@ impl ResolvedClientCapabilities {
         self.contains(Self::FULL_DIAGNOSTIC_OUTPUT)
     }
 
+    /// Returns `true` if the client supports ty's auto-import completion command.
+    pub(crate) const fn supports_auto_import_completion_command(self) -> bool {
+        self.contains(Self::AUTO_IMPORT_COMPLETION_COMMAND)
+    }
+
     /// Returns `true` if the client supports "label details" in completion items.
     pub(crate) const fn supports_completion_item_label_details(self) -> bool {
         self.contains(Self::COMPLETION_ITEM_LABEL_DETAILS_SUPPORT)
@@ -264,6 +270,16 @@ impl ResolvedClientCapabilities {
             .unwrap_or_default()
         {
             flags |= Self::FULL_DIAGNOSTIC_OUTPUT;
+        }
+
+        if client_capabilities
+            .experimental
+            .as_ref()
+            .and_then(|experimental| experimental.get("autoImportCompletionCommand"))
+            .and_then(serde_json::Value::as_bool)
+            .unwrap_or_default()
+        {
+            flags |= Self::AUTO_IMPORT_COMPLETION_COMMAND;
         }
 
         if text_document
