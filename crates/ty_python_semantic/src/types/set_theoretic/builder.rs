@@ -572,6 +572,36 @@ fn invalidate_batch(batch: &mut Option<&mut SimplifiedUnionBatch>) {
     }
 }
 
+/// Rechecks the union's simplification using tracked relation queries.
+///
+/// If validation participates in a Salsa cycle, the conservative `false` fallback prevents the
+/// caller from skipping the relation checks that are needed to discover and resolve that cycle.
+/// The LRU bounds the number of retained proofs; validating an evicted proof again is safe.
+#[salsa::tracked(
+    returns(copy),
+    cycle_initial=|_, _, _| false,
+    heap_size=ruff_memory_usage::heap_size,
+    lru=200
+)]
+pub(super) fn is_union_simplified<'db>(db: &'db dyn Db, union: UnionType<'db>) -> bool {
+    validate_union_simplification(db, union)
+}
+
+fn validate_union_simplification<'db>(db: &'db dyn Db, union: UnionType<'db>) -> bool {
+    let mut builder = UnionBuilder::new(db)
+        .unpack_aliases(false)
+        .recursively_defined(union.recursively_defined(db));
+    builder.reuse_simplified_sub_unions = false;
+
+    let rebuilt = union
+        .elements(db)
+        .iter()
+        .copied()
+        .fold(builder, UnionBuilder::add);
+
+    rebuilt.build() == Type::Union(union)
+}
+
 pub(crate) struct UnionBuilder<'db> {
     elements: Vec<UnionElement<'db>>,
     db: &'db dyn Db,
@@ -579,6 +609,8 @@ pub(crate) struct UnionBuilder<'db> {
     /// This is enabled when joining types in a `cycle_recovery` function. Because recovery cannot
     /// introduce a new cycle, relation-based union simplifications are skipped in this mode.
     cycle_recovery: bool,
+    /// Disabled while validating a simplification proof so validation takes the conservative path.
+    reuse_simplified_sub_unions: bool,
     recursively_defined: RecursivelyDefined,
 }
 
@@ -645,6 +677,7 @@ impl<'db> UnionBuilder<'db> {
             elements: vec![],
             unpack_aliases: true,
             cycle_recovery: false,
+            reuse_simplified_sub_unions: true,
             recursively_defined: RecursivelyDefined::No,
         }
     }
@@ -713,6 +746,10 @@ impl<'db> UnionBuilder<'db> {
         self.add_in_place_impl(ty, &mut vec![], None);
     }
 
+    fn can_skip_sub_union_redundancy_checks(&self, union: UnionType<'db>) -> bool {
+        self.reuse_simplified_sub_unions && !self.cycle_recovery && union.is_simplified(self.db)
+    }
+
     fn add_in_place_impl(
         &mut self,
         ty: Type<'db>,
@@ -736,10 +773,9 @@ impl<'db> UnionBuilder<'db> {
                 invalidate_batch(&mut batch);
                 let new_elements = union.elements(self.db);
                 self.elements.reserve(new_elements.len());
-                let mut union_batch = (!self.cycle_recovery
-                    && union.is_simplified(self.db)
-                    && !(self.unpack_aliases && union.has_aliases(self.db)))
-                .then(|| SimplifiedUnionBatch::new(self.elements.len()));
+                let skip_redundancy_checks = self.can_skip_sub_union_redundancy_checks(union);
+                let mut union_batch =
+                    skip_redundancy_checks.then(|| SimplifiedUnionBatch::new(self.elements.len()));
                 for element in new_elements {
                     self.add_in_place_impl(*element, seen_aliases, union_batch.as_mut());
                 }
@@ -1225,6 +1261,7 @@ impl<'db> UnionBuilder<'db> {
         let db = self.db;
         let unpack_aliases = self.unpack_aliases;
         let cycle_recovery = self.cycle_recovery;
+        let reuse_simplified_sub_unions = self.reuse_simplified_sub_unions;
         let recursively_defined = self.recursively_defined;
 
         let type_count = self.elements.iter().map(UnionElement::type_count).sum();
@@ -1268,10 +1305,11 @@ impl<'db> UnionBuilder<'db> {
         }
 
         if normalize_enum_complement_unions(db, &mut types) {
-            let builder = UnionBuilder::new(db)
+            let mut builder = UnionBuilder::new(db)
                 .unpack_aliases(unpack_aliases)
                 .cycle_recovery(cycle_recovery)
                 .recursively_defined(recursively_defined);
+            builder.reuse_simplified_sub_unions = reuse_simplified_sub_unions;
             return types
                 .into_iter()
                 .fold(builder, UnionBuilder::add)
@@ -2202,6 +2240,45 @@ mod tests {
     }
 
     #[test]
+    fn skips_redundancy_checks_only_for_simplified_sub_unions() {
+        let db = setup_db();
+        let builder = UnionBuilder::new(&db);
+
+        let literal_union = UnionType::from_elements(
+            &db,
+            [
+                Type::string_literal(&db, "first"),
+                Type::string_literal(&db, "second"),
+            ],
+        )
+        .expect_union();
+        assert!(builder.can_skip_sub_union_redundancy_checks(literal_union));
+        assert!(
+            !UnionBuilder::new(&db)
+                .cycle_recovery(true)
+                .can_skip_sub_union_redundancy_checks(literal_union)
+        );
+
+        let non_literal_union = UnionType::from_elements(
+            &db,
+            [
+                KnownClass::Int.to_instance(&db),
+                KnownClass::Str.to_instance(&db),
+            ],
+        )
+        .expect_union();
+        assert!(builder.can_skip_sub_union_redundancy_checks(non_literal_union));
+
+        let unsimplified_literal_union = UnionBuilder::new(&db)
+            .cycle_recovery(true)
+            .add(Type::int_literal(1))
+            .add(Type::int_literal(2))
+            .build()
+            .expect_union();
+        assert!(!builder.can_skip_sub_union_redundancy_checks(unsimplified_literal_union));
+    }
+
+    #[test]
     fn adding_cycle_recovery_union_rechecks_elements_after_relation_change() {
         fn class_instance<'db>(db: &'db TestDb, name: &str) -> Type<'db> {
             let module = ruff_db::files::system_path_to_file(db, "/src/a.py").unwrap();
@@ -2226,7 +2303,8 @@ mod tests {
         {
             let a = class_instance(&db, "A");
             let b = class_instance(&db, "B");
-            UnionType::from_elements(&db, [a, b]).expect_union();
+            let union = UnionType::from_elements(&db, [a, b]).expect_union();
+            assert!(union.is_simplified(&db));
         }
 
         // Change the relationship transitively so that `A` and `B` retain the stable identities
@@ -2249,6 +2327,7 @@ mod tests {
             .add(b)
             .build()
             .expect_union();
+        assert!(!cycle_recovery_union.is_simplified(&db));
 
         assert_eq!(
             UnionBuilder::new(&db)
