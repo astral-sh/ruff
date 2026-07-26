@@ -1624,6 +1624,11 @@ pub struct Flake8ImportConventionsOptions {
 
     /// A mapping from module to conventional import alias. These aliases will
     /// be added to the [`aliases`](#lint_flake8-import-conventions_aliases) mapping.
+    ///
+    /// Entries here take precedence over [`aliases`](#lint_flake8-import-conventions_aliases),
+    /// so this option can also be used to change or opt out of a default alias without
+    /// restating the entire mapping. Mapping a module to its own name requires it to be
+    /// imported unaliased.
     #[option(
         default = r#"{}"#,
         value_type = "dict[str, str]",
@@ -1631,6 +1636,8 @@ pub struct Flake8ImportConventionsOptions {
         example = r#"
             # Declare a custom alias for the `dask` module.
             "dask.dataframe" = "dd"
+            # Require `numpy` to be imported unaliased, overriding the default `np` alias.
+            numpy = "numpy"
         "#
     )]
     pub extend_aliases: Option<FxHashMap<ModuleName, Alias>>,
