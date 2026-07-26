@@ -106,7 +106,7 @@ fn prepare_implementations_finder_for_goto_target<'db>(
         ) =>
         {
             goto_target
-                .definitions(model, ImportAliasResolution::ResolveAliases)
+                .expression_definitions(model, ImportAliasResolution::ResolveAliases)
                 .and_then(|definitions| {
                     ImplementationsFinder::for_class_reference(
                         model.db(),
@@ -1401,6 +1401,43 @@ class MyClass:
     }
 
     #[test]
+    fn implementation_class_call_with_assigned_constructor() {
+        let test = cursor_test(
+            r#"
+            def init(self):
+                pass
+
+            class Base:
+                __init__ = init
+
+            class Child(Base):
+                pass
+
+            Ba<CURSOR>se()
+            "#,
+        );
+
+        assert_snapshot!(test.goto_implementation(), @"
+        info[goto-implementation]: Go to implementation
+          --> main.py:11:1
+           |
+        11 | Base()
+           | ^^^^ Clicking here
+           |
+        info: Found 2 implementations
+         --> main.py:5:7
+          |
+        5 | class Base:
+          |       ----
+        6 |     __init__ = init
+        7 |
+        8 | class Child(Base):
+          |       -----
+          |
+        ");
+    }
+
+    #[test]
     fn implementation_nested_class_reference() {
         let test = cursor_test(
             r#"
@@ -1467,6 +1504,81 @@ class MyClass:
           |       ---
           |
         ");
+    }
+
+    #[test]
+    fn implementation_mixed_class_value_attribute_uses_member_bindings() {
+        let test = cursor_test(
+            r#"
+            flag: bool
+
+            class Dog:
+                pass
+
+            class Puppy(Dog):
+                pass
+
+            class Factory:
+                item: type[Dog] | int
+                if flag:
+                    item = Dog
+                else:
+                    item = 0
+
+            factory = Factory()
+            factory.it<CURSOR>em
+            "#,
+        );
+
+        assert_snapshot!(test.goto_implementation(), @"
+        info[goto-implementation]: Go to implementation
+          --> main.py:18:9
+           |
+        18 | factory.item
+           |         ^^^^ Clicking here
+           |
+        info: Found 3 implementations
+          --> main.py:11:5
+           |
+        11 |     item: type[Dog] | int
+           |     ----
+        12 |     if flag:
+        13 |         item = Dog
+           |         ----
+        14 |     else:
+        15 |         item = 0
+           |         ----
+           |
+        ");
+    }
+
+    #[test]
+    fn implementation_mixed_class_and_module_binding_is_unsupported() {
+        let test = CursorTest::builder()
+            .source("flag_source.py", "flag: bool")
+            .source("helper.py", "value = 1")
+            .source(
+                "main.py",
+                r#"
+                import flag_source
+
+                class Dog:
+                    pass
+
+                class Puppy(Dog):
+                    pass
+
+                if flag_source.flag:
+                    import helper as Item
+                else:
+                    Item = Dog
+
+                It<CURSOR>em
+                "#,
+            )
+            .build();
+
+        assert_snapshot!(test.goto_implementation(), @"No goto target found");
     }
 
     #[test]

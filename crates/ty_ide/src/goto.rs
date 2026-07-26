@@ -581,6 +581,24 @@ impl GotoTarget<'_> {
         }
     }
 
+    /// Gets definitions for the underlying expression, excluding call dispatch targets.
+    pub(crate) fn expression_definitions<'db>(
+        &self,
+        model: &SemanticModel<'db>,
+        alias_resolution: ImportAliasResolution,
+    ) -> Option<Definitions<'db>> {
+        let expression = match self {
+            GotoTarget::Expression(expression)
+            | GotoTarget::Call {
+                callable: expression,
+                ..
+            } => *expression,
+            _ => return None,
+        };
+
+        definitions_for_expression(model, expression, alias_resolution).map(Definitions::new)
+    }
+
     /// Gets the definitions for this goto target.
     ///
     /// The `alias_resolution` parameter controls whether import aliases

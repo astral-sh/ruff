@@ -556,8 +556,9 @@ impl<'db> ImplementationsFinder<'db> {
     /// which is indistinguishable from an actual instance variable. The resolved definition's type is
     /// a class object precisely when the reference refers to a class.
     ///
-    /// Returns `None` when none of the resolved definitions refer to a class object (for example
-    /// instance variables or methods), so callers can fall back to member handling.
+    /// Returns `None` when no binding refers to a class object or any binding refers to a non-class
+    /// object (for example an instance variable or method), so callers can fall back to member
+    /// handling.
     pub fn for_class_reference(
         db: &'db dyn Db,
         resolved_definitions: &[ResolvedDefinition<'db>],
@@ -567,7 +568,7 @@ impl<'db> ImplementationsFinder<'db> {
 
         for def in resolved_definitions {
             let ResolvedDefinition::Definition(definition) = def else {
-                continue;
+                return None;
             };
 
             if !is_reachable_implementation_definition(db, *definition) {
@@ -592,9 +593,7 @@ impl<'db> ImplementationsFinder<'db> {
                 _ => None,
             };
 
-            let Some(root) = root else {
-                continue;
-            };
+            let root = root?;
 
             if seen.insert(root) {
                 roots.push(root);
