@@ -1,0 +1,12 @@
+---
+source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
+---
+E402 Module level import not at top of file
+  --> E402_9.py:11:1
+   |
+ 9 | assert "win32" == sys.platform
+10 |
+11 | import msvcrt
+   | ^^^^^^^^^^^^^
+   |
+help: Move module level imports to top of file

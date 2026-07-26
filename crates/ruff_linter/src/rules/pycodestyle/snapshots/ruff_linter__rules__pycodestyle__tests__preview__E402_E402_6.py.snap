@@ -1,0 +1,21 @@
+---
+source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
+---
+E402 [*] Module level import not at top of file
+  --> E402_6.py:51:1
+   |
+49 | assert supported(sys.platform)
+50 |
+51 | import ctypes
+   | ^^^^^^^^^^^^^
+   |
+help: Move module level imports to top of file
+   |
+2  |
+3  + import ctypes
+4  | import sys
+--------------------------------------------------------------------------------
+51 |
+   - import ctypes
+   |
+note: This is an unsafe fix and may change runtime behavior

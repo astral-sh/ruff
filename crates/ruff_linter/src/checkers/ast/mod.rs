@@ -1029,7 +1029,8 @@ impl<'a> Visitor<'a> for Checker<'a> {
                     || imports::is_sys_path_modification(stmt, self.semantic())
                     || imports::is_os_environ_modification(stmt, self.semantic())
                     || imports::is_pytest_importorskip(stmt, self.semantic())
-                    || imports::is_site_sys_path_modification(stmt, self.semantic()))
+                    || imports::is_site_sys_path_modification(stmt, self.semantic())
+                    || imports::is_platform_assertion(stmt, self.semantic()))
                 {
                     self.semantic.flags |= SemanticModelFlags::IMPORT_BOUNDARY;
                 }

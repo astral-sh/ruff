@@ -18,6 +18,12 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// `sys.path.insert`, `sys.path.append`, etc.) and `os.environ` modifications
 /// between imports.
 ///
+/// It also makes an exception for `assert` statements that check `sys.platform`, as in
+/// `assert sys.platform == "darwin"`. Type checkers treat such an assertion as making
+/// the rest of the module unreachable on other platforms, so it is a common way to
+/// guard platform-specific imports. The checks recognized here are the ones mypy
+/// narrows on. See [Python version and system platform checks].
+///
 /// ## Example
 /// ```python
 /// "One string"
@@ -47,6 +53,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// the imported code.
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#imports
+/// [Python version and system platform checks]: https://mypy.readthedocs.io/en/stable/common_issues.html#python-version-and-system-platform-checks
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.28")]
 pub(crate) struct ModuleImportNotAtTopOfFile {
