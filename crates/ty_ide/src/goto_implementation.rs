@@ -1,3 +1,60 @@
+//! Finds known implementations of classes and class members.
+//!
+//! This module implements the `textDocument/implementation` request, commonly exposed as **Go to
+//! Implementation** in an editor. It follows nominal inheritance and uses receiver type to decide
+//! where to start searching.
+//!
+//! For example, consider this class hierarchy:
+//!
+//! ```python
+//! class Animal:
+//!     sound = "unknown"
+//!
+//!     def speak(self) -> str:
+//!         return self.sound
+//!
+//! class Dog(Animal):
+//!     sound = "woof"
+//!
+//!     def speak(self) -> str:
+//!         return self.sound
+//!
+//! def make_sound(animal: Animal) -> str:
+//!     return animal.speak()
+//! ```
+//!
+//! A request on `animal.speak()` starts from `Animal`, so it returns both `Animal.speak` and
+//! `Dog.speak`. A request on a value known to be a `Dog` returns only the implementation selected
+//! for `Dog`.
+//!
+//! # Supported request locations
+//!
+//! - A method or data attribute use, such as `animal.speak()` or `animal.sound`.
+//! - The name in a method declaration, such as `speak` in the definition of `Animal` above. The
+//!   containing class becomes the starting point.
+//! - The name in a class declaration. The result includes that class and its known subclasses.
+//! - A class name used as a base class, type annotation, or constructor call. Qualified names such
+//!   as `module.Animal` and `Outer.Inner` are also supported.
+//!
+//! # Selecting results
+//!
+//! - An overloaded method resolves to its implementation body when one is available.
+//! - Reading, assigning, or deleting a property selects its getter, setter, or deleter (the
+//!   corresponding property accessor).
+//! - A declaration in a `.pyi` stub file maps to the corresponding source definition when
+//!   possible.
+//! - A class or member definition that cannot run in the configured Python environment is
+//!   excluded. A request directly on an unreachable class, method, property getter, setter, or
+//!   deleter returns no result.
+//!
+//! # Limits
+//!
+//! - Classes are not discovered just because they provide the methods required by a
+//!   `typing.Protocol` (structural subtyping); they must explicitly inherit from that protocol.
+//! - Properties created with Python's built-in `property` are recognized. Other objects that
+//!   customize what happens when an attribute is read, assigned, or deleted (descriptors) are not
+//!   interpreted as properties.
+
 use crate::goto::{Definitions, GotoTarget, find_goto_target};
 use crate::{Db, NavigationTarget, NavigationTargets, RangedValue};
 use rayon::prelude::*;
@@ -9,44 +66,10 @@ use ty_python_semantic::{
     ImplementationsFinder, ImportAliasResolution, ResolvedDefinition, SemanticModel,
 };
 
-/// Navigate from an attribute, method, or class target to its known implementations.
+/// Returns the known implementations for the supported target at `offset`.
 ///
-/// For an attribute access that resolves to a member, this resolves the receiver type and returns
-/// the implementation family for that type. The member may be a method or an attribute such as
-/// `sound: str = ...`:
-///
-/// ```py
-/// animal.sound
-///        ^^^^^
-/// ```
-///
-/// For a method declaration, this uses the containing class as the root and returns that method's
-/// implementation, if present, along with known overrides on subclasses:
-///
-/// ```py
-/// class Animal:
-///     def speak(self): ...
-///         ^^^^^
-/// ```
-///
-/// For a class declaration, this uses the class as the root and returns it along with its known
-/// transitive subclasses:
-///
-/// ```py
-/// class Animal:
-///       ^^^^^^
-///     pass
-/// ```
-///
-/// For a reference to a class (a base class, annotation, or `Animal()`), this behaves like clicking
-/// the class declaration: the referenced class plus its known transitive subclasses. The reference
-/// is resolved through its definitions, so a qualified reference such as
-/// `module.Animal` or `Outer.Inner` behaves the same as a bare name.
-///
-/// ```py
-/// class Dog(Animal): ...
-///           ^^^^^^
-/// ```
+/// Returns `None` when the cursor is not on a supported target or no implementation can be
+/// identified.
 pub fn goto_implementation(
     db: &dyn Db,
     file: File,
