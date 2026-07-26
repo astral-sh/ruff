@@ -829,15 +829,45 @@ pub(crate) fn narrow_type_by_constraint<'db>(
     context.narrow(projected_root, None)
 }
 
+/// Narrows `base_ty` to values compatible with the concrete execution paths in `id`.
+///
+/// Ambiguous reachability does not restrict the possible runtime paths and therefore does not
+/// narrow the type.
+pub(crate) fn narrow_type_by_reachability_constraint<'db>(
+    db: &'db dyn Db,
+    constraints: &ReachabilityConstraints,
+    predicates: &IndexSlice<ScopedPredicateId, Predicate<'db>>,
+    id: ScopedReachabilityConstraintId,
+    base_ty: Type<'db>,
+    place: ScopedPlaceId,
+) -> Type<'db> {
+    match id {
+        ScopedReachabilityConstraintId::ALWAYS_TRUE | ScopedReachabilityConstraintId::AMBIGUOUS => {
+            return base_ty;
+        }
+        ScopedReachabilityConstraintId::ALWAYS_FALSE => return Type::Never,
+        _ => {}
+    }
+
+    let mut projector = NarrowingProjector::new(db, constraints, predicates, place);
+    let projected_root = projector.project(id);
+    let mut context = ProjectedNarrowingContext {
+        db,
+        base_ty,
+        graph: &projector.graph,
+        joins: projector.graph.joins(projected_root),
+        join_cache: FxHashMap::default(),
+    };
+    context.narrow(projected_root, None)
+}
+
 fn apply_accumulated_narrowing<'db>(
     db: &'db dyn Db,
     base_ty: Type<'db>,
     accumulated: Option<NarrowingConstraint<'db>>,
 ) -> Type<'db> {
     match accumulated {
-        Some(constraint) => NarrowingConstraint::intersection(base_ty)
-            .merge_constraint_and(constraint)
-            .evaluate_constraint_type(db),
+        Some(constraint) => constraint.narrow(db, base_ty),
         None => base_ty,
     }
 }
@@ -1036,21 +1066,89 @@ impl ProjectedNarrowingGraph<'_> {
     }
 }
 
+#[derive(Clone, Copy)]
+struct ProjectableConstraintNode<Id> {
+    atom: ScopedPredicateId,
+    if_true: Id,
+    if_uncertain: Id,
+    if_false: Id,
+}
+
+trait ProjectableConstraintGraph {
+    type Id: Copy + Eq + std::hash::Hash;
+
+    fn terminal(id: Self::Id) -> Option<ProjectedNarrowingNodeId>;
+
+    fn node(&self, id: Self::Id) -> ProjectableConstraintNode<Self::Id>;
+}
+
+impl ProjectableConstraintGraph for NarrowingConstraints {
+    type Id = ScopedNarrowingConstraint;
+
+    fn terminal(id: Self::Id) -> Option<ProjectedNarrowingNodeId> {
+        match id {
+            ScopedNarrowingConstraint::ALWAYS_TRUE => Some(ProjectedNarrowingNodeId::ALWAYS_TRUE),
+            ScopedNarrowingConstraint::ALWAYS_FALSE => Some(ProjectedNarrowingNodeId::ALWAYS_FALSE),
+            _ => None,
+        }
+    }
+
+    fn node(&self, id: Self::Id) -> ProjectableConstraintNode<Self::Id> {
+        let node = self.get_interior_node(id);
+        ProjectableConstraintNode {
+            atom: node.atom,
+            if_true: node.if_true,
+            if_uncertain: node.if_uncertain,
+            if_false: node.if_false,
+        }
+    }
+}
+
+impl ProjectableConstraintGraph for ReachabilityConstraints {
+    type Id = ScopedReachabilityConstraintId;
+
+    fn terminal(id: Self::Id) -> Option<ProjectedNarrowingNodeId> {
+        match id {
+            ScopedReachabilityConstraintId::ALWAYS_TRUE
+            | ScopedReachabilityConstraintId::AMBIGUOUS => {
+                Some(ProjectedNarrowingNodeId::ALWAYS_TRUE)
+            }
+            ScopedReachabilityConstraintId::ALWAYS_FALSE => {
+                Some(ProjectedNarrowingNodeId::ALWAYS_FALSE)
+            }
+            _ => None,
+        }
+    }
+
+    fn node(&self, id: Self::Id) -> ProjectableConstraintNode<Self::Id> {
+        let node = self.get_interior_node(id);
+        ProjectableConstraintNode {
+            atom: node.atom(),
+            if_true: node.if_true(),
+            // `Ambiguous` is an analysis result, not a third runtime outcome. The concrete
+            // execution path represented by this constraint follows either the true or false
+            // branch, so it contributes no independent path to type narrowing.
+            if_uncertain: ScopedReachabilityConstraintId::ALWAYS_FALSE,
+            if_false: node.if_false(),
+        }
+    }
+}
+
 /// Removes predicates that cannot narrow one place from a narrowing constraint.
-struct NarrowingProjector<'a, 'db> {
+struct NarrowingProjector<'a, 'db, G: ProjectableConstraintGraph + ?Sized> {
     db: &'db dyn Db,
-    constraints: &'a NarrowingConstraints,
+    constraints: &'a G,
     predicates: &'a IndexSlice<ScopedPredicateId, Predicate<'db>>,
     place: ScopedPlaceId,
-    project_cache: FxHashMap<ScopedNarrowingConstraint, ProjectedNarrowingNodeId>,
+    project_cache: FxHashMap<G::Id, ProjectedNarrowingNodeId>,
     graph: ProjectedNarrowingGraph<'db>,
 }
 
-impl<'a, 'db> NarrowingProjector<'a, 'db> {
+impl<'a, 'db, G: ProjectableConstraintGraph + ?Sized> NarrowingProjector<'a, 'db, G> {
     /// Creates a projector for narrowing `place`.
     fn new(
         db: &'db dyn Db,
-        constraints: &'a NarrowingConstraints,
+        constraints: &'a G,
         predicates: &'a IndexSlice<ScopedPredicateId, Predicate<'db>>,
         place: ScopedPlaceId,
     ) -> Self {
@@ -1085,26 +1183,25 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
     }
 
     /// Projects one constraint node into the graph for this place.
-    fn project(&mut self, root: ScopedNarrowingConstraint) -> ProjectedNarrowingNodeId {
-        type Id = ScopedNarrowingConstraint;
-        enum Action {
+    fn project(&mut self, root: G::Id) -> ProjectedNarrowingNodeId {
+        enum Action<Id> {
             Visit(Id),
             AnalyzeNonTerminal(Id),
             FinishNonTerminal { id: Id, branch: Id },
             FinishPredicate(Id),
         }
 
-        let mut actions = SmallVec::<[Action; 8]>::new();
+        let mut actions = SmallVec::<[Action<G::Id>; 8]>::new();
         actions.push(Action::Visit(root));
 
         while let Some(action) = actions.pop() {
             match action {
                 Action::Visit(id) => {
-                    if id.is_terminal() || self.project_cache.contains_key(&id) {
+                    if G::terminal(id).is_some() || self.project_cache.contains_key(&id) {
                         continue;
                     }
 
-                    let node = self.constraints.get_interior_node(id);
+                    let node = self.constraints.node(id);
                     let predicate = self.predicates[node.atom];
 
                     if matches!(predicate.node, PredicateNode::IsNonTerminalCall(_)) {
@@ -1118,7 +1215,7 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
                     }
                 }
                 Action::AnalyzeNonTerminal(id) => {
-                    let node = self.constraints.get_interior_node(id);
+                    let node = self.constraints.node(id);
                     let predicate = self.predicates[node.atom];
                     let branch = match analyze_single(self.db, &predicate) {
                         Truthiness::AlwaysTrue => node.if_true,
@@ -1132,14 +1229,14 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
                     actions.push(Action::Visit(branch));
                 }
                 Action::FinishNonTerminal { id, branch } => {
-                    let node = self.constraints.get_interior_node(id);
+                    let node = self.constraints.node(id);
                     let branch = self.projected_node(branch);
                     let if_uncertain = self.projected_node(node.if_uncertain);
                     let projected = self.graph.or(branch, if_uncertain);
                     self.project_cache.insert(id, projected);
                 }
                 Action::FinishPredicate(id) => {
-                    let node = self.constraints.get_interior_node(id);
+                    let node = self.constraints.node(id);
                     let if_true = self.projected_node(node.if_true);
                     let if_uncertain = self.projected_node(node.if_uncertain);
                     let if_false = self.projected_node(node.if_false);
@@ -1164,12 +1261,8 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
         self.projected_node(root)
     }
 
-    fn projected_node(&self, id: ScopedNarrowingConstraint) -> ProjectedNarrowingNodeId {
-        match id {
-            ScopedNarrowingConstraint::ALWAYS_TRUE => ProjectedNarrowingNodeId::ALWAYS_TRUE,
-            ScopedNarrowingConstraint::ALWAYS_FALSE => ProjectedNarrowingNodeId::ALWAYS_FALSE,
-            _ => self.project_cache[&id],
-        }
+    fn projected_node(&self, id: G::Id) -> ProjectedNarrowingNodeId {
+        G::terminal(id).unwrap_or_else(|| self.project_cache[&id])
     }
 }
 
@@ -1684,6 +1777,39 @@ pub(crate) fn evaluate_reachability_with_cache<'db>(
         cache.evaluate(db, constraints, predicates, id)
     } else {
         constraints.evaluate(db, predicates, id)
+    }
+}
+
+/// Evaluates a reachability constraint while allowing the caller to refine individual predicates.
+///
+/// This is used when a predicate from an enclosing scope can be evaluated more precisely using
+/// narrowing constraints at a nested use site.
+pub(crate) fn evaluate_reachability_with_predicate_overrides<'db>(
+    db: &'db dyn Db,
+    constraints: &ReachabilityConstraints,
+    predicates: &IndexSlice<ScopedPredicateId, Predicate<'db>>,
+    mut predicate_override: impl FnMut(Predicate<'db>) -> Option<Truthiness>,
+    mut id: ScopedReachabilityConstraintId,
+) -> Truthiness {
+    if let Some(reachability) = terminal_reachability(id) {
+        return reachability;
+    }
+
+    let root_predicate = constraints.get_interior_node(id).atom();
+    analyze_non_terminal_call_prefix(db, predicates, root_predicate);
+
+    loop {
+        if let Some(reachability) = terminal_reachability(id) {
+            return reachability;
+        }
+
+        let node = constraints.get_interior_node(id);
+        let predicate = predicates[node.atom()];
+        id = match predicate_override(predicate).unwrap_or_else(|| analyze_single(db, &predicate)) {
+            Truthiness::AlwaysTrue => node.if_true(),
+            Truthiness::Ambiguous => node.if_ambiguous(),
+            Truthiness::AlwaysFalse => node.if_false(),
+        };
     }
 }
 

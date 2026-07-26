@@ -40,7 +40,10 @@ use crate::place::{
     place_from_bindings_with_reachability_cache, place_from_declarations_with_reachability_cache,
     typing_extensions_symbol,
 };
-use crate::reachability::{ReachabilityEvaluationCache, evaluate_reachability_with_cache};
+use crate::reachability::{
+    ReachabilityEvaluationCache, evaluate_reachability_with_cache,
+    evaluate_reachability_with_predicate_overrides, narrow_type_by_reachability_constraint,
+};
 use crate::types::add_inferred_python_version_hint_to_diagnostic;
 use crate::types::attribute_write::{AssignmentAttributeMembers, assignment_attribute_members};
 use crate::types::call::bind::{
@@ -93,8 +96,9 @@ use crate::types::infer::{
     nearest_enclosing_function, original_class_type,
 };
 use crate::types::match_pattern::{ClassPatternPositionalResult, class_pattern_positional_result};
-use crate::types::narrow::NarrowingEvaluatorExtension;
-use crate::types::narrow::pattern_success_types;
+use crate::types::narrow::{
+    NarrowingEvaluatorExtension, infer_narrowing_constraints, pattern_success_types,
+};
 use crate::types::newtype::NewType;
 use crate::types::set_theoretic::RecursivelyDefined;
 use crate::types::signatures::{CallableSignature, ReturnCallableTypeVarScope};
@@ -131,13 +135,13 @@ use ty_python_core::definition::{
 use ty_python_core::expression::{Expression, ExpressionKind};
 use ty_python_core::narrowing_constraints::ConstraintKey;
 use ty_python_core::node_key::NodeKey;
-use ty_python_core::place::{PlaceExpr, PlaceExprRef};
-use ty_python_core::predicate::PatternPredicate;
+use ty_python_core::place::{PlaceExpr, PlaceExprRef, ScopedPlaceId};
+use ty_python_core::predicate::{PatternPredicate, Predicate};
 use ty_python_core::scope::{FileScopeId, NodeWithScopeKind, NodeWithScopeRef, ScopeId, ScopeKind};
 use ty_python_core::symbol::{ScopedSymbolId, Symbol};
 use ty_python_core::{
-    ApplicableConstraints, EnclosingSnapshotResult, EvaluationMode, SemanticIndex, Truthiness,
-    unpack::UnpackPosition,
+    ApplicableConstraints, BindingWithConstraintsIterator, EnclosingSnapshotResult, EvaluationMode,
+    SemanticIndex, Truthiness, unpack::UnpackPosition,
 };
 use ty_python_core::{ExpressionNodeKey, Statement};
 
@@ -9231,7 +9235,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         for (enclosing_scope_file_id, constraint_key) in constraint_keys {
             let use_def = self.index.use_def_map(*enclosing_scope_file_id);
             let place_table = self.index.place_table(*enclosing_scope_file_id);
-            let place = place_table.place_id(expr).unwrap();
+            let Some(place) = place_table.place_id(expr) else {
+                continue;
+            };
 
             match use_def.applicable_constraints(
                 *constraint_key,
@@ -9298,6 +9304,246 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         }
         ty
+    }
+
+    /// Narrows a stable enclosing place by the execution paths that reach a nested use.
+    fn narrow_place_by_applicable_reachability(
+        &self,
+        expr: PlaceExprRef,
+        mut ty: Type<'db>,
+        constraint_keys: &[(FileScopeId, ConstraintKey)],
+    ) -> Type<'db> {
+        let db = self.db();
+        for (enclosing_scope_file_id, constraint_key) in constraint_keys {
+            let use_def = self.index.use_def_map(*enclosing_scope_file_id);
+            let place_table = self.index.place_table(*enclosing_scope_file_id);
+            let Some(place) = place_table.place_id(expr) else {
+                continue;
+            };
+            let ApplicableConstraints::ConstrainedBindings(bindings) = use_def
+                .applicable_constraints(
+                    *constraint_key,
+                    *enclosing_scope_file_id,
+                    expr,
+                    self.index,
+                )
+            else {
+                continue;
+            };
+
+            let reachability_constraints = bindings.reachability_constraints();
+            let predicates = bindings.predicates();
+            let mut union = UnionBuilder::new(db);
+            for binding in bindings {
+                if evaluate_reachability_with_cache(
+                    db,
+                    Some(self.reachability_cache()),
+                    reachability_constraints,
+                    predicates,
+                    binding.reachability_constraint,
+                )
+                .is_always_false()
+                {
+                    continue;
+                }
+                union = union.add(narrow_type_by_reachability_constraint(
+                    db,
+                    reachability_constraints,
+                    predicates,
+                    binding.reachability_constraint,
+                    ty,
+                    place,
+                ));
+            }
+            ty = union.build();
+        }
+        ty
+    }
+
+    fn enclosing_symbol_is_stable(
+        &self,
+        enclosing_scope_file_id: FileScopeId,
+        symbol: &Symbol,
+    ) -> bool {
+        if enclosing_scope_file_id.is_global() || !symbol.is_local() || symbol.is_reassigned() {
+            return false;
+        }
+
+        let place_table = self.index.place_table(enclosing_scope_file_id);
+        let Some(symbol_id) = place_table.symbol_id(symbol.name()) else {
+            return false;
+        };
+        // A nested `nonlocal` write can change the closure cell before this scope executes.
+        if self
+            .index
+            .use_def_map(enclosing_scope_file_id)
+            .reachable_symbol_bindings(symbol_id)
+            .any(|binding| {
+                matches!(
+                    binding.binding,
+                    DefinitionState::Defined(definition)
+                        if matches!(definition.kind(self.db()), DefinitionKind::NestedBindings(_))
+                )
+            })
+        {
+            return false;
+        }
+
+        let current_scope_file_id = self.scope().file_scope_id(self.db());
+        for (scope_file_id, scope) in self.index.ancestor_scopes(current_scope_file_id) {
+            if scope_file_id == enclosing_scope_file_id {
+                return true;
+            }
+
+            let place_table = self.index.place_table(scope_file_id);
+            let Some(intermediate_symbol) = place_table.symbol_by_name(symbol.name()) else {
+                continue;
+            };
+
+            if intermediate_symbol.is_global()
+                || (scope.kind().is_function_like() && intermediate_symbol.is_local())
+            {
+                return false;
+            }
+        }
+
+        false
+    }
+
+    fn enclosing_predicate_truthiness_at_use(
+        &self,
+        enclosing_scope_file_id: FileScopeId,
+        predicate: Predicate<'db>,
+        constraint_keys: &[(FileScopeId, ConstraintKey)],
+    ) -> Option<Truthiness> {
+        let db = self.db();
+        let enclosing_scope_id = enclosing_scope_file_id.to_scope_id(db, self.file());
+        let place_table = self.index.place_table(enclosing_scope_file_id);
+        let mut has_applicable_constraint = false;
+        let mut positive_possible = true;
+        let mut negative_possible = true;
+
+        for symbol in place_table.symbols() {
+            if !self.enclosing_symbol_is_stable(enclosing_scope_file_id, symbol) {
+                continue;
+            }
+
+            let Some(symbol_id) = place_table.symbol_id(symbol.name()) else {
+                continue;
+            };
+            let (positive, negative) =
+                infer_narrowing_constraints(db, predicate, ScopedPlaceId::Symbol(symbol_id));
+            if positive.is_none() && negative.is_none() {
+                continue;
+            }
+
+            let Some(base_ty) = place_by_id(
+                db,
+                enclosing_scope_id,
+                ScopedPlaceId::Symbol(symbol_id),
+                RequiresExplicitReExport::No,
+                ConsideredDefinitions::AllReachable,
+            )
+            .place
+            .ignore_possibly_undefined() else {
+                continue;
+            };
+            // A closure observes the current object, not its state when it was created. Restrict
+            // cross-scope truthiness correlation to `bool`, whose value cannot mutate.
+            // TODO: Support non-boolean conditions when their truthiness can be proven stable.
+            if !base_ty.is_equivalent_to(db, KnownClass::Bool.to_instance(db)) {
+                continue;
+            }
+            let narrowed_ty = self.narrow_place_with_applicable_constraints(
+                PlaceExprRef::Symbol(symbol),
+                base_ty,
+                constraint_keys,
+            );
+            let narrowed_ty = self.narrow_place_by_applicable_reachability(
+                PlaceExprRef::Symbol(symbol),
+                narrowed_ty,
+                constraint_keys,
+            );
+            if narrowed_ty.is_never() {
+                return None;
+            }
+
+            if let Some(constraint) = positive {
+                has_applicable_constraint = true;
+                positive_possible &= !constraint.narrow(db, narrowed_ty).is_never();
+            }
+            if let Some(constraint) = negative {
+                has_applicable_constraint = true;
+                negative_possible &= !constraint.narrow(db, narrowed_ty).is_never();
+            }
+        }
+
+        if !has_applicable_constraint {
+            return None;
+        }
+
+        match (positive_possible, negative_possible) {
+            (true, false) => Some(Truthiness::AlwaysTrue),
+            (false, true) => Some(Truthiness::AlwaysFalse),
+            (true, true) | (false, false) => None,
+        }
+    }
+
+    /// Resolves enclosing snapshot candidates and refines their absence using the nested use path.
+    fn place_from_enclosing_bindings(
+        &self,
+        enclosing_scope_file_id: FileScopeId,
+        place_expr: PlaceExprRef,
+        bindings: BindingWithConstraintsIterator<'_, 'db>,
+        constraint_keys: &[(FileScopeId, ConstraintKey)],
+    ) -> Place<'db> {
+        let missing_reachabilities = bindings
+            .clone()
+            .filter_map(|binding| {
+                matches!(
+                    binding.binding,
+                    DefinitionState::Undefined | DefinitionState::Deleted
+                )
+                .then_some(binding.reachability_constraint)
+            })
+            .collect::<SmallVec<[_; 1]>>();
+        let reachability_constraints = bindings.reachability_constraints();
+        let predicates = bindings.predicates();
+        let mut place = place_from_bindings_with_reachability_cache(
+            self.db(),
+            bindings,
+            self.reachability_cache(),
+        )
+        .place;
+
+        if !missing_reachabilities.is_empty()
+            && let Place::Defined(defined) = place
+            && defined.definedness == Definedness::PossiblyUndefined
+            && missing_reachabilities
+                .into_iter()
+                .all(|missing_reachability| {
+                    evaluate_reachability_with_predicate_overrides(
+                        self.db(),
+                        reachability_constraints,
+                        predicates,
+                        |predicate| {
+                            self.enclosing_predicate_truthiness_at_use(
+                                enclosing_scope_file_id,
+                                predicate,
+                                constraint_keys,
+                            )
+                        },
+                        missing_reachability,
+                    )
+                    .is_always_false()
+                })
+        {
+            place = Place::Defined(defined.with_definedness(Definedness::AlwaysDefined));
+        }
+
+        place.map_type(|ty| {
+            self.narrow_place_with_applicable_constraints(place_expr, ty, constraint_keys)
+        })
     }
 
     /// Check if the given ty is `@deprecated` or not
@@ -9739,19 +9985,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             }
                         }
                         EnclosingSnapshotResult::FoundBindings(bindings) => {
-                            let place = place_from_bindings_with_reachability_cache(
-                                db,
+                            let place = self.place_from_enclosing_bindings(
+                                enclosing_scope_file_id,
+                                place_expr,
                                 bindings,
-                                self.reachability_cache(),
-                            )
-                            .place
-                            .map_type(|ty| {
-                                self.narrow_place_with_applicable_constraints(
-                                    place_expr,
-                                    ty,
-                                    &constraint_keys,
-                                )
-                            });
+                                &constraint_keys,
+                            );
                             constraint_keys.push((
                                 enclosing_scope_file_id,
                                 ConstraintKey::NestedScope(file_scope_id),

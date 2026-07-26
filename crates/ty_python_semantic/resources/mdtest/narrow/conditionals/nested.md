@@ -22,6 +22,97 @@ def _(x: Literal[1, 2, 3]):
             reveal_type(x)  # revealed: Literal[3]
 ```
 
+## Conditional bindings in enclosing scopes
+
+A boolean condition in a nested function can establish that a conditionally-bound enclosing variable
+is available. This is only valid when the boolean cannot be reassigned:
+
+```py
+from typing import Any
+
+def safe(flag: bool) -> None:
+    if flag:
+        value = 1
+
+    def inner() -> None:
+        if flag:
+            reveal_type(value)  # revealed: Literal[1]
+
+def unsafe(flag: bool) -> None:
+    if flag:
+        value = 1
+
+    def inner() -> None:
+        if flag:
+            # error: [possibly-unresolved-reference] "Name `value` used when possibly not defined"
+            reveal_type(value)  # revealed: Literal[1]
+
+    flag = not flag
+
+def safe_with_stronger_condition(first: bool, second: bool) -> None:
+    if first:
+        value = 1
+
+    def inner() -> None:
+        if first and second:
+            reveal_type(value)  # revealed: Literal[1]
+
+    inner()
+
+def unsafe_with_weaker_condition(first: bool, second: bool) -> None:
+    if first and second:
+        value = 1
+
+    def inner() -> None:
+        if first:
+            # error: [possibly-unresolved-reference] "Name `value` used when possibly not defined"
+            reveal_type(value)  # revealed: Literal[1]
+
+    inner()
+
+def unsafe_after_nonlocal_reassignment(flag: bool) -> None:
+    if flag:
+        value = 1
+
+    def mutate() -> None:
+        nonlocal flag
+        flag = not flag
+
+    def inner() -> None:
+        if flag:
+            # error: [possibly-unresolved-reference] "Name `value` used when possibly not defined"
+            reveal_type(value)  # revealed: Literal[1]
+
+    mutate()
+    inner()
+
+def unsafe_after_mutation(items: list[int]) -> None:
+    # items may be falsy
+    if items:
+        value = 1
+
+    def inner() -> None:
+        # items here may be truthy
+        if items:
+            # error: [possibly-unresolved-reference] "Name `value` used when possibly not defined"
+            reveal_type(value)  # revealed: Literal[1]
+
+    items.append(1)
+    inner()
+
+def unsafe_dynamic(items: Any) -> None:
+    if items:
+        value = 1
+
+    def inner() -> None:
+        if items:
+            # error: [possibly-unresolved-reference] "Name `value` used when possibly not defined"
+            reveal_type(value)  # revealed: Literal[1]
+
+    items.append(1)
+    inner()
+```
+
 ## elif-else blocks
 
 ```py

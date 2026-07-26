@@ -759,6 +759,13 @@ impl<'db> NarrowingConstraint<'db> {
         }
     }
 
+    /// Applies this constraint to an existing type.
+    pub(crate) fn narrow(self, db: &'db dyn Db, base_ty: Type<'db>) -> Type<'db> {
+        Self::intersection(base_ty)
+            .merge_constraint_and(self)
+            .evaluate_constraint_type(db)
+    }
+
     /// Merge two constraints with OR semantics (union/disjunction).
     fn merge_constraint_or(&mut self, other: Self) {
         self.intersection_disjuncts
