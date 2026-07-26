@@ -19,21 +19,10 @@ use crate::checkers::ast::Checker;
 /// Consider raising a meaningful error instead of using `assert`.
 ///
 /// ## Type narrowing
-/// `assert` is sometimes used to narrow types for static type checkers, e.g.
-/// `assert x is not None`. Since these assertions are only useful to the
-/// type checker and have no runtime effect worth preserving, they are often
-/// better placed under a `TYPE_CHECKING` guard so they are not executed at
-/// runtime:
 ///
-/// ```python
-/// from typing import TYPE_CHECKING
-///
-/// if TYPE_CHECKING:
-///     assert isinstance(x, int)
-/// ```
-///
-/// Alternatively, if the assertion is needed at runtime, suppress the rule
-/// at the call site with `# noqa: S101`.
+/// Assertions in `TYPE_CHECKING` blocks are exempt from this rule, assuming
+/// they exist to satisfy a type checker. If the assertion is needed at
+/// runtime, suppress it at the call site with `# noqa: S101`.
 ///
 /// ## Example
 /// ```python
