@@ -47,6 +47,9 @@ Settings: Settings {
     src: SrcSettings {
         respect_ignore_files: true,
         exclude_scripts: false,
+        python_extensions: PythonExtensions(
+            [],
+        ),
         files: IncludeExcludeFilter {
             include: IncludeFilter(
                 [
