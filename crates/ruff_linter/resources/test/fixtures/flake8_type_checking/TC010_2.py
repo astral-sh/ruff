@@ -1,15 +1,15 @@
 from typing import TypeVar
 
 
-x: "int" | str  # TC010
-x: ("int" | str) | "bool"  # TC010
+x: "int" | str  # OK
+x: ("int" | str) | "bool"  # OK
 
 
 def func():
     x: "int" | str  # OK
 
 
-z: list[str, str | "int"] = []  # TC010
+z: list[str, str | "int"] = []  # OK
 
 type A = Value["int" | str]  # OK
 
