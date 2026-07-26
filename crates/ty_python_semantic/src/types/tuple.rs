@@ -2603,13 +2603,8 @@ impl<'db> Tuple<Type<'db>, VariableSegment<'db>> {
             // For most unions, it's better to go via `UnionType::from_elements` or use `UnionBuilder`;
             // those techniques ensure that union elements are deduplicated and unions are eagerly simplified
             // into other types where necessary. Here, however, we know that there are no duplicates
-            // in this union, so it's probably more efficient to use
-            // `UnionType::new_simplified()` directly.
-            Type::Union(UnionType::new_simplified(
-                db,
-                elements,
-                RecursivelyDefined::No,
-            ))
+            // in this union, so it's probably more efficient to use `UnionType::new()` directly.
+            Type::Union(UnionType::new(db, elements, RecursivelyDefined::No))
         };
 
         TupleSpec::heterogeneous([

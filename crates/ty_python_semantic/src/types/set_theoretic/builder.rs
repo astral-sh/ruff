@@ -1319,12 +1319,7 @@ impl<'db> UnionBuilder<'db> {
         match types.len() {
             0 => None,
             1 => Some(types[0]),
-            _ if cycle_recovery => Some(Type::Union(UnionType::new_unsimplified(
-                db,
-                types.into_boxed_slice(),
-                recursively_defined,
-            ))),
-            _ => Some(Type::Union(UnionType::new_simplified(
+            _ => Some(Type::Union(UnionType::new(
                 db,
                 types.into_boxed_slice(),
                 recursively_defined,
@@ -2104,7 +2099,6 @@ mod tests {
         let union = UnionType::from_elements(&db, [t0, t1]).expect_union();
 
         assert_eq!(union.elements(&db), &[t0, t1]);
-        assert!(union.is_simplified(&db));
     }
 
     #[test]
@@ -2212,70 +2206,22 @@ mod tests {
     }
 
     #[test]
-    fn simplification_state_does_not_change_union_identity() {
-        let db = setup_db();
-
-        let first = Type::int_literal(1);
-        let second = Type::int_literal(2);
-        let union_from_cycle_recovery = UnionBuilder::new(&db)
-            .cycle_recovery(true)
-            .add(first)
-            .add(second)
-            .build()
-            .expect_union();
-        assert!(!union_from_cycle_recovery.is_simplified(&db));
-
-        let simplified = UnionType::from_elements(&db, [first, second]).expect_union();
-        assert_eq!(union_from_cycle_recovery, simplified);
-        assert!(union_from_cycle_recovery.is_simplified(&db));
-
-        let union_from_later_cycle_recovery = UnionBuilder::new(&db)
-            .cycle_recovery(true)
-            .add(first)
-            .add(second)
-            .build()
-            .expect_union();
-        assert_eq!(union_from_later_cycle_recovery, simplified);
-        assert!(union_from_later_cycle_recovery.is_simplified(&db));
-    }
-
-    #[test]
-    fn skips_redundancy_checks_only_for_simplified_sub_unions() {
+    fn validates_sub_union_before_skipping_redundancy_checks() {
         let db = setup_db();
         let builder = UnionBuilder::new(&db);
 
-        let literal_union = UnionType::from_elements(
-            &db,
-            [
-                Type::string_literal(&db, "first"),
-                Type::string_literal(&db, "second"),
-            ],
-        )
-        .expect_union();
-        assert!(builder.can_skip_sub_union_redundancy_checks(literal_union));
+        let non_literal_union = UnionBuilder::new(&db)
+            .cycle_recovery(true)
+            .add(KnownClass::Int.to_instance(&db))
+            .add(KnownClass::Str.to_instance(&db))
+            .build()
+            .expect_union();
+        assert!(builder.can_skip_sub_union_redundancy_checks(non_literal_union));
         assert!(
             !UnionBuilder::new(&db)
                 .cycle_recovery(true)
-                .can_skip_sub_union_redundancy_checks(literal_union)
+                .can_skip_sub_union_redundancy_checks(non_literal_union)
         );
-
-        let non_literal_union = UnionType::from_elements(
-            &db,
-            [
-                KnownClass::Int.to_instance(&db),
-                KnownClass::Str.to_instance(&db),
-            ],
-        )
-        .expect_union();
-        assert!(builder.can_skip_sub_union_redundancy_checks(non_literal_union));
-
-        let unsimplified_literal_union = UnionBuilder::new(&db)
-            .cycle_recovery(true)
-            .add(Type::int_literal(1))
-            .add(Type::int_literal(2))
-            .build()
-            .expect_union();
-        assert!(!builder.can_skip_sub_union_redundancy_checks(unsimplified_literal_union));
     }
 
     #[test]

@@ -762,7 +762,7 @@ impl<'db> EnumComplementType<'db> {
             // Keep this exact. Routing these literals through `UnionBuilder` can widen very large
             // enum complements back to the original enum class, losing the excluded members that
             // made the compact complement useful in the first place.
-            _ => Type::Union(UnionType::new_simplified(
+            _ => Type::Union(UnionType::new(
                 db,
                 alternatives.into_boxed_slice(),
                 RecursivelyDefined::No,

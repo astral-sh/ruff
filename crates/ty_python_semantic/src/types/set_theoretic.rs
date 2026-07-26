@@ -1,8 +1,6 @@
 use itertools::Either;
 
 use std::convert::Infallible;
-use std::hash::{Hash, Hasher};
-use std::sync::atomic::{AtomicBool, Ordering};
 
 use crate::place::{
     DefinedPlace, Definedness, Place, PlaceAndQualifiers, Provenance, PublicTypePolicy, TypeOrigin,
@@ -26,8 +24,6 @@ pub struct UnionType<'db> {
     /// If `Yes`, union literal widening is performed early.
     #[returns(copy)]
     pub(crate) recursively_defined: RecursivelyDefined,
-    #[returns(ref)]
-    simplification_state: UnionSimplificationState,
 }
 
 pub(crate) fn walk_union<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
@@ -43,86 +39,9 @@ pub(crate) fn walk_union<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for UnionType<'_> {}
 
-/// Non-semantic simplification metadata for an interned union.
-///
-/// All instances compare and hash equally: once any construction simplifies an element set, this
-/// state is atomically shared by every occurrence of that same union without changing its identity.
-///
-/// Salsa does not track mutations to this metadata, so it is only used as a hint before validating
-/// the simplification through a tracked query.
-#[doc(hidden)]
-#[derive(Debug)]
-pub struct UnionSimplificationState(AtomicBool);
-
-impl UnionSimplificationState {
-    fn new(simplified: bool) -> Self {
-        Self(AtomicBool::new(simplified))
-    }
-
-    fn mark_simplified(&self) {
-        self.0.store(true, Ordering::Relaxed);
-    }
-
-    fn was_simplified(&self) -> bool {
-        self.0.load(Ordering::Relaxed)
-    }
-}
-
-impl Clone for UnionSimplificationState {
-    fn clone(&self) -> Self {
-        Self(AtomicBool::new(self.0.load(Ordering::Relaxed)))
-    }
-}
-
-impl PartialEq for UnionSimplificationState {
-    fn eq(&self, _other: &Self) -> bool {
-        true
-    }
-}
-
-impl Eq for UnionSimplificationState {}
-
-impl Hash for UnionSimplificationState {
-    fn hash<H: Hasher>(&self, _state: &mut H) {}
-}
-
-impl get_size2::GetSize for UnionSimplificationState {}
-
 impl<'db> UnionType<'db> {
-    pub(crate) fn new_simplified(
-        db: &'db dyn Db,
-        elements: Box<[Type<'db>]>,
-        recursively_defined: RecursivelyDefined,
-    ) -> Self {
-        let union = Self::new(
-            db,
-            elements,
-            recursively_defined,
-            UnionSimplificationState::new(true),
-        );
-        union.simplification_state(db).mark_simplified();
-        union
-    }
-
-    pub(crate) fn new_unsimplified(
-        db: &'db dyn Db,
-        elements: Box<[Type<'db>]>,
-        recursively_defined: RecursivelyDefined,
-    ) -> Self {
-        Self::new(
-            db,
-            elements,
-            recursively_defined,
-            UnionSimplificationState::new(false),
-        )
-    }
-
-    pub(crate) fn was_simplified(self, db: &'db dyn Db) -> bool {
-        self.simplification_state(db).was_simplified()
-    }
-
     pub(crate) fn is_simplified(self, db: &'db dyn Db) -> bool {
-        self.was_simplified(db) && builder::is_union_simplified(db, self)
+        builder::is_union_simplified(db, self)
     }
 }
 
@@ -358,16 +277,7 @@ impl<'db> UnionType<'db> {
             [] => Type::Never,
             [single] => *single,
             _ if new.len() == current.len() => Type::Union(self),
-            _ if self.was_simplified(db) => Type::Union(UnionType::new_simplified(
-                db,
-                new,
-                self.recursively_defined(db),
-            )),
-            _ => Type::Union(UnionType::new_unsimplified(
-                db,
-                new,
-                self.recursively_defined(db),
-            )),
+            _ => Type::Union(UnionType::new(db, new, self.recursively_defined(db))),
         }
     }
 
