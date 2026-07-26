@@ -19,7 +19,7 @@ use ty_python_semantic::types::Type;
 use ty_python_semantic::types::ide_support::{
     call_signature_details, call_type_simplified_by_overloads, constructor_signature,
     definitions_and_overloads_for_function, definitions_for_keyword_argument,
-    typed_dict_key_definition,
+    matching_call_definitions, typed_dict_key_definition,
 };
 use ty_python_semantic::{
     HasDefinition, HasType, ImportAliasResolution, SemanticModel, TypeQualifiers,
@@ -329,6 +329,48 @@ impl<'db> Definitions<'db> {
         }
     }
 
+    /// Apply the narrower declaration behavior used by navigation requests.
+    ///
+    /// Rename and references continue to use [`Definitions::goto_declaration`] so every
+    /// co-definition participates. Navigation narrows only calls that resolve to one overload
+    /// group and direct selections of an overload declaration; all other cases preserve the
+    /// existing targets.
+    pub(crate) fn goto_navigation_declaration(
+        self,
+        model: &SemanticModel<'db>,
+        goto_target: &GotoTarget<'_>,
+    ) -> Option<Definitions<'db>> {
+        let declarations = self.goto_declaration(model, goto_target)?;
+        if !declarations.is_single_overload_group(model.db()) {
+            return Some(declarations);
+        }
+
+        let selected = match goto_target {
+            GotoTarget::Call { call, .. } => matching_call_definitions(model, call)
+                .into_iter()
+                .map(ResolvedDefinition::Definition)
+                .filter(|definition| declarations.0.contains(definition))
+                .collect(),
+            GotoTarget::FunctionDef(function) => {
+                let definition = ResolvedDefinition::Definition(function.definition(model));
+                if declarations.0.contains(&definition)
+                    && definition.is_overload_declaration(model.db())
+                {
+                    vec![definition]
+                } else {
+                    Vec::new()
+                }
+            }
+            _ => Vec::new(),
+        };
+
+        if selected.is_empty() {
+            Some(declarations)
+        } else {
+            Some(Self::new(selected))
+        }
+    }
+
     /// Get the "goto-definition" interpretation of this definition
     ///
     /// In this case we apply stub-mapping to try to find the "real" implementation
@@ -339,8 +381,65 @@ impl<'db> Definitions<'db> {
         goto_target: &GotoTarget<'_>,
     ) -> Option<Definitions<'db>> {
         let definitions = self.goto_declaration(model, goto_target)?;
+        if let Some(implementation) = definitions.single_overload_implementation(model.db()) {
+            return Some(Self::new(vec![implementation]));
+        }
+
         let resolved = StubMapper::new(model.db()).map_definitions(definitions.0);
         Some(Self::new(resolved))
+    }
+
+    fn single_overload_implementation(
+        &self,
+        db: &'db dyn ty_python_semantic::Db,
+    ) -> Option<ResolvedDefinition<'db>> {
+        let implementations: Vec<_> = self
+            .iter()
+            .map(|definition| definition.overload_implementation(db))
+            .collect();
+        let implementation = implementations.iter().flatten().next()?.clone();
+
+        // Collapse only when every target belongs to the same overload chain. The implementation
+        // itself has no overload mapping, so accept that target only when it is the common result.
+        implementations
+            .iter()
+            .zip(self)
+            .all(|(candidate, definition)| {
+                candidate
+                    .as_ref()
+                    .is_some_and(|candidate| candidate == &implementation)
+                    || definition == &implementation
+            })
+            .then_some(implementation)
+    }
+
+    fn is_single_overload_group(&self, db: &'db dyn ty_python_semantic::Db) -> bool {
+        let mut place = None;
+        let mut overload_count = 0;
+        let mut implementation_count = 0;
+
+        for definition in self {
+            let Some(semantic_definition) = definition.definition() else {
+                return false;
+            };
+            if !matches!(*semantic_definition.kind(db), DefinitionKind::Function(_)) {
+                return false;
+            }
+
+            let definition_place = (semantic_definition.scope(db), semantic_definition.place(db));
+            if place.is_some_and(|place| place != definition_place) {
+                return false;
+            }
+            place = Some(definition_place);
+
+            if definition.is_overload_declaration(db) {
+                overload_count += 1;
+            } else {
+                implementation_count += 1;
+            }
+        }
+
+        overload_count > 0 && implementation_count <= 1
     }
 
     /// Convert these semantic definitions to editor-facing navigation targets.

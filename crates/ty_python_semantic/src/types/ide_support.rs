@@ -1161,6 +1161,31 @@ pub fn find_active_signature_from_details(
     Some(best_index)
 }
 
+/// Returns the definitions of every callable signature that matches this call.
+///
+/// Unlike [`resolved_call_signature`], this does not choose an arity-based fallback for an invalid
+/// call or collapse ambiguous matches to one signature.
+pub fn matching_call_definitions<'db>(
+    model: &SemanticModel<'db>,
+    call_expr: &ast::ExprCall,
+) -> Vec<Definition<'db>> {
+    let db = model.db();
+    let Some(callable_type) = call_expr
+        .func
+        .inferred_type(model)
+        .and_then(|ty| ty.try_upcast_to_callable(db))
+        .map(|callable| callable.into_type(db))
+    else {
+        return Vec::new();
+    };
+
+    full_type_bindings_for_call(model, callable_type, call_expr)
+        .iter_flat()
+        .flat_map(|binding| binding.matching_overloads().map(|(_, overload)| overload))
+        .filter_map(|binding| binding.signature.definition)
+        .collect()
+}
+
 /// Resolve a call expression to its matching overload's signature details,
 /// using full type checking (not just arity matching) for overload resolution.
 ///
@@ -1302,7 +1327,7 @@ mod resolve_definition {
 
     use crate::Db;
     use crate::module_docstring;
-    use crate::types::binding_type;
+    use crate::types::{binding_type, infer_definition_types};
     use ty_python_core::definition::{Definition, DefinitionCategory, DefinitionKind};
     use ty_python_core::scope::{NodeWithScopeKind, ScopeId};
     use ty_python_core::{global_scope, place_table, semantic_index, use_def_map};
@@ -1380,6 +1405,26 @@ mod resolve_definition {
                 ResolvedDefinition::Module(_) | ResolvedDefinition::FileWithRange(_) => None,
             }
         }
+
+        /// Returns `true` if this definition is an `@overload` declaration.
+        pub fn is_overload_declaration(&self, db: &'db dyn Db) -> bool {
+            let ResolvedDefinition::Definition(definition) = self else {
+                return false;
+            };
+
+            binding_type(db, *definition)
+                .as_function_literal()
+                .is_some_and(|function| function.overloads_and_implementation(db).1.is_none())
+        }
+
+        /// Returns the single concrete implementation associated with this overload declaration.
+        pub fn overload_implementation(&self, db: &'db dyn Db) -> Option<Self> {
+            let ResolvedDefinition::Definition(definition) = self else {
+                return None;
+            };
+
+            overload_implementation(db, *definition).map(ResolvedDefinition::Definition)
+        }
     }
 
     // Overload declarations often omit docstrings, while the runtime
@@ -1420,6 +1465,66 @@ mod resolve_definition {
             .last()?;
 
         implementation.definition(db).docstring(db)
+    }
+
+    fn overload_implementation<'db>(
+        db: &'db dyn Db,
+        definition: Definition<'db>,
+    ) -> Option<Definition<'db>> {
+        let DefinitionKind::Function(_) = definition.kind(db) else {
+            return None;
+        };
+
+        let name = definition.name(db)?;
+        let scope = definition.scope(db);
+        let symbol_id = place_table(db, scope).symbol_id(&name)?;
+        let use_def = use_def_map(db, scope);
+        let current_overload = binding_type(db, definition)
+            .as_function_literal()?
+            .literal(db)
+            .last_definition;
+        if !current_overload.is_overload(db) {
+            return None;
+        }
+
+        let mut implementations = use_def
+            .end_of_scope_symbol_bindings(symbol_id)
+            .filter_map(|binding| {
+                let binding_definition = binding.binding.definition()?;
+                let function = infer_definition_types(db, binding_definition)
+                    .function_type(binding_definition)?;
+                function
+                    .contains_definition(db, definition)
+                    .then_some(function)
+            })
+            .filter_map(|function| {
+                let (_, implementation) = function.overloads_and_implementation(db);
+                implementation?.signature(db).definition()
+            });
+        // Conditional bindings can expose multiple implementations for one symbol.
+        if let Some(implementation) = implementations.next()
+            && implementations.next().is_none()
+        {
+            return Some(implementation);
+        }
+
+        // A common implementation after conditional overload branches can retain only one
+        // branch in its linear function type. It is still unambiguous when it is the sole live
+        // binding at the end of the scope.
+        let mut bindings = use_def.end_of_scope_symbol_bindings(symbol_id);
+        let binding = bindings.next()?;
+        if bindings.next().is_some() {
+            return None;
+        }
+
+        let binding_definition = binding.binding.definition()?;
+        let function =
+            infer_definition_types(db, binding_definition).function_type(binding_definition)?;
+        let (overloads, implementation) = function.overloads_and_implementation(db);
+        if overloads.is_empty() {
+            return None;
+        }
+        implementation?.signature(db).definition()
     }
 
     /// Resolve import definitions to their targets.

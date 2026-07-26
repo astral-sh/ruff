@@ -21,7 +21,7 @@ pub fn goto_declaration(
 
     let declaration_targets = goto_target
         .definitions(&model, ImportAliasResolution::ResolveAliases)?
-        .goto_declaration(&model, &goto_target)?
+        .goto_navigation_declaration(&model, &goto_target)?
         .into_navigation_targets(model.db());
 
     Some(RangedValue {
@@ -2345,14 +2345,10 @@ def ab(a: str): ...
         4 | ab(1)
           | ^^ Clicking here
           |
-        info: Found 2 declarations
+        info: Found 1 declaration
          --> mymodule.pyi:5:5
           |
         5 | def ab(a: int): ...
-          |     --
-        6 |
-        7 | @overload
-        8 | def ab(a: str): ...
           |     --
           |
         ");
@@ -2397,13 +2393,9 @@ def ab(a: str): ...
         4 | ab("hello")
           | ^^ Clicking here
           |
-        info: Found 2 declarations
-         --> mymodule.pyi:5:5
+        info: Found 1 declaration
+         --> mymodule.pyi:8:5
           |
-        5 | def ab(a: int): ...
-          |     --
-        6 |
-        7 | @overload
         8 | def ab(a: str): ...
           |     --
           |
@@ -2449,14 +2441,10 @@ def ab(a: int): ...
         4 | ab(1, 2)
           | ^^ Clicking here
           |
-        info: Found 2 declarations
+        info: Found 1 declaration
          --> mymodule.pyi:5:5
           |
         5 | def ab(a: int, b: int): ...
-          |     --
-        6 |
-        7 | @overload
-        8 | def ab(a: int): ...
           |     --
           |
         ");
@@ -2501,13 +2489,9 @@ def ab(a: int): ...
         4 | ab(1)
           | ^^ Clicking here
           |
-        info: Found 2 declarations
-         --> mymodule.pyi:5:5
+        info: Found 1 declaration
+         --> mymodule.pyi:8:5
           |
-        5 | def ab(a: int, b: int): ...
-          |     --
-        6 |
-        7 | @overload
         8 | def ab(a: int): ...
           |     --
           |
@@ -2556,20 +2540,12 @@ def ab(a: int, *, c: int): ...
         4 | ab(1, b=2)
           | ^^ Clicking here
           |
-        info: Found 3 declarations
-          --> mymodule.pyi:5:5
-           |
-         5 | def ab(a: int): ...
-           |     --
-         6 |
-         7 | @overload
-         8 | def ab(a: int, *, b: int): ...
-           |     --
-         9 |
-        10 | @overload
-        11 | def ab(a: int, *, c: int): ...
-           |     --
-           |
+        info: Found 1 declaration
+         --> mymodule.pyi:8:5
+          |
+        8 | def ab(a: int, *, b: int): ...
+          |     --
+          |
         ");
     }
 
@@ -2615,19 +2591,183 @@ def ab(a: int, *, c: int): ...
         4 | ab(1, c=2)
           | ^^ Clicking here
           |
-        info: Found 3 declarations
-          --> mymodule.pyi:5:5
+        info: Found 1 declaration
+          --> mymodule.pyi:11:5
            |
-         5 | def ab(a: int): ...
-           |     --
-         6 |
-         7 | @overload
-         8 | def ab(a: int, *, b: int): ...
-           |     --
-         9 |
-        10 | @overload
         11 | def ab(a: int, *, c: int): ...
            |     --
+           |
+        ");
+    }
+
+    #[test]
+    fn goto_declaration_overloaded_method_selects_matching_overload() {
+        let test = cursor_test(
+            r#"
+            from typing import Any, overload
+
+            class C:
+                @overload
+                def f(self, value: int) -> int: ...
+                @overload
+                def f(self, value: str) -> str: ...
+                def f(self, value: Any) -> Any: ...
+
+            C().f<CURSOR>(1)
+            "#,
+        );
+
+        assert_snapshot!(test.goto_declaration(), @"
+        info[goto-declaration]: Go to declaration
+          --> main.py:11:5
+           |
+        11 | C().f(1)
+           |     ^ Clicking here
+           |
+        info: Found 1 declaration
+         --> main.py:6:9
+          |
+        6 |     def f(self, value: int) -> int: ...
+          |         -
+          |
+        ");
+    }
+
+    #[test]
+    fn goto_declaration_overloaded_constructor_opening_parenthesis_selects_matching_overload() {
+        let test = cursor_test(
+            r#"
+            from typing import Any, overload
+
+            class C:
+                @overload
+                def __init__(self, value: int) -> None: ...
+                @overload
+                def __init__(self, value: str) -> None: ...
+                def __init__(self, value: Any) -> None: ...
+
+            C<CURSOR>(1)
+            "#,
+        );
+
+        assert_snapshot!(test.goto_declaration(), @"
+        info[goto-declaration]: Go to declaration
+          --> main.py:11:1
+           |
+        11 | C(1)
+           | ^ Clicking here
+           |
+        info: Found 1 declaration
+         --> main.py:6:9
+          |
+        6 |     def __init__(self, value: int) -> None: ...
+          |         --------
+          |
+        ");
+    }
+
+    #[test]
+    fn goto_declaration_overloaded_constructor_empty_closing_parenthesis_selects_matching_overload()
+    {
+        let test = cursor_test(
+            r#"
+            from typing import Any, overload
+
+            class C:
+                @overload
+                def __init__(self) -> None: ...
+                @overload
+                def __init__(self, value: int) -> None: ...
+                def __init__(self, value: Any = None) -> None: ...
+
+            C(<CURSOR>)
+            "#,
+        );
+
+        assert_snapshot!(test.goto_declaration(), @"
+        info[goto-declaration]: Go to declaration
+          --> main.py:11:1
+           |
+        11 | C()
+           | ^ Clicking here
+           |
+        info: Found 1 declaration
+         --> main.py:6:9
+          |
+        6 |     def __init__(self) -> None: ...
+          |         --------
+          |
+        ");
+    }
+
+    #[test]
+    fn goto_declaration_overload_declaration_selects_itself() {
+        let test = cursor_test(
+            r#"
+            from typing import Any, overload
+
+            @overload
+            def f(value: int) -> int: ...
+            @overload
+            def f<CURSOR>(value: str) -> str: ...
+            def f(value: Any) -> Any:
+                return value
+            "#,
+        );
+
+        assert_snapshot!(test.goto_declaration(), @"
+        info[goto-declaration]: Go to declaration
+         --> main.py:7:5
+          |
+        7 | def f(value: str) -> str: ...
+          |     ^ Clicking here
+          |
+        info: Found 1 declaration
+         --> main.py:7:5
+          |
+        7 | def f(value: str) -> str: ...
+          |     -
+          |
+        ");
+    }
+
+    #[test]
+    fn goto_declaration_callable_union_keeps_existing_targets() {
+        let test = cursor_test(
+            r#"
+            from typing import Any, overload
+
+            @overload
+            def overloaded(value: int) -> int: ...
+            @overload
+            def overloaded(value: str) -> str: ...
+            def overloaded(value: Any) -> Any: ...
+
+            def regular(value: int) -> int: ...
+            def flag() -> bool: ...
+
+            target = overloaded if flag() else regular
+            target<CURSOR>(1)
+            "#,
+        );
+
+        // Multiple callable groups deliberately retain the pre-existing declaration behavior.
+        assert_snapshot!(test.goto_declaration(), @"
+        info[goto-declaration]: Go to declaration
+          --> main.py:14:1
+           |
+        14 | target(1)
+           | ^^^^^^ Clicking here
+           |
+        info: Found 2 declarations
+          --> main.py:10:5
+           |
+        10 | def regular(value: int) -> int: ...
+           |     -------
+        11 | def flag() -> bool: ...
+        12 |
+        13 | target = overloaded if flag() else regular
+           | ------
            |
         ");
     }
