@@ -30,6 +30,10 @@ use crate::package::PackageRoot;
 /// annotations. Ideally, types would be public; however, this is not always
 /// possible when using third-party libraries.
 ///
+/// This rule is not enforced in stub files (`.pyi`), which routinely import
+/// private names in order to describe the runtime accurately, or to reuse
+/// private helper types from typeshed (such as those in `_typeshed`).
+///
 /// ## Known problems
 /// Does not ignore private name imports from within the module that defines
 /// the private name if the module is defined with [PEP 420] namespace packages
@@ -72,6 +76,13 @@ impl Violation for ImportPrivateName {
 
 /// PLC2701
 pub(crate) fn import_private_name(checker: &Checker, scope: &Scope) {
+    // Stub files describe the runtime rather than being part of it, so importing a private name
+    // is often the only way to be accurate (e.g., re-exporting a private base class, or using the
+    // private helper types from `_typeshed`).
+    if checker.source_type.is_stub() {
+        return;
+    }
+
     for binding_id in scope.binding_ids() {
         let binding = checker.semantic().binding(binding_id);
         let Some(import) = binding.as_any_import() else {
