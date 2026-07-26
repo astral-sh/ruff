@@ -828,11 +828,13 @@ pub(crate) mod testing {
 
 #[cfg(test)]
 mod tests {
+    use crate::db::Db as _;
     use ruff_db::Db as _;
-    use ruff_db::files::FileRootKind;
+    use ruff_db::files::{FileRootKind, system_path_to_file};
     use ruff_db::system::{SystemPathBuf, TestSystem};
     use ty_module_resolver::list_modules;
 
+    use crate::watch::{ChangeEvent, CreatedKind};
     use crate::{ProjectDatabase, ProjectMetadata};
 
     #[test]
@@ -910,6 +912,71 @@ mod tests {
             venv_root.kind_at_time_of_creation(&db),
             FileRootKind::SearchPath
         );
+
+        Ok(())
+    }
+
+    #[test]
+    fn configured_extension_is_indexed_when_created() -> anyhow::Result<()> {
+        let system = TestSystem::default();
+        let writer = system.clone();
+        let project_root = SystemPathBuf::from("/project");
+        let template = project_root.join("template.py.tmpl");
+
+        system.memory_file_system().write_files_all([
+            (
+                project_root.join("ty.toml"),
+                r#"extension = { "py.tmpl" = "python" }"#,
+            ),
+            (project_root.join("main.py"), ""),
+        ])?;
+
+        let metadata = ProjectMetadata::discover(&project_root, &system)?;
+        let mut db = ProjectDatabase::fallible(metadata, system)?;
+        let project = db.project();
+
+        assert_eq!(project.files(&db).len(), 1);
+
+        writer
+            .memory_file_system()
+            .write_file_all(&template, "value: int = 'template'")?;
+        db.apply_changes(&[ChangeEvent::Created {
+            path: template.clone(),
+            kind: CreatedKind::File,
+        }]);
+
+        let template_file = system_path_to_file(&db, &template)?;
+        assert!(project.files(&db).contains(&template_file));
+
+        Ok(())
+    }
+
+    #[test]
+    fn changing_configured_extensions_reindexes_project() -> anyhow::Result<()> {
+        let system = TestSystem::default();
+        let writer = system.clone();
+        let project_root = SystemPathBuf::from("/project");
+        let config = project_root.join("ty.toml");
+        let template = project_root.join("template.py.tmpl");
+
+        system.memory_file_system().write_files_all([
+            (config.clone(), ""),
+            (template.clone(), "value: int = 'template'"),
+        ])?;
+
+        let metadata = ProjectMetadata::discover(&project_root, &system)?;
+        let mut db = ProjectDatabase::fallible(metadata, system)?;
+        let project = db.project();
+        let template_file = system_path_to_file(&db, &template)?;
+
+        assert!(!project.files(&db).contains(&template_file));
+
+        writer
+            .memory_file_system()
+            .write_file_all(&config, r#"extension = { "py.tmpl" = "python" }"#)?;
+        db.apply_changes(&[ChangeEvent::file_content_changed(config)]);
+
+        assert!(project.files(&db).contains(&template_file));
 
         Ok(())
     }

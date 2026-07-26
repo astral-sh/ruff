@@ -300,6 +300,47 @@ fn configuration_include_no_extension() -> anyhow::Result<()> {
     Ok(())
 }
 
+#[test]
+fn configuration_extension() -> anyhow::Result<()> {
+    let case = CliTest::with_files([
+        ("src/template.py.tmpl", "value: int = 'template'"),
+        ("src/template.tmpl", "value: int = 'wrong suffix'"),
+        ("src/excluded.py.tmpl", "value: int = 'excluded'"),
+    ])?;
+
+    assert_cmd_snapshot!(case.command().env("TY_OUTPUT_FORMAT", "concise"), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    WARN No python files found under the given path(s)
+    ");
+
+    case.write_file(
+        "ty.toml",
+        r#"
+        extension = { "py.tmpl" = "python" }
+
+        [src]
+        exclude = ["src/excluded.py.tmpl"]
+        "#,
+    )?;
+
+    assert_cmd_snapshot!(case.command().env("TY_OUTPUT_FORMAT", "concise"), @r#"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    src/template.py.tmpl:1:14: error[invalid-assignment] Object of type `Literal["template"]` is not assignable to `int`
+    Found 1 diagnostic
+
+    ----- stderr -----
+    "#);
+
+    Ok(())
+}
+
 /// Test configuration file exclude functionality
 #[test]
 fn configuration_exclude() -> anyhow::Result<()> {

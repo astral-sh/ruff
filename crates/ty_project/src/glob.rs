@@ -14,6 +14,33 @@ mod exclude;
 mod include;
 mod portable;
 
+/// Custom file extensions that should be treated as Python source files.
+#[derive(Clone, Debug, Default, Eq, PartialEq, get_size2::GetSize)]
+pub(crate) struct PythonExtensions(Box<[String]>);
+
+impl PythonExtensions {
+    pub(crate) fn matches(&self, path: &SystemPath) -> bool {
+        let Some(file_name) = path.file_name() else {
+            return false;
+        };
+
+        self.0.iter().any(|extension| {
+            file_name
+                .strip_suffix(extension)
+                .is_some_and(|prefix| prefix.ends_with('.'))
+        })
+    }
+}
+
+impl FromIterator<String> for PythonExtensions {
+    fn from_iter<T: IntoIterator<Item = String>>(iter: T) -> Self {
+        let mut extensions: Vec<_> = iter.into_iter().collect();
+        extensions.sort_unstable();
+        extensions.dedup();
+        Self(extensions.into_boxed_slice())
+    }
+}
+
 /// Path filtering based on an exclude and include glob pattern set.
 ///
 /// Exclude patterns take precedence over includes.
@@ -148,16 +175,37 @@ impl IncludeResult {
     }
 
     /// Returns `true` if an included file should be indexed.
-    pub(crate) fn should_index_file(self, system: &dyn System, path: &SystemPath) -> bool {
+    pub(crate) fn should_index_file(
+        self,
+        system: &dyn System,
+        python_extensions: &PythonExtensions,
+        path: &SystemPath,
+    ) -> bool {
         let Self::Included { literal_match } = self else {
             return false;
         };
 
         literal_match == Some(true)
+            || python_extensions.matches(path)
             || path
                 .extension()
                 .and_then(PySourceType::try_from_extension)
                 .or_else(|| system.source_type(path))
                 .is_some()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::PythonExtensions;
+    use ruff_db::system::SystemPath;
+
+    #[test]
+    fn matches_multi_part_python_extensions() {
+        let extensions = PythonExtensions::from_iter(["py.tmpl".to_string()]);
+
+        assert!(extensions.matches(SystemPath::new("src/template.py.tmpl")));
+        assert!(!extensions.matches(SystemPath::new("src/template.tmpl")));
+        assert!(!extensions.matches(SystemPath::new("src/template.py.tmpl.bak")));
     }
 }

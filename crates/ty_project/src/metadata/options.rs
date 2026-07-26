@@ -1,5 +1,7 @@
 use crate::Db;
-use crate::glob::{ExcludeFilter, IncludeExcludeFilter, IncludeFilter, PortableGlobKind};
+use crate::glob::{
+    ExcludeFilter, IncludeExcludeFilter, IncludeFilter, PortableGlobKind, PythonExtensions,
+};
 use crate::metadata::python_version::SupportedPythonVersion;
 use crate::metadata::settings::{OverrideSettings, SrcSettings};
 
@@ -19,7 +21,7 @@ use ruff_macros::{Combine, OptionsMetadata, RustDoc};
 use ruff_options_metadata::{OptionSet, OptionsMetadata, Visit};
 use ruff_python_ast::PythonVersion;
 use ruff_ranged_value::{RangedValue, ValueSource, ValueSourceGuard};
-use rustc_hash::FxHasher;
+use rustc_hash::{FxHashMap, FxHasher};
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 use std::cmp::Ordering;
@@ -43,6 +45,17 @@ use ty_python_semantic::{
 };
 use ty_static::EnvVars;
 
+/// The language that ty should use for a custom file extension.
+#[derive(
+    Debug, Default, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, get_size2::GetSize,
+)]
+#[serde(rename_all = "lowercase")]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+pub enum ExtensionLanguage {
+    #[default]
+    Python,
+}
+
 #[derive(
     Debug,
     Default,
@@ -62,6 +75,26 @@ pub struct Options {
     #[option_group]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub environment: Option<EnvironmentOptions>,
+
+    /// A mapping of custom file extensions to languages.
+    ///
+    /// The extension should be specified without a leading dot. Multiple-part extensions, such as
+    /// `py.tmpl`, are supported.
+    ///
+    /// Currently, the only supported language is `python`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[expect(
+        clippy::zero_sized_map_values,
+        reason = "the map preserves Ruff's extension-to-language configuration shape"
+    )]
+    #[option(
+        default = r#"{}"#,
+        value_type = r#"dict[str, "python"]"#,
+        example = r#"
+            extension = { "py.tmpl" = "python" }
+        "#
+    )]
+    pub extension: Option<FxHashMap<String, ExtensionLanguage>>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
     #[option_group]
@@ -471,8 +504,15 @@ impl Options {
             diagnostics.push(diagnostic);
         }
 
+        let python_extensions = self
+            .extension
+            .as_ref()
+            .into_iter()
+            .flat_map(|extensions| extensions.keys().cloned())
+            .collect();
+
         let src = src_options
-            .to_settings(db, project_root, &mut diagnostics)
+            .to_settings(db, project_root, python_extensions, &mut diagnostics)
             .map_err(|err| ToSettingsError {
                 diagnostic: err,
                 output_format: terminal.output_format,
@@ -1054,6 +1094,7 @@ impl SrcOptions {
         &self,
         db: &dyn Db,
         project_root: &SystemPath,
+        python_extensions: PythonExtensions,
         diagnostics: &mut Vec<OptionDiagnostic>,
     ) -> Result<SrcSettings, Box<OptionDiagnostic>> {
         let include = build_include_filter(
@@ -1075,6 +1116,7 @@ impl SrcOptions {
         Ok(SrcSettings {
             respect_ignore_files: self.respect_ignore_files.unwrap_or(true),
             exclude_scripts: self.exclude_scripts.unwrap_or(false),
+            python_extensions,
             files,
         })
     }
@@ -2205,6 +2247,23 @@ mod schema {
 pub enum TyTomlError {
     #[error(transparent)]
     TomlSyntax(#[from] toml::de::Error),
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{Options, ValueSource};
+
+    #[test]
+    fn rejects_unsupported_extension_language() {
+        let error = Options::from_toml_str(r#"extension = { tmpl = "pyi" }"#, ValueSource::Cli)
+            .unwrap_err();
+
+        assert!(
+            error
+                .to_string()
+                .contains("unknown variant `pyi`, expected `python`")
+        );
+    }
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, get_size2::GetSize)]
