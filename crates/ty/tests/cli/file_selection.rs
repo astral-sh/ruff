@@ -341,6 +341,32 @@ fn configuration_extension() -> anyhow::Result<()> {
     Ok(())
 }
 
+#[test]
+fn configuration_extension_in_pyproject_toml() -> anyhow::Result<()> {
+    let case = CliTest::with_files([
+        (
+            "pyproject.toml",
+            r#"
+            [tool.ty]
+            extension = { "py.tmpl" = "python" }
+            "#,
+        ),
+        ("src/template.py.tmpl", "value: int = 'template'"),
+    ])?;
+
+    assert_cmd_snapshot!(case.command().env("TY_OUTPUT_FORMAT", "concise"), @r#"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    src/template.py.tmpl:1:14: error[invalid-assignment] Object of type `Literal["template"]` is not assignable to `int`
+    Found 1 diagnostic
+
+    ----- stderr -----
+    "#);
+
+    Ok(())
+}
+
 /// Test configuration file exclude functionality
 #[test]
 fn configuration_exclude() -> anyhow::Result<()> {
