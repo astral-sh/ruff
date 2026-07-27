@@ -1549,7 +1549,7 @@ class FixedReceiverConstructor(Generic[ElementT]):
         cls: "type[FixedReceiverConstructor[ConcreteElement]]",
         value: Source[ElementT],
     ) -> "FixedReceiverConstructor[ElementT]":
-        return object.__new__(cls)
+        raise NotImplementedError
 
 def _(value: Intersection[Source[A], Source[ConcreteElement]]) -> None:
     reveal_type(FixedReceiverConstructor(value))  # revealed: FixedReceiverConstructor[ConcreteElement]
