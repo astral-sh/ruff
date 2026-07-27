@@ -266,6 +266,29 @@ impl NarrowingConstraintsBuilder {
         }
     }
 
+    /// Adds a constraint that selects between two formulas based on `predicate`.
+    pub(crate) fn add_conditional(
+        &mut self,
+        predicate: ScopedPredicateId,
+        if_true: ScopedNarrowingConstraint,
+        if_false: ScopedNarrowingConstraint,
+    ) -> ScopedNarrowingConstraint {
+        let node = InteriorNode {
+            atom: predicate,
+            if_true,
+            if_uncertain: ALWAYS_FALSE,
+            if_false,
+        };
+        if let Some(cached) = self.interior_cache.get(&node) {
+            return *cached;
+        }
+        if self.interiors.len() >= MAX_INTERIOR_NODES {
+            return ALWAYS_TRUE;
+        }
+
+        self.add_interior(node)
+    }
+
     pub(crate) fn add_or_constraint(
         &mut self,
         a: ScopedNarrowingConstraint,
