@@ -292,8 +292,12 @@ see the [`lint.per-file-ignores`](settings.md#lint_per-file-ignores) setting.
 
 ### Comments
 
-Ruff supports multiple forms of suppression comments, including inline and file-level `noqa`
-comments, and range suppressions.
+Ruff supports multiple forms of suppression comments, including inline and file-level `noqa` and
+`ruff: ignore` comments, and range suppressions.
+
+In [`preview`](preview.md) mode, rule names (e.g. `unused-import`) can be used in `ruff: ignore`,
+`ruff: file-ignore`, `ruff: disable`, and `ruff: enable` comments instead of rule codes (e.g.
+`F401`).
 
 #### Line-level
 
@@ -344,20 +348,18 @@ The full inline comment specification is as follows:
   missing delimiter (e.g. `F401F841`), though a warning will be emitted in this
   case.
 
-*The following is currently only available in [preview mode](`preview.md`).*
-
 To cover an entire "logical" line (a multi-line statement or suite header),
 an "ignore" comment may be placed above the first line:
 
 ```python
-# ruff: ignore[unused-function-argument]  # Covers the entire function signature
+# ruff: ignore[ARG001]  # Covers the entire function signature
 def foo(
     arg1,
     arg2,
 ):
     pass
 
-# ruff: ignore[line-too-long]  # Covers the entire list literal
+# ruff: ignore[E501]  # Covers the entire list literal
 things = [
     "really long string literal ...",
     "really long string literal ...",
@@ -371,13 +373,13 @@ of the multi-line statement or header uncovered:
 ```python
 def foo(
     arg1,
-    # ruff: ignore[unused-function-argument]  # Only covers `arg2`
+    # ruff: ignore[ARG001]  # Only covers `arg2`
     arg2,
 ):
     pass
 
 things = [
-    "really long string literal ...",  # ruff: ignore[line-too-long]  # Only covers this line
+    "really long string literal ...",  # ruff: ignore[E501]  # Only covers this line
     "really long string literal ...",
 ]
 ```
@@ -386,8 +388,8 @@ Ignore comments can also be "stacked" with other comments or pragmas, and will
 still cover the next logical line:
 
 ```python
-# ruff: ignore[ambiguous-variable-name]
-# ruff: ignore[unused-variable]
+# ruff: ignore[E741]
+# ruff: ignore[F841]
 # I definitely know what I'm doing.
 i = 1
 ```
@@ -454,9 +456,6 @@ be used to terminate a preceding "disable" comment with identical codes.
 Unlike `noqa` suppressions, range suppressions do not support "blanket" suppression
 of all violations. At least one violation code must be listed.
 
-In [`preview`](preview.md) mode, rule names (e.g. `unused-import`) can be used in these comments
-instead of rule codes (e.g. `F401`).
-
 The full range suppression comment specification is as follows:
 
 - An own-line comment starting with case sensitive `#ruff:`, with optional whitespace
@@ -496,12 +495,11 @@ The file-level suppression comment specification is as follows:
   optional whitespace and a case-insensitive match for `noqa`. After this, the
   specification is as in the inline `noqa` suppressions above.
 
-In [`preview`](preview.md) mode, one or more rules can be ignored across an
-entire file with a `file-ignore` comment on its own line, at global module scope,
-and preferably near the top of the file:
+One or more rules can also be ignored across an entire file with a `file-ignore` comment on its own
+line, at global module scope, and preferably near the top of the file:
 
 ```python
-# ruff: file-ignore[unused-import, unused-function-argument]
+# ruff: file-ignore[F401, ARG001]
 ```
 
 The full-level suppression comment specification is as follows:
@@ -534,15 +532,17 @@ $ ruff check /path/to/file.py --extend-select RUF100 --fix
 ### Inserting necessary suppression comments
 
 Ruff can _automatically add_ suppression comments to all lines that contain violations, which is
-useful when migrating a new codebase to Ruff. To add the appropriate comments to all relevant
-lines, run Ruff with `--add-noqa`:
+useful when migrating a new codebase to Ruff. To add the appropriate comments to all relevant lines,
+run Ruff with `--add-noqa` to add `noqa` comments or with `--add-ignore` to add `ruff: ignore`
+comments:
 
 ```shell-session
 $ ruff check /path/to/file.py --add-noqa
+$ ruff check /path/to/file.py --add-ignore
 ```
 
-The `--add-noqa` flag adds `noqa` directives with rule codes. To add `ruff: ignore` comments with
-human-readable rule names instead, use `--add-ignore` with preview mode enabled.
+Both of these flags use rule codes on stable. To add `ruff: ignore` comments with human-readable
+rule names instead, use `--add-ignore` with preview mode enabled.
 
 ### isort action comments
 

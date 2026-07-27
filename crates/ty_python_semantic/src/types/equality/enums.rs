@@ -12,17 +12,42 @@ use crate::types::{
 use crate::{Db, FxOrderMap, FxOrderSet};
 
 use super::{
-    ComparisonBranch, ComparisonOperator, ComparisonResult, KnownComparisonSemantics,
-    enum_literal_value,
+    ComparisonBranch, ComparisonEvaluator, ComparisonGoal, ComparisonOperator, ComparisonResult,
+    KnownComparisonSemantics, combine_definite_truthiness, enum_literal_value,
+    evaluate_against_results, evaluate_target_union,
 };
 
-/// Compare two enum value domains without comparing every pair of members.
+/// Compare enum values without checking every pair of members.
 ///
-/// Any narrowing constraint produced here contains only enum-membership facts. In particular,
-/// equality never transfers gradual or nominal intersection state from one operand to the other.
-/// Same-class domains compare compact member sets directly, while comparisons spanning multiple
-/// classes project their members onto runtime comparison keys.
-pub(super) fn evaluate_enum_domains<'db>(
+/// If either side also contains other values, compare those values normally.
+///
+/// Return `None` when the enum comparison does not apply.
+pub(super) fn evaluate_enum_comparison<'db>(
+    evaluator: &mut ComparisonEvaluator<'db>,
+    target: Type<'db>,
+    other: Type<'db>,
+    branch: ComparisonBranch,
+    operator: ComparisonOperator,
+) -> Option<ComparisonResult<'db>> {
+    evaluate_enum_domains(evaluator.db, target, other, branch, operator).or_else(|| {
+        PartitionedEnumComparison::new(evaluator.db, target, other, branch, operator).map(
+            |comparison| match comparison.evaluate(evaluator, branch, operator) {
+                ComparisonResult::CanNarrow(narrowed)
+                    if narrowed == target.resolve_type_alias(evaluator.db) =>
+                {
+                    ComparisonResult::Ambiguous
+                }
+                result => result,
+            },
+        )
+    })
+}
+
+/// Compare values that are all enum members.
+///
+/// Describe the result using enum members only. Do not copy other restrictions from one side to
+/// the other.
+fn evaluate_enum_domains<'db>(
     db: &'db dyn Db,
     target: Type<'db>,
     other: Type<'db>,
@@ -39,6 +64,195 @@ pub(super) fn evaluate_enum_domains<'db>(
     }
 
     ProjectedEnumComparison::new(db, target, &other, operator)?.evaluate(db, branch, operator)
+}
+
+/// Compare unions that contain enums and other values.
+///
+/// Compare enum members together and compare other values normally. Values such as `None`,
+/// `Any`, or a matching string can also affect which values match.
+///
+/// Compare the enum members only once.
+///
+/// ```python
+/// from enum import StrEnum
+///
+/// class Left(StrEnum):
+///     SHARED = "shared"
+///     LEFT = "left"
+///
+/// class Right(StrEnum):
+///     SHARED = "shared"
+///     RIGHT = "right"
+///
+/// def compare(left: Left | None, right: Right | None):
+///     if left == right:
+///         reveal_type(left)   # Literal[Left.SHARED] | None
+///         reveal_type(right)  # Literal[Right.SHARED] | None
+/// ```
+struct PartitionedEnumComparison<'db> {
+    target: EnumDomainPartition<'db>,
+    other: EnumDomainPartition<'db>,
+    other_type: Type<'db>,
+    enum_result: ComparisonResult<'db>,
+}
+
+impl<'db> PartitionedEnumComparison<'db> {
+    /// Prepare a comparison when both sides contain enums and at least one side also contains
+    /// another value.
+    ///
+    /// Return `None` if either enum has unsupported comparison behavior.
+    fn new(
+        db: &'db dyn Db,
+        target: Type<'db>,
+        other: Type<'db>,
+        branch: ComparisonBranch,
+        operator: ComparisonOperator,
+    ) -> Option<Self> {
+        if !matches!(target.resolve_type_alias(db), Type::Union(_))
+            && !matches!(other.resolve_type_alias(db), Type::Union(_))
+        {
+            return None;
+        }
+
+        let target = EnumDomainPartition::from_type(db, target)?;
+        let other_type = other;
+        let other = EnumDomainPartition::from_type(db, other)?;
+
+        if !target.has_other_values() && !other.has_other_values() {
+            return None;
+        }
+
+        let enum_result =
+            evaluate_enum_domains(db, target.enum_type, other.enum_type, branch, operator)?;
+
+        Some(Self {
+            target,
+            other,
+            other_type,
+            enum_result,
+        })
+    }
+
+    /// Reuse the saved enum result and compare all other values normally.
+    fn evaluate_pair(
+        &self,
+        evaluator: &mut ComparisonEvaluator<'db>,
+        target: Type<'db>,
+        other: Type<'db>,
+        branch: ComparisonBranch,
+        operator: ComparisonOperator,
+    ) -> ComparisonResult<'db> {
+        if target == self.target.enum_type && other == self.other.enum_type {
+            self.enum_result
+        } else {
+            evaluator.evaluate(target, other, branch, operator)
+        }
+    }
+
+    /// Compare one possible value with the other side.
+    ///
+    /// Compare `Any` and `Unknown` with the whole union so neither is narrowed by separate values.
+    ///
+    /// Return whether the result is certain or which values can still match.
+    fn evaluate_against_other(
+        &self,
+        evaluator: &mut ComparisonEvaluator<'db>,
+        target: Type<'db>,
+        branch: ComparisonBranch,
+        operator: ComparisonOperator,
+    ) -> ComparisonResult<'db> {
+        if let [other] = self.other.alternatives.as_slice() {
+            return self.evaluate_pair(evaluator, target, *other, branch, operator);
+        }
+
+        if evaluator.goal == ComparisonGoal::Truthiness {
+            return combine_definite_truthiness(
+                self.other
+                    .alternatives
+                    .iter()
+                    .map(|other| self.evaluate_pair(evaluator, target, *other, branch, operator)),
+            );
+        }
+
+        if matches!(target.resolve_type_alias(evaluator.db), Type::Dynamic(_)) {
+            return evaluator.evaluate(target, self.other_type, branch, operator);
+        }
+
+        evaluate_against_results(
+            evaluator.db,
+            target,
+            branch,
+            self.other
+                .alternatives
+                .iter()
+                .map(|other| self.evaluate_pair(evaluator, target, *other, branch, operator)),
+        )
+    }
+
+    /// Compare all possible values.
+    ///
+    /// If no member of an enum can match, exclude it from the other possible values.
+    ///
+    /// Return whether the result is certain or which values can still match.
+    fn evaluate(
+        &self,
+        evaluator: &mut ComparisonEvaluator<'db>,
+        branch: ComparisonBranch,
+        operator: ComparisonOperator,
+    ) -> ComparisonResult<'db> {
+        if let [target] = self.target.alternatives.as_slice() {
+            return self.evaluate_against_other(evaluator, *target, branch, operator);
+        }
+
+        if evaluator.goal == ComparisonGoal::Truthiness {
+            return combine_definite_truthiness(
+                self.target.alternatives.iter().map(|target| {
+                    self.evaluate_against_other(evaluator, *target, branch, operator)
+                }),
+            );
+        }
+
+        let mut narrowed_enum = None;
+        let result =
+            evaluate_target_union(evaluator.db, &self.target.alternatives, branch, |target| {
+                let result = self.evaluate_against_other(evaluator, target, branch, operator);
+                if target == self.target.enum_type
+                    && let ComparisonResult::CanNarrow(narrowed) = result
+                    && narrowed != target
+                {
+                    narrowed_enum = Some(narrowed);
+                }
+                result
+            });
+
+        if let ComparisonResult::CanNarrow(narrowed) = result
+            && let Some(narrowed_enum) = narrowed_enum
+            && let Some(domains) = EnumDomainSet::from_type(evaluator.db, self.target.enum_type)
+        {
+            let excluded = domains
+                .domains
+                .iter()
+                .fold(UnionBuilder::new(evaluator.db), |builder, domain| {
+                    let domain_type = domain.restriction_type(evaluator.db);
+                    if domain_type.is_disjoint_from(evaluator.db, narrowed_enum) {
+                        builder.add(domain_type)
+                    } else {
+                        builder
+                    }
+                })
+                .build();
+            if !excluded.is_never() {
+                return ComparisonResult::CanNarrow(
+                    IntersectionBuilder::new(evaluator.db)
+                        .add_positive(narrowed)
+                        .add_negative(excluded)
+                        .build(),
+                );
+            }
+        }
+
+        result
+    }
 }
 
 /// Two non-empty value domains from the same enum and the semantics used to compare them.
@@ -446,6 +660,86 @@ impl<'db> EnumValueSet<'db> {
 
     fn member_type(&self, db: &'db dyn Db, name: &Name, promotable: bool) -> Type<'db> {
         LiteralValueType::new(EnumLiteralType::new(db, self.enum_class, name), promotable).into()
+    }
+}
+
+/// The enum members and other values on one side of a comparison.
+///
+/// Place enum members at the first enum's position and keep other values in their original order.
+struct EnumDomainPartition<'db> {
+    enum_type: Type<'db>,
+    alternatives: Vec<Type<'db>>,
+}
+
+impl<'db> EnumDomainPartition<'db> {
+    /// Combine enum values while keeping other values in their original order.
+    ///
+    /// Return `None` when there is no enum or a type alias refers to itself.
+    fn from_type(db: &'db dyn Db, ty: Type<'db>) -> Option<Self> {
+        fn collect<'db>(
+            db: &'db dyn Db,
+            ty: Type<'db>,
+            enum_types: &mut Vec<Type<'db>>,
+            alternatives: &mut Vec<Type<'db>>,
+            enum_position: &mut Option<usize>,
+            active_types: &mut FxHashSet<Type<'db>>,
+        ) -> Option<()> {
+            if EnumValueSet::from_type(db, ty, active_types).is_some() {
+                enum_position.get_or_insert(alternatives.len());
+                enum_types.push(ty);
+                return Some(());
+            }
+
+            let Type::Union(union) = ty.resolve_type_alias(db) else {
+                alternatives.push(ty);
+                return Some(());
+            };
+
+            if !active_types.insert(ty) {
+                return None;
+            }
+
+            let result = union.elements(db).iter().try_for_each(|element| {
+                collect(
+                    db,
+                    *element,
+                    enum_types,
+                    alternatives,
+                    enum_position,
+                    active_types,
+                )
+            });
+            active_types.remove(&ty);
+            result
+        }
+
+        let mut enum_types = Vec::new();
+        let mut alternatives = Vec::new();
+        let mut enum_position = None;
+        let mut active_types = FxHashSet::default();
+        collect(
+            db,
+            ty,
+            &mut enum_types,
+            &mut alternatives,
+            &mut enum_position,
+            &mut active_types,
+        )?;
+        let enum_position = enum_position?;
+        let enum_type = enum_types
+            .into_iter()
+            .fold(UnionBuilder::new(db), UnionBuilder::add)
+            .build();
+        alternatives.insert(enum_position, enum_type);
+
+        Some(Self {
+            enum_type,
+            alternatives,
+        })
+    }
+
+    fn has_other_values(&self) -> bool {
+        self.alternatives.len() > 1
     }
 }
 

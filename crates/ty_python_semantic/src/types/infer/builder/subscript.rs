@@ -517,7 +517,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             if let Some(builder) = self.context.report_lint(&NOT_SUBSCRIPTABLE, subscript) {
                 let mut diagnostic =
                     builder.into_diagnostic("Cannot specialize non-generic type alias");
-                diagnostic.set_primary_message("Double specialization is not allowed");
+                diagnostic.set_primary_annotation_message("Double specialization is not allowed");
             }
             return Type::unknown();
         }
@@ -1767,7 +1767,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 slice_ty.display(db),
                                 object_ty.display(db),
                             ));
-                            diagnostic.set_primary_message(format_args!(
+                            diagnostic.set_primary_annotation_message(format_args!(
                                 "Expected value assignable to `{}`",
                                 expected_ty.display(db)
                             ));

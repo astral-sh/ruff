@@ -617,13 +617,13 @@ mod tests {
         let configuration = toml::from_str(
             r#"
             [lint.isort]
-            required-imports = ["from collections.abc import Set"]
+            required-imports = ["import numpy"]
             "#,
         )?;
         let editor_settings = EditorSettings {
             configuration: Some(ResolvedConfiguration::Inline(Box::new(configuration))),
             select: Some(vec![UnresolvedRuleSelector::new(
-                "PYI025",
+                "ICN001",
                 ValueSource::Editor,
             )]),
             ..Default::default()
@@ -636,7 +636,7 @@ mod tests {
             !settings
                 .linter
                 .rules
-                .enabled(Rule::UnaliasedCollectionsAbcSetImport)
+                .enabled(Rule::UnconventionalImportAlias)
         );
         Ok(())
     }

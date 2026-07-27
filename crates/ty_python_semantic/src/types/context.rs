@@ -129,7 +129,7 @@ impl<'db, 'ast> InferContext<'db, 'ast> {
     /// The severity of the diagnostic returned is automatically determined
     /// by the given lint and configuration. The message given to
     /// `LintDiagnosticGuardBuilder::to_diagnostic` is used to construct the
-    /// initial diagnostic and should be considered the "top-level message" of
+    /// initial diagnostic and should be considered the "headline message" of
     /// the diagnostic. (i.e., If nothing else about the diagnostic is seen,
     /// aside from its identifier, the message is probably the thing you'd pick
     /// to show.)
@@ -139,7 +139,7 @@ impl<'db, 'ast> InferContext<'db, 'ast> {
     /// typing context. (That means the range given _must_ be valid for the
     /// `File` currently being type checked.) This primary annotation does
     /// not have a message attached to it, but callers can attach one via
-    /// `LintDiagnosticGuard::set_primary_message`.
+    /// `LintDiagnosticGuard::set_primary_annotation_message`.
     ///
     /// After using the builder to make a guard, once the guard is dropped, the
     /// diagnostic is added to the context, unless there is something in the
@@ -263,7 +263,7 @@ impl fmt::Debug for InferContext<'_, '_> {
 ///
 /// * On `Drop`, the underlying diagnostic is added to the typing context.
 /// * Some convenience methods for mutating the underlying `Diagnostic`
-///   in lint context. For example, `LintDiagnosticGuard::set_primary_message`
+///   in lint context. For example, `LintDiagnosticGuard::set_primary_annotation_message`
 ///   will attach a message to the primary span on the diagnostic.
 pub(super) struct LintDiagnosticGuard<'db, 'ctx> {
     /// The typing context.
@@ -274,6 +274,7 @@ pub(super) struct LintDiagnosticGuard<'db, 'ctx> {
     diag: Option<Diagnostic>,
 
     source: LintSource,
+    message_override: Option<String>,
 }
 
 impl LintDiagnosticGuard<'_, '_> {
@@ -289,7 +290,7 @@ impl LintDiagnosticGuard<'_, '_> {
     ///
     /// Callers can add additional primary or secondary annotations via the
     /// `DerefMut` trait implementation to a `Diagnostic`.
-    pub(super) fn set_primary_message(&mut self, message: impl IntoDiagnosticMessage) {
+    pub(super) fn set_primary_annotation_message(&mut self, message: impl IntoDiagnosticMessage) {
         // N.B. It is normally bad juju to define `self` methods
         // on types that implement `Deref`. Instead, it's idiomatic
         // to do `fn foo(this: &mut LintDiagnosticGuard)`, which in
@@ -363,6 +364,22 @@ impl Drop for LintDiagnosticGuard<'_, '_> {
         // once.
         let mut diag = self.diag.take().unwrap();
 
+        if let Some(message_override) = self.message_override.take() {
+            let primary_annotation_has_message = diag
+                .primary_annotation()
+                .and_then(Annotation::get_message)
+                .is_some_and(|message| !message.is_empty());
+            let original_message = diag.headline_message().to_string();
+            if primary_annotation_has_message {
+                diag.prepend_info(original_message);
+            } else if let Some(annotation) = diag.primary_annotation_mut() {
+                annotation.set_message(original_message);
+            }
+
+            diag.set_headline_message(message_override);
+            diag.clear_concise_message();
+        }
+
         if self.ctx.db().verbose() {
             let rule = diag.id();
 
@@ -378,6 +395,9 @@ impl Drop for LintDiagnosticGuard<'_, '_> {
                 }
                 LintSource::Editor => {
                     format!("rule `{rule}` was selected in the editor settings")
+                }
+                LintSource::UvWorkspace => {
+                    format!("rule `{rule}` was selected by uv workspace metadata")
                 }
             });
         }
@@ -418,6 +438,7 @@ pub(super) struct LintDiagnosticGuardBuilder<'db, 'ctx> {
     severity: Severity,
     source: LintSource,
     primary_range: TextRange,
+    message_override: Option<(String, String)>,
 }
 
 impl<'db, 'ctx> LintDiagnosticGuardBuilder<'db, 'ctx> {
@@ -495,6 +516,7 @@ impl<'db, 'ctx> LintDiagnosticGuardBuilder<'db, 'ctx> {
             severity,
             source,
             primary_range: range,
+            message_override: None,
         })
     }
 
@@ -504,28 +526,43 @@ impl<'db, 'ctx> LintDiagnosticGuardBuilder<'db, 'ctx> {
     /// the ID and severity derived from the `LintMetadata` used to create
     /// this builder. The diagnostic also includes a primary annotation
     /// without a message. To add a message to this primary annotation, use
-    /// `LintDiagnosticGuard::set_primary_message`.
+    /// `LintDiagnosticGuard::set_primary_annotation_message`.
     ///
     /// The diagnostic can be further mutated on the guard via its `DerefMut`
     /// impl to `Diagnostic`.
+    ///
+    /// If a message override is present, it is applied when the diagnostic is finalized. `message`
+    /// is retained on the primary annotation if the annotation has no message, or as an info
+    /// sub-diagnostic otherwise. Any custom concise message is discarded.
     pub(super) fn into_diagnostic(
         self,
         message: impl std::fmt::Display,
     ) -> LintDiagnosticGuard<'db, 'ctx> {
-        let mut diag = Diagnostic::new(DiagnosticId::Lint(self.id.name()), self.severity, message);
-        diag.set_documentation_url(Some(self.id.documentation_url()));
-        // This is why `LintDiagnosticGuard::set_primary_message` exists.
-        // We add the primary annotation here (because it's required), but
-        // the optional message can be added later. We could accept it here
-        // in this `build` method, but we already accept the main diagnostic
-        // message. So the messages are likely to be quite confusable.
+        // This is why `LintDiagnosticGuard::set_primary_annotation_message` exists.
+        // We add the primary annotation here (because it's required). Without a message
+        // override, its optional message can be added later via `set_primary_annotation_message`.
         let primary_span = Span::from(self.ctx.file()).with_range(self.primary_range);
+        let mut diag = Diagnostic::new(DiagnosticId::Lint(self.id.name()), self.severity, message);
         diag.annotate(Annotation::primary(primary_span));
+        let message_override = self.message_override.map(|(message, info)| {
+            diag.info(info);
+            message
+        });
+        diag.set_documentation_url(Some(self.id.documentation_url()));
         LintDiagnosticGuard {
             ctx: self.ctx,
             source: self.source,
             diag: Some(diag),
+            message_override,
         }
+    }
+
+    /// Replace the headline message when the diagnostic is finalized and add an info
+    /// sub-diagnostic. The original message is retained on the primary annotation if it has no
+    /// message, or as an info sub-diagnostic otherwise.
+    pub(super) fn with_message_override(mut self, message: String, info: &str) -> Self {
+        self.message_override = Some((message, info.to_string()));
+        self
     }
 }
 

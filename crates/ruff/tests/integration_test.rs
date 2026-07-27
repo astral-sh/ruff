@@ -122,6 +122,9 @@ fn stdin_error() {
       |        ^^
       |
     help: Remove unused import: `os`
+      |
+      - import os
+      |
 
     Found 1 error.
     [*] 1 fixable with the `--fix` option.
@@ -147,6 +150,9 @@ fn stdin_filename() {
       |        ^^
       |
     help: Remove unused import: `os`
+      |
+      - import os
+      |
 
     Found 1 error.
     [*] 1 fixable with the `--fix` option.
@@ -183,6 +189,10 @@ import bar   # unused import
       |        ^^^
       |
     help: Remove unused import: `bar`
+      |
+    1 |
+      - import bar   # unused import
+      |
 
     F401 [*] `foo` imported but unused
      --> foo.py:2:8
@@ -191,6 +201,10 @@ import bar   # unused import
       |        ^^^
       |
     help: Remove unused import: `foo`
+      |
+    1 |
+      - import foo   # unused import
+      |
 
     Found 2 errors.
     [*] 2 fixable with the `--fix` option.
@@ -219,6 +233,9 @@ fn check_warn_stdin_filename_with_files() {
       |        ^^
       |
     help: Remove unused import: `os`
+      |
+      - import os
+      |
 
     Found 1 error.
     [*] 1 fixable with the `--fix` option.
@@ -246,6 +263,9 @@ fn stdin_source_type_py() {
       |        ^^
       |
     help: Remove unused import: `os`
+      |
+      - import os
+      |
 
     Found 1 error.
     [*] 1 fixable with the `--fix` option.
@@ -583,6 +603,10 @@ fn stdin_override_parser_ipynb() {
       |        ^^
       |
     help: Remove unused import: `os`
+     ::: cell 1
+      |
+      - import os
+      |
 
     F401 [*] `sys` imported but unused
      --> Jupyter.py:cell 3:1:8
@@ -591,6 +615,10 @@ fn stdin_override_parser_ipynb() {
       |        ^^^
       |
     help: Remove unused import: `sys`
+     ::: cell 3
+      |
+      - import sys
+      |
 
     Found 2 errors.
     [*] 2 fixable with the `--fix` option.
@@ -621,6 +649,9 @@ fn stdin_override_parser_py() {
       |        ^^
       |
     help: Remove unused import: `os`
+      |
+      - import os
+      |
 
     Found 1 error.
     [*] 1 fixable with the `--fix` option.
@@ -656,6 +687,9 @@ extension = {ipynb="python"}
       |        ^^
       |
     help: Remove unused import: `os`
+      |
+      - import os
+      |
 
     Found 1 error.
     [*] 1 fixable with the `--fix` option.
@@ -965,7 +999,10 @@ preview = true
 
 #[test]
 fn full_output_format() {
-    let mut cmd = RuffCheck::default().output_format("full").build();
+    let mut cmd = RuffCheck::default()
+        .output_format("full")
+        .args(["--select=E741"])
+        .build();
     assert_cmd_snapshot!(cmd
         .pass_stdin("l = 1"), @"
     success: false
@@ -1835,6 +1872,9 @@ fn check_input_from_argfile() -> Result<()> {
           |        ^^
           |
         help: Remove unused import: `os`
+          |
+          - import os
+          |
 
         Found 1 error.
         [*] 1 fixable with the `--fix` option.
@@ -1878,6 +1918,9 @@ fn check_hints_hidden_unsafe_fixes() {
     ----- stdout -----
     RUF901 [*] Hey this is a stable test rule with a safe fix.
     --> -:1:1
+      |
+    1 + # fix from stable-test-rule-safe-fix
+      |
 
     RUF902 Hey this is a stable test rule with an unsafe fix.
     --> -:1:1
@@ -1920,6 +1963,9 @@ fn check_no_hint_for_hidden_unsafe_fixes_when_disabled() {
     ----- stdout -----
     RUF901 [*] Hey this is a stable test rule with a safe fix.
     --> -:1:1
+      |
+    1 + # fix from stable-test-rule-safe-fix
+      |
 
     RUF902 Hey this is a stable test rule with an unsafe fix.
     --> -:1:1
@@ -1963,9 +2009,16 @@ fn check_shows_unsafe_fixes_with_opt_in() {
     ----- stdout -----
     RUF901 [*] Hey this is a stable test rule with a safe fix.
     --> -:1:1
+      |
+    1 + # fix from stable-test-rule-safe-fix
+      |
 
     RUF902 [*] Hey this is a stable test rule with an unsafe fix.
     --> -:1:1
+      |
+    1 + # fix from stable-test-rule-unsafe-fix
+      |
+    note: This is an unsafe fix and may change runtime behavior
 
     Found 2 errors.
     [*] 2 fixable with the `--fix` option.
@@ -2241,9 +2294,15 @@ extend-safe-fixes = ["RUF902"]
     ----- stdout -----
     RUF901 [*] Hey this is a stable test rule with a safe fix.
     --> -:1:1
+      |
+    1 + # fix from stable-test-rule-safe-fix
+      |
 
     RUF902 [*] Hey this is a stable test rule with an unsafe fix.
     --> -:1:1
+      |
+    1 + # fix from stable-test-rule-unsafe-fix
+      |
 
     Found 2 errors.
     [*] 2 fixable with the `--fix` option.
@@ -2279,6 +2338,9 @@ extend-safe-fixes = ["RUF902"]
     ----- stdout -----
     RUF901 [*] Hey this is a stable test rule with a safe fix.
     --> -:1:1
+      |
+    1 + # fix from stable-test-rule-safe-fix
+      |
 
     RUF902 Hey this is a stable test rule with an unsafe fix.
     --> -:1:1
@@ -2325,6 +2387,10 @@ extend-safe-fixes = ["RUF9"]
 
     RUF902 [*] Hey this is a stable test rule with an unsafe fix.
     --> -:1:1
+      |
+    1 + # fix from stable-test-rule-unsafe-fix
+    2 | x = {'a': 1, 'a': 1}
+      |
 
     RUF903 Hey this is a stable test rule with a display only fix.
     --> -:1:1
@@ -2544,7 +2610,7 @@ fn pyproject_toml_stdin_schema_error() {
 #[test]
 fn pyproject_toml_stdin_no_applicable_rules_selected() {
     let mut cmd = RuffCheck::default()
-        .args(["--stdin-filename", "pyproject.toml"])
+        .args(["--stdin-filename", "pyproject.toml", "--ignore=RUF200"])
         .build();
 
     assert_cmd_snapshot!(
@@ -2586,7 +2652,7 @@ fn pyproject_toml_stdin_no_errors() {
         .build();
 
     assert_cmd_snapshot!(
-        cmd.pass_stdin(r#"[project]\nname = "ruff"\nversion = "0.0.0""#),
+        cmd.pass_stdin("[project]\nname = 'ruff'\nversion = '0.0.0'"),
         @"
     success: true
     exit_code: 0

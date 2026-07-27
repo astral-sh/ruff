@@ -174,7 +174,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         let mut diagnostic = builder.into_diagnostic(format_args!(
                             "Invalid argument to parameter `{arg_name}` of `TypedDict()`"
                         ));
-                        diagnostic.set_primary_message(format_args!(
+                        diagnostic.set_primary_annotation_message(format_args!(
                             "Expected either `True` or `False`, got object of type `{}`",
                             kw_type.display(db)
                         ));
@@ -275,7 +275,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             let mut diagnostic = builder.into_diagnostic(format_args!(
                 "Invalid argument to parameter `typename` of `TypedDict()`"
             ));
-            diagnostic.set_primary_message(format_args!(
+            diagnostic.set_primary_annotation_message(format_args!(
                 "Expected `str`, found `{}`",
                 name_type.display(db)
             ));
@@ -650,8 +650,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             "Expected a string-literal key \
                                 in the `fields` dict of `TypedDict()`",
                         );
-                        diagnostic
-                            .set_primary_message(format_args!("Found `{}`", key_type.display(db)));
+                        diagnostic.set_primary_annotation_message(format_args!(
+                            "Found `{}`",
+                            key_type.display(db)
+                        ));
                     }
                 } else {
                     self.infer_expression(value, TypeContext::default());

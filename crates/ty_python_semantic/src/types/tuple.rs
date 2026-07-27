@@ -387,7 +387,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     let element_constraints = self.check_type_pair(db, source_ty, target_ty);
                     if result
                         .intersect(db, self.constraints, element_constraints)
-                        .is_never_satisfied(db)
+                        .is_trivially_never_satisfied()
                     {
                         return result;
                     }
@@ -399,7 +399,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     let element_constraints = self.check_type_pair(db, source_ty, target_ty);
                     if result
                         .intersect(db, self.constraints, element_constraints)
-                        .is_never_satisfied(db)
+                        .is_trivially_never_satisfied()
                     {
                         return result;
                     }
@@ -465,7 +465,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     let element_constraints = self.check_type_pair(db, source_ty, target_ty);
                     if result
                         .intersect(db, self.constraints, element_constraints)
-                        .is_never_satisfied(db)
+                        .is_trivially_never_satisfied()
                     {
                         return result;
                     }
@@ -478,7 +478,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     let element_constraints = self.check_type_pair(db, source_ty, target_ty);
                     if result
                         .intersect(db, self.constraints, element_constraints)
-                        .is_never_satisfied(db)
+                        .is_trivially_never_satisfied()
                     {
                         return result;
                     }
@@ -601,7 +601,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     };
                     if result
                         .intersect(db, self.constraints, pair_constraints)
-                        .is_never_satisfied(db)
+                        .is_trivially_never_satisfied()
                     {
                         return result;
                     }
@@ -638,7 +638,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     };
                     if result
                         .intersect(db, self.constraints, pair_constraints)
-                        .is_never_satisfied(db)
+                        .is_trivially_never_satisfied()
                     {
                         return result;
                     }

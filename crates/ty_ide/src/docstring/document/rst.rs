@@ -1,12 +1,12 @@
 use std::iter::{Enumerate, Peekable};
 
 use compact_str::{CompactString, ToCompactString};
-use indexmap::IndexMap;
 use ruff_python_trivia::leading_indentation;
 use ruff_source_file::{Line as SourceLine, UniversalNewlineIterator, UniversalNewlines};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use super::preformatted::PreformattedBlockScanner;
+use crate::FxIndexMap;
 
 /// Parses all reST field lists in a docstring.
 fn field_lists(raw: &str) -> Vec<FieldList> {
@@ -35,8 +35,8 @@ pub(in crate::docstring) fn top_level_field_lists(
 ///
 /// `normalized_source` must have already undergone PEP-257 trimming and universal newline
 /// normalization.
-pub(super) fn parameter_documentation(normalized_source: &str) -> IndexMap<String, String> {
-    let mut parameters = IndexMap::new();
+pub(super) fn parameter_documentation(normalized_source: &str) -> FxIndexMap<String, String> {
+    let mut parameters = FxIndexMap::default();
 
     for field_list in top_level_field_lists(normalized_source) {
         for field in field_list.fields {

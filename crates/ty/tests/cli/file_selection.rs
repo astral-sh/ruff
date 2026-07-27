@@ -2,6 +2,94 @@ use insta_cmd::assert_cmd_snapshot;
 
 use crate::CliTest;
 
+#[test]
+fn exclude_scripts_only_applies_to_implicitly_discovered_files() -> anyhow::Result<()> {
+    let case = CliTest::with_files([
+        ("main.py", "value: int = 'project'"),
+        (
+            "script.py",
+            r#"
+            # /// script
+            # dependencies = []
+            # ///
+            value: int = "script"
+            "#,
+        ),
+        (
+            "nested/script.py",
+            r#"
+            # /// script
+            # dependencies = []
+            # ///
+            value: int = "nested-script"
+            "#,
+        ),
+    ])?;
+
+    assert_cmd_snapshot!(case.command().env("TY_OUTPUT_FORMAT", "concise"), @r#"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    main.py:1:14: error[invalid-assignment] Object of type `Literal["project"]` is not assignable to `int`
+    nested/script.py:5:14: error[invalid-assignment] Object of type `Literal["nested-script"]` is not assignable to `int`
+    script.py:5:14: error[invalid-assignment] Object of type `Literal["script"]` is not assignable to `int`
+    Found 3 diagnostics
+
+    ----- stderr -----
+    "#);
+
+    assert_cmd_snapshot!(case.command().env("TY_OUTPUT_FORMAT", "concise").arg("--exclude-scripts"), @r#"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    main.py:1:14: error[invalid-assignment] Object of type `Literal["project"]` is not assignable to `int`
+    Found 1 diagnostic
+
+    ----- stderr -----
+    "#);
+
+    assert_cmd_snapshot!(case.command().env("TY_OUTPUT_FORMAT", "concise").arg("--exclude-scripts").arg("script.py"), @r#"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    script.py:5:14: error[invalid-assignment] Object of type `Literal["script"]` is not assignable to `int`
+    Found 1 diagnostic
+
+    ----- stderr -----
+    "#);
+
+    case.write_file(
+        "ty.toml",
+        r#"
+        [src]
+        exclude-scripts = true
+        "#,
+    )?;
+
+    assert_cmd_snapshot!(case.command().env("TY_OUTPUT_FORMAT", "concise"), @r#"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    main.py:1:14: error[invalid-assignment] Object of type `Literal["project"]` is not assignable to `int`
+    Found 1 diagnostic
+
+    ----- stderr -----
+    "#);
+    assert_cmd_snapshot!(case.command().env("TY_OUTPUT_FORMAT", "concise").arg("--include-scripts"), @r#"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    main.py:1:14: error[invalid-assignment] Object of type `Literal["project"]` is not assignable to `int`
+    nested/script.py:5:14: error[invalid-assignment] Object of type `Literal["nested-script"]` is not assignable to `int`
+    script.py:5:14: error[invalid-assignment] Object of type `Literal["script"]` is not assignable to `int`
+    Found 3 diagnostics
+
+    ----- stderr -----
+    "#);
+
+    Ok(())
+}
+
 /// Test exclude CLI argument functionality
 #[test]
 fn exclude_argument() -> anyhow::Result<()> {

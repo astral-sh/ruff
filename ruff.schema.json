@@ -145,7 +145,7 @@
       }
     },
     "extend-select": {
-      "description": "A list of rule codes or prefixes to enable, in addition to those\nspecified by [`select`](#lint_select).\n\nUnlike [`select`](#lint_select), which _replaces_ the default rule set\nwhen specified, `extend-select` _adds_ to whatever rules are already\nactive. This makes `extend-select` the preferred option when you want\nto enable additional rules on top of the defaults without having to\nenumerate them.\n\nFor example, to enable the defaults plus flake8-bugbear:\n\n```toml\n[tool.ruff.lint]\n# Adds flake8-bugbear on top of the default rules (E4, E7, E9, F).\nextend-select = [\"B\"]\n```\n\nUsing `select = [\"B\"]` instead would _replace_ the defaults, enabling\nonly flake8-bugbear.",
+      "description": "A list of rule codes or prefixes to enable, in addition to those\nspecified by [`select`](#lint_select).\n\nUnlike [`select`](#lint_select), which _replaces_ the default rule set\nwhen specified, `extend-select` _adds_ to whatever rules are already\nactive. This makes `extend-select` the preferred option when you want\nto enable additional rules on top of the defaults without having to\nenumerate them.\n\nFor example, to enable the defaults plus flake8-bugbear:\n\n```toml\n[tool.ruff.lint]\n# Adds flake8-bugbear on top of the default rules.\nextend-select = [\"B\"]\n```\n\nUsing `select = [\"B\"]` instead would _replace_ the defaults, enabling\nonly flake8-bugbear.",
       "type": [
         "array",
         "null"
@@ -2199,7 +2199,7 @@
           }
         },
         "extend-select": {
-          "description": "A list of rule codes or prefixes to enable, in addition to those\nspecified by [`select`](#lint_select).\n\nUnlike [`select`](#lint_select), which _replaces_ the default rule set\nwhen specified, `extend-select` _adds_ to whatever rules are already\nactive. This makes `extend-select` the preferred option when you want\nto enable additional rules on top of the defaults without having to\nenumerate them.\n\nFor example, to enable the defaults plus flake8-bugbear:\n\n```toml\n[tool.ruff.lint]\n# Adds flake8-bugbear on top of the default rules (E4, E7, E9, F).\nextend-select = [\"B\"]\n```\n\nUsing `select = [\"B\"]` instead would _replace_ the defaults, enabling\nonly flake8-bugbear.",
+          "description": "A list of rule codes or prefixes to enable, in addition to those\nspecified by [`select`](#lint_select).\n\nUnlike [`select`](#lint_select), which _replaces_ the default rule set\nwhen specified, `extend-select` _adds_ to whatever rules are already\nactive. This makes `extend-select` the preferred option when you want\nto enable additional rules on top of the defaults without having to\nenumerate them.\n\nFor example, to enable the defaults plus flake8-bugbear:\n\n```toml\n[tool.ruff.lint]\n# Adds flake8-bugbear on top of the default rules.\nextend-select = [\"B\"]\n```\n\nUsing `select = [\"B\"]` instead would _replace_ the defaults, enabling\nonly flake8-bugbear.",
           "type": [
             "array",
             "null"

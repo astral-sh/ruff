@@ -2561,7 +2561,7 @@ watermelon
         assert_eq!(
             diagnostics
                 .iter()
-                .map(Diagnostic::primary_message)
+                .map(Diagnostic::headline_message)
                 .collect::<Vec<_>>(),
             ["checking main.py", "checking mod.py"]
         );
@@ -2635,12 +2635,6 @@ watermelon
         pub(super) fn show_fix_status(&mut self, yes: bool) {
             let config = self.config.clone();
             self.config = config.with_show_fix_status(yes);
-        }
-
-        /// Show a diff for the fix when rendering.
-        pub(super) fn show_fix_diff(&mut self, yes: bool) {
-            let config = self.config.clone();
-            self.config = config.show_fix_diff(yes);
         }
 
         /// The lowest fix applicability to show when rendering.

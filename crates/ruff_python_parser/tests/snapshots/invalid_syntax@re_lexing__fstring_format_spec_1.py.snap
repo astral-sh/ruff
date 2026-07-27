@@ -481,15 +481,6 @@ Module(
 
 
    |
- 9 |         'format spec'}
-10 |
-   | ^ Syntax Error: Expected a statement
-11 | f'middle {'string':\\\
-12 |         'format spec'}
-   |
-
-
-   |
 11 | f'middle {'string':\\\
 12 |         'format spec'}
    |         ^ Syntax Error: f-string: expecting `}`

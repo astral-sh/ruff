@@ -64,8 +64,7 @@ impl<'a> FullRenderer<'a> {
                 writeln!(f, "{}", renderer.render(diag.to_annotate()))?;
             }
 
-            if self.config.show_fix_diff
-                && diag.has_applicable_fix(self.config.fix_applicability())
+            if diag.has_applicable_fix(self.config.fix_applicability())
                 && let Some(diff) =
                     Diff::from_diagnostic(diag, &stylesheet, self.resolver, self.config)
             {
@@ -480,6 +479,11 @@ mod tests {
           |        ^^
           |
         help: Remove unused import: `os`
+          |
+          - import os
+        1 |
+          |
+        note: This is an unsafe fix and may change runtime behavior
 
         F841 [*] Local variable `x` is assigned to but never used
          --> fib.py:6:5
@@ -492,6 +496,13 @@ mod tests {
         8 |         return 0
           |
         help: Remove assignment to unused variable `x`
+          |
+        5 |     """Compute the nth number in the Fibonacci sequence."""
+          -     x = 1
+        6 +     
+        7 |     if n == 0:
+          |
+        note: This is an unsafe fix and may change runtime behavior
 
         F821 Undefined name `a`
          --> undef.py:1:4
@@ -709,7 +720,7 @@ print()
     fn notebook_output() {
         let (mut env, diagnostics) = create_notebook_diagnostics(DiagnosticFormat::Full);
         env.show_fix_status(true);
-        insta::assert_snapshot!(env.render_diagnostics(&diagnostics), @r###"
+        insta::assert_snapshot!(env.render_diagnostics(&diagnostics), @"
         error[F401][*]: `os` imported but unused
          --> notebook.ipynb:cell 1:2:8
           |
@@ -718,6 +729,11 @@ print()
           |        ^^
           |
         help: Remove unused import: `os`
+         ::: cell 1
+          |
+        1 | # cell 1
+          - import os
+          |
 
         error[F401][*]: `math` imported but unused
          --> notebook.ipynb:cell 2:2:8
@@ -729,6 +745,12 @@ print()
         4 | print('hello world')
           |
         help: Remove unused import: `math`
+         ::: cell 2
+          |
+        1 | # cell 2
+          - import math
+        2 |
+          |
 
         error[F841]: Local variable `x` is assigned to but never used
          --> notebook.ipynb:cell 3:4:5
@@ -739,7 +761,7 @@ print()
           |     ^
           |
         help: Remove assignment to unused variable `x`
-        "###);
+        ");
     }
 
     /// Check notebook handling for multiple annotations in a single diagnostic that span cells.
@@ -821,7 +843,6 @@ print()
     #[test]
     fn notebook_output_with_diff() {
         let (mut env, diagnostics) = create_notebook_diagnostics(DiagnosticFormat::Full);
-        env.show_fix_diff(true);
         env.show_fix_status(true);
         env.fix_applicability(Applicability::DisplayOnly);
 
@@ -831,7 +852,6 @@ print()
     #[test]
     fn notebook_output_with_diff_spanning_cells() {
         let (mut env, mut diagnostics) = create_notebook_diagnostics(DiagnosticFormat::Full);
-        env.show_fix_diff(true);
         env.show_fix_status(true);
         env.fix_applicability(Applicability::DisplayOnly);
 
@@ -984,7 +1004,6 @@ line 10
         ";
         env.add("example.py", contents);
         env.format(DiagnosticFormat::Full);
-        env.show_fix_diff(true);
         env.show_fix_status(true);
         env.fix_applicability(Applicability::DisplayOnly);
 
@@ -1042,7 +1061,6 @@ line 13
         env.format(DiagnosticFormat::Full);
         env.context(0);
         env.merge_window(2);
-        env.show_fix_diff(true);
 
         let replacement = |target: &str| {
             let start = contents.find(target).unwrap();

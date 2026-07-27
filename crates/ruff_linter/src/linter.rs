@@ -436,6 +436,7 @@ pub fn add_suppressions_to_path(
         reason,
         &suppressions,
         suppression_kind,
+        settings.preview,
     )
 }
 

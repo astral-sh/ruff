@@ -45,6 +45,13 @@ impl<'a> MarkdownFence<'a> {
     }
 }
 
+/// Returns whether `line` starts a recognized preformatted block.
+pub(super) fn starts_preformatted_block(line: &str) -> bool {
+    PreformattedBlockScanner::line_starts_doctest(line)
+        || MarkdownFence::find(line).is_some()
+        || RestLiteralBlockScanner::line_starts_literal_block(line.trim_start())
+}
+
 /// Recognizes preformatted blocks that may occur within a docstring.
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub(super) struct PreformattedBlockScanner<'a> {

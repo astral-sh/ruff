@@ -212,7 +212,7 @@ fn assert_diagnostics(db: &dyn Db, diagnostics: &[Diagnostic], expected: &[KeyDi
                     .primary_span()
                     .and_then(|span| span.range())
                     .map(Range::<usize>::from),
-                diagnostic.primary_message(),
+                diagnostic.headline_message(),
                 diagnostic.severity(),
             )
         })
@@ -663,6 +663,44 @@ fn benchmark_narrowed_str_enum_comparison(criterion: &mut Criterion) {
     );
 
     benchmark_enum_comparison(criterion, "ty_micro[narrowed_str_enum_comparison]", &code);
+}
+
+/// Regression benchmark for <https://github.com/astral-sh/ty/issues/4069>.
+///
+/// Compare a large enum with optional enum fields in a chain of conditions.
+fn benchmark_optional_str_enum_comparison(criterion: &mut Criterion) {
+    const NUM_ENUM_MEMBERS: usize = 256;
+
+    let mut code =
+        "from dataclasses import dataclass\nfrom enum import StrEnum\n\nclass ModelSlug(StrEnum):\n"
+            .to_string();
+    for index in 0..NUM_ENUM_MEMBERS {
+        writeln!(&mut code, "    M{index} = \"m{index}\"").ok();
+    }
+    code.push_str(
+        r#"
+
+@dataclass
+class Category:
+    default_model: ModelSlug | None = None
+    browsing_model: ModelSlug | None = None
+    code_interpreter_model: ModelSlug | None = None
+    plugins_model: ModelSlug | None = None
+    dalle_model: ModelSlug | None = None
+
+
+def belongs(slug: ModelSlug, category: Category) -> bool:
+    return (
+        category.default_model == slug
+        or category.browsing_model == slug
+        or category.code_interpreter_model == slug
+        or category.plugins_model == slug
+        or category.dalle_model == slug
+    )
+"#,
+    );
+
+    benchmark_enum_comparison(criterion, "ty_micro[optional_str_enum_comparison]", &code);
 }
 
 /// Ensure explicit enum-literal unions are compared as value sets, not member pairs.
@@ -1542,6 +1580,79 @@ fn benchmark_pandas_tdd(criterion: &mut Criterion) {
     });
 }
 
+fn benchmark_mixed_typed_dict_union_copy(criterion: &mut Criterion) {
+    const NUM_VARIANTS: usize = 12;
+
+    setup_rayon();
+
+    let mut code = concat!(
+        "from collections import ChainMap, OrderedDict, defaultdict\n",
+        "from collections.abc import Mapping, MutableMapping\n",
+        "from typing import Any, Literal, TypedDict\n\n",
+    )
+    .to_string();
+
+    for i in 0..NUM_VARIANTS {
+        writeln!(
+            &mut code,
+            "class Item{i}(TypedDict):\n    type: Literal[{i}]"
+        )
+        .ok();
+        if i == 0 {
+            code.push_str("    other: Any\n");
+        }
+        code.push('\n');
+    }
+
+    code.push_str("type Item = ");
+    for i in 0..NUM_VARIANTS {
+        if i > 0 {
+            code.push_str(" | ");
+        }
+        write!(&mut code, "Item{i}").ok();
+    }
+
+    code.push_str(
+        r#"
+
+def copy_dict(value: Item | dict[str, Any]) -> dict[str, object]:
+    return dict(value)
+
+def copy_mapping(value: Item | Mapping[str, Any]) -> dict[str, object]:
+    return dict(value)
+
+def copy_mutable_mapping(value: Item | MutableMapping[str, Any]) -> dict[str, object]:
+    return dict(value)
+
+def copy_ordered_dict(value: Item | OrderedDict[str, Any]) -> dict[str, object]:
+    return dict(value)
+
+def copy_default_dict(value: Item | defaultdict[str, Any]) -> dict[str, object]:
+    return dict(value)
+
+def copy_chain_map(value: Item | ChainMap[str, Any]) -> dict[str, object]:
+    return dict(value)
+
+def copy_narrowed_mapping(value: Item | Mapping[str, Any]) -> dict[str, object] | None:
+    if isinstance(value, dict):
+        return dict(value)
+    return None
+"#,
+    );
+
+    criterion.bench_function("ty_micro[mixed_typed_dict_union_copy]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(&code),
+            |case| {
+                let Case { db, .. } = case;
+                let result = db.check();
+                assert_eq!(result.len(), 0);
+            },
+            BatchSize::SmallInput,
+        );
+    });
+}
+
 fn benchmark_recursive_typed_dict_union_contextual_inference(criterion: &mut Criterion) {
     const NUM_BRANCHES: usize = 11;
 
@@ -1958,6 +2069,7 @@ criterion_group!(
     benchmark_large_enum_membership,
     benchmark_many_enum_members,
     benchmark_narrowed_str_enum_comparison,
+    benchmark_optional_str_enum_comparison,
     benchmark_enum_literal_union_comparison,
     benchmark_repeated_str_enum_comparisons,
     benchmark_cross_str_enum_comparison,
@@ -1978,6 +2090,7 @@ criterion_group!(
     benchmark_repeated_statement_calls,
     benchmark_factored_upper_bounds,
     benchmark_pandas_tdd,
+    benchmark_mixed_typed_dict_union_copy,
     benchmark_recursive_typed_dict_union_contextual_inference,
     benchmark_invariant_generic_return_union,
     benchmark_invariant_generic_union_bound,

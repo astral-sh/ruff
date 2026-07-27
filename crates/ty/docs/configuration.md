@@ -948,6 +948,33 @@ to re-include `dist` use `exclude = ["!dist"]`
 
 ---
 
+### `exclude-scripts`
+
+Whether to exclude files containing PEP 723 inline script metadata unless they are
+explicitly passed on the command line.
+
+**Default value**: `false`
+
+**Type**: `bool`
+
+**Example usage**:
+
+=== "pyproject.toml"
+
+    ```toml
+    [tool.ty.src]
+    exclude-scripts = true
+    ```
+
+=== "ty.toml"
+
+    ```toml
+    [src]
+    exclude-scripts = true
+    ```
+
+---
+
 ### `include`
 
 A list of files and directories to check. The `include` option

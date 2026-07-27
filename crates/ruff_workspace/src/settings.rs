@@ -145,6 +145,7 @@ pub(crate) static INCLUDE: &[FilePattern] = &[
     FilePattern::Builtin("**/pyproject.toml"),
     FilePattern::Builtin("**/ruff.toml"),
     FilePattern::Builtin("**/.ruff.toml"),
+    FilePattern::Builtin("*.md"),
 ];
 pub(crate) static INCLUDE_PREVIEW: &[FilePattern] = &[
     FilePattern::Builtin("*.py"),

@@ -687,3 +687,26 @@ help: Replace with `Fraction` constructor
 75 | )
    |
 note: This is an unsafe fix and may change runtime behavior
+
+FURB164 [*] Verbose method `from_float` in `Decimal` construction
+  --> FURB164.py:79:5
+   |
+77 |   )
+78 |
+79 |   _ = Decimal.from_float(
+   |  _____^
+80 | |     # keep this comment
+81 | |     float("inf")
+82 | | )
+   | |_^
+   |
+help: Replace with `Decimal` constructor
+   |
+78 |
+   - _ = Decimal.from_float(
+   -     # keep this comment
+   -     float("inf")
+   - )
+79 + _ = Decimal("inf")
+   |
+note: This is an unsafe fix and may change runtime behavior

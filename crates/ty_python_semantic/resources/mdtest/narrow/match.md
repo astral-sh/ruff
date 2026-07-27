@@ -3101,6 +3101,13 @@ def cross_int_enum_members(value: First | Second) -> None:
         case _:
             reveal_type(value)  # revealed: Literal[First.TWO, Second.TWO]
 
+def optional_cross_int_enum_members(value: First | Second | None) -> None:
+    match value:
+        case First.ONE:
+            reveal_type(value)  # revealed: Literal[First.ONE, Second.ONE]
+        case _:
+            reveal_type(value)  # revealed: Literal[First.TWO, Second.TWO] | None
+
 class Warning(Enum):
     W1 = auto()
 

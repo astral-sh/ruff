@@ -780,7 +780,7 @@ impl<'db> EnumComplementType<'db> {
 
         let mut builder = IntersectionBuilder::new(db).add_positive(literal);
         for rest in self.rest(db) {
-            builder = builder.add_positive(*rest);
+            builder.add_positive_in_place(*rest);
         }
         builder.build()
     }

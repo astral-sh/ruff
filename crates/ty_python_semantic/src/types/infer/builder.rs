@@ -125,7 +125,8 @@ use ty_python_core::definition::{
     AnnotatedAssignmentDefinitionKind, AssignmentDefinitionKind, ComprehensionDefinitionKind,
     Definition, DefinitionKind, DefinitionNodeKey, DefinitionState, ExceptHandlerDefinitionKind,
     ForStmtDefinitionKind, LambdaParameterDefinitionNodeKind, LoopHeaderDefinitionKind,
-    NestedBindingsDefinitionKind, ParameterDefinitionNodeKind, TargetKind, WithItemDefinitionKind,
+    NestedBindingExecution, NestedBindingsDefinitionKind, ParameterDefinitionNodeKind, TargetKind,
+    WithItemDefinitionKind,
 };
 use ty_python_core::expression::{Expression, ExpressionKind};
 use ty_python_core::narrowing_constraints::ConstraintKey;
@@ -162,7 +163,7 @@ mod typed_dict;
 mod typeguard;
 mod typevar;
 
-use super::comparisons::{self, BinaryComparisonVisitor};
+use super::comparisons;
 
 /// A helper to track if we already know that declared and inferred types are the same.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -2486,18 +2487,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let this_scope_sees_nonlocal_bindings = !(this_scope_sees_global_bindings
             || (scope.scope(db).kind().is_class() && symbol.is_local()));
 
-        let mut visible_nested_declarations = nested_bindings_kind
-            .nested_declarations
-            .iter()
-            .filter(|declaration| {
-                if declaration.is_global() {
+        let mut binding_sources = nested_bindings_kind
+            .binding_sources(self.index)
+            .filter_map(|(is_global, bindings)| {
+                (if is_global {
                     this_scope_sees_global_bindings
                 } else {
                     this_scope_sees_nonlocal_bindings
-                }
+                })
+                .then_some(bindings)
             })
             .peekable();
-        if visible_nested_declarations.peek().is_some()
+        if binding_sources.peek().is_some()
             && self
                 .index
                 .use_def_map(scope_id)
@@ -2512,20 +2513,33 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return;
         }
 
-        let mut union = UnionBuilder::new(db).recursively_defined(RecursivelyDefined::Yes);
-        for declaration in visible_nested_declarations {
-            assert!(
-                declaration.is_bound,
-                "nested declarations without bindings shouldn't be recorded here",
-            );
-            let nested_place_table = self.index.place_table(declaration.file_scope_id);
-            let nested_symbol_id = nested_place_table
-                .symbol_id(&nested_bindings_kind.name)
-                .unwrap();
-            let use_def = self.index.use_def_map(declaration.file_scope_id);
+        let recursively_defined = match nested_bindings_kind.execution {
+            NestedBindingExecution::Lazy => RecursivelyDefined::Yes,
+            NestedBindingExecution::Eager => RecursivelyDefined::No,
+        };
+        let mut union = UnionBuilder::new(db).recursively_defined(recursively_defined);
+        for bindings in binding_sources {
+            if nested_bindings_kind.execution == NestedBindingExecution::Eager {
+                // A comprehension can execute repeatedly, so a source that is unreachable in the
+                // first modeled iteration may become reachable in a later one. Preserve each
+                // source's narrowed type and let the proxy's outer use-def state track boundness.
+                for binding in bindings {
+                    let DefinitionState::Defined(source) = binding.binding else {
+                        continue;
+                    };
+                    let ty = binding_type(db, source);
+                    union.add_in_place(binding.narrowing_constraint.narrow(
+                        db,
+                        ty,
+                        source.place(db),
+                    ));
+                }
+                continue;
+            }
+
             let Some(ty) = place_from_bindings_with_reachability_cache(
                 db,
-                use_def.reachable_bindings(nested_symbol_id.into()),
+                bindings,
                 self.reachability_cache(),
             )
             .place
@@ -2534,7 +2548,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             };
             union.add_in_place(ty);
         }
-        self.bindings.insert(definition, union.build());
+        let ty = union.build();
+        let ty = match nested_bindings_kind.execution {
+            NestedBindingExecution::Lazy => ty,
+            NestedBindingExecution::Eager => ty.promote(db),
+        };
+        self.bindings.insert(definition, ty);
     }
 
     fn infer_match_statement(&mut self, match_statement: &ast::StmtMatch) {
@@ -3627,7 +3646,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .report_lint(&INVALID_NEWTYPE, &arguments.args[1])
             {
                 let mut diag = builder.into_diagnostic("invalid base for `typing.NewType`");
-                diag.set_primary_message("A `NewType` base cannot be generic");
+                diag.set_primary_annotation_message("A `NewType` base cannot be generic");
             }
             return;
         }
@@ -3653,7 +3672,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .report_lint(&INVALID_NEWTYPE, &arguments.args[1])
         {
             let mut diag = builder.into_diagnostic("invalid base for `typing.NewType`");
-            diag.set_primary_message(format!("type `{}`", inferred.display(self.db())));
+            diag.set_primary_annotation_message(format!("type `{}`", inferred.display(self.db())));
             if matches!(inferred, Type::ProtocolInstance(_)) {
                 diag.info("The base of a `NewType` is not allowed to be a protocol class.");
             } else if matches!(inferred, Type::TypedDict(_)) {
@@ -4086,7 +4105,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 .secondary(annotation.as_ref())
                                 .message("Declared type"),
                         );
-                        diag.set_primary_message(format_args!(
+                        diag.set_primary_annotation_message(format_args!(
                             "Incompatible value of type `{}`",
                             value_ty.display(self.db()),
                         ));
@@ -4948,7 +4967,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             };
             let mut diag =
                 builder.into_diagnostic(format_args!("Invalid global declaration of `{name}`"));
-            diag.set_primary_message(format_args!(
+            diag.set_primary_annotation_message(format_args!(
                 "`{name}` has no declarations or bindings in the global scope"
             ));
             diag.info("This limits ty's ability to make accurate inferences about the boundness and types of global-scope symbols");
@@ -7276,7 +7295,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         let mut diag = builder
                             .into_diagnostic("Argument expression after ** must be a mapping type");
 
-                        diag.set_primary_message(format_args!(
+                        diag.set_primary_annotation_message(format_args!(
                             "Found `{}`",
                             unpack_ty.display(self.db())
                         ));
@@ -8256,7 +8275,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             builder
                 .into_diagnostic("Argument expression after ** must be a mapping type")
-                .set_primary_message(format_args!("Found `{}`", mapping_type.display(self.db())));
+                .set_primary_annotation_message(format_args!(
+                    "Found `{}`",
+                    mapping_type.display(self.db())
+                ));
         }
 
         call_arguments
@@ -9294,7 +9316,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             let mut diag =
                 builder.into_diagnostic(format_args!(r#"The class `{class_name}` is deprecated"#));
             if let Some(message) = deprecated.message {
-                diag.set_primary_message(message.value(self.db()));
+                diag.set_primary_annotation_message(message.value(self.db()));
             }
             diag.add_primary_tag(ruff_db::diagnostic::DiagnosticTag::Deprecated);
             return;
@@ -9326,7 +9348,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let mut diag =
             builder.into_diagnostic(format_args!(r#"The function `{func_name}` is deprecated"#));
         if let Some(message) = deprecated.message {
-            diag.set_primary_message(message.value(self.db()));
+            diag.set_primary_annotation_message(message.value(self.db()));
         }
         diag.add_primary_tag(ruff_db::diagnostic::DiagnosticTag::Deprecated);
     }
@@ -9878,7 +9900,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // because it's already caught by typing.Type.
         if Program::get(self.db()).python_version(self.db()) >= PythonVersion::PY39 {
             if let Some(("", builtin_name)) = as_pep_585_generic("typing", id) {
-                diagnostic.set_primary_message(format_args!("Did you mean `{builtin_name}`?"));
+                diagnostic
+                    .set_primary_annotation_message(format_args!("Did you mean `{builtin_name}`?"));
             }
         }
 
@@ -10718,7 +10741,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     *op,
                     right_ty,
                     range,
-                    &BinaryComparisonVisitor::new(Ok(Type::bool_literal(true))),
                 )
                 .unwrap_or_else(|error| {
                     report_unsupported_comparison(
@@ -11970,7 +11992,7 @@ impl<'db, 'ast> AddBinding<'db, 'ast> {
                         "Reassignment of `Final` symbol `{place}` is not allowed"
                     ));
 
-                    diagnostic.set_primary_message("Reassignment of `Final` symbol");
+                    diagnostic.set_primary_annotation_message("Reassignment of `Final` symbol");
 
                     if let Some(previous_definition) = previous_definition {
                         // It is not very helpful to show the previous definition if it results from
@@ -11997,7 +12019,8 @@ impl<'db, 'ast> AddBinding<'db, 'ast> {
                                         .message("Symbol declared as `Final` here"),
                                 );
                             }
-                            diagnostic.set_primary_message("Symbol later reassigned here");
+                            diagnostic
+                                .set_primary_annotation_message("Symbol later reassigned here");
                         }
                     }
                 }

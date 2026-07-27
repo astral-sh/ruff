@@ -162,6 +162,7 @@ pub(crate) fn check(
         } else {
             SuppressionKind::Noqa
         },
+        settings.linter.preview,
     );
     let context = LspDiagnosticContext {
         source_kind: &source_kind,
@@ -375,9 +376,9 @@ fn to_lsp_diagnostic(
             .primary_annotation()
             .and_then(Annotation::get_message)
         {
-            format!("{}: {annotation_message}", diagnostic.primary_message())
+            format!("{}: {annotation_message}", diagnostic.headline_message())
         } else {
-            diagnostic.primary_message().to_string()
+            diagnostic.headline_message().to_string()
         }
     } else {
         diagnostic.concise_message().to_string()

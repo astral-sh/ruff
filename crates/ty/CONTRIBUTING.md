@@ -144,7 +144,7 @@ ensure that the changes do not break any of the properties.
 ## Ecosystem CI (`ecosystem-analyzer`)
 
 GitHub Actions will run your changes against a number of real-world projects from GitHub and report
-any differences in ty's diagnostic output. You can use [`setup_primer_project.py`](./scripts/setup_primer_project.py)
+any differences in ty's diagnostic output. You can use [`setup_primer_project.py`](../../scripts/setup_primer_project.py)
 to reproduce the same testing conditions locally.
 
 ## Coding guidelines

@@ -977,7 +977,6 @@ Source with applied edits:
 
             let config = DisplayDiagnosticConfig::new("ty")
                 .color(false)
-                .show_fix_diff(true)
                 .context(0)
                 .format(DiagnosticFormat::Full);
 

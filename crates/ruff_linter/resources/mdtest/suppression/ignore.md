@@ -8,7 +8,6 @@ diagnostic range.
 
 ```toml
 [lint]
-preview = true
 select = ["RUF015"]
 ```
 
@@ -29,7 +28,6 @@ entire class definition.
 
 ```toml
 [lint]
-preview = true
 select = ["B903"]
 ```
 
@@ -46,7 +44,6 @@ Diagnostics with empty ranges should also be suppressible, as with `noqa`.
 
 ```toml
 [lint]
-preview = true
 select = ["W292"]
 ```
 
@@ -61,7 +58,6 @@ after the matching `ruff:enable` comment:
 
 ```toml
 [lint]
-preview = true
 select = ["RUF015"]
 ```
 
@@ -91,7 +87,6 @@ not_suppressed = [
 
 ```toml
 [lint]
-preview = true
 select = ["RUF015"]
 ```
 
@@ -153,7 +148,6 @@ x = (
 
 ```toml
 [lint]
-preview = true
 select = [ "F" ]
 ```
 
@@ -174,7 +168,6 @@ from foo import (  # ruff:ignore[F401]
 
 ```toml
 [lint]
-preview = true
 select = [ "F401", "RUF100" ]
 ```
 
@@ -201,7 +194,6 @@ from sys import ( # ruff:ignore[F401]
 
 ```toml
 [lint]
-preview = true
 select = [ "W291" ]
 ```
 
@@ -303,7 +295,6 @@ def f():
 
 ```toml
 [lint]
-preview = true
 select = ["F401", "RUF100", "RUF104"]
 ```
 
@@ -567,7 +558,6 @@ help: Remove unused suppression
 
 ```toml
 [lint]
-preview = true
 select = ["F401", "RUF103", "RUF104"]
 ```
 
@@ -617,7 +607,6 @@ import foo
 
 ```toml
 [lint]
-preview = true
 select = ["F401", "RUF103", "RUF104"]
 ```
 
@@ -667,7 +656,6 @@ import foo
 
 ```toml
 [lint]
-preview = true
 select = ["F401", "RUF100", "FIX002"]
 ```
 
@@ -699,7 +687,6 @@ a = 10
 
 ```toml
 [lint]
-preview = true
 select = ["E501", "F821", "RUF100", "RUF103"]
 ```
 
@@ -773,7 +760,6 @@ note: This is an unsafe fix and may change runtime behavior
 
 ```toml
 [lint]
-preview = true
 select = ["E501", "RUF100", "FIX002"]
 ```
 
@@ -811,7 +797,6 @@ note: This is an unsafe fix and may change runtime behavior
 
 ```toml
 [lint]
-preview = true
 select = ["E501", "F401", "F821", "RUF100", "RUF103"]
 ```
 
@@ -845,7 +830,6 @@ help: Remove unused suppression
 
 ```toml
 [lint]
-preview = true
 select = ["F821", "RUF102", "RUF103"]
 ```
 
@@ -881,7 +865,6 @@ note: This is an unsafe fix and may change runtime behavior
 
 ```toml
 [lint]
-preview = true
 select = ["F401", "F821", "RUF100", "RUF103"]
 ```
 
@@ -944,7 +927,6 @@ note: This is an unsafe fix and may change runtime behavior
 
 ```toml
 [lint]
-preview = true
 select = ["RUF103"]
 ```
 
@@ -993,7 +975,6 @@ note: This is an unsafe fix and may change runtime behavior
 
 ```toml
 [lint]
-preview = true
 select = ["F401", "RUF103"]
 ```
 
@@ -1008,7 +989,6 @@ import os  # before # ruff:ignore # ruff:ignore[F401] # after
 
 ```toml
 [lint]
-preview = true
 select = ["RUF100"]
 ```
 
@@ -1061,7 +1041,6 @@ at offset zero, as with `noqa`.
 
 ```toml
 [lint]
-preview = true
 select = ["D100"]
 ```
 

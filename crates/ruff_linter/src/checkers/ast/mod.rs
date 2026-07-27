@@ -3645,7 +3645,7 @@ impl DiagnosticGuard<'_, '_> {
     ///
     /// Callers can add additional primary or secondary annotations via the
     /// `DerefMut` trait implementation to a `Diagnostic`.
-    pub(crate) fn set_primary_message(&mut self, message: impl IntoDiagnosticMessage) {
+    pub(crate) fn set_primary_annotation_message(&mut self, message: impl IntoDiagnosticMessage) {
         // N.B. It is normally bad juju to define `self` methods
         // on types that implement `Deref`. Instead, it's idiomatic
         // to do `fn foo(this: &mut LintDiagnosticGuard)`, which in

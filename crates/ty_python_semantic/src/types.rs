@@ -24,7 +24,7 @@ use ty_module_resolver::{KnownModule, Module, ModuleName, resolve_module};
 
 pub(crate) use self::callable::UpcastPolicy;
 pub use self::cyclic::CycleDetector;
-pub(crate) use self::cyclic::{ActiveRecursionDetector, TypeTransformer};
+pub(crate) use self::cyclic::TypeTransformer;
 pub(crate) use self::diagnostic::register_lints;
 pub use self::diagnostic::{TypeCheckDiagnostics, UNDEFINED_REVEAL, UNRESOLVED_REFERENCE};
 pub(crate) use self::infer::{
@@ -1179,6 +1179,13 @@ impl<'db> Type<'db> {
             }
             None => Type::Divergent(divergent),
         })
+    }
+
+    pub(crate) const fn as_intersection(self) -> Option<IntersectionType<'db>> {
+        match self {
+            Type::Intersection(intersection) => Some(intersection),
+            _ => None,
+        }
     }
 
     pub const fn is_unknown(&self) -> bool {
@@ -4074,6 +4081,14 @@ impl<'db> Type<'db> {
                     .into()
                 }
                 Type::KnownInstance(KnownInstanceType::ConstraintSet(tracked))
+                    if name == "exists" =>
+                {
+                    Place::bound(Type::KnownBoundMethod(
+                        KnownBoundMethodType::ConstraintSetExists(tracked),
+                    ))
+                    .into()
+                }
+                Type::KnownInstance(KnownInstanceType::ConstraintSet(tracked))
                     if name == "for_all" =>
                 {
                     Place::bound(Type::KnownBoundMethod(
@@ -5862,10 +5877,10 @@ impl<'db> Type<'db> {
                 // Flatten each positive element and rebuild through the intersection builder.
                 let mut builder = IntersectionBuilder::new(db);
                 for pos in intersection.positive(db) {
-                    builder = builder.add_positive(pos.flatten_typevars(db));
+                    builder.add_positive_in_place(pos.flatten_typevars(db));
                 }
                 for neg in intersection.negative(db) {
-                    builder = builder.add_negative(neg.flatten_typevars(db));
+                    builder.add_negative_in_place(neg.flatten_typevars(db));
                 }
                 builder.build()
             }
@@ -6538,6 +6553,7 @@ impl<'db> Type<'db> {
                         | KnownBoundMethodType::ConstraintSetNever
                         | KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(_)
                         | KnownBoundMethodType::ConstraintSetSatisfies(_)
+                        | KnownBoundMethodType::ConstraintSetExists(_)
                         | KnownBoundMethodType::ConstraintSetForAll(_)
                         | KnownBoundMethodType::ConstraintSetSatisfiedByAllTypeVars(_)
                         | KnownBoundMethodType::ConstraintSetSolutionsFor(_)
@@ -6742,8 +6758,12 @@ impl<'db> Type<'db> {
             Type::Intersection(intersection) => {
                 let mut builder = IntersectionBuilder::new(db);
                 for positive in intersection.positive(db) {
-                    builder =
-                        builder.add_positive(positive.apply_type_mapping_impl(db, type_mapping, tcx, visitor));
+                    builder.add_positive_in_place(positive.apply_type_mapping_impl(
+                        db,
+                        type_mapping,
+                        tcx,
+                        visitor,
+                    ));
                 }
                 // Regular promotion should remove negative contributions from intersections,
                 // so we don't preserve them here when regular promotion is enabled.
@@ -6752,7 +6772,7 @@ impl<'db> Type<'db> {
                     TypeMapping::Promote(PromotionMode::On, PromotionKind::Regular)
                 ) {
                     for negative in intersection.negative(db) {
-                        builder = builder.add_negative(
+                        builder.add_negative_in_place(
                             negative.apply_type_mapping_impl(db, &type_mapping.flip(), tcx, visitor),
                         );
                     }
@@ -6905,6 +6925,7 @@ impl<'db> Type<'db> {
                 | KnownBoundMethodType::ConstraintSetNever
                 | KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(_)
                 | KnownBoundMethodType::ConstraintSetSatisfies(_)
+                | KnownBoundMethodType::ConstraintSetExists(_)
                 | KnownBoundMethodType::ConstraintSetForAll(_)
                 | KnownBoundMethodType::ConstraintSetSatisfiedByAllTypeVars(_)
                 | KnownBoundMethodType::ConstraintSetSolutionsFor(_)
@@ -7173,6 +7194,7 @@ impl<'db> Type<'db> {
                 | KnownBoundMethodType::ConstraintSetNever
                 | KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(_)
                 | KnownBoundMethodType::ConstraintSetSatisfies(_)
+                | KnownBoundMethodType::ConstraintSetExists(_)
                 | KnownBoundMethodType::ConstraintSetForAll(_)
                 | KnownBoundMethodType::ConstraintSetSatisfiedByAllTypeVars(_)
                 | KnownBoundMethodType::ConstraintSetSolutionsFor(_)
@@ -8549,7 +8571,7 @@ impl<'db> InvalidTypeExpression<'db> {
             {
                 return;
             }
-            diagnostic.set_primary_message(format_args!(
+            diagnostic.set_primary_annotation_message(format_args!(
                 "Did you mean to use the module's member \
                 `{module_name_final_part}.{module_name_final_part}`?"
             ));
@@ -8575,7 +8597,7 @@ impl<'db> InvalidTypeExpression<'db> {
                 .map(|parent| parent.to_scope_id(db, function_body_scope.file(db)))
                 == builtins_module_scope(db)
         {
-            diagnostic.set_primary_message("Did you mean `collections.abc.Callable`?");
+            diagnostic.set_primary_annotation_message("Did you mean `collections.abc.Callable`?");
         } else if matches!(self, InvalidTypeExpression::InvalidBareParamSpec(_)) {
             diagnostic.info("A bare ParamSpec is only valid:");
             diagnostic.info(" - as the first argument to `Callable`");

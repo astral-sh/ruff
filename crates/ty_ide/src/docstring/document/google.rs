@@ -30,7 +30,6 @@
 //!     retries: Number of retries.
 //! ```
 
-use indexmap::IndexMap;
 use ruff_python_stdlib::identifiers::is_identifier;
 use ruff_python_trivia::Cursor;
 use ruff_text_size::{TextRange, TextSize};
@@ -41,12 +40,13 @@ use super::syntax::{
     parsed_lines, split_once_at_top_level_colon, split_trailing_parenthetical,
 };
 use super::{DescriptionBuilder, HeaderKind, SectionKind};
+use crate::FxIndexMap;
 
 /// Returns parameter documentation from recognized Google-style parameter sections.
 ///
 /// `normalized_source` must have already undergone PEP-257 trimming and universal newline
 /// normalization.
-pub(super) fn parameter_documentation(normalized_source: &str) -> IndexMap<String, String> {
+pub(super) fn parameter_documentation(normalized_source: &str) -> FxIndexMap<String, String> {
     let mut parameters = Parameters::default();
     for section in sections(normalized_source) {
         let Section {
@@ -184,7 +184,7 @@ impl<'a> ParameterDisplayName<'a> {
 }
 
 #[derive(Default)]
-struct Parameters(IndexMap<String, String>);
+struct Parameters(FxIndexMap<String, String>);
 
 impl Parameters {
     fn extend_fragments(&mut self, fragments: Vec<BodyFragment>) {
@@ -209,7 +209,7 @@ impl Parameters {
         }
     }
 
-    fn into_inner(self) -> IndexMap<String, String> {
+    fn into_inner(self) -> FxIndexMap<String, String> {
         self.0
     }
 }

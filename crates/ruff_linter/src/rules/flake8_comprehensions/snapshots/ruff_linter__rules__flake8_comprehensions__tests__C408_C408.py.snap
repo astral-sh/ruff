@@ -529,12 +529,15 @@ C408 [*] Unnecessary `dict()` call (rewrite as a literal)
 38 | t"a {dict(x='y') | dict(y='z')} b"
 39 | t"a { dict(x='y') | dict(y='z') } b"
    |       ^^^^^^^^^^^
+40 |
+41 | # https://github.com/astral-sh/ruff/issues/16234
    |
 help: Rewrite as a literal
    |
 38 | t"a {dict(x='y') | dict(y='z')} b"
    - t"a { dict(x='y') | dict(y='z') } b"
 39 + t"a { {'x': 'y'} | dict(y='z') } b"
+40 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -545,11 +548,86 @@ C408 [*] Unnecessary `dict()` call (rewrite as a literal)
 38 | t"a {dict(x='y') | dict(y='z')} b"
 39 | t"a { dict(x='y') | dict(y='z') } b"
    |                     ^^^^^^^^^^^
+40 |
+41 | # https://github.com/astral-sh/ruff/issues/16234
    |
 help: Rewrite as a literal
    |
 38 | t"a {dict(x='y') | dict(y='z')} b"
    - t"a { dict(x='y') | dict(y='z') } b"
 39 + t"a { dict(x='y') | {'y': 'z'} } b"
+40 |
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+C408 [*] Unnecessary `dict()` call (rewrite as a literal)
+  --> C408.py:45:1
+   |
+43 | # normalize the keyword name to preserve the dictionary key at runtime. The character "ℼ" normalizes
+44 | # to "π", and "ſ" normalizes to "s".
+45 | dict(ℼ=3.14)
+   | ^^^^^^^^^^^^
+46 | dict(ſ=1)
+47 | dict(𝕒=1, b=2)
+   |
+help: Rewrite as a literal
+   |
+44 | # to "π", and "ſ" normalizes to "s".
+   - dict(ℼ=3.14)
+45 + {"π": 3.14}
+46 | dict(ſ=1)
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+C408 [*] Unnecessary `dict()` call (rewrite as a literal)
+  --> C408.py:46:1
+   |
+44 | # to "π", and "ſ" normalizes to "s".
+45 | dict(ℼ=3.14)
+46 | dict(ſ=1)
+   | ^^^^^^^^^
+47 | dict(𝕒=1, b=2)
+48 | dict(a=1, b=2)  # already NFKC-normalized: unchanged
+   |
+help: Rewrite as a literal
+   |
+45 | dict(ℼ=3.14)
+   - dict(ſ=1)
+46 + {"s": 1}
+47 | dict(𝕒=1, b=2)
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+C408 [*] Unnecessary `dict()` call (rewrite as a literal)
+  --> C408.py:47:1
+   |
+45 | dict(ℼ=3.14)
+46 | dict(ſ=1)
+47 | dict(𝕒=1, b=2)
+   | ^^^^^^^^^^^^^^
+48 | dict(a=1, b=2)  # already NFKC-normalized: unchanged
+   |
+help: Rewrite as a literal
+   |
+46 | dict(ſ=1)
+   - dict(𝕒=1, b=2)
+47 + {"a": 1, "b": 2}
+48 | dict(a=1, b=2)  # already NFKC-normalized: unchanged
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+C408 [*] Unnecessary `dict()` call (rewrite as a literal)
+  --> C408.py:48:1
+   |
+46 | dict(ſ=1)
+47 | dict(𝕒=1, b=2)
+48 | dict(a=1, b=2)  # already NFKC-normalized: unchanged
+   | ^^^^^^^^^^^^^^
+   |
+help: Rewrite as a literal
+   |
+47 | dict(𝕒=1, b=2)
+   - dict(a=1, b=2)  # already NFKC-normalized: unchanged
+48 + {"a": 1, "b": 2}  # already NFKC-normalized: unchanged
    |
 note: This is an unsafe fix and may change runtime behavior
