@@ -3777,7 +3777,7 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
                 let (_, place) = type_guard.place_info(self.db)?;
                 Some((
                     place,
-                    NarrowingConstraint::replacement(type_guard.return_type(self.db)),
+                    NarrowingConstraint::intersection(type_guard.return_type(self.db)),
                 ))
             }
             _ => None,
