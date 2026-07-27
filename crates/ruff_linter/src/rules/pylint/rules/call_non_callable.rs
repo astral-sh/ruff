@@ -42,11 +42,11 @@ use crate::{FixAvailability, Violation};
 /// ```
 #[derive(ViolationMetadata)]
 #[violation_metadata(preview_since = "NEXT_RUFF_VERSION")]
-pub(crate) struct NonCallable {
+pub(crate) struct CallNonCallable {
     python_type: String,
 }
 
-impl Violation for NonCallable {
+impl Violation for CallNonCallable {
     // No reliable fix in general, since we can't know the author's intent.
     // In theory, an unsafe fix could be offered to insert a comma, e.g. for
     // - collection literals: `[2 (3, 4)]` -> `[2, (3, 4)]`
@@ -57,13 +57,13 @@ impl Violation for NonCallable {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let NonCallable { python_type } = self;
+        let CallNonCallable { python_type } = self;
         format!("`{python_type}` object is not callable.")
     }
 }
 
 /// PLE1102
-pub(crate) fn non_callable(checker: &Checker, call: &ExprCall) {
+pub(crate) fn call_non_callable(checker: &Checker, call: &ExprCall) {
     let func = &*call.func;
 
     let resolved_type = ResolvedPythonType::from(func);
@@ -71,7 +71,7 @@ pub(crate) fn non_callable(checker: &Checker, call: &ExprCall) {
         // A `Union` is just a union `PythonType` non-callable atoms.
         ResolvedPythonType::Atom(_) | ResolvedPythonType::Union(_) => {
             checker.report_diagnostic(
-                NonCallable {
+                CallNonCallable {
                     python_type: resolved_type.to_string(),
                 },
                 func.range(),
@@ -81,7 +81,7 @@ pub(crate) fn non_callable(checker: &Checker, call: &ExprCall) {
             // TODO: Move to PythonType?
             if let Expr::TString(t_string) = func {
                 checker.report_diagnostic(
-                    NonCallable {
+                    CallNonCallable {
                         python_type: "Template".to_string(),
                     },
                     t_string.range(),
