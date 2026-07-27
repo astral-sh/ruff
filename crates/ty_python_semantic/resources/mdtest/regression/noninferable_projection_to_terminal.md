@@ -93,6 +93,41 @@ bounded_identity(1)  # error: [invalid-argument-type]
 constrained_identity(b"invalid")  # error: [invalid-argument-type]
 ```
 
+## Bounded-union method calls with outer return contexts
+
+When a rigid outer variable is bounded by two receiver types, a method shared by those types should
+retain both the outer variable and the matching receiver bound. The independent receiver diagnostics
+are expected, but the current `Unknown` in the return diagnostic is not. Combining return-context
+and argument constraints in [#26680](https://github.com/astral-sh/ruff/pull/26680) should instead
+produce `Response | (T@Manager & Socket)`.
+
+```py
+from __future__ import annotations
+
+from typing import Generic, TypeVar
+from typing_extensions import Self
+
+class Response:
+    async def __aenter__(self) -> Response:
+        return self
+
+class Socket:
+    async def __aenter__(self) -> Self:
+        return self
+
+T = TypeVar("T", bound=Response | Socket, covariant=True)
+
+class Manager(Generic[T]):
+    response: T
+
+    async def __aenter__(self) -> T:
+        # TODO(#26680): Retain `Response | (T@Manager & Socket)`.
+        # error: [invalid-return-type] "expected `T@Manager`, found `Response | Unknown`"
+        # error: [invalid-argument-type]
+        # error: [invalid-argument-type]
+        return await self.response.__aenter__()
+```
+
 ## Fixed nested non-inferable relationships
 
 A concrete argument can fix the inner type variable while a second argument preserves a nested
