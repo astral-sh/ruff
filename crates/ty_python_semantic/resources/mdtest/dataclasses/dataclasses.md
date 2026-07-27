@@ -1167,6 +1167,55 @@ child.a = 2  # error: [invalid-assignment]
 child.b = 2  # error: [invalid-assignment]
 ```
 
+Specialized frozen dataclasses still delegate non-field deletions through the unspecialized runtime
+class, for both traditional and PEP 695 generics:
+
+```py
+from dataclasses import dataclass
+from typing import Generic, NoReturn, TypeVar
+
+T = TypeVar("T")
+
+@dataclass(frozen=True)
+class LegacyFrozen(Generic[T]):
+    value: T
+
+@dataclass(frozen=True)
+class Pep695Frozen[T]:
+    value: T
+
+class RejectLater:
+    y: int = 1
+
+    def __delattr__(self, name: str) -> NoReturn:
+        raise AttributeError(name)
+
+class LegacyReadOnly(LegacyFrozen[int]):
+    @property
+    def y(self) -> int:
+        return 1
+
+class Pep695ReadOnly(Pep695Frozen[int]):
+    @property
+    def y(self) -> int:
+        return 1
+
+class LegacyRejectsLater(LegacyFrozen[int], RejectLater): ...
+class Pep695RejectsLater(Pep695Frozen[int], RejectLater): ...
+
+# error: [invalid-assignment] "Cannot delete read-only property `y` on object of type `LegacyReadOnly`"
+del LegacyReadOnly(1).y
+
+# error: [invalid-assignment] "Cannot delete read-only property `y` on object of type `Pep695ReadOnly`"
+del Pep695ReadOnly(1).y
+
+# error: [invalid-assignment] "Cannot delete attribute `y` on type `LegacyRejectsLater` whose `__delattr__` method returns `Never`/`NoReturn`"
+del LegacyRejectsLater(1).y
+
+# error: [invalid-assignment] "Cannot delete attribute `y` on type `Pep695RejectsLater` whose `__delattr__` method returns `Never`/`NoReturn`"
+del Pep695RejectsLater(1).y
+```
+
 ### frozen/non-frozen inheritance
 
 If a non-frozen dataclass inherits from a frozen dataclass, an exception is raised at runtime. We
