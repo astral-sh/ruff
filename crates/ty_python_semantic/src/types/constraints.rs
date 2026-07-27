@@ -927,9 +927,9 @@ struct ConstraintSetStorage<'db> {
     source_order_cache: FxHashMap<SourceOrder, SourceOrderId>,
     constraint_implication_cache: FxHashMap<(ConstraintId, ConstraintId), bool>,
     /// Only caches completed top-level results. Recursive results depend on active path
-    /// assignments and must not use this cache. Source order is part of the key because the same
-    /// TDD node can be traversed with different sidecar orderings, which changes sequent discovery.
-    never_satisfied_cache: FxHashMap<(NodeId, Option<SourceOrderId>), bool>,
+    /// assignments and must not use this cache. A BDD's satisfiability does not depend on the
+    /// source order used to traverse it.
+    never_satisfied_cache: FxHashMap<NodeId, bool>,
 
     negate_cache: FxHashMap<NodeId, NodeId>,
     or_cache: FxHashMap<(NodeId, NodeId), NodeId>,
@@ -2542,8 +2542,7 @@ impl NodeId {
             Node::AlwaysTrue => false,
             Node::AlwaysFalse => true,
             Node::Interior(interior) => {
-                let key = (self, source_order);
-                if let Some(result) = builder.storage.borrow().never_satisfied_cache.get(&key) {
+                if let Some(result) = builder.storage.borrow().never_satisfied_cache.get(&self) {
                     return *result;
                 }
 
@@ -2555,7 +2554,7 @@ impl NodeId {
                     .storage
                     .borrow_mut()
                     .never_satisfied_cache
-                    .insert(key, result);
+                    .insert(self, result);
                 result
             }
         }
@@ -7966,16 +7965,9 @@ mod tests {
 
         {
             let storage = builder.storage.borrow();
+            assert_eq!(storage.never_satisfied_cache.get(&t_int.node), Some(&false));
             assert_eq!(
-                storage
-                    .never_satisfied_cache
-                    .get(&(t_int.node, t_int.source_order)),
-                Some(&false)
-            );
-            assert_eq!(
-                storage
-                    .never_satisfied_cache
-                    .get(&(impossible.node, impossible.source_order)),
+                storage.never_satisfied_cache.get(&impossible.node),
                 Some(&true)
             );
             assert_eq!(storage.never_satisfied_cache.len(), 2);
@@ -7990,10 +7982,29 @@ mod tests {
                     .storage
                     .borrow()
                     .never_satisfied_cache
-                    .get(&(set.node, set.source_order)),
+                    .get(&set.node),
                 Some(&false)
             );
         });
+    }
+
+    #[test]
+    fn never_satisfied_cache_is_shared_across_source_orders() {
+        let db = setup_db();
+        let t = create_typevar(&db, "T");
+        let u = create_typevar(&db, "U");
+        let builder = ConstraintSetBuilder::new();
+        let t_int = create_constraint(&db, &builder, t, KnownClass::Int);
+        let u_str = create_constraint(&db, &builder, u, KnownClass::Str);
+
+        let first = t_int.and(&db, &builder, || u_str);
+        let second = u_str.and(&db, &builder, || t_int);
+
+        assert_eq!(first.node, second.node);
+        assert_ne!(first.source_order, second.source_order);
+        assert!(!first.is_never_satisfied(&db));
+        assert!(!second.is_never_satisfied(&db));
+        assert_eq!(builder.storage.borrow().never_satisfied_cache.len(), 1);
     }
 
     #[derive(Clone, Copy)]
