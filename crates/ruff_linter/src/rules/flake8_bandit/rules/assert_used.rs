@@ -18,11 +18,8 @@ use crate::checkers::ast::Checker;
 ///
 /// Consider raising a meaningful error instead of using `assert`.
 ///
-/// ## Type narrowing
-///
-/// Assertions in `TYPE_CHECKING` blocks are exempt from this rule, assuming
-/// they exist to satisfy a type checker. If the assertion is needed at
-/// runtime, suppress it at the call site with `# noqa: S101`.
+/// The rule exempts assertions within a `TYPE_CHECKING` block, assuming these are needed to satisfy
+/// a type checker.
 ///
 /// ## Example
 /// ```python
