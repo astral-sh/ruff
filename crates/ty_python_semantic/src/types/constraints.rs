@@ -1899,19 +1899,6 @@ impl<'db> Constraint<'db> {
         keeps_lower || keeps_upper
     }
 
-    /// Returns a new range constraint.
-    ///
-    /// Panics if `lower` and `upper` are not both fully static.
-    fn new_node(
-        db: &'db dyn Db,
-        builder: &ConstraintSetBuilder<'db>,
-        typevar: BoundTypeVarInstance<'db>,
-        lower: Type<'db>,
-        upper: Type<'db>,
-    ) -> (NodeId, Option<SourceOrderId>) {
-        Self::new_node_with_bounds(db, builder, typevar, Some(lower), Some(upper))
-    }
-
     /// Returns a new range constraint, preserving whether each bound was present explicitly.
     ///
     /// Panics if present `lower` and `upper` bounds are not fully static.
@@ -2832,10 +2819,10 @@ impl NodeId {
         (node, constraint_source_order)
     }
 
-    fn satisfied_by_all_typevars<'db>(
+    fn satisfied_by_all_typevars<'db, 'c>(
         self,
         db: &'db dyn Db,
-        builder: &ConstraintSetBuilder<'db>,
+        builder: &'c ConstraintSetBuilder<'db>,
         inferable: TypeVarSet<'db>,
         source_order: Option<SourceOrderId>,
     ) -> bool {
@@ -2851,22 +2838,29 @@ impl NodeId {
             typevars.insert(constraint.typevar);
         });
 
+        // Specializations can introduce constraints that do not appear in the original BDD.
+        // Compose full constraint sets so those constraints retain their source orders when the
+        // resulting BDD is traversed.
+        let original = ConstraintSet::from_node(builder, self, source_order);
+
         // Returns if some specialization satisfies this constraint set.
-        let some_specialization_satisfies = move |specializations: NodeId| {
-            let when_satisfied = specializations
-                .implies(builder, self)
-                .and(builder, specializations);
-            !when_satisfied.is_never_satisfied(db, builder, source_order)
+        let some_specialization_satisfies = move |specializations: ConstraintSet<'db, 'c>| {
+            let when_satisfied =
+                specializations
+                    .implies(db, builder, || original)
+                    .and(db, builder, || specializations);
+            !when_satisfied.is_never_satisfied(db)
         };
 
         // Returns if all specializations satisfy this constraint set.
-        let all_specializations_satisfy = move |specializations: NodeId| {
-            let when_satisfied = specializations
-                .implies(builder, self)
-                .and(builder, specializations);
+        let all_specializations_satisfy = move |specializations: ConstraintSet<'db, 'c>| {
+            let when_satisfied =
+                specializations
+                    .implies(db, builder, || original)
+                    .and(db, builder, || specializations);
             when_satisfied
-                .iff(builder, specializations)
-                .is_always_satisfied(db, builder, source_order)
+                .iff(db, builder, specializations)
+                .is_always_satisfied(db)
         };
 
         #[expect(
@@ -4509,13 +4503,12 @@ impl InteriorNode {
         // `PathAssignments` seeds its insertion-ordered discovered-constraint map from this list,
         // and uses that order when constructing non-commutative sequent pairs. Do not replace this
         // with TDD traversal order: doing so can change inference and lose gradual constraints.
-        // Keep synthetic constraints absent from the sidecar after the rest, using their stable
-        // creation order rather than the perturbed TDD traversal order.
+        // Every constraint in the TDD must appear in the sidecar. If an operation introduces new
+        // constraints, it must preserve their source orders rather than invent an order here.
         constraints.sort_by_key(|constraint| {
-            (
-                source_orders.get_index_of(constraint).unwrap_or(usize::MAX),
-                constraint.index(),
-            )
+            source_orders
+                .get_index_of(constraint)
+                .expect("every BDD constraint should have a source-order entry")
         });
         PathAssignments::new(constraints)
     }
@@ -7414,10 +7407,14 @@ impl<'db> BoundTypeVarInstance<'db> {
     /// Returns the valid specializations of a typevar. This is used when checking a constraint set
     /// when this typevar is in inferable position, where we only need _some_ specialization to
     /// satisfy the constraint set.
-    fn valid_specializations(self, db: &'db dyn Db, builder: &ConstraintSetBuilder<'db>) -> NodeId {
+    fn valid_specializations<'c>(
+        self,
+        db: &'db dyn Db,
+        builder: &'c ConstraintSetBuilder<'db>,
+    ) -> ConstraintSet<'db, 'c> {
         if self.paramspec_attr(db).is_some() {
             // P.args and P.kwargs are variadic, and do not have an upper bound or constraints.
-            return ALWAYS_TRUE;
+            return ConstraintSet::always(builder);
         }
 
         // For gradual upper bounds and constraints, we are free to choose any materialization that
@@ -7431,21 +7428,24 @@ impl<'db> BoundTypeVarInstance<'db> {
         // that _some_ valid specialization satisfies the constraint set, it's correct for us to
         // return the range of valid materializations that we can choose from.
         match self.typevar(db).bound_or_constraints(db) {
-            None => ALWAYS_TRUE,
+            None => ConstraintSet::always(builder),
             Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
                 let bound = bound.top_materialization(db);
-                let (node, _) =
-                    Constraint::new_node_with_bounds(db, builder, self, None, Some(bound));
-                node
+                ConstraintSet::constrain_typevar_upper_bound(db, builder, self, bound)
             }
             Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
-                let mut specializations = ALWAYS_FALSE;
+                let mut specializations = ConstraintSet::never(builder);
                 for constraint in constraints.elements(db) {
                     let constraint_lower = constraint.bottom_materialization(db);
                     let constraint_upper = constraint.top_materialization(db);
-                    let (constraint_node, _) =
-                        Constraint::new_node(db, builder, self, constraint_lower, constraint_upper);
-                    specializations = specializations.or(builder, constraint_node);
+                    let constraint = ConstraintSet::constrain_typevar(
+                        db,
+                        builder,
+                        self,
+                        constraint_lower,
+                        constraint_upper,
+                    );
+                    specializations.union(db, builder, constraint);
                 }
                 specializations
             }
@@ -7465,34 +7465,40 @@ impl<'db> BoundTypeVarInstance<'db> {
     /// specifies the required specializations, and the iterator will be empty. For a constrained
     /// typevar, the primary result will include the fully static constraints, and the iterator
     /// will include an entry for each non-fully-static constraint.
-    fn required_specializations(
+    fn required_specializations<'c>(
         self,
         db: &'db dyn Db,
-        builder: &ConstraintSetBuilder<'db>,
-    ) -> (NodeId, Vec<NodeId>) {
+        builder: &'c ConstraintSetBuilder<'db>,
+    ) -> (ConstraintSet<'db, 'c>, Vec<ConstraintSet<'db, 'c>>) {
         // For upper bounds and constraints, we are free to choose any materialization that makes
         // the check succeed. In non-inferable positions, it is most helpful to choose a
         // materialization that is as restrictive as possible, since that minimizes the number of
         // valid specializations that must satisfy the check. We therefore take the bottom
         // materialization of the bound or constraints.
         match self.typevar(db).bound_or_constraints(db) {
-            None => (ALWAYS_TRUE, Vec::new()),
+            None => (ConstraintSet::always(builder), Vec::new()),
             Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
                 let bound = bound.bottom_materialization(db);
-                let (node, _) =
-                    Constraint::new_node_with_bounds(db, builder, self, None, Some(bound));
-                (node, Vec::new())
+                (
+                    ConstraintSet::constrain_typevar_upper_bound(db, builder, self, bound),
+                    Vec::new(),
+                )
             }
             Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
-                let mut non_gradual_constraints = ALWAYS_FALSE;
+                let mut non_gradual_constraints = ConstraintSet::never(builder);
                 let mut gradual_constraints = Vec::new();
                 for constraint in constraints.elements(db) {
                     let constraint_lower = constraint.bottom_materialization(db);
                     let constraint_upper = constraint.top_materialization(db);
-                    let (constraint, _) =
-                        Constraint::new_node(db, builder, self, constraint_lower, constraint_upper);
+                    let constraint = ConstraintSet::constrain_typevar(
+                        db,
+                        builder,
+                        self,
+                        constraint_lower,
+                        constraint_upper,
+                    );
                     if constraint_lower == constraint_upper {
-                        non_gradual_constraints = non_gradual_constraints.or(builder, constraint);
+                        non_gradual_constraints.union(db, builder, constraint);
                     } else {
                         gradual_constraints.push(constraint);
                     }
@@ -8574,7 +8580,11 @@ mod tests {
     }
 
     impl ReconstructPathFold {
-        fn result(&self, at: PathFoldBreak, result: NodeId) -> ControlFlow<PathFoldBreak, NodeId> {
+        fn result(
+            &self,
+            at: PathFoldBreak,
+            result: (NodeId, Option<SourceOrderId>),
+        ) -> ControlFlow<PathFoldBreak, (NodeId, Option<SourceOrderId>)> {
             if self.break_at == Some(at) {
                 ControlFlow::Break(at)
             } else {
@@ -8584,7 +8594,7 @@ mod tests {
     }
 
     impl PathFold for ReconstructPathFold {
-        type Result = NodeId;
+        type Result = (NodeId, Option<SourceOrderId>);
         type Break = PathFoldBreak;
 
         fn satisfied<'db>(
@@ -8593,13 +8603,18 @@ mod tests {
             builder: &ConstraintSetBuilder<'db>,
             path: &PathAssignments,
         ) -> ControlFlow<Self::Break, Self::Result> {
-            let result = path
-                .assignments
-                .iter()
-                .fold(ALWAYS_TRUE, |result, (assignment, _)| {
-                    let (assignment, _) = Node::new_satisfied_constraint(builder, *assignment);
-                    result.and(builder, assignment)
-                });
+            let result =
+                path.assignments
+                    .iter()
+                    .fold((ALWAYS_TRUE, None), |result, (assignment, _)| {
+                        let (node, source_order) = result;
+                        let (assignment, assignment_source_order) =
+                            Node::new_satisfied_constraint(builder, *assignment);
+                        (
+                            node.and(builder, assignment),
+                            builder.ordered_source_order(source_order, assignment_source_order),
+                        )
+                    });
             self.result(PathFoldBreak::Satisfied, result)
         }
 
@@ -8609,7 +8624,7 @@ mod tests {
             _builder: &ConstraintSetBuilder<'db>,
             _path: &PathAssignments,
         ) -> ControlFlow<Self::Break, Self::Result> {
-            self.result(PathFoldBreak::Unsatisfied, ALWAYS_FALSE)
+            self.result(PathFoldBreak::Unsatisfied, (ALWAYS_FALSE, None))
         }
 
         fn impossible<'db>(
@@ -8618,7 +8633,7 @@ mod tests {
             _builder: &ConstraintSetBuilder<'db>,
             _path: &PathAssignments,
         ) -> ControlFlow<Self::Break, Self::Result> {
-            self.result(PathFoldBreak::Impossible, ALWAYS_FALSE)
+            self.result(PathFoldBreak::Impossible, (ALWAYS_FALSE, None))
         }
 
         fn combine<'db>(
@@ -8629,8 +8644,14 @@ mod tests {
             if_uncertain: Self::Result,
             if_false: Self::Result,
         ) -> ControlFlow<Self::Break, Self::Result> {
-            let result = if_true.or(builder, if_uncertain).or(builder, if_false);
-            self.result(PathFoldBreak::Combine, result)
+            let (if_true, if_true_source_order) = if_true;
+            let (if_uncertain, if_uncertain_source_order) = if_uncertain;
+            let (if_false, if_false_source_order) = if_false;
+            let node = if_true.or(builder, if_uncertain).or(builder, if_false);
+            let source_order =
+                builder.ordered_source_order(if_true_source_order, if_uncertain_source_order);
+            let source_order = builder.ordered_source_order(source_order, if_false_source_order);
+            self.result(PathFoldBreak::Combine, (node, source_order))
         }
     }
 
@@ -8711,12 +8732,13 @@ mod tests {
         ] {
             let mut path = path_assignments_for(&builder, set.node, set.source_order);
             let mut fold = ReconstructPathFold { break_at: None };
-            let ControlFlow::Continue(reconstructed) =
+            let ControlFlow::Continue((reconstructed, reconstructed_source_order)) =
                 path.visit(&db, &builder, set.node, &mut fold)
             else {
                 panic!("reconstruction unexpectedly aborted");
             };
-            let reconstructed = ConstraintSet::from_node(&builder, reconstructed, set.source_order);
+            let reconstructed =
+                ConstraintSet::from_node(&builder, reconstructed, reconstructed_source_order);
             assert!(
                 set.iff(&db, &builder, reconstructed)
                     .is_always_satisfied(&db)
@@ -8753,12 +8775,13 @@ mod tests {
             );
 
             let mut completing_fold = ReconstructPathFold { break_at: None };
-            let ControlFlow::Continue(reconstructed) =
+            let ControlFlow::Continue((reconstructed, reconstructed_source_order)) =
                 path.visit(&db, &builder, set.node, &mut completing_fold)
             else {
                 panic!("reconstruction unexpectedly aborted after {break_at:?}");
             };
-            let reconstructed = ConstraintSet::from_node(&builder, reconstructed, set.source_order);
+            let reconstructed =
+                ConstraintSet::from_node(&builder, reconstructed, reconstructed_source_order);
             assert!(
                 set.iff(&db, &builder, reconstructed)
                     .is_always_satisfied(&db)
