@@ -82,8 +82,10 @@ pub(crate) use self::constructor::ConstructorCallableKind;
 
 /// Overrides the lint and headline message for a call diagnostic emitted from an implicit call.
 ///
-/// The original call-error message is retained on the primary annotation, while `info` explains
-/// why the call happened. `argument_ranges` maps synthetic call arguments back to source ranges.
+/// The original call-error message is retained on the primary annotation if the call reporter
+/// does not supply its own annotation message, or as an info sub-diagnostic otherwise. `info`
+/// explains why the call happened. `argument_ranges` maps synthetic call arguments back to source
+/// ranges.
 pub(crate) struct CallDiagnosticOverride<'a> {
     pub(crate) lint: &'static LintMetadata,
     pub(crate) message: String,

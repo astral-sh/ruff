@@ -2997,6 +2997,7 @@ error[invalid-assignment]: Cannot assign object of type `tuple[Literal[1], Liter
 5 | c.x = (1, b"")  # snapshot: invalid-assignment
   |       ^^^^^^^^ Expected `tuple[int, str]`, found `tuple[Literal[1], Literal[b""]]`
   |
+info: Argument to bound method `C.__setattr__` is incorrect
 info: This assignment implicitly calls a custom `__setattr__` method
 info: the second tuple element is not compatible: `Literal[b""]` is not assignable to `str`
 info: Method defined here
@@ -3080,6 +3081,7 @@ error[invalid-assignment]: Cannot assign object of type `Literal["May"]` to attr
 13 | date.month = "May"  # snapshot: invalid-assignment
    |              ^^^^^ Expected `int`, found `Literal["May"]`
    |
+info: Argument to bound method `Date.__setattr__` is incorrect
 info: This assignment implicitly calls a custom `__setattr__` method
 info: Method defined here
  --> src/mdtest_snippet.py:5:9
@@ -3095,6 +3097,7 @@ error[invalid-assignment]: Cannot assign object of type `Literal["UTC"]` to attr
 16 | date.tz = "UTC"
    | ^^^^^^^ Expected `Literal["day", "month", "year"]`, found `Literal["tz"]`
    |
+info: Argument to bound method `Date.__setattr__` is incorrect
 info: This assignment implicitly calls a custom `__setattr__` method
 info: Method defined here
  --> src/mdtest_snippet.py:5:9
@@ -3110,6 +3113,7 @@ error[invalid-assignment]: Cannot assign object of type `Literal["UTC"]` to attr
 16 | date.tz = "UTC"
    |           ^^^^^ Expected `int`, found `Literal["UTC"]`
    |
+info: Argument to bound method `Date.__setattr__` is incorrect
 info: This assignment implicitly calls a custom `__setattr__` method
 info: Method defined here
  --> src/mdtest_snippet.py:5:9
