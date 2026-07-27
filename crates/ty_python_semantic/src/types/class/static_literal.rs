@@ -1436,8 +1436,9 @@ impl<'db> StaticClassLiteral<'db> {
                 };
                 let mut field_ty = field.declared_ty;
 
-                if name == "__init__" && !init {
-                    // Skip fields with `init=False`
+                if !init && (name == "__init__" || field_policy.is_pydantic()) {
+                    // Fields with `init=False` are excluded from constructors. Pydantic's private
+                    // and internal fields are also excluded from replacement.
                     continue;
                 }
 
@@ -1575,6 +1576,9 @@ impl<'db> StaticClassLiteral<'db> {
                         }
                         (false, false) => {}
                     }
+                } else if name == "__replace__" && field_policy.is_pydantic() {
+                    // Pydantic updates model fields by name rather than by initialization alias.
+                    add_parameter_with_name(field_name.clone(), default_ty);
                 } else {
                     // Use the alias name if provided, otherwise use the field name.
                     let parameter_name =
@@ -1778,9 +1782,10 @@ impl<'db> StaticClassLiteral<'db> {
                         )
                     })
             }
-            (CodeGeneratorKind::DataclassLike(_), "__replace__")
-                if Program::get(db).python_version(db) >= PythonVersion::PY313 =>
-            {
+            (
+                CodeGeneratorKind::DataclassLike(_) | CodeGeneratorKind::Pydantic(_),
+                "__replace__",
+            ) if Program::get(db).python_version(db) >= PythonVersion::PY313 => {
                 let self_parameter = Parameter::positional_or_keyword(Name::new_static("self"))
                     .with_annotated_type(instance_ty);
 
