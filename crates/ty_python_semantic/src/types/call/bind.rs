@@ -5232,51 +5232,6 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         )
     }
 
-    /// Yields only argument relations containing an inferable type variable on either side.
-    fn inference_argument_relations(&self) -> impl Iterator<Item = ArgumentRelation<'db>> + '_ {
-        self.argument_relations().filter(|relation| {
-            inferable_typevar_occurrences(self.db, relation.declared_type, self.inferable_typevars)
-                > 0
-                || inferable_typevar_occurrences(
-                    self.db,
-                    relation.argument_type,
-                    self.inferable_typevars,
-                ) > 0
-        })
-    }
-
-    /// Returns `true` if every argument relation that contributes to specialization inference is
-    /// fully static.
-    ///
-    /// Constraint-set assignability for gradual types is existential over materializations. Until
-    /// path solutions retain that provenance, only static relations can safely contribute
-    /// intersected return types.
-    ///
-    /// TODO: Replace this call-wide check with path-level gradual-evidence tracking.
-    fn argument_relations_are_fully_static(&self) -> bool {
-        self.inference_argument_relations().all(|relation| {
-            relation.argument_type.bottom_materialization(self.db)
-                == relation.argument_type.top_materialization(self.db)
-                && !relation.declared_type.has_dynamic(self.db)
-        })
-    }
-
-    /// Returns `true` if `specialization` independently validates every argument relation that
-    /// contributes to specialization inference.
-    fn specialization_validates_arguments(&self, specialization: Specialization<'db>) -> bool {
-        self.inference_argument_relations().all(|relation| {
-            relation
-                .argument_type
-                .apply_specialization(self.db, specialization)
-                .is_subtype_of(
-                    self.db,
-                    relation
-                        .declared_type
-                        .apply_specialization(self.db, specialization),
-                )
-        })
-    }
-
     /// Infers a specialization for this callable and updates its return type.
     ///
     /// When `allow_path_return_inference` is true, independently valid specialization paths may
@@ -5538,7 +5493,31 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                     return Some((*inference, return_ty));
                 }
 
-                if !self.argument_relations_are_fully_static() {
+                let inference_argument_relations: SmallVec<[ArgumentRelation<'db>; 4]> = self
+                    .argument_relations()
+                    .filter(|relation| {
+                        inferable_typevar_occurrences(
+                            self.db,
+                            relation.declared_type,
+                            self.inferable_typevars,
+                        ) > 0
+                            || inferable_typevar_occurrences(
+                                self.db,
+                                relation.argument_type,
+                                self.inferable_typevars,
+                            ) > 0
+                    })
+                    .collect();
+
+                // Gradual assignability is existential over materializations. Until solutions
+                // retain gradual evidence per path, only static argument relations can safely
+                // contribute intersected return types.
+                // TODO: Replace this call-wide check with path-level gradual-evidence tracking.
+                if inference_argument_relations.iter().any(|relation| {
+                    relation.argument_type.bottom_materialization(self.db)
+                        != relation.argument_type.top_materialization(self.db)
+                        || relation.declared_type.has_dynamic(self.db)
+                }) {
                     return None;
                 }
 
@@ -5560,7 +5539,17 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                     }
 
                     if inference.is_fully_static(self.db)
-                        && self.specialization_validates_arguments(specialization)
+                        && inference_argument_relations.iter().all(|relation| {
+                            relation
+                                .argument_type
+                                .apply_specialization(self.db, specialization)
+                                .is_subtype_of(
+                                    self.db,
+                                    relation
+                                        .declared_type
+                                        .apply_specialization(self.db, specialization),
+                                )
+                        })
                     {
                         returns.push((inference, return_ty));
                     }
