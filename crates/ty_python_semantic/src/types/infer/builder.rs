@@ -48,7 +48,9 @@ use crate::types::call::bind::{
 };
 use crate::types::call::{Binding, Bindings, CallArguments, CallError, CallErrorKind};
 use crate::types::callable::{CallableFunctionProvenance, CallableTypeKind};
-use crate::types::class::{ClassLiteral, CodeGeneratorKind, MethodDecorator};
+use crate::types::class::{
+    ClassLiteral, CodeGeneratorKind, FrozenDataclassDispatch, MethodDecorator,
+};
 use crate::types::constraints::{ConstraintSetBuilder, PathBounds, Solutions};
 use crate::types::context::InferContext;
 use crate::types::dedicated::pydantic;
@@ -2939,15 +2941,66 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             | Type::TypeForm(_)
             | Type::TypedDict(_)
             | Type::NewTypeInstance(_) => {
-                let delattr_dunder_call_result = object_ty.try_call_dunder_with_policy(
-                    db,
-                    "__delattr__",
-                    &mut CallArguments::positional([Type::string_literal(db, attribute)]),
-                    TypeContext::default(),
-                    MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
-                );
+                let frozen_dataclass_dispatch = object_ty
+                    .nominal_class(db)
+                    .and_then(|class| class.static_class_literal(db))
+                    .and_then(|(class, specialization)| {
+                        class.inherited_frozen_dataclass_dispatch(
+                            db,
+                            specialization,
+                            "__delattr__",
+                            attribute,
+                        )
+                    });
 
-                let returns_never = match &delattr_dunder_call_result {
+                let delattr_receiver = frozen_dataclass_dispatch
+                    .map_or(object_ty, |dispatch| dispatch.receiver(db, object_ty));
+
+                let mut delattr_arguments =
+                    CallArguments::positional([Type::string_literal(db, attribute)]);
+                let delattr_dunder_call_result = if matches!(delattr_receiver, Type::BoundSuper(_))
+                {
+                    match delattr_receiver
+                        .member_lookup_with_policy(
+                            db,
+                            "__delattr__",
+                            MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
+                        )
+                        .place
+                    {
+                        Place::Defined(DefinedPlace {
+                            ty: delattr,
+                            definedness,
+                            provenance,
+                            ..
+                        }) => match delattr.try_call(db, &delattr_arguments) {
+                            Ok(bindings) if definedness == Definedness::PossiblyUndefined => {
+                                Err(CallDunderError::PossiblyUnbound {
+                                    bindings: Box::new(bindings),
+                                    unbound_on: None,
+                                })
+                            }
+                            Ok(bindings) => Ok(bindings),
+                            Err(CallError(kind, bindings)) => {
+                                Err(CallDunderError::CallError(kind, bindings, provenance))
+                            }
+                        },
+                        Place::Undefined => Err(CallDunderError::MethodNotAvailable),
+                    }
+                } else {
+                    delattr_receiver.try_call_dunder_with_policy(
+                        db,
+                        "__delattr__",
+                        &mut delattr_arguments,
+                        TypeContext::default(),
+                        MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
+                    )
+                };
+
+                let returns_never = matches!(
+                    frozen_dataclass_dispatch,
+                    Some(FrozenDataclassDispatch::FrozenField)
+                ) || match &delattr_dunder_call_result {
                     Ok(result) => result.return_type(db).is_never(),
                     Err(err) => err.return_type(db).is_some_and(|ty| ty.is_never()),
                 };

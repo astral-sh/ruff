@@ -1066,6 +1066,107 @@ frozen = MyFrozenChildClass()
 del frozen.x  # error: [invalid-assignment]
 ```
 
+Non-field deletions on a frozen dataclass subclass still use the normal property and inherited
+`__delattr__` checks:
+
+```py
+from dataclasses import dataclass
+from typing import NoReturn
+
+@dataclass(frozen=True)
+class Frozen:
+    x: int = 1
+
+reveal_type(Frozen().__delattr__)  # revealed: (name) -> Never
+
+class ChildWithReadOnlyProperty(Frozen):
+    @property
+    def y(self) -> int:
+        return 1
+
+class ChildWithRejectingProperty(Frozen):
+    @property
+    def y(self) -> int:
+        return 1
+
+    @y.deleter
+    def y(self) -> NoReturn:
+        raise AttributeError("y")
+
+class RejectLater:
+    y: int = 1
+
+    def __delattr__(self, name: str) -> NoReturn:
+        raise AttributeError(name)
+
+class AllowLater:
+    @property
+    def y(self) -> int:
+        return 1
+
+    def __delattr__(self, name: str) -> None: ...
+
+class ChildWithLaterRejectingDelAttr(Frozen, RejectLater): ...
+class ChildWithLaterPermissiveDelAttr(Frozen, AllowLater): ...
+
+class ChildWithDeletableAttribute(Frozen):
+    y: int = 1
+
+class ChildWithOverriddenDelAttr(Frozen):
+    # error: [invalid-method-override]
+    def __delattr__(self, name: str) -> None: ...
+
+class GrandchildWithOverriddenDelAttr(ChildWithOverriddenDelAttr): ...
+
+# error: [invalid-assignment] "Cannot delete read-only property `y` on object of type `ChildWithReadOnlyProperty`"
+del ChildWithReadOnlyProperty().y
+
+# error: [invalid-assignment] "Cannot delete attribute `y` on type `ChildWithRejectingProperty` whose `__delete__` method returns `Never`/`NoReturn`"
+del ChildWithRejectingProperty().y
+
+# revealed: bound method ChildWithLaterRejectingDelAttr.__delattr__(name: str) -> Never
+reveal_type(super(Frozen, ChildWithLaterRejectingDelAttr()).__delattr__)
+
+# error: [invalid-assignment] "Cannot delete attribute `y` on type `ChildWithLaterRejectingDelAttr` whose `__delattr__` method returns `Never`/`NoReturn`"
+del ChildWithLaterRejectingDelAttr().y
+
+del ChildWithLaterPermissiveDelAttr().y
+
+deletable = ChildWithDeletableAttribute()
+deletable.y = 2
+del deletable.y
+del ChildWithOverriddenDelAttr().x
+del GrandchildWithOverriddenDelAttr().x
+```
+
+Independent frozen dataclasses protect fields from every generated method reachable in the MRO:
+
+```py
+from dataclasses import dataclass
+
+@dataclass(frozen=True)
+class A:
+    a: int = 1
+
+@dataclass(frozen=True)
+class B:
+    b: int = 1
+
+class Child(A, B): ...
+
+child = Child()
+# revealed: Overload[(name: Literal["a"]) -> Never, (name: Literal["b"]) -> Never, (name: str) -> None]
+reveal_type(child.__delattr__)
+# revealed: Overload[(name: Literal["a"], value) -> Never, (name: Literal["b"], value) -> Never, (name: str, value) -> None]
+reveal_type(child.__setattr__)
+
+del child.a  # error: [invalid-assignment]
+del child.b  # error: [invalid-assignment]
+
+child.a = 2  # error: [invalid-assignment]
+child.b = 2  # error: [invalid-assignment]
+```
+
 ### frozen/non-frozen inheritance
 
 If a non-frozen dataclass inherits from a frozen dataclass, an exception is raised at runtime. We

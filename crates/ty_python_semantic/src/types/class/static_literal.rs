@@ -1883,6 +1883,20 @@ impl<'db> StaticClassLiteral<'db> {
                 }
                 None
             }
+            (CodeGeneratorKind::DataclassLike(_), "__delattr__")
+                if self.is_frozen_dataclass(db) == Some(true) =>
+            {
+                let signature = Signature::new(
+                    Parameters::standard([
+                        Parameter::positional_or_keyword(Name::new_static("self"))
+                            .with_annotated_type(instance_ty),
+                        Parameter::positional_or_keyword(Name::new_static("name")),
+                    ]),
+                    Type::Never,
+                );
+
+                Some(Type::function_like_callable(db, signature))
+            }
             (field_policy @ CodeGeneratorKind::DataclassLike(_), "__slots__")
                 if Program::get(db).python_version(db) >= PythonVersion::PY310 =>
             {
