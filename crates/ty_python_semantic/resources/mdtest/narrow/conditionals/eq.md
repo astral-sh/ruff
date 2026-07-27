@@ -170,6 +170,31 @@ def compare_non_overlapping_literal_unions(
     reveal_type(left == right)  # revealed: Literal[False]
 ```
 
+Adding `None` to either side must not change which enum values can match:
+
+```py
+def compare_optional_left(left: Choice | None, right: Choice):
+    if left == right:
+        reveal_type(left)  # revealed: Choice
+    else:
+        reveal_type(left)  # revealed: Choice | None
+
+def compare_optional_right(left: Choice, right: Choice | None):
+    if left == right:
+        reveal_type(right)  # revealed: Choice
+```
+
+With ty's default builtin-equality assumptions, neither an integer nor `None` matches a
+string-valued enum member:
+
+```py
+def compare_enum_with_integer(left: Choice | int | None, right: Choice):
+    if left == right:
+        reveal_type(left)  # revealed: Choice
+    else:
+        reveal_type(left)  # revealed: Choice | int | None
+```
+
 Members with the same known value are aliases, even when one value comes from a function call.
 Comparisons between their canonical members are always true:
 
@@ -402,7 +427,8 @@ member. Exact member comparisons are true or false when both values are known:
 
 ```py
 from enum import StrEnum
-from typing import Literal
+from typing import Any, Literal
+from typing_extensions import assert_type
 
 class Left(StrEnum):
     A = "a"
@@ -448,12 +474,117 @@ def compare_subsets(
         reveal_type(right)  # revealed: Literal[Right.SHARED]
 ```
 
+When only one side can be `None`, equality still narrows both enums to their shared value:
+
+```py
+def compare_optional_cross_enum_left(left: Left | None, right: Right):
+    if left == right:
+        reveal_type(left)  # revealed: Literal[Left.SHARED]
+        reveal_type(right)  # revealed: Literal[Right.SHARED]
+
+def compare_optional_cross_enum_right(left: Left, right: Right | None):
+    if left == right:
+        reveal_type(left)  # revealed: Literal[Left.SHARED]
+        reveal_type(right)  # revealed: Literal[Right.SHARED]
+```
+
+When both sides can be `None`, equality can match `None` or the shared string:
+
+```py
+def compare_both_optional_cross_enums(left: Left | None, right: Right | None):
+    if left == right:
+        reveal_type(left)  # revealed: Literal[Left.SHARED] | None
+        reveal_type(right)  # revealed: Literal[Right.SHARED] | None
+```
+
+Under the same assumptions, an unrelated integer does not change which enum members match, whether
+the condition uses `==` or `!=`:
+
+```py
+def compare_cross_enums_with_integer(left: Left | None, right: Right | int):
+    if left == right:
+        reveal_type(left)  # revealed: Literal[Left.SHARED]
+        reveal_type(right)  # revealed: Literal[Right.SHARED]
+
+    if left != right:
+        reveal_type(left)  # revealed: Left | None
+        reveal_type(right)  # revealed: Right | int
+    else:
+        reveal_type(left)  # revealed: Literal[Left.SHARED]
+        reveal_type(right)  # revealed: Literal[Right.SHARED]
+```
+
+A plain string can also match a member of the other enum. The string and every matching enum member
+must remain possible:
+
+```py
+def compare_left_string_against_enum_members(left: Left | Literal["b"], right: Right):
+    if left == right:
+        reveal_type(left)  # revealed: Literal[Left.SHARED, "b"]
+        reveal_type(right)  # revealed: Literal[Right.SHARED, Right.B]
+
+def compare_right_string_against_enum_members(left: Left, right: Right | Literal["a"]):
+    if left == right:
+        reveal_type(left)  # revealed: Literal[Left.SHARED, Left.A]
+        assert_type(right, Literal[Right.SHARED, "a"])
+```
+
+A `dict[str, Any]` is treated as having dictionary equality, so it cannot match a string-valued enum
+member:
+
+```py
+def compare_cross_enum_with_dictionary(left: Left | dict[str, Any], right: Right | None):
+    if left == right:
+        reveal_type(left)  # revealed: Literal[Left.SHARED]
+        reveal_type(right)  # revealed: Literal[Right.SHARED]
+```
+
+By contrast, `Any` can match any enum member. It must not exclude `None` from the other side:
+
+```py
+def compare_optional_enum_against_any(left: Left | None, right: Right | Any):
+    if left == right:
+        reveal_type(left)  # revealed: Left | None
+        reveal_type(right)  # revealed: Literal[Right.SHARED] | Any
+
+def compare_any_against_optional_enum(left: Left | Any, right: Right | None):
+    if left == right:
+        reveal_type(left)  # revealed: Literal[Left.SHARED] | Any
+        reveal_type(right)  # revealed: Right | None
+```
+
+If the two sides have no matching values, `==` is always false and `!=` is always true. A shared
+`None` makes `==` uncertain:
+
+```py
+def compare_disjoint_cross_enum_alternatives(
+    left: Literal[Left.A] | None,
+    disjoint: Literal[Right.B] | Literal[1],
+    overlapping: Literal[Right.B] | None,
+):
+    reveal_type(left == disjoint)  # revealed: Literal[False]
+    reveal_type(left != disjoint)  # revealed: Literal[True]
+    reveal_type(left == overlapping)  # revealed: bool
+```
+
+When all possible values match, `==` is always true:
+
+```py
+def compare_matching_cross_enum_alternatives(
+    left: Literal[Left.SHARED] | Literal["shared"],
+    right: Literal[Right.SHARED],
+):
+    reveal_type(left == right)  # revealed: Literal[True]
+    reveal_type(left != right)  # revealed: Literal[False]
+```
+
 The same comparison-key projection applies when each operand spans several enum classes. This
 example represents 18 possible values on each side, which would otherwise require 324 pairwise
 comparisons:
 
 ```py
 from enum import IntEnum
+from typing import Literal
 
 class MixedLeft0(IntEnum):
     A = 0
@@ -506,6 +637,29 @@ def compare_mixed_domains(
     if left == right:
         reveal_type(left)  # revealed: MixedLeft0
         reveal_type(right)  # revealed: MixedRight0
+```
+
+Treating `str` as having builtin equality, adding `None` or `str` does not prevent matches between
+integer-valued enum classes:
+
+```py
+def compare_multiple_integer_enums_with_other_values(
+    left: MixedLeft0 | MixedLeft1 | None,
+    right: MixedRight0 | MixedRight1 | str,
+):
+    if left == right:
+        reveal_type(left)  # revealed: MixedLeft0
+        reveal_type(right)  # revealed: MixedRight0
+```
+
+Python considers `False` equal to `0`, so a `False` alternative can match an integer-valued enum
+member even when the other enum has no matching members:
+
+```py
+def compare_false_to_integer_enum(left: MixedLeft1 | Literal[False], right: MixedRight0):
+    if left == right:
+        reveal_type(left)  # revealed: Literal[False]
+        reveal_type(right)  # revealed: Literal[MixedRight0.A]
 ```
 
 An open identity-comparing enum can still be narrowed to all of its declared members. Undeclared
@@ -600,6 +754,23 @@ class OpenLeft(StrEnum):
         raise ValueError
 
 def compare_open(left: OpenLeft, right: CustomRight):
+    if left == right:
+        reveal_type(left)  # revealed: OpenLeft
+```
+
+A custom equality method must still determine the result when the enum is combined with `None`:
+
+```py
+def compare_optional_custom(left: CustomLeft | None, right: CustomRight):
+    if left == right:
+        reveal_type(left)  # revealed: CustomLeft
+```
+
+An enum with `_missing_` may have members that do not appear in its definition. Adding `None` must
+not cause the comparison to assume that its declared member is the only possible match:
+
+```py
+def compare_optional_open(left: OpenLeft | None, right: CustomRight):
     if left == right:
         reveal_type(left)  # revealed: OpenLeft
 ```
@@ -1459,7 +1630,10 @@ def tagged_union_with_unrelated_assignment(value: A | B):
 ```py
 import sys
 from enum import Enum, IntEnum
-from typing import Any, Literal, TypeVar
+from typing import Any, Literal, TypeAlias, TypeVar
+
+from ty_extensions import Unknown
+from typing_extensions import assert_never, assert_type
 
 T = TypeVar("T", bound=object)
 U = TypeVar("U")
@@ -1469,6 +1643,9 @@ RUNTIME_TYPE_VAR = TypeVar("RUNTIME_TYPE_VAR")
 class Color(Enum):
     RED = 1
     BLUE = 2
+
+class OtherColor(Enum):
+    RED = 1
 
 class NonReflexive(Enum):
     VALUE = 1
@@ -1558,6 +1735,147 @@ def _(x: Any):
         pass
     else:
         reveal_type(x)  # revealed: Any & ~TypeVar
+```
+
+`Any` must stay `Any` when compared with an enum, on either side of the comparison:
+
+```py
+def enum_against_any(value: Color, other: Any):
+    if value != other:
+        reveal_type(other)  # revealed: Any
+
+def any_against_enum(value: Any, other: Color):
+    if value != other:
+        reveal_type(value)  # revealed: Any
+```
+
+`Any` must also stay `Any` when the enum can be `None`:
+
+```py
+def optional_enum_against_any(value: Color | None, other: Any):
+    if value != other:
+        reveal_type(other)  # revealed: Any
+
+def any_against_optional_enum(value: Any, other: Color | None):
+    if value != other:
+        reveal_type(value)  # revealed: Any
+```
+
+`Any` must also stay `Any` when compared with `bool | None`:
+
+```py
+def optional_bool_against_any(value: bool | None, other: Any):
+    if value != other:
+        reveal_type(other)  # revealed: Any
+```
+
+Comparing `Color | Any` with `Color | None` must keep both `Color` and `Any`:
+
+```py
+def gradual_enum_union(value: Color | Any, other: Color | None):
+    if value != other:
+        reveal_type(value)  # revealed: Color | Any
+```
+
+`Color | Any` must stay unchanged when the other value can be an enum member or `None`. This applies
+to `!=` and the false branch of `==`:
+
+```py
+def any_union_against_optional_enum_member(value: Color | Any, other: Literal[Color.RED] | None):
+    if value != other:
+        reveal_type(value)  # revealed: Color | Any
+        assert_type(value, Color | Any)
+
+def any_union_against_optional_enum_member_equality_else(value: Color | Any, other: Literal[Color.RED] | None):
+    if value == other:
+        return
+    reveal_type(value)  # revealed: Color | Any
+```
+
+An alias for `Any` must preserve the same result:
+
+```py
+AnyAlias: TypeAlias = Any
+
+def any_alias_union_against_optional_enum_member(value: Color | AnyAlias, other: Literal[Color.RED] | None):
+    if value != other:
+        reveal_type(value)  # revealed: Color | Any
+```
+
+The same comparisons also preserve `Unknown`:
+
+```py
+def unknown_union_against_optional_enum_member(value: Color | Unknown, other: Literal[Color.RED] | None):
+    if value != other:
+        reveal_type(value)  # revealed: Color | Unknown
+        assert_type(value, Color | Unknown)
+
+def unknown_union_against_optional_enum_member_equality_else(value: Color | Unknown, other: Literal[Color.RED] | None):
+    if value == other:
+        return
+    reveal_type(value)  # revealed: Color | Unknown
+```
+
+When an enum check and a comparison are combined with `and`, either condition can be false. The
+original union must therefore be preserved:
+
+```py
+def any_union_after_enum_check(value: Color | Any, other: Color | Any):
+    if isinstance(value, Color) and value == other:
+        return
+    reveal_type(value)  # revealed: Color | Any
+    assert_type(value, Color | Any)
+
+def unknown_union_after_enum_check(value: Color | Unknown, other: Color | Unknown):
+    if isinstance(value, Color) and value == other:
+        return
+    reveal_type(value)  # revealed: Color | Unknown
+    assert_type(value, Color | Unknown)
+```
+
+The second comparison can fail even when the first one matches, so both possible types must remain:
+
+```py
+def any_union_after_failed_comparisons(value: Color | Any, other: OtherColor | None):
+    if value == Color.RED and value == other:
+        return
+    reveal_type(value)  # revealed: Color | Any
+    assert_type(value, Color | Any)
+
+def unknown_union_after_failed_comparisons(value: Color | Unknown, other: OtherColor | None):
+    if value == Color.RED and value == other:
+        return
+    reveal_type(value)  # revealed: Color | Unknown
+    assert_type(value, Color | Unknown)
+```
+
+These `Enum` classes compare by identity, so their members are not equal even when their underlying
+values match. Comparing with `OtherColor.RED` must therefore exclude every `Color` member:
+
+```py
+def any_comparison_with_other_enum(value: Color | OtherColor | Any):
+    if value == OtherColor.RED:
+        reveal_type(value)  # revealed: OtherColor | (Any & ~Color)
+        if isinstance(value, Color):
+            assert_never(value)
+
+def unknown_comparison_with_other_enum(value: Color | OtherColor | Unknown):
+    if value == OtherColor.RED:
+        reveal_type(value)  # revealed: OtherColor | (Unknown & ~Color)
+        if isinstance(value, Color):
+            assert_never(value)
+```
+
+`Color | Any` must also stay unchanged after either `==` or `!=`:
+
+```py
+def gradual_enum_union_against_enum(value: Color | Any, other: Color):
+    if value == other:
+        reveal_type(value)  # revealed: Color | Any
+
+def gradual_enum_union_inequality(value: Color | Any, other: Color):
+    if value != other:
+        reveal_type(value)  # revealed: Color | Any
 ```
 
 ## Booleans and integers
@@ -1772,17 +2090,22 @@ def _(x: A | B):
 
 ## Enabling strict equality narrowing
 
-The `strict-equality-semantics` option can be enabled to preserve broad builtin types and union
-members that a subclass could compare equal to. Narrowing types that are already literal unions
-remains safe and is unaffected. This also applies to tuples, whose subclasses can override equality.
+Enabling `strict-equality-semantics` accounts for builtin subclasses that override `__eq__` or
+compare equal to a literal without belonging to its `Literal` type. It preserves broad builtin types
+and union alternatives that could compare equal, including tuples. Literal unions and enum members
+are still narrowed when it is safe.
 
 ```toml
+[environment]
+python-version = "3.11"
+
 [analysis]
 strict-equality-semantics = true
 ```
 
 ```py
-from typing import Literal
+from enum import IntEnum, StrEnum
+from typing import Any, Literal
 
 def broad(value: str):
     if value == "a":
@@ -1799,6 +2122,64 @@ def inequality(value: str):
 def literal(value: Literal["a", "b"]):
     if value == "a":
         reveal_type(value)  # revealed: Literal["a"]
+
+class Left(StrEnum):
+    A = "a"
+    SHARED = "shared"
+
+class Right(StrEnum):
+    SHARED = "shared"
+    B = "b"
+
+def compare_enum_with_integer(left: Left | int | None, right: Left):
+    if left == right:
+        reveal_type(left)  # revealed: Left | int
+
+def compare_cross_enums_with_integer(left: Left | None, right: Right | int):
+    if left == right:
+        reveal_type(left)  # revealed: Left | None
+        reveal_type(right)  # revealed: Literal[Right.SHARED] | int
+
+    if left != right:
+        reveal_type(left)  # revealed: Left | None
+        reveal_type(right)  # revealed: Right | int
+    else:
+        reveal_type(left)  # revealed: Left | None
+        reveal_type(right)  # revealed: Literal[Right.SHARED] | int
+
+def compare_cross_enum_with_dictionary(left: Left | dict[str, Any], right: Right | None):
+    if left == right:
+        reveal_type(left)  # revealed: Literal[Left.SHARED] | dict[str, Any]
+        reveal_type(right)  # revealed: Right | None
+
+def compare_both_optional_cross_enums(left: Left | None, right: Right | None):
+    if left == right:
+        reveal_type(left)  # revealed: Literal[Left.SHARED] | None
+        reveal_type(right)  # revealed: Literal[Right.SHARED] | None
+
+class MixedLeft0(IntEnum):
+    ZERO = 0
+    ONE = 1
+
+class MixedLeft1(IntEnum):
+    TWO = 2
+    THREE = 3
+
+class MixedRight0(IntEnum):
+    ZERO = 0
+    ONE = 1
+
+class MixedRight1(IntEnum):
+    FOUR = 4
+    FIVE = 5
+
+def compare_multiple_integer_enums_with_other_values(
+    left: MixedLeft0 | MixedLeft1 | None,
+    right: MixedRight0 | MixedRight1 | str,
+):
+    if left == right:
+        reveal_type(left)  # revealed: MixedLeft0 | MixedLeft1 | None
+        reveal_type(right)  # revealed: MixedRight0 | str
 
 class Foo: ...
 

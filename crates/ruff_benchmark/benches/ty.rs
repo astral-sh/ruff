@@ -665,6 +665,44 @@ fn benchmark_narrowed_str_enum_comparison(criterion: &mut Criterion) {
     benchmark_enum_comparison(criterion, "ty_micro[narrowed_str_enum_comparison]", &code);
 }
 
+/// Regression benchmark for <https://github.com/astral-sh/ty/issues/4069>.
+///
+/// Compare a large enum with optional enum fields in a chain of conditions.
+fn benchmark_optional_str_enum_comparison(criterion: &mut Criterion) {
+    const NUM_ENUM_MEMBERS: usize = 256;
+
+    let mut code =
+        "from dataclasses import dataclass\nfrom enum import StrEnum\n\nclass ModelSlug(StrEnum):\n"
+            .to_string();
+    for index in 0..NUM_ENUM_MEMBERS {
+        writeln!(&mut code, "    M{index} = \"m{index}\"").ok();
+    }
+    code.push_str(
+        r#"
+
+@dataclass
+class Category:
+    default_model: ModelSlug | None = None
+    browsing_model: ModelSlug | None = None
+    code_interpreter_model: ModelSlug | None = None
+    plugins_model: ModelSlug | None = None
+    dalle_model: ModelSlug | None = None
+
+
+def belongs(slug: ModelSlug, category: Category) -> bool:
+    return (
+        category.default_model == slug
+        or category.browsing_model == slug
+        or category.code_interpreter_model == slug
+        or category.plugins_model == slug
+        or category.dalle_model == slug
+    )
+"#,
+    );
+
+    benchmark_enum_comparison(criterion, "ty_micro[optional_str_enum_comparison]", &code);
+}
+
 /// Ensure explicit enum-literal unions are compared as value sets, not member pairs.
 fn benchmark_enum_literal_union_comparison(criterion: &mut Criterion) {
     const NUM_ENUM_MEMBERS: usize = 256;
@@ -2031,6 +2069,7 @@ criterion_group!(
     benchmark_large_enum_membership,
     benchmark_many_enum_members,
     benchmark_narrowed_str_enum_comparison,
+    benchmark_optional_str_enum_comparison,
     benchmark_enum_literal_union_comparison,
     benchmark_repeated_str_enum_comparisons,
     benchmark_cross_str_enum_comparison,
