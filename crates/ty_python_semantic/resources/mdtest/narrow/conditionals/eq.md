@@ -184,7 +184,8 @@ def compare_optional_right(left: Choice, right: Choice | None):
         reveal_type(right)  # revealed: Choice
 ```
 
-Neither an integer nor `None` can compare equal to a string-valued enum member:
+With ty's default builtin-equality assumptions, neither an integer nor `None` matches a
+string-valued enum member:
 
 ```py
 def compare_enum_with_integer(left: Choice | int | None, right: Choice):
@@ -496,8 +497,8 @@ def compare_both_optional_cross_enums(left: Left | None, right: Right | None):
         reveal_type(right)  # revealed: Literal[Right.SHARED] | None
 ```
 
-An unrelated integer must not change which enum members match, whether the condition uses `==` or
-`!=`:
+Under the same assumptions, an unrelated integer does not change which enum members match, whether
+the condition uses `==` or `!=`:
 
 ```py
 def compare_cross_enums_with_integer(left: Left | None, right: Right | int):
@@ -528,7 +529,8 @@ def compare_right_string_against_enum_members(left: Left, right: Right | Literal
         assert_type(right, Literal[Right.SHARED, "a"])
 ```
 
-A dictionary containing `Any` is still a dictionary, so it cannot match a string-valued enum member:
+A `dict[str, Any]` is treated as having dictionary equality, so it cannot match a string-valued enum
+member:
 
 ```py
 def compare_cross_enum_with_dictionary(left: Left | dict[str, Any], right: Right | None):
@@ -637,7 +639,8 @@ def compare_mixed_domains(
         reveal_type(right)  # revealed: MixedRight0
 ```
 
-Adding `None` or a string must not prevent matches between members of integer-valued enum classes:
+Treating `str` as having builtin equality, adding `None` or `str` does not prevent matches between
+integer-valued enum classes:
 
 ```py
 def compare_multiple_integer_enums_with_other_values(
@@ -2087,17 +2090,22 @@ def _(x: A | B):
 
 ## Enabling strict equality narrowing
 
-The `strict-equality-semantics` option can be enabled to preserve broad builtin types and union
-members that a subclass could compare equal to. Narrowing types that are already literal unions
-remains safe and is unaffected. This also applies to tuples, whose subclasses can override equality.
+Enabling `strict-equality-semantics` accounts for builtin subclasses that override `__eq__` or
+compare equal to a literal without belonging to its `Literal` type. It preserves broad builtin types
+and union alternatives that could compare equal, including tuples. Literal unions and enum members
+are still narrowed when it is safe.
 
 ```toml
+[environment]
+python-version = "3.11"
+
 [analysis]
 strict-equality-semantics = true
 ```
 
 ```py
-from typing import Literal
+from enum import IntEnum, StrEnum
+from typing import Any, Literal
 
 def broad(value: str):
     if value == "a":
@@ -2114,6 +2122,64 @@ def inequality(value: str):
 def literal(value: Literal["a", "b"]):
     if value == "a":
         reveal_type(value)  # revealed: Literal["a"]
+
+class Left(StrEnum):
+    A = "a"
+    SHARED = "shared"
+
+class Right(StrEnum):
+    SHARED = "shared"
+    B = "b"
+
+def compare_enum_with_integer(left: Left | int | None, right: Left):
+    if left == right:
+        reveal_type(left)  # revealed: Left | int
+
+def compare_cross_enums_with_integer(left: Left | None, right: Right | int):
+    if left == right:
+        reveal_type(left)  # revealed: Left | None
+        reveal_type(right)  # revealed: Literal[Right.SHARED] | int
+
+    if left != right:
+        reveal_type(left)  # revealed: Left | None
+        reveal_type(right)  # revealed: Right | int
+    else:
+        reveal_type(left)  # revealed: Left | None
+        reveal_type(right)  # revealed: Literal[Right.SHARED] | int
+
+def compare_cross_enum_with_dictionary(left: Left | dict[str, Any], right: Right | None):
+    if left == right:
+        reveal_type(left)  # revealed: Literal[Left.SHARED] | dict[str, Any]
+        reveal_type(right)  # revealed: Right | None
+
+def compare_both_optional_cross_enums(left: Left | None, right: Right | None):
+    if left == right:
+        reveal_type(left)  # revealed: Literal[Left.SHARED] | None
+        reveal_type(right)  # revealed: Literal[Right.SHARED] | None
+
+class MixedLeft0(IntEnum):
+    ZERO = 0
+    ONE = 1
+
+class MixedLeft1(IntEnum):
+    TWO = 2
+    THREE = 3
+
+class MixedRight0(IntEnum):
+    ZERO = 0
+    ONE = 1
+
+class MixedRight1(IntEnum):
+    FOUR = 4
+    FIVE = 5
+
+def compare_multiple_integer_enums_with_other_values(
+    left: MixedLeft0 | MixedLeft1 | None,
+    right: MixedRight0 | MixedRight1 | str,
+):
+    if left == right:
+        reveal_type(left)  # revealed: MixedLeft0 | MixedLeft1 | None
+        reveal_type(right)  # revealed: MixedRight0 | str
 
 class Foo: ...
 
