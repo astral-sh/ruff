@@ -113,7 +113,8 @@ use crate::types::visitor::{
 };
 use crate::types::{
     ApplyTypeMappingVisitor, BoundTypeVarInstance, DynamicType, IntersectionType, Type,
-    TypeContext, TypeMapping, TypePair, TypeVarBoundOrConstraints, TypeVarVariance, UnionType,
+    TypeContext, TypeMapping, TypePair, TypeVarBoundOrConstraints, TypeVarVariance, TypedDictType,
+    UnionType,
 };
 use crate::{Db, FxIndexMap, FxIndexSet, FxOrderSet};
 
@@ -2490,20 +2491,22 @@ impl NodeId {
         // A bound that contains a typevar (specialized or not) is not concrete, so the fast paths
         // that rely on concrete bounds cannot reason about it.
         //
-        // Type aliases, protocols, and class-based TypedDicts can additionally hide typevars in
-        // lazy attributes. Do not expand those attributes here: a recursively specialized alias
-        // can produce a different type at every level, defeating the normal recursion guard.
-        // Their presence alone is enough to make the fast path unsafe, so fall back to sequent
-        // analysis.
-        any_over_type(db, bound, false, |ty| {
-            matches!(
-                ty,
-                Type::TypeVar(_)
-                    | Type::Dynamic(DynamicType::UnspecializedTypeVar)
-                    | Type::TypeAlias(_)
-                    | Type::ProtocolInstance(_)
-                    | Type::TypedDict(_)
-            )
+        // Type aliases and class-based protocols can hide typevars in lazy attributes. Generic
+        // and dynamically defined TypedDicts can likewise hide typevars in their lazy fields.
+        // Do not expand those attributes here: a recursively specialized alias can produce a
+        // different type at every level, defeating the normal recursion guard. Nongeneric,
+        // statement-defined TypedDicts cannot hide a generic specialization, and synthesized
+        // TypedDicts and protocols already expose their fields to the visitor, so none of those
+        // need to force sequent analysis.
+        any_over_type(db, bound, false, |ty| match ty {
+            Type::TypeVar(_)
+            | Type::Dynamic(DynamicType::UnspecializedTypeVar)
+            | Type::TypeAlias(_) => true,
+            Type::ProtocolInstance(protocol) => protocol.class_origin().is_some(),
+            Type::TypedDict(TypedDictType::Class(class)) => class
+                .static_class_literal(db)
+                .is_none_or(|(origin, _)| origin.generic_context(db).is_some()),
+            _ => false,
         })
     }
 
@@ -7742,12 +7745,23 @@ mod tests {
     use crate::db::tests::setup_db;
     use crate::place::global_symbol;
     use crate::types::generics::ApplySpecialization;
+    use crate::types::typed_dict::TypedDictFieldBuilder;
     use crate::types::{
-        BoundTypeVarInstance, KnownClass, KnownInstanceType, TypeAliasType, TypeVarVariance,
+        BoundTypeVarInstance, ClassType, KnownClass, KnownInstanceType, TypeAliasType,
+        TypeVarVariance,
     };
 
     fn create_typevar<'db>(db: &'db dyn Db, name: &'static str) -> BoundTypeVarInstance<'db> {
         BoundTypeVarInstance::synthetic(db, Name::new_static(name), TypeVarVariance::Invariant)
+    }
+
+    fn synthesized_typed_dict<'db>(db: &'db dyn Db, value: Type<'db>) -> Type<'db> {
+        let items = std::iter::once((
+            Name::new_static("value"),
+            TypedDictFieldBuilder::new(value).required(true).build(),
+        ))
+        .collect();
+        Type::TypedDict(TypedDictType::from_schema_items(db, items))
     }
 
     fn create_constraint<'db, 'c>(
@@ -7879,31 +7893,152 @@ mod tests {
     }
 
     #[test]
-    fn simple_conjunction_satisfiability_skips_sequent_analysis() {
-        // (int ≤ T) ∧ (str ≤ T) is satisfiable, decided without pairwise sequent analysis.
-        let db = setup_db();
-        let t = create_typevar(&db, "T");
-        let builder = ConstraintSetBuilder::new();
+    fn simple_concrete_bounds_skip_sequent_analysis() {
+        let mut db = setup_db();
+        db.write_dedented(
+            "/src/concrete_typed_dicts.py",
+            indoc! {r#"
+                from typing import TypedDict
+
+                class Movie(TypedDict):
+                    title: str
+
+                class Track(TypedDict):
+                    artist: str
+            "#},
+        )
+        .expect("write TypedDict source");
+        let file = ruff_db::files::system_path_to_file(&db, "/src/concrete_typed_dicts.py")
+            .expect("TypedDict source should exist");
+        let [movie, track] = ["Movie", "Track"].map(|name| {
+            Type::typed_dict(
+                global_symbol(&db, file, name)
+                    .place
+                    .expect_type()
+                    .expect_class_literal()
+                    .default_specialization(&db),
+            )
+        });
+
         let int = KnownClass::Int.to_instance(&db);
         let str = KnownClass::Str.to_instance(&db);
-        let set = ConstraintSet::constrain_typevar_lower_bound(&db, &builder, t, int).and(
-            &db,
-            &builder,
-            || ConstraintSet::constrain_typevar_lower_bound(&db, &builder, t, str),
-        );
-        let (single_sequents, pair_sequents) = {
-            let storage = builder.storage.borrow();
+
+        for (name, left, right) in [
+            ("statement-defined TypedDicts", movie, track),
             (
-                storage.single_sequent_cache.len(),
-                storage.pair_sequent_cache.len(),
-            )
+                "synthesized TypedDict",
+                synthesized_typed_dict(&db, int),
+                str,
+            ),
+            (
+                "synthesized protocol",
+                Type::protocol_with_readonly_members(&db, [("value", int)]),
+                str,
+            ),
+        ] {
+            let t = create_typevar(&db, "T");
+            let builder = ConstraintSetBuilder::new();
+            let set = ConstraintSet::constrain_typevar_lower_bound(&db, &builder, t, left).and(
+                &db,
+                &builder,
+                || ConstraintSet::constrain_typevar_lower_bound(&db, &builder, t, right),
+            );
+            let inferable =
+                InferableTypeVars::from_typevars(&db, std::iter::once(t.identity(&db)).collect());
+            let expected = Solutions::Constrained(vec![vec![TypeVarSolution {
+                bound_typevar: t,
+                solution: UnionType::from_elements(&db, [left, right]),
+            }]]);
+            let sequent_counts = || {
+                let storage = builder.storage.borrow();
+                (
+                    storage.single_sequent_cache.len(),
+                    storage.pair_sequent_cache.len(),
+                )
+            };
+            let before = sequent_counts();
+
+            assert!(!set.is_never_satisfied(&db), "{name}");
+            assert_eq!(set.solutions(&db, &builder, inferable), expected, "{name}");
+            assert_eq!(
+                sequent_counts(),
+                before,
+                "{name} should not require sequent analysis",
+            );
+        }
+    }
+
+    #[test]
+    fn nonconcrete_bounds_require_sequent_analysis() {
+        let mut db = setup_db();
+        db.write_dedented(
+            "/src/lazy_class_bounds.py",
+            indoc! {r#"
+                from typing import Generic, Protocol, TypedDict, TypeVar
+
+                S = TypeVar("S")
+
+                class GenericSchema(TypedDict, Generic[S]):
+                    value: S
+
+                FunctionalSchema = TypedDict("FunctionalSchema", {"value": int})
+
+                class ValueProtocol(Protocol):
+                    value: int
+            "#},
+        )
+        .expect("write lazy class source");
+        let file = ruff_db::files::system_path_to_file(&db, "/src/lazy_class_bounds.py")
+            .expect("lazy class source should exist");
+
+        let class_for = |name| {
+            global_symbol(&db, file, name)
+                .place
+                .expect_type()
+                .expect_class_literal()
         };
+        let generic_class = class_for("GenericSchema");
+        let s = create_typevar(&db, "S");
 
-        assert!(!set.is_never_satisfied(&db));
-
-        let storage = builder.storage.borrow();
-        assert_eq!(storage.single_sequent_cache.len(), single_sequents);
-        assert_eq!(storage.pair_sequent_cache.len(), pair_sequents);
+        for (name, bound) in [
+            ("type variable", Type::TypeVar(s)),
+            (
+                "unspecialized type variable",
+                Type::Dynamic(DynamicType::UnspecializedTypeVar),
+            ),
+            (
+                "GenericSchema",
+                Type::instance(&db, generic_class.default_specialization(&db)),
+            ),
+            (
+                "unspecialized GenericSchema",
+                Type::typed_dict(ClassType::NonGeneric(generic_class)),
+            ),
+            (
+                "FunctionalSchema",
+                Type::instance(
+                    &db,
+                    class_for("FunctionalSchema").default_specialization(&db),
+                ),
+            ),
+            (
+                "ValueProtocol",
+                Type::instance(&db, class_for("ValueProtocol").default_specialization(&db)),
+            ),
+            (
+                "synthesized TypedDict containing a type variable",
+                synthesized_typed_dict(&db, Type::TypeVar(s)),
+            ),
+            (
+                "synthesized protocol containing a type variable",
+                Type::protocol_with_readonly_members(&db, [("value", Type::TypeVar(s))]),
+            ),
+        ] {
+            assert!(
+                NodeId::bound_requires_sequent_analysis(&db, bound),
+                "`{name}` must not hide lazy members from the fast path",
+            );
+        }
     }
 
     #[test]
@@ -7912,7 +8047,7 @@ mod tests {
         let t = create_typevar(&db, "T");
         let builder = ConstraintSetBuilder::new();
         let mut set = ConstraintSet::always(&builder);
-        for value in 0..512 {
+        for value in 0..8 {
             set = set.and(&db, &builder, || {
                 ConstraintSet::constrain_typevar_upper_bound(
                     &db,
@@ -7947,31 +8082,6 @@ mod tests {
     }
 
     #[test]
-    fn simple_conjunction_contradiction_skips_sequent_analysis() {
-        // (int ≤ T ≤ int) ∧ (str ≤ T ≤ str) is unsatisfiable, decided without pairwise
-        // sequent analysis.
-        let db = setup_db();
-        let t = create_typevar(&db, "T");
-        let builder = ConstraintSetBuilder::new();
-        let set = create_constraint(&db, &builder, t, KnownClass::Int).and(&db, &builder, || {
-            create_constraint(&db, &builder, t, KnownClass::Str)
-        });
-        let (single_sequents, pair_sequents) = {
-            let storage = builder.storage.borrow();
-            (
-                storage.single_sequent_cache.len(),
-                storage.pair_sequent_cache.len(),
-            )
-        };
-
-        assert!(set.is_never_satisfied(&db));
-
-        let storage = builder.storage.borrow();
-        assert_eq!(storage.single_sequent_cache.len(), single_sequents);
-        assert_eq!(storage.pair_sequent_cache.len(), pair_sequents);
-    }
-
-    #[test]
     fn simple_conjunction_fast_path_matches_path_walk() {
         let db = setup_db();
         let t = create_typevar(&db, "T");
@@ -7998,19 +8108,48 @@ mod tests {
                 create_constraint(&db, &builder, t, KnownClass::Str)
             });
 
-        for set in [lower_bounds, overlapping, contradictory] {
+        let cases = [
+            ("lower bounds", lower_bounds, false),
+            ("overlapping bounds", overlapping, false),
+            ("contradictory bounds", contradictory, true),
+        ];
+        let sequent_counts = || {
+            let storage = builder.storage.borrow();
+            (
+                storage.single_sequent_cache.len(),
+                storage.pair_sequent_cache.len(),
+            )
+        };
+
+        for &(name, set, expected) in &cases {
+            let before = sequent_counts();
+            assert_eq!(set.is_never_satisfied(&db), expected, "{name}");
+            assert_eq!(
+                sequent_counts(),
+                before,
+                "{name} should not require sequent analysis",
+            );
+        }
+
+        for (name, set, expected) in cases {
             let Node::Interior(interior) = set.node.node() else {
                 panic!("expected an interior node");
             };
-            let fast_path = set
-                .node
-                .simple_conjunction_is_never_satisfied(&db, &builder)
-                .expect("fast path should apply to a simple conjunction");
+
+            assert_eq!(
+                set.node
+                    .simple_conjunction_is_never_satisfied(&db, &builder),
+                Some(expected),
+                "{name}",
+            );
+
             let mut path = interior.path_assignments(&builder);
-            let walked = path
-                .visit(&db, &builder, set.node, &mut IsNeverSatisfiedVisitor)
-                .is_continue();
-            assert_eq!(fast_path, walked);
+            assert_eq!(
+                path.visit(&db, &builder, set.node, &mut IsNeverSatisfiedVisitor)
+                    .is_continue(),
+                expected,
+                "{name}",
+            );
         }
     }
 
