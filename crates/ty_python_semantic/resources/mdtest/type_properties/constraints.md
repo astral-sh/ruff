@@ -875,19 +875,23 @@ from ty_extensions._internal import ConstraintSet
 
 def inferable_only[I, N]() -> None:
     constraints = ConstraintSet.range(int, I, int)
-    reveal_type(constraints.solutions(inferable=tuple[I]))  # revealed: tuple[Solution[I=int]]
+    # revealed: tuple[Solution[I=int]]
+    reveal_type(constraints.solutions(inferable=tuple[I]))
 
 def noninferable_only[I, N]() -> None:
     constraints = ConstraintSet.range(int, N, int)
-    reveal_type(constraints.solutions(inferable=tuple[I]))  # revealed: tuple[()]
+    # revealed: tuple[()]
+    reveal_type(constraints.solutions(inferable=tuple[I]))
 
 def independent_noninferable[I, N]() -> None:
     constraints = ConstraintSet.range(int, N, int) & ConstraintSet.range(str, I, str)
-    reveal_type(constraints.solutions(inferable=tuple[I]))  # revealed: tuple[Solution[I=str]]
+    # revealed: tuple[Solution[I=str]]
+    reveal_type(constraints.solutions(inferable=tuple[I]))
 
 def noninferable_alternative[I, N]() -> None:
     constraints = ConstraintSet.range(int, N, int) | ConstraintSet.range(str, I, str)
-    reveal_type(constraints.solutions(inferable=tuple[I]))  # revealed: tuple[()]
+    # revealed: tuple[()]
+    reveal_type(constraints.solutions(inferable=tuple[I]))
 ```
 
 ### Symbolic relationships and fixed non-inferable bindings
@@ -907,7 +911,7 @@ def symbolic_relationship[I, N]() -> None:
     reveal_type(constraints.solutions(inferable=tuple[I]))
 
 def symbolic_relationship_reversed[N, I]() -> None:
-    constraints = ConstraintSet.range(I, N, I)
+    constraints = ConstraintSet.range(N, I, N)
     # revealed: tuple[Solution[I=N@symbolic_relationship_reversed]]
     reveal_type(constraints.solutions(inferable=tuple[I]))
 
