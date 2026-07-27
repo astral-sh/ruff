@@ -976,8 +976,7 @@ class RejectingTypeParameterAssignmentChild(TypeParameterFrozen[int], RejectsAss
 RejectingTypeParameterAssignmentChild(1).y = 2
 ```
 
-When a subclass inherits from two frozen dataclasses, assignments to fields from both bases remain
-frozen:
+When a subclass inherits from two frozen dataclasses, fields from both bases remain frozen:
 
 ```py
 @dataclass(frozen=True)
@@ -993,12 +992,15 @@ class ChildWithTwoFrozenBases(FirstFrozen, SecondFrozen): ...
 multiple = ChildWithTwoFrozenBases()
 # revealed: Overload[(name: Literal["first"], value) -> Never, (name: Literal["second"], value) -> Never, (name: str, value) -> None]
 reveal_type(multiple.__setattr__)
+# revealed: Overload[(name: Literal["first"]) -> Never, (name: Literal["second"]) -> Never, (name: str) -> None]
+reveal_type(multiple.__delattr__)
 
 multiple.second = 2  # error: [invalid-assignment]
+del multiple.second  # error: [invalid-assignment]
 ```
 
-An `InitVar` is a constructor argument, not a frozen field. A subclass can assign to an attribute
-with the same name:
+An `InitVar` is a constructor argument, not a frozen field. A subclass can assign and delete an
+attribute with the same name:
 
 ```py
 from dataclasses import InitVar
@@ -1012,6 +1014,7 @@ class ChildWithInitVar(FrozenWithInitVar):
 
 init_var_child = ChildWithInitVar()
 init_var_child.temporary = 4
+del init_var_child.temporary
 ```
 
 The same rule applies when the `InitVar` belongs to a second frozen base:
@@ -1022,6 +1025,7 @@ class ChildWithSecondBaseInitVar(Frozen, FrozenWithInitVar):
 
 second_init_var_child = ChildWithSecondBaseInitVar()
 second_init_var_child.temporary = 4
+del second_init_var_child.temporary
 ```
 
 Non-field attributes on subclasses of slotted frozen dataclasses are still rejected. This correctly
@@ -1170,74 +1174,9 @@ del ChildWithDeletionOverride().x
 del GrandchildWithDeletionOverride().x
 ```
 
-When a subclass inherits from two frozen dataclasses, fields from both bases remain frozen:
-
-```py
-from dataclasses import dataclass
-
-@dataclass(frozen=True)
-class A:
-    a: int = 1
-
-@dataclass(frozen=True)
-class B:
-    b: int = 1
-
-class Child(A, B): ...
-
-child = Child()
-# revealed: Overload[(name: Literal["a"]) -> Never, (name: Literal["b"]) -> Never, (name: str) -> None]
-reveal_type(child.__delattr__)
-
-del child.b  # error: [invalid-assignment]
-child.b = 2  # error: [invalid-assignment]
-```
-
-An `InitVar` is a constructor argument, not a frozen field. A subclass can assign and delete an
-attribute with the same name:
-
-```py
-from dataclasses import InitVar, dataclass
-
-@dataclass(frozen=True)
-class Frozen:
-    x: int = 1
-
-@dataclass(frozen=True)
-class FrozenWithInitVar:
-    temporary: InitVar[int] = 0
-
-class FirstInitVarChild(FrozenWithInitVar):
-    temporary: int = 1
-
-first = FirstInitVarChild()
-first.temporary = 4
-del first.temporary
-```
-
-The same rule applies when the `InitVar` belongs to the second frozen base:
-
-```py
-class SecondInitVarChild(Frozen, FrozenWithInitVar):
-    temporary: int = 1
-
-later = SecondInitVarChild()
-later.temporary = 4
-del later.temporary
-```
-
 A read-only property remains protected when the frozen base is a specialized `Generic[T]` dataclass:
 
 ```py
-from dataclasses import dataclass
-from typing import Generic, TypeVar
-
-T = TypeVar("T")
-
-@dataclass(frozen=True)
-class GenericFrozen(Generic[T]):
-    value: T
-
 class ReadOnlyGenericChild(GenericFrozen[int]):
     @property
     def y(self) -> int:
@@ -1251,10 +1190,6 @@ The Python 3.12 type-parameter syntax must also preserve a `__delattr__` method 
 base class:
 
 ```py
-@dataclass(frozen=True)
-class TypeParameterFrozen[T]:
-    value: T
-
 class RejectingTypeParameterChild(TypeParameterFrozen[int], RejectsDeletion): ...
 
 # error: [invalid-assignment] "Cannot delete attribute `y` on type `RejectingTypeParameterChild` whose `__delattr__` method returns `Never`/`NoReturn`"

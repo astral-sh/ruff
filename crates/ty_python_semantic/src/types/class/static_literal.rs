@@ -126,7 +126,7 @@ impl get_size2::GetSize for StaticClassLiteral<'_> {}
 /// non-fields on subclass instances.
 #[derive(Clone, Copy)]
 pub(crate) enum FrozenDataclassDispatch<'db> {
-    /// A reachable frozen dataclass rejects modification of one of its fields.
+    /// A reachable frozen dataclass rejects assignment to or deletion of one of its fields.
     FrozenField,
     /// Every reachable frozen method delegates, with lookup resuming after this base.
     Delegate(StaticClassLiteral<'db>),
@@ -1998,6 +1998,7 @@ impl<'db> StaticClassLiteral<'db> {
     /// Assigning to `Child().x` is rejected because `x` is a field of `Frozen`. Assigning to
     /// `Child().y` instead delegates to `super(Frozen, child).__setattr__`, where a later
     /// `__setattr__` or the descriptor for `y` can still reject the assignment.
+    /// Deletion follows the same lookup through `__delattr__` and `__delete__`.
     ///
     /// If multiple frozen dataclasses are reachable before an explicit implementation of
     /// `method`, a non-field delegates past each generated method. [`FrozenDataclassDispatch::Delegate`]
