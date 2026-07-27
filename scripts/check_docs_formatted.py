@@ -2,7 +2,12 @@
 # /// script
 # requires-python = ">=3.10"
 # ///
-"""Check code snippets in docs are formatted by Ruff."""
+"""Check code snippets in docs are formatted by Ruff.
+
+Intended to be executed from the repository root:
+
+    uv run scripts/check_docs_formatted.py
+"""
 
 from __future__ import annotations
 
