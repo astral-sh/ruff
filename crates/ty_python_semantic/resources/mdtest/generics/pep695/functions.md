@@ -441,7 +441,6 @@ meet-preserving, and inferring `F[A & B]` from `F[A] & F[B]` would be unsound:
 
 ```py
 from collections.abc import Callable
-from typing import Any
 from ty_extensions import Intersection
 
 class F[T]:

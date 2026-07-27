@@ -1581,7 +1581,7 @@ handles values that are both `A` and `B`, as `F[A & B]` would allow. Thus `F` is
 meet-preserving, and inferring `F[A & B]` from `F[A] & F[B]` would be unsound:
 
 ```py
-from typing import Any, Callable, Generic, TypeVar
+from typing import Callable, Generic, TypeVar
 from ty_extensions import Intersection
 
 FSourceT = TypeVar("FSourceT", covariant=True)
