@@ -590,6 +590,35 @@ def f3(x: UnionAB3) -> None:
         reveal_type(y)  # revealed: A | B
 ```
 
+## Exit methods are looked up on the context manager's class
+
+A `with` statement invokes `type(manager).__exit__`, not an attribute stored on the manager
+instance. An instance-only `__exit__` is therefore neither a valid context-manager method nor a
+source of exception suppression.
+
+```py
+from collections.abc import Callable
+from typing_extensions import assert_type
+
+def suppress_exit(*args: object) -> bool:
+    return True
+
+class InstanceOnlyExit:
+    def __init__(self) -> None:
+        self.__exit__: Callable[..., bool] = suppress_exit
+
+    def __enter__(self) -> None:
+        return None
+
+def instance_attributes_do_not_suppress(value: int | str) -> None:
+    if isinstance(value, int):
+        # error: [invalid-context-manager]
+        with InstanceOnlyExit():
+            raise ValueError
+
+    assert_type(value, str)
+```
+
 ## Context manager without an `__enter__` or `__exit__` method
 
 ```py

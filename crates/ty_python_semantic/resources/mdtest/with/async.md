@@ -463,6 +463,35 @@ async def test():
         reveal_type(y)  # revealed: str
 ```
 
+## Async exit methods are looked up on the context manager's class
+
+An `async with` statement invokes `type(manager).__aexit__`, not an attribute stored on the manager
+instance. An instance-only `__aexit__` is therefore neither a valid async context-manager method nor
+a source of exception suppression.
+
+```py
+from collections.abc import Awaitable, Callable
+from typing_extensions import assert_type
+
+async def suppress_exit(*args: object) -> bool:
+    return True
+
+class InstanceOnlyAsyncExit:
+    def __init__(self) -> None:
+        self.__aexit__: Callable[..., Awaitable[bool]] = suppress_exit
+
+    async def __aenter__(self) -> None:
+        return None
+
+async def instance_attributes_do_not_suppress(value: int | str) -> None:
+    if isinstance(value, int):
+        # error: [invalid-context-manager]
+        async with InstanceOnlyAsyncExit():
+            raise ValueError
+
+    assert_type(value, str)
+```
+
 ## Context manager without an `__aenter__` or `__aexit__` method
 
 ```py

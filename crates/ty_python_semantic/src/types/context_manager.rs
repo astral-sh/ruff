@@ -4,8 +4,9 @@ use crate::{
     FxOrderSet,
     place::Place,
     types::{
-        Bindings, CallArguments, CallDunderError, KnownClass, Type, TypeContext, UnionBuilder,
-        call::CallErrorKind, context::InferContext, diagnostic::INVALID_CONTEXT_MANAGER,
+        Bindings, CallArguments, CallDunderError, KnownClass, MemberLookupPolicy, Type,
+        TypeContext, UnionBuilder, call::CallErrorKind, context::InferContext,
+        diagnostic::INVALID_CONTEXT_MANAGER,
     },
 };
 use ruff_python_ast as ast;
@@ -25,7 +26,15 @@ impl<'db> Type<'db> {
             EvaluationMode::Sync => "__exit__",
         };
 
-        let Place::Defined(exit) = self.member(db, env, exit_method).place else {
+        let Place::Defined(exit) = self
+            .member_lookup_with_policy(
+                db,
+                env,
+                exit_method,
+                MemberLookupPolicy::NO_INSTANCE_FALLBACK,
+            )
+            .place
+        else {
             return Truthiness::AlwaysFalse;
         };
 
