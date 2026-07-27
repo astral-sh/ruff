@@ -34,7 +34,7 @@ use symbol::ScopedSymbolId;
 pub use use_def::{
     ApplicableConstraints, BindingWithConstraints, BindingWithConstraintsIterator,
     DeclarationWithConstraint, DeclarationsIterator, LiveBinding, LoopHeaderId, NarrowingEvaluator,
-    ScopedDefinitionId, UseDefMap,
+    PredicateNarrowingTargets, ScopedDefinitionId, UseDefMap,
 };
 use use_def::{EnclosingSnapshotKey, ScopedEnclosingSnapshotId};
 

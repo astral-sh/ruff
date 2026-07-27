@@ -4668,6 +4668,7 @@ impl<'db> NarrowingEvaluatorExtension<'db> for NarrowingEvaluator<'_, 'db> {
             db,
             self.narrowing_constraints(),
             self.predicates(),
+            self.predicate_narrowing_targets(),
             self.constraint(),
             base_type,
             place,
