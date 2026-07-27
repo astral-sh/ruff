@@ -788,12 +788,9 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
 
         // Universal and existential quantification are duals. Reusing existential abstraction
         // also keeps this operation on its cached, single-pass implementation.
-        let (node, derived_source_order) =
-            self.node
-                .negate(builder)
-                .exists(db, builder, to_remove, self.source_order);
-        let source_order = builder.ordered_source_order(self.source_order, derived_source_order);
-        Self::from_node(builder, node.negate(builder), source_order)
+        self.negate(db, builder)
+            .reduce_inferable(db, builder, to_remove)
+            .negate(db, builder)
     }
 
     /// Computes solutions for each BDD path, using a caller-provided hook to select solutions.
