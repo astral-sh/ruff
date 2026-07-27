@@ -1379,7 +1379,7 @@ struct PendingReachabilityConstraint {
     narrowing_constraint: ScopedNarrowingConstraint,
 }
 
-/// An append-only tree of scope-wide reachability constraints and call narrowing gates.
+/// An append-only tree of scope-wide reachability constraints and narrowing gates.
 ///
 /// Each [`PendingPlaceState`] remembers the last node applied for each constraint kind, so
 /// snapshots can share place states and defer applying subsequent constraints until needed.
@@ -1520,8 +1520,8 @@ impl PendingReachability {
 
     /// Returns the place state needed to resolve a use.
     ///
-    /// A call's narrowing gate is only needed if the place is later changed or merged, so it is
-    /// not materialized here.
+    /// Pending narrowing gates are only needed to preserve path correlations across a later place
+    /// change or merge, so they are not materialized here.
     fn materialize_ref_at_use<'a>(
         &self,
         pending: &'a mut PendingPlaceState,
@@ -1556,7 +1556,7 @@ impl PendingReachability {
         constraint
     }
 
-    /// Combines the call narrowing gates after `ancestor` through `target` into one constraint.
+    /// Combines the narrowing gates after `ancestor` through `target` into one constraint.
     ///
     /// `ancestor` must be an ancestor of `target`.
     fn narrowing_constraint_between(
@@ -1682,7 +1682,7 @@ impl PendingReachability {
                     continue;
                 }
 
-                // Preserve call gates that precede the branch, then merge gates introduced on the
+                // Preserve gates that precede the branch, then merge gates introduced on the
                 // individual branch paths. If either path has no gate, the merged gate simplifies
                 // to `ALWAYS_TRUE` and can be discarded.
                 self.materialize_narrowing(current, branch_ancestor, narrowing_constraints);
@@ -1903,12 +1903,6 @@ impl<'db> UseDefMapBuilder<'db> {
     pub(super) fn exception_checkpoint_key(&self) -> ExceptionCheckpointKey {
         self.checkpoint_state
             .key((!self.reachability_constraints.is_saturated()).then_some(self.checkpoint_flow))
-    }
-
-    /// Invalidates checkpoint reuse for narrowing that has no corresponding reachability predicate.
-    /// Match guards use this because their success and failure are not modeled in reachability.
-    pub(super) fn record_exception_checkpoint_binding_change(&mut self) {
-        self.checkpoint_state.record_binding_change();
     }
 
     pub(super) fn record_binding(
@@ -2285,18 +2279,18 @@ impl<'db> UseDefMapBuilder<'db> {
 
     pub(super) fn record_reachability_constraint(
         &mut self,
-        constraint: ScopedReachabilityConstraintId,
+        reachability_constraint: ScopedReachabilityConstraintId,
     ) {
         self.checkpoint_flow = self
             .reachability_constraints
-            .add_and_constraint(self.checkpoint_flow, constraint);
-        self.record_reachability_constraint_impl(
-            constraint,
-            ScopedNarrowingConstraint::ALWAYS_TRUE,
-        );
+            .add_and_constraint(self.checkpoint_flow, reachability_constraint);
+        let narrowing_constraint = self
+            .reachability_constraints
+            .narrowing_gate(reachability_constraint, &mut self.narrowing_constraints);
+        self.record_reachability_constraint_impl(reachability_constraint, narrowing_constraint);
     }
 
-    /// Records a call's reachability predicate and its corresponding narrowing gate together.
+    /// Records a reachability predicate and its corresponding narrowing gate together.
     ///
     /// Reachability is materialized when a place is used, while the narrowing gate remains pending
     /// until that place is changed or merged.
@@ -2784,8 +2778,8 @@ impl<'db> UseDefMapBuilder<'db> {
             .iter_mut()
             .chain(self.member_states.iter_mut())
         {
-            // No later state change can require the correlation represented by pending call
-            // narrowing gates, so only reachability needs to be finalized here.
+            // No later place change or merge can require the path correlation represented by
+            // pending narrowing gates, so only reachability needs to be finalized here.
             self.pending_reachability.materialize_reachability(
                 state,
                 pending,
