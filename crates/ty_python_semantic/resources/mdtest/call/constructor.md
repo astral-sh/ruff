@@ -305,7 +305,9 @@ class Mapper(Generic[R]):
 
 values: Any
 
-Mapper(callback, values)
+# TODO: Preserve correlated overload solutions so dynamic values do not infer an extra
+# `frozenset` layer or an element type of `Never`.
+reveal_type(Mapper(callback, values))  # revealed: Mapper[frozenset[frozenset[Never]]]
 
 def wrap(function: Callable[P, R]) -> Callable[P, R]: ...
 
@@ -313,7 +315,8 @@ class Wrapped(Generic[R]):
     @wrap
     def __new__(cls, callback: Callable[[T], R], values: list[T]) -> Self: ...
 
-Wrapped(callback, values)
+# TODO: Preserve the callback's correlated overload solutions through the decorator.
+reveal_type(Wrapped(callback, values))  # revealed: Wrapped[frozenset[frozenset[Never]]]
 ```
 
 A decorator can preserve `cls` explicitly with `Concatenate`, re-expressing the receiver with its
@@ -329,7 +332,7 @@ class WrappedCls:
     @wrap_cls
     def __new__(cls) -> Self: ...
 
-WrappedCls()
+reveal_type(WrappedCls())  # revealed: WrappedCls
 ```
 
 A decorator can also return a callback protocol instead of `Callable`. Its inferred `type[Self]`
@@ -345,7 +348,7 @@ class WrappedObject:
     @wrap_object
     def __new__(cls) -> Self: ...
 
-WrappedObject()
+reveal_type(WrappedObject())  # revealed: WrappedObject
 ```
 
 The explicit `cls` type in a signature-preserving decorator can also be expressed with a generic
