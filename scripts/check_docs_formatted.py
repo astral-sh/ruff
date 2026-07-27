@@ -111,6 +111,7 @@ KNOWN_FORMATTING_VIOLATIONS = [
     "no-return-argument-annotation-in-stub",
     "no-space-after-block-comment",
     "no-space-after-inline-comment",
+    "non-callable",
     "non-empty-stub-body",
     "over-indentation",
     "over-indented",

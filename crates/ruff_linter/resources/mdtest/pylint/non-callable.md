@@ -6,7 +6,7 @@ preview = true
 select = ["PLE1102"]
 ```
 
-### Callables
+## Callables
 
 Cases of callables that shouldn't trigger a diagnostic.
 The only guaranteed callable here is `lambda` in all other cases we just can't be certain and therefore allow it.
@@ -34,7 +34,7 @@ async def f():
 
 ```
 
-### Errors + SyntaxWarnings
+## Errors + SyntaxWarnings
 
 All basic cases of non-callables, all emit SyntaxWarning error during Python compilation and result in `TypeError` at runtime.
 
@@ -240,7 +240,7 @@ error[PLE1102]: `Template` object is not callable.
    |
 ```
 
-### Errors caught using type inference
+## Errors caught using type inference
 
 Given that we have a small type inference engine it allows us to catch some more complex non-callables. Those would also result in `TypeError` at runtime, but they do not emit `SyntaxWarning` during compilation.
 
