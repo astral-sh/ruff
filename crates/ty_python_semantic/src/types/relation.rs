@@ -1590,7 +1590,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                     // check each literal individually.
                     let supertype_result = self
                         .without_context_collection(|| self.check_type_pair(db, supertype, target));
-                    if supertype_result.is_always_satisfied(db) {
+                    if supertype_result.is_trivially_always_satisfied() {
                         return supertype_result;
                     }
                 }

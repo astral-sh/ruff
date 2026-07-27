@@ -81,12 +81,14 @@ impl Default for TerminalSettings {
 #[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize)]
 pub struct SrcSettings {
     pub respect_ignore_files: bool,
+    pub exclude_scripts: bool,
     pub files: IncludeExcludeFilter,
 }
 impl SrcSettings {
     pub(crate) fn default() -> Self {
         Self {
             respect_ignore_files: true,
+            exclude_scripts: false,
             files: IncludeExcludeFilter::default(),
         }
     }

@@ -20,7 +20,7 @@ use ruff_db::diagnostic::{
     Diagnostic, DiagnosticId, DisplayDiagnosticConfig, DisplayDiagnostics, Severity,
 };
 use ruff_db::files::File;
-use ruff_db::system::{OsSystem, SystemPath, SystemPathBuf};
+use ruff_db::system::{OsSystem, System, SystemPath, SystemPathBuf};
 use ruff_db::{STACK_SIZE, max_parallelism};
 use ruff_diagnostics::Applicability;
 use salsa::Database;
@@ -156,8 +156,19 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
         Some(config_file) => {
             ProjectMetadata::from_config_file(config_file.clone(), &project_path, &system)?
         }
+        None if check_paths.iter().any(|path| system.is_file(path)) => {
+            // `uv check --script` passes a file as its check path. Disable uv workspace metadata
+            // for scripts until script integration is implemented in a follow-up.
+            ProjectMetadata::discover_without_uv(&project_path, &system)?
+        }
         None => ProjectMetadata::discover(&project_path, &system)?,
     };
+
+    if watch && project_metadata.has_uv_workspace() {
+        return Err(anyhow!(
+            "`--watch` is not supported with uv workspace integration"
+        ));
+    }
 
     project_metadata.apply_configuration_files(&system)?;
 

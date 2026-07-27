@@ -2561,7 +2561,7 @@ watermelon
         assert_eq!(
             diagnostics
                 .iter()
-                .map(Diagnostic::primary_message)
+                .map(Diagnostic::headline_message)
                 .collect::<Vec<_>>(),
             ["checking main.py", "checking mod.py"]
         );

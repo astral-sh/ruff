@@ -483,7 +483,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 let mut diagnostic = builder.into_diagnostic(format_args!(
                     "Invalid argument to parameter `value` of `{base_name}()`"
                 ));
-                diagnostic.set_primary_message(format_args!(
+                diagnostic.set_primary_annotation_message(format_args!(
                     "Expected `str`, found `{}`",
                     name_type.display(db)
                 ));
@@ -906,7 +906,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             let mut diagnostic = builder.into_diagnostic(format_args!(
                 "Invalid argument to parameter `names` of `{base_name}()`"
             ));
-            diagnostic.set_primary_message(format_args!(
+            diagnostic.set_primary_annotation_message(format_args!(
                 "Expected `{}`, found `{}`",
                 enum_names_type(db).display(db),
                 names_ty.display(db),

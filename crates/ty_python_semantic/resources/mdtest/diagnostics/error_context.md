@@ -693,6 +693,95 @@ help: A TypedDict is not usually assignable to any `dict[..]` type; `dict` types
 help: Consider using `Mapping[..]` instead of `dict[..]`.
 ```
 
+## Generic `TypedDict` field conflicts in overload diagnostics
+
+A generic `TypedDict` relation can be unsatisfiable without being the `never` terminal. The
+resulting overload diagnostic should still explain which field introduced the conflicting
+constraints.
+
+```py
+from typing import Generic, Self, TypeVar, TypedDict, overload
+
+T = TypeVar("T")
+
+class Pair(TypedDict, Generic[T]):
+    first: T
+    second: T
+
+class Fixed(TypedDict):
+    first: int
+    second: str
+
+class OverloadedSelf:
+    @overload
+    def method(self, value: Fixed) -> None: ...  # snapshot: invalid-overload
+    @overload
+    def method(self, value: str) -> None: ...
+    def method(self, value: Pair[Self] | str) -> None: ...
+```
+
+```snapshot
+error[invalid-overload]: Implementation does not accept all arguments of this overload
+  --> src/mdtest_snippet.py:15:9
+   |
+15 |     def method(self, value: Fixed) -> None: ...  # snapshot: invalid-overload
+   |         ^^^^^^
+16 |     @overload
+17 |     def method(self, value: str) -> None: ...
+18 |     def method(self, value: Pair[Self] | str) -> None: ...
+   |         ------ Implementation defined here
+   |
+info: Implementation signature `(self, value: Pair[Self@method] | str) -> None` is not assignable to overload signature `(self, value: Fixed) -> None`
+info: parameter `value` has an incompatible type: `Fixed` is not assignable to `Pair[Self@method] | str`
+info: └── type `Fixed` is not assignable to any element of the union `Pair[Self@method] | str`
+info:     ├── field "second" on TypedDict `Fixed` has type `str` which is not assignable to type `Self@method` expected by TypedDict `Pair`
+info:     └── ... omitted 1 union element without additional context
+```
+
+## Stop checking callable parameters after incompatible generic constraints
+
+Once earlier parameters produce an unsatisfiable nonterminal constraint set, continuing to a later
+parameter must not replace the diagnostic context that explains the original incompatibility.
+
+```py
+from typing import Generic, Self, TypeVar, TypedDict, overload
+
+T = TypeVar("T")
+
+class Pair(TypedDict, Generic[T]):
+    first: T
+    second: T
+
+class Fixed(TypedDict):
+    first: int
+    second: str
+
+class OverloadedSelf:
+    @overload
+    def method(self, value: Fixed, later: int) -> None: ...  # snapshot: invalid-overload
+    @overload
+    def method(self, value: str, later: str) -> None: ...
+    def method(self, value: Pair[Self] | str, later: str) -> None: ...
+```
+
+```snapshot
+error[invalid-overload]: Implementation does not accept all arguments of this overload
+  --> src/mdtest_snippet.py:15:9
+   |
+15 |     def method(self, value: Fixed, later: int) -> None: ...  # snapshot: invalid-overload
+   |         ^^^^^^
+16 |     @overload
+17 |     def method(self, value: str, later: str) -> None: ...
+18 |     def method(self, value: Pair[Self] | str, later: str) -> None: ...
+   |         ------ Implementation defined here
+   |
+info: Implementation signature `(self, value: Pair[Self@method] | str, later: str) -> None` is not assignable to overload signature `(self, value: Fixed, later: int) -> None`
+info: parameter `value` has an incompatible type: `Fixed` is not assignable to `Pair[Self@method] | str`
+info: └── type `Fixed` is not assignable to any element of the union `Pair[Self@method] | str`
+info:     ├── field "second" on TypedDict `Fixed` has type `str` which is not assignable to type `Self@method` expected by TypedDict `Pair`
+info:     └── ... omitted 1 union element without additional context
+```
+
 ## Type variable upper bounds
 
 Assignability context is included when an explicit type argument does not satisfy a type variable's
