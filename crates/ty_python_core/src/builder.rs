@@ -4101,6 +4101,10 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     self.visit_expr(context_expr);
                     let context_manager = self.add_standalone_expression(context_expr);
 
+                    // Entering this manager can raise into an earlier manager or an enclosing
+                    // `try`, but the manager itself cannot suppress a failed entry.
+                    self.record_exception_checkpoint();
+
                     if let Some(optional_vars) = optional_vars.as_deref() {
                         self.add_unpackable_assignment(
                             &Unpackable::WithItem {
@@ -4121,9 +4125,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                             is_positive: true,
                         }));
 
-                    let initial_state = self.flow_snapshot();
-                    self.try_node_context_stack_manager.push_context();
-                    suppression_contexts.push((initial_state, suppression_predicate));
+                    self.try_node_context_stack_manager
+                        .push_context(true, false);
+                    suppression_contexts.push(suppression_predicate);
                 }
 
                 self.visit_body(body);
@@ -4131,11 +4135,11 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 let normal_exit = self.flow_snapshot();
                 let mut suppressed_exits = Vec::with_capacity(items.len());
 
-                while let Some((initial_state, suppression_predicate)) = suppression_contexts.pop()
-                {
-                    let intermediate_states = self
+                while let Some(suppression_predicate) = suppression_contexts.pop() {
+                    let mut exception_checkpoints = self
                         .try_node_context_stack_manager
-                        .take_try_suite_snapshots();
+                        .take_try_suite_snapshots()
+                        .into_iter();
                     let terminal_states = self
                         .try_node_context_stack_manager
                         .pop_context()
@@ -4148,14 +4152,16 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         self.record_terminal_finally_entry();
                     }
 
-                    self.flow_restore(initial_state);
+                    let Some(first_checkpoint) = exception_checkpoints.next() else {
+                        continue;
+                    };
 
-                    for intermediate_state in intermediate_states {
-                        self.flow_merge(intermediate_state);
+                    self.flow_restore(first_checkpoint);
+
+                    for exception_checkpoint in exception_checkpoints {
+                        self.flow_merge(exception_checkpoint);
                     }
 
-                    // Like a `try` suite, a suppressing manager conservatively assumes an
-                    // exception can exit at any point in its body.
                     self.record_ambiguous_reachability();
                     self.record_with_suppression_constraint(suppression_predicate);
                     suppressed_exits.push(self.flow_snapshot());

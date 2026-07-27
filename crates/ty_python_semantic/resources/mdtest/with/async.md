@@ -74,11 +74,11 @@ async def main():
     reveal_type("reachable")  # revealed: Literal["reachable"]
 ```
 
-## Suppressing async context managers are modeled conservatively
+## Async control-flow transfers without exception checkpoints are not suppressed
 
-As with synchronous managers, an `async with` body is modeled like a `try` suite that can exit at
-any point. A bare `return` cannot actually be suppressed, but ty does not prove that individual
-statements cannot raise. This conservative missing-return diagnostic matches mypy and Pyright.
+A literal return does not create an exception checkpoint and cannot be suppressed. Awaiting a return
+expression can raise, so the manager can suppress that exception and continue past the `async with`
+statement.
 
 ```py
 from typing import Literal
@@ -91,7 +91,7 @@ class Suppresses:
 async def could_raise_returns_int() -> int:
     return 1
 
-async def returns_from_body() -> int:  # error: [invalid-return-type]
+async def returns_from_body() -> int:
     async with Suppresses():
         return 1
 
@@ -100,10 +100,10 @@ async def return_expression_can_be_suppressed() -> int:  # error: [invalid-retur
         return await could_raise_returns_int()
 ```
 
-## Async suppression does not prove that an inner exception escapes
+## Async typed handlers do not block exceptional checkpoint propagation
 
-An asynchronous suppressing manager is conservatively allowed to exit before the end of its body,
-even if an inner handler catches the exception or the exception appears in an unreachable branch.
+Exception checkpoints can propagate through a typed inner handler because ty does not yet determine
+which exceptions match each handler. An unreachable branch does not create a reachable checkpoint.
 
 ```py
 class Suppresses:
@@ -118,17 +118,61 @@ async def caught_by_inner_handler() -> int:  # error: [invalid-return-type]
         except ValueError:
             return 1
 
-async def statically_unreachable_exception() -> int:  # error: [invalid-return-type]
+async def statically_unreachable_exception() -> int:
     async with Suppresses():
         if False:
             raise ValueError
         return 1
 ```
 
+## Async bare inner handlers block exceptional checkpoint propagation
+
+A bare handler receives and handles an exception checkpoint before it can propagate to an outer
+asynchronously suppressing context manager.
+
+```py
+class Suppresses:
+    async def __aenter__(self) -> None: ...
+    async def __aexit__(self, exc_type, exc_value, traceback) -> bool:
+        return True
+
+async def caught_by_bare_inner_handler() -> int:
+    async with Suppresses():
+        try:
+            raise ValueError
+        except:
+            return 1
+```
+
+## Async suppression follows eager and lazy scope boundaries
+
+An eager comprehension can raise into its enclosing asynchronous context manager. A lazy generator
+body cannot raise merely because its generator is constructed.
+
+```py
+class Suppresses:
+    async def __aenter__(self) -> None: ...
+    async def __aexit__(self, exc_type, exc_value, traceback) -> bool:
+        return True
+
+def could_raise() -> None:
+    raise ValueError
+
+async def eager_comprehension() -> int:  # error: [invalid-return-type]
+    async with Suppresses():
+        [could_raise() for _ in [0]]
+        return 1
+
+async def lazy_generator_body() -> int:
+    async with Suppresses():
+        (could_raise() for _ in [0])
+        return 1
+```
+
 ## Assertions and async iteration can leave through a suppressing manager
 
-Assertions and asynchronous iteration can raise without a visible call expression. The body-wide
-model includes those implicit exception sites.
+Assertions and asynchronous iteration can raise without a visible call expression. The shared
+exception model records checkpoints for those implicit protocol operations.
 
 ```py
 from typing_extensions import Self
@@ -157,10 +201,10 @@ async def suppressed_iteration(values: RaisingAsyncIterable) -> int:  # error: [
         return 1
 ```
 
-## Async literal assignments are conservatively interruptible
+## Async literal assignments complete before an exception checkpoint
 
-An initial binding remains visible even when the only assignment inside the `async with` body has a
-literal right-hand side.
+A literal assignment cannot raise. An asynchronously suppressing manager therefore does not retain
+the original binding when the body contains no exception checkpoint.
 
 ```py
 class Suppresses:
@@ -174,14 +218,62 @@ async def main():
     async with Suppresses():
         value = "finished"
 
-    reveal_type(value)  # revealed: Literal[1, "finished"]
+    reveal_type(value)  # revealed: Literal["finished"]
 ```
 
-## Async deletions are not yet recorded as intermediate definitions
+## Async literal initializers remain defined at a later exception checkpoint
 
-The shared `try` snapshot machinery does not record `del` as an intermediate binding. As with
-synchronous context managers, a suppressed exception can therefore leave a deleted name incorrectly
-visible.
+Safe setup assignments complete before a later awaited operation can raise and be suppressed.
+
+```py
+from typing_extensions import assert_type
+
+class Suppresses:
+    async def __aenter__(self) -> None: ...
+    async def __aexit__(self, exc_type, exc_value, traceback) -> bool:
+        return True
+
+async def could_raise() -> None:
+    raise ValueError
+
+async def initialized_before_exception() -> None:
+    async with Suppresses():
+        first = [1, 2, 4]
+        second = [0.5, 0.8]
+        await could_raise()
+
+    assert_type(first, list[int])
+    assert_type(second, list[float])
+```
+
+## Async exception-assertion managers do not exempt setup calls
+
+An exception-assertion name does not make an awaited setup call safe. The manager can suppress an
+exception raised before the setup assignment completes.
+
+```py
+class Raises:
+    async def __aenter__(self) -> None: ...
+    async def __aexit__(self, exc_type, exc_value, traceback) -> bool:
+        return True
+
+def assert_raises(exception: type[ValueError]) -> Raises:
+    return Raises()
+
+async def could_raise_returns_list() -> list[int]:
+    raise ValueError
+
+async def exception_assertion() -> list[int]:
+    async with assert_raises(ValueError):
+        values = await could_raise_returns_list()
+
+    return values  # error: [possibly-unresolved-reference]
+```
+
+## Async suppressed exceptions preserve deleted-name state
+
+A checkpoint after `del` captures the fact that the name is no longer defined. Suppressing the
+subsequent exception cannot restore its earlier binding.
 
 ```py
 class Suppresses:
@@ -196,8 +288,7 @@ async def deleted_after_suppression() -> int:
         del value
         raise ValueError
 
-    # TODO: This should emit [possibly-unresolved-reference].
-    return value
+    return value  # error: [unresolved-reference]
 ```
 
 ## Async context manager exception suppression follows the typing specification
@@ -380,6 +471,13 @@ async def main():
         pass
 
     value  # error: [possibly-unresolved-reference]
+
+    inner = Inner()
+
+    async with Suppresses(), inner as preexisting_value:
+        pass
+
+    preexisting_value  # error: [possibly-unresolved-reference]
 ```
 
 ## Union async context managers combine awaited exit return types

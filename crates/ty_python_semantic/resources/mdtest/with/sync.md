@@ -20,8 +20,8 @@ with Manager() as f:
 
 ## Exception-suppressing context managers
 
-A context manager can suppress an exception raised anywhere in its body. Consequently, any binding
-visible before or partway through the body must remain visible after the `with` statement.
+A context manager can suppress an exception raised in its body. Consequently, any binding visible at
+a potentially raising operation must remain visible after the `with` statement.
 
 ```py
 from contextlib import suppress
@@ -90,18 +90,17 @@ with suppress(ValueError):
 reveal_type("reachable")  # revealed: Literal["reachable"]
 ```
 
-## Suppressing context managers are modeled conservatively
+## Control-flow transfers without exception checkpoints are not suppressed
 
 Returning, breaking, and continuing call `__exit__` with three `None` arguments, so a truthy exit
-value cannot itself cancel those control-flow transfers. Like mypy and Pyright, however, ty models a
-suppressing `with` body as a `try` suite that can exit at any point. It does not try to prove that a
-particular `return`, `break`, or `continue` cannot raise. Consequently, the path following the
-`with` statement remains reachable even when Python could not take it at runtime.
+value cannot itself cancel those control-flow transfers. A literal return, `break`, or `continue`
+does not create an exception checkpoint. A call in a return expression can raise, so a suppressing
+manager can instead continue after that call fails.
 
 ```py
 from contextlib import suppress
 
-def returns_from_body() -> int:  # error: [invalid-return-type]
+def returns_from_body() -> int:
     with suppress(ValueError):
         return 1
 
@@ -116,22 +115,22 @@ def breaks_from_body() -> int:
     while True:
         with suppress(ValueError):
             break
-        return "unreachable"  # error: [invalid-return-type]
+        return "unreachable"
     return 1
 
 def continues_from_body(values: list[int]) -> int:
     for value in values:
         with suppress(ValueError):
             continue
-        return "unreachable"  # error: [invalid-return-type]
+        return "unreachable"
     return 1
 ```
 
-## Suppression does not prove that an inner exception escapes
+## Typed handlers do not block exceptional checkpoint propagation
 
-The same conservative model does not determine whether an exception is caught by an inner `except`,
-suppressed by an inner manager, overridden by `finally`, or in a statically unreachable branch. The
-outer manager can still contribute a possible fall-through path, as it does in mypy and Pyright.
+Exception checkpoints can propagate through a typed inner handler because ty does not yet determine
+which exceptions match each handler. An exception in an unreachable branch does not create a
+reachable checkpoint.
 
 ```py
 from contextlib import suppress
@@ -156,18 +155,63 @@ def overridden_by_finally() -> int:  # error: [invalid-return-type]
         finally:
             return 1
 
-def statically_unreachable_exception() -> int:  # error: [invalid-return-type]
+def statically_unreachable_exception() -> int:
     with suppress(ValueError):
         if False:
             raise ValueError
         return 1
 ```
 
+## Bare inner handlers block exceptional checkpoint propagation
+
+A bare handler receives and handles an exception checkpoint before it can propagate to the outer
+suppressing context manager.
+
+```py
+from contextlib import suppress
+
+def caught_by_bare_inner_handler() -> int:
+    with suppress(ValueError):
+        try:
+            raise ValueError
+        except:
+            return 1
+```
+
+## Suppression follows eager and lazy scope boundaries
+
+Checkpoints from class bodies and list comprehensions propagate to an enclosing context manager
+because those scopes execute eagerly. Generator-expression bodies execute lazily and do not create
+an exception checkpoint when the generator is constructed.
+
+```py
+from contextlib import suppress
+
+def could_raise() -> None:
+    raise ValueError
+
+def eager_class_body() -> int:  # error: [invalid-return-type]
+    with suppress(ValueError):
+        class RunsImmediately:
+            could_raise()
+
+        return 1
+
+def eager_comprehension() -> int:  # error: [invalid-return-type]
+    with suppress(ValueError):
+        [could_raise() for _ in [0]]
+        return 1
+
+def lazy_generator_body() -> int:
+    with suppress(ValueError):
+        (could_raise() for _ in [0])
+        return 1
+```
+
 ## Assertions and iteration can leave through a suppressing manager
 
 A suppressed exception does not have to originate from a call expression. Assertions and the
-iterator protocol can raise implicitly, so they must have the same possible exit as the rest of a
-`with` body.
+iterator protocol can raise implicitly, so they also create exception checkpoints.
 
 ```py
 from collections.abc import Iterator
@@ -189,11 +233,10 @@ def suppressed_iteration(values: RaisingIterable) -> int:  # error: [invalid-ret
         return 1
 ```
 
-## Literal assignments are conservatively interruptible
+## Literal assignments complete before an exception checkpoint
 
-Even an assignment whose right-hand side is a literal is modeled as potentially interrupted. This
-matches the body-wide approximation used for `try` statements and by mypy and Pyright; the initial
-binding remains visible after the manager.
+Assigning a literal to a local name cannot raise. The original binding is therefore not visible
+after a suppressing manager whose body contains no exception checkpoint.
 
 ```py
 from contextlib import suppress
@@ -203,15 +246,80 @@ value = 1
 with suppress(ValueError):
     value = "finished"
 
-reveal_type(value)  # revealed: Literal[1, "finished"]
+reveal_type(value)  # revealed: Literal["finished"]
 ```
 
-## Deletions are not yet recorded as intermediate definitions
+## Literal initializers remain defined at a later exception checkpoint
 
-The existing `try` snapshot machinery records assignments but does not snapshot `del`. If an
-exception is suppressed after deleting a name, ty currently retains its pre-body binding even though
-using the name raises `UnboundLocalError` at runtime. This is also a limitation of mypy; Pyright
-reports the name as possibly unbound.
+Safe setup assignments complete before a later operation can raise and be suppressed.
+
+```py
+from contextlib import suppress
+from typing_extensions import assert_type
+
+def could_raise() -> None:
+    raise ValueError
+
+def initialized_before_exception() -> None:
+    with suppress(ValueError):
+        first = [1, 2, 4]
+        second = [0.5, 0.8]
+        could_raise()
+
+    assert_type(first, list[int])
+    assert_type(second, list[float])
+```
+
+## Exception-assertion managers do not exempt setup calls
+
+A context manager named `raises`, `assert_raises`, or `pytest.raises` does not make a call in its
+body safe. If that setup call raises the expected exception before its assignment completes, the
+manager suppresses the exception and the assigned name remains undefined.
+
+```py
+class Raises:
+    def __enter__(self) -> None: ...
+    def __exit__(self, exc_type, exc_value, traceback) -> bool:
+        return True
+
+def raises(exception: type[ValueError]) -> Raises:
+    return Raises()
+
+def assert_raises(exception: type[ValueError]) -> Raises:
+    return Raises()
+
+class Pytest:
+    def raises(self, exception: type[ValueError]) -> Raises:
+        return Raises()
+
+pytest = Pytest()
+
+def could_raise_returns_list() -> list[int]:
+    raise ValueError
+
+def direct_exception_assertion() -> list[int]:
+    with raises(ValueError):
+        values = could_raise_returns_list()
+
+    return values  # error: [possibly-unresolved-reference]
+
+def aliased_exception_assertion() -> list[int]:
+    with assert_raises(ValueError):
+        values = could_raise_returns_list()
+
+    return values  # error: [possibly-unresolved-reference]
+
+def qualified_exception_assertion() -> list[int]:
+    with pytest.raises(ValueError):
+        values = could_raise_returns_list()
+
+    return values  # error: [possibly-unresolved-reference]
+```
+
+## Suppressed exceptions preserve deleted-name state
+
+A checkpoint after `del` captures the fact that the name is no longer defined. Suppressing the
+subsequent exception cannot restore its earlier binding.
 
 ```py
 from contextlib import suppress
@@ -223,8 +331,7 @@ def deleted_after_suppression() -> int:
         del value
         raise ValueError
 
-    # TODO: This should emit [possibly-unresolved-reference].
-    return value
+    return value  # error: [unresolved-reference]
 ```
 
 ## Context manager exception suppression follows the typing specification
@@ -460,6 +567,13 @@ with suppress(ValueError), Inner() as value:
     pass
 
 value  # error: [possibly-unresolved-reference]
+
+inner = Inner()
+
+with suppress(ValueError), inner as preexisting_value:
+    pass
+
+preexisting_value  # error: [possibly-unresolved-reference]
 ```
 
 ## Non-suppressing context managers do not make later targets optional
