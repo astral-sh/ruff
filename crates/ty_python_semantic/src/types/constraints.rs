@@ -255,8 +255,8 @@ struct OwnedConstraintSetInner<'db> {
     typevars: IndexVec<TypeVarId, BoundTypeVarIdentity<'db>>,
     nodes: Box<[InteriorNodeData]>,
     node_indices: RankBitBox,
+    /// A dense, canonical source-order tree whose IDs are independent of builder history.
     source_orders: Box<[SourceOrder]>,
-    source_order_indices: RankBitBox,
 }
 
 impl Default for OwnedConstraintSet<'_> {
@@ -338,16 +338,6 @@ impl OwnedConstraintSetInner<'_> {
             "should not access constraint set constraint that was marked unused",
         );
         self.constraint_indices.rank(index) as usize
-    }
-
-    fn retained_source_order_index(&self, id: SourceOrderId) -> usize {
-        let index = id.index();
-        debug_assert_eq!(
-            self.source_order_indices.get_bit(index),
-            Some(true),
-            "should not access constraint set source_order that was marked unused",
-        );
-        self.source_order_indices.rank(index) as usize
     }
 }
 
@@ -987,6 +977,14 @@ impl ConstraintSetStorage<'_> {
                 .zip(compacted.nodes.iter().copied())
                 .map(|(old_index, node)| (node, NodeId::from_usize(old_index))),
         );
+        self.source_order_cache.extend(
+            compacted
+                .source_orders
+                .iter()
+                .copied()
+                .enumerate()
+                .map(|(index, source_order)| (source_order, SourceOrderId::from_usize(index))),
+        );
     }
 
     fn adjusted_node_id(&self, id: NodeId) -> NodeId {
@@ -1005,7 +1003,7 @@ impl ConstraintSetStorage<'_> {
 
     fn adjusted_source_order_id(&self, id: SourceOrderId) -> SourceOrderId {
         if let Some(compacted) = &self.compacted {
-            return id + compacted.source_order_indices.len();
+            return id + compacted.source_orders.len();
         }
         id
     }
@@ -1048,22 +1046,13 @@ impl<'db> ConstraintSetBuilder<'db> {
 
         // The source-order tree can retain repeated constraints from intermediate operations. If
         // this constraint set participates in a Salsa cycle, retaining that construction history
-        // can make an otherwise stable result grow on every iteration and never converge.
-        let source_order = self
-            .calculate_source_orders(Some(source_order))
-            .into_iter()
-            .fold(None, |source_order, constraint| {
-                self.ordered_source_order(
-                    source_order,
-                    Some(self.constraint_source_order(constraint)),
-                )
-            })
-            .expect("non-terminal BDD should have source_order");
+        // can make an otherwise stable result grow on every iteration and never converge. Build
+        // the owned source-order tree densely so its IDs are independent of that history.
+        let source_constraints = self.calculate_source_orders(Some(source_order));
 
         let mut storage = self.storage.into_inner();
         let mut used_nodes = RankBitBox::bits_with_capacity(storage.nodes.len());
         let mut used_constraints = RankBitBox::bits_with_capacity(storage.constraints.len());
-        let mut used_source_orders = RankBitBox::bits_with_capacity(storage.source_orders.len());
 
         let mut stack = vec![node];
         while let Some(node) = stack.pop() {
@@ -1078,26 +1067,23 @@ impl<'db> ConstraintSetBuilder<'db> {
             stack.push(interior.if_false);
         }
 
-        let mut stack = vec![source_order];
-        while let Some(source_order) = stack.pop() {
-            if used_source_orders[source_order.index()] {
-                continue;
-            }
-            used_source_orders.set(source_order.index(), true);
-            match storage.source_orders[source_order] {
-                SourceOrder::Ordered(left, right) => {
-                    stack.push(left);
-                    stack.push(right);
-                }
-                SourceOrder::Constraint(constraint) => {
-                    used_constraints.set(constraint.index(), true);
-                }
-            }
-        }
+        let mut source_orders: IndexVec<SourceOrderId, SourceOrder> =
+            IndexVec::with_capacity(source_constraints.len().saturating_mul(2).saturating_sub(1));
+        let source_order = source_constraints
+            .into_iter()
+            .fold(None, |left, source_constraint| {
+                used_constraints.set(source_constraint.index(), true);
+                let right = source_orders.push(SourceOrder::Constraint(source_constraint));
+
+                Some(match left {
+                    Some(left) => source_orders.push(SourceOrder::Ordered(left, right)),
+                    None => right,
+                })
+            })
+            .expect("non-terminal BDD should have source_order");
 
         used_nodes.truncate(used_nodes.last_one().map_or(0, |last| last + 1));
         used_constraints.truncate(used_constraints.last_one().map_or(0, |last| last + 1));
-        used_source_orders.truncate(used_source_orders.last_one().map_or(0, |last| last + 1));
 
         let nodes = storage
             .nodes
@@ -1115,14 +1101,6 @@ impl<'db> ConstraintSetBuilder<'db> {
             .collect();
         let constraint_indices = RankBitBox::from_bits(used_constraints);
 
-        let source_orders = storage
-            .source_orders
-            .into_iter()
-            .zip(&used_source_orders)
-            .filter_map(|(source_order, used)| used.then_some(source_order))
-            .collect();
-        let source_order_indices = RankBitBox::from_bits(used_source_orders);
-
         storage.typevars.shrink_to_fit();
 
         OwnedConstraintSet {
@@ -1134,8 +1112,7 @@ impl<'db> ConstraintSetBuilder<'db> {
                 typevars: storage.typevars,
                 nodes,
                 node_indices,
-                source_orders,
-                source_order_indices,
+                source_orders: source_orders.raw.into_boxed_slice(),
             })),
         }
     }
@@ -1218,10 +1195,8 @@ impl<'db> ConstraintSetBuilder<'db> {
         for (i, old_source_order) in inner.source_orders.iter().copied().enumerate() {
             match old_source_order {
                 SourceOrder::Ordered(old_left, old_right) => {
-                    let old_left_index = inner.retained_source_order_index(old_left);
-                    let new_left = source_orders[old_left_index];
-                    let old_right_index = inner.retained_source_order_index(old_right);
-                    let new_right = source_orders[old_right_index];
+                    let new_left = source_orders[old_left.index()];
+                    let new_right = source_orders[old_right.index()];
                     source_orders[i] = self.ordered_source_order(new_left, new_right);
                 }
                 SourceOrder::Constraint(old_constraint) => {
@@ -1238,8 +1213,7 @@ impl<'db> ConstraintSetBuilder<'db> {
         let old_source_order = other
             .source_order
             .expect("non-terminal constraint set should have a source_order");
-        let old_source_order_index = inner.retained_source_order_index(old_source_order);
-        let source_order = source_orders[old_source_order_index];
+        let source_order = source_orders[old_source_order.index()];
         ConstraintSet::from_node(self, node, source_order)
     }
 
@@ -1495,10 +1469,9 @@ impl<'db> ConstraintSetBuilder<'db> {
         let storage = self.storage.borrow();
         if let Some(compacted) = &storage.compacted {
             let index = source_order.index();
-            let split = compacted.source_order_indices.len();
+            let split = compacted.source_orders.len();
             if index < split {
-                let compacted_index = compacted.retained_source_order_index(source_order);
-                return compacted.source_orders[compacted_index];
+                return compacted.source_orders[index];
             }
             return storage.source_orders[SourceOrderId::from_usize(index - split)];
         }
@@ -8854,8 +8827,10 @@ mod tests {
             .expect("nonterminal root should retain storage");
 
         assert_eq!(owned.node.index(), 2);
+        assert_eq!(owned.source_order.map(SourceOrderId::index), Some(0));
         assert_eq!(inner.nodes.len(), 1);
         assert_eq!(inner.constraints.len(), 1);
+        assert_eq!(inner.source_orders.len(), 1);
         assert_eq!(inner.node_indices.len(), 3);
         assert_eq!(inner.constraint_indices.len(), 3);
         assert_eq!(inner.node_indices.iter_ones().collect::<Vec<_>>(), vec![2]);
@@ -8865,6 +8840,28 @@ mod tests {
         );
         assert_eq!(inner.typevars.len(), 3);
         assert!(owned.node.index() >= inner.nodes.len());
+    }
+
+    #[test]
+    fn owned_constraint_set_source_order_ignores_construction_history() {
+        let db = setup_db();
+        let t = create_typevar(&db, "T");
+        let u = create_typevar(&db, "U");
+
+        let build = |include_unused_source_order| {
+            ConstraintSetBuilder::new().into_owned(|builder| {
+                let t_int = create_constraint(&db, builder, t, KnownClass::Int);
+                let u_str = create_constraint(&db, builder, u, KnownClass::Str);
+
+                if include_unused_source_order {
+                    let _ = builder.ordered_source_order(t_int.source_order, t_int.source_order);
+                }
+
+                t_int.and(&db, builder, || u_str)
+            })
+        };
+
+        assert_eq!(build(false), build(true));
     }
 
     #[test]
@@ -8899,7 +8896,7 @@ mod tests {
         let owned = create_compacted_owned_set(&db);
 
         owned.query(|builder, set| {
-            let (node_split, constraint_split, typevar_split) = {
+            let (node_split, constraint_split, typevar_split, source_order_split) = {
                 let storage = builder.storage.borrow();
                 let compacted = storage
                     .compacted
@@ -8909,8 +8906,15 @@ mod tests {
                     compacted.node_indices.len(),
                     compacted.constraint_indices.len(),
                     compacted.typevars.len(),
+                    compacted.source_orders.len(),
                 )
             };
+
+            let existing_constraint = builder.interior_node_data(set.node).constraint;
+            assert_eq!(
+                Some(builder.constraint_source_order(existing_constraint)),
+                set.source_order
+            );
 
             let w = create_typevar(&db, "W");
             let w_str = create_constraint(&db, builder, w, KnownClass::Str);
@@ -8922,6 +8926,11 @@ mod tests {
             assert!(w_str.node.index() >= node_split);
             assert!(new_constraint.index() >= constraint_split);
             assert!(builder.typevar_id(&db, w).index() >= typevar_split);
+            assert!(
+                w_str
+                    .source_order
+                    .is_some_and(|source_order| source_order.index() >= source_order_split)
+            );
 
             let combined = set.and(&db, builder, || w_str);
             assert!(!combined.is_never_satisfied(&db));
