@@ -1206,8 +1206,17 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
                     let (pos_constraint, neg_constraint) = self.predicate_constraints(node.atom);
 
                     let projected = if pos_constraint.is_none() && neg_constraint.is_none() {
-                        let either = self.graph.or(if_true, if_false);
-                        self.graph.or(either, if_uncertain)
+                        // This node represents `if_uncertain || (P && if_true) || (!P && if_false)`.
+                        // Since the predicate `P` cannot narrow this place, remove it while retaining only branches that `P` can take.
+                        // Including a statically unreachable branch could erase narrowing from the reachable branch.
+                        match analyze_single(self.db, &self.predicates[node.atom]) {
+                            Truthiness::AlwaysTrue => self.graph.or(if_true, if_uncertain),
+                            Truthiness::AlwaysFalse => self.graph.or(if_false, if_uncertain),
+                            Truthiness::Ambiguous => {
+                                let either = self.graph.or(if_true, if_false);
+                                self.graph.or(either, if_uncertain)
+                            }
+                        }
                     } else {
                         self.graph.add_node(ProjectedNarrowingNode {
                             atom: node.atom,
