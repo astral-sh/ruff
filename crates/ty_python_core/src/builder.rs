@@ -3789,6 +3789,16 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     suppression_contexts.push((initial_state, suppression_predicate));
                 }
 
+                let is_exception_assertion = items
+                    .last()
+                    .is_some_and(|item| is_exception_assertion_context(&item.context_expr));
+                let mut leading_initializer_definitions = body
+                    .iter()
+                    .map_while(|statement| {
+                        context_manager_initializer_definitions(statement, is_exception_assertion)
+                    })
+                    .sum::<usize>();
+
                 self.visit_body(body);
 
                 let normal_exit = self.flow_snapshot();
@@ -3796,9 +3806,10 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
                 while let Some((initial_state, suppression_predicate)) = suppression_contexts.pop()
                 {
-                    let intermediate_states = self
+                    let mut intermediate_states = self
                         .try_node_context_stack_manager
-                        .take_try_suite_snapshots();
+                        .take_try_suite_snapshots()
+                        .into_iter();
                     let terminal_states = self
                         .try_node_context_stack_manager
                         .pop_context()
@@ -3810,6 +3821,19 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         self.flow_restore(terminal_state);
                         self.record_terminal_finally_entry();
                     }
+
+                    let initializer_definitions =
+                        std::mem::take(&mut leading_initializer_definitions);
+
+                    // Literal initializers cannot raise. Exception-assertion managers also assume
+                    // that setup succeeds before the operation expected to raise.
+                    let initial_state = if initializer_definitions == 0 {
+                        initial_state
+                    } else {
+                        intermediate_states
+                            .nth(initializer_definitions - 1)
+                            .unwrap_or(initial_state)
+                    };
 
                     self.flow_restore(initial_state);
 
@@ -5540,6 +5564,74 @@ fn is_empty_collection_constructor_call(expr: &ast::Expr) -> bool {
 
 fn is_collection_initializer(expr: &ast::Expr) -> bool {
     is_collection_literal(expr) || is_empty_collection_constructor_call(expr)
+}
+
+/// Returns whether a context expression is a conventional exception-assertion manager.
+fn is_exception_assertion_context(expr: &ast::Expr) -> bool {
+    let ast::Expr::Call(ast::ExprCall { func, .. }) = expr else {
+        return false;
+    };
+
+    match func.as_ref() {
+        ast::Expr::Name(ast::ExprName { id, .. }) => {
+            matches!(id.as_str(), "raises" | "assert_raises")
+        }
+        ast::Expr::Attribute(ast::ExprAttribute { value, attr, .. }) => {
+            attr == "raises"
+                && value
+                    .as_name_expr()
+                    .is_some_and(|name| name.id.as_str() == "pytest")
+        }
+        _ => false,
+    }
+}
+
+/// Counts the definitions produced by a context manager's leading setup assignment.
+fn context_manager_initializer_definitions(
+    statement: &ast::Stmt,
+    is_exception_assertion: bool,
+) -> Option<usize> {
+    fn is_non_raising_literal(expr: &ast::Expr) -> bool {
+        match expr {
+            ast::Expr::List(ast::ExprList { elts, .. })
+            | ast::Expr::Tuple(ast::ExprTuple { elts, .. }) => {
+                elts.iter().all(is_non_raising_literal)
+            }
+            _ => expr.is_literal_expr(),
+        }
+    }
+
+    match statement {
+        ast::Stmt::Assign(ast::StmtAssign { targets, value, .. }) => {
+            if !is_exception_assertion && !is_non_raising_literal(value) {
+                return None;
+            }
+
+            if targets.iter().all(ast::Expr::is_name_expr) {
+                return Some(targets.len());
+            }
+
+            if let [ast::Expr::Tuple(ast::ExprTuple { elts: targets, .. })] = targets.as_slice()
+                && let ast::Expr::Tuple(ast::ExprTuple { elts: values, .. }) = value.as_ref()
+                && targets.len() == values.len()
+                && targets.iter().all(ast::Expr::is_name_expr)
+            {
+                return Some(targets.len());
+            }
+
+            None
+        }
+        ast::Stmt::AnnAssign(ast::StmtAnnAssign {
+            target,
+            value: Some(value),
+            ..
+        }) if target.is_name_expr()
+            && (is_exception_assertion || is_non_raising_literal(value)) =>
+        {
+            Some(1)
+        }
+        _ => None,
+    }
 }
 
 pub(crate) fn is_collection_literal(expr: &ast::Expr) -> bool {

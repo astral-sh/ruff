@@ -159,10 +159,10 @@ async def suppressed_iteration(values: RaisingAsyncIterable) -> int:  # error: [
         return 1
 ```
 
-## Async literal assignments are conservatively interruptible
+## Leading async literal assignments are not interrupted
 
-An initial binding remains visible even when the only assignment inside the `async with` body has a
-literal right-hand side.
+An assignment of a literal to a name cannot raise a suppressible exception before the new binding is
+established, so the previous binding is not visible after the async context manager.
 
 ```py
 class Suppresses:
@@ -176,7 +176,118 @@ async def main():
     async with Suppresses():
         value = "finished"
 
-    reveal_type(value)  # revealed: Literal[1, "finished"]
+    reveal_type(value)  # revealed: Literal["finished"]
+```
+
+## Async literal initializers before a suppressible operation remain defined
+
+Leading literal assignments are complete before a later awaited operation can raise an exception
+that the async context manager suppresses.
+
+```py
+from typing import Literal
+from typing_extensions import assert_type
+
+class Suppresses:
+    async def __aenter__(self) -> None: ...
+    async def __aexit__(self, exc_type, exc_value, traceback) -> bool:
+        return True
+
+async def could_raise() -> None:
+    raise ValueError
+
+async def literal_initializers() -> None:
+    async with Suppresses():
+        x_values = [1, 2, 4]
+        y_values = [0.5, 0.8]
+        reservoir: list[int] = []
+        first, second = (1, 2)
+        await could_raise()
+
+    assert_type(x_values, list[int])
+    assert_type(y_values, list[float])
+    assert_type(reservoir, list[int])
+    assert_type(first, Literal[1])
+    assert_type(second, Literal[2])
+```
+
+## Async exception-assertion managers retain their setup assignments
+
+The exception-assertion name heuristic also applies when the manager implements the async
+context-manager protocol.
+
+```py
+from typing_extensions import assert_type
+
+class Raises:
+    async def __aenter__(self) -> None: ...
+    async def __aexit__(self, exc_type, exc_value, traceback) -> bool:
+        return True
+
+def assert_raises(exception: type[ValueError]) -> Raises:
+    return Raises()
+
+def custom_raises(exception: type[ValueError]) -> Raises:
+    return Raises()
+
+async def make_values() -> list[int]:
+    return [1, 2, 4]
+
+async def operation_under_test() -> None:
+    raise ValueError
+
+async def setup_before_exception() -> None:
+    async with assert_raises(ValueError):
+        x_values = await make_values()
+        y_values = await make_values()
+        first_values, second_values = await make_values(), await make_values()
+        await operation_under_test()
+
+    assert_type(x_values, list[int])
+    assert_type(y_values, list[int])
+    assert_type(first_values, list[int])
+    assert_type(second_values, list[int])
+
+async def unrecognized_exception_assertion_name() -> list[int]:
+    async with custom_raises(ValueError):
+        values = await make_values()
+        await operation_under_test()
+
+    return values  # error: [possibly-unresolved-reference]
+```
+
+## An awaited operation before literal initialization can still be suppressed
+
+```py
+class Suppresses:
+    async def __aenter__(self) -> None: ...
+    async def __aexit__(self, exc_type, exc_value, traceback) -> bool:
+        return True
+
+async def could_raise() -> None:
+    raise ValueError
+
+async def call_before_initializer() -> int:
+    async with Suppresses():
+        await could_raise()
+        value = 1
+
+    return value  # error: [possibly-unresolved-reference]
+
+async def could_raise_int() -> int:
+    raise ValueError
+
+async def await_as_initializer() -> int:
+    async with Suppresses():
+        value = await could_raise_int()
+
+    return value  # error: [possibly-unresolved-reference]
+
+async def await_inside_literal_initializer() -> list[int]:
+    async with Suppresses():
+        values = [await could_raise_int()]
+
+    return values  # error: [possibly-unresolved-reference]
 ```
 
 ## Async deletions are not yet recorded as intermediate definitions
@@ -463,6 +574,35 @@ async def test():
     async with Manager() as (x, y):
         reveal_type(x)  # revealed: int
         reveal_type(y)  # revealed: str
+```
+
+## Async exit methods are looked up on the context manager's class
+
+An `async with` statement invokes `type(manager).__aexit__`, not an attribute stored on the manager
+instance. An instance-only `__aexit__` is therefore neither a valid async context-manager method nor
+a source of exception suppression.
+
+```py
+from collections.abc import Awaitable, Callable
+from typing_extensions import assert_type
+
+async def suppress_exit(*args: object) -> bool:
+    return True
+
+class InstanceOnlyAsyncExit:
+    def __init__(self) -> None:
+        self.__aexit__: Callable[..., Awaitable[bool]] = suppress_exit
+
+    async def __aenter__(self) -> None:
+        return None
+
+async def instance_attributes_do_not_suppress(value: int | str) -> None:
+    if isinstance(value, int):
+        # error: [invalid-context-manager]
+        async with InstanceOnlyAsyncExit():
+            raise ValueError
+
+    assert_type(value, str)
 ```
 
 ## Context manager without an `__aenter__` or `__aexit__` method

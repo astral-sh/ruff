@@ -189,11 +189,10 @@ def suppressed_iteration(values: RaisingIterable) -> int:  # error: [invalid-ret
         return 1
 ```
 
-## Literal assignments are conservatively interruptible
+## Leading literal assignments are not interrupted
 
-Even an assignment whose right-hand side is a literal is modeled as potentially interrupted. This
-matches the body-wide approximation used for `try` statements and by mypy and Pyright; the initial
-binding remains visible after the manager.
+An assignment of a literal to a name cannot raise a suppressible exception before the new binding is
+established, so the previous binding is not visible after the context manager.
 
 ```py
 from contextlib import suppress
@@ -203,7 +202,149 @@ value = 1
 with suppress(ValueError):
     value = "finished"
 
-reveal_type(value)  # revealed: Literal[1, "finished"]
+reveal_type(value)  # revealed: Literal["finished"]
+```
+
+## Literal initializers before a suppressible operation remain defined
+
+Suppressing an exception from a later operation cannot undo leading assignments of literal values.
+This covers the initialization patterns used by pytest-based tests and `more-itertools`.
+
+```py
+from contextlib import suppress
+from typing import Literal
+from typing_extensions import assert_type
+
+def could_raise_value_error() -> None:
+    raise ValueError
+
+def could_raise_stop_iteration() -> None:
+    raise StopIteration
+
+def pytest_style_initializers() -> None:
+    with suppress(ValueError):
+        x_values = [1, 2, 4]
+        y_values = [0.5, 0.8]
+        could_raise_value_error()
+
+    assert_type(x_values, list[int])
+    assert_type(y_values, list[float])
+
+def empty_reservoir_initializer() -> None:
+    with suppress(StopIteration):
+        reservoir: list[int] = []
+        could_raise_stop_iteration()
+
+    assert_type(reservoir, list[int])
+
+def unpacked_literal_initializers() -> None:
+    with suppress(ValueError):
+        first, second = (1, 2)
+        could_raise_value_error()
+
+    assert_type(first, Literal[1])
+    assert_type(second, Literal[2])
+```
+
+## Exception-assertion managers retain their setup assignments
+
+The names `raises`, `pytest.raises`, and `assert_raises` conventionally identify an
+exception-assertion manager. As a small heuristic, ty assumes that leading single-name assignments
+set up the operation under test rather than raise its expected exception. This also covers setup
+calls such as `numpy.linspace` in SciPy's exception tests.
+
+```py
+from typing_extensions import assert_type
+
+class Raises:
+    def __enter__(self) -> None: ...
+    def __exit__(self, exc_type, exc_value, traceback) -> bool:
+        return True
+
+def raises(exception: type[ValueError]) -> Raises:
+    return Raises()
+
+def assert_raises(exception: type[ValueError]) -> Raises:
+    return Raises()
+
+def custom_raises(exception: type[ValueError]) -> Raises:
+    return Raises()
+
+def make_values() -> list[int]:
+    return [1, 2, 4]
+
+def operation_under_test() -> None:
+    raise ValueError
+
+def direct_exception_assertion() -> None:
+    with raises(ValueError):
+        values = make_values()
+        operation_under_test()
+
+    assert_type(values, list[int])
+
+def aliased_exception_assertion() -> None:
+    with assert_raises(ValueError):
+        x_values = make_values()
+        y_values = make_values()
+        first_values, second_values = make_values(), make_values()
+        operation_under_test()
+
+    assert_type(x_values, list[int])
+    assert_type(y_values, list[int])
+    assert_type(first_values, list[int])
+    assert_type(second_values, list[int])
+
+class Pytest:
+    def raises(self, exception: type[ValueError]) -> Raises:
+        return Raises()
+
+pytest = Pytest()
+
+def qualified_exception_assertion() -> None:
+    with pytest.raises(ValueError):
+        values = make_values()
+        operation_under_test()
+
+    assert_type(values, list[int])
+
+def unrecognized_exception_assertion_name() -> list[int]:
+    with custom_raises(ValueError):
+        values = make_values()
+        operation_under_test()
+
+    return values  # error: [possibly-unresolved-reference]
+```
+
+## An operation before literal initialization can still be suppressed
+
+```py
+from contextlib import suppress
+
+def could_raise() -> None:
+    raise ValueError
+
+def call_before_initializer() -> int:
+    with suppress(ValueError):
+        could_raise()
+        value = 1
+
+    return value  # error: [possibly-unresolved-reference]
+
+def could_raise_int() -> int:
+    raise ValueError
+
+def call_as_initializer() -> int:
+    with suppress(ValueError):
+        value = could_raise_int()
+
+    return value  # error: [possibly-unresolved-reference]
+
+def call_inside_literal_initializer() -> list[int]:
+    with suppress(ValueError):
+        values = [could_raise_int()]
+
+    return values  # error: [possibly-unresolved-reference]
 ```
 
 ## Deletions are not yet recorded as intermediate definitions
@@ -588,6 +729,35 @@ def f2(x: UnionAB2) -> None:
 def f3(x: UnionAB3) -> None:
     with x as y:
         reveal_type(y)  # revealed: A | B
+```
+
+## Exit methods are looked up on the context manager's class
+
+A `with` statement invokes `type(manager).__exit__`, not an attribute stored on the manager
+instance. An instance-only `__exit__` is therefore neither a valid context-manager method nor a
+source of exception suppression.
+
+```py
+from collections.abc import Callable
+from typing_extensions import assert_type
+
+def suppress_exit(*args: object) -> bool:
+    return True
+
+class InstanceOnlyExit:
+    def __init__(self) -> None:
+        self.__exit__: Callable[..., bool] = suppress_exit
+
+    def __enter__(self) -> None:
+        return None
+
+def instance_attributes_do_not_suppress(value: int | str) -> None:
+    if isinstance(value, int):
+        # error: [invalid-context-manager]
+        with InstanceOnlyExit():
+            raise ValueError
+
+    assert_type(value, str)
 ```
 
 ## Context manager without an `__enter__` or `__exit__` method
