@@ -24,6 +24,7 @@ use crate::{
         Parameter, Parameters, PropertyInstanceType, Signature, SpecialFormType, StaticMroError,
         SubclassOfType, Truthiness, Type, TypeContext, TypeMapping, TypeVarVariance,
         TypedDictModule, UnionBuilder, UnionType,
+        bound_super::BoundSuperType,
         call::{CallError, CallErrorKind},
         callable::{CallableFunctionProvenance, CallableTypeKind},
         class::{
@@ -118,6 +119,36 @@ pub struct StaticClassLiteral<'db> {
 
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for StaticClassLiteral<'_> {}
+
+/// The outcome of dispatching a frozen-dataclass method on a subclass instance.
+#[derive(Clone, Copy)]
+pub(crate) enum FrozenDataclassDispatch<'db> {
+    /// A reachable frozen dataclass rejects modification of one of its fields.
+    FrozenField,
+    /// Every reachable frozen method delegates past this base.
+    Delegate(StaticClassLiteral<'db>),
+}
+
+impl<'db> FrozenDataclassDispatch<'db> {
+    /// Returns `object` for a frozen field or `super(frozen_base, object)` for a non-field.
+    pub(crate) fn receiver(self, db: &'db dyn Db, object_ty: Type<'db>) -> Type<'db> {
+        match self {
+            Self::FrozenField => object_ty,
+            Self::Delegate(frozen_base) => BoundSuperType::build(
+                db,
+                Type::ClassLiteral(ClassLiteral::Static(frozen_base)),
+                object_ty,
+            )
+            .unwrap_or(object_ty),
+        }
+    }
+}
+
+/// Fields protected by reachable frozen-dataclass methods.
+struct InheritedFrozenDataclassFields<'db> {
+    names: Box<[Name]>,
+    last_frozen_base: StaticClassLiteral<'db>,
+}
 
 #[salsa::tracked]
 impl<'db> StaticClassLiteral<'db> {
@@ -1850,7 +1881,7 @@ impl<'db> StaticClassLiteral<'db> {
         }
 
         let frozen_base_fields =
-            self.inherited_non_slotted_frozen_dataclass_fields(db, specialization)?;
+            self.inherited_non_slotted_frozen_dataclass_fields(db, specialization, "__setattr__")?;
 
         let instance_ty =
             Type::instance(db, self.apply_optional_specialization(db, specialization));
@@ -1868,7 +1899,8 @@ impl<'db> StaticClassLiteral<'db> {
         };
 
         let overloads = frozen_base_fields
-            .keys()
+            .names
+            .iter()
             .map(|field| setattr_signature(Type::string_literal(db, field), Type::Never))
             .chain([setattr_signature(
                 KnownClass::Str.to_instance(db),
@@ -1883,15 +1915,60 @@ impl<'db> StaticClassLiteral<'db> {
         )))
     }
 
-    /// Return the inherited frozen dataclass fields whose generated `__setattr__` still controls
-    /// assignments on this class.
+    /// Returns the outcome of an inherited frozen-dataclass method for `name`.
+    ///
+    /// For a non-field, CPython delegates past each generated frozen method. Preserving the final
+    /// frozen base lets assignment validation perform the same `super()` lookup without hiding a
+    /// later method or an attribute's descriptor.
+    pub(crate) fn inherited_frozen_dataclass_dispatch(
+        self,
+        db: &'db dyn Db,
+        specialization: Option<Specialization<'db>>,
+        method: &str,
+        name: &str,
+    ) -> Option<FrozenDataclassDispatch<'db>> {
+        if CodeGeneratorKind::from_static_class(db, self).is_some()
+            || class_member(db, self.body_scope(db), method)
+                .ignore_possibly_undefined()
+                .is_some()
+        {
+            return None;
+        }
+
+        let frozen_base_fields =
+            self.inherited_non_slotted_frozen_dataclass_fields(db, specialization, method)?;
+
+        if frozen_base_fields
+            .names
+            .iter()
+            .any(|field| field.as_str() == name)
+        {
+            Some(FrozenDataclassDispatch::FrozenField)
+        } else {
+            Some(FrozenDataclassDispatch::Delegate(
+                frozen_base_fields.last_frozen_base,
+            ))
+        }
+    }
+
+    /// Returns the inherited fields protected by a generated frozen-dataclass method.
     fn inherited_non_slotted_frozen_dataclass_fields(
         self,
         db: &'db dyn Db,
         specialization: Option<Specialization<'db>>,
-    ) -> Option<&'db FxIndexMap<Name, Field<'db>>> {
+        method: &str,
+    ) -> Option<InheritedFrozenDataclassFields<'db>> {
+        let mut names = FxIndexSet::default();
+        let mut last_frozen_base = None;
+
         for base in self.iter_mro(db, specialization).skip(1) {
-            let (base_class, base_specialization) = base.into_class()?.static_class_literal(db)?;
+            let Some(base_class_type) = base.into_class() else {
+                break;
+            };
+            let Some((base_class, base_specialization)) = base_class_type.static_class_literal(db)
+            else {
+                break;
+            };
 
             // Stop if another class in the MRO replaces the generated frozen setter:
             //
@@ -1905,29 +1982,47 @@ impl<'db> StaticClassLiteral<'db> {
             //
             // Writes to `Child().x` dispatch to `Mutable.__setattr__`, not to the synthesized
             // `Frozen.__setattr__`.
-            if class_member(db, base_class.body_scope(db), "__setattr__")
+            if class_member(db, base_class.body_scope(db), method)
                 .ignore_possibly_undefined()
                 .is_some()
             {
-                return None;
+                break;
             }
 
             if base_class.is_frozen_dataclass(db) == Some(true) {
                 let field_policy @ CodeGeneratorKind::DataclassLike(_) =
                     CodeGeneratorKind::from_static_class(db, base_class)?
                 else {
-                    return None;
+                    break;
                 };
 
                 if base_class.has_dataclass_param(db, field_policy, DataclassFlags::SLOTS) {
-                    return None;
+                    break;
                 }
 
-                return Some(base_class.fields(db, base_specialization, field_policy));
+                names.extend(
+                    base_class
+                        .fields(db, base_specialization, field_policy)
+                        .iter()
+                        .filter(|(_, field)| {
+                            !matches!(
+                                field.kind,
+                                FieldKind::Dataclass {
+                                    init_only: true,
+                                    ..
+                                }
+                            )
+                        })
+                        .map(|(name, _)| name.clone()),
+                );
+                last_frozen_base = Some(base_class);
             }
         }
 
-        None
+        Some(InheritedFrozenDataclassFields {
+            names: names.into_iter().collect(),
+            last_frozen_base: last_frozen_base?,
+        })
     }
 
     /// Member lookup for classes that inherit from `typing.TypedDict`.

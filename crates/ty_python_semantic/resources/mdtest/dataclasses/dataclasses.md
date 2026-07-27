@@ -810,6 +810,141 @@ grandchild.z = 2
 grandchild.unknown = 2
 ```
 
+When another base class rejects assignment, a frozen dataclass must not hide its `__setattr__`
+method:
+
+```py
+from dataclasses import dataclass
+from typing import NoReturn
+
+@dataclass(frozen=True)
+class Frozen:
+    x: int = 1
+
+class RejectsAssignment:
+    y: int = 1
+
+    def __setattr__(self, name: str, value: object) -> NoReturn:
+        raise AttributeError(name)
+
+class ChildWithRejectingAssignmentBase(Frozen, RejectsAssignment): ...
+
+# error: [invalid-assignment] "Cannot assign to attribute `y` on type `ChildWithRejectingAssignmentBase` whose `__setattr__` method returns `Never`/`NoReturn`"
+ChildWithRejectingAssignmentBase().y = 2
+```
+
+A later base class can instead allow assignment to an otherwise read-only property. Its setter still
+determines which values are accepted:
+
+```py
+class AllowsAssignment:
+    @property
+    def y(self) -> int:
+        return 1
+
+    def __setattr__(self, name: str, value: int) -> None: ...
+
+class ChildWithAllowingAssignmentBase(Frozen, AllowsAssignment): ...
+
+allowed = ChildWithAllowingAssignmentBase()
+allowed.y = 2
+
+# error: [invalid-assignment] "Cannot assign object of type"
+allowed.y = "invalid"
+```
+
+A later `__setattr__` does not make the declared type of an ordinary attribute disappear:
+
+```py
+class AllowsUntypedAssignment:
+    y: int = 1
+
+    def __setattr__(self, name: str, value: object) -> None: ...
+
+class ChildWithUntypedAssignmentBase(Frozen, AllowsUntypedAssignment): ...
+
+# error: [invalid-assignment]
+ChildWithUntypedAssignmentBase().y = "invalid"
+```
+
+A specialized `Generic[T]` frozen base must also preserve the next `__setattr__` in the MRO:
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+
+@dataclass(frozen=True)
+class GenericFrozen(Generic[T]):
+    value: T
+
+class RejectingGenericAssignmentChild(GenericFrozen[int], RejectsAssignment): ...
+
+# error: [invalid-assignment] "Cannot assign to attribute `y` on type `RejectingGenericAssignmentChild` whose `__setattr__` method returns `Never`/`NoReturn`"
+RejectingGenericAssignmentChild(1).y = 2
+```
+
+The same behavior applies to Python 3.12 type-parameter syntax:
+
+```py
+@dataclass(frozen=True)
+class TypeParameterFrozen[T]:
+    value: T
+
+class RejectingTypeParameterAssignmentChild(TypeParameterFrozen[int], RejectsAssignment): ...
+
+# error: [invalid-assignment] "Cannot assign to attribute `y` on type `RejectingTypeParameterAssignmentChild` whose `__setattr__` method returns `Never`/`NoReturn`"
+RejectingTypeParameterAssignmentChild(1).y = 2
+```
+
+When a subclass inherits from two frozen dataclasses, assignments to fields from both bases remain
+frozen:
+
+```py
+@dataclass(frozen=True)
+class FirstFrozen:
+    first: int = 1
+
+@dataclass(frozen=True)
+class SecondFrozen:
+    second: int = 1
+
+class ChildWithTwoFrozenBases(FirstFrozen, SecondFrozen): ...
+
+multiple = ChildWithTwoFrozenBases()
+# revealed: Overload[(name: Literal["first"], value) -> Never, (name: Literal["second"], value) -> Never, (name: str, value) -> None]
+reveal_type(multiple.__setattr__)
+
+multiple.second = 2  # error: [invalid-assignment]
+```
+
+An `InitVar` is a constructor argument, not a frozen field. A subclass can assign to an attribute
+with the same name:
+
+```py
+from dataclasses import InitVar
+
+@dataclass(frozen=True)
+class FrozenWithInitVar:
+    temporary: InitVar[int] = 0
+
+class ChildWithInitVar(FrozenWithInitVar):
+    temporary: int = 1
+
+init_var_child = ChildWithInitVar()
+init_var_child.temporary = 4
+```
+
+The same rule applies when the `InitVar` belongs to a second frozen base:
+
+```py
+class ChildWithSecondBaseInitVar(Frozen, FrozenWithInitVar):
+    temporary: int = 1
+
+second_init_var_child = ChildWithSecondBaseInitVar()
+second_init_var_child.temporary = 4
+```
+
 Non-field attributes on subclasses of slotted frozen dataclasses are still rejected. This correctly
 models the runtime behavior, but is somewhat surprising and may be a CPython bug, as subclasses of
 slotted classes usually allow arbitrary attributes to be set on them unless the subclass also
