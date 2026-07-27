@@ -3723,6 +3723,7 @@ impl<'db> PathBounds<'db> {
                     && !typevar.is_inferable(db, inferable)
                     && !lower.has_typevar(db)
                     && !lower.has_unspecialized_type_var(db)
+                    && lower.bottom_materialization(db) == lower.top_materialization(db)
                 {
                     fixed_noninferable_bindings.push(TypeVarSolution {
                         bound_typevar: typevar,

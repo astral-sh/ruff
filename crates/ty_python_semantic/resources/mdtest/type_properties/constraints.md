@@ -897,7 +897,8 @@ its constraint subject. An explicit exact constraint fixes a non-inferable varia
 type; a one-sided bound does not.
 
 ```py
-from typing import Never
+from typing import Any, Never
+from ty_extensions import Unknown
 from ty_extensions._internal import ConstraintSet
 
 def symbolic_relationship[I, N]() -> None:
@@ -918,6 +919,16 @@ def fixed_noninferable[I, N]() -> None:
 def fixed_nested_noninferable[I, N]() -> None:
     constraints = ConstraintSet.range(int, N, int) & ConstraintSet.range(list[N], I, list[N])
     # revealed: tuple[Solution[I=list[int]]]
+    reveal_type(constraints.solutions(inferable=tuple[I]))
+
+def gradual_noninferable_any[I, N]() -> None:
+    constraints = ConstraintSet.range(Any, N, Any) & ConstraintSet.range(N, I, N)
+    # revealed: tuple[Solution[I=Any | N@gradual_noninferable_any]]
+    reveal_type(constraints.solutions(inferable=tuple[I]))
+
+def gradual_noninferable_unknown[I, N]() -> None:
+    constraints = ConstraintSet.range(Unknown, N, Unknown) & ConstraintSet.range(N, I, N)
+    # revealed: tuple[Solution[I=Unknown | N@gradual_noninferable_unknown]]
     reveal_type(constraints.solutions(inferable=tuple[I]))
 
 def lower_bounded_noninferable[I, N]() -> None:
