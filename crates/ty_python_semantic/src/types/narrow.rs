@@ -116,7 +116,11 @@ pub(crate) fn infer_narrowing_constraints<'db>(
     }
 }
 
-#[salsa::tracked(returns(as_ref), heap_size=ruff_memory_usage::heap_size)]
+#[salsa::tracked(
+    returns(as_ref),
+    cycle_initial=|_, _, _| None,
+    heap_size=ruff_memory_usage::heap_size,
+)]
 fn all_narrowing_constraints_for_pattern<'db>(
     db: &'db dyn Db,
     pattern: PatternPredicate<'db>,
@@ -149,7 +153,11 @@ fn all_narrowing_constraints_for_expression<'db>(
     }
 }
 
-#[salsa::tracked(returns(as_ref), heap_size=ruff_memory_usage::heap_size)]
+#[salsa::tracked(
+    returns(as_ref),
+    cycle_initial=|_, _, _| None,
+    heap_size=ruff_memory_usage::heap_size,
+)]
 fn all_negative_narrowing_constraints_for_pattern<'db>(
     db: &'db dyn Db,
     pattern: PatternPredicate<'db>,
@@ -162,7 +170,11 @@ fn all_negative_narrowing_constraints_for_pattern<'db>(
         .finish()
 }
 
-#[salsa::tracked(returns(as_ref), heap_size=ruff_memory_usage::heap_size)]
+#[salsa::tracked(
+    returns(as_ref),
+    cycle_initial=|_, _, _, _| None,
+    heap_size=ruff_memory_usage::heap_size,
+)]
 fn all_narrowing_constraints_for_subject_element_pattern<'db>(
     db: &'db dyn Db,
     pattern: PatternPredicate<'db>,
