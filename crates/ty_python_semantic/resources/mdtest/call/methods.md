@@ -1019,6 +1019,48 @@ class X:
         return self.__new__(type(self))
 ```
 
+Calling `object.__new__` from an overriding `__new__` method preserves `Self`, so an invalid
+attribute access on the result is reported:
+
+```py
+class Item:
+    def __new__(cls) -> Self:
+        result = object.__new__(cls)
+        reveal_type(result)  # revealed: Self@__new__
+        # error: [unresolved-attribute]
+        result.nonexistent()
+        return result
+```
+
+Explicitly marking `__new__` as a static method does not change the inferred result:
+
+```py
+class StaticItem:
+    @staticmethod
+    def __new__(cls) -> Self:
+        result = object.__new__(cls)
+        reveal_type(result)  # revealed: Self@__new__
+        return result
+```
+
+`Self` is also preserved through a chain of inherited `__new__` calls:
+
+```py
+class Foo: ...
+
+class Bar(Foo):
+    def __new__(cls) -> Self:
+        return Foo.__new__(cls)
+
+class Baz(Bar):
+    def __new__(cls) -> Self:
+        result = Bar.__new__(cls)
+        reveal_type(result)  # revealed: Self@__new__
+        # error: [unresolved-attribute]
+        result.nonexistent()
+        return result
+```
+
 ## Bound-method attribute fallback
 
 Bound-method attributes are resolved first on `types.MethodType`, then, if absent, on the underlying

@@ -527,6 +527,8 @@ to `Any`:
 from enum import Enum
 
 class Connector(Enum):
+    connector_id: int
+
     def __new__(cls, value: str, connector_id: int) -> "Connector":
         obj = object.__new__(cls)
         obj._value_ = value
@@ -546,6 +548,7 @@ from enum import Enum
 
 class AnnotatedConnector(Enum):
     _value_: str
+    connector_id: int
 
     def __new__(cls, value: str, connector_id: int = 0) -> "AnnotatedConnector":
         obj = object.__new__(cls)
@@ -661,6 +664,8 @@ annotation, subclass member values remain dynamic:
 from enum import Enum
 
 class Base(Enum):
+    connector_id: int
+
     def __new__(cls, value: str, connector_id: int) -> "Base":
         obj = object.__new__(cls)
         obj._value_ = value
@@ -680,6 +685,8 @@ An explicit `_value_` annotation on the subclass still takes precedence:
 from enum import Enum
 
 class Base(Enum):
+    connector_id: int
+
     def __new__(cls, value: str, connector_id: int = 0) -> "Base":
         obj = object.__new__(cls)
         obj._value_ = value
@@ -702,6 +709,8 @@ explicitly annotated:
 from enum import Enum
 
 class Base(Enum):
+    connector_id: int
+
     def __new__(cls, value: int, connector_id: int = 0) -> "Base":
         obj = object.__new__(cls)
         obj._value_ = value
