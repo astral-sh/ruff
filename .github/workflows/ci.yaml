@@ -30,6 +30,7 @@ env:
 jobs:
   determine_changes:
     name: "Determine changes"
+    if: github.event_name != 'workflow_dispatch'
     runs-on: ubuntu-latest
     outputs:
       # Flag that is raised when any code that affects parser is changed
@@ -1346,3 +1347,126 @@ jobs:
           fi
         env:
           NEEDS_JSON: ${{ toJSON(needs) }}
+
+  workspace-cache-benchmark:
+    name: "benchmark ${{ matrix.platform.name }}"
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ${{ matrix.platform.runner }}
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        platform:
+          - name: linux
+            runner: depot-ubuntu-22.04-16
+            shared-key: ruff-linux-debug
+          - name: macos
+            runner: namespace-profile-macos-15
+            shared-key: cargo-test-other
+          - name: windows
+            runner: depot-windows-2022-16
+            shared-key: cargo-test-other
+    env:
+      CARGO_INCREMENTAL: 0
+      CARGO_NET_RETRY: 10
+      CARGO_PROFILE_DEV_DEBUG: line-tables-only
+      CARGO_TERM_COLOR: always
+      MDTEST_EXTERNAL: "1"
+      NEXTEST_PROFILE: ci
+      RUSTUP_MAX_RETRIES: 10
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Restore production Rust dependency cache
+        uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
+        with:
+          shared-key: ${{ matrix.platform.shared-key }}
+          cache-bin: "false"
+          save-if: false
+
+      - name: Install Rust toolchain
+        run: rustup show
+
+      - name: Install mold
+        if: matrix.platform.name == 'linux'
+        uses: rui314/setup-mold@9c9c13bf4c3f1adef0cc596abc155580bcb04444 # v1
+
+      - name: Install cargo nextest
+        uses: taiki-e/install-action@43aecc8d72668fbcfe75c31400bc4f890f1c5853 # v2.83.2
+        with:
+          tool: cargo-nextest
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          version: "0.11.31"
+          enable-cache: "false"
+
+      - name: Seed baseline workspace artifacts
+        run: |
+          set -euo pipefail
+          started_at=$(date +%s)
+          cargo nextest run --no-run --cargo-quiet --all-features --locked
+          printf 'TIMING seed platform=%s variant=baseline seconds=%s\n' \
+            '${{ matrix.platform.name }}' "$(( $(date +%s) - started_at ))"
+
+      - name: Seed checksum workspace artifacts
+        env:
+          CARGO_TARGET_DIR: target-checksum
+          CARGO_UNSTABLE_CHECKSUM_FRESHNESS: "true"
+          RUSTC_BOOTSTRAP: 1
+        run: |
+          set -euo pipefail
+          started_at=$(date +%s)
+          cargo nextest run --no-run --cargo-quiet --all-features --locked
+          printf 'TIMING seed platform=%s variant=checksum seconds=%s\n' \
+            '${{ matrix.platform.name }}' "$(( $(date +%s) - started_at ))"
+
+      - name: Measure five paired warm-cache samples
+        run: |
+          set -euo pipefail
+
+          measure() {
+            variant="$1"
+            sample="$2"
+            if [[ "$variant" == checksum ]]; then
+              export CARGO_TARGET_DIR=target-checksum
+              export CARGO_UNSTABLE_CHECKSUM_FRESHNESS=true
+              export RUSTC_BOOTSTRAP=1
+            else
+              export CARGO_TARGET_DIR=target
+              unset CARGO_UNSTABLE_CHECKSUM_FRESHNESS RUSTC_BOOTSTRAP
+            fi
+
+            started_at=$(date +%s)
+            cargo nextest run --no-run --cargo-quiet --all-features --locked
+            compile_seconds=$(( $(date +%s) - started_at ))
+
+            started_at=$(date +%s)
+            cargo nextest run --cargo-quiet --all-features --locked \
+              --status-level fail --final-status-level fail \
+              --failure-output immediate --success-output never
+            test_seconds=$(( $(date +%s) - started_at ))
+
+            printf 'TIMING sample platform=%s variant=%s sample=%s compile=%s test=%s total=%s\n' \
+              '${{ matrix.platform.name }}' "$variant" "$sample" \
+              "$compile_seconds" "$test_seconds" "$(( compile_seconds + test_seconds ))"
+          }
+
+          for sample in 1 2 3 4 5; do
+            while IFS= read -r source; do
+              touch "$source"
+            done < <(git ls-files '*.rs' 'Cargo.toml' 'crates/**/Cargo.toml')
+
+            if (( sample % 2 )); then
+              measure baseline "$sample"
+              measure checksum "$sample"
+            else
+              measure checksum "$sample"
+              measure baseline "$sample"
+            fi
+          done
