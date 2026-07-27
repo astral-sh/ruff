@@ -659,7 +659,7 @@ reveal_type(WithUnsafeHash.__hash__)  # revealed: (self: WithUnsafeHash) -> int
 
 ### `frozen`
 
-If true (the default is False), assigning to or deleting fields will generate a diagnostic.
+When `frozen=True`, a dataclass does not allow its fields to be assigned or deleted.
 
 ```py
 from dataclasses import dataclass
@@ -670,6 +670,8 @@ class MyFrozenClass:
 
 frozen_instance = MyFrozenClass(1)
 frozen_instance.x = 2  # error: [invalid-assignment]
+
+reveal_type(frozen_instance.__delattr__)  # revealed: (name) -> Never
 
 # error: [invalid-assignment] "Cannot delete attribute `x` on type `MyFrozenClass` whose `__delattr__` method returns `Never`/`NoReturn`"
 del frozen_instance.x
@@ -1022,11 +1024,11 @@ second_init_var_child = ChildWithSecondBaseInitVar()
 second_init_var_child.temporary = 4
 ```
 
-Assignments and deletions of non-field attributes on subclasses of slotted frozen dataclasses are
-still rejected. This correctly models the runtime behavior, but is somewhat surprising and may be a
-CPython bug, as subclasses of slotted classes usually allow arbitrary attributes to be set on them
-unless the subclass also explicitly declares `__slots__`. We should change our behavior here to
-follow CPython, if they "fix" it.
+Non-field attributes on subclasses of slotted frozen dataclasses are still rejected. This correctly
+models the runtime behavior, but is somewhat surprising and may be a CPython bug, as subclasses of
+slotted classes usually allow arbitrary attributes to be set on them unless the subclass also
+explicitly declares `__slots__`. We should change our behavior here to follow CPython, if they "fix"
+it. The same limitation applies when deleting an attribute.
 
 ```py
 from dataclasses import dataclass
@@ -1054,13 +1056,9 @@ grandchild.x = 2  # error: [invalid-assignment]
 grandchild.y = 2  # error: [invalid-assignment]
 grandchild.z = 2  # error: [invalid-assignment]
 grandchild.unknown = 2  # error: [invalid-assignment]
-
-del grandchild.x  # error: [invalid-assignment]
-del grandchild.z  # error: [invalid-assignment]
 ```
 
-The same diagnostic is emitted if a frozen dataclass is inherited, and an attempt is made to delete
-an attribute:
+A frozen dataclass also prevents an ordinary subclass from deleting an inherited field:
 
 ```py
 from dataclasses import dataclass
@@ -1072,28 +1070,37 @@ class MyFrozenClass:
 class MyFrozenChildClass(MyFrozenClass): ...
 
 frozen = MyFrozenChildClass()
+
+# revealed: Overload[(name: Literal["x"]) -> Never, (name: str) -> None]
+reveal_type(frozen.__delattr__)
+
 del frozen.x  # error: [invalid-assignment]
 ```
 
-Non-field deletions on a frozen dataclass subclass still use the normal property and inherited
-`__delattr__` checks:
+A frozen dataclass does not make a subclass's read-only property safe to delete:
 
 ```py
 from dataclasses import dataclass
-from typing import NoReturn
 
 @dataclass(frozen=True)
 class Frozen:
     x: int = 1
 
-reveal_type(Frozen().__delattr__)  # revealed: (name) -> Never
-
-class ChildWithReadOnlyProperty(Frozen):
+class ReadOnlyChild(Frozen):
     @property
     def y(self) -> int:
         return 1
 
-class ChildWithRejectingProperty(Frozen):
+# error: [invalid-assignment] "Cannot delete read-only property `y` on object of type `ReadOnlyChild`"
+del ReadOnlyChild().y
+```
+
+Deleting a property is also invalid when its deleter never returns:
+
+```py
+from typing import NoReturn
+
+class RejectingPropertyChild(Frozen):
     @property
     def y(self) -> int:
         return 1
@@ -1102,53 +1109,68 @@ class ChildWithRejectingProperty(Frozen):
     def y(self) -> NoReturn:
         raise AttributeError("y")
 
-class RejectLater:
+# error: [invalid-assignment] "Cannot delete attribute `y` on type `RejectingPropertyChild` whose `__delete__` method returns `Never`/`NoReturn`"
+del RejectingPropertyChild().y
+```
+
+When another base class rejects deletion, the frozen dataclass must not hide its `__delattr__`
+method:
+
+```py
+class RejectsDeletion:
     y: int = 1
 
     def __delattr__(self, name: str) -> NoReturn:
         raise AttributeError(name)
 
-class AllowLater:
+class ChildWithRejectingBase(Frozen, RejectsDeletion): ...
+
+# error: [invalid-assignment] "Cannot delete attribute `y` on type `ChildWithRejectingBase` whose `__delattr__` method returns `Never`/`NoReturn`"
+del ChildWithRejectingBase().y
+```
+
+A second base class can instead allow deletion, even if the attribute is a read-only property:
+
+```py
+class AllowsDeletion:
     @property
     def y(self) -> int:
         return 1
 
     def __delattr__(self, name: str) -> None: ...
 
-class ChildWithLaterRejectingDelAttr(Frozen, RejectLater): ...
-class ChildWithLaterPermissiveDelAttr(Frozen, AllowLater): ...
+class ChildWithAllowingBase(Frozen, AllowsDeletion): ...
 
-class ChildWithDeletableAttribute(Frozen):
+del ChildWithAllowingBase().y
+```
+
+An ordinary attribute defined on a subclass can also be deleted:
+
+```py
+class ChildWithOwnAttribute(Frozen):
     y: int = 1
 
-class ChildWithOverriddenDelAttr(Frozen):
+deletable = ChildWithOwnAttribute()
+deletable.y = 2
+del deletable.y
+```
+
+A subclass can replace the inherited `__delattr__`, but a method that returns `None` is an invalid
+override of the frozen base's method, which returns `Never`. The overriding method still controls
+deletion on both that subclass and its subclasses:
+
+```py
+class ChildWithDeletionOverride(Frozen):
     # error: [invalid-method-override]
     def __delattr__(self, name: str) -> None: ...
 
-class GrandchildWithOverriddenDelAttr(ChildWithOverriddenDelAttr): ...
+class GrandchildWithDeletionOverride(ChildWithDeletionOverride): ...
 
-# error: [invalid-assignment] "Cannot delete read-only property `y` on object of type `ChildWithReadOnlyProperty`"
-del ChildWithReadOnlyProperty().y
-
-# error: [invalid-assignment] "Cannot delete attribute `y` on type `ChildWithRejectingProperty` whose `__delete__` method returns `Never`/`NoReturn`"
-del ChildWithRejectingProperty().y
-
-# revealed: bound method ChildWithLaterRejectingDelAttr.__delattr__(name: str) -> Never
-reveal_type(super(Frozen, ChildWithLaterRejectingDelAttr()).__delattr__)
-
-# error: [invalid-assignment] "Cannot delete attribute `y` on type `ChildWithLaterRejectingDelAttr` whose `__delattr__` method returns `Never`/`NoReturn`"
-del ChildWithLaterRejectingDelAttr().y
-
-del ChildWithLaterPermissiveDelAttr().y
-
-deletable = ChildWithDeletableAttribute()
-deletable.y = 2
-del deletable.y
-del ChildWithOverriddenDelAttr().x
-del GrandchildWithOverriddenDelAttr().x
+del ChildWithDeletionOverride().x
+del GrandchildWithDeletionOverride().x
 ```
 
-Independent frozen dataclasses protect fields from every generated method reachable in the MRO:
+When a subclass inherits from two frozen dataclasses, fields from both bases remain frozen:
 
 ```py
 from dataclasses import dataclass
@@ -1166,18 +1188,13 @@ class Child(A, B): ...
 child = Child()
 # revealed: Overload[(name: Literal["a"]) -> Never, (name: Literal["b"]) -> Never, (name: str) -> None]
 reveal_type(child.__delattr__)
-# revealed: Overload[(name: Literal["a"], value) -> Never, (name: Literal["b"], value) -> Never, (name: str, value) -> None]
-reveal_type(child.__setattr__)
 
-del child.a  # error: [invalid-assignment]
 del child.b  # error: [invalid-assignment]
-
-child.a = 2  # error: [invalid-assignment]
 child.b = 2  # error: [invalid-assignment]
 ```
 
-Init-only fields are not protected by a frozen dataclass, whether that dataclass is the first base
-or a later base:
+An `InitVar` is a constructor argument, not a frozen field. A subclass can assign and delete an
+attribute with the same name:
 
 ```py
 from dataclasses import InitVar, dataclass
@@ -1190,72 +1207,58 @@ class Frozen:
 class FrozenWithInitVar:
     temporary: InitVar[int] = 0
 
-class FirstInitVar(FrozenWithInitVar):
+class FirstInitVarChild(FrozenWithInitVar):
     temporary: int = 1
 
-class LaterInitVar(Frozen, FrozenWithInitVar):
-    temporary: int = 1
-
-first = FirstInitVar()
+first = FirstInitVarChild()
 first.temporary = 4
 del first.temporary
+```
 
-later = LaterInitVar()
-# revealed: Overload[(name: Literal["x"], value) -> Never, (name: str, value) -> None]
-reveal_type(later.__setattr__)
-# revealed: Overload[(name: Literal["x"]) -> Never, (name: str) -> None]
-reveal_type(later.__delattr__)
+The same rule applies when the `InitVar` belongs to the second frozen base:
+
+```py
+class SecondInitVarChild(Frozen, FrozenWithInitVar):
+    temporary: int = 1
+
+later = SecondInitVarChild()
 later.temporary = 4
 del later.temporary
 ```
 
-Specialized frozen dataclasses still delegate non-field deletions through the unspecialized runtime
-class, for both traditional and PEP 695 generics:
+A read-only property remains protected when the frozen base is a specialized `Generic[T]` dataclass:
 
 ```py
 from dataclasses import dataclass
-from typing import Generic, NoReturn, TypeVar
+from typing import Generic, TypeVar
 
 T = TypeVar("T")
 
 @dataclass(frozen=True)
-class LegacyFrozen(Generic[T]):
+class GenericFrozen(Generic[T]):
     value: T
 
+class ReadOnlyGenericChild(GenericFrozen[int]):
+    @property
+    def y(self) -> int:
+        return 1
+
+# error: [invalid-assignment] "Cannot delete read-only property `y` on object of type `ReadOnlyGenericChild`"
+del ReadOnlyGenericChild(1).y
+```
+
+The Python 3.12 type-parameter syntax must also preserve a `__delattr__` method defined by another
+base class:
+
+```py
 @dataclass(frozen=True)
-class Pep695Frozen[T]:
+class TypeParameterFrozen[T]:
     value: T
 
-class RejectLater:
-    y: int = 1
+class RejectingTypeParameterChild(TypeParameterFrozen[int], RejectsDeletion): ...
 
-    def __delattr__(self, name: str) -> NoReturn:
-        raise AttributeError(name)
-
-class LegacyReadOnly(LegacyFrozen[int]):
-    @property
-    def y(self) -> int:
-        return 1
-
-class Pep695ReadOnly(Pep695Frozen[int]):
-    @property
-    def y(self) -> int:
-        return 1
-
-class LegacyRejectsLater(LegacyFrozen[int], RejectLater): ...
-class Pep695RejectsLater(Pep695Frozen[int], RejectLater): ...
-
-# error: [invalid-assignment] "Cannot delete read-only property `y` on object of type `LegacyReadOnly`"
-del LegacyReadOnly(1).y
-
-# error: [invalid-assignment] "Cannot delete read-only property `y` on object of type `Pep695ReadOnly`"
-del Pep695ReadOnly(1).y
-
-# error: [invalid-assignment] "Cannot delete attribute `y` on type `LegacyRejectsLater` whose `__delattr__` method returns `Never`/`NoReturn`"
-del LegacyRejectsLater(1).y
-
-# error: [invalid-assignment] "Cannot delete attribute `y` on type `Pep695RejectsLater` whose `__delattr__` method returns `Never`/`NoReturn`"
-del Pep695RejectsLater(1).y
+# error: [invalid-assignment] "Cannot delete attribute `y` on type `RejectingTypeParameterChild` whose `__delattr__` method returns `Never`/`NoReturn`"
+del RejectingTypeParameterChild(1).y
 ```
 
 ### frozen/non-frozen inheritance
