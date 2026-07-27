@@ -165,7 +165,9 @@ reveal_type(C() <= C())  # revealed: NeReturnType
 
 When subclasses override comparison methods, these overridden methods take precedence over those in
 the parent class. Class `B` inherits from `A` and redefines comparison methods to return types other
-than `A`.
+than `A`. However, because `A` is not final, its instances could have runtime classes other than
+`A`. The reflected method therefore has priority only for some possible operands, so both methods'
+return types are included in the result.
 
 ```py
 from __future__ import annotations
@@ -215,14 +217,14 @@ class B(A):
     def __ge__(self, other: A) -> GeReturnType:  # error: [invalid-method-override]
         return GeReturnType()
 
-reveal_type(A() == B())  # revealed: EqReturnType
-reveal_type(A() != B())  # revealed: NeReturnType
+reveal_type(A() == B())  # revealed: A | EqReturnType
+reveal_type(A() != B())  # revealed: A | NeReturnType
 
-reveal_type(A() < B())  # revealed: GtReturnType
-reveal_type(A() <= B())  # revealed: GeReturnType
+reveal_type(A() < B())  # revealed: A | GtReturnType
+reveal_type(A() <= B())  # revealed: A | GeReturnType
 
-reveal_type(A() > B())  # revealed: LtReturnType
-reveal_type(A() >= B())  # revealed: LeReturnType
+reveal_type(A() > B())  # revealed: A | LtReturnType
+reveal_type(A() >= B())  # revealed: A | LeReturnType
 ```
 
 ## Reflected Comparisons with Subclass But Falls Back to LHS
