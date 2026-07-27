@@ -1167,6 +1167,39 @@ child.a = 2  # error: [invalid-assignment]
 child.b = 2  # error: [invalid-assignment]
 ```
 
+Init-only fields are not protected by a frozen dataclass, whether that dataclass is the first base
+or a later base:
+
+```py
+from dataclasses import InitVar, dataclass
+
+@dataclass(frozen=True)
+class Frozen:
+    x: int = 1
+
+@dataclass(frozen=True)
+class FrozenWithInitVar:
+    temporary: InitVar[int] = 0
+
+class FirstInitVar(FrozenWithInitVar):
+    temporary: int = 1
+
+class LaterInitVar(Frozen, FrozenWithInitVar):
+    temporary: int = 1
+
+first = FirstInitVar()
+first.temporary = 4
+del first.temporary
+
+later = LaterInitVar()
+# revealed: Overload[(name: Literal["x"], value) -> Never, (name: str, value) -> None]
+reveal_type(later.__setattr__)
+# revealed: Overload[(name: Literal["x"]) -> Never, (name: str) -> None]
+reveal_type(later.__delattr__)
+later.temporary = 4
+del later.temporary
+```
+
 Specialized frozen dataclasses still delegate non-field deletions through the unspecialized runtime
 class, for both traditional and PEP 695 generics:
 
