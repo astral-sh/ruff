@@ -590,3 +590,19 @@ reveal_type(Nest().x1)  # revealed: ?
 reveal_type(Nest().x2)  # revealed: ?
 reveal_type(Nest().x3)  # revealed: ?
 ```
+
+## Recursive lambda with a nested return type
+
+The same recursive inference should converge when another type contains the recursive reference.
+
+```py
+value = lambda: [value]
+condition = lambda: value
+
+while condition:
+    pass
+
+reveal_type(value)  # revealed: () -> list[Divergent | int]
+value = 0
+reveal_type(value)  # revealed: Literal[0]
+```
