@@ -25,7 +25,7 @@ use crate::{
     Db,
     types::{
         ErrorContext, ErrorContextTree, Type, TypePair, constraints::ConstraintSet,
-        generics::InferableTypeVars,
+        typevar::TypeVarSet,
     },
 };
 
@@ -314,7 +314,7 @@ impl<'db> Type<'db> {
     /// See [`TypeRelation::Subtyping`] for more details.
     pub(crate) fn is_subtype_of(self, db: &'db dyn Db, target: Type<'db>) -> bool {
         let constraints = ConstraintSetBuilder::new();
-        self.when_subtype_of(db, target, &constraints, InferableTypeVars::None)
+        self.when_subtype_of(db, target, &constraints, TypeVarSet::None)
             .is_always_satisfied(db)
     }
 
@@ -323,7 +323,7 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         target: Type<'db>,
         constraints: &'c ConstraintSetBuilder<'db>,
-        inferable: InferableTypeVars<'db>,
+        inferable: TypeVarSet<'db>,
     ) -> ConstraintSet<'db, 'c> {
         self.has_relation_to(db, target, constraints, inferable, TypeRelation::Subtyping)
     }
@@ -338,7 +338,7 @@ impl<'db> Type<'db> {
         target: Type<'db>,
         assuming: ConstraintSet<'db, 'c>,
         constraints: &'c ConstraintSetBuilder<'db>,
-        inferable: InferableTypeVars<'db>,
+        inferable: TypeVarSet<'db>,
     ) -> ConstraintSet<'db, 'c> {
         let relation_visitor = HasRelationToVisitor::default(constraints);
         let disjointness_visitor = IsDisjointVisitor::default(constraints);
@@ -364,7 +364,7 @@ impl<'db> Type<'db> {
     /// See `TypeRelation::Assignability` for more details.
     pub fn is_assignable_to(self, db: &'db dyn Db, target: Type<'db>) -> bool {
         let constraints = ConstraintSetBuilder::new();
-        self.when_assignable_to(db, target, &constraints, InferableTypeVars::None)
+        self.when_assignable_to(db, target, &constraints, TypeVarSet::None)
             .is_always_satisfied(db)
     }
 
@@ -383,7 +383,7 @@ impl<'db> Type<'db> {
         let builder = ConstraintSetBuilder::new();
         let checker = TypeRelationChecker {
             constraints: &builder,
-            inferable: InferableTypeVars::None,
+            inferable: TypeVarSet::None,
             relation: TypeRelation::Assignability,
             typevar_evaluation: TypeVarEvaluation::Eager,
             context_tree: Some(ErrorContextTree::new()),
@@ -416,7 +416,7 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         target: Type<'db>,
         constraints: &'c ConstraintSetBuilder<'db>,
-        inferable: InferableTypeVars<'db>,
+        inferable: TypeVarSet<'db>,
     ) -> ConstraintSet<'db, 'c> {
         self.has_relation_to(
             db,
@@ -483,7 +483,7 @@ impl<'db> Type<'db> {
                     db,
                     target,
                     constraints,
-                    InferableTypeVars::None,
+                    TypeVarSet::None,
                     TypeRelation::Assignability,
                     TypeVarEvaluation::Lazy,
                 )
@@ -510,7 +510,7 @@ impl<'db> Type<'db> {
             db,
             target,
             constraints,
-            InferableTypeVars::None,
+            TypeVarSet::None,
             TypeRelation::Assignability,
             TypeVarEvaluation::Lazy,
         )
@@ -526,7 +526,7 @@ impl<'db> Type<'db> {
             db,
             target,
             constraints,
-            InferableTypeVars::None,
+            TypeVarSet::None,
             TypeRelation::Subtyping,
             TypeVarEvaluation::Lazy,
         )
@@ -544,7 +544,7 @@ impl<'db> Type<'db> {
                     db,
                     types.second(db),
                     &ConstraintSetBuilder::new(),
-                    InferableTypeVars::None,
+                    TypeVarSet::None,
                     TypeRelation::Redundancy { pure: false },
                 )
                 .is_always_satisfied(db)
@@ -562,7 +562,7 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         target: Type<'db>,
         constraints: &'c ConstraintSetBuilder<'db>,
-        inferable: InferableTypeVars<'db>,
+        inferable: TypeVarSet<'db>,
         relation: TypeRelation,
     ) -> ConstraintSet<'db, 'c> {
         self.has_relation_to_with_typevar_evaluation(
@@ -580,7 +580,7 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         target: Type<'db>,
         constraints: &'c ConstraintSetBuilder<'db>,
-        inferable: InferableTypeVars<'db>,
+        inferable: TypeVarSet<'db>,
         relation: TypeRelation,
         typevar_evaluation: TypeVarEvaluation,
     ) -> ConstraintSet<'db, 'c> {
@@ -688,7 +688,7 @@ impl<'db> Type<'db> {
     /// `false` answers in some cases.
     pub(crate) fn is_disjoint_from(self, db: &'db dyn Db, other: Type<'db>) -> bool {
         let constraints = ConstraintSetBuilder::new();
-        self.when_disjoint_from(db, other, &constraints, InferableTypeVars::None)
+        self.when_disjoint_from(db, other, &constraints, TypeVarSet::None)
             .is_always_satisfied(db)
     }
 
@@ -697,7 +697,7 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         other: Type<'db>,
         constraints: &'c ConstraintSetBuilder<'db>,
-        inferable: InferableTypeVars<'db>,
+        inferable: TypeVarSet<'db>,
     ) -> ConstraintSet<'db, 'c> {
         let relation_visitor = HasRelationToVisitor::default(constraints);
         let disjointness_visitor = IsDisjointVisitor::default(constraints);
@@ -771,7 +771,7 @@ impl<'db, 'c> IsDisjointVisitor<'db, 'c> {
 #[derive(Clone)]
 pub(super) struct TypeRelationChecker<'a, 'c, 'db> {
     pub(super) constraints: &'c ConstraintSetBuilder<'db>,
-    pub(super) inferable: InferableTypeVars<'db>,
+    pub(super) inferable: TypeVarSet<'db>,
     pub(super) relation: TypeRelation,
     pub(super) typevar_evaluation: TypeVarEvaluation,
     context_tree: Option<ErrorContextTree<'db>>,
@@ -792,7 +792,7 @@ pub(super) struct TypeRelationChecker<'a, 'c, 'db> {
 impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
     pub(super) fn subtyping(
         constraints: &'c ConstraintSetBuilder<'db>,
-        inferable: InferableTypeVars<'db>,
+        inferable: TypeVarSet<'db>,
         relation_visitor: &'a HasRelationToVisitor<'db, 'c>,
         disjointness_visitor: &'a IsDisjointVisitor<'db, 'c>,
         signature_relation_visitor: &'a SignatureRelationVisitor<'db>,
@@ -821,7 +821,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
     ) -> Self {
         Self {
             constraints,
-            inferable: InferableTypeVars::None,
+            inferable: TypeVarSet::None,
             relation: TypeRelation::Assignability,
             typevar_evaluation: TypeVarEvaluation::Lazy,
             context_tree: None,
@@ -842,7 +842,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
     ) -> Self {
         Self {
             constraints,
-            inferable: InferableTypeVars::None,
+            inferable: TypeVarSet::None,
             relation: TypeRelation::Assignability,
             typevar_evaluation: TypeVarEvaluation::Lazy,
             context_tree: Some(ErrorContextTree::new()),
@@ -863,7 +863,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
     ) -> Self {
         Self {
             constraints,
-            inferable: InferableTypeVars::None,
+            inferable: TypeVarSet::None,
             relation: TypeRelation::Assignability,
             typevar_evaluation: TypeVarEvaluation::Eager,
             context_tree: Some(ErrorContextTree::new()),
@@ -875,7 +875,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         }
     }
 
-    pub(super) fn with_inferable_typevars(&self, inferable: InferableTypeVars<'db>) -> Self {
+    pub(super) fn with_inferable_typevars(&self, inferable: TypeVarSet<'db>) -> Self {
         Self {
             inferable,
             ..self.clone()
@@ -891,7 +891,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
     ) -> bool {
         Self::subtyping(
             self.constraints,
-            InferableTypeVars::None,
+            TypeVarSet::None,
             self.relation_visitor,
             self.disjointness_visitor,
             self.signature_relation_visitor,
@@ -2468,7 +2468,7 @@ impl<'c, 'db> EquivalenceChecker<'_, 'c, 'db> {
             constraints: self.constraints,
             context_tree: None,
             given: self.given,
-            inferable: InferableTypeVars::None,
+            inferable: TypeVarSet::None,
             relation_visitor: self.relation_visitor,
             disjointness_visitor: self.disjointness_visitor,
             signature_relation_visitor: self.signature_relation_visitor,
@@ -2508,7 +2508,7 @@ impl<'c, 'db> EquivalenceChecker<'_, 'c, 'db> {
 
 pub(super) struct DisjointnessChecker<'a, 'c, 'db> {
     pub(super) constraints: &'c ConstraintSetBuilder<'db>,
-    pub(super) inferable: InferableTypeVars<'db>,
+    pub(super) inferable: TypeVarSet<'db>,
     given: ConstraintSet<'db, 'c>,
 
     // N.B. these fields are private to reduce the risk of
@@ -2526,7 +2526,7 @@ pub(super) struct DisjointnessChecker<'a, 'c, 'db> {
 impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
     pub(super) fn new(
         constraints: &'c ConstraintSetBuilder<'db>,
-        inferable: InferableTypeVars<'db>,
+        inferable: TypeVarSet<'db>,
         relation_visitor: &'a HasRelationToVisitor<'db, 'c>,
         disjointness_visitor: &'a IsDisjointVisitor<'db, 'c>,
         signature_relation_visitor: &'a SignatureRelationVisitor<'db>,

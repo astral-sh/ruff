@@ -105,8 +105,7 @@ use ty_python_core::rank::RankBitBox;
 use ty_static::EnvVars;
 
 use crate::types::class::GenericAlias;
-use crate::types::generics::InferableTypeVars;
-use crate::types::typevar::{BoundTypeVarIdentity, walk_bound_type_var_type};
+use crate::types::typevar::{BoundTypeVarIdentity, TypeVarSet, walk_bound_type_var_type};
 use crate::types::variance::VarianceInferable;
 use crate::types::visitor::{
     TypeCollector, TypeKind, TypeVisitor, any_over_type, walk_non_atomic_type,
@@ -495,7 +494,7 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         &self,
         db: &'db dyn Db,
         builder: &'c ConstraintSetBuilder<'db>,
-        inferable: InferableTypeVars<'db>,
+        inferable: TypeVarSet<'db>,
     ) -> bool {
         self.verify_builder(builder);
         self.node.satisfied_by_all_typevars(db, builder, inferable)
@@ -615,7 +614,7 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         self,
         db: &'db dyn Db,
         builder: &'c ConstraintSetBuilder<'db>,
-        to_remove: InferableTypeVars<'db>,
+        to_remove: TypeVarSet<'db>,
     ) -> Self {
         self.verify_builder(builder);
         Self::from_node(builder, self.node.exists(db, builder, to_remove))
@@ -742,10 +741,10 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         self,
         db: &'db dyn Db,
         builder: &'c ConstraintSetBuilder<'db>,
-        to_remove: InferableTypeVars<'db>,
+        to_remove: TypeVarSet<'db>,
     ) -> Self {
         self.verify_builder(builder);
-        if to_remove == InferableTypeVars::None {
+        if to_remove == TypeVarSet::None {
             return self;
         }
 
@@ -773,7 +772,7 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         self,
         db: &'db dyn Db,
         builder: &'c ConstraintSetBuilder<'db>,
-        inferable: InferableTypeVars<'db>,
+        inferable: TypeVarSet<'db>,
     ) -> Solutions<'db> {
         self.solutions_with(db, builder, inferable, |_variance, path_bound| {
             PathBounds::default_solve(db, builder, path_bound)
@@ -784,7 +783,7 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         self,
         db: &'db dyn Db,
         builder: &'c ConstraintSetBuilder<'db>,
-        inferable: InferableTypeVars<'db>,
+        inferable: TypeVarSet<'db>,
         choose: impl FnMut(TypeVarVariance, &PathBound<'db>) -> Result<Option<Type<'db>>, ()>,
     ) -> Solutions<'db> {
         self.verify_builder(builder);
@@ -887,7 +886,7 @@ struct ConstraintSetStorage<'db> {
     negate_cache: FxHashMap<NodeId, NodeId>,
     or_cache: FxHashMap<(NodeId, NodeId, usize), NodeId>,
     and_cache: FxHashMap<(NodeId, NodeId, usize), NodeId>,
-    exists_cache: FxHashMap<(NodeId, InferableTypeVars<'db>), NodeId>,
+    exists_cache: FxHashMap<(NodeId, TypeVarSet<'db>), NodeId>,
     restrict_one_cache: FxHashMap<(NodeId, ConstraintAssignment), (NodeId, bool)>,
     simplify_cache: FxHashMap<NodeId, NodeId>,
 
@@ -2469,7 +2468,7 @@ impl NodeId {
         self,
         db: &'db dyn Db,
         builder: &ConstraintSetBuilder<'db>,
-        inferable: InferableTypeVars<'db>,
+        inferable: TypeVarSet<'db>,
         choose: impl FnMut(TypeVarVariance, &PathBound<'db>) -> Result<Option<Type<'db>>, ()>,
     ) -> Solutions<'db> {
         let path_bounds = PathBounds::compute(db, builder, self, inferable);
@@ -2839,7 +2838,7 @@ impl NodeId {
         self,
         db: &'db dyn Db,
         builder: &ConstraintSetBuilder<'db>,
-        inferable: InferableTypeVars<'db>,
+        inferable: TypeVarSet<'db>,
     ) -> bool {
         match self.node() {
             Node::AlwaysTrue => return true,
@@ -2918,9 +2917,9 @@ impl NodeId {
         self,
         db: &'db dyn Db,
         builder: &ConstraintSetBuilder<'db>,
-        bound_typevars: InferableTypeVars<'db>,
+        bound_typevars: TypeVarSet<'db>,
     ) -> Self {
-        if bound_typevars == InferableTypeVars::None {
+        if bound_typevars == TypeVarSet::None {
             return self;
         }
 
@@ -2946,7 +2945,7 @@ impl NodeId {
         self,
         db: &'db dyn Db,
         builder: &ConstraintSetBuilder<'db>,
-        inferable: InferableTypeVars<'db>,
+        inferable: TypeVarSet<'db>,
     ) -> Self {
         match self.node() {
             Node::AlwaysTrue => ALWAYS_TRUE,
@@ -3520,7 +3519,7 @@ impl<'db> Type<'db> {
         self,
         db: &'db dyn Db,
         target: Type<'db>,
-        inferable: InferableTypeVars<'db>,
+        inferable: TypeVarSet<'db>,
     ) -> &'db PathBounds<'db> {
         #[salsa::tracked(
             returns(ref),
@@ -3531,7 +3530,7 @@ impl<'db> Type<'db> {
             db: &'db dyn Db,
             source: Type<'db>,
             target: Type<'db>,
-            inferable: InferableTypeVars<'db>,
+            inferable: TypeVarSet<'db>,
         ) -> PathBounds<'db> {
             let when = source.when_constraint_set_assignable_to_owned(db, target);
             when.query(|builder, when| PathBounds::compute(db, builder, when.node, inferable))
@@ -3570,7 +3569,7 @@ impl<'db> PathBounds<'db> {
         db: &'db dyn Db,
         builder: &ConstraintSetBuilder<'db>,
         node: NodeId,
-        inferable: InferableTypeVars<'db>,
+        inferable: TypeVarSet<'db>,
     ) -> Self {
         #[derive(Default)]
         struct CollectVisitor {
@@ -3700,7 +3699,7 @@ impl<'db> PathBounds<'db> {
         db: &'db dyn Db,
         builder: &ConstraintSetBuilder<'db>,
         node: NodeId,
-        inferable: InferableTypeVars<'db>,
+        inferable: TypeVarSet<'db>,
     ) -> Option<Self> {
         match node.node() {
             Node::AlwaysTrue => return Some(PathBounds::Unconstrained),
@@ -4203,7 +4202,7 @@ impl InteriorNode {
         self,
         db: &'db dyn Db,
         builder: &ConstraintSetBuilder<'db>,
-        bound_typevars: InferableTypeVars<'db>,
+        bound_typevars: TypeVarSet<'db>,
     ) -> NodeId {
         let mentions_typevar = |ty: Type<'db>| match ty {
             Type::TypeVar(typevar) => typevar.is_inferable(db, bound_typevars),
@@ -4235,7 +4234,7 @@ impl InteriorNode {
         self,
         db: &'db dyn Db,
         builder: &ConstraintSetBuilder<'db>,
-        inferable: InferableTypeVars<'db>,
+        inferable: TypeVarSet<'db>,
     ) -> NodeId {
         let is_bare_inferable_typevar = |ty: Type<'db>| {
             ty.as_typevar()
@@ -7718,8 +7717,7 @@ mod tests {
             &builder,
             || ConstraintSet::constrain_typevar_lower_bound(&db, &builder, t, str),
         );
-        let inferable =
-            InferableTypeVars::from_typevars(&db, std::iter::once(t.identity(&db)).collect());
+        let inferable = TypeVarSet::from_typevars(&db, [t]);
         let (single_sequents, pair_sequents) = {
             let storage = builder.storage.borrow();
             (
@@ -7753,10 +7751,7 @@ mod tests {
             ConstraintSet::constrain_typevar(&db, &builder, t, int, int).and(&db, &builder, || {
                 ConstraintSet::constrain_typevar(&db, &builder, u, int, int)
             });
-        let inferable = InferableTypeVars::from_typevars(
-            &db,
-            [t.identity(&db), u.identity(&db)].into_iter().collect(),
-        );
+        let inferable = TypeVarSet::from_typevars(&db, [t, u]);
         let (single_sequents, pair_sequents) = {
             let storage = builder.storage.borrow();
             (
@@ -7795,8 +7790,7 @@ mod tests {
             ConstraintSet::constrain_typevar(&db, &builder, t, int, int).and(&db, &builder, || {
                 ConstraintSet::constrain_typevar(&db, &builder, t, str, str)
             });
-        let inferable =
-            InferableTypeVars::from_typevars(&db, std::iter::once(t.identity(&db)).collect());
+        let inferable = TypeVarSet::from_typevars(&db, [t]);
         let (single_sequents, pair_sequents) = {
             let storage = builder.storage.borrow();
             (
@@ -8090,13 +8084,7 @@ mod tests {
         build_bdd: impl Fn(&ConstraintSetBuilder<'db>) -> NodeId,
         expected: impl IntoIterator<Item = &'static str>,
     ) {
-        let inferable = InferableTypeVars::from_typevars(
-            db,
-            typevars
-                .iter()
-                .map(|typevar| typevar.identity(db))
-                .collect(),
-        );
+        let inferable = TypeVarSet::from_typevars(db, typevars.iter().copied());
         let mut signatures = FxIndexSet::default();
 
         for constraint_order in (0..atoms.len()).permutations(atoms.len()) {
