@@ -1942,16 +1942,21 @@ impl<'db> StaticClassLiteral<'db> {
         let instance_ty =
             Type::instance(db, self.apply_optional_specialization(db, specialization));
         let method_signature = |name_ty, return_ty| {
-            let mut parameters = vec![
-                Parameter::positional_or_keyword(Name::new_static("self"))
-                    .with_annotated_type(instance_ty),
-                Parameter::positional_or_keyword(Name::new_static("name"))
-                    .with_annotated_type(name_ty),
-            ];
-            if matches!(method, FrozenDataclassMethod::SetAttr) {
-                parameters.push(Parameter::positional_or_keyword(Name::new_static("value")));
-            }
-            Signature::new(Parameters::standard(parameters), return_ty)
+            let self_parameter = Parameter::positional_or_keyword(Name::new_static("self"))
+                .with_annotated_type(instance_ty);
+            let name_parameter = Parameter::positional_or_keyword(Name::new_static("name"))
+                .with_annotated_type(name_ty);
+            let parameters = match method {
+                FrozenDataclassMethod::SetAttr => Parameters::standard([
+                    self_parameter,
+                    name_parameter,
+                    Parameter::positional_or_keyword(Name::new_static("value")),
+                ]),
+                FrozenDataclassMethod::DelAttr => {
+                    Parameters::standard([self_parameter, name_parameter])
+                }
+            };
+            Signature::new(parameters, return_ty)
         };
 
         let overloads = frozen_base_fields
