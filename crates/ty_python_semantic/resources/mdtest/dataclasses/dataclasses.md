@@ -659,7 +659,7 @@ reveal_type(WithUnsafeHash.__hash__)  # revealed: (self: WithUnsafeHash) -> int
 
 ### `frozen`
 
-If true (the default is False), assigning to fields will generate a diagnostic.
+If true (the default is False), assigning to or deleting fields will generate a diagnostic.
 
 ```py
 from dataclasses import dataclass
@@ -670,6 +670,9 @@ class MyFrozenClass:
 
 frozen_instance = MyFrozenClass(1)
 frozen_instance.x = 2  # error: [invalid-assignment]
+
+# error: [invalid-assignment] "Cannot delete attribute `x` on type `MyFrozenClass` whose `__delattr__` method returns `Never`/`NoReturn`"
+del frozen_instance.x
 ```
 
 If `__setattr__()` or `__delattr__()` is defined in the class, a diagnostic is emitted.
@@ -1019,11 +1022,11 @@ second_init_var_child = ChildWithSecondBaseInitVar()
 second_init_var_child.temporary = 4
 ```
 
-Non-field attributes on subclasses of slotted frozen dataclasses are still rejected. This correctly
-models the runtime behavior, but is somewhat surprising and may be a CPython bug, as subclasses of
-slotted classes usually allow arbitrary attributes to be set on them unless the subclass also
-explicitly declares `__slots__`. We should change our behavior here to follow CPython, if they "fix"
-it.
+Assignments and deletions of non-field attributes on subclasses of slotted frozen dataclasses are
+still rejected. This correctly models the runtime behavior, but is somewhat surprising and may be a
+CPython bug, as subclasses of slotted classes usually allow arbitrary attributes to be set on them
+unless the subclass also explicitly declares `__slots__`. We should change our behavior here to
+follow CPython, if they "fix" it.
 
 ```py
 from dataclasses import dataclass
@@ -1043,11 +1046,17 @@ frozen.x = 2  # error: [invalid-assignment]
 frozen.y = 2  # error: [invalid-assignment]
 frozen.z = 2  # error: [invalid-assignment]
 
+del frozen.x  # error: [invalid-assignment]
+del frozen.y  # error: [invalid-assignment]
+
 grandchild = MySlottedFrozenGrandchildClass()
 grandchild.x = 2  # error: [invalid-assignment]
 grandchild.y = 2  # error: [invalid-assignment]
 grandchild.z = 2  # error: [invalid-assignment]
 grandchild.unknown = 2  # error: [invalid-assignment]
+
+del grandchild.x  # error: [invalid-assignment]
+del grandchild.z  # error: [invalid-assignment]
 ```
 
 The same diagnostic is emitted if a frozen dataclass is inherited, and an attempt is made to delete
