@@ -4908,6 +4908,119 @@ def h(obj: InstanceAttrBool):
     reveal_type(bool(obj))  # revealed: Literal[True]
 ```
 
+## Callable protocols with receiver-selected overloads
+
+A specialized callable protocol only requires the overloads whose explicit `self` annotations accept
+that specialization. Solving the receiver must also specialize the surviving overload's parameters
+with the same type-variable assignment.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Any, Generic, Protocol, Self, TypeVar, TypeVarTuple, Unpack, overload, reveal_type
+
+P = TypeVarTuple("P")
+V = TypeVar("V")
+
+class Callback(Protocol[Unpack[P]]):
+    @overload
+    def __call__(self: "Callback[()]") -> Any: ...
+    @overload
+    def __call__(self: "Callback[V]", value: V, /) -> Any: ...
+    def __call__(self, *args: Any) -> Any: ...
+
+def takes_callback(callback: Callback[str]) -> None: ...
+def takes_empty_callback(callback: Callback[()]) -> None: ...
+def handles_str(value: str) -> str:
+    return value
+
+def handles_int(value: int) -> int:
+    return value
+
+takes_callback(lambda value: value)
+takes_callback(handles_str)
+takes_callback(handles_int)  # error: [invalid-argument-type]
+
+takes_empty_callback(lambda: None)
+takes_empty_callback(lambda value: value)  # error: [invalid-argument-type]
+
+def reveal_callback(callback: Callback[str]) -> None:
+    reveal_type(callback.__call__)  # revealed: bound method Callback[str].__call__(value: str, /) -> Any
+
+class Box(Generic[V]):
+    pass
+
+class BoxedCallback(Protocol[Unpack[P]]):
+    @overload
+    def __call__(self: "BoxedCallback[()]") -> Any: ...
+    @overload
+    def __call__(self: "BoxedCallback[V]", value: Box[V], /) -> Any: ...
+    def __call__(self, *args: Any) -> Any: ...
+
+def takes_boxed_callback(callback: BoxedCallback[str]) -> None: ...
+def handles_str_box(value: Box[str]) -> Box[str]:
+    return value
+
+def handles_int_box(value: Box[int]) -> Box[int]:
+    return value
+
+takes_boxed_callback(lambda value: value)
+takes_boxed_callback(handles_str_box)
+takes_boxed_callback(handles_int_box)  # error: [invalid-argument-type]
+
+def reveal_boxed_callback(callback: BoxedCallback[str]) -> None:
+    reveal_type(callback.__call__)  # revealed: bound method BoxedCallback[str].__call__(value: Box[str], /) -> Any
+
+class StringOrIntCallback(Protocol[Unpack[P]]):
+    @overload
+    def __call__(self: "StringOrIntCallback[str]", value: str, /) -> Any: ...
+    @overload
+    def __call__(self: "StringOrIntCallback[int]", value: int, /) -> Any: ...
+    def __call__(self, *args: Any) -> Any: ...
+
+def takes_bytes_callback(callback: StringOrIntCallback[bytes]) -> None: ...
+def takes_no_arguments() -> None: ...
+
+takes_bytes_callback(takes_no_arguments)  # error: [invalid-argument-type]
+takes_bytes_callback(handles_str)  # error: [invalid-argument-type]
+takes_bytes_callback(handles_int)  # error: [invalid-argument-type]
+
+class InheritedCallback(Callback[Unpack[P]], Protocol[Unpack[P]]):
+    pass
+
+class FixedCallback(Callback[str], Protocol):
+    pass
+
+def takes_inherited_callback(callback: InheritedCallback[str]) -> None: ...
+def takes_fixed_callback(callback: FixedCallback) -> None: ...
+
+takes_inherited_callback(handles_str)
+takes_inherited_callback(handles_int)  # error: [invalid-argument-type]
+takes_fixed_callback(handles_str)
+takes_fixed_callback(handles_int)  # error: [invalid-argument-type]
+
+def reveal_inherited_callbacks(inherited: InheritedCallback[str], fixed: FixedCallback) -> None:
+    reveal_type(inherited.__call__)  # revealed: bound method InheritedCallback[str].__call__(value: str, /) -> Any
+    reveal_type(fixed.__call__)  # revealed: bound method FixedCallback.__call__(value: str, /) -> Any
+
+class SelfCallback(Protocol):
+    def __call__(self: "SelfCallback", value: Self) -> None: ...
+
+class SelfImplementation:
+    def __call__(self, value: Self) -> None: ...
+
+class InvalidSelfImplementation:
+    def __call__(self, value: str) -> None: ...
+
+def takes_self_callback(callback: SelfCallback) -> None: ...
+
+takes_self_callback(SelfImplementation())
+takes_self_callback(InvalidSelfImplementation())  # error: [invalid-argument-type]
+```
+
 ## Callable protocols
 
 An instance of a protocol type is callable if the protocol defines a `__call__` method:

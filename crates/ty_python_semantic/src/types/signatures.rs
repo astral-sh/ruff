@@ -1073,6 +1073,8 @@ impl<'db> Signature<'db> {
             } else {
                 parameter.annotated_type()
             };
+            let (receiver, annotation) =
+                Self::normalize_protocol_receiver_relation(db, receiver, annotation);
             // TODO: Also intersect nested receiver type variables, such as the `T` in
             // `self: list[T]`, with their valid specializations when constructing or solving the
             // receiver constraint set.
@@ -1151,6 +1153,28 @@ impl<'db> Signature<'db> {
         }
     }
 
+    fn normalize_protocol_receiver_relation(
+        db: &'db dyn Db,
+        receiver: Type<'db>,
+        annotation: Type<'db>,
+    ) -> (Type<'db>, Type<'db>) {
+        if let (Type::ProtocolInstance(receiver), Type::ProtocolInstance(annotation)) =
+            (receiver, annotation)
+            && let Some(receiver) = receiver.to_nominal_instance()
+            && let Some(annotation) = annotation.to_nominal_instance()
+            && receiver
+                .class(db)
+                .is_subtype_of_class_literal(db, annotation.class(db).class_literal(db))
+        {
+            (
+                Type::NominalInstance(receiver),
+                Type::NominalInstance(annotation),
+            )
+        } else {
+            (receiver, annotation)
+        }
+    }
+
     /// Returns this signature bound to `receiver_type` if its explicit receiver annotation is
     /// compatible with the bound receiver.
     ///
@@ -1163,12 +1187,31 @@ impl<'db> Signature<'db> {
         receiver_type: Type<'db>,
         typing_self_type: Type<'db>,
     ) -> Option<Self> {
+        self.bind_self_if_compatible_impl(db, receiver_type, Some(typing_self_type))
+    }
+
+    /// Binds a receiver without replacing `typing.Self`, which must remain available for the
+    /// concrete value that later implements a protocol.
+    pub(crate) fn bind_receiver_if_compatible(
+        &self,
+        db: &'db dyn Db,
+        receiver_type: Type<'db>,
+    ) -> Option<Self> {
+        self.bind_self_if_compatible_impl(db, receiver_type, None)
+    }
+
+    fn bind_self_if_compatible_impl(
+        &self,
+        db: &'db dyn Db,
+        receiver_type: Type<'db>,
+        typing_self_type: Option<Type<'db>>,
+    ) -> Option<Self> {
         if !self.can_bind_self_to(db, receiver_type) {
             return None;
         }
 
         let bound_signature =
-            self.bind_self_with_receiver(db, Some(receiver_type), Some(typing_self_type));
+            self.bind_self_with_receiver(db, Some(receiver_type), typing_self_type);
         let Some(receiver_constraints) = bound_signature.receiver_constraints.as_ref() else {
             return Some(bound_signature);
         };
@@ -1222,7 +1265,7 @@ impl<'db> Signature<'db> {
 
         Some(
             self.apply_specialization(db, specialization)
-                .bind_self_with_receiver(db, Some(receiver_type), Some(typing_self_type)),
+                .bind_self_with_receiver(db, Some(receiver_type), typing_self_type),
         )
     }
 
@@ -1282,6 +1325,8 @@ impl<'db> Signature<'db> {
             }
         }
 
+        let (self_type, expected_self_ty) =
+            Self::normalize_protocol_receiver_relation(db, self_type, expected_self_ty);
         let constraints = ConstraintSetBuilder::new();
         self_type
             .when_assignable_to(

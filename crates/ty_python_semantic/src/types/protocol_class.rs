@@ -32,7 +32,7 @@ use crate::{
         context::InferContext,
         diagnostic::report_undeclared_protocol_member,
         generics::Specialization,
-        signatures::walk_signature,
+        signatures::{CallableSignature, walk_signature},
     },
 };
 use ty_python_core::{definition::Definition, place::ScopedPlaceId, place_table, use_def_map};
@@ -407,7 +407,7 @@ impl<'db> ProtocolInterface<'db> {
             .map(|(name, callable)| {
                 (
                     Name::new(name),
-                    ProtocolMemberData::method(db, callable, None),
+                    ProtocolMemberData::method(db, callable, None, None),
                 )
             })
             .collect();
@@ -1069,6 +1069,7 @@ pub(super) struct ProtocolMemberData<'db> {
     kind: ProtocolMemberKind<'db>,
     qualifiers: TypeQualifiers,
     definition: Option<Definition<'db>>,
+    bound_instance_method: Option<ProtocolMemberType<'db>>,
 }
 
 impl<'db> ProtocolMemberData<'db> {
@@ -1076,6 +1077,7 @@ impl<'db> ProtocolMemberData<'db> {
         db: &'db dyn Db,
         callable: CallableType<'db>,
         definition: Option<Definition<'db>>,
+        protocol_receiver: Option<Type<'db>>,
     ) -> Self {
         let (method_kind, callable) = if callable.is_classmethod_like(db) {
             (
@@ -1088,6 +1090,14 @@ impl<'db> ProtocolMemberData<'db> {
             (ProtocolMethodKind::Instance, callable)
         };
 
+        let bound_instance_method = if method_kind == ProtocolMethodKind::Instance {
+            protocol_receiver
+                .and_then(|receiver| receiver_filtered_protocol_method(db, callable, receiver))
+                .map(|ty| ProtocolMemberType::with_definition(ty, definition))
+        } else {
+            None
+        };
+
         Self {
             kind: ProtocolMemberKind::Method(
                 ProtocolMemberType::with_definition(Type::Callable(callable), definition),
@@ -1095,6 +1105,7 @@ impl<'db> ProtocolMemberData<'db> {
             ),
             qualifiers: TypeQualifiers::default(),
             definition,
+            bound_instance_method,
         }
     }
 
@@ -1107,6 +1118,7 @@ impl<'db> ProtocolMemberData<'db> {
             kind: ProtocolMemberKind::Property { read, write },
             qualifiers: TypeQualifiers::default(),
             definition,
+            bound_instance_method: None,
         }
     }
 
@@ -1121,6 +1133,7 @@ impl<'db> ProtocolMemberData<'db> {
             )),
             qualifiers,
             definition,
+            bound_instance_method: None,
         }
     }
 
@@ -1133,7 +1146,9 @@ impl<'db> ProtocolMemberData<'db> {
             ProtocolMemberKind::Method(member, kind) => {
                 let instance_method = match (member.ty(), kind) {
                     (Type::Callable(callable), ProtocolMethodKind::Instance) => {
-                        member.with_ty(Type::Callable(protocol_bind_self(db, callable, None)))
+                        self.bound_instance_method.unwrap_or_else(|| {
+                            member.with_ty(Type::Callable(protocol_bind_self(db, callable, None)))
+                        })
                     }
                     _ => member,
                 };
@@ -1173,6 +1188,12 @@ impl<'db> ProtocolMemberData<'db> {
             kind: self.kind.cycle_normalized(db, previous.kind, cycle),
             qualifiers: self.qualifiers,
             definition: self.definition,
+            bound_instance_method: cycle_normalized_optional_type(
+                db,
+                self.bound_instance_method,
+                previous.bound_instance_method,
+                cycle,
+            ),
         }
     }
 
@@ -1186,6 +1207,10 @@ impl<'db> ProtocolMemberData<'db> {
             kind: self.kind.recursive_type_normalized_impl(db, div, nested)?,
             qualifiers: self.qualifiers,
             definition: self.definition,
+            bound_instance_method: match self.bound_instance_method {
+                Some(member) => Some(member.recursive_type_normalized_impl(db, div, nested)?),
+                None => None,
+            },
         })
     }
 
@@ -1202,6 +1227,9 @@ impl<'db> ProtocolMemberData<'db> {
                 .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
             qualifiers: self.qualifiers,
             definition: self.definition,
+            bound_instance_method: self
+                .bound_instance_method
+                .map(|member| member.apply_type_mapping_impl(db, type_mapping, tcx, visitor)),
         }
     }
 
@@ -2995,6 +3023,44 @@ impl<'db> ProtocolMemberCandidate<'db> {
     }
 }
 
+fn receiver_filtered_protocol_method<'db>(
+    db: &'db dyn Db,
+    callable: CallableType<'db>,
+    receiver_ty: Type<'db>,
+) -> Option<Type<'db>> {
+    if callable.is_classmethod_like(db) || callable.is_staticmethod_like(db) {
+        return None;
+    }
+
+    let signatures = callable.signatures(db);
+    if !signatures
+        .iter()
+        .any(Signature::has_explicit_positional_receiver_annotation)
+    {
+        return None;
+    }
+
+    let filtered_signatures = CallableSignature::from_overloads(
+        signatures
+            .iter()
+            .filter_map(|signature| signature.bind_receiver_if_compatible(db, receiver_ty)),
+    );
+
+    if filtered_signatures.iter().next().is_none() {
+        return Some(Type::Never);
+    }
+
+    Some(Type::Callable(
+        CallableType::new(
+            db,
+            filtered_signatures,
+            callable.kind(db),
+            callable.provenance(db),
+        )
+        .into_regular(db),
+    ))
+}
+
 /// Inner Salsa query for [`ProtocolClass::interface`].
 #[salsa::tracked(
     returns(copy),
@@ -3021,6 +3087,8 @@ fn cached_protocol_interface<'db>(
             bound_on_class,
         } = candidate;
 
+        let protocol_receiver = (name == "__call__").then(|| Type::instance(db, class));
+
         let member = match ty {
             Type::PropertyInstance(property) => ProtocolMemberData::property(
                 property.getter(db).map(ProtocolMemberType::property_getter),
@@ -3031,14 +3099,19 @@ fn cached_protocol_interface<'db>(
                 definition,
             ),
             Type::Callable(callable) if bound_on_class.is_yes() && callable.is_method_like(db) => {
-                ProtocolMemberData::method(db, callable, definition)
+                ProtocolMemberData::method(db, callable, definition, protocol_receiver)
             }
             Type::FunctionLiteral(function)
                 if bound_on_class.is_yes()
                     || function.is_staticmethod(db)
                     || function.is_classmethod(db) =>
             {
-                ProtocolMemberData::method(db, function.into_callable_type(db), definition)
+                ProtocolMemberData::method(
+                    db,
+                    function.into_callable_type(db),
+                    definition,
+                    protocol_receiver,
+                )
             }
             _ if bound_on_class.is_yes()
                 && definition.is_some_and(|definition| definition.kind(db).is_function_def()) =>
