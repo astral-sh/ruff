@@ -75,10 +75,3 @@ Module(
 3 |     pass
   | ^^^^ Syntax Error: Unexpected indentation
   |
-
-
-  |
-2 | if True)):
-3 |     pass
-  |         ^ Syntax Error: Expected a statement
-  |

@@ -441,7 +441,7 @@ where
     if !results.is_empty() {
         let mut builder = IntersectionBuilder::new(db);
         for result in results {
-            builder = builder.add_positive(result);
+            builder.add_positive_in_place(result);
         }
         return Ok(builder.build());
     }
@@ -457,7 +457,7 @@ where
 
     for error in errors {
         if !any_has_method || error.any_method_available() {
-            builder = builder.add_positive(error.result_type());
+            builder.add_positive_in_place(error.result_type());
             let error_iter = error.into_errors().into_iter();
             if any_has_method {
                 collected_errors.extend(

@@ -288,6 +288,7 @@ error[invalid-assignment]: Invalid assignment to data descriptor attribute `attr
 11 | instance.attr = "wrong"  # snapshot: invalid-assignment
    |                 ^^^^^^^ Expected `int`, found `Literal["wrong"]`
    |
+info: Argument to function `Descriptor.__set__` is incorrect
 info: This assignment implicitly calls `__set__` on a descriptor of type `Descriptor`
 info: Function defined here
  --> src/mdtest_snippet.py:2:9
@@ -355,6 +356,7 @@ error[invalid-assignment]: Invalid assignment to data descriptor attribute `docu
 11 |         self.document = None  # snapshot: invalid-assignment
    |                         ^^^^ Expected `Document`, found `None`
    |
+info: Argument to function `HasDocumentRef.document` is incorrect
 info: This assignment implicitly calls `__set__` on a descriptor of type `property`
 info: Function defined here
  --> src/mdtest_snippet.py:7:9
@@ -384,6 +386,7 @@ error[invalid-assignment]: Invalid assignment to data descriptor attribute `x` o
 8 | c.x = (1, b"")  # snapshot: invalid-assignment
   |       ^^^^^^^^ Expected `tuple[int, str]`, found `tuple[Literal[1], Literal[b""]]`
   |
+info: Argument to function `Descriptor.__set__` is incorrect
 info: This assignment implicitly calls `__set__` on a descriptor of type `Descriptor`
 info: the second tuple element is not compatible: `Literal[b""]` is not assignable to `str`
 info: Function defined here

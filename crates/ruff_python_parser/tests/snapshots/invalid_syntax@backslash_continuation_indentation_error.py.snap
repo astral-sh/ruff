@@ -69,10 +69,3 @@ Module(
 4 | |     2
   | |____^ Syntax Error: Unexpected indentation
   |
-
-
-  |
-3 |       \
-4 |     2
-  |      ^ Syntax Error: Expected a statement
-  |

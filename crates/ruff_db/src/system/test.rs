@@ -1,6 +1,7 @@
 use ruff_notebook::{Notebook, NotebookError};
 use rustc_hash::FxHashMap;
 use std::panic::RefUnwindSafe;
+use std::process::Output;
 use std::sync::{Arc, Mutex};
 
 use crate::Db;
@@ -138,6 +139,15 @@ impl System for TestSystem {
 
     fn which(&self, _name: &str) -> WhichResult {
         Err(WhichError::CannotFindBinaryPath)
+    }
+
+    fn run_command(
+        &self,
+        program: &str,
+        args: &[&str],
+        current_directory: &SystemPath,
+    ) -> Result<Output> {
+        self.system().run_command(program, args, current_directory)
     }
 
     fn read_directory<'a>(

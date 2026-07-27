@@ -376,9 +376,9 @@ fn to_lsp_diagnostic(
             .primary_annotation()
             .and_then(Annotation::get_message)
         {
-            format!("{}: {annotation_message}", diagnostic.primary_message())
+            format!("{}: {annotation_message}", diagnostic.headline_message())
         } else {
-            diagnostic.primary_message().to_string()
+            diagnostic.headline_message().to_string()
         }
     } else {
         diagnostic.concise_message().to_string()

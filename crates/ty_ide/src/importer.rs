@@ -366,10 +366,7 @@ impl<'ast> MembersInScope<'ast> {
     }
 
     pub(crate) fn find_member(&self, symbol_name: &str) -> Option<&MemberInScope> {
-        self.map
-            .iter()
-            .find(|(name, _)| *name == symbol_name)
-            .map(|(_, member)| member)
+        self.map.get(symbol_name)
     }
 
     pub(crate) fn satisfies(

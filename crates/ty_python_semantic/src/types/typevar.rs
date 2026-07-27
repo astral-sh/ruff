@@ -1102,12 +1102,17 @@ impl<'db> BoundTypeVarInstance<'db> {
         polarity: TypeVarVariance,
     ) -> TypeVarVariance {
         let _span = tracing::trace_span!("variance_with_polarity").entered();
+
         match self.typevar(db).explicit_variance(db) {
             Some(explicit_variance) => explicit_variance.compose(polarity),
             None => match self.binding_context(db) {
-                BindingContext::Definition(definition) => binding_type(db, definition)
-                    .with_polarity(polarity)
-                    .variance_of(db, self.identity(db)),
+                BindingContext::Definition(definition) => polarity.compose_thunk(|| {
+                    match binding_type(db, definition).variance_of(db, self.identity(db)) {
+                        // When both directions are valid, the typing spec selects covariance.
+                        TypeVarVariance::Bivariant => TypeVarVariance::Covariant,
+                        variance => variance,
+                    }
+                }),
                 BindingContext::Synthetic => TypeVarVariance::Invariant,
             },
         }

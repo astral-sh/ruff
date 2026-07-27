@@ -704,13 +704,14 @@ def _():
 ## Prefer the declared type of generic classes and callables
 
 When inferring a generic call, we only use the declared type as type context if it is in
-non-covariant position. The final annotated assignment binding still uses the declared type if the
-inferred and declared types are mutually assignable:
+non-covariant position. Unused type parameters are inferred as covariant. The final annotated
+assignment binding still uses the declared type if the inferred and declared types are mutually
+assignable:
 
 ```py
 from typing import Any
 
-class Bivariant[T]:
+class UnusedTypeParameter[T]:
     pass
 
 class Covariant[T]:
@@ -724,8 +725,8 @@ class Contravariant[T]:
 class Invariant[T]:
     x: T
 
-def bivariant[T](x: T) -> Bivariant[T]:
-    return Bivariant()
+def unused_type_parameter[T](x: T) -> UnusedTypeParameter[T]:
+    return UnusedTypeParameter()
 
 def covariant[T](x: T) -> Covariant[T]:
     return Covariant()
@@ -736,32 +737,32 @@ def contravariant[T](x: T) -> Contravariant[T]:
 def invariant[T](x: T) -> Invariant[T]:
     return Invariant()
 
-x1 = bivariant(1)
+x1 = unused_type_parameter(1)
 x2 = covariant(1)
 x3 = contravariant(1)
 x4 = invariant(1)
 
-reveal_type(x1)  # revealed: Bivariant[Literal[1]]
+reveal_type(x1)  # revealed: UnusedTypeParameter[Literal[1]]
 reveal_type(x2)  # revealed: Covariant[Literal[1]]
 reveal_type(x3)  # revealed: Contravariant[int]
 reveal_type(x4)  # revealed: Invariant[int]
 
-x5: Bivariant[int | None] = bivariant(1)
+x5: UnusedTypeParameter[int | None] = unused_type_parameter(1)
 x6: Covariant[int | None] = covariant(1)
 x7: Contravariant[int | None] = contravariant(1)
 x8: Invariant[int | None] = invariant(1)
 
-reveal_type(x5)  # revealed: Bivariant[int | None]
+reveal_type(x5)  # revealed: UnusedTypeParameter[Literal[1]]
 reveal_type(x6)  # revealed: Covariant[Literal[1]]
 reveal_type(x7)  # revealed: Contravariant[int | None]
 reveal_type(x8)  # revealed: Invariant[int | None]
 
-x9: Bivariant[Any] = bivariant(1)
+x9: UnusedTypeParameter[Any] = unused_type_parameter(1)
 x10: Covariant[Any] = covariant(1)
 x11: Contravariant[Any] = contravariant(1)
 x12: Invariant[Any] = invariant(1)
 
-reveal_type(x9)  # revealed: Bivariant[Any]
+reveal_type(x9)  # revealed: UnusedTypeParameter[Any]
 reveal_type(x10)  # revealed: Covariant[Any]
 reveal_type(x11)  # revealed: Contravariant[Any]
 reveal_type(x12)  # revealed: Invariant[Any]

@@ -1395,11 +1395,11 @@ print(sys.last_exc, os.getegid())
 
     assert_eq!(diagnostics.len(), 2);
     assert_eq!(
-        diagnostics[0].primary_message(),
+        diagnostics[0].headline_message(),
         "Module `sys` has no member `last_exc`"
     );
     assert_eq!(
-        diagnostics[1].primary_message(),
+        diagnostics[1].headline_message(),
         "Module `os` has no member `getegid`"
     );
 
@@ -1453,7 +1453,7 @@ fn reloading_options_updates_inferred_python_version_diagnostics_when_metadata_i
 
     assert_eq!(diagnostics.len(), 1);
     assert_eq!(
-        diagnostics[0].primary_message(),
+        diagnostics[0].headline_message(),
         format!(
             "Ignoring unsupported inferred Python version `3.{unsupported_minor}`; ty will use Python {} instead.",
             PythonVersion::latest_ty()

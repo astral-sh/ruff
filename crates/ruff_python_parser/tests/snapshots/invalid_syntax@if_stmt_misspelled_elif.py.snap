@@ -98,8 +98,8 @@ Module(
   |
 3 | elf:
 4 |     pass
-  |         ^ Syntax Error: Expected a statement
 5 | else:
+  | ^^^^ Syntax Error: Expected a statement
 6 |     pass
   |
 
@@ -127,11 +127,4 @@ Module(
 5 | else:
 6 |     pass
   | ^^^^ Syntax Error: Unexpected indentation
-  |
-
-
-  |
-5 | else:
-6 |     pass
-  |         ^ Syntax Error: Expected a statement
   |

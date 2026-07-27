@@ -2159,3 +2159,63 @@ class MaybeEqWhile:
         def __eq__(self, other: MaybeEqWhile) -> bool:
             return True
 ```
+
+## Overloaded generic receivers remain visible to override checks
+
+An override must still be checked against every applicable receiver-specialized overload when the
+subclass retains a covariant type parameter. A `str` receiver matches both the `str` and `object`
+overloads, so accepting only `str` is invalid. A two-item receiver excludes the one-item overload,
+so matching only that excluded overload is also invalid.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```pyi
+from typing import Any, Generic, TypeVar, overload
+
+ValueCo = TypeVar("ValueCo", covariant=True)
+ShapeCo = TypeVar("ShapeCo", covariant=True)
+
+class Receiver(Generic[ValueCo, ShapeCo]):
+    @overload
+    def by_value(self: "Receiver[str, Any]", value: str) -> None: ...
+    @overload
+    def by_value(self: "Receiver[object, Any]", value: object) -> None: ...
+    @overload
+    def by_shape(self: "Receiver[Any, tuple[str]]", value: str) -> None: ...
+    @overload
+    def by_shape(self: "Receiver[Any, tuple[str, str]]", value: bytes) -> None: ...
+
+class NarrowValueOverride(Receiver[str, ShapeCo], Generic[ShapeCo]):
+    def by_value(self, value: str) -> None: ...  # error: [invalid-method-override]
+
+class WrongShapeOverride(Receiver[ValueCo, tuple[str, str]], Generic[ValueCo]):
+    def by_shape(self, value: str) -> None: ...  # error: [invalid-method-override]
+```
+
+## Equivalent overloaded protocol receivers are valid overrides
+
+A generic implementation can restate a protocol's receiver-specialized overload set using its own
+receiver type without changing the method contract.
+
+```py
+from typing import Generic, Protocol, TypeVar, overload
+
+T = TypeVar("T")
+TContra = TypeVar("TContra", contravariant=True)
+
+class TaskStatus(Protocol[TContra]):
+    @overload
+    def started(self: "TaskStatus[None]") -> None: ...
+    @overload
+    def started(self, value: TContra) -> None: ...
+
+class ConcreteStatus(Generic[T], TaskStatus[T]):
+    @overload
+    def started(self: "ConcreteStatus[None]") -> None: ...
+    @overload
+    def started(self: "ConcreteStatus[T]", value: T) -> None: ...
+    def started(self, value: T | None = None) -> None: ...
+```

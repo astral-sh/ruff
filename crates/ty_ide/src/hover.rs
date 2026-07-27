@@ -4083,7 +4083,23 @@ def function():
             "#,
         );
 
-        assert_snapshot!(test.hover(), @"Hover provided no content");
+        assert_snapshot!(test.hover(), @"
+        AB@Alias2 (contravariant)
+        ---------------------------------------------
+        ```python
+        AB@Alias2 (contravariant)
+        ```
+        ---------------------------------------------
+        info[hover]: Hovered content is
+         --> main.py:3:15
+          |
+        3 | type Alias2[**AB = [int, str]] = Callable[AB, tuple[AB]]
+          |               ^-
+          |               ||
+          |               |Cursor offset
+          |               source
+          |
+        ");
     }
 
     #[test]
@@ -4272,10 +4288,10 @@ def function():
 
         // TODO: Should this be constravariant instead?
         assert_snapshot!(test.hover(), @"
-        P@Alias (bivariant)
+        P@Alias (covariant)
         ---------------------------------------------
         ```python
-        P@Alias (bivariant)
+        P@Alias (covariant)
         ```
         ---------------------------------------------
         info[hover]: Hovered content is

@@ -298,7 +298,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                                     builder.into_diagnostic("Unsupported `|` operation");
 
                                 if left_type_value.is_equivalent_to(self.db(), right_type_value) {
-                                    diagnostic.set_primary_message(format_args!(
+                                    diagnostic.set_primary_annotation_message(format_args!(
                                         "Both operands have type `{}`",
                                         left_type_value.display(self.db())
                                     ));
@@ -444,7 +444,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     if let Some(single_element) = bytes.as_single_part_bytestring()
                         && let Ok(valid_string) = String::from_utf8(single_element.value.to_vec())
                     {
-                        diagnostic.set_primary_message(format_args!(
+                        diagnostic.set_primary_annotation_message(format_args!(
                             "Did you mean `typing.Literal[b\"{valid_string}\"]`?"
                         ));
                     }
@@ -464,7 +464,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     ),
                 ) {
                     if let Some(int) = int.as_i64() {
-                        diagnostic.set_primary_message(format_args!(
+                        diagnostic.set_primary_annotation_message(format_args!(
                             "Did you mean `typing.Literal[{int}]`?"
                         ));
                     }
@@ -509,7 +509,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         self.type_expression_context()
                     ),
                 ) {
-                    diagnostic.set_primary_message(format_args!(
+                    diagnostic.set_primary_annotation_message(format_args!(
                         "Did you mean `typing.Literal[{}]`?",
                         if bool_value.value { "True" } else { "False" }
                     ));
@@ -539,7 +539,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         let hinted_type =
                             KnownClass::List.to_specialized_instance(db, &[inner_type]);
 
-                        diagnostic.set_primary_message(format_args!(
+                        diagnostic.set_primary_annotation_message(format_args!(
                             "Did you mean `{}`?",
                             hinted_type.display(self.db()),
                         ));
@@ -572,7 +572,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
                         if inner_types.iter().all(|ty| ty.is_hintable(self.db())) {
                             let hinted_type = Type::heterogeneous_tuple(self.db(), inner_types);
-                            diagnostic.set_primary_message(format_args!(
+                            diagnostic.set_primary_annotation_message(format_args!(
                                 "Did you mean `{}`?",
                                 hinted_type.display(self.db()),
                             ));
@@ -716,7 +716,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     if key_type.is_hintable(self.db()) && value_type.is_hintable(self.db()) {
                         let hinted_type = KnownClass::Dict
                             .to_specialized_instance(self.db(), &[key_type, value_type]);
-                        diagnostic.set_primary_message(format_args!(
+                        diagnostic.set_primary_annotation_message(format_args!(
                             "Did you mean `{}`?",
                             hinted_type.display(self.db()),
                         ));
@@ -744,7 +744,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         let hinted_type =
                             KnownClass::Set.to_specialized_instance(self.db(), &[inner_type]);
 
-                        diagnostic.set_primary_message(format_args!(
+                        diagnostic.set_primary_annotation_message(format_args!(
                             "Did you mean `{}`?",
                             hinted_type.display(self.db()),
                         ));
@@ -1082,8 +1082,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     {
                         let mut diagnostic =
                             builder.into_diagnostic("Invalid `tuple` specialization");
-                        diagnostic
-                            .set_primary_message("`...` cannot be used after an unpacked element");
+                        diagnostic.set_primary_annotation_message(
+                            "`...` cannot be used after an unpacked element",
+                        );
                     }
                     let result = TupleType::homogeneous(self.db(), element_ty);
                     self.store_expression_type(&tuple.slice, Type::tuple(Some(result)));
@@ -1099,7 +1100,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, tuple) {
                             let mut diagnostic =
                                 builder.into_diagnostic("Invalid `tuple` specialization");
-                            diagnostic.set_primary_message(
+                            diagnostic.set_primary_annotation_message(
                                 "`...` can only be used as the second element \
                                 in a two-element `tuple` specialization",
                             );
@@ -1188,7 +1189,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, tuple) {
                         let mut diagnostic =
                             builder.into_diagnostic("Invalid `tuple` specialization");
-                        diagnostic.set_primary_message(
+                        diagnostic.set_primary_annotation_message(
                             "`...` can only be used as the second element \
                                 in a two-element `tuple` specialization",
                         );
@@ -1911,7 +1912,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     "`[...]` is not a valid parameter list for `Callable`",
                 ) {
                     if let Some(returns) = return_type {
-                        diagnostic.set_primary_message(format_args!(
+                        diagnostic.set_primary_annotation_message(format_args!(
                             "Did you mean `Callable[..., {}]`?",
                             returns.display(db)
                         ));
