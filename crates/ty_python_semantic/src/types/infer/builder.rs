@@ -68,7 +68,7 @@ use crate::types::diagnostic::{
     INVALID_ARGUMENT_TYPE, INVALID_ASSIGNMENT, INVALID_ATTRIBUTE_ACCESS, INVALID_DECLARATION,
     INVALID_ENUM_MEMBER_ANNOTATION, INVALID_LEGACY_TYPE_VARIABLE, INVALID_NEWTYPE,
     INVALID_PARAMSPEC, INVALID_TYPE_ALIAS_TYPE, INVALID_TYPE_FORM, INVALID_TYPE_VARIABLE_BOUND,
-    INVALID_TYPE_VARIABLE_CONSTRAINTS, INVALID_TYPE_VARIABLE_DEFAULT,
+    INVALID_TYPE_VARIABLE_CONSTRAINTS, INVALID_TYPE_VARIABLE_DEFAULT, MISMATCHED_SENTINEL_NAME,
     POSSIBLY_MISSING_IMPLICIT_CALL, POSSIBLY_MISSING_SUBMODULE, TypeCheckDiagnostics,
     UNRESOLVED_ATTRIBUTE, UNRESOLVED_GLOBAL, UNRESOLVED_REFERENCE, UNSOUND_ASSIGNMENT,
     UNSOUND_YIELD, UNSUPPORTED_OPERATOR, YieldKind, autofix_with_notimplementederror,
@@ -3814,23 +3814,65 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             repr_arg = Some(&keyword.value);
         }
 
-        if !matches!(name_arg, ast::Expr::StringLiteral(_)) {
+        let ast::Expr::StringLiteral(name_arg) = name_arg else {
+            return None;
+        };
+
+        if repr_arg.is_some_and(|repr_arg| {
+            !matches!(repr_arg, ast::Expr::StringLiteral(_)) && !repr_arg.is_none_literal_expr()
+        }) {
             return None;
         }
 
-        let Some(repr_arg) = repr_arg else {
-            return Some(Type::KnownInstance(KnownInstanceType::Sentinel(
-                SentinelInstance::new(self.db(), target_name, definition),
-            )));
-        };
+        let name = name_arg.value.to_str();
 
-        if !matches!(repr_arg, ast::Expr::StringLiteral(_)) && !repr_arg.is_none_literal_expr() {
-            return None;
+        if !self.sentinel_name_matches_target(name, target_name)
+            && let Some(builder) = self
+                .context
+                .report_lint(&MISMATCHED_SENTINEL_NAME, name_arg)
+        {
+            let mut diagnostic = builder.into_diagnostic(format_args!(
+                "The name passed to `{}` does not match the variable it is assigned to",
+                KnownClass::Sentinel.name(self.program_environment().python_version(self.db())),
+            ));
+            diagnostic.set_primary_annotation_message(format_args!(
+                "Expected \"{target_name}\", got \"{name}\""
+            ));
         }
 
         Some(Type::KnownInstance(KnownInstanceType::Sentinel(
             SentinelInstance::new(self.db(), target_name, definition),
         )))
+    }
+
+    /// Sentinel names can be unqualified or include their exact enclosing class path.
+    fn sentinel_name_matches_target(&self, name: &str, target_name: &Name) -> bool {
+        if name == target_name.as_str() {
+            return true;
+        }
+
+        let mut name_components = name.rsplit('.');
+
+        if name_components.next() != Some(target_name.as_str()) {
+            return false;
+        }
+
+        for (_, scope) in self
+            .index
+            .ancestor_scopes(self.scope.file_scope_id(self.db()))
+        {
+            match scope.node() {
+                NodeWithScopeKind::Class(class) => {
+                    if name_components.next() != Some(class.node(self.module()).name.as_str()) {
+                        return false;
+                    }
+                }
+                NodeWithScopeKind::Module => return name_components.next().is_none(),
+                _ => return false,
+            }
+        }
+
+        false
     }
 
     fn sentinel_definition_scope_is_supported(&self) -> bool {

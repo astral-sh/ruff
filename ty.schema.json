@@ -1174,6 +1174,16 @@
             }
           ]
         },
+        "mismatched-sentinel-name": {
+          "title": "detects sentinel definitions whose declared name does not match the assigned variable",
+          "description": "## What it does\n\nChecks for `builtins.sentinel` and `typing_extensions.Sentinel` definitions whose name argument does\nnot match the variable they are assigned to. In class scope, the name can be unqualified or include\nthe full enclosing class path.\n\n## Why is this bad?\n\nA mismatched name can be a typo and can make a sentinel's runtime representation confusing.\n\n## Default level\n\nThis rule is disabled by default because sentinel names are not required to match their assigned\nvariables. Enable it to enforce consistent sentinel naming.\n\n## Examples\n\n```python\nfrom typing_extensions import Sentinel\n\nMISSING = Sentinel(\"OTHER\")  # error: [mismatched-sentinel-name]\n```\n\nUse a matching name instead:\n\n```python\nfrom typing_extensions import Sentinel\n\nMISSING = Sentinel(\"MISSING\")\n\n\nclass Container:\n    UNSET = Sentinel(\"Container.UNSET\")\n```",
+          "default": "ignore",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
         "mismatched-type-name": {
           "title": "detects functional typing definitions whose declared name does not match the assigned variable",
           "description": "## What it does\n\nChecks for functional typing definitions whose declared name does not match the variable they are\nassigned to.\n\n## Why is this bad?\n\nConstructors like `TypeVar`, `ParamSpec`, `NewType`, `NamedTuple`, `TypedDict`, and `TypeAliasType`\nall take a name argument that is normally expected to match the assigned variable. A mismatch is\nusually a typo and makes later diagnostics harder to understand.\n\n## Default level\n\nThis rule is a warning by default because ty can usually recover and continue understanding the\nresulting type.\n\n## Examples\n\n```python\nfrom typing import NewType, ParamSpec, TypeVar\nfrom typing_extensions import TypedDict\n\nT = TypeVar(\"U\")  # error: [mismatched-type-name]\nP = ParamSpec(\"Q\")  # error: [mismatched-type-name]\nUserId = NewType(\"Id\", int)  # error: [mismatched-type-name]\nMovie = TypedDict(\"Film\", {\"title\": str})  # error: [mismatched-type-name]\n```",
