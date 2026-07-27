@@ -473,6 +473,63 @@ with nullcontext(), nullcontext("value") as value:
 reveal_type(value)  # revealed: str
 ```
 
+## Union context managers combine their exit return types
+
+A union of context-manager alternatives is classified from its combined `__exit__` return type, not
+from each alternative independently. In particular, the common conditional combination of `suppress`
+and `nullcontext` returns `bool | None`, which the typing specification treats as non-suppressing.
+
+```py
+from contextlib import nullcontext, suppress
+from typing_extensions import assert_type
+
+def conditional_return(flag: bool) -> int:
+    manager = suppress(ValueError) if flag else nullcontext()
+    with manager:
+        return 1
+
+def reversed_conditional_return(flag: bool) -> int:
+    manager = nullcontext() if flag else suppress(ValueError)
+    with manager:
+        return 1
+
+def explicit_union_return(manager: suppress | nullcontext[None]) -> int:
+    with manager:
+        return 1
+
+def conditional_narrowing(flag: bool, value: int | str) -> None:
+    if isinstance(value, int):
+        manager = suppress(ValueError) if flag else nullcontext()
+        with manager:
+            raise ValueError
+
+    assert_type(value, str)
+```
+
+## Falsy union alternatives do not change a boolean exit type
+
+Unlike `bool | None`, a union of `bool` and `Literal[False]` simplifies to `bool`. The combined exit
+return type therefore remains potentially suppressing.
+
+```py
+from contextlib import suppress
+from typing import Literal
+from typing_extensions import assert_type
+
+class FalseExit:
+    def __enter__(self) -> None: ...
+    def __exit__(self, exc_type, exc_value, traceback) -> Literal[False]:
+        return False
+
+def conditional_narrowing(flag: bool, value: int | str) -> None:
+    if isinstance(value, int):
+        manager = suppress(ValueError) if flag else FalseExit()
+        with manager:
+            raise ValueError
+
+    assert_type(value, int | str)
+```
+
 ## Union context manager
 
 ```py
