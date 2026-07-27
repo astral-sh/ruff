@@ -4,7 +4,7 @@ use crate::{
     FxOrderSet,
     place::Place,
     types::{
-        Bindings, CallArguments, CallDunderError, KnownClass, Type, TypeContext,
+        Bindings, CallArguments, CallDunderError, KnownClass, Type, TypeContext, UnionBuilder,
         call::CallErrorKind, context::InferContext, diagnostic::INVALID_CONTEXT_MANAGER,
     },
 };
@@ -12,7 +12,8 @@ use ruff_python_ast as ast;
 use ty_python_core::{EvaluationMode, Truthiness};
 
 impl<'db> Type<'db> {
-    /// Returns whether an exit overload can suppress exceptions under the typing specification.
+    /// Returns whether the combined exit return type can suppress exceptions under the typing
+    /// specification.
     pub(crate) fn context_manager_exit_truthiness(
         self,
         db: &'db dyn Db,
@@ -32,7 +33,7 @@ impl<'db> Type<'db> {
             return Truthiness::AlwaysFalse;
         };
 
-        let bool_type = KnownClass::Bool.to_instance(db, env);
+        let mut return_types = UnionBuilder::new(db, env);
 
         for callable in &callables {
             for signature in callable.signatures(db) {
@@ -45,15 +46,19 @@ impl<'db> Type<'db> {
                     signature.return_ty
                 };
 
-                if return_type.is_equivalent_to(db, env, bool_type)
-                    || return_type.is_equivalent_to(db, env, Type::bool_literal(true))
-                {
-                    return Truthiness::AlwaysTrue;
-                }
+                return_types.add_in_place(return_type);
             }
         }
 
-        Truthiness::AlwaysFalse
+        let return_type = return_types.build();
+
+        if return_type.is_equivalent_to(db, env, KnownClass::Bool.to_instance(db, env))
+            || return_type.is_equivalent_to(db, env, Type::bool_literal(true))
+        {
+            Truthiness::AlwaysTrue
+        } else {
+            Truthiness::AlwaysFalse
+        }
     }
 
     /// Returns the type bound from a context manager with type `self`.

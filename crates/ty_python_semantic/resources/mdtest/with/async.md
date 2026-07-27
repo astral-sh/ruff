@@ -382,6 +382,72 @@ async def main():
     value  # error: [possibly-unresolved-reference]
 ```
 
+## Union async context managers combine awaited exit return types
+
+The awaited `__aexit__` return types of alternative managers must be combined before applying the
+typing specification. A conditional union of a `bool`-returning async manager and `nullcontext`
+therefore has an effective return type of `bool | None` and is non-suppressing.
+
+```py
+from contextlib import nullcontext
+from typing_extensions import assert_type
+
+class Suppresses:
+    async def __aenter__(self) -> None: ...
+    async def __aexit__(self, exc_type, exc_value, traceback) -> bool:
+        return True
+
+async def conditional_return(flag: bool) -> int:
+    manager = Suppresses() if flag else nullcontext()
+    async with manager:
+        return 1
+
+async def reversed_conditional_return(flag: bool) -> int:
+    manager = nullcontext() if flag else Suppresses()
+    async with manager:
+        return 1
+
+async def explicit_union_return(manager: Suppresses | nullcontext[None]) -> int:
+    async with manager:
+        return 1
+
+async def conditional_narrowing(flag: bool, value: int | str) -> None:
+    if isinstance(value, int):
+        manager = Suppresses() if flag else nullcontext()
+        async with manager:
+            raise ValueError
+
+    assert_type(value, str)
+```
+
+## Falsy async union alternatives do not change a boolean exit type
+
+After awaiting, `bool | Literal[False]` simplifies to `bool`, so a union of these async manager
+alternatives remains potentially suppressing.
+
+```py
+from typing import Literal
+from typing_extensions import assert_type
+
+class Suppresses:
+    async def __aenter__(self) -> None: ...
+    async def __aexit__(self, exc_type, exc_value, traceback) -> bool:
+        return True
+
+class FalseExit:
+    async def __aenter__(self) -> None: ...
+    async def __aexit__(self, exc_type, exc_value, traceback) -> Literal[False]:
+        return False
+
+async def conditional_narrowing(flag: bool, value: int | str) -> None:
+    if isinstance(value, int):
+        manager = Suppresses() if flag else FalseExit()
+        async with manager:
+            raise ValueError
+
+    assert_type(value, int | str)
+```
+
 ## Multiple targets
 
 ```py
