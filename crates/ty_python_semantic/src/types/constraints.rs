@@ -2492,12 +2492,13 @@ impl NodeId {
         // that rely on concrete bounds cannot reason about it.
         //
         // Type aliases and class-based protocols can hide typevars in lazy attributes. Generic
-        // and dynamically defined TypedDicts can likewise hide typevars in their lazy fields.
-        // Do not expand those attributes here: a recursively specialized alias can produce a
-        // different type at every level, defeating the normal recursion guard. Nongeneric,
-        // statement-defined TypedDicts cannot hide a generic specialization, and synthesized
-        // TypedDicts and protocols already expose their fields to the visitor, so none of those
-        // need to force sequent analysis.
+        // TypedDicts defined with a class statement and functionally defined TypedDicts can
+        // likewise hide typevars in their lazy fields. Do not expand those attributes here: a
+        // recursively specialized alias can produce a different type at every level, defeating
+        // the normal recursion guard. Nongeneric TypedDicts defined with a class statement
+        // cannot hide a generic specialization, and synthesized TypedDicts and protocols
+        // already expose their fields to the visitor, so none of those need to force sequent
+        // analysis.
         any_over_type(db, bound, false, |ty| match ty {
             Type::TypeVar(_)
             | Type::Dynamic(DynamicType::UnspecializedTypeVar)
@@ -7924,7 +7925,7 @@ mod tests {
         let str = KnownClass::Str.to_instance(&db);
 
         for (name, left, right) in [
-            ("statement-defined TypedDicts", movie, track),
+            ("TypedDicts defined with a class statement", movie, track),
             (
                 "synthesized TypedDict",
                 synthesized_typed_dict(&db, int),
@@ -7982,6 +7983,10 @@ mod tests {
                     value: S
 
                 FunctionalSchema = TypedDict("FunctionalSchema", {"value": int})
+                GenericFunctionalSchema = TypedDict(
+                    "GenericFunctionalSchema",
+                    {"director": str, "assistant producer": S},
+                )
 
                 class ValueProtocol(Protocol):
                     value: int
@@ -8019,6 +8024,13 @@ mod tests {
                 Type::instance(
                     &db,
                     class_for("FunctionalSchema").default_specialization(&db),
+                ),
+            ),
+            (
+                "GenericFunctionalSchema",
+                Type::instance(
+                    &db,
+                    class_for("GenericFunctionalSchema").default_specialization(&db),
                 ),
             ),
             (
