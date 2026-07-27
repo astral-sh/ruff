@@ -255,7 +255,8 @@ struct OwnedConstraintSetInner<'db> {
     typevars: IndexVec<TypeVarId, BoundTypeVarIdentity<'db>>,
     nodes: Box<[InteriorNodeData]>,
     node_indices: RankBitBox,
-    /// A dense, canonical source-order tree whose IDs are independent of builder history.
+    /// A dense, canonical source-order tree whose IDs are independent of sidecar construction
+    /// history.
     source_orders: Box<[SourceOrder]>,
 }
 
@@ -1041,10 +1042,11 @@ impl<'db> ConstraintSetBuilder<'db> {
             .source_order
             .expect("non-terminal BDD should have source_order");
 
-        // The source-order tree can retain repeated constraints from intermediate operations. If
-        // this constraint set participates in a Salsa cycle, retaining that construction history
-        // can make an otherwise stable result grow on every iteration and never converge. Build
-        // the owned source-order tree densely so its IDs are independent of that history.
+        // Combining constraint sets can allocate a new source-order tree even when the BDD is
+        // unchanged. Preserve each constraint's first source position, but rebuild the persisted
+        // sidecar densely so redundant combinations cannot affect its IDs or owned-set equality.
+        // Unlike node and constraint IDs, source-order IDs are not embedded in the BDD, so the
+        // sidecar can be rebuilt without remapping the BDD.
         let source_constraints = self.calculate_source_orders(Some(source_order));
 
         let mut storage = self.storage.into_inner();
@@ -8879,13 +8881,17 @@ mod tests {
         let t = create_typevar(&db, "T");
         let u = create_typevar(&db, "U");
 
-        let build = |include_unused_source_order| {
+        let build = |include_redundant_combination| {
             ConstraintSetBuilder::new().into_owned(|builder| {
                 let t_int = create_constraint(&db, builder, t, KnownClass::Int);
                 let u_str = create_constraint(&db, builder, u, KnownClass::Str);
 
-                if include_unused_source_order {
-                    let _ = builder.ordered_source_order(t_int.source_order, t_int.source_order);
+                if include_redundant_combination {
+                    // The redundant combination leaves the BDD unchanged but still creates an
+                    // intermediate source-order tree. It must not affect the final owned set.
+                    let redundant = t_int.and(&db, builder, || t_int);
+                    assert_eq!(redundant.node, t_int.node);
+                    assert_ne!(redundant.source_order, t_int.source_order);
                 }
 
                 t_int.and(&db, builder, || u_str)
