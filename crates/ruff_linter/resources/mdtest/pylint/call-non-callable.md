@@ -1,4 +1,4 @@
-# `non-callable` (`PLE1102`)
+# `call-non-callable` (`PLE1102`)
 
 ```toml
 [lint]
@@ -40,58 +40,58 @@ All basic cases of non-callables, all emit SyntaxWarning error during Python com
 
 ```python
 # String
-"foo"()  # snapshot: non-callable
+"foo"()  # snapshot: call-non-callable
 
 # F-string
-f"foo"()  # snapshot: non-callable
+f"foo"()  # snapshot: call-non-callable
 
 # Bytes
-b"foo"()  # snapshot: non-callable
+b"foo"()  # snapshot: call-non-callable
 
 # Number (int)
-(1)()  # snapshot: non-callable
+(1)()  # snapshot: call-non-callable
 
 # Number (float)
-(1.5)()  # snapshot: non-callable
+(1.5)()  # snapshot: call-non-callable
 
 # Number (complex)
-(1j)()  # snapshot: non-callable
+(1j)()  # snapshot: call-non-callable
 
 # Number (bool)
-True()  # snapshot: non-callable
+True()  # snapshot: call-non-callable
 
 # None
-None()  # snapshot: non-callable
+None()  # snapshot: call-non-callable
 
 # Ellipsis
-(...)()  # snapshot: non-callable
+(...)()  # snapshot: call-non-callable
 
 # Dict
-{"a": 1}()  # snapshot: non-callable
+{"a": 1}()  # snapshot: call-non-callable
 
 # Dict comprehension
-{k: v for k, v in [("a", 1)]}()  # snapshot: non-callable
+{k: v for k, v in [("a", 1)]}()  # snapshot: call-non-callable
 
 # List
-[1, 2, 3]()  # snapshot: non-callable
+[1, 2, 3]()  # snapshot: call-non-callable
 
 # List comprehension
-[i for i in range(5)]()  # snapshot: non-callable
+[i for i in range(5)]()  # snapshot: call-non-callable
 
 # Set
-{1, 2, 3}()  # snapshot: non-callable
+{1, 2, 3}()  # snapshot: call-non-callable
 
 # Set comprehension
-{i for i in range(5)}()  # snapshot: non-callable
+{i for i in range(5)}()  # snapshot: call-non-callable
 
 # Tuple
-(1, 2, 3)()  # snapshot: non-callable
+(1, 2, 3)()  # snapshot: call-non-callable
 
 # Generator
-(i for i in range(5))()  # snapshot: non-callable
+(i for i in range(5))()  # snapshot: call-non-callable
 
 # Template
-t"hello {name}"()  # snapshot: non-callable
+t"hello {name}"()  # snapshot: call-non-callable
 
 ```
 
@@ -99,7 +99,7 @@ t"hello {name}"()  # snapshot: non-callable
 error[PLE1102]: `str` object is not callable.
  --> src/mdtest_snippet.py:2:1
   |
-2 | "foo"()  # snapshot: non-callable
+2 | "foo"()  # snapshot: call-non-callable
   | ^^^^^
   |
 
@@ -107,7 +107,7 @@ error[PLE1102]: `str` object is not callable.
 error[PLE1102]: `str` object is not callable.
  --> src/mdtest_snippet.py:5:1
   |
-5 | f"foo"()  # snapshot: non-callable
+5 | f"foo"()  # snapshot: call-non-callable
   | ^^^^^^
   |
 
@@ -115,7 +115,7 @@ error[PLE1102]: `str` object is not callable.
 error[PLE1102]: `bytes` object is not callable.
  --> src/mdtest_snippet.py:8:1
   |
-8 | b"foo"()  # snapshot: non-callable
+8 | b"foo"()  # snapshot: call-non-callable
   | ^^^^^^
   |
 
@@ -123,7 +123,7 @@ error[PLE1102]: `bytes` object is not callable.
 error[PLE1102]: `int` object is not callable.
   --> src/mdtest_snippet.py:11:2
    |
-11 | (1)()  # snapshot: non-callable
+11 | (1)()  # snapshot: call-non-callable
    |  ^
    |
 
@@ -131,7 +131,7 @@ error[PLE1102]: `int` object is not callable.
 error[PLE1102]: `float` object is not callable.
   --> src/mdtest_snippet.py:14:2
    |
-14 | (1.5)()  # snapshot: non-callable
+14 | (1.5)()  # snapshot: call-non-callable
    |  ^^^
    |
 
@@ -139,7 +139,7 @@ error[PLE1102]: `float` object is not callable.
 error[PLE1102]: `complex` object is not callable.
   --> src/mdtest_snippet.py:17:2
    |
-17 | (1j)()  # snapshot: non-callable
+17 | (1j)()  # snapshot: call-non-callable
    |  ^^
    |
 
@@ -147,7 +147,7 @@ error[PLE1102]: `complex` object is not callable.
 error[PLE1102]: `bool` object is not callable.
   --> src/mdtest_snippet.py:20:1
    |
-20 | True()  # snapshot: non-callable
+20 | True()  # snapshot: call-non-callable
    | ^^^^
    |
 
@@ -155,7 +155,7 @@ error[PLE1102]: `bool` object is not callable.
 error[PLE1102]: `NoneType` object is not callable.
   --> src/mdtest_snippet.py:23:1
    |
-23 | None()  # snapshot: non-callable
+23 | None()  # snapshot: call-non-callable
    | ^^^^
    |
 
@@ -163,7 +163,7 @@ error[PLE1102]: `NoneType` object is not callable.
 error[PLE1102]: `ellipsis` object is not callable.
   --> src/mdtest_snippet.py:26:2
    |
-26 | (...)()  # snapshot: non-callable
+26 | (...)()  # snapshot: call-non-callable
    |  ^^^
    |
 
@@ -171,7 +171,7 @@ error[PLE1102]: `ellipsis` object is not callable.
 error[PLE1102]: `dict` object is not callable.
   --> src/mdtest_snippet.py:29:1
    |
-29 | {"a": 1}()  # snapshot: non-callable
+29 | {"a": 1}()  # snapshot: call-non-callable
    | ^^^^^^^^
    |
 
@@ -179,7 +179,7 @@ error[PLE1102]: `dict` object is not callable.
 error[PLE1102]: `dict` object is not callable.
   --> src/mdtest_snippet.py:32:1
    |
-32 | {k: v for k, v in [("a", 1)]}()  # snapshot: non-callable
+32 | {k: v for k, v in [("a", 1)]}()  # snapshot: call-non-callable
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
 
@@ -187,7 +187,7 @@ error[PLE1102]: `dict` object is not callable.
 error[PLE1102]: `list` object is not callable.
   --> src/mdtest_snippet.py:35:1
    |
-35 | [1, 2, 3]()  # snapshot: non-callable
+35 | [1, 2, 3]()  # snapshot: call-non-callable
    | ^^^^^^^^^
    |
 
@@ -195,7 +195,7 @@ error[PLE1102]: `list` object is not callable.
 error[PLE1102]: `list` object is not callable.
   --> src/mdtest_snippet.py:38:1
    |
-38 | [i for i in range(5)]()  # snapshot: non-callable
+38 | [i for i in range(5)]()  # snapshot: call-non-callable
    | ^^^^^^^^^^^^^^^^^^^^^
    |
 
@@ -203,7 +203,7 @@ error[PLE1102]: `list` object is not callable.
 error[PLE1102]: `set` object is not callable.
   --> src/mdtest_snippet.py:41:1
    |
-41 | {1, 2, 3}()  # snapshot: non-callable
+41 | {1, 2, 3}()  # snapshot: call-non-callable
    | ^^^^^^^^^
    |
 
@@ -211,7 +211,7 @@ error[PLE1102]: `set` object is not callable.
 error[PLE1102]: `set` object is not callable.
   --> src/mdtest_snippet.py:44:1
    |
-44 | {i for i in range(5)}()  # snapshot: non-callable
+44 | {i for i in range(5)}()  # snapshot: call-non-callable
    | ^^^^^^^^^^^^^^^^^^^^^
    |
 
@@ -219,7 +219,7 @@ error[PLE1102]: `set` object is not callable.
 error[PLE1102]: `tuple` object is not callable.
   --> src/mdtest_snippet.py:47:1
    |
-47 | (1, 2, 3)()  # snapshot: non-callable
+47 | (1, 2, 3)()  # snapshot: call-non-callable
    | ^^^^^^^^^
    |
 
@@ -227,7 +227,7 @@ error[PLE1102]: `tuple` object is not callable.
 error[PLE1102]: `generator` object is not callable.
   --> src/mdtest_snippet.py:50:1
    |
-50 | (i for i in range(5))()  # snapshot: non-callable
+50 | (i for i in range(5))()  # snapshot: call-non-callable
    | ^^^^^^^^^^^^^^^^^^^^^
    |
 
@@ -235,7 +235,7 @@ error[PLE1102]: `generator` object is not callable.
 error[PLE1102]: `Template` object is not callable.
   --> src/mdtest_snippet.py:53:1
    |
-53 | t"hello {name}"()  # snapshot: non-callable
+53 | t"hello {name}"()  # snapshot: call-non-callable
    | ^^^^^^^^^^^^^^^
    |
 ```
@@ -246,23 +246,23 @@ Given that we have a small type inference engine it allows us to catch some more
 
 ```python
 # BinOp
-("a" + "b")()  # snapshot: non-callable
+("a" + "b")()  # snapshot: call-non-callable
 
 # If (Union)
-(1 if True else "a")()  # snapshot: non-callable
+(1 if True else "a")()  # snapshot: call-non-callable
 
 # UnaryOp
-(not 1)()  # snapshot: non-callable
+(not 1)()  # snapshot: call-non-callable
 
 # BoolOp
-(True or False)()  # snapshot: non-callable
+(True or False)()  # snapshot: call-non-callable
 ```
 
 ```snapshot
 error[PLE1102]: `str` object is not callable.
  --> src/mdtest_snippet.py:2:2
   |
-2 | ("a" + "b")()  # snapshot: non-callable
+2 | ("a" + "b")()  # snapshot: call-non-callable
   |  ^^^^^^^^^
   |
 
@@ -270,7 +270,7 @@ error[PLE1102]: `str` object is not callable.
 error[PLE1102]: `str | int` object is not callable.
  --> src/mdtest_snippet.py:5:2
   |
-5 | (1 if True else "a")()  # snapshot: non-callable
+5 | (1 if True else "a")()  # snapshot: call-non-callable
   |  ^^^^^^^^^^^^^^^^^^
   |
 
@@ -278,7 +278,7 @@ error[PLE1102]: `str | int` object is not callable.
 error[PLE1102]: `bool` object is not callable.
  --> src/mdtest_snippet.py:8:2
   |
-8 | (not 1)()  # snapshot: non-callable
+8 | (not 1)()  # snapshot: call-non-callable
   |  ^^^^^
   |
 
@@ -286,7 +286,7 @@ error[PLE1102]: `bool` object is not callable.
 error[PLE1102]: `bool` object is not callable.
   --> src/mdtest_snippet.py:11:2
    |
-11 | (True or False)()  # snapshot: non-callable
+11 | (True or False)()  # snapshot: call-non-callable
    |  ^^^^^^^^^^^^^
    |
 ```
