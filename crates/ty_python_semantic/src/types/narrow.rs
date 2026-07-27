@@ -5305,14 +5305,6 @@ impl<'db> NarrowingEvaluatorExtension<'db> for NarrowingEvaluator<'_, 'db> {
         base_type: Type<'db>,
         place: ScopedPlaceId,
     ) -> Type<'db> {
-        narrow_type_by_constraint(
-            db,
-            env,
-            self.narrowing_constraints(),
-            self.predicates(),
-            self.constraint(),
-            base_type,
-            place,
-        )
+        narrow_type_by_constraint(db, env, self, base_type, place)
     }
 }
