@@ -7944,8 +7944,7 @@ mod tests {
                 &builder,
                 || ConstraintSet::constrain_typevar_lower_bound(&db, &builder, t, right),
             );
-            let inferable =
-                InferableTypeVars::from_typevars(&db, std::iter::once(t.identity(&db)).collect());
+            let inferable = TypeVarSet::from_typevars(&db, [t]);
             let expected = Solutions::Constrained(vec![vec![TypeVarSolution {
                 bound_typevar: t,
                 solution: UnionType::from_elements(&db, [left, right]),
@@ -8069,8 +8068,7 @@ mod tests {
                 )
             });
         }
-        let inferable =
-            InferableTypeVars::from_typevars(&db, std::iter::once(t.identity(&db)).collect());
+        let inferable = TypeVarSet::from_typevars(&db, [t]);
         let (single_sequents, pair_sequents) = {
             let storage = builder.storage.borrow();
             (
@@ -8198,8 +8196,7 @@ mod tests {
         assert!(walked);
         assert_eq!(fast_path, walked);
 
-        let inferable =
-            InferableTypeVars::from_typevars(&db, std::iter::once(t.identity(&db)).collect());
+        let inferable = TypeVarSet::from_typevars(&db, [t]);
         assert_eq!(
             set.solutions(&db, &builder, inferable),
             Solutions::Unsatisfiable
@@ -8260,10 +8257,7 @@ mod tests {
         assert!(walked);
         assert!(set.is_never_satisfied(&db));
 
-        let inferable = InferableTypeVars::from_typevars(
-            &db,
-            [t.identity(&db), s.identity(&db)].into_iter().collect(),
-        );
+        let inferable = TypeVarSet::from_typevars(&db, [t, s]);
         assert_eq!(
             set.solutions(&db, &builder, inferable),
             Solutions::Unsatisfiable
