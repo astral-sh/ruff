@@ -1,14 +1,55 @@
 use crate::{
     Db, FxOrderSet,
+    place::Place,
     types::{
-        CallArguments, CallDunderError, Type, TypeContext, call::CallErrorKind,
+        CallArguments, CallDunderError, KnownClass, Type, TypeContext, call::CallErrorKind,
         context::InferContext, diagnostic::INVALID_CONTEXT_MANAGER,
     },
 };
 use ruff_python_ast as ast;
-use ty_python_core::EvaluationMode;
+use ty_python_core::{EvaluationMode, Truthiness};
 
 impl<'db> Type<'db> {
+    /// Returns whether an exit overload can suppress exceptions under the typing specification.
+    pub(crate) fn context_manager_exit_truthiness(
+        self,
+        db: &'db dyn Db,
+        mode: EvaluationMode,
+    ) -> Truthiness {
+        let exit_method = match mode {
+            EvaluationMode::Async => "__aexit__",
+            EvaluationMode::Sync => "__exit__",
+        };
+
+        let Place::Defined(exit) = self.member(db, exit_method).place else {
+            return Truthiness::AlwaysFalse;
+        };
+
+        let Some(callables) = exit.ty.try_upcast_to_callable(db) else {
+            return Truthiness::AlwaysFalse;
+        };
+
+        let bool_type = KnownClass::Bool.to_instance(db);
+
+        for callable in &callables {
+            for signature in callable.signatures(db) {
+                let return_type = if mode.is_async() {
+                    signature.return_ty.try_await(db).unwrap_or(Type::unknown())
+                } else {
+                    signature.return_ty
+                };
+
+                if return_type.is_equivalent_to(db, bool_type)
+                    || return_type.is_equivalent_to(db, Type::bool_literal(true))
+                {
+                    return Truthiness::AlwaysTrue;
+                }
+            }
+        }
+
+        Truthiness::AlwaysFalse
+    }
+
     /// Returns the type bound from a context manager with type `self`.
     ///
     /// This method should only be used outside of type checking because it omits any errors.
@@ -80,7 +121,6 @@ impl<'db> Type<'db> {
                     mode,
                 })
             }
-            // TODO: Use the `exit_ty` to determine if any raised exception is suppressed.
             (Err(enter_error), Ok(_)) => Err(ContextManagerError::Enter(enter_error, mode)),
             (Err(enter_error), Err(exit_error)) => Err(ContextManagerError::EnterAndExit {
                 enter_error,

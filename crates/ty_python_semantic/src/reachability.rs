@@ -214,8 +214,8 @@ use ruff_text_size::TextRange;
 use rustc_hash::{FxHashMap, FxHashSet};
 use smallvec::SmallVec;
 use ty_python_core::{
-    BindingWithConstraints, DeclarationWithConstraint, DeclarationsIterator, FileScopeId,
-    ScopedDefinitionId, SemanticIndex, Truthiness, UseDefMap,
+    BindingWithConstraints, DeclarationWithConstraint, DeclarationsIterator, EvaluationMode,
+    FileScopeId, ScopedDefinitionId, SemanticIndex, Truthiness, UseDefMap,
     definition::DefinitionState,
     expression::Expression,
     narrowing_constraints::{NarrowingConstraints, ScopedNarrowingConstraint},
@@ -527,7 +527,11 @@ const REACHABILITY_EVALUATION_CHUNK_SIZE: usize = 256;
 
 fn predicate_scope<'db>(db: &'db dyn Db, predicate: &Predicate<'db>) -> ScopeId<'db> {
     match predicate.node {
-        PredicateNode::Expression(expression) => expression.scope(db),
+        PredicateNode::Expression(expression)
+        | PredicateNode::ContextManagerMaySuppress {
+            context_manager: expression,
+            ..
+        } => expression.scope(db),
         PredicateNode::IsNonTerminalCall(CallableAndCallExpr { callable, .. }) => {
             callable.scope(db)
         }
@@ -1089,8 +1093,8 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
         type Id = ScopedNarrowingConstraint;
         enum Action {
             Visit(Id),
-            AnalyzeNonTerminal(Id),
-            FinishNonTerminal { id: Id, branch: Id },
+            AnalyzeResolvedPredicate(Id),
+            FinishResolvedPredicate { id: Id, branch: Id },
             FinishPredicate(Id),
         }
 
@@ -1107,8 +1111,12 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
                     let node = self.constraints.get_interior_node(id);
                     let predicate = self.predicates[node.atom];
 
-                    if matches!(predicate.node, PredicateNode::IsNonTerminalCall(_)) {
-                        actions.push(Action::AnalyzeNonTerminal(id));
+                    if matches!(
+                        predicate.node,
+                        PredicateNode::IsNonTerminalCall(_)
+                            | PredicateNode::ContextManagerMaySuppress { .. }
+                    ) {
+                        actions.push(Action::AnalyzeResolvedPredicate(id));
                         actions.push(Action::Visit(node.if_uncertain));
                     } else {
                         actions.push(Action::FinishPredicate(id));
@@ -1117,21 +1125,26 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
                         actions.push(Action::Visit(node.if_true));
                     }
                 }
-                Action::AnalyzeNonTerminal(id) => {
+                Action::AnalyzeResolvedPredicate(id) => {
                     let node = self.constraints.get_interior_node(id);
                     let predicate = self.predicates[node.atom];
                     let branch = match analyze_single(self.db, &predicate) {
-                        Truthiness::AlwaysTrue => node.if_true,
-                        Truthiness::AlwaysFalse => node.if_false,
-                        Truthiness::Ambiguous => {
-                            unreachable!("`IsNonTerminalCall` predicates should never be Ambiguous")
-                        }
+                        Truthiness::AlwaysTrue => Some(node.if_true),
+                        Truthiness::AlwaysFalse => Some(node.if_false),
+                        Truthiness::Ambiguous => None,
                     };
 
-                    actions.push(Action::FinishNonTerminal { id, branch });
-                    actions.push(Action::Visit(branch));
+                    if let Some(branch) = branch {
+                        actions.push(Action::FinishResolvedPredicate { id, branch });
+                        actions.push(Action::Visit(branch));
+                    } else {
+                        actions.push(Action::FinishPredicate(id));
+                        actions.push(Action::Visit(node.if_false));
+                        actions.push(Action::Visit(node.if_uncertain));
+                        actions.push(Action::Visit(node.if_true));
+                    }
                 }
-                Action::FinishNonTerminal { id, branch } => {
+                Action::FinishResolvedPredicate { id, branch } => {
                     let node = self.constraints.get_interior_node(id);
                     let branch = self.projected_node(branch);
                     let if_uncertain = self.projected_node(node.if_uncertain);
@@ -1485,6 +1498,12 @@ fn analyze_single(db: &dyn Db, predicate: &Predicate) -> Truthiness {
                 .bool(db)
                 .negate_if(!predicate.is_positive)
         }
+        PredicateNode::ContextManagerMaySuppress {
+            context_manager,
+            is_async,
+        } => infer_same_file_expression_type(db, context_manager, TypeContext::default())
+            .context_manager_exit_truthiness(db, EvaluationMode::from_is_async(is_async))
+            .negate_if(!predicate.is_positive),
         PredicateNode::IsNonTerminalCall(CallableAndCallExpr {
             callable,
             call_expr,

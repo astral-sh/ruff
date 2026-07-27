@@ -102,7 +102,8 @@ pub(crate) fn infer_narrowing_constraints<'db>(
             .and_then(|constraints| constraints.get(&place).cloned());
             (positive, None)
         }
-        PredicateNode::IsNonTerminalCall(_)
+        PredicateNode::ContextManagerMaySuppress { .. }
+        | PredicateNode::IsNonTerminalCall(_)
         | PredicateNode::IsNonEmptyIterable(_)
         | PredicateNode::StarImportPlaceholder(_) => (None, None),
     };
@@ -1083,7 +1084,8 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             PredicateNode::SubjectElementPattern(subject_element) => {
                 self.evaluate_subject_element_pattern(subject_element)
             }
-            PredicateNode::IsNonTerminalCall(_) => return None,
+            PredicateNode::ContextManagerMaySuppress { .. }
+            | PredicateNode::IsNonTerminalCall(_) => return None,
             PredicateNode::IsNonEmptyIterable(_) => return None,
             PredicateNode::StarImportPlaceholder(_) => return None,
         };
@@ -2656,7 +2658,11 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
 
     fn scope(&self) -> ScopeId<'db> {
         match self.predicate {
-            PredicateNode::Expression(expression) => expression.scope(self.db),
+            PredicateNode::Expression(expression)
+            | PredicateNode::ContextManagerMaySuppress {
+                context_manager: expression,
+                ..
+            } => expression.scope(self.db),
             PredicateNode::Pattern(pattern) => pattern.scope(self.db),
             PredicateNode::SubjectElementPattern(subject_element) => {
                 subject_element.pattern.scope(self.db)

@@ -2170,6 +2170,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                             .pattern(pattern, module)
                     }
                     PredicateNode::SubjectElementPattern(_)
+                    | PredicateNode::ContextManagerMaySuppress { .. }
                     | PredicateNode::IsNonTerminalCall(_)
                     | PredicateNode::IsNonEmptyIterable(_)
                     | PredicateNode::StarImportPlaceholder(_) => {
@@ -2214,6 +2215,21 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     fn record_ambiguous_reachability(&mut self) {
         self.current_use_def_map_mut()
             .record_reachability_constraint(ScopedReachabilityConstraintId::AMBIGUOUS);
+    }
+
+    /// Guards both exceptional reachability and the narrowing retained from the `with` body.
+    /// A statically non-suppressing manager must not leave body-only narrowing visible after its
+    /// exceptional path has been discarded.
+    fn record_with_suppression_constraint(&mut self, predicate: ScopedPredicateId) {
+        let reachability = self
+            .current_reachability_constraints_mut()
+            .add_atom(predicate);
+        let narrowing = self
+            .current_use_def_map_mut()
+            .narrowing_constraints
+            .add_atom(predicate);
+        self.current_use_def_map_mut()
+            .record_non_terminal_call_constraints(reachability, narrowing);
     }
 
     /// Record a constraint that affects the reachability of the current position in the semantic
@@ -3736,6 +3752,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 is_async,
                 ..
             }) => {
+                let mut suppression_contexts = Vec::with_capacity(items.len());
+
                 for item @ ast::WithItem {
                     range: _,
                     node_index: _,
@@ -3744,9 +3762,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 } in items
                 {
                     self.visit_expr(context_expr);
+                    let context_manager = self.add_standalone_expression(context_expr);
 
                     if let Some(optional_vars) = optional_vars.as_deref() {
-                        let context_manager = self.add_standalone_expression(context_expr);
                         self.add_unpackable_assignment(
                             &Unpackable::WithItem {
                                 item,
@@ -3756,8 +3774,61 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                             context_manager,
                         );
                     }
+
+                    let suppression_predicate =
+                        self.add_predicate(PredicateOrLiteral::Predicate(Predicate {
+                            node: PredicateNode::ContextManagerMaySuppress {
+                                context_manager,
+                                is_async: *is_async,
+                            },
+                            is_positive: true,
+                        }));
+
+                    let initial_state = self.flow_snapshot();
+                    self.try_node_context_stack_manager.push_context();
+                    suppression_contexts.push((initial_state, suppression_predicate));
                 }
+
                 self.visit_body(body);
+
+                let normal_exit = self.flow_snapshot();
+                let mut suppressed_exits = Vec::with_capacity(items.len());
+
+                while let Some((initial_state, suppression_predicate)) = suppression_contexts.pop()
+                {
+                    let intermediate_states = self
+                        .try_node_context_stack_manager
+                        .take_try_suite_snapshots();
+                    let terminal_states = self
+                        .try_node_context_stack_manager
+                        .pop_context()
+                        .into_terminal_finally_entry_snapshots();
+
+                    // A `with` context must not intercept terminal entries intended for an
+                    // enclosing `finally` suite.
+                    for terminal_state in terminal_states {
+                        self.flow_restore(terminal_state);
+                        self.record_terminal_finally_entry();
+                    }
+
+                    self.flow_restore(initial_state);
+
+                    for intermediate_state in intermediate_states {
+                        self.flow_merge(intermediate_state);
+                    }
+
+                    // Like a `try` suite, a suppressing manager conservatively assumes an
+                    // exception can exit at any point in its body.
+                    self.record_ambiguous_reachability();
+                    self.record_with_suppression_constraint(suppression_predicate);
+                    suppressed_exits.push(self.flow_snapshot());
+                }
+
+                self.flow_restore(normal_exit);
+
+                for suppressed_exit in suppressed_exits {
+                    self.flow_merge(suppressed_exit);
+                }
             }
 
             ast::Stmt::For(
