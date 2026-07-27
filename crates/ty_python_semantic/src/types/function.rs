@@ -52,6 +52,7 @@
 use std::{borrow::Cow, str::FromStr};
 
 use bitflags::bitflags;
+use itertools::Either;
 use ruff_db::diagnostic::{Annotation, DiagnosticId, Severity, Span};
 use ruff_db::files::{File, FileRange};
 use ruff_db::parsed::{ParsedModuleRef, parsed_module};
@@ -517,12 +518,16 @@ impl<'db> OverloadLiteral<'db> {
     }
 
     /// Returns the effective signatures of this overload after applying decorators.
-    pub(crate) fn decorated_signatures(self, db: &'db dyn Db) -> Vec<Signature<'db>> {
-        let Type::Callable(callable) = binding_type(db, self.definition(db)) else {
-            return vec![self.signature(db)];
-        };
-
-        callable.signatures(db).overloads.to_vec()
+    pub(crate) fn decorated_signatures(
+        self,
+        db: &'db dyn Db,
+    ) -> impl Iterator<Item = Signature<'db>> + Clone + 'db {
+        match binding_type(db, self.definition(db)) {
+            Type::Callable(callable) => {
+                Either::Left(callable.signatures(db).overloads.iter().cloned())
+            }
+            _ => Either::Right(std::iter::once(self.signature(db))),
+        }
     }
 
     /// Typed internally-visible "raw" signature for this function.
@@ -905,9 +910,9 @@ impl<'db> FunctionLiteral<'db> {
         CallableSignature::from_overloads(overloads.iter().flat_map(|overload| {
             // The last overload may still be inferred, so querying its binding would create a cycle.
             if *overload == self.last_definition {
-                vec![overload.signature(db)]
+                Either::Left(std::iter::once(overload.signature(db)))
             } else {
-                overload.decorated_signatures(db)
+                Either::Right(overload.decorated_signatures(db))
             }
         }))
     }
