@@ -2183,8 +2183,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         mut choose: impl FnMut(BoundTypeVarInstance<'db>, Option<&PathBound<'db>>) -> Option<Type<'db>>,
     ) -> Option<Box<[TypeVarInference<'db>]>> {
         if generic_context
-            .variables_inner(self.db)
-            .values()
+            .variables(self.db)
             .any(|typevar| typevar.is_paramspec(self.db) || typevar.is_typevartuple(self.db))
         {
             return None;
@@ -2253,8 +2252,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
     ) -> Result<FxHashMap<BoundTypeVarIdentity<'db>, Type<'db>>, ()> {
         // TODO: Move `ParamSpec` and `TypeVarTuple` handling to the new constraint solver.
         if generic_context
-            .variables_inner(self.db)
-            .values()
+            .variables(self.db)
             .any(|typevar| typevar.is_paramspec(self.db) || typevar.is_typevartuple(self.db))
         {
             return Ok(self.solve_hash_map_with(generic_context, choose));
