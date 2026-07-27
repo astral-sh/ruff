@@ -269,6 +269,25 @@ mod tests {
     }
 
     #[test]
+    fn suppressing_context_manager_preserves_used_initial_binding() -> anyhow::Result<()> {
+        let source = dedent(
+            "
+            from contextlib import suppress
+
+            def first(values: list[int]) -> int | None:
+                result = None
+                with suppress(StopIteration):
+                    result = next(iter(values))
+                return result
+            ",
+        );
+
+        let names = collect_unused_names(&source)?;
+        assert!(names.is_empty(), "unexpected unused bindings: {names:?}");
+        Ok(())
+    }
+
+    #[test]
     fn captures_safe_local_binding_kinds() -> anyhow::Result<()> {
         let source = dedent(
             "
