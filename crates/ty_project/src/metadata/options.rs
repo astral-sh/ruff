@@ -1500,9 +1500,10 @@ pub struct AnalysisOptions {
     /// representing the (infinite) union of all possible `list` specializations. Iterating
     /// over the list would yield values of type `object`.
     ///
-    /// When disabled, ty narrows to the class's `Unknown`-specialization instead. The same
-    /// check narrows a value of type `object` to `list[Unknown]`. Iterating over the list then
-    /// yields values of type `Unknown`, which is more permissive than `object`.
+    /// When disabled, ty instead preserves the provenance of the narrowing with tagged
+    /// `object*` and `Never*` bounds. The same check still narrows a value of type `object`
+    /// to `Top[list[Unknown]]`, but iterating over the list yields values of type `object*`.
+    /// Passing an item to the list requires a value assignable to `Never*`.
     ///
     /// Defaults to `false`.
     #[option(

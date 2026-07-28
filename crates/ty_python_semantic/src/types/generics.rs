@@ -1247,6 +1247,12 @@ impl<'db> Specialization<'db> {
         );
         match other.materialization_kind(db) {
             None => new_specialization,
+            Some(materialization_kind) if other.narrowing_materialization(db) => new_specialization
+                .materialize_for_narrowing_impl(
+                    db,
+                    materialization_kind,
+                    &ApplyTypeMappingVisitor::default(),
+                ),
             Some(materialization_kind) => new_specialization.materialize_impl(
                 db,
                 materialization_kind,
@@ -1293,11 +1299,7 @@ impl<'db> Specialization<'db> {
         }
 
         let mut new_materialization_kind = self.materialization_kind(db);
-        let narrowing_materialization = self.narrowing_materialization(db)
-            && !matches!(type_mapping, TypeMapping::EraseNarrowingBounds);
-        if !narrowing_materialization && self.narrowing_materialization(db) {
-            new_materialization_kind = None;
-        }
+        let narrowing_materialization = self.narrowing_materialization(db);
         let types = self.map_types(db, |i, typevar, ty| {
             let tcx = TypeContext::new(tcx.get(i).copied());
             match (typevar.variance(db), type_mapping) {
@@ -1490,7 +1492,19 @@ impl<'db> Specialization<'db> {
                     // so any materialization is acceptable.
                     materialize(vartype, MaterializationKind::Top)
                 }
-                TypeVarVariance::Covariant => materialize(vartype, materialization_kind),
+                TypeVarVariance::Covariant => {
+                    let vartype = if for_narrowing
+                        && materialization_kind == MaterializationKind::Top
+                        && vartype.is_unknown()
+                        && let Some(TypeVarBoundOrConstraints::UpperBound(bound)) =
+                            bound_typevar.typevar(db).bound_or_constraints(db)
+                    {
+                        bound
+                    } else {
+                        vartype
+                    };
+                    materialize(vartype, materialization_kind)
+                }
                 TypeVarVariance::Contravariant => materialize(vartype, materialization_kind.flip()),
                 TypeVarVariance::Invariant => {
                     let top_materialization =
@@ -2674,9 +2688,32 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 })
         }
 
+        #[derive(Clone, Copy)]
+        struct DictNarrowingContext<'db> {
+            top_materializations: [Type<'db>; 3],
+            is_constructor_protocol: bool,
+        }
+
+        fn normalize_dict_constructor_intersection<'db>(
+            db: &'db dyn Db,
+            intersection: IntersectionType<'db>,
+            dict_top_materializations: [Type<'db>; 3],
+        ) -> Type<'db> {
+            let [dict, dict_top, narrowing_dict_top] = dict_top_materializations;
+            intersection.map_positive(db, |element| {
+                let resolved = element.resolve_type_alias(db);
+                if resolved == dict || resolved == narrowing_dict_top {
+                    dict_top
+                } else {
+                    *element
+                }
+            })
+        }
+
         fn collect_typed_dicts<'db>(
             db: &'db dyn Db,
             ty: Type<'db>,
+            dict_narrowing: DictNarrowingContext<'db>,
             resolving: &mut FxHashSet<Type<'db>>,
             completed: &mut FxHashMap<Type<'db>, bool>,
             typed_dicts: &mut FxHashSet<Type<'db>>,
@@ -2700,6 +2737,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                         collect_typed_dicts(
                             db,
                             *element,
+                            dict_narrowing,
                             resolving,
                             completed,
                             typed_dicts,
@@ -2717,15 +2755,22 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                         && intersection.iter_positive(db).all(|element| {
                             let element = element.resolve_type_alias(db);
                             element.is_typed_dict()
-                                || element
-                                    == KnownClass::Dict
-                                        .to_instance_unknown(db)
-                                        .top_materialization(db)
+                                || dict_narrowing.top_materializations.contains(&element)
                         }) =>
                 {
                     // `isinstance(value, dict)` narrows a `TypedDict` to an intersection with
-                    // `Top[dict[Unknown, Unknown]]`. Other conjuncts may contribute gradual
-                    // constraints that the shared mapping would erase.
+                    // `dict[Unknown, Unknown]` or its ordinary or tagged top materialization.
+                    // Other conjuncts may contribute gradual constraints that the shared mapping
+                    // would erase.
+                    let ty = if dict_narrowing.is_constructor_protocol {
+                        normalize_dict_constructor_intersection(
+                            db,
+                            intersection,
+                            dict_narrowing.top_materializations,
+                        )
+                    } else {
+                        ty
+                    };
                     typed_dicts.insert(ty);
                     true
                 }
@@ -2737,15 +2782,22 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                         && intersection.iter_positive(db).all(|element| {
                             let element = element.resolve_type_alias(db);
                             is_string_keyed_mapping(db, element)
-                                || element
-                                    == KnownClass::Dict
-                                        .to_instance_unknown(db)
-                                        .top_materialization(db)
+                                || dict_narrowing.top_materializations.contains(&element)
                         }) =>
                 {
                     // `isinstance(value, dict)` can also narrow a mapping to an intersection with
-                    // `Top[dict[Unknown, Unknown]]`. Retain the full intersection so its original
-                    // key and value constraints are preserved.
+                    // `dict[Unknown, Unknown]` or its ordinary or tagged top materialization.
+                    // Retain the full intersection so its original key and value constraints are
+                    // preserved.
+                    let ty = if dict_narrowing.is_constructor_protocol {
+                        normalize_dict_constructor_intersection(
+                            db,
+                            intersection,
+                            dict_narrowing.top_materializations,
+                        )
+                    } else {
+                        ty
+                    };
                     other_types.insert(ty);
                     true
                 }
@@ -2759,6 +2811,18 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             result
         }
 
+        let dict = KnownClass::Dict.to_instance_unknown(self.db);
+        let dict_narrowing = DictNarrowingContext {
+            top_materializations: [
+                dict,
+                dict.top_materialization(self.db),
+                dict.top_materialization_for_narrowing(self.db),
+            ],
+            is_constructor_protocol: matches!(formal, Type::ProtocolInstance(protocol)
+            if protocol.class_origin(self.db).is_some_and(|class| {
+                class.is_known(self.db, KnownClass::SupportsKeysAndGetItem)
+            })),
+        };
         let mut resolving = FxHashSet::default();
         let mut completed = FxHashMap::default();
         let mut typed_dicts = FxHashSet::default();
@@ -2767,6 +2831,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             collect_typed_dicts(
                 self.db,
                 *element,
+                dict_narrowing,
                 &mut resolving,
                 &mut completed,
                 &mut typed_dicts,
@@ -2780,12 +2845,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         }
         // Other protocols can observe key-specific or gradual evidence that the shared mapping
         // fallback erases; restrict mixed unions to the protocol used by dictionary constructors.
-        if !other_types.is_empty()
-            && !matches!(formal, Type::ProtocolInstance(protocol)
-            if protocol.class_origin(self.db).is_some_and(|class| {
-                class.is_known(self.db, KnownClass::SupportsKeysAndGetItem)
-            }))
-        {
+        if !other_types.is_empty() && !dict_narrowing.is_constructor_protocol {
             return None;
         }
 

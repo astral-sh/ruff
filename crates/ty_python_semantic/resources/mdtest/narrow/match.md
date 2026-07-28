@@ -146,7 +146,7 @@ from typing import Any
 
 def test_isinstance(x: dict[Any, Any] | int) -> None:
     if isinstance(x, Mapping):
-        reveal_type(x)  # revealed: dict[Any, Any] | (int & Mapping[Unknown, Unknown])
+        reveal_type(x)  # revealed: dict[Any, Any] | (int & Top[Mapping[Unknown, object*]])
     else:
         reveal_type(x)  # revealed: int & ~Top[Mapping[Unknown, object]]
 

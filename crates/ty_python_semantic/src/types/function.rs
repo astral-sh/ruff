@@ -2390,10 +2390,26 @@ impl KnownFunction {
 
         match self {
             KnownFunction::RevealType => {
-                let revealed_type = overload
+                let mut argument_types = overload
                     .arguments_for_parameter(call_arguments, 0)
-                    .fold(UnionBuilder::new(db), |builder, (_, ty)| builder.add(ty))
-                    .build();
+                    .map(|(_, ty)| ty)
+                    .peekable();
+                let revealed_type = if let Some(first) = argument_types.next() {
+                    // A singleton tagged bound must not be canonicalized to ordinary `object`.
+                    if argument_types.peek().is_none()
+                        && first
+                            .as_nominal_instance()
+                            .is_some_and(|instance| instance.narrowing_bound_kind().is_some())
+                    {
+                        first
+                    } else {
+                        argument_types
+                            .fold(UnionBuilder::new(db).add(first), UnionBuilder::add)
+                            .build()
+                    }
+                } else {
+                    Type::Never
+                };
                 report_revealed_type(
                     context,
                     revealed_type,

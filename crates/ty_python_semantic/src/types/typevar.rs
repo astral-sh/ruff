@@ -1165,7 +1165,21 @@ impl<'db> BoundTypeVarInstance<'db> {
                         // Materialization uses a different mapping mode. Reuse of the outer
                         // visitor can incorrectly hit a cache entry from specialization.
                         let materialization_visitor = ApplyTypeMappingVisitor::default();
-                        mapped.materialize(db, *materialization_kind, &materialization_visitor)
+                        if specialization
+                            .as_specialization(db)
+                            .is_some_and(|specialization| {
+                                specialization.narrowing_materialization(db)
+                            })
+                        {
+                            mapped.apply_type_mapping_impl(
+                                db,
+                                &TypeMapping::MaterializeForNarrowing(*materialization_kind),
+                                TypeContext::default(),
+                                &materialization_visitor,
+                            )
+                        } else {
+                            mapped.materialize(db, *materialization_kind, &materialization_visitor)
+                        }
                     }
                 })
                 .unwrap_or(Type::TypeVar(self)),
@@ -1203,7 +1217,6 @@ impl<'db> BoundTypeVarInstance<'db> {
                 }
             }
             TypeMapping::Promote(..)
-            | TypeMapping::EraseNarrowingBounds
             | TypeMapping::ReplaceParameterDefaults
             | TypeMapping::BindLegacyTypevars(_)
             | TypeMapping::EagerExpansion

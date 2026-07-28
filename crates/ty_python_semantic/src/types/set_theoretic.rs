@@ -96,7 +96,17 @@ impl<'db> UnionType<'db> {
         I: IntoIterator<Item = T>,
         T: Into<Type<'db>>,
     {
+        let mut elements = elements.into_iter();
+        let Some(first) = elements.next() else {
+            return Type::Never;
+        };
+        let Some(second) = elements.next() else {
+            return first.into();
+        };
+
         let mut builder = UnionBuilder::new(db).unpack_aliases(false);
+        builder.add_in_place(first.into());
+        builder.add_in_place(second.into());
         for element in elements {
             builder.add_in_place(element.into());
         }
