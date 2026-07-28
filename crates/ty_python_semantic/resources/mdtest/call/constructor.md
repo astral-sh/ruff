@@ -991,6 +991,75 @@ reveal_type(SimpleMixed(1))  # revealed: int
 reveal_type(SimpleMixed("foo"))  # revealed: SimpleMixed
 ```
 
+### Overlapping generic `__new__` overloads preserve first-match selection
+
+A synthetic constructor receiver can still contain inferable class type variables, even though each
+overload specializes `cls` differently. Step 5 of the overload evaluation algorithm must preserve
+the overload's inferable variables when checking whether the argument types are covered; otherwise a
+concrete constructor call appears ambiguous. In particular, both overloads below accept `list[int]`,
+but the first one must win. The non-instance return case verifies that this is not specific to
+`Self` or to returning the constructed class.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from __future__ import annotations
+
+from typing import Self, overload
+
+class MixedSelf[T]:
+    @overload
+    def __new__(cls, value: list[T]) -> Self: ...
+    @overload
+    def __new__(cls, value: T) -> T: ...
+    def __new__(cls, value: object) -> object:
+        return object.__new__(cls)
+
+reveal_type(MixedSelf([1]))  # revealed: MixedSelf[int]
+reveal_type(MixedSelf(1))  # revealed: Literal[1]
+
+class DistinctNonInstanceReturns[T]:
+    @overload
+    def __new__(cls, value: list[T]) -> str: ...
+    @overload
+    def __new__(cls, value: T) -> T: ...
+    def __new__(cls, value: object) -> object:
+        return object.__new__(cls)
+
+reveal_type(DistinctNonInstanceReturns([1]))  # revealed: str
+```
+
+### A gradual constructor receiver participates in overload filtering
+
+The synthetic `cls` argument must participate in overload filtering because it can be the only
+gradual argument. A concrete class specialization selects its matching receiver overload, but an
+`Any` specialization can match receivers with different return types and must remain ambiguous.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from __future__ import annotations
+
+from typing import Any, overload
+
+class Foo[T]:
+    @overload
+    def __new__(cls: type[Foo[int]]) -> int: ...
+    @overload
+    def __new__(cls: type[Foo[str]]) -> str: ...
+    def __new__(cls) -> object: ...
+
+reveal_type(Foo[int]())  # revealed: int
+reveal_type(Foo[str]())  # revealed: str
+reveal_type(Foo[Any]())  # revealed: Unknown
+```
+
 ### Multiple matching `__new__` overloads
 
 If overload resolution for `__new__` falls back to `Unknown` because the argument is `Any` or
