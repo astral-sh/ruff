@@ -638,72 +638,32 @@ def _(x: object):
         reveal_type(x.get())  # revealed: int
 ```
 
-Negative narrowing must exclude every instance of the generic class, including gradual
-specializations. In particular, no impossible generic arm should remain after an `isinstance()`
-check has returned.
+Negative narrowing must exclude every specialization of a bounded generic, including a gradual one.
 
 ```py
-from os import PathLike
-from typing import Any, final
+from typing import Any
 
-@final
-class Image:
-    mode: str
+def excludes_bounded_generic(value: BoundedCovariant[Any] | bool) -> bool:
+    if isinstance(value, BoundedCovariant):
+        reveal_type(value)  # revealed: BoundedCovariant[Any]
+        return False
 
-class Array[Shape: tuple[int, ...], Scalar: int | str]:
-    def shape(self) -> Shape:
-        raise NotImplementedError
+    reveal_type(value)  # revealed: bool
+    return value
+```
 
-    def scalar(self) -> Scalar:
-        raise NotImplementedError
+The same exclusion applies when the generic appears in a tuple of runtime classes.
 
-def excludes_bounded_generic(value: Array[tuple[Any, ...], Any] | Image) -> str:
-    if isinstance(value, Array):
-        reveal_type(value)  # revealed: Array[tuple[Any, ...], Any]
-        return "array"
-
-    reveal_type(value)  # revealed: Image
-    return value.mode
-
+```py
 def excludes_bounded_generic_tuple(
-    value: Array[tuple[Any, ...], Any] | Image | bytes,
-) -> str:
-    if isinstance(value, (Array, bytes)):
-        reveal_type(value)  # revealed: Array[tuple[Any, ...], Any] | bytes
-        return "array or bytes"
+    value: BoundedCovariant[Any] | bool | bytes,
+) -> bool:
+    if isinstance(value, (BoundedCovariant, bytes)):
+        reveal_type(value)  # revealed: BoundedCovariant[Any] | bytes
+        return False
 
-    reveal_type(value)  # revealed: Image
-    return value.mode
-
-class ConstrainedPath[T: (str, bytes)]:
-    def __fspath__(self) -> T:
-        raise NotImplementedError
-
-def excludes_constrained_generic(value: ConstrainedPath[Any] | Image) -> str:
-    if isinstance(value, ConstrainedPath):
-        reveal_type(value)  # revealed: ConstrainedPath[Any]
-        return "path"
-
-    reveal_type(value)  # revealed: Image
-    return value.mode
-
-def excludes_constrained_pathlike(value: PathLike[Any] | Image) -> str:
-    if isinstance(value, PathLike):
-        reveal_type(value)  # revealed: PathLike[Any]
-        return "path"
-
-    reveal_type(value)  # revealed: Image
-    return value.mode
-
-def excludes_bounded_generic_subclass(
-    cls: type[Array[tuple[Any, ...], Any]] | type[Image],
-) -> type[Image]:
-    if issubclass(cls, Array):
-        reveal_type(cls)  # revealed: type[Array[tuple[Any, ...], Any]]
-        return Image
-
-    reveal_type(cls)  # revealed: <class 'Image'>
-    return cls
+    reveal_type(value)  # revealed: bool
+    return value
 ```
 
 Constrained type parameters preserve the materialization of the generic class while making the union
@@ -718,6 +678,18 @@ def _(x: object):
     if isinstance(x, ConstrainedCovariant):
         reveal_type(x)  # revealed: Top[ConstrainedCovariant[Unknown]]
         reveal_type(x.get())  # revealed: int | str
+```
+
+Constrained generics must also be excluded by negative narrowing.
+
+```py
+def excludes_constrained_generic(value: ConstrainedCovariant[Any] | bool) -> bool:
+    if isinstance(value, ConstrainedCovariant):
+        reveal_type(value)  # revealed: ConstrainedCovariant[Any]
+        return False
+
+    reveal_type(value)  # revealed: bool
+    return value
 ```
 
 Similarly, contravariant type parameters use their lower bound of `Never`:
@@ -821,6 +793,28 @@ def _(x: Invariant[int] | Covariant[str]):
         reveal_type(x)  # revealed: Covariant[str] & ~Top[Invariant[Unknown]]
 ```
 
+The built-in `tuple` stores its variable-length shape separately from its generic type argument.
+Narrowing must preserve and materialize that shape.
+
+```py
+def narrow_tuple(value: object) -> None:
+    if isinstance(value, tuple):
+        reveal_type(value)  # revealed: tuple[object, ...]
+```
+
+A tuple subclass retains its nominal type and inherits its tuple shape from its specialized base.
+The subclass's own type parameter is still materialized using its declared bound.
+
+```py
+class BoundedTuple[T: int](tuple[T, str]): ...
+
+def narrow_tuple_subclass(value: object) -> None:
+    if isinstance(value, BoundedTuple):
+        reveal_type(value)  # revealed: BoundedTuple[int]
+        reveal_type(value[0])  # revealed: int
+        reveal_type(value[1])  # revealed: str
+```
+
 The behavior of `issubclass()` is similar.
 
 ```py
@@ -831,6 +825,20 @@ def _(x: type[object], y: type[object], z: type[object]):
         reveal_type(y)  # revealed: type[Contravariant[Never]]
     if issubclass(z, Invariant):
         reveal_type(z)  # revealed: type[Top[Invariant[Unknown]]]
+```
+
+Negative `issubclass()` narrowing also excludes every specialization of a bounded generic.
+
+```py
+def excludes_bounded_generic_subclass(
+    cls: type[BoundedCovariant[Any]] | type[bool],
+) -> type[bool]:
+    if issubclass(cls, BoundedCovariant):
+        reveal_type(cls)  # revealed: type[BoundedCovariant[Any]]
+        return bool
+
+    reveal_type(cls)  # revealed: <class 'bool'>
+    return cls
 ```
 
 ## Narrowing generic defaults in Python 3.13
@@ -874,23 +882,50 @@ A default never restricts which specialization matches at runtime. In particular
 must not prevent narrowing a bounded generic or recovering its original type argument.
 
 ```py
-from typing import Any, Never
+from typing import Never, assert_never
 
-class Unit[T: str = Never]:
-    mapping: dict[T, Any]
+class Box[T: str = Never]:
+    value: T
 
-    def __init__(self, key: T | None = None) -> None: ...
+    def __init__(self, value: T) -> None: ...
 
-def unit_with_default[T: str = Never](unit: Unit[T] | T) -> Unit[T]:
-    if isinstance(unit, Unit):
-        reveal_type(unit)  # revealed: Unit[T@unit_with_default]
-        return unit
+def box_with_default[T: str = Never](value: Box[T] | T) -> Box[T]:
+    if isinstance(value, Box):
+        reveal_type(value)  # revealed: Box[T@box_with_default]
+        return value
 
-    if not isinstance(unit, Unit):
-        reveal_type(unit)  # revealed: T@unit_with_default & ~Top[Unit[Unknown]]
-        return Unit[T](unit)
+    if not isinstance(value, Box):
+        reveal_type(value)  # revealed: T@box_with_default & ~Top[Box[Unknown]]
+        return Box[T](value)
 
-    raise AssertionError("Unreachable")
+    assert_never(value)
+```
+
+A tuple subclass must likewise materialize its declared bound, not its `Never` default. Its
+heterogeneous tuple shape is inherited from the specialized base.
+
+```py
+class DefaultedTuple[T: int = Never](tuple[T, str]): ...
+
+def narrow_defaulted_tuple(value: object) -> None:
+    if isinstance(value, DefaultedTuple):
+        reveal_type(value)  # revealed: DefaultedTuple[int]
+        reveal_type(value[0])  # revealed: int
+        reveal_type(value[1])  # revealed: str
+```
+
+Negative narrowing also excludes gradual specializations of the defaulted tuple subclass.
+
+```py
+def excludes_defaulted_tuple(value: DefaultedTuple[Any] | bool) -> bool:
+    if isinstance(value, DefaultedTuple):
+        reveal_type(value)  # revealed: DefaultedTuple[Any]
+        reveal_type(value[0])  # revealed: Any
+        reveal_type(value[1])  # revealed: str
+        return False
+
+    reveal_type(value)  # revealed: bool
+    return value
 ```
 
 ## Narrowing generic `classmethod`

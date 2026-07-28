@@ -84,6 +84,62 @@ static_assert(not is_equivalent_to(type, type[Any]))
 static_assert(not is_equivalent_to(type[object], type[Any]))
 ```
 
+## Bounded gradual specializations
+
+A bounded generic's gradual type arguments must remain equivalent without being replaced by their
+static upper bounds.
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+A covariant bounded type parameter treats a gradual tuple alias the same as the aliased tuple. The
+alias must not be replaced with the type parameter's static upper bound.
+
+```py
+from typing import Any
+
+from ty_extensions import Unknown, static_assert
+from ty_extensions._internal import is_equivalent_to
+
+type AnyTuple = tuple[Any, ...]
+type UnknownTuple = tuple[Unknown, ...]
+
+class BoundedCovariant[T: tuple[int, ...]]:
+    def get(self) -> T:
+        raise NotImplementedError
+
+static_assert(is_equivalent_to(BoundedCovariant[AnyTuple], BoundedCovariant[tuple[Any, ...]]))
+static_assert(is_equivalent_to(BoundedCovariant[UnknownTuple], BoundedCovariant[AnyTuple]))
+static_assert(not is_equivalent_to(BoundedCovariant[AnyTuple], BoundedCovariant[tuple[int, ...]]))
+```
+
+The same gradual tuple alias remains equivalent when the bounded type parameter is invariant.
+
+```py
+class BoundedInvariant[T: tuple[int, ...]]:
+    value: T
+
+static_assert(is_equivalent_to(BoundedInvariant[AnyTuple], BoundedInvariant[tuple[Any, ...]]))
+static_assert(not is_equivalent_to(BoundedInvariant[AnyTuple], BoundedInvariant[tuple[int, ...]]))
+```
+
+A nested bounded generic remains equivalent whether its gradual default is implicit or explicit.
+
+```py
+class Inner[T: int = Any]:
+    def get(self) -> T:
+        raise NotImplementedError
+
+class Outer[T: int, U: Inner[Any] = Inner[Any]]:
+    def get(self) -> U:
+        raise NotImplementedError
+
+static_assert(is_equivalent_to(Outer[int, Inner[Any]], Outer[int, Inner]))
+static_assert(is_equivalent_to(Outer[int, Inner[Any]], Outer[int]))
+```
+
 ## Unions and intersections
 
 ```pyi

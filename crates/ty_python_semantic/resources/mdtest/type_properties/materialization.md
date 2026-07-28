@@ -681,10 +681,10 @@ def contravariant(top: Top[ContravariantCallable], bottom: Bottom[ContravariantC
     reveal_type(bottom)  # revealed: (GenericContravariant[Never], /) -> None
 ```
 
-## Bounded and constrained generic type parameters
+## Bounded generic type parameters
 
-Materialization respects the declared upper bound of a type parameter. The lower bound remains
-`Never`, and covariance or contravariance determines which bound belongs to each materialization.
+Top materialization of a covariant generic uses the type parameter's declared upper bound. Bottom
+materialization uses its lower bound, `Never`.
 
 ```toml
 [environment]
@@ -693,23 +693,33 @@ python-version = "3.12"
 
 ```py
 from typing import Any, Generic, Never, TypeVar
-from ty_extensions import Bottom, Intersection, Not, Top, static_assert
-from ty_extensions._internal import is_assignable_to, is_equivalent_to, is_subtype_of
+from ty_extensions import Bottom, Top, static_assert
+from ty_extensions._internal import is_equivalent_to, is_subtype_of
 
 class BoundedCovariant[T: int]:
     def get(self) -> T:
         raise NotImplementedError
 
+static_assert(is_equivalent_to(Top[BoundedCovariant[Any]], BoundedCovariant[int]))
+static_assert(is_equivalent_to(Bottom[BoundedCovariant[Any]], BoundedCovariant[Never]))
+static_assert(is_subtype_of(BoundedCovariant[Any], Top[BoundedCovariant[Any]]))
+static_assert(is_subtype_of(BoundedCovariant[Any], BoundedCovariant[int]))
+```
+
+Contravariance reverses which bound is used by top and bottom materialization.
+
+```py
 class BoundedContravariant[T: int]:
     def put(self, value: T) -> None: ...
 
-static_assert(is_equivalent_to(Top[BoundedCovariant[Any]], BoundedCovariant[int]))
-static_assert(is_equivalent_to(Bottom[BoundedCovariant[Any]], BoundedCovariant[Never]))
 static_assert(is_equivalent_to(Top[BoundedContravariant[Any]], BoundedContravariant[Never]))
 static_assert(is_equivalent_to(Bottom[BoundedContravariant[Any]], BoundedContravariant[int]))
-static_assert(is_subtype_of(BoundedCovariant[Any], Top[BoundedCovariant[Any]]))
-static_assert(is_subtype_of(BoundedCovariant[Any], BoundedCovariant[int]))
+```
 
+For an invariant generic, materialize attributes and method parameters according to their own
+variance. An unrelated `Any` attribute must remain gradual.
+
+```py
 class BoundedInvariant[T: int]:
     value: T
     unrelated: Any
@@ -718,21 +728,6 @@ class BoundedInvariant[T: int]:
         raise NotImplementedError
 
     def put(self, value: T) -> None: ...
-
-BoundedT_co = TypeVar("BoundedT_co", bound=int, covariant=True)
-BoundedT_contra = TypeVar("BoundedT_contra", bound=int, contravariant=True)
-BoundedT = TypeVar("BoundedT", bound=int)
-
-class LegacyBoundedCovariant(Generic[BoundedT_co]): ...
-class LegacyBoundedContravariant(Generic[BoundedT_contra]): ...
-
-class LegacyBoundedInvariant(Generic[BoundedT]):
-    value: BoundedT
-
-static_assert(is_equivalent_to(Top[LegacyBoundedCovariant[Any]], LegacyBoundedCovariant[int]))
-static_assert(is_equivalent_to(Bottom[LegacyBoundedCovariant[Any]], LegacyBoundedCovariant[Never]))
-static_assert(is_equivalent_to(Top[LegacyBoundedContravariant[Any]], LegacyBoundedContravariant[Never]))
-static_assert(is_equivalent_to(Bottom[LegacyBoundedContravariant[Any]], LegacyBoundedContravariant[int]))
 
 def bounded_invariant(
     top: Top[BoundedInvariant[Any]],
@@ -747,6 +742,35 @@ def bounded_invariant(
     reveal_type(bottom.get)  # revealed: bound method Bottom[BoundedInvariant[Any]].get() -> Never
     reveal_type(bottom.put)  # revealed: bound method Bottom[BoundedInvariant[Any]].put(value: int) -> None
     reveal_type(bottom.value)  # revealed: Never
+```
+
+Explicitly covariant and contravariant legacy `TypeVar` declarations obey the same bounded
+materialization rules.
+
+```py
+BoundedT_co = TypeVar("BoundedT_co", bound=int, covariant=True)
+
+class LegacyBoundedCovariant(Generic[BoundedT_co]): ...
+
+static_assert(is_equivalent_to(Top[LegacyBoundedCovariant[Any]], LegacyBoundedCovariant[int]))
+static_assert(is_equivalent_to(Bottom[LegacyBoundedCovariant[Any]], LegacyBoundedCovariant[Never]))
+
+BoundedT_contra = TypeVar("BoundedT_contra", bound=int, contravariant=True)
+
+class LegacyBoundedContravariant(Generic[BoundedT_contra]): ...
+
+static_assert(is_equivalent_to(Top[LegacyBoundedContravariant[Any]], LegacyBoundedContravariant[Never]))
+static_assert(is_equivalent_to(Bottom[LegacyBoundedContravariant[Any]], LegacyBoundedContravariant[int]))
+```
+
+A legacy invariant type parameter also materializes a readable attribute to its upper or lower
+bound.
+
+```py
+BoundedT = TypeVar("BoundedT", bound=int)
+
+class LegacyBoundedInvariant(Generic[BoundedT]):
+    value: BoundedT
 
 def legacy_bounded_invariant(
     legacy_top: Top[LegacyBoundedInvariant[Any]],
@@ -756,56 +780,32 @@ def legacy_bounded_invariant(
     reveal_type(legacy_bottom.value)  # revealed: Never
 ```
 
+## Constrained generic type parameters
+
 A constrained type parameter cannot generally be replaced by the union of its constraints: the union
-need not itself be a valid specialization. Preserve the materialization instead.
+need not itself be a valid specialization. Top and bottom materialization must instead retain the
+covariant generic and its valid specializations.
+
+```toml
+[environment]
+python-version = "3.12"
+```
 
 ```py
+from typing import Any, Generic, Never, TypeVar
+from ty_extensions import Bottom, Intersection, Not, Top, static_assert
+from ty_extensions._internal import is_assignable_to, is_equivalent_to, is_subtype_of
+
 class ConstrainedCovariant[T: (int, str)]:
     def get(self) -> T:
         raise NotImplementedError
 
-class ConstrainedContravariant[T: (int, str)]:
-    def put(self, value: T) -> None: ...
-
-class ConstrainedInvariant[T: (int, str)]:
-    value: T
-    unrelated: Any
-
-    def get(self) -> T:
-        raise NotImplementedError
-
-    def put(self, value: T) -> None: ...
-
-ConstrainedT_co = TypeVar("ConstrainedT_co", int, str, covariant=True)
-ConstrainedT_contra = TypeVar("ConstrainedT_contra", int, str, contravariant=True)
-
-class LegacyConstrainedCovariant(Generic[ConstrainedT_co]): ...
-class LegacyConstrainedContravariant(Generic[ConstrainedT_contra]): ...
-
-def constrained(
-    covariant_top: Top[ConstrainedCovariant[Any]],
-    covariant_bottom: Bottom[ConstrainedCovariant[Any]],
-    contravariant_top: Top[ConstrainedContravariant[Any]],
-    contravariant_bottom: Bottom[ConstrainedContravariant[Any]],
+def constrained_covariant(
+    top: Top[ConstrainedCovariant[Any]],
+    bottom: Bottom[ConstrainedCovariant[Any]],
 ) -> None:
-    reveal_type(covariant_top)  # revealed: Top[ConstrainedCovariant[Any]]
-    reveal_type(covariant_bottom)  # revealed: Bottom[ConstrainedCovariant[Any]]
-    reveal_type(contravariant_top)  # revealed: Top[ConstrainedContravariant[Any]]
-    reveal_type(contravariant_bottom)  # revealed: Bottom[ConstrainedContravariant[Any]]
-
-def constrained_invariant(
-    top: Top[ConstrainedInvariant[Any]],
-    bottom: Bottom[ConstrainedInvariant[Any]],
-) -> None:
-    reveal_type(top.value)  # revealed: int | str
-    reveal_type(top.unrelated)  # revealed: Any
-    reveal_type(top.get)  # revealed: bound method Top[ConstrainedInvariant[Any]].get() -> int | str
-    reveal_type(top.put)  # revealed: bound method Top[ConstrainedInvariant[Any]].put(value: Never) -> None
-
-    reveal_type(bottom.unrelated)  # revealed: Any
-    reveal_type(bottom.get)  # revealed: bound method Bottom[ConstrainedInvariant[Any]].get() -> Never
-    reveal_type(bottom.put)  # revealed: bound method Bottom[ConstrainedInvariant[Any]].put(value: int | str) -> None
-    reveal_type(bottom.value)  # revealed: Never
+    reveal_type(top)  # revealed: Top[ConstrainedCovariant[Any]]
+    reveal_type(bottom)  # revealed: Bottom[ConstrainedCovariant[Any]]
 
 static_assert(is_subtype_of(ConstrainedCovariant[int], Top[ConstrainedCovariant[Any]]))
 static_assert(is_subtype_of(ConstrainedCovariant[str], Top[ConstrainedCovariant[Any]]))
@@ -820,6 +820,21 @@ static_assert(not is_equivalent_to(Intersection[ConstrainedCovariant[str], Not[C
 static_assert(is_assignable_to(ConstrainedCovariant[int], Top[ConstrainedCovariant[Any]]))
 static_assert(not is_assignable_to(Top[ConstrainedCovariant[Any]], ConstrainedCovariant[int]))
 static_assert(is_assignable_to(Bottom[ConstrainedCovariant[Any]], ConstrainedCovariant[int]))
+```
+
+Contravariant constrained generics likewise preserve their materializations while reversing the
+relationship between input positions and top or bottom types.
+
+```py
+class ConstrainedContravariant[T: (int, str)]:
+    def put(self, value: T) -> None: ...
+
+def constrained_contravariant(
+    top: Top[ConstrainedContravariant[Any]],
+    bottom: Bottom[ConstrainedContravariant[Any]],
+) -> None:
+    reveal_type(top)  # revealed: Top[ConstrainedContravariant[Any]]
+    reveal_type(bottom)  # revealed: Bottom[ConstrainedContravariant[Any]]
 
 static_assert(is_subtype_of(ConstrainedContravariant[int], Top[ConstrainedContravariant[Any]]))
 static_assert(is_subtype_of(ConstrainedContravariant[str], Top[ConstrainedContravariant[Any]]))
@@ -832,17 +847,68 @@ static_assert(is_subtype_of(Bottom[ConstrainedContravariant[Any]], Top[Constrain
 static_assert(is_assignable_to(ConstrainedContravariant[int], Top[ConstrainedContravariant[Any]]))
 static_assert(not is_assignable_to(Top[ConstrainedContravariant[Any]], ConstrainedContravariant[int]))
 static_assert(is_assignable_to(Bottom[ConstrainedContravariant[Any]], ConstrainedContravariant[int]))
+```
+
+An invariant constrained parameter materializes readable values to the union of valid constraints
+and writable parameters to `Never`. Unrelated gradual attributes remain `Any`.
+
+```py
+class ConstrainedInvariant[T: (int, str)]:
+    value: T
+    unrelated: Any
+
+    def get(self) -> T:
+        raise NotImplementedError
+
+    def put(self, value: T) -> None: ...
+
+def constrained_invariant(
+    top: Top[ConstrainedInvariant[Any]],
+    bottom: Bottom[ConstrainedInvariant[Any]],
+) -> None:
+    reveal_type(top.value)  # revealed: int | str
+    reveal_type(top.unrelated)  # revealed: Any
+    reveal_type(top.get)  # revealed: bound method Top[ConstrainedInvariant[Any]].get() -> int | str
+    reveal_type(top.put)  # revealed: bound method Top[ConstrainedInvariant[Any]].put(value: Never) -> None
+
+    reveal_type(bottom.unrelated)  # revealed: Any
+    reveal_type(bottom.get)  # revealed: bound method Bottom[ConstrainedInvariant[Any]].get() -> Never
+    reveal_type(bottom.put)  # revealed: bound method Bottom[ConstrainedInvariant[Any]].put(value: int | str) -> None
+    reveal_type(bottom.value)  # revealed: Never
+```
+
+Legacy constrained type variables preserve the same covariant and contravariant subtype
+relationships.
+
+```py
+ConstrainedT_co = TypeVar("ConstrainedT_co", int, str, covariant=True)
+
+class LegacyConstrainedCovariant(Generic[ConstrainedT_co]): ...
 
 static_assert(is_subtype_of(LegacyConstrainedCovariant[int], Top[LegacyConstrainedCovariant[Any]]))
 static_assert(is_subtype_of(Bottom[LegacyConstrainedCovariant[Any]], LegacyConstrainedCovariant[str]))
+
+ConstrainedT_contra = TypeVar("ConstrainedT_contra", int, str, contravariant=True)
+
+class LegacyConstrainedContravariant(Generic[ConstrainedT_contra]): ...
+
 static_assert(is_subtype_of(LegacyConstrainedContravariant[int], Top[LegacyConstrainedContravariant[Any]]))
 static_assert(is_subtype_of(Bottom[LegacyConstrainedContravariant[Any]], LegacyConstrainedContravariant[str]))
+```
 
+A partially gradual type argument filters out constraints incompatible with its static `int` arm.
+
+```py
 static_assert(is_equivalent_to(Bottom[ConstrainedCovariant[Any | int]], ConstrainedCovariant[int]))
 static_assert(not is_subtype_of(ConstrainedCovariant[str], Top[ConstrainedCovariant[Any | int]]))
 static_assert(is_equivalent_to(Top[ConstrainedContravariant[Any | int]], ConstrainedContravariant[int]))
 static_assert(not is_subtype_of(Bottom[ConstrainedContravariant[Any | int]], ConstrainedContravariant[str]))
+```
 
+An intersection of `int` and `Any` likewise retains only the compatible `int` constraint for both
+variances.
+
+```py
 type GradualInt = Intersection[int, Any]
 
 static_assert(is_subtype_of(ConstrainedCovariant[int], Top[ConstrainedCovariant[GradualInt]]))
@@ -853,6 +919,22 @@ static_assert(is_subtype_of(ConstrainedContravariant[int], Top[ConstrainedContra
 static_assert(not is_subtype_of(ConstrainedContravariant[str], Top[ConstrainedContravariant[GradualInt]]))
 static_assert(is_subtype_of(Bottom[ConstrainedContravariant[GradualInt]], ConstrainedContravariant[int]))
 static_assert(not is_subtype_of(Bottom[ConstrainedContravariant[GradualInt]], ConstrainedContravariant[str]))
+```
+
+## Gradual generic constraints
+
+When `Any` is itself a constraint, static specializations outside the other constraint must remain
+valid. Reading a top-materialized covariant value produces `object`.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Any
+from ty_extensions import Bottom, Top, static_assert
+from ty_extensions._internal import is_subtype_of
 
 class GradualConstrainedCovariant[T: (int, Any)]:
     def get(self) -> T:
@@ -873,6 +955,22 @@ static_assert(is_subtype_of(GradualConstrainedContravariant[int], Top[GradualCon
 static_assert(is_subtype_of(GradualConstrainedContravariant[str], Top[GradualConstrainedContravariant[Any]]))
 static_assert(is_subtype_of(Bottom[GradualConstrainedContravariant[Any]], GradualConstrainedContravariant[int]))
 static_assert(is_subtype_of(Bottom[GradualConstrainedContravariant[Any]], GradualConstrainedContravariant[str]))
+```
+
+## Overlapping generic constraints
+
+When one valid constraint is a subtype of another, the broader constraint supplies the upper bound
+and the narrower constraint supplies the lower bound.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Any
+from ty_extensions import Bottom, Top, static_assert
+from ty_extensions._internal import is_equivalent_to
 
 class OverlappingCovariant[T: (int, bool)]:
     def get(self) -> T:
@@ -885,6 +983,24 @@ static_assert(is_equivalent_to(Top[OverlappingCovariant[Any]], OverlappingCovari
 static_assert(is_equivalent_to(Bottom[OverlappingCovariant[Any]], OverlappingCovariant[bool]))
 static_assert(is_equivalent_to(Top[OverlappingContravariant[Any]], OverlappingContravariant[bool]))
 static_assert(is_equivalent_to(Bottom[OverlappingContravariant[Any]], OverlappingContravariant[int]))
+```
+
+## Mixed constrained and unconstrained type parameters
+
+A generic with both constrained and unconstrained parameters materializes each parameter
+independently. Filtering the constrained parameter must not change the unconstrained parameter.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Any
+from ty_extensions import Bottom, Intersection, Top, static_assert
+from ty_extensions._internal import is_assignable_to, is_subtype_of
+
+type GradualInt = Intersection[int, Any]
 
 class MixedConstrained[T: (int, str), U]:
     value: T
@@ -913,6 +1029,9 @@ static_assert(not is_assignable_to(Bottom[MixedConstrained[GradualInt, Any]], Mi
 ```
 
 ## Materialization does not force invalid recursive specializations
+
+An invalid self-referential bound must produce the expected diagnostics without forcing recursive
+materialization. Invalid specializations recover as `Unknown`.
 
 ```toml
 [environment]

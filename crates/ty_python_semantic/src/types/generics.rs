@@ -815,9 +815,18 @@ impl<'db> GenericContext<'db> {
         self.specialize(db, types)
     }
 
-    pub(crate) fn unknown_specialization(self, db: &'db dyn Db) -> Specialization<'db> {
-        self.specialize(
+    /// Specializes every type parameter to its unknown form.
+    ///
+    /// The built-in `tuple` also needs an explicit variable-length tuple shape so that
+    /// materialization can preserve its element type.
+    pub(crate) fn unknown_specialization(
+        self,
+        db: &'db dyn Db,
+        known_class: Option<KnownClass>,
+    ) -> Specialization<'db> {
+        Specialization::new(
             db,
+            self,
             self.variables(db)
                 .map(|typevar| match typevar.kind(db) {
                     TypeVarKind::LegacyTypeVarTuple | TypeVarKind::Pep695TypeVarTuple => {
@@ -828,7 +837,10 @@ impl<'db> GenericContext<'db> {
                     }
                     _ => Type::unknown(),
                 })
-                .collect::<Vec<_>>(),
+                .collect::<Box<[_]>>(),
+            None,
+            (known_class == Some(KnownClass::Tuple))
+                .then(|| TupleType::homogeneous(db, Type::unknown())),
         )
     }
 

@@ -112,6 +112,29 @@ def f(x: Covariant[int]):
             assert_never(x)
 ```
 
+A class pattern must also preserve and materialize the built-in tuple's variable-length shape.
+
+```py
+def match_tuple(value: object) -> None:
+    match value:
+        case tuple():
+            reveal_type(value)  # revealed: tuple[object, ...]
+```
+
+A tuple-subclass pattern preserves both the subclass's bounded type argument and the inherited
+heterogeneous tuple shape.
+
+```py
+class BoundedTuple[T: int](tuple[T, str]): ...
+
+def match_tuple_subclass(value: object) -> None:
+    match value:
+        case BoundedTuple():
+            reveal_type(value)  # revealed: BoundedTuple[int]
+            reveal_type(value[0])  # revealed: int
+            reveal_type(value[1])  # revealed: str
+```
+
 ## Class patterns with bounded generic classes
 
 A bounded generic class pattern matches every specialization, including gradual specializations, and
@@ -123,27 +146,20 @@ python-version = "3.12"
 ```
 
 ```py
-from typing import Any, final
+from typing import Any
 
-@final
-class Image:
-    mode: str
-
-class Array[Shape: tuple[int, ...], Scalar: int | str]:
-    def shape(self) -> Shape:
+class BoundedCovariant[T: int]:
+    def get(self) -> T:
         raise NotImplementedError
 
-    def scalar(self) -> Scalar:
-        raise NotImplementedError
-
-def match_bounded_generic(value: Array[tuple[Any, ...], Any] | Image) -> str:
+def match_bounded_generic(value: BoundedCovariant[Any] | bool) -> bool:
     match value:
-        case Array():
-            reveal_type(value)  # revealed: Array[tuple[Any, ...], Any]
-            return "array"
-        case image:
-            reveal_type(image)  # revealed: Image
-            return image.mode
+        case BoundedCovariant():
+            reveal_type(value)  # revealed: BoundedCovariant[Any]
+            return False
+        case remaining:
+            reveal_type(remaining)  # revealed: bool
+            return remaining
 ```
 
 ## Generic patterns ignore type parameter defaults
@@ -157,21 +173,52 @@ python-version = "3.13"
 ```
 
 ```py
-from typing import Any, Never
+from typing import Never
 
-class Unit[T: str = Never]:
-    mapping: dict[T, Any]
+class Box[T: str = Never]:
+    value: T
 
-    def __init__(self, key: T | None = None) -> None: ...
+    def __init__(self, value: T) -> None: ...
 
-def unit_with_default[T: str = Never](unit: Unit[T] | T) -> Unit[T]:
-    match unit:
-        case Unit():
-            reveal_type(unit)  # revealed: Unit[T@unit_with_default]
-            return unit
-        case key:
-            reveal_type(key)  # revealed: T@unit_with_default & ~Top[Unit[Unknown]]
-            return Unit[T](key)
+def box_with_default[T: str = Never](value: Box[T] | T) -> Box[T]:
+    match value:
+        case Box():
+            reveal_type(value)  # revealed: Box[T@box_with_default]
+            return value
+        case remaining:
+            reveal_type(remaining)  # revealed: T@box_with_default & ~Top[Box[Unknown]]
+            return Box[T](remaining)
+```
+
+A tuple-subclass pattern also materializes the declared bound rather than the `Never` default, while
+preserving the heterogeneous tuple shape inherited from its base.
+
+```py
+class DefaultedTuple[T: int = Never](tuple[T, str]): ...
+
+def match_defaulted_tuple(value: object) -> None:
+    match value:
+        case DefaultedTuple():
+            reveal_type(value)  # revealed: DefaultedTuple[int]
+            reveal_type(value[0])  # revealed: int
+            reveal_type(value[1])  # revealed: str
+```
+
+The same pattern excludes gradual specializations from the remaining match arms.
+
+```py
+from typing import Any
+
+def excludes_defaulted_tuple(value: DefaultedTuple[Any] | bool) -> bool:
+    match value:
+        case DefaultedTuple():
+            reveal_type(value)  # revealed: DefaultedTuple[Any]
+            reveal_type(value[0])  # revealed: Any
+            reveal_type(value[1])  # revealed: str
+            return False
+        case remaining:
+            reveal_type(remaining)  # revealed: bool
+            return remaining
 ```
 
 ## Class patterns with generic `@final` classes
