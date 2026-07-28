@@ -61,6 +61,14 @@ use super::unittest_assert::UnittestAssert;
 ///     assert not something
 ///     assert not something_else
 /// ```
+///
+/// ## Fix safety
+///
+/// On stable, the rule's fix is always unsafe and not offered when it would remove comments in the
+/// compound assertion. In [preview], the fix is only unsafe when it would delete such comments and
+/// safe otherwise.
+///
+/// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.208")]
 pub(crate) struct PytestCompositeAssertion;
