@@ -433,27 +433,15 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
                 if matches!(
                     frozen_dataclass_dispatch,
                     Some(FrozenDataclassDispatch::Delegate(_))
-                ) {
-                    match setattr_result {
-                        Ok(_) | Err(CallDunderError::PossiblyUnbound { .. })
-                            if matches!(
-                                member,
-                                ExplicitAttributeWriteRequirement::Descriptor { .. }
-                            ) =>
-                        {
-                            return true;
-                        }
-                        Err(CallDunderError::CallError(kind, bindings, _)) => {
-                            if emit_diagnostics {
-                                self.report(AssignmentAttributeWriteDiagnostic::BadSetAttr {
-                                    value_ty,
-                                    failure: CallError(kind, bindings),
-                                });
-                            }
-                            return false;
-                        }
-                        _ => {}
+                ) && let Err(CallDunderError::CallError(kind, bindings, _)) = setattr_result
+                {
+                    if emit_diagnostics {
+                        self.report(AssignmentAttributeWriteDiagnostic::BadSetAttr {
+                            value_ty,
+                            failure: CallError(kind, bindings),
+                        });
                     }
+                    return false;
                 }
                 let member_valid =
                     self.evaluate_explicit_member(object_ty, member, value_ty, emit_diagnostics);
@@ -679,17 +667,27 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
         emit_diagnostics: bool,
     ) -> bool {
         let db = self.builder.db();
-        if property_setter_returns_never(db, descriptor_ty, object_ty, value_ty) {
+        let setter_result = setter_ty.try_call(
+            db,
+            &CallArguments::positional([descriptor_ty, object_ty, value_ty]),
+        );
+        // `Never` supports arbitrary operations only because there can be no runtime value to
+        // mutate; it is not a concrete descriptor with a terminal setter.
+        let setter_returns_never = !descriptor_ty.is_never()
+            && match &setter_result {
+                Ok(bindings) => bindings.return_type(db).is_never(),
+                Err(error) => error.return_type(db).is_never(),
+            };
+        if setter_returns_never
+            || property_setter_returns_never(db, descriptor_ty, object_ty, value_ty)
+        {
             if emit_diagnostics {
                 self.report(AssignmentAttributeWriteDiagnostic::TerminalDescriptor);
             }
             return false;
         }
 
-        match setter_ty.try_call(
-            db,
-            &CallArguments::positional([descriptor_ty, object_ty, value_ty]),
-        ) {
+        match setter_result {
             Ok(_) => true,
             Err(error) => {
                 if emit_diagnostics {

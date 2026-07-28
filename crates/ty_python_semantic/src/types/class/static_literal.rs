@@ -120,17 +120,26 @@ pub struct StaticClassLiteral<'db> {
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for StaticClassLiteral<'_> {}
 
-/// The outcome of dispatching a frozen-dataclass method on a subclass instance.
+/// The result of [`StaticClassLiteral::inherited_frozen_dataclass_dispatch`].
+///
+/// See that method for details on how generated frozen-dataclass methods handle fields and
+/// non-fields on subclass instances.
 #[derive(Clone, Copy)]
 pub(crate) enum FrozenDataclassDispatch<'db> {
     /// A reachable frozen dataclass rejects modification of one of its fields.
     FrozenField,
-    /// Every reachable frozen method delegates past this base.
+    /// Every reachable frozen method delegates, with lookup resuming after this base.
     Delegate(StaticClassLiteral<'db>),
 }
 
 impl<'db> FrozenDataclassDispatch<'db> {
-    /// Returns `object` for a frozen field or `super(frozen_base, object)` for a non-field.
+    /// Returns the receiver for the next step of assignment or deletion validation.
+    ///
+    /// Validation stays on `object_ty` for a frozen field because the generated method rejects the
+    /// mutation. For a non-field, the generated method calls `super(frozen_base, object_ty)`, so
+    /// lookup must resume after the last frozen base. For example, assigning `Child().y` for
+    /// `class Child(Frozen, Later)` uses `super(Frozen, child)` when `y` is not a field of `Frozen`;
+    /// this preserves a later `__setattr__` or a descriptor for `y`.
     pub(crate) fn receiver(self, db: &'db dyn Db, object_ty: Type<'db>) -> Type<'db> {
         match self {
             Self::FrozenField => object_ty,
@@ -147,6 +156,9 @@ impl<'db> FrozenDataclassDispatch<'db> {
 /// Fields protected by reachable frozen-dataclass methods.
 struct InheritedFrozenDataclassFields<'db> {
     names: Box<[Name]>,
+    /// The final frozen dataclass whose generated method participates in dispatch.
+    ///
+    /// For a non-field, mutation validation resumes after this class in the MRO.
     last_frozen_base: StaticClassLiteral<'db>,
 }
 
@@ -1915,11 +1927,33 @@ impl<'db> StaticClassLiteral<'db> {
         )))
     }
 
-    /// Returns the outcome of an inherited frozen-dataclass method for `name`.
+    /// Determines how an inherited generated frozen-dataclass `method` handles `name`.
     ///
-    /// For a non-field, CPython delegates past each generated frozen method. Preserving the final
-    /// frozen base lets assignment validation perform the same `super()` lookup without hiding a
-    /// later method or an attribute's descriptor.
+    /// CPython's generated `__setattr__` and `__delattr__` reject every mutation when called on an
+    /// instance of the exact frozen class. On an ordinary subclass instance, they reject only
+    /// dataclass fields and delegate other names with `super(frozen_class, instance)`.
+    ///
+    /// For example:
+    ///
+    /// ```python
+    /// @dataclass(frozen=True)
+    /// class Frozen:
+    ///     x: int
+    ///
+    /// class Later:
+    ///     y: int
+    ///
+    /// class Child(Frozen, Later): ...
+    /// ```
+    ///
+    /// Assigning to `Child().x` is rejected because `x` is a field of `Frozen`. Assigning to
+    /// `Child().y` instead delegates to `super(Frozen, child).__setattr__`, where a later
+    /// `__setattr__` or the descriptor for `y` can still reject the assignment.
+    ///
+    /// If multiple frozen dataclasses are reachable before an explicit implementation of
+    /// `method`, a non-field delegates past each generated method. [`FrozenDataclassDispatch::Delegate`]
+    /// stores the last frozen base so the caller can perform the equivalent lookup once, after all
+    /// of them.
     pub(crate) fn inherited_frozen_dataclass_dispatch(
         self,
         db: &'db dyn Db,

@@ -833,14 +833,12 @@ class ChildWithRejectingAssignmentBase(Frozen, RejectsAssignment): ...
 ChildWithRejectingAssignmentBase().y = 2
 ```
 
-A later base class can instead allow assignment to an otherwise read-only property. Its setter still
-determines which values are accepted:
+A later base class can customize assignment to an ordinary attribute. The value must satisfy both
+the later `__setattr__` and the attribute declaration:
 
 ```py
 class AllowsAssignment:
-    @property
-    def y(self) -> int:
-        return 1
+    y: object = 1
 
     def __setattr__(self, name: str, value: int) -> None: ...
 
@@ -851,6 +849,82 @@ allowed.y = 2
 
 # error: [invalid-assignment] "Cannot assign object of type"
 allowed.y = "invalid"
+```
+
+A later `__setattr__` can forward to `object.__setattr__`, which still invokes data descriptors:
+
+```py
+class ForwardsAssignment:
+    def __setattr__(self, name: str, value: object) -> None:
+        super().__setattr__(name, value)
+```
+
+A read-only property therefore remains read-only:
+
+```py
+class ReadOnlyPropertyBase(ForwardsAssignment):
+    @property
+    def y(self) -> int:
+        return 1
+
+class ChildWithReadOnlyProperty(Frozen, ReadOnlyPropertyBase): ...
+
+# error: [invalid-assignment] "Cannot assign to read-only property `y` on object of type `ChildWithReadOnlyProperty`"
+ChildWithReadOnlyProperty().y = 2
+```
+
+The property's setter still determines which values it accepts:
+
+```py
+class TypedPropertyBase(ForwardsAssignment):
+    @property
+    def y(self) -> int:
+        return 1
+
+    @y.setter
+    def y(self, value: int) -> None: ...
+
+class ChildWithTypedProperty(Frozen, TypedPropertyBase): ...
+
+# error: [invalid-assignment] "Expected `int`, found `Literal["invalid"]`"
+ChildWithTypedProperty().y = "invalid"
+```
+
+A property setter that never returns prevents assignment:
+
+```py
+class TerminalPropertyBase(ForwardsAssignment):
+    @property
+    def y(self) -> int:
+        return 1
+
+    @y.setter
+    def y(self, value: int) -> NoReturn:
+        raise AttributeError
+
+class ChildWithTerminalProperty(Frozen, TerminalPropertyBase): ...
+
+# error: [invalid-assignment] "Cannot assign to attribute `y` on type `ChildWithTerminalProperty` whose `__set__` method returns `Never`/`NoReturn`"
+ChildWithTerminalProperty().y = 2
+```
+
+The same rule applies to a custom descriptor whose setter never returns:
+
+```py
+class TerminalDescriptor:
+    def __get__(self, instance: object, owner: type | None = None) -> int:
+        return 1
+
+    def __set__(self, instance: object, value: int) -> NoReturn:
+        raise AttributeError
+
+class TerminalDescriptorBase(ForwardsAssignment):
+    y: TerminalDescriptor = TerminalDescriptor()
+
+class ChildWithTerminalDescriptor(Frozen, TerminalDescriptorBase): ...
+
+# error: [invalid-assignment] "Cannot assign to attribute `y` on type `ChildWithTerminalDescriptor` whose `__set__` method returns `Never`/`NoReturn`"
+ChildWithTerminalDescriptor().y = 2
 ```
 
 A later `__setattr__` does not make the declared type of an ordinary attribute disappear:
