@@ -563,11 +563,6 @@ impl<'db> ProtocolInterface<'db> {
             .any(|name| self.inner(db).get(name) != other.inner(db).get(name))
     }
 
-    pub(super) fn member_has_todo_type(self, db: &'db dyn Db, name: &str) -> bool {
-        self.member_by_name(db, name)
-            .is_some_and(|member| member.has_todo_type())
-    }
-
     pub(super) fn member_is_property(self, db: &'db dyn Db, name: &str) -> bool {
         self.member_by_name(db, name)
             .is_some_and(|member| member.is_property())
