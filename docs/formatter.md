@@ -96,7 +96,7 @@ Going forward, the Ruff Formatter will support Black's preview style under Ruff'
 
 ## Configuration
 
-The Ruff Formatter exposes a small set of configuration options, some of which are also supported
+The Ruff formatter exposes a small set of configuration options, some of which are also supported
 by Black (like line width), some of which are unique to Ruff (like quote, indentation style and
 formatting code examples in docstrings).
 
