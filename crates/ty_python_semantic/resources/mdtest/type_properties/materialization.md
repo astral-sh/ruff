@@ -1040,8 +1040,7 @@ python-version = "3.12"
 
 ```py
 # error: [invalid-type-arguments]
-class RecursiveSpecialization[T: "RecursiveSpecialization[int]"]:
-    pass
+class RecursiveSpecialization[T: "RecursiveSpecialization[int]"]: ...
 
 # error: [invalid-type-arguments]
 def recursive_specialization(value: RecursiveSpecialization[str]) -> None:

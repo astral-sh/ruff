@@ -173,7 +173,7 @@ python-version = "3.13"
 ```
 
 ```py
-from typing import Never
+from typing import Any, Never
 
 class Box[T: str = Never]:
     value: T
@@ -207,8 +207,6 @@ def match_defaulted_tuple(value: object) -> None:
 The same pattern excludes gradual specializations from the remaining match arms.
 
 ```py
-from typing import Any
-
 def excludes_defaulted_tuple(value: DefaultedTuple[Any] | bool) -> bool:
     match value:
         case DefaultedTuple():

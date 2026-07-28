@@ -1616,17 +1616,23 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     ),
                     TypeVarVariance::Covariant | TypeVarVariance::Contravariant => {
                         let (
-                            (source_type, source_materialization),
-                            (target_type, target_materialization),
+                            source_type,
+                            source_materialization,
+                            target_type,
+                            target_materialization,
                         ) = if variance.is_covariant() {
                             (
-                                (*source_type, source_materialization_kind),
-                                (*target_type, target_materialization_kind),
+                                *source_type,
+                                source_materialization_kind,
+                                *target_type,
+                                target_materialization_kind,
                             )
                         } else {
                             (
-                                (*target_type, target_materialization_kind),
-                                (*source_type, source_materialization_kind),
+                                *target_type,
+                                target_materialization_kind.map(MaterializationKind::flip),
+                                *source_type,
+                                source_materialization_kind.map(MaterializationKind::flip),
                             )
                         };
 
@@ -1636,14 +1642,12 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                                 db,
                                 bound_typevar,
                                 source_type,
-                                variance,
                                 source_materialization,
                             ),
                             self.materialize_constrained_type_argument(
                                 db,
                                 bound_typevar,
                                 target_type,
-                                variance,
                                 target_materialization,
                             ),
                         )
@@ -1665,7 +1669,6 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         db: &'db dyn Db,
         bound_typevar: BoundTypeVarInstance<'db>,
         ty: Type<'db>,
-        variance: TypeVarVariance,
         materialization: Option<MaterializationKind>,
     ) -> Type<'db> {
         let Some(materialization) = materialization else {
@@ -1695,11 +1698,6 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             MaterializationKind::Bottom,
             self.materialization_visitor,
         );
-        let effective_materialization = if variance.is_covariant() {
-            materialization
-        } else {
-            materialization.flip()
-        };
 
         let viable_constraints = constraints.iter().filter_map(|constraint| {
             let constraint_top =
@@ -1714,7 +1712,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 return None;
             }
 
-            Some(match effective_materialization {
+            Some(match materialization {
                 MaterializationKind::Top => constraint_top,
                 MaterializationKind::Bottom => constraint.materialize(
                     db,
@@ -1724,7 +1722,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             })
         });
 
-        match effective_materialization {
+        match materialization {
             MaterializationKind::Top => IntersectionType::from_two_elements(
                 db,
                 argument_top,
