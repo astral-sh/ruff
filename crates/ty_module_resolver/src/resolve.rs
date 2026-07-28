@@ -1550,7 +1550,9 @@ fn resolve_component(
         candidate.py_typed = package_path
             .py_typed(context)
             .inherit_parent(candidate.py_typed);
-        if is_legacy_namespace_package(package_path, context, init) {
+        if !package_path.search_path().is_standard_library()
+            && is_legacy_namespace_package(context.db, init)
+        {
             candidate.module = ResolvedModule::LegacyNamespacePackage(init);
         } else {
             candidate.module = ResolvedModule::RegularPackage(init);
@@ -1679,16 +1681,8 @@ fn resolve_file_module_with_filter(
 /// we find on the search paths. To the extent that the different copies "need" to have the same
 /// contents, they all "need" to have the legacy namespace idiom (we do nothing to enforce that,
 /// we will just get confused if you mess it up).
-fn is_legacy_namespace_package(
-    package_path: &ModulePath,
-    context: &ResolverContext,
-    init: File,
-) -> bool {
-    // Just an optimization, the stdlib and typeshed are never legacy namespace packages
-    if package_path.search_path().is_standard_library() {
-        return false;
-    }
-
+/// Returns whether `init` declares a legacy namespace package.
+pub fn is_legacy_namespace_package(db: &dyn Db, init: File) -> bool {
     // This is all syntax-only analysis so it *could* be fooled but it's really unlikely.
     //
     // The benefit of being syntax-only is speed and avoiding circular dependencies
@@ -1696,9 +1690,9 @@ fn is_legacy_namespace_package(
     //
     // The downside is if you write slightly different syntax we will fail to detect the idiom,
     // but hey, this is better than nothing!
-    let parsed = ruff_db::parsed::parsed_module(context.db, init);
+    let parsed = ruff_db::parsed::parsed_module(db, init);
     let mut visitor = LegacyNamespacePackageVisitor::default();
-    visitor.visit_body(parsed.load(context.db).suite());
+    visitor.visit_body(parsed.load(db).suite());
 
     visitor.is_legacy_namespace_package
 }

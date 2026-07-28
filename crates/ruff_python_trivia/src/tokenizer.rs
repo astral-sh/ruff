@@ -134,9 +134,8 @@ fn is_identifier_start(c: char) -> bool {
     }
 }
 
-// Checks if the character c is a valid continuation character as described
-// in https://docs.python.org/3/reference/lexical_analysis.html#identifiers
-fn is_identifier_continuation(c: char) -> bool {
+/// Returns whether `c` can continue a Python identifier.
+pub fn is_identifier_continuation(c: char) -> bool {
     // Arrange things such that ASCII codepoints never
     // result in the slower `is_xid_continue` getting called.
     if c.is_ascii() {

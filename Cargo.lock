@@ -4743,6 +4743,7 @@ dependencies = [
  "ty_python_core",
  "ty_python_semantic",
  "ty_vendored",
+ "unicode-normalization",
 ]
 
 [[package]]
