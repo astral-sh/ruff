@@ -1531,7 +1531,7 @@ impl DisplayDiagnosticConfig {
     }
 
     /// Whether rule codes are explicitly preferred over human-readable rule names.
-    pub fn prefer_rule_codes_enabled(&self) -> bool {
+    pub fn is_prefer_rule_codes_enabled(&self) -> bool {
         self.prefer_rule_codes
     }
 
