@@ -96,8 +96,8 @@ strict-generic-narrowing = false
 ```
 
 In relaxed generic narrowing mode, an `isinstance(.., Callable)` check retains the tagged top
-callable `Top[(...) -> object*]`. As in strict mode, no particular arguments are guaranteed to be
-valid, but the return type retains its narrowing provenance:
+callable `Top[(...) -> object*]`. Its tagged parameters accept arbitrary arguments, and the return
+type retains its narrowing provenance:
 
 ```py
 from typing import Callable
@@ -106,12 +106,9 @@ def call_with_args(y: object):
     if isinstance(y, Callable):
         reveal_type(y)  # revealed: Top[(...) -> object*]
 
-        # error: [call-top-callable]
-        y()
-        # error: [call-top-callable]
-        y(1, "foo")
-        # error: [call-top-callable]
-        y(1, "foo", keyword_arg="bar")
+        reveal_type(y())  # revealed: object*
+        reveal_type(y(1, "foo"))  # revealed: object*
+        reveal_type(y(1, "foo", keyword_arg="bar"))  # revealed: object*
 ```
 
 ## Narrowing with named expressions (walrus operator)

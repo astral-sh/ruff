@@ -6927,7 +6927,9 @@ impl<'db> Binding<'db> {
     ) {
         let parameters = self.signature.parameters();
 
-        if parameters.is_top() {
+        // A narrowing top preserves its top behavior for type relations, but its tagged
+        // parameters are gradual when checking the arguments of a call.
+        if matches!(parameters.kind(), ParametersKind::Top) {
             self.errors
                 .push(BindingError::CalledTopCallable(self.signature_type));
             return;
