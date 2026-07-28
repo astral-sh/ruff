@@ -619,7 +619,7 @@ a covariant generic, this is equivalent to using the upper bound of the type par
 `object`):
 
 ```py
-from typing import Self
+from typing import Any, Self
 
 class Covariant[T]:
     def get(self) -> T:
@@ -629,6 +629,49 @@ def _(x: object):
     if isinstance(x, Covariant):
         reveal_type(x)  # revealed: Covariant[object]
         reveal_type(x.get())  # revealed: object
+```
+
+For a bounded covariant generic, the narrowed type uses the declared upper bound:
+
+```py
+class UpperBound: ...
+
+class BoundedCovariant[T: UpperBound]:
+    def get(self) -> T:
+        raise NotImplementedError
+
+def _(x: object):
+    if isinstance(x, BoundedCovariant):
+        reveal_type(x)  # revealed: BoundedCovariant[UpperBound]
+        reveal_type(x.get())  # revealed: UpperBound
+
+class Other:
+    def only_on_other(self) -> None: ...
+
+def _(x: BoundedCovariant[Any] | Other):
+    if isinstance(x, BoundedCovariant):
+        return
+
+    reveal_type(x)  # revealed: Other & ~BoundedCovariant[UpperBound]
+    x.only_on_other()
+
+class BoundedDType[T: UpperBound]:
+    def get(self) -> T:
+        raise NotImplementedError
+
+class BoundedArray[Shape: tuple[int, ...], DType: BoundedDType[Any]]:
+    def shape(self) -> Shape:
+        raise NotImplementedError
+
+    def dtype(self) -> DType:
+        raise NotImplementedError
+
+def _(x: BoundedArray[Any, Any] | Other):
+    if isinstance(x, BoundedArray):
+        return
+
+    reveal_type(x)  # revealed: Other & ~BoundedArray[tuple[int, ...], BoundedDType[Any]]
+    x.only_on_other()
 ```
 
 Similarly, contravariant type parameters use their lower bound of `Never`:

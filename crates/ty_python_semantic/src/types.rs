@@ -1565,8 +1565,7 @@ impl<'db> Type<'db> {
     /// More concretely, `T'`, the materialization of `T`, is the type `T` with all occurrences of
     /// the dynamic types (`Any`, `Unknown`, `Todo`) replaced as follows:
     ///
-    /// - In covariant position, it's replaced with `object` (TODO: it should be the `TypeVar`'s upper
-    ///   bound, if any)
+    /// - In covariant position, it's replaced with the `TypeVar`'s upper bound, if any, or `object`
     /// - In contravariant position, it's replaced with `Never`
     /// - In invariant position, we replace the object with a special form recording that it's the top
     ///   or bottom materialization.

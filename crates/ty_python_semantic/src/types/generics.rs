@@ -1418,18 +1418,27 @@ impl<'db> Specialization<'db> {
         }
         let mut has_dynamic_invariant_typevar = false;
         let types = self.map_types(db, |_, bound_typevar, vartype| {
+            let materialize = |materialization_kind| {
+                let materialized = vartype.materialize(db, materialization_kind, visitor);
+
+                if materialization_kind == MaterializationKind::Top
+                    && materialized != vartype
+                    && let Some(upper_bound) = bound_typevar.typevar(db).upper_bound(db)
+                {
+                    IntersectionType::from_two_elements(db, materialized, upper_bound)
+                } else {
+                    materialized
+                }
+            };
+
             match specialization_variance(db, bound_typevar) {
                 TypeVarVariance::Bivariant => {
                     // With bivariance, all specializations are subtypes of each other,
                     // so any materialization is acceptable.
                     vartype.materialize(db, MaterializationKind::Top, visitor)
                 }
-                TypeVarVariance::Covariant => {
-                    vartype.materialize(db, materialization_kind, visitor)
-                }
-                TypeVarVariance::Contravariant => {
-                    vartype.materialize(db, materialization_kind.flip(), visitor)
-                }
+                TypeVarVariance::Covariant => materialize(materialization_kind),
+                TypeVarVariance::Contravariant => materialize(materialization_kind.flip()),
                 TypeVarVariance::Invariant => {
                     let top_materialization =
                         vartype.materialize(db, MaterializationKind::Top, visitor);

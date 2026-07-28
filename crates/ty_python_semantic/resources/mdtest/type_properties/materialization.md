@@ -10,7 +10,8 @@ There are two materializations of a type:
 More concretely, `T'`, the materialization of `T`, is the type `T` with all occurrences of `Any` and
 `Unknown` replaced as follows:
 
-- In covariant position, it's replaced with `object`
+- In covariant position, it's replaced with its enclosing type variable's upper bound, or with
+    `object` if the type variable is unbounded
 - In contravariant position, it's replaced with `Never`
 - In invariant position, it's replaced with an unresolved type variable
 
@@ -543,7 +544,7 @@ python-version = "3.12"
 
 ```py
 from typing import Any, Generic, TypeVar, Never
-from ty_extensions import Bottom, Top, static_assert
+from ty_extensions import Bottom, Intersection, Top, static_assert
 from ty_extensions._internal import is_equivalent_to
 
 T = TypeVar("T")
@@ -614,6 +615,39 @@ def covariant(top: Top[CovariantCallable], bottom: Bottom[CovariantCallable]) ->
 def contravariant(top: Top[ContravariantCallable], bottom: Bottom[ContravariantCallable]) -> None:
     reveal_type(top)  # revealed: (GenericContravariant[object], /) -> None
     reveal_type(bottom)  # revealed: (GenericContravariant[Never], /) -> None
+```
+
+The top materialization of a bounded covariant type parameter is its declared upper bound, rather
+than `object`.
+
+```py
+class UpperBound: ...
+
+class BoundedCovariant[T: UpperBound]:
+    def get(self) -> T:
+        raise NotImplementedError
+
+T_bounded_co = TypeVar("T_bounded_co", bound=UpperBound, covariant=True)
+
+class LegacyBoundedCovariant(Generic[T_bounded_co]):
+    def get(self) -> T_bounded_co:
+        raise NotImplementedError
+
+static_assert(is_equivalent_to(Top[BoundedCovariant[Any]], BoundedCovariant[UpperBound]))
+static_assert(is_equivalent_to(Bottom[BoundedCovariant[Any]], BoundedCovariant[Never]))
+
+static_assert(is_equivalent_to(Top[LegacyBoundedCovariant[Any]], LegacyBoundedCovariant[UpperBound]))
+static_assert(is_equivalent_to(Bottom[LegacyBoundedCovariant[Any]], LegacyBoundedCovariant[Never]))
+```
+
+If the materialization of the existing gradual specialization is already narrower than the bound, it
+is retained:
+
+```py
+class Sub(UpperBound): ...
+
+static_assert(is_equivalent_to(Top[BoundedCovariant[Intersection[Any, Sub]]], BoundedCovariant[Sub]))
+static_assert(is_equivalent_to(Top[LegacyBoundedCovariant[Intersection[Any, Sub]]], LegacyBoundedCovariant[Sub]))
 ```
 
 ## Invalid use
