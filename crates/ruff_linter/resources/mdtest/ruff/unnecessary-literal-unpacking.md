@@ -1,9 +1,9 @@
-# `unnecessary-literal-unpacking` (`RUF077`)
+# `unnecessary-literal-unpacking` (`PIE811`)
 
 ```toml
 [lint]
 preview = true
-select = ["RUF077"]
+select = ["PIE811"]
 ```
 
 ## Call arguments
@@ -35,7 +35,7 @@ foo(*
 ```
 
 ```snapshot
-error[RUF077]: Unnecessary unpacking of list literal
+error[PIE811]: Unnecessary unpacking of list literal
  --> src/mdtest_snippet.py:8:5
   |
 8 | foo(*[bar])  # snapshot: unnecessary-literal-unpacking
@@ -65,7 +65,7 @@ rest = [3, 4]
 ```
 
 ```snapshot
-error[RUF077]: Unnecessary unpacking of list literal
+error[PIE811]: Unnecessary unpacking of list literal
  --> src/mdtest_snippet.py:5:2
   |
 5 | [*[bar, baz], *rest]  # snapshot: unnecessary-literal-unpacking
@@ -103,7 +103,7 @@ for value in *[bar], baz:  # error: [unnecessary-literal-unpacking]
 ```
 
 ```snapshot
-error[RUF077]: Unnecessary unpacking of list literal
+error[PIE811]: Unnecessary unpacking of list literal
  --> src/mdtest_snippet.py:4:10
   |
 4 | values = *[bar],  # snapshot: unnecessary-literal-unpacking
@@ -139,7 +139,7 @@ values = *([bar]),  # error: [unnecessary-literal-unpacking]
 ```
 
 ```snapshot
-error[RUF077]: Unnecessary unpacking of list literal
+error[PIE811]: Unnecessary unpacking of list literal
  --> src/mdtest_snippet.py:5:5
   |
 5 | foo(*([bar, baz]))  # snapshot: unnecessary-literal-unpacking
@@ -166,7 +166,7 @@ foo(*([bar]  # comment
 ```
 
 ```snapshot
-error[RUF077]: Unnecessary unpacking of list literal
+error[PIE811]: Unnecessary unpacking of list literal
   --> src/mdtest_snippet.py:17:5
    |
 17 |   foo(*([bar]  # comment
@@ -206,7 +206,7 @@ class C3(*[]): ...  # snapshot: unnecessary-literal-unpacking
 ```
 
 ```snapshot
-error[RUF077]: Unnecessary unpacking of list literal
+error[PIE811]: Unnecessary unpacking of list literal
  --> src/mdtest_snippet.py:7:10
   |
 7 | class C1(*[Base]): ...  # snapshot: unnecessary-literal-unpacking
@@ -221,7 +221,7 @@ help: Remove unnecessary list
   |
 
 
-error[RUF077]: Unnecessary unpacking of list literal
+error[PIE811]: Unnecessary unpacking of list literal
   --> src/mdtest_snippet.py:13:10
    |
 13 | class C3(*[]): ...  # snapshot: unnecessary-literal-unpacking
@@ -271,7 +271,7 @@ class C(*{bar}): ...  # error: [unnecessary-literal-unpacking]
 ```
 
 ```snapshot
-error[RUF077]: Unnecessary unpacking of set literal
+error[PIE811]: Unnecessary unpacking of set literal
  --> src/mdtest_snippet.py:6:5
   |
 6 | foo(*{bar})  # snapshot: unnecessary-literal-unpacking
@@ -334,7 +334,7 @@ foo(
 ```
 
 ```snapshot
-error[RUF077]: Unnecessary unpacking of list literal
+error[PIE811]: Unnecessary unpacking of list literal
   --> src/mdtest_snippet.py:7:5
    |
  7 | /     *[
@@ -377,7 +377,7 @@ foo(bar, *[])  # error: [unnecessary-literal-unpacking]
 ```
 
 ```snapshot
-error[RUF077]: Unnecessary unpacking of tuple literal
+error[PIE811]: Unnecessary unpacking of tuple literal
  --> src/mdtest_snippet.py:8:5
   |
 8 | foo(*(), bar)  # snapshot: unnecessary-literal-unpacking
@@ -408,7 +408,7 @@ values = bar, *[]  # error: [unnecessary-literal-unpacking]
 ```
 
 ```snapshot
-error[RUF077]: Unnecessary unpacking of list literal
+error[PIE811]: Unnecessary unpacking of list literal
   --> src/mdtest_snippet.py:15:2
    |
 15 | (*[], bar)  # snapshot: unnecessary-literal-unpacking
@@ -423,7 +423,7 @@ help: Remove unnecessary list
    |
 
 
-error[RUF077]: Unnecessary unpacking of list literal
+error[PIE811]: Unnecessary unpacking of list literal
   --> src/mdtest_snippet.py:18:7
    |
 18 | (bar, *[],)  # snapshot: unnecessary-literal-unpacking
@@ -455,7 +455,7 @@ values = [
 ```
 
 ```snapshot
-error[RUF077]: Unnecessary unpacking of list literal
+error[PIE811]: Unnecessary unpacking of list literal
   --> src/mdtest_snippet.py:21:2
    |
 21 | {*[]}  # snapshot: unnecessary-literal-unpacking
@@ -470,7 +470,7 @@ help: Remove unnecessary list
    |
 
 
-error[RUF077]: Unnecessary unpacking of list literal
+error[PIE811]: Unnecessary unpacking of list literal
   --> src/mdtest_snippet.py:22:2
    |
 22 | (*[],)  # snapshot: unnecessary-literal-unpacking
@@ -485,7 +485,7 @@ help: Remove unnecessary list
    |
 
 
-error[RUF077]: Unnecessary unpacking of list literal
+error[PIE811]: Unnecessary unpacking of list literal
   --> src/mdtest_snippet.py:23:10
    |
 23 | values = *[],  # snapshot: unnecessary-literal-unpacking
@@ -500,7 +500,7 @@ help: Remove unnecessary list
    |
 
 
-error[RUF077]: Unnecessary unpacking of list literal
+error[PIE811]: Unnecessary unpacking of list literal
   --> src/mdtest_snippet.py:26:2
    |
 26 | [*[],]  # snapshot: unnecessary-literal-unpacking
@@ -525,7 +525,7 @@ values = (*[],  # comment
 ```
 
 ```snapshot
-error[RUF077]: Unnecessary unpacking of list literal
+error[PIE811]: Unnecessary unpacking of list literal
   --> src/mdtest_snippet.py:31:11
    |
 31 | values = (*[],  # comment
@@ -557,7 +557,7 @@ foo(*[],  # comment
 ```
 
 ```snapshot
-error[RUF077]: Unnecessary unpacking of list literal
+error[PIE811]: Unnecessary unpacking of list literal
   --> src/mdtest_snippet.py:39:5
    |
 39 | foo(*[],  # comment
@@ -584,7 +584,7 @@ foo(*{*[]})  # snapshot: unnecessary-literal-unpacking
 ```
 
 ```snapshot
-error[RUF077]: Unnecessary unpacking of list literal
+error[PIE811]: Unnecessary unpacking of list literal
   --> src/mdtest_snippet.py:44:7
    |
 44 | foo(*{*[]})  # snapshot: unnecessary-literal-unpacking
@@ -608,7 +608,7 @@ set = list
 ```
 
 ```snapshot
-error[RUF077]: Unnecessary unpacking of list literal
+error[PIE811]: Unnecessary unpacking of list literal
   --> src/mdtest_snippet.py:47:2
    |
 47 | {*[]}  # snapshot: unnecessary-literal-unpacking
@@ -638,7 +638,7 @@ values = qux, *[
 ```
 
 ```snapshot
-error[RUF077]: Unnecessary unpacking of list literal
+error[PIE811]: Unnecessary unpacking of list literal
   --> src/mdtest_snippet.py:54:27
    |
 54 | with_keyword(keyword=qux, *[])
@@ -653,7 +653,7 @@ help: Remove unnecessary list
    |
 
 
-error[RUF077]: Unnecessary unpacking of list literal
+error[PIE811]: Unnecessary unpacking of list literal
   --> src/mdtest_snippet.py:56:10
    |
 56 |   values = *[
@@ -701,7 +701,7 @@ values = *[], bar, *[]
 ```
 
 ```snapshot
-error[RUF077]: Unnecessary unpacking of list literal
+error[PIE811]: Unnecessary unpacking of list literal
   --> src/mdtest_snippet.py:66:2
    |
 66 | (*[], bar, *[])
@@ -716,7 +716,7 @@ help: Remove unnecessary list
    |
 
 
-error[RUF077]: Unnecessary unpacking of list literal
+error[PIE811]: Unnecessary unpacking of list literal
   --> src/mdtest_snippet.py:66:12
    |
 66 | (*[], bar, *[])
@@ -753,7 +753,7 @@ baz = 2
 ```
 
 ```snapshot
-error[RUF077]: Unnecessary unpacking of list literal
+error[PIE811]: Unnecessary unpacking of list literal
   --> src/mdtest_snippet.py:93:2
    |
 93 | (*[], *[bar])
@@ -768,7 +768,7 @@ help: Remove unnecessary list
    |
 
 
-error[RUF077]: Unnecessary unpacking of list literal
+error[PIE811]: Unnecessary unpacking of list literal
   --> src/mdtest_snippet.py:93:7
    |
 93 | (*[], *[bar])
@@ -790,7 +790,7 @@ target-version = "py311"
 
 [lint]
 preview = true
-select = ["RUF077"]
+select = ["PIE811"]
 ```
 
 `A[*Ts]` subscripts `A` with a one-element tuple even though it is written without a comma, so the
@@ -825,7 +825,7 @@ r: A[*(
 ```
 
 ```snapshot
-error[RUF077]: Unnecessary unpacking of tuple literal
+error[PIE811]: Unnecessary unpacking of tuple literal
  --> src/mdtest_snippet.py:9:6
   |
 9 | x: A[*(int,)]  # snapshot: unnecessary-literal-unpacking
@@ -840,7 +840,7 @@ help: Remove unnecessary tuple
    |
 
 
-error[RUF077]: Unnecessary unpacking of tuple literal
+error[PIE811]: Unnecessary unpacking of tuple literal
   --> src/mdtest_snippet.py:10:6
    |
 10 | y: A[*(int, str)]  # snapshot: unnecessary-literal-unpacking
@@ -855,7 +855,7 @@ help: Remove unnecessary tuple
    |
 
 
-error[RUF077]: Unnecessary unpacking of tuple literal
+error[PIE811]: Unnecessary unpacking of tuple literal
   --> src/mdtest_snippet.py:12:6
    |
 12 | w: A[*()]  # snapshot: unnecessary-literal-unpacking
@@ -870,7 +870,7 @@ help: Remove unnecessary tuple
    |
 
 
-error[RUF077]: Unnecessary unpacking of tuple literal
+error[PIE811]: Unnecessary unpacking of tuple literal
   --> src/mdtest_snippet.py:15:6
    |
 15 | v: A[*(), int]  # snapshot: unnecessary-literal-unpacking
@@ -885,7 +885,7 @@ help: Remove unnecessary tuple
    |
 
 
-error[RUF077]: Unnecessary unpacking of tuple literal
+error[PIE811]: Unnecessary unpacking of tuple literal
   --> src/mdtest_snippet.py:18:6
    |
 18 | t: A[*((int,))]  # snapshot: unnecessary-literal-unpacking
@@ -900,7 +900,7 @@ help: Remove unnecessary tuple
    |
 
 
-error[RUF077]: Unnecessary unpacking of tuple literal
+error[PIE811]: Unnecessary unpacking of tuple literal
   --> src/mdtest_snippet.py:23:6
    |
 23 |   r: A[*(
@@ -937,7 +937,7 @@ v: "A[*(int,)]" = None  # snapshot: unnecessary-literal-unpacking
 ```
 
 ```snapshot
-error[RUF077]: Unnecessary unpacking of tuple literal
+error[PIE811]: Unnecessary unpacking of tuple literal
   --> src/mdtest_snippet.py:34:7
    |
 34 | v: "A[*(int,)]" = None  # snapshot: unnecessary-literal-unpacking
@@ -973,7 +973,7 @@ foo(
 ```
 
 ```snapshot
-error[RUF077]: Unnecessary unpacking of list literal
+error[PIE811]: Unnecessary unpacking of list literal
  --> src/mdtest_snippet.py:6:5
   |
 6 | /     *  # comment
@@ -1013,7 +1013,7 @@ values = (
 ```
 
 ```snapshot
-error[RUF077]: Unnecessary unpacking of list literal
+error[PIE811]: Unnecessary unpacking of list literal
  --> src/mdtest_snippet.py:4:11
   |
 4 | values = [*[]  # comment
@@ -1045,7 +1045,7 @@ foo(keyword=bar, *[baz])  # snapshot: unnecessary-literal-unpacking
 ```
 
 ```snapshot
-error[RUF077]: Unnecessary unpacking of list literal
+error[PIE811]: Unnecessary unpacking of list literal
  --> src/mdtest_snippet.py:5:18
   |
 5 | foo(keyword=bar, *[baz])  # snapshot: unnecessary-literal-unpacking
@@ -1069,7 +1069,7 @@ class C(metaclass=Meta, *[Base]): ...  # snapshot: unnecessary-literal-unpacking
 ```
 
 ```snapshot
-error[RUF077]: Unnecessary unpacking of list literal
+error[PIE811]: Unnecessary unpacking of list literal
  --> src/mdtest_snippet.py:7:25
   |
 7 | class C(metaclass=Meta, *[Base]): ...  # snapshot: unnecessary-literal-unpacking
@@ -1137,7 +1137,7 @@ target-version = "py313"
 
 [lint]
 preview = true
-select = ["RUF077"]
+select = ["PIE811"]
 ```
 
 ```py

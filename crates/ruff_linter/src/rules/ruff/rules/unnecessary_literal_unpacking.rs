@@ -88,7 +88,7 @@ impl Violation for UnnecessaryLiteralUnpacking {
     }
 }
 
-/// RUF077
+/// PIE811
 pub(crate) fn unnecessary_literal_unpacking(checker: &Checker, starred: &ast::ExprStarred) {
     // A starred expression in a store context is an assignment target (`a, *b = c`), not an
     // unpacking.

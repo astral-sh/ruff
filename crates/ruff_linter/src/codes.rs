@@ -899,6 +899,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Pie, "807") => rules::flake8_pie::rules::ReimplementedContainerBuiltin,
         (Flake8Pie, "808") => rules::flake8_pie::rules::UnnecessaryRangeStart,
         (Flake8Pie, "810") => rules::flake8_pie::rules::MultipleStartsEndsWith,
+        (Flake8Pie, "811") => rules::ruff::rules::UnnecessaryLiteralUnpacking,
 
         // flake8-commas
         (Flake8Commas, "812") => rules::flake8_commas::rules::MissingTrailingComma,
@@ -1083,7 +1084,6 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Ruff, "074") => rules::ruff::rules::IncorrectDecoratorOrder,
         (Ruff, "075") => rules::ruff::rules::FallibleContextManager,
         (Ruff, "076") => rules::ruff::rules::PytestFixtureAutouse,
-        (Ruff, "077") => rules::ruff::rules::UnnecessaryLiteralUnpacking,
 
         (Ruff, "100") => rules::ruff::rules::UnusedNOQA,
         (Ruff, "101") => rules::ruff::rules::RedirectedNOQA,

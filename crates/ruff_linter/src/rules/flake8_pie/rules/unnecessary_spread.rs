@@ -26,13 +26,13 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// ```
 ///
 /// ## See also
-/// [`unnecessary-literal-unpacking`][RUF077] is the counterpart for `*` applied to a
+/// [`unnecessary-literal-unpacking`][PIE811] is the counterpart for `*` applied to a
 /// list, tuple, or set literal.
 ///
 /// ## References
 /// - [Python documentation: Dictionary displays](https://docs.python.org/3/reference/expressions.html#dictionary-displays)
 ///
-/// [RUF077]: https://docs.astral.sh/ruff/rules/unnecessary-literal-unpacking/
+/// [PIE811]: https://docs.astral.sh/ruff/rules/unnecessary-literal-unpacking/
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.231")]
 pub(crate) struct UnnecessarySpread;
