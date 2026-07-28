@@ -3194,8 +3194,10 @@ impl<'db> CallableBinding<'db> {
     /// Binds an inferred constructor receiver before resolving an overloaded `__new__`.
     ///
     /// Explicit receiver annotations can constrain overload selection, so mixed or explicitly
-    /// annotated overloads keep their synthetic class argument. A single inferred receiver also
-    /// remains synthetic because prebinding it can change constructor specialization.
+    /// annotated overloads keep their synthetic class argument. Callable arguments can also infer
+    /// the constructed instance's type variables, so their signatures retain the receiver too. A
+    /// single inferred receiver remains synthetic because prebinding it can change constructor
+    /// specialization.
     pub(crate) fn bind_constructor_receiver(
         &mut self,
         db: &'db dyn Db,
@@ -3207,6 +3209,12 @@ impl<'db> CallableBinding<'db> {
                 !overload
                     .signature
                     .has_implicit_positional_receiver_annotation()
+                    || overload
+                        .signature
+                        .parameters()
+                        .iter()
+                        .skip(1)
+                        .any(|parameter| matches!(parameter.annotated_type(), Type::Callable(_)))
             })
         {
             self.bound_type = Some(receiver_type);

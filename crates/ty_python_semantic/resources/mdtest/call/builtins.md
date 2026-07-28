@@ -397,6 +397,20 @@ def partial_mutually_recursive_alias(x: RecursivePartialA) -> bool:  # error: [i
         return True
 ```
 
+## `map` preserves callable inference for an unknown iterable
+
+An unknown iterable must not force an overloaded callable into one synthesized signature. In
+particular, `dict` has distinct constructor overloads for string and bytes pairs, so `map` must
+retain an unknown element type instead of rejecting `dict`.
+
+```py
+from ty_extensions import Unknown
+
+def _(rows: Unknown) -> None:
+    reveal_type(map(dict, rows))  # revealed: map[Unknown]
+    reveal_type(list(map(dict, rows)))  # revealed: list[Unknown]
+```
+
 ## Generic builtins should not overfit upper-bound-only callback constraints
 
 These examples are minimized from ecosystem regressions seen while preserving explicit `Never` and
