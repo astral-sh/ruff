@@ -1078,20 +1078,24 @@ impl<'db> ProtocolMemberData<'db> {
         definition: Option<Definition<'db>>,
         receiver: Option<Type<'db>>,
     ) -> Self {
-        let (method_kind, callable, receiver) = if callable.is_classmethod_like(db) {
+        let (method_kind, callable) = if callable.is_classmethod_like(db) {
             (
                 ProtocolMethodKind::Class,
-                receiver.map_or_else(
-                    || protocol_bind_self(db, callable, None),
-                    |receiver| protocol_bind_receiver(db, callable, receiver.to_meta_type(db)),
-                ),
-                None,
+                protocol_bind_self(db, callable, None),
             )
         } else if callable.is_staticmethod_like(db) {
-            (ProtocolMethodKind::Static, callable.into_regular(db), None)
+            (ProtocolMethodKind::Static, callable.into_regular(db))
         } else {
-            (ProtocolMethodKind::Instance, callable, receiver)
+            (ProtocolMethodKind::Instance, callable)
         };
+        let receiver = receiver.filter(|_| {
+            method_kind == ProtocolMethodKind::Instance
+                && callable.signatures(db).overloads.len() > 1
+                && callable
+                    .signatures(db)
+                    .iter()
+                    .any(Signature::has_explicit_positional_receiver_annotation)
+        });
 
         Self {
             kind: ProtocolMemberKind::Method {
@@ -1143,10 +1147,11 @@ impl<'db> ProtocolMemberData<'db> {
             } => {
                 let instance_method = match (member.ty(), kind) {
                     (Type::Callable(callable), ProtocolMethodKind::Instance) => {
-                        member.with_ty(Type::Callable(receiver.map_or_else(
+                        let callable = receiver.map_or_else(
                             || protocol_bind_self(db, callable, None),
                             |receiver| protocol_bind_receiver(db, callable, receiver),
-                        )))
+                        );
+                        member.with_ty(Type::Callable(callable))
                     }
                     _ => member,
                 };
@@ -1280,7 +1285,7 @@ enum ProtocolMemberKind<'db> {
     Method {
         member: ProtocolMemberType<'db>,
         kind: ProtocolMethodKind,
-        /// Specialized owner used to bind receiver-conditioned overloads.
+        /// Specialized receiver used to bind a callable protocol's `__call__` method.
         receiver: Option<Type<'db>>,
     },
     Property {
@@ -1532,7 +1537,7 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
 
         let is_recursive = signatures.iter().any(|signature| {
             signature
-                .receiver_constraint_types(db)
+                .receiver_constraint_types()
                 .chain(
                     signature
                         .parameters()
@@ -3083,7 +3088,7 @@ fn cached_protocol_interface<'db>(
             bound_on_class,
         } = candidate;
 
-        let receiver = Some(Type::instance(db, class));
+        let receiver = (name == "__call__").then(|| Type::instance(db, class));
 
         let member = match ty {
             Type::PropertyInstance(property) => ProtocolMemberData::property(
@@ -3155,7 +3160,10 @@ fn protocol_bind_self<'db>(
     callable.bind_self(db, self_type).into_regular(db)
 }
 
-/// Binds a protocol member while retaining receiver conditions for overload comparison.
+/// Binds a callable protocol member after selecting any receiver-specific overload.
+///
+/// This is separate from [`protocol_bind_self`] because `typing.Self` must remain available for
+/// the concrete implementation rather than being replaced by the protocol receiver.
 #[salsa::tracked(returns(copy), heap_size=ruff_memory_usage::heap_size)]
 fn protocol_bind_receiver<'db>(
     db: &'db dyn Db,
@@ -3166,7 +3174,7 @@ fn protocol_bind_receiver<'db>(
         db,
         callable
             .signatures(db)
-            .bind_self_with_owner(db, receiver_type),
+            .bind_protocol_receiver(db, receiver_type),
         callable.kind(db),
         callable.provenance(db),
     )
