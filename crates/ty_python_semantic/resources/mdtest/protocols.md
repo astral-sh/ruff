@@ -5045,6 +5045,47 @@ def takes_explicit_self_callback(callback: ExplicitSelfCallback) -> None: ...
 
 takes_explicit_self_callback(ExplicitSelfImplementation())
 takes_explicit_self_callback(InvalidExplicitSelfImplementation())  # error: [invalid-argument-type]
+
+class Marker(Protocol):
+    marker: int
+
+class ExternalReceiverCallback(Protocol):
+    def __call__(self: Marker, value: int) -> None: ...
+
+class ExternalReceiverImplementation:
+    marker: int
+
+    def __call__(self, value: int) -> None: ...
+
+class MissingMarkerImplementation:
+    def __call__(self, value: int) -> None: ...
+
+class ExternalOverloadedReceiverCallback(Protocol):
+    @overload
+    def __call__(self: Marker, value: int) -> None: ...
+    @overload
+    def __call__(self: Marker, value: str) -> None: ...
+    def __call__(self: Marker, value: int | str) -> None: ...
+
+class ExternalOverloadedReceiverImplementation:
+    marker: int
+
+    def __call__(self, value: int | str) -> None: ...
+
+class MissingMarkerOverloadedReceiverImplementation:
+    def __call__(self, value: int | str) -> None: ...
+
+def takes_external_receiver_callback(callback: ExternalReceiverCallback) -> None: ...
+def takes_external_overloaded_receiver_callback(
+    callback: ExternalOverloadedReceiverCallback,
+) -> None: ...
+
+takes_external_receiver_callback(ExternalReceiverImplementation())
+takes_external_receiver_callback(MissingMarkerImplementation())  # error: [invalid-argument-type]
+takes_external_overloaded_receiver_callback(ExternalOverloadedReceiverImplementation())
+takes_external_overloaded_receiver_callback(
+    MissingMarkerOverloadedReceiverImplementation()  # error: [invalid-argument-type]
+)
 ```
 
 ## Callable protocols

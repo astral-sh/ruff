@@ -1050,6 +1050,11 @@ impl<'db> Signature<'db> {
         self.bind_self_with_receiver_impl(db, Some(receiver_type), None, true)
     }
 
+    /// Removes the receiver while preserving its constraint for a later concrete receiver.
+    pub(crate) fn defer_receiver_binding(&self, db: &'db dyn Db) -> Self {
+        self.bind_self_with_receiver_impl(db, None, None, true)
+    }
+
     fn bind_self_with_receiver_impl(
         &self,
         db: &'db dyn Db,
@@ -1370,6 +1375,36 @@ impl<'db> Signature<'db> {
         self.parameters
             .get(0)
             .is_some_and(|parameter| parameter.is_positional() && !parameter.inferred_annotation)
+    }
+
+    /// Returns whether the explicit receiver annotation belongs to the protocol receiver's class
+    /// hierarchy and can therefore select an overload for that protocol specialization.
+    pub(crate) fn receiver_annotation_selects_protocol_overload(
+        &self,
+        db: &'db dyn Db,
+        receiver_type: Type<'db>,
+    ) -> bool {
+        let Some(parameter) = self
+            .parameters
+            .get(0)
+            .filter(|parameter| parameter.is_positional() && !parameter.inferred_annotation)
+        else {
+            return false;
+        };
+
+        let mut annotation = parameter
+            .annotated_type()
+            .bind_self_typevars(db, receiver_type);
+        if let Some((_, receiver_specialization)) = receiver_type.class_specialization(db) {
+            annotation =
+                annotation.apply_optional_specialization(db, Some(receiver_specialization));
+        }
+        annotation = annotation.resolve_type_alias(db);
+
+        matches!(
+            Self::normalize_protocol_receiver_relation(db, receiver_type, annotation),
+            (Type::NominalInstance(_), Type::NominalInstance(_))
+        )
     }
 
     pub(crate) fn has_implicit_positional_receiver_annotation(&self) -> bool {

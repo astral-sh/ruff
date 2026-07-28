@@ -3045,11 +3045,14 @@ fn receiver_filtered_protocol_method<'db>(
         return None;
     }
 
-    let filtered_signatures = CallableSignature::from_overloads(
-        signatures
-            .iter()
-            .filter_map(|signature| signature.bind_receiver_if_compatible(db, receiver_ty)),
-    );
+    let filtered_signatures =
+        CallableSignature::from_overloads(signatures.iter().filter_map(|signature| {
+            if signature.receiver_annotation_selects_protocol_overload(db, receiver_ty) {
+                signature.bind_receiver_if_compatible(db, receiver_ty)
+            } else {
+                Some(signature.defer_receiver_binding(db))
+            }
+        }));
 
     if filtered_signatures.iter().next().is_none() {
         return Some(Type::Never);
