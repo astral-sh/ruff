@@ -1066,13 +1066,11 @@ warning[ambiguous-protocol-member]: Cannot assign to an undeclared attribute in 
     |
 326 |         self.augmented += 1  # snapshot: ambiguous-protocol-member
     |         ^^^^^^^^^^^^^^ `augmented` is not declared as a protocol member
-    |
 info: Assigning to an undeclared attribute in a protocol method leads to an ambiguous interface
    --> src/mdtest_snippet.py:318:7
     |
 318 | class AssignmentForms(Protocol):
     |       ^^^^^^^^^^^^^^^^^^^^^^^^^ `AssignmentForms` declared as a protocol here
-    |
 info: No declarations found for `augmented` in the body of `AssignmentForms` or any of its superclasses
 ```
 
@@ -4235,13 +4233,12 @@ iterable: Iterable[int] = DirectIterable  # snapshot
 
 ```snapshot
 error[invalid-assignment]: Object of type `<class 'DirectIterable'>` is not assignable to `Iterable[int]`
-  --> src/mdtest_snippet.py:20:11
+  --> src/mdtest_snippet.py:20:27
    |
 20 | iterable: Iterable[int] = DirectIterable  # snapshot
    |           -------------   ^^^^^^^^^^^^^^ Incompatible value of type `<class 'DirectIterable'>`
    |           |
    |           Declared type
-   |
 info: type `<class 'DirectIterable'>` is not assignable to protocol `Iterable[int]`
 info: └── protocol member `__iter__` is not defined on type `<class 'DirectIterable'>`
 info:     └── special methods must be defined on the meta-type when matching a protocol
@@ -5163,7 +5160,7 @@ def _(x: Foo):
         pass
 ```
 
-## Protocols are never singleton types, and are never single-valued types
+## Protocols are never singleton types
 
 It *might* be possible to have a singleton protocol-instance type...?
 
@@ -5173,14 +5170,13 @@ worth it. Such cases should anyway be exceedingly rare and/or contrived.
 
 ```py
 from typing import Protocol, Callable
-from ty_extensions._internal import is_singleton, is_single_valued
+from ty_extensions._internal import is_singleton
 
 class WeirdAndWacky(Protocol):
     @property
     def __class__(self) -> Callable[[], None]: ...
 
 reveal_type(is_singleton(WeirdAndWacky))  # revealed: Literal[False]
-reveal_type(is_single_valued(WeirdAndWacky))  # revealed: Literal[False]
 ```
 
 ## Integration test: `typing.SupportsIndex` and `typing.Sized`
@@ -5766,7 +5762,7 @@ def f(c: C[int]) -> None:
     # The key thing is that we don't stack overflow while checking this.
     # The cycle detection assumes compatibility when it detects potential
     # infinite recursion between protocol specializations.
-    takes_c(c)
+    takes_c(c)  # error: [invalid-argument-type]
 
 class Left[T](Protocol):
     @property

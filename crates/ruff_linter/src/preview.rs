@@ -56,6 +56,11 @@ pub(crate) const fn is_fix_f_string_logging_enabled(settings: &LinterSettings) -
     settings.preview.is_enabled()
 }
 
+// https://github.com/astral-sh/ruff/pull/27201
+pub(crate) const fn is_fix_pytest_composite_assertion_enabled(settings: &LinterSettings) -> bool {
+    settings.preview.is_enabled()
+}
+
 // https://github.com/astral-sh/ruff/pull/16719
 pub(crate) const fn is_fix_manual_dict_comprehension_enabled(settings: &LinterSettings) -> bool {
     settings.preview.is_enabled()
@@ -331,6 +336,8 @@ pub(crate) const fn is_pep604_future_annotations_fix_enabled(settings: &LinterSe
 }
 
 // https://github.com/astral-sh/ruff/pull/25614
+// TODO(brent) Remove ecosystem selector normalization when stabilizing human-readable rule names:
+// https://github.com/astral-sh/ruff/pull/27158
 pub const fn is_human_readable_names_enabled(preview: PreviewMode) -> bool {
     preview.is_enabled()
 }

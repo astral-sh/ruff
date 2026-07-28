@@ -27,7 +27,6 @@ error[invalid-type-form]: The special form `typing.TypedDict` is not allowed in 
   |
 4 | x: TypedDict = {"name": "Alice"}
   |    ^^^^^^^^^
-  |
 help: You might have meant to use a concrete TypedDict or `collections.abc.Mapping[str, object]`
 
 ```

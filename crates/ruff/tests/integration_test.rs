@@ -120,7 +120,6 @@ fn stdin_error() {
       |
     1 | import os
       |        ^^
-      |
     help: Remove unused import: `os`
       |
       - import os
@@ -148,7 +147,6 @@ fn stdin_filename() {
       |
     1 | import os
       |        ^^
-      |
     help: Remove unused import: `os`
       |
       - import os
@@ -187,7 +185,6 @@ import bar   # unused import
       |
     2 | import bar   # unused import
       |        ^^^
-      |
     help: Remove unused import: `bar`
       |
     1 |
@@ -199,7 +196,6 @@ import bar   # unused import
       |
     2 | import foo   # unused import
       |        ^^^
-      |
     help: Remove unused import: `foo`
       |
     1 |
@@ -231,7 +227,6 @@ fn check_warn_stdin_filename_with_files() {
       |
     1 | import os
       |        ^^
-      |
     help: Remove unused import: `os`
       |
       - import os
@@ -261,7 +256,6 @@ fn stdin_source_type_py() {
       |
     1 | import os
       |        ^^
-      |
     help: Remove unused import: `os`
       |
       - import os
@@ -502,7 +496,6 @@ fn stdin_fix_jupyter() {
       |
     1 | print(x)
       |       ^
-      |
 
     Found 3 errors (2 fixed, 1 remaining).
     "#);
@@ -601,7 +594,6 @@ fn stdin_override_parser_ipynb() {
       |
     1 | import os
       |        ^^
-      |
     help: Remove unused import: `os`
      ::: cell 1
       |
@@ -613,7 +605,6 @@ fn stdin_override_parser_ipynb() {
       |
     1 | import sys
       |        ^^^
-      |
     help: Remove unused import: `sys`
      ::: cell 3
       |
@@ -647,7 +638,6 @@ fn stdin_override_parser_py() {
       |
     1 | import os
       |        ^^
-      |
     help: Remove unused import: `os`
       |
       - import os
@@ -685,7 +675,6 @@ extension = {ipynb="python"}
       |
     1 | import os
       |        ^^
-      |
     help: Remove unused import: `os`
       |
       - import os
@@ -884,7 +873,6 @@ fn stdin_parse_error() {
       |
     1 | from foo import
       |                ^
-      |
 
     Found 1 error.
 
@@ -914,7 +902,6 @@ fn stdin_multiple_parse_error() {
     1 | from foo import
     2 | bar =
       |      ^
-      |
 
     Found 2 errors.
 
@@ -936,7 +923,6 @@ fn parse_error_not_included() {
       |
     1 | foo =
       |      ^
-      |
 
     Found 1 error.
 
@@ -959,7 +945,6 @@ fn full_output_preview() {
       |
     1 | l = 1
       | ^
-      |
 
     Found 1 error.
 
@@ -988,7 +973,6 @@ preview = true
       |
     1 | l = 1
       | ^
-      |
 
     Found 1 error.
 
@@ -1013,7 +997,6 @@ fn full_output_format() {
       |
     1 | l = 1
       | ^
-      |
 
     Found 1 error.
 
@@ -1870,7 +1853,6 @@ fn check_input_from_argfile() -> Result<()> {
           |
         1 | import os
           |        ^^
-          |
         help: Remove unused import: `os`
           |
           - import os
@@ -2502,7 +2484,6 @@ select = ["RUF017"]
     2 | y = [4, 5, 6]
     3 | sum([x, y], [])
       | ^^^^^^^^^^^^^^^
-      |
     help: Replace with `functools.reduce`
 
     Found 1 error.
@@ -2543,7 +2524,6 @@ unfixable = ["RUF"]
     2 | y = [4, 5, 6]
     3 | sum([x, y], [])
       | ^^^^^^^^^^^^^^^
-      |
     help: Replace with `functools.reduce`
 
     Found 1 error.
@@ -2571,7 +2551,6 @@ fn pyproject_toml_stdin_syntax_error() {
       |
     1 | [project
       |         ^
-      |
 
     Found 1 error.
 
@@ -2598,7 +2577,6 @@ fn pyproject_toml_stdin_schema_error() {
     1 | [project]
     2 | name = 1
       |        ^
-      |
 
     Found 1 error.
 
@@ -2691,7 +2669,6 @@ fn pyproject_toml_stdin_schema_error_fix() {
     1 | [project]
     2 | name = 1
       |        ^
-      |
 
     Found 1 error.
     "

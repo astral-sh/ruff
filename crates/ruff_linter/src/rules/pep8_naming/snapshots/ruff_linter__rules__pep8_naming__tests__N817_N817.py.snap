@@ -15,7 +15,6 @@ N817 CamelCase `CamelCase` imported as acronym `CC`
 1 | import mod.CaMel as CM
 2 | from mod import CamelCase as CC
   |                 ^^^^^^^^^^^^^^^
-  |
 
 N817 CamelCase `ElementTree` imported as acronym `ET`
   --> N817.py:10:26
@@ -23,4 +22,3 @@ N817 CamelCase `ElementTree` imported as acronym `ET`
  9 | # Always an error (relative import)
 10 | from ..xml.eltree import ElementTree as ET
    |                          ^^^^^^^^^^^^^^^^^
-   |

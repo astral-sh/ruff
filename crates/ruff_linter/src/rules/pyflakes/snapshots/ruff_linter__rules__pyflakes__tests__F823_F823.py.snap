@@ -7,7 +7,6 @@ F823 Local variable `my_var` referenced before assignment
 5 | def foo():
 6 |     my_var += 1
   |     ^^^^^^
-  |
 
 F823 Local variable `my_var` referenced before assignment
   --> F823.py:32:15

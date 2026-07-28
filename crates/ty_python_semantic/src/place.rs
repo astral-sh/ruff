@@ -1989,21 +1989,81 @@ fn is_reexported(db: &dyn Db, definition: Definition<'_>) -> bool {
 
 pub(crate) mod implicit_globals {
     use ruff_db::files::File;
+    use ruff_db::parsed::parsed_module;
     use ruff_python_ast as ast;
     use ruff_python_ast::name::Name;
+    use ty_module_resolver::KnownModule;
 
     use crate::Program;
     use crate::db::Db;
     use crate::module_docstring;
     use crate::place::{Definedness, PlaceAndQualifiers};
-    use crate::types::{
-        ClassLiteral, KnownClass, MemberLookupPolicy, Parameter, Parameters, Signature, Type,
-    };
+    use crate::reachability::evaluate_reachability;
+    use crate::types::{KnownClass, MemberLookupPolicy, Parameter, Parameters, Signature, Type};
     use ruff_python_ast::PythonVersion;
+    use ty_python_core::definition::{DefinitionKind, DefinitionState};
+    use ty_python_core::scope::{NodeWithScopeRef, ScopeId};
     use ty_python_core::symbol::Symbol;
-    use ty_python_core::{place_table, use_def_map};
+    use ty_python_core::{place_table, semantic_index, use_def_map};
 
-    use super::{DefinedPlace, Place, place_from_declarations};
+    use super::{DefinedPlace, Place, core_module_scope, is_reexported, place_from_declarations};
+
+    /// Returns the body scope when all reachable, exported definitions of `name`
+    /// in a vendored module are the same direct class definition.
+    ///
+    /// This can be used as a fast-path to avoid query cycles.
+    fn try_vendored_class_scope<'db>(
+        db: &'db dyn Db,
+        module_scope: ScopeId<'db>,
+        name: &str,
+    ) -> Option<ScopeId<'db>> {
+        let file = module_scope.file(db);
+        if !file.path(db).is_vendored_path() {
+            return None;
+        }
+        let symbol_id = place_table(db, module_scope).symbol_id(name)?;
+        let use_def = use_def_map(db, module_scope);
+        let module = parsed_module(db, file).load(db);
+        let index = semantic_index(db, file);
+        let mut body_scope = None;
+
+        for binding in use_def.end_of_scope_symbol_bindings(symbol_id) {
+            let DefinitionState::Defined(definition) = binding.binding else {
+                continue;
+            };
+            if file.is_stub(db) && !is_reexported(db, definition) {
+                continue;
+            }
+            if evaluate_reachability(db, use_def, binding.reachability_constraint).is_always_false()
+            {
+                continue;
+            }
+
+            let DefinitionKind::Class(class) = definition.kind(db) else {
+                return None;
+            };
+            let class_scope = index
+                .node_scope(NodeWithScopeRef::Class(class.node(&module)))
+                .to_scope_id(db, file);
+            if body_scope.is_some_and(|body_scope| body_scope != class_scope) {
+                return None;
+            }
+            body_scope = Some(class_scope);
+        }
+
+        body_scope
+    }
+
+    /// Return the body scope of the canonical `types.ModuleType` class.
+    #[salsa::tracked(returns(copy), heap_size=ruff_memory_usage::heap_size)]
+    fn module_type_body_scope(db: &dyn Db) -> Option<ScopeId<'_>> {
+        let module_scope = core_module_scope(db, KnownModule::Types)?;
+        try_vendored_class_scope(db, module_scope, "ModuleType").or_else(|| {
+            KnownClass::ModuleType
+                .try_to_class_literal(db)
+                .map(|class| class.body_scope(db))
+        })
+    }
 
     pub(crate) fn module_type_implicit_global_declaration<'db>(
         db: &'db dyn Db,
@@ -2015,14 +2075,9 @@ pub(crate) mod implicit_globals {
         {
             return Place::Undefined.into();
         }
-        let Type::ClassLiteral(module_type_class) = KnownClass::ModuleType.to_class_literal(db)
-        else {
+        let Some(module_type_scope) = module_type_body_scope(db) else {
             return Place::Undefined.into();
         };
-        let Some(class) = module_type_class.as_static() else {
-            return Place::Undefined.into();
-        };
-        let module_type_scope = class.body_scope(db);
         let place_table = place_table(db, module_type_scope);
         let Some(symbol_id) = place_table.symbol_id(name) else {
             return Place::Undefined.into();
@@ -2141,25 +2196,11 @@ pub(crate) mod implicit_globals {
     /// Conceptually this function could be a `Set` rather than a list,
     /// but the number of symbols declared in this scope is likely to be very small,
     /// so the cost of hashing the names is likely to be more expensive than it's worth.
-    #[salsa::tracked(
-        returns(deref),
-        cycle_initial=|_, _| smallvec::SmallVec::default(),
-        heap_size=ruff_memory_usage::heap_size
-    )]
-    fn module_type_symbols(db: &dyn Db) -> smallvec::SmallVec<[ast::name::Name; 8]> {
-        let Some(module_type) = KnownClass::ModuleType
-            .to_class_literal(db)
-            .as_class_literal()
-        else {
-            // The most likely way we get here is if a user specified a `--custom-typeshed-dir`
-            // without a `types.pyi` stub in the `stdlib/` directory
-            return smallvec::SmallVec::default();
-        };
-
-        let ClassLiteral::Static(module_type) = module_type else {
-            return smallvec::SmallVec::default();
-        };
-        let module_type_symbol_table = place_table(db, module_type.body_scope(db));
+    fn module_type_symbols_from_scope(
+        db: &dyn Db,
+        module_type_scope: ScopeId<'_>,
+    ) -> smallvec::SmallVec<[ast::name::Name; 8]> {
+        let module_type_symbol_table = place_table(db, module_type_scope);
 
         module_type_symbol_table
             .symbols()
@@ -2173,6 +2214,20 @@ pub(crate) mod implicit_globals {
             })
             .cloned()
             .collect()
+    }
+
+    #[salsa::tracked(
+        returns(deref),
+        cycle_initial=|_, _| smallvec::SmallVec::default(),
+        heap_size=ruff_memory_usage::heap_size
+    )]
+    fn module_type_symbols(db: &dyn Db) -> smallvec::SmallVec<[ast::name::Name; 8]> {
+        let Some(module_type_scope) = module_type_body_scope(db) else {
+            // The most likely way we get here is if a user specified a `--custom-typeshed-dir`
+            // without a resolvable `ModuleType` class in the `stdlib/types.pyi` stub.
+            return smallvec::SmallVec::default();
+        };
+        module_type_symbols_from_scope(db, module_type_scope)
     }
 
     /// Returns an iterator over all implicit module global symbols and their types.

@@ -32,7 +32,6 @@ I001 [*] Import block is un-sorted or un-formatted
 26 | | # comment 9
 27 | | from baz import *  # comment 10
    | |_________________^
-   |
 help: Organize imports
    |
    - import sys, math

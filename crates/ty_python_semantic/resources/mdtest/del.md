@@ -448,7 +448,6 @@ error[invalid-argument-type]: Cannot delete required key "name" from TypedDict `
    |
 19 | del m["name"]
    |       ^^^^^^
-   |
 info: Field defined here
  --> src/mdtest_snippet.py:3:7
   |
@@ -459,7 +458,6 @@ info: Field defined here
   |     |
   |     `name` declared as required here
   |     Consider making it `NotRequired`
-  |
 info: Only keys marked as `NotRequired` (or in a TypedDict with `total=False`) can be deleted
 ```
 
@@ -488,7 +486,6 @@ error[invalid-argument-type]: Cannot delete required key "name" from TypedDict `
    |
 23 | del mixed["name"]
    |           ^^^^^^
-   |
 info: Field defined here
   --> src/mdtest_snippet.py:11:7
    |
@@ -499,7 +496,6 @@ info: Field defined here
    |     |
    |     `name` declared as required here
    |     Consider making it `NotRequired`
-   |
 info: Only keys marked as `NotRequired` (or in a TypedDict with `total=False`) can be deleted
 ```
 
@@ -516,5 +512,4 @@ error[invalid-argument-type]: Cannot delete unknown key "non_existent" from Type
    |
 25 | del mixed["non_existent"]
    |           ^^^^^^^^^^^^^^
-   |
 ```

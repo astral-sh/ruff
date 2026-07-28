@@ -8,7 +8,6 @@ D200 One-line docstring should fit on one line
 2 | /     """\
 3 | |     """
   | |_______^
-  |
 help: Reformat to one line
 
 D200 [*] One-line docstring should fit on one line
@@ -18,7 +17,6 @@ D200 [*] One-line docstring should fit on one line
 7 | /     """\\
 8 | |     """
   | |_______^
-  |
 help: Reformat to one line
   |
 6 | def func():
@@ -36,5 +34,4 @@ D200 One-line docstring should fit on one line
 12 | /     """\ \
 13 | |     """
    | |_______^
-   |
 help: Reformat to one line

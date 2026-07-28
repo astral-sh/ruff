@@ -204,6 +204,19 @@ pub(crate) struct CheckCommand {
     #[clap(long, overrides_with("force_exclude"), hide = true)]
     no_force_exclude: bool,
 
+    /// Exclude files containing PEP 723 inline script metadata unless passed explicitly.
+    /// Use `--include-scripts` to disable.
+    #[arg(
+        long,
+        overrides_with("include_scripts"),
+        help_heading = "File selection",
+        default_missing_value = "true",
+        num_args = 0..1
+    )]
+    exclude_scripts: Option<bool>,
+    #[clap(long, overrides_with("exclude_scripts"), hide = true)]
+    include_scripts: bool,
+
     /// Glob patterns for files to exclude from type checking.
     ///
     /// Uses gitignore-style syntax to exclude files and directories from type checking.
@@ -251,6 +264,10 @@ impl CheckCommand {
             .no_respect_ignore_files
             .then_some(false)
             .or(self.respect_ignore_files);
+        let exclude_scripts = self
+            .include_scripts
+            .then_some(false)
+            .or(self.exclude_scripts);
         let error_on_warning = self
             .exit_zero_on_warning
             .then_some(false)
@@ -279,6 +296,7 @@ impl CheckCommand {
             }),
             src: Some(SrcOptions {
                 respect_ignore_files,
+                exclude_scripts,
                 exclude: self.exclude.map(|excludes| {
                     RangedValue::cli(excludes.iter().map(RelativeGlobPattern::cli).collect())
                 }),

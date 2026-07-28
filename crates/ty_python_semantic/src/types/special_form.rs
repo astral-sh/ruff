@@ -234,6 +234,18 @@ impl SpecialFormType {
         self.class().to_instance(db)
     }
 
+    /// Return `true` if this special form is guaranteed to be a singleton at runtime.
+    ///
+    /// Nearly all `SpecialForm` types are singletons, but if a symbol could validly
+    /// originate from either `typing` or `typing_extensions` then this is not guaranteed.
+    /// E.g. `typing.TypeGuard` is equivalent to `typing_extensions.TypeGuard`, so both are treated
+    /// as inhabiting the type `SpecialFormType::TypeGuard` in our model, but they are actually
+    /// distinct symbols at different memory addresses at runtime.
+    pub(super) const fn is_guaranteed_singleton(self) -> bool {
+        !(self.check_module(KnownModule::Typing)
+            && self.check_module(KnownModule::TypingExtensions))
+    }
+
     /// Return the type denoted by this retained special-form value when it is valid without
     /// parameters or a surrounding inference scope.
     pub(crate) fn type_form_argument(self, db: &dyn Db) -> Option<Type<'_>> {
@@ -517,7 +529,7 @@ impl SpecialFormType {
     ///
     /// Most variants can only exist in one module, which is the same as `self.class().canonical_module(db)`.
     /// Some variants could validly be defined in either `typing` or `typing_extensions`, however.
-    pub(super) fn check_module(self, module: KnownModule) -> bool {
+    pub(super) const fn check_module(self, module: KnownModule) -> bool {
         match self {
             Self::TypeQualifier(qualifier) => qualifier.check_module(module),
             Self::LegacyStdlibAlias(_)

@@ -910,7 +910,7 @@ mod tests {
             check_file_impl(&db, file)
                 .as_ref()
                 .unwrap_err()
-                .primary_message()
+                .headline_message()
                 .to_string(),
             "Failed to read file: No such file or directory".to_string()
         );
@@ -928,7 +928,7 @@ mod tests {
                 .as_ref()
                 .unwrap()
                 .iter()
-                .map(|diagnostic| diagnostic.primary_message().to_string())
+                .map(|diagnostic| diagnostic.headline_message().to_string())
                 .collect::<Vec<_>>(),
             vec![] as Vec<String>
         );

@@ -5,11 +5,11 @@ use crate::{
         KnownClass, KnownInstanceType, ParamSpecAttrKind, SubclassOfInner, SubclassOfType, Type,
         TypeContext, TypeVarKind, UnionType,
         diagnostic::{
-            FINAL_ON_NON_METHOD, INVALID_PARAMETER_DEFAULT, INVALID_PARAMSPEC, INVALID_TYPE_FORM,
-            USELESS_OVERLOAD_BODY, add_type_expression_reference_link,
-            is_invalid_typed_dict_literal, report_implicit_return_type,
-            report_invalid_generator_function_return_type, report_invalid_return_type,
-            report_shadowed_type_variable,
+            ABSTRACT_AND_FINAL_METHOD, FINAL_ON_NON_METHOD, INVALID_PARAMETER_DEFAULT,
+            INVALID_PARAMSPEC, INVALID_TYPE_FORM, USELESS_OVERLOAD_BODY,
+            add_type_expression_reference_link, is_invalid_typed_dict_literal,
+            report_implicit_return_type, report_invalid_generator_function_return_type,
+            report_invalid_return_type, report_shadowed_type_variable,
         },
         function::{
             FunctionBodyKind, FunctionDecorators, FunctionLiteral, FunctionType, KnownFunction,
@@ -381,6 +381,20 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             diagnostic.info("`@final` is only meaningful on methods and classes");
         }
 
+        if function_decorators
+            .contains(FunctionDecorators::ABSTRACT_METHOD | FunctionDecorators::FINAL)
+            && self
+                .index
+                .scope(self.scope().file_scope_id(db))
+                .kind()
+                .is_class()
+            && let Some(builder) = self.context.report_lint(&ABSTRACT_AND_FINAL_METHOD, name)
+        {
+            builder.into_diagnostic(format_args!(
+                "Method `{name}` cannot be both `@abstractmethod` and `@final`",
+            ));
+        }
+
         let has_defaults = parameters
             .iter_non_variadic_params()
             .any(|param| param.default.is_some());
@@ -420,8 +434,19 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             function.returns.is_some(),
         );
         let function_literal = FunctionLiteral::new(db, overload_literal);
+        let function_type = FunctionType::new(db, function_literal, None);
+        let is_decorated_overload_implementation = !decorator_types_and_nodes.is_empty()
+            && function_literal.has_separate_implementation(db);
+        let is_decorated_overload =
+            !decorator_types_and_nodes.is_empty() && overload_literal.is_overload(db);
 
-        let mut inferred_ty = Type::FunctionLiteral(FunctionType::new(db, function_literal, None));
+        let mut inferred_ty = Type::FunctionLiteral(
+            if is_decorated_overload_implementation || is_decorated_overload {
+                FunctionType::new(db, function_literal.without_overloads(), None)
+            } else {
+                function_type
+            },
+        );
         if !decorator_list.is_empty() {
             self.undecorated_type = Some(inferred_ty);
         }
@@ -464,6 +489,34 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             };
         }
 
+        if is_decorated_overload_implementation {
+            let function_type = if let Type::FunctionLiteral(function) = inferred_ty {
+                FunctionType::new(
+                    db,
+                    function_literal
+                        .with_last_definition_metadata(db, function.literal(db).last_definition),
+                    None,
+                )
+            } else {
+                function_type
+            };
+            let implementation_callables = inferred_ty
+                .try_upcast_to_callable(db)
+                .map_or_else(Box::default, |callables| {
+                    callables.iter().copied().collect()
+                });
+            inferred_ty = Type::FunctionLiteral(
+                function_type.with_implementation_callables(db, implementation_callables),
+            );
+        } else if is_decorated_overload && let Type::FunctionLiteral(function) = inferred_ty {
+            inferred_ty = Type::FunctionLiteral(FunctionType::new(
+                db,
+                function_literal
+                    .with_last_definition_metadata(db, function.literal(db).last_definition),
+                None,
+            ));
+        }
+
         self.add_declaration_with_binding(
             function.into(),
             definition,
@@ -491,7 +544,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     "Useless body for `@overload`-decorated function `{}`",
                     function.name
                 ));
-                diagnostic.set_primary_message("This statement will never be executed");
+                diagnostic.set_primary_annotation_message("This statement will never be executed");
                 diagnostic.info(
                     "`@overload`-decorated functions are solely for type checkers \
                     and must be overwritten at runtime by a non-`@overload`-decorated implementation",
@@ -925,7 +978,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 let mut diag = builder.into_diagnostic(format_args!(
                                     "`{name}.kwargs` is valid only in `**kwargs` annotation",
                                 ));
-                                diag.set_primary_message(format_args!(
+                                diag.set_primary_annotation_message(format_args!(
                                     "Did you mean `{name}.args`?"
                                 ));
                                 add_type_expression_reference_link(diag);
@@ -1004,7 +1057,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .as_class_literal()
                 .and_then(|class| class.known(db))
             {
-                if known_class == KnownClass::Staticmethod {
+                if known_class == KnownClass::Staticmethod && function_name != "__new__" {
                     return None;
                 }
 
@@ -1054,7 +1107,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             let mut diag = builder.into_diagnostic(format_args!(
                                 "`{name}.args` is valid only in `*args` annotation",
                             ));
-                            diag.set_primary_message(format_args!("Did you mean `{name}.kwargs`?"));
+                            diag.set_primary_annotation_message(format_args!(
+                                "Did you mean `{name}.kwargs`?"
+                            ));
                             add_type_expression_reference_link(diag);
                         }
                         KnownClass::Dict.to_specialized_instance(

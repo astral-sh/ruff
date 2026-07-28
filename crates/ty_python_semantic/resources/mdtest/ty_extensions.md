@@ -31,9 +31,8 @@ o: Not[()]
 p: Not[(int,)]
 
 def static_truthiness(not_one: Not[Literal[1]]) -> None:
-    # TODO: `bool` is not incorrect, but these would ideally be `Literal[True]` and `Literal[False]`
-    # respectively, since all possible runtime objects that are created by the literal syntax `1`
-    # are members of the type `Literal[1]`
+    # A `NewType` over `int` is distinct from `Literal[1]` but can refer to the same runtime object,
+    # so neither identity comparison has a definite result.
     reveal_type(not_one is not 1)  # revealed: bool
     reveal_type(not_one is 1)  # revealed: bool
 
@@ -294,7 +293,6 @@ error[static-assert-error]: Static assertion error: argument evaluates to `False
   | ^^^^^^^^^^^^^^-----^
   |               |
   |               Inferred type of argument is `Literal[False]`
-  |
 ```
 
 With a custom message:
@@ -312,7 +310,6 @@ error[static-assert-error]: Static assertion error: with a message
   | ^^^^^^^^^^^^^^-----^^^^^^^^^^^^^^^^^^^
   |               |
   |               Inferred type of argument is `Literal[False]`
-  |
 ```
 
 When it evaluates to something falsy:
@@ -330,7 +327,6 @@ error[static-assert-error]: Static assertion error: argument of type `Literal[""
    | ^^^^^^^^^^^^^^--^
    |               |
    |               Inferred type of argument is `Literal[""]`
-   |
 ```
 
 When it evaluates to something that is not statically known to be truthy or falsy:
@@ -348,7 +344,6 @@ error[static-assert-error]: Static assertion error: argument of type `int` has a
    | ^^^^^^^^^^^^^^--------------------^
    |               |
    |               Inferred type of argument is `int`
-   |
 ```
 
 ## Type predicates
@@ -432,21 +427,6 @@ static_assert(is_singleton(Literal[True]))
 
 static_assert(not is_singleton(int))
 static_assert(not is_singleton(Literal["a"]))
-```
-
-### Single-valued types
-
-```py
-from ty_extensions import static_assert
-from ty_extensions._internal import is_single_valued
-from typing import Literal
-
-static_assert(is_single_valued(None))
-static_assert(is_single_valued(Literal[True]))
-static_assert(is_single_valued(Literal["a"]))
-
-static_assert(not is_single_valued(int))
-static_assert(not is_single_valued(Literal["a"] | Literal["b"]))
 ```
 
 ## `TypeOf`

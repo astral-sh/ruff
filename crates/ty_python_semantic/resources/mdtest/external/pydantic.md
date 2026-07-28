@@ -2,7 +2,7 @@
 
 ```toml
 [environment]
-python-version = "3.12"
+python-version = "3.13"
 python-platform = "linux"
 
 [project]
@@ -1497,6 +1497,187 @@ class InvalidFieldQualifiers(BaseModel):
     read_only: ReadOnly[int]
     # error: [invalid-type-form] "`Required` is not allowed in Pydantic model fields"
     required: Required[int]
+```
+
+## Replacement
+
+Pydantic models support `copy.replace` and expose a synthesized `__replace__` method on Python 3.13
+and later.
+
+### Frozen models
+
+```py
+from copy import replace
+
+from pydantic import BaseModel
+
+class Model(BaseModel, frozen=True):
+    value: int
+
+model = Model(value=1)
+
+# revealed: (self: Model, *, value: int = ...) -> Model
+reveal_type(Model.__replace__)
+
+reveal_type(model.__replace__(value=2))  # revealed: Model
+reveal_type(replace(model, value=2))  # revealed: Model
+```
+
+### Mutable models
+
+Replacement is available on mutable models and accepts only real model fields.
+
+```py
+from copy import replace
+
+from pydantic import BaseModel
+
+class Model(BaseModel):
+    value: int
+    _private: int = 0
+
+model = Model(value=1)
+
+# revealed: (self: Model, *, value: int = ...) -> Model
+reveal_type(Model.__replace__)
+
+reveal_type(model.__replace__(value=2))  # revealed: Model
+reveal_type(replace(model, value=2))  # revealed: Model
+
+model.__replace__(value="two")  # error: [invalid-argument-type]
+model.__replace__(_private=2)  # error: [unknown-argument]
+model.__replace__(missing=2)  # error: [unknown-argument]
+```
+
+### Field aliases
+
+Replacement updates model fields by name, even when initialization uses an alias.
+
+```py
+from copy import replace
+
+from pydantic import BaseModel, Field
+
+class Model(BaseModel):
+    value: int = Field(alias="external_value")
+
+model = Model(external_value=1)
+
+# revealed: (self: Model, *, value: int = ...) -> Model
+reveal_type(Model.__replace__)
+
+reveal_type(model.__replace__(value=2))  # revealed: Model
+reveal_type(replace(model, value=2))  # revealed: Model
+
+model.__replace__(external_value=2)  # error: [unknown-argument]
+```
+
+### Member discovery
+
+The synthesized method is available in completions for both a model class and its instances. Models
+do not expose attributes that belong only to standard-library dataclasses.
+
+```py
+from pydantic import BaseModel
+from ty_extensions import static_assert
+from ty_extensions._internal import has_member
+
+class Model(BaseModel):
+    value: int
+
+model = Model(value=1)
+
+static_assert(has_member(Model, "__replace__"))
+static_assert(has_member(model, "__replace__"))
+static_assert(not has_member(Model, "__dataclass_fields__"))
+static_assert(not has_member(Model, "__dataclass_params__"))
+static_assert(not has_member(Model, "__match_args__"))
+```
+
+### Inherited fields
+
+```py
+from copy import replace
+
+from pydantic import BaseModel
+
+class Parent(BaseModel):
+    inherited: int
+
+class Child(Parent):
+    own: str
+
+model = Child(inherited=1, own="first")
+
+# revealed: (self: Child, *, inherited: int = ..., own: str = ...) -> Child
+reveal_type(Child.__replace__)
+
+reveal_type(model.__replace__(inherited=2))  # revealed: Child
+reveal_type(model.__replace__(own="second"))  # revealed: Child
+reveal_type(replace(model, inherited=2, own="second"))  # revealed: Child
+
+model.__replace__(inherited="two")  # error: [invalid-argument-type]
+model.__replace__(own=2)  # error: [invalid-argument-type]
+```
+
+### Generic models
+
+```py
+from copy import replace
+
+from pydantic import BaseModel
+
+class Model[T](BaseModel):
+    value: T
+
+model = Model[int](value=1)
+
+reveal_type(model.__replace__(value=2))  # revealed: Model[int]
+reveal_type(replace(model, value=2))  # revealed: Model[int]
+
+model.__replace__(value="two")  # error: [invalid-argument-type]
+```
+
+### Root models
+
+```py
+from copy import replace
+
+from pydantic import RootModel
+
+class Model(RootModel[int]): ...
+
+model = Model(1)
+
+# revealed: (self: Model, *, root: int = ...) -> Model
+reveal_type(Model.__replace__)
+
+reveal_type(model.__replace__(root=2))  # revealed: Model
+reveal_type(replace(model, root=2))  # revealed: Model
+
+model.__replace__(root="two")  # error: [invalid-argument-type]
+```
+
+### Settings models
+
+```py
+from copy import replace
+
+from pydantic_settings import BaseSettings
+
+class Model(BaseSettings):
+    value: int
+
+model = Model(value=1)
+
+# revealed: (self: Model, *, value: int = ...) -> Model
+reveal_type(Model.__replace__)
+
+reveal_type(model.__replace__(value=2))  # revealed: Model
+reveal_type(replace(model, value=2))  # revealed: Model
+
+model.__replace__(value="two")  # error: [invalid-argument-type]
+model.__replace__(_secrets_dir=".")  # error: [unknown-argument]
 ```
 
 ## Pydantic dataclasses

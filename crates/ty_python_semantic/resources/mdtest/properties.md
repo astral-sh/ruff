@@ -313,7 +313,6 @@ error[invalid-assignment]: Cannot delete read-only property `attr` on object of 
   |
 3 |     def attr(self) -> int:
   |         ---- Property `C.attr` defined here with no deleter
-  |
 ```
 
 ## Limitations
@@ -459,13 +458,11 @@ error[invalid-argument-type]: Argument to function `C.attr` is incorrect
    |
 31 | type(attr_property).__set__(attr_property, c, 1)
    |                                               ^ Expected `str`, found `Literal[1]`
-   |
 info: Function defined here
   --> src/mdtest_snippet.py:10:9
    |
 10 |     def attr(self, value: str) -> None:
    |         ^^^^       ---------- Parameter declared here
-   |
 ```
 
 which is also equivalent to the following expressions:

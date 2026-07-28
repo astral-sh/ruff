@@ -659,7 +659,7 @@ reveal_type(WithUnsafeHash.__hash__)  # revealed: (self: WithUnsafeHash) -> int
 
 ### `frozen`
 
-If true (the default is False), assigning to fields will generate a diagnostic.
+When `frozen=True`, a dataclass does not allow its fields to be assigned or deleted.
 
 ```py
 from dataclasses import dataclass
@@ -670,6 +670,11 @@ class MyFrozenClass:
 
 frozen_instance = MyFrozenClass(1)
 frozen_instance.x = 2  # error: [invalid-assignment]
+
+reveal_type(frozen_instance.__delattr__)  # revealed: (name) -> Never
+
+# error: [invalid-assignment] "Cannot delete attribute `x` on type `MyFrozenClass` whose `__delattr__` method returns `Never`/`NoReturn`"
+del frozen_instance.x
 ```
 
 If `__setattr__()` or `__delattr__()` is defined in the class, a diagnostic is emitted.
@@ -810,11 +815,224 @@ grandchild.z = 2
 grandchild.unknown = 2
 ```
 
+When another base class rejects assignment, a frozen dataclass must not hide its `__setattr__`
+method:
+
+```py
+from dataclasses import dataclass
+from typing import NoReturn
+
+@dataclass(frozen=True)
+class Frozen:
+    x: int = 1
+
+class RejectsAssignment:
+    y: int = 1
+
+    def __setattr__(self, name: str, value: object) -> NoReturn:
+        raise AttributeError(name)
+
+class ChildWithRejectingAssignmentBase(Frozen, RejectsAssignment): ...
+
+# error: [invalid-assignment] "Cannot assign to attribute `y` on type `ChildWithRejectingAssignmentBase` whose `__setattr__` method returns `Never`/`NoReturn`"
+ChildWithRejectingAssignmentBase().y = 2
+```
+
+A later base class can customize assignment to an ordinary attribute. The value must satisfy both
+the later `__setattr__` and the attribute declaration:
+
+```py
+class AllowsAssignment:
+    y: object = 1
+
+    def __setattr__(self, name: str, value: int) -> None: ...
+
+class ChildWithAllowingAssignmentBase(Frozen, AllowsAssignment): ...
+
+allowed = ChildWithAllowingAssignmentBase()
+allowed.y = 2
+
+# error: [invalid-assignment] "Cannot assign object of type"
+allowed.y = "invalid"
+```
+
+A later `__setattr__` can forward to `object.__setattr__`, which still invokes data descriptors:
+
+```py
+class ForwardsAssignment:
+    def __setattr__(self, name: str, value: object) -> None:
+        super().__setattr__(name, value)
+```
+
+A read-only property therefore remains read-only:
+
+```py
+class ReadOnlyPropertyBase(ForwardsAssignment):
+    @property
+    def y(self) -> int:
+        return 1
+
+class ChildWithReadOnlyProperty(Frozen, ReadOnlyPropertyBase): ...
+
+# error: [invalid-assignment] "Cannot assign to read-only property `y` on object of type `ChildWithReadOnlyProperty`"
+ChildWithReadOnlyProperty().y = 2
+```
+
+The property's setter still determines which values it accepts:
+
+```py
+class TypedPropertyBase(ForwardsAssignment):
+    @property
+    def y(self) -> int:
+        return 1
+
+    @y.setter
+    def y(self, value: int) -> None: ...
+
+class ChildWithTypedProperty(Frozen, TypedPropertyBase): ...
+
+# error: [invalid-assignment] "Expected `int`, found `Literal["invalid"]`"
+ChildWithTypedProperty().y = "invalid"
+```
+
+A property setter that never returns prevents assignment:
+
+```py
+class TerminalPropertyBase(ForwardsAssignment):
+    @property
+    def y(self) -> int:
+        return 1
+
+    @y.setter
+    def y(self, value: int) -> NoReturn:
+        raise AttributeError
+
+class ChildWithTerminalProperty(Frozen, TerminalPropertyBase): ...
+
+# error: [invalid-assignment] "Cannot assign to attribute `y` on type `ChildWithTerminalProperty` whose `__set__` method returns `Never`/`NoReturn`"
+ChildWithTerminalProperty().y = 2
+```
+
+The same rule applies to a custom descriptor whose setter never returns:
+
+```py
+class TerminalDescriptor:
+    def __get__(self, instance: object, owner: type | None = None) -> int:
+        return 1
+
+    def __set__(self, instance: object, value: int) -> NoReturn:
+        raise AttributeError
+
+class TerminalDescriptorBase(ForwardsAssignment):
+    y: TerminalDescriptor = TerminalDescriptor()
+
+class ChildWithTerminalDescriptor(Frozen, TerminalDescriptorBase): ...
+
+# error: [invalid-assignment] "Cannot assign to attribute `y` on type `ChildWithTerminalDescriptor` whose `__set__` method returns `Never`/`NoReturn`"
+ChildWithTerminalDescriptor().y = 2
+```
+
+A later `__setattr__` does not make the declared type of an ordinary attribute disappear:
+
+```py
+class AllowsUntypedAssignment:
+    y: int = 1
+
+    def __setattr__(self, name: str, value: object) -> None: ...
+
+class ChildWithUntypedAssignmentBase(Frozen, AllowsUntypedAssignment): ...
+
+# error: [invalid-assignment]
+ChildWithUntypedAssignmentBase().y = "invalid"
+```
+
+A specialized `Generic[T]` frozen base must also preserve the next `__setattr__` in the MRO:
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+
+@dataclass(frozen=True)
+class GenericFrozen(Generic[T]):
+    value: T
+
+class RejectingGenericAssignmentChild(GenericFrozen[int], RejectsAssignment): ...
+
+# error: [invalid-assignment] "Cannot assign to attribute `y` on type `RejectingGenericAssignmentChild` whose `__setattr__` method returns `Never`/`NoReturn`"
+RejectingGenericAssignmentChild(1).y = 2
+```
+
+The same behavior applies to Python 3.12 type-parameter syntax:
+
+```py
+@dataclass(frozen=True)
+class TypeParameterFrozen[T]:
+    value: T
+
+class RejectingTypeParameterAssignmentChild(TypeParameterFrozen[int], RejectsAssignment): ...
+
+# error: [invalid-assignment] "Cannot assign to attribute `y` on type `RejectingTypeParameterAssignmentChild` whose `__setattr__` method returns `Never`/`NoReturn`"
+RejectingTypeParameterAssignmentChild(1).y = 2
+```
+
+When a subclass inherits from two frozen dataclasses, fields from both bases remain frozen:
+
+```py
+@dataclass(frozen=True)
+class FirstFrozen:
+    first: int = 1
+
+@dataclass(frozen=True)
+class SecondFrozen:
+    second: int = 1
+
+class ChildWithTwoFrozenBases(FirstFrozen, SecondFrozen): ...
+
+multiple = ChildWithTwoFrozenBases()
+# revealed: Overload[(name: Literal["first"], value) -> Never, (name: Literal["second"], value) -> Never, (name: str, value) -> None]
+reveal_type(multiple.__setattr__)
+# revealed: Overload[(name: Literal["first"]) -> Never, (name: Literal["second"]) -> Never, (name: str) -> None]
+reveal_type(multiple.__delattr__)
+
+multiple.second = 2  # error: [invalid-assignment]
+del multiple.second  # error: [invalid-assignment]
+```
+
+An `InitVar` is a constructor argument, not a frozen field. A subclass can assign and delete an
+attribute with the same name:
+
+```py
+from dataclasses import InitVar
+
+@dataclass(frozen=True)
+class FrozenWithInitVar:
+    temporary: InitVar[int] = 0
+
+class ChildWithInitVar(FrozenWithInitVar):
+    temporary: int = 1
+
+init_var_child = ChildWithInitVar()
+init_var_child.temporary = 4
+del init_var_child.temporary
+```
+
+The same rule applies when the `InitVar` belongs to a second frozen base:
+
+```py
+class ChildWithSecondBaseInitVar(Frozen, FrozenWithInitVar):
+    temporary: int = 1
+
+second_init_var_child = ChildWithSecondBaseInitVar()
+second_init_var_child.temporary = 4
+del second_init_var_child.temporary
+```
+
 Non-field attributes on subclasses of slotted frozen dataclasses are still rejected. This correctly
 models the runtime behavior, but is somewhat surprising and may be a CPython bug, as subclasses of
 slotted classes usually allow arbitrary attributes to be set on them unless the subclass also
 explicitly declares `__slots__`. We should change our behavior here to follow CPython, if they "fix"
-it.
+it. The same limitation applies when deleting an attribute.
 
 ```py
 from dataclasses import dataclass
@@ -834,6 +1052,9 @@ frozen.x = 2  # error: [invalid-assignment]
 frozen.y = 2  # error: [invalid-assignment]
 frozen.z = 2  # error: [invalid-assignment]
 
+del frozen.x  # error: [invalid-assignment]
+del frozen.y  # error: [invalid-assignment]
+
 grandchild = MySlottedFrozenGrandchildClass()
 grandchild.x = 2  # error: [invalid-assignment]
 grandchild.y = 2  # error: [invalid-assignment]
@@ -841,8 +1062,7 @@ grandchild.z = 2  # error: [invalid-assignment]
 grandchild.unknown = 2  # error: [invalid-assignment]
 ```
 
-The same diagnostic is emitted if a frozen dataclass is inherited, and an attempt is made to delete
-an attribute:
+A frozen dataclass also prevents an ordinary subclass from deleting an inherited field:
 
 ```py
 from dataclasses import dataclass
@@ -854,7 +1074,183 @@ class MyFrozenClass:
 class MyFrozenChildClass(MyFrozenClass): ...
 
 frozen = MyFrozenChildClass()
-del frozen.x  # TODO this should emit an [invalid-assignment]
+
+# revealed: Overload[(name: Literal["x"]) -> Never, (name: str) -> None]
+reveal_type(frozen.__delattr__)
+
+del frozen.x  # error: [invalid-assignment]
+```
+
+A frozen dataclass does not make a subclass's read-only property safe to delete:
+
+```py
+from dataclasses import dataclass
+
+@dataclass(frozen=True)
+class Frozen:
+    x: int = 1
+
+class ReadOnlyChild(Frozen):
+    @property
+    def y(self) -> int:
+        return 1
+
+# error: [invalid-assignment] "Cannot delete read-only property `y` on object of type `ReadOnlyChild`"
+del ReadOnlyChild().y
+```
+
+Deleting a property is also invalid when its deleter never returns:
+
+```py
+from typing import NoReturn
+
+class RejectingPropertyChild(Frozen):
+    @property
+    def y(self) -> int:
+        return 1
+
+    @y.deleter
+    def y(self) -> NoReturn:
+        raise AttributeError("y")
+
+# error: [invalid-assignment] "Cannot delete attribute `y` on type `RejectingPropertyChild` whose `__delete__` method returns `Never`/`NoReturn`"
+del RejectingPropertyChild().y
+```
+
+When another base class rejects deletion, the frozen dataclass must not hide its `__delattr__`
+method:
+
+```py
+class RejectsDeletion:
+    y: int = 1
+
+    def __delattr__(self, name: str) -> NoReturn:
+        raise AttributeError(name)
+
+class ChildWithRejectingBase(Frozen, RejectsDeletion): ...
+
+# error: [invalid-assignment] "Cannot delete attribute `y` on type `ChildWithRejectingBase` whose `__delattr__` method returns `Never`/`NoReturn`"
+del ChildWithRejectingBase().y
+```
+
+A second base class can customize deletion of an ordinary attribute:
+
+```py
+class AllowsDeletion:
+    y: int = 1
+
+    def __delattr__(self, name: str) -> None: ...
+
+class ChildWithAllowingBase(Frozen, AllowsDeletion): ...
+
+del ChildWithAllowingBase().y
+```
+
+A later `__delattr__` can forward to `object.__delattr__`, which still invokes data descriptors:
+
+```py
+class ForwardsDeletion:
+    def __delattr__(self, name: str) -> None:
+        super().__delattr__(name)
+```
+
+A read-only property therefore remains read-only:
+
+```py
+class ReadOnlyDeletionBase(ForwardsDeletion):
+    @property
+    def y(self) -> int:
+        return 1
+
+class ChildWithReadOnlyDeletion(Frozen, ReadOnlyDeletionBase): ...
+
+# error: [invalid-assignment] "Cannot delete read-only property `y` on object of type `ChildWithReadOnlyDeletion`"
+del ChildWithReadOnlyDeletion().y
+```
+
+A property deleter that never returns also prevents deletion:
+
+```py
+class TerminalDeletionBase(ForwardsDeletion):
+    @property
+    def y(self) -> int:
+        return 1
+
+    @y.deleter
+    def y(self) -> NoReturn:
+        raise AttributeError
+
+class ChildWithTerminalDeletion(Frozen, TerminalDeletionBase): ...
+
+# error: [invalid-assignment] "Cannot delete attribute `y` on type `ChildWithTerminalDeletion` whose `__delete__` method returns `Never`/`NoReturn`"
+del ChildWithTerminalDeletion().y
+```
+
+The same rule applies to a custom descriptor whose deleter never returns:
+
+```py
+class TerminalDeleteDescriptor:
+    def __get__(self, instance: object, owner: type | None = None) -> int:
+        return 1
+
+    def __delete__(self, instance: object) -> NoReturn:
+        raise AttributeError
+
+class TerminalDescriptorDeletionBase(ForwardsDeletion):
+    y: TerminalDeleteDescriptor = TerminalDeleteDescriptor()
+
+class ChildWithTerminalDescriptorDeletion(Frozen, TerminalDescriptorDeletionBase): ...
+
+# error: [invalid-assignment] "Cannot delete attribute `y` on type `ChildWithTerminalDescriptorDeletion` whose `__delete__` method returns `Never`/`NoReturn`"
+del ChildWithTerminalDescriptorDeletion().y
+```
+
+An ordinary attribute defined on a subclass can also be deleted:
+
+```py
+class ChildWithOwnAttribute(Frozen):
+    y: int = 1
+
+deletable = ChildWithOwnAttribute()
+deletable.y = 2
+del deletable.y
+```
+
+A subclass can replace the inherited `__delattr__`, but a method that returns `None` is an invalid
+override of the frozen base's method, which returns `Never`. The overriding method still controls
+deletion on both that subclass and its subclasses:
+
+```py
+class ChildWithDeletionOverride(Frozen):
+    # error: [invalid-method-override]
+    def __delattr__(self, name: str) -> None: ...
+
+class GrandchildWithDeletionOverride(ChildWithDeletionOverride): ...
+
+del ChildWithDeletionOverride().x
+del GrandchildWithDeletionOverride().x
+```
+
+A read-only property remains protected when the frozen base is a specialized `Generic[T]` dataclass:
+
+```py
+class ReadOnlyGenericChild(GenericFrozen[int]):
+    @property
+    def y(self) -> int:
+        return 1
+
+# error: [invalid-assignment] "Cannot delete read-only property `y` on object of type `ReadOnlyGenericChild`"
+del ReadOnlyGenericChild(1).y
+```
+
+The Python 3.12 type-parameter syntax must also preserve a `__delattr__` method defined by another
+base class:
+
+```py
+class RejectingTypeParameterChild(TypeParameterFrozen[int], RejectsDeletion): ...
+
+# error: [invalid-assignment] "Cannot delete attribute `y` on type `RejectingTypeParameterChild` whose `__delattr__` method returns `Never`/`NoReturn`"
+del RejectingTypeParameterChild(1).y
 ```
 
 ### frozen/non-frozen inheritance
@@ -879,23 +1275,21 @@ class Child(FrozenBase):
 
 ```snapshot
 error[invalid-frozen-dataclass-subclass]: Non-frozen dataclass cannot inherit from frozen dataclass
- --> src/foo.py:7:1
+ --> src/foo.py:9:7
   |
 7 | @dataclass
   | ---------- `Child` dataclass parameters
 8 | # snapshot: invalid-frozen-dataclass-subclass
 9 | class Child(FrozenBase):
   |       ^^^^^^----------^ Subclass `Child` is not frozen but base class `FrozenBase` is
-  |
 info: This causes the class creation to fail
 info: Base class definition
- --> src/foo.py:3:1
+ --> src/foo.py:4:7
   |
 3 | @dataclass(frozen=True)
   | ----------------------- `FrozenBase` dataclass parameters
 4 | class FrozenBase:
   |       ^^^^^^^^^^ `FrozenBase` definition
-  |
 ```
 
 Frozen dataclasses inheriting from non-frozen dataclasses are also illegal:
@@ -1862,7 +2256,6 @@ error[missing-argument]: No argument provided for required parameter `y`
    |
 13 | C(3, "")
    | ^^^^^^^^
-   |
 
 
 error[too-many-positional-arguments]: Too many positional arguments: expected 1, got 2
@@ -1870,7 +2263,6 @@ error[too-many-positional-arguments]: Too many positional arguments: expected 1,
    |
 13 | C(3, "")
    |      ^^
-   |
 ```
 
 Declaration order still controls `KW_ONLY` when a later field name was already referenced by an

@@ -3,7 +3,7 @@ use std::num::NonZeroUsize;
 
 use similar::{ChangeTag, DiffOp, TextDiff};
 
-use ruff_annotate_snippets::Renderer as AnnotateRenderer;
+use annotate_snippets::Renderer as AnnotateRenderer;
 use ruff_diagnostics::{Applicability, Fix};
 use ruff_notebook::NotebookIndex;
 use ruff_source_file::OneIndexed;
@@ -48,7 +48,7 @@ impl<'a> FullRenderer<'a> {
             .info(stylesheet.info)
             .note(stylesheet.note)
             .help(stylesheet.help)
-            .line_no(stylesheet.line_no)
+            .line_num(stylesheet.line_no)
             .emphasis(stylesheet.emphasis)
             .none(stylesheet.none)
             .hyperlink(stylesheet.hyperlink);
@@ -61,7 +61,7 @@ impl<'a> FullRenderer<'a> {
             let resolved = Resolved::new(self.resolver, diag, self.config);
             let renderable = resolved.to_renderable(self.config);
             for diag in renderable.diagnostics.iter() {
-                writeln!(f, "{}", renderer.render(diag.to_annotate()))?;
+                writeln!(f, "{}", renderer.render(&[diag.to_annotate()]))?;
             }
 
             if diag.has_applicable_fix(self.config.fix_applicability())
@@ -395,7 +395,6 @@ mod tests {
           |
         1 | import os
           |        ^^
-          |
         help: Remove unused import: `os`
 
         error[F841]: Local variable `x` is assigned to but never used
@@ -415,7 +414,6 @@ mod tests {
           |
         1 | if a == 1: pass
           |    ^
-          |
 
         error[F821]: Undefined name `fibonaccii`
           --> fib.py:12:16
@@ -424,7 +422,6 @@ mod tests {
         11 |     else:
         12 |         return fibonaccii(n - 1) + fibonacci(n - 2)
            |                ^^^^^^^^^^          -
-           |
         info: Did you mean to import it from `/some/path/def.py`?
          --> fib.py:4:5
           |
@@ -477,7 +474,6 @@ mod tests {
           |
         1 | import os
           |        ^^
-          |
         help: Remove unused import: `os`
           |
           - import os
@@ -509,7 +505,6 @@ mod tests {
           |
         1 | if a == 1: pass
           |    ^
-          |
 
         F821 Undefined name `fibonaccii`
           --> fib.py:12:16
@@ -518,7 +513,6 @@ mod tests {
         11 |     else:
         12 |         return fibonaccii(n - 1) + fibonacci(n - 2)
            |                ^^^^^^^^^^          -
-           |
         info: Did you mean to import it from `/some/path/def.py`?
          --> fib.py:4:5
           |
@@ -603,7 +597,6 @@ print()
         2 | if False:
         3 | print()
           | ^
-          |
         ");
     }
 
@@ -641,9 +634,8 @@ print()
         error[invalid-character-sub]: Invalid unescaped character SUB, use "\x1a" instead
          --> example.py:1:25
           |
-        1 | nested_fstrings = f'␈{f'{f'␛'}'}'
+        1 | nested_fstrings = f'␈{f'␚{f'␛'}'}'
           |                         ^
-          |
         "#);
     }
 
@@ -666,9 +658,8 @@ print()
         error[invalid-character-sub]: Invalid unescaped character SUB, use "\x1a" instead
          --> example.py:1:2
           |
-        1 | ␈␛
+        1 | ␈␚␛
           |  ^
-          |
         "#);
 
         Ok(())
@@ -691,7 +682,6 @@ print()
         1 | def foo():
         2 |     return 1
           |     ^^^^^^^^
-          |
         ");
     }
 
@@ -727,7 +717,6 @@ print()
         1 | # cell 1
         2 | import os
           |        ^^
-          |
         help: Remove unused import: `os`
          ::: cell 1
           |
@@ -759,7 +748,6 @@ print()
         3 |     print()
         4 |     x = 1
           |     ^
-          |
         help: Remove assignment to unused variable `x`
         ");
     }
@@ -822,7 +810,6 @@ print()
         3 |     print()
         4 |     x = 1
           |     - second cell
-          |
         help: Remove unused import: `os`
 
         error[test-diagnostic]: main diagnostic message
@@ -834,7 +821,6 @@ print()
         3 |
         4 | print('hello world')
           | ----- print statement
-          |
         help: Remove `print` statement
         ");
     }
@@ -919,7 +905,6 @@ print()
           |
         1 | import foo
           | ^
-          |
         ");
     }
 
@@ -940,7 +925,6 @@ print()
           |
         1 | import foo
           | ^
-          |
         ");
     }
 
@@ -963,11 +947,10 @@ print()
 
         insta::assert_snapshot!(env.render(&diagnostic), @r"
         error[test-diagnostic]: main diagnostic message
-         --> example.py:2:1
+         --> example.py:1:16
           |
         1 | unexpected eof
           |               ^
-          |
         ");
     }
 
@@ -1083,7 +1066,6 @@ line 13
           |
         2 | line 2
           | ^^^^^^
-          |
         help: Replace three lines
            |
         1  | line 1

@@ -8,7 +8,6 @@ FURB187 [*] Use of assignment of `reversed` on list `l`
 5 |     l = []
 6 |     l = reversed(l)
   |     ^^^^^^^^^^^^^^^
-  |
 help: Replace with `l.reverse()`
   |
 5 |     l = []
@@ -25,7 +24,6 @@ FURB187 [*] Use of assignment of `reversed` on list `l`
 10 |     l = []
 11 |     l = list(reversed(l))
    |     ^^^^^^^^^^^^^^^^^^^^^
-   |
 help: Replace with `l.reverse()`
    |
 10 |     l = []
@@ -42,7 +40,6 @@ FURB187 [*] Use of assignment of `reversed` on list `l`
 15 |     l = []
 16 |     l = l[::-1]
    |     ^^^^^^^^^^^
-   |
 help: Replace with `l.reverse()`
    |
 15 |     l = []

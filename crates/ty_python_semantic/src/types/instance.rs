@@ -17,7 +17,7 @@ use crate::types::constraints::{
     ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension,
 };
 use crate::types::enums::is_single_member_enum;
-use crate::types::generics::{InferableTypeVars, walk_specialization};
+use crate::types::generics::walk_specialization;
 use crate::types::protocol_class::{
     ProtocolClass, has_all_protocol_members_defined, walk_protocol_instance_member,
     walk_protocol_interface,
@@ -28,6 +28,7 @@ use crate::types::relation::{
 };
 use crate::types::signatures::SignatureRelationVisitor;
 use crate::types::tuple::{TupleSpec, TupleType, walk_tuple_type};
+use crate::types::typevar::TypeVarSet;
 use crate::types::visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard};
 use crate::types::{
     ApplyTypeMappingVisitor, CallableType, ClassBase, ClassLiteral, ErrorContext,
@@ -427,20 +428,6 @@ impl<'db> NominalInstanceType<'db> {
         }
     }
 
-    pub(super) fn is_single_valued(self, db: &'db dyn Db) -> bool {
-        match self.0 {
-            NominalInstanceInner::ExactTuple(tuple) => tuple.is_single_valued(db),
-            NominalInstanceInner::Object => false,
-            NominalInstanceInner::SysVersionInfo => true,
-            NominalInstanceInner::NonTuple(class) => class
-                .class(db)
-                .known(db)
-                .and_then(KnownClass::is_single_valued)
-                .or_else(|| Some(self.tuple_spec(db)?.is_single_valued(db)))
-                .unwrap_or_else(|| is_single_member_enum(db, class.class(db).class_literal(db))),
-        }
-    }
-
     pub(super) fn to_meta_type(self, db: &'db dyn Db) -> Type<'db> {
         SubclassOfType::from(db, self.class(db))
     }
@@ -528,7 +515,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
 
             if result
                 .union(db, self.constraints, nominally_satisfied)
-                .is_always_satisfied(db)
+                .is_trivially_always_satisfied()
             {
                 return result;
             }
@@ -800,7 +787,7 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
             let compatible = self.check_tuple_spec_pair(db, &left_spec, &right_spec);
             if result
                 .union(db, self.constraints, compatible)
-                .is_always_satisfied(db)
+                .is_trivially_always_satisfied()
             {
                 return result;
             }
@@ -1049,7 +1036,7 @@ impl<'db> ProtocolInstanceType<'db> {
             let materialization_visitor = ApplyTypeMappingVisitor::default();
             let checker = TypeRelationChecker::subtyping(
                 &constraints,
-                InferableTypeVars::None,
+                TypeVarSet::None,
                 &relation_visitor,
                 &disjointness_visitor,
                 &signature_relation_visitor,

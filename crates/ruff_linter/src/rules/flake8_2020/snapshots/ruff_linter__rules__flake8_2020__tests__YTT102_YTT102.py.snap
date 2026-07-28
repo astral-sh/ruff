@@ -17,4 +17,3 @@ YTT102 `sys.version[2]` referenced (python3.10), use `sys.version_info`
 4 | py_minor = sys.version[2]
 5 | py_minor = version[2]
   |            ^^^^^^^
-  |

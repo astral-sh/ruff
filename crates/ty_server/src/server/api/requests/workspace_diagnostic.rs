@@ -280,7 +280,7 @@ impl ProgressReporter for WorkspaceDiagnosticsProgressReporter<'_> {
             } else {
                 tracing::debug!(
                     "Ignoring diagnostic without a file: {diagnostic}",
-                    diagnostic = diagnostic.primary_message()
+                    diagnostic = diagnostic.headline_message()
                 );
             }
         }

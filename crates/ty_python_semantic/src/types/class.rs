@@ -10,7 +10,8 @@ pub(super) use self::named_tuple::{
     DynamicNamedTupleAnchor, DynamicNamedTupleLiteral, NamedTupleField, NamedTupleSpec,
 };
 pub(crate) use self::static_literal::{
-    ExpandedClassBaseEntry, StaticClassLiteral, expanded_class_base_entries,
+    ExpandedClassBaseEntry, FrozenDataclassDispatch, StaticClassLiteral,
+    expanded_class_base_entries,
 };
 pub(super) use self::typed_dict::{DynamicTypedDictAnchor, DynamicTypedDictLiteral};
 use super::dedicated::pydantic;
@@ -26,9 +27,7 @@ use crate::types::constraints::{
 };
 use crate::types::enums::enum_metadata;
 use crate::types::function::{AbstractMethodKind, DataclassTransformerParams};
-use crate::types::generics::{
-    GenericContext, InferableTypeVars, Specialization, walk_specialization,
-};
+use crate::types::generics::{GenericContext, Specialization, walk_specialization};
 use crate::types::known_instance::DeprecatedInstance;
 use crate::types::member::Member;
 use crate::types::relation::{
@@ -38,6 +37,7 @@ use crate::types::signatures::{
     CallableSignature, Parameter, Parameters, Signature, SignatureRelationVisitor,
 };
 use crate::types::tuple::TupleSpec;
+use crate::types::typevar::TypeVarSet;
 use crate::types::{
     ApplyTypeMappingVisitor, CallableType, CallableTypes, DataclassParams,
     FindLegacyTypeVarsVisitor, IntersectionType, TypeContext, TypeMapping, TypedDictModule,
@@ -1381,7 +1381,7 @@ impl<'db> ClassType<'db> {
         let materialization_visitor = ApplyTypeMappingVisitor::default();
         let checker = TypeRelationChecker::subtyping(
             &constraints,
-            InferableTypeVars::None,
+            TypeVarSet::None,
             &relation_visitor,
             &disjointness_visitor,
             &signature_relation_visitor,
@@ -1425,7 +1425,7 @@ impl<'db> ClassType<'db> {
         constraints: &ConstraintSetBuilder<'db>,
     ) -> bool {
         self.could_exist_in_mro_of_impl(db, other, |this, other| {
-            this.is_disjoint_from(db, other, constraints, InferableTypeVars::None)
+            this.is_disjoint_from(db, other, constraints, TypeVarSet::None)
                 .is_always_satisfied(db)
         })
     }
@@ -1512,11 +1512,11 @@ impl<'db> ClassType<'db> {
             other,
             |this, other| this.could_exist_in_mro_of(db, other, constraints),
             |this, other| {
-                this.is_disjoint_from(db, other, constraints, InferableTypeVars::None)
+                this.is_disjoint_from(db, other, constraints, TypeVarSet::None)
                     .is_always_satisfied(db)
             },
             |this, other| {
-                this.when_disjoint_from(db, other, constraints, InferableTypeVars::None)
+                this.when_disjoint_from(db, other, constraints, TypeVarSet::None)
                     .is_always_satisfied(db)
             },
         )

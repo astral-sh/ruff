@@ -736,6 +736,7 @@ impl<'src> Parser<'src> {
         mut parse_element: impl FnMut(&mut Parser<'src>),
     ) {
         let mut progress = ParserProgress::default();
+        let mut unexpected_indents = 0;
 
         let saved_context = self.recovery_context;
         self.recovery_context = self
@@ -745,7 +746,12 @@ impl<'src> Parser<'src> {
         loop {
             progress.assert_progressing(self);
 
-            if recovery_context_kind.is_list_element(self) {
+            if 0 < unexpected_indents && self.at(TokenKind::Dedent) {
+                // Ignore this `Dedent` like we ignored the `Indent`, avoiding extra errors from
+                // being imbalanced
+                unexpected_indents -= 1;
+                self.bump(TokenKind::Dedent);
+            } else if recovery_context_kind.is_list_element(self) {
                 parse_element(self);
             } else if recovery_context_kind.is_regular_list_terminator(self) {
                 break;
@@ -763,6 +769,14 @@ impl<'src> Parser<'src> {
                     self.current_token_range(),
                 );
 
+                if matches!(
+                    recovery_context_kind,
+                    RecoveryContextKind::ModuleStatements | RecoveryContextKind::BlockStatements
+                ) && self.at(TokenKind::Indent)
+                {
+                    // For this invalid `Indent`, ensure the matching `Dedent` gets consumed as well
+                    unexpected_indents += 1;
+                }
                 self.bump_any();
             }
         }

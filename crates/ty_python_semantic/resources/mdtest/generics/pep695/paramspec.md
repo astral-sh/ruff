@@ -33,7 +33,6 @@ position. The parser could do a better job in recovering from these errors.
 # error: [invalid-syntax]
 def foo[**P: int]() -> None:
     # error: [invalid-syntax]
-    # error: [invalid-syntax]
     pass
 ```
 
@@ -1103,11 +1102,10 @@ def unwrap_awaitable(function: Callable[P, Awaitable[R]], /) -> Callable[P, R]:
 async def unwrapped(value: int) -> int: ...
 @overload
 async def unwrapped(value: str) -> str: ...
-@unwrap_awaitable
 async def unwrapped(value: int | str) -> int | str:
     raise NotImplementedError
 
-reveal_type(unwrapped(1))  # revealed: int | str
+reveal_type(unwrap_awaitable(unwrapped)(1))  # revealed: int | str
 ```
 
 The selected decorator overload can use an `Awaitable` return type.

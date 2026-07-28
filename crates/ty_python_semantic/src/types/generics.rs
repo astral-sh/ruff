@@ -1,9 +1,8 @@
 use std::borrow::Cow;
 use std::cell::{Cell, RefCell};
 use std::collections::hash_map::Entry;
-use std::fmt::Display;
 
-use itertools::{Either, Itertools};
+use itertools::Itertools;
 use ruff_python_ast as ast;
 use rustc_hash::{FxHashMap, FxHashSet};
 
@@ -25,7 +24,7 @@ use crate::types::tuple::{
 };
 use crate::types::type_alias::{walk_manual_pep_695_type_alias, walk_pep_695_type_alias};
 use crate::types::typevar::{
-    BoundTypeVarIdentity, TypeVarIdentity, TypeVarInstance, walk_type_var_bounds,
+    BoundTypeVarIdentity, TypeVarIdentity, TypeVarInstance, TypeVarSet, walk_type_var_bounds,
 };
 use crate::types::visitor::{
     TypeCollector, TypeVisitor, any_over_type, walk_type_with_recursion_guard,
@@ -242,92 +241,6 @@ pub(crate) fn typing_self<'db>(
     )
 }
 
-/// The set of bound typevar occurrences that can be solved by the current inference context.
-///
-/// Membership is keyed by [`BoundTypeVarIdentity`], including any freshness nonce. This lets a
-/// fresh generic-callable occurrence be inferable without making the surrounding source-level
-/// typevar inferable.
-#[derive(Clone, Copy, Debug, Hash, Eq, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
-pub(crate) enum InferableTypeVars<'db> {
-    None,
-    Some(InferableTypeVarsInner<'db>),
-}
-
-impl<'db> InferableTypeVars<'db> {
-    pub(crate) fn from_typevars(
-        db: &'db dyn Db,
-        mut typevars: FxOrderSet<BoundTypeVarIdentity<'db>>,
-    ) -> Self {
-        if typevars.is_empty() {
-            return InferableTypeVars::None;
-        }
-
-        typevars.shrink_to_fit();
-        Self::Some(InferableTypeVarsInner::new_internal(db, typevars))
-    }
-}
-
-#[salsa::interned(debug, constructor=new_internal, heap_size=ruff_memory_usage::heap_size)]
-pub(crate) struct InferableTypeVarsInner<'db> {
-    #[returns(ref)]
-    inferable: FxOrderSet<BoundTypeVarIdentity<'db>>,
-}
-
-// The Salsa heap is tracked separately.
-impl get_size2::GetSize for InferableTypeVarsInner<'_> {}
-
-impl<'db> BoundTypeVarIdentity<'db> {
-    pub(crate) fn is_inferable(self, db: &'db dyn Db, inferable: InferableTypeVars<'db>) -> bool {
-        match inferable {
-            InferableTypeVars::None => false,
-            InferableTypeVars::Some(inner) => inner.inferable(db).contains(&self),
-        }
-    }
-}
-
-impl<'db> BoundTypeVarInstance<'db> {
-    pub(crate) fn is_inferable(self, db: &'db dyn Db, inferable: InferableTypeVars<'db>) -> bool {
-        self.identity(db).is_inferable(db, inferable)
-    }
-}
-
-#[salsa::tracked]
-impl<'db> InferableTypeVars<'db> {
-    #[salsa::tracked(returns(copy), heap_size=ruff_memory_usage::heap_size)]
-    pub(crate) fn merge(self, db: &'db dyn Db, other: Self) -> Self {
-        match (self, other) {
-            (InferableTypeVars::None, other) | (other, InferableTypeVars::None) => other,
-            (InferableTypeVars::Some(self_inner), InferableTypeVars::Some(other_inner)) => {
-                let merged = self_inner.inferable(db) | other_inner.inferable(db);
-                Self::Some(InferableTypeVarsInner::new_internal(db, merged))
-            }
-        }
-    }
-
-    // This is not an IntoIterator implementation because I have no desire to try to name the
-    // iterator type.
-    pub(crate) fn iter(
-        self,
-        db: &'db dyn Db,
-    ) -> impl Iterator<Item = BoundTypeVarIdentity<'db>> + 'db {
-        match self {
-            InferableTypeVars::None => Either::Left(std::iter::empty()),
-            InferableTypeVars::Some(inner) => Either::Right(inner.inferable(db).iter().copied()),
-        }
-    }
-
-    // Keep this around for debugging purposes
-    #[expect(dead_code)]
-    pub(crate) fn display(&self, db: &'db dyn Db) -> impl Display {
-        format!(
-            "[{}]",
-            self.iter(db)
-                .map(|identity| identity.display(db))
-                .format(", ")
-        )
-    }
-}
-
 /// A list of formal type variables for a generic function, class, type alias, or fresh callable
 /// occurrence.
 ///
@@ -470,10 +383,10 @@ impl<'db> GenericContext<'db> {
     /// In this example, `method`'s generic context binds `Self` and `T`, but its inferable set
     /// also includes `A@C`. This is needed because at each call site, we need to infer the
     /// specialized class instance type whose method is being invoked.
-    pub(crate) fn inferable_typevars(self, db: &'db dyn Db) -> InferableTypeVars<'db> {
+    pub(crate) fn inferable_typevars(self, db: &'db dyn Db) -> TypeVarSet<'db> {
         #[derive(Default)]
         struct CollectTypeVars<'db> {
-            typevars: RefCell<FxOrderSet<BoundTypeVarIdentity<'db>>>,
+            typevars: RefCell<FxOrderMap<BoundTypeVarIdentity<'db>, BoundTypeVarInstance<'db>>>,
             recursion_guard: TypeCollector<'db>,
         }
 
@@ -489,7 +402,8 @@ impl<'db> GenericContext<'db> {
             ) {
                 self.typevars
                     .borrow_mut()
-                    .insert(bound_typevar.identity(db));
+                    .entry(bound_typevar.identity(db))
+                    .or_insert(bound_typevar);
                 let typevar = bound_typevar.typevar(db);
                 if let Some(bound_or_constraints) = typevar.bound_or_constraints(db) {
                     walk_type_var_bounds(db, bound_or_constraints, self);
@@ -503,18 +417,18 @@ impl<'db> GenericContext<'db> {
 
         #[salsa::tracked(
             returns(copy),
-            cycle_initial=|_, _, _| InferableTypeVars::None,
+            cycle_initial=|_, _, _| TypeVarSet::None,
             heap_size=ruff_memory_usage::heap_size,
         )]
         fn inferable_typevars_inner<'db>(
             db: &'db dyn Db,
             generic_context: GenericContext<'db>,
-        ) -> InferableTypeVars<'db> {
+        ) -> TypeVarSet<'db> {
             let visitor = CollectTypeVars::default();
             for bound_typevar in generic_context.variables(db) {
                 visitor.visit_bound_type_var_type(db, bound_typevar);
             }
-            InferableTypeVars::from_typevars(db, visitor.typevars.into_inner())
+            TypeVarSet::from_typevars(db, visitor.typevars.into_inner().into_values())
         }
 
         inferable_typevars_inner(db, self)
@@ -1563,7 +1477,7 @@ impl<'db> Specialization<'db> {
         db: &'db dyn Db,
         other: Self,
         constraints: &'c ConstraintSetBuilder<'db>,
-        inferable: InferableTypeVars<'db>,
+        inferable: TypeVarSet<'db>,
     ) -> ConstraintSet<'db, 'c> {
         let relation_visitor = HasRelationToVisitor::default(constraints);
         let disjointness_visitor = IsDisjointVisitor::default(constraints);
@@ -2041,7 +1955,7 @@ impl<'db> Type<'db> {
 pub(crate) struct SpecializationBuilder<'db, 'c> {
     db: &'db dyn Db,
     constraints: &'c ConstraintSetBuilder<'db>,
-    inferable: InferableTypeVars<'db>,
+    inferable: TypeVarSet<'db>,
     pending: ConstraintSet<'db, 'c>,
     types: FxHashMap<BoundTypeVarIdentity<'db>, UnionAccumulator<'db>>,
     paramspec_seen: FxHashSet<BoundTypeVarIdentity<'db>>,
@@ -2111,7 +2025,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
     pub(crate) fn new(
         db: &'db dyn Db,
         constraints: &'c ConstraintSetBuilder<'db>,
-        inferable: InferableTypeVars<'db>,
+        inferable: TypeVarSet<'db>,
     ) -> Self {
         Self {
             db,
@@ -2121,6 +2035,15 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             types: FxHashMap::default(),
             paramspec_seen: FxHashSet::default(),
         }
+    }
+
+    /// Adds a constraint set to the pending specialization and projects its valid solutions into
+    /// the legacy type mappings.
+    pub(crate) fn add_constraint_set(
+        &mut self,
+        set: ConstraintSet<'db, 'c>,
+    ) -> Result<(), SpecializationError<'db>> {
+        self.infer_from_constraint_set(set)
     }
 
     /// Build a specialization, using a caller-provided hook to select the solution for each
@@ -2651,19 +2574,46 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         }
     }
 
-    /// Returns common protocol constraints for a union containing only `TypedDict`s when every
+    /// Returns common protocol constraints for the `TypedDict` members of a union when every such
     /// member has the same constraints as their shared `Mapping[str, object]` fallback.
     fn common_typed_dict_protocol_constraints(
         &self,
         formal: Type<'db>,
         actual: UnionType<'db>,
     ) -> Option<ConstraintSet<'db, 'c>> {
+        fn is_string_keyed_mapping<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
+            let Type::NominalInstance(instance) = ty.resolve_type_alias(db) else {
+                return false;
+            };
+
+            matches!(
+                instance.class(db).known(db),
+                Some(
+                    KnownClass::Dict
+                        | KnownClass::Mapping
+                        | KnownClass::MutableMapping
+                        | KnownClass::DefaultDict
+                        | KnownClass::ChainMap
+                        | KnownClass::OrderedDict
+                )
+            ) && instance
+                .class(db)
+                .into_generic_alias()
+                .is_some_and(|alias| {
+                    matches!(
+                        alias.specialization(db).types(db),
+                        [key, _] if key.resolve_type_alias(db) == KnownClass::Str.to_instance(db)
+                    )
+                })
+        }
+
         fn collect_typed_dicts<'db>(
             db: &'db dyn Db,
             ty: Type<'db>,
             resolving: &mut FxHashSet<Type<'db>>,
             completed: &mut FxHashMap<Type<'db>, bool>,
             typed_dicts: &mut FxHashSet<Type<'db>>,
+            other_types: &mut FxOrderSet<Type<'db>>,
         ) -> bool {
             let ty = ty.resolve_type_alias(db);
             if let Some(result) = completed.get(&ty) {
@@ -2680,20 +2630,60 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                         return false;
                     }
                     let result = union.elements(db).iter().all(|element| {
-                        collect_typed_dicts(db, *element, resolving, completed, typed_dicts)
+                        collect_typed_dicts(
+                            db,
+                            *element,
+                            resolving,
+                            completed,
+                            typed_dicts,
+                            other_types,
+                        )
                     });
                     resolving.remove(&ty);
                     result
                 }
                 Type::Intersection(intersection)
-                    if intersection
-                        .iter_positive(db)
-                        .any(|element| element.resolve_type_alias(db).is_typed_dict()) =>
+                    if intersection.negative(db).is_empty()
+                        && intersection
+                            .iter_positive(db)
+                            .any(|element| element.resolve_type_alias(db).is_typed_dict())
+                        && intersection.iter_positive(db).all(|element| {
+                            let element = element.resolve_type_alias(db);
+                            element.is_typed_dict()
+                                || element
+                                    == KnownClass::Dict
+                                        .to_instance_unknown(db)
+                                        .top_materialization(db)
+                        }) =>
                 {
                     // `isinstance(value, dict)` narrows a `TypedDict` to an intersection with
-                    // `Top[dict[Unknown, Unknown]]`. Keep the full intersection so the normal
-                    // constraint-equivalence check below remains authoritative.
+                    // `Top[dict[Unknown, Unknown]]`. Other conjuncts may contribute gradual
+                    // constraints that the shared mapping would erase.
                     typed_dicts.insert(ty);
+                    true
+                }
+                Type::Intersection(intersection)
+                    if intersection.negative(db).is_empty()
+                        && intersection
+                            .iter_positive(db)
+                            .any(|element| is_string_keyed_mapping(db, element))
+                        && intersection.iter_positive(db).all(|element| {
+                            let element = element.resolve_type_alias(db);
+                            is_string_keyed_mapping(db, element)
+                                || element
+                                    == KnownClass::Dict
+                                        .to_instance_unknown(db)
+                                        .top_materialization(db)
+                        }) =>
+                {
+                    // `isinstance(value, dict)` can also narrow a mapping to an intersection with
+                    // `Top[dict[Unknown, Unknown]]`. Retain the full intersection so its original
+                    // key and value constraints are preserved.
+                    other_types.insert(ty);
+                    true
+                }
+                Type::NominalInstance(_) if is_string_keyed_mapping(db, ty) => {
+                    other_types.insert(ty);
                     true
                 }
                 _ => false,
@@ -2705,6 +2695,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         let mut resolving = FxHashSet::default();
         let mut completed = FxHashMap::default();
         let mut typed_dicts = FxHashSet::default();
+        let mut other_types = FxOrderSet::default();
         if !actual.elements(self.db).iter().all(|element| {
             collect_typed_dicts(
                 self.db,
@@ -2712,8 +2703,22 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 &mut resolving,
                 &mut completed,
                 &mut typed_dicts,
+                &mut other_types,
             )
         }) {
+            return None;
+        }
+        if typed_dicts.is_empty() {
+            return None;
+        }
+        // Other protocols can observe key-specific or gradual evidence that the shared mapping
+        // fallback erases; restrict mixed unions to the protocol used by dictionary constructors.
+        if !other_types.is_empty()
+            && !matches!(formal, Type::ProtocolInstance(protocol)
+            if protocol.class_origin().is_some_and(|class| {
+                class.is_known(self.db, KnownClass::SupportsKeysAndGetItem)
+            }))
+        {
             return None;
         }
 
@@ -2724,18 +2729,35 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         let mapping = KnownClass::Mapping.to_specialized_instance(self.db, spec);
         let mapping_when = mapping.when_constraint_set_assignable_to_owned(self.db, formal);
         let mapping_when = self.constraints.load(self.db, &mapping_when);
-        typed_dicts
-            .into_iter()
-            .all(|element| {
-                let element_when = self.constraints.load(
-                    self.db,
-                    &element.when_constraint_set_assignable_to_owned(self.db, formal),
-                );
-                element_when
-                    .iff(self.db, self.constraints, mapping_when)
-                    .is_always_satisfied(self.db)
-            })
-            .then_some(mapping_when)
+        // Logically equivalent constraints can still infer different solutions, such as `Any`
+        // instead of `object`; preserve the original constraints when gradual evidence differs.
+        let mapping_solutions = mapping_when.solutions(self.db, self.constraints, self.inferable);
+        if !typed_dicts.into_iter().all(|element| {
+            let element_when = self.constraints.load(
+                self.db,
+                &element.when_constraint_set_assignable_to_owned(self.db, formal),
+            );
+            element_when
+                .iff(self.db, self.constraints, mapping_when)
+                .is_always_satisfied(self.db)
+                && element_when.solutions(self.db, self.constraints, self.inferable)
+                    == mapping_solutions
+        }) {
+            return None;
+        }
+
+        // Reuse one constraint for all equivalent TypedDicts, but retain each mapping arm's
+        // original constraints.
+        Some(mapping_when.and(self.db, self.constraints, || {
+            other_types
+                .into_iter()
+                .when_all(self.db, self.constraints, |element| {
+                    self.constraints.load(
+                        self.db,
+                        &element.when_constraint_set_assignable_to_owned(self.db, formal),
+                    )
+                })
+        }))
     }
 
     /// Infer type mappings by comparing formal callable signatures against actual callables.
@@ -3507,5 +3529,32 @@ impl<'db> SpecializationError<'db> {
             Self::MismatchedBound { argument, .. } => *argument,
             Self::MismatchedConstraint { argument, .. } => *argument,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use ruff_python_ast::name::Name;
+
+    use crate::db::tests::setup_db;
+
+    #[test]
+    fn generic_context_inferable_typevars_retain_instances_from_bounds() {
+        let db = setup_db();
+        let u =
+            BoundTypeVarInstance::synthetic(&db, Name::new_static("U"), TypeVarVariance::Invariant);
+        let t =
+            BoundTypeVarInstance::synthetic(&db, Name::new_static("T"), TypeVarVariance::Invariant)
+                .map_bound_or_constraints(&db, |_| {
+                    Some(TypeVarBoundOrConstraints::UpperBound(Type::TypeVar(u)))
+                });
+        let context = GenericContext::from_typevar_instances(&db, [t]);
+
+        let inferable = context.inferable_typevars(&db);
+        assert_eq!(inferable.iter(&db).collect::<Vec<_>>(), [t, u]);
+        assert!(t.is_inferable(&db, inferable));
+        assert!(u.is_inferable(&db, inferable));
     }
 }

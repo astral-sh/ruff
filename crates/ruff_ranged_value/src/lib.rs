@@ -29,6 +29,9 @@ pub enum ValueSource {
     /// or if the value was auto-discovered by the editor
     /// (e.g., the Python environment)
     Editor,
+
+    /// The value was provided by `uv workspace metadata`.
+    UvWorkspace,
 }
 
 impl ValueSource {
@@ -37,6 +40,7 @@ impl ValueSource {
             ValueSource::File(path) => Some(&**path),
             ValueSource::Cli => None,
             ValueSource::Editor => None,
+            ValueSource::UvWorkspace => None,
         }
     }
 

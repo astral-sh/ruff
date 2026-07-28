@@ -22,10 +22,11 @@ use super::{DynamicType, Type, TypeVarVariance, UnionType, semantic_index};
 use crate::types::callable::{CallableFunctionProvenance, CallableTypeKind};
 use crate::types::constraints::{
     ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension, OwnedConstraintSet,
+    PathBounds, Solutions,
 };
 use crate::types::cyclic::ActiveRecursionDetector;
 use crate::types::generics::{
-    ApplySpecialization, GenericContext, InferableTypeVars, Specialization, TypeVarInference,
+    ApplySpecialization, GenericContext, Specialization, SpecializationBuilder, TypeVarInference,
     walk_generic_context,
 };
 use crate::types::infer::{TypeExpressionFlags, infer_deferred_types};
@@ -34,7 +35,7 @@ use crate::types::relation::{
 };
 use crate::types::tuple::{Tuple, TupleType, VariableSegment};
 use crate::types::typed_dict::extract_unpacked_typed_dict_keys_from_kwargs_annotation;
-use crate::types::typevar::max_typevar_freshness_matching_generic_context;
+use crate::types::typevar::{TypeVarSet, max_typevar_freshness_matching_generic_context};
 use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarIdentity, BoundTypeVarInstance,
     CallableType, ErrorContext, ErrorContextTree, FindLegacyTypeVarsVisitor, KnownClass,
@@ -1150,11 +1151,86 @@ impl<'db> Signature<'db> {
         }
     }
 
+    /// Returns this signature bound to `receiver_type` if its explicit receiver annotation is
+    /// compatible with the bound receiver.
+    ///
+    /// Matching the receiver can constrain type variables that occur elsewhere in the signature.
+    /// Exact bounds determine an unambiguous specialization; one-sided constraints remain attached
+    /// to the bound signature for later relation checks.
+    pub(crate) fn bind_self_if_compatible(
+        &self,
+        db: &'db dyn Db,
+        receiver_type: Type<'db>,
+        typing_self_type: Type<'db>,
+    ) -> Option<Self> {
+        if !self.can_bind_self_to(db, receiver_type) {
+            return None;
+        }
+
+        let bound_signature =
+            self.bind_self_with_receiver(db, Some(receiver_type), Some(typing_self_type));
+        let Some(receiver_constraints) = bound_signature.receiver_constraints.as_ref() else {
+            return Some(bound_signature);
+        };
+
+        let constraints = ConstraintSetBuilder::new();
+        let when = constraints.load(db, receiver_constraints);
+        let inferable = self.inferable_typevars(db);
+
+        match when.solutions(db, &constraints, inferable) {
+            Solutions::Unsatisfiable => return None,
+            Solutions::Unconstrained => return Some(bound_signature),
+            // Each receiver path can leave a different type variable unconstrained. Preserve the
+            // original relation instead of combining those independent solutions.
+            Solutions::Constrained(solutions) if solutions.len() > 1 => {
+                return Some(bound_signature);
+            }
+            Solutions::Constrained(_) => {}
+        }
+
+        let Some(generic_context) = self.generic_context else {
+            return Some(bound_signature);
+        };
+
+        let mut builder = SpecializationBuilder::new(db, &constraints, inferable);
+        builder.add_constraint_set(when).ok()?;
+        let concrete_class_receiver =
+            matches!(receiver_type, Type::ClassLiteral(_) | Type::GenericAlias(_));
+        let specialization = builder.build_with(generic_context, |typevar, bounds| {
+            if let Some(bounds) = bounds
+                && let Some(lower) = bounds.lower
+                && let Some(upper) = bounds.upper.as_single_bound()
+                && lower.is_equivalent_to(db, upper)
+                && let Ok(Some(solution)) = PathBounds::default_solve(db, &constraints, bounds)
+            {
+                return Some(solution);
+            }
+
+            if let Some(bounds) = bounds
+                && concrete_class_receiver
+                && bound_signature
+                    .variance_of(db, typevar.identity(db))
+                    .is_covariant()
+                && bounds.lower.is_some_and(|lower| !lower.is_never())
+                && let Ok(Some(solution)) = PathBounds::default_solve(db, &constraints, bounds)
+            {
+                return Some(solution);
+            }
+
+            Some(Type::TypeVar(typevar))
+        });
+
+        Some(
+            self.apply_specialization(db, specialization)
+                .bind_self_with_receiver(db, Some(receiver_type), Some(typing_self_type)),
+        )
+    }
+
     /// Returns `true` if this signature's first parameter can accept the bound `self` type.
     ///
     /// This is used to prune impossible overloads when a method is bound to a concrete receiver.
     /// If a signature has no positional first parameter, we conservatively keep it.
-    pub(crate) fn can_bind_self_to(&self, db: &'db dyn Db, self_type: Type<'db>) -> bool {
+    fn can_bind_self_to(&self, db: &'db dyn Db, self_type: Type<'db>) -> bool {
         // A dynamic receiver might be compatible with any explicit receiver annotation.
         if self_type.is_dynamic() {
             return true;
@@ -1499,10 +1575,10 @@ impl<'db> Signature<'db> {
                 .any(|(_, parameter)| parameter.annotated_type().contains_self(db))
     }
 
-    fn inferable_typevars(&self, db: &'db dyn Db) -> InferableTypeVars<'db> {
+    fn inferable_typevars(&self, db: &'db dyn Db) -> TypeVarSet<'db> {
         match self.generic_context {
             Some(generic_context) => generic_context.inferable_typevars(db),
-            None => InferableTypeVars::None,
+            None => TypeVarSet::None,
         }
     }
 
@@ -2281,6 +2357,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     parameter,
                 });
             }
+            // Continuing past a nonterminal contradiction can bind later `ParamSpec`s or
+            // replace the diagnostic context that explains the incompatible parameter.
             !result
                 .intersect(db, self.constraints, constraint_set)
                 .is_never_satisfied(db)

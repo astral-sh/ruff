@@ -128,7 +128,7 @@ impl<'db> BoundSuperError<'db> {
                         _ => {
                             let mut diagnostic =
                                 builder.into_diagnostic("Argument is not a valid class");
-                            diagnostic.set_primary_message(format_args!(
+                            diagnostic.set_primary_annotation_message(format_args!(
                                 "Argument has type `{}`",
                                 pivot_class.display(context.db())
                             ));
@@ -726,7 +726,7 @@ impl<'db> BoundSuperType<'db> {
                 for positive in intersection.positive(db) {
                     if let Ok(good_element) = delegate_to(*positive) {
                         one_good_element_found = true;
-                        builder = builder.add_positive(good_element);
+                        builder.add_positive_in_place(good_element);
                     }
                 }
                 if !one_good_element_found {
@@ -738,7 +738,7 @@ impl<'db> BoundSuperType<'db> {
                 }
                 for negative in intersection.negative(db) {
                     if let Ok(good_element) = delegate_to(*negative) {
-                        builder = builder.add_negative(good_element);
+                        builder.add_negative_in_place(good_element);
                     }
                 }
                 return Ok(builder.build());
@@ -1009,7 +1009,7 @@ impl<'c, 'db> EquivalenceChecker<'_, 'c, 'db> {
             }
             (ClassBase::TypedDict(_), _) => self.never(),
         };
-        if class_equivalence.is_never_satisfied(db) {
+        if class_equivalence.is_trivially_never_satisfied() {
             return self.never();
         }
         let owner_equivalence = match (left.owner(db), right.owner(db)) {

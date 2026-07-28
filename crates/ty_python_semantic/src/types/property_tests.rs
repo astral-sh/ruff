@@ -145,12 +145,6 @@ mod stable {
         forall types s, t. s.is_subtype_of(db, t) => s.is_assignable_to(db, t)
     );
 
-    // If `T` is a singleton, it is also single-valued.
-    type_property_test!(
-        singleton_implies_single_valued, db,
-        forall types t. t.is_singleton(db) => t.is_single_valued(db)
-    );
-
     // All types should be assignable to `object`
     type_property_test!(
         all_types_assignable_to_object, db,

@@ -7,4 +7,3 @@ RUF065 Unnecessary `str()` conversion when formatting with `%s`
 16 | # str() with single keyword argument - should be flagged (equivalent to str("!"))
 17 | logging.warning("%s", str(object="!"))
    |                       ^^^^^^^^^^^^^^^
-   |

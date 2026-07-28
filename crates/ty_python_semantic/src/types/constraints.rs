@@ -105,8 +105,7 @@ use ty_python_core::rank::RankBitBox;
 use ty_static::EnvVars;
 
 use crate::types::class::GenericAlias;
-use crate::types::generics::InferableTypeVars;
-use crate::types::typevar::{BoundTypeVarIdentity, walk_bound_type_var_type};
+use crate::types::typevar::{BoundTypeVarIdentity, TypeVarSet, walk_bound_type_var_type};
 use crate::types::variance::VarianceInferable;
 use crate::types::visitor::{
     TypeCollector, TypeKind, TypeVisitor, any_over_type, walk_non_atomic_type,
@@ -170,8 +169,8 @@ pub(crate) trait IteratorConstraintsExtension<T> {
     /// Returns the constraints under which any element of the iterator holds.
     ///
     /// This method short-circuits; if we encounter any element that
-    /// [`is_always_satisfied`][ConstraintSet::is_always_satisfied], then the overall result
-    /// must be as well, and we stop consuming elements from the iterator.
+    /// [`is_trivially_always_satisfied`][ConstraintSet::is_trivially_always_satisfied], then the
+    /// overall result must be as well, and we stop consuming elements from the iterator.
     fn when_any<'db, 'c>(
         self,
         db: &'db dyn Db,
@@ -182,8 +181,8 @@ pub(crate) trait IteratorConstraintsExtension<T> {
     /// Returns the constraints under which every element of the iterator holds.
     ///
     /// This method short-circuits; if we encounter any element that
-    /// [`is_never_satisfied`][ConstraintSet::is_never_satisfied], then the overall result
-    /// must be as well, and we stop consuming elements from the iterator.
+    /// [`is_trivially_never_satisfied`][ConstraintSet::is_trivially_never_satisfied], then the
+    /// overall result must be as well, and we stop consuming elements from the iterator.
     fn when_all<'db, 'c>(
         self,
         db: &'db dyn Db,
@@ -198,12 +197,11 @@ where
 {
     fn when_any<'db, 'c>(
         self,
-        db: &'db dyn Db,
+        _db: &'db dyn Db,
         builder: &'c ConstraintSetBuilder<'db>,
         mut f: impl FnMut(T) -> ConstraintSet<'db, 'c>,
     ) -> ConstraintSet<'db, 'c> {
         let node = NodeId::distributed_or(
-            db,
             builder,
             self.map(|element| {
                 let constraint = f(element);
@@ -216,12 +214,11 @@ where
 
     fn when_all<'db, 'c>(
         self,
-        db: &'db dyn Db,
+        _db: &'db dyn Db,
         builder: &'c ConstraintSetBuilder<'db>,
         mut f: impl FnMut(T) -> ConstraintSet<'db, 'c>,
     ) -> ConstraintSet<'db, 'c> {
         let node = NodeId::distributed_and(
-            db,
             builder,
             self.map(|element| {
                 let constraint = f(element);
@@ -437,14 +434,32 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         debug_assert!(std::ptr::eq(self.builder, builder));
     }
 
-    /// Returns whether this constraint set never holds
+    /// Returns whether this constraint set never holds.
     pub(crate) fn is_never_satisfied(self, db: &'db dyn Db) -> bool {
         self.node.is_never_satisfied(db, self.builder)
     }
 
-    /// Returns whether this constraint set always holds
+    /// Returns whether this constraint set is the `never` terminal.
+    ///
+    /// A nonterminal constraint set can also never be satisfied, so `false` does not prove that
+    /// the set is satisfiable. Use [`Self::is_never_satisfied`] when false negatives are not
+    /// acceptable.
+    pub(crate) fn is_trivially_never_satisfied(self) -> bool {
+        self.node == ALWAYS_FALSE
+    }
+
+    /// Returns whether this constraint set always holds.
     pub(crate) fn is_always_satisfied(self, db: &'db dyn Db) -> bool {
         self.node.is_always_satisfied(db, self.builder)
+    }
+
+    /// Returns whether this constraint set is the `always` terminal.
+    ///
+    /// A nonterminal constraint set can also always be satisfied, so `false` does not prove that
+    /// the set is not always satisfied. Use [`Self::is_always_satisfied`] when false negatives are
+    /// not acceptable.
+    pub(crate) fn is_trivially_always_satisfied(self) -> bool {
+        self.node == ALWAYS_TRUE
     }
 
     /// Returns the constraints under which `lhs` is a subtype of `rhs`, assuming that the
@@ -479,7 +494,7 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         &self,
         db: &'db dyn Db,
         builder: &'c ConstraintSetBuilder<'db>,
-        inferable: InferableTypeVars<'db>,
+        inferable: TypeVarSet<'db>,
     ) -> bool {
         self.verify_builder(builder);
         self.node.satisfied_by_all_typevars(db, builder, inferable)
@@ -535,7 +550,7 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         other: impl FnOnce() -> Self,
     ) -> Self {
         self.verify_builder(builder);
-        if !self.is_never_satisfied(db) {
+        if !self.is_trivially_never_satisfied() {
             let other = other();
             other.verify_builder(builder);
             self.intersect(db, builder, other);
@@ -556,7 +571,7 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         other: impl FnOnce() -> Self,
     ) -> Self {
         self.verify_builder(builder);
-        if !self.is_always_satisfied(db) {
+        if !self.is_trivially_always_satisfied() {
             let other = other();
             other.verify_builder(builder);
             self.union(db, builder, other);
@@ -599,7 +614,7 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         self,
         db: &'db dyn Db,
         builder: &'c ConstraintSetBuilder<'db>,
-        to_remove: InferableTypeVars<'db>,
+        to_remove: TypeVarSet<'db>,
     ) -> Self {
         self.verify_builder(builder);
         Self::from_node(builder, self.node.exists(db, builder, to_remove))
@@ -726,10 +741,10 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         self,
         db: &'db dyn Db,
         builder: &'c ConstraintSetBuilder<'db>,
-        to_remove: InferableTypeVars<'db>,
+        to_remove: TypeVarSet<'db>,
     ) -> Self {
         self.verify_builder(builder);
-        if to_remove == InferableTypeVars::None {
+        if to_remove == TypeVarSet::None {
             return self;
         }
 
@@ -757,7 +772,7 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         self,
         db: &'db dyn Db,
         builder: &'c ConstraintSetBuilder<'db>,
-        inferable: InferableTypeVars<'db>,
+        inferable: TypeVarSet<'db>,
     ) -> Solutions<'db> {
         self.solutions_with(db, builder, inferable, |_variance, path_bound| {
             PathBounds::default_solve(db, builder, path_bound)
@@ -768,7 +783,7 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         self,
         db: &'db dyn Db,
         builder: &'c ConstraintSetBuilder<'db>,
-        inferable: InferableTypeVars<'db>,
+        inferable: TypeVarSet<'db>,
         choose: impl FnMut(TypeVarVariance, &PathBound<'db>) -> Result<Option<Type<'db>>, ()>,
     ) -> Solutions<'db> {
         self.verify_builder(builder);
@@ -871,7 +886,7 @@ struct ConstraintSetStorage<'db> {
     negate_cache: FxHashMap<NodeId, NodeId>,
     or_cache: FxHashMap<(NodeId, NodeId, usize), NodeId>,
     and_cache: FxHashMap<(NodeId, NodeId, usize), NodeId>,
-    exists_cache: FxHashMap<(NodeId, InferableTypeVars<'db>), NodeId>,
+    exists_cache: FxHashMap<(NodeId, TypeVarSet<'db>), NodeId>,
     restrict_one_cache: FxHashMap<(NodeId, ConstraintAssignment), (NodeId, bool)>,
     simplify_cache: FxHashMap<NodeId, NodeId>,
 
@@ -1503,7 +1518,7 @@ impl<'db> UpperBound<'db> {
         !self.is_empty()
     }
 
-    fn as_single_bound(&self) -> Option<Type<'db>> {
+    pub(crate) fn as_single_bound(&self) -> Option<Type<'db>> {
         if self.clauses.len() != 1 {
             return None;
         }
@@ -2453,7 +2468,7 @@ impl NodeId {
         self,
         db: &'db dyn Db,
         builder: &ConstraintSetBuilder<'db>,
-        inferable: InferableTypeVars<'db>,
+        inferable: TypeVarSet<'db>,
         choose: impl FnMut(TypeVarVariance, &PathBound<'db>) -> Result<Option<Type<'db>>, ()>,
     ) -> Solutions<'db> {
         let path_bounds = PathBounds::compute(db, builder, self, inferable);
@@ -2548,14 +2563,13 @@ impl NodeId {
     /// You must also provide the "zero" and "one" units of the operator. The "zero" is the value
     /// that has no effect (`0 ∨ a = a`). It is returned if the iterator is empty. The "one" is the
     /// value that saturates (`1 ∨ a = 1`). We use this to short-circuit; if any element BDD or any
-    /// intermediate result evaluates to "one", we can return early.
-    fn tree_fold<'db>(
-        db: &'db dyn Db,
-        builder: &ConstraintSetBuilder<'db>,
+    /// intermediate result is the "one" terminal, we can return early.
+    fn tree_fold(
+        builder: &ConstraintSetBuilder<'_>,
         nodes: impl Iterator<Item = Self>,
         zero: Self,
-        is_one: impl Fn(Self, &'db dyn Db, &ConstraintSetBuilder<'db>) -> bool,
-        mut combine: impl FnMut(Self, &ConstraintSetBuilder<'db>, Self) -> Self,
+        one: Self,
+        mut combine: impl FnMut(Self, &ConstraintSetBuilder<'_>, Self) -> Self,
     ) -> Self {
         // To implement the "linear" shape described above, we could collect the iterator elements
         // into a vector, and then use the fold at the bottom of this method to combine the
@@ -2583,7 +2597,7 @@ impl NodeId {
         // until the iterator passes 256 elements.
         let mut accumulator: SmallVec<[(NodeId, u8); 8]> = SmallVec::default();
         for node in nodes {
-            if is_one(node, db, builder) {
+            if node == one {
                 return node;
             }
 
@@ -2594,7 +2608,7 @@ impl NodeId {
             {
                 let (existing, _) = accumulator.pop().expect("accumulator should not be empty");
                 node = combine(existing, builder, node);
-                if is_one(node, db, builder) {
+                if node == one {
                     return node;
                 }
                 depth += 1;
@@ -2610,32 +2624,28 @@ impl NodeId {
             .fold(zero, |result, (node, _)| combine(result, builder, node))
     }
 
-    fn distributed_or<'db>(
-        db: &'db dyn Db,
-        builder: &ConstraintSetBuilder<'db>,
+    fn distributed_or(
+        builder: &ConstraintSetBuilder<'_>,
         nodes: impl Iterator<Item = NodeId>,
     ) -> Self {
         Self::tree_fold(
-            db,
             builder,
             nodes,
             ALWAYS_FALSE,
-            Self::is_always_satisfied,
+            ALWAYS_TRUE,
             Self::or_with_offset,
         )
     }
 
-    fn distributed_and<'db>(
-        db: &'db dyn Db,
-        builder: &ConstraintSetBuilder<'db>,
+    fn distributed_and(
+        builder: &ConstraintSetBuilder<'_>,
         nodes: impl Iterator<Item = NodeId>,
     ) -> Self {
         Self::tree_fold(
-            db,
             builder,
             nodes,
             ALWAYS_TRUE,
-            Self::is_never_satisfied,
+            ALWAYS_FALSE,
             Self::and_with_offset,
         )
     }
@@ -2828,7 +2838,7 @@ impl NodeId {
         self,
         db: &'db dyn Db,
         builder: &ConstraintSetBuilder<'db>,
-        inferable: InferableTypeVars<'db>,
+        inferable: TypeVarSet<'db>,
     ) -> bool {
         match self.node() {
             Node::AlwaysTrue => return true,
@@ -2907,9 +2917,9 @@ impl NodeId {
         self,
         db: &'db dyn Db,
         builder: &ConstraintSetBuilder<'db>,
-        bound_typevars: InferableTypeVars<'db>,
+        bound_typevars: TypeVarSet<'db>,
     ) -> Self {
-        if bound_typevars == InferableTypeVars::None {
+        if bound_typevars == TypeVarSet::None {
             return self;
         }
 
@@ -2935,7 +2945,7 @@ impl NodeId {
         self,
         db: &'db dyn Db,
         builder: &ConstraintSetBuilder<'db>,
-        inferable: InferableTypeVars<'db>,
+        inferable: TypeVarSet<'db>,
     ) -> Self {
         match self.node() {
             Node::AlwaysTrue => ALWAYS_TRUE,
@@ -3509,7 +3519,7 @@ impl<'db> Type<'db> {
         self,
         db: &'db dyn Db,
         target: Type<'db>,
-        inferable: InferableTypeVars<'db>,
+        inferable: TypeVarSet<'db>,
     ) -> &'db PathBounds<'db> {
         #[salsa::tracked(
             returns(ref),
@@ -3520,7 +3530,7 @@ impl<'db> Type<'db> {
             db: &'db dyn Db,
             source: Type<'db>,
             target: Type<'db>,
-            inferable: InferableTypeVars<'db>,
+            inferable: TypeVarSet<'db>,
         ) -> PathBounds<'db> {
             let when = source.when_constraint_set_assignable_to_owned(db, target);
             when.query(|builder, when| PathBounds::compute(db, builder, when.node, inferable))
@@ -3559,7 +3569,7 @@ impl<'db> PathBounds<'db> {
         db: &'db dyn Db,
         builder: &ConstraintSetBuilder<'db>,
         node: NodeId,
-        inferable: InferableTypeVars<'db>,
+        inferable: TypeVarSet<'db>,
     ) -> Self {
         #[derive(Default)]
         struct CollectVisitor {
@@ -3689,7 +3699,7 @@ impl<'db> PathBounds<'db> {
         db: &'db dyn Db,
         builder: &ConstraintSetBuilder<'db>,
         node: NodeId,
-        inferable: InferableTypeVars<'db>,
+        inferable: TypeVarSet<'db>,
     ) -> Option<Self> {
         match node.node() {
             Node::AlwaysTrue => return Some(PathBounds::Unconstrained),
@@ -3899,14 +3909,26 @@ impl<'db> PathBounds<'db> {
                     // Lower-bound evidence asks for the narrowest compatible declared constraint
                     // above the lower bound. With only upper-bound evidence, ask for the widest
                     // compatible declared constraint below the upper bound. If the candidates are
-                    // equivalent or incomparable, keep the current best to preserve the TypeVar's
+                    // assignable in both directions, prefer a fully static constraint over a
+                    // gradual one. Otherwise, keep the current best to preserve the TypeVar's
                     // declared constraint order.
-                    if path_bound.lower.is_some() {
-                        candidate.is_subtype_of(db, current_best)
-                            && !current_best.is_subtype_of(db, candidate)
+                    let candidate_assignable_to_best = candidate.is_assignable_to(db, current_best);
+                    let best_assignable_to_candidate = current_best.is_assignable_to(db, candidate);
+
+                    if candidate_assignable_to_best != best_assignable_to_candidate {
+                        if path_bound.lower.is_some() {
+                            candidate_assignable_to_best
+                        } else {
+                            best_assignable_to_candidate
+                        }
+                    } else if candidate_assignable_to_best {
+                        let candidate_is_static = candidate.bottom_materialization(db)
+                            == candidate.top_materialization(db);
+                        let best_is_static = current_best.bottom_materialization(db)
+                            == current_best.top_materialization(db);
+                        candidate_is_static && !best_is_static
                     } else {
-                        current_best.is_subtype_of(db, candidate)
-                            && !candidate.is_subtype_of(db, current_best)
+                        false
                     }
                 };
 
@@ -4192,7 +4214,7 @@ impl InteriorNode {
         self,
         db: &'db dyn Db,
         builder: &ConstraintSetBuilder<'db>,
-        bound_typevars: InferableTypeVars<'db>,
+        bound_typevars: TypeVarSet<'db>,
     ) -> NodeId {
         let mentions_typevar = |ty: Type<'db>| match ty {
             Type::TypeVar(typevar) => typevar.is_inferable(db, bound_typevars),
@@ -4224,7 +4246,7 @@ impl InteriorNode {
         self,
         db: &'db dyn Db,
         builder: &ConstraintSetBuilder<'db>,
-        inferable: InferableTypeVars<'db>,
+        inferable: TypeVarSet<'db>,
     ) -> NodeId {
         let is_bare_inferable_typevar = |ty: Type<'db>| {
             ty.as_typevar()
@@ -7707,8 +7729,7 @@ mod tests {
             &builder,
             || ConstraintSet::constrain_typevar_lower_bound(&db, &builder, t, str),
         );
-        let inferable =
-            InferableTypeVars::from_typevars(&db, std::iter::once(t.identity(&db)).collect());
+        let inferable = TypeVarSet::from_typevars(&db, [t]);
         let (single_sequents, pair_sequents) = {
             let storage = builder.storage.borrow();
             (
@@ -7742,10 +7763,7 @@ mod tests {
             ConstraintSet::constrain_typevar(&db, &builder, t, int, int).and(&db, &builder, || {
                 ConstraintSet::constrain_typevar(&db, &builder, u, int, int)
             });
-        let inferable = InferableTypeVars::from_typevars(
-            &db,
-            [t.identity(&db), u.identity(&db)].into_iter().collect(),
-        );
+        let inferable = TypeVarSet::from_typevars(&db, [t, u]);
         let (single_sequents, pair_sequents) = {
             let storage = builder.storage.borrow();
             (
@@ -7784,8 +7802,7 @@ mod tests {
             ConstraintSet::constrain_typevar(&db, &builder, t, int, int).and(&db, &builder, || {
                 ConstraintSet::constrain_typevar(&db, &builder, t, str, str)
             });
-        let inferable =
-            InferableTypeVars::from_typevars(&db, std::iter::once(t.identity(&db)).collect());
+        let inferable = TypeVarSet::from_typevars(&db, [t]);
         let (single_sequents, pair_sequents) = {
             let storage = builder.storage.borrow();
             (
@@ -7889,6 +7906,126 @@ mod tests {
     }
 
     #[test]
+    fn trivial_satisfaction_only_recognizes_terminals() {
+        let db = setup_db();
+        let t = create_typevar(&db, "T");
+        let builder = ConstraintSetBuilder::new();
+        let t_int = create_constraint(&db, &builder, t, KnownClass::Int);
+        let t_str = create_constraint(&db, &builder, t, KnownClass::Str);
+        let impossible = t_int.and(&db, &builder, || t_str);
+
+        assert!(ConstraintSet::always(&builder).is_trivially_always_satisfied());
+        assert!(!ConstraintSet::always(&builder).is_trivially_never_satisfied());
+        assert!(ConstraintSet::never(&builder).is_trivially_never_satisfied());
+        assert!(!ConstraintSet::never(&builder).is_trivially_always_satisfied());
+        assert!(!t_int.is_trivially_always_satisfied());
+        assert!(!t_int.is_trivially_never_satisfied());
+        assert!(impossible.is_never_satisfied(&db));
+        assert!(!impossible.is_trivially_never_satisfied());
+
+        let t_bool_upper = ConstraintSet::constrain_typevar_upper_bound(
+            &db,
+            &builder,
+            t,
+            KnownClass::Bool.to_instance(&db),
+        );
+        let t_int_upper = ConstraintSet::constrain_typevar_upper_bound(
+            &db,
+            &builder,
+            t,
+            KnownClass::Int.to_instance(&db),
+        );
+        let tautology = t_bool_upper
+            .negate(&db, &builder)
+            .or(&db, &builder, || t_int_upper);
+
+        assert!(tautology.is_always_satisfied(&db));
+        assert!(!tautology.is_trivially_always_satisfied());
+    }
+
+    #[test]
+    fn combinators_only_short_circuit_on_terminal_saturation() {
+        let db = setup_db();
+        let t = create_typevar(&db, "T");
+        let builder = ConstraintSetBuilder::new();
+        let t_int = create_constraint(&db, &builder, t, KnownClass::Int);
+        let t_str = create_constraint(&db, &builder, t, KnownClass::Str);
+        let impossible = t_int.and(&db, &builder, || t_str);
+        let t_bool_upper = ConstraintSet::constrain_typevar_upper_bound(
+            &db,
+            &builder,
+            t,
+            KnownClass::Bool.to_instance(&db),
+        );
+        let t_int_upper = ConstraintSet::constrain_typevar_upper_bound(
+            &db,
+            &builder,
+            t,
+            KnownClass::Int.to_instance(&db),
+        );
+        let tautology = t_bool_upper
+            .negate(&db, &builder)
+            .or(&db, &builder, || t_int_upper);
+
+        let forced = Cell::new(0);
+        ConstraintSet::never(&builder).and(&db, &builder, || {
+            forced.set(forced.get() + 1);
+            t_int
+        });
+        ConstraintSet::always(&builder).or(&db, &builder, || {
+            forced.set(forced.get() + 1);
+            t_int
+        });
+        assert_eq!(forced.get(), 0);
+
+        impossible.and(&db, &builder, || {
+            forced.set(forced.get() + 1);
+            t_int
+        });
+        tautology.or(&db, &builder, || {
+            forced.set(forced.get() + 1);
+            t_int
+        });
+        assert_eq!(forced.get(), 2);
+
+        let visited = Cell::new(0);
+        [impossible, t_int]
+            .into_iter()
+            .when_all(&db, &builder, |set| {
+                visited.set(visited.get() + 1);
+                set
+            });
+        assert_eq!(visited.get(), 2);
+
+        visited.set(0);
+        [tautology, t_int]
+            .into_iter()
+            .when_any(&db, &builder, |set| {
+                visited.set(visited.get() + 1);
+                set
+            });
+        assert_eq!(visited.get(), 2);
+
+        visited.set(0);
+        [ConstraintSet::never(&builder), t_int]
+            .into_iter()
+            .when_all(&db, &builder, |set| {
+                visited.set(visited.get() + 1);
+                set
+            });
+        assert_eq!(visited.get(), 1);
+
+        visited.set(0);
+        [ConstraintSet::always(&builder), t_int]
+            .into_iter()
+            .when_any(&db, &builder, |set| {
+                visited.set(visited.get() + 1);
+                set
+            });
+        assert_eq!(visited.get(), 1);
+    }
+
+    #[test]
     fn never_satisfied_results_are_cached() {
         let db = setup_db();
         let t = create_typevar(&db, "T");
@@ -7959,13 +8096,7 @@ mod tests {
         build_bdd: impl Fn(&ConstraintSetBuilder<'db>) -> NodeId,
         expected: impl IntoIterator<Item = &'static str>,
     ) {
-        let inferable = InferableTypeVars::from_typevars(
-            db,
-            typevars
-                .iter()
-                .map(|typevar| typevar.identity(db))
-                .collect(),
-        );
+        let inferable = TypeVarSet::from_typevars(db, typevars.iter().copied());
         let mut signatures = FxIndexSet::default();
 
         for constraint_order in (0..atoms.len()).permutations(atoms.len()) {

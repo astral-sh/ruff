@@ -371,7 +371,7 @@ pub(crate) fn check_static_class_definitions<'db>(
                     "TypedDict class `{}` can only inherit from TypedDict classes",
                     class.name(db),
                 ));
-                diagnostic.set_primary_message(format_args!(
+                diagnostic.set_primary_annotation_message(format_args!(
                     "`{}` is not a `TypedDict` class",
                     base_class.name(db)
                 ));
@@ -665,7 +665,7 @@ pub(crate) fn check_static_class_definitions<'db>(
                                 "Invalid argument to parameter `{arg_name}` \
                                     in `TypedDict` definition",
                             ));
-                            diagnostic.set_primary_message(format_args!(
+                            diagnostic.set_primary_annotation_message(format_args!(
                                 "Expected either `True` or `False`, got object of type `{}`",
                                 passed_type.display(db)
                             ));
@@ -1270,7 +1270,8 @@ fn check_final_class_abstract_methods<'db>(
             "Final class `{class_name}` has unimplemented abstract method \
                 `{first_method_name}`",
         ));
-        diagnostic.set_primary_message(format_args!("`{first_method_name}` is unimplemented"));
+        diagnostic
+            .set_primary_annotation_message(format_args!("`{first_method_name}` is unimplemented"));
     } else {
         let verbose = db.verbose();
         let max_abstract_methods_to_print = if verbose { num_abstract_methods } else { 3 };
@@ -1278,7 +1279,7 @@ fn check_final_class_abstract_methods<'db>(
             format_enumeration(abstract_methods.keys().take(max_abstract_methods_to_print));
 
         if num_abstract_methods > max_abstract_methods_to_print {
-            diagnostic.set_primary_message(format_args!(
+            diagnostic.set_primary_annotation_message(format_args!(
                 "{num_abstract_methods} abstract methods are unimplemented, \
                         including {formatted_methods}",
             ));
@@ -1295,7 +1296,7 @@ fn check_final_class_abstract_methods<'db>(
                 "Final class `{class_name}` has unimplemented \
                     abstract methods {formatted_methods}",
             ));
-            diagnostic.set_primary_message(format_args!(
+            diagnostic.set_primary_annotation_message(format_args!(
                 "Abstract methods {formatted_methods} are unimplemented"
             ));
         }

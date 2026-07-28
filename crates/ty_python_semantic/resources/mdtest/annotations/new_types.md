@@ -201,7 +201,6 @@ warning[mismatched-type-name]: The name passed to `NewType` must match the varia
   |
 5 | UserId = NewType("Id", int)
   |                  ^^^^ Expected "UserId", got "Id"
-  |
 ```
 
 ```py
@@ -217,7 +216,6 @@ warning[mismatched-type-name]: The name passed to `NewType` must match the varia
    |
 10 | UsesExistingId = NewType("Id", "Id")
    |                          ^^^^ Expected "UsesExistingId", got "Id"
-   |
 ```
 
 ## The base must be a class type or another newtype
@@ -566,24 +564,21 @@ E(["foo"])  # error: [invalid-argument-type]
 E(E(E(["foo"])))  # error: [invalid-argument-type]
 ```
 
-## `NewType` wrapping preserves singleton-ness and single-valued-ness
+## `NewType` wrapping preserves singleton-ness
 
 ```py
 from typing_extensions import NewType
 from ty_extensions import static_assert
-from ty_extensions._internal import is_singleton, is_single_valued
+from ty_extensions._internal import is_singleton
 from types import EllipsisType
 
 A = NewType("A", EllipsisType)
 static_assert(is_singleton(A))
-static_assert(is_single_valued(A))
 reveal_type(type(A(...)) is EllipsisType)  # revealed: Literal[True]
-# TODO: This should be `Literal[True]` also.
-reveal_type(A(...) is ...)  # revealed: bool
+reveal_type(A(...) is ...)  # revealed: Literal[True]
 
 B = NewType("B", int)
 static_assert(not is_singleton(B))
-static_assert(not is_single_valued(B))
 ```
 
 ## `NewType`s of tuples can be iterated/unpacked
@@ -645,7 +640,6 @@ error[invalid-base]: Cannot subclass an instance of NewType
   |
 6 | class Foo(X): ...
   |           ^
-  |
 info: Perhaps you were looking for: `Foo = NewType('Foo', X)`
 info: Definition of class `Foo` will raise `TypeError` at runtime
 ```
@@ -692,7 +686,6 @@ error[invalid-newtype]: invalid base for `typing.NewType`
   |
 7 | UserId = NewType("UserId", Id)
   |                            ^^ type `Id`
-  |
 info: The base of a `NewType` is not allowed to be a protocol class.
 ```
 
@@ -710,7 +703,6 @@ error[invalid-newtype]: invalid base for `typing.NewType`
    |
 12 | Bar = NewType("Bar", Foo)
    |                      ^^^ type `Foo`
-   |
 info: The base of a `NewType` is not allowed to be a `TypedDict`.
 ```
 

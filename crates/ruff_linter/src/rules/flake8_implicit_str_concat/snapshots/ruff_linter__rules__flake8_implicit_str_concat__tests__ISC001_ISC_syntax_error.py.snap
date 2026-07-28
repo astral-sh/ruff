@@ -186,12 +186,10 @@ invalid-syntax: f-string: unterminated triple-quoted string
 28 | |     "i" "j"
 29 | | )
    | |__^
-   |
 
 invalid-syntax: f-string: unterminated string
-  --> ISC_syntax_error.py:30:1
+  --> ISC_syntax_error.py:29:3
    |
 28 |     "i" "j"
 29 | )
    |  ^
-   |

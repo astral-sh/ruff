@@ -160,7 +160,6 @@ S103 `os.chmod` setting a permissive mask `0o11` on file or directory
 26 | os.chmod("/etc/secrets.txt", 0o21)  # OK (stable); Error (preview, S_IWGRP)
 27 | os.chmod("/etc/secrets.txt", 0o11)  # Error (S_IXGRP)
    |                              ^^^^
-   |
 
 S103 `os.chmod` setting a permissive mask `0o777` on file or directory
   --> S103.py:31:20
