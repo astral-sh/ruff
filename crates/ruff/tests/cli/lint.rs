@@ -1445,7 +1445,6 @@ fn value_given_to_table_key_is_not_inline_table_2() {
     - `lint.extend-per-file-ignores`
     - `lint.exclude`
     - `lint.preview`
-    - `lint.output-prefer-rule-codes`
     - `lint.typing-extensions`
     - `lint.future-annotations`
 
@@ -4282,7 +4281,7 @@ fn prefer_rule_codes_in_output() {
             .args([
                 "--preview",
                 "--config",
-                "lint.output-prefer-rule-codes = true",
+                "output-prefer-rule-codes = true",
                 "--select=A001",
                 "-",
             ])

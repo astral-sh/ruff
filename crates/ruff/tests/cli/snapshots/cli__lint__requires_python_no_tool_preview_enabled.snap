@@ -24,6 +24,7 @@ cache_dir = "[TMP]/.ruff_cache"
 fix = false
 fix_only = false
 output_format = concise
+output_prefer_rule_codes = false
 show_fixes = false
 unsafe_fixes = hint
 
@@ -86,7 +87,6 @@ linter.safety_table.forced_unsafe = []
 linter.unresolved_target_version = 3.11
 linter.per_file_target_version = {}
 linter.preview = enabled
-linter.output_prefer_rule_codes = false
 linter.explicit_preview_rules = false
 linter.extension = ExtensionMapping({})
 linter.allowed_confusables = []

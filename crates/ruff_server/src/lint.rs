@@ -4,6 +4,7 @@ use std::fmt::Write;
 use std::path::Path;
 
 use ruff_python_ast::SourceType;
+use ruff_workspace::Settings;
 use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
 
@@ -23,7 +24,7 @@ use ruff_linter::{
     package::PackageRoot,
     packaging::detect_package_root,
     preview::is_human_readable_names_enabled,
-    settings::{LinterSettings, flags},
+    settings::flags,
     source_kind::SourceKind,
     suppression::Suppressions,
 };
@@ -158,7 +159,7 @@ pub(crate) fn check(
         stylist.line_ending(),
         &suppressions,
         if is_human_readable_names_enabled(settings.linter.preview)
-            && !settings.linter.output_prefer_rule_codes
+            && !settings.output_prefer_rule_codes
         {
             SuppressionKind::Ignore
         } else {
@@ -174,7 +175,7 @@ pub(crate) fn check(
         document_uri: &document_uri,
         notebook,
         supports_related_information,
-        settings: &settings.linter,
+        settings,
     };
 
     let mut diagnostics_map = DiagnosticsMap::default();
@@ -260,7 +261,7 @@ struct LspDiagnosticContext<'a> {
     document_uri: &'a lsp_types::Uri,
     notebook: Option<&'a NotebookDocument>,
     supports_related_information: bool,
-    settings: &'a LinterSettings,
+    settings: &'a Settings,
 }
 
 /// Generates an LSP diagnostic with an associated cell index for the diagnostic to go in.
@@ -278,7 +279,7 @@ fn to_lsp_diagnostic(
 
     let (severity, code) = if let Some(code) = diagnostic.secondary_code() {
         let severity = severity(code);
-        let code = if is_human_readable_names_enabled(context.settings.preview)
+        let code = if is_human_readable_names_enabled(context.settings.linter.preview)
             && !context.settings.output_prefer_rule_codes
         {
             name.to_string()
@@ -569,7 +570,7 @@ mod tests {
         };
         let index = LineIndex::from_source_text(source);
         let uri = lsp_types::Uri::parse("file:///test.py").expect("URI to be valid");
-        let settings = LinterSettings::default();
+        let settings = Settings::default();
         let context = LspDiagnosticContext {
             source_kind: &source_kind,
             index: &index,

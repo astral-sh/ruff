@@ -107,6 +107,30 @@ pub struct Options {
     )]
     pub output_format: Option<OutputFormat>,
 
+    /// Whether to prefer rule codes over human-readable rule names in diagnostic output, even
+    /// when preview mode is enabled.
+    ///
+    /// Diagnostics without rule codes, such as syntax errors and formatting diagnostics, will
+    /// continue to use the human-readable name, but those corresponding to lint rules will use the
+    /// rule's code. For example, the concise diagnostic for an unused import will use the code
+    /// `F401` instead of the name `unused-import`:
+    ///
+    /// ```console
+    /// $ ruff check --preview --config 'lint.output-prefer-rule-codes = true' --output-format=concise example.py
+    /// example.py:1:8: F401 [*] `math` imported but unused
+    /// $ ruff check --preview --config 'lint.output-prefer-rule-codes = false' --output-format=concise example.py
+    /// example.py:1:8: unused-import: [*] `math` imported but unused
+    /// ```
+    #[option(
+        default = "false",
+        value_type = "bool",
+        example = r#"
+            # Display rule codes instead of human-readable rule names.
+            output-prefer-rule-codes = true
+        "#
+    )]
+    pub output_prefer_rule_codes: Option<bool>,
+
     /// Enable fix behavior by-default when running `ruff` (overridden
     /// by the `--fix` and `--no-fix` command-line flags).
     /// Only includes automatic fixes unless `--unsafe-fixes` is provided.
@@ -548,30 +572,6 @@ pub struct LintOptions {
         "#
     )]
     pub preview: Option<bool>,
-
-    /// Whether to prefer rule codes over human-readable rule names in diagnostic output, even
-    /// when preview mode is enabled.
-    ///
-    /// Diagnostics without rule codes, such as syntax errors and formatting diagnostics, will
-    /// continue to use the human-readable name, but those corresponding to lint rules will use the
-    /// rule's code. For example, the concise diagnostic for an unused import will use the code
-    /// `F401` instead of the name `unused-import`:
-    ///
-    /// ```console
-    /// $ ruff check --preview --config 'lint.output-prefer-rule-codes = true' --output-format=concise example.py
-    /// example.py:1:8: F401 [*] `math` imported but unused
-    /// $ ruff check --preview --config 'lint.output-prefer-rule-codes = false' --output-format=concise example.py
-    /// example.py:1:8: unused-import: [*] `math` imported but unused
-    /// ```
-    #[option(
-        default = "false",
-        value_type = "bool",
-        example = r#"
-            # Display rule codes instead of human-readable rule names.
-            output-prefer-rule-codes = true
-        "#
-    )]
-    pub output_prefer_rule_codes: Option<bool>,
 
     /// Whether to allow imports from the third-party `typing_extensions` module for Python versions
     /// before a symbol was added to the first-party `typing` module.
@@ -4299,7 +4299,6 @@ pub struct LintOptionsWire {
     pydoclint: Option<PydoclintOptions>,
     ruff: Option<RuffOptions>,
     preview: Option<bool>,
-    output_prefer_rule_codes: Option<bool>,
     typing_extensions: Option<bool>,
     future_annotations: Option<bool>,
 }
@@ -4356,7 +4355,6 @@ impl From<LintOptionsWire> for LintOptions {
             pydoclint,
             ruff,
             preview,
-            output_prefer_rule_codes,
             typing_extensions,
             future_annotations,
         } = value;
@@ -4414,7 +4412,6 @@ impl From<LintOptionsWire> for LintOptions {
             pydoclint,
             ruff,
             preview,
-            output_prefer_rule_codes,
             typing_extensions,
             future_annotations,
         }
