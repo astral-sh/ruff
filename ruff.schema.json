@@ -1254,7 +1254,7 @@
           "uniqueItems": true
         },
         "extend-aliases": {
-          "description": "A mapping from module to conventional import alias. These aliases will\nbe added to the [`aliases`](#lint_flake8-import-conventions_aliases) mapping.\n\nEntries here take precedence over [`aliases`](#lint_flake8-import-conventions_aliases),\nso this option can also be used to change or opt out of a default alias without\nrestating the entire mapping. Mapping a module to its own name requires it to be\nimported unaliased.",
+          "description": "A mapping from module to conventional import alias. These aliases will\nbe added to the [`aliases`](#lint_flake8-import-conventions_aliases) mapping\nand will override any existing `aliases` if the two settings overlap.",
           "type": [
             "object",
             "null"
