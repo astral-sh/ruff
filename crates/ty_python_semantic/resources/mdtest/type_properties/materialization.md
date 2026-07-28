@@ -499,12 +499,6 @@ static_assert(is_equivalent_to(Bottom[type[int | Any]], type[int]))
 def _(top: Top[list[type[Any]]], bottom: Bottom[list[type[Any]]]):
     reveal_type(top)  # revealed: Top[list[type[Any]]]
     reveal_type(bottom)  # revealed: Bottom[list[type[Any]]]
-
-def annotated_materialized_list_classes(top: type[Top[list[Any]]], bottom: type[Bottom[list[Any]]]) -> None:
-    reveal_type(top)  # revealed: type[Top[list[Any]]]
-    reveal_type(bottom)  # revealed: type[Bottom[list[Any]]]
-    reveal_type(top())  # revealed: Top[list[Any]]
-    reveal_type(bottom())  # revealed: Bottom[list[Any]]
 ```
 
 ## Materialized class annotations and constructors
@@ -709,10 +703,6 @@ def _(
     top_two: Top[int, str],  # error: [invalid-type-form]
     bottom_two: Bottom[int, str],  # error: [invalid-type-form]
 ): ...
-def nested_invalid_arity(
-    top_two: type[Top[int, str]],  # error: [invalid-type-form]
-    bottom_two: type[Bottom[int, str]],  # error: [invalid-type-form]
-) -> None: ...
 ```
 
 The argument must be a type expression:
@@ -1214,10 +1204,10 @@ static_assert(is_subtype_of(NominalChild, Bottom[NominalBase]))
 
 A covariant `Awaitable[int]` satisfies the top-materialized `Awaitable[object]` protocol. Narrowing
 to that protocol must therefore preserve `Awaitable[int]` without retaining a redundant
-intersection, including when it appears in a callable's union return type:
+intersection:
 
 ```py
-from typing import Awaitable, Callable
+from typing import Awaitable
 from typing_extensions import TypeIs
 
 static_assert(is_subtype_of(Awaitable[int], Top[Awaitable[object]]))
@@ -1228,18 +1218,6 @@ def is_top_awaitable(value: object) -> TypeIs[Top[Awaitable[object]]]:
 def narrow_awaitable(value: Awaitable[int]) -> None:
     if is_top_awaitable(value):
         reveal_type(value)  # revealed: Awaitable[int]
-
-def is_top_async_callable(value: object) -> TypeIs[Top[Callable[..., Awaitable[object]]]]:
-    return True
-
-async def narrow_awaitable_union(fn: Callable[[int], int | Awaitable[int]]) -> None:
-    if is_top_async_callable(fn):
-        # revealed: ((int, /) -> int | Awaitable[int]) & Top[(...) -> Top[Awaitable[object]]]
-        reveal_type(fn)
-        result = fn(1)
-        # revealed: (int & Top[Awaitable[object]]) | Awaitable[int]
-        reveal_type(result)
-        reveal_type(await result)  # revealed: object
 ```
 
 ### Class variables

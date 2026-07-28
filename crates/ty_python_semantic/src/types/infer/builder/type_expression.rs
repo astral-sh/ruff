@@ -1349,15 +1349,6 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         }
                     }
                     Type::SpecialForm(
-                        special_form @ (SpecialFormType::Top | SpecialFormType::Bottom),
-                    ) => {
-                        let slice_ty = self.infer_parameterized_special_form_type_expression(
-                            subscript,
-                            special_form,
-                        );
-                        subclass_of_type_argument(self, slice, slice_ty)
-                    }
-                    Type::SpecialForm(
                         special_form @ (SpecialFormType::TypingCallable
                         | SpecialFormType::CollectionsAbcCallable),
                     ) => {

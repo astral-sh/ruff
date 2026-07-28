@@ -1488,9 +1488,7 @@ impl<'db> Type<'db> {
     pub(crate) fn nominal_class(self, db: &'db dyn Db) -> Option<ClassType<'db>> {
         match self {
             Type::NominalInstance(instance) => Some(instance.class(db)),
-            Type::ProtocolInstance(instance) => instance
-                .nominal_origin_instance(db)
-                .map(|instance| instance.class(db)),
+            Type::ProtocolInstance(instance) => instance.class_origin(db).map(|class| *class),
             Type::TypeAlias(alias) => alias.value_type(db).nominal_class(db),
             Type::NewTypeInstance(newtype) => newtype.concrete_base_type(db).nominal_class(db),
             Type::TypeVar(typevar) => {
@@ -2719,8 +2717,7 @@ impl<'db> Type<'db> {
             return fallback.class_member_with_policy(db, name, policy);
         }
         if let Type::ProtocolInstance(protocol) = ty
-            && protocol.materialization_kind(db).is_some()
-            && let Some(origin) = protocol.class_origin(db)
+            && let Some(origin) = protocol.materialized_origin(db)
         {
             let interface = protocol.interface(db);
             return if interface.includes_member(db, name) {
@@ -4583,7 +4580,7 @@ impl<'db> Type<'db> {
                 // checking it structurally again during call inference.
                 if self_instance
                     .as_protocol_instance()
-                    .is_some_and(|protocol| protocol.nominal_origin_instance(db).is_some())
+                    .is_some_and(|protocol| protocol.class_origin(db).is_some())
                     && signature
                         .overloads
                         .iter()
@@ -5860,16 +5857,14 @@ impl<'db> Type<'db> {
             Type::NominalInstance(instance) => {
                 instance.class(db).iter_mro(db).find_map(from_class_base)
             }
-            Type::ProtocolInstance(protocol) => {
-                let generator_types = protocol
-                    .class_origin(db)
-                    .and_then(|class| class.iter_mro(db).find_map(from_class_base));
-                if let Some(kind) = protocol.materialization_kind(db) {
-                    generator_types.map(|types| types.materialize(db, kind))
-                } else {
-                    generator_types
-                }
-            }
+            Type::ProtocolInstance(protocol) => protocol
+                .class_origin(db)
+                .and_then(|class| class.iter_mro(db).find_map(from_class_base))
+                .map(|types| {
+                    protocol
+                        .materialization_kind(db)
+                        .map_or(types, |kind| types.materialize(db, kind))
+                }),
             Type::Union(union) => {
                 let mut yield_builder = Some(UnionBuilder::new(db));
                 let mut send_builder = Some(UnionBuilder::new(db));

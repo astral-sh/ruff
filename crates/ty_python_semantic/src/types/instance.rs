@@ -502,9 +502,6 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         // exact same class specialization can therefore settle these directions without expanding
         // a recursive protocol's members or confusing opposite materialization requirements.
         if let Some(source) = source_protocol
-            && let (Some(source_origin), Some(target_origin)) =
-                (source.class_origin(db), protocol.class_origin(db))
-            && source_origin == target_origin
             && matches!(
                 (
                     source.materialization_kind(db),
@@ -515,18 +512,15 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     Some(MaterializationKind::Top)
                 ) | (Some(MaterializationKind::Bottom), None)
             )
+            && let (Some(source_origin), Some(target_origin)) =
+                (source.class_origin(db), protocol.class_origin(db))
+            && source_origin == target_origin
         {
             return self.always();
         }
 
         let source_protocol_as_nominal =
             source_protocol.and_then(|source| source.nominal_origin_instance(db));
-        let is_generator_pair = source_protocol
-            .and_then(|source| source.class_origin(db))
-            .is_some_and(|class| class.is_known(db, KnownClass::Generator))
-            && protocol
-                .class_origin(db)
-                .is_some_and(|class| class.is_known(db, KnownClass::Generator));
         if let Some(nominal_instance) = protocol.nominal_origin_instance(db) {
             // if `ty` and `protocol` are *both* protocols, we also need to treat `ty` as if it
             // were a nominal type, or we won't consider a protocol `P` that explicitly inherits
@@ -545,7 +539,10 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             // Python 3.13 and newer.
             // TODO: Remove the Python 3.13+ extension once
             // https://github.com/astral-sh/ty/issues/3596 is fixed.
-            if is_generator_pair {
+            if nominal_instance.has_known_class(db, KnownClass::Generator)
+                && source_protocol_as_nominal
+                    .is_some_and(|source| source.has_known_class(db, KnownClass::Generator))
+            {
                 return nominally_satisfied;
             }
 
@@ -961,8 +958,11 @@ pub(super) fn walk_protocol_instance_type<'db, V: super::visitor::TypeVisitor<'d
         walk_protocol_interface(db, protocol.interface(db), visitor);
     } else {
         match protocol.inner {
-            Protocol::FromClass(class) => {
-                if let Some((_, Some(specialization))) = class.static_class_literal(db) {
+            Protocol::FromClass(_) | Protocol::Materialized(_) => {
+                if let Some((_, Some(specialization))) = protocol
+                    .class_origin(db)
+                    .and_then(|class| class.static_class_literal(db))
+                {
                     walk_specialization(db, specialization, visitor);
                 }
             }
@@ -973,13 +973,6 @@ pub(super) fn walk_protocol_instance_type<'db, V: super::visitor::TypeVisitor<'d
                     visitor,
                 );
             }
-            Protocol::Materialized(materialized) => {
-                if let Some((_, Some(specialization))) =
-                    materialized.origin(db).static_class_literal(db)
-                {
-                    walk_specialization(db, specialization, visitor);
-                }
-            }
         }
     }
 }
@@ -987,8 +980,8 @@ pub(super) fn walk_protocol_instance_type<'db, V: super::visitor::TypeVisitor<'d
 impl<'db> ProtocolInstanceType<'db> {
     /// Return `true` if this is the standard-library `Hashable` protocol.
     pub(super) fn is_hashable(self, db: &'db dyn Db) -> bool {
-        self.nominal_origin_instance(db)
-            .is_some_and(|instance| instance.class(db).is_known(db, KnownClass::Hashable))
+        self.class_origin(db)
+            .is_some_and(|class| class.is_known(db, KnownClass::Hashable))
     }
 
     // Keep this method private, so that the only way of constructing `ProtocolInstanceType`
@@ -1025,11 +1018,6 @@ impl<'db> ProtocolInstanceType<'db> {
             )),
             _phantom: PhantomData,
         }
-    }
-
-    /// Return the class backing a class-based protocol instance.
-    pub(super) fn as_class_based(self, db: &'db dyn Db) -> Option<ProtocolClass<'db>> {
-        self.class_origin(db)
     }
 
     /// Returns the nominal instance of a protocol's origin without asserting nominal subtyping.
@@ -1091,12 +1079,10 @@ impl<'db> ProtocolInstanceType<'db> {
         db: &'db dyn Db,
         target: ProtocolInstanceType<'db>,
     ) -> bool {
-        let Some(origin) = self.materialized_origin(db) else {
-            return false;
-        };
-        let original = ProtocolInterfaceView::new(origin.unmaterialized_interface(db), None);
-        self.interface(db)
-            .differs_for_members_required_by(db, original, target.interface(db))
+        self.materialization_kind(db).is_some()
+            && self
+                .interface(db)
+                .differs_for_members_required_by(db, target.interface(db))
     }
 
     /// Returns the materialization wrapper needed for displaying this protocol.
@@ -1108,8 +1094,10 @@ impl<'db> ProtocolInstanceType<'db> {
         self,
         db: &'db dyn Db,
     ) -> Option<MaterializationKind> {
-        let materialization_kind = self.materialization_kind(db)?;
-        let origin = self.materialized_origin(db)?;
+        let Protocol::Materialized(materialized) = self.inner else {
+            return None;
+        };
+        let origin = materialized.origin(db);
         if origin
             .static_class_literal(db)
             .and_then(|(_, specialization)| specialization)
@@ -1119,10 +1107,10 @@ impl<'db> ProtocolInstanceType<'db> {
             return None;
         }
 
-        let original = ProtocolInterfaceView::new(origin.unmaterialized_interface(db), None);
-        self.interface(db)
-            .differs_for_members_required_by(db, original, original)
-            .then_some(materialization_kind)
+        let interface = self.interface(db);
+        interface
+            .differs_for_members_required_by(db, interface)
+            .then_some(materialized.materialization_kind(db))
     }
 
     /// Return the structural meta-type of this protocol-instance type.

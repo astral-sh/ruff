@@ -3284,9 +3284,8 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             }
 
             (formal, Type::ProtocolInstance(actual_protocol)) => {
-                if actual_protocol.materialization_kind(self.db).is_some()
-                    && let Type::ProtocolInstance(formal_protocol) = formal
-                    && let Some(actual_origin) = actual_protocol.class_origin(self.db)
+                if let Type::ProtocolInstance(formal_protocol) = formal
+                    && let Some(actual_origin) = actual_protocol.materialized_origin(self.db)
                     && let Some(formal_origin) = formal_protocol.class_origin(self.db)
                     && (actual_origin
                         .iter_mro(self.db)
