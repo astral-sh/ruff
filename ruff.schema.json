@@ -1254,7 +1254,7 @@
           "uniqueItems": true
         },
         "extend-aliases": {
-          "description": "A mapping from module to conventional import alias. These aliases will\nbe added to the [`aliases`](#lint_flake8-import-conventions_aliases) mapping.",
+          "description": "A mapping from module to conventional import alias. These aliases will\nbe added to the [`aliases`](#lint_flake8-import-conventions_aliases) mapping\nand will override any existing `aliases` if the two settings overlap.",
           "type": [
             "object",
             "null"

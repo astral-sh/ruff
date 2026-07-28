@@ -1623,7 +1623,8 @@ pub struct Flake8ImportConventionsOptions {
     pub aliases: Option<FxHashMap<ModuleName, Alias>>,
 
     /// A mapping from module to conventional import alias. These aliases will
-    /// be added to the [`aliases`](#lint_flake8-import-conventions_aliases) mapping.
+    /// be added to the [`aliases`](#lint_flake8-import-conventions_aliases) mapping
+    /// and will override any existing `aliases` if the two settings overlap.
     #[option(
         default = r#"{}"#,
         value_type = "dict[str, str]",
