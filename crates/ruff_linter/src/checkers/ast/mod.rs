@@ -53,7 +53,7 @@ use ruff_python_parser::semantic_errors::{
 use ruff_python_parser::typing::{AnnotationKind, ParsedAnnotation, parse_type_annotation};
 use ruff_python_parser::{ParseError, Parsed};
 use ruff_python_semantic::all::{DunderAllDefinition, DunderAllFlags};
-use ruff_python_semantic::analyze::{imports, typing};
+use ruff_python_semantic::analyze::{imports, typing, visibility};
 use ruff_python_semantic::{
     BindingFlags, BindingId, BindingKind, Exceptions, Export, FromImport, GeneratorKind, Globals,
     Import, Module, ModuleKind, ModuleSource, NodeId, ScopeId, ScopeKind, SemanticModel,
@@ -167,7 +167,9 @@ pub(crate) enum ExpectedDocstringKind {
     /// ```
     Function,
 
-    /// An attribute-level docstring.
+    /// An attribute-level docstring: a string immediately following an
+    /// assignment, an annotated assignment, or a `type` alias statement, at
+    /// the module, class, or `__init__` method level.
     ///
     /// For example,
     /// ```python
@@ -178,6 +180,10 @@ pub(crate) enum ExpectedDocstringKind {
     /// class Foo:
     ///     b = 1
     ///     """This is the docstring for `Foo.b` class variable."""
+    ///
+    ///     def __init__(self):
+    ///         self.c = 1
+    ///         """This is the docstring for the `c` instance attribute."""
     /// ```
     Attribute,
 }
@@ -1636,19 +1642,28 @@ impl<'a> Visitor<'a> for Checker<'a> {
             _ => visitor::walk_stmt(self, stmt),
         }
 
-        if self.semantic().at_top_level() || self.semantic().current_scope().kind.is_class() {
-            match stmt {
-                Stmt::Assign(ast::StmtAssign { targets, .. }) => {
-                    if let [Expr::Name(_)] = targets.as_slice() {
-                        self.docstring_state =
-                            DocstringState::Expected(ExpectedDocstringKind::Attribute);
-                    }
+        if matches!(
+            stmt,
+            Stmt::Assign(_) | Stmt::AnnAssign(_) | Stmt::TypeAlias(_)
+        ) {
+            // Per PEP 257, attribute docstrings exist at the module, class, and
+            // `__init__` method level. The check is scope-based rather than
+            // top-level-based (an assignment nested in an `if` block can still
+            // carry one), and accepts any assignment target, both intentionally
+            // broader than PEP 257's "simple assignment" to stay conservative.
+            let scope_allows_attribute_docstrings = match &self.semantic.current_scope().kind {
+                ScopeKind::Module | ScopeKind::Class(_) => true,
+                ScopeKind::Function(function_def) => {
+                    visibility::is_init(&function_def.name)
+                        && self
+                            .semantic
+                            .first_non_type_parent_scope(self.semantic.current_scope())
+                            .is_some_and(|scope| scope.kind.is_class())
                 }
-                Stmt::AnnAssign(ast::StmtAnnAssign { target, .. }) if target.is_name_expr() => {
-                    self.docstring_state =
-                        DocstringState::Expected(ExpectedDocstringKind::Attribute);
-                }
-                _ => {}
+                _ => false,
+            };
+            if scope_allows_attribute_docstrings {
+                self.docstring_state = DocstringState::Expected(ExpectedDocstringKind::Attribute);
             }
         }
 
@@ -2394,6 +2409,11 @@ impl<'a> Visitor<'a> for Checker<'a> {
         for stmt in body {
             self.visit_stmt(stmt);
         }
+
+        // Don't let a docstring expectation escape the suite that set it:
+        // without this reset, an assignment at the end of an `if` body would
+        // mark a string after the block as an attribute docstring.
+        self.docstring_state = DocstringState::Other;
     }
 
     fn visit_match_case(&mut self, match_case: &'a MatchCase) {

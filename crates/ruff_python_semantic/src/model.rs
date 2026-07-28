@@ -2803,10 +2803,9 @@ bitflags! {
 
         /// The model is in an attribute docstring.
         ///
-        /// An attribute docstring is a string literal immediately following an assignment or an
-        /// annotated assignment statement. The context in which this is valid are:
-        /// 1. At the top level of a module
-        /// 2. At the top level of a class definition i.e., a class attribute
+        /// An attribute docstring is a string literal immediately following an assignment, an
+        /// annotated assignment, or a `type` alias statement, at the module, class, or
+        /// `__init__` method level.
         ///
         /// For example:
         /// ```python
@@ -2817,6 +2816,10 @@ bitflags! {
         /// class Foo:
         ///     b = 1
         ///     """This is an attribute docstring for `Foo.b` class variable"""
+        ///
+        ///     def __init__(self):
+        ///         self.c = 1
+        ///         """This is an attribute docstring for the `c` instance attribute"""
         /// ```
         ///
         /// Unlike other kinds of docstrings as described in [PEP 257], attribute docstrings are
