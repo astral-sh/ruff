@@ -181,6 +181,61 @@ def _(a: type[Unknown], b: type[Any]):
     assert_type(b, type[Unknown])  # fine
 ```
 
+## Equivalent bounded gradual specializations
+
+Checking whether gradual specializations are equivalent must preserve their shape aliases instead of
+replacing the aliases with their static upper bounds. It must also treat defaulted nested generics
+and their explicit `Any` specializations equivalently.
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+from typing import Any, assert_type
+
+from ty_extensions import Unknown, static_assert
+from ty_extensions._internal import is_equivalent_to
+
+type AnyShape = tuple[Any, ...]
+type UnknownShape = tuple[Unknown, ...]
+
+class Array[Shape: tuple[int, ...]]:
+    def shape(self) -> Shape:
+        raise NotImplementedError
+
+class InvariantArray[Shape: tuple[int, ...]]:
+    shape: Shape
+
+class Floating[Precision: float = Any]:
+    def precision(self) -> Precision:
+        raise NotImplementedError
+
+class Uniform[Shape: tuple[int, ...], Scalar: Floating[Any] = Floating[Any]]:
+    def scalar(self) -> Scalar:
+        raise NotImplementedError
+
+def equivalent_shapes(
+    aliased: Array[AnyShape],
+    explicit: Array[tuple[Any, ...]],
+    unknown: Array[UnknownShape],
+    invariant: InvariantArray[AnyShape],
+) -> None:
+    assert_type(aliased, Array[tuple[Any, ...]])
+    assert_type(explicit, Array[AnyShape])
+    assert_type(unknown, Array[AnyShape])
+    assert_type(invariant, InvariantArray[tuple[Any, ...]])
+
+def equivalent_defaulted_scalars(value: Uniform[tuple[int], Floating[Any]]) -> None:
+    assert_type(value, Uniform[tuple[int], Floating])
+    assert_type(value, Uniform[tuple[int]])
+
+static_assert(is_equivalent_to(Array[AnyShape], Array[tuple[Any, ...]]))
+static_assert(is_equivalent_to(InvariantArray[AnyShape], InvariantArray[tuple[Any, ...]]))
+static_assert(is_equivalent_to(Uniform[tuple[int], Floating[Any]], Uniform[tuple[int]]))
+```
+
 ## Tuples
 
 Tuple types with the same elements are the same.

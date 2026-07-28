@@ -1550,12 +1550,13 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         // valid materializations are subtypes. Materialize the entire source so declared bounds
         // and constraints restrict gradual type arguments before comparing each argument. Besides
         // establishing `C[Any] <: Top[C[Any]]`, this ensures an `isinstance(x, C)` check excludes
-        // every specialization of `C` from its false branch.
+        // every specialization of `C` from its false branch. Pure redundancy instead checks
+        // equivalence and must preserve the specialization's full range of materializations.
         if matches!(
             self.relation,
             TypeRelation::Subtyping
                 | TypeRelation::SubtypingAssuming
-                | TypeRelation::Redundancy { .. }
+                | TypeRelation::Redundancy { pure: false }
         ) && source.materialization_kind(db).is_none()
             && source.types(db).iter().any(|ty| ty.has_dynamic(db))
             && target
