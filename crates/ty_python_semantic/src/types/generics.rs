@@ -1556,6 +1556,28 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         *target_type,
                         target_materialization_kind,
                     ),
+                    TypeVarVariance::Covariant
+                        if self.relation.is_subtyping()
+                            && source_type.has_dynamic(db)
+                            && let Some(upper_bound) =
+                                bound_typevar.typevar(db).upper_bound(db) =>
+                    {
+                        let source_type = IntersectionType::from_two_elements(
+                            db,
+                            source_type.materialize(
+                                db,
+                                MaterializationKind::Top,
+                                self.materialization_visitor,
+                            ),
+                            upper_bound,
+                        );
+
+                        if source_type == *target_type {
+                            self.always()
+                        } else {
+                            self.check_type_pair(db, source_type, *target_type)
+                        }
+                    }
                     TypeVarVariance::Covariant => {
                         self.check_type_pair(db, *source_type, *target_type)
                     }

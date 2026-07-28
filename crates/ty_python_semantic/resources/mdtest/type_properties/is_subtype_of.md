@@ -890,7 +890,7 @@ of the first type represent sets of values that are a subset of every possible s
 represented by a materialization of the second type.
 
 ```pyi
-from ty_extensions import Unknown, static_assert
+from ty_extensions import Intersection, Unknown, static_assert
 from ty_extensions._internal import is_subtype_of
 from typing_extensions import Any
 
@@ -913,6 +913,31 @@ static_assert(not is_subtype_of(Covariant[Any], Covariant[int]))
 static_assert(not is_subtype_of(Covariant[int], Covariant[Any]))
 static_assert(is_subtype_of(Covariant[Any], Covariant[object]))
 static_assert(not is_subtype_of(Covariant[object], Covariant[Any]))
+
+class UpperBound: ...
+class Sub(UpperBound): ...
+
+class BoundedCovariant[T: UpperBound]:
+    def get(self) -> T:
+        raise NotImplementedError
+
+static_assert(is_subtype_of(BoundedCovariant[Any], BoundedCovariant[UpperBound]))
+static_assert(is_subtype_of(BoundedCovariant[Intersection[Any, Sub]], BoundedCovariant[Sub]))
+static_assert(not is_subtype_of(BoundedCovariant[Any], BoundedCovariant[Sub]))
+static_assert(not is_subtype_of(BoundedCovariant[Any], BoundedCovariant[Any]))
+
+class BoundedDType[T: UpperBound]:
+    def get(self) -> T:
+        raise NotImplementedError
+
+class BoundedArray[Shape: tuple[int, ...], DType: BoundedDType[Any]]:
+    def shape(self) -> Shape:
+        raise NotImplementedError
+
+    def dtype(self) -> DType:
+        raise NotImplementedError
+
+static_assert(is_subtype_of(BoundedArray[Any, Any], BoundedArray[tuple[int, ...], BoundedDType[Any]]))
 
 class Contravariant[T]:
     def receive(self, input: T): ...
