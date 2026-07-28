@@ -4919,7 +4919,7 @@ python-version = "3.12"
 ```
 
 ```py
-from typing import Any, Protocol, Self, TypeVar, TypeVarTuple, Unpack, overload
+from typing import Any, Callable, Protocol, Self, TypeVar, TypeVarTuple, Unpack, overload
 
 P = TypeVarTuple("P")
 V = TypeVar("V")
@@ -4937,6 +4937,25 @@ def handles_int(value: int) -> int:
 
 takes_callback(lambda value: value)
 takes_callback(handles_int)  # error: [invalid-argument-type]
+
+# Receiver filtering is preserved when an overloaded protocol is captured by a `ParamSpec`.
+class ParamSpecCallback[T](Protocol):
+    @overload
+    def __call__(self: "ParamSpecCallback[int]") -> Any: ...
+    @overload
+    def __call__(self: "ParamSpecCallback[str]", value: str, /) -> Any: ...
+    def __call__(self, *args: Any) -> Any: ...
+
+def preserve_callback[**Params](
+    callback: Callable[Params, Any],
+) -> Callable[Params, Any]:
+    return callback
+
+def preserve_str_callback(callback: ParamSpecCallback[str]) -> None:
+    preserved = preserve_callback(callback)
+    preserved("value")
+    preserved()  # error: [missing-argument]
+    preserved(1)  # error: [invalid-argument-type]
 
 # A gradual specialization keeps every receiver overload that could apply.
 def any_args(*args: Any) -> Any:
@@ -4980,6 +4999,43 @@ class UnionReceiverCallback(Protocol):
 def takes_union_receiver_callback(callback: UnionReceiverCallback) -> None: ...
 
 takes_union_receiver_callback(PlainIntCallback())
+
+# Owner selection is evaluated independently for each arm of a receiver union. An unrelated
+# `Self`-dependent arm must not make a same-protocol arm depend on the implementation.
+class SelfMarker[T](Protocol):
+    marker: T
+
+class MixedSelfUnionCallback[T](Protocol):
+    @overload
+    def __call__(
+        self: "MixedSelfUnionCallback[int] | SelfMarker[Self]",
+        value: int,
+        /,
+    ) -> Any: ...
+    @overload
+    def __call__(
+        self: "MixedSelfUnionCallback[bytes]",
+        value: bytes,
+        /,
+    ) -> Any: ...
+    def __call__(self, value: object, /) -> Any: ...
+
+class HandlesOnlyInt:
+    def __call__(self, value: int, /) -> Any:
+        return value
+
+class MarkedSelfUnionInt:
+    marker: Self
+
+    def __call__(self, value: int, /) -> Any:
+        return value
+
+def takes_mixed_self_union_callback(
+    callback: MixedSelfUnionCallback[str],
+) -> None: ...
+
+takes_mixed_self_union_callback(HandlesOnlyInt())  # error: [invalid-argument-type]
+takes_mixed_self_union_callback(MarkedSelfUnionInt())
 
 # Receiver inference must constrain the type variables that occur in the visible signature.
 T_co = TypeVar("T_co", covariant=True)

@@ -121,10 +121,9 @@ struct DeferredReceiverBinding<'db> {
     owner: Type<'db>,
     receiver: Option<Type<'db>>,
     annotation: Type<'db>,
-    /// Whether a same-protocol receiver annotation selects overloads from the cached owner.
-    ///
-    /// `typing.Self` must instead remain dependent on the concrete implementation receiver.
-    use_owner: bool,
+    /// Delay `Self` substitution until each receiver-union arm chooses its own receiver.
+    self_type: Option<Type<'db>>,
+    self_binding_context: Option<BindingContext<'db>>,
 }
 
 impl<'db> DeferredReceiverBinding<'db> {
@@ -140,7 +139,13 @@ impl<'db> DeferredReceiverBinding<'db> {
             annotation: self
                 .annotation
                 .cycle_normalized(db, previous.annotation, cycle),
-            use_owner: self.use_owner,
+            self_type: match (self.self_type, previous.self_type) {
+                (Some(self_type), Some(previous)) => {
+                    Some(self_type.cycle_normalized(db, previous, cycle))
+                }
+                (self_type, _) => self_type,
+            },
+            self_binding_context: self.self_binding_context,
         }
     }
 
@@ -159,7 +164,11 @@ impl<'db> DeferredReceiverBinding<'db> {
             annotation: self
                 .annotation
                 .recursive_type_normalized_impl(db, div, nested)?,
-            use_owner: self.use_owner,
+            self_type: match self.self_type {
+                Some(self_type) => Some(self_type.recursive_type_normalized_impl(db, div, nested)?),
+                None => None,
+            },
+            self_binding_context: self.self_binding_context,
         })
     }
 
@@ -170,7 +179,10 @@ impl<'db> DeferredReceiverBinding<'db> {
                 .receiver
                 .map(|receiver| receiver.recursive_type_normalized(db, cycle)),
             annotation: self.annotation.recursive_type_normalized(db, cycle),
-            use_owner: self.use_owner,
+            self_type: self
+                .self_type
+                .map(|self_type| self_type.recursive_type_normalized(db, cycle)),
+            self_binding_context: self.self_binding_context,
         }
     }
 
@@ -191,7 +203,10 @@ impl<'db> DeferredReceiverBinding<'db> {
             annotation: self
                 .annotation
                 .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
-            use_owner: self.use_owner,
+            self_type: self
+                .self_type
+                .map(|self_type| self_type.apply_type_mapping_impl(db, type_mapping, tcx, visitor)),
+            self_binding_context: self.self_binding_context,
         }
     }
 
@@ -202,14 +217,13 @@ impl<'db> DeferredReceiverBinding<'db> {
         self_type: Type<'db>,
         binding_context: Option<BindingContext<'db>>,
     ) -> Self {
-        let mapping = TypeMapping::BindSelf(SelfBinding::new(db, self_type, binding_context));
+        let self_type = self.annotation.contains_self(db).then_some(self_type);
         Self {
             owner: self.owner,
             receiver: self.receiver.or(Some(receiver_type)),
-            annotation: self
-                .annotation
-                .apply_type_mapping(db, &mapping, TypeContext::default()),
-            use_owner: self.use_owner,
+            annotation: self.annotation,
+            self_type,
+            self_binding_context: self_type.and(binding_context),
         }
     }
 
@@ -217,6 +231,7 @@ impl<'db> DeferredReceiverBinding<'db> {
         std::iter::once(self.owner)
             .chain(self.receiver)
             .chain(std::iter::once(self.annotation))
+            .chain(self.self_type)
     }
 
     fn when_satisfied<'c>(
@@ -242,7 +257,21 @@ impl<'db> DeferredReceiverBinding<'db> {
         db: &'db dyn Db,
         annotation: Type<'db>,
     ) -> ConstraintSet<'db, 'c> {
-        if self.use_owner
+        let annotation = annotation.resolve_type_alias(db);
+        let use_owner = !annotation.contains_self(db);
+        let annotation = if use_owner {
+            annotation
+        } else if let Some(self_type) = self.self_type {
+            annotation.apply_type_mapping(
+                db,
+                &TypeMapping::BindSelf(SelfBinding::new(db, self_type, self.self_binding_context)),
+                TypeContext::default(),
+            )
+        } else {
+            annotation
+        };
+
+        if use_owner
             && let Some((owner_protocol, owner_is_meta)) =
                 Self::as_protocol_receiver(db, self.owner)
             && let Some((annotation_protocol, annotation_is_meta)) =
@@ -330,7 +359,8 @@ impl<'db> ReceiverConditions<'db> {
                 owner,
                 receiver: None,
                 annotation,
-                use_owner: !annotation.contains_self(db),
+                self_type: None,
+                self_binding_context: None,
             }]
             .into_boxed_slice(),
         )

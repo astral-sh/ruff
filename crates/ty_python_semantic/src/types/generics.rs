@@ -3283,7 +3283,11 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 );
             }
 
-            (formal, Type::ProtocolInstance(actual_protocol)) => {
+            // Callable inference needs the protocol's structural callable interface. Converting it
+            // to a nominal instance here would discard receiver-selected overloads.
+            (formal, Type::ProtocolInstance(actual_protocol))
+                if !matches!(formal, Type::Callable(_)) =>
+            {
                 // TODO: This will only handle protocol classes that explicit inherit
                 // from other generic protocol classes by listing it as a base class.
                 // To handle classes that implicitly implement a generic protocol, we
