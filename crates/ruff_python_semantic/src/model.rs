@@ -1949,6 +1949,18 @@ impl<'a> SemanticModel<'a> {
         node.ends_with(&dominator)
     }
 
+    /// Returns `true` if `node` is guaranteed to have executed by the time the current statement
+    /// runs.
+    ///
+    /// Passes that run after the AST traversal have no current statement; there, only nodes
+    /// outside any branch qualify.
+    pub fn dominates_current_statement(&self, node: NodeId) -> bool {
+        match self.current_statement_id() {
+            Some(current) => self.dominates(node, current),
+            None => self.nodes.branch_id(node).is_none(),
+        }
+    }
+
     /// Returns `true` if the given expression is an unused variable, or consists solely of
     /// references to other unused variables. This method is conservative in that it considers a
     /// variable to be "used" if it's shadowed by another variable with usages.
@@ -3018,6 +3030,11 @@ impl ImportedName {
 
     pub const fn context(&self) -> ExecutionContext {
         self.context
+    }
+
+    /// The [`NodeId`] of the statement from which the symbol is imported.
+    pub const fn source(&self) -> NodeId {
+        self.source
     }
 
     pub fn statement<'a>(&self, semantic: &SemanticModel<'a>) -> &'a Stmt {

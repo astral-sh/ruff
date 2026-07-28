@@ -1,0 +1,17 @@
+---
+source: crates/ruff_linter/src/rules/pylint/mod.rs
+---
+PLR1722 [*] Use `sys.exit()` instead of `exit`
+ --> sys_exit_alias_19.py:5:5
+  |
+4 | if cond:
+5 |     exit(1)
+  |     ^^^^
+  |
+help: Replace `exit` with `sys.exit()`
+  |
+4 | if cond:
+  -     exit(1)
+5 +     sys.exit(1)
+  |
+note: This is an unsafe fix and may change runtime behavior

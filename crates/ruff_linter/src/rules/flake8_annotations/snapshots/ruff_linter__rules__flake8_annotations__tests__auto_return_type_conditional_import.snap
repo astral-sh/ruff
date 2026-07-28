@@ -1,0 +1,12 @@
+---
+source: crates/ruff_linter/src/rules/flake8_annotations/mod.rs
+---
+ANN201 Missing return type annotation for public function `func`
+ --> auto_return_type_conditional_import.py:7:5
+  |
+7 | def func(x):
+  |     ^^^^
+8 |     if x:
+9 |         return 1
+  |
+help: Add return type annotation

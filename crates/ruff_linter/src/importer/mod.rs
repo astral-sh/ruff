@@ -343,6 +343,28 @@ impl<'a> Importer<'a> {
             return Err(ResolutionError::IncompatibleContext);
         }
 
+        // If the symbol source (i.e., the import statement) is only reached on some execution
+        // paths, but we're in a runtime context, abort. `sys` may be unbound when the fixed code
+        // runs in:
+        //
+        // ```python
+        // if False:
+        //     import sys
+        //
+        // exit(1)
+        // ```
+        //
+        // Cross-scope comparisons are sound: a usage whose branch path ends with the import's
+        // branch path is lexically nested in that branch regardless of scope. In a typing-only
+        // context this is fine: `if TYPE_CHECKING:` imports are resolved by type checkers without
+        // executing the branch.
+        // See https://github.com/astral-sh/ruff/issues/4419
+        if semantic.execution_context().is_runtime()
+            && !semantic.dominates_current_statement(imported_name.source())
+        {
+            return Err(ResolutionError::ConditionalImport);
+        }
+
         Ok(Some(imported_name))
     }
 
@@ -656,6 +678,9 @@ pub(crate) enum ResolutionError {
     /// The symbol is imported, but in an incompatible context (e.g., in typing-only context, while
     /// we're in a runtime context).
     IncompatibleContext,
+    /// The symbol is imported, but only conditionally (e.g., within an `if` branch that isn't
+    /// guaranteed to have executed).
+    ConditionalImport,
     /// The symbol can't be imported, because another symbol is bound to the same name.
     ConflictingName(String),
     /// The symbol can't be imported due to an error in editing an existing import statement.
@@ -670,6 +695,9 @@ impl std::fmt::Display for ResolutionError {
             }
             ResolutionError::IncompatibleContext => {
                 fmt.write_str("Unable to use existing symbol due to incompatible context")
+            }
+            ResolutionError::ConditionalImport => {
+                fmt.write_str("Unable to use existing symbol due to conditional import")
             }
             ResolutionError::ConflictingName(binding) => std::write!(
                 fmt,
