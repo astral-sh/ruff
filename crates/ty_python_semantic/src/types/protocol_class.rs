@@ -1248,31 +1248,25 @@ impl<'db> ProtocolMemberData<'db> {
                 class: ProtocolMemberAccess::NONE,
             },
             ProtocolMemberKind::Attribute { read, write } => {
-                self.attribute_capabilities(read, write.map_or(read, |write| read.with_ty(write)))
+                let is_class_var = self.qualifiers.contains(TypeQualifiers::CLASS_VAR);
+                let is_final = self.qualifiers.contains(TypeQualifiers::FINAL);
+                let write = write.map_or(read, |write| read.with_ty(write));
+                ProtocolMemberCapabilities {
+                    instance: ProtocolMemberAccess::new(
+                        Some(read),
+                        (!is_class_var && !is_final)
+                            .then_some(ProtocolMemberWrite::from_type(write)),
+                    ),
+                    class: if is_class_var {
+                        ProtocolMemberAccess::new(
+                            Some(read),
+                            (!is_final).then_some(ProtocolMemberWrite::from_type(write)),
+                        )
+                    } else {
+                        ProtocolMemberAccess::NONE
+                    },
+                }
             }
-        }
-    }
-
-    fn attribute_capabilities(
-        &self,
-        read: ProtocolMemberType<'db>,
-        write: ProtocolMemberType<'db>,
-    ) -> ProtocolMemberCapabilities<'db> {
-        let is_class_var = self.qualifiers.contains(TypeQualifiers::CLASS_VAR);
-        let is_final = self.qualifiers.contains(TypeQualifiers::FINAL);
-        ProtocolMemberCapabilities {
-            instance: ProtocolMemberAccess::new(
-                Some(read),
-                (!is_class_var && !is_final).then_some(ProtocolMemberWrite::from_type(write)),
-            ),
-            class: if is_class_var {
-                ProtocolMemberAccess::new(
-                    Some(read),
-                    (!is_final).then_some(ProtocolMemberWrite::from_type(write)),
-                )
-            } else {
-                ProtocolMemberAccess::NONE
-            },
         }
     }
 

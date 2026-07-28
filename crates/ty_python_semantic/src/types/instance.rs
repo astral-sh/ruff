@@ -1283,7 +1283,6 @@ impl<'db> ProtocolInstanceType<'db> {
                 // different specialization, would add a fresh wrapper every time it is mapped
                 // again. Keep the stable class-backed representation until recursive protocol
                 // materialization can preserve its origin without expanding indefinitely.
-                // TODO: Remove this fallback once https://github.com/astral-sh/ruff/pull/24981 merges.
                 if interface_references_protocol_origin(db, interface, class) {
                     return Self::from_class(mapped_class);
                 }
