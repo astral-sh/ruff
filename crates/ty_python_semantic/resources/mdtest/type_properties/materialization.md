@@ -501,6 +501,71 @@ def _(top: Top[list[type[Any]]], bottom: Bottom[list[type[Any]]]):
     reveal_type(bottom)  # revealed: Bottom[list[type[Any]]]
 ```
 
+## Materialized class annotations and constructors
+
+A class-object annotation can name either materialization of an invariant generic. Calling the
+annotated class produces an instance with the same materialization.
+
+```py
+from typing import Any
+from ty_extensions import Bottom, Top
+
+def materialized_list_classes(
+    top: type[Top[list[Any]]],
+    bottom: type[Bottom[list[Any]]],
+) -> None:
+    reveal_type(top)  # revealed: type[Top[list[Any]]]
+    reveal_type(bottom)  # revealed: type[Bottom[list[Any]]]
+    reveal_type(top())  # revealed: Top[list[Any]]
+    reveal_type(bottom())  # revealed: Bottom[list[Any]]
+```
+
+## Generic aliases of materialized classes
+
+A generic class alias can be materialized inside `type[...]`. Aliasing the complete materialized
+type also preserves its polarity, and both alias forms resolve to the underlying class.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Any
+from ty_extensions import Bottom, Top
+
+type ListAlias[T] = list[T]
+type TopList = Top[ListAlias[Any]]
+type BottomList = Bottom[ListAlias[Any]]
+
+def aliased_materialized_list_classes(
+    generic_top: type[Top[ListAlias[Any]]],
+    generic_bottom: type[Bottom[ListAlias[Any]]],
+    aliased_top: type[TopList],
+    aliased_bottom: type[BottomList],
+) -> None:
+    reveal_type(generic_top)  # revealed: type[Top[list[Any]]]
+    reveal_type(generic_bottom)  # revealed: type[Bottom[list[Any]]]
+    reveal_type(aliased_top)  # revealed: type[Top[list[Any]]]
+    reveal_type(aliased_bottom)  # revealed: type[Bottom[list[Any]]]
+    reveal_type(aliased_top())  # revealed: Top[list[Any]]
+    reveal_type(aliased_bottom())  # revealed: Bottom[list[Any]]
+```
+
+## Invalid materialization arity in class annotations
+
+`Top` and `Bottom` each require exactly one type argument, even when they are nested inside a
+class-object annotation.
+
+```py
+from ty_extensions import Bottom, Top
+
+def invalid_materialized_list_classes(
+    top: type[Top[int, str]],  # error: [invalid-type-form]
+    bottom: type[Bottom[int, str]],  # error: [invalid-type-form]
+) -> None: ...
+```
+
 ## Type variables
 
 ```toml
