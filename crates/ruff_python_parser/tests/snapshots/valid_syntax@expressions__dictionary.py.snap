@@ -1112,34 +1112,36 @@ Module(
                         ExprDictComp {
                             node_index: NodeIndex(None),
                             range: 516..575,
-                            key: If(
-                                ExprIf {
-                                    node_index: NodeIndex(None),
-                                    range: 517..533,
-                                    test: BooleanLiteral(
-                                        ExprBooleanLiteral {
-                                            node_index: NodeIndex(None),
-                                            range: 522..526,
-                                            value: true,
-                                        },
-                                    ),
-                                    body: Name(
-                                        ExprName {
-                                            node_index: NodeIndex(None),
-                                            range: 517..518,
-                                            id: Name("x"),
-                                            ctx: Load,
-                                        },
-                                    ),
-                                    orelse: Name(
-                                        ExprName {
-                                            node_index: NodeIndex(None),
-                                            range: 532..533,
-                                            id: Name("y"),
-                                            ctx: Load,
-                                        },
-                                    ),
-                                },
+                            key: Some(
+                                If(
+                                    ExprIf {
+                                        node_index: NodeIndex(None),
+                                        range: 517..533,
+                                        test: BooleanLiteral(
+                                            ExprBooleanLiteral {
+                                                node_index: NodeIndex(None),
+                                                range: 522..526,
+                                                value: true,
+                                            },
+                                        ),
+                                        body: Name(
+                                            ExprName {
+                                                node_index: NodeIndex(None),
+                                                range: 517..518,
+                                                id: Name("x"),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                        orelse: Name(
+                                            ExprName {
+                                                node_index: NodeIndex(None),
+                                                range: 532..533,
+                                                id: Name("y"),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                    },
+                                ),
                             ),
                             value: Name(
                                 ExprName {

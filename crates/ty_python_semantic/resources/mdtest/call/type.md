@@ -54,7 +54,8 @@ reveal_type(DerivedClass)  # revealed: <class 'DerivedClass'>
 Each `type()` call produces a distinct class type, even if they have the same name and bases:
 
 ```py
-from ty_extensions import static_assert, is_equivalent_to
+from ty_extensions import static_assert
+from ty_extensions._internal import is_equivalent_to
 
 class Base: ...
 
@@ -74,9 +75,9 @@ def takes_foo2(x: Foo2) -> None: ...
 takes_foo1(foo1)  # OK
 takes_foo2(foo2)  # OK
 
-# error: [invalid-argument-type] "Argument to function `takes_foo1` is incorrect: Expected `mdtest_snippet.Foo @ src/mdtest_snippet.py:5:8`, found `mdtest_snippet.Foo @ src/mdtest_snippet.py:6:8`"
+# error: [invalid-argument-type] "Argument to function `takes_foo1` is incorrect: Expected `mdtest_snippet.Foo @ src/mdtest_snippet.py:6:8`, found `mdtest_snippet.Foo @ src/mdtest_snippet.py:7:8`"
 takes_foo1(foo2)
-# error: [invalid-argument-type] "Argument to function `takes_foo2` is incorrect: Expected `mdtest_snippet.Foo @ src/mdtest_snippet.py:6:8`, found `mdtest_snippet.Foo @ src/mdtest_snippet.py:5:8`"
+# error: [invalid-argument-type] "Argument to function `takes_foo2` is incorrect: Expected `mdtest_snippet.Foo @ src/mdtest_snippet.py:7:8`, found `mdtest_snippet.Foo @ src/mdtest_snippet.py:6:8`"
 takes_foo2(foo1)
 ```
 
@@ -125,6 +126,16 @@ reveal_type(Foo.custom_attr)  # revealed: Literal[42]
 # Instance attribute access
 foo = Foo()
 reveal_type(foo.custom_attr)  # revealed: Literal[42]
+```
+
+Methods from the namespace dictionary use the descriptor protocol:
+
+```py
+def dynamic_method(self) -> int:
+    return 1
+
+DynamicBase = type("DynamicBase", (), {"method": dynamic_method})
+reveal_type(DynamicBase().method())  # revealed: int
 ```
 
 When the namespace dict is not a literal (e.g., passed as a parameter), attribute access returns
@@ -200,7 +211,7 @@ closed TypedDict namespace should NOT be marked as dynamic, and accessing unknow
 emit an error instead of returning `Unknown`.
 
 ```py
-from typing import TypedDict
+from typing_extensions import TypedDict
 
 class ClosedNamespace(TypedDict, closed=True):
     x: int
@@ -287,7 +298,8 @@ def check_disjointness(x: Foo | int) -> None:
 Disjointness also works for `type[]` of dynamic classes:
 
 ```py
-from ty_extensions import is_disjoint_from, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import is_disjoint_from
 
 # Dynamic classes with disjoint bases have disjoint type[] types.
 IntClass = type("IntClass", (int,), {})
@@ -415,6 +427,15 @@ reveal_type(IntContainer)  # revealed: <class 'IntContainer'>
 container = IntContainer()
 reveal_type(container)  # revealed: IntContainer
 reveal_type(container.value)  # revealed: int
+
+class IntContainerBase(Container[int]): ...
+class StrContainerBase(Container[str]): ...
+
+# error: [invalid-generic-class]
+ConflictingContainer = type("ConflictingContainer", (IntContainerBase, StrContainerBase), {})
+
+# error: [invalid-generic-class]
+conflicting_container = type("InlineConflictingContainer", (IntContainerBase, StrContainerBase), {})()
 ```
 
 ## `type()` and `__class__` on dynamic instances
@@ -534,25 +555,43 @@ class Base: ...
 # error: [invalid-argument-type] "Invalid argument to parameter 1 (`name`) of `type()`: Expected `str`, found `Literal[b"Foo"]`"
 type(b"Foo", (), {})
 
-# error: [invalid-argument-type] "Invalid argument to parameter 2 (`bases`) of `type()`: Expected `tuple[type, ...]`, found `<class 'Base'>`"
+# error: [invalid-argument-type] "Invalid argument to parameter 2 (`bases`) of `type()`: Expected `tuple[object, ...]`, found `<class 'Base'>`"
 type("Foo", Base, {})
 
 # error: 14 [invalid-base] "Invalid class base with type `Literal[1]`"
 # error: 17 [invalid-base] "Invalid class base with type `Literal[2]`"
 type("Foo", (1, 2), {})
 
-# error: [invalid-argument-type] "Invalid argument to parameter 3 (`namespace`) of `type()`: Expected `dict[str, Any]`, found `dict[Unknown | bytes, Unknown | int]`"
+# error: [invalid-argument-type] "Invalid argument to parameter 3 (`namespace`) of `type()`: Expected `dict[str, Any]`, found `dict[bytes, int]`"
 type("Foo", (Base,), {b"attr": 1})
+```
+
+Assigned calls still preserve list-literal base information after reporting the invalid `bases`
+argument:
+
+```py
+class Base:
+    attr: int = 1
+
+# error: [invalid-argument-type]
+FromList = type("FromList", [Base], {})
+reveal_type(FromList().attr)  # revealed: int
+
+bases = (Base,)
+
+# error: [invalid-argument-type]
+FromStarredList = type("FromStarredList", [*bases], {})
+reveal_type(FromStarredList().attr)  # revealed: int
 ```
 
 ## `type[...]` as base class
 
-`type[...]` (SubclassOf) types cannot be used as base classes. When a `type[...]` is used in the
-bases tuple, we emit a diagnostic and insert `Unknown` into the MRO. This gives exactly one
-diagnostic about the unsupported base, rather than cascading errors:
+`type[...]` (SubclassOf) types are valid class bases, but the exact class is not known, so the MRO
+cannot be resolved. `Unknown` is inserted into the MRO and `unsupported-dynamic-base` is emitted.
+This gives exactly one diagnostic rather than cascading errors:
 
 ```py
-from ty_extensions import reveal_mro
+from ty_extensions._internal import reveal_mro
 
 class Base:
     base_attr: int = 1
@@ -569,6 +608,18 @@ def f(x: type[Base]):
 
     # Attributes from `Unknown` are accessible without further errors
     reveal_type(child.base_attr)  # revealed: Unknown
+```
+
+`type[Any]` and `type[Unknown]` already carry the dynamic kind, so no diagnostic is needed. An
+unknowable MRO is already inherent to `Any`/`Unknown`:
+
+```py
+from typing import Any
+
+def g(x: type[Any]):
+    # No diagnostic: `Any` base is fine as-is
+    Child = type("Child", (x,), {})
+    reveal_type(Child)  # revealed: <class 'Child'>
 ```
 
 ## MRO errors
@@ -624,44 +675,138 @@ CyclicChild = type("CyclicChild", (Cyclic,), {})
 A common cause of "inconsistent MRO" errors is where a class inherits from `Generic[]`, but
 `Generic[]` is not the last base class. We provide an autofix for this common error:
 
-<!-- snapshot-diagnostics -->
-
 ```py
 from typing import Generic, TypeVar
 
 K = TypeVar("K")
 V = TypeVar("V")
 
-class Foo1(Generic[K, V], dict): ...  # error: [inconsistent-mro]
+# error: [missing-type-argument]
+class Foo1(Generic[K, V], dict): ...  # snapshot: inconsistent-mro
+```
 
+```snapshot
+error[inconsistent-mro]: Cannot create a consistent method resolution order (MRO) for class `Foo1` with bases list `[<special-form 'typing.Generic[K, V]'>, <class 'dict'>]`
+ --> src/mdtest_snippet.py:7:7
+  |
+7 | class Foo1(Generic[K, V], dict): ...  # snapshot: inconsistent-mro
+  |       ^^^^^^^^^^^^^^^^^^^^^^^^^
+help: Move `Generic[K, V]` to the end of the bases list
+  |
+6 | # error: [missing-type-argument]
+  - class Foo1(Generic[K, V], dict): ...  # snapshot: inconsistent-mro
+7 + class Foo1(dict, Generic[K, V]): ...  # snapshot: inconsistent-mro
+8 | # fmt: off
+  |
+note: This is an unsafe fix and may change runtime behavior
+```
+
+```py
 # fmt: off
 
-class Foo2(  # error: [inconsistent-mro]
+class Foo2(  # snapshot: inconsistent-mro
     # comment1
     Generic[K, V],  # comment2
     # comment3
+    # error: [missing-type-argument]
     dict  # comment4
     # comment5
 ): ...
+```
 
-class Foo3(Generic[K, V], dict, metaclass=type): ...  # error: [inconsistent-mro]
+```snapshot
+error[inconsistent-mro]: Cannot create a consistent method resolution order (MRO) for class `Foo2` with bases list `[<special-form 'typing.Generic[K, V]'>, <class 'dict'>]`
+  --> src/mdtest_snippet.py:10:7
+   |
+10 |   class Foo2(  # snapshot: inconsistent-mro
+   |  _______^
+11 | |     # comment1
+12 | |     Generic[K, V],  # comment2
+13 | |     # comment3
+14 | |     # error: [missing-type-argument]
+15 | |     dict  # comment4
+16 | |     # comment5
+17 | | ): ...
+   | |_^
+help: Move `Generic[K, V]` to the end of the bases list
+   |
+11 |     # comment1
+   -     Generic[K, V],  # comment2
+   -     # comment3
+   -     # error: [missing-type-argument]
+   -     dict  # comment4
+12 +     dict, Generic[K, V]  # comment4
+13 |     # comment5
+   |
+note: This is an unsafe fix and may change runtime behavior
+```
 
-class Foo4(  # error: [inconsistent-mro]
+```py
+# error: [missing-type-argument]
+class Foo3(Generic[K, V], dict, metaclass=type): ...  # snapshot: inconsistent-mro
+```
+
+```snapshot
+error[inconsistent-mro]: Cannot create a consistent method resolution order (MRO) for class `Foo3` with bases list `[<special-form 'typing.Generic[K, V]'>, <class 'dict'>]`
+  --> src/mdtest_snippet.py:19:7
+   |
+19 | class Foo3(Generic[K, V], dict, metaclass=type): ...  # snapshot: inconsistent-mro
+   |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+help: Move `Generic[K, V]` to the end of the bases list
+   |
+18 | # error: [missing-type-argument]
+   - class Foo3(Generic[K, V], dict, metaclass=type): ...  # snapshot: inconsistent-mro
+19 + class Foo3(dict, Generic[K, V], metaclass=type): ...  # snapshot: inconsistent-mro
+20 | class Foo4(  # snapshot: inconsistent-mro
+   |
+note: This is an unsafe fix and may change runtime behavior
+```
+
+```py
+class Foo4(  # snapshot: inconsistent-mro
     # comment1
     Generic[K, V],  # comment2
     # comment3
+    # error: [missing-type-argument]
     dict,  # comment4
     # comment5
-    metaclass=type  # comment6
+    metaclass=type,  # comment6
     # comment7
 ): ...
 
 # fmt: on
 ```
 
-## MRO error highlighting (snapshot)
+```snapshot
+error[inconsistent-mro]: Cannot create a consistent method resolution order (MRO) for class `Foo4` with bases list `[<special-form 'typing.Generic[K, V]'>, <class 'dict'>]`
+  --> src/mdtest_snippet.py:20:7
+   |
+20 |   class Foo4(  # snapshot: inconsistent-mro
+   |  _______^
+21 | |     # comment1
+22 | |     Generic[K, V],  # comment2
+23 | |     # comment3
+24 | |     # error: [missing-type-argument]
+25 | |     dict,  # comment4
+26 | |     # comment5
+27 | |     metaclass=type,  # comment6
+28 | |     # comment7
+29 | | ): ...
+   | |_^
+help: Move `Generic[K, V]` to the end of the bases list
+   |
+21 |     # comment1
+   -     Generic[K, V],  # comment2
+   -     # comment3
+   -     # error: [missing-type-argument]
+   -     dict,  # comment4
+22 +     dict, Generic[K, V],  # comment4
+23 |     # comment5
+   |
+note: This is an unsafe fix and may change runtime behavior
+```
 
-<!-- snapshot-diagnostics -->
+## MRO error highlighting (snapshot)
 
 This snapshot test documents the diagnostic highlighting range for dynamic class literals.
 Currently, the entire `type()` call expression is highlighted:
@@ -669,7 +814,16 @@ Currently, the entire `type()` call expression is highlighted:
 ```py
 class A: ...
 
-Dup = type("Dup", (A, A), {})  # error: [duplicate-base]
+# snapshot: duplicate-base
+Dup = type("Dup", (A, A), {})
+```
+
+```snapshot
+error[duplicate-base]: Duplicate base class <class 'A'> in class `Dup`
+ --> src/mdtest_snippet.py:4:7
+  |
+4 | Dup = type("Dup", (A, A), {})
+  |       ^^^^^^^^^^^^^^^^^^^^^^^
 ```
 
 ## Metaclass conflicts
@@ -778,8 +932,6 @@ def f(ns: dict[str, Any]):
 
 ## `instance-layout-conflict` diagnostic snapshots
 
-<!-- snapshot-diagnostics -->
-
 When the bases are a tuple literal, the diagnostic includes annotations for each conflicting base:
 
 ```py
@@ -789,8 +941,23 @@ class A:
 class B:
     __slots__ = ("y",)
 
-# error: [instance-layout-conflict]
+# snapshot: instance-layout-conflict
 X = type("X", (A, B), {})
+```
+
+```snapshot
+error[instance-layout-conflict]: Class will raise `TypeError` at runtime due to incompatible bases
+ --> src/mdtest_snippet.py:8:5
+  |
+8 | X = type("X", (A, B), {})
+  |     ^^^^^^^^^^^^^^^^^^^^^ Bases `A` and `B` cannot be combined in multiple inheritance
+info: Two classes cannot coexist in a class's MRO if their instances have incompatible memory layouts
+ --> src/mdtest_snippet.py:8:16
+  |
+8 | X = type("X", (A, B), {})
+  |                -  - `B` instances have a distinct memory layout because `B` defines non-empty `__slots__`
+  |                |
+  |                `A` instances have a distinct memory layout because `A` defines non-empty `__slots__`
 ```
 
 When the bases are not a tuple literal (e.g., a variable), the diagnostic is emitted without
@@ -906,7 +1073,7 @@ literal type but with `Unknown` in the MRO. This means instances are treated hig
 any attribute access returns `Unknown`:
 
 ```py
-from ty_extensions import reveal_mro
+from ty_extensions._internal import reveal_mro
 
 class Base1: ...
 class Base2: ...
@@ -946,7 +1113,7 @@ reveal_type(instance.attr)  # revealed: int
 Unpacking arguments with `*args` or `**kwargs`:
 
 ```py
-from ty_extensions import reveal_mro
+from ty_extensions._internal import reveal_mro
 
 class Base: ...
 
@@ -1013,6 +1180,68 @@ class Unrelated: ...
 Bad: type[Unrelated] = type("Bad", (Base,), {})
 ```
 
+## Dynamic class reassignment in a loop
+
+A dynamic class can capture the previous value of a loop-carried variable in its namespace. Type
+inference should reach a fixed point instead of repeatedly nesting the dynamic class's member type.
+
+```py
+def make_chain(depth: int) -> type[object]:
+    current: type[object] = type("Leaf", (object,), {})
+    for index in range(depth):
+        current = type(f"Level{index}", (object,), {"child": current})
+    return current
+```
+
+## Dynamic class base reassignment in a loop
+
+A dynamic class that is not the direct right-hand side of an assignment stores its inferred bases in
+its identity. Those bases should not prevent type inference from reaching a fixed point.
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+
+def identity(value: T) -> T:
+    return value
+
+def make_chain(depth: int) -> type[object]:
+    current: type[object] = object
+    for _ in range(depth):
+        current = identity(type("Level", (current,), {}))  # error: [unsupported-dynamic-base]
+    return current
+```
+
+## Functional dynamic class reassignment in a loop
+
+Functional class literals can capture the previous value of a loop-carried variable when they are
+used in a dynamic class namespace. Their inferred field or member types should not prevent type
+inference from reaching a fixed point.
+
+```py
+from enum import Enum
+from typing import NamedTuple, TypedDict
+
+def make_named_tuple_chain(depth: int) -> type[object]:
+    current: type[object] = object
+    for _ in range(depth):
+        current = type("Level", (), {"child": NamedTuple("N", [("value", current)])})
+    return current
+
+def make_typed_dict_chain(depth: int) -> type[object]:
+    current: type[object] = object
+    for _ in range(depth):
+        current = type("Level", (), {"child": TypedDict("T", {"value": current})})
+    return current
+
+def make_enum_chain(depth: int) -> type[object]:
+    current: type[object] = object
+    for _ in range(depth):
+        current = type("Level", (), {"child": Enum("E", {"VALUE": current})})
+    return current
+```
+
 ## Special base classes
 
 Some special base classes work with dynamic class creation, but special semantics may not be fully
@@ -1058,7 +1287,7 @@ Inheriting from a class that is itself a protocol is valid:
 
 ```py
 from typing import Protocol
-from ty_extensions import reveal_mro
+from ty_extensions._internal import reveal_mro
 
 class MyProtocol(Protocol):
     def method(self) -> int: ...
@@ -1077,7 +1306,7 @@ Inheriting from a class that is itself a TypedDict is valid:
 
 ```py
 from typing_extensions import TypedDict
-from ty_extensions import reveal_mro
+from ty_extensions._internal import reveal_mro
 
 class MyDict(TypedDict):
     name: str
@@ -1093,7 +1322,7 @@ reveal_mro(DictSubclass)  # revealed: (<class 'DictSubclass'>, <class 'MyDict'>,
 ```py
 # NamedTuple bases work but the dynamic subclass isn't recognized as a NamedTuple
 from typing import NamedTuple
-from ty_extensions import reveal_mro
+from ty_extensions._internal import reveal_mro
 
 class Point(NamedTuple):
     x: int
@@ -1145,8 +1374,8 @@ class Base:
 class Child(Base, required_arg="value"):
     pass
 
-# The dynamically assigned attribute has Unknown in its type
-reveal_type(Child.config)  # revealed: Unknown | str
+# The dynamically assigned attribute has the inferred type
+reveal_type(Child.config)  # revealed: str
 
 DynamicChild = type("DynamicChild", (Base,), {}, required_arg="value")
 ```
@@ -1156,7 +1385,7 @@ DynamicChild = type("DynamicChild", (Base,), {}, required_arg="value")
 When the bases tuple is empty, the class implicitly inherits from `object`:
 
 ```py
-from ty_extensions import reveal_mro
+from ty_extensions._internal import reveal_mro
 
 EmptyBases = type("EmptyBases", (), {})
 reveal_type(EmptyBases)  # revealed: <class 'EmptyBases'>
@@ -1241,5 +1470,5 @@ def f(flag: bool):
     # TODO: should be `type[MyClass] | int`, but the `type` arm misses dynamic class creation
     # because the early-return guard only matches `ClassLiteral`, not union members.
     MyClass = x("MyClass", (), {})  # error: [no-matching-overload]
-    reveal_type(MyClass)  # revealed: type | Unknown
+    reveal_type(MyClass)  # revealed: type | int
 ```

@@ -33,8 +33,8 @@ import sys
 from _typeshed import MaybeNone
 from collections.abc import Callable, Iterable, Iterator
 from types import GenericAlias
-from typing import Any, Generic, Literal, SupportsComplex, SupportsFloat, SupportsIndex, SupportsInt, TypeVar, overload
-from typing_extensions import Self, TypeAlias, disjoint_base
+from typing import Any, Generic, Literal, SupportsComplex, SupportsFloat, SupportsIndex, SupportsInt, TypeAlias, TypeVar, overload
+from typing_extensions import Self, disjoint_base
 
 _T = TypeVar("_T")
 _S = TypeVar("_S")
@@ -76,6 +76,7 @@ class count(Generic[_N]):
     def __new__(cls, start: _N, step: _Step = 1) -> count[_N]: ...
     @overload
     def __new__(cls, *, step: _N) -> count[_N]: ...
+
     def __next__(self) -> _N:
         """Implement next(self)."""
 
@@ -104,6 +105,7 @@ class repeat(Generic[_T]):
     def __new__(cls, object: _T) -> Self: ...
     @overload
     def __new__(cls, object: _T, times: int) -> Self: ...
+
     def __next__(self) -> _T:
         """Implement next(self)."""
 
@@ -121,6 +123,7 @@ class accumulate(Generic[_T]):
     def __new__(cls, iterable: Iterable[_T], func: None = None, *, initial: _T | None = None) -> Self: ...
     @overload
     def __new__(cls, iterable: Iterable[_S], func: Callable[[_T, _S], _T], *, initial: _T | None = None) -> Self: ...
+
     def __iter__(self) -> Self:
         """Implement iter(self)."""
 
@@ -147,14 +150,16 @@ class chain(Generic[_T]):
         """Alternative chain() constructor taking a single iterable argument that evaluates lazily."""
 
     def __class_getitem__(cls, item: Any, /) -> GenericAlias:
-        """See PEP 585"""
+        """chain is generic over the type of its contents.
+        This is the union of the types of the input iterable contents.
+        """
 
 @disjoint_base
 class compress(Generic[_T]):
     """Return data elements corresponding to true selector elements.
 
-    Forms a shorter iterator from selected data elements using the selectors to
-    choose the data elements.
+    Forms a shorter iterator from selected data elements using the selectors
+    to choose the data elements.
     """
 
     def __new__(cls, data: Iterable[_T], selectors: Iterable[Any]) -> Self: ...
@@ -208,6 +213,7 @@ class groupby(Generic[_T_co, _S_co]):
     def __new__(cls, iterable: Iterable[_T1], key: None = None) -> groupby[_T1, _T1]: ...
     @overload
     def __new__(cls, iterable: Iterable[_T1], key: Callable[[_T1], _T2]) -> groupby[_T2, _T1]: ...
+
     def __iter__(self) -> Self:
         """Implement iter(self)."""
 
@@ -231,6 +237,7 @@ class islice(Generic[_T]):
     def __new__(cls, iterable: Iterable[_T], stop: int | None, /) -> Self: ...
     @overload
     def __new__(cls, iterable: Iterable[_T], start: int | None, stop: int | None, step: int | None = 1, /) -> Self: ...
+
     def __iter__(self) -> Self:
         """Implement iter(self)."""
 
@@ -346,6 +353,7 @@ class zip_longest(Generic[_T_co]):
         *iterables: Iterable[_T],
         fillvalue: _T,
     ) -> zip_longest[tuple[_T, ...]]: ...
+
     def __iter__(self) -> Self:
         """Implement iter(self)."""
 
@@ -450,6 +458,7 @@ class product(Generic[_T_co]):
     ) -> product[tuple[_T1, _T2, _T3, _T4, _T5, _T6, _T7, _T8, _T9, _T10]]: ...
     @overload
     def __new__(cls, *iterables: Iterable[_T1], repeat: int = 1) -> product[tuple[_T1, ...]]: ...
+
     def __iter__(self) -> Self:
         """Implement iter(self)."""
 
@@ -473,6 +482,7 @@ class permutations(Generic[_T_co]):
     def __new__(cls, iterable: Iterable[_T], r: Literal[5]) -> permutations[tuple[_T, _T, _T, _T, _T]]: ...
     @overload
     def __new__(cls, iterable: Iterable[_T], r: int | None = None) -> permutations[tuple[_T, ...]]: ...
+
     def __iter__(self) -> Self:
         """Implement iter(self)."""
 
@@ -496,6 +506,7 @@ class combinations(Generic[_T_co]):
     def __new__(cls, iterable: Iterable[_T], r: Literal[5]) -> combinations[tuple[_T, _T, _T, _T, _T]]: ...
     @overload
     def __new__(cls, iterable: Iterable[_T], r: int) -> combinations[tuple[_T, ...]]: ...
+
     def __iter__(self) -> Self:
         """Implement iter(self)."""
 
@@ -519,26 +530,26 @@ class combinations_with_replacement(Generic[_T_co]):
     def __new__(cls, iterable: Iterable[_T], r: Literal[5]) -> combinations_with_replacement[tuple[_T, _T, _T, _T, _T]]: ...
     @overload
     def __new__(cls, iterable: Iterable[_T], r: int) -> combinations_with_replacement[tuple[_T, ...]]: ...
+
     def __iter__(self) -> Self:
         """Implement iter(self)."""
 
     def __next__(self) -> _T_co:
         """Implement next(self)."""
 
-if sys.version_info >= (3, 10):
-    @disjoint_base
-    class pairwise(Generic[_T_co]):
-        """Return an iterator of overlapping pairs taken from the input iterator.
+@disjoint_base
+class pairwise(Generic[_T_co]):
+    """Return an iterator of overlapping pairs taken from the input iterator.
 
-        s -> (s0,s1), (s1,s2), (s2, s3), ...
-        """
+    s -> (s0,s1), (s1,s2), (s2, s3), ...
+    """
 
-        def __new__(cls, iterable: Iterable[_T], /) -> pairwise[tuple[_T, _T]]: ...
-        def __iter__(self) -> Self:
-            """Implement iter(self)."""
+    def __new__(cls, iterable: Iterable[_T], /) -> pairwise[tuple[_T, _T]]: ...
+    def __iter__(self) -> Self:
+        """Implement iter(self)."""
 
-        def __next__(self) -> _T_co:
-            """Implement next(self)."""
+    def __next__(self) -> _T_co:
+        """Implement next(self)."""
 
 if sys.version_info >= (3, 12):
     @disjoint_base

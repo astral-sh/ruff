@@ -1,7 +1,7 @@
 [package]
 name = "ruff_db"
-version = "0.0.0"
-publish = false
+version = "0.0.6"
+description = "This is an internal component crate of Ruff"
 authors = { workspace = true }
 edition = { workspace = true }
 rust-version = { workspace = true }
@@ -26,19 +26,19 @@ ty_static = { workspace = true }
 anstyle = { workspace = true }
 arc-swap = { workspace = true }
 camino = { workspace = true }
+compact_str = { workspace = true }
 dashmap = { workspace = true }
 dunce = { workspace = true }
 filetime = { workspace = true }
 get-size2 = { workspace = true }
-glob = { workspace = true }
 ignore = { workspace = true, optional = true }
-is_executable = { workspace = true }
 matchit = { workspace = true }
 path-slash = { workspace = true }
 pathdiff = { workspace = true }
 quick-junit = { workspace = true, optional = true }
 rustc-hash = { workspace = true }
 salsa = { workspace = true }
+same-file = { workspace = true, optional = true }
 schemars = { workspace = true, optional = true }
 serde = { workspace = true, optional = true }
 serde_json = { workspace = true, optional = true }
@@ -47,6 +47,7 @@ supports-hyperlinks = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true, optional = true }
+which = { workspace = true, optional = true }
 zip = { workspace = true }
 
 [target.'cfg(not(target_arch="wasm32"))'.dependencies]
@@ -55,9 +56,6 @@ etcetera = { workspace = true, optional = true }
 [target.'cfg(target_arch="wasm32")'.dependencies]
 web-time = { version = "1.1.0" }
 
-[target.'cfg(not(target_family = "wasm"))'.dependencies]
-which = { workspace = true }
-
 [dev-dependencies]
 insta = { workspace = true, features = ["filters"] }
 tempfile = { workspace = true }
@@ -65,7 +63,7 @@ tempfile = { workspace = true }
 [features]
 cache = ["ruff_cache"]
 junit = ["dep:quick-junit"]
-os = ["ignore", "dep:etcetera"]
+os = ["ignore", "dep:etcetera", "dep:same-file", "dep:which"]
 serde = [
     "camino/serde1",
     "dep:serde",

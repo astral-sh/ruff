@@ -12,10 +12,23 @@ use std::path::Path;
 use path_slash::PathExt;
 use zip::CompressionMethod;
 use zip::result::ZipResult;
-use zip::write::{FileOptions, ZipWriter};
+use zip::write::{SimpleFileOptions, ZipWriter};
 
 const TYPESHED_SOURCE_DIR: &str = "vendor/typeshed";
-const TY_EXTENSIONS_STUBS: &str = "ty_extensions/ty_extensions.pyi";
+const TY_EXTENSIONS_STUBS: &[(&str, &str)] = &[
+    (
+        "ty_extensions/__init__.pyi",
+        "stdlib/ty_extensions/__init__.pyi",
+    ),
+    (
+        "ty_extensions/_internal.pyi",
+        "stdlib/ty_extensions/_internal.pyi",
+    ),
+    (
+        "ty_extensions/pydantic.pyi",
+        "stdlib/ty_extensions/pydantic.pyi",
+    ),
+];
 const TYPESHED_ZIP_LOCATION: &str = "/zipped_typeshed.zip";
 
 /// Recursively zip the contents of the entire typeshed directory and patch typeshed
@@ -30,18 +43,14 @@ fn write_zipped_typeshed_to(writer: File) -> ZipResult<File> {
     // [source](https://github.com/gyscos/zstd-rs/wiki/Compile-for-WASM) which complicates the build
     // by a lot. Deflated compression is slower but it shouldn't matter much for the WASM use case
     // (WASM itself is already slower than a native build for a specific platform).
-    // We can't use `#[cfg(...)]` here because the target-arch in a build script is the
-    // architecture of the system running the build script and not the architecture of the build-target.
-    // That's why we use the `TARGET` environment variable here.
-    let method = if cfg!(feature = "zstd") {
-        CompressionMethod::Zstd
-    } else if cfg!(feature = "deflate") {
-        CompressionMethod::Deflated
-    } else {
-        CompressionMethod::Stored
-    };
+    #[cfg(feature = "zstd")]
+    let method = CompressionMethod::Zstd;
+    #[cfg(all(not(feature = "zstd"), feature = "deflate"))]
+    let method = CompressionMethod::Deflated;
+    #[cfg(not(any(feature = "zstd", feature = "deflate")))]
+    let method = CompressionMethod::Stored;
 
-    let options = FileOptions::default()
+    let options = SimpleFileOptions::default()
         .compression_method(method)
         .unix_permissions(0o644);
 
@@ -74,11 +83,13 @@ fn write_zipped_typeshed_to(writer: File) -> ZipResult<File> {
         }
     }
 
-    // Patch typeshed and add the stubs for the `ty_extensions` module
-    println!("adding file {TY_EXTENSIONS_STUBS} as stdlib/ty_extensions.pyi ...");
-    zip.start_file("stdlib/ty_extensions.pyi", options)?;
-    let mut f = File::open(TY_EXTENSIONS_STUBS)?;
-    std::io::copy(&mut f, &mut zip).unwrap();
+    // Patch typeshed and add the stubs for the `ty_extensions` package.
+    for (source, destination) in TY_EXTENSIONS_STUBS {
+        println!("adding file {source} as {destination} ...");
+        zip.start_file(destination, options)?;
+        let mut f = File::open(source)?;
+        std::io::copy(&mut f, &mut zip).unwrap();
+    }
 
     zip.finish()
 }

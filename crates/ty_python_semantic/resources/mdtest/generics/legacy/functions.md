@@ -142,6 +142,26 @@ reveal_type(takes_in_protocol(ExplicitSub()))  # revealed: int
 reveal_type(takes_in_protocol(ExplicitGenericSub[str]()))  # revealed: str
 ```
 
+An overload is not a match if it requires a type-variable solution that violates the declared bound.
+Here, the first overload would require `T_str` to be `int`, which does not satisfy the bound `str`,
+so the second overload is selected.
+
+```py
+from collections.abc import Iterable
+from typing import TypeVar, overload
+
+T_str = TypeVar("T_str", bound=str)
+
+@overload
+def pick(x: Iterable[T_str]) -> T_str: ...
+@overload
+def pick(x: Iterable[int]) -> bool: ...
+def pick(x: object) -> str | bool:
+    raise NotImplementedError
+
+reveal_type(pick([1]))  # revealed: bool
+```
+
 ## Inferring tuple parameter types
 
 ```toml
@@ -189,8 +209,6 @@ reveal_type(takes_homogeneous_tuple((42, 43)))  # revealed: Literal[42, 43]
 
 ## Inferring a bound typevar
 
-<!-- snapshot-diagnostics -->
-
 ```py
 from typing import TypeVar
 
@@ -201,13 +219,45 @@ def f(x: T) -> T:
 
 reveal_type(f(1))  # revealed: Literal[1]
 reveal_type(f(True))  # revealed: Literal[True]
-# error: [invalid-argument-type]
+# snapshot: invalid-argument-type
 reveal_type(f("string"))  # revealed: Unknown
 ```
 
-## Inferring a constrained typevar
+```snapshot
+error[invalid-argument-type]: Argument to function `f` is incorrect
+  --> src/mdtest_snippet.py:11:15
+   |
+11 | reveal_type(f("string"))  # revealed: Unknown
+   |               ^^^^^^^^ Argument type `Literal["string"]` does not satisfy upper bound `int` of type variable `T`
+info: Type variable defined here
+ --> src/mdtest_snippet.py:3:1
+  |
+3 | T = TypeVar("T", bound=int)
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+```
 
-<!-- snapshot-diagnostics -->
+A bound can also be a union of protocols. If inference produces a union for the type variable, each
+member must satisfy at least one protocol in the bound. `int` supports ordering, but `None` does
+not, so `None | int` is invalid.
+
+```py
+from collections.abc import Iterable
+from typing import Any, Protocol, TypeVar
+
+class SupportsLT(Protocol):
+    def __lt__(self, other: Any, /) -> object: ...
+
+class SupportsGT(Protocol):
+    def __gt__(self, other: Any, /) -> object: ...
+
+ComparableT = TypeVar("ComparableT", bound=SupportsLT | SupportsGT)
+
+def consume_comparable(values: Iterable[ComparableT]) -> None: ...
+
+consume_comparable([None, 2])  # error: [invalid-argument-type]
+```
+
+## Inferring a constrained typevar
 
 ```py
 from typing import TypeVar
@@ -220,8 +270,21 @@ def f(x: T) -> T:
 reveal_type(f(1))  # revealed: int
 reveal_type(f(True))  # revealed: int
 reveal_type(f(None))  # revealed: None
-# error: [invalid-argument-type]
+# snapshot: invalid-argument-type
 reveal_type(f("string"))  # revealed: Unknown
+```
+
+```snapshot
+error[invalid-argument-type]: Argument to function `f` is incorrect
+  --> src/mdtest_snippet.py:12:15
+   |
+12 | reveal_type(f("string"))  # revealed: Unknown
+   |               ^^^^^^^^ Argument type `Literal["string"]` does not satisfy constraints (`int`, `None`) of type variable `T`
+info: Type variable defined here
+ --> src/mdtest_snippet.py:3:1
+  |
+3 | T = TypeVar("T", int, None)
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 ```
 
 ## Typevar constraints
@@ -308,6 +371,23 @@ def positive_typevar(t: S) -> S:
     return +t
 ```
 
+Narrowing should preserve the constrained typevar identity so the narrowed value remains assignable
+to the function's return type:
+
+```py
+from typing import TypeVar
+
+class P: ...
+class Q: ...
+
+NarrowedT = TypeVar("NarrowedT", P, Q)
+
+def return_narrowed_typevar(x: NarrowedT) -> NarrowedT:
+    if isinstance(x, P):
+        return x
+    return x
+```
+
 Unary operations that are not supported by all constraints should error:
 
 ```py
@@ -330,6 +410,73 @@ def unions_are_different(t1: int | str, t2: int | str) -> int | str:
     return t1 + t2
 ```
 
+## Constraints containing `Any`
+
+A heterogeneous collection can infer a union of tuple types. If every member of that union is
+compatible with `tuple[Any, ...]`, a constrained type variable can use that constraint.
+
+```py
+from collections.abc import Callable, Iterable
+from typing import Any, TypeVar
+
+Row = TypeVar("Row", list[Any], tuple[Any, ...])
+
+class Dense: ...
+class Sparse: ...
+
+def consume(rows: Iterable[Row]) -> Row:
+    raise NotImplementedError
+
+reveal_type(consume([(1.0, Dense()), (0.0, Sparse())]))  # revealed: tuple[Any, ...]
+
+def callback(row: tuple[int, ...]) -> None: ...
+def consume_callback(callback: Callable[[Row], None]) -> Row:
+    raise NotImplementedError
+
+reveal_type(consume_callback(callback))  # revealed: tuple[Any, ...]
+```
+
+## Prefer specific compatible constraints over gradual constraints
+
+A gradual constraint can be compatible with a concrete argument and a more specific declared
+constraint. We prefer the more specific constraint regardless of declaration order.
+
+```py
+from typing import Any, TypeVar
+
+class Row(tuple[Any, ...]):
+    def asDict(self) -> dict[str, Any]:
+        raise NotImplementedError
+
+GradualFirst = TypeVar("GradualFirst", list[Any], tuple[Any, ...], Row)
+RowFirst = TypeVar("RowFirst", Row, tuple[Any, ...], list[Any])
+AnyFirst = TypeVar("AnyFirst", Any, int)
+IntFirst = TypeVar("IntFirst", int, Any)
+
+def gradual_first(row: GradualFirst) -> GradualFirst:
+    return row
+
+def row_first(row: RowFirst) -> RowFirst:
+    return row
+
+def any_first(value: AnyFirst) -> AnyFirst:
+    return value
+
+def int_first(value: IntFirst) -> IntFirst:
+    return value
+
+gradual = gradual_first(Row())
+reveal_type(gradual)  # revealed: Row
+gradual.asDict()
+
+specific = row_first(Row())
+reveal_type(specific)  # revealed: Row
+specific.asDict()
+
+reveal_type(any_first(1))  # revealed: int
+reveal_type(int_first(1))  # revealed: int
+```
+
 ## Typevar inference is a unification problem
 
 When inferring typevar assignments in a generic function call, we cannot simply solve constraints
@@ -348,10 +495,66 @@ reveal_type(two_params("a", "b"))  # revealed: Literal["a", "b"]
 reveal_type(two_params("a", 1))  # revealed: Literal["a", 1]
 ```
 
+## Upper-bound inference preserves intersection order
+
+When a typevar occurs contravariantly, argument matching can provide only upper bounds for its
+solution. Multiple upper bounds are intersected in the order in which they occur at the call site.
+
+```py
+from typing import Callable, Protocol, TypeVar
+
+class P(Protocol):
+    def p(self) -> None: ...
+
+class Q(Protocol):
+    def q(self) -> None: ...
+
+T = TypeVar("T")
+
+def accepts_p(value: P) -> None: ...
+def accepts_q(value: Q) -> None: ...
+def infer_from_callbacks(first: Callable[[T], None], second: Callable[[T], None]) -> T:
+    raise NotImplementedError
+
+reveal_type(infer_from_callbacks(accepts_p, accepts_q))  # revealed: P & Q
+reveal_type(infer_from_callbacks(accepts_q, accepts_p))  # revealed: Q & P
+```
+
+## Recursive generic calls
+
+Recursive occurrences of a generic function should be treated as fresh generic callable occurrences.
+The recursive call's typevars are inferable at the call site, even though the function body's own
+typevars are non-inferable.
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+A = TypeVar("A")
+B = TypeVar("B")
+
+def recursive_identity(t: T) -> T:
+    reveal_type(recursive_identity(t))  # revealed: T@recursive_identity
+    return t
+
+def pair(a: A, b: B) -> tuple[A, B]:
+    return (a, b)
+
+def recursive_pair(t: T) -> T:
+    reveal_type(pair(recursive_pair(t), recursive_pair(1)))  # revealed: tuple[T@recursive_pair, Literal[1]]
+    return t
+```
+
+## Union parameter inference
+
 When one of the parameters is a union, we attempt to find the smallest specialization that satisfies
 all of the constraints.
 
 ```py
+from typing import TypeVar
+
+T = TypeVar("T")
+
 def union_param(x: T | None) -> T:
     if x is None:
         raise ValueError
@@ -394,21 +597,39 @@ reveal_type(accepts_t_or_int(Unrelated()))  # revealed: Unknown
 ```
 
 ```py
-T_str = TypeVar("T_str", bound=str)
+T_str2 = TypeVar("T_str2", bound=str)
 
-def accepts_t_or_list_of_t(x: T_str | list[T_str]) -> T_str:
+def accepts_t_or_list_of_t(x: T_str2 | list[T_str2]) -> T_str2:
     raise NotImplementedError
 
 reveal_type(accepts_t_or_list_of_t("a"))  # revealed: Literal["a"]
-# error: [invalid-argument-type] "Argument type `Literal[1]` does not satisfy upper bound `str` of type variable `T_str`"
+# error: [invalid-argument-type] "Argument type `Literal[1]` does not satisfy upper bound `str` of type variable `T_str2`"
 reveal_type(accepts_t_or_list_of_t(1))  # revealed: Unknown
 
 def _(list_ofstr: list[str], list_of_int: list[int]):
     reveal_type(accepts_t_or_list_of_t(list_ofstr))  # revealed: str
 
     # TODO: the error message here could be improved by referring to the second union element
-    # error: [invalid-argument-type] "Argument type `list[int]` does not satisfy upper bound `str` of type variable `T_str`"
+    # error: [invalid-argument-type] "Argument type `list[int]` does not satisfy upper bound `str` of type variable `T_str2`"
     reveal_type(accepts_t_or_list_of_t(list_of_int))  # revealed: Unknown
+```
+
+A union argument must not widen a bounded type variable with an incompatible union element:
+
+```py
+class MyClass: ...
+
+T_bounded = TypeVar("T_bounded", bound=MyClass)
+
+def accepts_instance_or_int(instance: T_bounded, x: T_bounded | int) -> T_bounded:
+    return instance
+
+def _(x: int | None, valid: MyClass | int) -> MyClass:
+    # error: [invalid-argument-type] "Argument type `None` does not satisfy upper bound `MyClass` of type variable `T_bounded`"
+    result = accepts_instance_or_int(MyClass(), x)
+    reveal_type(result)  # revealed: MyClass
+    reveal_type(accepts_instance_or_int(MyClass(), valid))  # revealed: MyClass
+    return result
 ```
 
 Here, we make sure that `S` is solved as `Literal[1]` instead of a union of the two literals, which
@@ -423,6 +644,8 @@ def tuple_param(x: T | S, y: tuple[T, S]) -> tuple[T, S]:
 reveal_type(tuple_param("a", ("a", 1)))  # revealed: tuple[Literal["a"], Literal[1]]
 reveal_type(tuple_param(1, ("a", 1)))  # revealed: tuple[Literal["a"], Literal[1]]
 ```
+
+## Inference from unions containing generic classes
 
 When a union parameter contains generic classes like `P[T] | Q[T]`, we can infer the typevar from
 the actual argument even for non-final classes.
@@ -630,6 +853,59 @@ def decorated(t: T) -> None:
     reveal_type(cast(T, t))  # revealed: T@decorated
 ```
 
+## Attribute access on `Callable`-bounded TypeVars
+
+```py
+from typing import Any, Callable, Generic, TypeVar
+
+F = TypeVar("F", bound=Callable[..., Any])
+
+def my_decorator(f: F) -> None:
+    # error: [unresolved-attribute]
+    f.whatever
+    # error: [unresolved-attribute]
+    f.whatever = 1
+
+class Box(Generic[F]):
+    cls: type[F]
+
+def specialized(box: Box[Callable[..., Any]]) -> None:
+    # error: [unresolved-attribute]
+    box.cls.whatever
+```
+
+## Attribute access on TypeVars bounded by `type[...]`
+
+Regression test for <https://github.com/astral-sh/ty/issues/3782>.
+
+```py
+from typing import ClassVar, TypeVar
+from typing_extensions import Self
+
+class A:
+    attr: ClassVar[str]
+    current: ClassVar[Self]
+
+    @classmethod
+    def create(cls) -> Self:
+        return cls()
+
+class B:
+    attr: ClassVar[int]
+
+T = TypeVar("T", bound=type[A])
+
+def single_bound(cls: T) -> None:
+    reveal_type(cls.attr)  # revealed: str
+    reveal_type(cls.current)  # revealed: T'instance@single_bound
+    reveal_type(cls.create())  # revealed: T'instance@single_bound
+
+U = TypeVar("U", bound=type[A] | type[B])
+
+def union_bound(cls: U) -> None:
+    reveal_type(cls.attr)  # revealed: str | int
+```
+
 ## Solving TypeVars with upper bounds in unions
 
 ```py
@@ -779,6 +1055,98 @@ y: list[Sub] = f2(Sub())
 reveal_type(y)  # revealed: list[Sub]
 ```
 
+## Prefer specific compatible constraints over union constraints
+
+When multiple declared constraints are compatible with a lower bound, we prefer the most specific
+one. This does not depend on the order in which the constraints were declared.
+
+```py
+from typing import TypeVar
+
+BroadFirst = TypeVar("BroadFirst", str | bytes, str, bytes)
+NarrowFirst = TypeVar("NarrowFirst", str, bytes, str | bytes)
+
+def broad_first(value: BroadFirst) -> BroadFirst:
+    return value
+
+def narrow_first(value: NarrowFirst) -> NarrowFirst:
+    return value
+
+def check(value: str) -> None:
+    reveal_type(broad_first(value))  # revealed: str
+    reveal_type(narrow_first(value))  # revealed: str
+```
+
+## Prefer general constraints for upper-bound-only inference
+
+When inference provides only an upper bound, we prefer the most general compatible declared
+constraint. This also does not depend on declaration order.
+
+```py
+from typing import Callable, TypeVar
+
+NarrowFirst = TypeVar("NarrowFirst", int, object)
+BroadFirst = TypeVar("BroadFirst", object, int)
+
+def narrow_first(callback: Callable[[NarrowFirst], None]) -> NarrowFirst:
+    raise NotImplementedError
+
+def broad_first(callback: Callable[[BroadFirst], None]) -> BroadFirst:
+    raise NotImplementedError
+
+def accepts_object(value: object) -> None: ...
+
+reveal_type(narrow_first(accepts_object))  # revealed: object
+reveal_type(broad_first(accepts_object))  # revealed: object
+```
+
+## Ambiguous constrained TypeVar inference from `Any`
+
+A gradual argument alone provides no evidence for choosing between multiple compatible constraints.
+We currently fall back to `Unknown` rather than choosing an arbitrary concrete constraint. Ideally,
+we would preserve `Any` instead.
+
+```py
+from typing import Any, TypeVar
+
+T = TypeVar("T", int, int | list[int])
+
+def identity(value: T) -> T:
+    return value
+
+def choose(left: T, right: T) -> T:
+    return left
+
+def caller(value: Any) -> None:
+    reveal_type(identity(value))  # revealed: Any
+    # TODO: revealed: Any
+    reveal_type(choose(value, 1))  # revealed: int
+
+def list_caller(value: list[Any]) -> None:
+    reveal_type(identity(value))  # revealed: int | list[int]
+    reveal_type(choose(value, 1))  # revealed: int | list[int]
+    reveal_type(choose(value, [1]))  # revealed: int | list[int]
+```
+
+## Ambiguous constrained TypeVar inference from a gradual callable return
+
+Constraint-set-native inference also preserves gradual evidence nested inside a callable. As above,
+we currently fall back to `Unknown` when that evidence matches multiple constraints.
+
+```py
+from typing import Any, Callable, TypeVar
+
+T = TypeVar("T", int, int | list[int])
+
+def call(callback: Callable[[], T]) -> T:
+    return callback()
+
+def callback() -> Any:
+    return 1
+
+reveal_type(call(callback))  # revealed: Any
+```
+
 ## Bounded TypeVar with callable parameter
 
 When a bounded TypeVar appears in a `Callable` parameter's return type, the inferred type should be
@@ -806,6 +1174,25 @@ reveal_type(result)  # revealed: Derived
 
 # Accessing an attribute that only exists on Derived should work
 print(result.attr)  # No error
+```
+
+## Callable instances
+
+Generic parameters can be inferred from the `__call__` method of a class instance.
+
+```py
+from typing import Callable, TypeVar
+
+R = TypeVar("R")
+
+def call(callable: Callable[[], R]) -> R:
+    return callable()
+
+class MyCallable:
+    def __call__(self) -> int:
+        return 1
+
+reveal_type(call(MyCallable()))  # revealed: int
 ```
 
 ## Passing a constrained TypeVar to a function expecting a compatible constrained TypeVar
@@ -851,6 +1238,8 @@ reveal_type(narrow(1))  # revealed: int
 reveal_type(narrow("hello"))  # revealed: str
 ```
 
+## Incompatible constraint sets
+
 But a constrained TypeVar with constraints not satisfied by the formal TypeVar should still error:
 
 ```py
@@ -865,6 +1254,8 @@ def target(x: T) -> T:
 def source(x: U) -> U:
     return target(x)  # error: [invalid-argument-type]
 ```
+
+## Constraint equivalence
 
 We require equivalence rather than mere assignability when matching constraints. Constrained
 TypeVars allow narrowing via `isinstance` checks in the function body, so a constraint that is a
@@ -898,16 +1289,102 @@ def flatten(*iterables: Iterable[FlatT]) -> list[FlatT]:
 def flatten_covariant(*iterables: Iterable[FlatT]) -> tuple[FlatT, ...]:
     return tuple(x for iterable in iterables for x in iterable)
 
+# TODO: revealed: list[LiteralString | int]
 reveal_type(flatten("abc", (1, 2, 3)))  # revealed: list[str | int]
-# TODO: we could have `Literal["a", "b", "c"]` instead of `str` here
+# TODO: revealed: tuple[LiteralString | Literal[1, 2, 3], ...]
 reveal_type(flatten_covariant("abc", (1, 2, 3)))  # revealed: tuple[str | Literal[1, 2, 3], ...]
 
 def literal_string_case(literal_string: LiteralString):
+    # TODO: revealed: list[LiteralString | int]
     reveal_type(flatten(literal_string, (1, 2, 3)))  # revealed: list[str | int]
+
+def literal_string_case(string: str):
+    reveal_type(flatten(string, (1, 2, 3)))  # revealed: list[str | int]
 
 reveal_type(flatten(b"abc"))  # revealed: list[int]
 reveal_type(flatten(b"abc", ("x",)))  # revealed: list[int | str]
 # TODO: we could have `Literal[97, 98, 99]` instead of `int` in the next two lines
 reveal_type(flatten_covariant(b"abc"))  # revealed: tuple[int, ...]
 reveal_type(flatten_covariant(b"abc", ("x",)))  # revealed: tuple[int | Literal["x"], ...]
+```
+
+## Inferring typevars in intersections (formal type position)
+
+```py
+from typing import TypeVar, Iterable
+from ty_extensions import Intersection
+
+T = TypeVar("T")
+
+class Foo: ...
+
+def foo(x: Intersection[Iterable[T], Foo]) -> T:
+    return next(iter(x))
+
+class Bar(list[int], Foo): ...
+
+reveal_type(foo(Bar()))  # revealed: int
+```
+
+## Inferring typevars in intersections (actual type position)
+
+```py
+from typing import TypeVar, Sequence, Iterable
+
+T = TypeVar("T")
+
+def first(iterable: Iterable[T]) -> T:
+    return next(iter(iterable))
+
+def narrowed_via_isinstance(x: Sequence[str] | int):
+    if isinstance(x, int):
+        reveal_type(x)  # revealed: int
+    else:
+        reveal_type(x)  # revealed: Sequence[str] & ~int
+        reveal_type(first(x))  # revealed: str
+
+def narrowed_via_truthiness(y: list[str]):
+    if y:
+        reveal_type(y)  # revealed: list[str] & ~AlwaysFalsy
+        reveal_type(first(y))  # revealed: str
+```
+
+## Inferring typevars in intersections (actual type position, multiple positive types)
+
+When an actual intersection has multiple positive elements and a bounded typevar, inference can fail
+for some elements but succeed for others:
+
+```py
+from typing import Sequence, TypeVar
+from ty_extensions import Intersection
+
+class Base: ...
+class Sub1(Base): ...
+class Sub2(Base): ...
+class Unrelated1: ...
+class Unrelated2: ...
+
+T = TypeVar("T", bound=Base)
+
+def first(x: Sequence[T]) -> T:
+    return x[0]
+
+# An intersection where both positive elements satisfy the bound.
+def _(x: Intersection[Sequence[Sub1], Sequence[Sub2]]) -> None:
+    reveal_type(first(x))  # revealed: Sub1 | Sub2
+
+# An intersection with one positive element that satisfies the bound and one that doesn't.
+def _(x: Intersection[Sequence[Sub1], Sequence[Unrelated1]]) -> None:
+    reveal_type(first(x))  # revealed: Sub1
+
+# An intersection with two positive elements that satisfy the bound and one that doesn't.
+def _(x: Intersection[Sequence[Sub1], Sequence[Sub2], Sequence[Unrelated1]]) -> None:
+    reveal_type(first(x))  # revealed: Sub1 | Sub2
+
+# An intersection with two positive elements, neither of which satisfies the bound. In this case,
+# only the error related to the first element is reported.
+def _(x: Intersection[Sequence[Unrelated1], Sequence[Unrelated2]]) -> None:
+    # TODO: We only report the first error here, but we should report both.
+    # error: [invalid-argument-type] "Argument to function `first` is incorrect: Argument type `Unrelated1` does not satisfy upper bound `Base` of type variable `T`"
+    reveal_type(first(x))  # revealed: Unknown
 ```

@@ -7,10 +7,9 @@ F401 [*] `foo.baz` imported but unused
 3 | __all__ = ("bar",)
 4 | from foo import bar, baz
   |                      ^^^
-  |
 help: Remove unused import: `foo.baz`
-1 | """Test: late-binding of `__all__`."""
-2 | 
+  |
 3 | __all__ = ("bar",)
   - from foo import bar, baz
 4 + from foo import bar
+  |

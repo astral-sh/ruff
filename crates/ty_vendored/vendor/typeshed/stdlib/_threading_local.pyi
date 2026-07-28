@@ -7,8 +7,8 @@
 """
 
 from threading import RLock
-from typing import Any
-from typing_extensions import Self, TypeAlias
+from typing import Any, TypeAlias
+from typing_extensions import Self
 from weakref import ReferenceType
 
 __all__ = ["local"]

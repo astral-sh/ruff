@@ -46,7 +46,8 @@ inline-quotes = "single"
     test.py:1:5: Q000 [*] Double quotes found but single quotes preferred
     test.py:1:5: B005 Using `.strip()` with multi-character strings is misleading
     test.py:1:19: Q000 [*] Double quotes found but single quotes preferred
-    Found 3 errors.
+    test.py:1:19: PLE1310 String `strip` call contains duplicate characters
+    Found 4 errors.
     [*] 2 fixable with the `--fix` option.
 
     ----- stderr -----
@@ -83,7 +84,8 @@ inline-quotes = "single"
     -:1:5: Q000 [*] Double quotes found but single quotes preferred
     -:1:5: B005 Using `.strip()` with multi-character strings is misleading
     -:1:19: Q000 [*] Double quotes found but single quotes preferred
-    Found 3 errors.
+    -:1:19: PLE1310 String `strip` call contains duplicate characters
+    Found 4 errors.
     [*] 2 fixable with the `--fix` option.
 
     ----- stderr -----
@@ -117,7 +119,8 @@ inline-quotes = "single"
     -:1:5: Q000 [*] Double quotes found but single quotes preferred
     -:1:5: B005 Using `.strip()` with multi-character strings is misleading
     -:1:19: Q000 [*] Double quotes found but single quotes preferred
-    Found 3 errors.
+    -:1:19: PLE1310 String `strip` call contains duplicate characters
+    Found 4 errors.
     [*] 2 fixable with the `--fix` option.
 
     ----- stderr -----
@@ -157,7 +160,8 @@ inline-quotes = "single"
     -:1:5: Q000 [*] Double quotes found but single quotes preferred
     -:1:5: B005 Using `.strip()` with multi-character strings is misleading
     -:1:19: Q000 [*] Double quotes found but single quotes preferred
-    Found 3 errors.
+    -:1:19: PLE1310 String `strip` call contains duplicate characters
+    Found 4 errors.
     [*] 2 fixable with the `--fix` option.
 
     ----- stderr -----
@@ -468,7 +472,6 @@ ignore = ["D203", "D212"]
     All checks passed!
 
     ----- stderr -----
-    warning: No Python files found under the given path(s)
     ");
 
     Ok(())
@@ -756,18 +759,536 @@ x = "longer_than_90_charactersssssssssssssssssssssssssssssssssssssssssssssssssss
     Ok(())
 }
 
+fn unknown_rule_selector_test() -> Result<CliTest> {
+    CliTest::with_file("test.py", "import os\n")
+}
+
+#[test]
+fn unknown_rule_selectors_select_f481() -> Result<()> {
+    let fixture = unknown_rule_selector_test()?;
+    assert_cmd_snapshot!(fixture.check_command().args(["--select", "F481"]), @"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    ruff failed
+      Cause: Unknown rule selector `F481` in `select` from the CLI
+    ");
+    Ok(())
+}
+
+#[test]
+fn unknown_rule_selectors_extend_select_f481() -> Result<()> {
+    let fixture = unknown_rule_selector_test()?;
+    assert_cmd_snapshot!(fixture.check_command().args(["--extend-select", "F481"]), @"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    ruff failed
+      Cause: Unknown rule selector `F481` in `extend-select` from the CLI
+    ");
+    Ok(())
+}
+
+#[test]
+fn unknown_rule_selectors_ignore_f481() -> Result<()> {
+    let fixture = unknown_rule_selector_test()?;
+    assert_cmd_snapshot!(fixture.check_command().args(["--ignore", "F481"]), @"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    ruff failed
+      Cause: Unknown rule selector `F481` in `ignore` from the CLI
+    ");
+    Ok(())
+}
+
+#[test]
+fn unknown_rule_selectors_fixable_f481() -> Result<()> {
+    let fixture = unknown_rule_selector_test()?;
+    assert_cmd_snapshot!(fixture.check_command().args(["--fixable", "F481"]), @"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    ruff failed
+      Cause: Unknown rule selector `F481` in `fixable` from the CLI
+    ");
+    Ok(())
+}
+
+#[test]
+fn unknown_rule_selectors_extend_fixable_f481() -> Result<()> {
+    let fixture = unknown_rule_selector_test()?;
+    assert_cmd_snapshot!(fixture.check_command().args(["--extend-fixable", "F481"]), @"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    ruff failed
+      Cause: Unknown rule selector `F481` in `extend-fixable` from the CLI
+    ");
+    Ok(())
+}
+
+#[test]
+fn unknown_rule_selectors_unfixable_f481() -> Result<()> {
+    let fixture = unknown_rule_selector_test()?;
+    assert_cmd_snapshot!(fixture.check_command().args(["--unfixable", "F481"]), @"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    ruff failed
+      Cause: Unknown rule selector `F481` in `unfixable` from the CLI
+    ");
+    Ok(())
+}
+
+#[test]
+fn unknown_rule_selectors_config_ignore_f481() -> Result<()> {
+    let fixture = unknown_rule_selector_test()?;
+    assert_cmd_snapshot!(fixture.check_command().args(["--config", "lint.ignore=['F481']"]), @"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    ruff failed
+      Cause: Unknown rule selector `F481` in `ignore` from the CLI
+    ");
+    Ok(())
+}
+
+#[test]
+fn unknown_rule_selectors_ruff_toml_extend_safe_fixes_f481() -> Result<()> {
+    let fixture = unknown_rule_selector_test()?;
+    fixture.write_file("ruff.toml", r#"lint = { extend-safe-fixes = ["F481"] }"#)?;
+    assert_cmd_snapshot!(fixture.check_command(), @"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    ruff failed
+      Cause: Unknown rule selector `F481` in `extend-safe-fixes` from `[TMP]/ruff.toml`
+    ");
+    Ok(())
+}
+
+#[test]
+fn unknown_rule_selectors_ruff_toml_extend_unsafe_fixes_f481() -> Result<()> {
+    let fixture = unknown_rule_selector_test()?;
+    fixture.write_file("ruff.toml", r#"lint = { extend-unsafe-fixes = ["F481"] }"#)?;
+    assert_cmd_snapshot!(fixture.check_command(), @"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    ruff failed
+      Cause: Unknown rule selector `F481` in `extend-unsafe-fixes` from `[TMP]/ruff.toml`
+    ");
+    Ok(())
+}
+
+#[test]
+fn unknown_rule_selectors_per_file_ignores_f481() -> Result<()> {
+    let fixture = unknown_rule_selector_test()?;
+    assert_cmd_snapshot!(fixture.check_command().args(["--per-file-ignores", "test.py:F481"]), @"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    ruff failed
+      Cause: Unknown rule selector `F481` in `per-file-ignores` from the CLI
+    ");
+    Ok(())
+}
+
+#[test]
+fn unknown_rule_selectors_extend_per_file_ignores_f481() -> Result<()> {
+    let fixture = unknown_rule_selector_test()?;
+    assert_cmd_snapshot!(fixture.check_command().args(["--extend-per-file-ignores", "test.py:F481"]), @"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    ruff failed
+      Cause: Unknown rule selector `F481` in `per-file-ignores` from the CLI
+    ");
+    Ok(())
+}
+
+#[test]
+fn unknown_rule_selectors_ruff_toml_per_file_ignores_f481() -> Result<()> {
+    let fixture = unknown_rule_selector_test()?;
+    fixture.write_file(
+        "ruff.toml",
+        r#"lint = { per-file-ignores = { "test.py" = ["F481"] } }"#,
+    )?;
+    assert_cmd_snapshot!(fixture.check_command(), @"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    ruff failed
+      Cause: Unknown rule selector `F481` in `per-file-ignores` from `[TMP]/ruff.toml`
+    ");
+    Ok(())
+}
+
+#[test]
+fn unknown_rule_selectors_ruff_toml_extend_per_file_ignores_f481() -> Result<()> {
+    let fixture = unknown_rule_selector_test()?;
+    fixture.write_file(
+        "ruff.toml",
+        r#"lint = { extend-per-file-ignores = { "test.py" = ["F481"] } }"#,
+    )?;
+    assert_cmd_snapshot!(fixture.check_command(), @"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    ruff failed
+      Cause: Unknown rule selector `F481` in `per-file-ignores` from `[TMP]/ruff.toml`
+    ");
+    Ok(())
+}
+
+#[test]
+fn unknown_rule_selectors_select_f481_preview() -> Result<()> {
+    let fixture = unknown_rule_selector_test()?;
+    assert_cmd_snapshot!(fixture.check_command().args(["--preview", "--select", "F481"]), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    warning: Unknown rule selector `F481` in `select` from the CLI
+    ");
+    Ok(())
+}
+
+#[test]
+fn unknown_rule_selectors_extend_select_f481_preview() -> Result<()> {
+    let fixture = unknown_rule_selector_test()?;
+    assert_cmd_snapshot!(fixture.check_command().args(["--preview", "--extend-select", "F481"]), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    test.py:1:8: unused-import: [*] `os` imported but unused
+    Found 1 error.
+    [*] 1 fixable with the `--fix` option.
+
+    ----- stderr -----
+    warning: Unknown rule selector `F481` in `extend-select` from the CLI
+    ");
+    Ok(())
+}
+
+#[test]
+fn unknown_rule_selectors_ignore_f481_preview() -> Result<()> {
+    let fixture = unknown_rule_selector_test()?;
+    assert_cmd_snapshot!(fixture.check_command().args(["--preview", "--ignore", "F481"]), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    test.py:1:8: unused-import: [*] `os` imported but unused
+    Found 1 error.
+    [*] 1 fixable with the `--fix` option.
+
+    ----- stderr -----
+    warning: Unknown rule selector `F481` in `ignore` from the CLI
+    ");
+    Ok(())
+}
+
+#[test]
+fn unknown_rule_selectors_fixable_f481_preview() -> Result<()> {
+    let fixture = unknown_rule_selector_test()?;
+    assert_cmd_snapshot!(fixture.check_command().args(["--preview", "--fixable", "F481"]), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    test.py:1:8: unused-import: `os` imported but unused
+    Found 1 error.
+
+    ----- stderr -----
+    warning: Unknown rule selector `F481` in `fixable` from the CLI
+    ");
+    Ok(())
+}
+
+#[test]
+fn unknown_rule_selectors_extend_fixable_f481_preview() -> Result<()> {
+    let fixture = unknown_rule_selector_test()?;
+    assert_cmd_snapshot!(fixture.check_command().args(["--preview", "--extend-fixable", "F481"]), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    test.py:1:8: unused-import: [*] `os` imported but unused
+    Found 1 error.
+    [*] 1 fixable with the `--fix` option.
+
+    ----- stderr -----
+    warning: Unknown rule selector `F481` in `extend-fixable` from the CLI
+    ");
+    Ok(())
+}
+
+#[test]
+fn unknown_rule_selectors_unfixable_f481_preview() -> Result<()> {
+    let fixture = unknown_rule_selector_test()?;
+    assert_cmd_snapshot!(fixture.check_command().args(["--preview", "--unfixable", "F481"]), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    test.py:1:8: unused-import: [*] `os` imported but unused
+    Found 1 error.
+    [*] 1 fixable with the `--fix` option.
+
+    ----- stderr -----
+    warning: Unknown rule selector `F481` in `unfixable` from the CLI
+    ");
+    Ok(())
+}
+
+#[test]
+fn unknown_rule_selectors_config_ignore_f481_preview() -> Result<()> {
+    let fixture = unknown_rule_selector_test()?;
+    assert_cmd_snapshot!(fixture.check_command().args(["--preview", "--config", "lint.ignore=['F481']"]), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    test.py:1:8: unused-import: [*] `os` imported but unused
+    Found 1 error.
+    [*] 1 fixable with the `--fix` option.
+
+    ----- stderr -----
+    warning: Unknown rule selector `F481` in `ignore` from the CLI
+    ");
+    Ok(())
+}
+
+#[test]
+fn unknown_rule_selectors_ruff_toml_extend_safe_fixes_f481_preview() -> Result<()> {
+    let fixture = unknown_rule_selector_test()?;
+    fixture.write_file(
+        "ruff.toml",
+        r#"lint = { preview = true, extend-safe-fixes = ["F481"] }"#,
+    )?;
+    assert_cmd_snapshot!(fixture.check_command(), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    test.py:1:8: unused-import: [*] `os` imported but unused
+    Found 1 error.
+    [*] 1 fixable with the `--fix` option.
+
+    ----- stderr -----
+    warning: Unknown rule selector `F481` in `extend-safe-fixes` from `[TMP]/ruff.toml`
+    ");
+    Ok(())
+}
+
+#[test]
+fn unknown_rule_selectors_ruff_toml_extend_unsafe_fixes_f481_preview() -> Result<()> {
+    let fixture = unknown_rule_selector_test()?;
+    fixture.write_file(
+        "ruff.toml",
+        r#"lint = { preview = true, extend-unsafe-fixes = ["F481"] }"#,
+    )?;
+    assert_cmd_snapshot!(fixture.check_command(), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    test.py:1:8: unused-import: [*] `os` imported but unused
+    Found 1 error.
+    [*] 1 fixable with the `--fix` option.
+
+    ----- stderr -----
+    warning: Unknown rule selector `F481` in `extend-unsafe-fixes` from `[TMP]/ruff.toml`
+    ");
+    Ok(())
+}
+
+#[test]
+fn unknown_rule_selectors_per_file_ignores_f481_preview() -> Result<()> {
+    let fixture = unknown_rule_selector_test()?;
+    assert_cmd_snapshot!(fixture.check_command().args(["--preview", "--per-file-ignores", "test.py:F481"]), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    test.py:1:8: unused-import: [*] `os` imported but unused
+    Found 1 error.
+    [*] 1 fixable with the `--fix` option.
+
+    ----- stderr -----
+    warning: Unknown rule selector `F481` in `per-file-ignores` from the CLI
+    ");
+    Ok(())
+}
+
+#[test]
+fn unknown_rule_selectors_extend_per_file_ignores_f481_preview() -> Result<()> {
+    let fixture = unknown_rule_selector_test()?;
+    assert_cmd_snapshot!(fixture.check_command().args(["--preview", "--extend-per-file-ignores", "test.py:F481"]), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    test.py:1:8: unused-import: [*] `os` imported but unused
+    Found 1 error.
+    [*] 1 fixable with the `--fix` option.
+
+    ----- stderr -----
+    warning: Unknown rule selector `F481` in `per-file-ignores` from the CLI
+    ");
+    Ok(())
+}
+
+#[test]
+fn unknown_rule_selectors_ruff_toml_per_file_ignores_f481_preview() -> Result<()> {
+    let fixture = unknown_rule_selector_test()?;
+    fixture.write_file(
+        "ruff.toml",
+        r#"lint = { preview = true, per-file-ignores = { "test.py" = ["F481"] } }"#,
+    )?;
+    assert_cmd_snapshot!(fixture.check_command(), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    test.py:1:8: unused-import: [*] `os` imported but unused
+    Found 1 error.
+    [*] 1 fixable with the `--fix` option.
+
+    ----- stderr -----
+    warning: Unknown rule selector `F481` in `per-file-ignores` from `[TMP]/ruff.toml`
+    ");
+    Ok(())
+}
+
+#[test]
+fn unknown_rule_selectors_ruff_toml_extend_per_file_ignores_f481_preview() -> Result<()> {
+    let fixture = unknown_rule_selector_test()?;
+    fixture.write_file(
+        "ruff.toml",
+        r#"lint = { preview = true, extend-per-file-ignores = { "test.py" = ["F481"] } }"#,
+    )?;
+    assert_cmd_snapshot!(fixture.check_command(), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    test.py:1:8: unused-import: [*] `os` imported but unused
+    Found 1 error.
+    [*] 1 fixable with the `--fix` option.
+
+    ----- stderr -----
+    warning: Unknown rule selector `F481` in `per-file-ignores` from `[TMP]/ruff.toml`
+    ");
+    Ok(())
+}
+
+#[test]
+fn rule_name_selector_cli_preview_disabled() -> Result<()> {
+    let fixture = unknown_rule_selector_test()?;
+
+    assert_cmd_snapshot!(fixture.check_command().args(["--select", "unused-import"]), @"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    ruff failed
+      Cause: Invalid selector `unused-import` in `select` from the CLI. Selecting rules by name requires preview mode
+    ");
+
+    Ok(())
+}
+
+#[test]
+fn rule_name_selector_cli_preview_enabled() -> Result<()> {
+    let fixture = unknown_rule_selector_test()?;
+
+    assert_cmd_snapshot!(fixture.check_command().args(["--select", "unused-import", "--preview"]), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    test.py:1:8: unused-import: [*] `os` imported but unused
+    Found 1 error.
+    [*] 1 fixable with the `--fix` option.
+
+    ----- stderr -----
+    ");
+
+    Ok(())
+}
+
+#[test]
+fn rule_name_selector_config_preview_disabled() -> Result<()> {
+    let fixture = unknown_rule_selector_test()?;
+    fixture.write_file("ruff.toml", r#"lint = { select = ["unused-import"] }"#)?;
+
+    assert_cmd_snapshot!(fixture.check_command(), @"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    ruff failed
+      Cause: Invalid selector `unused-import` in `select` from `[TMP]/ruff.toml`. Selecting rules by name requires preview mode
+    ");
+
+    Ok(())
+}
+
+#[test]
+fn rule_name_selector_config_preview_enabled() -> Result<()> {
+    let fixture = unknown_rule_selector_test()?;
+    fixture.write_file(
+        "ruff.toml",
+        r#"lint = { preview = true, select = ["unused-import"] }"#,
+    )?;
+
+    assert_cmd_snapshot!(fixture.check_command(), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    test.py:1:8: unused-import: [*] `os` imported but unused
+    Found 1 error.
+    [*] 1 fixable with the `--fix` option.
+
+    ----- stderr -----
+    ");
+
+    Ok(())
+}
+
 #[test]
 fn valid_toml_but_nonexistent_option_provided_via_config_argument() {
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
         .args(STDIN_BASE_OPTIONS)
-        .args([".", "--config", "extend-select=['F481']"]),  // No such code as F481!
+        .args([".", "--config", "extend-selection=['F401']"]),  // No such option as extend-selection!
         @"
     success: false
     exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
-    error: invalid value 'extend-select=['F481']' for '--config <CONFIG_OPTION>'
+    error: invalid value 'extend-selection=['F401']' for '--config <CONFIG_OPTION>'
 
       tip: A `--config` flag must either be a path to a `.toml` configuration file
            or a TOML `<KEY> = <VALUE>` pair overriding a specific configuration
@@ -775,7 +1296,7 @@ fn valid_toml_but_nonexistent_option_provided_via_config_argument() {
 
     Could not parse the supplied argument as a `ruff.toml` configuration option:
 
-    Unknown rule selector: `F481`
+    unknown field `extend-selection`
 
     For more information, try '--help'.
     ");
@@ -1126,15 +1647,15 @@ required-version = "0.1.0"
         .pass_stdin(r#"
 import os
 "#), @"
-    success: false
-    exit_code: 2
-    ----- stdout -----
+        success: false
+        exit_code: 2
+        ----- stdout -----
 
-    ----- stderr -----
-    ruff failed
-      Cause: Failed to load configuration `[TMP]/ruff.toml`
-      Cause: Required version `==0.1.0` does not match the running version `[VERSION]`
-    ");
+        ----- stderr -----
+        ruff failed
+          Cause: Failed to load configuration `[TMP]/ruff.toml`
+          Cause: Required version `==0.1.0` does not match the running version `[VERSION]`
+        ");
     });
 
     Ok(())
@@ -1202,15 +1723,15 @@ required-version = ">{version}"
         .pass_stdin(r#"
 import os
 "#), @"
-    success: false
-    exit_code: 2
-    ----- stdout -----
+        success: false
+        exit_code: 2
+        ----- stdout -----
 
-    ----- stderr -----
-    ruff failed
-      Cause: Failed to load configuration `[TMP]/ruff.toml`
-      Cause: Required version `>[VERSION]` does not match the running version `[VERSION]`
-    ");
+        ----- stderr -----
+        ruff failed
+          Cause: Failed to load configuration `[TMP]/ruff.toml`
+          Cause: Required version `>[VERSION]` does not match the running version `[VERSION]`
+        ");
     });
 
     Ok(())
@@ -1243,15 +1764,15 @@ select = ["RUF999"]
         .pass_stdin(r#"
 import os
 "#), @"
-    success: false
-    exit_code: 2
-    ----- stdout -----
+        success: false
+        exit_code: 2
+        ----- stdout -----
 
-    ----- stderr -----
-    ruff failed
-      Cause: Failed to load configuration `[TMP]/ruff.toml`
-      Cause: Required version `>[VERSION]` does not match the running version `[VERSION]`
-    ");
+        ----- stderr -----
+        ruff failed
+          Cause: Failed to load configuration `[TMP]/ruff.toml`
+          Cause: Required version `>[VERSION]` does not match the running version `[VERSION]`
+        ");
     });
 
     Ok(())
@@ -1869,6 +2390,88 @@ print(
 }
 
 #[test]
+fn add_noqa_top_of_file() -> Result<()> {
+    let fixture = CliTest::new()?;
+    fixture.write_file(
+        "ruff.toml",
+        r#"
+[lint]
+select = ["D100"]
+"#,
+    )?;
+
+    fixture.write_file(
+        "noqa.py", r"
+",
+    )?;
+
+    assert_cmd_snapshot!(fixture
+        .check_command()
+        .args(["--config", "ruff.toml"])
+        .arg("noqa.py")
+        .arg("--preview")
+        .args(["--add-noqa"])
+        , @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    Added 1 noqa directive.
+    ");
+
+    let test_code =
+        fs::read_to_string(fixture.root().join("noqa.py")).expect("should read test file");
+
+    insta::assert_snapshot!(test_code, @"# noqa: D100");
+
+    Ok(())
+}
+
+#[test]
+fn add_noqa_top_of_file_with_shebang() -> Result<()> {
+    let fixture = CliTest::new()?;
+    fixture.write_file(
+        "ruff.toml",
+        r#"
+[lint]
+select = ["D100"]
+"#,
+    )?;
+
+    fixture.write_file(
+        "noqa.py",
+        r"#!/usr/bin/env fake command
+",
+    )?;
+
+    assert_cmd_snapshot!(fixture
+        .check_command()
+        .args(["--config", "ruff.toml"])
+        .arg("noqa.py")
+        .arg("--preview")
+        .args(["--add-noqa"])
+        , @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    Added 1 noqa directive.
+    ");
+
+    let test_code =
+        fs::read_to_string(fixture.root().join("noqa.py")).expect("should read test file");
+
+    insta::assert_snapshot!(test_code, @"
+    #!/usr/bin/env fake command
+    # noqa: D100
+    ");
+
+    Ok(())
+}
+
+#[test]
 fn add_noqa_exclude() -> Result<()> {
     let fixture = CliTest::new()?;
     fixture.write_file(
@@ -1992,6 +2595,86 @@ fn add_noqa_with_newline_in_reason() -> Result<()> {
     ruff failed
       Cause: --add-noqa <reason> cannot contain newline characters
     ");
+
+    Ok(())
+}
+
+#[test]
+fn add_ignore() -> Result<()> {
+    let fixture = CliTest::new()?;
+    fixture.write_file(
+        "noqa.py",
+        r#"
+        def first_square():
+            return [x * x for x in range(20)][0]
+        "#,
+    )?;
+
+    assert_cmd_snapshot!(
+        fixture
+            .check_command()
+            .arg("--select=RUF015")
+            .arg("--add-ignore"),
+        @"
+        success: true
+        exit_code: 0
+        ----- stdout -----
+
+        ----- stderr -----
+        Added 1 ignore comment.
+        ",
+    );
+
+    let test_code = fixture.read_file("noqa.py")?;
+
+    insta::assert_snapshot!(
+        test_code,
+        @"
+
+    def first_square():
+        return [x * x for x in range(20)][0]  # ruff: ignore[RUF015]
+    ",
+    );
+
+    Ok(())
+}
+
+#[test]
+fn add_noqa_existing_ignore() -> Result<()> {
+    let fixture = CliTest::new()?;
+    fixture.write_file(
+        "noqa.py",
+        r#"
+        def unused(x):  # ruff:ignore[ANN001, ARG001, D103]
+            pass
+        "#,
+    )?;
+
+    assert_cmd_snapshot!(
+        fixture
+            .check_command()
+            .arg("--select=ANN001,ANN201,ARG001,D103")
+            .arg("--add-noqa"),
+        @"
+        success: true
+        exit_code: 0
+        ----- stdout -----
+
+        ----- stderr -----
+        Added 1 noqa directive.
+        ",
+    );
+
+    let test_code = fixture.read_file("noqa.py")?;
+
+    insta::assert_snapshot!(
+        test_code,
+        @"
+
+        def unused(x):  # ruff:ignore[ANN001, ARG001, D103]  # noqa: ANN201
+            pass
+        ",
+    );
 
     Ok(())
 }
@@ -2649,7 +3332,7 @@ fn nested_implicit_namespace_package() -> Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    foo/bar/baz/__init__.py:1:1: INP001 File `foo/bar/baz/__init__.py` declares a package, but is nested under an implicit namespace package. Add an `__init__.py` to `foo/bar`.
+    foo/bar/baz/__init__.py:1:1: implicit-namespace-package: File `foo/bar/baz/__init__.py` declares a package, but is nested under an implicit namespace package. Add an `__init__.py` to `foo/bar`.
     Found 1 error.
 
     ----- stderr -----
@@ -2936,6 +3619,7 @@ d: Literal[None,] | Literal[None]
         .args(["--stdin-filename", "test.py"])
         .arg("--preview")
         .arg("--diff")
+        .arg("--unsafe-fixes")
         .arg("-")
         .pass_stdin(snippet), @"
     success: false
@@ -3010,6 +3694,48 @@ def func(t: _T) -> _T:
     );
 }
 
+/// Test that `noqa` comments with rule codes
+/// 1. Get replaced with Ruff-specific suppression comments (RUF105)
+/// 2. Use human-readable rule names instead of codes (RUF106)
+#[test]
+fn noqa_comments_to_human_readable_ruff_ignores() -> Result<()> {
+    let fixture = CliTest::new()?;
+    let source = "# ruff: noqa: F401
+import os
+
+def foo():
+    value = 1  # noqa: F841
+";
+
+    assert_cmd_snapshot!(
+        fixture
+            .check_command()
+            .args([
+                "--select=F401,F841,RUF105,RUF106",
+                "--stdin-filename=test.py",
+                "--fix",
+                "--preview",
+                "-",
+            ])
+            .pass_stdin(source),
+        @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    # ruff: file-ignore[unused-import]
+    import os
+
+    def foo():
+        value = 1  # ruff: ignore[unused-variable]
+
+    ----- stderr -----
+    Found 4 errors (4 fixed, 0 remaining).
+    ",
+    );
+
+    Ok(())
+}
+
 /// Test that we do not rename two different type parameters to the same name
 /// in one execution of Ruff (autofixing this to `class Foo[T, T]: ...` would
 /// introduce invalid syntax)
@@ -3039,7 +3765,7 @@ class Foo[_T, __T]:
         pass
 
     ----- stderr -----
-    test.py:2:14: UP049 Generic class uses private type parameters
+    test.py:2:14: private-type-parameter: Generic class uses private type parameters
     Found 2 errors (1 fixed, 1 remaining).
     "
     );
@@ -3185,7 +3911,7 @@ class A(Generic[T]):
     success: false
     exit_code: 1
     ----- stdout -----
-    test.py:6:9: UP046 Generic class `A` uses `Generic` subclass instead of type parameters
+    test.py:6:9: non-pep695-generic-class: Generic class `A` uses `Generic` subclass instead of type parameters
     Found 1 error.
     No fixes available (1 hidden fix can be enabled with the `--unsafe-fixes` option).
 
@@ -3230,7 +3956,7 @@ fn walrus_before_py38() {
         .args(["--stdin-filename", "test.py"])
         .arg("--target-version=py38")
         .arg("-")
-        .pass_stdin(r#"(x := 1)"#),
+        .pass_stdin(r#"if (x := 1): ..."#),
         @"
     success: true
     exit_code: 0
@@ -3247,12 +3973,12 @@ fn walrus_before_py38() {
         .args(["--stdin-filename", "test.py"])
         .arg("--target-version=py37")
         .arg("-")
-        .pass_stdin(r#"(x := 1)"#),
+        .pass_stdin(r#"if (x := 1): ..."#),
         @"
     success: false
     exit_code: 1
     ----- stdout -----
-    test.py:1:2: invalid-syntax: Cannot use named assignment expression (`:=`) on Python 3.7 (syntax was added in Python 3.8)
+    test.py:1:5: invalid-syntax: Cannot use named assignment expression (`:=`) on Python 3.7 (syntax was added in Python 3.8)
     Found 1 error.
 
     ----- stderr -----
@@ -3475,7 +4201,7 @@ fn semantic_syntax_errors() -> Result<()> {
     exit_code: 1
     ----- stdout -----
     main.py:1:3: invalid-syntax: assignment expression cannot rebind comprehension variable
-    main.py:1:20: F821 Undefined name `foo`
+    main.py:1:20: undefined-name: Undefined name `foo`
 
     ----- stderr -----
     "
@@ -3489,7 +4215,7 @@ fn semantic_syntax_errors() -> Result<()> {
     exit_code: 1
     ----- stdout -----
     main.py:1:3: invalid-syntax: assignment expression cannot rebind comprehension variable
-    main.py:1:20: F821 Undefined name `foo`
+    main.py:1:20: undefined-name: Undefined name `foo`
 
     ----- stderr -----
     "
@@ -3596,6 +4322,56 @@ match 42:  # invalid-syntax
     Ok(())
 }
 
+#[test_case::test_case("concise")]
+#[test_case::test_case("full")]
+#[test_case::test_case("json")]
+#[test_case::test_case("json-lines")]
+#[test_case::test_case("junit")]
+#[test_case::test_case("grouped")]
+#[test_case::test_case("github")]
+#[test_case::test_case("gitlab")]
+#[test_case::test_case("pylint")]
+#[test_case::test_case("rdjson")]
+#[test_case::test_case("azure")]
+#[test_case::test_case("sarif")]
+fn output_format_preview(output_format: &str) -> Result<()> {
+    const CONTENT: &str = "\
+import os  # F401
+x = y      # F821
+match 42:  # invalid-syntax
+    case _: ...
+";
+
+    let fixture = CliTest::with_settings(|_project_dir, mut settings| {
+        // JSON double escapes backslashes
+        settings.add_filter(r#""[^"]+\\?/?input.py"#, r#""[TMP]/input.py"#);
+
+        settings
+    })?;
+
+    fixture.write_file("input.py", CONTENT)?;
+
+    let snapshot = format!("output_format_preview_{output_format}");
+
+    assert_cmd_snapshot!(
+        snapshot,
+        fixture.command().args([
+            "check",
+            "--no-cache",
+            "--output-format",
+            output_format,
+            "--select",
+            "F401,F821",
+            "--target-version",
+            "py39",
+            "--preview",
+            "input.py",
+        ])
+    );
+
+    Ok(())
+}
+
 #[test_case::test_case("concise"; "concise_show_fixes")]
 #[test_case::test_case("full"; "full_show_fixes")]
 #[test_case::test_case("grouped"; "grouped_show_fixes")]
@@ -3616,6 +4392,37 @@ fn output_format_show_fixes(output_format: &str) -> Result<()> {
             "--show-fixes",
             "input.py",
         ])
+    );
+
+    Ok(())
+}
+
+#[test]
+fn show_fixes_preview() -> Result<()> {
+    let fixture = CliTest::with_file("input.py", "import os  # F401")?;
+
+    assert_cmd_snapshot!(
+        fixture.check_command().args([
+            "--select",
+            "F401",
+            "--fix",
+            "--show-fixes",
+            "--preview",
+            "input.py",
+        ]),
+        @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    Fixed 1 error:
+    - input.py:
+        1 × unused-import (F401)
+
+    Found 1 error (1 fixed, 0 remaining).
+
+    ----- stderr -----
+    "
     );
 
     Ok(())
@@ -3663,14 +4470,15 @@ fn show_fixes_in_full_output_with_preview_enabled() {
     success: false
     exit_code: 1
     ----- stdout -----
-    F401 [*] `math` imported but unused
+    unused-import: [*] `math` imported but unused
      --> -:1:8
       |
     1 | import math
       |        ^^^^
-      |
     help: Remove unused import: `math`
+      |
       - import math
+      |
 
     Found 1 error.
     [*] 1 fixable with the `--fix` option.
@@ -3694,12 +4502,12 @@ fn rule_panic_mixed_results_concise() -> Result<()> {
     success: false
     exit_code: 2
     ----- stdout -----
-    normal.py:1:1: RUF900 Hey this is a stable test rule.
-    normal.py:1:1: RUF901 [*] Hey this is a stable test rule with a safe fix.
-    normal.py:1:1: RUF902 Hey this is a stable test rule with an unsafe fix.
-    normal.py:1:1: RUF903 Hey this is a stable test rule with a display only fix.
-    normal.py:1:1: RUF911 Hey this is a preview test rule.
-    normal.py:1:1: RUF950 Hey this is a test rule that was redirected from another.
+    normal.py:1:1: stable-test-rule: Hey this is a stable test rule.
+    normal.py:1:1: stable-test-rule-safe-fix: [*] Hey this is a stable test rule with a safe fix.
+    normal.py:1:1: stable-test-rule-unsafe-fix: Hey this is a stable test rule with an unsafe fix.
+    normal.py:1:1: stable-test-rule-display-only-fix: Hey this is a stable test rule with a display only fix.
+    normal.py:1:1: preview-test-rule: Hey this is a preview test rule.
+    normal.py:1:1: redirected-to-test-rule: Hey this is a test rule that was redirected from another.
     panic.py: panic: Panicked at <location> when checking `[TMP]/panic.py`: `This is a fake panic for testing.`
     Found 7 errors.
     [*] 1 fixable with the `--fix` option (1 hidden fix can be enabled with the `--unsafe-fixes` option).
@@ -3729,24 +4537,26 @@ fn rule_panic_mixed_results_full() -> Result<()> {
     success: false
     exit_code: 2
     ----- stdout -----
-    RUF900 Hey this is a stable test rule.
+    stable-test-rule: Hey this is a stable test rule.
     --> normal.py:1:1
 
-    RUF901 [*] Hey this is a stable test rule with a safe fix.
+    stable-test-rule-safe-fix: [*] Hey this is a stable test rule with a safe fix.
     --> normal.py:1:1
+      |
     1 + # fix from stable-test-rule-safe-fix
     2 | import os
+      |
 
-    RUF902 Hey this is a stable test rule with an unsafe fix.
+    stable-test-rule-unsafe-fix: Hey this is a stable test rule with an unsafe fix.
     --> normal.py:1:1
 
-    RUF903 Hey this is a stable test rule with a display only fix.
+    stable-test-rule-display-only-fix: Hey this is a stable test rule with a display only fix.
     --> normal.py:1:1
 
-    RUF911 Hey this is a preview test rule.
+    preview-test-rule: Hey this is a preview test rule.
     --> normal.py:1:1
 
-    RUF950 Hey this is a test rule that was redirected from another.
+    redirected-to-test-rule: Hey this is a test rule that was redirected from another.
     --> normal.py:1:1
 
     panic: Panicked at <location> when checking `[TMP]/panic.py`: `This is a fake panic for testing.`
@@ -3918,10 +4728,10 @@ fn supported_file_extensions_preview_enabled() -> Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    src/thing.ipynb:cell 1:1:8: F401 [*] `os` imported but unused
-    src/thing.py:1:8: F401 [*] `os` imported but unused
-    src/thing.pyi:1:8: F401 [*] `os` imported but unused
-    src/thing.pyw:1:8: F401 [*] `os` imported but unused
+    src/thing.ipynb:cell 1:1:8: unused-import: [*] `os` imported but unused
+    src/thing.py:1:8: unused-import: [*] `os` imported but unused
+    src/thing.pyi:1:8: unused-import: [*] `os` imported but unused
+    src/thing.pyw:1:8: unused-import: [*] `os` imported but unused
     Found 4 errors.
     [*] 4 fixable with the `--fix` option.
 
@@ -3931,7 +4741,7 @@ fn supported_file_extensions_preview_enabled() -> Result<()> {
 }
 
 #[test]
-fn preview_default_rules() -> Result<()> {
+fn default_rules() -> Result<()> {
     let test = CliTest::with_settings(|_path, mut settings| {
         settings.add_filter(r"(?s).*(linter\.rules\.enabled[^]]+]).*", "$1");
         settings
@@ -3940,7 +4750,7 @@ fn preview_default_rules() -> Result<()> {
     test.write_file("try.py", "1")?;
 
     assert_cmd_snapshot!(
-        test.check_command().args(["--preview", "--show-settings"]),
+        test.check_command().arg("--show-settings"),
         @"
     linter.rules.enabled = [
     	sys-version-slice3 (YTT101),
@@ -4033,6 +4843,7 @@ fn preview_default_rules() -> Result<()> {
     	f-string-in-get-text-func-call (INT001),
     	format-in-get-text-func-call (INT002),
     	printf-in-get-text-func-call (INT003),
+    	implicit-string-concatenation-in-collection-literal (ISC004),
     	direct-logger-instantiation (LOG001),
     	invalid-get-logger-argument (LOG002),
     	undocumented-warn (LOG009),
@@ -4073,7 +4884,7 @@ fn preview_default_rules() -> Result<()> {
     	str-or-repr-defined-in-stub (PYI029),
     	unnecessary-literal-union (PYI030),
     	any-eq-ne-annotation (PYI032),
-    	type-comment-in-stub (PYI033),
+    	legacy-type-comment (PYI033),
     	non-self-return-type (PYI034),
     	unassigned-special-variable-in-stub (PYI035),
     	bad-exit-annotation (PYI036),
@@ -4104,7 +4915,6 @@ fn preview_default_rules() -> Result<()> {
     	pytest-use-fixtures-without-parameters (PT026),
     	pytest-warns-with-multiple-statements (PT031),
     	unnecessary-return-none (RET501),
-    	unnecessary-assign (RET504),
     	duplicate-isinstance-call (SIM101),
     	collapsible-if (SIM102),
     	needless-bool (SIM103),
@@ -4137,9 +4947,7 @@ fn preview_default_rules() -> Result<()> {
     	invalid-module-name (N999),
     	unnecessary-list-cast (PERF101),
     	incorrect-dict-iterator (PERF102),
-    	manual-list-comprehension (PERF401),
     	manual-list-copy (PERF402),
-    	manual-dict-comprehension (PERF403),
     	bare-except (E722),
     	io-error (E902),
     	invalid-escape-sequence (W605),
@@ -4199,6 +5007,7 @@ fn preview_default_rules() -> Result<()> {
     	nonlocal-without-binding (PLE0117),
     	load-before-global-declaration (PLE0118),
     	invalid-length-return-type (PLE0303),
+    	invalid-bool-return-type (PLE0304),
     	invalid-index-return-type (PLE0305),
     	invalid-str-return-type (PLE0307),
     	invalid-bytes-return-type (PLE0308),
@@ -4229,8 +5038,8 @@ fn preview_default_rules() -> Result<()> {
     	property-with-parameters (PLR0206),
     	manual-from-import (PLR0402),
     	redefined-argument-from-local (PLR1704),
+    	stop-iteration-return (PLR1708),
     	useless-return (PLR1711),
-    	repeated-equality-comparison (PLR1714),
     	boolean-chained-comparison (PLR1716),
     	sys-exit-alias (PLR1722),
     	if-stmt-min-max (PLR1730),
@@ -4315,6 +5124,7 @@ fn preview_default_rules() -> Result<()> {
     	implicit-cwd (FURB177),
     	hashlib-digest-hex (FURB181),
     	slice-to-remove-prefix-or-suffix (FURB188),
+    	sorted-min-max (FURB192),
     	zip-instead-of-pairwise (RUF007),
     	mutable-dataclass-default (RUF008),
     	function-call-in-dataclass-default-argument (RUF009),
@@ -4346,6 +5156,8 @@ fn preview_default_rules() -> Result<()> {
     	unnecessary-round (RUF057),
     	starmap-zip (RUF058),
     	unused-unpacked-variable (RUF059),
+    	access-annotations-from-class-dict (RUF063),
+    	duplicate-entry-in-dunder-all (RUF068),
     	unused-noqa (RUF100),
     	redirected-noqa (RUF101),
     	invalid-pyproject-toml (RUF200),
@@ -4353,10 +5165,47 @@ fn preview_default_rules() -> Result<()> {
     	type-check-without-type-error (TRY004),
     	verbose-raise (TRY201),
     	useless-try-except (TRY203),
-    	try-consider-else (TRY300),
     	verbose-log-message (TRY401),
     ]
     ",
     );
+    Ok(())
+}
+
+#[test]
+fn ruff_toml_is_linted() -> Result<()> {
+    let test = CliTest::with_file("ruff.toml", r#"lint.select = ["F401"]"#)?;
+
+    assert_cmd_snapshot!(
+        test.command().args([
+            "check",
+            "--no-cache",
+            "--isolated",
+            "--preview",
+            "--select",
+            "RUF201",
+        ]),
+        @r#"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    rule-codes-in-selectors: [*] Rule code used instead of name in `lint.select`
+     --> ruff.toml:1:17
+      |
+    1 | lint.select = ["F401"]
+      |                 ^^^^
+    help: Replace rule code with `unused-import`
+      |
+      - lint.select = ["F401"]
+    1 + lint.select = ["unused-import"]
+      |
+
+    Found 1 error.
+    [*] 1 fixable with the `--fix` option.
+
+    ----- stderr -----
+    "#,
+    );
+
     Ok(())
 }

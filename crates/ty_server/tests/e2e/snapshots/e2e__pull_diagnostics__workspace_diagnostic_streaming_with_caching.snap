@@ -3,7 +3,7 @@ source: crates/ty_server/tests/e2e/pull_diagnostics.rs
 expression: all_items
 ---
 [
-    Full(
+    WorkspaceFullDocumentDiagnosticReport(
         WorkspaceFullDocumentDiagnosticReport {
             uri: Url {
                 scheme: "file",
@@ -67,16 +67,18 @@ expression: all_items
                         source: Some(
                             "ty",
                         ),
-                        message: "Name `true` used when not defined",
-                        related_information: None,
+                        message: String(
+                            "Name `true` used when not defined",
+                        ),
                         tags: None,
+                        related_information: None,
                         data: None,
                     },
                 ],
             },
         },
     ),
-    Full(
+    WorkspaceFullDocumentDiagnosticReport(
         WorkspaceFullDocumentDiagnosticReport {
             uri: Url {
                 scheme: "file",
@@ -140,16 +142,18 @@ expression: all_items
                         source: Some(
                             "ty",
                         ),
-                        message: "Name `true` used when not defined",
-                        related_information: None,
+                        message: String(
+                            "Name `true` used when not defined",
+                        ),
                         tags: None,
+                        related_information: None,
                         data: None,
                     },
                 ],
             },
         },
     ),
-    Full(
+    WorkspaceFullDocumentDiagnosticReport(
         WorkspaceFullDocumentDiagnosticReport {
             uri: Url {
                 scheme: "file",
@@ -213,16 +217,18 @@ expression: all_items
                         source: Some(
                             "ty",
                         ),
-                        message: "Name `true` used when not defined",
-                        related_information: None,
+                        message: String(
+                            "Name `true` used when not defined",
+                        ),
                         tags: None,
+                        related_information: None,
                         data: None,
                     },
                 ],
             },
         },
     ),
-    Unchanged(
+    WorkspaceUnchangedDocumentDiagnosticReport(
         WorkspaceUnchangedDocumentDiagnosticReport {
             uri: Url {
                 scheme: "file",
@@ -241,7 +247,7 @@ expression: all_items
             },
         },
     ),
-    Unchanged(
+    WorkspaceUnchangedDocumentDiagnosticReport(
         WorkspaceUnchangedDocumentDiagnosticReport {
             uri: Url {
                 scheme: "file",
@@ -260,7 +266,7 @@ expression: all_items
             },
         },
     ),
-    Unchanged(
+    WorkspaceUnchangedDocumentDiagnosticReport(
         WorkspaceUnchangedDocumentDiagnosticReport {
             uri: Url {
                 scheme: "file",
@@ -279,7 +285,7 @@ expression: all_items
             },
         },
     ),
-    Unchanged(
+    WorkspaceUnchangedDocumentDiagnosticReport(
         WorkspaceUnchangedDocumentDiagnosticReport {
             uri: Url {
                 scheme: "file",

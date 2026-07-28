@@ -47,3 +47,6 @@ __all__ = [
 
 if sys.version_info >= (3, 14):
     __all__ += ["IEEEContext", "IEEE_CONTEXT_MAX_BITS"]
+
+if sys.version_info >= (3, 15):
+    __all__ += ["SPEC_VERSION"]

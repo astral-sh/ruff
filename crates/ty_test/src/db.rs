@@ -1,10 +1,12 @@
+use crate::config::{Analysis, Rules, ScriptOptions};
 use camino::{Utf8Component, Utf8PathBuf};
 use ruff_db::Db as SourceDb;
-use ruff_db::diagnostic::Severity;
+use ruff_db::diagnostic::{Diagnostic, Severity};
 use ruff_db::files::{File, Files};
+use ruff_db::source::source_text;
 use ruff_db::system::{
-    CaseSensitivity, DbWithWritableSystem, InMemorySystem, OsSystem, System, SystemPath,
-    SystemPathBuf, WritableSystem,
+    DbWithWritableSystem, InMemorySystem, OsSystem, System, SystemPath, SystemPathBuf, WhichResult,
+    WritableSystem,
 };
 use ruff_db::vendored::VendoredFileSystem;
 use ruff_notebook::{Notebook, NotebookError};
@@ -13,10 +15,12 @@ use std::borrow::Cow;
 use std::sync::Arc;
 use tempfile::TempDir;
 use ty_module_resolver::{ModuleGlobSetBuilder, SearchPaths};
+use ty_python_core::Db as _;
+use ty_python_core::program::Program;
 use ty_python_semantic::lint::{LintRegistry, RuleSelection};
-use ty_python_semantic::{AnalysisSettings, Db as SemanticDb, Program, default_lint_registry};
-
-use crate::config::Analysis;
+use ty_python_semantic::{
+    AnalysisSettings, Db as SemanticDb, check_file_unwrap, default_lint_registry,
+};
 
 #[salsa::db]
 #[derive(Clone)]
@@ -25,14 +29,11 @@ pub(crate) struct Db {
     files: Files,
     system: MdtestSystem,
     vendored: VendoredFileSystem,
-    rule_selection: Arc<RuleSelection>,
     settings: Option<Settings>,
 }
 
 impl Db {
     pub(crate) fn setup() -> Self {
-        let rule_selection = RuleSelection::all(default_lint_registry(), Severity::Info);
-
         let mut db = Self {
             system: MdtestSystem::in_memory(),
             storage: salsa::Storage::new(Some(Box::new({
@@ -42,7 +43,6 @@ impl Db {
             }))),
             vendored: ty_vendored::file_system().clone(),
             files: Files::default(),
-            rule_selection: Arc::new(rule_selection),
             settings: None,
         };
 
@@ -59,55 +59,26 @@ impl Db {
     }
 
     pub(crate) fn update_analysis_options(&mut self, options: Option<&Analysis>) {
-        let analysis = if let Some(options) = options {
-            let AnalysisSettings {
-                respect_type_ignore_comments: respect_type_ignore_comments_default,
-                allowed_unresolved_imports: allowed_unresolved_imports_default,
-                replace_imports_with_any: replace_imports_with_any_default,
-            } = AnalysisSettings::default();
-
-            let allowed_unresolved_imports = if let Some(allowed_unresolved_imports) =
-                options.allowed_unresolved_imports.as_deref()
-            {
-                let mut builder = ModuleGlobSetBuilder::new();
-                for pattern in allowed_unresolved_imports {
-                    builder
-                        .add(pattern)
-                        .expect("Invalid `allowed-unresolved-imports` pattern `{pattern}");
-                }
-                builder.build().unwrap()
-            } else {
-                allowed_unresolved_imports_default
-            };
-
-            let replace_imports_with_any = if let Some(replace_imports_with_any) =
-                options.replace_imports_with_any.as_deref()
-            {
-                let mut builder = ModuleGlobSetBuilder::new();
-                for pattern in replace_imports_with_any {
-                    builder
-                        .add(pattern)
-                        .expect("Invalid `replace-imports-with-any` pattern `{pattern}");
-                }
-                builder.build().unwrap()
-            } else {
-                replace_imports_with_any_default
-            };
-
-            AnalysisSettings {
-                respect_type_ignore_comments: options
-                    .respect_type_ignore_comments
-                    .unwrap_or(respect_type_ignore_comments_default),
-                allowed_unresolved_imports,
-                replace_imports_with_any,
-            }
-        } else {
-            AnalysisSettings::default()
-        };
+        let analysis = mdtest_analysis_settings(options);
 
         let settings = self.settings();
         if settings.analysis(self) != &analysis {
             settings.set_analysis(self).to(analysis);
+        }
+    }
+
+    pub(crate) fn update_mdtest_rule_selection(
+        &mut self,
+        rules: Option<&Rules>,
+        required_rule: Option<&str>,
+    ) {
+        let rule_selection = mdtest_rule_selection(rules, required_rule);
+
+        let settings = self.settings();
+        if settings.rule_selection(self) != &rule_selection {
+            settings
+                .set_rule_selection(self)
+                .to(MdtestRuleSelection(rule_selection));
         }
     }
 
@@ -153,13 +124,24 @@ impl ty_module_resolver::Db for Db {
 }
 
 #[salsa::db]
-impl SemanticDb for Db {
+impl ty_python_core::Db for Db {
     fn should_check_file(&self, file: File) -> bool {
         !file.path(self).is_vendored_path()
     }
+}
 
-    fn rule_selection(&self, _file: File) -> &RuleSelection {
-        &self.rule_selection
+#[salsa::db]
+impl SemanticDb for Db {
+    fn check_file(&self, file: File) -> Vec<Diagnostic> {
+        if !self.should_check_file(file) {
+            return Vec::new();
+        }
+
+        check_file_unwrap(self, file)
+    }
+
+    fn rule_selection(&self, file: File) -> &RuleSelection {
+        file_settings(self, file).rules(self)
     }
 
     fn lint_registry(&self) -> &LintRegistry {
@@ -170,8 +152,16 @@ impl SemanticDb for Db {
         self.settings().verbose(self)
     }
 
-    fn analysis_settings(&self, _file: File) -> &AnalysisSettings {
-        self.settings().analysis(self)
+    fn is_open_file(&self, _file: File) -> bool {
+        false
+    }
+
+    fn analysis_settings(&self, file: File) -> &AnalysisSettings {
+        file_settings(self, file).analysis(self)
+    }
+
+    fn dyn_clone(&self) -> Box<dyn SemanticDb> {
+        Box::new(self.clone())
     }
 }
 
@@ -185,13 +175,190 @@ impl DbWithWritableSystem for Db {
     }
 }
 
+#[salsa::tracked(returns(ref))]
+fn file_settings(db: &dyn SemanticDb, file: File) -> FileSettings {
+    let source = source_text(db, file);
+    if source.is_notebook() {
+        return FileSettings::Global;
+    }
+    let Some(options) = ScriptOptions::from_source(&source) else {
+        return FileSettings::Global;
+    };
+
+    FileSettings::File {
+        rules: MdtestRuleSelection(mdtest_rule_selection(options.rules.as_ref(), None)),
+        analysis: mdtest_analysis_settings(options.analysis.as_ref()),
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+enum FileSettings {
+    Global,
+    File {
+        rules: MdtestRuleSelection,
+        analysis: AnalysisSettings,
+    },
+}
+
+impl FileSettings {
+    fn rules<'db>(&'db self, db: &'db Db) -> &'db RuleSelection {
+        match self {
+            Self::Global => db.settings().rule_selection(db),
+            Self::File { rules, .. } => rules,
+        }
+    }
+
+    fn analysis<'db>(&'db self, db: &'db Db) -> &'db AnalysisSettings {
+        match self {
+            Self::Global => db.settings().analysis(db),
+            Self::File { analysis, .. } => analysis,
+        }
+    }
+}
+
 #[salsa::input(debug)]
 struct Settings {
     #[default]
     #[returns(ref)]
     analysis: AnalysisSettings,
     #[default]
+    #[returns(deref)]
+    rule_selection: MdtestRuleSelection,
+    #[default]
+    #[returns(copy)]
     verbose: bool,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct MdtestRuleSelection(RuleSelection);
+
+impl Default for MdtestRuleSelection {
+    fn default() -> Self {
+        Self(mdtest_rule_selection(None, None))
+    }
+}
+
+impl std::ops::Deref for MdtestRuleSelection {
+    type Target = RuleSelection;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+fn mdtest_analysis_settings(options: Option<&Analysis>) -> AnalysisSettings {
+    let Some(options) = options else {
+        return AnalysisSettings::default();
+    };
+
+    let AnalysisSettings {
+        strict_equality_semantics: strict_equality_semantics_default,
+        respect_type_ignore_comments: respect_type_ignore_comments_default,
+        allowed_unresolved_imports: allowed_unresolved_imports_default,
+        replace_imports_with_any: replace_imports_with_any_default,
+    } = AnalysisSettings::default();
+
+    let allowed_unresolved_imports =
+        if let Some(allowed_unresolved_imports) = options.allowed_unresolved_imports.as_deref() {
+            let mut builder = ModuleGlobSetBuilder::new();
+            for pattern in allowed_unresolved_imports {
+                builder
+                    .add(pattern)
+                    .expect("Invalid `allowed-unresolved-imports` pattern `{pattern}`");
+            }
+            builder.build().unwrap()
+        } else {
+            allowed_unresolved_imports_default
+        };
+
+    let replace_imports_with_any =
+        if let Some(replace_imports_with_any) = options.replace_imports_with_any.as_deref() {
+            let mut builder = ModuleGlobSetBuilder::new();
+            for pattern in replace_imports_with_any {
+                builder
+                    .add(pattern)
+                    .expect("Invalid `replace-imports-with-any` pattern `{pattern}`");
+            }
+            builder.build().unwrap()
+        } else {
+            replace_imports_with_any_default
+        };
+
+    AnalysisSettings {
+        strict_equality_semantics: options
+            .strict_equality_semantics
+            .unwrap_or(strict_equality_semantics_default),
+        respect_type_ignore_comments: options
+            .respect_type_ignore_comments
+            .unwrap_or(respect_type_ignore_comments_default),
+        allowed_unresolved_imports,
+        replace_imports_with_any,
+    }
+}
+
+fn mdtest_rule_selection(rules: Option<&Rules>, required_rule: Option<&str>) -> RuleSelection {
+    let registry = default_lint_registry();
+    let mut selection = RuleSelection::all(registry, Severity::Info);
+
+    // In general (as shown by the initialization of `selection` above), we enable even rules that
+    // are ignored by default in mdtests so that their behaviour is covered alongside the default
+    // rules.
+    //
+    // `missing-override-decorator` is an exception: because it is extremely pedantic we have
+    // chosen to keep it opt-in to minimize churn in unrelated tests.
+    let missing_override_decorator = registry
+        .get("missing-override-decorator")
+        .expect("missing-override-decorator is a known lint rule");
+    selection.disable(missing_override_decorator);
+
+    // `experimental-syntax` is also an exception: we make use of `&` and `~` for intersection and
+    // negation types in our tests for better readability.
+    let experimental_syntax = registry
+        .get("experimental-syntax")
+        .expect("experimental-syntax is a known lint rule");
+    selection.disable(experimental_syntax);
+
+    if let Some(rules) = rules {
+        let set_lint_level =
+            |selection: &mut RuleSelection, lint, level| match Severity::try_from(level) {
+                Ok(severity) => {
+                    selection.enable(lint, severity, ty_python_semantic::lint::LintSource::File);
+                }
+                Err(()) => selection.disable(lint),
+            };
+
+        // If "all" key is present, use it's value as the default for all rules.
+        if let Some(level) = rules.get("all") {
+            for lint in registry.lints() {
+                set_lint_level(&mut selection, *lint, *level);
+            }
+        }
+
+        // Apply overrides for specific (non-"all") rules.
+        for (rule_name, level) in rules {
+            if rule_name == "all" {
+                continue;
+            }
+
+            let lint = registry
+                .get(rule_name)
+                .unwrap_or_else(|error| panic!("Unknown lint rule `{rule_name}`: {error}"));
+            set_lint_level(&mut selection, lint, *level);
+        }
+    }
+
+    if let Some(required_rule) = required_rule {
+        let lint = registry
+            .get(required_rule)
+            .unwrap_or_else(|error| panic!("Unknown lint rule `{required_rule}`: {error}"));
+        selection.enable(
+            lint,
+            Severity::Info,
+            ty_python_semantic::lint::LintSource::File,
+        );
+    }
+
+    selection
 }
 
 #[derive(Debug, Clone)]
@@ -280,6 +447,15 @@ impl System for MdtestSystem {
         }
     }
 
+    fn is_same_file(
+        &self,
+        first: &SystemPath,
+        second: &SystemPath,
+    ) -> ruff_db::system::Result<bool> {
+        self.as_system()
+            .is_same_file(&self.normalize_path(first), &self.normalize_path(second))
+    }
+
     fn read_to_string(&self, path: &SystemPath) -> ruff_db::system::Result<String> {
         self.as_system().read_to_string(&self.normalize_path(path))
     }
@@ -303,17 +479,8 @@ impl System for MdtestSystem {
         self.as_system().read_virtual_path_to_notebook(path)
     }
 
-    fn path_exists_case_sensitive(&self, path: &SystemPath, prefix: &SystemPath) -> bool {
-        self.as_system()
-            .path_exists_case_sensitive(&self.normalize_path(path), &self.normalize_path(prefix))
-    }
-
-    fn case_sensitivity(&self) -> CaseSensitivity {
-        self.as_system().case_sensitivity()
-    }
-
-    fn is_executable(&self, path: &SystemPath) -> bool {
-        self.as_system().is_executable(path)
+    fn which(&self, name: &str) -> WhichResult {
+        self.as_system().which(name)
     }
 
     fn current_directory(&self) -> &SystemPath {
@@ -342,17 +509,6 @@ impl System for MdtestSystem {
         path: &SystemPath,
     ) -> ruff_db::system::walk_directory::WalkDirectoryBuilder {
         self.as_system().walk_directory(&self.normalize_path(path))
-    }
-
-    fn glob(
-        &self,
-        pattern: &str,
-    ) -> Result<
-        Box<dyn Iterator<Item = Result<SystemPathBuf, ruff_db::system::GlobError>> + '_>,
-        ruff_db::system::PatternError,
-    > {
-        self.as_system()
-            .glob(self.normalize_path(SystemPath::new(pattern)).as_str())
     }
 
     fn as_writable(&self) -> Option<&dyn WritableSystem> {

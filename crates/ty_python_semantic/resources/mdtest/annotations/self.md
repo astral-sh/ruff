@@ -181,7 +181,7 @@ Calling an instance method explicitly verifies the first argument:
 ```py
 A.implicit_self(a)
 
-# error: [invalid-argument-type] "Argument to function `implicit_self` is incorrect: Argument type `Literal[1]` does not satisfy upper bound `A` of type variable `Self`"
+# error: [invalid-argument-type] "Argument to function `A.implicit_self` is incorrect: Argument type `Literal[1]` does not satisfy upper bound `A` of type variable `Self`"
 A.implicit_self(1)
 ```
 
@@ -193,7 +193,7 @@ from typing import Never, Callable
 class Strange:
     def can_not_be_called(self: Never) -> None: ...
 
-# error: [invalid-argument-type] "Argument to bound method `can_not_be_called` is incorrect: Expected `Never`, found `Strange`"
+# error: [invalid-argument-type] "Argument to bound method `Strange.can_not_be_called` is incorrect: Expected `Never`, found `Strange`"
 Strange().can_not_be_called()
 ```
 
@@ -309,7 +309,7 @@ Here, both `Foo.foo` and `Bar.bar` use `Self`. When accessing a bound method, we
 occurrences of `Self` with the bound `self` type. In this example, when we access `x.foo`, we only
 want to substitute the occurrences of `Self` in `Foo.foo` — that is, occurrences of `Self@foo`. The
 fact that `x` is an instance of `Foo[Self@bar]` (a completely different `Self` type) should not
-affect that subtitution. If we blindly substitute all occurrences of `Self`, we would get
+affect that substitution. If we blindly substitute all occurrences of `Self`, we would get
 `Foo[Self@bar]` as the return type of the bound method.
 
 ```py
@@ -413,6 +413,7 @@ class GenericShape[T]:
     @classmethod
     def baz[U](cls, u: U) -> "GenericShape[U]":
         reveal_type(cls)  # revealed: type[Self@baz]
+        # error: [invalid-return-type]
         return cls()
 
 class GenericCircle[T](GenericShape[T]): ...
@@ -471,6 +472,21 @@ class Child(Parent):
 
 # When called on concrete types, Self is substituted correctly.
 reveal_type(Child.create())  # revealed: Child
+```
+
+An inherited classmethod should also preserve the method's `Self` type when accessed through `self`.
+
+```py
+from typing import Self, assert_type
+
+class Parent:
+    @classmethod
+    def create(cls) -> Self:
+        return cls()
+
+class Child(Parent):
+    def method(self) -> None:
+        assert_type(self.create(), Self)
 ```
 
 ## Attributes
@@ -639,8 +655,13 @@ class C[T: Base]:
 # Calling a method on a specialized instance should not produce an error
 C[Base]().g()
 
+BaseNewType = NewType("BaseNewType", Base)
+
+C[BaseNewType]().g()
+
 # Test with a NewType bound
 K = NewType("K", int)
+K2 = NewType("K2", K)
 
 class D[T: K]:
     x: T
@@ -650,6 +671,30 @@ class D[T: K]:
 
 # Calling a method on a specialized instance should not produce an error
 D[K]().h()
+D[K2]().h()
+
+# Test with a union-NewType bound
+K3 = NewType("K3", float)
+K4 = NewType("K4", K3)
+
+class D2[T: K3]:
+    x: T
+
+    def h(self) -> None:
+        pass
+
+# Calling a method on a specialized instance should not produce an error
+D2[K3]().h()
+D2[K4]().h()
+
+class D3[T: float]:
+    x: T
+
+    def h(self) -> None:
+        pass
+
+D3[K3]().h()
+D3[K4]().h()
 ```
 
 ## Protocols
@@ -669,8 +714,7 @@ class Linkable(Protocol):
         return self.next_node
 
 def _(l: Linkable) -> None:
-    # TODO: Should be `Linkable`
-    reveal_type(l.next_node)  # revealed: @Todo(type[T] for protocols)
+    reveal_type(l.next_node)  # revealed: Linkable
 
 class CopyableImpl:
     def copy(self) -> Self:
@@ -767,20 +811,248 @@ class Foo:
         return Foo()
 
     @staticmethod
-    # TODO: The usage of `Self` here should be rejected because this is a static method
+    # error: [invalid-type-form] "`Self` cannot be used in a static method"
     def make() -> Self:
-        # error: [invalid-return-type]
         return Foo()
 
 class Bar(Generic[T]): ...
 
 # error: [invalid-type-form]
 class Baz(Bar[Self]): ...
+```
+
+## Self usage in static methods
+
+`Self` cannot be used anywhere in a static method, including parameters, return types, nested
+functions, and default argument values.
+
+```py
+from typing import Self
+
+class StaticMethodTests:
+    @staticmethod
+    # error: [invalid-type-form] "`Self` cannot be used in a static method"
+    def with_self_return() -> Self:
+        pass
+
+    @staticmethod
+    # error: [invalid-type-form] "`Self` cannot be used in a static method"
+    def with_self_param(x: Self) -> None:
+        pass
+
+    @staticmethod
+    def with_nested_function() -> None:
+        # `Self` in nested function inside static method is also invalid
+        # because `Self` binds to the outermost method (the static method).
+        # error: [invalid-type-form] "`Self` cannot be used in a static method"
+        def inner() -> Self:
+            pass
+
+    @staticmethod
+    # error: [invalid-type-form] "`Self` cannot be used in a static method"
+    def with_self_default(x: int = 0, y: "Self | None" = None) -> None:
+        pass
+```
+
+## Aliased staticmethod decorator
+
+Using an aliased `staticmethod` decorator should still be detected:
+
+```py
+from typing import Self
+
+sm = staticmethod
+
+class AliasedStaticMethod:
+    @sm
+    # error: [invalid-type-form] "`Self` cannot be used in a static method"
+    def aliased_static() -> Self:
+        pass
+```
+
+## `__new__` allows `Self`
+
+`__new__` is a static method even without an explicit `@staticmethod` decorator, but at runtime it
+is heavily special-cased by the interpreter to behave more like a classmethod. It always receives a
+`cls` parameter with type `type[Self]` and typically returns an object of type `Self`, so `Self` is
+permitted in `__new__`:
+
+```py
+from typing import Self
+
+class WithNew:
+    def __new__(cls) -> Self:
+        instance = object.__new__(cls)
+        return instance
+
+reveal_type(WithNew())  # revealed: WithNew
+
+class SubclassWithNew(WithNew):
+    def __new__(cls) -> Self:
+        return super().__new__(cls)
+
+reveal_type(SubclassWithNew())  # revealed: SubclassWithNew
+```
+
+## Stacked decorators with staticmethod
+
+When `@staticmethod` is stacked with other decorators, `Self` should still be invalid:
+
+```py
+from typing import Self, Callable
+
+def identity[**P, R](f: Callable[P, R]) -> Callable[P, R]:
+    return f
+
+class StackedDecorators:
+    @staticmethod
+    @identity
+    # error: [invalid-type-form] "`Self` cannot be used in a static method"
+    def static_then_identity() -> Self:
+        pass
+    # TODO: On Python <3.10, this should ideally be rejected, because `staticmethod` objects were not callable.
+    @identity
+    @staticmethod
+    # error: [invalid-type-form] "`Self` cannot be used in a static method"
+    def identity_then_static() -> Self:
+        pass
+```
+
+## Self usage in metaclasses
+
+The spec [prohibits the use of `Self` in metaclasses][spec], so we emit a diagnostic for this.
+
+```py
+from typing import Self
 
 class MyMetaclass(type):
-    # TODO: reject the Self usage. because self cannot be used within a metaclass.
+    # error: [invalid-type-form] "`Self` cannot be used in a metaclass"
+    registry: list[Self]
+
+    # error: [invalid-type-form] "`Self` cannot be used in a metaclass"
     def __new__(cls, name, bases, dct) -> Self:
         return cls(name, bases, dct)
+    # error: [invalid-type-form] "`Self` cannot be used in a metaclass"
+    def instance_method(self) -> Self:
+        return self
+
+    @classmethod
+    # error: [invalid-type-form] "`Self` cannot be used in a metaclass"
+    def metaclass_classmethod(cls) -> Self:
+        return cls("", (), {})
+    # Note: static methods in metaclasses get the static method error, not metaclass error
+    @staticmethod
+    # error: [invalid-type-form] "`Self` cannot be used in a static method"
+    def metaclass_staticmethod() -> Self:
+        pass
+```
+
+## Runtime use of `self` parameter in metaclass
+
+Using the `self` parameter as a runtime value should not be flagged, even in a metaclass. Only the
+literal `Self` type form should be disallowed.
+
+```py
+class AnnotableMeta(type):
+    def __or__(self, other):
+        return self  # No error: runtime use of `self`, not the `Self` type form
+```
+
+## Indirect metaclass inheritance
+
+Classes that inherit from `type` indirectly (through another metaclass) are also metaclasses:
+
+```py
+from typing import Self
+from abc import ABCMeta
+
+class IndirectMetaclass(ABCMeta):
+    # error: [invalid-type-form] "`Self` cannot be used in a metaclass"
+    def method(self) -> Self:
+        return self
+
+class MultiLevelMeta(IndirectMetaclass):
+    # error: [invalid-type-form] "`Self` cannot be used in a metaclass"
+    def another_method(self) -> Self:
+        return self
+```
+
+## Classes using a metaclass are not metaclasses
+
+A class that uses a metaclass (via `metaclass=...`) is _not_ itself a metaclass. `Self` should be
+valid in such classes:
+
+```py
+from typing import Self
+
+class SomeMeta(type):
+    pass
+
+class UsesMetaclass(metaclass=SomeMeta):
+    def method(self) -> Self:
+        reveal_type(self)  # revealed: Self@method
+        return self
+
+reveal_type(UsesMetaclass().method())  # revealed: UsesMetaclass
+
+class SubclassOfMetaclassUser(UsesMetaclass):
+    def another(self) -> Self:
+        return self
+
+reveal_type(SubclassOfMetaclassUser().another())  # revealed: SubclassOfMetaclassUser
+```
+
+## Nested class inside a metaclass
+
+A nested class inside a metaclass is _not_ a metaclass (unless it also inherits from `type`):
+
+```py
+from typing import Self
+
+class OuterMeta(type):
+    # error: [invalid-type-form] "`Self` cannot be used in a metaclass"
+    def meta_method(self) -> Self:
+        return self
+
+    class NestedRegularClass:
+        # This is fine - NestedRegularClass is not a metaclass
+        def method(self) -> Self:
+            reveal_type(self)  # revealed: Self@method
+            return self
+
+    class NestedMetaclass(type):
+        # error: [invalid-type-form] "`Self` cannot be used in a metaclass"
+        def nested_meta_method(self) -> Self:
+            return self
+```
+
+## `builtins.staticmethod`
+
+Using the fully qualified `builtins.staticmethod` should also be detected:
+
+```py
+from typing import Self
+import builtins
+
+class BuiltinsStaticMethod:
+    @builtins.staticmethod
+    # error: [invalid-type-form] "`Self` cannot be used in a static method"
+    def method() -> Self:
+        pass
+```
+
+## EnumMeta is a metaclass
+
+`enum.EnumMeta` (or `enum.EnumType` in Python 3.11+) is a metaclass, so `Self` should be invalid:
+
+```py
+from typing import Self
+from enum import EnumMeta
+
+class CustomEnumMeta(EnumMeta):
+    # error: [invalid-type-form] "`Self` cannot be used in a metaclass"
+    def custom_method(self) -> Self:
+        return self
 ```
 
 ## Explicit annotations override implicit `Self`
@@ -809,7 +1081,7 @@ class Explicit:
     def forward(self: Explicit) -> None:
         reveal_type(self)  # revealed: Explicit
 
-# error: [invalid-argument-type] "Argument to bound method `bad` is incorrect: Expected `Disjoint`, found `Explicit`"
+# error: [invalid-argument-type] "Argument to bound method `Explicit.bad` is incorrect: Expected `Disjoint`, found `Explicit`"
 Explicit().bad()
 
 Explicit().forward()
@@ -820,7 +1092,7 @@ class ExplicitGeneric[T]:
 
 ExplicitGeneric[int]().special()
 
-# TODO: this should be an `invalid-argument-type` error
+# error: [invalid-argument-type] "Argument to bound method `ExplicitGeneric.special` is incorrect: Expected `ExplicitGeneric[int]`, found `ExplicitGeneric[str]`"
 ExplicitGeneric[str]().special()
 ```
 
@@ -858,7 +1130,7 @@ bound at `C.f`.
 
 ```py
 from typing import Self
-from ty_extensions import generic_context
+from ty_extensions._internal import generic_context
 
 class C[T]():  # fmt:skip
     def f(self: Self):
@@ -867,7 +1139,7 @@ class C[T]():  # fmt:skip
         # revealed: None
         reveal_type(generic_context(b))
 
-# revealed: ty_extensions.GenericContext[Self@f]
+# revealed: ty_extensions._internal.GenericContext[Self@f]
 reveal_type(generic_context(C.f))
 ```
 
@@ -876,7 +1148,7 @@ Even if the `Self` annotation appears first in the nested function, it is the me
 
 ```py
 from typing import Self
-from ty_extensions import generic_context
+from ty_extensions._internal import generic_context
 
 class C:
     def f(self: "C"):
@@ -894,12 +1166,12 @@ reveal_type(generic_context(C.f))
 This makes sure that we don't bind `self` if it's not a positional parameter:
 
 ```py
-from ty_extensions import CallableTypeOf
+from ty_extensions._internal import RegularCallableTypeOf
 
 class C:
     def method(*args, **kwargs) -> None: ...
 
-def _(c: CallableTypeOf[C().method]):
+def _(c: RegularCallableTypeOf[C().method]):
     reveal_type(c)  # revealed: (...) -> None
 ```
 
@@ -977,3 +1249,5 @@ class Child(Base):
 reveal_type(Child.attr)  # revealed: Child
 reveal_type(Child().attr)  # revealed: Child
 ```
+
+[spec]: https://typing.python.org/en/latest/spec/generics.html#valid-locations-for-self

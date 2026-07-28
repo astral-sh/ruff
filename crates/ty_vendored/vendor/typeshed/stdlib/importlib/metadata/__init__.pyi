@@ -1,3 +1,12 @@
+"""
+APIs exposing metadata from third-party Python packages.
+
+This codebase is shared between importlib.metadata in the stdlib
+and importlib_metadata in PyPI. See
+https://github.com/python/importlib_metadata/wiki/Development-Methodology
+for more detail.
+"""
+
 import abc
 import pathlib
 import sys
@@ -5,13 +14,12 @@ import types
 from _collections_abc import dict_keys, dict_values
 from _typeshed import StrPath
 from collections.abc import Iterable, Iterator, Mapping
-from email.message import Message
 from importlib.abc import MetaPathFinder
+from importlib.metadata._meta import PackageMetadata as PackageMetadata, SimplePath
 from os import PathLike
-from pathlib import Path
 from re import Pattern
-from typing import Any, ClassVar, Generic, NamedTuple, TypeVar, overload
-from typing_extensions import Self, TypeAlias, deprecated, disjoint_base
+from typing import Any, ClassVar, Generic, NamedTuple, TypeAlias, TypeVar, overload, type_check_only
+from typing_extensions import Self, deprecated, disjoint_base
 
 _T = TypeVar("_T")
 _KT = TypeVar("_KT")
@@ -20,42 +28,43 @@ _VT = TypeVar("_VT")
 __all__ = [
     "Distribution",
     "DistributionFinder",
+    "PackageMetadata",
     "PackageNotFoundError",
     "distribution",
     "distributions",
     "entry_points",
     "files",
     "metadata",
+    "packages_distributions",
     "requires",
     "version",
 ]
 
-if sys.version_info >= (3, 10):
-    __all__ += ["PackageMetadata", "packages_distributions"]
+if sys.version_info >= (3, 15):
+    __all__ += ["PackagePath", "MetadataNotFound", "SimplePath"]
 
-if sys.version_info >= (3, 10):
-    from importlib.metadata._meta import PackageMetadata as PackageMetadata, SimplePath
-    def packages_distributions() -> Mapping[str, list[str]]:
-        """
-        Return a mapping of top-level packages to their
-        distributions.
+_SimplePath: TypeAlias = SimplePath
 
-        >>> import collections.abc
-        >>> pkgs = packages_distributions()
-        >>> all(isinstance(dist, collections.abc.Sequence) for dist in pkgs.values())
-        True
-        """
-    _SimplePath: TypeAlias = SimplePath
+def packages_distributions() -> Mapping[str, list[str]]:
+    """
+    Return a mapping of top-level packages to their
+    distributions.
 
-else:
-    _SimplePath: TypeAlias = Path
+    >>> import collections.abc
+    >>> pkgs = packages_distributions()
+    >>> all(isinstance(dist, collections.abc.Sequence) for dist in pkgs.values())
+    True
+    """
 
 class PackageNotFoundError(ModuleNotFoundError):
     """The package was not found."""
 
     @property
-    def name(self) -> str:  # type: ignore[override]
-        """module name"""
+    def name(self) -> str: ...  # type: ignore[override]
+
+if sys.version_info >= (3, 15):
+    class MetadataNotFound(FileNotFoundError):
+        """No metadata file is present in the distribution."""
 
 if sys.version_info >= (3, 13):
     _EntryPointBase = object
@@ -78,6 +87,7 @@ elif sys.version_info >= (3, 11):
 
     _EntryPointBase = DeprecatedTuple
 else:
+    @type_check_only
     class _EntryPointBase(NamedTuple):
         name: str
         value: str
@@ -99,6 +109,30 @@ if sys.version_info >= (3, 11):
         'attr'
         >>> ep.extras
         ['extra1', 'extra2']
+
+        If the value package or module are not valid identifiers, a
+        ValueError is raised on access.
+
+        >>> EntryPoint(name=None, group=None, value='invalid-name').module
+        Traceback (most recent call last):
+        ...
+        ValueError: ('Invalid object reference...invalid-name...
+        >>> EntryPoint(name=None, group=None, value='invalid-name').attr
+        Traceback (most recent call last):
+        ...
+        ValueError: ('Invalid object reference...invalid-name...
+        >>> EntryPoint(name=None, group=None, value='invalid-name').extras
+        Traceback (most recent call last):
+        ...
+        ValueError: ('Invalid object reference...invalid-name...
+
+        The same thing happens on construction.
+
+        >>> EntryPoint(name=None, group=None, value='invalid-name')
+        Traceback (most recent call last):
+        ...
+        ValueError: ('Invalid object reference...invalid-name...
+
         """
 
         pattern: ClassVar[Pattern[str]]
@@ -192,37 +226,36 @@ else:
         def module(self) -> str: ...
         @property
         def attr(self) -> str: ...
-        if sys.version_info >= (3, 10):
-            dist: ClassVar[Distribution | None]
-            def matches(
-                self,
-                *,
-                name: str = ...,
-                value: str = ...,
-                group: str = ...,
-                module: str = ...,
-                attr: str = ...,
-                extras: list[str] = ...,
-            ) -> bool:  # undocumented
-                """
-                EntryPoint matches the given parameters.
+        dist: ClassVar[Distribution | None]
+        def matches(
+            self,
+            *,
+            name: str = ...,
+            value: str = ...,
+            group: str = ...,
+            module: str = ...,
+            attr: str = ...,
+            extras: list[str] = ...,
+        ) -> bool:  # undocumented
+            """
+            EntryPoint matches the given parameters.
 
-                >>> ep = EntryPoint(group='foo', name='bar', value='bing:bong [extra1, extra2]')
-                >>> ep.matches(group='foo')
-                True
-                >>> ep.matches(name='bar', value='bing:bong [extra1, extra2]')
-                True
-                >>> ep.matches(group='foo', name='other')
-                False
-                >>> ep.matches()
-                True
-                >>> ep.matches(extras=['extra1', 'extra2'])
-                True
-                >>> ep.matches(module='bing')
-                True
-                >>> ep.matches(attr='bong')
-                True
-                """
+            >>> ep = EntryPoint(group='foo', name='bar', value='bing:bong [extra1, extra2]')
+            >>> ep.matches(group='foo')
+            True
+            >>> ep.matches(name='bar', value='bing:bong [extra1, extra2]')
+            True
+            >>> ep.matches(group='foo', name='other')
+            False
+            >>> ep.matches()
+            True
+            >>> ep.matches(extras=['extra1', 'extra2'])
+            True
+            >>> ep.matches(module='bing')
+            True
+            >>> ep.matches(attr='bong')
+            True
+            """
 
         def __hash__(self) -> int: ...
         def __iter__(self) -> Iterator[Any]:  # result of iter((str, Self)), really
@@ -269,7 +302,7 @@ if sys.version_info >= (3, 12):
             Return the set of all groups of all entry points.
             """
 
-elif sys.version_info >= (3, 10):
+else:
     class DeprecatedList(list[_T]):
         """
         Allow an otherwise immutable object to implement mutability
@@ -347,7 +380,7 @@ elif sys.version_info >= (3, 10):
             set()
             """
 
-if sys.version_info >= (3, 10) and sys.version_info < (3, 12):
+if sys.version_info < (3, 12):
     class Deprecated(Generic[_KT, _VT]):
         """
         Compatibility add-in for mapping to indicate that
@@ -372,12 +405,14 @@ if sys.version_info >= (3, 10) and sys.version_info < (3, 12):
         """
 
         def __getitem__(self, name: _KT) -> _VT: ...
+
         @overload
         def get(self, name: _KT, default: None = None) -> _VT | None: ...
         @overload
         def get(self, name: _KT, default: _VT) -> _VT: ...
         @overload
         def get(self, name: _KT, default: _T) -> _VT | _T: ...
+
         def __iter__(self) -> Iterator[_KT]: ...
         def __contains__(self, *args: object) -> bool: ...
         def keys(self) -> dict_keys[_KT, _VT]: ...
@@ -423,6 +458,7 @@ class PackagePath(pathlib.PurePosixPath):
     def read_binary(self) -> bytes: ...
     def locate(self) -> PathLike[str]:
         """Return a path-like object for this path"""
+
     # The following attributes are not defined on PackagePath, but are dynamically added by Distribution.files:
     hash: FileHash | None
     size: int | None
@@ -433,7 +469,9 @@ class FileHash:
     value: str
     def __init__(self, spec: str) -> None: ...
 
-if sys.version_info >= (3, 12):
+if sys.version_info >= (3, 15):
+    _distribution_parent = abc.ABC
+elif sys.version_info >= (3, 12):
     class DeprecatedNonAbstract: ...
     _distribution_parent = DeprecatedNonAbstract
 else:
@@ -478,6 +516,17 @@ class Distribution(_distribution_parent):
         """
         Given a path to a file in this distribution, return a SimplePath
         to it.
+
+        This method is used by callers of ``Distribution.files()`` to
+        locate files within the distribution. If it's possible for a
+        Distribution to represent files in the distribution as
+        ``SimplePath`` objects, it should implement this method
+        to resolve such objects.
+
+        Some Distribution providers may elect not to resolve SimplePath
+        objects within the distribution by raising a
+        NotImplementedError, but consumers of such a Distribution would
+        be unable to invoke ``Distribution.files()``.
         """
 
     @classmethod
@@ -504,12 +553,12 @@ class Distribution(_distribution_parent):
         :return: Iterable of Distribution objects for packages matching
           the context.
         """
-
     @overload
     @classmethod
     def discover(
         cls, *, context: None = None, name: str | None = ..., path: list[str] = ..., **kwargs: Any
     ) -> Iterable[Distribution]: ...
+
     @staticmethod
     def at(path: StrPath) -> PathDistribution:
         """Return a Distribution for the indicated metadata path.
@@ -517,38 +566,29 @@ class Distribution(_distribution_parent):
         :param path: a string or path-like object
         :return: a concrete Distribution instance for the path
         """
-    if sys.version_info >= (3, 10):
-        @property
-        def metadata(self) -> PackageMetadata:
-            """Return the parsed metadata for this Distribution.
 
-            The returned object will have keys that name the various bits of
-            metadata per the
-            `Core metadata specifications <https://packaging.python.org/en/latest/specifications/core-metadata/#core-metadata>`_.
+    @property
+    def metadata(self) -> PackageMetadata:
+        """Return the parsed metadata for this Distribution.
 
-            Custom providers may provide the METADATA file or override this
-            property.
-            """
+        The returned object will have keys that name the various bits of
+        metadata per the
+        `Core metadata specifications <https://packaging.python.org/en/latest/specifications/core-metadata/#core-metadata>`_.
 
-        @property
-        def entry_points(self) -> EntryPoints:
-            """
-            Return EntryPoints for this distribution.
+        Custom providers may provide the METADATA file or override this
+        property.
 
-            Custom providers may provide the ``entry_points.txt`` file
-            or override this property.
-            """
-    else:
-        @property
-        def metadata(self) -> Message:
-            """Return the parsed metadata for this Distribution.
+        :raises MetadataNotFound: If no metadata file is present.
+        """
 
-            The returned object will have keys that name the various bits of
-            metadata.  See PEP 566 for details.
-            """
+    @property
+    def entry_points(self) -> EntryPoints:
+        """
+        Return EntryPoints for this distribution.
 
-        @property
-        def entry_points(self) -> list[EntryPoint]: ...
+        Custom providers may provide the ``entry_points.txt`` file
+        or override this property.
+        """
 
     @property
     def version(self) -> str:
@@ -573,10 +613,11 @@ class Distribution(_distribution_parent):
     @property
     def requires(self) -> list[str] | None:
         """Generated requirements specified for this Distribution"""
-    if sys.version_info >= (3, 10):
-        @property
-        def name(self) -> str:
-            """Return the 'Name' metadata for the distribution package."""
+
+    @property
+    def name(self) -> str:
+        """Return the 'Name' metadata for the distribution package."""
+
     if sys.version_info >= (3, 13):
         @property
         def origin(self) -> types.SimpleNamespace | None: ...
@@ -645,10 +686,11 @@ class MetadataPathFinder(DistributionFinder):
         (or all names if ``None`` indicated) along the paths in the list
         of directories ``context.path``.
         """
+
     if sys.version_info >= (3, 11):
         @classmethod
         def invalidate_caches(cls) -> None: ...
-    elif sys.version_info >= (3, 10):
+    else:
         # Yes, this is an instance method that has a parameter named "cls"
         def invalidate_caches(cls) -> None: ...
 
@@ -697,27 +739,18 @@ def distributions(*, context: DistributionFinder.Context) -> Iterable[Distributi
 
     :return: An iterable of ``Distribution`` instances.
     """
-
 @overload
 def distributions(
     *, context: None = None, name: str | None = ..., path: list[str] = ..., **kwargs: Any
 ) -> Iterable[Distribution]: ...
 
-if sys.version_info >= (3, 10):
-    def metadata(distribution_name: str) -> PackageMetadata:
-        """Get the metadata for the named package.
+def metadata(distribution_name: str) -> PackageMetadata:
+    """Get the metadata for the named package.
 
-        :param distribution_name: The name of the distribution package to query.
-        :return: A PackageMetadata containing the parsed metadata.
-        """
-
-else:
-    def metadata(distribution_name: str) -> Message:
-        """Get the metadata for the named package.
-
-        :param distribution_name: The name of the distribution package to query.
-        :return: An email.Message containing the parsed metadata.
-        """
+    :param distribution_name: The name of the distribution package to query.
+    :return: A PackageMetadata containing the parsed metadata.
+    :raises MetadataNotFound: If no metadata file is present in the distribution.
+    """
 
 if sys.version_info >= (3, 12):
     def entry_points(
@@ -732,7 +765,7 @@ if sys.version_info >= (3, 12):
         :return: EntryPoints for all installed packages.
         """
 
-elif sys.version_info >= (3, 10):
+else:
     @overload
     def entry_points() -> SelectableGroups:
         """Return EntryPoint objects for all installed packages.
@@ -751,18 +784,10 @@ elif sys.version_info >= (3, 10):
 
         :return: EntryPoints or SelectableGroups for all installed packages.
         """
-
     @overload
     def entry_points(
         *, name: str = ..., value: str = ..., group: str = ..., module: str = ..., attr: str = ..., extras: list[str] = ...
     ) -> EntryPoints: ...
-
-else:
-    def entry_points() -> dict[str, list[EntryPoint]]:
-        """Return EntryPoint objects for all installed packages.
-
-        :return: EntryPoint objects for all installed packages.
-        """
 
 def version(distribution_name: str) -> str:
     """Get the version string for the named package.

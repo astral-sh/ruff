@@ -1,17 +1,20 @@
 use std::collections::HashMap;
 
-use lsp_types::Url;
+use lsp_types::Uri;
 use ruff_db::system::{System, SystemPath, SystemPathBuf};
 use ruff_macros::Combine;
 use ruff_python_ast::PythonVersion;
+use ruff_ranged_value::{RangedValue, ValueSource};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
+use strum::IntoEnumIterator;
 use ty_combine::Combine;
 use ty_ide::{CompletionSettings, InlayHintSettings};
 use ty_project::CheckMode;
 use ty_project::metadata::Options as TyOptions;
-use ty_project::metadata::options::ProjectOptionsOverrides;
-use ty_project::metadata::value::{RangedValue, RelativePathBuf, ValueSource};
+use ty_project::metadata::options::EnvironmentOptions;
+use ty_project::metadata::python_version::SupportedPythonVersion;
+use ty_project::metadata::value::RelativePathBuf;
 
 use super::settings::{ExperimentalSettings, GlobalSettings, WorkspaceSettings};
 use crate::logging::LogLevel;
@@ -122,6 +125,15 @@ impl ClientOptions {
             .completions
             .get_or_insert_default()
             .auto_import = Some(enabled);
+        self
+    }
+
+    #[must_use]
+    pub fn with_complete_function_parentheses(mut self, enabled: bool) -> Self {
+        self.workspace
+            .completions
+            .get_or_insert_default()
+            .complete_function_parentheses = Some(enabled);
         self
     }
 
@@ -244,33 +256,25 @@ impl WorkspaceOptions {
                 }
             });
 
-        let mut overrides =
-            ProjectOptionsOverrides::new(configuration_file, options_overrides.unwrap_or_default());
+        let override_options = options_overrides
+            .filter(|options| options != &TyOptions::default())
+            .map(Box::new);
+        let mut fallback_environment = EnvironmentOptions::default();
 
         if let Some(extension) = self.python_extension
             && let Some(active_environment) = extension.active_environment
         {
-            overrides.fallback_python = if let Some(environment) = &active_environment.environment {
-                environment.folder_uri.to_file_path().ok().and_then(|path| {
-                    Some(RelativePathBuf::python_extension(
-                        SystemPathBuf::from_path_buf(path).ok()?,
-                    ))
-                })
-            } else {
-                Some(RelativePathBuf::python_extension(
-                    active_environment.executable.sys_prefix.clone(),
-                ))
-            };
+            fallback_environment.python = Some(RelativePathBuf::python_extension(
+                active_environment.executable.sys_prefix,
+            ));
 
-            overrides.fallback_python_version =
-                active_environment.version.as_ref().and_then(|version| {
-                    Some(RangedValue::python_extension(PythonVersion::from((
-                        u8::try_from(version.major).ok()?,
-                        u8::try_from(version.minor).ok()?,
-                    ))))
-                });
+            fallback_environment.python_version = active_environment
+                .version
+                .as_ref()
+                .and_then(resolve_editor_python_version)
+                .map(RangedValue::python_extension);
 
-            if let Some(python) = &overrides.fallback_python {
+            if let Some(python) = &fallback_environment.python {
                 tracing::debug!(
                     "Using the Python environment selected in your editor \
                     in case the configuration doesn't specify a Python environment: {python}",
@@ -278,7 +282,7 @@ impl WorkspaceOptions {
                 );
             }
 
-            if let Some(version) = &overrides.fallback_python_version {
+            if let Some(version) = &fallback_environment.python_version {
                 tracing::debug!(
                     "Using the Python version selected in your editor: {version} \
                     in case the configuration doesn't specify a Python version",
@@ -286,10 +290,13 @@ impl WorkspaceOptions {
             }
         }
 
-        let overrides = if overrides == ProjectOptionsOverrides::default() {
+        let fallback_options = if fallback_environment == EnvironmentOptions::default() {
             None
         } else {
-            Some(overrides)
+            Some(Box::new(TyOptions {
+                environment: Some(fallback_environment),
+                ..TyOptions::default()
+            }))
         };
 
         WorkspaceSettings {
@@ -302,9 +309,38 @@ impl WorkspaceOptions {
                 .completions
                 .map(CompletionOptions::into_settings)
                 .unwrap_or_default(),
-            overrides,
+            configuration_file,
+            override_options,
+            fallback_options,
         }
     }
+}
+
+/// Resolve the selected editor Python version, if ty supports it.
+fn resolve_editor_python_version(version: &EnvironmentVersion) -> Option<SupportedPythonVersion> {
+    let warn_unsupported_editor_python_version = || {
+        tracing::warn!(
+            "Unsupported Python version `{}.{}` selected in your editor; ty won't set \
+            the Python version to the selected interpreter's version. Expected one of {}.",
+            version.major,
+            version.minor,
+            SupportedPythonVersion::iter()
+                .map(|version| format!("`{version}`"))
+                .collect::<Vec<_>>()
+                .join(", ")
+        );
+    };
+
+    let python_version = u8::try_from(version.major)
+        .and_then(|major| {
+            u8::try_from(version.minor).map(|minor| PythonVersion::from((major, minor)))
+        })
+        .inspect_err(|_| warn_unsupported_editor_python_version())
+        .ok()?;
+
+    SupportedPythonVersion::try_from(python_version)
+        .inspect_err(|_| warn_unsupported_editor_python_version())
+        .ok()
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, Default, PartialEq, Eq)]
@@ -341,6 +377,8 @@ impl InlayHintOptions {
 #[serde(rename_all = "camelCase")]
 pub struct CompletionOptions {
     auto_import: Option<bool>,
+    /// Whether callable completions should insert parentheses.
+    complete_function_parentheses: Option<bool>,
 }
 
 impl CompletionOptions {
@@ -353,6 +391,7 @@ impl CompletionOptions {
     fn into_settings(self) -> CompletionSettings {
         CompletionSettings {
             auto_import: self.auto_import.unwrap_or(true),
+            complete_function_parentheses: self.complete_function_parentheses.unwrap_or(false),
         }
     }
 }
@@ -449,6 +488,7 @@ impl Combine for PythonExtension {
 #[serde(rename_all = "camelCase")]
 pub(crate) struct ActiveEnvironment {
     pub(crate) executable: PythonExecutable,
+    #[deprecated]
     pub(crate) environment: Option<PythonEnvironment>,
     pub(crate) version: Option<EnvironmentVersion>,
 }
@@ -458,27 +498,32 @@ pub(crate) struct ActiveEnvironment {
 pub(crate) struct EnvironmentVersion {
     pub(crate) major: i64,
     pub(crate) minor: i64,
-    #[allow(dead_code)]
-    pub(crate) patch: i64,
-    #[allow(dead_code)]
-    pub(crate) sys_version: String,
+    #[deprecated(
+        note = "Not provided by all clients (Zed, VS Code when using the Python Environment extension). Use `major` and `minor` instead."
+    )]
+    pub(crate) patch: Option<i64>,
+    #[deprecated(
+        note = "Not provided by all clients (Zed, VS Code when using the Python Environment extension)."
+    )]
+    pub(crate) sys_version: Option<String>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct PythonEnvironment {
-    pub(crate) folder_uri: Url,
-    #[allow(dead_code)]
+    #[deprecated]
+    pub(crate) folder_uri: Option<Uri>,
+    #[deprecated]
     #[serde(rename = "type")]
-    pub(crate) kind: String,
-    #[allow(dead_code)]
+    pub(crate) kind: Option<String>,
+    #[deprecated]
     pub(crate) name: Option<String>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct PythonExecutable {
-    #[allow(dead_code)]
-    pub(crate) uri: Url,
+    #[deprecated]
+    pub(crate) uri: Option<Uri>,
     pub(crate) sys_prefix: SystemPathBuf,
 }

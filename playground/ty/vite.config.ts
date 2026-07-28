@@ -1,6 +1,6 @@
 import { defineConfig } from "vite";
 import tailwindcss from "@tailwindcss/vite";
-import react from "@vitejs/plugin-react-swc";
+import react from "@vitejs/plugin-react";
 import { dirname, join } from "path";
 import { fileURLToPath } from "url";
 import { normalizePath } from "vite";
@@ -28,6 +28,7 @@ export function viteStaticCopyPyodide() {
       {
         src: [pyodideDir, ...PYODIDE_EXCLUDE],
         dest: "assets",
+        rename: { stripBase: true },
       },
     ],
   });

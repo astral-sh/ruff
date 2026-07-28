@@ -5,24 +5,10 @@ expression: line_continuation_at_eof(UNIX_EOL)
 ## Tokens
 ```
 [
-    (
-        Int(
-            1,
-        ),
-        0..1,
-    ),
-    (
-        Comma,
-        1..2,
-    ),
-    (
-        Unknown,
-        2..5,
-    ),
-    (
-        Newline,
-        5..5,
-    ),
+    Int 0..1,
+    Comma 1..2,
+    Unknown 2..5,
+    Newline 5..5,
 ]
 ```
 ## Errors

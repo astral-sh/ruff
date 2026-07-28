@@ -198,6 +198,11 @@ def process_board_action(
     payload: WildValue, action_type: Optional[str]
 ) -> Optional[Tuple[str, str]]:
     pass
+
+
+# Preserve parentheses around invalid type expressions.
+async def preserve_await_return_annotation() -> (await g()):
+    pass
 ```
 
 ## Output
@@ -506,5 +511,10 @@ def double(
 def process_board_action(
     payload: WildValue, action_type: Optional[str]
 ) -> Optional[Tuple[str, str]]:
+    pass
+
+
+# Preserve parentheses around invalid type expressions.
+async def preserve_await_return_annotation() -> (await g()):
     pass
 ```

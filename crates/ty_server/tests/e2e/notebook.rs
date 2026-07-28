@@ -1,5 +1,8 @@
 use insta::assert_json_snapshot;
-use lsp_types::{NotebookCellKind, Position, Range};
+use lsp_types::{
+    Message, NotebookCellKind, Position, Range, TextDocumentContentChangePartial,
+    TextDocumentIdentifier,
+};
 use ruff_db::system::SystemPath;
 use ty_server::ClientOptions;
 
@@ -45,13 +48,62 @@ type Style = Literal["italic", "bold", "underline"]"#,
     builder.open(&mut server);
 
     let cell1_diagnostics =
-        server.await_notification::<lsp_types::notification::PublishDiagnostics>();
+        server.await_notification::<lsp_types::PublishDiagnosticsNotification>();
     let cell2_diagnostics =
-        server.await_notification::<lsp_types::notification::PublishDiagnostics>();
+        server.await_notification::<lsp_types::PublishDiagnosticsNotification>();
     let cell3_diagnostics =
-        server.await_notification::<lsp_types::notification::PublishDiagnostics>();
+        server.await_notification::<lsp_types::PublishDiagnosticsNotification>();
 
     assert_json_snapshot!([cell1_diagnostics, cell2_diagnostics, cell3_diagnostics]);
+
+    Ok(())
+}
+
+#[test]
+fn publish_unused_binding_diagnostics_open() -> anyhow::Result<()> {
+    let mut server = TestServerBuilder::new()?
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    server.initialization_result().unwrap();
+
+    let mut builder = NotebookBuilder::virtual_file("test.ipynb");
+    builder.add_python_cell(
+        r#"def f():
+    x = 1
+    return 0
+"#,
+    );
+
+    builder.open(&mut server);
+
+    let diagnostics = server.collect_publish_diagnostic_notifications(1);
+    assert_json_snapshot!(diagnostics);
+
+    Ok(())
+}
+
+#[test]
+fn publish_unreachable_code_diagnostics_open() -> anyhow::Result<()> {
+    let mut server = TestServerBuilder::new()?
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    server.initialization_result().unwrap();
+
+    let mut builder = NotebookBuilder::virtual_file("test.ipynb");
+    builder.add_python_cell(
+        r#"def f():
+    return 0
+    print("dead")
+    print("still dead")
+"#,
+    );
+
+    builder.open(&mut server);
+
+    let diagnostics = server.collect_publish_diagnostic_notifications(1);
+    assert_json_snapshot!(diagnostics);
 
     Ok(())
 }
@@ -91,33 +143,33 @@ type Style = Literal["italic", "bold", "underline"]"#,
 IOError"#,
     );
 
-    let notebook_url = builder.open(&mut server);
+    let notebook_uri = builder.open(&mut server);
 
     server.collect_publish_diagnostic_notifications(3);
 
-    server.send_notification::<lsp_types::notification::DidChangeNotebookDocument>(
+    server.send_notification::<lsp_types::DidChangeNotebookDocumentNotification>(
         lsp_types::DidChangeNotebookDocumentParams {
             notebook_document: lsp_types::VersionedNotebookDocumentIdentifier {
                 version: 0,
-                uri: notebook_url,
+                uri: notebook_uri,
             },
             change: lsp_types::NotebookDocumentChangeEvent {
                 metadata: None,
-                cells: Some(lsp_types::NotebookDocumentCellChange {
+                cells: Some(lsp_types::NotebookDocumentCellChanges {
                     structure: None,
                     data: None,
-                    text_content: Some(vec![lsp_types::NotebookDocumentChangeTextContent {
+                    text_content: Some(vec![lsp_types::NotebookDocumentCellContentChanges {
                         document: lsp_types::VersionedTextDocumentIdentifier {
-                            uri: cell_3,
+                            text_document_identifier: TextDocumentIdentifier { uri: cell_3 },
                             version: 0,
                         },
 
                         changes: {
-                            vec![lsp_types::TextDocumentContentChangeEvent {
-                                range: Some(Range::new(Position::new(0, 16), Position::new(0, 17))),
-                                range_length: Some(1),
+                            vec![lsp_types::TextDocumentContentChangeEvent::TextDocumentContentChangePartial (TextDocumentContentChangePartial{
+                                range: Range::new(Position::new(0, 16), Position::new(0, 17)),
                                 text: String::new(),
-                            }]
+                                ..Default::default()
+                            })]
                         },
                     }]),
                 }),
@@ -179,6 +231,42 @@ type Style = Literal["italic", "bold", "underline"]"#,
 }
 
 #[test]
+fn semantic_tokens_for_cell_do_not_leak_stringified_annotations() -> anyhow::Result<()> {
+    let mut server = TestServerBuilder::new()?
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    server.initialization_result().unwrap();
+
+    let mut builder = NotebookBuilder::virtual_file("src/test.ipynb");
+
+    // Create a first cell that contains semantic tokens.
+    builder.add_python_cell(
+        r#"from typing import cast
+
+x = cast("list[str]", [])"#,
+    );
+
+    // Create a second, empty cell that does not contain any semantic tokens.
+    let second_cell = builder.add_python_cell("");
+
+    builder.open(&mut server);
+
+    // Assert that we didn't receive any semantic tokens for the empty cell.
+    // This proves that none were leaked from the first cell.
+    let response = semantic_tokens_full_for_cell(&mut server, &second_cell);
+    if let Some(tokens) = response {
+        assert!(tokens.data.is_empty());
+    } else {
+        panic!("Expected semantic tokens, but response was empty");
+    }
+
+    server.collect_publish_diagnostic_notifications(2);
+
+    Ok(())
+}
+
+#[test]
 fn swap_cells() -> anyhow::Result<()> {
     let mut server = TestServerBuilder::new()?
         .build()
@@ -229,7 +317,7 @@ fn swap_cells() -> anyhow::Result<()> {
     "#);
 
     // Re-order the cells from `b`, `a`, `c` to `a`, `b`, `c` (swapping cell 1 and 2)
-    server.send_notification::<lsp_types::notification::DidChangeNotebookDocument>(
+    server.send_notification::<lsp_types::DidChangeNotebookDocumentNotification>(
         lsp_types::DidChangeNotebookDocumentParams {
             notebook_document: lsp_types::VersionedNotebookDocumentIdentifier {
                 version: 1,
@@ -237,7 +325,7 @@ fn swap_cells() -> anyhow::Result<()> {
             },
             change: lsp_types::NotebookDocumentChangeEvent {
                 metadata: None,
-                cells: Some(lsp_types::NotebookDocumentCellChange {
+                cells: Some(lsp_types::NotebookDocumentCellChanges {
                     structure: Some(lsp_types::NotebookDocumentCellChangeStructure {
                         array: lsp_types::NotebookCellArrayChange {
                             start: 0,
@@ -460,103 +548,120 @@ fn invalid_syntax_with_syntax_errors_disabled() -> anyhow::Result<()> {
 
     let diagnostics = server.collect_publish_diagnostic_notifications(2);
 
-    assert_json_snapshot!(diagnostics, @r#"
-    {
-      "vscode-notebook-cell://src/test.ipynb#0": [],
-      "vscode-notebook-cell://src/test.ipynb#1": []
-    }
-    "#);
+    // We still publish unused-bindings for both cells, even when syntax-error reporting is disabled.
+    assert_eq!(diagnostics.len(), 2);
+    assert!(
+        diagnostics
+            .values()
+            .flatten()
+            .all(|diagnostic| diagnostic.message
+                != Message::String("unexpected EOF while parsing".into()))
+    );
 
     Ok(())
 }
 
 fn semantic_tokens_full_for_cell(
     server: &mut TestServer,
-    cell_uri: &lsp_types::Url,
-) -> Option<lsp_types::SemanticTokensResult> {
-    let cell1_tokens_req_id = server.send_request::<lsp_types::request::SemanticTokensFullRequest>(
-        lsp_types::SemanticTokensParams {
+    cell_uri: &lsp_types::Uri,
+) -> Option<lsp_types::SemanticTokens> {
+    let cell1_tokens_req_id =
+        server.send_request::<lsp_types::SemanticTokensRequest>(lsp_types::SemanticTokensParams {
             work_done_progress_params: lsp_types::WorkDoneProgressParams::default(),
             partial_result_params: lsp_types::PartialResultParams::default(),
             text_document: lsp_types::TextDocumentIdentifier {
                 uri: cell_uri.clone(),
             },
-        },
-    );
+        });
 
-    server.await_response::<lsp_types::request::SemanticTokensFullRequest>(&cell1_tokens_req_id)
+    server.await_response::<lsp_types::SemanticTokensRequest>(&cell1_tokens_req_id)
 }
 
 #[derive(Debug)]
 pub(crate) struct NotebookBuilder {
-    notebook_url: lsp_types::Url,
-    // The cells: (cell_metadata, content, language_id)
-    cells: Vec<(lsp_types::NotebookCell, String, String)>,
+    notebook_uri: lsp_types::Uri,
+    // The cells: (cell_metadata, content, language_id, version)
+    cells: Vec<(lsp_types::NotebookCell, String, String, i32)>,
 }
 
 impl NotebookBuilder {
     pub(crate) fn virtual_file(name: &str) -> Self {
-        let url: lsp_types::Url = format!("vs-code:/{name}").parse().unwrap();
+        let uri: lsp_types::Uri = format!("vs-code:/{name}").parse().unwrap();
         Self {
-            notebook_url: url,
+            notebook_uri: uri,
             cells: Vec::new(),
         }
     }
 
-    pub(crate) fn add_python_cell(&mut self, content: &str) -> lsp_types::Url {
+    pub(crate) fn add_python_cell(&mut self, content: &str) -> lsp_types::Uri {
+        self.add_python_cell_with_version(content, 0)
+    }
+
+    pub(crate) fn add_python_cell_with_version(
+        &mut self,
+        content: &str,
+        version: i32,
+    ) -> lsp_types::Uri {
         let index = self.cells.len();
         let id = format!(
             "vscode-notebook-cell:/{}#{}",
-            self.notebook_url.path(),
+            self.notebook_uri.path(),
             index
         );
 
-        let url: lsp_types::Url = id.parse().unwrap();
+        let uri: lsp_types::Uri = id.parse().unwrap();
 
         self.cells.push((
             lsp_types::NotebookCell {
                 kind: NotebookCellKind::Code,
-                document: url.clone(),
+                document: uri.clone(),
                 metadata: None,
                 execution_summary: None,
             },
             content.to_string(),
             "python".to_string(),
+            version,
         ));
 
-        url
+        uri
     }
 
-    pub(crate) fn open(self, server: &mut TestServer) -> lsp_types::Url {
-        server.send_notification::<lsp_types::notification::DidOpenNotebookDocument>(
+    pub(crate) fn open(self, server: &mut TestServer) -> lsp_types::Uri {
+        server.send_notification::<lsp_types::DidOpenNotebookDocumentNotification>(
             lsp_types::DidOpenNotebookDocumentParams {
                 notebook_document: lsp_types::NotebookDocument {
-                    uri: self.notebook_url.clone(),
+                    uri: self.notebook_uri.clone(),
                     notebook_type: "jupyter-notebook".to_string(),
                     version: 0,
                     metadata: None,
-                    cells: self.cells.iter().map(|(cell, _, _)| cell.clone()).collect(),
+                    cells: self
+                        .cells
+                        .iter()
+                        .map(|(cell, _, _, _)| cell.clone())
+                        .collect(),
                 },
                 cell_text_documents: self
                     .cells
                     .iter()
-                    .map(|(cell, content, language_id)| lsp_types::TextDocumentItem {
-                        uri: cell.document.clone(),
-                        language_id: language_id.clone(),
-                        version: 0,
-                        text: content.clone(),
-                    })
+                    .map(
+                        |(cell, content, language_id, version)| lsp_types::TextDocumentItem {
+                            uri: cell.document.clone(),
+                            language_id: language_id.clone().into(),
+                            version: *version,
+                            text: content.clone(),
+                        },
+                    )
                     .collect(),
             },
         );
 
-        self.notebook_url
+        self.notebook_uri
     }
 }
 
 fn literal_completions(
     server: &mut TestServer,
-    cell: &lsp_types::Url,
+    cell: &lsp_types::Uri,
     position: Position,
 ) -> Vec<lsp_types::CompletionItem> {
     let mut items = server.completion_request(cell, position);

@@ -55,7 +55,7 @@ use crate::checkers::ast::Checker;
 ///
 /// [override]: https://docs.python.org/3/library/typing.html#typing.override
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "v0.1.7")]
+#[violation_metadata(stable_since = "0.16.0")]
 pub(crate) struct TooManyPositionalArguments {
     c_pos: usize,
     max_pos: usize,
@@ -65,7 +65,7 @@ impl Violation for TooManyPositionalArguments {
     #[derive_message_formats]
     fn message(&self) -> String {
         let TooManyPositionalArguments { c_pos, max_pos } = self;
-        format!("Too many positional arguments ({c_pos}/{max_pos})")
+        format!("Too many positional arguments ({c_pos} > {max_pos})")
     }
 }
 

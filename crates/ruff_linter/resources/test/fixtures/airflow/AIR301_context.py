@@ -205,3 +205,37 @@ def test_inlet_events_dataset_subscript_ok(**context):
 
     print(context["inlet_events"][Dataset("this://is-url")])
     print(context["inlet_events"][Asset("this://is-url")])
+
+
+# Same context checks with airflow.sdk import
+from airflow.sdk import task as sdk_task
+
+
+@sdk_task
+def sdk_access_deprecated_context_key(**context):
+    execution_date = context["execution_date"]
+    next_ds = context["next_ds"]
+
+
+@sdk_task
+def sdk_access_valid_context_key(**context):
+    logical_date = context["logical_date"]
+
+
+# Test variant decorator forms like @task.branch and @task.short_circuit
+@task.branch
+def branch_task_with_deprecated_context(**context):
+    execution_date = context["execution_date"]
+    return "some_task"
+
+
+@task.short_circuit
+def short_circuit_task_with_deprecated_context(**context):
+    next_ds = context["next_ds"]
+    return True
+
+
+@task.branch()
+def branch_task_with_call_and_deprecated_context(**context):
+    tomorrow_ds = context["tomorrow_ds"]
+    return "some_task"

@@ -1,6 +1,5 @@
 use lsp_server::ErrorCode;
-use lsp_types::DidOpenNotebookDocumentParams;
-use lsp_types::notification::DidOpenNotebookDocument;
+use lsp_types::{DidOpenNotebookDocumentNotification, DidOpenNotebookDocumentParams};
 
 use crate::TextDocument;
 use crate::document::NotebookDocument;
@@ -14,7 +13,7 @@ use crate::session::client::Client;
 pub(crate) struct DidOpenNotebookHandler;
 
 impl NotificationHandler for DidOpenNotebookHandler {
-    type NotificationType = DidOpenNotebookDocument;
+    type NotificationType = DidOpenNotebookDocumentNotification;
 }
 
 impl SyncNotificationHandler for DidOpenNotebookHandler {
@@ -39,9 +38,9 @@ impl SyncNotificationHandler for DidOpenNotebookHandler {
         let notebook_path = document.notebook_or_file_path();
 
         for cell in params.cell_text_documents {
-            let cell_document = TextDocument::new(cell.uri, cell.text, cell.version)
-                .with_language_id(&cell.language_id)
-                .with_notebook(notebook_path.clone());
+            let cell_document =
+                TextDocument::new(cell.uri, cell.text, cell.version, cell.language_id)
+                    .with_notebook(notebook_path.clone());
             session.open_text_document(cell_document);
         }
 

@@ -53,7 +53,7 @@ use ruff_python_ast::token::parenthesized_range;
 pub(crate) struct UnquotedTypeAlias;
 
 impl Violation for UnquotedTypeAlias {
-    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Always;
 
     #[derive_message_formats]
     fn message(&self) -> String {

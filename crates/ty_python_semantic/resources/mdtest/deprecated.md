@@ -38,6 +38,89 @@ MyClass.afunc()  # error: [deprecated] "use something else"
 MyClass().amethod()  # error: [deprecated] "don't use this!"
 ```
 
+## Function replacements
+
+An outer `@deprecated` decorator applies to the function returned by inner decorators.
+
+```py
+from collections.abc import Callable
+from typing import Any, TypeVar
+from typing_extensions import deprecated
+
+R = TypeVar("R")
+
+def replacement() -> str:
+    return "replacement"
+
+def replace_with(value: R) -> Callable[[Callable[..., Any]], R]:
+    def decorator(_function: Callable[..., Any]) -> R:
+        return value
+
+    return decorator
+
+@deprecated("use replacement directly")
+@replace_with(replacement)
+def old() -> None:
+    pass
+
+old()  # error: [deprecated] "use replacement directly"
+replacement()
+
+@replace_with(replacement)
+@deprecated("discarded by outer replacement")
+def replaced_after_deprecation() -> None:
+    pass
+
+replaced_after_deprecation()
+
+@deprecated("outer deprecation")
+@replace_with(replacement)
+@deprecated("inner deprecation")
+def multiply_deprecated() -> None:
+    pass
+
+multiply_deprecated()  # error: [deprecated] "outer deprecation"
+
+class StaticMethodReplacement:
+    @staticmethod
+    @deprecated("use replacement directly")
+    @replace_with(replacement)
+    def old() -> None:
+        pass
+
+StaticMethodReplacement.old()  # error: [deprecated] "use replacement directly"
+```
+
+## Callable-object replacements
+
+`@deprecated` can also wrap other callable objects at runtime, but we currently only preserve the
+deprecation when an inner decorator returns a function literal.
+
+```py
+from collections.abc import Callable
+from typing import Any, TypeVar
+from typing_extensions import deprecated
+
+R = TypeVar("R")
+
+def replace_with(value: R) -> Callable[[Callable[..., Any]], R]:
+    def decorator(_function: Callable[..., Any]) -> R:
+        return value
+
+    return decorator
+
+class Replacement:
+    def __call__(self) -> str:
+        return "replacement"
+
+@deprecated("use Replacement directly")
+@replace_with(Replacement())
+def old() -> None:
+    pass
+
+old()  # TODO: error: [deprecated] "use Replacement directly"
+```
+
 ## Syntax
 
 <!-- snapshot-diagnostics -->
@@ -137,6 +220,19 @@ from typing_extensions import deprecated
 def valid_deco(): ...
 
 valid_deco()  # error: [deprecated] "some message"
+```
+
+## Category
+
+The category must be a `Warning` subclass or `None`.
+
+```py
+from typing_extensions import deprecated
+
+@deprecated("some message", category=42)  # error: [invalid-argument-type] "type[Warning] | None"
+def invalid_category(): ...
+@deprecated("some message", category=None)
+def no_category(): ...
 ```
 
 ## Different Versions

@@ -27,15 +27,16 @@ env:
 jobs:
   publish:
     runs-on: ubuntu-latest
+    environment: release-playground
     env:
       CF_API_TOKEN_EXISTS: ${{ secrets.CF_API_TOKEN != '' }}
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           persist-credentials: false
       - name: "Install Rust toolchain"
         run: rustup target add wasm32-unknown-unknown
-      - uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 24
           package-manager-cache: false
@@ -49,9 +50,16 @@ jobs:
       - name: "Build ty playground"
         run: npm run build --workspace ty-playground
         working-directory: playground
+      - name: "Verify Pyodide assets"
+        run: |
+          test -f ty/dist/assets/pyodide.asm.mjs
+          test -f ty/dist/assets/pyodide.asm.wasm
+          test -f ty/dist/assets/pyodide-lock.json
+          test -f ty/dist/assets/python_stdlib.zip
+        working-directory: playground
       - name: "Deploy to Cloudflare Pages"
         if: ${{ env.CF_API_TOKEN_EXISTS == 'true' }}
-        uses: cloudflare/wrangler-action@da0e0dfe58b7a431659754fdf3f186c529afbe65 # v3.14.1
+        uses: cloudflare/wrangler-action@ebbaa1584979971c8614a24965b4405ff95890e0 # v4.0.0
         with:
           apiToken: ${{ secrets.CF_API_TOKEN }}
           accountId: ${{ secrets.CF_ACCOUNT_ID }}

@@ -1,6 +1,6 @@
 const API_URL = import.meta.env.PROD
   ? "https://api.astral-1ad.workers.dev"
-  : "http://0.0.0.0:8787";
+  : "http://localhost:8787";
 
 export type Playground = {
   pythonSource: string;

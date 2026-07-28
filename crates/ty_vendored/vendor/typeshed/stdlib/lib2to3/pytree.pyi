@@ -10,8 +10,8 @@ There's also a pattern matching implementation here.
 from _typeshed import Incomplete, SupportsGetItem, SupportsLenAndGetItem, Unused
 from abc import abstractmethod
 from collections.abc import Iterable, Iterator, MutableSequence
-from typing import ClassVar, Final
-from typing_extensions import Self, TypeAlias
+from typing import ClassVar, Final, TypeAlias
+from typing_extensions import Self
 
 from .fixer_base import BaseFix
 from .pgen2.grammar import Grammar
@@ -47,6 +47,7 @@ class Base:
 
         This calls the method _eq().
         """
+
     __hash__: ClassVar[None]  # type: ignore[assignment]
     @abstractmethod
     def _eq(self, other: Base) -> bool:

@@ -47,6 +47,7 @@ def foo(
     z: tuple[type[BaseException], ...],
     zz: tuple[type[TypeError | RuntimeError], ...],
     zzz: type[BaseException] | tuple[type[BaseException], ...],
+    v: type[ValueError] | tuple[type[ValueError], ...],
 ):
     try:
         help()
@@ -60,6 +61,41 @@ def foo(
         reveal_type(h)  # revealed: TypeError | RuntimeError
     except zzz as i:
         reveal_type(i)  # revealed: BaseException
+    except v as j:
+        reveal_type(j)  # revealed: ValueError
+```
+
+## Exception-class expressions
+
+Exception-class expressions can produce intersections, gradual refinements, or unions. Positive
+class-object constraints project into the caught instance type; unmappable positive constraints and
+exact-class negatives do not exclude valid subclass instances.
+
+```py
+from typing import Any
+from ty_extensions import Intersection
+
+class FirstError(Exception): ...
+class SecondError(Exception): ...
+
+def catch_intersection(exc: Intersection[type[FirstError], type[SecondError]]) -> None:
+    try:
+        help()
+    except exc as caught:
+        reveal_type(caught)  # revealed: FirstError & SecondError
+
+def catch_proper_subclass(exc: Any) -> None:
+    if exc != ValueError and issubclass(exc, ValueError):
+        reveal_type(exc)  # revealed: Any & type[ValueError] & ~<class 'ValueError'>
+        try:
+            help()
+        except exc as caught:
+            reveal_type(caught)  # revealed: Any & ValueError
+
+try:
+    help()
+except ZeroDivisionError and ValueError as caught:
+    reveal_type(caught)  # revealed: ZeroDivisionError | ValueError
 ```
 
 We do not emit an `invalid-exception-caught` if a class is caught that has `Any` or `Unknown` in its
@@ -93,7 +129,9 @@ python-version = "3.12"
 ```
 
 ```py
-from typing import Callable
+from typing import Callable, TypeVar
+
+E = TypeVar("E", bound=Exception)
 
 def silence[T: type[BaseException]](
     func: Callable[[], None],
@@ -109,6 +147,22 @@ def silence2[T: (type[ValueError], type[TypeError])](func: Callable[[], None], e
         func()
     except exception_type as e:
         reveal_type(e)  # revealed: T'instance@silence2
+
+def silence3(func: Callable[[], None], exception_types: type[E] | tuple[type[E], ...]):
+    try:
+        func()
+    except exception_types as e:
+        reveal_type(e)  # revealed: E@silence3
+
+def silence4[T: type[BaseException] | tuple[type[BaseException], ...]](
+    func: Callable[[], None],
+    exception_types: T,
+):
+    try:
+        func()
+    except exception_types as e:
+        # TODO: Should reveal something more like `T'instance@silence4`.
+        reveal_type(e)  # revealed: BaseException
 ```
 
 ## Invalid exception handlers

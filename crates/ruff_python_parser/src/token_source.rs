@@ -5,7 +5,6 @@ use crate::Mode;
 use crate::error::LexicalError;
 use crate::lexer::{Lexer, LexerCheckpoint};
 use crate::string::InterpolatedStringKind;
-use crate::token::TokenValue;
 
 /// Token source for the parser that skips over any trivia tokens.
 #[derive(Debug)]
@@ -21,18 +20,17 @@ pub(crate) struct TokenSource<'src> {
 
 impl<'src> TokenSource<'src> {
     /// Create a new token source for the given lexer.
-    pub(crate) fn new(lexer: Lexer<'src>) -> Self {
-        // TODO(dhruvmanila): Use `allocate_tokens_vec`
+    pub(crate) fn new(lexer: Lexer<'src>, source: &str, start_offset: TextSize) -> Self {
         TokenSource {
             lexer,
-            tokens: vec![],
+            tokens: allocate_tokens_vec(&source[start_offset.to_usize()..]),
         }
     }
 
     /// Create a new token source from the given source code which starts at the given offset.
     pub(crate) fn from_source(source: &'src str, mode: Mode, start_offset: TextSize) -> Self {
         let lexer = Lexer::new(source, mode, start_offset);
-        let mut source = TokenSource::new(lexer);
+        let mut source = TokenSource::new(lexer, source, start_offset);
 
         // Initialize the token source so that the current token is set correctly.
         source.do_bump();
@@ -40,26 +38,24 @@ impl<'src> TokenSource<'src> {
     }
 
     /// Returns the kind of the current token.
-    pub(crate) fn current_kind(&self) -> TokenKind {
+    pub(crate) const fn current_kind(&self) -> TokenKind {
         self.lexer.current_kind()
     }
 
     /// Returns the range of the current token.
-    pub(crate) fn current_range(&self) -> TextRange {
+    pub(crate) const fn current_range(&self) -> TextRange {
         self.lexer.current_range()
     }
 
-    /// Returns the flags for the current token.
-    pub(crate) fn current_flags(&self) -> TokenFlags {
-        self.lexer.current_flags()
+    /// Returns the current parenthesis, bracket, and brace nesting level.
+    #[inline]
+    pub(crate) const fn nesting(&self) -> u32 {
+        self.lexer.nesting()
     }
 
-    /// Calls the underlying [`take_value`] method on the lexer. Refer to its documentation
-    /// for more info.
-    ///
-    /// [`take_value`]: Lexer::take_value
-    pub(crate) fn take_value(&mut self) -> TokenValue {
-        self.lexer.take_value()
+    /// Returns the flags for the current token.
+    pub(crate) const fn current_flags(&self) -> TokenFlags {
+        self.lexer.current_flags()
     }
 
     /// Calls the underlying [`re_lex_logical_token`] method on the lexer with the new lexer
@@ -244,6 +240,8 @@ impl<'src> TokenSource<'src> {
             assert_eq!(last.kind(), TokenKind::EndOfFile);
         }
 
+        self.tokens.shrink_to_fit();
+
         (self.tokens, self.lexer.finish())
     }
 }
@@ -253,12 +251,20 @@ pub(crate) struct TokenSourceCheckpoint {
     tokens_position: usize,
 }
 
-/// Allocates a [`Vec`] with an approximated capacity to fit all tokens
-/// of `contents`.
-///
-/// See [#9546](https://github.com/astral-sh/ruff/pull/9546) for a more detailed explanation.
-#[expect(dead_code)]
+/// Allocates a token buffer with a capacity intended to skip early grows.
 fn allocate_tokens_vec(contents: &str) -> Vec<Token> {
-    let lower_bound = contents.len().saturating_mul(15) / 100;
-    Vec::with_capacity(lower_bound)
+    // In sampled ruff-ecosystem projects, about three quarters of Python files contain at least
+    // one token per eight source bytes. Intentionally underestimate the final token count to avoid
+    // over-reserving for token-sparse files.
+    const BYTES_PER_PREALLOCATED_TOKEN: usize = 8;
+    const MIN_INITIAL_CAPACITY: usize = 128;
+
+    let capacity_hint = contents.len() / BYTES_PER_PREALLOCATED_TOKEN;
+    if capacity_hint < MIN_INITIAL_CAPACITY {
+        return Vec::new();
+    }
+
+    // Stay on a power-of-two bucket so that later geometric growth does not preserve an
+    // arbitrary capacity offset.
+    Vec::with_capacity(1 << capacity_hint.ilog2())
 }

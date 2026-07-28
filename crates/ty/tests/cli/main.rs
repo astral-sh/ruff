@@ -4,7 +4,10 @@ mod exit_code;
 mod file_selection;
 mod fixes;
 mod python_environment;
+mod rule;
 mod rule_selection;
+mod scripts;
+mod uv_workspace;
 
 use anyhow::Context as _;
 use insta::Settings;
@@ -48,14 +51,12 @@ fn test_quiet_output() -> anyhow::Result<()> {
     exit_code: 1
     ----- stdout -----
     error[invalid-assignment]: Object of type `Literal["foo"]` is not assignable to `int`
-     --> test.py:1:4
+     --> test.py:1:10
       |
     1 | x: int = 'foo'
       |    ---   ^^^^^ Incompatible value of type `Literal["foo"]`
       |    |
       |    Declared type
-      |
-    info: rule `invalid-assignment` is enabled by default
 
     Found 1 diagnostic
 
@@ -109,8 +110,8 @@ fn test_output_format_env() -> anyhow::Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    ::warning title=ty (unresolved-reference),file=<temp_dir>/test.py,line=2,col=7,endLine=2,endColumn=8::test.py:2:7: unresolved-reference: Name `x` used when not defined%0A  info: rule `unresolved-reference` was selected on the command line
-    ::error title=ty (not-subscriptable),file=<temp_dir>/test.py,line=3,col=7,endLine=3,endColumn=11::test.py:3:7: not-subscriptable: Cannot subscript object of type `Literal[4]` with no `__getitem__` method%0A  info: rule `not-subscriptable` is enabled by default
+    ::warning title=ty (unresolved-reference),file=<temp_dir>/test.py,line=2,col=7,endLine=2,endColumn=8::test.py:2:7: unresolved-reference: Name `x` used when not defined
+    ::error title=ty (not-subscriptable),file=<temp_dir>/test.py,line=3,col=7,endLine=3,endColumn=11::test.py:3:7: not-subscriptable: Cannot subscript object of type `Literal[4]` with no `__getitem__` method
     ::notice title=ty (revealed-type),file=<temp_dir>/test.py,line=5,col=13,endLine=5,endColumn=26::test.py:5:13: revealed-type: Revealed type: `LiteralString`
 
     ----- stderr -----
@@ -130,7 +131,6 @@ fn test_run_in_sub_directory() -> anyhow::Result<()> {
       |
     1 | ~
       |  ^
-      |
 
     Found 1 diagnostic
 
@@ -151,7 +151,6 @@ fn test_include_hidden_files_by_default() -> anyhow::Result<()> {
       |
     1 | ~
       |  ^
-      |
 
     Found 1 diagnostic
 
@@ -184,7 +183,6 @@ fn test_respect_ignore_files() -> anyhow::Result<()> {
       |
     1 | ~
       |  ^
-      |
 
     Found 1 diagnostic
 
@@ -202,7 +200,6 @@ fn test_respect_ignore_files() -> anyhow::Result<()> {
       |
     1 | ~
       |  ^
-      |
 
     Found 1 diagnostic
 
@@ -220,7 +217,6 @@ fn test_respect_ignore_files() -> anyhow::Result<()> {
       |
     1 | ~
       |  ^
-      |
 
     Found 1 diagnostic
 
@@ -281,14 +277,10 @@ fn cli_arguments_are_relative_to_the_current_directory() -> anyhow::Result<()> {
       |
     2 | from utils import add
       |      ^^^^^
-    3 |
-    4 | stat = add(10, 15)
-      |
     info: Searched in the following paths during module resolution:
     info:   1. <temp_dir>/ (first-party code)
     info:   2. vendored://stdlib (stdlib typeshed stubs vendored by ty)
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
-    info: rule `unresolved-import` is enabled by default
 
     Found 1 diagnostic
 
@@ -383,15 +375,11 @@ fn user_configuration() -> anyhow::Result<()> {
         ),
     ])?;
 
-    let config_directory = case.root().join("home/.config");
-    let config_env_var = if cfg!(windows) {
-        "APPDATA"
-    } else {
-        "XDG_CONFIG_HOME"
-    };
+    let config_directory = case.user_config_directory();
+    let config_env_var = user_config_directory_env_var();
 
     assert_cmd_snapshot!(
-        case.command().current_dir(case.root().join("project")).env(config_env_var, config_directory.as_os_str()),
+        case.command().arg("--verbose").current_dir(case.root().join("project")).env(config_env_var, config_directory.as_os_str()),
         @"
     success: false
     exit_code: 1
@@ -401,24 +389,19 @@ fn user_configuration() -> anyhow::Result<()> {
       |
     2 | y = 4 / 0
       |     ^^^^^
-    3 |
-    4 | for a in range(0, int(y)):
-      |
     info: rule `division-by-zero` was selected in the configuration file
 
     error[unresolved-reference]: Name `prin` used when not defined
      --> main.py:7:1
       |
-    5 |     x = a
-    6 |
     7 | prin(x)
       | ^^^^
-      |
     info: rule `unresolved-reference` is enabled by default
 
     Found 2 diagnostics
 
     ----- stderr -----
+    INFO Indexed 1 file(s) in 0.000s
     "
     );
 
@@ -435,34 +418,29 @@ fn user_configuration() -> anyhow::Result<()> {
     )?;
 
     assert_cmd_snapshot!(
-        case.command().current_dir(case.root().join("project")).env(config_env_var, config_directory.as_os_str()),
+        case.command().arg("--verbose").current_dir(case.root().join("project")).env(config_env_var, config_directory.as_os_str()),
         @"
-    success: true
-    exit_code: 0
+    success: false
+    exit_code: 1
     ----- stdout -----
     warning[division-by-zero]: Cannot divide object of type `Literal[4]` by zero
      --> main.py:2:5
       |
     2 | y = 4 / 0
       |     ^^^^^
-    3 |
-    4 | for a in range(0, int(y)):
-      |
     info: rule `division-by-zero` was selected in the configuration file
 
     warning[unresolved-reference]: Name `prin` used when not defined
      --> main.py:7:1
       |
-    5 |     x = a
-    6 |
     7 | prin(x)
       | ^^^^
-      |
     info: rule `unresolved-reference` was selected in the configuration file
 
     Found 2 diagnostics
 
     ----- stderr -----
+    INFO Indexed 1 file(s) in 0.000s
     "
     );
 
@@ -505,26 +483,20 @@ fn check_specific_paths() -> anyhow::Result<()> {
       |
     2 | from main2 import z  # error: unresolved-import
       |      ^^^^^
-    3 |
-    4 | print(z)
-      |
     info: Searched in the following paths during module resolution:
     info:   1. <temp_dir>/ (first-party code)
     info:   2. vendored://stdlib (stdlib typeshed stubs vendored by ty)
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
-    info: rule `unresolved-import` is enabled by default
 
     error[unresolved-import]: Cannot resolve imported module `does_not_exist`
      --> project/tests/test_main.py:2:8
       |
     2 | import does_not_exist  # error: unresolved-import
       |        ^^^^^^^^^^^^^^
-      |
     info: Searched in the following paths during module resolution:
     info:   1. <temp_dir>/ (first-party code)
     info:   2. vendored://stdlib (stdlib typeshed stubs vendored by ty)
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
-    info: rule `unresolved-import` is enabled by default
 
     Found 2 diagnostics
 
@@ -545,26 +517,20 @@ fn check_specific_paths() -> anyhow::Result<()> {
       |
     2 | from main2 import z  # error: unresolved-import
       |      ^^^^^
-    3 |
-    4 | print(z)
-      |
     info: Searched in the following paths during module resolution:
     info:   1. <temp_dir>/ (first-party code)
     info:   2. vendored://stdlib (stdlib typeshed stubs vendored by ty)
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
-    info: rule `unresolved-import` is enabled by default
 
     error[unresolved-import]: Cannot resolve imported module `does_not_exist`
      --> project/tests/test_main.py:2:8
       |
     2 | import does_not_exist  # error: unresolved-import
       |        ^^^^^^^^^^^^^^
-      |
     info: Searched in the following paths during module resolution:
     info:   1. <temp_dir>/ (first-party code)
     info:   2. vendored://stdlib (stdlib typeshed stubs vendored by ty)
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
-    info: rule `unresolved-import` is enabled by default
 
     Found 2 diagnostics
 
@@ -621,8 +587,6 @@ fn check_file_without_extension() -> anyhow::Result<()> {
       |
     1 | a = b
       |     ^
-      |
-    info: rule `unresolved-reference` is enabled by default
 
     Found 1 diagnostic
 
@@ -794,8 +758,8 @@ fn github_diagnostics() -> anyhow::Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    ::warning title=ty (unresolved-reference),file=<temp_dir>/test.py,line=2,col=7,endLine=2,endColumn=8::test.py:2:7: unresolved-reference: Name `x` used when not defined%0A  info: rule `unresolved-reference` was selected on the command line
-    ::error title=ty (not-subscriptable),file=<temp_dir>/test.py,line=3,col=7,endLine=3,endColumn=11::test.py:3:7: not-subscriptable: Cannot subscript object of type `Literal[4]` with no `__getitem__` method%0A  info: rule `not-subscriptable` is enabled by default
+    ::warning title=ty (unresolved-reference),file=<temp_dir>/test.py,line=2,col=7,endLine=2,endColumn=8::test.py:2:7: unresolved-reference: Name `x` used when not defined
+    ::error title=ty (not-subscriptable),file=<temp_dir>/test.py,line=3,col=7,endLine=3,endColumn=11::test.py:3:7: not-subscriptable: Cannot subscript object of type `Literal[4]` with no `__getitem__` method
     ::notice title=ty (revealed-type),file=<temp_dir>/test.py,line=5,col=13,endLine=5,endColumn=26::test.py:5:13: revealed-type: Revealed type: `LiteralString`
 
     ----- stderr -----
@@ -859,11 +823,8 @@ fn can_handle_large_binop_expressions() -> anyhow::Result<()> {
     info[revealed-type]: Revealed type
      --> test.py:4:13
       |
-    2 | from typing_extensions import reveal_type
-    3 | total = 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 +…
     4 | reveal_type(total)
       |             ^^^^^ `Literal[2000]`
-      |
 
     Found 1 diagnostic
 
@@ -888,19 +849,29 @@ impl CliTest {
         // Canonicalize the tempdir path because macos uses symlinks for tempdirs
         // and that doesn't play well with our snapshot filtering.
         // Simplify with dunce because otherwise we get UNC paths on Windows.
-        let project_dir = dunce::simplified(
+        let temp_dir_path = dunce::simplified(
             &temp_dir
                 .path()
                 .canonicalize()
-                .context("Failed to canonicalize project path")?,
+                .context("Failed to canonicalize temporary directory path")?,
         )
         .to_path_buf();
+        let project_dir = temp_dir_path.join("project");
+        std::fs::create_dir_all(&project_dir)
+            .with_context(|| format!("Failed to create directory `{}`", project_dir.display()))?;
 
         let mut settings = insta::Settings::clone_current();
         settings.add_filter(&tempdir_filter(&project_dir), "<temp_dir>/");
+        settings.add_filter(r"\bty\.exe\b", "ty");
         settings.add_filter(r#"\\(\w\w|\s|\.|")"#, "/$1");
         // 0.003s
         settings.add_filter(r"\d.\d\d\ds", "0.000s");
+        settings.add_filter(
+            "INFO Checking file `[^`]+` took more than 100ms \\([^)]+\\)\n",
+            "",
+        );
+        settings.add_filter("INFO Defaulting to python-platform `[^`]+`\n", "");
+        settings.add_filter("INFO Python version: [^,]+, platform: [a-z0-9_]+\n", "");
         settings.add_filter(
             r#"The system cannot find the file specified."#,
             "No such file or directory",
@@ -1016,8 +987,20 @@ impl CliTest {
 
         // Unset all environment variables because they can affect test behavior.
         command.env_clear();
+        // Point user config discovery at a test-local directory to avoid picking up host config.
+        command.env(
+            user_config_directory_env_var(),
+            self.user_config_directory(),
+        );
 
         command
+    }
+
+    fn user_config_directory(&self) -> PathBuf {
+        self.project_dir
+            .parent()
+            .expect("project directory always has a parent")
+            .join("home/.config")
     }
 }
 
@@ -1030,5 +1013,13 @@ fn site_packages_filter(python_version: &str) -> String {
         "Lib/site-packages".to_string()
     } else {
         format!("lib/python{}/site-packages", regex::escape(python_version))
+    }
+}
+
+fn user_config_directory_env_var() -> &'static str {
+    if cfg!(windows) {
+        "APPDATA"
+    } else {
+        "XDG_CONFIG_HOME"
     }
 }

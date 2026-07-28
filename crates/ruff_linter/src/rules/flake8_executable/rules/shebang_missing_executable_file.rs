@@ -5,7 +5,7 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 use crate::Violation;
 use crate::checkers::ast::LintContext;
 #[cfg(target_family = "unix")]
-use crate::rules::flake8_executable::helpers::is_executable;
+use crate::rules::flake8_executable::helpers::{is_executable, is_wsl};
 
 /// ## What it does
 /// Checks for executable `.py` files that do not have a shebang.
@@ -50,7 +50,7 @@ pub(crate) fn shebang_missing_executable_file(filepath: &Path, context: &LintCon
     // WSL supports Windows file systems, which do not have executable bits.
     // Instead, everything is executable. Therefore, we skip this rule on WSL.
 
-    if is_wsl::is_wsl() {
+    if is_wsl() {
         return;
     }
     if let Ok(true) = is_executable(filepath) {

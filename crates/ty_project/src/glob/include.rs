@@ -1,3 +1,5 @@
+use bitvec::prelude::{BitBox, BitVec};
+use get_size2::GetSize;
 use globset::{Glob, GlobBuilder, GlobSet, GlobSetBuilder};
 use regex_automata::dfa;
 use regex_automata::dfa::Automaton;
@@ -36,14 +38,19 @@ pub(crate) struct IncludeFilter {
     #[get_size(ignore)]
     glob_set: GlobSet,
     original_patterns: Box<[Box<str>]>,
-    literal_pattern_indices: Box<[usize]>,
+    #[get_size(size_fn = bit_box_size)]
+    literal_pattern_indices: BitBox,
     #[get_size(size_fn = dfa_memory_usage)]
     dfa: Option<dfa::dense::DFA<Vec<u32>>>,
     #[get_size(ignore)]
     matches: Arc<Pool<Vec<usize>>>,
 }
 
-#[allow(clippy::ref_option)]
+fn bit_box_size(bits: &BitBox) -> usize {
+    bits.as_raw_slice().get_heap_size()
+}
+
+#[expect(clippy::ref_option)]
 fn dfa_memory_usage(dfa: &Option<dfa::dense::DFA<Vec<u32>>>) -> usize {
     dfa.as_ref().map(dfa::dense::DFA::memory_usage).unwrap_or(0)
 }
@@ -68,7 +75,11 @@ impl IncludeFilter {
             MatchFile::No
         } else {
             for match_index in matches.iter() {
-                if self.literal_pattern_indices.contains(match_index) {
+                if self
+                    .literal_pattern_indices
+                    .get(*match_index)
+                    .is_some_and(|bit| *bit)
+                {
                     return MatchFile::Literal;
                 }
             }
@@ -165,13 +176,13 @@ pub(crate) struct IncludeFilterBuilder {
     original_patterns: Vec<Box<str>>,
     regexes: Vec<String>,
     /// Indices of literal patterns (contain no meta characters).
-    literal_pattern_indices: Vec<usize>,
+    literal_pattern_indices: BitVec,
 }
 
 impl IncludeFilterBuilder {
     pub(crate) fn new() -> Self {
         Self {
-            literal_pattern_indices: Vec::new(),
+            literal_pattern_indices: BitVec::new(),
             set: GlobSetBuilder::new(),
             set_len: 0,
             original_patterns: Vec::new(),
@@ -205,8 +216,6 @@ impl IncludeFilterBuilder {
             .backslash_escape(true)
             .build()?;
 
-        let is_literal_pattern = globset::escape(glob_pattern) == glob_pattern;
-
         self.original_patterns.push(input.relative().into());
 
         // `lib` is the same as `lib/**`
@@ -228,8 +237,11 @@ impl IncludeFilterBuilder {
             // so that `match_file` returns true when matching against a file. However, we don't
             // need to do this if this is a pattern that should only match a directory (specifically, its contents).
             if !only_directory {
+                let is_literal_pattern = globset::escape(glob_pattern) == glob_pattern;
+
                 if is_literal_pattern {
-                    self.literal_pattern_indices.push(self.set_len);
+                    self.literal_pattern_indices.resize(self.set_len, false);
+                    self.literal_pattern_indices.push(true);
                 }
 
                 self.add_glob(glob);
@@ -294,7 +306,7 @@ impl IncludeFilterBuilder {
         Ok(IncludeFilter {
             glob_set,
             dfa,
-            literal_pattern_indices: self.literal_pattern_indices.into(),
+            literal_pattern_indices: self.literal_pattern_indices.into_boxed_bitslice(),
             original_patterns: self.original_patterns.into(),
             matches: Arc::new(Pool::new(Vec::new)),
         })

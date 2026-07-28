@@ -21,7 +21,6 @@ fn multiline_token_client_not_supporting_multiline_tokens() -> Result<()> {
 "#;
 
     let mut server = TestServerBuilder::new()?
-        .enable_pull_diagnostics(true)
         .enable_multiline_token_support(false)
         .with_workspace(workspace_root, None)?
         .with_file(foo, foo_content)?
@@ -55,7 +54,6 @@ fn multiline_token_client_supporting_multiline_tokens() -> Result<()> {
 "#;
 
     let mut server = TestServerBuilder::new()?
-        .enable_pull_diagnostics(true)
         .enable_multiline_token_support(true)
         .with_workspace(workspace_root, None)?
         .with_file(foo, foo_content)?
@@ -78,7 +76,6 @@ fn no_stale_tokens_after_opening_the_same_file_with_new_content() -> Result<()> 
     let initial_content =
         "def calculate_sum(a):\n # Version A: Basic math\n return a\n\nresult = calculate_sum(5)\n";
     let mut server = TestServerBuilder::new()?
-        .enable_pull_diagnostics(true)
         .enable_multiline_token_support(true)
         .with_workspace(SystemPath::new("src"), None)?
         .with_file(file_name, initial_content)?

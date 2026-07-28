@@ -11,8 +11,8 @@ from collections.abc import Callable, Iterable, Iterator
 from io import TextIOWrapper
 from os import PathLike
 from types import TracebackType
-from typing import IO, Final, Literal, Protocol, overload, type_check_only
-from typing_extensions import Self, TypeAlias
+from typing import IO, Final, Literal, Protocol, TypeAlias, overload, type_check_only
+from typing_extensions import Self
 
 __all__ = [
     "BadZipFile",
@@ -81,6 +81,7 @@ class ZipExtFile(io.BufferedIOBase):
     newlines: list[bytes] | None
     mode: _ReadWriteMode
     name: str
+
     @overload
     def __init__(
         self, fileobj: _ClosableZipStream, mode: _ReadWriteMode, zipinfo: ZipInfo, pwd: bytes | None, close_fileobj: Literal[True]
@@ -104,6 +105,7 @@ class ZipExtFile(io.BufferedIOBase):
         pwd: bytes | None = None,
         close_fileobj: Literal[False] = False,
     ) -> None: ...
+
     def read(self, n: int | None = -1) -> bytes:
         """Read and return up to n bytes.
         If the argument is omitted, None, or negative, data is read and returned until EOF is reached.
@@ -156,19 +158,19 @@ class ZipFile:
     mode: The mode can be either read 'r', write 'w', exclusive create 'x',
           or append 'a'.
     compression: ZIP_STORED (no compression), ZIP_DEFLATED (requires zlib),
-                 ZIP_BZIP2 (requires bz2), ZIP_LZMA (requires lzma), or
-                 ZIP_ZSTANDARD (requires compression.zstd).
-    allowZip64: if True ZipFile will create files with ZIP64 extensions when
-                needed, otherwise it will raise an exception when this would
-                be necessary.
-    compresslevel: None (default for the given compression type) or an integer
-                   specifying the level to pass to the compressor.
-                   When using ZIP_STORED or ZIP_LZMA this keyword has no effect.
-                   When using ZIP_DEFLATED integers 0 through 9 are accepted.
-                   When using ZIP_BZIP2 integers 1 through 9 are accepted.
-                   When using ZIP_ZSTANDARD integers -7 though 22 are common,
-                   see the CompressionParameter enum in compression.zstd for
-                   details.
+          ZIP_BZIP2 (requires bz2), ZIP_LZMA (requires lzma), or
+          ZIP_ZSTANDARD (requires compression.zstd).
+    allowZip64: if True ZipFile will create files with ZIP64 extensions
+          when needed, otherwise it will raise an exception when this
+          would be necessary.
+    compresslevel: None (default for the given compression type) or
+          an integer specifying the level to pass to the compressor.
+          When using ZIP_STORED or ZIP_LZMA this keyword has no effect.
+          When using ZIP_DEFLATED integers 0 through 9 are accepted.
+          When using ZIP_BZIP2 integers 1 through 9 are accepted.
+          When using ZIP_ZSTANDARD integers -7 though 22 are common,
+          see the CompressionParameter enum in compression.zstd for
+          details.
 
     """
 
@@ -199,8 +201,8 @@ class ZipFile:
             strict_timestamps: bool = True,
             metadata_encoding: str | None = None,
         ) -> None:
-            """Open the ZIP file with mode read 'r', write 'w', exclusive create 'x',
-            or append 'a'.
+            """Open the ZIP file with mode read 'r', write 'w', exclusive create
+            'x', or append 'a'.
             """
         # metadata_encoding is only allowed for read mode
         @overload
@@ -254,7 +256,6 @@ class ZipFile:
             """Open the ZIP file with mode read 'r', write 'w', exclusive create 'x',
             or append 'a'.
             """
-
         @overload
         def __init__(
             self,
@@ -322,10 +323,10 @@ class ZipFile:
 
         pwd is the password to decrypt files (only used for reading).
 
-        When writing, if the file size is not known in advance but may exceed
-        2 GiB, pass force_zip64 to use the ZIP64 format, which can handle large
-        files.  If the size is known in advance, it is best to pass a ZipInfo
-        instance for name, with zinfo.file_size set.
+        When writing, if the file size is not known in advance but may
+        exceed 2 GiB, pass force_zip64 to use the ZIP64 format, which can
+        handle large files.  If the size is known in advance, it is best to
+        pass a ZipInfo instance for name, with zinfo.file_size set.
         """
 
     def extract(self, member: str | ZipInfo, path: StrPath | None = None, pwd: bytes | None = None) -> str:
@@ -388,6 +389,7 @@ class ZipFile:
         'zinfo_or_arcname' is either a ZipInfo instance or
         the name of the file in the archive.
         """
+
     if sys.version_info >= (3, 11):
         def mkdir(self, zinfo_or_directory_name: str | ZipInfo, mode: int = 0o777) -> None:
             """Creates a directory inside the zip archive."""
@@ -468,11 +470,12 @@ class ZipInfo:
     def from_file(cls, filename: StrPath, arcname: StrPath | None = None, *, strict_timestamps: bool = True) -> Self:
         """Construct an appropriate ZipInfo for a file on the filesystem.
 
-        filename should be the path to a file or directory on the filesystem.
+        filename should be the path to a file or directory on the
+        filesystem.
 
-        arcname is the name which it will have within the archive (by default,
-        this will be the same as filename, but without a drive letter and with
-        leading path separators removed).
+        arcname is the name which it will have within the archive (by
+        default, this will be the same as filename, but without a drive
+        letter and with leading path separators removed).
         """
 
     def is_dir(self) -> bool:
@@ -485,6 +488,7 @@ class ZipInfo:
         decide based upon the file_size and compress_size, if known,
         False otherwise.
         """
+
     if sys.version_info >= (3, 14):
         def _for_archive(self, archive: ZipFile) -> Self:
             """Resolve suitable defaults from the archive.
@@ -518,7 +522,6 @@ else:
             Given a source (filename or zipfile), return an
             appropriate CompleteDirs subclass.
             """
-
         @overload
         @classmethod
         def make(cls, source: StrPath | IO[bytes]) -> Self: ...
@@ -618,9 +621,8 @@ else:
         def name(self) -> str: ...
         @property
         def parent(self) -> PathLike[str]: ...  # undocumented
-        if sys.version_info >= (3, 10):
-            @property
-            def filename(self) -> PathLike[str]: ...  # undocumented
+        @property
+        def filename(self) -> PathLike[str]: ...  # undocumented
         if sys.version_info >= (3, 11):
             @property
             def suffix(self) -> str: ...
@@ -646,15 +648,10 @@ else:
             of ``pathlib.Path.open()`` by passing arguments through
             to io.TextIOWrapper().
             """
-
         @overload
         def open(self, mode: Literal["rb", "wb"], *, pwd: bytes | None = None) -> IO[bytes]: ...
 
-        if sys.version_info >= (3, 10):
-            def iterdir(self) -> Iterator[Self]: ...
-        else:
-            def iterdir(self) -> Iterator[Path]: ...
-
+        def iterdir(self) -> Iterator[Self]: ...
         def is_dir(self) -> bool: ...
         def is_file(self) -> bool: ...
         def exists(self) -> bool: ...
@@ -667,11 +664,7 @@ else:
             write_through: bool = False,
         ) -> str: ...
         def read_bytes(self) -> bytes: ...
-        if sys.version_info >= (3, 10):
-            def joinpath(self, *other: StrPath) -> Path: ...
-        else:
-            def joinpath(self, add: StrPath) -> Path: ...  # undocumented
-
+        def joinpath(self, *other: StrPath) -> Path: ...
         def __truediv__(self, add: StrPath) -> Path: ...
 
 def is_zipfile(filename: StrOrBytesPath | _SupportsReadSeekTell) -> bool:

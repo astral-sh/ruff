@@ -13,8 +13,8 @@ from _codecs import *
 from _typeshed import ReadableBuffer
 from abc import abstractmethod
 from collections.abc import Callable, Generator, Iterable
-from typing import Any, BinaryIO, ClassVar, Final, Literal, Protocol, TextIO, overload, type_check_only
-from typing_extensions import Self, TypeAlias, deprecated, disjoint_base
+from typing import Any, BinaryIO, ClassVar, Final, Literal, Protocol, TextIO, TypeAlias, overload, type_check_only
+from typing_extensions import Self, deprecated, disjoint_base
 
 __all__ = [
     "register",
@@ -229,9 +229,9 @@ def getincrementaldecoder(encoding: _BufferedEncoding) -> _BufferedIncrementalDe
     or the codecs doesn't provide an incremental decoder.
 
     """
-
 @overload
 def getincrementaldecoder(encoding: str) -> _IncrementalDecoder: ...
+
 def getreader(encoding: str) -> _StreamReader:
     """Lookup up the codec for the given encoding and return
     its StreamReader class or factory function.
@@ -306,7 +306,7 @@ def EncodedFile(file: _Stream, data_encoding: str, file_encoding: str | None = N
 
     """
 
-def iterencode(iterator: Iterable[str], encoding: str, errors: str = "strict") -> Generator[bytes, None, None]:
+def iterencode(iterator: Iterable[str], encoding: str, errors: str = "strict") -> Generator[bytes]:
     """
     Encoding iterator.
 
@@ -316,7 +316,7 @@ def iterencode(iterator: Iterable[str], encoding: str, errors: str = "strict") -
     constructor.
     """
 
-def iterdecode(iterator: Iterable[bytes], encoding: str, errors: str = "strict") -> Generator[str, None, None]:
+def iterdecode(iterator: Iterable[bytes], encoding: str, errors: str = "strict") -> Generator[str]:
     """
     Decoding iterator.
 
@@ -446,6 +446,7 @@ class IncrementalEncoder:
         """
         Resets the encoder to the initial state.
         """
+
     # documentation says int but str is needed for the subclass.
     def getstate(self) -> int | str:
         """
@@ -721,6 +722,7 @@ class StreamReaderWriter(TextIO):
     def __exit__(self, type: type[BaseException] | None, value: BaseException | None, tb: types.TracebackType | None) -> None: ...
     def __getattr__(self, name: str) -> Any:
         """Inherit all other methods from the underlying stream."""
+
     # These methods don't actually exist directly, but they are needed to satisfy the TextIO
     # interface. At runtime, they are delegated through __getattr__.
     def close(self) -> None: ...

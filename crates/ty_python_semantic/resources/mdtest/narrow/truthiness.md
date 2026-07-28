@@ -3,47 +3,125 @@
 ## Value Literals
 
 ```py
+from typing import Literal, TypeAlias
+
+X: TypeAlias = Literal[0, -1, True, False, "", "foo", b"", b"bar", None] | tuple[()]
+
+def _(x: X):
+    if x:
+        reveal_type(x)  # revealed: Literal[-1, True, "foo", b"bar"]
+    else:
+        reveal_type(x)  # revealed: Literal[0, False, "", b""] | None | tuple[()]
+
+def _(x: X):
+    if not x:
+        reveal_type(x)  # revealed: Literal[0, False, "", b""] | None | tuple[()]
+    else:
+        reveal_type(x)  # revealed: Literal[-1, True, "foo", b"bar"]
+
+def _(x: X):
+    if x and not x:
+        reveal_type(x)  # revealed: Never
+    else:
+        reveal_type(x)  # revealed: Literal[0, -1, "", "foo", b"", b"bar"] | bool | None | tuple[()]
+
+def _(x: X):
+    if not (x and not x):
+        reveal_type(x)  # revealed: Literal[0, -1, "", "foo", b"", b"bar"] | bool | None | tuple[()]
+    else:
+        reveal_type(x)  # revealed: Never
+
+def _(x: X):
+    if x or not x:
+        reveal_type(x)  # revealed: Literal[-1, 0, "foo", "", b"bar", b""] | bool | None | tuple[()]
+    else:
+        reveal_type(x)  # revealed: Never
+
+def _(x: X):
+    if not (x or not x):
+        reveal_type(x)  # revealed: Never
+    else:
+        reveal_type(x)  # revealed: Literal[-1, 0, "foo", "", b"bar", b""] | bool | None | tuple[()]
+
+def _(x: X):
+    if (isinstance(x, int) or isinstance(x, str)) and x:
+        reveal_type(x)  # revealed: Literal[-1, True, "foo"]
+    else:
+        reveal_type(x)  # revealed: Literal[b"", b"bar", 0, False, ""] | None | tuple[()]
+```
+
+## Walrus Member Access
+
+We can narrow on an attribute expression, even when its base is a named expression:
+
+```py
+class Foo:
+    val: int | None
+
+if (foo := Foo()).val:
+    reveal_type(foo.val)  # revealed: int & ~AlwaysFalsy
+```
+
+But we don't pick up stale narrowings from before the assignment in the named expression:
+
+```py
+foo1 = Foo()
+foo1.val = None
+if (foo1 := Foo()).val:
+    reveal_type(foo1.val)  # revealed: int & ~AlwaysFalsy
+```
+
+## Narrowing tagged unions of nominal classes by attribute truthiness
+
+```py
 from typing import Literal
 
-def foo() -> Literal[0, -1, True, False, "", "foo", b"", b"bar", None] | tuple[()]:
-    return 0
+class Success:
+    success: Literal[True]
+    result: int
 
-x = foo()
+class Failure:
+    success: Literal[False]
+    errors: list[str]
 
-if x:
-    reveal_type(x)  # revealed: Literal[-1, True, "foo", b"bar"]
-else:
-    reveal_type(x)  # revealed: Literal[0, False, "", b""] | None | tuple[()]
+def _(response: Success | Failure):
+    if response.success:
+        reveal_type(response)  # revealed: Success
+        reveal_type(response.result)  # revealed: int
+    else:
+        reveal_type(response)  # revealed: Failure
+        reveal_type(response.errors)  # revealed: list[str]
 
-if not x:
-    reveal_type(x)  # revealed: Literal[0, False, "", b""] | None | tuple[()]
-else:
-    reveal_type(x)  # revealed: Literal[-1, True, "foo", b"bar"]
+    if not response.success:
+        reveal_type(response)  # revealed: Failure
+    else:
+        reveal_type(response)  # revealed: Success
 
-if x and not x:
-    reveal_type(x)  # revealed: Never
-else:
-    reveal_type(x)  # revealed: Literal[0, -1, "", "foo", b"", b"bar"] | bool | None | tuple[()]
+class TruthyIntTag:
+    success: Literal[1]
 
-if not (x and not x):
-    reveal_type(x)  # revealed: Literal[0, -1, "", "foo", b"", b"bar"] | bool | None | tuple[()]
-else:
-    reveal_type(x)  # revealed: Never
+class FalsyIntTag:
+    success: Literal[0]
 
-if x or not x:
-    reveal_type(x)  # revealed: Literal[-1, 0, "foo", "", b"bar", b""] | bool | None | tuple[()]
-else:
-    reveal_type(x)  # revealed: Never
+class AmbiguousTag:
+    success: bool
 
-if not (x or not x):
-    reveal_type(x)  # revealed: Never
-else:
-    reveal_type(x)  # revealed: Literal[-1, 0, "foo", "", b"bar", b""] | bool | None | tuple[()]
+def _(response: Success | Failure | TruthyIntTag | FalsyIntTag | AmbiguousTag):
+    if response.success:
+        reveal_type(response)  # revealed: Success | TruthyIntTag | AmbiguousTag
+    else:
+        reveal_type(response)  # revealed: Failure | FalsyIntTag | AmbiguousTag
 
-if (isinstance(x, int) or isinstance(x, str)) and x:
-    reveal_type(x)  # revealed: Literal[-1, True, "foo"]
-else:
-    reveal_type(x)  # revealed: Literal[b"", b"bar", 0, False, ""] | None | tuple[()]
+def truthiness_after_value_guard(response: Success | Failure | None):
+    if not response:
+        return
+
+    if response.success:
+        reveal_type(response)  # revealed: Success & ~AlwaysFalsy
+        reveal_type(response.result)  # revealed: int
+    else:
+        reveal_type(response)  # revealed: Failure & ~AlwaysFalsy
+        reveal_type(response.errors)  # revealed: list[str]
 ```
 
 ## Function Literals
@@ -331,6 +409,57 @@ def _(x: type[FalsyClass] | type[TruthyClass]):
     reveal_type(x and A())  # revealed: type[FalsyClass] | A
 ```
 
+## Narrowing with conditional expressions
+
+```py
+def _(coinflip_1: bool, coinflip_2: bool):
+    if coinflip_1 if coinflip_2 else coinflip_1:
+        reveal_type(coinflip_1)  # revealed: Literal[True]
+    else:
+        reveal_type(coinflip_1)  # revealed: Literal[False]
+```
+
+## Conditional expressions with ambiguous branch constraints
+
+```py
+from typing import Literal
+
+def _(flag: bool, x: Literal[0, 1], y: Literal[0, 1]):
+    if x if flag else y:
+        reveal_type(x)  # revealed: Literal[0, 1]
+        reveal_type(y)  # revealed: Literal[0, 1]
+    else:
+        reveal_type(x)  # revealed: Literal[0, 1]
+        reveal_type(y)  # revealed: Literal[0, 1]
+
+def _(flag: bool, x: Literal[0, 1, 2]):
+    if (x == 1) if flag else (x == 2):
+        reveal_type(x)  # revealed: Literal[1, 2]
+    else:
+        reveal_type(x)  # revealed: Literal[0, 2, 1]
+
+def _(flag: bool, x: Literal[0, 1], y: int):
+    if (x == 1) if flag else y:
+        reveal_type(x)  # revealed: Literal[0, 1]
+```
+
+## Conditional expressions with statically known tests
+
+```py
+from typing import Literal
+
+def _(x: Literal[0, 1], y: Literal[0, 1]):
+    if x if True else y:
+        reveal_type(x)  # revealed: Literal[1]
+    else:
+        reveal_type(x)  # revealed: Literal[0]
+
+    if x if False else y:
+        reveal_type(y)  # revealed: Literal[1]
+    else:
+        reveal_type(y)  # revealed: Literal[0]
+```
+
 ## Truthiness narrowing for `LiteralString`
 
 ```py
@@ -362,6 +491,18 @@ def f():
         reveal_type(x)  # revealed: str & ~AlwaysFalsy
     else:
         reveal_type(x)  # revealed: (str & ~AlwaysTruthy) | None
+```
+
+## Narrowing the value of a named expression
+
+The value expression on the right-hand side of the walrus operator should also be narrowed:
+
+```py
+def foo(value: int | None):
+    if foo := value:
+        reveal_type(value)  # revealed: int & ~AlwaysFalsy
+    else:
+        reveal_type(value)  # revealed: (int & ~AlwaysTruthy) | None
 ```
 
 ## Narrowing a union of a `TypedDict` and `None`
@@ -425,4 +566,30 @@ def test() -> None:
     reveal_type(p)  # revealed: Person & ~AlwaysFalsy
     # error: [invalid-key] "Unknown key "nonexistent" for TypedDict `Person`"
     print(p["nonexistent"])
+```
+
+## Truthiness narrowing of `NewType`s
+
+`NewType`s over `float` and `complex` use their concrete union base when looking up numeric
+attributes such as `real`. Truthiness adds `~AlwaysFalsy` to the outer `NewType`, but that
+refinement must not be forwarded as the receiver for this special union-base lookup.
+
+```py
+from typing import NewType
+
+FloatNewType = NewType("FloatNewType", float)
+ComplexNewType = NewType("ComplexNewType", complex)
+
+def expects_float(x: float): ...
+def expects_complex(x: complex): ...
+def f(floaty: FloatNewType, complexy: ComplexNewType):
+    if floaty:
+        reveal_type(floaty)  # revealed:FloatNewType & ~AlwaysFalsy
+        expects_float(floaty)  # fine
+
+    if complexy:
+        reveal_type(complexy)  # revealed: ComplexNewType & ~AlwaysFalsy
+        reveal_type(complexy.real)  # revealed: int | float
+        expects_complex(complexy)  # fine
+        expects_float(complexy)  # error: [invalid-argument-type]
 ```

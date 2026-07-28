@@ -4,8 +4,7 @@
 # Can't NOQA on a specific line: https://github.com/plinss/flake8-noqa/issues/22
 import sys
 from collections.abc import Awaitable, Coroutine, Generator
-from typing import Any, TypeVar
-from typing_extensions import TypeAlias
+from typing import Any, TypeAlias, TypeVar
 
 # As at runtime, this depends on all submodules defining __all__ accurately.
 from .base_events import *
@@ -34,6 +33,24 @@ if sys.platform == "win32":
     from .windows_events import *
 else:
     from .unix_events import *
+
+if sys.version_info >= (3, 14):
+    from .events import _AbstractEventLoopPolicy
+
+    AbstractEventLoopPolicy = _AbstractEventLoopPolicy
+
+if sys.platform == "win32":
+    if sys.version_info >= (3, 14):
+        from .windows_events import _DefaultEventLoopPolicy, _WindowsProactorEventLoopPolicy, _WindowsSelectorEventLoopPolicy
+
+        DefaultEventLoopPolicy = _DefaultEventLoopPolicy
+        WindowsProactorEventLoopPolicy = _WindowsProactorEventLoopPolicy
+        WindowsSelectorEventLoopPolicy = _WindowsSelectorEventLoopPolicy
+else:
+    if sys.version_info >= (3, 14):
+        from .unix_events import _DefaultEventLoopPolicy
+
+        DefaultEventLoopPolicy = _DefaultEventLoopPolicy
 
 if sys.platform == "win32":
     if sys.version_info >= (3, 14):

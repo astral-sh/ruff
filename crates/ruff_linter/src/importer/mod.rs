@@ -17,8 +17,9 @@ use ruff_python_parser::Parsed;
 use ruff_python_semantic::{
     ImportedName, MemberNameImport, ModuleNameImport, NameImport, SemanticModel,
 };
-use ruff_python_trivia::textwrap::indent;
-use ruff_text_size::{Ranged, TextSize};
+use ruff_python_trivia::{PythonWhitespace, textwrap::indent};
+use ruff_source_file::LineRanges;
+use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::cst::matchers::{match_aliases, match_import_from, match_statement};
 use crate::fix;
@@ -77,16 +78,23 @@ impl<'a> Importer<'a> {
             // Insert after the last top-level import.
             Insertion::end_of_statement(stmt, self.source, self.stylist).into_edit(&required_import)
         } else {
-            // Check if there are any future imports that we need to respect
-            if let Some(last_future_import) = self.find_last_future_import() {
-                // Insert after the last future import
-                Insertion::end_of_statement(last_future_import, self.source, self.stylist)
-                    .into_edit(&required_import)
-            } else {
-                // Insert at the start of the file.
-                Insertion::start_of_file(self.python_ast, self.source, self.stylist, None)
-                    .into_edit(&required_import)
-            }
+            self.add_at_start(&required_import)
+        }
+    }
+
+    /// Add an existing import statement to the start of the file.
+    pub(crate) fn add_import_at_start(&self, import: &Stmt) -> Edit {
+        let range = TextRange::new(import.start(), self.source.line_end(import.end()));
+        self.add_at_start(self.source[range].trim_whitespace())
+    }
+
+    fn add_at_start(&self, text: &str) -> Edit {
+        if let Some(last_future_import) = self.find_last_future_import() {
+            Insertion::end_of_statement(last_future_import, self.source, self.stylist)
+                .into_edit(text)
+        } else {
+            Insertion::start_of_file(self.python_ast, self.source, self.stylist, None)
+                .into_edit(text)
         }
     }
 
@@ -457,6 +465,7 @@ impl<'a> Importer<'a> {
                 module: name,
                 names,
                 level,
+                is_lazy: _,
                 range: _,
                 node_index: _,
             }) = stmt
@@ -539,8 +548,9 @@ impl<'a> Importer<'a> {
         let _docstring = body.next_if(|stmt| ast::helpers::is_docstring_stmt(stmt));
 
         body.take_while(|stmt| {
-            stmt.as_import_from_stmt()
-                .is_some_and(|import_from| import_from.module.as_deref() == Some("__future__"))
+            stmt.as_import_from_stmt().is_some_and(|import_from| {
+                !import_from.is_lazy && import_from.module.as_deref() == Some("__future__")
+            })
         })
         .last()
     }

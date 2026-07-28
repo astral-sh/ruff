@@ -1,8 +1,10 @@
-use lsp_types::request::{TypeHierarchyPrepare, TypeHierarchySubtypes, TypeHierarchySupertypes};
 use lsp_types::{
     PartialResultParams, Position, TextDocumentIdentifier, TextDocumentPositionParams,
     TypeHierarchyPrepareParams, TypeHierarchySubtypesParams, TypeHierarchySupertypesParams,
     WorkDoneProgressParams,
+};
+use lsp_types::{
+    TypeHierarchyPrepareRequest, TypeHierarchySubtypesRequest, TypeHierarchySupertypesRequest,
 };
 
 use crate::TestServerBuilder;
@@ -17,7 +19,6 @@ class Derived(Base):
 "#;
 
     let mut server = TestServerBuilder::new()?
-        .enable_pull_diagnostics(true)
         .with_file("foo.py", content)?
         .build()
         .wait_until_workspaces_are_initialized();
@@ -50,7 +51,6 @@ class Child2(Base):
 "#;
 
     let mut server = TestServerBuilder::new()?
-        .enable_pull_diagnostics(true)
         .with_file("foo.py", content)?
         .build()
         .wait_until_workspaces_are_initialized();
@@ -86,7 +86,6 @@ class Child(Parent):
 "#;
 
     let mut server = TestServerBuilder::new()?
-        .enable_pull_diagnostics(true)
         .with_file("foo.py", content)?
         .build()
         .wait_until_workspaces_are_initialized();
@@ -131,7 +130,6 @@ class Child(Parent):
 fn vendored_supertypes() -> anyhow::Result<()> {
     let content = "from enum import StrEnum";
     let mut server = TestServerBuilder::new()?
-        .enable_pull_diagnostics(true)
         .with_file("foo.py", content)?
         .build()
         .wait_until_workspaces_are_initialized();
@@ -165,7 +163,7 @@ fn prepare(
     path: impl AsRef<ruff_db::system::SystemPath>,
     position: Position,
 ) -> Option<Vec<lsp_types::TypeHierarchyItem>> {
-    server.send_request_await::<TypeHierarchyPrepare>(TypeHierarchyPrepareParams {
+    server.send_request_await::<TypeHierarchyPrepareRequest>(TypeHierarchyPrepareParams {
         text_document_position_params: TextDocumentPositionParams {
             text_document: TextDocumentIdentifier {
                 uri: server.file_uri(path),
@@ -181,7 +179,7 @@ fn supertypes(
     server: &mut crate::TestServer,
     item: lsp_types::TypeHierarchyItem,
 ) -> Option<Vec<lsp_types::TypeHierarchyItem>> {
-    server.send_request_await::<TypeHierarchySupertypes>(TypeHierarchySupertypesParams {
+    server.send_request_await::<TypeHierarchySupertypesRequest>(TypeHierarchySupertypesParams {
         item,
         work_done_progress_params: WorkDoneProgressParams::default(),
         partial_result_params: PartialResultParams::default(),
@@ -193,7 +191,7 @@ fn subtypes(
     server: &mut crate::TestServer,
     item: lsp_types::TypeHierarchyItem,
 ) -> Option<Vec<lsp_types::TypeHierarchyItem>> {
-    server.send_request_await::<TypeHierarchySubtypes>(TypeHierarchySubtypesParams {
+    server.send_request_await::<TypeHierarchySubtypesRequest>(TypeHierarchySubtypesParams {
         item,
         work_done_progress_params: WorkDoneProgressParams::default(),
         partial_result_params: PartialResultParams::default(),

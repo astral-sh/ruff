@@ -222,6 +222,7 @@ class MimeTypes:
         list of standard types, else to the list of non-standard
         types.
         """
+
     if sys.version_info >= (3, 13):
         def guess_file_type(self, path: StrPath, *, strict: bool = True) -> tuple[str | None, str | None]:
             """Guess the type of a file based on its path.

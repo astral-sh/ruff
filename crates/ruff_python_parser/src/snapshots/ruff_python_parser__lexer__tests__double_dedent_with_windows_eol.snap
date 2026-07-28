@@ -5,87 +5,24 @@ expression: double_dedent_with_eol(WINDOWS_EOL)
 ## Tokens
 ```
 [
-    (
-        Def,
-        0..3,
-    ),
-    (
-        Name(
-            Name("foo"),
-        ),
-        4..7,
-    ),
-    (
-        Lpar,
-        7..8,
-    ),
-    (
-        Rpar,
-        8..9,
-    ),
-    (
-        Colon,
-        9..10,
-    ),
-    (
-        Newline,
-        10..12,
-    ),
-    (
-        Indent,
-        12..13,
-    ),
-    (
-        If,
-        13..15,
-    ),
-    (
-        Name(
-            Name("x"),
-        ),
-        16..17,
-    ),
-    (
-        Colon,
-        17..18,
-    ),
-    (
-        Newline,
-        18..20,
-    ),
-    (
-        NonLogicalNewline,
-        20..22,
-    ),
-    (
-        Indent,
-        22..24,
-    ),
-    (
-        Return,
-        24..30,
-    ),
-    (
-        Int(
-            99,
-        ),
-        31..33,
-    ),
-    (
-        Newline,
-        33..35,
-    ),
-    (
-        NonLogicalNewline,
-        35..37,
-    ),
-    (
-        Dedent,
-        37..37,
-    ),
-    (
-        Dedent,
-        37..37,
-    ),
+    Def 0..3,
+    Name 4..7,
+    Lpar 7..8,
+    Rpar 8..9,
+    Colon 9..10,
+    Newline 10..12,
+    Indent 12..13,
+    If 13..15,
+    Name 16..17,
+    Colon 17..18,
+    Newline 18..20,
+    NonLogicalNewline 20..22,
+    Indent 22..24,
+    Return 24..30,
+    Int 31..33,
+    Newline 33..35,
+    NonLogicalNewline 35..37,
+    Dedent 37..37,
+    Dedent 37..37,
 ]
 ```

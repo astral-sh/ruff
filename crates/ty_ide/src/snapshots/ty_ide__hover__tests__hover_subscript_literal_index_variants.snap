@@ -12,13 +12,11 @@ str
 info[hover]: Hovered content is
  --> main.py:3:7
   |
-2 | values: list[str] = ["a", "b"]
 3 | print(values[0])
   |       ^^^^^^^-^
   |       |      |
   |       |      Cursor offset
   |       source
-  |
 
 
 
@@ -32,13 +30,11 @@ str
 info[hover]: Hovered content is
  --> main.py:3:7
   |
-2 | values: list[str] = ["a", "b"]
 3 | print(values[0])
   |       ^^^^^^^^-
   |       |       |
   |       |       Cursor offset
   |       source
-  |
 
 
 
@@ -52,13 +48,11 @@ str
 info[hover]: Hovered content is
  --> main.py:3:7
   |
-2 | values: list[str] = ["a", "b"]
 3 | print(values[0])
   |       ^^^^^^-^^
   |       |     |
   |       |     Cursor offset
   |       source
-  |
 
 
 
@@ -72,13 +66,11 @@ str
 info[hover]: Hovered content is
  --> main.py:3:7
   |
-2 | values: list[str] = ["a", "b"]
 3 | print(values[-1])
   |       ^^^^^^-^^^
   |       |     |
   |       |     Cursor offset
   |       source
-  |
 
 
 
@@ -92,13 +84,11 @@ str
 info[hover]: Hovered content is
  --> main.py:3:7
   |
-2 | values: list[str] = ["a", "b"]
 3 | print(values[-1])
   |       ^^^^^^^-^^
   |       |      |
   |       |      Cursor offset
   |       source
-  |
 
 
 
@@ -112,13 +102,11 @@ str
 info[hover]: Hovered content is
  --> main.py:3:7
   |
-2 | values: list[str] = ["a", "b"]
 3 | print(values[-1])
   |       ^^^^^^^^-^
   |       |       |
   |       |       Cursor offset
   |       source
-  |
 
 
 
@@ -132,13 +120,11 @@ str
 info[hover]: Hovered content is
  --> main.py:3:7
   |
-2 | values: list[str] = ["a", "b"]
 3 | print(values[-1])
   |       ^^^^^^^^^-
   |       |        |
   |       |        Cursor offset
   |       source
-  |
 
 
 
@@ -152,13 +138,11 @@ str
 info[hover]: Hovered content is
  --> main.py:3:7
   |
-2 | values: list[str] = ["a", "b"]
 3 | print(values[+1])
   |       ^^^^^^^^-^
   |       |       |
   |       |       Cursor offset
   |       source
-  |
 
 
 
@@ -172,10 +156,8 @@ str
 info[hover]: Hovered content is
  --> main.py:3:7
   |
-2 | values: list[str] = ["a", "b"]
 3 | print(values[+1])
   |       ^^^^^^^^^-
   |       |        |
   |       |        Cursor offset
   |       source
-  |

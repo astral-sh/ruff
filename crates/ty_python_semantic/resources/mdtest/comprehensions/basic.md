@@ -31,6 +31,231 @@ class Table:
 [[reveal_type((x, y)) for x in range(3)] for y in range(3)]
 ```
 
+## Assignment expressions in comprehensions
+
+[PEP 572] specifies that an assignment expression in a comprehension binds its target in the scope
+containing the outermost comprehension.
+
+ty currently assumes that a comprehension runs at least once and that a generator expression is
+consumed immediately.
+
+### Basic forms
+
+Assignment expressions can appear in the element of a list comprehension and in the key or value of
+a dictionary comprehension:
+
+```py
+[(list_value := item) for item in [1]]
+{(dict_key := item): (dict_value := item) for item in [1]}
+
+reveal_type(list_value)  # revealed: int
+reveal_type(dict_key)  # revealed: int
+reveal_type(dict_value)  # revealed: int
+```
+
+### Generator expressions
+
+The target also binds in the containing scope when the assignment is in a generator expression. PEP
+572 uses this `any` pattern as a motivating example:
+
+```py
+def find_comment(lines: list[str]):
+    if any((comment := line).startswith("#") for line in lines):
+        reveal_type(comment)  # revealed: str
+```
+
+### Assignment order
+
+If an iteration assigns the same target more than once, the last assignment determines its value
+after the comprehension:
+
+```py
+[(ordered := item, ordered := "") for item in [1]]
+reveal_type(ordered)  # revealed: str
+```
+
+### Branches that do not assign
+
+A target in a branch known not to run remains unbound, while the other target is available after the
+comprehension:
+
+```py
+[(dead := 1) if False else (live := 2) for _ in [0]]
+
+dead  # error: [unresolved-reference]
+reveal_type(live)  # revealed: int
+```
+
+### Assignments on only some paths
+
+When the assignment only runs on one possible path, an earlier value remains possible:
+
+```py
+def conditional_with_previous_value(flag: bool):
+    value = "old"
+    [(value := 1) if flag else 0 for _ in [0]]
+    reveal_type(value)  # revealed: Literal["old"] | int
+```
+
+Without an earlier value, the target may be unbound:
+
+```py
+def conditional_without_previous_value(flag: bool):
+    [(value := 1) if flag else 0 for _ in [0]]
+    # error: [possibly-unresolved-reference]
+    reveal_type(value)  # revealed: int
+```
+
+ty conservatively keeps the type of an assignment that is unreachable on the first iteration, since
+a later iteration may take a different branch. Even though `0 == 1` is always false, the target is
+therefore possibly unbound, and checking must continue after the read:
+
+```py
+def statically_false_condition():
+    [(value := 1) if 0 == 1 else 0 for _ in [0]]
+    # error: [possibly-unresolved-reference]
+    reveal_type(value)  # revealed: int
+    still_reachable  # error: [unresolved-reference]
+```
+
+### Comprehension filters
+
+A false filter skips the element, but an assignment made while evaluating that filter still takes
+effect:
+
+```py
+[value for value in [True, False] if (last_value := value)]
+reveal_type(last_value)  # revealed: bool
+```
+
+If short-circuit evaluation skips the assignment, the target may be unbound:
+
+```py
+def conditional_filter(flag: bool):
+    [0 for _ in [0] if flag and (value := 1)]
+    # error: [possibly-unresolved-reference]
+    reveal_type(value)  # revealed: int
+```
+
+An assignment in the element only runs when every preceding filter succeeds:
+
+```py
+def assignment_after_filter(flag: bool):
+    [(value := 1) for _ in [0] if flag]
+    # error: [possibly-unresolved-reference]
+    reveal_type(value)  # revealed: int
+```
+
+### Assignments that depend on earlier iterations
+
+An assignment can read the value left by an earlier iteration. In this example, the final value is
+`3`, so retaining only the first iteration's literal values would be incorrect:
+
+```py
+def partial_sum():
+    total = 0
+    [total := total + value for value in [1, 2]]
+    reveal_type(total)  # revealed: int
+```
+
+ty does not yet account for a type that changes between iterations. The second iteration below
+assigns `int`, so the final type should be `str | int` and `value.upper()` should report an error:
+
+```py
+def type_changes_across_iterations():
+    value = 0
+    [value := "" if isinstance(value, int) else 0 for _ in [0, 1]]
+    reveal_type(value)  # revealed: str
+    value.upper()
+```
+
+The same applies when two targets depend on values from earlier iterations:
+
+```py
+def two_dependent_targets():
+    x = 0
+    y = 0
+    [(y := x, x := y + 1) for _ in [1, 2]]
+    reveal_type(x)  # revealed: int
+    reveal_type(y)  # revealed: int
+```
+
+A guard can also depend on a value changed by a later assignment in the same iteration. The first
+iteration below sets `flag`, so the second iteration assigns `value`:
+
+```py
+def loop_carried_guard():
+    flag = False
+    [((value := 1) if flag else 0, (flag := True)) for _ in [0, 1]]
+    # error: [possibly-unresolved-reference]
+    reveal_type(value)  # revealed: int
+```
+
+### Function-local targets
+
+An assignment in a branch known not to run still makes its target local to the containing function.
+A read must not fall back to a global variable with the same name:
+
+```py
+local_target = "global"
+
+def read_local_target():
+    [(local_target := 1) if False else 0 for _ in [0]]
+    local_target  # error: [unresolved-reference]
+```
+
+A walrus also makes its target local before the first iteration. Its first assignment must not read
+a global with the same name. Explicit `global` and `nonlocal` declarations still refer to the
+existing outer variable:
+
+```py
+total = 0
+
+def sums(values: list[int]) -> list[int]:
+    return [total := total + value for value in values]  # error: [unresolved-reference]
+
+def sums_global(values: list[int]) -> list[int]:
+    global total
+    return [total := total + value for value in values]
+
+def sums_nonlocal(values: list[int]) -> list[int]:
+    total = 0
+
+    def add_values() -> list[int]:
+        nonlocal total
+        return [total := total + value for value in values]
+
+    return add_values()
+```
+
+### Nested comprehensions
+
+An assignment in an inner comprehension still binds outside the outermost comprehension. A later
+assignment in the outer comprehension replaces the inner value:
+
+```py
+[([nested_order := 1 for _ in [0]], (nested_order := "")) for _ in [0]]
+reveal_type(nested_order)  # revealed: str
+```
+
+These are controls for an inner comprehension that is never evaluated. It must not replace an
+earlier value:
+
+```py
+def unreachable_nested_assignment_with_previous_value():
+    value = "old"
+    [[value := 1 for _ in [0]] if False else [] for _ in [0]]
+    reveal_type(value)  # revealed: Literal["old"]
+```
+
+Nor should it create a new value:
+
+```py
+def unreachable_nested_assignment_without_previous_value():
+    [[value := 1 for _ in [0]] if False else [] for _ in [0]]
+    value  # error: [unresolved-reference]
+```
+
 ## Comprehension referencing outer comprehension
 
 ```py
@@ -128,9 +353,10 @@ The type of the expression being iterated over is immutable, and so should not b
 `Unknown` or through literal promotion:
 
 ```py
-# TODO: This should reveal `Literal["a", "b"]`
-# revealed: Unknown | str
-x = [reveal_type(string) for string in ["a", "b"]]
+x = [
+    reveal_type(string)  # revealed: Literal["a", "b"]
+    for string in ["a", "b"]
+]
 ```
 
 ## Comprehension expression types
@@ -140,40 +366,65 @@ The type of the comprehension expression itself should reflect the inferred elem
 ```py
 from typing import TypedDict, Literal
 
-# revealed: list[Unknown | int]
+# revealed: list[int]
 reveal_type([x for x in range(10)])
 
-# revealed: set[Unknown | int]
+# revealed: set[int]
 reveal_type({x for x in range(10)})
 
-# revealed: dict[Unknown | int, Unknown | str]
+# revealed: dict[int, str]
 reveal_type({x: str(x) for x in range(10)})
 
-# revealed: list[Unknown | tuple[int, Unknown | str]]
+# revealed: list[tuple[int, str]]
 reveal_type([(x, y) for x in range(5) for y in ["a", "b", "c"]])
 
 squares: list[int | None] = [x**2 for x in range(10)]
 reveal_type(squares)  # revealed: list[int | None]
 ```
 
+## PEP 798 unpacking comprehensions
+
+```toml
+[environment]
+python-version = "3.15"
+```
+
+Unpacking comprehensions flatten the unpacked element type:
+
+```py
+list_of_lists: list[list[int]] = [[1], [2, 3]]
+sets: list[set[str]] = [{"a"}, {"b", "c"}]
+dicts: list[dict[str, int]] = [{"a": 1}, {"b": 2}]
+not_iterables: list[int] = [1, 2]
+
+reveal_type([*xs for xs in list_of_lists])  # revealed: list[int]
+reveal_type({*xs for xs in sets})  # revealed: set[str]
+reveal_type({**d for d in dicts})  # revealed: dict[str, int]
+
+[*value for value in not_iterables]  # error: [not-iterable] "Object of type `int` is not iterable"
+{*value for value in not_iterables}  # error: [not-iterable] "Object of type `int` is not iterable"
+{**value for value in not_iterables}  # error: [invalid-argument-type]
+```
+
+## Inference for comprehensions takes context
+
 Inference for comprehensions takes the type context into account:
 
 ```py
-from typing import Sequence
+from typing import Literal, Sequence, TypedDict
 
 # Without type context:
-reveal_type([x for x in [1, 2, 3]])  # revealed: list[Unknown | int]
-reveal_type({x: "a" for x in [1, 2, 3]})  # revealed: dict[Unknown | int, Unknown | str]
-reveal_type({str(x): x for x in [1, 2, 3]})  # revealed: dict[Unknown | str, Unknown | int]
-reveal_type({x for x in [1, 2, 3]})  # revealed: set[Unknown | int]
+reveal_type([x for x in [1, 2, 3]])  # revealed: list[int]
+reveal_type({x: "a" for x in [1, 2, 3]})  # revealed: dict[int, str]
+reveal_type({str(x): x for x in [1, 2, 3]})  # revealed: dict[str, int]
+reveal_type({x for x in [1, 2, 3]})  # revealed: set[int]
 
 # With type context:
 x1: list[int] = [x for x in [1, 2, 3]]
 reveal_type(x1)  # revealed: list[int]
 
 x2: Sequence[int] = [x for x in [1, 2, 3]]
-# TODO: This should reveal `list[int]`.
-reveal_type(x2)  # revealed: list[Unknown | int]
+reveal_type(x2)  # revealed: list[int]
 
 x3: dict[int, str] = {x: str(x) for x in [1, 2, 3]}
 reveal_type(x3)  # revealed: dict[int, str]
@@ -186,7 +437,7 @@ This also works for nested comprehensions:
 
 ```py
 table = [[(x, y) for x in range(3)] for y in range(3)]
-reveal_type(table)  # revealed: list[Unknown | list[Unknown | tuple[int, int]]]
+reveal_type(table)  # revealed: list[list[tuple[int, int]]]
 
 table_with_content: list[list[tuple[int, int, str | None]]] = [[(x, y, None) for x in range(3)] for y in range(3)]
 reveal_type(table_with_content)  # revealed: list[list[tuple[int, int, str | None]]]
@@ -208,7 +459,7 @@ y3: list[Person] = [{"name": n} for n in ["Alice", "Bob"]]
 reveal_type(y3)  # revealed: list[Person]
 
 # error: [invalid-assignment]
-# error: [invalid-key] "Unknown key "misspelled" for TypedDict `Person`: Unknown key "misspelled""
+# error: [invalid-key] "Unknown key "misspelled" for TypedDict `Person`"
 # error: [missing-typed-dict-key] "Missing required key 'name' in TypedDict `Person` constructor"
 y4: list[Person] = [{"misspelled": n} for n in ["Alice", "Bob"]]
 ```
@@ -216,9 +467,9 @@ y4: list[Person] = [{"misspelled": n} for n in ["Alice", "Bob"]]
 We promote literals to avoid overly-precise types in invariant positions:
 
 ```py
-reveal_type([x for x in ("a", "b", "c")])  # revealed: list[Unknown | str]
-reveal_type({x for x in (1, 2, 3)})  # revealed: set[Unknown | int]
-reveal_type({k: 0 for k in ("a", "b", "c")})  # revealed: dict[Unknown | str, Unknown | int]
+reveal_type([x for x in ("a", "b", "c")])  # revealed: list[str]
+reveal_type({x for x in (1, 2, 3)})  # revealed: set[int]
+reveal_type({k: 0 for k in ("a", "b", "c")})  # revealed: dict[str, int]
 ```
 
 Type context can prevent this promotion from happening:
@@ -236,3 +487,5 @@ reveal_type(dict_with_literal_values)  # revealed: dict[str, Literal[1, 2, 3]]
 set_with_literals: set[Literal[1, 2, 3]] = {k for k in (1, 2, 3)}
 reveal_type(set_with_literals)  # revealed: set[Literal[1, 2, 3]]
 ```
+
+[pep 572]: https://peps.python.org/pep-0572/#scope-of-the-target

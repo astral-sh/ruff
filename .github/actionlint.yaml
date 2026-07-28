@@ -8,13 +8,9 @@ self-hosted-runner:
     - depot-ubuntu-latest-8
     - depot-ubuntu-22.04-16
     - depot-ubuntu-22.04-32
-    - depot-windows-2022-16
+    - namespace-profile-macos-15
+    - namespace-profile-windows-2022-x86-64-16x32
     - depot-ubuntu-22.04-arm-4
     - github-windows-2025-x86_64-8
     - github-windows-2025-x86_64-16
     - codspeed-macro
-
-paths:
-  ".github/workflows/mypy_primer.yaml":
-    ignore:
-      - 'constant expression "false" in condition. remove the if: section'

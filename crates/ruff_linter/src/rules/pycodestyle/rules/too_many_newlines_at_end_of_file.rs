@@ -1,6 +1,5 @@
 use std::iter::Peekable;
 
-use itertools::Itertools;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_notebook::CellOffsets;
 use ruff_python_ast::token::{Token, TokenKind, Tokens};
@@ -64,32 +63,38 @@ pub(crate) fn too_many_newlines_at_end_of_file(
     tokens: &Tokens,
     cell_offsets: Option<&CellOffsets>,
 ) {
-    let mut tokens_iter = tokens.iter().rev().peekable();
-
     if let Some(cell_offsets) = cell_offsets {
-        notebook_newline_diagnostics(tokens_iter, cell_offsets, context);
+        notebook_newline_diagnostics(tokens, cell_offsets, context);
     } else {
+        let mut tokens_iter = tokens.iter().rev().peekable();
         newline_diagnostic(&mut tokens_iter, false, context);
     }
 }
 
 /// Collects trailing newline diagnostics for each cell
-fn notebook_newline_diagnostics<'a>(
-    mut tokens_iter: Peekable<impl Iterator<Item = &'a Token>>,
+fn notebook_newline_diagnostics(
+    tokens: &Tokens,
     cell_offsets: &CellOffsets,
     context: &LintContext,
 ) {
-    let offset_iter = cell_offsets.iter().rev();
+    let mut remaining_tokens = &tokens[..];
 
-    // NB: When interpreting the below, recall that the iterators
-    // have been reversed.
-    for &offset in offset_iter {
-        // Advance to offset
-        tokens_iter
-            .peeking_take_while(|tok| tok.end() >= offset)
-            .for_each(drop);
+    for range in cell_offsets.content_ranges() {
+        let start_index = remaining_tokens
+            .iter()
+            .position(|token| token.end() > range.start())
+            .unwrap_or(remaining_tokens.len());
+        remaining_tokens = &remaining_tokens[start_index..];
 
+        let end_index = remaining_tokens
+            .iter()
+            .position(|token| token.start() >= range.end())
+            .unwrap_or(remaining_tokens.len());
+        let (cell_tokens, rest) = remaining_tokens.split_at(end_index);
+
+        let mut tokens_iter = cell_tokens.iter().rev().peekable();
         newline_diagnostic(&mut tokens_iter, true, context);
+        remaining_tokens = rest;
     }
 }
 

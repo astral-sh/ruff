@@ -95,6 +95,6 @@ if sys.platform == "win32":
 
     def SetErrorMode(mode: int, /) -> int:
         """Wrapper around SetErrorMode."""
-    if sys.version_info >= (3, 10):
-        def GetErrorMode() -> int:  # undocumented
-            """Wrapper around GetErrorMode."""
+
+    def GetErrorMode() -> int:  # undocumented
+        """Wrapper around GetErrorMode."""

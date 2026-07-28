@@ -17,6 +17,7 @@ ty <COMMAND>
 <dl class="cli-reference"><dt><a href="#ty-check"><code>ty check</code></a></dt><dd><p>Check a project for type errors</p></dd>
 <dt><a href="#ty-server"><code>ty server</code></a></dt><dd><p>Start the language server</p></dd>
 <dt><a href="#ty-version"><code>ty version</code></a></dt><dd><p>Display ty's version</p></dd>
+<dt><a href="#ty-explain"><code>ty explain</code></a></dt><dd><p>Explain rules and other parts of ty</p></dd>
 <dt><a href="#ty-help"><code>ty help</code></a></dt><dd><p>Print this message or the help of the given subcommand(s)</p></dd>
 </dl>
 
@@ -51,12 +52,18 @@ over all configuration files.</p>
 </dd><dt id="ty-check--config-file"><a href="#ty-check--config-file"><code>--config-file</code></a> <i>path</i></dt><dd><p>The path to a <code>ty.toml</code> file to use for configuration.</p>
 <p>While ty configuration can be included in a <code>pyproject.toml</code> file, it is not allowed in this context.</p>
 <p>May also be set with the <code>TY_CONFIG_FILE</code> environment variable.</p></dd><dt id="ty-check--error"><a href="#ty-check--error"><code>--error</code></a> <i>rule</i></dt><dd><p>Treat the given rule as having severity 'error'. Can be specified multiple times. Use 'all' to apply to all rules.</p>
-</dd><dt id="ty-check--error-on-warning"><a href="#ty-check--error-on-warning"><code>--error-on-warning</code></a></dt><dd><p>Use exit code 1 if there are any warning-level diagnostics</p>
+</dd><dt id="ty-check--error-on-warning"><a href="#ty-check--error-on-warning"><code>--error-on-warning</code></a></dt><dd><p>Use exit code 1 if there are any warning-level diagnostics.</p>
+<p>Cannot be used in combination with <code>--exit-zero</code> or <code>--exit-zero-on-warning</code>.</p>
 </dd><dt id="ty-check--exclude"><a href="#ty-check--exclude"><code>--exclude</code></a> <i>exclude</i></dt><dd><p>Glob patterns for files to exclude from type checking.</p>
 <p>Uses gitignore-style syntax to exclude files and directories from type checking. Supports patterns like <code>tests/</code>, <code>*.tmp</code>, <code>**/__pycache__/**</code>.</p>
-</dd><dt id="ty-check--exit-zero"><a href="#ty-check--exit-zero"><code>--exit-zero</code></a></dt><dd><p>Always use exit code 0, even when there are error-level diagnostics</p>
+</dd><dt id="ty-check--exclude-scripts"><a href="#ty-check--exclude-scripts"><code>--exclude-scripts</code></a></dt><dd><p>Exclude files containing PEP 723 inline script metadata unless passed explicitly. Use <code>--include-scripts</code> to disable</p>
+</dd><dt id="ty-check--exit-zero"><a href="#ty-check--exit-zero"><code>--exit-zero</code></a></dt><dd><p>Always use exit code 0, even when there are error-level diagnostics.</p>
+<p>Cannot be used in combination with <code>--error-on-warning</code>.</p>
+</dd><dt id="ty-check--exit-zero-on-warning"><a href="#ty-check--exit-zero-on-warning"><code>--exit-zero-on-warning</code></a></dt><dd><p>Use exit code 0 if there are no error-level diagnostics.</p>
+<p>Cannot be used in combination with <code>--error-on-warning</code>.</p>
 </dd><dt id="ty-check--extra-search-path"><a href="#ty-check--extra-search-path"><code>--extra-search-path</code></a> <i>path</i></dt><dd><p>Additional path to use as a module-resolution source (can be passed multiple times).</p>
 <p>This is an advanced option that should usually only be used for first-party or third-party modules that are not installed into your Python environment in a conventional way. Use <code>--python</code> to point ty to your Python environment if it is in an unusual location.</p>
+</dd><dt id="ty-check--fix"><a href="#ty-check--fix"><code>--fix</code></a></dt><dd><p>Apply fixes to resolve errors</p>
 </dd><dt id="ty-check--force-exclude"><a href="#ty-check--force-exclude"><code>--force-exclude</code></a></dt><dd><p>Enforce exclusions, even for paths passed to ty directly on the command-line. Use <code>--no-force-exclude</code> to disable</p>
 </dd><dt id="ty-check--help"><a href="#ty-check--help"><code>--help</code></a>, <code>-h</code></dt><dd><p>Print help (see a summary with '-h')</p>
 </dd><dt id="ty-check--ignore"><a href="#ty-check--ignore"><code>--ignore</code></a> <i>rule</i></dt><dd><p>Disables the rule. Can be specified multiple times. Use 'all' to apply to all rules.</p>
@@ -158,6 +165,58 @@ ty generate-shell-completion <SHELL>
 
 <dl class="cli-reference"><dt id="ty-generate-shell-completion--help"><a href="#ty-generate-shell-completion--help"><code>--help</code></a>, <code>-h</code></dt><dd><p>Print help</p>
 </dd></dl>
+
+## ty explain
+
+Explain rules and other parts of ty
+
+<h3 class="cli-reference">Usage</h3>
+
+```
+ty explain <COMMAND>
+```
+
+<h3 class="cli-reference">Commands</h3>
+
+<dl class="cli-reference"><dt><a href="#ty-explain-rule"><code>ty explain rule</code></a></dt><dd><p>Explain a rule (or all rules)</p></dd>
+<dt><a href="#ty-explain-help"><code>ty explain help</code></a></dt><dd><p>Print this message or the help of the given subcommand(s)</p></dd>
+</dl>
+
+### ty explain rule
+
+Explain a rule (or all rules)
+
+<h3 class="cli-reference">Usage</h3>
+
+```
+ty explain rule [OPTIONS] [RULE]
+```
+
+<h3 class="cli-reference">Arguments</h3>
+
+<dl class="cli-reference"><dt id="ty-explain-rule--rule"><a href="#ty-explain-rule--rule"><code>RULE</code></a></dt><dd><p>Rule to explain</p>
+<p>Defaults to all rules if omitted.</p>
+</dd></dl>
+
+<h3 class="cli-reference">Options</h3>
+
+<dl class="cli-reference"><dt id="ty-explain-rule--help"><a href="#ty-explain-rule--help"><code>--help</code></a>, <code>-h</code></dt><dd><p>Print help (see a summary with '-h')</p>
+</dd><dt id="ty-explain-rule--output-format"><a href="#ty-explain-rule--output-format"><code>--output-format</code></a> <i>output-format</i></dt><dd><p>Output format</p>
+<p>[default: text]</p><p>Possible values:</p>
+<ul>
+<li><code>text</code></li>
+<li><code>json</code></li>
+</ul></dd></dl>
+
+### ty explain help
+
+Print this message or the help of the given subcommand(s)
+
+<h3 class="cli-reference">Usage</h3>
+
+```
+ty explain help [COMMAND]
+```
 
 ## ty help
 

@@ -7,17 +7,15 @@ fn cli_config_args_toml_string_basic() -> anyhow::Result<()> {
     let case = CliTest::with_file("test.py", r"print(x)  # [unresolved-reference]")?;
 
     // Long flag
-    assert_cmd_snapshot!(case.command().arg("--warn").arg("unresolved-reference").arg("--config").arg("terminal.error-on-warning=true"), @"
-    success: false
-    exit_code: 1
+    assert_cmd_snapshot!(case.command().arg("--warn").arg("unresolved-reference").arg("--config").arg("terminal.error-on-warning=false"), @"
+    success: true
+    exit_code: 0
     ----- stdout -----
     warning[unresolved-reference]: Name `x` used when not defined
      --> test.py:1:7
       |
     1 | print(x)  # [unresolved-reference]
       |       ^
-      |
-    info: rule `unresolved-reference` was selected on the command line
 
     Found 1 diagnostic
 
@@ -25,17 +23,15 @@ fn cli_config_args_toml_string_basic() -> anyhow::Result<()> {
     ");
 
     // Short flag
-    assert_cmd_snapshot!(case.command().arg("-c").arg("terminal.error-on-warning=true"), @"
-    success: false
-    exit_code: 1
+    assert_cmd_snapshot!(case.command().arg("--warn").arg("unresolved-reference").arg("-c").arg("terminal.error-on-warning=false"), @"
+    success: true
+    exit_code: 0
     ----- stdout -----
-    error[unresolved-reference]: Name `x` used when not defined
+    warning[unresolved-reference]: Name `x` used when not defined
      --> test.py:1:7
       |
     1 | print(x)  # [unresolved-reference]
       |       ^
-      |
-    info: rule `unresolved-reference` is enabled by default
 
     Found 1 diagnostic
 
@@ -52,32 +48,14 @@ fn cli_config_args_overrides_ty_toml() -> anyhow::Result<()> {
             "ty.toml",
             r#"
             [terminal]
-            error-on-warning = true
+            error-on-warning = false
             "#,
         ),
         ("test.py", r"print(x)  # [unresolved-reference]"),
     ])?;
 
-    // Exit code of 1 due to the setting in `ty.toml`
+    // Exit code of 0 due to the setting in `ty.toml`
     assert_cmd_snapshot!(case.command().arg("--warn").arg("unresolved-reference"), @"
-    success: false
-    exit_code: 1
-    ----- stdout -----
-    warning[unresolved-reference]: Name `x` used when not defined
-     --> test.py:1:7
-      |
-    1 | print(x)  # [unresolved-reference]
-      |       ^
-      |
-    info: rule `unresolved-reference` was selected on the command line
-
-    Found 1 diagnostic
-
-    ----- stderr -----
-    ");
-
-    // Exit code of 0 because the `ty.toml` setting is overwritten by `--config`
-    assert_cmd_snapshot!(case.command().arg("--warn").arg("unresolved-reference").arg("--config").arg("terminal.error-on-warning=false"), @"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -86,8 +64,22 @@ fn cli_config_args_overrides_ty_toml() -> anyhow::Result<()> {
       |
     1 | print(x)  # [unresolved-reference]
       |       ^
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    ");
+
+    // Exit code of 1 because the `ty.toml` setting is overwritten by `--config`
+    assert_cmd_snapshot!(case.command().arg("--warn").arg("unresolved-reference").arg("--config").arg("terminal.error-on-warning=true"), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    warning[unresolved-reference]: Name `x` used when not defined
+     --> test.py:1:7
       |
-    info: rule `unresolved-reference` was selected on the command line
+    1 | print(x)  # [unresolved-reference]
+      |       ^
 
     Found 1 diagnostic
 
@@ -109,8 +101,6 @@ fn cli_config_args_later_overrides_earlier() -> anyhow::Result<()> {
       |
     1 | print(x)  # [unresolved-reference]
       |       ^
-      |
-    info: rule `unresolved-reference` was selected on the command line
 
     Found 1 diagnostic
 
@@ -146,7 +136,7 @@ fn cli_config_args_invalid_option() -> anyhow::Result<()> {
 
 #[test]
 fn config_file_override() -> anyhow::Result<()> {
-    // Set `error-on-warning` to true in the configuration file
+    // Set `error-on-warning` to false in the configuration file
     // Explicitly set `--warn unresolved-reference` to ensure the rule warns instead of errors
     let case = CliTest::with_files(vec![
         ("test.py", r"print(x)  # [unresolved-reference]"),
@@ -154,45 +144,64 @@ fn config_file_override() -> anyhow::Result<()> {
             "ty-override.toml",
             r#"
             [terminal]
-            error-on-warning = true
+            error-on-warning = false
             "#,
         ),
     ])?;
 
-    // Ensure flag works via CLI arg
+    // Ensure the configuration file is loaded via the CLI argument
     assert_cmd_snapshot!(case.command().arg("--warn").arg("unresolved-reference").arg("--config-file").arg("ty-override.toml"), @"
-    success: false
-    exit_code: 1
+    success: true
+    exit_code: 0
     ----- stdout -----
     warning[unresolved-reference]: Name `x` used when not defined
      --> test.py:1:7
       |
     1 | print(x)  # [unresolved-reference]
       |       ^
-      |
-    info: rule `unresolved-reference` was selected on the command line
 
     Found 1 diagnostic
 
     ----- stderr -----
     ");
 
-    // Ensure the flag works via an environment variable
+    // Ensure the configuration file is loaded via the environment variable
     assert_cmd_snapshot!(case.command().arg("--warn").arg("unresolved-reference").env("TY_CONFIG_FILE", "ty-override.toml"), @"
-    success: false
-    exit_code: 1
+    success: true
+    exit_code: 0
     ----- stdout -----
     warning[unresolved-reference]: Name `x` used when not defined
      --> test.py:1:7
       |
     1 | print(x)  # [unresolved-reference]
       |       ^
-      |
-    info: rule `unresolved-reference` was selected on the command line
 
     Found 1 diagnostic
 
     ----- stderr -----
+    ");
+
+    Ok(())
+}
+
+#[test]
+fn invalid_configuration_file() -> anyhow::Result<()> {
+    let case = CliTest::with_files([("ty.toml", "x"), ("test.py", "")])?;
+
+    assert_cmd_snapshot!(case.command().arg("--config-file").arg("ty.toml"), @"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    ty failed
+      Cause: Error loading configuration file at <temp_dir>/ty.toml
+      Cause: <temp_dir>/ty.toml is not a valid `ty.toml`
+      Cause: TOML parse error at line 1, column 2
+      |
+    1 | x
+      |  ^
+    key with no value, expected `=`
     ");
 
     Ok(())

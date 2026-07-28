@@ -19,7 +19,7 @@
     "classnames": "^2.5.1",
     "lz-string": "^1.5.0",
     "monaco-editor": "^0.55.0",
-    "pyodide": "^0.29.0",
+    "pyodide": "^314.0.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-resizable-panels": "^4.0.0",
@@ -34,6 +34,6 @@
     }
   },
   "devDependencies": {
-    "vite-plugin-static-copy": "^3.0.0"
+    "vite-plugin-static-copy": "^4.0.0"
   }
 }

@@ -1,5 +1,7 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, Arguments, Expr, ExprContext, Identifier, Keyword, Stmt};
+use ruff_python_ast::{
+    self as ast, Arguments, Expr, ExprContext, Identifier, Keyword, Stmt, Suite,
+};
 use ruff_python_codegen::Generator;
 use ruff_python_semantic::SemanticModel;
 use ruff_python_stdlib::identifiers::is_identifier;
@@ -167,7 +169,7 @@ fn create_field_assignment_stmt(field: &str, annotation: &Expr) -> Stmt {
 /// Generate a `StmtKind:ClassDef` statement based on the provided body, keywords, and base class.
 fn create_class_def_stmt(
     class_name: &str,
-    body: Vec<Stmt>,
+    body: Suite,
     total_keyword: Option<&Keyword>,
     base_class: &Expr,
 ) -> Stmt {
@@ -176,28 +178,28 @@ fn create_class_def_stmt(
         arguments: Some(Box::new(Arguments {
             args: Box::from([base_class.clone()]),
             keywords: match total_keyword {
-                Some(keyword) => Box::from([keyword.clone()]),
-                None => Box::from([]),
+                Some(keyword) => std::iter::once(keyword.clone()).collect(),
+                None => std::iter::empty().collect(),
             },
             range: TextRange::default(),
             node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         })),
         body,
         type_params: None,
-        decorator_list: vec![],
+        decorator_list: ast::DecoratorList::new(),
         range: TextRange::default(),
         node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     }
     .into()
 }
 
-fn fields_from_dict_literal(items: &[ast::DictItem]) -> Option<Vec<Stmt>> {
+fn fields_from_dict_literal(items: &[ast::DictItem]) -> Option<Suite> {
     if items.is_empty() {
         let node = Stmt::Pass(ast::StmtPass {
             range: TextRange::default(),
             node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         });
-        Some(vec![node])
+        Some(Suite::from([node]))
     } else {
         items
             .iter()
@@ -220,7 +222,7 @@ fn fields_from_dict_literal(items: &[ast::DictItem]) -> Option<Vec<Stmt>> {
     }
 }
 
-fn fields_from_dict_call(func: &Expr, keywords: &[Keyword]) -> Option<Vec<Stmt>> {
+fn fields_from_dict_call(func: &Expr, keywords: &[Keyword]) -> Option<Suite> {
     let ast::ExprName { id, .. } = func.as_name_expr()?;
     if id != "dict" {
         return None;
@@ -231,20 +233,20 @@ fn fields_from_dict_call(func: &Expr, keywords: &[Keyword]) -> Option<Vec<Stmt>>
             range: TextRange::default(),
             node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         });
-        Some(vec![node])
+        Some(Suite::from([node]))
     } else {
         fields_from_keywords(keywords)
     }
 }
 
 // Deprecated in Python 3.11, removed in Python 3.13.
-fn fields_from_keywords(keywords: &[Keyword]) -> Option<Vec<Stmt>> {
+fn fields_from_keywords(keywords: &[Keyword]) -> Option<Suite> {
     if keywords.is_empty() {
         let node = Stmt::Pass(ast::StmtPass {
             range: TextRange::default(),
             node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         });
-        return Some(vec![node]);
+        return Some(Suite::from([node]));
     }
 
     keywords
@@ -259,7 +261,7 @@ fn fields_from_keywords(keywords: &[Keyword]) -> Option<Vec<Stmt>> {
 }
 
 /// Match the fields and `total` keyword from a `TypedDict` call.
-fn match_fields_and_total(arguments: &Arguments) -> Option<(Vec<Stmt>, Option<&Keyword>)> {
+fn match_fields_and_total(arguments: &Arguments) -> Option<(Suite, Option<&Keyword>)> {
     match (&*arguments.args, &*arguments.keywords) {
         // Ex) `TypedDict("MyType", {"a": int, "b": str})`
         ([_typename, fields], [..]) => {
@@ -285,7 +287,7 @@ fn match_fields_and_total(arguments: &Arguments) -> Option<(Vec<Stmt>, Option<&K
                 range: TextRange::default(),
                 node_index: ruff_python_ast::AtomicNodeIndex::NONE,
             });
-            Some((vec![node], None))
+            Some((Suite::from([node]), None))
         }
         // Ex) `TypedDict("MyType", a=int, b=str)`
         ([_typename], fields) => Some((fields_from_keywords(fields)?, None)),
@@ -298,7 +300,7 @@ fn match_fields_and_total(arguments: &Arguments) -> Option<(Vec<Stmt>, Option<&K
 fn convert_to_class(
     stmt: &Stmt,
     class_name: &str,
-    body: Vec<Stmt>,
+    body: Suite,
     total_keyword: Option<&Keyword>,
     base_class: &Expr,
     generator: Generator,

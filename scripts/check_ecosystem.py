@@ -26,7 +26,7 @@ from collections.abc import Awaitable
 from contextlib import asynccontextmanager, nullcontext
 from pathlib import Path
 from signal import SIGINT, SIGTERM
-from typing import TYPE_CHECKING, Any, NamedTuple, Self, TypeVar
+from typing import TYPE_CHECKING, NamedTuple, Self, TypeVar
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator, Iterator, Sequence
@@ -71,7 +71,7 @@ class Repository(NamedTuple):
         git_clone_command.extend(
             [
                 f"https://github.com/{self.org}/{self.repo}",
-                checkout_dir,
+                str(checkout_dir),
             ],
         )
 
@@ -126,7 +126,7 @@ REPOSITORIES: list[Repository] = [
     Repository("aws", "aws-sam-cli", "develop"),
     Repository("binary-husky", "gpt_academic", "master"),
     Repository("bloomberg", "pytest-memray", "main"),
-    Repository("bokeh", "bokeh", "branch-3.3", select="ALL"),
+    Repository("bokeh", "bokeh", "branch-3.10", select="ALL"),
     # Disabled due to use of explicit `select` with `E999`, which has been removed.
     # See: https://github.com/astral-sh/ruff/pull/12129
     # Repository("demisto", "content", "master"),
@@ -136,7 +136,7 @@ REPOSITORIES: list[Repository] = [
     Repository("fronzbot", "blinkpy", "dev"),
     Repository("ibis-project", "ibis", "master"),
     Repository("ing-bank", "probatus", "main"),
-    Repository("jrnl-org", "jrnl", "develop"),
+    Repository("jrnl-org", "jrnl", "main"),
     Repository("langchain-ai", "langchain", "main"),
     Repository("latchbio", "latch", "main"),
     Repository("lnbits", "lnbits", "main"),
@@ -244,7 +244,7 @@ async def compare(
     ruff2: Path,
     repo: Repository,
     checkouts: Path | None = None,
-) -> Diff | None:
+) -> Diff:
     """Check a specific repository against two versions of ruff."""
     removed, added = set(), set()
 
@@ -343,7 +343,7 @@ DIFF_LINE_RE = re.compile(
     r"^(?P<pre>[+-]) (?P<inner>(?P<path>[^:]+):(?P<lnum>\d+):\d+:) (?P<post>.*)$",
 )
 
-T = TypeVar("T", bound=Awaitable[Any])
+T = TypeVar("T")
 
 
 async def main(
@@ -365,7 +365,7 @@ async def main(
     # Otherwise doing 3k repositories can take >8GB RAM
     semaphore = asyncio.Semaphore(50)
 
-    async def limited_parallelism(coroutine: T) -> T:
+    async def limited_parallelism(coroutine: Awaitable[T]) -> T:
         async with semaphore:
             return await coroutine
 
@@ -383,7 +383,7 @@ async def main(
     errors = 0
 
     for diff in diffs.values():
-        if isinstance(diff, Exception):
+        if isinstance(diff, BaseException):
             errors += 1
         else:
             total_removed += len(diff.removed)
@@ -399,7 +399,7 @@ async def main(
         print()
 
         for (org, repo), diff in diffs.items():
-            if isinstance(diff, Exception):
+            if isinstance(diff, BaseException):
                 changes = "error"
                 print(f"<details><summary>{repo} ({changes})</summary>")
                 repo = repositories[(org, repo)]

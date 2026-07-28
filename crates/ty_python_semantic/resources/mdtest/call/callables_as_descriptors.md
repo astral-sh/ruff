@@ -13,16 +13,16 @@ instance to the first argument. The bound-method object therefore has a differen
 the first argument:
 
 ```py
-from ty_extensions import CallableTypeOf
-from typing import Callable
+from ty_extensions._internal import RegularCallableTypeOf
+from typing import Any, Callable
 
 class C1:
     def method(self: C1, x: int) -> str:
         return str(x)
 
 def _(
-    accessed_on_class: CallableTypeOf[C1.method],
-    accessed_on_instance: CallableTypeOf[C1().method],
+    accessed_on_class: RegularCallableTypeOf[C1.method],
+    accessed_on_instance: RegularCallableTypeOf[C1().method],
 ):
     reveal_type(accessed_on_class)  # revealed: (self: C1, x: int) -> str
     reveal_type(accessed_on_instance)  # revealed:        (x: int) -> str
@@ -41,8 +41,8 @@ class C2:
     non_descriptor_callable: NonDescriptorCallable2 = NonDescriptorCallable2()
 
 def _(
-    accessed_on_class: CallableTypeOf[C2.non_descriptor_callable],
-    accessed_on_instance: CallableTypeOf[C2().non_descriptor_callable],
+    accessed_on_class: RegularCallableTypeOf[C2.non_descriptor_callable],
+    accessed_on_instance: RegularCallableTypeOf[C2().non_descriptor_callable],
 ):
     reveal_type(accessed_on_class)  # revealed:    (c2: C2, x: int) -> str
     reveal_type(accessed_on_instance)  # revealed: (c2: C2, x: int) -> str
@@ -68,8 +68,8 @@ However, when they are accessed on instances of `C3`, they have different signat
 
 ```py
 def _(
-    method_accessed_on_instance: CallableTypeOf[C3().method],
-    callable_accessed_on_instance: CallableTypeOf[C3().non_descriptor_callable],
+    method_accessed_on_instance: RegularCallableTypeOf[C3().method],
+    callable_accessed_on_instance: RegularCallableTypeOf[C3().non_descriptor_callable],
 ):
     reveal_type(method_accessed_on_instance)  # revealed:           (x: int) -> str
     reveal_type(callable_accessed_on_instance)  # revealed: (c3: C3, x: int) -> str
@@ -111,7 +111,7 @@ intention that it shouldn't influence the method's descriptor behavior. For exam
 `method_decorated` below as a bound method, even though its type is `Callable[[C1, int], str]`:
 
 ```py
-from typing import Callable
+from typing import Any, Callable
 
 def memoize[**P, R](f: Callable[P, R]) -> Callable[P, R]:
     raise NotImplementedError
@@ -132,7 +132,7 @@ C1().method_decorated(1)
 This also works with an argumentless `Callable` annotation:
 
 ```py
-def memoize2(f: Callable) -> Callable:
+def memoize2(f: Callable[..., Any]) -> Callable[..., Any]:
     raise NotImplementedError
 
 class C2:
@@ -141,6 +141,21 @@ class C2:
         return str(x)
 
 C2().method_decorated(1)
+```
+
+And if the callable-typed decorator leaves some generic parameters unconstrained, we should keep
+those parameters unspecialized rather than collapsing them to `Never`:
+
+```py
+def passthrough[T, R](f: Callable[[T], R]) -> Callable[[T], R]:
+    raise NotImplementedError
+
+@passthrough
+def f(x):
+    return x
+
+reveal_type(f)  # revealed: (Unknown, /) -> Unknown
+reveal_type(f(1))  # revealed: Unknown
 ```
 
 And with unions of `Callable` types:
@@ -159,27 +174,34 @@ class C3:
 reveal_type(C3().method_decorated(1))  # revealed: int | str
 ```
 
-Note that we currently only apply this heuristic when calling a function such as `memoize` via the
-decorator syntax. This is inconsistent, because the above *should* be equivalent to the following,
-but here we emit errors:
+Transparent decorators are also treated consistently when spelled as an equivalent assignment:
 
 ```py
-def memoize3(f: Callable[[C4, int], str]) -> Callable[[C4, int], str]:
-    raise NotImplementedError
-
 class C4:
     def method(self, x: int) -> str:
         return str(x)
-    method_decorated = memoize3(method)
+    method_decorated = memoize(method)
 
-# error: [missing-argument]
-# error: [invalid-argument-type]
 C4().method_decorated(1)
 ```
 
-The reason for this is that the heuristic is problematic. We don't *know* that the `Callable` in the
-return type of `memoize` is actually related to the method that we pass in. But when `memoize` is
-applied as a decorator, it is reasonable to assume so.
+For non-transparent decorators, avoid resolving the decorated function's signature before the
+decorator itself has been rejected. Doing so can introduce a cycle when the signature refers back to
+the decorated name:
+
+```py
+decorated = lambda: decorated
+try:
+    pass
+except* Exception:
+    pass
+
+unknown_decorator: Any
+
+@unknown_decorator  # error: [unresolved-reference]
+def decorated(argument: lambda: decorated, /):  # error: [invalid-type-form]
+    pass
+```
 
 In general, a function call might however return a `Callable` that is unrelated to the argument
 passed in. And here, it seems more reasonable and safe to treat the `Callable` as a non-descriptor.
@@ -200,7 +222,39 @@ def square_then(c: Callable[[float], int]) -> Callable[[float], int]:
 class Calculator:
     square_then_round = square_then(round)
 
-reveal_type(Calculator().square_then_round(3.14))  # revealed: Unknown | int
+reveal_type(Calculator().square_then_round(3.14))  # revealed: int
+```
+
+## Use case: Wrappers with explicit receivers
+
+`trio` defines multiple functions that takes in a callable with `Concatenate`-prepended receiver
+types, and returns a wrapper function with a different receiver type. They should still preserve
+descriptor behavior when the returned callable is assigned in the class body.
+
+```py
+from collections.abc import Callable, Iterable
+from typing import Concatenate, ParamSpec, TypeVar
+
+P = ParamSpec("P")
+T = TypeVar("T")
+
+class RawPath:
+    def write_bytes(self, data: bytes) -> int:
+        raise NotImplementedError
+
+def _wrap_method(
+    fn: Callable[Concatenate[RawPath, P], T],
+) -> Callable[Concatenate["Path", P], T]:
+    raise NotImplementedError
+
+class Path:
+    write_bytes = _wrap_method(RawPath.write_bytes)
+
+def check(path: Path) -> None:
+    # TODO: shouldn't be errors, should reveal `int`
+    # error: [missing-argument]
+    # error: [invalid-argument-type]
+    reveal_type(path.write_bytes(b""))  # revealed: int
 ```
 
 ## Use case: Treating dunder methods as bound-method descriptors
@@ -222,8 +276,8 @@ Tensor() ** 2
 ```
 
 The following example is also taken from a real world project. Here, the `__lt__` dunder attribute
-is not declared. The attribute type is therefore inferred as `Unknown | Callable[…]`, but we still
-treat it as a bound-method descriptor:
+is not declared. The attribute type is inferred as `Callable[…]`, but we still treat it as a
+bound-method descriptor:
 
 ```py
 def make_comparison_operator(name: str) -> Callable[[Matrix, Matrix], bool]:
@@ -233,6 +287,44 @@ class Matrix:
     __lt__ = make_comparison_operator("lt")
 
 Matrix() < Matrix()
+```
+
+The dunder-name heuristic does not apply when the callable takes no arguments, because it cannot
+accept a receiver:
+
+```py
+class Thunk:
+    __value_thunk__: Callable[[], int]
+
+    def replace(self, other: "Thunk") -> None:
+        self.__value_thunk__ = other.__value_thunk__
+
+reveal_type(Thunk().__value_thunk__)  # revealed: () -> int
+```
+
+For other concrete signatures, the heuristic does not check whether the first parameter can accept
+the instance:
+
+```py
+def descriptor_candidate(value: str) -> int:
+    return len(value)
+
+class DescriptorCandidate:
+    __value__: Callable[[str], int] = descriptor_candidate
+
+reveal_type(DescriptorCandidate().__value__)  # revealed: () -> int
+```
+
+A gradual callable signature might accept the receiver, so we preserve the function-descriptor
+heuristic. This also preserves function attributes on class access:
+
+```py
+from typing import Any
+
+class Method:
+    __call__: Callable[..., Any]
+
+Method.__call__.__code__
 ```
 
 ## `self`-binding behaviour of function-like `Callable`s
@@ -301,7 +393,7 @@ The callable type of a type object is not function-like.
 
 ```py
 from typing import ClassVar
-from ty_extensions import CallableTypeOf
+from ty_extensions._internal import RegularCallableTypeOf
 
 class WithNew:
     def __new__(self, x: int) -> WithNew:
@@ -312,8 +404,8 @@ class WithInit:
         pass
 
 class C:
-    with_new: ClassVar[CallableTypeOf[WithNew]]
-    with_init: ClassVar[CallableTypeOf[WithInit]]
+    with_new: ClassVar[RegularCallableTypeOf[WithNew]]
+    with_init: ClassVar[RegularCallableTypeOf[WithInit]]
 
 C.with_new(1)
 C().with_new(1)

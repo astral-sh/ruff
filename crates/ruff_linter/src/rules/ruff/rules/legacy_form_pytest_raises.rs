@@ -239,7 +239,7 @@ fn generate_with_statement(
 
     let (func_args, func_keywords): (Vec<_>, Vec<_>) = legacy_call
         .arguments
-        .arguments_source_order()
+        .iter_source_order()
         .skip(if expected.is_some() { 2 } else { 1 })
         .partition_map(|arg_or_keyword| match arg_or_keyword {
             ast::ArgOrKeyword::Arg(expr) => Either::Left(expr.clone()),
@@ -305,6 +305,6 @@ fn generate_with_statement(
             context_expr: context_call.into(),
             optional_vars: optional_vars.map(|var| Box::new(var.clone())),
         }],
-        body: vec![body],
+        body: ast::Suite::from([body]),
     })
 }

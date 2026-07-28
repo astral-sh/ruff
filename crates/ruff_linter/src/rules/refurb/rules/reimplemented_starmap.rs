@@ -112,7 +112,7 @@ pub(crate) fn reimplemented_starmap(checker: &Checker, target: &StarmapCandidate
             }
 
             // If the argument is used outside the function call, we can't replace it.
-            if any_over_expr(func, &|expr| {
+            if any_over_expr(func, |expr| {
                 expr.as_name_expr().is_some_and(|expr| expr.id == name.id)
             }) {
                 return;
@@ -128,7 +128,7 @@ pub(crate) fn reimplemented_starmap(checker: &Checker, target: &StarmapCandidate
             }
 
             // If any of the members are used outside the function call, we can't replace it.
-            if any_over_expr(func, &|expr| {
+            if any_over_expr(func, |expr| {
                 tuple
                     .iter()
                     .any(|elem| ComparableExpr::from(expr) == ComparableExpr::from(elem))
@@ -320,7 +320,7 @@ fn construct_starmap_call(starmap_binding: Name, iter: &Expr, func: &Expr) -> as
         func: Box::new(starmap.into()),
         arguments: ast::Arguments {
             args: Box::from([func.clone(), iter.clone()]),
-            keywords: Box::from([]),
+            keywords: std::iter::empty().collect(),
             range: TextRange::default(),
             node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         },
@@ -341,7 +341,7 @@ fn wrap_with_call_to(call: ast::ExprCall, func_name: Name) -> ast::ExprCall {
         func: Box::new(name.into()),
         arguments: ast::Arguments {
             args: Box::from([call.into()]),
-            keywords: Box::from([]),
+            keywords: std::iter::empty().collect(),
             range: TextRange::default(),
             node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         },

@@ -1,8 +1,7 @@
 import sys
 from _typeshed import ReadOnlyBuffer, SupportsRead, SupportsWrite
 from curses import _ncurses_version
-from typing import Any, Final, final, overload
-from typing_extensions import TypeAlias
+from typing import Any, Final, TypeAlias, final, overload
 
 # NOTE: This module is ordinarily only available on Unix, but the windows-curses
 # package makes it available on Windows as well with the same contents.
@@ -96,13 +95,12 @@ BUTTON4_PRESSED: Final[int]
 BUTTON4_RELEASED: Final[int]
 BUTTON4_TRIPLE_CLICKED: Final[int]
 # Darwin ncurses doesn't provide BUTTON5_* constants prior to 3.12.10 and 3.13.3
-if sys.version_info >= (3, 10):
-    if sys.version_info >= (3, 12) or sys.platform != "darwin":
-        BUTTON5_PRESSED: Final[int]
-        BUTTON5_RELEASED: Final[int]
-        BUTTON5_CLICKED: Final[int]
-        BUTTON5_DOUBLE_CLICKED: Final[int]
-        BUTTON5_TRIPLE_CLICKED: Final[int]
+if sys.version_info >= (3, 12) or sys.platform != "darwin":
+    BUTTON5_PRESSED: Final[int]
+    BUTTON5_RELEASED: Final[int]
+    BUTTON5_CLICKED: Final[int]
+    BUTTON5_DOUBLE_CLICKED: Final[int]
+    BUTTON5_TRIPLE_CLICKED: Final[int]
 BUTTON_ALT: Final[int]
 BUTTON_CTRL: Final[int]
 BUTTON_SHIFT: Final[int]
@@ -291,11 +289,12 @@ def cbreak(flag: bool = True, /) -> None:
       flag
         If false, the effect is the same as calling nocbreak().
 
-    In cbreak mode (sometimes called "rare" mode) normal tty line buffering is
-    turned off and characters are available to be read one by one.  However,
-    unlike raw mode, special characters (interrupt, quit, suspend, and flow
-    control) retain their effects on the tty driver and calling program.
-    Calling first raw() then cbreak() leaves the terminal in cbreak mode.
+    In cbreak mode (sometimes called "rare" mode) normal tty line buffering
+    is turned off and characters are available to be read one by one.
+    However, unlike raw mode, special characters (interrupt, quit, suspend,
+    and flow control) retain their effects on the tty driver and calling
+    program.  Calling first raw() then cbreak() leaves the terminal in
+    cbreak mode.
     """
 
 def color_content(color_number: int, /) -> tuple[int, int, int]:
@@ -304,8 +303,9 @@ def color_content(color_number: int, /) -> tuple[int, int, int]:
       color_number
         The number of the color (0 - (COLORS-1)).
 
-    A 3-tuple is returned, containing the R, G, B values for the given color,
-    which will be between 0 (no component) and 1000 (maximum amount of component).
+    A 3-tuple is returned, containing the R, G, B values for the given
+    color, which will be between 0 (no component) and 1000 (maximum amount
+    of component).
     """
 
 def color_pair(pair_number: int, /) -> int:
@@ -315,7 +315,8 @@ def color_pair(pair_number: int, /) -> int:
         The number of the color pair.
 
     This attribute value can be combined with A_STANDOUT, A_REVERSE, and the
-    other A_* attributes.  pair_number() is the counterpart to this function.
+    other A_* attributes.  pair_number() is the counterpart to this
+    function.
     """
 
 def curs_set(visibility: int, /) -> int:
@@ -325,9 +326,9 @@ def curs_set(visibility: int, /) -> int:
         0 for invisible, 1 for normal visible, or 2 for very visible.
 
     If the terminal supports the visibility requested, the previous cursor
-    state is returned; otherwise, an exception is raised.  On many terminals,
-    the "visible" mode is an underline cursor and the "very visible" mode is
-    a block cursor.
+    state is returned; otherwise, an exception is raised.  On many
+    terminals, the "visible" mode is an underline cursor and the "very
+    visible" mode is a block cursor.
     """
 
 def def_prog_mode() -> None:
@@ -341,7 +342,8 @@ def def_prog_mode() -> None:
 def def_shell_mode() -> None:
     """Save the current terminal mode as the "shell" mode.
 
-    The "shell" mode is the mode when the running program is not using curses.
+    The "shell" mode is the mode when the running program is not using
+    curses.
 
     Subsequent calls to reset_shell_mode() will restore this mode.
     """
@@ -362,7 +364,8 @@ def echo(flag: bool = True, /) -> None:
       flag
         If false, the effect is the same as calling noecho().
 
-    In echo mode, each character input is echoed to the screen as it is entered.
+    In echo mode, each character input is echoed to the screen as it is
+    entered.
     """
 
 def endwin() -> None:
@@ -371,33 +374,42 @@ def endwin() -> None:
 def erasechar() -> bytes:
     """Return the user's current erase character."""
 
-def filter() -> None: ...
+def filter() -> None:
+    """Restrict screen updates to the current line.
+
+    Must be called before initscr().  Afterwards curses confines the cursor
+    and screen updates to a single line, which is useful for enabling
+    character-at-a-time line editing without touching the rest of the
+    screen.
+    """
+
 def flash() -> None:
     """Flash the screen.
 
-    That is, change it to reverse-video and then change it back in a short interval.
+    That is, change it to reverse-video and then change it back in a short
+    interval.
     """
 
 def flushinp() -> None:
     """Flush all input buffers.
 
-    This throws away any typeahead that has been typed by the user and has not
-    yet been processed by the program.
+    This throws away any typeahead that has been typed by the user and has
+    not yet been processed by the program.
     """
 
 def get_escdelay() -> int:
     """Gets the curses ESCDELAY setting.
 
-    Gets the number of milliseconds to wait after reading an escape character,
-    to distinguish between an individual escape character entered on the
-    keyboard from escape sequences sent by cursor and function keys.
+    Gets the number of milliseconds to wait after reading an escape
+    character, to distinguish between an individual escape character entered
+    on the keyboard from escape sequences sent by cursor and function keys.
     """
 
 def get_tabsize() -> int:
     """Gets the curses TABSIZE setting.
 
-    Gets the number of columns used by the curses library when converting a tab
-    character to spaces as it adds the tab to a window.
+    Gets the number of columns used by the curses library when converting
+    a tab character to spaces as it adds the tab to a window.
     """
 
 def getmouse() -> tuple[int, int, int, int, int]:
@@ -432,13 +444,12 @@ def halfdelay(tenths: int, /) -> None:
 def has_colors() -> bool:
     """Return True if the terminal can display colors; otherwise, return False."""
 
-if sys.version_info >= (3, 10):
-    def has_extended_color_support() -> bool:
-        """Return True if the module supports extended colors; otherwise, return False.
+def has_extended_color_support() -> bool:
+    """Return True if the module supports extended colors; otherwise, return False.
 
-        Extended color support allows more than 256 color-pairs for terminals
-        that support more than 16 colors (e.g. xterm-256color).
-        """
+    Extended color support allows more than 256 color-pairs for terminals
+    that support more than 16 colors (e.g. xterm-256color).
+    """
 
 if sys.version_info >= (3, 14):
     def assume_default_colors(fg: int, bg: int, /) -> None:
@@ -490,8 +501,9 @@ def init_pair(pair_number: int, fg: int, bg: int, /) -> None:
       bg
         Background color number (-1 - (COLORS-1)).
 
-    If the color-pair was previously initialized, the screen is refreshed and
-    all occurrences of that color-pair are changed to the new definition.
+    If the color-pair was previously initialized, the screen is refreshed
+    and all occurrences of that color-pair are changed to the new
+    definition.
     """
 
 def initscr() -> window:
@@ -500,7 +512,14 @@ def initscr() -> window:
     Return a WindowObject which represents the whole screen.
     """
 
-def intrflush(flag: bool, /) -> None: ...
+def intrflush(flag: bool, /) -> None:
+    """Control flushing of the output buffer when an interrupt key is pressed.
+
+    If flag is true, pressing an interrupt key (interrupt, break, or quit)
+    flushes all output in the terminal driver queue.  If flag is false, no
+    flushing is done.
+    """
+
 def is_term_resized(nlines: int, ncols: int, /) -> bool:
     """Return True if resize_term() would modify the window structure, False otherwise.
 
@@ -526,8 +545,8 @@ def killchar() -> bytes:
 def longname() -> bytes:
     """Return the terminfo long name field describing the current terminal.
 
-    The maximum length of a verbose description is 128 characters.  It is defined
-    only after the call to initscr().
+    The maximum length of a verbose description is 128 characters.  It is
+    defined only after the call to initscr().
     """
 
 def meta(yes: bool, /) -> None:
@@ -544,17 +563,17 @@ def mouseinterval(interval: int, /) -> None:
         Time in milliseconds.
 
     Set the maximum time that can elapse between press and release events in
-    order for them to be recognized as a click, and return the previous interval
-    value.
+    order for them to be recognized as a click, and return the previous
+    interval value.
     """
 
 def mousemask(newmask: int, /) -> tuple[int, int]:
-    """Set the mouse events to be reported, and return a tuple (availmask, oldmask).
+    """Set the mouse events to be reported, and return (availmask, oldmask).
 
     Return a tuple (availmask, oldmask).  availmask indicates which of the
-    specified mouse events can be reported; on complete failure it returns 0.
-    oldmask is the previous value of the given window's mouse event mask.
-    If this function is never called, no mouse events are ever reported.
+    specified mouse events can be reported; on complete failure it returns
+    0.  oldmask is the previous value of the mouse event mask.  If this
+    function is never called, no mouse events are ever reported.
     """
 
 def napms(ms: int, /) -> int:
@@ -586,8 +605,8 @@ def newwin(nlines: int, ncols: int, begin_y: int = 0, begin_x: int = 0, /) -> wi
       begin_x
         Left side x-coordinate.
 
-    By default, the window will extend from the specified position to the lower
-    right corner of the screen.
+    By default, the window will extend from the specified position to the
+    lower right corner of the screen.
     """
 
 def nl(flag: bool = True, /) -> None:
@@ -596,8 +615,9 @@ def nl(flag: bool = True, /) -> None:
       flag
         If false, the effect is the same as calling nonl().
 
-    This mode translates the return key into newline on input, and translates
-    newline into return and line-feed on output.  Newline mode is initially on.
+    This mode translates the return key into newline on input, and
+    translates newline into return and line-feed on output.  Newline mode
+    is initially on.
     """
 
 def nocbreak() -> None:
@@ -615,8 +635,8 @@ def noecho() -> None:
 def nonl() -> None:
     """Leave newline mode.
 
-    Disable translation of return into newline on input, and disable low-level
-    translation of newline into newline/return on output.
+    Disable translation of return into newline on input, and disable
+    low-level translation of newline into newline/return on output.
     """
 
 def noqiflush() -> None:
@@ -668,8 +688,8 @@ def raw(flag: bool = True, /) -> None:
         If false, the effect is the same as calling noraw().
 
     In raw mode, normal line buffering and processing of interrupt, quit,
-    suspend, and flow control keys are turned off; characters are presented to
-    curses input functions one by one.
+    suspend, and flow control keys are turned off; characters are presented
+    to curses input functions one by one.
     """
 
 def reset_prog_mode() -> None:
@@ -690,10 +710,11 @@ def resize_term(nlines: int, ncols: int, /) -> None:
         Width.
 
     When resizing the windows, resize_term() blank-fills the areas that are
-    extended.  The calling application should fill in these areas with appropriate
-    data.  The resize_term() function attempts to resize all windows.  However,
-    due to the calling convention of pads, it is not possible to resize these
-    without additional interaction with the application.
+    extended.  The calling application should fill in these areas with
+    appropriate data.  The resize_term() function attempts to resize all
+    windows.  However, due to the calling convention of pads, it is not
+    possible to resize these without additional interaction with the
+    application.
     """
 
 def resizeterm(nlines: int, ncols: int, /) -> None:
@@ -704,8 +725,8 @@ def resizeterm(nlines: int, ncols: int, /) -> None:
       ncols
         Width.
 
-    Adjusts other bookkeeping data used by the curses library that record the
-    window dimensions (in particular the SIGWINCH handler).
+    Adjusts other bookkeeping data used by the curses library that record
+    the window dimensions (in particular the SIGWINCH handler).
     """
 
 def savetty() -> None:
@@ -717,9 +738,9 @@ def set_escdelay(ms: int, /) -> None:
       ms
         length of the delay in milliseconds.
 
-    Sets the number of milliseconds to wait after reading an escape character,
-    to distinguish between an individual escape character entered on the
-    keyboard from escape sequences sent by cursor and function keys.
+    Sets the number of milliseconds to wait after reading an escape
+    character, to distinguish between an individual escape character entered
+    on the keyboard from escape sequences sent by cursor and function keys.
     """
 
 def set_tabsize(size: int, /) -> None:
@@ -728,8 +749,8 @@ def set_tabsize(size: int, /) -> None:
       size
         rendered cell width of a tab character.
 
-    Sets the number of columns used by the curses library when converting a tab
-    character to spaces as it adds the tab to a window.
+    Sets the number of columns used by the curses library when converting
+    a tab character to spaces as it adds the tab to a window.
     """
 
 def setsyx(y: int, x: int, /) -> None:
@@ -757,12 +778,12 @@ def setupterm(term: str | None = None, fd: int = -1) -> None:
 def start_color() -> None:
     """Initializes eight basic colors and global variables COLORS and COLOR_PAIRS.
 
-    Must be called if the programmer wants to use colors, and before any other
-    color manipulation routine is called.  It is good practice to call this
-    routine right after initscr().
+    Must be called if the programmer wants to use colors, and before any
+    other color manipulation routine is called.  It is good practice to call
+    this routine right after initscr().
 
-    It also restores the colors on the terminal to the values they had when the
-    terminal was just turned on.
+    It also restores the colors on the terminal to the values they had when
+    the terminal was just turned on.
     """
 
 def termattrs() -> int:
@@ -787,8 +808,8 @@ def tigetnum(capname: str, /) -> int:
       capname
         The terminfo capability name.
 
-    The value -2 is returned if capname is not a numeric capability, or -1 if
-    it is canceled or absent from the terminal description.
+    The value -2 is returned if capname is not a numeric capability, or -1
+    if it is canceled or absent from the terminal description.
     """
 
 def tigetstr(capname: str, /) -> bytes | None:
@@ -797,8 +818,8 @@ def tigetstr(capname: str, /) -> bytes | None:
       capname
         The terminfo capability name.
 
-    None is returned if capname is not a string capability, or is canceled or
-    absent from the terminal description.
+    None is returned if capname is not a string capability, or is canceled
+    or absent from the terminal description.
     """
 
 def tparm(
@@ -848,21 +869,26 @@ def ungetmouse(id: int, x: int, y: int, z: int, bstate: int, /) -> None:
     The following getmouse() will return the given state data.
     """
 
-def update_lines_cols() -> None: ...
+def update_lines_cols() -> None:
+    """Update the LINES and COLS module variables.
+
+    This is useful for detecting manual screen resize.
+    """
+
 def use_default_colors() -> None:
     """Equivalent to assume_default_colors(-1, -1)."""
 
 def use_env(flag: bool, /) -> None:
     """Use environment variables LINES and COLUMNS.
 
-    If used, this function should be called before initscr() or newterm() are
-    called.
+    If used, this function should be called before initscr() or newterm()
+    are called.
 
-    When flag is False, the values of lines and columns specified in the terminfo
-    database will be used, even if environment variables LINES and COLUMNS (used
-    by default) are set, or if curses is running in a window (in which case
-    default behavior would be to use the window size if LINES and COLUMNS are
-    not set).
+    When flag is False, the values of lines and columns specified in the
+    terminfo database will be used, even if environment variables LINES and
+    COLUMNS (used by default) are set, or if curses is running in a window
+    (in which case default behavior would be to use the window size if LINES
+    and COLUMNS are not set).
     """
 
 class error(Exception): ...
@@ -891,9 +917,9 @@ class window:  # undocumented
         By default, the character position and attributes are the
         current settings for the window object.
         """
-
     @overload
     def addch(self, y: int, x: int, ch: _ChType, attr: int = ...) -> None: ...
+
     @overload
     def addnstr(self, str: str, n: int, attr: int = ...) -> None:
         """addnstr([y, x,] str, n, [attr])
@@ -915,9 +941,9 @@ class window:  # undocumented
         By default, the character position and attributes are the
         current settings for the window object.
         """
-
     @overload
     def addnstr(self, y: int, x: int, str: str, n: int, attr: int = ...) -> None: ...
+
     @overload
     def addstr(self, str: str, attr: int = ...) -> None:
         """addstr([y, x,] str, [attr])
@@ -937,9 +963,9 @@ class window:  # undocumented
         By default, the character position and attributes are the
         current settings for the window object.
         """
-
     @overload
     def addstr(self, y: int, x: int, str: str, attr: int = ...) -> None: ...
+
     def attroff(self, attr: int, /) -> None:
         """Remove attribute attr from the "background" set."""
 
@@ -997,10 +1023,10 @@ class window:  # undocumented
           br
             Bottom-right corner.
 
-        Each parameter specifies the character to use for a specific part of the
-        border.  The characters can be specified as integers or as one-character
-        strings.  A 0 value for any parameter will cause the default character to be
-        used for that parameter.
+        Each parameter specifies the character to use for a specific part of
+        the border.  The characters can be specified as integers or as
+        one-character strings.  A 0 value for any parameter will cause the
+        default character to be used for that parameter.
         """
 
     @overload
@@ -1013,12 +1039,13 @@ class window:  # undocumented
           horch
             Top and bottom side.
 
-        Similar to border(), but both ls and rs are verch and both ts and bs are
-        horch.  The default corner characters are always used by this function.
+        Similar to border(), but both ls and rs are verch and both ts and bs
+        are horch.  The default corner characters are always used by this
+        function.
         """
-
     @overload
     def box(self, vertch: _ChType = 0, horch: _ChType = 0) -> None: ...
+
     @overload
     def chgat(self, attr: int) -> None:
         """chgat([y, x,] [n=-1,] attr)
@@ -1040,32 +1067,47 @@ class window:  # undocumented
         the touchline() method so that the contents will be redisplayed by the next
         window refresh.
         """
-
     @overload
     def chgat(self, num: int, attr: int) -> None: ...
     @overload
     def chgat(self, y: int, x: int, attr: int) -> None: ...
     @overload
     def chgat(self, y: int, x: int, num: int, attr: int) -> None: ...
-    def clear(self) -> None: ...
-    def clearok(self, yes: int) -> None: ...
-    def clrtobot(self) -> None: ...
-    def clrtoeol(self) -> None: ...
-    def cursyncup(self) -> None: ...
+
+    def clear(self) -> None:
+        """Clear the window and repaint it completely on the next refresh()."""
+
+    def clearok(self, flag: bool, /) -> None:
+        """Clear the window on the next refresh() if flag is true."""
+
+    def clrtobot(self) -> None:
+        """Erase from the cursor to the end of the window."""
+
+    def clrtoeol(self) -> None:
+        """Erase from the cursor to the end of the line."""
+
+    def cursyncup(self) -> None:
+        """Update the cursor position of all ancestor windows to match."""
+
     @overload
     def delch(self) -> None:
         """delch([y, x])
-        Delete any character at (y, x).
+        Delete the character under the cursor, or at (y, x) if specified.
 
           y
             Y-coordinate.
           x
             X-coordinate.
-        """
 
+        All characters to the right on the same line are shifted one
+        position left.
+        """
     @overload
     def delch(self, y: int, x: int) -> None: ...
-    def deleteln(self) -> None: ...
+
+    def deleteln(self) -> None:
+        """Delete the line under the cursor; move following lines up by one."""
+
     @overload
     def derwin(self, begin_y: int, begin_x: int) -> window:
         """derwin([nlines=0, ncols=0,] begin_y, begin_x)
@@ -1080,13 +1122,13 @@ class window:  # undocumented
           begin_x
             Left side x-coordinate.
 
-        derwin() is the same as calling subwin(), except that begin_y and begin_x
-        are relative to the origin of the window, rather than relative to the entire
-        screen.
+        derwin() is the same as calling subwin(), except that begin_y and
+        begin_x are relative to the origin of the window, rather than
+        relative to the entire screen.
         """
-
     @overload
     def derwin(self, nlines: int, ncols: int, begin_y: int, begin_x: int) -> window: ...
+
     def echochar(self, ch: _ChType, attr: int = 0, /) -> None:
         """Add character ch with attribute attr, and refresh.
 
@@ -1105,8 +1147,12 @@ class window:  # undocumented
           X-coordinate.
         """
 
-    def erase(self) -> None: ...
-    def getbegyx(self) -> tuple[int, int]: ...
+    def erase(self) -> None:
+        """Clear the window."""
+
+    def getbegyx(self) -> tuple[int, int]:
+        """Return a tuple (y, x) of the upper-left corner coordinates."""
+
     def getbkgd(self) -> tuple[int, int]:
         """Return the window's current background character/attribute pair."""
 
@@ -1120,13 +1166,14 @@ class window:  # undocumented
           x
             X-coordinate.
 
-        The integer returned does not have to be in ASCII range: function keys,
-        keypad keys and so on return numbers higher than 256.  In no-delay mode, -1
-        is returned if there is no input, else getch() waits until a key is pressed.
+        The integer returned does not have to be in ASCII range: function
+        keys, keypad keys and so on return numbers higher than 256.  In
+        no-delay mode, -1 is returned if there is no input, else getch()
+        waits until a key is pressed.
         """
-
     @overload
     def getch(self, y: int, x: int) -> int: ...
+
     @overload
     def get_wch(self) -> int | str:
         """get_wch([y, x])
@@ -1140,9 +1187,9 @@ class window:  # undocumented
         Return a character for most keys, or an integer for function keys,
         keypad keys, and other special keys.
         """
-
     @overload
     def get_wch(self, y: int, x: int) -> int | str: ...
+
     @overload
     def getkey(self) -> str:
         """getkey([y, x])
@@ -1153,15 +1200,20 @@ class window:  # undocumented
           x
             X-coordinate.
 
-        Returning a string instead of an integer, as getch() does.  Function keys,
-        keypad keys and other special keys return a multibyte string containing the
-        key name.  In no-delay mode, an exception is raised if there is no input.
+        Returning a string instead of an integer, as getch() does.  Function
+        keys, keypad keys and other special keys return a multibyte string
+        containing the key name.  In no-delay mode, an exception is raised
+        if there is no input.
         """
-
     @overload
     def getkey(self, y: int, x: int) -> str: ...
-    def getmaxyx(self) -> tuple[int, int]: ...
-    def getparyx(self) -> tuple[int, int]: ...
+
+    def getmaxyx(self) -> tuple[int, int]:
+        """Return a tuple (y, x) of the window height and width."""
+
+    def getparyx(self) -> tuple[int, int]:
+        """Return (y, x) relative to the parent window, or (-1, -1) if none."""
+
     @overload
     def getstr(self) -> bytes:
         """getstr([[y, x,] n=2047])
@@ -1174,14 +1226,16 @@ class window:  # undocumented
           n
             Maximal number of characters.
         """
-
     @overload
     def getstr(self, n: int) -> bytes: ...
     @overload
     def getstr(self, y: int, x: int) -> bytes: ...
     @overload
     def getstr(self, y: int, x: int, n: int) -> bytes: ...
-    def getyx(self) -> tuple[int, int]: ...
+
+    def getyx(self) -> tuple[int, int]:
+        """Return a tuple (y, x) of the current cursor position."""
+
     @overload
     def hline(self, ch: _ChType, n: int) -> None:
         """hline([y, x,] ch, n, [attr=_curses.A_NORMAL])
@@ -1198,12 +1252,18 @@ class window:  # undocumented
           attr
             Attributes for the characters.
         """
-
     @overload
     def hline(self, y: int, x: int, ch: _ChType, n: int) -> None: ...
-    def idcok(self, flag: bool) -> None: ...
-    def idlok(self, yes: bool) -> None: ...
-    def immedok(self, flag: bool) -> None: ...
+
+    def idcok(self, flag: bool, /) -> None:
+        """Enable or disable the hardware insert/delete character feature."""
+
+    def idlok(self, flag: bool, /) -> None:
+        """Enable or disable the hardware insert/delete line feature."""
+
+    def immedok(self, flag: bool, /) -> None:
+        """If flag is true, refresh the window on every change to it."""
+
     @overload
     def inch(self) -> int:
         """inch([y, x])
@@ -1214,11 +1274,12 @@ class window:  # undocumented
           x
             X-coordinate.
 
-        The bottom 8 bits are the character proper, and upper bits are the attributes.
+        The bottom 8 bits are the character proper, and upper bits are the
+        attributes.
         """
-
     @overload
     def inch(self, y: int, x: int) -> int: ...
+
     @overload
     def insch(self, ch: _ChType, attr: int = ...) -> None:
         """insch([y, x,] ch, [attr=_curses.A_NORMAL])
@@ -1233,14 +1294,18 @@ class window:  # undocumented
           attr
             Attributes for the character.
 
-        All characters to the right of the cursor are shifted one position right, with
-        the rightmost characters on the line being lost.
+        All characters to the right of the cursor are shifted one position
+        right, with the rightmost characters on the line being lost.
         """
-
     @overload
     def insch(self, y: int, x: int, ch: _ChType, attr: int = ...) -> None: ...
-    def insdelln(self, nlines: int) -> None: ...
-    def insertln(self) -> None: ...
+
+    def insdelln(self, nlines: int, /) -> None:
+        """Insert (nlines > 0) or delete (nlines < 0) lines above the cursor."""
+
+    def insertln(self) -> None:
+        """Insert a blank line under the cursor; move following lines down."""
+
     @overload
     def insnstr(self, str: str, n: int, attr: int = ...) -> None:
         """insnstr([y, x,] str, n, [attr])
@@ -1257,16 +1322,16 @@ class window:  # undocumented
           attr
             Attributes for characters.
 
-        Insert a character string (as many characters as will fit on the line)
-        before the character under the cursor, up to n characters.  If n is zero
-        or negative, the entire string is inserted.  All characters to the right
-        of the cursor are shifted right, with the rightmost characters on the line
-        being lost.  The cursor position does not change (after moving to y, x, if
-        specified).
+        Insert a character string (as many characters as will fit on the
+        line) before the character under the cursor, up to n characters.  If
+        n is zero or negative, the entire string is inserted.  All
+        characters to the right of the cursor are shifted right, with the
+        rightmost characters on the line being lost.  The cursor position
+        does not change (after moving to y, x, if specified).
         """
-
     @overload
     def insnstr(self, y: int, x: int, str: str, n: int, attr: int = ...) -> None: ...
+
     @overload
     def insstr(self, str: str, attr: int = ...) -> None:
         """insstr([y, x,] str, [attr])
@@ -1281,15 +1346,15 @@ class window:  # undocumented
           attr
             Attributes for characters.
 
-        Insert a character string (as many characters as will fit on the line)
-        before the character under the cursor.  All characters to the right of
-        the cursor are shifted right, with the rightmost characters on the line
-        being lost.  The cursor position does not change (after moving to y, x,
-        if specified).
+        Insert a character string (as many characters as will fit on the
+        line) before the character under the cursor.  All characters to the
+        right of the cursor are shifted right, with the rightmost characters
+        on the line being lost.  The cursor position does not change (after
+        moving to y, x, if specified).
         """
-
     @overload
     def insstr(self, y: int, x: int, str: str, attr: int = ...) -> None: ...
+
     @overload
     def instr(self, n: int = 2047) -> bytes:
         """instr([y, x,] n=2047)
@@ -1302,82 +1367,103 @@ class window:  # undocumented
           n
             Maximal number of characters.
 
-        Return a string of characters, extracted from the window starting at the
-        current cursor position, or at y, x if specified.  Attributes are stripped
-        from the characters.  If n is specified, instr() returns a string at most
-        n characters long (exclusive of the trailing NUL).
+        Return a string of characters, extracted from the window starting
+        at the current cursor position, or at y, x if specified, and
+        stopping at the end of the line.  Attributes and color
+        information are stripped from the characters.  If n is specified,
+        instr() returns a string at most n characters long (exclusive of
+        the trailing NUL).
         """
-
     @overload
     def instr(self, y: int, x: int, n: int = 2047) -> bytes: ...
+
     def is_linetouched(self, line: int, /) -> bool:
         """Return True if the specified line was modified, otherwise return False.
 
           line
             Line number.
 
-        Raise a curses.error exception if line is not valid for the given window.
+        Raise a curses.error exception if line is not valid for the given
+        window.
         """
 
-    def is_wintouched(self) -> bool: ...
-    def keypad(self, yes: bool, /) -> None: ...
-    def leaveok(self, yes: bool) -> None: ...
-    def move(self, new_y: int, new_x: int) -> None: ...
-    def mvderwin(self, y: int, x: int) -> None: ...
-    def mvwin(self, new_y: int, new_x: int) -> None: ...
-    def nodelay(self, yes: bool) -> None: ...
-    def notimeout(self, yes: bool) -> None: ...
+    def is_wintouched(self) -> bool:
+        """Return True if the window changed since the last refresh()."""
+
+    def keypad(self, flag: bool, /) -> None:
+        """Interpret escape sequences for special keys if flag is true."""
+
+    def leaveok(self, flag: bool, /) -> None:
+        """If flag is true, leave the cursor where the update leaves it."""
+
+    def move(self, new_y: int, new_x: int, /) -> None:
+        """Move the cursor to (new_y, new_x)."""
+
+    def mvderwin(self, y: int, x: int, /) -> None:
+        """Move the window inside its parent window."""
+
+    def mvwin(self, new_y: int, new_x: int, /) -> None:
+        """Move the window so its upper-left corner is at (new_y, new_x)."""
+
+    def nodelay(self, flag: bool, /) -> None:
+        """If flag is true, getch() becomes non-blocking."""
+
+    def notimeout(self, flag: bool, /) -> None:
+        """If flag is true, do not time out escape sequences."""
+
     @overload
     def noutrefresh(self) -> None:
         """noutrefresh([pminrow, pmincol, sminrow, smincol, smaxrow, smaxcol])
         Mark for refresh but wait.
 
-        This function updates the data structure representing the desired state of the
-        window, but does not force an update of the physical screen.  To accomplish
-        that, call doupdate().
+        This function updates the data structure representing the desired
+        state of the window, but does not force an update of the physical
+        screen.  To accomplish that, call doupdate().
         """
-
     @overload
     def noutrefresh(self, pminrow: int, pmincol: int, sminrow: int, smincol: int, smaxrow: int, smaxcol: int) -> None: ...
+
     @overload
     def overlay(self, destwin: window) -> None:
         """overlay(destwin, [sminrow, smincol, dminrow, dmincol, dmaxrow, dmaxcol])
         Overlay the window on top of destwin.
 
-        The windows need not be the same size, only the overlapping region is copied.
-        This copy is non-destructive, which means that the current background
-        character does not overwrite the old contents of destwin.
+        The windows need not be the same size, only the overlapping region
+        is copied.  This copy is non-destructive, which means that the
+        current background character does not overwrite the old contents of
+        destwin.
 
-        To get fine-grained control over the copied region, the second form of
-        overlay() can be used.  sminrow and smincol are the upper-left coordinates
-        of the source window, and the other variables mark a rectangle in the
-        destination window.
+        To get fine-grained control over the copied region, the second form
+        of overlay() can be used.  sminrow and smincol are the upper-left
+        coordinates of the source window, and the other variables mark
+        a rectangle in the destination window.
         """
-
     @overload
     def overlay(
         self, destwin: window, sminrow: int, smincol: int, dminrow: int, dmincol: int, dmaxrow: int, dmaxcol: int
     ) -> None: ...
+
     @overload
     def overwrite(self, destwin: window) -> None:
         """overwrite(destwin, [sminrow, smincol, dminrow, dmincol, dmaxrow,
                   dmaxcol])
         Overwrite the window on top of destwin.
 
-        The windows need not be the same size, in which case only the overlapping
-        region is copied.  This copy is destructive, which means that the current
-        background character overwrites the old contents of destwin.
+        The windows need not be the same size, in which case only the
+        overlapping region is copied.  This copy is destructive, which means
+        that the current background character overwrites the old contents of
+        destwin.
 
-        To get fine-grained control over the copied region, the second form of
-        overwrite() can be used. sminrow and smincol are the upper-left coordinates
-        of the source window, the other variables mark a rectangle in the destination
-        window.
+        To get fine-grained control over the copied region, the second form
+        of overwrite() can be used. sminrow and smincol are the upper-left
+        coordinates of the source window, the other variables mark
+        a rectangle in the destination window.
         """
-
     @overload
     def overwrite(
         self, destwin: window, sminrow: int, smincol: int, dminrow: int, dmincol: int, dmaxrow: int, dmaxcol: int
     ) -> None: ...
+
     def putwin(self, file: SupportsWrite[bytes], /) -> None:
         """Write all data associated with the window into the provided file object.
 
@@ -1395,28 +1481,33 @@ class window:  # undocumented
         They should be completely redrawn on the next refresh() call.
         """
 
-    def redrawwin(self) -> None: ...
+    def redrawwin(self) -> None:
+        """Mark the entire window for redraw on the next refresh()."""
+
     @overload
     def refresh(self) -> None:
         """refresh([pminrow, pmincol, sminrow, smincol, smaxrow, smaxcol])
         Update the display immediately.
 
         Synchronize actual screen with previous drawing/deleting methods.
-        The 6 optional arguments can only be specified when the window is a pad
-        created with newpad().  The additional parameters are needed to indicate
-        what part of the pad and screen are involved.  pminrow and pmincol specify
-        the upper left-hand corner of the rectangle to be displayed in the pad.
-        sminrow, smincol, smaxrow, and smaxcol specify the edges of the rectangle to
-        be displayed on the screen.  The lower right-hand corner of the rectangle to
-        be displayed in the pad is calculated from the screen coordinates, since the
-        rectangles must be the same size.  Both rectangles must be entirely contained
-        within their respective structures.  Negative values of pminrow, pmincol,
-        sminrow, or smincol are treated as if they were zero.
+        The 6 optional arguments can only be specified when the window is
+        a pad created with newpad().  The additional parameters are needed
+        to indicate what part of the pad and screen are involved.  pminrow
+        and pmincol specify the upper left-hand corner of the rectangle to
+        be displayed in the pad.  sminrow, smincol, smaxrow, and smaxcol
+        specify the edges of the rectangle to be displayed on the screen.
+        The lower right-hand corner of the rectangle to be displayed in the
+        pad is calculated from the screen coordinates, since the rectangles
+        must be the same size.  Both rectangles must be entirely contained
+        within their respective structures.  Negative values of pminrow,
+        pmincol, sminrow, or smincol are treated as if they were zero.
         """
-
     @overload
     def refresh(self, pminrow: int, pmincol: int, sminrow: int, smincol: int, smaxrow: int, smaxcol: int) -> None: ...
-    def resize(self, nlines: int, ncols: int) -> None: ...
+
+    def resize(self, nlines: int, ncols: int, /) -> None:
+        """Resize the window to nlines rows and ncols columns."""
+
     def scroll(self, lines: int = 1) -> None:
         """scroll([lines=1])
         Scroll the screen or scrolling region.
@@ -1424,10 +1515,13 @@ class window:  # undocumented
           lines
             Number of lines to scroll.
 
-        Scroll upward if the argument is positive and downward if it is negative.
+        Scroll upward if the argument is positive and downward if it is
+        negative.
         """
 
-    def scrollok(self, flag: bool) -> None: ...
+    def scrollok(self, flag: bool, /) -> None:
+        """Control whether the window scrolls when the cursor moves off it."""
+
     def setscrreg(self, top: int, bottom: int, /) -> None:
         """Define a software scrolling region.
 
@@ -1439,8 +1533,12 @@ class window:  # undocumented
         All scrolling actions will take place in this region.
         """
 
-    def standend(self) -> None: ...
-    def standout(self) -> None: ...
+    def standend(self) -> None:
+        """Turn off the standout attribute."""
+
+    def standout(self) -> None:
+        """Turn on the A_STANDOUT attribute."""
+
     @overload
     def subpad(self, begin_y: int, begin_x: int) -> window:
         """subwin([nlines=0, ncols=0,] begin_y, begin_x)
@@ -1455,12 +1553,12 @@ class window:  # undocumented
           begin_x
             Left side x-coordinate.
 
-        By default, the sub-window will extend from the specified position to the
-        lower right corner of the window.
+        By default, the sub-window will extend from the specified position
+        to the lower right corner of the window.
         """
-
     @overload
     def subpad(self, nlines: int, ncols: int, begin_y: int, begin_x: int) -> window: ...
+
     @overload
     def subwin(self, begin_y: int, begin_x: int) -> window:
         """subwin([nlines=0, ncols=0,] begin_y, begin_x)
@@ -1475,26 +1573,39 @@ class window:  # undocumented
           begin_x
             Left side x-coordinate.
 
-        By default, the sub-window will extend from the specified position to the
-        lower right corner of the window.
+        By default, the sub-window will extend from the specified position
+        to the lower right corner of the window.
         """
-
     @overload
     def subwin(self, nlines: int, ncols: int, begin_y: int, begin_x: int) -> window: ...
-    def syncdown(self) -> None: ...
-    def syncok(self, flag: bool) -> None: ...
-    def syncup(self) -> None: ...
-    def timeout(self, delay: int) -> None: ...
+
+    def syncdown(self) -> None:
+        """Touch each location changed in any ancestor of the window."""
+
+    def syncok(self, flag: bool, /) -> None:
+        """If flag is true, call syncup() on every change to the window."""
+
+    def syncup(self) -> None:
+        """Touch locations in ancestors that changed in this window."""
+
+    def timeout(self, delay: int, /) -> None:
+        """Set blocking or non-blocking read behavior for the window."""
+
     def touchline(self, start: int, count: int, changed: bool = True) -> None:
         """touchline(start, count, [changed=True])
         Pretend count lines have been changed, starting with line start.
 
-        If changed is supplied, it specifies whether the affected lines are marked
-        as having been changed (changed=True) or unchanged (changed=False).
+        If changed is supplied, it specifies whether the affected lines are
+        marked as having been changed (changed=True) or unchanged
+        (changed=False).
         """
 
-    def touchwin(self) -> None: ...
-    def untouchwin(self) -> None: ...
+    def touchwin(self) -> None:
+        """Mark the whole window as changed."""
+
+    def untouchwin(self) -> None:
+        """Mark all lines in the window as unchanged since last refresh()."""
+
     @overload
     def vline(self, ch: _ChType, n: int) -> None:
         """vline([y, x,] ch, n, [attr=_curses.A_NORMAL])
@@ -1511,7 +1622,6 @@ class window:  # undocumented
           attr
             Attributes for the character.
         """
-
     @overload
     def vline(self, y: int, x: int, ch: _ChType, n: int) -> None: ...
 

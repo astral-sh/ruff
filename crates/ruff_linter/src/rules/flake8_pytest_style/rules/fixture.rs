@@ -6,7 +6,6 @@ use ruff_python_ast::name::UnqualifiedName;
 use ruff_python_ast::visitor;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{self as ast, Expr, Parameters, Stmt};
-use ruff_python_semantic::SemanticModel;
 use ruff_python_semantic::analyze::visibility::is_abstract;
 use ruff_source_file::LineRanges;
 use ruff_text_size::Ranged;
@@ -692,12 +691,10 @@ impl<'a> Visitor<'a> for SkipFunctionsVisitor<'a> {
     }
 }
 
-fn fixture_decorator<'a>(
-    decorators: &'a [Decorator],
-    semantic: &SemanticModel,
-) -> Option<&'a Decorator> {
+fn fixture_decorator<'a>(decorators: &'a [Decorator], checker: &Checker) -> Option<&'a Decorator> {
     decorators.iter().find(|decorator| {
-        is_pytest_fixture(decorator, semantic) || is_pytest_yield_fixture(decorator, semantic)
+        is_pytest_fixture(decorator, checker)
+            || is_pytest_yield_fixture(decorator, checker.semantic())
     })
 }
 
@@ -963,7 +960,7 @@ pub(crate) fn fixture(
     decorators: &[Decorator],
     body: &[Stmt],
 ) {
-    let decorator = fixture_decorator(decorators, checker.semantic());
+    let decorator = fixture_decorator(decorators, checker);
     if let Some(decorator) = decorator {
         if checker.is_rule_enabled(Rule::PytestFixtureIncorrectParenthesesStyle)
             || checker.is_rule_enabled(Rule::PytestFixturePositionalArgs)

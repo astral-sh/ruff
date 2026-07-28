@@ -2,8 +2,7 @@
 
 import sys
 import termios
-from typing import IO, Final
-from typing_extensions import TypeAlias
+from typing import IO, Final, TypeAlias
 
 if sys.platform != "win32":
     __all__ = ["setraw", "setcbreak"]
@@ -29,6 +28,7 @@ if sys.platform != "win32":
 
     def setcbreak(fd: _FD, when: int = 2) -> _ModeSetterReturn:
         """Put terminal into cbreak mode."""
+
     if sys.version_info >= (3, 12):
         def cfmakeraw(mode: termios._Attr) -> None:
             """Make termios mode raw."""

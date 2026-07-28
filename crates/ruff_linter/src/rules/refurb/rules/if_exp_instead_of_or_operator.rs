@@ -46,7 +46,7 @@ use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 pub(crate) struct IfExpInsteadOfOrOperator;
 
 impl Violation for IfExpInsteadOfOrOperator {
-    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Always;
 
     #[derive_message_formats]
     fn message(&self) -> String {

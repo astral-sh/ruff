@@ -45,8 +45,19 @@ tuple_with_typevar = ("foo", TypeVar("W"))
 ```py
 from typing import TypeVar
 
-# error: [invalid-legacy-type-variable]
+# error: [mismatched-type-name]
 T = TypeVar("Q")
+```
+
+## Must not be redefined
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+
+# error: [invalid-legacy-type-variable]
+T = TypeVar("T")
 ```
 
 ## No variadic arguments

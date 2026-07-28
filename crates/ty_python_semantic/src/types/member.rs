@@ -3,12 +3,12 @@ use crate::place::{
     ConsideredDefinitions, DefinedPlace, Place, PlaceAndQualifiers, RequiresExplicitReExport,
     place_by_id, place_from_bindings,
 };
-use crate::semantic_index::{place_table, scope::ScopeId, use_def_map};
 use crate::types::Type;
+use ty_python_core::{place_table, scope::ScopeId, use_def_map};
 
 /// The return type of certain member-lookup operations. Contains information
 /// about the type, type qualifiers, boundness/declaredness.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, salsa::Update, get_size2::GetSize, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, get_size2::GetSize, Default, salsa::SalsaValue)]
 pub(super) struct Member<'db> {
     /// Type, qualifiers, and boundness information of this member
     pub(super) inner: PlaceAndQualifiers<'db>,
@@ -73,7 +73,12 @@ pub(super) fn class_member<'db>(db: &'db dyn Db, scope: ScopeId<'db>, name: &str
             }
 
             if let PlaceAndQualifiers {
-                place: Place::Defined(DefinedPlace { ty, .. }),
+                place:
+                    Place::Defined(DefinedPlace {
+                        ty,
+                        provenance: declared_provenance,
+                        ..
+                    }),
                 qualifiers,
             } = place_and_quals
             {
@@ -87,9 +92,12 @@ pub(super) fn class_member<'db>(db: &'db dyn Db, scope: ScopeId<'db>, name: &str
                 Member {
                     inner: match inferred {
                         Place::Undefined => Place::Undefined.with_qualifiers(qualifiers),
-                        Place::Defined(place) => {
-                            Place::Defined(DefinedPlace { ty, ..place }).with_qualifiers(qualifiers)
-                        }
+                        Place::Defined(place) => Place::Defined(DefinedPlace {
+                            ty,
+                            provenance: place.provenance.or(declared_provenance),
+                            ..place
+                        })
+                        .with_qualifiers(qualifiers),
                     },
                 }
             } else {

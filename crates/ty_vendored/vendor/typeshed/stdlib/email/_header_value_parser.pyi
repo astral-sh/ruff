@@ -86,21 +86,20 @@ TOKEN_ENDS: Final[set[str]]
 ASPECIALS: Final[set[str]]
 ATTRIBUTE_ENDS: Final[set[str]]
 EXTENDED_ATTRIBUTE_ENDS: Final[set[str]]
-# Added in Python 3.9.20, 3.10.15, 3.11.10, 3.12.5
+# Added in Python 3.10.15, 3.11.10, 3.12.5
 NLSET: Final[set[str]]
-# Added in Python 3.9.20, 3.10.15, 3.11.10, 3.12.5
+# Added in Python 3.10.15, 3.11.10, 3.12.5
 SPECIALSNL: Final[set[str]]
 
-# Added in Python 3.9.23, 3.10.17, 3.11.12, 3.12.9, 3.13.2
+# Added in Python 3.10.17, 3.11.12, 3.12.9, 3.13.2
 def make_quoted_pairs(value: Any) -> str:
     """Escape dquote and backslash for use within a quoted-string."""
 
 def quote_string(value: Any) -> str: ...
 
-if sys.version_info >= (3, 13):
-    # Added in Python 3.13.12, 3.14.3
-    def make_parenthesis_pairs(value: Any) -> str:
-        """Escape parenthesis and backslash for use within a comment."""
+# Added in Python 3.10.20, 3.11.15, 3.12.13, 3.13.12, 3.14.3
+def make_parenthesis_pairs(value: Any) -> str:
+    """Escape parenthesis and backslash for use within a comment."""
 
 rfc2047_matcher: Final[Pattern[str]]
 

@@ -1,13 +1,16 @@
 use crate::Db;
 use crate::db::tests::TestDb;
-use crate::place::{builtins_symbol, known_module_symbol};
+use crate::place::{DefinedPlace, Place, builtins_symbol, global_symbol, known_module_symbol};
 use crate::types::enums::is_single_member_enum;
+use crate::types::known_instance::KnownInstanceType;
 use crate::types::tuple::TupleType;
 use crate::types::{
-    BoundMethodType, EnumLiteralType, IntersectionBuilder, IntersectionType, KnownClass, Parameter,
-    Parameters, Signature, SpecialFormType, SubclassOfType, Type, UnionType,
+    ApplyTypeMappingVisitor, BoundMethodType, EnumLiteralType, IntersectionBuilder,
+    IntersectionType, KnownClass, MaterializationKind, Parameter, Parameters, Signature,
+    SpecialFormType, SubclassOfType, Type, UnionType,
 };
 use quickcheck::{Arbitrary, Gen};
+use ruff_db::files::system_path_to_file;
 use ruff_python_ast::name::Name;
 use rustc_hash::FxHashSet;
 use ty_module_resolver::KnownModule;
@@ -20,6 +23,9 @@ use ty_module_resolver::KnownModule;
 pub(crate) enum Ty {
     Never,
     Unknown,
+    Divergent,
+    TopDivergent,
+    BottomDivergent,
     None,
     Any,
     IntLiteral(i64),
@@ -65,6 +71,16 @@ pub(crate) enum Ty {
     /// where the class has `Any` in its MRO
     UnittestMockInstance,
     UnittestMockLiteral,
+    /// Instances of various `NewType`s that we construct in `setup.rs`.
+    /// `FloatNewType` and `ComplexNewType` are interesting because they are the only
+    /// kinds of `NewType`s that can have unions as their concrete base types.
+    IntNewtypeInstance,
+    StrNewtypeInstance,
+    FloatNewtypeInstance,
+    ComplexNewtypeInstance,
+    SubNewTypeOfIntInstance,
+    SubSubNewTypeOfIntInstance,
+    SubNewTypeOfFloatInstance,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -77,7 +93,7 @@ impl CallableParams {
     pub(crate) fn into_parameters(self, db: &TestDb) -> Parameters<'_> {
         match self {
             CallableParams::GradualForm => Parameters::gradual_form(),
-            CallableParams::List(params) => Parameters::new(
+            CallableParams::List(params) => Parameters::from_annotation(
                 db,
                 params.into_iter().map(|param| {
                     let parameter = match param.kind {
@@ -117,7 +133,7 @@ enum ParamKind {
     KeywordVariadic,
 }
 
-#[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
+#[salsa::tracked(returns(copy), heap_size=ruff_memory_usage::heap_size)]
 fn create_bound_method<'db>(
     db: &'db dyn Db,
     function: Type<'db>,
@@ -126,7 +142,7 @@ fn create_bound_method<'db>(
     Type::BoundMethod(BoundMethodType::new(
         db,
         function.expect_function_literal(),
-        builtins_class.to_instance(db).unwrap(),
+        builtins_class.to_instance_approximation(db).unwrap(),
     ))
 }
 
@@ -135,6 +151,9 @@ impl Ty {
         match self {
             Ty::Never => Type::Never,
             Ty::Unknown => Type::unknown(),
+            Ty::Divergent => divergent(db, 1, None),
+            Ty::TopDivergent => divergent(db, 2, Some(MaterializationKind::Top)),
+            Ty::BottomDivergent => divergent(db, 3, Some(MaterializationKind::Bottom)),
             Ty::None => Type::none(db),
             Ty::Any => Type::any(),
             Ty::IntLiteral(n) => Type::int_literal(n),
@@ -142,14 +161,15 @@ impl Ty {
             Ty::BooleanLiteral(b) => Type::bool_literal(b),
             Ty::LiteralString => Type::literal_string(),
             Ty::BytesLiteral(s) => Type::bytes_literal(db, s.as_bytes()),
-            Ty::EnumLiteral(name) => Type::enum_literal(EnumLiteralType::new(
-                db,
-                known_module_symbol(db, KnownModule::Uuid, "SafeUUID")
+            Ty::EnumLiteral(name) => {
+                let enum_class = known_module_symbol(db, KnownModule::Uuid, "SafeUUID")
                     .place
                     .expect_type()
-                    .expect_class_literal(),
-                Name::new(name),
-            )),
+                    .expect_class_literal()
+                    .into_enum_class(db)
+                    .expect("`uuid.SafeUUID` is an enum");
+                Type::enum_literal(EnumLiteralType::new(db, enum_class, Name::new(name)))
+            }
             Ty::SingleMemberEnumLiteral => {
                 let ty = known_module_symbol(db, KnownModule::Dataclasses, "MISSING")
                     .place
@@ -162,12 +182,12 @@ impl Ty {
             Ty::BuiltinInstance(s) => builtins_symbol(db, s)
                 .place
                 .expect_type()
-                .to_instance(db)
+                .to_instance_approximation(db)
                 .unwrap(),
             Ty::AbcInstance(s) => known_module_symbol(db, KnownModule::Abc, s)
                 .place
                 .expect_type()
-                .to_instance(db)
+                .to_instance_approximation(db)
                 .unwrap(),
             Ty::AbcClassLiteral(s) => known_module_symbol(db, KnownModule::Abc, s)
                 .place
@@ -177,7 +197,7 @@ impl Ty {
                 .expect_type(),
             Ty::UnittestMockInstance => Ty::UnittestMockLiteral
                 .into_type(db)
-                .to_instance(db)
+                .to_instance_approximation(db)
                 .unwrap(),
             Ty::TypingLiteral => Type::SpecialForm(SpecialFormType::Literal),
             Ty::BuiltinClassLiteral(s) => builtins_symbol(db, s).place.expect_type(),
@@ -188,10 +208,10 @@ impl Ty {
             Ty::Intersection { pos, neg } => {
                 let mut builder = IntersectionBuilder::new(db);
                 for p in pos {
-                    builder = builder.add_positive(p.into_type(db));
+                    builder.add_positive_in_place(p.into_type(db));
                 }
                 for n in neg {
-                    builder = builder.add_negative(n.into_type(db));
+                    builder.add_negative_in_place(n.into_type(db));
                 }
                 builder.build()
             }
@@ -235,7 +255,41 @@ impl Ty {
                 db,
                 Signature::new(params.into_parameters(db), returns.into_type(db)),
             ),
+            Ty::FloatNewtypeInstance => newtype_instance(db, "NewTypeOfFloat"),
+            Ty::IntNewtypeInstance => newtype_instance(db, "NewTypeOfInt"),
+            Ty::StrNewtypeInstance => newtype_instance(db, "NewTypeOfStr"),
+            Ty::ComplexNewtypeInstance => newtype_instance(db, "NewTypeOfComplex"),
+            Ty::SubNewTypeOfIntInstance => newtype_instance(db, "SubNewTypeOfInt"),
+            Ty::SubSubNewTypeOfIntInstance => newtype_instance(db, "SubSubNewTypeOfInt"),
+            Ty::SubNewTypeOfFloatInstance => newtype_instance(db, "SubNewTypeOfFloat"),
         }
+    }
+}
+
+fn divergent(db: &TestDb, id_bits: u64, materialization: Option<MaterializationKind>) -> Type<'_> {
+    let divergent = Type::divergent(salsa::plumbing::Id::from_bits(id_bits));
+
+    match materialization {
+        Some(materialization_kind) => divergent.materialize(
+            db,
+            materialization_kind,
+            &ApplyTypeMappingVisitor::default(),
+        ),
+        None => divergent,
+    }
+}
+
+fn newtype_instance<'db>(db: &'db dyn Db, name: &str) -> Type<'db> {
+    let file = system_path_to_file(db, super::setup::PROPERTY_TEST_MODULE_PATH)
+        .expect("Property-test module must exist");
+    let Place::Defined(DefinedPlace { ty, .. }) = global_symbol(db, file, name).place else {
+        panic!(
+            "Expected a global symbol for `{name}` in the property test module, but it was not found"
+        );
+    };
+    match ty {
+        Type::KnownInstance(KnownInstanceType::NewType(newtype)) => Type::NewTypeInstance(newtype),
+        _ => panic!("Expected NewType symbol for `{name}`, got {ty:?}"),
     }
 }
 
@@ -255,10 +309,13 @@ fn arbitrary_core_type(g: &mut Gen, fully_static: bool) -> Ty {
     let bool_lit = Ty::BooleanLiteral(bool::arbitrary(g));
 
     // Update this if new non-fully-static types are added below.
-    let fully_static_index = 5;
+    let fully_static_index = 8;
     let types = &[
         Ty::Any,
         Ty::Unknown,
+        Ty::Divergent,
+        Ty::TopDivergent,
+        Ty::BottomDivergent,
         Ty::SubclassOfAny,
         Ty::UnittestMockLiteral,
         Ty::UnittestMockInstance,
@@ -280,6 +337,8 @@ fn arbitrary_core_type(g: &mut Gen, fully_static: bool) -> Ty {
         Ty::KnownClassInstance(KnownClass::Object),
         Ty::KnownClassInstance(KnownClass::Str),
         Ty::KnownClassInstance(KnownClass::Int),
+        Ty::KnownClassInstance(KnownClass::Float),
+        Ty::KnownClassInstance(KnownClass::Complex),
         Ty::KnownClassInstance(KnownClass::Bool),
         Ty::KnownClassInstance(KnownClass::FunctionType),
         Ty::KnownClassInstance(KnownClass::SpecialForm),
@@ -313,6 +372,13 @@ fn arbitrary_core_type(g: &mut Gen, fully_static: bool) -> Ty {
             class: "int",
             method: "bit_length",
         },
+        Ty::IntNewtypeInstance,
+        Ty::StrNewtypeInstance,
+        Ty::FloatNewtypeInstance,
+        Ty::ComplexNewtypeInstance,
+        Ty::SubNewTypeOfIntInstance,
+        Ty::SubSubNewTypeOfIntInstance,
+        Ty::SubNewTypeOfFloatInstance,
     ];
     let types = if fully_static {
         &types[fully_static_index..]
@@ -439,11 +505,7 @@ fn arbitrary_parameter_list(g: &mut Gen, size: u32, fully_static: bool) -> Vec<P
 }
 
 fn arbitrary_optional_type(g: &mut Gen, size: u32, fully_static: bool) -> Option<Ty> {
-    match u32::arbitrary(g) % 2 {
-        0 => None,
-        1 => Some(arbitrary_type(g, size, fully_static)),
-        _ => unreachable!(),
-    }
+    bool::arbitrary(g).then(|| arbitrary_type(g, size, fully_static))
 }
 
 fn arbitrary_name(g: &mut Gen) -> Name {
@@ -451,11 +513,7 @@ fn arbitrary_name(g: &mut Gen) -> Name {
 }
 
 fn arbitrary_optional_name(g: &mut Gen) -> Option<Name> {
-    match u32::arbitrary(g) % 2 {
-        0 => None,
-        1 => Some(arbitrary_name(g)),
-        _ => unreachable!(),
-    }
+    bool::arbitrary(g).then(|| arbitrary_name(g))
 }
 
 impl Arbitrary for Ty {

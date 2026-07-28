@@ -128,9 +128,9 @@ class Charset:
         string using the ascii codec produces the correct string version
         of the content.
         """
-
     @overload
     def body_encode(self, string: str | bytes) -> str: ...
+
     __hash__: ClassVar[None]  # type: ignore[assignment]
     def __eq__(self, other: object) -> bool: ...
     def __ne__(self, value: object, /) -> bool: ...

@@ -16,8 +16,8 @@ from ssl import (
     SSLWantWriteError as SSLWantWriteError,
     SSLZeroReturnError as SSLZeroReturnError,
 )
-from typing import Any, ClassVar, Final, Literal, TypedDict, final, overload, type_check_only
-from typing_extensions import NotRequired, Self, TypeAlias, deprecated, disjoint_base
+from typing import Any, ClassVar, Final, Literal, TypeAlias, TypedDict, final, overload, type_check_only
+from typing_extensions import NotRequired, Self, deprecated, disjoint_base
 
 _PasswordType: TypeAlias = Callable[[], str | bytes | bytearray] | str | bytes | bytearray
 _PCTRTT: TypeAlias = tuple[tuple[str, str], ...]
@@ -70,14 +70,11 @@ if sys.version_info < (3, 12):
         if the bytes generated are cryptographically strong.
         """
 
-if sys.version_info < (3, 10):
-    def RAND_egd(path: str) -> None: ...
-
 def RAND_status() -> bool:
     """Returns True if the OpenSSL PRNG has been seeded with enough data and False if not.
 
-    It is necessary to seed the PRNG with RAND_add() on some platforms before
-    using the ssl() function.
+    It is necessary to seed the PRNG with RAND_add() on some platforms
+    before using the ssl() function.
     """
 
 def get_default_verify_paths() -> tuple[str, str, str, str]:
@@ -86,16 +83,19 @@ def get_default_verify_paths() -> tuple[str, str, str, str]:
     The values are 'cert_file_env', 'cert_file', 'cert_dir_env', 'cert_dir'.
     """
 
+if sys.version_info >= (3, 15):
+    def get_sigalgs() -> list[str]: ...
+
 if sys.platform == "win32":
     _EnumRetType: TypeAlias = list[tuple[bytes, str, set[str] | bool]]
     def enum_certificates(store_name: str) -> _EnumRetType:
         """Retrieve certificates from Windows' cert store.
 
-        store_name may be one of 'CA', 'ROOT' or 'MY'.  The system may provide
-        more cert storages, too.  The function returns a list of (bytes,
-        encoding_type, trust) tuples.  The encoding_type flag can be interpreted
-        with X509_ASN_ENCODING or PKCS_7_ASN_ENCODING. The trust setting is either
-        a set of OIDs or the boolean True.
+        store_name may be one of 'CA', 'ROOT' or 'MY'.  The system may
+        provide more cert storages, too.  The function returns a list of
+        (bytes, encoding_type, trust) tuples.  The encoding_type flag can be
+        interpreted with X509_ASN_ENCODING or PKCS_7_ASN_ENCODING.  The
+        trust setting is either a set of OIDs or the boolean True.
         """
 
     def enum_crls(store_name: str) -> _EnumRetType:
@@ -129,15 +129,15 @@ class _SSLContext:
     options: int
     post_handshake_auth: bool
     protocol: int
-    if sys.version_info >= (3, 10):
-        security_level: int
-        """The current security level."""
+    security_level: int
+    """The current security level."""
 
     sni_callback: Callable[[SSLObject, str, SSLContext], None | int] | None
     """Set a callback that will be called when a server name is provided by the SSL/TLS client in the SNI extension.
 
-    If the argument is None then the callback is disabled. The method is called
-    with the SSLSocket, the server name as a string, and the SSLContext object.
+    If the argument is None then the callback is disabled.  The method
+    is called with the SSLSocket, the server name as a string, and the
+    SSLContext object.
 
     See RFC 6066 for details of the SNI extension.
     """
@@ -148,28 +148,28 @@ class _SSLContext:
     def cert_store_stats(self) -> dict[str, int]:
         """Returns quantities of loaded X.509 certificates.
 
-        X.509 certificates with a CA extension and certificate revocation lists
-        inside the context's cert store.
+        X.509 certificates with a CA extension and certificate revocation
+        lists inside the context's cert store.
 
-        NOTE: Certificates in a capath directory aren't loaded unless they have
-        been used at least once.
+        NOTE: Certificates in a capath directory aren't loaded unless they
+        have been used at least once.
         """
 
     @overload
     def get_ca_certs(self, binary_form: Literal[False] = False) -> list[_PeerCertRetDictType]:
         """Returns a list of dicts with information of loaded CA certs.
 
-        If the optional argument is True, returns a DER-encoded copy of the CA
-        certificate.
+        If the optional argument is True, returns a DER-encoded copy of the
+        CA certificate.
 
-        NOTE: Certificates in a capath directory aren't loaded unless they have
-        been used at least once.
+        NOTE: Certificates in a capath directory aren't loaded unless they
+        have been used at least once.
         """
-
     @overload
     def get_ca_certs(self, binary_form: Literal[True]) -> list[bytes]: ...
     @overload
     def get_ca_certs(self, binary_form: bool = False) -> Any: ...
+
     def get_ciphers(self) -> list[_Cipher]: ...
     def load_cert_chain(
         self, certfile: StrOrBytesPath, keyfile: StrOrBytesPath | None = None, password: _PasswordType | None = None
@@ -185,6 +185,12 @@ class _SSLContext:
     def set_ciphers(self, cipherlist: str, /) -> None: ...
     def set_default_verify_paths(self) -> None: ...
     def set_ecdh_curve(self, name: str, /) -> None: ...
+    if sys.version_info >= (3, 15):
+        def get_groups(self, *, include_aliases: bool = False) -> list[str]: ...
+        def set_ciphersuites(self, ciphersuites: str, /) -> None: ...
+        def set_client_sigalgs(self, sigalgslist: str, /) -> None: ...
+        def set_groups(self, grouplist: str, /) -> None: ...
+        def set_server_sigalgs(self, sigalgslist: str, /) -> None: ...
     if sys.version_info >= (3, 13):
         def set_psk_client_callback(self, callback: Callable[[str | None], tuple[str | None, bytes]] | None) -> None: ...
         def set_psk_server_callback(
@@ -254,18 +260,18 @@ class SSLSession:
 #
 # You can find a _ssl._SSLSocket object as the _sslobj attribute of a ssl.SSLSocket object
 
-if sys.version_info >= (3, 10):
-    @final
-    class Certificate:
-        def get_info(self) -> _CertInfo: ...
-        @overload
-        def public_bytes(self) -> str: ...
-        @overload
-        def public_bytes(self, format: Literal[1] = 1, /) -> str: ...  # ENCODING_PEM
-        @overload
-        def public_bytes(self, format: Literal[2], /) -> bytes: ...  # ENCODING_DER
-        @overload
-        def public_bytes(self, format: int, /) -> str | bytes: ...
+@final
+class Certificate:
+    def get_info(self) -> _CertInfo: ...
+
+    @overload
+    def public_bytes(self) -> str: ...
+    @overload
+    def public_bytes(self, format: Literal[1] = 1, /) -> str: ...  # ENCODING_PEM
+    @overload
+    def public_bytes(self, format: Literal[2], /) -> bytes: ...  # ENCODING_DER
+    @overload
+    def public_bytes(self, format: int, /) -> str | bytes: ...
 
 if sys.version_info < (3, 12):
     err_codes_to_names: dict[tuple[int, int], str]
@@ -292,13 +298,12 @@ CERT_REQUIRED: Final = 2
 
 # verify flags
 VERIFY_DEFAULT: Final = 0
-VERIFY_CRL_CHECK_LEAF: Final = 0x4
-VERIFY_CRL_CHECK_CHAIN: Final = 0x8
+VERIFY_CRL_CHECK_LEAF: Final = 0x04
+VERIFY_CRL_CHECK_CHAIN: Final = 0x0C
 VERIFY_X509_STRICT: Final = 0x20
 VERIFY_X509_TRUSTED_FIRST: Final = 0x8000
-if sys.version_info >= (3, 10):
-    VERIFY_ALLOW_PROXY_CERTS: Final = 0x40
-    VERIFY_X509_PARTIAL_CHAIN: Final = 0x80000
+VERIFY_ALLOW_PROXY_CERTS: Final = 0x40
+VERIFY_X509_PARTIAL_CHAIN: Final = 0x80000
 
 # alert descriptions
 ALERT_DESCRIPTION_CLOSE_NOTIFY: Final = 0
@@ -339,7 +344,7 @@ PROTOCOL_TLSv1_1: Final = 4
 PROTOCOL_TLSv1_2: Final = 5
 
 # protocol options
-OP_ALL: Final = 0x80000050
+OP_ALL: Final[int]
 OP_NO_SSLv2: Final = 0x0
 OP_NO_SSLv3: Final = 0x2000000
 OP_NO_TLSv1: Final = 0x4000000
@@ -367,10 +372,9 @@ HOSTFLAG_NO_PARTIAL_WILDCARDS: Final = 0x4
 HOSTFLAG_MULTI_LABEL_WILDCARDS: Final = 0x8
 HOSTFLAG_SINGLE_LABEL_SUBDOMAINS: Final = 0x10
 
-if sys.version_info >= (3, 10):
-    # certificate file types
-    ENCODING_PEM: Final = 1
-    ENCODING_DER: Final = 2
+# certificate file types
+ENCODING_PEM: Final = 1
+ENCODING_DER: Final = 2
 
 # protocol versions
 PROTO_MINIMUM_SUPPORTED: Final = -2
@@ -388,6 +392,8 @@ HAS_ECDH: Final[bool]
 HAS_NPN: Final[bool]
 if sys.version_info >= (3, 13):
     HAS_PSK: Final[bool]
+if sys.version_info >= (3, 15):
+    HAS_PSK_TLS13: Final[bool]
 HAS_ALPN: Final[bool]
 HAS_SSLv2: Final[bool]
 HAS_SSLv3: Final[bool]

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-import shlex
 import subprocess
 import sys
 from pathlib import Path
@@ -20,7 +19,7 @@ class Command(NamedTuple):
     command: list[str]
     """The command to benchmark."""
 
-    prepare: str | None = None
+    prepare: list[str] | None = None
     """The command to run before each benchmark run."""
 
 
@@ -71,7 +70,7 @@ class Hyperfine(NamedTuple):
 
         # Add all prepare statements.
         for command in self.commands:
-            args.extend(["--prepare", command.prepare or ""])
+            args.extend(["--prepare", shlex.join(command.prepare or [])])
 
         # Add all commands.
         for command in self.commands:

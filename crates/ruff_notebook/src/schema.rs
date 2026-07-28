@@ -11,8 +11,8 @@
 //!   `"additionalProperties": false`
 //! * `#[serde(flatten)] pub other: BTreeMap<String, Value>` for
 //!   `"additionalProperties": true` as preparation for round-trip support.
-//! * `#[serde(skip_serializing_none)]` was added to all structs where one or
-//!   more fields were optional to avoid serializing `null` values.
+//! * `#[serde(skip_serializing_if = "Option::is_none")]` was added to optional
+//!   fields where `null` values should not be serialized.
 //! * `Cell::execution_count` is a required property only for code cells, but
 //!   we serialize it for all cells. This is because we can't know if a cell is
 //!   a code cell or not without looking at the `cell_type` property, which
@@ -22,7 +22,6 @@ use std::collections::{BTreeMap, HashMap};
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use serde_with::skip_serializing_none;
 
 fn sort_alphabetically<T: Serialize, S: serde::Serializer>(
     value: &T,
@@ -112,14 +111,15 @@ pub enum Cell {
 }
 
 /// Notebook raw nbconvert cell.
-#[skip_serializing_none]
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct RawCell {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub attachments: Option<Value>,
     /// Technically, id isn't required (it's not even present) in schema v4.0 through v4.4, but
     /// it's required in v4.5. Main issue is that pycharm creates notebooks without an id
     /// <https://youtrack.jetbrains.com/issue/PY-59438/Jupyter-notebooks-created-with-PyCharm-are-missing-the-id-field-in-cells-in-the-.ipynb-json>
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub id: Option<String>,
     /// Cell-level metadata.
     pub metadata: CellMetadata,
@@ -127,14 +127,15 @@ pub struct RawCell {
 }
 
 /// Notebook markdown cell.
-#[skip_serializing_none]
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct MarkdownCell {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub attachments: Option<Value>,
     /// Technically, id isn't required (it's not even present) in schema v4.0 through v4.4, but
     /// it's required in v4.5. Main issue is that pycharm creates notebooks without an id
     /// <https://youtrack.jetbrains.com/issue/PY-59438/Jupyter-notebooks-created-with-PyCharm-are-missing-the-id-field-in-cells-in-the-.ipynb-json>
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub id: Option<String>,
     /// Cell-level metadata.
     pub metadata: CellMetadata,
@@ -160,7 +161,6 @@ pub struct CodeCell {
 }
 
 /// Cell-level metadata.
-#[skip_serializing_none]
 #[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
 pub struct CellMetadata {
     /// VS Code specific cell metadata.
@@ -168,6 +168,7 @@ pub struct CellMetadata {
     /// This is [`Some`] only if the cell's preferred language is different from the notebook's
     /// preferred language.
     /// <https://github.com/microsoft/vscode/blob/e6c009a3d4ee60f352212b978934f52c4689fbd9/extensions/ipynb/src/serializers.ts#L117-L122>
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub vscode: Option<CodeCellMetadataVSCode>,
     /// For additional properties that isn't required by Ruff.
     #[serde(flatten)]
@@ -184,19 +185,23 @@ pub struct CodeCellMetadataVSCode {
 }
 
 /// Notebook root-level metadata.
-#[skip_serializing_none]
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Default)]
 pub struct RawNotebookMetadata {
     /// The author(s) of the notebook document
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub authors: Option<Value>,
     /// Kernel information.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub kernelspec: Option<Kernelspec>,
     /// Language information.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub language_info: Option<LanguageInfo>,
     /// Original notebook format (major number) before converting the notebook between versions.
     /// This should never be written to a file.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub orig_nbformat: Option<i64>,
     /// The title of the notebook document
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub title: Option<String>,
     /// For additional properties.
     #[serde(flatten)]
@@ -204,7 +209,6 @@ pub struct RawNotebookMetadata {
 }
 
 /// Kernel information.
-#[skip_serializing_none]
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct Kernelspec {
     /// The language name. This isn't mentioned in the spec but is populated by various tools and
@@ -214,6 +218,7 @@ pub struct Kernelspec {
     /// <https://github.com/microsoft/vscode/blob/1c31e758985efe11bc0453a45ea0bb6887e670a4/extensions/ipynb/src/deserializers.ts#L20-L22>.
     ///
     /// [`language_info`]: RawNotebookMetadata::language_info
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub language: Option<String>,
     /// For additional properties that isn't required by Ruff.
     #[serde(flatten)]
@@ -221,18 +226,21 @@ pub struct Kernelspec {
 }
 
 /// Language information.
-#[skip_serializing_none]
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct LanguageInfo {
     /// The codemirror mode to use for code in this language.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub codemirror_mode: Option<Value>,
     /// The file extension for files in this language.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub file_extension: Option<String>,
     /// The mimetype corresponding to files in this language.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub mimetype: Option<String>,
     /// The programming language which this kernel runs.
     pub name: String,
     /// The pygments lexer to use for code in this language.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub pygments_lexer: Option<String>,
     /// For additional properties.
     #[serde(flatten)]

@@ -1,5 +1,5 @@
 ---
-source: crates/ty_test/src/lib.rs
+source: crates/mdtest/src/lib.rs
 expression: snapshot
 ---
 
@@ -26,20 +26,17 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/subscript/assignment_dia
 
 ```
 error[invalid-key]: Unknown key "Retries" for TypedDict `Config`
- --> src/mdtest_snippet.py:7:5
+ --> src/mdtest_snippet.py:7:12
   |
-6 | def _(config: Config) -> None:
 7 |     config["Retries"] = 30.0  # error: [invalid-key]
   |     ------ ^^^^^^^^^ Did you mean "retries"?
   |     |
   |     TypedDict `Config`
   |
-info: rule `invalid-key` is enabled by default
-4 |     retries: int
-5 | 
 6 | def _(config: Config) -> None:
   -     config["Retries"] = 30.0  # error: [invalid-key]
 7 +     config["retries"] = 30.0  # error: [invalid-key]
+  |
 note: This is an unsafe fix and may change runtime behavior
 
 ```

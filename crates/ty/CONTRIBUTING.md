@@ -38,8 +38,7 @@ You can optionally install hooks to automatically run the validation checks
 when making a commit:
 
 ```shell
-uv tool install prek
-prek install
+uv run --only-group dev --locked prek install
 ```
 
 We recommend [nextest](https://nexte.st/) to run ty's test suite (via `cargo nextest run`),
@@ -66,7 +65,7 @@ and that it passes both the lint and test validation checks:
 ```shell
 cargo clippy --workspace --all-targets --all-features -- -D warnings  # Rust linting
 cargo test  # Rust testing
-uvx prek run -a  # Rust and Python formatting, Markdown and Python linting, etc.
+uv run --only-group dev --locked prek run --all-files  # Rust and Python formatting, Markdown and Python linting, etc.
 ```
 
 These checks will run on GitHub Actions when you open your pull request, but running them locally
@@ -142,11 +141,11 @@ The property tests do not run in CI on every PR, just once daily. It is advisabl
 locally after modifying core type relation methods (`is_subtype_of`, `is_equivalent_to`, etc.) to
 ensure that the changes do not break any of the properties.
 
-## Ecosystem CI (mypy-primer)
+## Ecosystem CI (`ecosystem-analyzer`)
 
-GitHub Actions will run your changes against a number of real-world projects from GitHub and
-report on any linter or formatter differences. See [`crates/ty/docs/mypy_primer.md`](./docs/mypy_primer.md)
-for instructions on running these checks locally.
+GitHub Actions will run your changes against a number of real-world projects from GitHub and report
+any differences in ty's diagnostic output. You can use [`setup_primer_project.py`](../../scripts/setup_primer_project.py)
+to reproduce the same testing conditions locally.
 
 ## Coding guidelines
 

@@ -7,10 +7,11 @@ use ruff_python_semantic::analyze::typing::traverse_union;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::fix::edits::pad;
 use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
-/// Checks for type annotations where `None` is not at the end of an union.
+/// Checks for type annotations where `None` is not at the end of a union.
 ///
 /// ## Why is this bad?
 /// Type annotation unions are commutative, meaning that the order of the elements
@@ -32,7 +33,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// - [Python documentation: `typing.Optional`](https://docs.python.org/3/library/typing.html#typing.Optional)
 /// - [Python documentation: `None`](https://docs.python.org/3/library/constants.html#None)
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "0.7.4")]
+#[violation_metadata(stable_since = "0.16.0")]
 pub(crate) struct NoneNotAtEndOfUnion;
 
 impl Violation for NoneNotAtEndOfUnion {
@@ -90,6 +91,11 @@ fn is_union_expr(semantic: &SemanticModel, expr: &Expr) -> bool {
 /// RUF036
 pub(crate) fn none_not_at_end_of_union<'a>(checker: &Checker, union: &'a Expr) {
     let semantic = checker.semantic();
+
+    if !semantic.in_type_definition() {
+        return;
+    }
+
     let mut none_exprs: Vec<&Expr> = Vec::new();
     let mut other_exprs: Vec<&Expr> = Vec::new();
 
@@ -149,10 +155,12 @@ fn generate_fix(
     annotation: &Expr,
     is_pep604: bool,
 ) -> Option<Fix> {
-    let applicability = if checker.comment_ranges().intersects(annotation.range()) {
-        Applicability::Unsafe
-    } else {
+    let applicability = if checker.semantic().in_typing_only_annotation()
+        && !checker.comment_ranges().intersects(annotation.range())
+    {
         Applicability::Safe
+    } else {
+        Applicability::Unsafe
     };
 
     let reordered: Vec<Expr> = other_exprs
@@ -184,6 +192,13 @@ fn generate_fix(
         })
     };
 
-    let edit = Edit::range_replacement(checker.generator().expr(&new_expr), annotation.range());
+    let edit = Edit::range_replacement(
+        pad(
+            checker.generator().expr(&new_expr),
+            annotation.range(),
+            checker.locator(),
+        ),
+        annotation.range(),
+    );
     Some(Fix::applicable_edit(edit, applicability))
 }

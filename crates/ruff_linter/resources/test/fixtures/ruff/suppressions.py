@@ -42,7 +42,7 @@ def f():
 
 def f():
     # Neither of these are ignored and warnings are logged to user.
-    # An usued suppression diagnostic should also be logged.
+    # An unused suppression diagnostic should also be logged.
     # ruff: disable[E501]
     I = 1
     # ruff: enable[E501]
@@ -50,7 +50,7 @@ def f():
 
 def f():
     # These should both be ignored by the range suppression,
-    # and an unusued noqa diagnostic should be logged.
+    # and an unused noqa diagnostic should be logged.
     # ruff:disable[E741,F841]
     I = 1  # noqa: E741,F841
     # ruff:enable[E741,F841]
@@ -109,6 +109,65 @@ def f():
     # ruff: disable
     # ruff: disable[]
     print("hello")
+
+
+def f():
+    # Should only cover the first statement, leaving a single diagnostic for bar
+    # ruff: ignore[F841]
+    foo = 0
+    bar = 0
+
+
+def f():
+    # Should only cover the first statement, leaving a single diagnostic for bar
+    foo = 0  # ruff: ignore[F841]
+    bar = 0
+
+
+def f():
+    # Should only cover the multiline statement, leaving a single diagnostic for bar
+    foo = """
+        value
+    """  # ruff: ignore[F841]
+    bar = 0
+
+
+# ruff: ignore[ARG001]  should cover the entire def
+def f(
+    foo,
+    bar,
+):
+    print("hello")
+
+
+def f(
+    # ruff: ignore[ARG001]  should only cover the first argument
+    foo,
+    bar,
+):
+    print("hello")
+
+
+def f(
+    foo,  # ruff: ignore[ARG001]  should only cover the first argument
+    bar,
+):
+    print("hello")
+
+
+def f(
+    foo,
+    bar,
+):  # ruff: ignore[ARG001]  should cover nothing and be marked as unused
+    pass
+
+
+class Foo:
+    # ruff: ignore[ARG002]  should be unused due to file-ignore below
+    def bar(self, arg1, arg2):
+        print("hello")
+
+# ruff: file-ignore[ARG002]  should cover the class method above!
 
 
 # Ensure LAST suppression in file is reported.

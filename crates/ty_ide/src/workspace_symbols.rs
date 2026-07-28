@@ -1,6 +1,7 @@
 use crate::symbols::{QueryPattern, SymbolInfo, symbols_for_file};
+use rayon::prelude::*;
 use ruff_db::files::File;
-use ty_project::Db;
+use ty_project::{Db, parallel::ParallelIteratorExt};
 
 /// Get all workspace symbols matching the query string.
 /// Returns symbols from all files in the workspace, filtered by the query.
@@ -17,37 +18,28 @@ pub fn workspace_symbols(db: &dyn Db, query: &str) -> Vec<WorkspaceSymbolInfo> {
 
     let query = QueryPattern::fuzzy(query);
     let files = project.files(db);
-    let results = std::sync::Mutex::new(Vec::new());
-    {
-        let db = db.dyn_clone();
-        let files = &files;
-        let results = &results;
-        let query = &query;
-        let workspace_symbols_span = &workspace_symbols_span;
+    let files: Vec<_> = files.iter().copied().collect();
 
-        rayon::scope(move |s| {
-            // For each file, extract symbols and add them to results
-            for file in files.iter() {
-                let db = db.dyn_clone();
-                s.spawn(move |_| {
-                    let symbols_for_file_span = tracing::debug_span!(parent: workspace_symbols_span, "symbols_for_file", ?file);
-                    let _entered = symbols_for_file_span.entered();
+    files
+        .into_par_iter()
+        .map_with_db(db, |db, file| {
+            let symbols_for_file_span = tracing::debug_span!(
+                parent: &workspace_symbols_span,
+                "symbols_for_file",
+                ?file
+            );
+            let _entered = symbols_for_file_span.entered();
 
-                    for (_, symbol) in symbols_for_file(&*db, *file).search(query) {
-                        // It seems like we could do better here than
-                        // locking `results` for every single symbol,
-                        // but this works pretty well as it is.
-                        results.lock().unwrap().push(WorkspaceSymbolInfo {
-                            symbol: symbol.to_owned(),
-                            file: *file,
-                        });
-                    }
-                });
-            }
-        });
-    }
-
-    results.into_inner().unwrap()
+            symbols_for_file(db, file)
+                .search(&query)
+                .map(|(_, symbol)| WorkspaceSymbolInfo {
+                    symbol: symbol.to_owned(),
+                    file,
+                })
+                .collect::<Vec<_>>()
+        })
+        .flat_map_iter(|symbols| symbols)
+        .collect()
 }
 
 /// A symbol found in the workspace, including the file it was found in.
@@ -104,9 +96,6 @@ API_BASE_URL = 'https://api.example.com'
           |
         2 | def utility_function():
           |     ^^^^^^^^^^^^^^^^
-        3 |     '''A helpful utility function'''
-        4 |     pass
-          |
         info: Function utility_function
         ");
 
@@ -116,9 +105,6 @@ API_BASE_URL = 'https://api.example.com'
           |
         2 | class DataModel:
           |       ^^^^^^^^^
-        3 |     '''A data model class'''
-        4 |     def __init__(self):
-          |
         info: Class DataModel
         ");
 
@@ -128,7 +114,6 @@ API_BASE_URL = 'https://api.example.com'
           |
         2 | API_BASE_URL = 'https://api.example.com'
           | ^^^^^^^^^^^^
-          |
         info: Constant API_BASE_URL
         ");
     }
@@ -149,10 +134,8 @@ class Test:
         info[workspace-symbols]: WorkspaceSymbolInfo
          --> utils.py:3:9
           |
-        2 | class Test:
         3 |     def from_path(): ...
           |         ^^^^^^^^^
-          |
         info: Method from_path
         ");
     }
@@ -174,11 +157,8 @@ class Test:
         info[workspace-symbols]: WorkspaceSymbolInfo
          --> utils.py:4:9
           |
-        2 | __all__ = []
-        3 | class Test:
         4 |     def from_path(): ...
           |         ^^^^^^^^^
-          |
         info: Method from_path
         ");
     }
@@ -201,11 +181,8 @@ foo = 1
         info[workspace-symbols]: WorkspaceSymbolInfo
          --> utils.py:5:1
           |
-        3 | import json as json
-        4 | from collections import defaultdict
         5 | foo = 1
           | ^^^
-          |
         info: Variable foo
         ");
         assert_snapshot!(test.workspace_symbols("re"), @"No symbols found");

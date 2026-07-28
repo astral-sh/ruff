@@ -33,16 +33,34 @@ bad_nesting: Literal[LiteralString]  # error: [invalid-type-form]
 
 `LiteralString` cannot be parameterized.
 
-<!-- snapshot-diagnostics -->
-
 ```py
 from typing_extensions import LiteralString
 
-# error: [invalid-type-form]
+# snapshot: invalid-type-form
 a: LiteralString[str]
+```
 
-# error: [invalid-type-form]
+```snapshot
+error[invalid-type-form]: `LiteralString` expects no type parameter
+ --> src/mdtest_snippet.py:4:4
+  |
+4 | a: LiteralString[str]
+  |    ^^^^^^^^^^^^^^^^^^
+```
+
+```py
+# snapshot: invalid-type-form
 b: LiteralString["foo"]
+```
+
+```snapshot
+error[invalid-type-form]: `LiteralString` expects no type parameter
+ --> src/mdtest_snippet.py:6:4
+  |
+6 | b: LiteralString["foo"]
+  |    -------------^^^^^^^
+  |    |
+  |    Did you mean `Literal`?
 ```
 
 ### As a base class
@@ -92,6 +110,13 @@ def _(literal_a: LiteralString, literal_b: LiteralString, a_str: str):
     reveal_type(f"{literal_a} {literal_b}")  # revealed: LiteralString
     reveal_type(f"{literal_a} {a_str}")  # revealed: str
 
+    if literal_a != "foo":
+        reveal_type(literal_a)  # revealed: LiteralString & ~Literal["foo"]
+
+        # the handling for `LiteralString` works even for subtypes of `LiteralString`,
+        # such as `LiteralString & ~Literal["foo]`, not just `LiteralString` itself
+        reveal_type(f"{literal_a} {literal_b}")  # revealed: LiteralString
+
     # Repetition
     reveal_type(literal_a * 10)  # revealed: LiteralString
 ```
@@ -103,7 +128,8 @@ not vice versa.
 
 ```py
 from typing_extensions import Literal, LiteralString
-from ty_extensions import static_assert, is_assignable_to
+from ty_extensions import static_assert
+from ty_extensions._internal import is_assignable_to
 
 static_assert(is_assignable_to(Literal[""], LiteralString))
 static_assert(is_assignable_to(Literal["abc"], LiteralString))

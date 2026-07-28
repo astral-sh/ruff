@@ -35,9 +35,10 @@ class H(
 <!-- snapshot-diagnostics -->
 
 ```pyi
-from typing_extensions import final, Callable, TypeVar
+from typing_extensions import Any, Callable, TypeVar, final
 
-def lossy_decorator(fn: Callable) -> Callable: ...
+# Decorator intentionally erases the wrapped signature.
+def lossy_decorator(fn: Callable[..., Any]) -> Callable[..., Any]: ...
 
 class Parent:
     @final
@@ -85,7 +86,7 @@ class Child(Parent):
     @property
     def my_property3(self) -> int: ...  # error: [override-of-final-method]
     @my_property3.deleter
-    def my_proeprty3(self) -> None: ...
+    def my_property3(self) -> None: ...
     @classmethod
     def class_method1(cls) -> int: ...  # error: [override-of-final-method]
     @staticmethod
@@ -449,6 +450,65 @@ class F:
     def method(self):
         @final  # error: [final-on-non-method]
         def not_a_method(): ...
+```
+
+## A method cannot be both abstract and final
+
+An abstract method must be overridden for a subclass to become concrete, but a final method cannot
+be overridden.
+
+```py
+from abc import abstractmethod
+from typing import final
+
+class A:
+    @final
+    @abstractmethod
+    def first(self) -> None: ...  # error: [abstract-and-final-method]
+
+    # Decorator order does not matter.
+    @abstractmethod
+    @final
+    def second(self) -> None: ...  # error: [abstract-and-final-method]
+    @abstractmethod
+    def abstract(self) -> None: ...
+    @final
+    def final(self) -> None: ...
+```
+
+## An overloaded method cannot be both abstract and final
+
+`runtime.py`:
+
+```py
+from abc import ABC, abstractmethod
+from typing import final, overload
+
+class A(ABC):
+    @overload
+    def method(self, value: int) -> int: ...
+    @overload
+    def method(self, value: str) -> str: ...
+    @final
+    @abstractmethod
+    def method(self, value: int | str) -> int | str:  # error: [abstract-and-final-method]
+        raise NotImplementedError
+```
+
+`stub.pyi`:
+
+```pyi
+from abc import abstractmethod
+from typing import final, overload
+
+class A:
+    @overload
+    @final
+    @abstractmethod
+    def method(self, value: int) -> int: ...  # error: [abstract-and-final-method]
+    @overload
+    @abstractmethod
+    def method(self, value: str) -> str: ...
 ```
 
 ## An `@final` method is overridden by an implicit instance attribute
@@ -931,7 +991,8 @@ way as an `@final` non-`Protocol` class:
 
 ```py
 from typing import final, Protocol
-from ty_extensions import static_assert, is_subtype_of
+from ty_extensions import static_assert
+from ty_extensions._internal import is_subtype_of
 
 class Base(Protocol):
     def abstract(self) -> int: ...
@@ -1062,7 +1123,7 @@ class ConcreteOrdered(AbstractOrdered): ...  # fine
 # exists in the MRO is abstract!
 @final
 @total_ordering
-class AlsoConreteOrdered(AbstractOrdered):  # error: [abstract-method-in-final-class]
+class AlsoConcreteOrdered(AbstractOrdered):  # error: [abstract-method-in-final-class]
     def __gt__(self, other): ...
 ```
 
@@ -1164,8 +1225,7 @@ class Bad(Base):  # error: [abstract-method-in-final-class]
     pass
 ```
 
-Similarly, a property with an abstract deleter is also abstract. However, we don't yet support
-property deleters, so this is a TODO test:
+Similarly, a property with an abstract deleter (but concrete getter and setter) is also abstract:
 
 ```py
 from abc import ABC, abstractmethod
@@ -1185,8 +1245,13 @@ class Base(ABC):
     def value(self) -> None: ...
 
 @final
-# TODO: should emit [abstract-method-in-final-class]
-class Bad(Base):
+class Good(Base):
+    @Base.value.deleter
+    def value(self) -> None:
+        pass
+
+@final
+class Bad(Base):  # error: [abstract-method-in-final-class]
     pass
 ```
 
@@ -1325,7 +1390,7 @@ class Base(ABC):
     @abstractproperty  # error: [deprecated]
     def value(self) -> int:
         return 0
-
+    # error: [invalid-argument-type]
     @abstractclassmethod  # error: [deprecated]
     def make(cls) -> "Base":
         raise NotImplementedError

@@ -1,10 +1,9 @@
 use lsp_server::ErrorCode;
-use lsp_types::notification::DidCloseTextDocument;
+use lsp_types::DidCloseTextDocumentNotification;
 use lsp_types::{DidCloseTextDocumentParams, TextDocumentIdentifier};
 
 use crate::server::Result;
 use crate::server::api::LSPResult;
-use crate::server::api::diagnostics::clear_diagnostics_if_needed;
 use crate::server::api::traits::{NotificationHandler, SyncNotificationHandler};
 use crate::session::Session;
 use crate::session::client::Client;
@@ -12,7 +11,7 @@ use crate::session::client::Client;
 pub(crate) struct DidCloseTextDocumentHandler;
 
 impl NotificationHandler for DidCloseTextDocumentHandler {
-    type NotificationType = DidCloseTextDocument;
+    type NotificationType = DidCloseTextDocumentNotification;
 }
 
 impl SyncNotificationHandler for DidCloseTextDocumentHandler {
@@ -34,7 +33,7 @@ impl SyncNotificationHandler for DidCloseTextDocumentHandler {
             .with_failure_code(ErrorCode::InternalError)?;
 
         if should_clear_diagnostics {
-            clear_diagnostics_if_needed(&document, session, client);
+            session.clear_diagnostics_if_needed(&document, client);
         }
 
         Ok(())

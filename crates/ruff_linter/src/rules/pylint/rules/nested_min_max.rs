@@ -203,7 +203,7 @@ pub(crate) fn nested_min_max(
             func: Box::new(func.clone()),
             arguments: Arguments {
                 args: collect_nested_args(min_max, args, checker.semantic()).into_boxed_slice(),
-                keywords: Box::from(keywords),
+                keywords: keywords.iter().cloned().collect(),
                 range: TextRange::default(),
                 node_index: ruff_python_ast::AtomicNodeIndex::NONE,
             },

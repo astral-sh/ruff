@@ -20,8 +20,9 @@ pub fn goto_declaration(
     let goto_target = find_goto_target(&model, &module, offset)?;
 
     let declaration_targets = goto_target
-        .get_definition_targets(&model, ImportAliasResolution::ResolveAliases)?
-        .declaration_targets(&model, &goto_target)?;
+        .definitions(&model, ImportAliasResolution::ResolveAliases)?
+        .goto_declaration(&model, &goto_target)?
+        .into_navigation_targets(model.db());
 
     Some(RangedValue {
         range: FileRange::new(file, goto_target.range()),
@@ -50,18 +51,13 @@ mod tests {
         info[goto-declaration]: Go to declaration
          --> main.py:5:10
           |
-        3 |     return x + y
-        4 |
         5 | result = my_function(1, 2)
           |          ^^^^^^^^^^^ Clicking here
-          |
         info: Found 1 declaration
          --> main.py:2:5
           |
         2 | def my_function(x, y):
           |     -----------
-        3 |     return x + y
-          |
         ");
     }
 
@@ -78,17 +74,13 @@ mod tests {
         info[goto-declaration]: Go to declaration
          --> main.py:3:5
           |
-        2 | x = 42
         3 | y = x
           |     ^ Clicking here
-          |
         info: Found 1 declaration
          --> main.py:2:1
           |
         2 | x = 42
           | -
-        3 | y = x
-          |
         ");
     }
 
@@ -111,18 +103,13 @@ mod tests {
         info[goto-declaration]: Go to declaration
          --> main.py:9:12
           |
-        8 | def foo(person: Person):
         9 |     person["name"]
           |            ^^^^^^ Clicking here
-          |
         info: Found 1 declaration
          --> main.py:5:5
           |
-        4 | class Person(TypedDict):
         5 |     name: str
           |     ----
-        6 |     age: int
-          |
         "#);
     }
 
@@ -142,19 +129,13 @@ mod tests {
         info[goto-declaration]: Go to declaration
          --> main.py:6:12
           |
-        4 |         pass
-        5 |
         6 | instance = MyClass()
           |            ^^^^^^^ Clicking here
-          |
         info: Found 1 declaration
          --> main.py:2:7
           |
         2 | class MyClass:
           |       -------
-        3 |     def __init__(self):
-        4 |         pass
-          |
         ");
     }
 
@@ -171,17 +152,13 @@ mod tests {
         info[goto-declaration]: Go to declaration
          --> main.py:3:12
           |
-        2 | def foo(param):
         3 |     return param * 2
           |            ^^^^^ Clicking here
-          |
         info: Found 1 declaration
          --> main.py:2:9
           |
         2 | def foo(param):
           |         -----
-        3 |     return param * 2
-          |
         ");
     }
 
@@ -199,19 +176,13 @@ mod tests {
         info[goto-declaration]: Go to declaration
          --> main.py:3:8
           |
-        2 | def generic_func[T](value: T) -> T:
         3 |     v: T = value
           |        ^ Clicking here
-        4 |     return v
-          |
         info: Found 1 declaration
          --> main.py:2:18
           |
         2 | def generic_func[T](value: T) -> T:
           |                  -
-        3 |     v: T = value
-        4 |     return v
-          |
         ");
     }
 
@@ -229,19 +200,13 @@ mod tests {
         info[goto-declaration]: Go to declaration
          --> main.py:3:31
           |
-        2 | class GenericClass[T]:
         3 |     def __init__(self, value: T):
           |                               ^ Clicking here
-        4 |         self.value = value
-          |
         info: Found 1 declaration
          --> main.py:2:20
           |
         2 | class GenericClass[T]:
           |                    -
-        3 |     def __init__(self, value: T):
-        4 |         self.value = value
-          |
         ");
     }
 
@@ -261,20 +226,13 @@ mod tests {
         info[goto-declaration]: Go to declaration
          --> main.py:5:16
           |
-        3 | def outer_func():
-        4 |     def inner_func():
         5 |         return x  # Should find outer x
           |                ^ Clicking here
-        6 |     return inner_func
-          |
         info: Found 1 declaration
          --> main.py:2:1
           |
         2 | x = "outer"
           | -
-        3 | def outer_func():
-        4 |     def inner_func():
-          |
         "#);
     }
 
@@ -317,23 +275,18 @@ variable = 42
             )
             .build();
 
-        assert_snapshot!(test.goto_declaration(), @r#"
+        assert_snapshot!(test.goto_declaration(), @"
         info[goto-declaration]: Go to declaration
          --> main.py:3:7
           |
-        2 | import mymodule
         3 | print(mymodule.function())
           |       ^^^^^^^^ Clicking here
-          |
         info: Found 1 declaration
          --> mymodule.py:1:1
           |
         1 |
           | -
-        2 | def function():
-        3 |     return "hello from mymodule"
-          |
-        "#);
+        ");
     }
 
     #[test]
@@ -358,22 +311,18 @@ def other_function():
             )
             .build();
 
-        assert_snapshot!(test.goto_declaration(), @r#"
+        assert_snapshot!(test.goto_declaration(), @"
         info[goto-declaration]: Go to declaration
          --> main.py:3:7
           |
-        2 | from mymodule import my_function
         3 | print(my_function())
           |       ^^^^^^^^^^^ Clicking here
-          |
         info: Found 1 declaration
          --> mymodule.py:2:5
           |
         2 | def my_function():
           |     -----------
-        3 |     return "hello"
-          |
-        "#);
+        ");
     }
 
     #[test]
@@ -405,17 +354,13 @@ FOO = 0
         info[goto-declaration]: Go to declaration
          --> main.py:3:7
           |
-        2 | import mymodule.submodule as sub
         3 | print(sub.helper())
           |       ^^^ Clicking here
-          |
         info: Found 1 declaration
          --> mymodule/submodule.py:1:1
           |
         1 |
           | -
-        2 | FOO = 0
-          |
         ");
     }
 
@@ -434,11 +379,11 @@ FOO = 0
           |
         1 | from lib import module
           |                 ^^^^^^ Clicking here
-          |
         info: Found 1 declaration
-        --> lib/module.py:1:1
-         |
-         |
+         --> lib/module.py:1:1
+          |
+        1 |
+          | -
         ");
     }
 
@@ -466,17 +411,13 @@ def func(arg):
         info[goto-declaration]: Go to declaration
          --> main.py:3:7
           |
-        2 | from utils import func as h
         3 | print(h("test"))
           |       ^ Clicking here
-          |
         info: Found 1 declaration
          --> utils.py:2:5
           |
         2 | def func(arg):
           |     ----
-        3 |     return f"Processed: {arg}"
-          |
         "#);
     }
 
@@ -506,22 +447,18 @@ def shared_function():
             )
             .build();
 
-        assert_snapshot!(test.goto_declaration(), @r#"
+        assert_snapshot!(test.goto_declaration(), @"
         info[goto-declaration]: Go to declaration
          --> main.py:3:7
           |
-        2 | from intermediate import shared_function
         3 | print(shared_function())
           |       ^^^^^^^^^^^^^^^ Clicking here
-          |
         info: Found 1 declaration
          --> original.py:2:5
           |
         2 | def shared_function():
           |     ---------------
-        3 |     return "from original"
-          |
-        "#);
+        ");
     }
 
     #[test]
@@ -548,23 +485,18 @@ def multiply_numbers(a, b):
             )
             .build();
 
-        assert_snapshot!(test.goto_declaration(), @r#"
+        assert_snapshot!(test.goto_declaration(), @"
         info[goto-declaration]: Go to declaration
          --> main.py:3:10
           |
-        2 | from math_utils import *
         3 | result = add_numbers(5, 3)
           |          ^^^^^^^^^^^ Clicking here
-          |
         info: Found 1 declaration
          --> math_utils.py:2:5
           |
         2 | def add_numbers(a, b):
           |     -----------
-        3 |     """Add two numbers together."""
-        4 |     return a + b
-          |
-        "#);
+        ");
     }
 
     #[test]
@@ -602,18 +534,13 @@ def another_helper():
         info[goto-declaration]: Go to declaration
          --> package/main.py:3:10
           |
-        2 | from .utils import helper_function
         3 | result = helper_function("test")
           |          ^^^^^^^^^^^^^^^ Clicking here
-          |
         info: Found 1 declaration
          --> package/utils.py:2:5
           |
         2 | def helper_function(arg):
           |     ---------------
-        3 |     """A helper function in utils module."""
-        4 |     return f"Processed: {arg}"
-          |
         "#);
     }
 
@@ -651,18 +578,13 @@ def another_helper():
         info[goto-declaration]: Go to declaration
          --> package/main.py:3:10
           |
-        2 | from .utils import *
         3 | result = helper_function("test")
           |          ^^^^^^^^^^^^^^^ Clicking here
-          |
         info: Found 1 declaration
          --> package/utils.py:2:5
           |
         2 | def helper_function(arg):
           |     ---------------
-        3 |     """A helper function in utils module."""
-        4 |     return f"Processed: {arg}"
-          |
         "#);
     }
 
@@ -696,15 +618,11 @@ FOO = 0
           |
         2 | import mymodule.submodule as sub
           |                              ^^^ Clicking here
-        3 | print(sub.helper())
-          |
         info: Found 1 declaration
          --> mymodule/submodule.py:1:1
           |
         1 |
           | -
-        2 | FOO = 0
-          |
         ");
     }
 
@@ -738,15 +656,11 @@ FOO = 0
           |
         2 | import mymodule.submodule as sub
           |                 ^^^^^^^^^ Clicking here
-        3 | print(sub.helper())
-          |
         info: Found 1 declaration
          --> mymodule/submodule.py:1:1
           |
         1 |
           | -
-        2 | FOO = 0
-          |
         ");
     }
 
@@ -778,22 +692,18 @@ def another_helper(path):
             )
             .build();
 
-        assert_snapshot!(test.goto_declaration(), @r#"
+        assert_snapshot!(test.goto_declaration(), @"
         info[goto-declaration]: Go to declaration
          --> main.py:2:29
           |
         2 | from mypackage.utils import helper as h
           |                             ^^^^^^ Clicking here
-        3 | result = h("/a", "/b")
-          |
         info: Found 1 declaration
          --> mypackage/utils.py:2:5
           |
         2 | def helper(a, b):
           |     ------
-        3 |     return a + "/" + b
-          |
-        "#);
+        ");
     }
 
     #[test]
@@ -824,22 +734,18 @@ def another_helper(path):
             )
             .build();
 
-        assert_snapshot!(test.goto_declaration(), @r#"
+        assert_snapshot!(test.goto_declaration(), @"
         info[goto-declaration]: Go to declaration
          --> main.py:2:39
           |
         2 | from mypackage.utils import helper as h
           |                                       ^ Clicking here
-        3 | result = h("/a", "/b")
-          |
         info: Found 1 declaration
          --> mypackage/utils.py:2:5
           |
         2 | def helper(a, b):
           |     ------
-        3 |     return a + "/" + b
-          |
-        "#);
+        ");
     }
 
     #[test]
@@ -870,23 +776,18 @@ def another_helper(path):
             )
             .build();
 
-        assert_snapshot!(test.goto_declaration(), @r#"
+        assert_snapshot!(test.goto_declaration(), @"
         info[goto-declaration]: Go to declaration
          --> main.py:2:16
           |
         2 | from mypackage.utils import helper as h
           |                ^^^^^ Clicking here
-        3 | result = h("/a", "/b")
-          |
         info: Found 1 declaration
          --> mypackage/utils.py:1:1
           |
         1 |
           | -
-        2 | def helper(a, b):
-        3 |     return a + "/" + b
-          |
-        "#);
+        ");
     }
 
     #[test]
@@ -906,20 +807,13 @@ def another_helper(path):
         info[goto-declaration]: Go to declaration
          --> main.py:7:7
           |
-        6 | c = C()
         7 | y = c.x
           |       ^ Clicking here
-          |
         info: Found 1 declaration
          --> main.py:4:9
           |
-        2 | class C:
-        3 |     def __init__(self):
         4 |         self.x: int = 1
           |         ------
-        5 |
-        6 | c = C()
-          |
         ");
     }
 
@@ -940,18 +834,11 @@ def another_helper(path):
           |
         2 | a: "MyClass" = 1
           |     ^^^^^^^ Clicking here
-        3 |
-        4 | class MyClass:
-          |
         info: Found 1 declaration
          --> main.py:4:7
           |
-        2 | a: "MyClass" = 1
-        3 |
         4 | class MyClass:
           |       -------
-        5 |     """some docs"""
-          |
         "#);
     }
 
@@ -972,18 +859,11 @@ def another_helper(path):
           |
         2 | a: "None | MyClass" = 1
           |            ^^^^^^^ Clicking here
-        3 |
-        4 | class MyClass:
-          |
         info: Found 1 declaration
          --> main.py:4:7
           |
-        2 | a: "None | MyClass" = 1
-        3 |
         4 | class MyClass:
           |       -------
-        5 |     """some docs"""
-          |
         "#);
     }
 
@@ -1018,18 +898,11 @@ def another_helper(path):
           |
         2 | a: "None | MyClass" = 1
           |            ^^^^^^^ Clicking here
-        3 |
-        4 | class MyClass:
-          |
         info: Found 1 declaration
          --> main.py:4:7
           |
-        2 | a: "None | MyClass" = 1
-        3 |
         4 | class MyClass:
           |       -------
-        5 |     """some docs"""
-          |
         "#);
     }
 
@@ -1078,18 +951,11 @@ def another_helper(path):
           |
         2 | a: "MyClass | No" = 1
           |     ^^^^^^^ Clicking here
-        3 |
-        4 | class MyClass:
-          |
         info: Found 1 declaration
          --> main.py:4:7
           |
-        2 | a: "MyClass | No" = 1
-        3 |
         4 | class MyClass:
           |       -------
-        5 |     """some docs"""
-          |
         "#);
     }
 
@@ -1121,13 +987,11 @@ def another_helper(path):
           |
         2 | ab: "ab"
           |      ^^ Clicking here
-          |
         info: Found 1 declaration
          --> main.py:2:1
           |
         2 | ab: "ab"
           | --
-          |
         "#);
     }
 
@@ -1159,18 +1023,11 @@ def another_helper(path):
           |
         2 | x: "list['MyClass | int'] | None"
           |           ^^^^^^^ Clicking here
-        3 |
-        4 | class MyClass:
-          |
         info: Found 1 declaration
          --> main.py:4:7
           |
-        2 | x: "list['MyClass | int'] | None"
-        3 |
         4 | class MyClass:
           |       -------
-        5 |     """some docs"""
-          |
         "#);
     }
 
@@ -1191,18 +1048,11 @@ def another_helper(path):
           |
         2 | x: "list['int | MyClass'] | None"
           |                 ^^^^^^^ Clicking here
-        3 |
-        4 | class MyClass:
-          |
         info: Found 1 declaration
          --> main.py:4:7
           |
-        2 | x: "list['int | MyClass'] | None"
-        3 |
         4 | class MyClass:
           |       -------
-        5 |     """some docs"""
-          |
         "#);
     }
 
@@ -1223,18 +1073,11 @@ def another_helper(path):
           |
         2 | x: "list['int | None'] | MyClass"
           |                          ^^^^^^^ Clicking here
-        3 |
-        4 | class MyClass:
-          |
         info: Found 1 declaration
          --> main.py:4:7
           |
-        2 | x: "list['int | None'] | MyClass"
-        3 |
         4 | class MyClass:
           |       -------
-        5 |     """some docs"""
-          |
         "#);
     }
 
@@ -1255,18 +1098,11 @@ def another_helper(path):
           |
         2 | x: "list['int' | 'MyClass'] | None"
           |                   ^^^^^^^ Clicking here
-        3 |
-        4 | class MyClass:
-          |
         info: Found 1 declaration
          --> main.py:4:7
           |
-        2 | x: "list['int' | 'MyClass'] | None"
-        3 |
         4 | class MyClass:
           |       -------
-        5 |     """some docs"""
-          |
         "#);
     }
 
@@ -1287,18 +1123,11 @@ def another_helper(path):
           |
         2 | x: "list['MyClass' | 'str'] | None"
           |           ^^^^^^^ Clicking here
-        3 |
-        4 | class MyClass:
-          |
         info: Found 1 declaration
          --> main.py:4:7
           |
-        2 | x: "list['MyClass' | 'str'] | None"
-        3 |
         4 | class MyClass:
           |       -------
-        5 |     """some docs"""
-          |
         "#);
     }
 
@@ -1333,18 +1162,11 @@ def another_helper(path):
           |
         2 | x: """'list["int" | "str"]' | MyClass"""
           |                               ^^^^^^^ Clicking here
-        3 |
-        4 | class MyClass:
-          |
         info: Found 1 declaration
          --> main.py:4:7
           |
-        2 | x: """'list["int" | "str"]' | MyClass"""
-        3 |
         4 | class MyClass:
           |       -------
-        5 |     """some docs"""
-          |
         "#);
     }
 
@@ -1369,20 +1191,13 @@ def another_helper(path):
         info[goto-declaration]: Go to declaration
           --> main.py:11:9
            |
-        10 | d = D()
         11 | y = d.y.x
            |         ^ Clicking here
-           |
         info: Found 1 declaration
          --> main.py:4:9
           |
-        2 | class C:
-        3 |     def __init__(self):
         4 |         self.x: int = 1
           |         ------
-        5 |
-        6 | class D:
-          |
         ");
     }
 
@@ -1403,20 +1218,13 @@ def another_helper(path):
         info[goto-declaration]: Go to declaration
          --> main.py:7:7
           |
-        6 | c = C()
         7 | y = c.x
           |       ^ Clicking here
-          |
         info: Found 1 declaration
          --> main.py:4:9
           |
-        2 | class C:
-        3 |     def __init__(self):
         4 |         self.x = 1
           |         ------
-        5 |
-        6 | c = C()
-          |
         ");
     }
 
@@ -1437,18 +1245,13 @@ def another_helper(path):
         info[goto-declaration]: Go to declaration
          --> main.py:7:9
           |
-        6 | c = C()
         7 | res = c.foo()
           |         ^^^ Clicking here
-          |
         info: Found 1 declaration
          --> main.py:3:9
           |
-        2 | class C:
         3 |     def foo(self):
           |         ---
-        4 |         return 42
-          |
         ");
     }
 
@@ -1508,24 +1311,15 @@ def outer():
         // Should find the variable declaration in the outer scope, not the nonlocal statement
         assert_snapshot!(test.goto_declaration(), @r#"
         info[goto-declaration]: Go to declaration
-          --> main.py:8:16
-           |
-         6 |         nonlocal x
-         7 |         x = "modified"
-         8 |         return x  # Should find the nonlocal x declaration in outer scope
-           |                ^ Clicking here
-         9 |
-        10 |     return inner
-           |
+         --> main.py:8:16
+          |
+        8 |         return x  # Should find the nonlocal x declaration in outer scope
+          |                ^ Clicking here
         info: Found 1 declaration
          --> main.py:3:5
           |
-        2 | def outer():
         3 |     x = "outer_value"
           |     -
-        4 |
-        5 |     def inner():
-          |
         "#);
     }
 
@@ -1550,21 +1344,13 @@ def outer():
         info[goto-declaration]: Go to declaration
          --> main.py:6:18
           |
-        5 |     def inner():
         6 |         nonlocal xy
           |                  ^^ Clicking here
-        7 |         xy = "modified"
-        8 |         return x  # Should find the nonlocal x declaration in outer scope
-          |
         info: Found 1 declaration
          --> main.py:3:5
           |
-        2 | def outer():
         3 |     xy = "outer_value"
           |     --
-        4 |
-        5 |     def inner():
-          |
         "#);
     }
 
@@ -1586,19 +1372,13 @@ def function():
         info[goto-declaration]: Go to declaration
          --> main.py:7:12
           |
-        5 |     global global_var
-        6 |     global_var = "modified"
         7 |     return global_var  # Should find the global variable declaration
           |            ^^^^^^^^^^ Clicking here
-          |
         info: Found 1 declaration
          --> main.py:2:1
           |
         2 | global_var = "global_value"
           | ----------
-        3 |
-        4 | def function():
-          |
         "#);
     }
 
@@ -1620,20 +1400,13 @@ def function():
         info[goto-declaration]: Go to declaration
          --> main.py:5:12
           |
-        4 | def function():
         5 |     global global_var
           |            ^^^^^^^^^^ Clicking here
-        6 |     global_var = "modified"
-        7 |     return global_var  # Should find the global variable declaration
-          |
         info: Found 1 declaration
          --> main.py:2:1
           |
         2 | global_var = "global_value"
           | ----------
-        3 |
-        4 | def function():
-          |
         "#);
     }
 
@@ -1656,19 +1429,13 @@ def function():
         info[goto-declaration]: Go to declaration
          --> main.py:9:7
           |
-        8 | b = B()
         9 | y = b.x
           |       ^ Clicking here
-          |
         info: Found 1 declaration
          --> main.py:3:5
           |
-        2 | class A:
         3 |     x = 10
           |     -
-        4 |
-        5 | class B(A):
-          |
         ");
     }
 
@@ -1687,21 +1454,13 @@ def function():
         info[goto-declaration]: Go to declaration
          --> main.py:4:22
           |
-        2 | def my_func(command: str):
-        3 |     match command.split():
         4 |         case ["get", ab]:
           |                      ^^ Clicking here
-        5 |             x = ab
-          |
         info: Found 1 declaration
          --> main.py:4:22
           |
-        2 | def my_func(command: str):
-        3 |     match command.split():
         4 |         case ["get", ab]:
           |                      --
-        5 |             x = ab
-          |
         "#);
     }
 
@@ -1720,20 +1479,13 @@ def function():
         info[goto-declaration]: Go to declaration
          --> main.py:5:17
           |
-        3 |     match command.split():
-        4 |         case ["get", ab]:
         5 |             x = ab
           |                 ^^ Clicking here
-          |
         info: Found 1 declaration
          --> main.py:4:22
           |
-        2 | def my_func(command: str):
-        3 |     match command.split():
         4 |         case ["get", ab]:
           |                      --
-        5 |             x = ab
-          |
         "#);
     }
 
@@ -1752,21 +1504,13 @@ def function():
         info[goto-declaration]: Go to declaration
          --> main.py:4:23
           |
-        2 | def my_func(command: str):
-        3 |     match command.split():
         4 |         case ["get", *ab]:
           |                       ^^ Clicking here
-        5 |             x = ab
-          |
         info: Found 1 declaration
          --> main.py:4:23
           |
-        2 | def my_func(command: str):
-        3 |     match command.split():
         4 |         case ["get", *ab]:
           |                       --
-        5 |             x = ab
-          |
         "#);
     }
 
@@ -1785,20 +1529,13 @@ def function():
         info[goto-declaration]: Go to declaration
          --> main.py:5:17
           |
-        3 |     match command.split():
-        4 |         case ["get", *ab]:
         5 |             x = ab
           |                 ^^ Clicking here
-          |
         info: Found 1 declaration
          --> main.py:4:23
           |
-        2 | def my_func(command: str):
-        3 |     match command.split():
         4 |         case ["get", *ab]:
           |                       --
-        5 |             x = ab
-          |
         "#);
     }
 
@@ -1817,21 +1554,13 @@ def function():
         info[goto-declaration]: Go to declaration
          --> main.py:4:37
           |
-        2 | def my_func(command: str):
-        3 |     match command.split():
         4 |         case ["get", ("a" | "b") as ab]:
           |                                     ^^ Clicking here
-        5 |             x = ab
-          |
         info: Found 1 declaration
          --> main.py:4:37
           |
-        2 | def my_func(command: str):
-        3 |     match command.split():
         4 |         case ["get", ("a" | "b") as ab]:
           |                                     --
-        5 |             x = ab
-          |
         "#);
     }
 
@@ -1850,20 +1579,13 @@ def function():
         info[goto-declaration]: Go to declaration
          --> main.py:5:17
           |
-        3 |     match command.split():
-        4 |         case ["get", ("a" | "b") as ab]:
         5 |             x = ab
           |                 ^^ Clicking here
-          |
         info: Found 1 declaration
          --> main.py:4:37
           |
-        2 | def my_func(command: str):
-        3 |     match command.split():
         4 |         case ["get", ("a" | "b") as ab]:
           |                                     --
-        5 |             x = ab
-          |
         "#);
     }
 
@@ -1888,21 +1610,13 @@ def function():
         info[goto-declaration]: Go to declaration
           --> main.py:10:30
            |
-         8 | def my_func(event: Click):
-         9 |     match event:
         10 |         case Click(x, button=ab):
            |                              ^^ Clicking here
-        11 |             x = ab
-           |
         info: Found 1 declaration
           --> main.py:10:30
            |
-         8 | def my_func(event: Click):
-         9 |     match event:
         10 |         case Click(x, button=ab):
            |                              --
-        11 |             x = ab
-           |
         ");
     }
 
@@ -1927,20 +1641,13 @@ def function():
         info[goto-declaration]: Go to declaration
           --> main.py:11:17
            |
-         9 |     match event:
-        10 |         case Click(x, button=ab):
         11 |             x = ab
            |                 ^^ Clicking here
-           |
         info: Found 1 declaration
           --> main.py:10:30
            |
-         8 | def my_func(event: Click):
-         9 |     match event:
         10 |         case Click(x, button=ab):
            |                              --
-        11 |             x = ab
-           |
         ");
     }
 
@@ -1961,25 +1668,18 @@ def function():
             "#,
         );
 
-        assert_snapshot!(test.goto_declaration(), @r#"
+        assert_snapshot!(test.goto_declaration(), @"
         info[goto-declaration]: Go to declaration
           --> main.py:10:14
            |
-         8 | def my_func(event: Click):
-         9 |     match event:
         10 |         case Click(x, button=ab):
            |              ^^^^^ Clicking here
-        11 |             x = ab
-           |
         info: Found 1 declaration
          --> main.py:2:7
           |
         2 | class Click:
           |       -----
-        3 |     __match_args__ = ("position", "button")
-        4 |     def __init__(self, pos, btn):
-          |
-        "#);
+        ");
     }
 
     #[test]
@@ -2016,13 +1716,11 @@ def function():
           |
         2 | type Alias1[AB: int = bool] = tuple[AB, list[AB]]
           |             ^^ Clicking here
-          |
         info: Found 1 declaration
          --> main.py:2:13
           |
         2 | type Alias1[AB: int = bool] = tuple[AB, list[AB]]
           |             --
-          |
         ");
     }
 
@@ -2040,13 +1738,11 @@ def function():
           |
         2 | type Alias1[AB: int = bool] = tuple[AB, list[AB]]
           |                                     ^^ Clicking here
-          |
         info: Found 1 declaration
          --> main.py:2:13
           |
         2 | type Alias1[AB: int = bool] = tuple[AB, list[AB]]
           |             --
-          |
         ");
     }
 
@@ -2063,17 +1759,13 @@ def function():
         info[goto-declaration]: Go to declaration
          --> main.py:3:15
           |
-        2 | from typing import Callable
         3 | type Alias2[**AB = [int, str]] = Callable[AB, tuple[AB]]
           |               ^^ Clicking here
-          |
         info: Found 1 declaration
          --> main.py:3:15
           |
-        2 | from typing import Callable
         3 | type Alias2[**AB = [int, str]] = Callable[AB, tuple[AB]]
           |               --
-          |
         ");
     }
 
@@ -2090,17 +1782,13 @@ def function():
         info[goto-declaration]: Go to declaration
          --> main.py:3:43
           |
-        2 | from typing import Callable
         3 | type Alias2[**AB = [int, str]] = Callable[AB, tuple[AB]]
           |                                           ^^ Clicking here
-          |
         info: Found 1 declaration
          --> main.py:3:15
           |
-        2 | from typing import Callable
         3 | type Alias2[**AB = [int, str]] = Callable[AB, tuple[AB]]
           |               --
-          |
         ");
     }
 
@@ -2118,13 +1806,11 @@ def function():
           |
         2 | type Alias3[*AB = ()] = tuple[tuple[*AB], tuple[*AB]]
           |              ^^ Clicking here
-          |
         info: Found 1 declaration
          --> main.py:2:14
           |
         2 | type Alias3[*AB = ()] = tuple[tuple[*AB], tuple[*AB]]
           |              --
-          |
         ");
     }
 
@@ -2142,13 +1828,11 @@ def function():
           |
         2 | type Alias3[*AB = ()] = tuple[tuple[*AB], tuple[*AB]]
           |                                      ^^ Clicking here
-          |
         info: Found 1 declaration
          --> main.py:2:14
           |
         2 | type Alias3[*AB = ()] = tuple[tuple[*AB], tuple[*AB]]
           |              --
-          |
         ");
     }
 
@@ -2173,18 +1857,13 @@ def function():
         info[goto-declaration]: Go to declaration
           --> main.py:11:3
            |
-        10 | c = C()
         11 | c.value = 42
            |   ^^^^^ Clicking here
-           |
         info: Found 1 declaration
          --> main.py:7:9
           |
-        6 |     @property
         7 |     def value(self):
           |         -----
-        8 |         return self._value
-          |
         ");
     }
 
@@ -2246,20 +1925,13 @@ def function():
         info[goto-declaration]: Go to declaration
          --> main.py:9:9
           |
-        8 | def use_drawable(obj: Drawable):
         9 |     obj.name
           |         ^^^^ Clicking here
-          |
         info: Found 1 declaration
          --> main.py:6:5
           |
-        4 | class Drawable(Protocol):
-        5 |     def draw(self) -> None: ...
         6 |     name: str
           |     ----
-        7 |
-        8 | def use_drawable(obj: Drawable):
-          |
         ");
     }
 
@@ -2280,21 +1952,13 @@ class MyClass:
         info[goto-declaration]: Go to declaration
          --> main.py:5:40
           |
-        3 |     ClassType = int
-        4 |
         5 |     def generic_method[T](self, value: ClassType) -> T:
           |                                        ^^^^^^^^^ Clicking here
-        6 |         return value
-          |
         info: Found 1 declaration
          --> main.py:3:5
           |
-        2 | class MyClass:
         3 |     ClassType = int
           |     ---------
-        4 |
-        5 |     def generic_method[T](self, value: ClassType) -> T:
-          |
         ");
     }
 
@@ -2313,18 +1977,13 @@ class MyClass:
         info[goto-declaration]: Go to declaration
          --> main.py:5:25
           |
-        3 |     return x + y + z
-        4 |
         5 | result = my_function(1, y=2, z=3)
           |                         ^ Clicking here
-          |
         info: Found 1 declaration
          --> main.py:2:20
           |
         2 | def my_function(x, y, z=10):
           |                    -
-        3 |     return x + y + z
-          |
         ");
     }
 
@@ -2353,24 +2012,166 @@ class MyClass:
         info[goto-declaration]: Go to declaration
           --> main.py:14:27
            |
-        13 | # Call the overloaded function
         14 | result = process("hello", format="json")
            |                           ^^^^^^ Clicking here
-           |
         info: Found 2 declarations
-          --> main.py:5:24
-           |
-         4 | @overload
-         5 | def process(data: str, format: str) -> str: ...
-           |                        ------
-         6 |
-         7 | @overload
-         8 | def process(data: int, format: int) -> int: ...
-           |                        ------
-         9 |
-        10 | def process(data, format):
-           |
+         --> main.py:5:24
+          |
+        5 | def process(data: str, format: str) -> str: ...
+          |                        ------
+        6 |
+        7 | @overload
+        8 | def process(data: int, format: int) -> int: ...
+          |                        ------
         "#);
+    }
+
+    #[test]
+    fn goto_declaration_keyword_argument_typeddict() {
+        let test = cursor_test(
+            r#"
+        from typing import TypedDict
+
+        class TD(TypedDict):
+            f: int
+            g: str
+
+        TD(f<CURSOR>=1)
+        "#,
+        );
+
+        assert_snapshot!(test.goto_declaration(), @"
+        info[goto-declaration]: Go to declaration
+         --> main.py:8:4
+          |
+        8 | TD(f=1)
+          |    ^ Clicking here
+        info: Found 1 declaration
+         --> main.py:5:5
+          |
+        5 |     f: int
+          |     -
+        ");
+    }
+
+    #[test]
+    fn goto_declaration_keyword_argument_namedtuple() {
+        let test = cursor_test(
+            r#"
+        from typing import NamedTuple
+
+        class NT(NamedTuple):
+            f: int
+            g: str
+
+        NT(f<CURSOR>=1)
+        "#,
+        );
+
+        assert_snapshot!(test.goto_declaration(), @"
+        info[goto-declaration]: Go to declaration
+         --> main.py:8:4
+          |
+        8 | NT(f=1)
+          |    ^ Clicking here
+        info: Found 1 declaration
+         --> main.py:5:5
+          |
+        5 |     f: int
+          |     -
+        ");
+    }
+
+    #[test]
+    fn goto_declaration_keyword_argument_dataclass() {
+        let test = cursor_test(
+            r#"
+        from dataclasses import dataclass
+
+        @dataclass
+        class DC:
+            f: int
+            g: str
+
+        DC(f<CURSOR>=1)
+        "#,
+        );
+
+        assert_snapshot!(test.goto_declaration(), @"
+        info[goto-declaration]: Go to declaration
+         --> main.py:9:4
+          |
+        9 | DC(f=1)
+          |    ^ Clicking here
+        info: Found 1 declaration
+         --> main.py:6:5
+          |
+        6 |     f: int
+          |     -
+        ");
+    }
+
+    #[test]
+    fn goto_declaration_keyword_argument_dataclass_custom_init() {
+        let test = cursor_test(
+            r#"
+        from dataclasses import dataclass
+
+        @dataclass
+        class DC:
+            f: int
+            g: str
+
+            def __init__(self, f: int) -> None: ...
+
+        DC(f<CURSOR>=1)
+        "#,
+        );
+
+        assert_snapshot!(test.goto_declaration(), @"
+        info[goto-declaration]: Go to declaration
+          --> main.py:11:4
+           |
+        11 | DC(f=1)
+           |    ^ Clicking here
+        info: Found 1 declaration
+         --> main.py:9:24
+          |
+        9 |     def __init__(self, f: int) -> None: ...
+          |                        -
+        ");
+    }
+
+    #[test]
+    fn goto_declaration_keyword_argument_dataclass_transform_alias() {
+        let test = cursor_test(
+            r#"
+        from typing import dataclass_transform
+
+        def Field(alias: str = ...): ...
+
+        @dataclass_transform(field_specifiers=(Field,))
+        class MyDataclass: ...
+
+        class DC(MyDataclass):
+            f: int = Field(alias='g')
+
+        DC(g<CURSOR>=1)
+        "#,
+        );
+
+        assert_snapshot!(test.goto_declaration(), @"
+        info[goto-declaration]: Go to declaration
+          --> main.py:12:4
+           |
+        12 | DC(g=1)
+           |    ^ Clicking here
+        info: Found 1 declaration
+          --> main.py:10:5
+           |
+        10 |     f: int = Field(alias='g')
+           |     -
+        ");
     }
 
     #[test]
@@ -2409,22 +2210,17 @@ def ab(a: str): ...
         info[goto-declaration]: Go to declaration
          --> main.py:4:1
           |
-        2 | from mymodule import ab
-        3 |
         4 | ab(1)
           | ^^ Clicking here
-          |
         info: Found 2 declarations
          --> mymodule.pyi:5:5
           |
-        4 | @overload
         5 | def ab(a: int): ...
           |     --
         6 |
         7 | @overload
         8 | def ab(a: str): ...
           |     --
-          |
         ");
     }
 
@@ -2464,22 +2260,17 @@ def ab(a: str): ...
         info[goto-declaration]: Go to declaration
          --> main.py:4:1
           |
-        2 | from mymodule import ab
-        3 |
         4 | ab("hello")
           | ^^ Clicking here
-          |
         info: Found 2 declarations
          --> mymodule.pyi:5:5
           |
-        4 | @overload
         5 | def ab(a: int): ...
           |     --
         6 |
         7 | @overload
         8 | def ab(a: str): ...
           |     --
-          |
         "#);
     }
 
@@ -2519,22 +2310,17 @@ def ab(a: int): ...
         info[goto-declaration]: Go to declaration
          --> main.py:4:1
           |
-        2 | from mymodule import ab
-        3 |
         4 | ab(1, 2)
           | ^^ Clicking here
-          |
         info: Found 2 declarations
          --> mymodule.pyi:5:5
           |
-        4 | @overload
         5 | def ab(a: int, b: int): ...
           |     --
         6 |
         7 | @overload
         8 | def ab(a: int): ...
           |     --
-          |
         ");
     }
 
@@ -2574,22 +2360,17 @@ def ab(a: int): ...
         info[goto-declaration]: Go to declaration
          --> main.py:4:1
           |
-        2 | from mymodule import ab
-        3 |
         4 | ab(1)
           | ^^ Clicking here
-          |
         info: Found 2 declarations
          --> mymodule.pyi:5:5
           |
-        4 | @overload
         5 | def ab(a: int, b: int): ...
           |     --
         6 |
         7 | @overload
         8 | def ab(a: int): ...
           |     --
-          |
         ");
     }
 
@@ -2632,15 +2413,11 @@ def ab(a: int, *, c: int): ...
         info[goto-declaration]: Go to declaration
          --> main.py:4:1
           |
-        2 | from mymodule import ab
-        3 |
         4 | ab(1, b=2)
           | ^^ Clicking here
-          |
         info: Found 3 declarations
           --> mymodule.pyi:5:5
            |
-         4 | @overload
          5 | def ab(a: int): ...
            |     --
          6 |
@@ -2651,7 +2428,6 @@ def ab(a: int, *, c: int): ...
         10 | @overload
         11 | def ab(a: int, *, c: int): ...
            |     --
-           |
         ");
     }
 
@@ -2694,15 +2470,11 @@ def ab(a: int, *, c: int): ...
         info[goto-declaration]: Go to declaration
          --> main.py:4:1
           |
-        2 | from mymodule import ab
-        3 |
         4 | ab(1, c=2)
           | ^^ Clicking here
-          |
         info: Found 3 declarations
           --> mymodule.pyi:5:5
            |
-         4 | @overload
          5 | def ab(a: int): ...
            |     --
          6 |
@@ -2713,7 +2485,6 @@ def ab(a: int, *, c: int): ...
         10 | @overload
         11 | def ab(a: int, *, c: int): ...
            |     --
-           |
         ");
     }
 
@@ -2741,19 +2512,13 @@ def ab(a: int, *, c: int): ...
         info[goto-declaration]: Go to declaration
          --> mypackage/__init__.py:4:5
           |
-        2 | from .subpkg.submod import val
-        3 |
         4 | x = subpkg
           |     ^^^^^^ Clicking here
-          |
         info: Found 1 declaration
          --> mypackage/__init__.py:2:7
           |
         2 | from .subpkg.submod import val
           |       ------
-        3 |
-        4 | x = subpkg
-          |
         ");
     }
 
@@ -2787,13 +2552,11 @@ def ab(a: int, *, c: int): ...
           |
         2 | from .subpkg.submod import val
           |       ^^^^^^ Clicking here
-        3 |
-        4 | x = subpkg
-          |
         info: Found 1 declaration
-        --> mypackage/subpkg/__init__.py:1:1
-         |
-         |
+         --> mypackage/subpkg/__init__.py:1:1
+          |
+        1 |
+          | -
         ");
     }
 
@@ -2848,16 +2611,11 @@ def ab(a: int, *, c: int): ...
           |
         2 | from .subpkg.submod import val
           |              ^^^^^^ Clicking here
-        3 |
-        4 | x = submod
-          |
         info: Found 1 declaration
          --> mypackage/subpkg/submod.py:1:1
           |
         1 |
           | -
-        2 | val: int = 0
-          |
         ");
     }
 
@@ -2887,16 +2645,11 @@ def ab(a: int, *, c: int): ...
           |
         2 | from .subpkg import subpkg
           |       ^^^^^^ Clicking here
-        3 |
-        4 | x = subpkg
-          |
         info: Found 1 declaration
          --> mypackage/subpkg/__init__.py:1:1
           |
         1 |
           | -
-        2 | subpkg: int = 10
-          |
         ");
     }
 
@@ -2926,15 +2679,11 @@ def ab(a: int, *, c: int): ...
           |
         2 | from .subpkg import subpkg
           |                     ^^^^^^ Clicking here
-        3 |
-        4 | x = subpkg
-          |
         info: Found 1 declaration
          --> mypackage/subpkg/__init__.py:2:1
           |
         2 | subpkg: int = 10
           | ------
-          |
         ");
     }
 
@@ -2957,42 +2706,19 @@ def ab(a: int, *, c: int): ...
             )
             .build();
 
-        // TODO(submodule-imports): Ok this one is FASCINATING but definitely wrong!
-        //
-        // So there's 3 relevant definitions here:
-        //
-        // * `subpkg: int = 10` in the other file is in fact the original definition.
-        //    Including it here is accurate and possibly useful?
-        //
-        // *  the LHS `subpkg` in the import is an instance of `subpkg = ...`
-        //    because it's a `DefinitionKind::ImportFromSubmodle`.
-        //    Including it here is Pedantically Correct but Unhelpful.
-        //
-        // * `the RHS `subpkg` in the import is a second instance of `subpkg = ...`
-        //    that *immediately* overwrites the `ImportFromSubmodule`'s definition.
-        //    This is the most important one and doesn't show up at all! Sadness!
+        // The transient submodule binding is skipped because this import statement
+        // immediately shadows it with the imported symbol.
         assert_snapshot!(test.goto_declaration(), @"
         info[goto-declaration]: Go to declaration
          --> mypackage/__init__.py:4:5
           |
-        2 | from .subpkg import subpkg
-        3 |
         4 | x = subpkg
           |     ^^^^^^ Clicking here
-          |
-        info: Found 2 declarations
-         --> mypackage/__init__.py:2:7
-          |
-        2 | from .subpkg import subpkg
-          |       ------
-        3 |
-        4 | x = subpkg
-          |
-         ::: mypackage/subpkg/__init__.py:2:1
+        info: Found 1 declaration
+         --> mypackage/subpkg/__init__.py:2:1
           |
         2 | subpkg: int = 10
           | ------
-          |
         ");
     }
 
@@ -3018,13 +2744,8 @@ def ab(a: int, *, c: int): ...
         info[goto-declaration]: Go to declaration
          --> main.py:6:7
           |
-        4 | a: int = 10
-        5 |
         6 | print(a)
           |       ^ Clicking here
-        7 |
-        8 | a: bool = True
-          |
         info: Found 3 declarations
          --> main.py:2:1
           |
@@ -3038,7 +2759,6 @@ def ab(a: int, *, c: int): ...
         7 |
         8 | a: bool = True
           | -
-          |
         "#);
     }
 

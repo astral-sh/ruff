@@ -1,7 +1,7 @@
 [package]
 name = "ty_site_packages"
-version = "0.0.0"
-publish = false
+version = "0.0.6"
+description = "This is an internal component crate of Ruff"
 authors = { workspace = true }
 edition = { workspace = true }
 rust-version = { workspace = true }
@@ -9,6 +9,9 @@ homepage = { workspace = true }
 documentation = { workspace = true }
 repository = { workspace = true }
 license = { workspace = true }
+
+[lib]
+doctest = false
 
 [dependencies]
 ruff_annotate_snippets = { workspace = true }
@@ -27,11 +30,9 @@ strum = { workspace = true }
 strum_macros = { workspace = true }
 tracing = { workspace = true }
 
-[target.'cfg(not(target_family = "wasm"))'.dependencies]
-which = { workspace = true }
-
 [dev-dependencies]
 ruff_db = { workspace = true, features = ["testing", "os"] }
+tempfile = { workspace = true }
 
 [lints]
 workspace = true

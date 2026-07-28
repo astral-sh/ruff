@@ -70,7 +70,7 @@ reveal_type(bound_method(1))  # revealed: str
 When we call the function object itself, we need to pass the `instance` explicitly:
 
 ```py
-# error: [invalid-argument-type] "Argument to function `f` is incorrect: Expected `C`, found `Literal[1]`"
+# error: [invalid-argument-type] "Argument to function `C.f` is incorrect: Expected `C`, found `Literal[1]`"
 # error: [missing-argument]
 C.f(1)
 
@@ -191,6 +191,39 @@ def f(a_or_b: A | B, any_or_a: Any | A):
     reveal_type(any_or_a.f())  # revealed: Any | int
 ```
 
+## Stored protocol-bound methods
+
+A protocol-bound method stored alongside another callable must not re-check its already-bound
+receiver when the callable union is invoked.
+
+```py
+from collections.abc import Iterator
+from typing import Any
+
+class PeekIterator(Iterator[Any]):
+    def __init__(self, iterator: Iterator[Any]) -> None:
+        self._next = iterator.__next__
+
+    def __next__(self) -> Any:
+        return self._next()
+
+    def use_fallback(self) -> None:
+        self._next = lambda: None
+```
+
+Only a genuine implicit positional receiver can be consumed before call inference. Other parameter
+shapes must continue through the ordinary bound-method call path.
+
+```py
+from typing import Protocol
+
+class Variadic(Protocol):
+    def method(*args: int) -> int: ...
+
+def check_variadic(value: Variadic) -> None:
+    value.method()  # error: [invalid-argument-type]
+```
+
 ## Method calls on `KnownInstance` types
 
 ```toml
@@ -244,6 +277,8 @@ class SubclassOfAny(Any):
 
 a = SubclassOfAny()
 assert_type(a.method(), int)
+
+value: str = a.method()  # error: [invalid-assignment]
 
 assert_type(a.non_existing_method(), Any)
 ```
@@ -399,7 +434,7 @@ class D:
         # This function is wrongly annotated, it should be `type[D]` instead of `D`
         pass
 
-# error: [invalid-argument-type] "Argument to bound method `f` is incorrect: Expected `D`, found `<class 'D'>`"
+# error: [invalid-argument-type] "Argument to bound method `D.f` is incorrect: Expected `D`, found `<class 'D'>`"
 D.f()
 ```
 
@@ -414,6 +449,29 @@ reveal_type(Derived().f)  # revealed: bound method type[Derived].f(x: int) -> st
 
 reveal_type(Derived.f(1))  # revealed: str
 reveal_type(Derived().f(1))  # revealed: str
+```
+
+### Implicit receivers in generic final classes
+
+For a generic final class, an implicit `type[Self]` receiver can bind to another classmethod on the
+exact generic class object:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import final
+
+@final
+class GenericFinal[T]:
+    @classmethod
+    def call_method(cls) -> None:
+        cls.method()
+
+    @classmethod
+    def method(cls) -> None: ...
 ```
 
 ### Accessing the classmethod as a static member
@@ -516,12 +574,9 @@ with Child().create() as child:
 
 ### `__init_subclass__`
 
-The [`__init_subclass__`] method is implicitly a classmethod:
+#### Basics
 
-```toml
-[environment]
-python-version = "3.12"
-```
+The [`__init_subclass__`] method is implicitly a classmethod:
 
 ```py
 class Base:
@@ -546,18 +601,158 @@ class RequiresArg:
 
 class NoArg:
     def __init_subclass__(cls): ...
-
-# Single-base definitions
-class MissingArg(RequiresArg): ...  # error: [missing-argument]
-class InvalidType(RequiresArg, arg="foo"): ...  # error: [invalid-argument-type]
-class Valid(RequiresArg, arg=1): ...
-
-# error: [missing-argument]
-# error: [unknown-argument]
-class IncorrectArg(RequiresArg, not_arg="foo"): ...
 ```
 
+Single-base definitions
+
+```py
+# snapshot: missing-argument
+class MissingArg(RequiresArg): ...
+```
+
+```snapshot
+error[missing-argument]: No argument provided for required parameter `arg` of function `RequiresArg.__init_subclass__`
+  --> src/mdtest_snippet.py:18:1
+   |
+18 | class MissingArg(RequiresArg): ...
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+info: Parameter declared here
+  --> src/mdtest_snippet.py:13:32
+   |
+13 |     def __init_subclass__(cls, arg: int): ...
+   |                                ^^^^^^^^
+```
+
+```py
+# snapshot: invalid-argument-type
+class InvalidType(RequiresArg, arg="foo"): ...
+class Valid(RequiresArg, arg=1): ...
+```
+
+```snapshot
+error[invalid-argument-type]: Argument to function `RequiresArg.__init_subclass__` is incorrect
+  --> src/mdtest_snippet.py:20:32
+   |
+20 | class InvalidType(RequiresArg, arg="foo"): ...
+   |                                ^^^^^^^^^ Expected `int`, found `Literal["foo"]`
+info: Function defined here
+  --> src/mdtest_snippet.py:13:9
+   |
+13 |     def __init_subclass__(cls, arg: int): ...
+   |         ^^^^^^^^^^^^^^^^^      -------- Parameter declared here
+```
+
+```py
+# snapshot: missing-argument
+# snapshot: unknown-argument
+class IncorrectArg(RequiresArg, not_arg="foo"):
+    a = 1
+    b = 2
+    c = 3
+    d = 4
+    e = 5
+    f = 6
+    g = 7
+    h = 8
+    i = 9
+    j = 10
+```
+
+```snapshot
+error[missing-argument]: No argument provided for required parameter `arg` of function `RequiresArg.__init_subclass__`
+  --> src/mdtest_snippet.py:24:1
+   |
+24 | class IncorrectArg(RequiresArg, not_arg="foo"):
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+info: Parameter declared here
+  --> src/mdtest_snippet.py:13:32
+   |
+13 |     def __init_subclass__(cls, arg: int): ...
+   |                                ^^^^^^^^
+
+
+error[unknown-argument]: Argument `not_arg` does not match any known parameter of function `RequiresArg.__init_subclass__`
+  --> src/mdtest_snippet.py:24:33
+   |
+24 | class IncorrectArg(RequiresArg, not_arg="foo"):
+   |                                 ^^^^^^^^^^^^^
+info: Function signature here
+  --> src/mdtest_snippet.py:13:9
+   |
+13 |     def __init_subclass__(cls, arg: int): ...
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+```
+
+```py
+class NotCallableInitSubclass:
+    __init_subclass__ = None
+
+# snapshot: non-callable-init-subclass
+class Bad(NotCallableInitSubclass):
+    a = 1
+    b = 2
+    c = 3
+```
+
+```snapshot
+error[non-callable-init-subclass]: Invalid definition of class `Bad`
+  --> src/mdtest_snippet.py:39:7
+   |
+36 |     __init_subclass__ = None
+   |     ----------------- `NotCallableInitSubclass.__init_subclass__` has type `None | Unknown`, which may not be callable
+37 |
+38 | # snapshot: non-callable-init-subclass
+39 | class Bad(NotCallableInitSubclass):
+   |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Superclass `NotCallableInitSubclass` cannot be subclassed
+info: `__init_subclass__` on a superclass is implicitly called during creation of a class object
+info: See https://docs.python.org/3/reference/datamodel.html#customizing-class-creation
+```
+
+The `metaclass` keyword is ignored, as it has special meaning and is not passed to
+`__init_subclass__` at runtime.
+
+```py
+class Base:
+    def __init_subclass__(cls, arg: int): ...
+
+class Valid(Base, arg=5, metaclass=object): ...
+
+# error: [invalid-argument-type]
+class Invalid(Base, metaclass=type, arg="foo"): ...
+```
+
+Overload matching is performed correctly:
+
+```py
+from typing import Literal, overload
+
+class Base:
+    @overload
+    def __init_subclass__(cls, mode: Literal["a"], arg: int) -> None: ...
+    @overload
+    def __init_subclass__(cls, mode: Literal["b"], arg: str) -> None: ...
+    def __init_subclass__(cls, mode: str, arg: int | str) -> None: ...
+
+class Valid(Base, mode="a", arg=5): ...
+class Valid(Base, mode="b", arg="foo"): ...
+
+# error: [no-matching-overload]
+class InvalidType(Base, mode="b", arg=5):
+    a = 1
+    b = 2
+    c = 3
+    d = 4
+    e = 5
+```
+
+#### More complex cases
+
 For multiple inheritance, the first resolved `__init_subclass__` method is used.
+
+```toml
+[environment]
+python-version = "3.12"
+```
 
 ```py
 class Empty: ...
@@ -632,31 +827,6 @@ class Base(Generic[T]):
 
 class Valid(Base[int], arg=1): ...
 class InvalidType(Base[int], arg="x"): ...  # error: [invalid-argument-type]
-```
-
-So are overloads:
-
-```py
-class Base:
-    @overload
-    def __init_subclass__(cls, mode: Literal["a"], arg: int) -> None: ...
-    @overload
-    def __init_subclass__(cls, mode: Literal["b"], arg: str) -> None: ...
-    def __init_subclass__(cls, mode: str, arg: int | str) -> None: ...
-
-class Valid(Base, mode="a", arg=5): ...
-class Valid(Base, mode="b", arg="foo"): ...
-class InvalidType(Base, mode="b", arg=5): ...  # error: [no-matching-overload]
-```
-
-The `metaclass` keyword is ignored, as it has special meaning and is not passed to
-`__init_subclass__` at runtime.
-
-```py
-class Base:
-    def __init_subclass__(cls, arg: int): ...
-
-class Valid(Base, arg=5, metaclass=object): ...
 ```
 
 ## `@staticmethod`
@@ -840,6 +1010,72 @@ class X:
         return self.__new__(type(self))
 ```
 
+Calling `object.__new__` from an overriding `__new__` method preserves `Self`, so an invalid
+attribute access on the result is reported:
+
+```py
+class Item:
+    def __new__(cls) -> Self:
+        result = object.__new__(cls)
+        reveal_type(result)  # revealed: Self@__new__
+        # error: [unresolved-attribute]
+        result.nonexistent()
+        return result
+```
+
+Explicitly marking `__new__` as a static method does not change the inferred result:
+
+```py
+class StaticItem:
+    @staticmethod
+    def __new__(cls) -> Self:
+        result = object.__new__(cls)
+        reveal_type(result)  # revealed: Self@__new__
+        return result
+```
+
+`Self` is also preserved through a chain of inherited `__new__` calls:
+
+```py
+class Foo: ...
+
+class Bar(Foo):
+    def __new__(cls) -> Self:
+        return Foo.__new__(cls)
+
+class Baz(Bar):
+    def __new__(cls) -> Self:
+        result = Bar.__new__(cls)
+        reveal_type(result)  # revealed: Self@__new__
+        # error: [unresolved-attribute]
+        result.nonexistent()
+        return result
+```
+
+## Bound-method attribute fallback
+
+Bound-method attributes are resolved first on `types.MethodType`, then, if absent, on the underlying
+function object. A protocol refinement of the bound method must not be used as the receiver for that
+underlying-function fallback:
+
+```py
+from typing import Protocol, runtime_checkable
+
+class C:
+    def f(self, x: int) -> str:
+        return "a"
+
+@runtime_checkable
+class ReturnsStr(Protocol):
+    def __call__(self, x: str) -> str: ...
+
+def narrowed_bound_method_attribute():
+    method = C().f
+    if isinstance(method, ReturnsStr):
+        reveal_type(method)  # revealed: (bound method C.f(x: int) -> str) & ReturnsStr
+        reveal_type(method.__globals__)  # revealed: dict[str, Any]
+```
+
 ## Builtin functions and methods
 
 Some builtin functions and methods are heavily special-cased by ty. This mdtest checks that various
@@ -847,8 +1083,9 @@ properties are understood correctly for these functions and methods.
 
 ```py
 import types
-from typing import Callable
-from ty_extensions import static_assert, CallableTypeOf, is_assignable_to, TypeOf
+from typing import Any, Callable
+from ty_extensions import static_assert
+from ty_extensions._internal import RegularCallableTypeOf, TypeOf, is_assignable_to
 
 def f(obj: type) -> None: ...
 
@@ -860,70 +1097,70 @@ class MyClass:
     @my_property.setter
     def my_property(self, value: int | str) -> None: ...
 
-static_assert(is_assignable_to(types.FunctionType, Callable))
+static_assert(is_assignable_to(types.FunctionType, Callable[..., Any]))
 
 # revealed: <wrapper-descriptor '__get__' of 'function' objects>
 reveal_type(types.FunctionType.__get__)
-static_assert(is_assignable_to(TypeOf[types.FunctionType.__get__], Callable))
+static_assert(is_assignable_to(TypeOf[types.FunctionType.__get__], Callable[..., Any]))
 
 # revealed: def f(obj: type) -> None
 reveal_type(f)
-static_assert(is_assignable_to(TypeOf[f], Callable))
+static_assert(is_assignable_to(TypeOf[f], Callable[..., Any]))
 
 # revealed: <method-wrapper '__get__' of function 'f'>
 reveal_type(f.__get__)
-static_assert(is_assignable_to(TypeOf[f.__get__], Callable))
+static_assert(is_assignable_to(TypeOf[f.__get__], Callable[..., Any]))
 
 # revealed: def __call__(self, *args: Any, **kwargs: Any) -> Any
 reveal_type(types.FunctionType.__call__)
-static_assert(is_assignable_to(TypeOf[types.FunctionType.__call__], Callable))
+static_assert(is_assignable_to(TypeOf[types.FunctionType.__call__], Callable[..., Any]))
 
 # revealed: <method-wrapper '__call__' of function 'f'>
 reveal_type(f.__call__)
-static_assert(is_assignable_to(TypeOf[f.__call__], Callable))
+static_assert(is_assignable_to(TypeOf[f.__call__], Callable[..., Any]))
 
 # revealed: <wrapper-descriptor '__get__' of 'property' objects>
 reveal_type(property.__get__)
-static_assert(is_assignable_to(TypeOf[property.__get__], Callable))
+static_assert(is_assignable_to(TypeOf[property.__get__], Callable[..., Any]))
 
 # revealed: property
 reveal_type(MyClass.my_property)
-static_assert(is_assignable_to(TypeOf[property], Callable))
-static_assert(not is_assignable_to(TypeOf[MyClass.my_property], Callable))
+static_assert(is_assignable_to(TypeOf[property], Callable[..., Any]))
+static_assert(not is_assignable_to(TypeOf[MyClass.my_property], Callable[..., Any]))
 
 # revealed: <method-wrapper '__get__' of property 'my_property'>
 reveal_type(MyClass.my_property.__get__)
-static_assert(is_assignable_to(TypeOf[MyClass.my_property.__get__], Callable))
+static_assert(is_assignable_to(TypeOf[MyClass.my_property.__get__], Callable[..., Any]))
 
 # revealed: <wrapper-descriptor '__set__' of 'property' objects>
 reveal_type(property.__set__)
-static_assert(is_assignable_to(TypeOf[property.__set__], Callable))
+static_assert(is_assignable_to(TypeOf[property.__set__], Callable[..., Any]))
 
 # revealed: <method-wrapper '__set__' of property 'my_property'>
 reveal_type(MyClass.my_property.__set__)
-static_assert(is_assignable_to(TypeOf[MyClass.my_property.__set__], Callable))
+static_assert(is_assignable_to(TypeOf[MyClass.my_property.__set__], Callable[..., Any]))
 
 # revealed: def startswith(self, prefix: str | tuple[str, ...], start: SupportsIndex | None = None, end: SupportsIndex | None = None, /) -> bool
 reveal_type(str.startswith)
-static_assert(is_assignable_to(TypeOf[str.startswith], Callable))
+static_assert(is_assignable_to(TypeOf[str.startswith], Callable[..., Any]))
 
 # revealed: <method-wrapper 'startswith' of string 'foo'>
 reveal_type("foo".startswith)
-static_assert(is_assignable_to(TypeOf["foo".startswith], Callable))
+static_assert(is_assignable_to(TypeOf["foo".startswith], Callable[..., Any]))
 
 def _(
-    a: CallableTypeOf[types.FunctionType.__get__],
-    b: CallableTypeOf[f],
-    c: CallableTypeOf[f.__get__],
-    d: CallableTypeOf[types.FunctionType.__call__],
-    e: CallableTypeOf[f.__call__],
-    f: CallableTypeOf[property],
-    g: CallableTypeOf[property.__get__],
-    h: CallableTypeOf[MyClass.my_property.__get__],
-    i: CallableTypeOf[property.__set__],
-    j: CallableTypeOf[MyClass.my_property.__set__],
-    k: CallableTypeOf[str.startswith],
-    l: CallableTypeOf["foo".startswith],
+    a: RegularCallableTypeOf[types.FunctionType.__get__],
+    b: RegularCallableTypeOf[f],
+    c: RegularCallableTypeOf[f.__get__],
+    d: RegularCallableTypeOf[types.FunctionType.__call__],
+    e: RegularCallableTypeOf[f.__call__],
+    f: RegularCallableTypeOf[property],
+    g: RegularCallableTypeOf[property.__get__],
+    h: RegularCallableTypeOf[MyClass.my_property.__get__],
+    i: RegularCallableTypeOf[property.__set__],
+    j: RegularCallableTypeOf[MyClass.my_property.__set__],
+    k: RegularCallableTypeOf[str.startswith],
+    l: RegularCallableTypeOf["foo".startswith],
 ):
     # revealed: Overload[(self: FunctionType, instance: None, owner: type, /) -> Unknown, (self: FunctionType, instance: object, owner: type | None = None, /) -> Unknown]
     reveal_type(a)

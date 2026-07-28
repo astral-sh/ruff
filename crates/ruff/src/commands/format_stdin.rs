@@ -7,7 +7,7 @@ use log::error;
 use ruff_linter::source_kind::{SourceError, SourceKind};
 use ruff_python_ast::SourceType;
 use ruff_workspace::FormatterSettings;
-use ruff_workspace::resolver::{PyprojectConfig, Resolver, match_exclusion, python_file_at_path};
+use ruff_workspace::resolver::{PyprojectConfig, Resolver, match_exclusion, project_file_at_path};
 
 use crate::ExitStatus;
 use crate::args::{ConfigArguments, FormatArguments, FormatRange};
@@ -30,7 +30,7 @@ pub(crate) fn format_stdin(
 
     if resolver.force_exclude() {
         if let Some(filename) = cli.stdin_filename.as_deref() {
-            if !python_file_at_path(filename, &mut resolver, config_arguments)? {
+            if !project_file_at_path(filename, &mut resolver, config_arguments)? {
                 if mode.is_write() {
                     parrot_stdin()?;
                 }

@@ -4,10 +4,8 @@ use ruff_text_size::Ranged;
 
 use crate::builders::parenthesize_if_expands;
 use crate::comments::{SourceComment, dangling_comments, leading_comments, trailing_comments};
-use crate::expression::parentheses::{
-    NeedsParentheses, OptionalParentheses, Parentheses, is_expression_parenthesized,
-};
-use crate::expression::{CallChainLayout, has_own_parentheses};
+use crate::expression::has_own_parentheses;
+use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses, Parentheses};
 use crate::other::parameters::ParametersParentheses;
 use crate::prelude::*;
 
@@ -259,6 +257,7 @@ struct FormatBody<'a> {
 }
 
 impl Format<PyFormatContext<'_>> for FormatBody<'_> {
+    #[expect(clippy::if_same_then_else)]
     fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
         let FormatBody {
             dangling_header_comments,
@@ -321,9 +320,7 @@ impl Format<PyFormatContext<'_>> for FormatBody<'_> {
             // )
             // ```
             let comments = f.context().comments();
-            if is_expression_parenthesized(body.into(), comments.ranges(), f.context().source())
-                && comments.has_leading(body)
-            {
+            if f.context().is_expression_parenthesized(body.into()) && comments.has_leading(body) {
                 trailing_comments(dangling_header_comments).fmt(f)?;
 
                 // Note that `leading_body_comments` have already been formatted as part of
@@ -358,6 +355,24 @@ impl Format<PyFormatContext<'_>> for FormatBody<'_> {
         else if body_comments.has_leading() || body_comments.has_trailing_own_line() {
             body.format().with_options(Parentheses::Always).fmt(f)
         }
+        // Include parentheses for cases that always require them, such as named expressions:
+        //
+        // ```py
+        // lambda x: (y := x + 1)
+        // ```
+        else if matches!(needs_parentheses, OptionalParentheses::Always) {
+            body.format().with_options(Parentheses::Always).fmt(f)
+        }
+        // Use `parenthesize_if_expands` for cases that require parentheses when broken over
+        // multiple lines, including some calls and subscripts:
+        //
+        // ```py
+        // lambda x: "implicitly" "concatenated {x}".format(x)
+        // lambda x: "implicitly" "concatenated {x}"[x]
+        // ```
+        else if matches!(needs_parentheses, OptionalParentheses::Multiline) {
+            parenthesize_if_expands(&body.format().with_options(Parentheses::Never)).fmt(f)
+        }
         // Calls and subscripts require special formatting because they have their own
         // parentheses, but they can also have an arbitrary amount of text before the
         // opening parenthesis. We want to avoid cases where we keep a long callable on the
@@ -387,31 +402,20 @@ impl Format<PyFormatContext<'_>> for FormatBody<'_> {
         // )
         // ```
         else if matches!(body, Expr::Call(_) | Expr::Subscript(_)) {
-            let unparenthesized = body.format().with_options(Parentheses::Never);
-            if CallChainLayout::from_expression(
-                body.into(),
-                comments.ranges(),
-                f.context().source(),
-            )
-            .is_fluent()
-            {
-                parenthesize_if_expands(&unparenthesized).fmt(f)
-            } else {
-                let unparenthesized = unparenthesized.memoized();
-                if unparenthesized.inspect(f)?.will_break() {
-                    expand_parent().fmt(f)?;
-                }
-
-                best_fitting![
-                    // body all flat
-                    unparenthesized,
-                    // body expanded
-                    group(&unparenthesized).should_expand(true),
-                    // parenthesized
-                    format_args![token("("), block_indent(&unparenthesized), token(")")]
-                ]
-                .fmt(f)
+            let unparenthesized = body.format().with_options(Parentheses::Never).memoized();
+            if unparenthesized.inspect(f)?.will_break() {
+                expand_parent().fmt(f)?;
             }
+
+            best_fitting![
+                // body all flat
+                unparenthesized,
+                // body expanded
+                group(&unparenthesized).should_expand(true),
+                // parenthesized
+                format_args![token("("), block_indent(&unparenthesized), token(")")]
+            ]
+            .fmt(f)
         }
         // For other cases with their own parentheses, such as lists, sets, dicts, tuples,
         // etc., we can just format the body directly. Their own formatting results in the
@@ -432,14 +436,6 @@ impl Format<PyFormatContext<'_>> for FormatBody<'_> {
         // ```
         else if has_own_parentheses(body, f.context()).is_some() {
             body.format().fmt(f)
-        }
-        // Include parentheses for cases that always require them, such as named expressions:
-        //
-        // ```py
-        // lambda x: (y := x + 1)
-        // ```
-        else if matches!(needs_parentheses, OptionalParentheses::Always) {
-            body.format().with_options(Parentheses::Always).fmt(f)
         }
         // Finally, for expressions without their own parentheses, use
         // `parenthesize_if_expands` to add parentheses around the body, only if it expands

@@ -74,13 +74,14 @@ class RefactoringTool:
     @overload
     def log_message(self, msg: object) -> None:
         """Hook to log a message."""
-
     @overload
     def log_message(self, msg: str, *args: object) -> None: ...
+
     @overload
     def log_debug(self, msg: object) -> None: ...
     @overload
     def log_debug(self, msg: str, *args: object) -> None: ...
+
     def print_output(self, old_text: str, new_text: str, filename: StrPath, equal: bool) -> None:
         """Called with the old version, new version, and filename of a
         refactored file.
@@ -161,6 +162,7 @@ class RefactoringTool:
         then rewrites the file; the latter is only done if the write option is
         set.
         """
+
     PS1: Final = ">>> "
     PS2: Final = "... "
     def refactor_docstring(self, input: str, filename: StrPath) -> str:
@@ -195,10 +197,10 @@ class RefactoringTool:
 
     def wrap_toks(
         self, block: Iterable[str], lineno: int, indent: int
-    ) -> Generator[tuple[int, str, tuple[int, int], tuple[int, int], str], None, None]:
+    ) -> Generator[tuple[int, str, tuple[int, int], tuple[int, int], str]]:
         """Wraps a tokenize stream to systematically modify start/end."""
 
-    def gen_lines(self, block: Iterable[str], indent: int) -> Generator[str, None, None]:
+    def gen_lines(self, block: Iterable[str], indent: int) -> Generator[str]:
         """Generates lines as expected by tokenize from a list of lines.
 
         This strips the first len(indent + self.PS1) characters off each line.

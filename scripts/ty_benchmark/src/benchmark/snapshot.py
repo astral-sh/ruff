@@ -69,7 +69,6 @@ class SnapshotRunner(NamedTuple):
                 logging.info(f"Running prepare: {command.prepare}")
                 subprocess.run(
                     command.prepare,
-                    shell=True,
                     cwd=cwd,
                     env=env,
                     capture_output=True,

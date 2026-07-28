@@ -2177,6 +2177,8 @@ enum NumpySectionOrder {
     ShortSummary,
     ExtendedSummary,
     Parameters,
+    Attributes,
+    Methods,
     Returns,
     Yields,
     Receives,
@@ -2188,8 +2190,6 @@ enum NumpySectionOrder {
     Notes,
     References,
     Examples,
-    Attributes,
-    Methods,
 }
 
 fn numpy_section_order(kind: SectionKind) -> Option<NumpySectionOrder> {
@@ -2197,6 +2197,8 @@ fn numpy_section_order(kind: SectionKind) -> Option<NumpySectionOrder> {
         SectionKind::ShortSummary => Some(NumpySectionOrder::ShortSummary),
         SectionKind::ExtendedSummary => Some(NumpySectionOrder::ExtendedSummary),
         SectionKind::Parameters => Some(NumpySectionOrder::Parameters),
+        SectionKind::Attributes => Some(NumpySectionOrder::Attributes),
+        SectionKind::Methods => Some(NumpySectionOrder::Methods),
         SectionKind::Returns => Some(NumpySectionOrder::Returns),
         SectionKind::Yields => Some(NumpySectionOrder::Yields),
         SectionKind::Receives => Some(NumpySectionOrder::Receives),
@@ -2210,8 +2212,6 @@ fn numpy_section_order(kind: SectionKind) -> Option<NumpySectionOrder> {
         SectionKind::Notes => Some(NumpySectionOrder::Notes),
         SectionKind::References => Some(NumpySectionOrder::References),
         SectionKind::Examples => Some(NumpySectionOrder::Examples),
-        SectionKind::Attributes => Some(NumpySectionOrder::Attributes),
-        SectionKind::Methods => Some(NumpySectionOrder::Methods),
         _ => None,
     }
 }

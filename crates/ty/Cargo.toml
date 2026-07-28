@@ -1,6 +1,7 @@
 [package]
 name = "ty"
 version = "0.0.0"
+publish = false
 # required for correct pypi metadata
 homepage = "https://github.com/astral-sh/ty/"
 documentation = "https://docs.astral.sh/ty/"
@@ -13,12 +14,16 @@ license.workspace = true
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[lib]
+doctest = false
+
 [dependencies]
 ruff_db = { workspace = true, features = ["os", "cache", "junit"] }
-ruff_python_ast = { workspace = true }
+ruff_diagnostics = { workspace = true }
+ruff_ranged_value = { workspace = true }
 ty_combine = { workspace = true }
 ty_project = { workspace = true, features = ["zstd", "junit"] }
-ty_python_semantic = { workspace = true }
+ty_python_semantic = { workspace = true, features = ["serde"] }
 ty_server = { workspace = true }
 ty_static = { workspace = true }
 
@@ -46,8 +51,10 @@ tikv-jemallocator = { workspace = true }
 
 [dev-dependencies]
 ruff_db = { workspace = true, features = ["testing"] }
+ruff_python_ast = { workspace = true }
 ruff_python_trivia = { workspace = true }
 ty_module_resolver = { workspace = true }
+ty_python_core = { workspace = true }
 
 dunce = { workspace = true }
 filetime = { workspace = true }
@@ -59,6 +66,7 @@ toml = { workspace = true }
 
 [features]
 default = []
+test-uv = []
 
 [lints]
 workspace = true

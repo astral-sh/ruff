@@ -15,6 +15,7 @@ Module(
                     node_index: NodeIndex(None),
                     range: 0..6,
                     names: [],
+                    is_lazy: false,
                 },
             ),
             Expr(
@@ -54,6 +55,7 @@ Module(
                             asname: None,
                         },
                     ],
+                    is_lazy: false,
                 },
             ),
             Expr(
@@ -119,18 +121,15 @@ Module(
 1 | import *
 2 | import x, *, y
   |         ^ Syntax Error: Trailing comma not allowed
-  |
 
 
   |
 1 | import *
 2 | import x, *, y
   |           ^ Syntax Error: Simple statements must be separated by newlines or semicolons
-  |
 
 
   |
 1 | import *
 2 | import x, *, y
   |            ^ Syntax Error: Expected an expression
-  |

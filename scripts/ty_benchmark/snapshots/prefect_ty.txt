@@ -1,141 +1,206 @@
-src/prefect/concurrency/_leases.py:116:10: error[invalid-context-manager] Object of type `AsyncCancelScope` cannot be used with `with` because it does not correctly implement `__exit__`
-src/prefect/events/cli/automations.py:173:33: error[missing-argument] No argument provided for required parameter `self` of function `model_dump_json`
-src/prefect/events/cli/automations.py:176:42: error[invalid-argument-type] Argument to function `no_really_json` is incorrect: Expected `type[BaseModel]`, found `Automation`
-src/prefect/events/cli/automations.py:178:41: error[invalid-argument-type] Argument to function `no_really_json` is incorrect: Expected `type[BaseModel]`, found `Automation`
-src/prefect/events/cli/automations.py:241:44: warning[possibly-missing-attribute] Attribute `id` may be missing on object of type `Automation | None`
-src/prefect/events/cli/automations.py:242:65: warning[possibly-missing-attribute] Attribute `id` may be missing on object of type `Automation | None`
-src/prefect/events/cli/automations.py:296:43: warning[possibly-missing-attribute] Attribute `id` may be missing on object of type `Automation | None`
-src/prefect/events/cli/automations.py:297:64: warning[possibly-missing-attribute] Attribute `id` may be missing on object of type `Automation | None`
-src/prefect/events/cli/automations.py:359:44: error[invalid-argument-type] Argument to bound method `delete_automation` is incorrect: Expected `UUID`, found `str & ~AlwaysFalsy`
-src/prefect/events/cli/automations.py:429:33: error[invalid-argument-type] Argument to function `loads` is incorrect: Expected `bytes | bytearray | memoryview[int] | str`, found `str | None`
-src/prefect/events/clients.py:389:23: warning[possibly-missing-attribute] Attribute `send` may be missing on object of type `ClientConnection | None`
-src/prefect/events/clients.py:600:13: error[invalid-argument-type] Argument is incorrect: Expected `DateTime`, found `datetime`
-src/prefect/events/clients.py:601:13: error[invalid-argument-type] Argument is incorrect: Expected `DateTime`, found `datetime`
-src/prefect/events/clients.py:642:50: warning[possibly-missing-attribute] Attribute `recv` may be missing on object of type `ClientConnection | None`
+src/prefect/concurrency/_leases.py:225:10: error[invalid-context-manager] Object of type `AsyncCancelScope` cannot be used with `with` because it does not correctly implement `__exit__`
+src/prefect/events/clients.py:776:13: error[invalid-argument-type] Argument is incorrect: Expected `DateTime`, found `datetime`
+src/prefect/events/clients.py:777:13: error[invalid-argument-type] Argument is incorrect: Expected `DateTime`, found `datetime`
+src/prefect/events/filters.py:97:23: error[invalid-assignment] Object of type `dataclasses.Field[datetime]` is not assignable to `DateTime`
+src/prefect/events/filters.py:104:23: error[invalid-assignment] Object of type `dataclasses.Field[datetime]` is not assignable to `DateTime`
 src/prefect/events/related.py:100:17: error[invalid-argument-type] Argument to function `_get_and_cache_related_object` is incorrect: Expected `(UUID | str, /) -> Awaitable[ObjectBaseModel | None]`, found `bound method PrefectClient.read_flow_run(flow_run_id: UUID) -> CoroutineType[Any, Any, FlowRun]`
 src/prefect/events/related.py:123:21: error[invalid-argument-type] Argument to function `_get_and_cache_related_object` is incorrect: Expected `(UUID | str, /) -> Awaitable[ObjectBaseModel | None]`, found `bound method PrefectClient.read_flow(flow_id: UUID) -> CoroutineType[Any, Any, Flow]`
 src/prefect/events/related.py:142:25: error[invalid-argument-type] Argument to function `_get_and_cache_related_object` is incorrect: Expected `(UUID | str, /) -> Awaitable[ObjectBaseModel | None]`, found `bound method PrefectClient.read_work_queue(id: UUID) -> CoroutineType[Any, Any, WorkQueue]`
 src/prefect/events/related.py:153:25: error[invalid-argument-type] Argument to function `_get_and_cache_related_object` is incorrect: Expected `(UUID | str, /) -> Awaitable[ObjectBaseModel | None]`, found `bound method PrefectClient.read_work_pool(work_pool_name: str) -> CoroutineType[Any, Any, WorkPool]`
-src/prefect/events/related.py:182:25: error[invalid-argument-type] Argument to bound method `__init__` is incorrect: Expected `Iterable[Unknown]`, found `object`
-src/prefect/events/related.py:212:5: error[invalid-assignment] Invalid subscript assignment with key of type `str` and value of type `tuple[dict[str, str | ObjectBaseModel | None] | dict[Unknown | str, Unknown | str | ObjectBaseModel | None], datetime]` on object of type `dict[str, tuple[dict[str, str | ObjectBaseModel | None], DateTime]]`
-src/prefect/events/schemas/automations.py:86:23: error[call-non-callable] Object of type `object` is not callable
-src/prefect/events/utilities.py:96:27: error[invalid-argument-type] Argument is incorrect: Expected `DateTime`, found `Any | dict[str, Any] | None`
-src/prefect/events/utilities.py:96:27: error[invalid-argument-type] Argument is incorrect: Expected `str`, found `Any | dict[str, Any] | None`
-src/prefect/events/utilities.py:96:27: error[invalid-argument-type] Argument is incorrect: Expected `Resource`, found `Any | dict[str, Any] | None`
-src/prefect/events/utilities.py:96:27: error[invalid-argument-type] Argument is incorrect: Expected `list[RelatedResource]`, found `Any | dict[str, Any] | None`
-src/prefect/events/utilities.py:96:27: error[invalid-argument-type] Argument is incorrect: Expected `dict[str, Any]`, found `Any | dict[str, Any] | None`
-src/prefect/events/utilities.py:96:27: error[invalid-argument-type] Argument is incorrect: Expected `UUID`, found `Any | dict[str, Any] | None`
-src/prefect/events/utilities.py:96:27: error[invalid-argument-type] Argument is incorrect: Expected `UUID | None`, found `Any | dict[str, Any] | None`
-src/prefect/events/worker.py:74:9: error[invalid-method-override] Invalid override of method `_prepare_item`: Definition is incompatible with `QueueService._prepare_item`
-src/prefect/events/worker.py:78:15: error[invalid-method-override] Invalid override of method `_handle`: Definition is incompatible with `QueueService._handle`
-src/prefect/events/worker.py:100:9: error[invalid-method-override] Invalid override of method `instance`: Definition is incompatible with `_QueueServiceBase.instance`
-src/prefect/events/worker.py:130:16: error[invalid-return-type] Return type does not match returned value: expected `Self@instance`, found `EventsWorker`
-src/prefect/input/actions.py:46:49: warning[deprecated] The function `json` is deprecated: The `json` method is deprecated; use `model_dump_json` instead.
-src/prefect/server/models/artifacts.py:449:12: error[unresolved-attribute] Object of type `Result[Unknown]` has no attribute `rowcount`
-src/prefect/server/models/artifacts.py:449:39: error[unresolved-attribute] Object of type `Result[Unknown]` has no attribute `rowcount`
-src/prefect/server/models/artifacts.py:534:12: error[unresolved-attribute] Object of type `Result[Any]` has no attribute `rowcount`
-src/prefect/server/models/block_documents.py:145:13: error[invalid-argument-type] Argument is incorrect: Expected `BlockDocumentFilterId | None`, found `dict[str, list[Unknown | UUID]]`
-src/prefect/server/models/block_documents.py:256:13: error[invalid-argument-type] Argument is incorrect: Expected `BlockDocumentFilterName | None`, found `dict[str, list[Unknown | str]]`
-src/prefect/server/models/block_documents.py:261:13: error[invalid-argument-type] Argument is incorrect: Expected `BlockTypeFilterSlug | None`, found `dict[str, list[Unknown | str]]`
-src/prefect/server/models/block_documents.py:427:47: error[invalid-argument-type] Argument is incorrect: Expected `BlockSchemaFilterId | None`, found `dict[str, list[UUID | Unknown]]`
-src/prefect/server/models/block_documents.py:473:12: error[unresolved-attribute] Object of type `Result[Any]` has no attribute `rowcount`
-src/prefect/server/models/block_documents.py:664:12: error[unresolved-attribute] Object of type `Result[Any]` has no attribute `rowcount`
-src/prefect/server/models/block_schemas.py:264:13: error[unresolved-attribute] Object of type `dict[str, Any]` has no attribute `replace`
-src/prefect/server/models/block_schemas.py:268:30: error[unresolved-attribute] Object of type `dict[str, Any]` has no attribute `replace`
-src/prefect/server/models/block_schemas.py:303:12: error[unresolved-attribute] Object of type `Result[Any]` has no attribute `rowcount`
-src/prefect/server/models/block_types.py:200:12: error[unresolved-attribute] Object of type `Result[Unknown]` has no attribute `rowcount`
-src/prefect/server/models/block_types.py:221:12: error[unresolved-attribute] Object of type `Result[Any]` has no attribute `rowcount`
-src/prefect/server/models/concurrency_limits.py:153:12: error[unresolved-attribute] Object of type `Result[Any]` has no attribute `rowcount`
-src/prefect/server/models/concurrency_limits.py:165:12: error[unresolved-attribute] Object of type `Result[Any]` has no attribute `rowcount`
-src/prefect/server/models/concurrency_limits_v2.py:16:12: error[invalid-return-type] Return type does not match returned value: expected `ColumnElement[int | float]`, found `greatest[int]`
-src/prefect/server/models/concurrency_limits_v2.py:69:12: error[invalid-return-type] Return type does not match returned value: expected `ColumnElement[int | float]`, found `greatest[int]`
-src/prefect/server/models/concurrency_limits_v2.py:171:12: error[unresolved-attribute] Object of type `Result[Unknown]` has no attribute `rowcount`
-src/prefect/server/models/concurrency_limits_v2.py:192:12: error[unresolved-attribute] Object of type `Result[Any]` has no attribute `rowcount`
-src/prefect/server/models/concurrency_limits_v2.py:236:12: error[unresolved-attribute] Object of type `Result[Unknown]` has no attribute `rowcount`
-src/prefect/server/models/concurrency_limits_v2.py:284:12: error[unresolved-attribute] Object of type `Result[Unknown]` has no attribute `rowcount`
-src/prefect/server/models/concurrency_limits_v2.py:306:12: error[unresolved-attribute] Object of type `Result[Unknown]` has no attribute `rowcount`
+src/prefect/events/related.py:182:25: error[invalid-argument-type] Argument to `set.__init__` is incorrect: Expected `Iterable[Unknown]`, found `object`
+src/prefect/events/related.py:212:5: error[invalid-assignment] Invalid subscript assignment with key of type `str` and value of type `tuple[dict[str, str | ObjectBaseModel | None], datetime]` on object of type `dict[str, tuple[dict[str, str | ObjectBaseModel | None], DateTime]]`
+src/prefect/events/schemas/automations.py:89:23: error[call-non-callable] Object of type `object` is not callable
+src/prefect/events/schemas/events.py:119:50: error[invalid-assignment] Object of type `dataclasses.Field[datetime]` is not assignable to `DateTime`
+src/prefect/events/worker.py:92:9: error[invalid-method-override] Invalid override of method `_prepare_item`: Definition is incompatible with `QueueService._prepare_item`
+src/prefect/events/worker.py:99:15: error[invalid-method-override] Invalid override of method `_handle`: Definition is incompatible with `QueueService._handle`
+src/prefect/events/worker.py:131:9: error[invalid-method-override] Invalid override of method `instance`: Definition is incompatible with `_QueueServiceBase.instance`
+src/prefect/input/actions.py:54:49: warning[deprecated] The function `json` is deprecated: The `json` method is deprecated; use `model_dump_json` instead.
+src/prefect/input/actions.py:85:49: warning[deprecated] The function `json` is deprecated: The `json` method is deprecated; use `model_dump_json` instead.
+src/prefect/input/run_input.py:254:30: error[invalid-argument-type] Argument expression after ** must be a mapping type: Found `(Any & ~AlwaysFalsy) | (Coroutine[Any, Any, Any] & ~AlwaysFalsy)`
+src/prefect/input/run_input.py:426:15: error[invalid-method-override] Invalid override of method `aload`: Definition is incompatible with `BaseRunInput.aload`
+src/prefect/input/run_input.py:448:16: error[unresolved-attribute] Attribute `value` is not defined on `Coroutine[Any, Any, Self@load]` in union `Self@load | Coroutine[Any, Any, Self@load]`
+src/prefect/input/run_input.py:601:52: error[not-iterable] Object of type `(list[FlowRunInput] & ~AlwaysFalsy) | (Coroutine[Any, Any, list[FlowRunInput]] & ~AlwaysFalsy)` may not be iterable
+src/prefect/input/run_input.py:603:16: error[invalid-return-type] Return type does not match returned value: expected `list[FlowRunInput]`, found `list[FlowRunInput] | Coroutine[Any, Any, list[FlowRunInput]]`
+src/prefect/input/run_input.py:672:20: error[invalid-return-type] Return type does not match returned value: expected `T@GetAutomaticInputHandler | AutomaticRunInput[T@GetAutomaticInputHandler]`, found `T@GetAutomaticInputHandler | AutomaticRunInput[T@GetAutomaticInputHandler] | Coroutine[Any, Any, T@GetAutomaticInputHandler | AutomaticRunInput[T@GetAutomaticInputHandler]]`
+src/prefect/input/run_input.py:713:52: error[not-iterable] Object of type `(list[FlowRunInput] & ~AlwaysFalsy) | (Coroutine[Any, Any, list[FlowRunInput]] & ~AlwaysFalsy)` may not be iterable
+src/prefect/input/run_input.py:715:16: error[invalid-return-type] Return type does not match returned value: expected `list[FlowRunInput]`, found `list[FlowRunInput] | Coroutine[Any, Any, list[FlowRunInput]]`
+src/prefect/server/models/artifacts.py:25:78: error[invalid-argument-type] Argument to function `artifact_collection_created_event` is incorrect: Expected `DateTime`, found `datetime`
+src/prefect/server/models/artifacts.py:35:78: error[invalid-argument-type] Argument to function `artifact_collection_updated_event` is incorrect: Expected `DateTime`, found `datetime`
+src/prefect/server/models/artifacts.py:45:78: error[invalid-argument-type] Argument to function `artifact_collection_deleted_event` is incorrect: Expected `DateTime`, found `datetime`
+src/prefect/server/models/artifacts.py:144:30: error[invalid-argument-type] Argument is incorrect: Expected `DateTime | None`, found `datetime`
+src/prefect/server/models/artifacts.py:149:9: error[invalid-argument-type] Argument is incorrect: Expected `DateTime | None`, found `datetime`
+src/prefect/server/models/artifacts.py:486:12: error[unresolved-attribute] Object of type `Result[Any]` has no attribute `rowcount`
+src/prefect/server/models/artifacts.py:486:39: error[unresolved-attribute] Object of type `Result[Any]` has no attribute `rowcount`
+src/prefect/server/models/artifacts.py:585:12: error[unresolved-attribute] Object of type `Result[Any]` has no attribute `rowcount`
+src/prefect/server/models/block_documents.py:36:68: error[invalid-argument-type] Argument to function `block_document_created_event` is incorrect: Expected `DateTime`, found `datetime`
+src/prefect/server/models/block_documents.py:46:68: error[invalid-argument-type] Argument to function `block_document_updated_event` is incorrect: Expected `DateTime`, found `datetime`
+src/prefect/server/models/block_documents.py:56:68: error[invalid-argument-type] Argument to function `block_document_deleted_event` is incorrect: Expected `DateTime`, found `datetime`
+src/prefect/server/models/block_documents.py:180:13: error[invalid-argument-type] Argument is incorrect: Expected `BlockDocumentFilterId | None`, found `dict[str, list[UUID]]`
+src/prefect/server/models/block_documents.py:303:13: error[invalid-argument-type] Argument is incorrect: Expected `BlockDocumentFilterName | None`, found `dict[str, list[str]]`
+src/prefect/server/models/block_documents.py:308:13: error[invalid-argument-type] Argument is incorrect: Expected `BlockTypeFilterSlug | None`, found `dict[str, list[str]]`
+src/prefect/server/models/block_documents.py:474:47: error[invalid-argument-type] Argument is incorrect: Expected `BlockSchemaFilterId | None`, found `dict[str, list[UUID]]`
+src/prefect/server/models/block_documents.py:789:12: error[unresolved-attribute] Object of type `Result[Any]` has no attribute `rowcount`
+src/prefect/server/models/block_schemas.py:265:13: error[unresolved-attribute] Object of type `dict[str, Any]` has no attribute `replace`
+src/prefect/server/models/block_schemas.py:269:30: error[unresolved-attribute] Object of type `dict[str, Any]` has no attribute `replace`
+src/prefect/server/models/block_schemas.py:311:8: error[unresolved-attribute] Object of type `Result[Any]` has no attribute `rowcount`
+src/prefect/server/models/block_schemas.py:383:41: error[invalid-argument-type] Argument to function `_construct_full_block_schema` is incorrect: Expected `list[tuple[prefect.server.schemas.core.BlockSchema, str | None, UUID | None]]`, found `Sequence[Row[tuple[prefect.server.database.orm_models.BlockSchema, Any, Any]]]`
+src/prefect/server/models/block_schemas.py:742:17: error[invalid-argument-type] Argument to function `_construct_full_block_schema` is incorrect: Expected `list[tuple[prefect.server.schemas.core.BlockSchema, str | None, UUID | None]]`, found `Sequence[Row[tuple[prefect.server.database.orm_models.BlockSchema, Any, Any]]]`
+src/prefect/server/models/block_schemas.py:833:41: error[invalid-argument-type] Argument to function `_construct_full_block_schema` is incorrect: Expected `list[tuple[prefect.server.schemas.core.BlockSchema, str | None, UUID | None]]`, found `Sequence[Row[tuple[prefect.server.database.orm_models.BlockSchema, Any, Any]]]`
+src/prefect/server/models/block_types.py:30:60: error[invalid-argument-type] Argument to function `block_type_created_event` is incorrect: Expected `DateTime`, found `datetime`
+src/prefect/server/models/block_types.py:38:60: error[invalid-argument-type] Argument to function `block_type_updated_event` is incorrect: Expected `DateTime`, found `datetime`
+src/prefect/server/models/block_types.py:46:60: error[invalid-argument-type] Argument to function `block_type_deleted_event` is incorrect: Expected `DateTime`, found `datetime`
+src/prefect/server/models/concurrency_limits.py:29:74: error[invalid-argument-type] Argument to function `concurrency_limit_created_event` is incorrect: Expected `DateTime`, found `datetime`
+src/prefect/server/models/concurrency_limits.py:39:74: error[invalid-argument-type] Argument to function `concurrency_limit_updated_event` is incorrect: Expected `DateTime`, found `datetime`
+src/prefect/server/models/concurrency_limits.py:49:74: error[invalid-argument-type] Argument to function `concurrency_limit_deleted_event` is incorrect: Expected `DateTime`, found `datetime`
+src/prefect/server/models/concurrency_limits.py:67:5: error[invalid-assignment] Object of type `datetime` is not assignable to attribute `updated` of type `DateTime | None`
+src/prefect/server/models/concurrency_limits_v2.py:23:77: error[invalid-argument-type] Argument to function `concurrency_limit_v2_created_event` is incorrect: Expected `DateTime`, found `datetime`
+src/prefect/server/models/concurrency_limits_v2.py:33:77: error[invalid-argument-type] Argument to function `concurrency_limit_v2_updated_event` is incorrect: Expected `DateTime`, found `datetime`
+src/prefect/server/models/concurrency_limits_v2.py:43:77: error[invalid-argument-type] Argument to function `concurrency_limit_v2_deleted_event` is incorrect: Expected `DateTime`, found `datetime`
+src/prefect/server/models/concurrency_limits_v2.py:279:12: error[unresolved-attribute] Object of type `Result[Any]` has no attribute `rowcount`
+src/prefect/server/models/concurrency_limits_v2.py:327:12: error[unresolved-attribute] Object of type `Result[Any]` has no attribute `rowcount`
+src/prefect/server/models/concurrency_limits_v2.py:349:12: error[unresolved-attribute] Object of type `Result[Any]` has no attribute `rowcount`
+src/prefect/server/models/configuration.py:18:44: warning[unused-type-ignore-comment] Unused blanket `type: ignore` directive
+src/prefect/server/models/configuration.py:46:12: error[unresolved-attribute] Object of type `Result[Any]` has no attribute `rowcount`
 src/prefect/server/models/csrf_token.py:105:12: error[unresolved-attribute] Object of type `Result[Any]` has no attribute `rowcount`
-src/prefect/server/models/deployments.py:108:74: error[invalid-argument-type] Argument to function `with_system_labels_for_deployment` is incorrect: Expected `Deployment`, found `Deployment | DeploymentCreate`
-src/prefect/server/models/deployments.py:324:12: error[unresolved-attribute] Object of type `Result[Unknown]` has no attribute `rowcount`
-src/prefect/server/models/deployments.py:593:12: error[unresolved-attribute] Object of type `Result[Any]` has no attribute `rowcount`
-src/prefect/server/models/deployments.py:1041:12: error[unresolved-attribute] Object of type `Result[Unknown]` has no attribute `rowcount`
-src/prefect/server/models/deployments.py:1066:12: error[unresolved-attribute] Object of type `Result[Any]` has no attribute `rowcount`
-src/prefect/server/models/deployments.py:1093:12: error[unresolved-attribute] Object of type `Result[Any]` has no attribute `rowcount`
-src/prefect/server/models/deployments.py:1146:25: error[invalid-argument-type] Argument to function `deployment_status_event` is incorrect: Expected `DateTime`, found `datetime`
-src/prefect/server/models/deployments.py:1199:29: error[invalid-argument-type] Argument to function `deployment_status_event` is incorrect: Expected `DateTime`, found `datetime`
+src/prefect/server/models/deployments.py:153:5: error[invalid-assignment] Object of type `datetime` is not assignable to attribute `updated` on type `Deployment | DeploymentCreate`
+src/prefect/server/models/deployments.py:155:74: error[invalid-argument-type] Argument to function `with_system_labels_for_deployment` is incorrect: Expected `Deployment`, found `Deployment | DeploymentCreate`
+src/prefect/server/models/deployments.py:410:15: error[unresolved-attribute] Object of type `Result[Any]` has no attribute `rowcount`
+src/prefect/server/models/deployments.py:689:53: error[invalid-argument-type] Argument to function `deployment_deleted_event` is incorrect: Expected `DateTime`, found `datetime`
+src/prefect/server/models/deployments.py:704:15: error[unresolved-attribute] Object of type `Result[Any]` has no attribute `rowcount`
+src/prefect/server/models/deployments.py:760:48: error[invalid-argument-type] Argument to function `deployment_deleted_event` is incorrect: Expected `DateTime`, found `datetime`
+src/prefect/server/models/deployments.py:1036:13: error[unresolved-attribute] Object of type `FromClause` has no attribute `insert`
+src/prefect/server/models/deployments.py:1229:12: error[unresolved-attribute] Object of type `Result[Any]` has no attribute `rowcount`
+src/prefect/server/models/deployments.py:1254:12: error[unresolved-attribute] Object of type `Result[Any]` has no attribute `rowcount`
+src/prefect/server/models/deployments.py:1281:12: error[unresolved-attribute] Object of type `Result[Any]` has no attribute `rowcount`
+src/prefect/server/models/deployments.py:1350:25: error[invalid-argument-type] Argument to function `deployment_status_event` is incorrect: Expected `DateTime`, found `datetime`
+src/prefect/server/models/deployments.py:1414:29: error[invalid-argument-type] Argument to function `deployment_status_event` is incorrect: Expected `DateTime`, found `datetime`
+src/prefect/server/models/deployments.py:1499:17: error[invalid-argument-type] Argument to function `deployment_created_event` is incorrect: Expected `DateTime`, found `datetime`
+src/prefect/server/models/deployments.py:1518:17: error[invalid-argument-type] Argument to function `deployment_updated_event` is incorrect: Expected `DateTime`, found `datetime`
+src/prefect/server/models/deployments.py:1533:17: error[invalid-argument-type] Argument to function `deployment_deleted_event` is incorrect: Expected `DateTime`, found `datetime`
 src/prefect/server/models/events.py:52:9: error[invalid-argument-type] Argument is incorrect: Expected `DateTime`, found `datetime`
-src/prefect/server/models/events.py:54:9: error[invalid-argument-type] Argument is incorrect: Expected `Resource`, found `dict[Unknown | str, Unknown | str | None]`
+src/prefect/server/models/events.py:54:9: error[invalid-argument-type] Argument is incorrect: Expected `Resource`, found `dict[str, str | None]`
 src/prefect/server/models/events.py:69:9: error[invalid-argument-type] Argument is incorrect: Expected `list[RelatedResource]`, found `list[dict[str, str]]`
 src/prefect/server/models/events.py:82:9: error[invalid-argument-type] Argument is incorrect: Expected `UUID`, found `UUID | None`
-src/prefect/server/models/events.py:356:9: error[invalid-argument-type] Argument is incorrect: Expected `Resource`, found `dict[Unknown | str, Unknown | str]`
-src/prefect/server/models/events.py:391:9: error[invalid-argument-type] Argument is incorrect: Expected `Resource`, found `dict[Unknown | str, Unknown | str]`
-src/prefect/server/models/events.py:396:9: error[invalid-argument-type] Argument is incorrect: Expected `list[RelatedResource]`, found `list[dict[str, Any]]`
-src/prefect/server/models/events.py:413:9: error[invalid-argument-type] Argument is incorrect: Expected `Resource`, found `dict[Unknown | str, Unknown | str]`
+src/prefect/server/models/events.py:393:9: error[invalid-argument-type] Argument is incorrect: Expected `Resource`, found `dict[str, str]`
+src/prefect/server/models/events.py:397:9: error[invalid-argument-type] Argument is incorrect: Expected `list[RelatedResource]`, found `list[dict[str, str]]`
+src/prefect/server/models/events.py:411:9: error[invalid-argument-type] Argument is incorrect: Expected `Resource`, found `dict[str, str]`
+src/prefect/server/models/events.py:415:9: error[invalid-argument-type] Argument is incorrect: Expected `list[RelatedResource]`, found `list[dict[str, str]]`
+src/prefect/server/models/events.py:430:9: error[invalid-argument-type] Argument is incorrect: Expected `Resource`, found `dict[str, str]`
+src/prefect/server/models/events.py:434:9: error[invalid-argument-type] Argument is incorrect: Expected `list[RelatedResource]`, found `list[dict[str, str]]`
+src/prefect/server/models/events.py:452:9: error[invalid-argument-type] Argument is incorrect: Expected `Resource`, found `dict[str, str]`
+src/prefect/server/models/events.py:456:9: error[invalid-argument-type] Argument is incorrect: Expected `list[RelatedResource]`, found `list[dict[str, str]]`
+src/prefect/server/models/events.py:487:9: error[invalid-argument-type] Argument is incorrect: Expected `Resource`, found `dict[str, str]`
+src/prefect/server/models/events.py:492:9: error[invalid-argument-type] Argument is incorrect: Expected `list[RelatedResource]`, found `list[dict[str, Any]]`
+src/prefect/server/models/events.py:509:9: error[invalid-argument-type] Argument is incorrect: Expected `Resource`, found `dict[str, str]`
+src/prefect/server/models/events.py:530:9: error[invalid-argument-type] Argument is incorrect: Expected `Resource`, found `dict[str, str]`
+src/prefect/server/models/events.py:571:9: error[invalid-argument-type] Argument is incorrect: Expected `Resource`, found `dict[str, str]`
+src/prefect/server/models/events.py:576:9: error[invalid-argument-type] Argument is incorrect: Expected `list[RelatedResource]`, found `list[dict[str, Any]]`
+src/prefect/server/models/events.py:634:9: error[invalid-argument-type] Argument is incorrect: Expected `Resource`, found `dict[str, str]`
+src/prefect/server/models/events.py:635:9: error[invalid-argument-type] Argument is incorrect: Expected `list[RelatedResource]`, found `list[dict[str, str]]`
+src/prefect/server/models/events.py:648:9: error[invalid-argument-type] Argument is incorrect: Expected `Resource`, found `dict[str, str]`
+src/prefect/server/models/events.py:649:9: error[invalid-argument-type] Argument is incorrect: Expected `list[RelatedResource]`, found `list[dict[str, str]]`
+src/prefect/server/models/events.py:685:9: error[invalid-argument-type] Argument is incorrect: Expected `Resource`, found `dict[str, str]`
+src/prefect/server/models/events.py:690:9: error[invalid-argument-type] Argument is incorrect: Expected `list[RelatedResource]`, found `list[dict[str, Any]]`
+src/prefect/server/models/events.py:704:9: error[invalid-argument-type] Argument is incorrect: Expected `Resource`, found `dict[str, str]`
+src/prefect/server/models/events.py:709:9: error[invalid-argument-type] Argument is incorrect: Expected `list[RelatedResource]`, found `list[dict[str, Any]]`
 src/prefect/server/models/flow_run_input.py:91:12: error[unresolved-attribute] Object of type `Result[Any]` has no attribute `rowcount`
 src/prefect/server/models/flow_run_states.py:79:12: error[unresolved-attribute] Object of type `Result[Any]` has no attribute `rowcount`
-src/prefect/server/models/flow_runs.py:174:12: error[unresolved-attribute] Object of type `Result[Unknown]` has no attribute `rowcount`
+src/prefect/server/models/flow_runs.py:174:12: error[unresolved-attribute] Object of type `Result[Any]` has no attribute `rowcount`
 src/prefect/server/models/flow_runs.py:251:26: error[invalid-type-form] Variable of type `type[Flow]` is not allowed in a type expression
 src/prefect/server/models/flow_runs.py:252:26: error[invalid-type-form] Variable of type `type[TaskRun]` is not allowed in a type expression
+src/prefect/server/models/flow_runs.py:267:50: warning[possibly-unresolved-reference] Name `flow_or_task_run_exists_clause` used when possibly not defined
+src/prefect/server/models/flow_runs.py:276:29: warning[possibly-unresolved-reference] Name `flow_or_task_run_exists_clause` used when possibly not defined
 src/prefect/server/models/flow_runs.py:322:41: error[invalid-argument-type] Argument to function `load_only` is incorrect: Expected `Literal["*"] | QueryableAttribute[Any]`, found `str`
-src/prefect/server/models/flow_runs.py:504:12: error[unresolved-attribute] Object of type `Result[Any]` has no attribute `rowcount`
-src/prefect/server/models/flow_runs.py:582:15: error[missing-argument] No argument provided for required parameter `db`
-src/prefect/server/models/flow_runs.py:582:15: error[missing-argument] No argument provided for required parameter `db`
-src/prefect/server/models/flow_runs.py:685:19: error[unresolved-attribute] Object of type `Result[Unknown]` has no attribute `rowcount`
-src/prefect/server/models/flows.py:83:12: error[unresolved-attribute] Object of type `Result[Unknown]` has no attribute `rowcount`
-src/prefect/server/models/flows.py:290:12: error[unresolved-attribute] Object of type `Result[Any]` has no attribute `rowcount`
-src/prefect/server/models/logs.py:113:12: error[unresolved-attribute] Object of type `Result[Any]` has no attribute `rowcount`
+src/prefect/server/models/flow_runs.py:419:17: error[invalid-argument-type] Argument is incorrect: Expected `list[TaskRunResult]`, found `list[TaskRunResult | FlowRunResult | Parameter | Constant]`
+src/prefect/server/models/flow_runs.py:420:17: error[invalid-argument-type] Argument is incorrect: Expected `State | None`, found `TaskRunState | None`
+src/prefect/server/models/flow_runs.py:544:12: error[unresolved-attribute] Object of type `Result[Any]` has no attribute `rowcount`
+src/prefect/server/models/flow_runs.py:638:87: warning[unused-type-ignore-comment] Unused blanket `type: ignore` directive
+src/prefect/server/models/flow_runs.py:664:15: error[unresolved-attribute] Object of type `OrchestrationContext[FlowRun, FlowRunPolicy]` has no attribute `validate_proposed_state`
+src/prefect/server/models/flow_runs.py:693:9: error[invalid-argument-type] Argument is incorrect: Expected `DateTime`, found `datetime`
+src/prefect/server/models/flow_runs.py:767:19: error[unresolved-attribute] Object of type `Result[Any]` has no attribute `rowcount`
+src/prefect/server/models/flows.py:26:69: error[invalid-argument-type] Argument to function `flow_created_event` is incorrect: Expected `DateTime`, found `datetime`
+src/prefect/server/models/flows.py:32:69: error[invalid-argument-type] Argument to function `flow_updated_event` is incorrect: Expected `DateTime`, found `datetime`
+src/prefect/server/models/flows.py:38:69: error[invalid-argument-type] Argument to function `flow_deleted_event` is incorrect: Expected `DateTime`, found `datetime`
+src/prefect/server/models/flows.py:66:16: error[unresolved-attribute] Object of type `Result[Any]` has no attribute `rowcount`
+src/prefect/server/models/logs.py:130:12: error[unresolved-attribute] Object of type `Result[Any]` has no attribute `rowcount`
 src/prefect/server/models/saved_searches.py:146:12: error[unresolved-attribute] Object of type `Result[Any]` has no attribute `rowcount`
 src/prefect/server/models/task_run_states.py:74:12: error[unresolved-attribute] Object of type `Result[Any]` has no attribute `rowcount`
-src/prefect/server/models/task_runs.py:176:12: error[unresolved-attribute] Object of type `Result[Unknown]` has no attribute `rowcount`
-src/prefect/server/models/task_runs.py:462:12: error[unresolved-attribute] Object of type `Result[Any]` has no attribute `rowcount`
-src/prefect/server/models/task_runs.py:535:15: error[missing-argument] No argument provided for required parameter `db`
-src/prefect/server/models/task_runs.py:535:15: error[missing-argument] No argument provided for required parameter `db`
+src/prefect/server/models/task_runs.py:176:12: error[unresolved-attribute] Object of type `Result[Any]` has no attribute `rowcount`
+src/prefect/server/models/task_runs.py:483:12: error[unresolved-attribute] Object of type `Result[Any]` has no attribute `rowcount`
+src/prefect/server/models/task_runs.py:531:87: warning[unused-type-ignore-comment] Unused blanket `type: ignore` directive
+src/prefect/server/models/task_runs.py:556:15: error[unresolved-attribute] Object of type `OrchestrationContext[TaskRun, TaskRunPolicy]` has no attribute `validate_proposed_state`
 src/prefect/server/models/task_workers.py:71:13: error[invalid-argument-type] Argument is incorrect: Expected `DateTime`, found `datetime`
-src/prefect/server/models/variables.py:123:12: error[unresolved-attribute] Object of type `Result[Unknown]` has no attribute `rowcount`
-src/prefect/server/models/variables.py:140:12: error[unresolved-attribute] Object of type `Result[Unknown]` has no attribute `rowcount`
-src/prefect/server/models/variables.py:154:12: error[unresolved-attribute] Object of type `Result[Any]` has no attribute `rowcount`
-src/prefect/server/models/variables.py:168:12: error[unresolved-attribute] Object of type `Result[Any]` has no attribute `rowcount`
-src/prefect/server/models/work_queues.py:282:15: error[unresolved-attribute] Object of type `Result[Unknown]` has no attribute `rowcount`
-src/prefect/server/models/work_queues.py:311:12: error[unresolved-attribute] Object of type `Result[Any]` has no attribute `rowcount`
-src/prefect/server/models/work_queues.py:403:17: error[invalid-argument-type] Argument is incorrect: Expected `Operator`, found `dict[str, list[str] | None] | dict[str, list[UUID] | None | bool]`
-src/prefect/server/models/work_queues.py:403:17: error[invalid-argument-type] Argument is incorrect: Expected `FlowRunFilterId | None`, found `dict[str, list[str] | None] | dict[str, list[UUID] | None | bool]`
-src/prefect/server/models/work_queues.py:403:17: error[invalid-argument-type] Argument is incorrect: Expected `FlowRunFilterName | None`, found `dict[str, list[str] | None] | dict[str, list[UUID] | None | bool]`
-src/prefect/server/models/work_queues.py:403:17: error[invalid-argument-type] Argument is incorrect: Expected `FlowRunFilterTags | None`, found `dict[str, list[str] | None] | dict[str, list[UUID] | None | bool]`
-src/prefect/server/models/work_queues.py:403:17: error[invalid-argument-type] Argument is incorrect: Expected `FlowRunFilterDeploymentId | None`, found `dict[str, list[str] | None] | dict[str, list[UUID] | None | bool]`
-src/prefect/server/models/work_queues.py:403:17: error[invalid-argument-type] Argument is incorrect: Expected `FlowRunFilterWorkQueueName | None`, found `dict[str, list[str] | None] | dict[str, list[UUID] | None | bool]`
-src/prefect/server/models/work_queues.py:403:17: error[invalid-argument-type] Argument is incorrect: Expected `FlowRunFilterFlowVersion | None`, found `dict[str, list[str] | None] | dict[str, list[UUID] | None | bool]`
-src/prefect/server/models/work_queues.py:403:17: error[invalid-argument-type] Argument is incorrect: Expected `FlowRunFilterStartTime | None`, found `dict[str, list[str] | None] | dict[str, list[UUID] | None | bool]`
-src/prefect/server/models/work_queues.py:403:17: error[invalid-argument-type] Argument is incorrect: Expected `FlowRunFilterEndTime | None`, found `dict[str, list[str] | None] | dict[str, list[UUID] | None | bool]`
-src/prefect/server/models/work_queues.py:403:17: error[invalid-argument-type] Argument is incorrect: Expected `FlowRunFilterExpectedStartTime | None`, found `dict[str, list[str] | None] | dict[str, list[UUID] | None | bool]`
-src/prefect/server/models/work_queues.py:403:17: error[invalid-argument-type] Argument is incorrect: Expected `FlowRunFilterNextScheduledStartTime | None`, found `dict[str, list[str] | None] | dict[str, list[UUID] | None | bool]`
-src/prefect/server/models/work_queues.py:403:17: error[invalid-argument-type] Argument is incorrect: Expected `FlowRunFilterParentFlowRunId | None`, found `dict[str, list[str] | None] | dict[str, list[UUID] | None | bool]`
-src/prefect/server/models/work_queues.py:403:17: error[invalid-argument-type] Argument is incorrect: Expected `FlowRunFilterParentTaskRunId | None`, found `dict[str, list[str] | None] | dict[str, list[UUID] | None | bool]`
-src/prefect/server/models/work_queues.py:403:17: error[invalid-argument-type] Argument is incorrect: Expected `FlowRunFilterIdempotencyKey | None`, found `dict[str, list[str] | None] | dict[str, list[UUID] | None | bool]`
-src/prefect/server/models/work_queues.py:404:17: error[invalid-argument-type] Argument is incorrect: Expected `FlowRunFilterState | None`, found `dict[str, dict[str, list[Unknown | StateType]]]`
-src/prefect/server/models/work_queues.py:421:13: error[invalid-argument-type] Argument is incorrect: Expected `Operator`, found `dict[str, list[str] | None] | dict[str, list[UUID] | None | bool]`
-src/prefect/server/models/work_queues.py:421:13: error[invalid-argument-type] Argument is incorrect: Expected `FlowRunFilterId | None`, found `dict[str, list[str] | None] | dict[str, list[UUID] | None | bool]`
-src/prefect/server/models/work_queues.py:421:13: error[invalid-argument-type] Argument is incorrect: Expected `FlowRunFilterName | None`, found `dict[str, list[str] | None] | dict[str, list[UUID] | None | bool]`
-src/prefect/server/models/work_queues.py:421:13: error[invalid-argument-type] Argument is incorrect: Expected `FlowRunFilterTags | None`, found `dict[str, list[str] | None] | dict[str, list[UUID] | None | bool]`
-src/prefect/server/models/work_queues.py:421:13: error[invalid-argument-type] Argument is incorrect: Expected `FlowRunFilterDeploymentId | None`, found `dict[str, list[str] | None] | dict[str, list[UUID] | None | bool]`
-src/prefect/server/models/work_queues.py:421:13: error[invalid-argument-type] Argument is incorrect: Expected `FlowRunFilterWorkQueueName | None`, found `dict[str, list[str] | None] | dict[str, list[UUID] | None | bool]`
-src/prefect/server/models/work_queues.py:421:13: error[invalid-argument-type] Argument is incorrect: Expected `FlowRunFilterFlowVersion | None`, found `dict[str, list[str] | None] | dict[str, list[UUID] | None | bool]`
-src/prefect/server/models/work_queues.py:421:13: error[invalid-argument-type] Argument is incorrect: Expected `FlowRunFilterStartTime | None`, found `dict[str, list[str] | None] | dict[str, list[UUID] | None | bool]`
-src/prefect/server/models/work_queues.py:421:13: error[invalid-argument-type] Argument is incorrect: Expected `FlowRunFilterEndTime | None`, found `dict[str, list[str] | None] | dict[str, list[UUID] | None | bool]`
-src/prefect/server/models/work_queues.py:421:13: error[invalid-argument-type] Argument is incorrect: Expected `FlowRunFilterExpectedStartTime | None`, found `dict[str, list[str] | None] | dict[str, list[UUID] | None | bool]`
-src/prefect/server/models/work_queues.py:421:13: error[invalid-argument-type] Argument is incorrect: Expected `FlowRunFilterParentFlowRunId | None`, found `dict[str, list[str] | None] | dict[str, list[UUID] | None | bool]`
-src/prefect/server/models/work_queues.py:421:13: error[invalid-argument-type] Argument is incorrect: Expected `FlowRunFilterParentTaskRunId | None`, found `dict[str, list[str] | None] | dict[str, list[UUID] | None | bool]`
-src/prefect/server/models/work_queues.py:421:13: error[invalid-argument-type] Argument is incorrect: Expected `FlowRunFilterIdempotencyKey | None`, found `dict[str, list[str] | None] | dict[str, list[UUID] | None | bool]`
-src/prefect/server/models/work_queues.py:422:13: error[invalid-argument-type] Argument is incorrect: Expected `FlowRunFilterState | None`, found `dict[str, dict[str, list[Unknown | StateType]]]`
-src/prefect/server/models/work_queues.py:423:13: error[invalid-argument-type] Argument is incorrect: Expected `FlowRunFilterNextScheduledStartTime | None`, found `dict[str, datetime | None]`
-src/prefect/server/models/work_queues.py:491:54: error[invalid-argument-type] Argument is incorrect: Expected `FlowRunFilterStateName | None`, found `dict[Unknown | str, Unknown | list[Unknown | str]]`
-src/prefect/server/models/work_queues.py:571:17: error[invalid-argument-type] Argument to function `work_queue_status_event` is incorrect: Expected `DateTime`, found `datetime`
-src/prefect/server/models/work_queues.py:609:17: error[invalid-argument-type] Argument to function `work_queue_status_event` is incorrect: Expected `DateTime`, found `datetime`
-src/prefect/server/models/work_queues.py:628:13: error[invalid-argument-type] Argument to function `work_queue_status_event` is incorrect: Expected `DateTime`, found `datetime`
-src/prefect/server/models/workers.py:253:15: error[unresolved-attribute] Object of type `Result[Unknown]` has no attribute `rowcount`
-src/prefect/server/models/workers.py:289:12: error[unresolved-attribute] Object of type `Result[Any]` has no attribute `rowcount`
-src/prefect/server/models/workers.py:626:15: error[unresolved-attribute] Object of type `Result[Unknown]` has no attribute `rowcount`
-src/prefect/server/models/workers.py:672:12: warning[possibly-missing-attribute] Submodule `exc` may not be available as an attribute on module `sqlalchemy`
-src/prefect/server/models/workers.py:755:9: error[invalid-assignment] Invalid subscript assignment with key of type `Literal["heartbeat_interval_seconds"]` and value of type `int` on object of type `dict[str, datetime | WorkerStatus]`
-src/prefect/server/models/workers.py:770:12: error[unresolved-attribute] Object of type `Result[Unknown]` has no attribute `rowcount`
-src/prefect/server/models/workers.py:799:12: error[unresolved-attribute] Object of type `Result[Any]` has no attribute `rowcount`
-Found 140 diagnostics
+src/prefect/server/models/variables.py:18:77: error[invalid-argument-type] Argument to function `variable_created_event` is incorrect: Expected `DateTime`, found `datetime`
+src/prefect/server/models/variables.py:24:77: error[invalid-argument-type] Argument to function `variable_updated_event` is incorrect: Expected `DateTime`, found `datetime`
+src/prefect/server/models/variables.py:30:77: error[invalid-argument-type] Argument to function `variable_deleted_event` is incorrect: Expected `DateTime`, found `datetime`
+src/prefect/server/models/work_queues.py:96:21: error[invalid-argument-type] Argument is incorrect: Expected `uuid.UUID | prefect.server.utilities.database.UUID`, found `uuid.UUID | None`
+src/prefect/server/models/work_queues.py:283:23: error[no-matching-overload] No overload of `dict.__init__` matches arguments
+src/prefect/server/models/work_queues.py:426:15: error[unresolved-attribute] Object of type `Result[Any]` has no attribute `rowcount`
+src/prefect/server/models/work_queues.py:522:13: error[invalid-argument-type] Argument is incorrect: Expected `DateTime | None`, found `datetime | None`
+src/prefect/server/models/work_queues.py:583:17: error[invalid-argument-type] Argument is incorrect: Expected `FlowRunFilterCreatedBy | None`, found `dict[str, list[str] | None] | dict[str, list[UUID] | None | bool]`
+src/prefect/server/models/work_queues.py:583:17: error[invalid-argument-type] Argument is incorrect: Expected `FlowRunFilterDeploymentId | None`, found `dict[str, list[str] | None] | dict[str, list[UUID] | None | bool]`
+src/prefect/server/models/work_queues.py:583:17: error[invalid-argument-type] Argument is incorrect: Expected `FlowRunFilterEndTime | None`, found `dict[str, list[str] | None] | dict[str, list[UUID] | None | bool]`
+src/prefect/server/models/work_queues.py:583:17: error[invalid-argument-type] Argument is incorrect: Expected `FlowRunFilterExpectedStartTime | None`, found `dict[str, list[str] | None] | dict[str, list[UUID] | None | bool]`
+src/prefect/server/models/work_queues.py:583:17: error[invalid-argument-type] Argument is incorrect: Expected `FlowRunFilterFlowVersion | None`, found `dict[str, list[str] | None] | dict[str, list[UUID] | None | bool]`
+src/prefect/server/models/work_queues.py:583:17: error[invalid-argument-type] Argument is incorrect: Expected `FlowRunFilterId | None`, found `dict[str, list[str] | None] | dict[str, list[UUID] | None | bool]`
+src/prefect/server/models/work_queues.py:583:17: error[invalid-argument-type] Argument is incorrect: Expected `FlowRunFilterIdempotencyKey | None`, found `dict[str, list[str] | None] | dict[str, list[UUID] | None | bool]`
+src/prefect/server/models/work_queues.py:583:17: error[invalid-argument-type] Argument is incorrect: Expected `FlowRunFilterName | None`, found `dict[str, list[str] | None] | dict[str, list[UUID] | None | bool]`
+src/prefect/server/models/work_queues.py:583:17: error[invalid-argument-type] Argument is incorrect: Expected `FlowRunFilterNextScheduledStartTime | None`, found `dict[str, list[str] | None] | dict[str, list[UUID] | None | bool]`
+src/prefect/server/models/work_queues.py:583:17: error[invalid-argument-type] Argument is incorrect: Expected `FlowRunFilterParentFlowRunId | None`, found `dict[str, list[str] | None] | dict[str, list[UUID] | None | bool]`
+src/prefect/server/models/work_queues.py:583:17: error[invalid-argument-type] Argument is incorrect: Expected `FlowRunFilterParentTaskRunId | None`, found `dict[str, list[str] | None] | dict[str, list[UUID] | None | bool]`
+src/prefect/server/models/work_queues.py:583:17: error[invalid-argument-type] Argument is incorrect: Expected `FlowRunFilterStartTime | None`, found `dict[str, list[str] | None] | dict[str, list[UUID] | None | bool]`
+src/prefect/server/models/work_queues.py:583:17: error[invalid-argument-type] Argument is incorrect: Expected `FlowRunFilterTags | None`, found `dict[str, list[str] | None] | dict[str, list[UUID] | None | bool]`
+src/prefect/server/models/work_queues.py:583:17: error[invalid-argument-type] Argument is incorrect: Expected `FlowRunFilterWorkQueueName | None`, found `dict[str, list[str] | None] | dict[str, list[UUID] | None | bool]`
+src/prefect/server/models/work_queues.py:583:17: error[invalid-argument-type] Argument is incorrect: Expected `Operator`, found `dict[str, list[str] | None] | dict[str, list[UUID] | None | bool]`
+src/prefect/server/models/work_queues.py:584:17: error[invalid-argument-type] Argument is incorrect: Expected `FlowRunFilterState | None`, found `dict[str, dict[str, list[StateType]]]`
+src/prefect/server/models/work_queues.py:601:13: error[invalid-argument-type] Argument is incorrect: Expected `FlowRunFilterCreatedBy | None`, found `dict[str, list[str] | None] | dict[str, list[UUID] | None | bool]`
+src/prefect/server/models/work_queues.py:601:13: error[invalid-argument-type] Argument is incorrect: Expected `FlowRunFilterDeploymentId | None`, found `dict[str, list[str] | None] | dict[str, list[UUID] | None | bool]`
+src/prefect/server/models/work_queues.py:601:13: error[invalid-argument-type] Argument is incorrect: Expected `FlowRunFilterEndTime | None`, found `dict[str, list[str] | None] | dict[str, list[UUID] | None | bool]`
+src/prefect/server/models/work_queues.py:601:13: error[invalid-argument-type] Argument is incorrect: Expected `FlowRunFilterExpectedStartTime | None`, found `dict[str, list[str] | None] | dict[str, list[UUID] | None | bool]`
+src/prefect/server/models/work_queues.py:601:13: error[invalid-argument-type] Argument is incorrect: Expected `FlowRunFilterFlowVersion | None`, found `dict[str, list[str] | None] | dict[str, list[UUID] | None | bool]`
+src/prefect/server/models/work_queues.py:601:13: error[invalid-argument-type] Argument is incorrect: Expected `FlowRunFilterId | None`, found `dict[str, list[str] | None] | dict[str, list[UUID] | None | bool]`
+src/prefect/server/models/work_queues.py:601:13: error[invalid-argument-type] Argument is incorrect: Expected `FlowRunFilterIdempotencyKey | None`, found `dict[str, list[str] | None] | dict[str, list[UUID] | None | bool]`
+src/prefect/server/models/work_queues.py:601:13: error[invalid-argument-type] Argument is incorrect: Expected `FlowRunFilterName | None`, found `dict[str, list[str] | None] | dict[str, list[UUID] | None | bool]`
+src/prefect/server/models/work_queues.py:601:13: error[invalid-argument-type] Argument is incorrect: Expected `FlowRunFilterParentFlowRunId | None`, found `dict[str, list[str] | None] | dict[str, list[UUID] | None | bool]`
+src/prefect/server/models/work_queues.py:601:13: error[invalid-argument-type] Argument is incorrect: Expected `FlowRunFilterParentTaskRunId | None`, found `dict[str, list[str] | None] | dict[str, list[UUID] | None | bool]`
+src/prefect/server/models/work_queues.py:601:13: error[invalid-argument-type] Argument is incorrect: Expected `FlowRunFilterStartTime | None`, found `dict[str, list[str] | None] | dict[str, list[UUID] | None | bool]`
+src/prefect/server/models/work_queues.py:601:13: error[invalid-argument-type] Argument is incorrect: Expected `FlowRunFilterTags | None`, found `dict[str, list[str] | None] | dict[str, list[UUID] | None | bool]`
+src/prefect/server/models/work_queues.py:601:13: error[invalid-argument-type] Argument is incorrect: Expected `FlowRunFilterWorkQueueName | None`, found `dict[str, list[str] | None] | dict[str, list[UUID] | None | bool]`
+src/prefect/server/models/work_queues.py:601:13: error[invalid-argument-type] Argument is incorrect: Expected `Operator`, found `dict[str, list[str] | None] | dict[str, list[UUID] | None | bool]`
+src/prefect/server/models/work_queues.py:602:13: error[invalid-argument-type] Argument is incorrect: Expected `FlowRunFilterState | None`, found `dict[str, dict[str, list[StateType]]]`
+src/prefect/server/models/work_queues.py:603:13: error[invalid-argument-type] Argument is incorrect: Expected `FlowRunFilterNextScheduledStartTime | None`, found `dict[str, datetime | None]`
+src/prefect/server/models/work_queues.py:643:38: error[invalid-argument-type] Argument is incorrect: Expected `uuid.UUID | prefect.server.utilities.database.UUID`, found `uuid.UUID | None`
+src/prefect/server/models/work_queues.py:671:54: error[invalid-argument-type] Argument is incorrect: Expected `FlowRunFilterStateName | None`, found `dict[str, list[str]]`
+src/prefect/server/models/work_queues.py:685:46: warning[unused-type-ignore-comment] Unused blanket `type: ignore` directive
+src/prefect/server/models/work_queues.py:751:17: error[invalid-argument-type] Argument to function `work_queue_status_event` is incorrect: Expected `DateTime`, found `datetime`
+src/prefect/server/models/work_queues.py:789:17: error[invalid-argument-type] Argument to function `work_queue_status_event` is incorrect: Expected `DateTime`, found `datetime`
+src/prefect/server/models/work_queues.py:809:13: error[invalid-argument-type] Argument to function `work_queue_status_event` is incorrect: Expected `DateTime`, found `datetime`
+src/prefect/server/models/work_queues.py:829:17: error[invalid-argument-type] Argument to function `work_queue_updated_event` is incorrect: Expected `DateTime`, found `datetime`
+src/prefect/server/models/work_queues.py:844:17: error[invalid-argument-type] Argument to function `work_queue_created_event` is incorrect: Expected `DateTime`, found `datetime`
+src/prefect/server/models/work_queues.py:859:17: error[invalid-argument-type] Argument to function `work_queue_deleted_event` is incorrect: Expected `DateTime`, found `datetime`
+src/prefect/server/models/workers.py:91:47: warning[unused-type-ignore-comment] Unused blanket `type: ignore` directive
+src/prefect/server/models/workers.py:255:12: error[no-matching-overload] No overload of `dict.__init__` matches arguments
+src/prefect/server/models/workers.py:305:12: error[no-matching-overload] No overload of `dict.__init__` matches arguments
+src/prefect/server/models/workers.py:380:15: error[unresolved-attribute] Object of type `Result[Any]` has no attribute `rowcount`
+src/prefect/server/models/workers.py:421:19: error[missing-argument] No arguments provided for required parameters 1, 2, 3, 4
+src/prefect/server/models/workers.py:423:17: error[unknown-argument] Argument `occurred` does not match any known parameter
+src/prefect/server/models/workers.py:424:17: error[unknown-argument] Argument `pre_update_work_pool` does not match any known parameter
+src/prefect/server/models/workers.py:425:17: error[unknown-argument] Argument `work_pool` does not match any known parameter
+src/prefect/server/models/workers.py:455:56: error[invalid-argument-type] Argument to function `work_queue_deleted_event` is incorrect: Expected `DateTime`, found `datetime`
+src/prefect/server/models/workers.py:501:9: error[invalid-argument-type] Argument is incorrect: Expected `DateTime | None`, found `datetime | None`
+src/prefect/server/models/workers.py:502:9: error[invalid-argument-type] Argument is incorrect: Expected `DateTime | None`, found `datetime | None`
+src/prefect/server/models/workers.py:575:52: error[invalid-argument-type] Argument to function `work_queue_created_event` is incorrect: Expected `DateTime`, found `datetime`
+src/prefect/server/models/workers.py:831:15: error[unresolved-attribute] Object of type `Result[Any]` has no attribute `rowcount`
+src/prefect/server/models/workers.py:910:57: error[invalid-argument-type] Argument to function `work_queue_deleted_event` is incorrect: Expected `DateTime`, found `datetime`
+src/prefect/server/models/workers.py:919:12: warning[possibly-missing-submodule] Submodule `exc` might not have been imported
+src/prefect/server/models/workers.py:1021:9: error[invalid-assignment] Invalid subscript assignment with key of type `Literal["heartbeat_interval_seconds"]` and value of type `int` on object of type `dict[str, datetime | WorkerStatus]`
+src/prefect/server/models/workers.py:1036:12: error[unresolved-attribute] Object of type `Result[Any]` has no attribute `rowcount`
+src/prefect/server/models/workers.py:1107:12: error[unresolved-attribute] Object of type `Result[Any]` has no attribute `rowcount`
+src/prefect/server/models/workers.py:1161:9: error[invalid-return-type] Return type does not match returned value: expected `ScalarSelect[Unknown]`, found `Label[Any]`
+src/prefect/server/models/workers.py:1253:12: error[invalid-return-type] Return type does not match returned value: expected `Sequence[tuple[FlowRun, DateTime | None]]`, found `Sequence[Row[tuple[FlowRun, Unknown]]]`
+src/prefect/server/models/workers.py:1270:12: error[no-matching-overload] No overload of `dict.__init__` matches arguments
+src/prefect/server/models/workers.py:1342:12: error[invalid-return-type] Return type does not match returned value: expected `Sequence[tuple[FlowRun, DateTime | None]]`, found `Sequence[Row[tuple[FlowRun, Unknown]]]`
+src/prefect/server/models/workers.py:1360:17: error[invalid-argument-type] Argument to function `work_pool_updated_event` is incorrect: Expected `DateTime`, found `datetime`
+src/prefect/server/models/workers.py:1369:64: error[invalid-argument-type] Argument to function `work_pool_created_event` is incorrect: Expected `DateTime`, found `datetime`
+src/prefect/server/models/workers.py:1377:64: error[invalid-argument-type] Argument to function `work_pool_deleted_event` is incorrect: Expected `DateTime`, found `datetime`
+Found 205 diagnostics

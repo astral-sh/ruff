@@ -9,8 +9,21 @@ from collections.abc import Callable, Container, Iterable, Mapping, Sequence, Se
 from contextlib import AbstractContextManager
 from re import Pattern
 from types import GenericAlias, TracebackType
-from typing import Any, AnyStr, Final, Generic, NoReturn, Protocol, SupportsAbs, SupportsRound, TypeVar, overload, type_check_only
-from typing_extensions import Never, ParamSpec, Self
+from typing import (
+    Any,
+    AnyStr,
+    Final,
+    Generic,
+    NoReturn,
+    ParamSpec,
+    Protocol,
+    SupportsAbs,
+    SupportsRound,
+    TypeVar,
+    overload,
+    type_check_only,
+)
+from typing_extensions import Never, Self
 from unittest._log import _AssertLogsContext, _LoggingWatcher
 from warnings import WarningMessage
 
@@ -88,7 +101,7 @@ class SkipTest(Exception):
     instead of raising this directly.
     """
 
-    def __init__(self, reason: str) -> None: ...
+    def __init__(self, reason: str, /) -> None: ...
 
 @type_check_only
 class _SupportsAbsAndDunderGE(SupportsDunderGE[Any], SupportsAbs[Any], Protocol): ...
@@ -170,6 +183,7 @@ class TestCase:
 
     def debug(self) -> None:
         """Run the test without collecting errors in a TestResult"""
+
     if sys.version_info < (3, 11):
         def _addSkip(self, result: unittest.result.TestResult, test_case: TestCase, reason: str) -> None: ...
 
@@ -218,27 +232,27 @@ class TestCase:
     @overload
     def assertGreater(self, a: SupportsDunderGT[_T], b: _T, msg: Any = None) -> None:
         """Just like self.assertTrue(a > b), but with a nicer default message."""
-
     @overload
     def assertGreater(self, a: _T, b: SupportsDunderLT[_T], msg: Any = None) -> None: ...
+
     @overload
     def assertGreaterEqual(self, a: SupportsDunderGE[_T], b: _T, msg: Any = None) -> None:
         """Just like self.assertTrue(a >= b), but with a nicer default message."""
-
     @overload
     def assertGreaterEqual(self, a: _T, b: SupportsDunderLE[_T], msg: Any = None) -> None: ...
+
     @overload
     def assertLess(self, a: SupportsDunderLT[_T], b: _T, msg: Any = None) -> None:
         """Just like self.assertTrue(a < b), but with a nicer default message."""
-
     @overload
     def assertLess(self, a: _T, b: SupportsDunderGT[_T], msg: Any = None) -> None: ...
+
     @overload
     def assertLessEqual(self, a: SupportsDunderLE[_T], b: _T, msg: Any = None) -> None:
         """Just like self.assertTrue(a <= b), but with a nicer default message."""
-
     @overload
     def assertLessEqual(self, a: _T, b: SupportsDunderGE[_T], msg: Any = None) -> None: ...
+
     # `assertRaises`, `assertRaisesRegex`, and `assertRaisesRegexp`
     # are not using `ParamSpec` intentionally,
     # because they might be used with explicitly wrong arg types to raise some error in tests.
@@ -275,11 +289,11 @@ class TestCase:
             the_exception = cm.exception
             self.assertEqual(the_exception.error_code, 3)
         """
-
     @overload
     def assertRaises(
         self, expected_exception: type[_E] | tuple[type[_E], ...], *, msg: Any = ...
     ) -> _AssertRaisesContext[_E]: ...
+
     @overload
     def assertRaisesRegex(
         self,
@@ -300,11 +314,11 @@ class TestCase:
             msg: Optional message used in case of failure. Can only be used
                     when assertRaisesRegex is used as a context manager.
         """
-
     @overload
     def assertRaisesRegex(
         self, expected_exception: type[_E] | tuple[type[_E], ...], expected_regex: str | Pattern[str], *, msg: Any = ...
     ) -> _AssertRaisesContext[_E]: ...
+
     @overload
     def assertWarns(
         self,
@@ -340,11 +354,11 @@ class TestCase:
             the_warning = cm.warning
             self.assertEqual(the_warning.some_attribute, 147)
         """
-
     @overload
     def assertWarns(
         self, expected_warning: type[Warning] | tuple[type[Warning], ...], *, msg: Any = ...
     ) -> _AssertWarnsContext: ...
+
     @overload
     def assertWarnsRegex(
         self,
@@ -368,42 +382,72 @@ class TestCase:
             msg: Optional message used in case of failure. Can only be used
                     when assertWarnsRegex is used as a context manager.
         """
-
     @overload
     def assertWarnsRegex(
         self, expected_warning: type[Warning] | tuple[type[Warning], ...], expected_regex: str | Pattern[str], *, msg: Any = ...
     ) -> _AssertWarnsContext: ...
-    def assertLogs(
-        self, logger: str | logging.Logger | None = None, level: int | str | None = None
-    ) -> _AssertLogsContext[_LoggingWatcher]:
-        """Fail unless a log message of level *level* or higher is emitted
-        on *logger_name* or its children.  If omitted, *level* defaults to
-        INFO and *logger* defaults to the root logger.
 
-        This method must be used as a context manager, and will yield
-        a recording object with two attributes: `output` and `records`.
-        At the end of the context manager, the `output` attribute will
-        be a list of the matching formatted log messages and the
-        `records` attribute will be a list of the corresponding LogRecord
-        objects.
+    if sys.version_info >= (3, 15):
+        def assertLogs(
+            self,
+            logger: str | logging.Logger | None = None,
+            level: int | str | None = None,
+            formatter: logging.Formatter | None = None,
+        ) -> _AssertLogsContext[_LoggingWatcher]:
+            """Fail unless a log message of level *level* or higher is emitted
+            on *logger_name* or its children.  If omitted, *level* defaults to
+            INFO and *logger* defaults to the root logger.
 
-        Example::
+            This method must be used as a context manager, and will yield
+            a recording object with two attributes: `output` and `records`.
+            At the end of the context manager, the `output` attribute will
+            be a list of the matching formatted log messages and the
+            `records` attribute will be a list of the corresponding LogRecord
+            objects.
 
-            with self.assertLogs('foo', level='INFO') as cm:
-                logging.getLogger('foo').info('first message')
-                logging.getLogger('foo.bar').error('second message')
-            self.assertEqual(cm.output, ['INFO:foo:first message',
-                                         'ERROR:foo.bar:second message'])
-        """
-    if sys.version_info >= (3, 10):
-        def assertNoLogs(
-            self, logger: str | logging.Logger | None = None, level: int | str | None = None
-        ) -> _AssertLogsContext[None]:
-            """Fail unless no log messages of level *level* or higher are emitted
-            on *logger_name* or its children.
+            Optionally supply `formatter` to control how messages are formatted.
 
-            This method must be used as a context manager.
+            Example::
+
+                with self.assertLogs('foo', level='INFO') as cm:
+                    logging.getLogger('foo').info('first message')
+                    logging.getLogger('foo.bar').error('second message')
+                self.assertEqual(cm.output, ['INFO:foo:first message',
+                                             'ERROR:foo.bar:second message'])
             """
+
+    else:
+        def assertLogs(
+            self, logger: str | logging.Logger | None = None, level: int | str | None = None
+        ) -> _AssertLogsContext[_LoggingWatcher]:
+            """Fail unless a log message of level *level* or higher is emitted
+            on *logger_name* or its children.  If omitted, *level* defaults to
+            INFO and *logger* defaults to the root logger.
+
+            This method must be used as a context manager, and will yield
+            a recording object with two attributes: `output` and `records`.
+            At the end of the context manager, the `output` attribute will
+            be a list of the matching formatted log messages and the
+            `records` attribute will be a list of the corresponding LogRecord
+            objects.
+
+            Example::
+
+                with self.assertLogs('foo', level='INFO') as cm:
+                    logging.getLogger('foo').info('first message')
+                    logging.getLogger('foo.bar').error('second message')
+                self.assertEqual(cm.output, ['INFO:foo:first message',
+                                             'ERROR:foo.bar:second message'])
+            """
+
+    def assertNoLogs(
+        self, logger: str | logging.Logger | None = None, level: int | str | None = None
+    ) -> _AssertLogsContext[None]:
+        """Fail unless no log messages of level *level* or higher are emitted
+        on *logger_name* or its children.
+
+        This method must be used as a context manager.
+        """
 
     @overload
     def assertAlmostEqual(self, first: _S, second: _S, places: None, msg: Any, delta: _SupportsAbsAndDunderGE) -> None:
@@ -419,7 +463,6 @@ class TestCase:
         If the two objects compare equal then they will automatically
         compare almost equal.
         """
-
     @overload
     def assertAlmostEqual(
         self, first: _S, second: _S, places: None = None, msg: Any = None, *, delta: _SupportsAbsAndDunderGE
@@ -442,6 +485,7 @@ class TestCase:
         msg: Any = None,
         delta: None = None,
     ) -> None: ...
+
     @overload
     def assertNotAlmostEqual(self, first: _S, second: _S, places: None, msg: Any, delta: _SupportsAbsAndDunderGE) -> None:
         """Fail if the two objects are equal as determined by their
@@ -454,7 +498,6 @@ class TestCase:
 
         Objects that are equal automatically fail.
         """
-
     @overload
     def assertNotAlmostEqual(
         self, first: _S, second: _S, places: None = None, msg: Any = None, *, delta: _SupportsAbsAndDunderGE
@@ -477,6 +520,7 @@ class TestCase:
         msg: Any = None,
         delta: None = None,
     ) -> None: ...
+
     def assertRegex(self, text: AnyStr, expected_regex: AnyStr | Pattern[AnyStr], msg: Any = None) -> None:
         """Fail the test unless the text matches the regular expression."""
 
@@ -564,6 +608,7 @@ class TestCase:
         is optimized for sets specifically (parameters must support a
         difference method).
         """
+
     # assertDictEqual accepts only true dict instances. We can't use that here, since that would make
     # assertDictEqual incompatible with TypedDict.
     def assertDictEqual(self, d1: Mapping[Any, object], d2: Mapping[Any, object], msg: Any = None) -> None: ...
@@ -588,6 +633,7 @@ class TestCase:
 
         Cleanup items are called even if setUp fails (unlike tearDown).
         """
+
     if sys.version_info >= (3, 11):
         def enterContext(self, cm: AbstractContextManager[_T]) -> _T:
             """Enters the supplied context manager.
@@ -612,6 +658,7 @@ class TestCase:
         """Execute all class cleanup functions. Normally called for you after
         tearDownClass.
         """
+
     if sys.version_info >= (3, 11):
         @classmethod
         def enterClassContext(cls, cm: AbstractContextManager[_T]) -> _T:
@@ -635,6 +682,7 @@ class TestCase:
         raise a failure exception if first != second with a useful human
         readable error message for those types.
         """
+
     if sys.version_info < (3, 12):
         failUnlessEqual = assertEqual
         assertEquals = assertEqual
@@ -653,9 +701,9 @@ class TestCase:
         assertRaisesRegexp = assertRaisesRegex
         def assertDictContainsSubset(self, subset: Mapping[Any, Any], dictionary: Mapping[Any, Any], msg: object = None) -> None:
             """Checks whether dictionary is a superset of subset."""
-    if sys.version_info >= (3, 10):
-        # Runtime has *args, **kwargs, but will error if any are supplied
-        def __init_subclass__(cls, *args: Never, **kwargs: Never) -> None: ...
+
+    # Runtime has *args, **kwargs, but will error if any are supplied
+    def __init_subclass__(cls, *args: Never, **kwargs: Never) -> None: ...
 
     if sys.version_info >= (3, 14):
         def assertIsSubclass(self, cls: type, superclass: type | tuple[type, ...], msg: Any = None) -> None: ...
@@ -698,7 +746,8 @@ class _AssertRaisesContext(_AssertRaisesBaseContext, Generic[_E]):
     def __class_getitem__(cls, item: Any, /) -> GenericAlias:
         """Represent a PEP 585 generic type
 
-        E.g. for t = list[int], t.__origin__ is list and t.__args__ is (int,).
+        For example, for t = list[int], t.__origin__ is list and t.__args__
+        is (int,).
         """
 
 class _AssertWarnsContext(_AssertRaisesBaseContext):

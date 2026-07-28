@@ -6,12 +6,12 @@
 //! [Ruff]: https://github.com/astral-sh/ruff
 
 pub use locator::Locator;
-pub use noqa::generate_noqa_edits;
+pub use noqa::{SuppressionKind, generate_suppression_edits};
 #[cfg(feature = "clap")]
 pub use registry::clap_completion::RuleParser;
-pub use rule_selector::RuleSelector;
 #[cfg(feature = "clap")]
-pub use rule_selector::clap_completion::RuleSelectorParser;
+pub use rule_selector::clap_completion::UnresolvedRuleSelectorParser;
+pub use rule_selector::{RuleSelector, UnresolvedRuleSelector};
 pub use rules::pycodestyle::rules::IOError;
 
 pub(crate) use ruff_diagnostics::{Applicability, Edit, Fix};
@@ -38,7 +38,6 @@ mod noqa;
 pub mod package;
 pub mod packaging;
 pub mod preview;
-pub mod pyproject_toml;
 pub mod registry;
 mod renamer;
 mod rule_redirects;
@@ -48,10 +47,11 @@ pub mod settings;
 pub mod source_kind;
 pub mod suppression;
 mod text_helpers;
+pub mod toml;
 pub mod upstream_categories;
 mod violation;
 
-#[cfg(any(test, fuzzing))]
+#[cfg(any(test, fuzzing, feature = "testing"))]
 pub mod test;
 
 pub const RUFF_PKG_VERSION: &str = env!("CARGO_PKG_VERSION");

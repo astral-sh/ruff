@@ -4,16 +4,16 @@ use anyhow::Result;
 
 use libcst_native::{LeftParen, ParenthesizedNode, RightParen};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::token::TokenKind;
+use ruff_python_ast::token::{TokenKind, parenthesized_range};
 use ruff_python_ast::{self as ast, Expr, OperatorPrecedence};
-use ruff_text_size::Ranged;
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::cst::helpers::space;
 use crate::cst::matchers::{
     match_call_mut, match_formatted_string, match_formatted_string_expression, transform_expression,
 };
-use crate::{Edit, Fix, FixAvailability, Violation};
+use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for uses of `str()`, `repr()`, and `ascii()` as explicit type
@@ -39,6 +39,11 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// a = "some string"
 /// f"{a!r}"
 /// ```
+///
+/// ## Fix safety
+///
+/// This rule's fix is marked as unsafe if the call expression contains
+/// comments that would be deleted by applying the fix.
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.267")]
 pub(crate) struct ExplicitFStringTypeConversion;
@@ -123,7 +128,7 @@ pub(crate) fn explicit_f_string_type_conversion(checker: &Checker, f_string: &as
             checker.report_diagnostic(ExplicitFStringTypeConversion, expression.range());
 
         diagnostic.try_set_fix(|| {
-            convert_call_to_conversion_flag(checker, conversion, f_string, index, arg)
+            convert_call_to_conversion_flag(checker, conversion, f_string, index, call, arg)
         });
     }
 }
@@ -134,15 +139,16 @@ fn convert_call_to_conversion_flag(
     conversion: Conversion,
     f_string: &ast::FString,
     index: usize,
+    call: &ast::ExprCall,
     arg: &Expr,
 ) -> Result<Fix> {
     let source_code = checker.locator().slice(f_string);
-    transform_expression(source_code, checker.stylist(), |mut expression| {
+    let output = transform_expression(source_code, checker.stylist(), |mut expression| {
         let formatted_string = match_formatted_string(&mut expression)?;
         // Replace the formatted call expression at `index` with a conversion flag.
         let formatted_string_expression =
             match_formatted_string_expression(&mut formatted_string.parts[index])?;
-        let call = match_call_mut(&mut formatted_string_expression.expression)?;
+        let call_cst = match_call_mut(&mut formatted_string_expression.expression)?;
 
         formatted_string_expression.conversion = Some(conversion.as_str());
 
@@ -151,17 +157,45 @@ fn convert_call_to_conversion_flag(
         }
 
         formatted_string_expression.expression = if needs_paren_expr(arg) {
-            call.args[0]
+            call_cst.args[0]
                 .value
                 .clone()
                 .with_parens(LeftParen::default(), RightParen::default())
         } else {
-            call.args[0].value.clone()
+            call_cst.args[0].value.clone()
         };
 
         Ok(expression)
-    })
-    .map(|output| Fix::safe_edit(Edit::range_replacement(output, f_string.range())))
+    })?;
+
+    // Determine applicability: mark the fix as unsafe if there are comments in the
+    // call expression that fall outside the effective argument range (i.e., comments
+    // that would be deleted by replacing the call with a conversion flag).
+    //
+    // Extra parentheses wrapping the argument are preserved by the libcst transformation
+    // (e.g., `ascii((arg))` → `(arg)!a`), so comments inside them are not deleted.
+    let comment_ranges = checker.comment_ranges();
+    let call_range = call.range();
+    // Use the parenthesized range of the arg (within call.arguments) to account for
+    // any extra parens that wrap the argument and whose content will be preserved.
+    let effective_arg_range =
+        parenthesized_range(arg.into(), (&call.arguments).into(), checker.tokens())
+            .unwrap_or_else(|| arg.range());
+    let has_deletable_comments = comment_ranges.intersects(TextRange::new(
+        call_range.start(),
+        effective_arg_range.start(),
+    )) || comment_ranges
+        .intersects(TextRange::new(effective_arg_range.end(), call_range.end()));
+    let applicability = if has_deletable_comments {
+        Applicability::Unsafe
+    } else {
+        Applicability::Safe
+    };
+
+    Ok(Fix::applicable_edit(
+        Edit::range_replacement(output, f_string.range()),
+        applicability,
+    ))
 }
 
 fn starts_with_brace(checker: &Checker, arg: &Expr) -> bool {

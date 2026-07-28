@@ -1,9 +1,11 @@
 use crate::Db;
 use crate::goto::find_goto_target;
+use rayon::prelude::*;
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::name::Name;
 use ruff_text_size::{TextRange, TextSize};
+use ty_project::parallel::ParallelIteratorExt;
 use ty_python_semantic::SemanticModel;
 use ty_python_semantic::TypeHierarchyClass;
 use ty_python_semantic::types::Type;
@@ -56,6 +58,8 @@ pub fn type_hierarchy_supertypes(
 }
 
 /// Get the subtypes (derived classes) of a type hierarchy item.
+///
+/// This scans all available modules and can be expensive in large projects.
 pub fn type_hierarchy_subtypes(
     db: &dyn Db,
     file: File,
@@ -64,9 +68,16 @@ pub fn type_hierarchy_subtypes(
     let Some(ty) = resolve_type_at(db, file, offset) else {
         return vec![];
     };
-    ty_python_semantic::type_hierarchy_subtypes(db, ty)
-        .into_iter()
-        .map(|c| type_hierarchy_class_to_item(db, c))
+
+    ty_module_resolver::all_modules(db)
+        .into_par_iter()
+        .map_with_db(db, |db, module| {
+            ty_python_semantic::type_hierarchy_subtypes(db, ty, &[module])
+                .into_iter()
+                .map(|class| type_hierarchy_class_to_item(db, class))
+                .collect::<Vec<_>>()
+        })
+        .flat_map_iter(|items| items)
         .collect()
 }
 
@@ -172,7 +183,7 @@ mod tests {
 
         let mut supertypes = test.supertypes();
         supertypes.sort_by(|a, b| a.name.cmp(&b.name));
-        insta::assert_snapshot!(snapshot(&test.db, &supertypes), @r"
+        insta::assert_snapshot!(snapshot(&test.db, &supertypes), @"
         /main.py:7:8 A :: main
         /main.py:26:27 B :: main
         ");
@@ -210,7 +221,7 @@ mod tests {
         let supertypes = test.supertypes();
         insta::assert_snapshot!(
             snapshot(&test.db, &supertypes),
-            @"vendored://stdlib/builtins.pyi:3608:3614 object :: builtins",
+            @"vendored://stdlib/builtins.pyi:3620:3626 object :: builtins",
         );
     }
 
@@ -231,7 +242,7 @@ mod tests {
 
         let mut subtypes = test.subtypes();
         subtypes.sort_by(|a, b| a.name.cmp(&b.name));
-        insta::assert_snapshot!(snapshot(&test.db, &subtypes), @r"
+        insta::assert_snapshot!(snapshot(&test.db, &subtypes), @"
         /main.py:29:37 Derived1 :: main
         /main.py:61:69 Derived2 :: main
         ");
@@ -322,11 +333,11 @@ mod tests {
         );
 
         let subtypes = test.subtypes();
-        insta::assert_snapshot!(snapshot(&test.db, &subtypes), @r"
+        insta::assert_snapshot!(snapshot(&test.db, &subtypes), @"
         vendored://stdlib/email/headerregistry.pyi:703:713 BaseHeader :: email.headerregistry
-        vendored://stdlib/enum.pyi:18342:18349 StrEnum :: enum
-        vendored://stdlib/pdb.pyi:38460:38465 _rstr :: pdb
-        vendored://stdlib/xxlimited.pyi:113:116 Str :: xxlimited
+        vendored://stdlib/enum.pyi:18348:18355 StrEnum :: enum
+        vendored://stdlib/pdb.pyi:38720:38725 _rstr :: pdb
+        vendored://stdlib/xxlimited.pyi:103:106 Str :: xxlimited
         ");
     }
 
@@ -354,12 +365,12 @@ mod tests {
         );
 
         let subtypes = test.subtypes();
-        insta::assert_snapshot!(snapshot(&test.db, &subtypes), @r"
+        insta::assert_snapshot!(snapshot(&test.db, &subtypes), @"
         vendored://stdlib/email/headerregistry.pyi:703:713 BaseHeader :: email.headerregistry
-        vendored://stdlib/enum.pyi:18342:18349 StrEnum :: enum
+        vendored://stdlib/enum.pyi:18348:18355 StrEnum :: enum
         /main.py:77:89 MyEventTypeA :: main
-        vendored://stdlib/pdb.pyi:38460:38465 _rstr :: pdb
-        vendored://stdlib/xxlimited.pyi:113:116 Str :: xxlimited
+        vendored://stdlib/pdb.pyi:38720:38725 _rstr :: pdb
+        vendored://stdlib/xxlimited.pyi:103:106 Str :: xxlimited
         ");
     }
 
@@ -424,12 +435,12 @@ mod tests {
         let item = test.prepare().unwrap();
         insta::assert_snapshot!(
             snapshot(&test.db, &[item]),
-            @"vendored://stdlib/builtins.pyi:8615:8619 type :: builtins",
+            @"vendored://stdlib/builtins.pyi:8520:8524 type :: builtins",
         );
         let supertypes = test.supertypes();
         insta::assert_snapshot!(
             snapshot(&test.db, &supertypes),
-            @"vendored://stdlib/builtins.pyi:3608:3614 object :: builtins",
+            @"vendored://stdlib/builtins.pyi:3620:3626 object :: builtins",
         );
     }
 
@@ -481,7 +492,7 @@ mod tests {
         let supertypes = test.supertypes();
         insta::assert_snapshot!(
             snapshot(&test.db, &supertypes),
-            @"vendored://stdlib/builtins.pyi:101715:101720 tuple :: builtins",
+            @"vendored://stdlib/builtins.pyi:104692:104697 tuple :: builtins",
         );
     }
 
@@ -652,7 +663,7 @@ Public = _Internal
         // We should only see our own subtype and the only third-party
         // subtype that isn't treated as private.
         let subtypes = test.subtypes();
-        insta::assert_snapshot!(snapshot(&test.db, &subtypes), @r"
+        insta::assert_snapshot!(snapshot(&test.db, &subtypes), @"
         /src/foo.py:6:13 MyBytes :: foo
         /site-packages/thirdparty/__init__.py:6:17 OtherBytes1 :: thirdparty
         ");
@@ -680,7 +691,7 @@ Public = _Internal
         // Note that pylance doesn't seem to respect `__all__` in
         // this case either.
         let subtypes = test.subtypes();
-        insta::assert_snapshot!(snapshot(&test.db, &subtypes), @r"
+        insta::assert_snapshot!(snapshot(&test.db, &subtypes), @"
         /src/foo.py:6:13 MyBytes :: foo
         /site-packages/thirdparty/__init__.py:7:18 OtherBytes1 :: thirdparty
         /site-packages/thirdparty/__init__.py:38:49 OtherBytes2 :: thirdparty

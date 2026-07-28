@@ -5,6 +5,9 @@
 //! ```toml
 //! log = true # or log = "ty=WARN"
 //!
+//! [rules]
+//! possibly-unresolved-reference = "warn"
+//!
 //! [environment]
 //! python-version = "3.10"
 //!
@@ -12,11 +15,14 @@
 //! dependencies = ["pydantic==2.12.2"]
 //! ```
 
-use anyhow::Context;
+use std::collections::BTreeMap;
+
 use ruff_db::system::{SystemPath, SystemPathBuf};
 use ruff_python_ast::PythonVersion;
+use ruff_python_ast::script::ScriptTag;
 use serde::{Deserialize, Serialize};
-use ty_python_semantic::PythonPlatform;
+use ty_python_core::platform::PythonPlatform;
+use ty_python_semantic::lint::Level;
 
 #[derive(Deserialize, Debug, Default, Clone)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
@@ -24,6 +30,8 @@ pub(crate) struct MarkdownTestConfig {
     pub(crate) environment: Option<Environment>,
 
     pub(crate) log: Option<Log>,
+
+    pub(crate) rules: Option<Rules>,
 
     pub(crate) analysis: Option<Analysis>,
 
@@ -41,10 +49,6 @@ pub(crate) struct MarkdownTestConfig {
 }
 
 impl MarkdownTestConfig {
-    pub(crate) fn from_str(s: &str) -> anyhow::Result<Self> {
-        toml::from_str(s).context("Error while parsing Markdown TOML config")
-    }
-
     pub(crate) fn python_version(&self) -> Option<PythonVersion> {
         self.environment.as_ref()?.python_version
     }
@@ -73,6 +77,34 @@ impl MarkdownTestConfig {
         self.verbose.unwrap_or_default()
     }
 }
+
+#[derive(Deserialize, Debug, Default)]
+#[serde(rename_all = "kebab-case", deny_unknown_fields)]
+pub(crate) struct ScriptOptions {
+    pub(crate) rules: Option<Rules>,
+    pub(crate) analysis: Option<Analysis>,
+}
+
+impl ScriptOptions {
+    pub(crate) fn from_source(source: &str) -> Option<Self> {
+        let tag = ScriptTag::parse(source.as_bytes())?;
+        let metadata: ScriptMetadata = toml::from_str(tag.metadata()).ok()?;
+
+        Some(metadata.tool.and_then(|tool| tool.ty).unwrap_or_default())
+    }
+}
+
+#[derive(Deserialize)]
+struct ScriptMetadata {
+    tool: Option<ScriptTool>,
+}
+
+#[derive(Deserialize)]
+struct ScriptTool {
+    ty: Option<ScriptOptions>,
+}
+
+pub(crate) type Rules = BTreeMap<String, Level>;
 
 #[derive(Deserialize, Debug, Default, Clone)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
@@ -116,6 +148,10 @@ pub(crate) struct Environment {
 #[derive(Deserialize, Default, Debug, Clone)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub(crate) struct Analysis {
+    /// Whether equality-based checks should preserve possible subclass behavior.
+    #[serde(alias = "strict-literal-narrowing")]
+    pub(crate) strict_equality_semantics: Option<bool>,
+
     /// Whether ty should support `type: ignore` comments.
     pub(crate) respect_type_ignore_comments: Option<bool>,
 

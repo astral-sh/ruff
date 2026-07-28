@@ -7,8 +7,8 @@ from email.charset import Charset
 from email.contentmanager import ContentManager
 from email.errors import MessageDefect
 from email.policy import Policy
-from typing import Any, Generic, Literal, Protocol, TypeVar, overload, type_check_only
-from typing_extensions import Self, TypeAlias
+from typing import Any, Generic, Literal, Protocol, TypeAlias, TypeVar, overload, type_check_only
+from typing_extensions import Self
 
 __all__ = ["Message", "EmailMessage"]
 
@@ -69,6 +69,7 @@ class Message(Generic[_HeaderT_co, _HeaderParamT_contra]):
         is called.  If you want to set the payload to a scalar object, use
         set_payload() instead.
         """
+
     # `i: int` without a multipart payload results in an error
     # `| MaybeNone` acts like `| Any`: can be None for cleared or unset payload, but annoying to check
     @overload  # multipart
@@ -92,7 +93,6 @@ class Message(Generic[_HeaderT_co, _HeaderParamT_contra]):
         If the message is a multipart and the decode flag is True, then None
         is returned.
         """
-
     @overload  # multipart
     def get_payload(self, i: int, decode: Literal[False] = False) -> _PayloadType | MaybeNone: ...
     @overload  # either
@@ -101,6 +101,7 @@ class Message(Generic[_HeaderT_co, _HeaderParamT_contra]):
     def get_payload(self, i: None = None, *, decode: Literal[True]) -> _EncodedPayloadType | MaybeNone: ...
     @overload  # not multipart, IDEM but w/o kwarg
     def get_payload(self, i: None, decode: Literal[True]) -> _EncodedPayloadType | MaybeNone: ...
+
     # If `charset=None` and payload supports both `encode` AND `decode`,
     # then an invalid payload could be passed, but this is unlikely
     # Not[_SupportsEncodeToPayload]
@@ -111,13 +112,13 @@ class Message(Generic[_HeaderT_co, _HeaderParamT_contra]):
         Optional charset sets the message's default character set.  See
         set_charset() for details.
         """
-
     @overload
     def set_payload(
         self,
         payload: _SupportsEncodeToPayload | _SupportsDecodeToPayload | _PayloadType | _MultipartPayloadType,
         charset: Charset | str,
     ) -> None: ...
+
     def set_charset(self, charset: _CharsetType) -> None:
         """Set the charset of the payload to a given character set.
 
@@ -202,9 +203,9 @@ class Message(Generic[_HeaderT_co, _HeaderParamT_contra]):
         Like __getitem__() but return failobj instead of None when the field
         is missing.
         """
-
     @overload
     def get(self, name: str, failobj: _T) -> _HeaderT_co | _T: ...
+
     @overload
     def get_all(self, name: str, failobj: None = None) -> list[_HeaderT_co] | None:
         """Return a list of all the values for the named field.
@@ -215,9 +216,9 @@ class Message(Generic[_HeaderT_co, _HeaderParamT_contra]):
 
         If no such fields exist, failobj is returned (defaults to None).
         """
-
     @overload
     def get_all(self, name: str, failobj: _T) -> list[_HeaderT_co] | _T: ...
+
     def add_header(self, _name: str, _value: str, **_params: _ParamsType) -> None:
         """Extended header setting.
 
@@ -307,9 +308,9 @@ class Message(Generic[_HeaderT_co, _HeaderParamT_contra]):
         header.  Optional header is the header to search instead of
         Content-Type.  If unquote is True, the value is unquoted.
         """
-
     @overload
     def get_params(self, failobj: _T, header: str = "content-type", unquote: bool = True) -> list[tuple[str, str]] | _T: ...
+
     @overload
     def get_param(
         self, param: str, failobj: None = None, header: str = "content-type", unquote: bool = True
@@ -336,9 +337,9 @@ class Message(Generic[_HeaderT_co, _HeaderParamT_contra]):
             param = email.utils.collapse_rfc2231_value(rawparam)
 
         """
-
     @overload
     def get_param(self, param: str, failobj: _T, header: str = "content-type", unquote: bool = True) -> _ParamType | _T: ...
+
     def del_param(self, param: str, header: str = "content-type", requote: bool = True) -> None:
         """Remove the given parameter completely from the Content-Type header.
 
@@ -373,9 +374,9 @@ class Message(Generic[_HeaderT_co, _HeaderParamT_contra]):
         the 'filename' parameter, this method falls back to looking for the
         'name' parameter.
         """
-
     @overload
     def get_filename(self, failobj: _T) -> str | _T: ...
+
     @overload
     def get_boundary(self, failobj: None = None) -> str | None:
         """Return the boundary associated with the payload if present.
@@ -383,9 +384,9 @@ class Message(Generic[_HeaderT_co, _HeaderParamT_contra]):
         The boundary is extracted from the Content-Type header's 'boundary'
         parameter, and it is unquoted.
         """
-
     @overload
     def get_boundary(self, failobj: _T) -> str | _T: ...
+
     def set_boundary(self, boundary: str) -> None:
         """Set the boundary parameter in Content-Type to 'boundary'.
 
@@ -405,9 +406,9 @@ class Message(Generic[_HeaderT_co, _HeaderParamT_contra]):
         Content-Type header, or if that header has no charset parameter,
         failobj is returned.
         """
-
     @overload
     def get_content_charset(self, failobj: _T) -> str | _T: ...
+
     @overload
     def get_charsets(self, failobj: None = None) -> list[str | None]:
         """Return a list containing the charset(s) used in this message.
@@ -425,10 +426,10 @@ class Message(Generic[_HeaderT_co, _HeaderParamT_contra]):
         one for the container message (i.e. self), so that a non-multipart
         message will still return a list of length 1.
         """
-
     @overload
     def get_charsets(self, failobj: _T) -> list[str | _T]: ...
-    def walk(self) -> Generator[Self, None, None]:
+
+    def walk(self) -> Generator[Self]:
         """Walk over the message tree, yielding each subpart.
 
         The walk is performed in depth-first order.  This method is a
@@ -495,6 +496,7 @@ class Message(Generic[_HeaderT_co, _HeaderParamT_contra]):
         2231.  Optional language specifies the RFC 2231 language, defaulting
         to the empty string.  Both charset and language should be strings.
         """
+
     # The following two methods are undocumented, but a source code comment states that they are public API
     def set_raw(self, name: str, value: _HeaderParamT_contra) -> None:
         """Store name and value in the model without modification.
@@ -510,7 +512,9 @@ class Message(Generic[_HeaderT_co, _HeaderParamT_contra]):
 
 class MIMEPart(Message[_HeaderRegistryT_co, _HeaderRegistryParamT_contra]):
     def __init__(self, policy: Policy[Any] | None = None) -> None: ...
-    def get_body(self, preferencelist: Sequence[str] = ("related", "html", "plain")) -> MIMEPart[_HeaderRegistryT_co] | None:
+    def get_body(
+        self, preferencelist: Sequence[str] = ("related", "html", "plain")
+    ) -> MIMEPart[_HeaderRegistryT_co, _HeaderRegistryParamT_contra] | None:
         """Return best candidate mime part for display as 'body' of message.
 
         Do a depth first search, starting with self, looking for the first part
@@ -528,6 +532,7 @@ class MIMEPart(Message[_HeaderRegistryT_co, _HeaderRegistryParamT_contra]):
         is called.  If you want to set the payload to a scalar object, use
         set_payload() instead.
         """
+
     # The attachments are created via type(self) in the attach method. It's theoretically
     # possible to sneak other attachment types into a MIMEPart instance, but could cause
     # cause unforseen consequences.
@@ -543,7 +548,7 @@ class MIMEPart(Message[_HeaderRegistryT_co, _HeaderRegistryParamT_contra]):
         non-multipart.
         """
 
-    def iter_parts(self) -> Iterator[MIMEPart[_HeaderRegistryT_co]]:
+    def iter_parts(self) -> Iterator[MIMEPart[_HeaderRegistryT_co, _HeaderRegistryParamT_contra]]:
         """Return an iterator over all immediate subparts of a multipart.
 
         Return an empty iterator for a non-multipart.
@@ -573,4 +578,4 @@ class MIMEPart(Message[_HeaderRegistryT_co, _HeaderRegistryParamT_contra]):
 
     def is_attachment(self) -> bool: ...
 
-class EmailMessage(MIMEPart): ...
+class EmailMessage(MIMEPart[_HeaderRegistryT_co, _HeaderRegistryParamT_contra]): ...

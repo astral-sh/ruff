@@ -61,6 +61,7 @@ fn includes_import(stmt: &Stmt, target: &NameImport) -> bool {
         NameImport::Import(target) => {
             let Stmt::Import(ast::StmtImport {
                 names,
+                is_lazy: _,
                 range: _,
                 node_index: _,
             }) = &stmt
@@ -77,6 +78,7 @@ fn includes_import(stmt: &Stmt, target: &NameImport) -> bool {
                 module,
                 names,
                 level,
+                is_lazy: _,
                 range: _,
                 node_index: _,
             }) = &stmt

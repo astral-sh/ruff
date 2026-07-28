@@ -40,7 +40,6 @@ PLC2401 Variable name `ápple_count` contains a non-ASCII character
 4 |
 5 | (ápple_count for ápple_count in y)
   |                  ^^^^^^^^^^^
-  |
 help: Rename the variable using ASCII characters
 
 PLC2401 Argument name `ápple_count` contains a non-ASCII character

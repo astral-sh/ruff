@@ -69,7 +69,7 @@ impl Violation for Numpy2Deprecation {
         } = self;
         match migration_guide {
             Some(migration_guide) => {
-                format!("`np.{existing}` will be removed in NumPy 2.0. {migration_guide}",)
+                format!("`np.{existing}` will be removed in NumPy 2.0. {migration_guide}")
             }
             None => format!("`np.{existing}` will be removed without replacement in NumPy 2.0"),
         }
@@ -323,10 +323,10 @@ pub(crate) fn numpy_2_0_deprecation(checker: &Checker, expr: &Expr) {
         },
         ["numpy", "in1d"] => Replacement {
             existing: "in1d",
-            details: Details::AutoImport {
-                path: "numpy",
-                name: "isin",
-                compatibility: Compatibility::BackwardsCompatible,
+            details: Details::Manual {
+                guideline: Some(
+                    "Use `np.isin` instead. Unlike `np.in1d`, `np.isin` preserves the shape of its input, so `np.in1d(ar1, ar2)` is equivalent to `np.isin(ar1, ar2).ravel()`.",
+                ),
             },
         },
         ["numpy", "INF"] => Replacement {
@@ -759,7 +759,7 @@ fn is_guarded_by_try_except(
             try_block_contains_undeprecated_attribute(try_node, &replacement.details, semantic)
         }
         Expr::Name(ast::ExprName { id, .. }) => {
-            let Some(binding_id) = semantic.lookup_symbol(id.as_str()) else {
+            let Some(binding_id) = semantic.lookup_symbol(id.as_str()).binding_id() else {
                 return false;
             };
             let binding = semantic.binding(binding_id);

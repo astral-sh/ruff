@@ -149,7 +149,6 @@ pub(crate) fn used_dummy_variable(checker: &Checker, binding: &Binding, binding_
         | BindingKind::FromImport(_)
         | BindingKind::SubmoduleImport(_)
         | BindingKind::Deletion
-        | BindingKind::ConditionalDeletion(_)
         | BindingKind::DunderClassCell => return,
     }
 

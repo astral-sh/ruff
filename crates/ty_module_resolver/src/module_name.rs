@@ -101,6 +101,24 @@ impl ModuleName {
             .expect("at least one module component")
     }
 
+    /// Returns the last component in this module name.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use ty_module_resolver::ModuleName;
+    ///
+    /// assert_eq!(ModuleName::new_static("foo.bar.baz").unwrap().last_component(), "baz");
+    /// ```
+    #[must_use]
+    pub fn last_component(&self) -> &str {
+        // OK because `Self::is_valid_name` guarantees that there is at least
+        // one component in the module name.
+        self.components()
+            .next_back()
+            .expect("at least one module component")
+    }
+
     /// The name of this module's immediate parent, if it has a parent.
     ///
     /// # Examples
@@ -235,22 +253,14 @@ impl ModuleName {
         if !is_identifier(first_part) {
             return None;
         }
-        let name = if let Some(second_part) = components.next() {
-            if !is_identifier(second_part) {
+        let mut name = CompactString::from(first_part);
+        for part in components {
+            if !is_identifier(part) {
                 return None;
             }
-            let mut name = format!("{first_part}.{second_part}");
-            for part in components {
-                if !is_identifier(part) {
-                    return None;
-                }
-                name.push('.');
-                name.push_str(part);
-            }
-            CompactString::from(&name)
-        } else {
-            CompactString::from(first_part)
-        };
+            name.push('.');
+            name.push_str(part);
+        }
         Some(Self(name))
     }
 
@@ -308,6 +318,7 @@ impl ModuleName {
             module,
             level,
             names: _,
+            is_lazy: _,
             range: _,
             node_index: _,
         } = node;
@@ -390,7 +401,7 @@ impl ModuleName {
     /// assert!(!module_name.is_test_module());
     /// ```
     pub fn is_test_module(&self) -> bool {
-        if self.components().next_back() == Some("conftest") {
+        if self.last_component() == "conftest" {
             return true;
         }
         self.components()

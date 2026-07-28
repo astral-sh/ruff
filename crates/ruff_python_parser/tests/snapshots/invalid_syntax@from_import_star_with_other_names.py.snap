@@ -44,6 +44,7 @@ Module(
                         },
                     ],
                     level: 0,
+                    is_lazy: false,
                 },
             ),
             ImportFrom(
@@ -90,6 +91,7 @@ Module(
                         },
                     ],
                     level: 0,
+                    is_lazy: false,
                 },
             ),
             ImportFrom(
@@ -132,6 +134,7 @@ Module(
                         },
                     ],
                     level: 0,
+                    is_lazy: false,
                 },
             ),
             ImportFrom(
@@ -178,6 +181,7 @@ Module(
                         },
                     ],
                     level: 0,
+                    is_lazy: false,
                 },
             ),
         ],
@@ -217,4 +221,3 @@ Module(
 3 | from x import *, a as b
 4 | from x import *, *, a
   |               ^^^^^^^ Syntax Error: Star import must be the only import
-  |

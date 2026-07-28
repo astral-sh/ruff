@@ -53,7 +53,7 @@ pub(crate) struct UnnecessaryLiteralUnion {
 }
 
 impl Violation for UnnecessaryLiteralUnion {
-    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Always;
 
     #[derive_message_formats]
     fn message(&self) -> String {

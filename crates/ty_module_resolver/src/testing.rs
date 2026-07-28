@@ -8,6 +8,7 @@ use ruff_python_ast::PythonVersion;
 
 use crate::db::tests::TestDb;
 use crate::settings::SearchPathSettings;
+use crate::strategy::FallibleStrategy;
 
 /// A test case for the module resolver.
 ///
@@ -108,11 +109,6 @@ pub(crate) struct TestCaseBuilder<T> {
     site_packages_files: Vec<FileSpec>,
     // Additional file roots (beyond site_packages, src and stdlib)
     // that should be registered with the `Db` abstraction.
-    //
-    // This is necessary to make testing "list modules" work. Namely,
-    // "list modules" relies on caching via a file root's revision,
-    // and if file roots aren't registered, then the implementation
-    // can't access the root's revision.
     roots: Vec<SystemPathBuf>,
 }
 
@@ -253,18 +249,11 @@ impl TestCaseBuilder<MockedTypeshed> {
             site_packages_paths: vec![site_packages.clone()],
             ..SearchPathSettings::empty()
         }
-        .to_search_paths(db.system(), db.vendored())
+        .to_search_paths(db.system(), db.vendored(), &FallibleStrategy)
         .expect("Valid search path settings");
 
         db = db.with_search_paths(search_paths);
 
-        // This root is needed for correct Salsa tracking.
-        // Namely, a `SearchPath` is treated as an input, and
-        // thus the revision number must be bumped accordingly
-        // when the directory tree changes. We rely on detecting
-        // this revision from the file root. If we don't add them
-        // here, they won't get added.
-        //
         // Roots for other search paths are added as part of
         // search path initialization in `SearchPaths::from_settings`,
         // and any remaining are added below.
@@ -272,11 +261,10 @@ impl TestCaseBuilder<MockedTypeshed> {
             .try_add_root(&db, SystemPath::new("/src"), FileRootKind::Project);
 
         db.files()
-            .try_add_root(&db, &stdlib, FileRootKind::LibrarySearchPath);
+            .try_add_root(&db, &stdlib, FileRootKind::SearchPath);
 
         for root in &roots {
-            db.files()
-                .try_add_root(&db, root, FileRootKind::LibrarySearchPath);
+            db.files().try_add_root(&db, root, FileRootKind::SearchPath);
         }
 
         TestCase {
@@ -327,7 +315,7 @@ impl TestCaseBuilder<VendoredTypeshed> {
             site_packages_paths: vec![site_packages.clone()],
             ..SearchPathSettings::empty()
         }
-        .to_search_paths(db.system(), db.vendored())
+        .to_search_paths(db.system(), db.vendored(), &FallibleStrategy)
         .expect("Valid search path settings");
 
         db = db.with_search_paths(search_paths);
@@ -335,8 +323,7 @@ impl TestCaseBuilder<VendoredTypeshed> {
         db.files()
             .try_add_root(&db, SystemPath::new("/src"), FileRootKind::Project);
         for root in &roots {
-            db.files()
-                .try_add_root(&db, root, FileRootKind::LibrarySearchPath);
+            db.files().try_add_root(&db, root, FileRootKind::SearchPath);
         }
 
         TestCase {

@@ -1,5 +1,7 @@
+use std::borrow::Cow;
 use std::collections::btree_map::{BTreeMap, Entry};
 
+use ruff_db::files::directory_listing;
 use ruff_python_ast::PythonVersion;
 
 use crate::db::Db;
@@ -10,7 +12,7 @@ use crate::resolve::{ModuleResolveMode, ResolverContext, resolve_file_module, se
 
 /// List all available modules, including all sub-modules, sorted in lexicographic order.
 pub fn all_modules(db: &dyn Db) -> Vec<Module<'_>> {
-    let mut modules = list_modules(db);
+    let mut modules = list_modules(db).to_vec();
     let mut stack = modules.clone();
     while let Some(module) = stack.pop() {
         for &submodule in module.all_submodules(db) {
@@ -23,30 +25,42 @@ pub fn all_modules(db: &dyn Db) -> Vec<Module<'_>> {
 }
 
 /// List all available top-level modules.
-#[salsa::tracked]
-pub fn list_modules(db: &dyn Db) -> Vec<Module<'_>> {
-    let mut modules = BTreeMap::new();
-    for search_path in search_paths(db, ModuleResolveMode::StubsAllowed) {
-        for module in list_modules_in(db, SearchPathIngredient::new(db, search_path.clone())) {
-            match modules.entry(module.name(db)) {
+#[salsa::tracked(returns(deref))]
+pub fn list_modules(db: &dyn Db) -> Box<[Module<'_>]> {
+    let mut modules: BTreeMap<&ModuleName, ListedModule<'_>> = BTreeMap::new();
+    for search_path in search_paths(db, ModuleResolveMode::Typing) {
+        for &new in list_modules_in(db, SearchPathIngredient::new(db, search_path.clone())) {
+            match modules.entry(new.module(db).name(db)) {
                 Entry::Vacant(entry) => {
-                    entry.insert(module);
+                    entry.insert(new);
                 }
                 Entry::Occupied(mut entry) => {
-                    // The only case where a module can override
-                    // a module with the same name in a higher
-                    // precedent search path is if the higher
-                    // precedent search path contained a namespace
-                    // package and the lower precedent search path
-                    // contained a "regular" module.
-                    if let (None, Some(_)) = (entry.get().search_path(db), module.search_path(db)) {
-                        entry.insert(module);
+                    // A module can override a module with the same name in
+                    // a higher precedent search path when either of the following
+                    // are true:
+                    //
+                    // 1. The higher precedent search path contained a namespace
+                    //    package and the lower precedent search path contained
+                    //    a "regular" module/package.
+                    // 2. The new module is from a stub package (`foo-stubs`),
+                    //    which has priority regardless of search path ordering
+                    //    per the typing spec's import resolution ordering.
+                    let existing = entry.get();
+                    let existing_is_namespace = existing.module(db).search_path(db).is_none();
+                    let new_is_non_namespace = new.module(db).search_path(db).is_some();
+                    if (existing_is_namespace && new_is_non_namespace)
+                        || (!existing.is_stub_package(db) && new.is_stub_package(db))
+                    {
+                        entry.insert(new);
                     }
                 }
             }
         }
     }
-    modules.into_values().collect()
+    modules
+        .into_values()
+        .map(|listed| listed.module(db))
+        .collect()
 }
 
 #[salsa::tracked(debug, heap_size=ruff_memory_usage::heap_size)]
@@ -56,28 +70,22 @@ struct SearchPathIngredient<'db> {
 }
 
 /// List all available top-level modules in the given `SearchPath`.
-#[salsa::tracked]
+#[salsa::tracked(returns(deref))]
 fn list_modules_in<'db>(
     db: &'db dyn Db,
     search_path: SearchPathIngredient<'db>,
-) -> Vec<Module<'db>> {
-    tracing::debug!("Listing modules in search path '{}'", search_path.path(db));
-    let mut lister = Lister::new(db, search_path.path(db));
-    match search_path.path(db).as_path() {
+) -> Vec<ListedModule<'db>> {
+    let path = search_path.path(db);
+    tracing::debug!("Listing modules in search path '{}'", path);
+    let mut lister = Lister::new(db, path);
+    match path.as_path() {
         SystemOrVendoredPathRef::System(system_search_path) => {
-            // Read the revision on the corresponding file root to
-            // register an explicit dependency on this directory. When
-            // the revision gets bumped, the cache that Salsa creates
-            // for this routine will be invalidated.
-            let root = db.files().expect_root(db, system_search_path);
-            let _ = root.revision(db);
-
-            let Ok(it) = db.system().read_directory(system_search_path) else {
+            let Ok(listing) = directory_listing(db, system_search_path) else {
                 return vec![];
             };
-            for result in it {
-                let Ok(entry) = result else { continue };
-                lister.add_path(&entry.path().into(), entry.file_type().into());
+            for (name, file_type) in listing.iter() {
+                let path = system_search_path.join(name);
+                lister.add_path(&path.as_path().into(), file_type.into());
             }
         }
         SystemOrVendoredPathRef::Vendored(vendored_search_path) => {
@@ -89,6 +97,17 @@ fn list_modules_in<'db>(
     lister.into_modules()
 }
 
+/// A module paired with whether it came from a stub package.
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+struct ListedModule<'db> {
+    #[returns(copy)]
+    module: Module<'db>,
+    #[returns(copy)]
+    is_stub_package: bool,
+}
+
+impl get_size2::GetSize for ListedModule<'_> {}
+
 /// An implementation helper for "list all modules."
 ///
 /// This is responsible for accumulating modules indexed by
@@ -99,7 +118,7 @@ fn list_modules_in<'db>(
 struct Lister<'db> {
     db: &'db dyn Db,
     search_path: &'db SearchPath,
-    modules: BTreeMap<&'db ModuleName, Module<'db>>,
+    modules: BTreeMap<&'db ModuleName, ListedModule<'db>>,
 }
 
 impl<'db> Lister<'db> {
@@ -114,7 +133,7 @@ impl<'db> Lister<'db> {
     }
 
     /// Returns the modules collected, sorted by module name.
-    fn into_modules(self) -> Vec<Module<'db>> {
+    fn into_modules(self) -> Vec<ListedModule<'db>> {
         self.modules.into_values().collect()
     }
 
@@ -160,7 +179,7 @@ impl<'db> Lister<'db> {
                         &module_path,
                         Module::file_module(
                             self.db,
-                            module_name,
+                            Cow::Owned(module_name),
                             ModuleKind::Package,
                             self.search_path.clone(),
                             file,
@@ -204,7 +223,7 @@ impl<'db> Lister<'db> {
                 if !self.search_path.is_standard_library() {
                     self.add_module(
                         &module_path,
-                        Module::namespace_package(self.db, module_name),
+                        Module::namespace_package(self.db, Cow::Owned(module_name)),
                     );
                 }
                 return;
@@ -232,7 +251,7 @@ impl<'db> Lister<'db> {
             &module_path,
             Module::file_module(
                 self.db,
-                module_name,
+                Cow::Owned(module_name),
                 ModuleKind::Module,
                 self.search_path.clone(),
                 file,
@@ -246,22 +265,23 @@ impl<'db> Lister<'db> {
     /// existing entry, then this is a no-op. That is, this assumes that the
     /// caller looks for modules in search path priority order.
     fn add_module(&mut self, path: &ModulePath, module: Module<'db>) {
+        let listed = ListedModule::new(self.db, module, path.is_stub_package());
         let mut entry = match self.modules.entry(module.name(self.db)) {
             Entry::Vacant(entry) => {
-                entry.insert(module);
+                entry.insert(listed);
                 return;
             }
             Entry::Occupied(entry) => entry,
         };
 
-        let existing = entry.get();
+        let existing = entry.get().module(self.db);
         match (existing.search_path(self.db), module.search_path(self.db)) {
             // When we had a namespace package and now try to
             // insert a non-namespace package, the latter always
             // takes precedent, even if it's in a lower priority
             // search path.
             (None, Some(_)) => {
-                entry.insert(module);
+                entry.insert(listed);
             }
             (Some(_), Some(_)) => {
                 // Merging across search paths is only necessary for
@@ -275,25 +295,20 @@ impl<'db> Lister<'db> {
                 // the same directory, the former takes precedent.
                 // (This case can only occur when both have a search
                 // path.)
-                if existing.kind(self.db) == ModuleKind::Module
-                    && module.kind(self.db) == ModuleKind::Package
-                {
-                    entry.insert(module);
-                    return;
-                }
                 // Or if we have two file modules and the new one
                 // is a stub, then the stub takes priority.
                 if existing.kind(self.db) == ModuleKind::Module
-                    && module.kind(self.db) == ModuleKind::Module
-                    && path.is_stub_file()
+                    && let module_kind = module.kind(self.db)
+                    && (module_kind == ModuleKind::Package
+                        || module_kind == ModuleKind::Module && path.is_stub_file())
                 {
-                    entry.insert(module);
+                    entry.insert(listed);
                     return;
                 }
                 // Or... if we have a stub package, the stub package
                 // always gets priority.
                 if path.is_stub_package() {
-                    entry.insert(module);
+                    entry.insert(listed);
                 }
             }
             _ => {}
@@ -302,8 +317,7 @@ impl<'db> Lister<'db> {
 
     /// Returns true if the given module name cannot be shadowable.
     fn is_non_shadowable(&self, name: &ModuleName) -> bool {
-        ModuleResolveMode::StubsAllowed
-            .is_non_shadowable(self.python_version().minor, name.as_str())
+        ModuleResolveMode::Typing.is_non_shadowable(self.python_version().minor, name.as_str())
     }
 
     /// Returns the Python version we want to perform module resolution
@@ -319,7 +333,7 @@ impl<'db> Lister<'db> {
             python_version: self.python_version(),
             // We don't currently support listing modules
             // in a "no stubs allowed" mode.
-            mode: ModuleResolveMode::StubsAllowed,
+            mode: ModuleResolveMode::Typing,
         }
     }
 }
@@ -378,8 +392,11 @@ mod tests {
     use ruff_db::Db as _;
     use ruff_db::files::{File, FilePath, FileRootKind};
     use ruff_db::system::{DbWithTestSystem, DbWithWritableSystem, SystemPath, SystemPathBuf};
-    use ruff_db::testing::assert_function_query_was_not_run;
+    use ruff_db::testing::{
+        assert_function_query_was_not_run, assert_function_query_was_not_run_by_name,
+    };
     use ruff_python_ast::PythonVersion;
+    use salsa::plumbing::AsId as _;
 
     use crate::db::{Db, tests::TestDb};
     use crate::module::Module;
@@ -387,6 +404,7 @@ mod tests {
         ModuleResolveMode, ModuleResolveModeIngredient, dynamic_resolution_paths,
     };
     use crate::settings::SearchPathSettings;
+    use crate::strategy::FallibleStrategy;
     use crate::testing::{FileSpec, MockedTypeshed, TestCase, TestCaseBuilder};
 
     use super::list_modules;
@@ -406,8 +424,8 @@ mod tests {
                     // For snapshots, just normalize all paths to using
                     // Unix slashes for simplicity.
                     let path_components = match module.file(self.db).path(self.db) {
-                        FilePath::System(path) => path.as_path().components(),
-                        FilePath::Vendored(path) => path.as_path().components(),
+                        FilePath::System(path) => path.components(),
+                        FilePath::Vendored(path) => path.components(),
                         FilePath::SystemVirtual(path) => Utf8Path::new(path.as_str()).components(),
                     };
                     let nice_path = path_components
@@ -440,7 +458,7 @@ mod tests {
     }
 
     fn sorted_list(db: &dyn Db) -> Vec<Module<'_>> {
-        let mut modules = list_modules(db);
+        let mut modules = list_modules(db).to_vec();
         modules.sort_by(|m1, m2| m1.name(db).cmp(m2.name(db)));
         modules
     }
@@ -966,7 +984,7 @@ mod tests {
 
         db.set_search_paths(
             settings
-                .to_search_paths(db.system(), db.vendored())
+                .to_search_paths(db.system(), db.vendored(), &FallibleStrategy)
                 .expect("Valid search path settings"),
         );
 
@@ -1021,6 +1039,60 @@ mod tests {
             Module::File("foo", "first-party", "/src/foo.py", Module, None),
         ]
         "#,
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn deeply_nested_file_does_not_invalidate_top_level_listing() -> anyhow::Result<()> {
+        let TestCase { mut db, src, .. } = TestCaseBuilder::new()
+            .with_src_files(&[("package/__init__.py", ""), ("package/sub/__init__.py", "")])
+            .build();
+
+        list_modules(&db);
+        db.clear_salsa_events();
+
+        db.write_file(src.join("package/sub/nested.py"), "")?;
+        list_modules(&db);
+
+        let events = db.take_salsa_events();
+        assert_function_query_was_not_run_by_name(&db, "list_modules_in", None, &events);
+
+        Ok(())
+    }
+
+    #[test]
+    fn sibling_file_does_not_invalidate_package_submodules() -> anyhow::Result<()> {
+        let TestCase { mut db, src, .. } = TestCaseBuilder::new()
+            .with_src_files(&[("package/__init__.py", "")])
+            .build();
+
+        let package_id = {
+            let package = list_modules(&db)
+                .iter()
+                .find(|module| module.name(&db).as_str() == "package")
+                .copied()
+                .expect("package to exist");
+            package.all_submodules(&db);
+            package.as_id()
+        };
+        db.clear_salsa_events();
+
+        db.write_file(src.join("sibling.py"), "")?;
+        let package = list_modules(&db)
+            .iter()
+            .find(|module| module.name(&db).as_str() == "package")
+            .copied()
+            .expect("package to exist");
+        package.all_submodules(&db);
+
+        let events = db.take_salsa_events();
+        assert_function_query_was_not_run_by_name(
+            &db,
+            "all_submodule_names_for_package",
+            Some(package_id),
+            &events,
         );
 
         Ok(())
@@ -1364,7 +1436,7 @@ not_a_directory
         assert_function_query_was_not_run(
             &db,
             dynamic_resolution_paths,
-            ModuleResolveModeIngredient::new(&db, ModuleResolveMode::StubsAllowed),
+            ModuleResolveModeIngredient::new(&db, ModuleResolveMode::Typing),
             &events,
         );
     }
@@ -1473,7 +1545,7 @@ not_a_directory
 
         db.set_search_paths(
             settings
-                .to_search_paths(db.system(), db.vendored())
+                .to_search_paths(db.system(), db.vendored(), &FallibleStrategy)
                 .expect("Valid search path settings"),
         );
 
@@ -1524,7 +1596,7 @@ not_a_directory
 
         db.set_search_paths(
             settings
-                .to_search_paths(db.system(), db.vendored())
+                .to_search_paths(db.system(), db.vendored(), &FallibleStrategy)
                 .expect("Valid search path settings"),
         );
 
@@ -1604,7 +1676,7 @@ not_a_directory
 
         let settings = SearchPathSettings::new(vec![src]);
         let search_paths = settings
-            .to_search_paths(db.system(), db.vendored())
+            .to_search_paths(db.system(), db.vendored(), &FallibleStrategy)
             .expect("valid search path settings");
         db.set_search_paths(search_paths);
 
@@ -1644,7 +1716,7 @@ not_a_directory
         };
         db.set_search_paths(
             settings
-                .to_search_paths(db.system(), db.vendored())
+                .to_search_paths(db.system(), db.vendored(), &FallibleStrategy)
                 .unwrap(),
         );
 
@@ -1792,7 +1864,7 @@ not_a_directory
 
         let settings = SearchPathSettings::new(vec![project_directory]);
         let search_paths = settings
-            .to_search_paths(db.system(), db.vendored())
+            .to_search_paths(db.system(), db.vendored(), &FallibleStrategy)
             .expect("Valid search path settings");
         db.set_search_paths(search_paths);
 

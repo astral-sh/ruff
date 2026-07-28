@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_python_formatter/tests/fixtures.rs
+input_file: crates/ruff_python_formatter/resources/test/fixtures/black/cases/preview_multiline_strings.py
 ---
 ## Input
 
@@ -108,7 +109,7 @@ test_vectors = [
     "two\nliner\n",
     """expressed
 as a three line
-mulitline string""",
+multiline string""",
 ]
 
 _wat = re.compile(
@@ -608,7 +609,7 @@ test_vectors = [
     "two\nliner\n",
     """expressed
 as a three line
-mulitline string""",
+multiline string""",
 ]
 
 _wat = re.compile(
@@ -926,7 +927,7 @@ test_vectors = [
     "two\nliner\n",
     """expressed
 as a three line
-mulitline string""",
+multiline string""",
 ]
 
 _wat = re.compile(

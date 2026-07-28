@@ -120,7 +120,7 @@ for _ in foo:
         ...
     break
 
-# should error (?)
+# should not error - outer break makes the mutation safe
 for _ in foo:
     foo.remove(1)
     if bar:
@@ -193,3 +193,123 @@ def success_map(mapping):
 def fail_list(seq):
     for val in seq:
         return seq.pop(4)
+
+# should not error - break after non-flow-altering if (issue #12402)
+for item in some_list:
+    some_list.append(item)
+    if True:
+        pass
+    break
+
+# should error - continue followed by unreachable break (issue #12402)
+for item in some_list:
+    some_list.remove(item)
+    continue
+    break
+
+# should error - nested `break` does not exit the outer loop
+for item in some_list:
+    some_list.append(item)
+    for _ in range(3):
+        break
+
+# should error - nested `continue` does not exit the outer loop
+for item in some_list:
+    some_list.append(item)
+    for _ in range(3):
+        continue
+
+# should error - nested `while`'s `break` only exits the inner loop
+for item in some_list:
+    some_list.append(item)
+    while True:
+        break
+
+# should error - nested `for`'s `break` can bypass `else: return`,
+# so outer mutation may still be reached on re-iteration
+def fail_nested_for_else(some_list, other):
+    for item in some_list:
+        some_list.append(item)
+        for y in other:
+            if y:
+                break
+        else:
+            return
+
+# should error - nested `while`'s `break` can bypass `else: return`,
+# so outer mutation may still be reached on re-iteration
+def fail_nested_while_else(some_list):
+    for item in some_list:
+        some_list.append(item)
+        while True:
+            break
+        else:
+            return
+
+# should error - `return` in `except` must not clear mutation in `try`
+def fail_try_except(some_list):
+    for item in some_list:
+        try:
+            some_list.append(item)
+        except Exception:
+            return
+
+# should error - `return` in `except` must not clear mutation in `else`
+def fail_try_else(some_list):
+    for item in some_list:
+        try:
+            pass
+        except Exception:
+            return
+        else:
+            some_list.append(item)
+
+# should error - `return` in `except` must not clear mutation in `finally`
+def fail_try_finally(some_list):
+    for item in some_list:
+        try:
+            pass
+        except Exception:
+            return
+        finally:
+            some_list.append(item)
+
+# should not error - `finally: return` unconditionally exits, so the `try`
+# body's mutation never reaches another iteration
+def pass_try_finally_return(items):
+    for item in items:
+        try:
+            items.append(item)
+        finally:
+            return
+
+# should error - nested loop's body has a `return` but no `break`, so the
+# outer mutation can reach another iteration if the `return` doesn't fire
+def fail_nested_return_bypasses_else(outer, inner):
+    for item in outer:
+        outer.append(item)
+        for y in inner:
+            if y:
+                return
+        else:
+            return
+
+# should error - nested loop's body can `raise`, which also skips `else`
+def fail_nested_raise_bypasses_else(outer, inner):
+    for item in outer:
+        outer.append(item)
+        for y in inner:
+            if y:
+                raise ValueError
+        else:
+            return
+
+# should not error - the `break` is unreachable, so `else` always runs and `return` exits
+def pass_nested_continue_before_dead_break(outer, inner):
+    for x in outer:
+        outer.append(x)
+        for y in inner:
+            continue
+            break
+        else:
+            return

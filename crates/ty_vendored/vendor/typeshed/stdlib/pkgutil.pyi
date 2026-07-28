@@ -86,40 +86,23 @@ if sys.version_info < (3, 12):
         def __init__(self, fullname: str, file: IO[str], filename: StrOrBytesPath, etc: tuple[str, str, int]) -> None: ...
 
 if sys.version_info < (3, 14):
-    if sys.version_info >= (3, 12):
-        @deprecated("Deprecated since Python 3.12; removed in Python 3.14. Use `importlib.util.find_spec()` instead.")
-        def find_loader(fullname: str) -> LoaderProtocol | None:
-            """Find a "loader" object for fullname
+    @deprecated("Deprecated since Python 3.12; removed in Python 3.14. Use `importlib.util.find_spec()` instead.")
+    def find_loader(fullname: str) -> LoaderProtocol | None:
+        """Find a "loader" object for fullname
 
-            This is a backwards compatibility wrapper around
-            importlib.util.find_spec that converts most failures to ImportError
-            and only returns the loader rather than the full spec
-            """
+        This is a backwards compatibility wrapper around
+        importlib.util.find_spec that converts most failures to ImportError
+        and only returns the loader rather than the full spec
+        """
 
-        @deprecated("Deprecated since Python 3.12; removed in Python 3.14. Use `importlib.util.find_spec()` instead.")
-        def get_loader(module_or_name: str) -> LoaderProtocol | None:
-            """Get a "loader" object for module_or_name
+    @deprecated("Deprecated since Python 3.12; removed in Python 3.14. Use `importlib.util.find_spec()` instead.")
+    def get_loader(module_or_name: str) -> LoaderProtocol | None:
+        """Get a "loader" object for module_or_name
 
-            Returns None if the module cannot be found or imported.
-            If the named module is not already imported, its containing package
-            (if any) is imported, in order to establish the package __path__.
-            """
-    else:
-        def find_loader(fullname: str) -> LoaderProtocol | None:
-            """Find a "loader" object for fullname
-
-            This is a backwards compatibility wrapper around
-            importlib.util.find_spec that converts most failures to ImportError
-            and only returns the loader rather than the full spec
-            """
-
-        def get_loader(module_or_name: str) -> LoaderProtocol | None:
-            """Get a "loader" object for module_or_name
-
-            Returns None if the module cannot be found or imported.
-            If the named module is not already imported, its containing package
-            (if any) is imported, in order to establish the package __path__.
-            """
+        Returns None if the module cannot be found or imported.
+        If the named module is not already imported, its containing package
+        (if any) is imported, in order to establish the package __path__.
+        """
 
 def get_importer(path_item: StrOrBytesPath) -> PathEntryFinderProtocol | None:
     """Retrieve a finder for the given path item
@@ -209,35 +192,76 @@ def get_data(package: str, resource: str) -> bytes | None:
     which does not support get_data(), then None is returned.
     """
 
-def resolve_name(name: str) -> Any:
-    """
-    Resolve a name to an object.
+if sys.version_info >= (3, 15):
+    def resolve_name(name: str, *, strict: bool = False) -> Any:
+        """
+        Resolve a name to an object.
 
-    It is expected that `name` will be a string in one of the following
-    formats, where W is shorthand for a valid Python identifier and dot stands
-    for a literal period in these pseudo-regexes:
+        It is expected that `name` will be a string in one of the following
+        formats, where W is shorthand for a valid Python identifier and dot stands
+        for a literal period in these pseudo-regexes:
 
-    W(.W)*
-    W(.W)*:(W(.W)*)?
+        W(.W)*
+        W(.W)*:(W(.W)*)?
+        W(.W)*:(W(.W)*)
 
-    The first form is intended for backward compatibility only. It assumes that
-    some part of the dotted name is a package, and the rest is an object
-    somewhere within that package, possibly nested inside other objects.
-    Because the place where the package stops and the object hierarchy starts
-    can't be inferred by inspection, repeated attempts to import must be done
-    with this form.
+        The first form is intended for backward compatibility only. It assumes that
+        some part of the dotted name is a package, and the rest is an object
+        somewhere within that package, possibly nested inside other objects.
+        Because the place where the package stops and the object hierarchy starts
+        can't be inferred by inspection, repeated attempts to import must be done
+        with this form.
 
-    In the second form, the caller makes the division point clear through the
-    provision of a single colon: the dotted name to the left of the colon is a
-    package to be imported, and the dotted name to the right is the object
-    hierarchy within that package. Only one import is needed in this form. If
-    it ends with the colon, then a module object is returned.
+        In the second form, the caller makes the division point clear through the
+        provision of a single colon: the dotted name to the left of the colon is a
+        package to be imported, and the dotted name to the right is the object
+        hierarchy within that package. Only one import is needed in this form. If
+        it ends with the colon, then a module object is returned.
 
-    The function will return an object (which might be a module), or raise one
-    of the following exceptions:
+        The first two forms are accepted when `strict=False` (the default).
 
-    ValueError - if `name` isn't in a recognised format
-    ImportError - if an import failed when it shouldn't have
-    AttributeError - if a failure occurred when traversing the object hierarchy
-                     within the imported package to get to the desired object.
-    """
+        The third form requires both the module name and callable, separated by
+        a colon. Only this form is accepted when `strict=True`.
+
+        The function will return an object (which might be a module), or raise one
+        of the following exceptions:
+
+        ValueError - if `name` isn't in a recognised format
+        ImportError - if an import failed when it shouldn't have
+        AttributeError - if a failure occurred when traversing the object hierarchy
+                         within the imported package to get to the desired object.
+        """
+
+else:
+    def resolve_name(name: str) -> Any:
+        """
+        Resolve a name to an object.
+
+        It is expected that `name` will be a string in one of the following
+        formats, where W is shorthand for a valid Python identifier and dot stands
+        for a literal period in these pseudo-regexes:
+
+        W(.W)*
+        W(.W)*:(W(.W)*)?
+
+        The first form is intended for backward compatibility only. It assumes that
+        some part of the dotted name is a package, and the rest is an object
+        somewhere within that package, possibly nested inside other objects.
+        Because the place where the package stops and the object hierarchy starts
+        can't be inferred by inspection, repeated attempts to import must be done
+        with this form.
+
+        In the second form, the caller makes the division point clear through the
+        provision of a single colon: the dotted name to the left of the colon is a
+        package to be imported, and the dotted name to the right is the object
+        hierarchy within that package. Only one import is needed in this form. If
+        it ends with the colon, then a module object is returned.
+
+        The function will return an object (which might be a module), or raise one
+        of the following exceptions:
+
+        ValueError - if `name` isn't in a recognised format
+        ImportError - if an import failed when it shouldn't have
+        AttributeError - if a failure occurred when traversing the object hierarchy
+                         within the imported package to get to the desired object.
+        """

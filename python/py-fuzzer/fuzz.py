@@ -46,9 +46,9 @@ ExitCode = NewType("ExitCode", int)
 
 TY_TARGET_PLATFORM: Final = "linux"
 
-# ty supports `--python-version=3.8`, but typeshed only supports 3.9+,
+# ty supports `--python-version=3.8`, but typeshed only supports 3.10+,
 # so that's probably the oldest version we can usefully test with.
-OLDEST_SUPPORTED_PYTHON: Final = "3.9"
+OLDEST_SUPPORTED_PYTHON: Final = "3.10"
 
 
 def ty_contains_bug(code: str, *, ty_executable: Path) -> bool:

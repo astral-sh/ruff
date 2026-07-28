@@ -5,129 +5,24 @@ expression: lex_source(source)
 ## Tokens
 ```
 [
-    (
-        FStringStart,
-        0..2,
-        TokenFlags(
-            F_STRING,
-        ),
-    ),
-    (
-        InterpolatedStringMiddle(
-            "\\",
-        ),
-        2..3,
-        TokenFlags(
-            F_STRING,
-        ),
-    ),
-    (
-        Lbrace,
-        3..4,
-    ),
-    (
-        Name(
-            Name("foo"),
-        ),
-        4..7,
-    ),
-    (
-        Rbrace,
-        7..8,
-    ),
-    (
-        FStringEnd,
-        8..9,
-        TokenFlags(
-            F_STRING,
-        ),
-    ),
-    (
-        FStringStart,
-        10..12,
-        TokenFlags(
-            F_STRING,
-        ),
-    ),
-    (
-        InterpolatedStringMiddle(
-            "\\\\",
-        ),
-        12..14,
-        TokenFlags(
-            F_STRING,
-        ),
-    ),
-    (
-        Lbrace,
-        14..15,
-    ),
-    (
-        Name(
-            Name("foo"),
-        ),
-        15..18,
-    ),
-    (
-        Rbrace,
-        18..19,
-    ),
-    (
-        FStringEnd,
-        19..20,
-        TokenFlags(
-            F_STRING,
-        ),
-    ),
-    (
-        FStringStart,
-        21..23,
-        TokenFlags(
-            F_STRING,
-        ),
-    ),
-    (
-        InterpolatedStringMiddle(
-            "\\{foo}",
-        ),
-        23..31,
-        TokenFlags(
-            F_STRING,
-        ),
-    ),
-    (
-        FStringEnd,
-        31..32,
-        TokenFlags(
-            F_STRING,
-        ),
-    ),
-    (
-        FStringStart,
-        33..35,
-        TokenFlags(
-            F_STRING,
-        ),
-    ),
-    (
-        InterpolatedStringMiddle(
-            "\\\\{foo}",
-        ),
-        35..44,
-        TokenFlags(
-            F_STRING,
-        ),
-    ),
-    (
-        FStringEnd,
-        44..45,
-        TokenFlags(
-            F_STRING,
-        ),
-    ),
-    (
-        Newline,
-        45..45,
-    ),
+    FStringStart 0..2 (flags = F_STRING),
+    FStringMiddle 2..3 (flags = F_STRING),
+    Lbrace 3..4,
+    Name 4..7,
+    Rbrace 7..8,
+    FStringEnd 8..9 (flags = F_STRING),
+    FStringStart 10..12 (flags = F_STRING),
+    FStringMiddle 12..14 (flags = F_STRING),
+    Lbrace 14..15,
+    Name 15..18,
+    Rbrace 18..19,
+    FStringEnd 19..20 (flags = F_STRING),
+    FStringStart 21..23 (flags = F_STRING),
+    FStringMiddle 23..31 (flags = F_STRING),
+    FStringEnd 31..32 (flags = F_STRING),
+    FStringStart 33..35 (flags = F_STRING),
+    FStringMiddle 35..44 (flags = F_STRING),
+    FStringEnd 44..45 (flags = F_STRING),
+    Newline 45..45,
 ]
 ```

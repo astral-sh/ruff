@@ -66,6 +66,7 @@ class InteractiveInterpreter:
         caller should be prepared to deal with it.
 
         """
+
     if sys.version_info >= (3, 13):
         def showsyntaxerror(self, filename: str | None = None, *, source: str = "") -> None:
             """Display the syntax error that just occurred.
@@ -79,6 +80,7 @@ class InteractiveInterpreter:
             The output is written by self.write(), below.
 
             """
+
     else:
         def showsyntaxerror(self, filename: str | None = None) -> None:
             """Display the syntax error that just occurred.
@@ -121,6 +123,7 @@ class InteractiveConsole(InteractiveInterpreter):
     buffer: list[str]  # undocumented
     filename: str  # undocumented
     if sys.version_info >= (3, 13):
+        local_exit: bool  # undocumented
         def __init__(
             self, locals: dict[str, Any] | None = None, filename: str = "<console>", *, local_exit: bool = False
         ) -> None:
@@ -148,6 +151,7 @@ class InteractiveConsole(InteractiveInterpreter):
             with in some way (this is the same as runsource()).
 
             """
+
     else:
         def __init__(self, locals: dict[str, Any] | None = None, filename: str = "<console>") -> None:
             """Constructor.

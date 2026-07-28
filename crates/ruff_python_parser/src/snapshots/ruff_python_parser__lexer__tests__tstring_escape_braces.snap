@@ -5,129 +5,24 @@ expression: lex_source(source)
 ## Tokens
 ```
 [
-    (
-        TStringStart,
-        0..2,
-        TokenFlags(
-            T_STRING,
-        ),
-    ),
-    (
-        InterpolatedStringMiddle(
-            "\\",
-        ),
-        2..3,
-        TokenFlags(
-            T_STRING,
-        ),
-    ),
-    (
-        Lbrace,
-        3..4,
-    ),
-    (
-        Name(
-            Name("foo"),
-        ),
-        4..7,
-    ),
-    (
-        Rbrace,
-        7..8,
-    ),
-    (
-        TStringEnd,
-        8..9,
-        TokenFlags(
-            T_STRING,
-        ),
-    ),
-    (
-        TStringStart,
-        10..12,
-        TokenFlags(
-            T_STRING,
-        ),
-    ),
-    (
-        InterpolatedStringMiddle(
-            "\\\\",
-        ),
-        12..14,
-        TokenFlags(
-            T_STRING,
-        ),
-    ),
-    (
-        Lbrace,
-        14..15,
-    ),
-    (
-        Name(
-            Name("foo"),
-        ),
-        15..18,
-    ),
-    (
-        Rbrace,
-        18..19,
-    ),
-    (
-        TStringEnd,
-        19..20,
-        TokenFlags(
-            T_STRING,
-        ),
-    ),
-    (
-        TStringStart,
-        21..23,
-        TokenFlags(
-            T_STRING,
-        ),
-    ),
-    (
-        InterpolatedStringMiddle(
-            "\\{foo}",
-        ),
-        23..31,
-        TokenFlags(
-            T_STRING,
-        ),
-    ),
-    (
-        TStringEnd,
-        31..32,
-        TokenFlags(
-            T_STRING,
-        ),
-    ),
-    (
-        TStringStart,
-        33..35,
-        TokenFlags(
-            T_STRING,
-        ),
-    ),
-    (
-        InterpolatedStringMiddle(
-            "\\\\{foo}",
-        ),
-        35..44,
-        TokenFlags(
-            T_STRING,
-        ),
-    ),
-    (
-        TStringEnd,
-        44..45,
-        TokenFlags(
-            T_STRING,
-        ),
-    ),
-    (
-        Newline,
-        45..45,
-    ),
+    TStringStart 0..2 (flags = T_STRING),
+    TStringMiddle 2..3 (flags = T_STRING),
+    Lbrace 3..4,
+    Name 4..7,
+    Rbrace 7..8,
+    TStringEnd 8..9 (flags = T_STRING),
+    TStringStart 10..12 (flags = T_STRING),
+    TStringMiddle 12..14 (flags = T_STRING),
+    Lbrace 14..15,
+    Name 15..18,
+    Rbrace 18..19,
+    TStringEnd 19..20 (flags = T_STRING),
+    TStringStart 21..23 (flags = T_STRING),
+    TStringMiddle 23..31 (flags = T_STRING),
+    TStringEnd 31..32 (flags = T_STRING),
+    TStringStart 33..35 (flags = T_STRING),
+    TStringMiddle 35..44 (flags = T_STRING),
+    TStringEnd 44..45 (flags = T_STRING),
+    Newline 45..45,
 ]
 ```

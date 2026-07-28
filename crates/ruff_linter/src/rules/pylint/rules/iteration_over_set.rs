@@ -9,12 +9,11 @@ use crate::checkers::ast::Checker;
 use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
-/// Checks for iteration over a `set` literal where each element in the set is
-/// itself a literal value.
+/// Checks for iteration over a `set` literal in which each element is a literal.
 ///
 /// ## Why is this bad?
 /// Iterating over a `set` is less efficient than iterating over a sequence
-/// type, like `list` or `tuple`.
+/// type, such as `list` or `tuple`.
 ///
 /// ## Example
 /// ```python

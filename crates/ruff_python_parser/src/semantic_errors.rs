@@ -7,7 +7,7 @@
 use ruff_python_ast::{
     self as ast, Expr, ExprContext, IrrefutablePatternKind, Pattern, PythonVersion, Stmt, StmtExpr,
     StmtFunctionDef, StmtImportFrom,
-    comparable::ComparableExpr,
+    comparable::HashableExpr,
     helpers,
     visitor::{Visitor, walk_expr, walk_stmt},
 };
@@ -57,6 +57,22 @@ impl SemanticSyntaxChecker {
         });
     }
 
+    fn check_lazy_import_context<Ctx: SemanticSyntaxContext>(
+        ctx: &Ctx,
+        range: TextRange,
+        kind: LazyImportKind,
+    ) -> bool {
+        if let Some(context) = ctx.lazy_import_context() {
+            Self::add_error(
+                ctx,
+                SemanticSyntaxErrorKind::LazyImportNotAllowed { context, kind },
+                range,
+            );
+            return true;
+        }
+        false
+    }
+
     fn check_stmt<Ctx: SemanticSyntaxContext>(&mut self, stmt: &ast::Stmt, ctx: &Ctx) {
         match stmt {
             Stmt::ImportFrom(StmtImportFrom {
@@ -64,9 +80,66 @@ impl SemanticSyntaxChecker {
                 module,
                 level,
                 names,
+                is_lazy,
                 ..
             }) => {
-                if matches!(module.as_deref(), Some("__future__")) {
+                let mut handled_lazy_error = false;
+
+                if *is_lazy {
+                    // test_ok lazy_import_semantic_ok_py315
+                    // # parse_options: {"target-version": "3.15"}
+                    // import contextlib
+                    // with contextlib.nullcontext():
+                    //     lazy import os
+                    // with contextlib.nullcontext():
+                    //     lazy from sys import path
+
+                    // test_err lazy_import_invalid_context_py315
+                    // # parse_options: {"target-version": "3.15"}
+                    // try:
+                    //     lazy import os
+                    // except:
+                    //     pass
+                    //
+                    // try:
+                    //     x
+                    // except* Exception:
+                    //     lazy import sys
+                    //
+                    // def func():
+                    //     lazy import math
+                    //
+                    // async def async_func():
+                    //     lazy from json import loads
+                    //
+                    // class MyClass:
+                    //     lazy import typing
+                    //
+                    // def outer():
+                    //     class Inner:
+                    //         lazy import json
+                    if Self::check_lazy_import_context(ctx, *range, LazyImportKind::ImportFrom) {
+                        handled_lazy_error = true;
+                    } else if names.iter().any(|alias| alias.name.as_str() == "*") {
+                        // test_err lazy_import_invalid_from_py315
+                        // # parse_options: {"target-version": "3.15"}
+                        // lazy from os import *
+                        // lazy from __future__ import annotations
+                        //
+                        // def func():
+                        //     lazy from sys import *
+                        Self::add_error(ctx, SemanticSyntaxErrorKind::LazyImportStar, *range);
+                        handled_lazy_error = true;
+                    } else if matches!(module.as_deref(), Some("__future__")) {
+                        Self::add_error(ctx, SemanticSyntaxErrorKind::LazyFutureImport, *range);
+                        handled_lazy_error = true;
+                    }
+                }
+
+                if handled_lazy_error {
+                    // Skip the regular `from`-import validations after reporting the lazy-specific
+                    // syntax error with the highest precedence.
+                } else if matches!(module.as_deref(), Some("__future__")) {
                     for name in names {
                         if !is_known_future_feature(&name.name) {
                             // test_ok valid_future_feature
@@ -114,6 +187,13 @@ impl SemanticSyntaxChecker {
                     }
                 }
             }
+            Stmt::Import(ast::StmtImport {
+                range,
+                is_lazy: true,
+                ..
+            }) => {
+                Self::check_lazy_import_context(ctx, *range, LazyImportKind::Import);
+            }
             Stmt::Match(match_stmt) => {
                 Self::irrefutable_match_case(match_stmt, ctx);
                 for case in &match_stmt.cases {
@@ -131,6 +211,7 @@ impl SemanticSyntaxChecker {
             }) => {
                 if let Some(type_params) = type_params {
                     Self::duplicate_type_parameter_name(type_params, ctx);
+                    Self::type_parameter_default_order(type_params, ctx);
                 }
                 Self::duplicate_parameter_name(parameters, ctx);
             }
@@ -253,15 +334,11 @@ impl SemanticSyntaxChecker {
                     }
                 }
             }
-            Stmt::Break(ast::StmtBreak { range, .. }) => {
-                if !ctx.in_loop_context() {
-                    Self::add_error(ctx, SemanticSyntaxErrorKind::BreakOutsideLoop, *range);
-                }
+            Stmt::Break(ast::StmtBreak { range, .. }) if !ctx.in_loop_context() => {
+                Self::add_error(ctx, SemanticSyntaxErrorKind::BreakOutsideLoop, *range);
             }
-            Stmt::Continue(ast::StmtContinue { range, .. }) => {
-                if !ctx.in_loop_context() {
-                    Self::add_error(ctx, SemanticSyntaxErrorKind::ContinueOutsideLoop, *range);
-                }
+            Stmt::Continue(ast::StmtContinue { range, .. }) if !ctx.in_loop_context() => {
+                Self::add_error(ctx, SemanticSyntaxErrorKind::ContinueOutsideLoop, *range);
             }
             _ => {}
         }
@@ -509,6 +586,7 @@ impl SemanticSyntaxChecker {
                 // def __debug__(): ...  # function name
                 // def f[__debug__](): ...  # type parameter name
                 // def f(__debug__): ...  # parameter name
+                // lambda __debug__: 0  # lambda parameter name
                 Self::check_identifier(name, ctx);
                 if let Some(type_params) = type_params {
                     for type_param in type_params.iter() {
@@ -636,7 +714,7 @@ impl SemanticSyntaxChecker {
         ctx: &Ctx,
     ) {
         let mut seen_default = false;
-        for type_param in type_params.iter() {
+        for type_param in type_params {
             let has_default = match type_param {
                 ast::TypeParam::TypeVar(ast::TypeParamTypeVar { default, .. })
                 | ast::TypeParam::TypeVarTuple(ast::TypeParamTypeVarTuple { default, .. })
@@ -649,6 +727,7 @@ impl SemanticSyntaxChecker {
                 // test_err type_parameter_default_order
                 // class C[T = int, U]: ...
                 // class C[T1, T2 = int, T3, T4]: ...
+                // def f[T = int, U](): ...
                 // type Alias[T = int, U] = ...
                 Self::add_error(
                     ctx,
@@ -748,9 +827,12 @@ impl SemanticSyntaxChecker {
         match stmt {
             Stmt::Expr(StmtExpr { value, .. })
                 if !self.seen_module_docstring_boundary && value.is_string_literal_expr() => {}
-            Stmt::ImportFrom(StmtImportFrom { module, .. }) => {
-                // Allow __future__ imports until we see a non-__future__ import.
-                if !matches!(module.as_deref(), Some("__future__")) {
+            Stmt::ImportFrom(StmtImportFrom {
+                module, is_lazy, ..
+            }) => {
+                // Allow eager `__future__` imports until we see any other import. Lazy imports,
+                // including `lazy from __future__ import ...`, always close the boundary.
+                if *is_lazy || !matches!(module.as_deref(), Some("__future__")) {
                     self.seen_futures_boundary = true;
                 }
             }
@@ -789,6 +871,7 @@ impl SemanticSyntaxChecker {
                 elt, generators, ..
             }) => {
                 Self::check_generator_expr(elt, generators, ctx);
+                Self::check_generator_clauses(generators, ctx);
                 Self::async_comprehension_in_sync_comprehension(ctx, generators);
                 for generator in generators.iter().filter(|g| g.is_async) {
                     Self::await_outside_async_function(
@@ -804,8 +887,11 @@ impl SemanticSyntaxChecker {
                 generators,
                 ..
             }) => {
-                Self::check_generator_expr(key, generators, ctx);
+                if let Some(key) = key {
+                    Self::check_generator_expr(key, generators, ctx);
+                }
                 Self::check_generator_expr(value, generators, ctx);
+                Self::check_generator_clauses(generators, ctx);
                 Self::async_comprehension_in_sync_comprehension(ctx, generators);
                 for generator in generators.iter().filter(|g| g.is_async) {
                     Self::await_outside_async_function(
@@ -819,6 +905,7 @@ impl SemanticSyntaxChecker {
                 elt, generators, ..
             }) => {
                 Self::check_generator_expr(elt, generators, ctx);
+                Self::check_generator_clauses(generators, ctx);
                 // Note that `await_outside_async_function` is not called here because generators
                 // are evaluated lazily. See the note in the function for more details.
             }
@@ -926,6 +1013,9 @@ impl SemanticSyntaxChecker {
                 parameters: Some(parameters),
                 ..
             }) => {
+                for parameter in parameters {
+                    Self::check_identifier(parameter.name(), ctx);
+                }
                 Self::duplicate_parameter_name(parameters, ctx);
             }
             _ => {}
@@ -1007,25 +1097,72 @@ impl SemanticSyntaxChecker {
         );
     }
 
-    /// Add a [`SyntaxErrorKind::ReboundComprehensionVariable`] if `expr` rebinds an iteration
-    /// variable in `generators`.
+    /// Add a [`SemanticSyntaxErrorKind::ReboundComprehensionVariable`] if `expr` rebinds an
+    /// iteration variable in `generators`.
     fn check_generator_expr<Ctx: SemanticSyntaxContext>(
         expr: &Expr,
         comprehensions: &[ast::Comprehension],
         ctx: &Ctx,
     ) {
-        let rebound_variables = {
-            let mut visitor = ReboundComprehensionVisitor {
-                comprehensions,
-                rebound_variables: Vec::new(),
-            };
-            visitor.visit_expr(expr);
-            visitor.rebound_variables
-        };
+        Self::check_rebound_variables(
+            expr,
+            comprehension_target_names(comprehensions),
+            FxHashSet::default(),
+            ctx,
+        );
+        Self::check_class_body_expr(expr, ctx);
+    }
 
-        // TODO(brent) with multiple diagnostic ranges, we could mark both the named expr (current)
-        // and the name expr being rebound
-        for range in rebound_variables {
+    fn check_generator_clauses<Ctx: SemanticSyntaxContext>(
+        generators: &[ast::Comprehension],
+        ctx: &Ctx,
+    ) {
+        // test_ok starred_comprehension_target
+        // [item for (*items,) in source]
+
+        // test_err starred_comprehension_target
+        // [item for *items in source]
+        for (index, generator) in generators.iter().enumerate() {
+            Self::invalid_star_expression(&generator.target, ctx);
+
+            for if_expr in &generator.ifs {
+                Self::check_rebound_variables(
+                    if_expr,
+                    comprehension_target_names(&generators[..=index]),
+                    comprehension_target_names(&generators[index + 1..]),
+                    ctx,
+                );
+                Self::check_class_body_expr(if_expr, ctx);
+            }
+
+            let mut visitor = ComprehensionIterableNamedExpressionVisitor::default();
+            visitor.visit_expr(&generator.iter);
+            for range in visitor.ranges {
+                Self::add_error(
+                    ctx,
+                    SemanticSyntaxErrorKind::NamedExpressionInComprehensionIterable,
+                    range,
+                );
+            }
+        }
+    }
+
+    fn check_rebound_variables<'a, Ctx: SemanticSyntaxContext>(
+        expr: &Expr,
+        targets: FxHashSet<&'a ast::name::Name>,
+        direct_targets: FxHashSet<&'a ast::name::Name>,
+        ctx: &Ctx,
+    ) {
+        let mut visitor = ReboundComprehensionVisitor {
+            targets,
+            direct_targets,
+            ranges: Vec::new(),
+        };
+        visitor.visit_expr(expr);
+
+        // TODO(brent): With multiple diagnostic ranges, mark both the named expression target
+        // (currently reported) and the comprehension target it rebinds.
+        for range in visitor.ranges {
             // test_err rebound_comprehension_variable
             // [(a := 0) for a in range(0)]
             // {(a := 0) for a in range(0)}
@@ -1042,6 +1179,22 @@ impl SemanticSyntaxChecker {
             Self::add_error(
                 ctx,
                 SemanticSyntaxErrorKind::ReboundComprehensionVariable,
+                range,
+            );
+        }
+    }
+
+    fn check_class_body_expr<Ctx: SemanticSyntaxContext>(expr: &Expr, ctx: &Ctx) {
+        if !ctx.in_class_body_comprehension() {
+            return;
+        }
+
+        let mut visitor = ClassBodyNamedExpressionVisitor::default();
+        visitor.visit_expr(expr);
+        for range in visitor.ranges {
+            Self::add_error(
+                ctx,
+                SemanticSyntaxErrorKind::NamedExpressionInClassBodyComprehension,
                 range,
             );
         }
@@ -1114,6 +1267,19 @@ fn is_known_future_feature(name: &str) -> bool {
     )
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, get_size2::GetSize)]
+pub enum LazyImportKind {
+    Import,
+    ImportFrom,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, get_size2::GetSize)]
+pub enum LazyImportContext {
+    Function,
+    Class,
+    TryExceptBlocks,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash, get_size2::GetSize)]
 pub struct SemanticSyntaxError {
     pub kind: SemanticSyntaxErrorKind,
@@ -1127,6 +1293,12 @@ impl Display for SemanticSyntaxError {
             SemanticSyntaxErrorKind::LateFutureImport => {
                 f.write_str("__future__ imports must be at the top of the file")
             }
+            SemanticSyntaxErrorKind::NamedExpressionInComprehensionIterable => f.write_str(
+                "assignment expression cannot be used in a comprehension iterable expression",
+            ),
+            SemanticSyntaxErrorKind::NamedExpressionInClassBodyComprehension => f.write_str(
+                "assignment expression within a comprehension cannot be used in a class body",
+            ),
             SemanticSyntaxErrorKind::ReboundComprehensionVariable => {
                 f.write_str("assignment expression cannot rebind comprehension variable")
             }
@@ -1141,6 +1313,9 @@ impl Display for SemanticSyntaxError {
             }
             SemanticSyntaxErrorKind::MultipleCaseAssignment(name) => {
                 write!(f, "multiple assignments to name `{name}` in pattern")
+            }
+            SemanticSyntaxErrorKind::MultipleStarredNamesInSequencePattern => {
+                f.write_str("multiple starred names in sequence pattern")
             }
             SemanticSyntaxErrorKind::IrrefutableCasePattern(kind) => match kind {
                 // These error messages are taken from CPython's syntax errors
@@ -1177,7 +1352,7 @@ impl Display for SemanticSyntaxError {
                 )
             }
             SemanticSyntaxErrorKind::DuplicateMatchClassAttribute(name) => {
-                write!(f, "attribute name `{name}` repeated in class pattern",)
+                write!(f, "attribute name `{name}` repeated in class pattern")
             }
             SemanticSyntaxErrorKind::LoadBeforeGlobalDeclaration { name, start: _ } => {
                 write!(f, "name `{name}` is used prior to global declaration")
@@ -1231,10 +1406,31 @@ impl Display for SemanticSyntaxError {
             SemanticSyntaxErrorKind::FutureFeatureNotDefined(name) => {
                 write!(f, "Future feature `{name}` is not defined")
             }
+            SemanticSyntaxErrorKind::LazyImportNotAllowed { context, kind } => {
+                let statement = match kind {
+                    LazyImportKind::Import => "lazy import",
+                    LazyImportKind::ImportFrom => "lazy from ... import",
+                };
+                let location = match context {
+                    LazyImportContext::Function => "functions",
+                    LazyImportContext::Class => "classes",
+                    LazyImportContext::TryExceptBlocks => "try/except blocks",
+                };
+                write!(f, "{statement} not allowed inside {location}")
+            }
+            SemanticSyntaxErrorKind::LazyImportStar => {
+                f.write_str("lazy from ... import * is not allowed")
+            }
+            SemanticSyntaxErrorKind::LazyFutureImport => {
+                f.write_str("lazy from __future__ import is not allowed")
+            }
             SemanticSyntaxErrorKind::BreakOutsideLoop => f.write_str("`break` outside loop"),
             SemanticSyntaxErrorKind::ContinueOutsideLoop => f.write_str("`continue` outside loop"),
             SemanticSyntaxErrorKind::GlobalParameter(name) => {
-                write!(f, "name `{name}` is parameter and global")
+                write!(
+                    f,
+                    "name `{name}` cannot refer to a parameter and a global variable"
+                )
             }
             SemanticSyntaxErrorKind::DifferentMatchPatternBindings => {
                 write!(f, "alternative patterns bind different names")
@@ -1257,6 +1453,18 @@ impl Ranged for SemanticSyntaxError {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, get_size2::GetSize)]
 pub enum SemanticSyntaxErrorKind {
+    /// Represents a `lazy` import statement in an invalid context.
+    LazyImportNotAllowed {
+        context: LazyImportContext,
+        kind: LazyImportKind,
+    },
+
+    /// Represents the use of `lazy from ... import *`.
+    LazyImportStar,
+
+    /// Represents the use of `lazy from __future__ import ...`.
+    LazyFutureImport,
+
     /// Represents the use of a `__future__` import after the beginning of a file.
     ///
     /// ## Examples
@@ -1271,6 +1479,27 @@ pub enum SemanticSyntaxErrorKind {
     ///
     /// [`late-future-import`]: https://docs.astral.sh/ruff/rules/late-future-import/
     LateFutureImport,
+
+    /// Represents the use of an assignment expression within a comprehension iterable clause.
+    ///
+    /// ## Examples
+    ///
+    /// ```python
+    /// [x for x in (y := range(3))]
+    /// [x for x in [z for z in range(3) if (y := z)]]
+    /// ```
+    NamedExpressionInComprehensionIterable,
+
+    /// Represents the use of an assignment expression within a comprehension nested directly or
+    /// indirectly in a class body.
+    ///
+    /// ## Examples
+    ///
+    /// ```python
+    /// class C:
+    ///     [(x := y) for y in range(3)]
+    /// ```
+    NamedExpressionInClassBodyComprehension,
 
     /// Represents the rebinding of the iteration variable of a list, set, or dict comprehension or
     /// a generator expression.
@@ -1309,6 +1538,16 @@ pub enum SemanticSyntaxErrorKind {
     ///     case Class(x=1, x=2): ...
     /// ```
     MultipleCaseAssignment(ast::name::Name),
+
+    /// Represents multiple starred names in a sequence pattern.
+    ///
+    /// ## Examples
+    ///
+    /// ```python
+    /// match x:
+    ///     case [*head, middle, *tail]: ...
+    /// ```
+    MultipleStarredNamesInSequencePattern,
 
     /// Represents an irrefutable `case` pattern before the last `case` in a `match` statement.
     ///
@@ -1746,25 +1985,95 @@ pub enum WriteToDebugKind {
     Delete(PythonVersion),
 }
 
-/// Searches for the first named expression (`x := y`) rebinding one of the `iteration_variables` in
-/// a comprehension or generator expression.
+fn comprehension_target_names(
+    comprehensions: &[ast::Comprehension],
+) -> FxHashSet<&ast::name::Name> {
+    let mut visitor = helpers::StoredNameFinder::default();
+    for comprehension in comprehensions {
+        visitor.visit_expr(&comprehension.target);
+    }
+    visitor.names.into_values().map(|name| &name.id).collect()
+}
+
+#[derive(Default)]
+struct ComprehensionIterableNamedExpressionVisitor {
+    ranges: Vec<TextRange>,
+}
+
+impl Visitor<'_> for ComprehensionIterableNamedExpressionVisitor {
+    fn visit_expr(&mut self, expr: &Expr) {
+        if let Expr::Named(ast::ExprNamed { target, range, .. }) = expr
+            && target.is_name_expr()
+        {
+            self.ranges.push(*range);
+        }
+        walk_expr(self, expr);
+    }
+}
+
+#[derive(Default)]
+struct ClassBodyNamedExpressionVisitor {
+    ranges: Vec<TextRange>,
+}
+
+impl Visitor<'_> for ClassBodyNamedExpressionVisitor {
+    fn visit_expr(&mut self, expr: &Expr) {
+        match expr {
+            Expr::Lambda(ast::ExprLambda { parameters, .. }) => {
+                // Defaults execute in the enclosing comprehension; lambda bodies do not.
+                if let Some(parameters) = parameters {
+                    self.visit_parameters(parameters);
+                }
+                return;
+            }
+            Expr::ListComp(_) | Expr::SetComp(_) | Expr::DictComp(_) | Expr::Generator(_) => {
+                // Nested comprehensions are checked when normal traversal reaches them.
+                return;
+            }
+            Expr::Named(ast::ExprNamed { target, range, .. }) if target.is_name_expr() => {
+                self.ranges.push(*range);
+            }
+            _ => {}
+        }
+        walk_expr(self, expr);
+    }
+}
+
+/// Searches for named expressions (`x := y`) rebinding a comprehension or generator expression's
+/// iteration variables.
 struct ReboundComprehensionVisitor<'a> {
-    comprehensions: &'a [ast::Comprehension],
-    rebound_variables: Vec<TextRange>,
+    /// Targets that apply inside nested comprehensions.
+    targets: FxHashSet<&'a ast::name::Name>,
+    /// Targets from later filter clauses, which do not apply inside nested comprehensions.
+    direct_targets: FxHashSet<&'a ast::name::Name>,
+    ranges: Vec<TextRange>,
 }
 
 impl Visitor<'_> for ReboundComprehensionVisitor<'_> {
     fn visit_expr(&mut self, expr: &Expr) {
-        if let Expr::Named(ast::ExprNamed { target, .. }) = expr {
-            if let Expr::Name(ast::ExprName { id, range, .. }) = &**target {
-                if self.comprehensions.iter().any(|comp| {
-                    comp.target
-                        .as_name_expr()
-                        .is_some_and(|name| name.id == *id)
-                }) {
-                    self.rebound_variables.push(*range);
+        match expr {
+            Expr::Lambda(ast::ExprLambda { parameters, .. }) => {
+                if let Some(parameters) = parameters {
+                    self.visit_parameters(parameters);
+                }
+                return;
+            }
+            Expr::ListComp(_) | Expr::SetComp(_) | Expr::DictComp(_) | Expr::Generator(_)
+                if !self.direct_targets.is_empty() =>
+            {
+                let direct_targets = std::mem::take(&mut self.direct_targets);
+                walk_expr(self, expr);
+                self.direct_targets = direct_targets;
+                return;
+            }
+            Expr::Named(ast::ExprNamed { target, .. }) => {
+                if let Expr::Name(ast::ExprName { id, range, .. }) = &**target
+                    && (self.targets.contains(id) || self.direct_targets.contains(id))
+                {
+                    self.ranges.push(*range);
                 }
             }
+            _ => {}
         }
         walk_expr(self, expr);
     }
@@ -1826,6 +2135,10 @@ impl<'a, Ctx: SemanticSyntaxContext> MatchPatternVisitor<'a, Ctx> {
         //     case Class(y=x, z=x): ...  # MatchClass keyword
         //     case [x] | {1: x} | Class(y=x, z=x): ...  # MatchOr
         //     case x as x: ...  # MatchAs
+
+        // test_err multiple_starred_names_in_sequence_pattern
+        // match subject:
+        //     case *first, *second, *third: ...
         match pattern {
             Pattern::MatchValue(_) | Pattern::MatchSingleton(_) => {}
             Pattern::MatchStar(ast::PatternMatchStar { name, .. }) => {
@@ -1834,7 +2147,18 @@ impl<'a, Ctx: SemanticSyntaxContext> MatchPatternVisitor<'a, Ctx> {
                 }
             }
             Pattern::MatchSequence(ast::PatternMatchSequence { patterns, .. }) => {
+                let mut seen_star_pattern = false;
                 for pattern in patterns {
+                    if pattern.is_match_star() {
+                        if seen_star_pattern {
+                            SemanticSyntaxChecker::add_error(
+                                self.ctx,
+                                SemanticSyntaxErrorKind::MultipleStarredNamesInSequencePattern,
+                                pattern.range(),
+                            );
+                        }
+                        seen_star_pattern = true;
+                    }
                     self.visit_pattern(pattern);
                 }
             }
@@ -1854,12 +2178,13 @@ impl<'a, Ctx: SemanticSyntaxContext> MatchPatternVisitor<'a, Ctx> {
                 let mut seen = FxHashSet::default();
                 for key in keys
                     .iter()
-                    // complex numbers (`1 + 2j`) are allowed as keys but are not literals
-                    // because they are represented as a `BinOp::Add` between a real number and
-                    // an imaginary number
-                    .filter(|key| key.is_literal_expr() || key.is_bin_op_expr())
+                    // Signed and complex numbers are allowed as keys but are represented as unary
+                    // or binary expressions rather than literals.
+                    .filter(|key| {
+                        key.is_literal_expr() || key.is_unary_op_expr() || key.is_bin_op_expr()
+                    })
                 {
-                    if !seen.insert(ComparableExpr::from(key)) {
+                    if !seen.insert(HashableExpr::from(key)) {
                         let key_range = key.range();
                         let duplicate_key = self.ctx.source()[key_range].to_string();
                         // test_ok duplicate_match_key_attr
@@ -1875,6 +2200,10 @@ impl<'a, Ctx: SemanticSyntaxContext> MatchPatternVisitor<'a, Ctx> {
                         //     case {1.0 + 2j: 1, 1.0 + 2j: 2}: ...
                         //     case {True: 1, True: 2}: ...
                         //     case {None: 1, None: 2}: ...
+                        //     case {0: 1, False: 2}: ...
+                        //     case {1.0: 1, True: 2}: ...
+                        //     case {-0: 1, False: 2}: ...
+                        //     case {1 + 0j: 1, True: 2}: ...
                         //     case {
                         //     """x
                         //     y
@@ -1889,6 +2218,8 @@ impl<'a, Ctx: SemanticSyntaxContext> MatchPatternVisitor<'a, Ctx> {
                         //     case [{"x": 1, "x": 2}]: ...
                         //     case Foo(x=1, y={"x": 1, "x": 2}): ...
                         //     case [Foo(x=1), Foo(x=1, y={"x": 1, "x": 2})]: ...
+                        //     case {2: 1, 2.0: 2}: ...
+                        //     case {9007199254740993: 1, 9007199254740993 + 0j: 2}: ...
                         SemanticSyntaxChecker::add_error(
                             self.ctx,
                             SemanticSyntaxErrorKind::DuplicateMatchKey(duplicate_key),
@@ -2131,6 +2462,12 @@ pub trait SemanticSyntaxContext {
     /// Returns `true` if `__future__`-style type annotations are enabled.
     fn future_annotations_or_stub(&self) -> bool;
 
+    /// Returns the nearest invalid context for a `lazy` import statement, if any.
+    ///
+    /// This should return the innermost relevant restriction in order of precedence:
+    /// function, class, then `try`/`except`.
+    fn lazy_import_context(&self) -> Option<LazyImportContext>;
+
     /// The target Python version for detecting backwards-incompatible syntax changes.
     fn python_version(&self) -> PythonVersion;
 
@@ -2205,6 +2542,10 @@ pub trait SemanticSyntaxContext {
     /// scopes until it finds a sync comprehension. As a result, the two methods will typically be
     /// used together.
     fn in_sync_comprehension(&self) -> bool;
+
+    /// Returns `true` if a comprehension introduced at the current position is nested directly
+    /// or indirectly in a class body, without crossing a function or lambda boundary.
+    fn in_class_body_comprehension(&self) -> bool;
 
     /// Returns `true` if the visitor is at the top-level module scope.
     fn in_module_scope(&self) -> bool;

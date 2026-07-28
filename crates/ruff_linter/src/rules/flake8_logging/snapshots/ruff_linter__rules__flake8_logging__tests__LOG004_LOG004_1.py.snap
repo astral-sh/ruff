@@ -6,11 +6,10 @@ LOG004 [*] `.exception()` call outside exception handlers
   |
 4 | logger.exception("")
   | ^^^^^^^^^^^^^^^^^^^^
-  |
 help: Replace with `.error()`
-1 | _ = (logger := __import__("somewhere").logger)
-2 | 
-3 | 
+  |
+3 |
   - logger.exception("")
 4 + logger.error("")
+  |
 note: This is an unsafe fix and may change runtime behavior

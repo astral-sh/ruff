@@ -4,8 +4,7 @@ import sys
 import unittest.case
 from _typeshed import OptExcInfo
 from collections.abc import Callable
-from typing import Any, Final, TextIO, TypeVar
-from typing_extensions import TypeAlias
+from typing import Any, Final, TextIO, TypeAlias, TypeVar
 
 _F = TypeVar("_F", bound=Callable[..., Any])
 _DurationsType: TypeAlias = list[tuple[str, float]]
@@ -96,6 +95,7 @@ class TestResult:
         'err' is None if the subtest ended successfully, otherwise it's a
         tuple of values as returned by sys.exc_info().
         """
+
     if sys.version_info >= (3, 12):
         def addDuration(self, test: unittest.case.TestCase, elapsed: float) -> None:
             """Called when a test finished to run, regardless of its outcome.

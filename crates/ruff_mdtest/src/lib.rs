@@ -1,0 +1,225 @@
+use std::sync::Arc;
+
+use anyhow::anyhow;
+use camino::Utf8Path;
+
+use mdtest::{
+    Failures, FileFailures, MarkdownEdit, TestFile, TestOutcome, attempt_test, matcher, parser,
+};
+use ruff_db::diagnostic::{Annotation, Diagnostic, Span};
+use ruff_db::files::{File, system_path_to_file};
+use ruff_db::source::source_text;
+use ruff_db::system::{DbWithWritableSystem as _, SystemPathBuf};
+use ruff_linter::source_kind::SourceKind;
+use ruff_linter::test::test_contents;
+use ruff_linter::toml::lint_toml;
+use ruff_python_ast::SourceType;
+use ruff_ranged_value::{ValueSource, ValueSourceGuard};
+use ruff_workspace::configuration::Configuration;
+use ruff_workspace::options::Options;
+
+use crate::db::Db;
+
+mod db;
+
+pub fn run(
+    absolute_fixture_path: &Utf8Path,
+    relative_fixture_path: &Utf8Path,
+    source: &str,
+    snapshot_path: &Utf8Path,
+    short_title: &str,
+    test_name: &str,
+    crate_name: &str,
+) -> anyhow::Result<()> {
+    let suite =
+        parse(short_title, source).map_err(|err| anyhow!("Failed to parse fixture: {err}"))?;
+
+    let mut db = Db::setup();
+
+    mdtest::run(
+        absolute_fixture_path,
+        relative_fixture_path,
+        source,
+        test_name,
+        crate_name,
+        &suite,
+        |test, _assertion, _output_format| {
+            run_test(&mut db, relative_fixture_path, snapshot_path, test)
+        },
+    )
+}
+
+fn run_test(
+    db: &mut Db,
+    relative_fixture_path: &Utf8Path,
+    snapshot_path: &Utf8Path,
+    test: &parser::MarkdownTest<Options>,
+) -> Result<(TestOutcome, Vec<MarkdownEdit>), Failures> {
+    // Initialize the system and remove all files and directories to reset the system to a clean state.
+    db.use_in_memory_system();
+
+    let project_root = SystemPathBuf::from("/src");
+    db.create_directory_all(&project_root)
+        .expect("Creating the project root to succeed");
+
+    let test_files: Vec<_> = test
+        .files()
+        .filter_map(|embedded| {
+            if embedded.lang == "ignore" {
+                return None;
+            }
+
+            assert!(
+                matches!(embedded.lang, "py" | "pyi" | "python" | "ipynb" | "toml"),
+                "Supported file types are: py (or python), pyi, ipynb, toml, and ignore"
+            );
+
+            let full_path = embedded.full_path(&project_root);
+
+            db.write_file(&full_path, &*embedded.code).unwrap();
+
+            let file = system_path_to_file(db, full_path).unwrap();
+
+            Some(TestFile {
+                file,
+                code_blocks: embedded.code_blocks.clone(),
+            })
+        })
+        .collect();
+
+    let settings = Configuration::from_options(
+        test.configuration().clone(),
+        None,
+        project_root.as_std_path(),
+    )
+    .expect("Failed to construct configuration from options")
+    .into_settings(project_root.as_std_path())
+    .expect("Failed to construct settings");
+
+    let mut all_diagnostics = vec![];
+
+    // Edits for updating changed inline snapshots.
+    let mut markdown_edits = vec![];
+
+    let mut panic_info = None;
+
+    let failures: Failures = test_files
+        .iter()
+        .filter_map(|test_file| {
+            let mdtest_result = attempt_test(
+                |file| {
+                    let source = source_text(db, file);
+                    let path = file
+                        .path(db)
+                        .as_system_path()
+                        .expect("mdtest files are on the system")
+                        .as_std_path();
+                    match SourceType::from(path) {
+                        SourceType::Python(_) => {
+                            let source_kind = if let Some(notebook) = source.as_notebook() {
+                                SourceKind::ipy_notebook(notebook.clone())
+                            } else {
+                                SourceKind::Python {
+                                    code: source.as_str().to_string(),
+                                    is_stub: file.is_stub(db),
+                                }
+                            };
+                            test_contents(&source_kind, path, &settings.linter).0
+                        }
+                        SourceType::Toml(source_type) => {
+                            lint_toml(path, source.as_str(), &settings.linter, source_type)
+                        }
+                        SourceType::Markdown => Vec::new(),
+                    }
+                },
+                test_file,
+            );
+
+            let mut diagnostics = match mdtest_result {
+                Ok(diagnostics) => diagnostics,
+                Err(failures) => {
+                    if test.should_expect_panic().is_ok() {
+                        panic_info = Some(failures.info);
+                        return None;
+                    }
+
+                    return Some(failures.into_file_failures(db, "run mdtest", None));
+                }
+            };
+            normalize_diagnostics(test_file.file, &mut diagnostics);
+
+            let failure = match matcher::match_file(
+                db,
+                test_file.file,
+                &diagnostics,
+                mdtest::RunOptions::default(),
+            )
+            .and_then(|inline_diagnostics| {
+                mdtest::validate_inline_snapshot(
+                    db,
+                    "ruff",
+                    test_file,
+                    &inline_diagnostics,
+                    &mut markdown_edits,
+                )
+            }) {
+                Ok(()) => None,
+                Err(line_failures) => Some(FileFailures {
+                    backtick_offsets: test_file.to_code_block_backtick_offsets(),
+                    by_line: line_failures,
+                }),
+            };
+
+            all_diagnostics.extend(diagnostics);
+
+            failure
+        })
+        .collect();
+
+    mdtest::check_panic(test, panic_info);
+    mdtest::snapshot_diagnostics(
+        test,
+        db,
+        "ruff",
+        relative_fixture_path,
+        snapshot_path,
+        &all_diagnostics,
+        |_| true,
+    );
+
+    if failures.is_empty() {
+        Ok((TestOutcome::Success, markdown_edits))
+    } else {
+        Err(failures)
+    }
+}
+
+/// Replace Ruff-style `SourceFile`s in `diagnostics` with Salsa-backed `File`s for use in `mdtest`.
+fn normalize_diagnostics(file: File, diagnostics: &mut [Diagnostic]) {
+    for diagnostic in diagnostics {
+        for annotation in diagnostic.annotations_mut() {
+            normalize_annotation(file, annotation);
+        }
+
+        for sub_diagnostic in diagnostic.sub_diagnostics_mut() {
+            for annotation in sub_diagnostic.annotations_mut() {
+                normalize_annotation(file, annotation);
+            }
+        }
+    }
+}
+
+fn normalize_annotation(file: File, annotation: &mut Annotation) {
+    annotation.set_span(Span::from(file).with_optional_range(annotation.get_span().range()));
+}
+
+fn parse<'s>(
+    short_title: &'s str,
+    source: &'s str,
+) -> anyhow::Result<parser::MarkdownTestSuite<'s, Options>> {
+    let _guard = ValueSourceGuard::new(
+        ValueSource::File(Arc::new(SystemPathBuf::from(short_title))),
+        false,
+    );
+    parser::parse::<Options>(short_title, source, |_| Ok(()))
+}

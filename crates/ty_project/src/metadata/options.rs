@@ -1,11 +1,10 @@
 use crate::Db;
 use crate::glob::{ExcludeFilter, IncludeExcludeFilter, IncludeFilter, PortableGlobKind};
+use crate::metadata::python_version::SupportedPythonVersion;
 use crate::metadata::settings::{OverrideSettings, SrcSettings};
 
 use super::settings::{Override, Settings, TerminalSettings};
-use crate::metadata::value::{
-    RangedValue, RelativeGlobPattern, RelativePathBuf, ValueSource, ValueSourceGuard,
-};
+use crate::metadata::value::{RelativeGlobPattern, RelativePathBuf};
 use anyhow::Context;
 use ordermap::OrderMap;
 use ruff_db::RustDoc;
@@ -19,23 +18,28 @@ use ruff_db::vendored::VendoredFileSystem;
 use ruff_macros::{Combine, OptionsMetadata, RustDoc};
 use ruff_options_metadata::{OptionSet, OptionsMetadata, Visit};
 use ruff_python_ast::PythonVersion;
+use ruff_ranged_value::{RangedValue, ValueSource, ValueSourceGuard};
 use rustc_hash::FxHasher;
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
+use std::cmp::Ordering;
 use std::fmt::{self, Debug, Display};
 use std::hash::BuildHasherDefault;
 use std::ops::Deref;
 use std::sync::Arc;
+use strum::IntoEnumIterator;
 use thiserror::Error;
 use ty_combine::Combine;
 use ty_module_resolver::{
     ModuleGlobSet, ModuleGlobSetBuilder, SearchPathSettings, SearchPathSettingsError, SearchPaths,
 };
+use ty_python_core::platform::PythonPlatform;
+use ty_python_core::program::{MisconfigurationStrategy, ProgramSettings};
 use ty_python_semantic::lint::{Level, LintSource, RuleSelection};
 use ty_python_semantic::{
-    AnalysisSettings, MisconfigurationMode, ProgramSettings, PythonEnvironment, PythonPlatform,
-    PythonVersionFileSource, PythonVersionSource, PythonVersionWithSource, SitePackagesPaths,
-    SysPrefixPathOrigin,
+    AnalysisSettings, PythonEnvironment, PythonVersionFileSource, PythonVersionSource,
+    PythonVersionWithSource, SitePackagesPaths, SysPrefixPathOrigin,
+    inferred_python_version_source_annotation,
 };
 use ty_static::EnvVars;
 
@@ -73,7 +77,9 @@ pub struct Options {
     /// * `ignore`: Disable the rule.
     /// * `warn`: Enable the rule and create a warning diagnostic.
     /// * `error`: Enable the rule and create an error diagnostic.
-    ///   ty will exit with a non-zero code if any error diagnostics are emitted.
+    ///
+    /// By default, ty exits with code 1 if it emits any warning or error diagnostics.
+    /// Set `terminal.error-on-warning` to `false` to exit with code 0 if all diagnostics have `warning` severity.
     #[serde(skip_serializing_if = "Option::is_none")]
     #[option(
         default = r#"{...}"#,
@@ -105,10 +111,49 @@ pub struct Options {
 }
 
 impl Options {
+    pub(super) fn file_options(&self) -> FileOptions {
+        FileOptions {
+            rules: self.rules.clone(),
+            analysis: self.analysis.clone(),
+        }
+    }
+
     pub fn from_toml_str(content: &str, source: ValueSource) -> Result<Self, TyTomlError> {
         let _guard = ValueSourceGuard::new(source, true);
-        let options = toml::from_str(content)?;
+        let mut options: Self = toml::from_str(content)?;
+        options.prioritize_all_selectors();
         Ok(options)
+    }
+
+    /// Ensures that the `all` selector is applied before per-rule selectors
+    /// in all rule tables (top-level and overrides).
+    ///
+    /// This must be called after deserializing from TOML and before any
+    /// [`Combine::combine`] calls, because TOML tables are unordered and the
+    /// `toml` crate sorts keys lexicographically.
+    pub(crate) fn prioritize_all_selectors(&mut self) {
+        // Stable sort that moves all `all` selectors before non-`all` selectors
+        // while preserving relative order among non-`all` entries.
+        let sort = |rules: &mut Rules| {
+            rules.inner.sort_by(
+                |key_a, _, key_b, _| match (**key_a == "all", **key_b == "all") {
+                    (true, false) => Ordering::Less,
+                    (false, true) => Ordering::Greater,
+                    _ => Ordering::Equal,
+                },
+            );
+        };
+
+        if let Some(rules) = &mut self.rules {
+            sort(rules);
+        }
+        if let Some(overrides) = &mut self.overrides {
+            for override_option in &mut overrides.0 {
+                if let Some(rules) = &mut override_option.rules {
+                    sort(rules);
+                }
+            }
+        }
     }
 
     pub fn deserialize_with<'de, D>(source: ValueSource, deserializer: D) -> Result<Self, D::Error>
@@ -119,31 +164,22 @@ impl Options {
         Self::deserialize(deserializer)
     }
 
-    pub(crate) fn to_program_settings(
+    pub(crate) fn to_program_settings<Strategy: MisconfigurationStrategy>(
         &self,
         project_root: &SystemPath,
         project_name: &str,
         system: &dyn System,
         vendored: &VendoredFileSystem,
-        misconfiguration_mode: MisconfigurationMode,
-    ) -> anyhow::Result<ProgramSettings> {
+        strategy: &Strategy,
+    ) -> Result<(ProgramSettings, Vec<ProgramSettingsDiagnostic>), Strategy::Error<anyhow::Error>>
+    {
+        let mut diagnostics = Vec::new();
         let environment = self.environment.or_default();
 
-        let options_python_version =
-            environment
-                .python_version
-                .as_ref()
-                .map(|ranged_version| PythonVersionWithSource {
-                    version: **ranged_version,
-                    source: match ranged_version.source() {
-                        ValueSource::Cli => PythonVersionSource::Cli,
-                        ValueSource::File(path) => PythonVersionSource::ConfigFile(
-                            PythonVersionFileSource::new(path.clone(), ranged_version.range()),
-                        ),
-                        ValueSource::Editor => PythonVersionSource::Editor,
-                    },
-                });
-
+        let configured_python_version = environment
+            .python_version
+            .as_ref()
+            .map(python_version_from_config);
         let python_platform = environment
             .python_platform
             .as_deref()
@@ -161,6 +197,7 @@ impl Options {
                     SysPrefixPathOrigin::ConfigFileSetting(path.clone(), python_path.range())
                 }
                 ValueSource::Editor => SysPrefixPathOrigin::Editor,
+                ValueSource::UvWorkspace => SysPrefixPathOrigin::UvWorkspace,
             };
 
             PythonEnvironment::new(python_path.absolute(project_root, system), origin, system)
@@ -172,17 +209,11 @@ impl Options {
         };
 
         // If in safe-mode, fallback to None if this fails instead of erroring.
-        let python_environment = match python_environment {
-            Ok(python_environment) => python_environment,
-            Err(err) => {
-                if misconfiguration_mode == MisconfigurationMode::UseDefault {
-                    tracing::debug!("Default settings failed to discover local Python environment");
-                    None
-                } else {
-                    return Err(err);
-                }
-            }
-        };
+        let python_environment = strategy
+            .fallback_opt(python_environment, |_| {
+                tracing::debug!("Default settings failed to discover local Python environment");
+            })?
+            .flatten();
 
         let self_environment = self_environment_search_paths(
             python_environment
@@ -196,19 +227,10 @@ impl Options {
             let site_packages_paths = python_environment
                 .site_packages_paths(system)
                 .context("Failed to discover the site-packages directory");
-            let site_packages_paths = match site_packages_paths {
-                Ok(paths) => paths,
-                Err(err) => {
-                    if misconfiguration_mode == MisconfigurationMode::UseDefault {
-                        tracing::debug!(
-                            "Default settings failed to discover site-packages directory"
-                        );
-                        SitePackagesPaths::default()
-                    } else {
-                        return Err(err);
-                    }
-                }
-            };
+            let site_packages_paths = strategy.fallback(site_packages_paths, |_| {
+                tracing::debug!("Default settings failed to discover site-packages directory");
+                SitePackagesPaths::default()
+            })?;
             match self_environment {
                 // When ty is installed in a virtual environment (e.g., `uvx --with ...`),
                 // the self-environment takes priority over the discovered environment.
@@ -231,41 +253,50 @@ impl Options {
             }).ok()
         });
 
-        let python_version = options_python_version
+        let python_version = configured_python_version
+            .map(PythonVersionResolution::Configured)
             .or_else(|| {
-                python_environment
-                    .as_ref()?
-                    .python_version_from_metadata()
+                let inferred_python_version = python_environment
+                    .as_ref()
+                    .and_then(|python_environment| {
+                        python_environment.python_version_from_metadata()
+                    })
                     .cloned()
+                    .or_else(|| site_packages_paths.python_version_from_layout());
+
+                inferred_python_version.map(PythonVersionResolution::Inferred)
             })
-            .or_else(|| site_packages_paths.python_version_from_layout())
+            .and_then(|resolution| resolution.into_program_version(&mut diagnostics))
             .unwrap_or_default();
 
         // Safe mode is handled inside this function, so we just assume this can't fail
-        let search_paths = self.to_search_paths(
+        let search_paths = strategy.to_anyhow(self.to_search_paths(
             project_root,
             project_name,
             site_packages_paths,
             real_stdlib_path,
             system,
             vendored,
-            misconfiguration_mode,
-        )?;
+            strategy,
+        ))?;
 
         tracing::info!(
             "Python version: Python {python_version}, platform: {python_platform}",
             python_version = python_version.version
         );
 
-        Ok(ProgramSettings {
-            python_version,
-            python_platform,
-            search_paths,
-        })
+        Ok((
+            ProgramSettings {
+                python_version,
+                python_platform,
+                search_paths,
+            },
+            diagnostics,
+        ))
     }
 
     #[expect(clippy::too_many_arguments)]
-    fn to_search_paths(
+    fn to_search_paths<Strategy: MisconfigurationStrategy>(
         &self,
         project_root: &SystemPath,
         project_name: &str,
@@ -273,8 +304,8 @@ impl Options {
         real_stdlib_path: Option<SystemPathBuf>,
         system: &dyn System,
         vendored: &VendoredFileSystem,
-        misconfiguration_mode: MisconfigurationMode,
-    ) -> Result<SearchPaths, SearchPathSettingsError> {
+        strategy: &Strategy,
+    ) -> Result<SearchPaths, Strategy::Error<SearchPathSettingsError>> {
         let environment = self.environment.or_default();
         let src = self.src.or_default();
 
@@ -386,17 +417,17 @@ impl Options {
                 .map(|path| path.absolute(project_root, system)),
             site_packages_paths: site_packages_paths.into_vec(),
             real_stdlib_path,
-            misconfiguration_mode,
         };
 
-        settings.to_search_paths(system, vendored)
+        settings.to_search_paths(system, vendored, strategy)
     }
 
-    pub(crate) fn to_settings(
+    pub(crate) fn to_settings<Strategy: MisconfigurationStrategy>(
         &self,
         db: &dyn Db,
         project_root: &SystemPath,
-    ) -> Result<(Settings, Vec<OptionDiagnostic>), ToSettingsError> {
+        strategy: &Strategy,
+    ) -> Result<(Settings, Vec<OptionDiagnostic>), Strategy::Error<ToSettingsError>> {
         let mut diagnostics = Vec::new();
         let rules = self.to_rule_selection(db, &mut diagnostics);
 
@@ -407,7 +438,7 @@ impl Options {
                 .as_deref()
                 .copied()
                 .unwrap_or_default(),
-            error_on_warning: terminal_options.error_on_warning.unwrap_or_default(),
+            error_on_warning: terminal_options.error_on_warning.unwrap_or(true),
         };
 
         let src_options = self.src.or_default();
@@ -446,7 +477,8 @@ impl Options {
                 diagnostic: err,
                 output_format: terminal.output_format,
                 color: colored::control::SHOULD_COLORIZE.should_colorize(),
-            })?;
+            });
+        let src = strategy.fallback(src, |_| SrcSettings::default())?;
 
         let mut analysis_diagnostics = Vec::new();
         let analysis = self
@@ -454,13 +486,17 @@ impl Options {
             .or_default()
             .to_settings(db, &mut analysis_diagnostics);
 
-        if let Some(diagnostic) = analysis_diagnostics.into_iter().next() {
-            return Err(ToSettingsError {
-                diagnostic: Box::new(diagnostic),
-                output_format: terminal.output_format,
-                color: colored::control::SHOULD_COLORIZE.should_colorize(),
-            });
-        }
+        let analysis_result: Result<_, ToSettingsError> =
+            if let Some(diagnostic) = analysis_diagnostics.into_iter().next() {
+                Err(ToSettingsError {
+                    diagnostic: Box::new(diagnostic),
+                    output_format: terminal.output_format,
+                    color: colored::control::SHOULD_COLORIZE.should_colorize(),
+                })
+            } else {
+                Ok(analysis)
+            };
+        let analysis = strategy.fallback(analysis_result, |_| AnalysisSettings::default())?;
 
         let overrides = self
             .to_overrides_settings(db, project_root, &mut diagnostics)
@@ -468,7 +504,8 @@ impl Options {
                 diagnostic: err,
                 output_format: terminal.output_format,
                 color: colored::control::SHOULD_COLORIZE.should_colorize(),
-            })?;
+            });
+        let overrides = strategy.fallback(overrides, |_| Vec::new())?;
 
         let settings = Settings {
             rules: Arc::new(rules),
@@ -516,6 +553,152 @@ impl Options {
 
         Ok(overrides)
     }
+}
+
+fn python_version_from_config(
+    ranged_version: &RangedValue<SupportedPythonVersion>,
+) -> PythonVersionWithSource {
+    PythonVersionWithSource {
+        version: PythonVersion::from(**ranged_version),
+        source: match ranged_version.source() {
+            ValueSource::Cli => PythonVersionSource::Cli,
+            ValueSource::File(path) => PythonVersionSource::ConfigFile(
+                PythonVersionFileSource::new(path.clone(), ranged_version.range()),
+            ),
+            ValueSource::Editor => PythonVersionSource::Editor,
+            ValueSource::UvWorkspace => PythonVersionSource::UvWorkspace,
+        },
+    }
+}
+
+/// A Python version before unsupported inferred versions are filtered.
+#[derive(Eq, PartialEq, Debug, Clone)]
+enum PythonVersionResolution {
+    /// The Python version was configured directly by the user.
+    Configured(PythonVersionWithSource),
+    /// The Python version was inferred from the environment.
+    Inferred(PythonVersionWithSource),
+}
+
+impl PythonVersionResolution {
+    fn into_program_version(
+        self,
+        diagnostics: &mut Vec<ProgramSettingsDiagnostic>,
+    ) -> Option<PythonVersionWithSource> {
+        match self {
+            Self::Configured(python_version) => Some(python_version),
+            Self::Inferred(python_version) => {
+                if SupportedPythonVersion::try_from(python_version.version).is_ok() {
+                    Some(python_version)
+                } else {
+                    diagnostics.push(ProgramSettingsDiagnostic::UnsupportedInferredPythonVersion(
+                        python_version,
+                    ));
+                    None
+                }
+            }
+        }
+    }
+}
+
+/// A diagnostic produced while resolving [`ProgramSettings`].
+///
+/// These diagnostics are kept separate from [`OptionDiagnostic`] while program settings are
+/// resolved so that this step does not need access to the database.
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub enum ProgramSettingsDiagnostic {
+    /// The Python version inferred from the environment is newer than ty supports.
+    UnsupportedInferredPythonVersion(PythonVersionWithSource),
+}
+
+impl ProgramSettingsDiagnostic {
+    /// Convert this program-settings diagnostic into a diagnostic that can be stored on a project.
+    pub(crate) fn into_diagnostic(self, db: &dyn Db) -> OptionDiagnostic {
+        match self {
+            Self::UnsupportedInferredPythonVersion(python_version) => {
+                unsupported_inferred_python_version_diagnostic(db, &python_version)
+            }
+        }
+    }
+}
+
+/// Construct an [`OptionDiagnostic`] to indicate that the inferred Python version is unsupported.
+fn unsupported_inferred_python_version_diagnostic(
+    db: &dyn Db,
+    python_version: &PythonVersionWithSource,
+) -> OptionDiagnostic {
+    let expected = SupportedPythonVersion::iter()
+        .map(|version| format!("`{version}`"))
+        .collect::<Vec<_>>()
+        .join(", ");
+    let fallback = PythonVersion::latest_ty();
+
+    let mut diagnostic = OptionDiagnostic::new(
+        DiagnosticId::UnsupportedPythonVersion,
+        format!(
+            "Ignoring unsupported inferred Python version `{}`; ty will use Python {fallback} instead.",
+            python_version.version
+        ),
+        Severity::Warning,
+    )
+    .sub(SubDiagnostic::new(
+        SubDiagnosticSeverity::Info,
+        format!("Expected one of {expected}."),
+    ))
+    .sub(SubDiagnostic::new(
+        SubDiagnosticSeverity::Info,
+        "Set `environment.python-version` explicitly to override the inferred version.",
+    ));
+
+    diagnostic = match &python_version.source {
+        source @ PythonVersionSource::ConfigFile(_) => diagnostic
+            .with_annotation(inferred_python_version_source_annotation(db, source))
+            .sub(SubDiagnostic::new(
+                SubDiagnosticSeverity::Info,
+                "The version was inferred from a configuration file.",
+            )),
+        source @ PythonVersionSource::PyvenvCfgFile(_) => diagnostic
+            .with_annotation(inferred_python_version_source_annotation(db, source))
+            .sub(SubDiagnostic::new(
+                SubDiagnosticSeverity::Info,
+                "The version was inferred from your virtual environment metadata.",
+            )),
+        PythonVersionSource::InstallationDirectoryLayout {
+            site_packages_parent_dir,
+            source,
+        } => diagnostic
+            .with_annotation(inferred_python_version_source_annotation(
+                db,
+                &PythonVersionSource::InstallationDirectoryLayout {
+                    site_packages_parent_dir: site_packages_parent_dir.clone(),
+                    source: source.clone(),
+                },
+            ))
+            .sub(SubDiagnostic::new(
+                SubDiagnosticSeverity::Info,
+                format!(
+                    "The version was inferred from the `lib/{site_packages_parent_dir}/site-packages` directory layout.",
+                ),
+            )),
+        PythonVersionSource::Cli => diagnostic.sub(SubDiagnostic::new(
+            SubDiagnosticSeverity::Info,
+            "The version was inferred from the command line.",
+        )),
+        PythonVersionSource::Editor => diagnostic.sub(SubDiagnostic::new(
+            SubDiagnosticSeverity::Info,
+            "The version was inferred from your editor.",
+        )),
+        PythonVersionSource::UvWorkspace => diagnostic.sub(SubDiagnostic::new(
+            SubDiagnosticSeverity::Info,
+            "The version was provided by uv workspace metadata.",
+        )),
+        PythonVersionSource::Default => diagnostic.sub(SubDiagnostic::new(
+            SubDiagnosticSeverity::Info,
+            "ty fell back to its default Python version.",
+        )),
+    };
+
+    diagnostic
 }
 
 /// Return the site-packages from the environment ty is installed in, as derived from ty's
@@ -600,9 +783,13 @@ pub struct EnvironmentOptions {
 
     /// Specifies the version of Python that will be used to analyze the source code.
     /// The version should be specified as a string in the format `M.m` where `M` is the major version
-    /// and `m` is the minor (e.g. `"3.0"` or `"3.6"`).
+    /// and `m` is the minor (e.g. `"3.7"` or `"3.12"`).
     /// If a version is provided, ty will generate errors if the source code makes use of language features
     /// that are not supported in that version.
+    ///
+    /// ty officially supports type checking code that targets Python 3.10 and later. Python 3.7
+    /// through 3.9 can still be selected, but ty may produce false positives or false negatives for
+    /// standard-library APIs because its bundled stubs do not fully describe those versions.
     ///
     /// If a version is not specified, ty will try the following techniques in order of preference
     /// to determine a value:
@@ -615,15 +802,15 @@ pub struct EnvironmentOptions {
     /// For some language features, ty can also understand conditionals based on comparisons
     /// with `sys.version_info`. These are commonly found in typeshed, for example,
     /// to reflect the differing contents of the standard library across Python versions.
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     #[option(
         default = r#""3.14""#,
-        value_type = r#""3.7" | "3.8" | "3.9" | "3.10" | "3.11" | "3.12" | "3.13" | "3.14" | <major>.<minor>"#,
+        value_type = r#""3.7" | "3.8" | "3.9" | "3.10" | "3.11" | "3.12" | "3.13" | "3.14" | "3.15""#,
         example = r#"
             python-version = "3.12"
         "#
     )]
-    pub python_version: Option<RangedValue<PythonVersion>>,
+    pub python_version: Option<RangedValue<SupportedPythonVersion>>,
 
     /// Specifies the target platform that will be used to analyze the source code.
     /// If specified, ty will understand conditions based on comparisons with `sys.platform`, such
@@ -756,6 +943,18 @@ pub struct SrcOptions {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub respect_ignore_files: Option<bool>,
 
+    /// Whether to exclude files containing PEP 723 inline script metadata unless they are
+    /// explicitly passed on the command line.
+    #[option(
+        default = r#"false"#,
+        value_type = r#"bool"#,
+        example = r#"
+            exclude-scripts = true
+        "#
+    )]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub exclude_scripts: Option<bool>,
+
     /// A list of files and directories to check. The `include` option
     /// follows a similar syntax to `.gitignore` but reversed:
     /// Including a file or directory will make it so that it (and its contents)
@@ -875,6 +1074,7 @@ impl SrcOptions {
 
         Ok(SrcSettings {
             respect_ignore_files: self.respect_ignore_files.unwrap_or(true),
+            exclude_scripts: self.exclude_scripts.unwrap_or(false),
             files,
         })
     }
@@ -885,6 +1085,10 @@ impl SrcOptions {
 )]
 #[serde(rename_all = "kebab-case", transparent)]
 pub struct Rules {
+    /// The rules with their severity. Entries coming later in the map take precedence over
+    /// earlier entries (e.g. a `all` selector earlier in the hash map will be overridden
+    /// by a specific rule selector coming after it but if `all` is the last selector, then it
+    /// overrides even specific rule codes).
     inner: OrderMap<RangedValue<String>, RangedValue<Level>, BuildHasherDefault<FxHasher>>,
 }
 
@@ -916,6 +1120,7 @@ impl Rules {
                 ValueSource::File(_) => LintSource::File,
                 ValueSource::Cli => LintSource::Cli,
                 ValueSource::Editor => LintSource::Editor,
+                ValueSource::UvWorkspace => LintSource::UvWorkspace,
             };
 
             let mut set_lint_level = |lint| {
@@ -927,7 +1132,7 @@ impl Rules {
             };
 
             // Handle "all" as a special case - apply the level to all rules
-            if rule_name.eq_ignore_ascii_case("all") {
+            if rule_name.as_str() == "all" {
                 for lint in registry.lints() {
                     set_lint_level(*lint);
                 }
@@ -970,7 +1175,7 @@ impl Rules {
 }
 
 /// Default exclude patterns for src options.
-const DEFAULT_SRC_EXCLUDES: &[&str] = &[
+pub(crate) const DEFAULT_SRC_EXCLUDES: &[&str] = &[
     "**/.bzr/",
     "**/.direnv/",
     "**/.eggs/",
@@ -1257,15 +1462,15 @@ pub struct TerminalOptions {
         "#
     )]
     pub output_format: Option<RangedValue<OutputFormat>>,
-    /// Use exit code 1 if there are any warning-level diagnostics.
+    /// Use exit code 1, even if all diagnostics only had `warning` severity.
     ///
-    /// Defaults to `false`.
+    /// Defaults to `true`.
     #[option(
-        default = r#"false"#,
+        default = r#"true"#,
         value_type = "bool",
         example = r#"
-        # Error if ty emits any warning-level diagnostics.
-        error-on-warning = true
+        # Exit with code 0 if all diagnostics had `warning` severity.
+        error-on-warning = false
         "#
     )]
     pub error_on_warning: Option<bool>,
@@ -1287,6 +1492,96 @@ pub struct TerminalOptions {
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct AnalysisOptions {
+    /// Configure ty's behavior regarding type inference and narrowing of equality
+    /// checks. Defaults to `false`.
+    ///
+    /// By default, ty makes various assumptions about equality checks that match the
+    /// intuitions of most Python programmers, but may not be fully sound in all situations.
+    /// Enabling this option makes ty more conservative about these assumptions, making it
+    /// less likely to infer `Literal[True]` or `Literal[False]` as the result of an
+    /// equality check. This has various effects on type checking, including fewer type
+    /// narrowing opportunities and more conservative assumptions regarding control flow.
+    ///
+    /// One way in which ty will by default make unsound assumptions is by narrowing an
+    /// object `x` of type `str` to `Literal["a"]` after an `if x == "a"` check. This is
+    /// unsound because a subclass of `str` with value `"a"` will (by default) compare equal
+    /// to `"a"`, but will not be of type `Literal["a"]`:
+    ///
+    /// ```pycon
+    /// >>> # `Literal["a"]` can only be inhabited by instances of exactly `str`, not
+    /// >>> # subclasses, but str subclasses compare equal by default:
+    /// >>> class StringSubclass(str): ...
+    /// ...
+    /// >>> StringSubclass("a") == "a"
+    /// True
+    /// >>>
+    /// >>> # This also applies to `StrEnum`s:
+    /// >>> from enum import StrEnum
+    /// >>> class MyEnum(StrEnum):
+    /// ...     A = "a"
+    /// ...
+    /// >>> MyEnum.A == "a"
+    /// True
+    /// ```
+    ///
+    /// Enabling this option prevents the unsound narrowing of `x` to `Literal["a"]`,
+    /// and instead keeps it as `str`:
+    ///
+    /// ```python
+    /// from typing import Literal
+    ///
+    /// def parse(value: str) -> Literal["a"] | None:
+    ///     # with `strict-equality-semantics = true`, no narrowing will occur here,
+    ///     # and an error will be emitted on the `return` statement.
+    ///     if value == "a":
+    ///         return value
+    ///     return None
+    /// ```
+    ///
+    /// Another assumption ty makes by default is that subclasses will never override `__eq__` or
+    /// `__ne__`. This allows ty to narrow the following union based on an equality check, despite
+    /// the fact that an instance of a subclass of `Foo` could compare equal to `None`, and it's
+    /// perfectly valid to pass an instance of a subclass into the `x` parameter of this function:
+    ///
+    /// ```python
+    /// def narrow(x: Foo | None, other: Foo) -> None:
+    ///     if x == other:
+    ///         # with this option enabled, `x` will still have type `Foo | None` here,
+    ///         # since it is legal to subclass `Foo` and override its `__eq__` method.
+    ///         reveal_type(x)
+    /// ```
+    ///
+    /// Many operations in Python implicitly call `__eq__` under the hood; enabling this option
+    /// will also impact those operations. For example, this option will also impact narrowing from
+    /// `in` checks, and narrowing in `match` statements that use value patterns:
+    ///
+    /// ```python
+    /// def narrow_in(x: Foo | None, other: list[Foo]) -> None:
+    ///     if x in other:
+    ///         # with this option enabled, `x` will still have type `Foo | None` here,
+    ///         # since the `in` operator implicitly calls `__eq__` on each element of `other`.
+    ///         reveal_type(x)
+    ///
+    ///
+    /// def narrow_match(x: str) -> None:
+    ///     match x:
+    ///         case "a":
+    ///             # with this option enabled, `x` will still have type `str` here,
+    ///             # since this `case` branch will be taken by any object that compares
+    ///             # equal to `"a"`, including subclasses of `str`.
+    ///             reveal_type(x)
+    /// ```
+    #[option(
+        default = r#"false"#,
+        value_type = "bool",
+        example = r#"
+        # Preserve broad builtin types instead of narrowing them to literals
+        strict-equality-semantics = true
+        "#
+    )]
+    #[serde(alias = "strict-literal-narrowing")]
+    pub strict_equality_semantics: Option<bool>,
+
     /// Whether ty should respect `type: ignore` comments.
     ///
     /// When set to `false`, `type: ignore` comments are treated like any other normal
@@ -1363,12 +1658,14 @@ impl AnalysisOptions {
         diagnostics: &mut Vec<OptionDiagnostic>,
     ) -> AnalysisSettings {
         let Self {
+            strict_equality_semantics,
             respect_type_ignore_comments,
             allowed_unresolved_imports,
             replace_imports_with_any,
         } = self;
 
         let AnalysisSettings {
+            strict_equality_semantics: strict_equality_semantics_default,
             respect_type_ignore_comments: respect_type_ignore_default,
             allowed_unresolved_imports: allowed_unresolved_imports_default,
             replace_imports_with_any: replace_imports_with_any_default,
@@ -1397,6 +1694,8 @@ impl AnalysisOptions {
             };
 
         AnalysisSettings {
+            strict_equality_semantics: strict_equality_semantics
+                .unwrap_or(strict_equality_semantics_default),
             respect_type_ignore_comments: respect_type_ignore_comments
                 .unwrap_or(respect_type_ignore_default),
             allowed_unresolved_imports,
@@ -1583,7 +1882,18 @@ pub struct OverrideOptions {
     pub analysis: Option<AnalysisOptions>,
 }
 
-impl RangedValue<OverrideOptions> {
+trait ToOverride {
+    fn to_override(
+        &self,
+        db: &dyn Db,
+        project_root: &SystemPath,
+        global_rules: Option<&Rules>,
+        global_analysis: Option<&AnalysisOptions>,
+        diagnostics: &mut Vec<OptionDiagnostic>,
+    ) -> Result<Option<Override>, Box<OptionDiagnostic>>;
+}
+
+impl ToOverride for RangedValue<OverrideOptions> {
     fn to_override(
         &self,
         db: &dyn Db,
@@ -1767,6 +2077,15 @@ pub(super) struct InnerOverrideOptions {
     pub(super) analysis: Option<AnalysisOptions>,
 }
 
+/// The settings that can vary between individual files.
+#[derive(Debug, Default, Clone, PartialEq, Eq, Hash, Combine, get_size2::GetSize)]
+pub(super) struct FileOptions {
+    /// Raw rule options, preserved so multiple configuration layers can be merged.
+    pub(super) rules: Option<Rules>,
+
+    pub(super) analysis: Option<AnalysisOptions>,
+}
+
 /// Error returned when the settings can't be resolved because of a hard error.
 #[derive(Debug)]
 pub struct ToSettingsError {
@@ -1777,29 +2096,21 @@ pub struct ToSettingsError {
 
 impl ToSettingsError {
     pub fn pretty<'a>(&'a self, db: &'a dyn Db) -> impl fmt::Display + use<'a> {
-        struct DisplayPretty<'a> {
-            db: &'a dyn ruff_db::Db,
-            error: &'a ToSettingsError,
-        }
+        let db: &dyn ruff_db::Db = db;
 
-        impl fmt::Display for DisplayPretty<'_> {
-            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-                let display_config = DisplayDiagnosticConfig::new("ty")
-                    .format(self.error.output_format.into())
-                    .color(self.error.color);
+        fmt::from_fn(move |f| {
+            let display_config = DisplayDiagnosticConfig::new("ty")
+                .format(self.output_format.into())
+                .color(self.color);
 
-                write!(
-                    f,
-                    "{}",
-                    self.error
-                        .diagnostic
-                        .to_diagnostic()
-                        .display(&self.db, &display_config)
-                )
-            }
-        }
-
-        DisplayPretty { db, error: self }
+            write!(
+                f,
+                "{}",
+                self.diagnostic
+                    .to_diagnostic()
+                    .display(&db, &display_config)
+            )
+        })
     }
 
     pub fn into_diagnostic(self) -> OptionDiagnostic {
@@ -1828,7 +2139,7 @@ mod schema {
             let registry = ty_python_semantic::default_lint_registry();
             let level_schema = generator.subschema_for::<super::Level>();
 
-            let properties: Map<String, Value> = registry
+            let mut properties: Map<String, Value> = registry
                 .lints()
                 .iter()
                 .map(|lint| {
@@ -1857,6 +2168,26 @@ mod schema {
                     (lint.name().to_string(), schema.into())
                 })
                 .collect();
+
+            let mut all_schema = schemars::Schema::default();
+            let all = all_schema.ensure_object();
+            all.insert(
+                "title".to_string(),
+                Value::String("set the default severity level for all rules".to_string()),
+            );
+            all.insert(
+                "description".to_string(),
+                Value::String(
+                    "Configure a default severity level for all rules. Individual rule settings override this default."
+                        .to_string(),
+                ),
+            );
+            all.insert(
+                "oneOf".to_string(),
+                Value::Array(vec![level_schema.clone().into()]),
+            );
+
+            properties.insert("all".to_string(), all_schema.into());
 
             let mut schema = schemars::json_schema!({ "type": "object" });
             let object = schema.ensure_object();
@@ -1957,6 +2288,10 @@ impl OptionDiagnostic {
                 SubDiagnosticSeverity::Info,
                 "The {value_label} was specified in the editor settings.",
             )),
+            ValueSource::UvWorkspace => self.sub(SubDiagnostic::new(
+                SubDiagnosticSeverity::Info,
+                format!("The {value_label} was provided by uv workspace metadata."),
+            )),
         }
     }
 
@@ -1982,40 +2317,6 @@ impl OptionDiagnostic {
         }
 
         diag
-    }
-}
-
-/// This is a wrapper for options that actually get loaded from configuration files
-/// and the CLI, which also includes a `config_file_override` option that overrides
-/// default configuration discovery with an explicitly-provided path to a configuration file
-#[derive(Debug, Default, PartialEq, Eq, Clone)]
-pub struct ProjectOptionsOverrides {
-    pub config_file_override: Option<SystemPathBuf>,
-    pub fallback_python_version: Option<RangedValue<PythonVersion>>,
-    pub fallback_python: Option<RelativePathBuf>,
-    pub options: Options,
-}
-
-impl ProjectOptionsOverrides {
-    pub fn new(config_file_override: Option<SystemPathBuf>, options: Options) -> Self {
-        Self {
-            config_file_override,
-            options,
-            ..Self::default()
-        }
-    }
-
-    pub fn apply_to(&self, options: Options) -> Options {
-        let mut combined = self.options.clone().combine(options);
-
-        // Set the fallback python version and path if set
-        combined.environment.combine_with(Some(EnvironmentOptions {
-            python_version: self.fallback_python_version.clone(),
-            python: self.fallback_python.clone(),
-            ..EnvironmentOptions::default()
-        }));
-
-        combined
     }
 }
 

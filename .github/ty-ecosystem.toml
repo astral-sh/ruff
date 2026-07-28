@@ -1,0 +1,10 @@
+#:schema ../ty.schema.json
+# Configuration overrides for ty ecosystem analysis
+
+# Enable off-by-default rules.
+[rules]
+division-by-zero = "warn"
+possibly-missing-attribute = "warn"
+possibly-missing-import = "warn"
+possibly-unresolved-reference = "warn"
+unsupported-dynamic-base = "warn"

@@ -3,8 +3,8 @@
 import sys
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
-from typing import Any, Literal, Protocol, overload, type_check_only
-from typing_extensions import ParamSpec, Self, TypeAlias, TypeVar, TypeVarTuple, Unpack
+from typing import Any, Literal, ParamSpec, Protocol, TypeAlias, overload, type_check_only
+from typing_extensions import Self, TypeVar, TypeVarTuple, Unpack
 
 _Task: TypeAlias = tuple[bytes, Literal["function", "script"]]
 _Ts = TypeVarTuple("_Ts")
@@ -27,6 +27,7 @@ if sys.version_info >= (3, 14):
     class WorkerContext(ThreadWorkerContext):
         interp: Interpreter | None
         results: Queue | None
+
         @overload  # type: ignore[override]
         @classmethod
         def prepare(
@@ -35,6 +36,7 @@ if sys.version_info >= (3, 14):
         @overload
         @classmethod
         def prepare(cls, initializer: Callable[[], object], initargs: tuple[()]) -> tuple[Callable[[], Self], _TaskFunc]: ...
+
         def __init__(self, initdata: _Task) -> None: ...
         def __del__(self) -> None: ...
         def run(self, task: _Task) -> None: ...  # type: ignore[override]
@@ -57,6 +59,7 @@ if sys.version_info >= (3, 14):
         def prepare_context(
             cls, initializer: Callable[[Unpack[_Ts]], object], initargs: tuple[Unpack[_Ts]]
         ) -> tuple[Callable[[], WorkerContext], _TaskFunc]: ...
+
         @overload
         def __init__(
             self,
@@ -68,14 +71,13 @@ if sys.version_info >= (3, 14):
             """Initializes a new InterpreterPoolExecutor instance.
 
             Args:
-                max_workers: The maximum number of interpreters that can be used to
-                    execute the given calls.
+                max_workers: The maximum number of interpreters that can be used
+                    to execute the given calls.
                 thread_name_prefix: An optional name prefix to give our threads.
                 initializer: A callable or script used to initialize
                     each worker interpreter.
                 initargs: A tuple of arguments to pass to the initializer.
             """
-
         @overload
         def __init__(
             self,

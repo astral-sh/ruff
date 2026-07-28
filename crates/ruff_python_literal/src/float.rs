@@ -1,5 +1,3 @@
-use std::f64;
-
 fn is_integer(v: f64) -> bool {
     (v - v.round()).abs() < f64::EPSILON
 }

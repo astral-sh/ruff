@@ -187,12 +187,14 @@ elif TYPE_CHECKING:
     def j() -> str: ...
 
 else:
-    def j_() -> str: ...  # error: [empty-body]
+    def j():
+        raise NotImplementedError
 
 if False:
     pass
 elif not TYPE_CHECKING:
-    def k_() -> str: ...  # error: [empty-body]
+    def k() -> str:
+        raise NotImplementedError
 
 else:
     def k() -> str: ...
@@ -224,19 +226,22 @@ if typing.TYPE_CHECKING:
     def o() -> str: ...
 
 if not typing.TYPE_CHECKING:
-    def p() -> str: ...  # error: [empty-body]
+    def p() -> str:
+        raise NotImplementedError
 
 if compat.sub.sub.TYPE_CHECKING:
     def q() -> str: ...
 
 if not compat.sub.sub.TYPE_CHECKING:
-    def r() -> str: ...  # error: [empty-body]
+    def r() -> str:
+        raise NotImplementedError
 
 if t.TYPE_CHECKING:
     def s() -> str: ...
 
 if not t.TYPE_CHECKING:
-    def t() -> str: ...  # error: [empty-body]
+    def t() -> str:
+        raise NotImplementedError
 ```
 
 ## Conditional return type
@@ -384,7 +389,6 @@ def f(cond: bool) -> str:
 ```py
 def f() -> None:
     if False:
-        # error: [invalid-return-type]
         return 1
 
 # error: [invalid-return-type]
@@ -511,23 +515,55 @@ statements.
 import types
 import typing
 
-def f() -> types.GeneratorType:
+def f() -> types.GeneratorType[int, None, None]:
     yield 42
 
-def g() -> typing.Generator:
+def g() -> typing.Generator[int]:
     yield 42
 
-def h() -> typing.Iterator:
+def h() -> typing.Iterator[int]:
     yield 42
 
-def i() -> typing.Iterable:
+def i() -> typing.Iterable[int]:
     yield 42
 
-def i2() -> typing.Generator:
+def i2() -> typing.Generator[int]:
     yield from i()
 
 def j() -> str:  # error: [invalid-return-type]
     yield 42
+
+def invalid_return_type() -> typing.Generator[None, None, None]:
+    yield
+    return ""  # error: [invalid-return-type]
+```
+
+The return value of the function must be assignable to the return type of the `Generator`. This is
+specified in the third type parameter.
+
+```py
+def wrong_return() -> typing.Generator[int, int, int]:
+    yield 1
+    return ""  # error: [invalid-return-type]
+```
+
+If the function has no return and it's implicitly returning it is still type checked.
+
+```py
+def bare_return_ok() -> typing.Generator[int, int, None]:
+    yield 1
+
+def missing_return() -> typing.Generator[int, int, int]:  # error: [invalid-return-type]
+    yield 1
+```
+
+Iterators must not return anything.
+
+```py
+def iterator_must_not_return() -> typing.Iterator[int]:
+    yield 2
+    # error: [invalid-return-type]
+    return "foo"
 ```
 
 ### Asynchronous
@@ -541,20 +577,24 @@ if it does not contain any `return` statements.
 import types
 import typing
 
-async def f() -> types.AsyncGeneratorType:
+async def f() -> types.AsyncGeneratorType[int, None]:
     yield 42
 
-async def g() -> typing.AsyncGenerator:
+async def g() -> typing.AsyncGenerator[int]:
     yield 42
 
-async def h() -> typing.AsyncIterator:
+async def h() -> typing.AsyncIterator[int]:
     yield 42
 
-async def i() -> typing.AsyncIterable:
+async def i() -> typing.AsyncIterable[int]:
     yield 42
 
 async def j() -> str:  # error: [invalid-return-type]
     yield 42
+
+async def k() -> typing.AsyncGenerator[int]:
+    yield 42
+    return 2  # error: [invalid-syntax] "`return` with value in async generator"
 ```
 
 ## Diagnostics for `empty-body` on non-protocol subclasses of protocol classes

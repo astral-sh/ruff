@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/params_follows_var_keyword_param.py
 ---
 ## AST
 
@@ -120,28 +121,23 @@ Module(
   |
 1 | def foo(**kwargs, a, /, b=10, *, *args): ...
   |                   ^ Syntax Error: Parameter cannot follow var-keyword parameter
-  |
 
 
   |
 1 | def foo(**kwargs, a, /, b=10, *, *args): ...
   |                      ^ Syntax Error: Parameter cannot follow var-keyword parameter
-  |
 
 
   |
 1 | def foo(**kwargs, a, /, b=10, *, *args): ...
   |                         ^ Syntax Error: Parameter cannot follow var-keyword parameter
-  |
 
 
   |
 1 | def foo(**kwargs, a, /, b=10, *, *args): ...
   |                               ^ Syntax Error: Parameter cannot follow var-keyword parameter
-  |
 
 
   |
 1 | def foo(**kwargs, a, /, b=10, *, *args): ...
   |                                  ^ Syntax Error: Parameter cannot follow var-keyword parameter
-  |

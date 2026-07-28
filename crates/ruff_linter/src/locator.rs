@@ -68,8 +68,6 @@ impl<'a> Locator<'a> {
     /// Finds the closest [`TextSize`] not exceeding the offset for which `is_char_boundary` is
     /// `true`.
     ///
-    /// Can be replaced with `str::floor_char_boundary` once it's stable.
-    ///
     /// ## Examples
     ///
     /// ```
@@ -106,16 +104,7 @@ impl<'a> Locator<'a> {
     /// );
     /// ```
     pub fn floor_char_boundary(&self, offset: TextSize) -> TextSize {
-        if offset >= self.text_len() {
-            self.text_len()
-        } else {
-            // We know that the character boundary is within four bytes.
-            (0u32..=3u32)
-                .map(TextSize::from)
-                .filter_map(|index| offset.checked_sub(index))
-                .find(|offset| self.contents.is_char_boundary(offset.to_usize()))
-                .unwrap_or_default()
-        }
+        TextSize::try_from(self.contents.floor_char_boundary(offset.to_usize())).unwrap()
     }
 
     /// Take the source code between the given [`TextRange`].

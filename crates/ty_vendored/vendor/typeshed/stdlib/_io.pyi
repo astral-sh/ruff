@@ -43,7 +43,7 @@ from types import TracebackType
 from typing import IO, Any, BinaryIO, Final, Generic, Literal, Protocol, TextIO, TypeVar, overload, type_check_only
 from typing_extensions import Self, disjoint_base
 
-_T = TypeVar("_T")
+_S = TypeVar("_S", bound=str)
 
 if sys.version_info >= (3, 14):
     DEFAULT_BUFFER_SIZE: Final = 131072
@@ -55,8 +55,8 @@ open = builtins.open
 def open_code(path: str) -> IO[bytes]:
     """Opens the provided file with the intent to import the contents.
 
-    This may perform extra validation beyond open(), but is otherwise interchangeable
-    with calling open(path, 'rb').
+    This may perform extra validation beyond open(), but is otherwise
+    interchangeable with calling open(path, 'rb').
     """
 
 BlockingIOError = builtins.BlockingIOError
@@ -134,6 +134,7 @@ if sys.version_info >= (3, 12):
 
             If False, read() will raise OSError.
             """
+
         read: Callable[..., Any]
         def readlines(self, hint: int = -1, /) -> list[bytes]:
             """Return a list of lines from the stream.
@@ -151,11 +152,13 @@ if sys.version_info >= (3, 12):
               whence
                 The relative position to seek from.
 
-            The offset is interpreted relative to the position indicated by whence.
-            Values for whence are:
+            The offset is interpreted relative to the position indicated by
+            whence.  Values for whence are:
 
-            * os.SEEK_SET or 0 -- start of stream (the default); offset should be zero or positive
-            * os.SEEK_CUR or 1 -- current stream position; offset may be negative
+            * os.SEEK_SET or 0 -- start of stream (the default); offset should
+              be zero or positive
+            * os.SEEK_CUR or 1 -- current stream position; offset may be
+              negative
             * os.SEEK_END or 2 -- end of stream; offset is usually negative
 
             Return the new absolute position.
@@ -174,8 +177,8 @@ if sys.version_info >= (3, 12):
         def truncate(self, size: int | None = None, /) -> int:
             """Truncate file to size bytes.
 
-            File pointer is left unchanged. Size defaults to the current IO position
-            as reported by tell(). Return the new size.
+            File pointer is left unchanged.  Size defaults to the current IO
+            position as reported by tell().  Return the new size.
             """
 
         def writable(self) -> bool:
@@ -183,6 +186,7 @@ if sys.version_info >= (3, 12):
 
             If False, write() will raise OSError.
             """
+
         write: Callable[..., Any]
         def writelines(self, lines: Iterable[ReadableBuffer], /) -> None:
             """Write a list of lines to stream.
@@ -280,6 +284,7 @@ else:
 
             If False, read() will raise OSError.
             """
+
         read: Callable[..., Any]
         def readlines(self, hint: int = -1, /) -> list[bytes]:
             """Return a list of lines from the stream.
@@ -329,6 +334,7 @@ else:
 
             If False, write() will raise OSError.
             """
+
         write: Callable[..., Any]
         def writelines(self, lines: Iterable[ReadableBuffer], /) -> None:
             """Write a list of lines to stream.
@@ -357,6 +363,7 @@ class _RawIOBase(_IOBase):
 
     def readall(self) -> bytes:
         """Read until EOF, using multiple read() call."""
+
     # The following methods can return None if the file is in non-blocking mode
     # and no data is available.
     def readinto(self, buffer: WriteableBuffer, /) -> int | MaybeNone: ...
@@ -429,16 +436,19 @@ class FileIO(RawIOBase, _RawIOBase, BinaryIO):  # type: ignore[misc]  # incompat
     """Open a file.
 
     The mode can be 'r' (default), 'w', 'x' or 'a' for reading,
-    writing, exclusive creation or appending.  The file will be created if it
-    doesn't exist when opened for writing or appending; it will be truncated
-    when opened for writing.  A FileExistsError will be raised if it already
-    exists when opened for creating. Opening a file for creating implies
-    writing so this mode behaves in a similar way to 'w'.Add a '+' to the mode
-    to allow simultaneous reading and writing. A custom opener can be used by
-    passing a callable as *opener*. The underlying file descriptor for the file
-    object is then obtained by calling opener with (*name*, *flags*).
-    *opener* must return an open file descriptor (passing os.open as *opener*
-    results in functionality similar to passing None).
+    writing, exclusive creation or appending.  The file will be created
+    if it doesn't exist when opened for writing or appending; it will be
+    truncated when opened for writing.  A FileExistsError will be raised
+    if it already exists when opened for creating.  Opening a file for
+    creating implies writing so this mode behaves in a similar way to
+    'w'.  Add a '+' to the mode to allow simultaneous reading and
+    writing.
+
+    A custom opener can be used by passing a callable as *opener*.
+    The underlying file descriptor for the file object is then obtained
+    by calling opener with (*name*, *flags*).  *opener* must return
+    an open file descriptor (passing os.open as *opener* results in
+    functionality similar to passing None).
     """
 
     mode: str
@@ -458,11 +468,12 @@ class FileIO(RawIOBase, _RawIOBase, BinaryIO):  # type: ignore[misc]  # incompat
     def seek(self, pos: int, whence: int = 0, /) -> int:
         """Move to new file position and return the file position.
 
-        Argument offset is a byte count.  Optional argument whence defaults to
-        SEEK_SET or 0 (offset from start of file, offset should be >= 0); other values
-        are SEEK_CUR or 1 (move relative to current position, positive or negative),
-        and SEEK_END or 2 (move relative to end of file, usually negative, although
-        many platforms allow seeking beyond the end of a file).
+        Argument offset is a byte count.  Optional argument whence defaults
+        to SEEK_SET or 0 (offset from start of file, offset should be >= 0);
+        other values are SEEK_CUR or 1 (move relative to current position,
+        positive or negative), and SEEK_END or 2 (move relative to end of
+        file, usually negative, although many platforms allow seeking beyond
+        the end of a file).
 
         Note that not all file objects are seekable.
         """
@@ -470,14 +481,14 @@ class FileIO(RawIOBase, _RawIOBase, BinaryIO):  # type: ignore[misc]  # incompat
     def read(self, size: int | None = -1, /) -> bytes | MaybeNone:
         """Read at most size bytes, returned as bytes.
 
-        If size is less than 0, read all bytes in the file making multiple read calls.
-        See ``FileIO.readall``.
+        If size is less than 0, read all bytes in the file making multiple
+        read calls.  See ``FileIO.readall``.
 
-        Attempts to make only one system call, retrying only per PEP 475 (EINTR). This
-        means less data may be returned than requested.
+        Attempts to make only one system call, retrying only per PEP 475
+        (EINTR).  This means less data may be returned than requested.
 
-        In non-blocking mode, returns None if no data is available. Return an empty
-        bytes object at EOF.
+        In non-blocking mode, returns None if no data is available.  Return
+        an empty bytes object at EOF.
         """
 
 @disjoint_base
@@ -498,8 +509,8 @@ class BytesIO(BufferedIOBase, _BufferedIOBase, BinaryIO):  # type: ignore[misc] 
     def read1(self, size: int | None = -1, /) -> bytes:
         """Read at most size bytes, returned as a bytes object.
 
-        If the size argument is negative or omitted, read until EOF is reached.
-        Return an empty bytes object at EOF.
+        If the size argument is negative or omitted, read until EOF is
+        reached.  Return an empty bytes object at EOF.
         """
 
     def readlines(self, size: int | None = None, /) -> list[bytes]:
@@ -562,8 +573,34 @@ class BufferedReader(BufferedIOBase, _BufferedIOBase, BinaryIO, Generic[_Buffere
     def seek(self, target: int, whence: int = 0, /) -> int: ...
     def truncate(self, pos: int | None = None, /) -> int: ...
 
+@type_check_only
+class _BufferedWriterStream(Protocol):
+    def write(self, b: WriteableBuffer, /) -> int | None: ...
+    def seek(self, pos: int, whence: int, /) -> int: ...
+    def tell(self) -> int: ...
+    def truncate(self, size: int, /) -> int: ...
+    def flush(self) -> object: ...
+    def close(self) -> object: ...
+    @property
+    def closed(self) -> bool: ...
+    def writable(self) -> bool: ...
+    def seekable(self) -> bool: ...
+
+    # The following methods just pass through to the underlying stream. Since
+    # not all streams support them, they are marked as optional here, and will
+    # raise an AttributeError if called on a stream that does not support them.
+
+    # @property
+    # def name(self) -> Any: ...  # Type is inconsistent between the various I/O types.
+    # @property
+    # def mode(self) -> str: ...
+    # def fileno(self) -> int: ...
+    # def isatty(self) -> bool: ...
+
+_BufferedWriterStreamT = TypeVar("_BufferedWriterStreamT", bound=_BufferedWriterStream, default=_BufferedWriterStream)
+
 @disjoint_base
-class BufferedWriter(BufferedIOBase, _BufferedIOBase, BinaryIO):  # type: ignore[misc]  # incompatible definitions of writelines in the base classes
+class BufferedWriter(BufferedIOBase, _BufferedIOBase, BinaryIO, Generic[_BufferedWriterStreamT]):  # type: ignore[misc]  # incompatible definitions of writelines in the base classes
     """A buffer for a writeable sequential RawIO object.
 
     The constructor creates a BufferedWriter for the given writeable raw
@@ -571,11 +608,11 @@ class BufferedWriter(BufferedIOBase, _BufferedIOBase, BinaryIO):  # type: ignore
     DEFAULT_BUFFER_SIZE.
     """
 
-    raw: RawIOBase
+    raw: _BufferedWriterStreamT
     if sys.version_info >= (3, 14):
-        def __init__(self, raw: RawIOBase, buffer_size: int = 131072) -> None: ...
+        def __init__(self, raw: _BufferedWriterStreamT, buffer_size: int = 131072) -> None: ...
     else:
-        def __init__(self, raw: RawIOBase, buffer_size: int = 8192) -> None: ...
+        def __init__(self, raw: _BufferedWriterStreamT, buffer_size: int = 8192) -> None: ...
 
     def write(self, buffer: ReadableBuffer, /) -> int: ...
     def seek(self, target: int, whence: int = 0, /) -> int: ...
@@ -603,7 +640,7 @@ class BufferedRandom(BufferedIOBase, _BufferedIOBase, BinaryIO):  # type: ignore
     def truncate(self, pos: int | None = None, /) -> int: ...
 
 @disjoint_base
-class BufferedRWPair(BufferedIOBase, _BufferedIOBase, Generic[_BufferedReaderStreamT]):
+class BufferedRWPair(BufferedIOBase, _BufferedIOBase, Generic[_BufferedReaderStreamT, _BufferedWriterStreamT]):
     """A buffered reader and writer object together.
 
     A buffered reader object and buffered writer object put together to
@@ -616,9 +653,13 @@ class BufferedRWPair(BufferedIOBase, _BufferedIOBase, Generic[_BufferedReaderStr
     """
 
     if sys.version_info >= (3, 14):
-        def __init__(self, reader: _BufferedReaderStreamT, writer: RawIOBase, buffer_size: int = 131072, /) -> None: ...
+        def __init__(
+            self, reader: _BufferedReaderStreamT, writer: _BufferedWriterStreamT, buffer_size: int = 131072, /
+        ) -> None: ...
     else:
-        def __init__(self, reader: _BufferedReaderStreamT, writer: RawIOBase, buffer_size: int = 8192, /) -> None: ...
+        def __init__(
+            self, reader: _BufferedReaderStreamT, writer: _BufferedWriterStreamT, buffer_size: int = 8192, /
+        ) -> None: ...
 
     def peek(self, size: int = 0, /) -> bytes: ...
 
@@ -659,7 +700,8 @@ class _TextIOBase(_IOBase):
     def detach(self) -> BinaryIO:
         """Separate the underlying buffer from the TextIOBase and return it.
 
-        After the underlying buffer has been detached, the TextIO is in an unusable state.
+        After the underlying buffer has been detached, the TextIO is in
+        an unusable state.
         """
 
     def write(self, s: str, /) -> int:
@@ -694,8 +736,8 @@ class _TextIOBase(_IOBase):
     def read(self, size: int | None = -1, /) -> str:
         """Read at most size characters from stream.
 
-        Read from underlying buffer until we have size characters or we hit EOF.
-        If size is negative or omitted, read until EOF.
+        Read from underlying buffer until we have size characters or we hit
+        EOF.  If size is negative or omitted, read until EOF.
         """
 
 @type_check_only
@@ -834,7 +876,8 @@ class StringIO(TextIOBase, _TextIOBase, TextIO):  # type: ignore[misc]  # incomp
     def seek(self, pos: int, whence: int = 0, /) -> int:
         """Change stream position.
 
-        Seek to character offset pos relative to position indicated by whence:
+        Seek to character offset pos relative to position indicated by
+        whence:
             0  Start of stream (the default).  pos should be >= 0;
             1  Current position - pos must be 0;
             2  End of stream - pos must be 0.
@@ -869,21 +912,19 @@ class IncrementalNewlineDecoder:
     def reset(self) -> None: ...
     def setstate(self, state: tuple[bytes, int], /) -> None: ...
 
-if sys.version_info >= (3, 10):
-    @overload
-    def text_encoding(encoding: None, stacklevel: int = 2, /) -> Literal["locale", "utf-8"]:
-        """A helper function to choose the text encoding.
+@overload
+def text_encoding(encoding: None, stacklevel: int = 2, /) -> Literal["locale", "utf-8"]:
+    """A helper function to choose the text encoding.
 
-        When encoding is not None, this function returns it.
-        Otherwise, this function returns the default text encoding
-        (i.e. "locale" or "utf-8" depends on UTF-8 mode).
+    When encoding is not None, this function returns it.
+    Otherwise, this function returns the default text encoding
+    (i.e. "locale" or "utf-8" depends on UTF-8 mode).
 
-        This function emits an EncodingWarning if encoding is None and
-        sys.flags.warn_default_encoding is true.
+    This function emits an EncodingWarning if encoding is None and
+    sys.flags.warn_default_encoding is true.
 
-        This can be used in APIs with an encoding=None parameter.
-        However, please consider using encoding="utf-8" for new APIs.
-        """
-
-    @overload
-    def text_encoding(encoding: _T, stacklevel: int = 2, /) -> _T: ...
+    This can be used in APIs with an encoding=None parameter.
+    However, please consider using encoding="utf-8" for new APIs.
+    """
+@overload
+def text_encoding(encoding: _S, stacklevel: int = 2, /) -> _S: ...

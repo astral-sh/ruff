@@ -247,7 +247,7 @@ X: int = 42
 from . import foo
 import package
 
-# error: [possibly-missing-attribute]
+# error: [possibly-missing-submodule]
 reveal_type(package.foo.X)  # revealed: Unknown
 ```
 

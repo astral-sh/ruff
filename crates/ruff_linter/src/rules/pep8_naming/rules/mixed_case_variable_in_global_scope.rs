@@ -1,7 +1,5 @@
-use ruff_python_ast::Expr;
-
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_text_size::Ranged;
+use ruff_text_size::TextRange;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
@@ -66,7 +64,7 @@ impl Violation for MixedCaseVariableInGlobalScope {
 }
 
 /// N816
-pub(crate) fn mixed_case_variable_in_global_scope(checker: &Checker, expr: &Expr, name: &str) {
+pub(crate) fn mixed_case_variable_in_global_scope(checker: &Checker, range: TextRange, name: &str) {
     if !helpers::is_mixed_case(name) {
         return;
     }
@@ -84,6 +82,6 @@ pub(crate) fn mixed_case_variable_in_global_scope(checker: &Checker, expr: &Expr
         MixedCaseVariableInGlobalScope {
             name: name.to_string(),
         },
-        expr.range(),
+        range,
     );
 }

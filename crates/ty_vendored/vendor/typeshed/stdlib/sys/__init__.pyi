@@ -28,6 +28,7 @@ last_traceback -- traceback of last uncaught exception
 
 Static objects:
 
+abi_info -- Python ABI information.
 builtin_module_names -- tuple of module names built into this interpreter
 copyright -- copyright notice pertaining to this interpreter
 exec_prefix -- prefix used to find the machine-specific Python library
@@ -76,18 +77,30 @@ from _typeshed.importlib import MetaPathFinderProtocol, PathEntryFinderProtocol
 from builtins import object as _object
 from collections.abc import AsyncGenerator, Callable, Sequence
 from io import TextIOWrapper
-from types import FrameType, ModuleType, TracebackType
-from typing import Any, Final, Literal, NoReturn, Protocol, TextIO, TypeVar, final, overload, type_check_only
-from typing_extensions import LiteralString, TypeAlias, deprecated
+from types import FrameType, ModuleType, SimpleNamespace, TracebackType
+from typing import Any, Final, Literal, NoReturn, Protocol, TextIO, TypeAlias, TypeVar, final, overload, type_check_only
+from typing_extensions import LiteralString, deprecated
 
 _T = TypeVar("_T")
+_LazyImportMode: TypeAlias = Literal["normal", "all", "none"]
+_LazyImportFilter: TypeAlias = Callable[[str | None, str, tuple[str, ...] | None], bool]
 
 # see https://github.com/python/typeshed/issues/8513#issue-1333671093 for the rationale behind this alias
 _ExitCode: TypeAlias = str | int | None
 
+if sys.version_info >= (3, 15):
+    @type_check_only
+    class _AbiInfo(SimpleNamespace):
+        pointer_bits: int
+        free_threaded: bool
+        debug: bool
+        byteorder: Literal["little", "big"]
+
 # ----- sys variables -----
 if sys.platform != "win32":
     abiflags: str
+if sys.version_info >= (3, 15):
+    abi_info: _AbiInfo
 argv: list[str]
 base_exec_prefix: str
 base_prefix: str
@@ -116,8 +129,9 @@ maxsize: int
 maxunicode: int
 meta_path: list[MetaPathFinderProtocol]
 modules: dict[str, ModuleType]
-if sys.version_info >= (3, 10):
-    orig_argv: list[str]
+if sys.version_info >= (3, 15):
+    lazy_modules: set[str]
+orig_argv: list[str]
 path: list[str]
 path_hooks: list[Callable[[str], PathEntryFinderProtocol]]
 path_importer_cache: dict[str, PathEntryFinderProtocol | None]
@@ -141,9 +155,7 @@ ps2: object
 stdin: TextIO | MaybeNone
 stdout: TextIO | MaybeNone
 stderr: TextIO | MaybeNone
-
-if sys.version_info >= (3, 10):
-    stdlib_module_names: frozenset[str]
+stdlib_module_names: frozenset[str]
 
 __stdin__: Final[TextIOWrapper | None]  # Contains the original value of stdin
 __stdout__: Final[TextIOWrapper | None]  # Contains the original value of stdout
@@ -209,7 +221,7 @@ class _flags(_UninstantiableStructseq, tuple[int, ...]):
             "safe_path",
             "int_max_str_digits",
         )
-    elif sys.version_info >= (3, 10):
+    else:
         __match_args__: Final = (
             "debug",
             "inspect",
@@ -289,18 +301,21 @@ class _flags(_UninstantiableStructseq, tuple[int, ...]):
     @property
     def utf8_mode(self) -> int:
         """-X utf8"""
-    if sys.version_info >= (3, 10):
-        @property
-        def warn_default_encoding(self) -> int:
-            """-X warn_default_encoding"""
+
+    @property
+    def warn_default_encoding(self) -> int:
+        """-X warn_default_encoding"""
+
     if sys.version_info >= (3, 11):
         @property
         def safe_path(self) -> bool:
             """-P"""
+
     if sys.version_info >= (3, 13):
         @property
         def gil(self) -> Literal[0, 1]:
             """-X gil"""
+
     if sys.version_info >= (3, 14):
         @property
         def thread_inherit_context(self) -> Literal[0, 1]:
@@ -309,6 +324,7 @@ class _flags(_UninstantiableStructseq, tuple[int, ...]):
         @property
         def context_aware_warnings(self) -> Literal[0, 1]:
             """-X context_aware_warnings"""
+
     # Whether or not this exists on lower versions of Python
     # may depend on which patch release you're using
     # (it was backported to all Python versions on 3.8+ as a security fix)
@@ -337,20 +353,19 @@ class _float_info(structseq[float], tuple[float, int, int, float, int, int, int,
     your system's :file:`float.h` for more information.
     """
 
-    if sys.version_info >= (3, 10):
-        __match_args__: Final = (
-            "max",
-            "max_exp",
-            "max_10_exp",
-            "min",
-            "min_exp",
-            "min_10_exp",
-            "dig",
-            "mant_dig",
-            "epsilon",
-            "radix",
-            "rounds",
-        )
+    __match_args__: Final = (
+        "max",
+        "max_exp",
+        "max_10_exp",
+        "min",
+        "min_exp",
+        "min_10_exp",
+        "dig",
+        "mant_dig",
+        "epsilon",
+        "radix",
+        "rounds",
+    )
 
     @property
     def max(self) -> float:  # DBL_MAX
@@ -413,8 +428,7 @@ class _hash_info(structseq[Any | int], tuple[int, int, int, int, int, str, int, 
     hashes. The attributes are read only.
     """
 
-    if sys.version_info >= (3, 10):
-        __match_args__: Final = ("width", "modulus", "inf", "nan", "imag", "algorithm", "hash_bits", "seed_bits", "cutoff")
+    __match_args__: Final = ("width", "modulus", "inf", "nan", "imag", "algorithm", "hash_bits", "seed_bits", "cutoff")
 
     @property
     def width(self) -> int:
@@ -484,8 +498,7 @@ class _int_info(structseq[int], tuple[int, int, int, int]):
     internal representation of integers.  The attributes are read only.
     """
 
-    if sys.version_info >= (3, 10):
-        __match_args__: Final = ("bits_per_digit", "sizeof_digit", "default_max_str_digits", "str_digits_check_threshold")
+    __match_args__: Final = ("bits_per_digit", "sizeof_digit", "default_max_str_digits", "str_digits_check_threshold")
 
     @property
     def bits_per_digit(self) -> int:
@@ -515,8 +528,7 @@ class _thread_info(_UninstantiableStructseq, tuple[_ThreadInfoName, _ThreadInfoL
     A named tuple holding information about the thread implementation.
     """
 
-    if sys.version_info >= (3, 10):
-        __match_args__: Final = ("name", "lock", "version")
+    __match_args__: Final = ("name", "lock", "version")
 
     @property
     def name(self) -> _ThreadInfoName:
@@ -547,8 +559,7 @@ class _version_info(_UninstantiableStructseq, tuple[int, int, int, _ReleaseLevel
     Version information as a named tuple.
     """
 
-    if sys.version_info >= (3, 10):
-        __match_args__: Final = ("major", "minor", "micro", "releaselevel", "serial")
+    __match_args__: Final = ("major", "minor", "micro", "releaselevel", "serial")
 
     @property
     def major(self) -> int:
@@ -697,6 +708,20 @@ def getfilesystemencoding() -> LiteralString:
 def getfilesystemencodeerrors() -> LiteralString:
     """Return the error mode used Unicode to OS filename conversion."""
 
+if sys.version_info >= (3, 15):
+    def get_lazy_imports() -> _LazyImportMode:
+        """Gets the global lazy imports mode.
+
+        Returns "all" if all top level imports are potentially lazy.
+        Returns "normal" if only explicitly marked imports are lazy.
+        """
+
+    def get_lazy_imports_filter() -> _LazyImportFilter | None:
+        """Get the current lazy imports filter callback.
+
+        Returns the filter callable or None if no filter is set.
+        """
+
 def getrefcount(object: Any, /) -> int:
     """Return the reference count of object.
 
@@ -796,7 +821,6 @@ def intern(string: LiteralString, /) -> LiteralString:
     purpose is to speed up dictionary lookups. Return the string itself or
     the previously interned string object with the same value.
     """
-
 @overload
 def intern(string: str, /) -> str: ...  # type: ignore[misc]
 
@@ -899,8 +923,7 @@ _AsyncgenHook: TypeAlias = Callable[[AsyncGenerator[Any, Any]], None] | None
 @final
 @type_check_only
 class _asyncgen_hooks(structseq[_AsyncgenHook], tuple[_AsyncgenHook, _AsyncgenHook]):
-    if sys.version_info >= (3, 10):
-        __match_args__: Final = ("firstiter", "finalizer")
+    __match_args__: Final = ("firstiter", "finalizer")
 
     @property
     def firstiter(self) -> _AsyncgenHook: ...
@@ -934,6 +957,7 @@ if sys.platform == "win32":
             This is equivalent to defining the PYTHONLEGACYWINDOWSFSENCODING
             environment variable before launching Python.
             """
+
     else:
         def _enablelegacywindowsfsencoding() -> None:
             """Changes the default filesystem encoding to mbcs:replace.
@@ -965,10 +989,36 @@ def set_int_max_str_digits(maxdigits: int) -> None:
 def get_int_max_str_digits() -> int:
     """Return the maximum string digits limit for non-binary int<->str conversions."""
 
+if sys.version_info >= (3, 15):
+    def set_lazy_imports(mode: _LazyImportMode) -> None:
+        """Sets the global lazy imports mode.
+
+        The mode parameter must be one of the following strings:
+        - "all": All top-level imports become potentially lazy
+        - "normal": Only explicitly marked imports (with 'lazy' keyword) are
+          lazy
+
+        In addition to the mode, lazy imports can be controlled via the filter
+        provided to sys.set_lazy_imports_filter
+        """
+
+    def set_lazy_imports_filter(filter: _LazyImportFilter | None) -> None:
+        """Set the lazy imports filter callback.
+
+        The filter is a callable which disables lazy imports when they
+        would otherwise be enabled. Returns True if the import is still enabled
+        or False to disable it. The callable is called with:
+
+        (importing_module_name, resolved_imported_module_name, [fromlist])
+
+        Pass None to clear the filter.
+        """
+
 if sys.version_info >= (3, 12):
     if sys.version_info >= (3, 13):
         def getunicodeinternedsize(*, _only_immortal: bool = False) -> int:
             """Return the number of elements of the unicode interned dictionary"""
+
     else:
         def getunicodeinternedsize() -> int:
             """Return the number of elements of the unicode interned dictionary"""
@@ -981,13 +1031,16 @@ if sys.version_info >= (3, 12):
 
     def is_stack_trampoline_active() -> bool:
         """Return *True* if a stack profiler trampoline is active."""
+
     # It always exists, but raises on non-linux platforms:
     if sys.platform == "linux":
         def activate_stack_trampoline(backend: str, /) -> None:
             """Activate stack profiler trampoline *backend*."""
+
     else:
         def activate_stack_trampoline(backend: str, /) -> NoReturn:
             """Activate stack profiler trampoline *backend*."""
+
     from . import _monitoring
 
     monitoring = _monitoring
@@ -1000,16 +1053,16 @@ if sys.version_info >= (3, 14):
         """Executes a file containing Python code in a given remote Python process.
 
         This function returns immediately, and the code will be executed by the
-        target process's main thread at the next available opportunity, similarly
-        to how signals are handled. There is no interface to determine when the
-        code has been executed. The caller is responsible for making sure that
-        the file still exists whenever the remote process tries to read it and that
-        it hasn't been overwritten.
+        target process's main thread at the next available opportunity,
+        similarly to how signals are handled.  There is no interface to
+        determine when the code has been executed.  The caller is responsible
+        for making sure that the file still exists whenever the remote process
+        tries to read it and that it hasn't been overwritten.
 
-        The remote process must be running a CPython interpreter of the same major
-        and minor version as the local process. If either the local or remote
-        interpreter is pre-release (alpha, beta, or release candidate) then the
-        local and remote interpreters must be the same exact version.
+        The remote process must be running a CPython interpreter of the same
+        major and minor version as the local process.  If either the local or
+        remote interpreter is pre-release (alpha, beta, or release candidate)
+        then the local and remote interpreters must be the same exact version.
 
         Args:
              pid (int): The process ID of the target Python process.
@@ -1022,3 +1075,7 @@ if sys.version_info >= (3, 14):
 
         This function should be used for specialized purposes only.
         """
+
+    from . import __jit
+
+    _jit = __jit

@@ -1,12 +1,11 @@
 use crate::server::Result;
 use crate::session::{Client, Session};
-use lsp_types as types;
-use lsp_types::notification as notif;
+use lsp_types::{self as types, DidChangeConfigurationNotification};
 
 pub(crate) struct DidChangeConfiguration;
 
 impl super::NotificationHandler for DidChangeConfiguration {
-    type NotificationType = notif::DidChangeConfiguration;
+    type NotificationType = DidChangeConfigurationNotification;
 }
 
 impl super::SyncNotificationHandler for DidChangeConfiguration {

@@ -1,17 +1,18 @@
 use ruff_text_size::TextRange;
 
 use crate::diagnostic::{
-    Annotation, Diagnostic, FileResolver, Severity, SubDiagnosticSeverity, UnifiedFile,
+    Annotation, Diagnostic, DisplayDiagnosticConfig, FileResolver, Severity, SubDiagnosticSeverity,
+    UnifiedFile,
 };
 
 pub(super) struct GithubRenderer<'a> {
     resolver: &'a dyn FileResolver,
-    program: &'a str,
+    config: &'a DisplayDiagnosticConfig,
 }
 
 impl<'a> GithubRenderer<'a> {
-    pub(super) fn new(resolver: &'a dyn FileResolver, program: &'a str) -> Self {
-        Self { resolver, program }
+    pub(super) fn new(resolver: &'a dyn FileResolver, config: &'a DisplayDiagnosticConfig) -> Self {
+        Self { resolver, config }
     }
 
     pub(super) fn render(
@@ -25,11 +26,15 @@ impl<'a> GithubRenderer<'a> {
                 Severity::Warning => "warning",
                 Severity::Error | Severity::Fatal => "error",
             };
+            let code = if self.config.preview {
+                diagnostic.id().as_str()
+            } else {
+                diagnostic.secondary_code_or_id()
+            };
             write!(
                 f,
                 "::{severity} title={program} ({code})",
-                program = self.program,
-                code = diagnostic.secondary_code_or_id()
+                program = self.config.program,
             )?;
 
             if let Some(span) = diagnostic.primary_span() {
@@ -85,7 +90,9 @@ impl<'a> GithubRenderer<'a> {
                 write!(f, "::")?;
             }
 
-            if let Some(code) = diagnostic.secondary_code() {
+            if !self.config.preview
+                && let Some(code) = diagnostic.secondary_code()
+            {
                 write!(f, "{code}")?;
             } else {
                 write!(f, "{id}:", id = diagnostic.id())?;

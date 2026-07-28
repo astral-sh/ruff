@@ -338,15 +338,15 @@ a 'global' command, e.g.:
 
 import signal
 import sys
+from _typeshed import ReadableBuffer
 from bdb import Bdb, _Backend
 from cmd import Cmd
 from collections.abc import Callable, Iterable, Mapping, Sequence
-from inspect import _SourceObjectType
 from linecache import _ModuleGlobals
 from rlcompleter import Completer
 from types import CodeType, FrameType, TracebackType
-from typing import IO, Any, ClassVar, Final, Literal, TypeVar
-from typing_extensions import ParamSpec, Self, TypeAlias, deprecated
+from typing import IO, Any, ClassVar, Final, Literal, ParamSpec, TypeAlias, TypeVar
+from typing_extensions import Self, deprecated
 
 __all__ = ["run", "pm", "Pdb", "runeval", "runctx", "runcall", "set_trace", "post_mortem", "help"]
 if sys.version_info >= (3, 14):
@@ -361,7 +361,9 @@ line_prefix: Final[str]  # undocumented
 class Restart(Exception):
     """Causes a debugger to be restarted for the debugged python program."""
 
-def run(statement: str, globals: dict[str, Any] | None = None, locals: Mapping[str, Any] | None = None) -> None:
+def run(  # matches `builtins.exec`
+    statement: str | ReadableBuffer | CodeType, globals: dict[str, Any] | None = None, locals: Mapping[str, object] | None = None
+) -> None:
     """Execute the *statement* (given as a string or a code object)
     under debugger control.
 
@@ -375,7 +377,12 @@ def run(statement: str, globals: dict[str, Any] | None = None, locals: Mapping[s
     the built-in exec() or eval() functions.).
     """
 
-def runeval(expression: str, globals: dict[str, Any] | None = None, locals: Mapping[str, Any] | None = None) -> Any:
+def runctx(  # matches `builtins.exec`
+    statement: str | ReadableBuffer | CodeType, globals: dict[str, Any], locals: Mapping[str, object]
+) -> None: ...
+def runeval(  # matches `builtins.eval`
+    expression: str | ReadableBuffer | CodeType, globals: dict[str, Any] | None = None, locals: Mapping[str, object] | None = None
+) -> Any:
     """Evaluate the *expression* (given as a string or a code object)
     under debugger control.
 
@@ -383,7 +390,6 @@ def runeval(expression: str, globals: dict[str, Any] | None = None, locals: Mapp
     Otherwise this function is similar to run().
     """
 
-def runctx(statement: str, globals: dict[str, Any], locals: Mapping[str, Any]) -> None: ...
 def runcall(func: Callable[_P, _T], *args: _P.args, **kwds: _P.kwargs) -> _T | None:
     """Call the function (a function or method object, not a string)
     with the given arguments.
@@ -519,6 +525,7 @@ class Pdb(Bdb, Cmd):
         Returns True if the normal interaction function must be called,
         False otherwise.
         """
+
     if sys.version_info >= (3, 13):
         def interaction(self, frame: FrameType | None, tb_or_exc: TracebackType | BaseException | None) -> None: ...
     else:
@@ -543,6 +550,7 @@ class Pdb(Bdb, Cmd):
             Return `lineno` if it is, 0 if not (e.g. a docstring, comment, blank
             line or EOF). Warning: testing is not comprehensive.
             """
+
     else:
         def checkline(self, filename: str, lineno: int) -> int:
             """Check whether specified line seems to be executable.
@@ -557,7 +565,11 @@ class Pdb(Bdb, Cmd):
     else:
         def print_stack_trace(self) -> None: ...
 
-    def print_stack_entry(self, frame_lineno: tuple[FrameType, int], prompt_prefix: str = "\n-> ") -> None: ...
+    if sys.version_info >= (3, 15):
+        def print_stack_entry(self, frame_lineno: tuple[FrameType, int], prompt_prefix: str | None = None) -> None: ...
+    else:
+        def print_stack_entry(self, frame_lineno: tuple[FrameType, int], prompt_prefix: str = "\n-> ") -> None: ...
+
     def lookupmodule(self, filename: str) -> str | None:
         """Helper function for break/clear parsing -- may be overridden.
 
@@ -571,6 +583,7 @@ class Pdb(Bdb, Cmd):
 
         files and modules will be searched in sys.path.
         """
+
     if sys.version_info < (3, 11):
         def _runscript(self, filename: str) -> None: ...
 
@@ -617,6 +630,7 @@ class Pdb(Bdb, Cmd):
         print anything, you will see no sign that the breakpoint was
         reached.
         """
+
     if sys.version_info >= (3, 14):
         def do_break(self, arg: str, temporary: bool = False) -> bool | None:
             """b(reak) [ ([filename:]lineno | function) [, condition] ]
@@ -634,6 +648,7 @@ class Pdb(Bdb, Cmd):
             hasn't been loaded yet).  The file is searched for on
             sys.path; the .py suffix may be omitted.
             """
+
     else:
         def do_break(self, arg: str, temporary: bool | Literal[0, 1] = 0) -> bool | None:
             """b(reak) [ ([filename:]lineno | function) [, condition] ]
@@ -715,6 +730,7 @@ class Pdb(Bdb, Cmd):
         An arrow indicates the "current frame", which determines the
         context of most commands.  'bt' is an alias for this command.
         """
+
     if sys.version_info >= (3, 13):
         def do_exceptions(self, arg: str) -> bool | None:
             """exceptions [number]
@@ -907,6 +923,7 @@ class Pdb(Bdb, Cmd):
         "help pdb" shows the full pdb documentation.
         "help exec" gives help on the ! command.
         """
+
     do_b = do_break
     do_cl = do_clear
     do_w = do_where
@@ -1007,6 +1024,7 @@ class Pdb(Bdb, Cmd):
 
         Without expression, clear all display expressions for the current frame.
         """
+
     do_ll = do_longlist
     def _complete_location(self, text: str, line: str, begidx: int, endidx: int) -> list[str]: ...
     def _complete_bpnumber(self, text: str, line: str, begidx: int, endidx: int) -> list[str]: ...
@@ -1039,10 +1057,6 @@ class Pdb(Bdb, Cmd):
 def find_function(funcname: str, filename: str) -> tuple[str, str, int] | None: ...
 def main() -> None: ...
 def help() -> None: ...
-
-if sys.version_info < (3, 10):
-    def getsourcelines(obj: _SourceObjectType) -> tuple[list[str], int]: ...
-
 def lasti2lineno(code: CodeType, lasti: int) -> int: ...
 
 class _rstr(str):

@@ -38,10 +38,16 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 ///     """Metadata about a photo."""
 /// ```
 ///
+/// ## Formatter compatibility
+/// We recommend against using this rule alongside the [formatter]. The
+/// formatter removes blank lines before class docstrings, which conflicts
+/// with this rule's requirement to include them.
+///
 /// ## Options
 /// - `lint.pydocstyle.convention`
 ///
 /// [D211]: https://docs.astral.sh/ruff/rules/blank-line-before-class
+/// [formatter]: https://docs.astral.sh/ruff/formatter
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.70")]
 pub(crate) struct IncorrectBlankLineBeforeClass;

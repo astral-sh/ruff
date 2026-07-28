@@ -144,11 +144,11 @@ ConfigParser -- responsible for parsing a list of
 """
 
 import sys
-from _typeshed import MaybeNone, StrOrBytesPath, SupportsWrite
+from _typeshed import BytesPath, GenericPath, MaybeNone, StrOrBytesPath, StrPath, SupportsWrite
 from collections.abc import Callable, ItemsView, Iterable, Iterator, Mapping, MutableMapping, Sequence
 from re import Pattern
-from typing import Any, ClassVar, Final, Literal, TypeVar, overload, type_check_only
-from typing_extensions import TypeAlias, deprecated
+from typing import Any, AnyStr, ClassVar, Final, Literal, TypeAlias, TypeVar, overload, type_check_only
+from typing_extensions import deprecated
 
 if sys.version_info >= (3, 14):
     __all__ = (
@@ -460,7 +460,8 @@ class RawConfigParser(_Parser):
         assumed. If the specified `section` does not exist, returns False.
         """
 
-    def read(self, filenames: StrOrBytesPath | Iterable[StrOrBytesPath], encoding: str | None = None) -> list[str]:
+    @overload
+    def read(self, filenames: GenericPath[AnyStr], encoding: str | None = None) -> list[AnyStr]:
         """Read and parse a filename or an iterable of filenames.
 
         Files that cannot be opened are silently ignored; this is
@@ -472,6 +473,12 @@ class RawConfigParser(_Parser):
 
         Return list of successfully read files.
         """
+    @overload
+    def read(self, filenames: Iterable[StrPath], encoding: str | None = None) -> list[str]: ...
+    @overload
+    def read(self, filenames: Iterable[BytesPath], encoding: str | None = None) -> list[bytes]: ...
+    @overload
+    def read(self, filenames: Iterable[StrOrBytesPath], encoding: str | None = None) -> list[str | bytes]: ...
 
     def read_file(self, f: Iterable[str], source: str | None = None) -> None:
         """Like read() but the argument must be a file-like object.
@@ -498,30 +505,35 @@ class RawConfigParser(_Parser):
         Optional second argument is the `source` specifying the name of the
         dictionary being read.
         """
+
     if sys.version_info < (3, 12):
         @deprecated("Deprecated since Python 3.2; removed in Python 3.12. Use `parser.read_file()` instead.")
         def readfp(self, fp: Iterable[str], filename: str | None = None) -> None:
             """Deprecated, use read_file instead."""
+
     # These get* methods are partially applied (with the same names) in
     # SectionProxy; the stubs should be kept updated together
     @overload
     def getint(self, section: _SectionName, option: str, *, raw: bool = False, vars: _Section | None = None) -> int: ...
     @overload
     def getint(
-        self, section: _SectionName, option: str, *, raw: bool = False, vars: _Section | None = None, fallback: _T = ...
+        self, section: _SectionName, option: str, *, raw: bool = False, vars: _Section | None = None, fallback: _T
     ) -> int | _T: ...
+
     @overload
     def getfloat(self, section: _SectionName, option: str, *, raw: bool = False, vars: _Section | None = None) -> float: ...
     @overload
     def getfloat(
-        self, section: _SectionName, option: str, *, raw: bool = False, vars: _Section | None = None, fallback: _T = ...
+        self, section: _SectionName, option: str, *, raw: bool = False, vars: _Section | None = None, fallback: _T
     ) -> float | _T: ...
+
     @overload
     def getboolean(self, section: _SectionName, option: str, *, raw: bool = False, vars: _Section | None = None) -> bool: ...
     @overload
     def getboolean(
-        self, section: _SectionName, option: str, *, raw: bool = False, vars: _Section | None = None, fallback: _T = ...
+        self, section: _SectionName, option: str, *, raw: bool = False, vars: _Section | None = None, fallback: _T
     ) -> bool | _T: ...
+
     def _get_conv(
         self,
         section: _SectionName,
@@ -532,6 +544,7 @@ class RawConfigParser(_Parser):
         vars: _Section | None = None,
         fallback: _T = ...,
     ) -> _T: ...
+
     # This is incompatible with MutableMapping so we ignore the type
     @overload  # type: ignore[override]
     def get(self, section: _SectionName, option: str, *, raw: bool = False, vars: _Section | None = None) -> str | MaybeNone:
@@ -549,11 +562,11 @@ class RawConfigParser(_Parser):
 
         The section DEFAULT is special.
         """
-
     @overload
     def get(
         self, section: _SectionName, option: str, *, raw: bool = False, vars: _Section | None = None, fallback: _T
     ) -> str | _T | MaybeNone: ...
+
     @overload
     def items(self, *, raw: bool = False, vars: _Section | None = None) -> ItemsView[str, SectionProxy]:
         """Return a list of (name, value) tuples for each option in a section.
@@ -566,9 +579,9 @@ class RawConfigParser(_Parser):
 
         The section DEFAULT is special.
         """
-
     @overload
     def items(self, section: _SectionName, raw: bool = False, vars: _Section | None = None) -> list[tuple[str, str]]: ...
+
     def set(self, section: _SectionName, option: str, value: str | None = None) -> None:
         """Set an option."""
 
@@ -612,7 +625,6 @@ class ConfigParser(RawConfigParser):
 
         The section DEFAULT is special.
         """
-
     @overload
     def get(
         self, section: _SectionName, option: str, *, raw: bool = False, vars: _Section | None = None, fallback: _T
@@ -639,6 +651,7 @@ class SectionProxy(MutableMapping[str, str]):
     def parser(self) -> RawConfigParser: ...
     @property
     def name(self) -> str: ...
+
     # This is incompatible with MutableMapping so we ignore the type
     @overload  # type: ignore[override]
     def get(
@@ -657,7 +670,6 @@ class SectionProxy(MutableMapping[str, str]):
         is not found.
 
         """
-
     @overload
     def get(
         self,
@@ -669,20 +681,24 @@ class SectionProxy(MutableMapping[str, str]):
         _impl: Any | None = None,
         **kwargs: Any,  # passed to the underlying parser's get() method
     ) -> str | _T: ...
+
     # These are partially-applied version of the methods with the same names in
     # RawConfigParser; the stubs should be kept updated together
     @overload
     def getint(self, option: str, *, raw: bool = False, vars: _Section | None = None) -> int | None: ...
     @overload
     def getint(self, option: str, fallback: _T = ..., *, raw: bool = False, vars: _Section | None = None) -> int | _T: ...
+
     @overload
     def getfloat(self, option: str, *, raw: bool = False, vars: _Section | None = None) -> float | None: ...
     @overload
     def getfloat(self, option: str, fallback: _T = ..., *, raw: bool = False, vars: _Section | None = None) -> float | _T: ...
+
     @overload
     def getboolean(self, option: str, *, raw: bool = False, vars: _Section | None = None) -> bool | None: ...
     @overload
     def getboolean(self, option: str, fallback: _T = ..., *, raw: bool = False, vars: _Section | None = None) -> bool | _T: ...
+
     # SectionProxy can have arbitrary attributes when custom converters are used
     def __getattr__(self, key: str) -> Callable[..., Any]: ...
 
@@ -799,7 +815,6 @@ class ParsingError(Error):
         @deprecated("Deprecated since Python 3.2; removed in Python 3.12. Use `source` instead.")
         def filename(self) -> str:
             """Deprecated, use `source'."""
-
         @filename.setter
         @deprecated("Deprecated since Python 3.2; removed in Python 3.12. Use `source` instead.")
         def filename(self, value: str) -> None: ...

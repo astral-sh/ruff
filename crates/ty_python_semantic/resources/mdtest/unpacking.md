@@ -173,6 +173,14 @@ reveal_type(a)  # revealed: Unknown
 reveal_type(b)  # revealed: Unknown
 ```
 
+### Non-name unpacking target
+
+```py
+# error: [not-iterable] "Object of type `Literal[1]` is not iterable"
+# error: [invalid-assignment] "Cannot assign to a subscript on an object of type `Literal[1]`"
+(1[0],) = 1
+```
+
 ### Custom iterator unpacking
 
 ```py
@@ -213,8 +221,8 @@ reveal_type(d)  # revealed: Literal[2]
 
 ```py
 a, b = [1, 2]
-reveal_type(a)  # revealed: Unknown | int
-reveal_type(b)  # revealed: Unknown | int
+reveal_type(a)  # revealed: Literal[1]
+reveal_type(b)  # revealed: Literal[2]
 ```
 
 ### Simple unpacking

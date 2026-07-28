@@ -1,0 +1,26 @@
+---
+source: crates/ty_server/tests/e2e/notebook.rs
+expression: diagnostics
+---
+{
+  "vscode-notebook-cell://test.ipynb#0": [
+    {
+      "range": {
+        "start": {
+          "line": 2,
+          "character": 4
+        },
+        "end": {
+          "line": 3,
+          "character": 23
+        }
+      },
+      "severity": 4,
+      "source": "ty",
+      "message": "Code is always unreachable",
+      "tags": [
+        1
+      ]
+    }
+  ]
+}

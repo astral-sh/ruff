@@ -17,12 +17,12 @@ def _(
     f: LiteralString,
     g: int,
 ):
-    reveal_type(str(a))  # revealed: Literal["1"]
-    reveal_type(str(b))  # revealed: Literal["True"]
-    reveal_type(str(c))  # revealed: Literal["False"]
-    reveal_type(str(d))  # revealed: Literal["ab'cd"]
-    reveal_type(str(e))  # revealed: Literal["Answer.YES"]
-    reveal_type(str(f))  # revealed: LiteralString
+    reveal_type(str(a))  # revealed: str
+    reveal_type(str(b))  # revealed: str
+    reveal_type(str(c))  # revealed: str
+    reveal_type(str(d))  # revealed: str
+    reveal_type(str(e))  # revealed: str
+    reveal_type(str(f))  # revealed: str
     reveal_type(str(g))  # revealed: str
 
     reveal_type(repr(a))  # revealed: Literal["1"]

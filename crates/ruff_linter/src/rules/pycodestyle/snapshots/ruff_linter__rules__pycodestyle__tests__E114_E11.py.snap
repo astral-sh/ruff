@@ -23,17 +23,6 @@ invalid-syntax: Unexpected indentation
 14 | mimetype = 'application/x-directory'
    |
 
-invalid-syntax: Expected a statement
-  --> E11.py:14:1
-   |
-12 |     print()
-13 | #: E114 E116
-14 | mimetype = 'application/x-directory'
-   | ^
-15 |      # 'httpd/unix-directory'
-16 | create_date = False
-   |
-
 E114 Indentation is not a multiple of 4 (comment)
   --> E11.py:15:1
    |

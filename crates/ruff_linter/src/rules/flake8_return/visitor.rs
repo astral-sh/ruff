@@ -109,14 +109,13 @@ impl<'a> Visitor<'a> for ReturnVisitor<'_, 'a> {
                     .non_locals
                     .extend(names.iter().map(Identifier::as_str));
             }
-            Stmt::AnnAssign(ast::StmtAnnAssign { target, value, .. }) => {
+            Stmt::AnnAssign(ast::StmtAnnAssign { target, value, .. })
                 // Ex) `x: int`
-                if value.is_none() {
+                if value.is_none() => {
                     if let Expr::Name(name) = target.as_ref() {
                         self.stack.annotations.insert(name.id.as_str());
                     }
                 }
-            }
             Stmt::Return(stmt_return) => {
                 // If the `return` statement is preceded by an `assignment` statement, then the
                 // `assignment` statement may be redundant.

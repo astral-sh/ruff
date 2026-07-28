@@ -1,5 +1,5 @@
 ---
-source: crates/ty_test/src/lib.rs
+source: crates/mdtest/src/lib.rs
 expression: snapshot
 ---
 
@@ -84,10 +84,10 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/overloads.md
 
 ```
 error[invalid-overload]: `@override` decorator should be applied only to the overload implementation
-  --> src/mdtest_snippet.py:24:5
+  --> src/mdtest_snippet.py:26:9
    |
-22 |     def method(self, x: int) -> int: ...
 23 |     @overload
+   |     ---------
 24 |     @override
    |     ---------
 25 |     # error: [invalid-overload]
@@ -95,18 +95,15 @@ error[invalid-overload]: `@override` decorator should be applied only to the ove
    |         ^^^^^^
 27 |     def method(self, x: int | str) -> int | str:
    |         ------ Implementation defined here
-28 |         return x
-   |
-info: rule `invalid-overload` is enabled by default
 
 ```
 
 ```
 error[invalid-overload]: `@override` decorator should be applied only to the overload implementation
-  --> src/mdtest_snippet.py:32:5
+  --> src/mdtest_snippet.py:34:9
    |
-30 | class Sub3(Base):
 31 |     @overload
+   |     ---------
 32 |     @override
    |     ---------
 33 |     # error: [invalid-overload]
@@ -116,27 +113,21 @@ error[invalid-overload]: `@override` decorator should be applied only to the ove
 36 |     def method(self, x: str) -> str: ...
 37 |     def method(self, x: int | str) -> int | str:
    |         ------ Implementation defined here
-38 |         return x
-   |
-info: rule `invalid-overload` is enabled by default
 
 ```
 
 ```
 error[invalid-overload]: `@override` decorator should be applied only to the first overload
-  --> src/mdtest_snippet.pyi:18:9
+  --> src/mdtest_snippet.pyi:22:9
    |
-16 | class Sub2(Base):
-17 |     @overload
-18 |     def method(self, x: int) -> int: ...
-   |         ------ First overload defined here
-19 |     @overload
-20 |     @override
-   |     ---------
-21 |     # error: [invalid-overload]
-22 |     def method(self, x: str) -> str: ...
-   |         ^^^^^^
-   |
-info: rule `invalid-overload` is enabled by default
+17 | /     @overload
+18 | |     def method(self, x: int) -> int: ...
+   | |________________________________________- First overload defined here
+19 |       @overload
+20 |       @override
+   |       ---------
+21 |       # error: [invalid-overload]
+22 |       def method(self, x: str) -> str: ...
+   |           ^^^^^^
 
 ```

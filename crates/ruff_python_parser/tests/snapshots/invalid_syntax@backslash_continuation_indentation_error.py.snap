@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/backslash_continuation_indentation_error.py
 ---
 ## AST
 
@@ -67,11 +68,3 @@ Module(
 3 | /       \
 4 | |     2
   | |____^ Syntax Error: Unexpected indentation
-  |
-
-
-  |
-3 |       \
-4 |     2
-  |      ^ Syntax Error: Expected a statement
-  |

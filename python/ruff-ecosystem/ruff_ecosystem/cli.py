@@ -54,7 +54,7 @@ def entrypoint():
                 f"Could not find ruff baseline executable: {args.baseline_executable}",
                 sys.stderr,
             )
-            exit(1)
+            sys.exit(1)
         logger.info(
             "Resolved baseline executable %s to %s",
             args.baseline_executable,
@@ -69,7 +69,7 @@ def entrypoint():
                 f"Could not find ruff comparison executable: {args.comparison_executable}",
                 sys.stderr,
             )
-            exit(1)
+            sys.exit(1)
         logger.info(
             "Resolved comparison executable %s to %s",
             args.comparison_executable,

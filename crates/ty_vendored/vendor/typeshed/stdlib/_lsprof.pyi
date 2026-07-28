@@ -1,6 +1,5 @@
 """Fast profiler"""
 
-import sys
 from _typeshed import structseq
 from collections.abc import Callable
 from types import CodeType
@@ -65,8 +64,7 @@ class Profiler:
 
 @final
 class profiler_entry(structseq[Any], tuple[CodeType | str, int, int, float, float, list[profiler_subentry]]):
-    if sys.version_info >= (3, 10):
-        __match_args__: Final = ("code", "callcount", "reccallcount", "totaltime", "inlinetime", "calls")
+    __match_args__: Final = ("code", "callcount", "reccallcount", "totaltime", "inlinetime", "calls")
     code: CodeType | str
     """code object or built-in function name"""
 
@@ -87,8 +85,7 @@ class profiler_entry(structseq[Any], tuple[CodeType | str, int, int, float, floa
 
 @final
 class profiler_subentry(structseq[Any], tuple[CodeType | str, int, int, float, float]):
-    if sys.version_info >= (3, 10):
-        __match_args__: Final = ("code", "callcount", "reccallcount", "totaltime", "inlinetime")
+    __match_args__: Final = ("code", "callcount", "reccallcount", "totaltime", "inlinetime")
     code: CodeType | str
     """called code object or built-in function name"""
 

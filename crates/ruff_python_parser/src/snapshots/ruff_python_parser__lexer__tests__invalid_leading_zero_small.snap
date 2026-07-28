@@ -5,14 +5,8 @@ expression: "lex_invalid(source, Mode::Module)"
 ## Tokens
 ```
 [
-    (
-        Unknown,
-        0..3,
-    ),
-    (
-        Newline,
-        3..3,
-    ),
+    Unknown 0..3,
+    Newline 3..3,
 ]
 ```
 ## Errors

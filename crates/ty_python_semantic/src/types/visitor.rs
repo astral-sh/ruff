@@ -1,25 +1,36 @@
-use rustc_hash::FxHashSet;
+use std::cell::{Cell, RefCell};
+use std::hash::Hash;
+
+use rustc_hash::{FxBuildHasher, FxHashSet};
+use smallvec::SmallVec;
 
 use crate::{
     Db,
     types::{
-        BoundMethodType, BoundSuperType, BoundTypeVarInstance, CallableType, GenericAlias,
-        IntersectionType, KnownBoundMethodType, KnownInstanceType, NominalInstanceType,
-        PropertyInstanceType, ProtocolInstanceType, SubclassOfType, Type, TypeAliasType,
-        TypeGuardType, TypeIsType, TypeVarInstance, TypedDictType, UnionType,
+        BoundMethodType, BoundSuperType, BoundTypeVarInstance, CallableType, EnumComplementType,
+        GenericAlias, IntersectionType, KnownBoundMethodType, KnownInstanceType,
+        NominalInstanceType, PropertyInstanceType, ProtocolInstanceType, StaticClassLiteral,
+        SubclassOfType, Type, TypeAliasType, TypeFormType, TypeGuardType, TypeIsType,
+        TypedDictType, UnionType,
         bound_super::walk_bound_super_type,
+        callable::walk_callable_type,
         class::walk_generic_alias,
+        cyclic::ActiveRecursionDetector,
         function::{FunctionType, walk_function_type},
         instance::{walk_nominal_instance_type, walk_protocol_instance_type},
+        known_instance::walk_known_instance_type,
+        method::{walk_bound_method_type, walk_method_wrapper_type},
         newtype::{NewType, walk_newtype_instance_type},
+        protocol_class::walk_protocol_instance_interface,
+        set_theoretic::{walk_intersection_type, walk_union},
         subclass_of::walk_subclass_of_type,
-        walk_bound_method_type, walk_bound_type_var_type, walk_callable_type,
-        walk_intersection_type, walk_known_instance_type, walk_method_wrapper_type,
-        walk_property_instance_type, walk_type_alias_type, walk_type_var_type,
-        walk_typed_dict_type, walk_typeguard_type, walk_typeis_type, walk_union,
+        type_alias::walk_type_alias_type,
+        type_form::walk_typeform_type,
+        typed_dict::walk_typed_dict_type,
+        typevar::{TypeVarInstance, walk_bound_type_var_type, walk_type_var_type},
+        walk_property_instance_type, walk_typeguard_type, walk_typeis_type,
     },
 };
-use std::cell::{Cell, RefCell};
 
 /// A visitor trait that recurses into nested types.
 ///
@@ -40,6 +51,12 @@ pub(crate) trait TypeVisitor<'db> {
         walk_intersection_type(db, intersection, self);
     }
 
+    fn visit_enum_complement_type(&self, db: &'db dyn Db, complement: EnumComplementType<'db>) {
+        for rest in complement.rest(db) {
+            self.visit_type(db, *rest);
+        }
+    }
+
     fn visit_callable_type(&self, db: &'db dyn Db, callable: CallableType<'db>) {
         walk_callable_type(db, callable, self);
     }
@@ -54,6 +71,10 @@ pub(crate) trait TypeVisitor<'db> {
 
     fn visit_typeguard_type(&self, db: &'db dyn Db, type_is: TypeGuardType<'db>) {
         walk_typeguard_type(db, type_is, self);
+    }
+
+    fn visit_typeform_type(&self, db: &'db dyn Db, typeform: TypeFormType<'db>) {
+        walk_typeform_type(db, typeform, self);
     }
 
     fn visit_subclass_of_type(&self, db: &'db dyn Db, subclass_of: SubclassOfType<'db>) {
@@ -122,6 +143,7 @@ pub(crate) trait TypeVisitor<'db> {
 pub(super) enum NonAtomicType<'db> {
     Union(UnionType<'db>),
     Intersection(IntersectionType<'db>),
+    EnumComplement(EnumComplementType<'db>),
     FunctionLiteral(FunctionType<'db>),
     BoundMethod(BoundMethodType<'db>),
     BoundSuper(BoundSuperType<'db>),
@@ -134,6 +156,7 @@ pub(super) enum NonAtomicType<'db> {
     PropertyInstance(PropertyInstanceType<'db>),
     TypeIs(TypeIsType<'db>),
     TypeGuard(TypeGuardType<'db>),
+    TypeForm(TypeFormType<'db>),
     TypeVar(BoundTypeVarInstance<'db>),
     ProtocolInstance(ProtocolInstanceType<'db>),
     TypedDict(TypedDictType<'db>),
@@ -159,6 +182,7 @@ impl<'db> From<Type<'db>> for TypeKind<'db> {
             | Type::ModuleLiteral(_)
             | Type::ClassLiteral(_)
             | Type::SpecialForm(_)
+            | Type::Divergent(_)
             | Type::Dynamic(_) => TypeKind::Atomic,
 
             // Non-atomic types
@@ -167,6 +191,9 @@ impl<'db> From<Type<'db>> for TypeKind<'db> {
             }
             Type::Intersection(intersection) => {
                 TypeKind::NonAtomic(NonAtomicType::Intersection(intersection))
+            }
+            Type::EnumComplement(complement) => {
+                TypeKind::NonAtomic(NonAtomicType::EnumComplement(complement))
             }
             Type::Union(union) => TypeKind::NonAtomic(NonAtomicType::Union(union)),
             Type::BoundMethod(method) => TypeKind::NonAtomic(NonAtomicType::BoundMethod(method)),
@@ -200,6 +227,7 @@ impl<'db> From<Type<'db>> for TypeKind<'db> {
             Type::TypeGuard(type_guard) => {
                 TypeKind::NonAtomic(NonAtomicType::TypeGuard(type_guard))
             }
+            Type::TypeForm(typeform) => TypeKind::NonAtomic(NonAtomicType::TypeForm(typeform)),
             Type::TypedDict(typed_dict) => {
                 TypeKind::NonAtomic(NonAtomicType::TypedDict(typed_dict))
             }
@@ -221,6 +249,9 @@ pub(super) fn walk_non_atomic_type<'db, V: TypeVisitor<'db> + ?Sized>(
         NonAtomicType::Intersection(intersection) => {
             visitor.visit_intersection_type(db, intersection);
         }
+        NonAtomicType::EnumComplement(complement) => {
+            visitor.visit_enum_complement_type(db, complement);
+        }
         NonAtomicType::Union(union) => visitor.visit_union_type(db, union),
         NonAtomicType::BoundMethod(method) => visitor.visit_bound_method_type(db, method),
         NonAtomicType::BoundSuper(bound_super) => visitor.visit_bound_super_type(db, bound_super),
@@ -239,6 +270,7 @@ pub(super) fn walk_non_atomic_type<'db, V: TypeVisitor<'db> + ?Sized>(
         }
         NonAtomicType::TypeIs(type_is) => visitor.visit_typeis_type(db, type_is),
         NonAtomicType::TypeGuard(type_guard) => visitor.visit_typeguard_type(db, type_guard),
+        NonAtomicType::TypeForm(typeform) => visitor.visit_typeform_type(db, typeform),
         NonAtomicType::TypeVar(bound_typevar) => {
             visitor.visit_bound_type_var_type(db, bound_typevar);
         }
@@ -274,12 +306,179 @@ pub(crate) fn walk_type_with_recursion_guard<'db>(
 }
 
 #[derive(Default, Debug)]
-pub(crate) struct TypeCollector<'db>(RefCell<FxHashSet<Type<'db>>>);
+pub(crate) struct TypeCollector<'db>(RefCell<CollectedTypes<'db>>);
 
 impl<'db> TypeCollector<'db> {
     pub(crate) fn type_was_already_seen(&self, ty: Type<'db>) -> bool {
         !self.0.borrow_mut().insert(ty)
     }
+}
+
+// Most guarded walks are shallow; avoid allocating a hash table until linear search is costly.
+type CollectedTypes<'db> = SmallSet<Type<'db>, 8>;
+
+/// A set optimized for values that usually contain only a few distinct elements.
+#[derive(Debug)]
+enum SmallSet<T, const INLINE_CAPACITY: usize> {
+    Inline(SmallVec<[T; INLINE_CAPACITY]>),
+    Spilled(FxHashSet<T>),
+}
+
+impl<T, const INLINE_CAPACITY: usize> Default for SmallSet<T, INLINE_CAPACITY> {
+    fn default() -> Self {
+        Self::Inline(SmallVec::new())
+    }
+}
+
+impl<T, const INLINE_CAPACITY: usize> SmallSet<T, INLINE_CAPACITY> {
+    #[inline]
+    pub(super) fn insert(&mut self, value: T) -> bool
+    where
+        T: Hash + Eq,
+    {
+        match self {
+            Self::Inline(inline) => {
+                if inline.contains(&value) {
+                    return false;
+                }
+
+                if inline.len() < INLINE_CAPACITY {
+                    inline.push(value);
+                    return true;
+                }
+
+                *self = Self::Spilled(Self::spill(inline, value));
+                true
+            }
+            Self::Spilled(set) => set.insert(value),
+        }
+    }
+
+    #[cold]
+    fn spill(inline: &mut SmallVec<[T; INLINE_CAPACITY]>, value: T) -> FxHashSet<T>
+    where
+        T: Hash + Eq,
+    {
+        let mut set = FxHashSet::with_capacity_and_hasher(inline.len() + 1, FxBuildHasher);
+        set.extend(inline.drain(..));
+        let inserted = set.insert(value);
+        debug_assert!(inserted);
+        set
+    }
+
+    #[cfg(test)]
+    pub(super) const fn is_spilled(&self) -> bool {
+        matches!(self, Self::Spilled(_))
+    }
+}
+
+/// Whether a type contains a non-`Any` dynamic type.
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub(super) enum DynamicContent {
+    /// The type was fully inspected and contains no non-`Any` dynamic type.
+    Absent,
+    /// The type contains a non-`Any` dynamic type.
+    Present,
+    /// Recursive specialization prevented the type from being fully inspected.
+    Indeterminate,
+}
+
+impl DynamicContent {
+    pub(super) const fn is_absent(self) -> bool {
+        matches!(self, Self::Absent)
+    }
+}
+
+/// Determine whether `ty` contains a dynamic type other than `Any`.
+///
+/// Class-based protocol interfaces can be recursively specialized. An exact recursive cycle adds
+/// no new information, but revisiting the same protocol definition under a different
+/// specialization may expose different members and is therefore indeterminate.
+///
+/// ```python
+/// class Exact[T](Protocol):
+///     next: Exact[T]
+///
+/// class Growing[T](Protocol):
+///     next: Growing[list[T]]
+/// ```
+///
+/// Walking `Exact[int]` can skip its exact back-edge. Walking `Growing[int]` is indeterminate
+/// because each recursive edge creates a new specialization.
+pub(super) fn non_any_dynamic_content<'db>(db: &'db dyn Db, ty: Type<'db>) -> DynamicContent {
+    struct DynamicContentVisitor<'db> {
+        recursion_guard: TypeCollector<'db>,
+        active_class_protocols: ActiveRecursionDetector<StaticClassLiteral<'db>>,
+        content: Cell<DynamicContent>,
+    }
+
+    impl DynamicContentVisitor<'_> {
+        fn record(&self, content: DynamicContent) {
+            debug_assert!(self.content.get().is_absent());
+            debug_assert!(!content.is_absent());
+            self.content.set(content);
+        }
+    }
+
+    impl<'db> TypeVisitor<'db> for DynamicContentVisitor<'db> {
+        fn should_visit_lazy_type_attributes(&self) -> bool {
+            true
+        }
+
+        fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
+            if !self.content.get().is_absent() {
+                return;
+            }
+
+            if ty.is_dynamic() && !matches!(ty, Type::Dynamic(crate::types::DynamicType::Any)) {
+                self.record(DynamicContent::Present);
+                return;
+            }
+
+            walk_type_with_recursion_guard(db, ty, self, &self.recursion_guard);
+        }
+
+        fn visit_protocol_instance_type(
+            &self,
+            db: &'db dyn Db,
+            protocol: ProtocolInstanceType<'db>,
+        ) {
+            let protocol_ty = Type::ProtocolInstance(protocol);
+            let Some(class) = protocol.as_class_based() else {
+                walk_protocol_instance_interface(db, protocol.interface(db), protocol_ty, self);
+                return;
+            };
+            let Some((origin, specialization)) = class.static_class_literal(db) else {
+                walk_protocol_instance_interface(db, protocol.interface(db), protocol_ty, self);
+                return;
+            };
+
+            if let Some(specialization) = specialization {
+                // Bounds and defaults in the generic context do not describe the specialized
+                // instance; only inspect the types assigned to its parameters.
+                for ty in specialization.types(db) {
+                    self.visit_type(db, *ty);
+                    if !self.content.get().is_absent() {
+                        return;
+                    }
+                }
+            }
+
+            self.active_class_protocols.visit(
+                &origin,
+                || self.record(DynamicContent::Indeterminate),
+                || walk_protocol_instance_interface(db, protocol.interface(db), protocol_ty, self),
+            );
+        }
+    }
+
+    let visitor = DynamicContentVisitor {
+        recursion_guard: TypeCollector::default(),
+        active_class_protocols: ActiveRecursionDetector::default(),
+        content: Cell::new(DynamicContent::Absent),
+    };
+    visitor.visit_type(db, ty);
+    visitor.content.get()
 }
 
 /// Implementation for `any_over_type` and `find_over_type`.
@@ -373,4 +572,36 @@ where
     T: Copy + PartialEq,
 {
     any_over_type_impl(db, ty, should_visit_lazy_type_attributes, query)
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::types::{DynamicType, SpecialFormType, Type};
+
+    use super::CollectedTypes;
+
+    #[test]
+    fn collected_types_spills_without_losing_deduplication() {
+        let mut collected = CollectedTypes::default();
+        let types = [
+            Type::Never,
+            Type::AlwaysTruthy,
+            Type::AlwaysFalsy,
+            Type::Dynamic(DynamicType::Any),
+            Type::Dynamic(DynamicType::Unknown),
+            Type::Dynamic(DynamicType::UnspecializedTypeVar),
+            Type::Dynamic(DynamicType::InvalidConcatenateUnknown),
+            Type::Dynamic(DynamicType::AmbiguousOverload),
+            Type::SpecialForm(SpecialFormType::Any),
+        ];
+
+        for ty in types {
+            assert!(collected.insert(ty));
+        }
+
+        assert!(collected.is_spilled());
+        assert!(!collected.insert(Type::Never));
+        assert!(!collected.insert(Type::SpecialForm(SpecialFormType::Any)));
+        assert!(collected.insert(Type::SpecialForm(SpecialFormType::Unknown)));
+    }
 }

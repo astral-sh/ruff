@@ -18,6 +18,8 @@ use tempfile::TempDir;
 mod analyze_graph;
 mod format;
 mod lint;
+mod show_settings;
+mod version;
 
 const BIN_NAME: &str = "ruff";
 
@@ -154,6 +156,13 @@ impl CliTest {
             .with_context(|| format!("Failed to write file `{}`", file_path.display()))?;
 
         Ok(())
+    }
+
+    /// Reads a file from the test directory.
+    pub(crate) fn read_file(&self, path: impl AsRef<Path>) -> Result<String> {
+        let file_path = self.project_dir.join(path);
+        fs::read_to_string(&file_path)
+            .with_context(|| format!("Failed to read file `{}`", file_path.display()))
     }
 
     pub(crate) fn write_files<'a>(

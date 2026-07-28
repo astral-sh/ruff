@@ -8,12 +8,9 @@ E304 [*] Blank lines found after function decorator (1)
 31 |     
 32 |     def with_blank_line(): ...
    |     ^^^
-   |
 help: Remove extraneous blank line(s)
-28 |     def grouped2(): ...
-29 |     def grouped3( ): ...
+   |
 30 |     @decorated
    -     
 31 |     def with_blank_line(): ...
-32 |     
-33 |
+   |

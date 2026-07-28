@@ -24,12 +24,13 @@ expression: code_actions
           "href": "https://ty.dev/rules#unused-ignore-comment"
         },
         "source": "ty",
-        "message": "Unused `ty: ignore` directive",
+        "message": "Unused `ty: ignore` directive\n\nhelp: Remove the unused suppression comment",
         "tags": [
           1
         ]
       }
     ],
+    "isPreferred": true,
     "edit": {
       "changes": {
         "file://<temp_dir>/src/foo.py": [
@@ -48,8 +49,7 @@ expression: code_actions
           }
         ]
       }
-    },
-    "isPreferred": true
+    }
   },
   {
     "title": "Ignore 'unused-ignore-comment' for this line",
@@ -72,12 +72,13 @@ expression: code_actions
           "href": "https://ty.dev/rules#unused-ignore-comment"
         },
         "source": "ty",
-        "message": "Unused `ty: ignore` directive",
+        "message": "Unused `ty: ignore` directive\n\nhelp: Remove the unused suppression comment",
         "tags": [
           1
         ]
       }
     ],
+    "isPreferred": false,
     "edit": {
       "changes": {
         "file://<temp_dir>/src/foo.py": [
@@ -96,7 +97,6 @@ expression: code_actions
           }
         ]
       }
-    },
-    "isPreferred": false
+    }
   }
 ]

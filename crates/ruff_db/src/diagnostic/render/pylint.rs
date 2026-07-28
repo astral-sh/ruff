@@ -1,4 +1,4 @@
-use crate::diagnostic::{Diagnostic, SecondaryCode, render::FileResolver};
+use crate::diagnostic::{Diagnostic, DisplayDiagnosticConfig, render::FileResolver};
 
 /// Generate violations in Pylint format.
 ///
@@ -11,11 +11,12 @@ use crate::diagnostic::{Diagnostic, SecondaryCode, render::FileResolver};
 /// See: [Flake8 documentation](https://flake8.pycqa.org/en/latest/internal/formatters.html#pylint-formatter)
 pub(super) struct PylintRenderer<'a> {
     resolver: &'a dyn FileResolver,
+    config: &'a DisplayDiagnosticConfig,
 }
 
 impl<'a> PylintRenderer<'a> {
-    pub(super) fn new(resolver: &'a dyn FileResolver) -> Self {
-        Self { resolver }
+    pub(super) fn new(resolver: &'a dyn FileResolver, config: &'a DisplayDiagnosticConfig) -> Self {
+        Self { resolver, config }
     }
 }
 
@@ -45,9 +46,11 @@ impl PylintRenderer<'_> {
                 })
                 .unwrap_or_default();
 
-            let code = diagnostic
-                .secondary_code()
-                .map_or_else(|| diagnostic.name(), SecondaryCode::as_str);
+            let code = if self.config.preview {
+                diagnostic.id().as_str()
+            } else {
+                diagnostic.secondary_code_or_id()
+            };
 
             let row = row.unwrap_or_default();
 

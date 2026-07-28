@@ -5,6 +5,7 @@
 import sys
 import typing_extensions
 from _collections_abc import dict_items, dict_keys, dict_values
+from _typeshed import AnnotationForm
 from abc import ABCMeta
 from collections.abc import Awaitable, Generator, Iterable, Mapping
 from typing import Any, ClassVar, Generic, TypeVar, overload
@@ -28,6 +29,10 @@ class TypedDictFallback(Mapping[str, object], metaclass=ABCMeta):
     if sys.version_info >= (3, 13):
         __readonly_keys__: ClassVar[frozenset[str]]
         __mutable_keys__: ClassVar[frozenset[str]]
+    if sys.version_info >= (3, 15):
+        # PEP 728
+        __closed__: ClassVar[bool | None]
+        __extra_items__: ClassVar[AnnotationForm]
 
     def copy(self) -> typing_extensions.Self: ...
     # Using Never so that only calls using mypy plugin hook that specialize the signature
@@ -40,14 +45,17 @@ class TypedDictFallback(Mapping[str, object], metaclass=ABCMeta):
     def items(self) -> dict_items[str, object]: ...
     def keys(self) -> dict_keys[str, object]: ...
     def values(self) -> dict_values[str, object]: ...
+
     @overload
     def __or__(self, value: typing_extensions.Self, /) -> typing_extensions.Self: ...
     @overload
     def __or__(self, value: dict[str, Any], /) -> dict[str, object]: ...
+
     @overload
     def __ror__(self, value: typing_extensions.Self, /) -> typing_extensions.Self: ...
     @overload
     def __ror__(self, value: dict[str, Any], /) -> dict[str, object]: ...
+
     # supposedly incompatible definitions of __or__ and __ior__
     def __ior__(self, value: typing_extensions.Self, /) -> typing_extensions.Self: ...  # type: ignore[misc]
 
@@ -55,6 +63,7 @@ class TypedDictFallback(Mapping[str, object], metaclass=ABCMeta):
 class NamedTupleFallback(tuple[Any, ...]):
     _field_defaults: ClassVar[dict[str, Any]]
     _fields: ClassVar[tuple[str, ...]]
+    __match_args__: ClassVar[tuple[str, ...]] = ...
     # __orig_bases__ sometimes exists on <3.12, but not consistently
     # So we only add it to the stub on 3.12+.
     if sys.version_info >= (3, 12):
@@ -67,6 +76,7 @@ class NamedTupleFallback(tuple[Any, ...]):
         "Creating a typing.NamedTuple using keyword arguments is deprecated and support will be removed in Python 3.15"
     )
     def __init__(self, typename: str, fields: None = None, /, **kwargs: Any) -> None: ...
+
     @classmethod
     def _make(cls, iterable: Iterable[Any]) -> typing_extensions.Self: ...
     def _asdict(self) -> dict[str, Any]: ...

@@ -392,3 +392,8 @@ class UsesStringizedForwardReferences:
     def __enter__(self) -> "UsesStringizedForwardReferences": ...    # PYI034
     async def __aenter__(self) -> "UsesStringizedForwardReferences": ...  # PYI034
     def __iadd__(self, other) -> "UsesStringizedForwardReferences": ...  # PYI034
+
+
+class InPlaceOperationReturningOtherTypeAtRuntime:
+    def __iadd__(self, other: int) -> int:
+        return 1

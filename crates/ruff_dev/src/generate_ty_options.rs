@@ -44,18 +44,18 @@ pub(crate) fn main(args: &Args) -> anyhow::Result<()> {
         Mode::Check => {
             let current = std::fs::read_to_string(&markdown_path)?;
             if output == current {
-                println!("Up-to-date: {file_name}",);
+                println!("Up-to-date: {file_name}");
             } else {
                 let comparison = StrComparison::new(&current, &output);
-                bail!("{file_name} changed, please run `{REGENERATE_ALL_COMMAND}`:\n{comparison}",);
+                bail!("{file_name} changed, please run `{REGENERATE_ALL_COMMAND}`:\n{comparison}");
             }
         }
         Mode::Write => {
             let current = std::fs::read_to_string(&markdown_path)?;
             if current == output {
-                println!("Up-to-date: {file_name}",);
+                println!("Up-to-date: {file_name}");
             } else {
-                println!("Updating: {file_name}",);
+                println!("Updating: {file_name}");
                 std::fs::write(markdown_path, output.as_bytes())?;
             }
         }
@@ -75,7 +75,7 @@ fn generate_set(output: &mut String, set: Set, parents: &mut Vec<Set>) {
                 .filter_map(|set| set.name())
                 .chain(std::iter::once(name.as_str()))
                 .join(".");
-            writeln!(output, "## `{title}`\n",).unwrap();
+            writeln!(output, "## `{title}`\n").unwrap();
         }
     }
 

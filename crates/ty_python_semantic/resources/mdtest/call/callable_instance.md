@@ -54,7 +54,7 @@ class NonCallable:
     __call__ = 1
 
 a = NonCallable()
-# error: [call-non-callable] "Object of type `Literal[1]` is not callable"
+# error: [call-non-callable] "Object of type `NonCallable` is not callable"
 reveal_type(a())  # revealed: Unknown
 ```
 
@@ -85,7 +85,7 @@ class C:
 
 c = C()
 
-# error: 15 [invalid-argument-type] "Argument to bound method `__call__` is incorrect: Expected `int`, found `Literal["foo"]`"
+# error: 15 [invalid-argument-type] "Argument to bound method `C.__call__` is incorrect: Expected `int`, found `Literal["foo"]`"
 reveal_type(c("foo"))  # revealed: int
 ```
 
@@ -99,7 +99,7 @@ class C:
 
 c = C()
 
-# error: 13 [invalid-argument-type] "Argument to bound method `__call__` is incorrect: Expected `int`, found `C`"
+# error: 13 [invalid-argument-type] "Argument to bound method `C.__call__` is incorrect: Expected `int`, found `C`"
 reveal_type(c())  # revealed: int
 ```
 

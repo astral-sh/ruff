@@ -2,7 +2,7 @@
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
 ---
 F811 Redefinition of unused `baz` from line 17
-  --> F811_31.py:17:5
+  --> F811_31.py:19:29
    |
 16 | try:
 17 |     baz = None

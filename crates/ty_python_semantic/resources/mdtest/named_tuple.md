@@ -9,7 +9,8 @@ name, and not just by its numeric position within the tuple:
 
 ```py
 from typing import NamedTuple, Sequence
-from ty_extensions import static_assert, is_subtype_of, is_assignable_to, reveal_mro
+from ty_extensions import static_assert
+from ty_extensions._internal import is_subtype_of, is_assignable_to, reveal_mro
 
 class Person(NamedTuple):
     id: int
@@ -84,12 +85,14 @@ reveal_type(Person.age)  # revealed: property
 alice.id = 42
 # error: [invalid-assignment]
 bob.age = None
+# error: [invalid-assignment]
+del alice.id
 ```
 
 Alternative functional syntax with a list of tuples:
 
 ```py
-Person2 = NamedTuple("Person", [("id", int), ("name", str)])
+Person2 = NamedTuple("Person2", [("id", int), ("name", str)])
 alice2 = Person2(1, "Alice")
 
 # error: [missing-argument]
@@ -102,7 +105,7 @@ reveal_type(alice2.name)  # revealed: str
 Functional syntax with a tuple of tuples:
 
 ```py
-Person3 = NamedTuple("Person", (("id", int), ("name", str)))
+Person3 = NamedTuple("Person3", (("id", int), ("name", str)))
 alice3 = Person3(1, "Alice")
 
 reveal_type(alice3.id)  # revealed: int
@@ -112,7 +115,7 @@ reveal_type(alice3.name)  # revealed: str
 Functional syntax with a tuple of lists:
 
 ```py
-Person4 = NamedTuple("Person", (["id", int], ["name", str]))
+Person4 = NamedTuple("Person4", (["id", int], ["name", str]))
 alice4 = Person4(1, "Alice")
 
 reveal_type(alice4.id)  # revealed: int
@@ -122,11 +125,27 @@ reveal_type(alice4.name)  # revealed: str
 Functional syntax with a list of lists:
 
 ```py
-Person5 = NamedTuple("Person", [["id", int], ["name", str]])
+Person5 = NamedTuple("Person5", [["id", int], ["name", str]])
 alice5 = Person5(1, "Alice")
 
 reveal_type(alice5.id)  # revealed: int
 reveal_type(alice5.name)  # revealed: str
+```
+
+### Name mismatch diagnostics
+
+<!-- snapshot-diagnostics -->
+
+The assigned variable name should match the `typename` argument:
+
+```py
+from typing import NamedTuple
+from ty_extensions._internal import is_subtype_of
+
+# error: [mismatched-type-name]
+Mismatch = NamedTuple("WrongName", [("x", int)])
+reveal_type(Mismatch)  # revealed: <class 'WrongName'>
+reveal_type(is_subtype_of(Mismatch, tuple[int]))  # revealed: ConstraintSet[Literal[True]]
 ```
 
 ### Functional syntax with string annotations
@@ -243,10 +262,10 @@ reveal_type(n.next)  # revealed: Unknown | None
 Dangling calls cannot contain other dangling calls; that's an invalid type form:
 
 ```py
-from ty_extensions import reveal_mro
+from ty_extensions._internal import reveal_mro
 
 # error: [invalid-type-form]
-class A(NamedTuple("B", [("x", NamedTuple("C", [("x", "A" | None)]))])):
+class A(NamedTuple("B", [("x", NamedTuple("C", [("x", "A | None")]))])):
     pass
 
 # revealed: (<class 'A'>, <class 'B'>, <class 'tuple[Unknown]'>, <class 'Sequence[Unknown]'>, <class 'Reversible[Unknown]'>, <class 'Collection[Unknown]'>, <class 'Iterable[Unknown]'>, <class 'Container[Any]'>, typing.Protocol, typing.Generic, <class 'object'>)
@@ -268,6 +287,15 @@ reveal_type(p.id)  # revealed: int
 reveal_type(p.name)  # revealed: str
 ```
 
+Non-literal `str` names should not be treated as proven mismatches:
+
+```py
+from typing import NamedTuple
+
+def f(name: str) -> None:
+    Match = NamedTuple(name, [("value", int)])
+```
+
 ### Functional syntax with tuple variable fields
 
 When fields are passed via a tuple variable, we cannot extract the literal field names and types
@@ -275,7 +303,8 @@ from the inferred tuple type. We instead emit a diagnostic:
 
 ```py
 from typing import NamedTuple
-from ty_extensions import static_assert, is_subtype_of, reveal_mro
+from ty_extensions import static_assert
+from ty_extensions._internal import is_subtype_of, reveal_mro
 
 fields = (("host", str), ("port", int))
 # error: [invalid-named-tuple] "Invalid argument to parameter `fields` of `NamedTuple()`: `fields` must be a literal list or tuple"
@@ -348,7 +377,7 @@ python-version = "3.11"
 
 ```py
 from typing import NamedTuple
-from ty_extensions import reveal_mro
+from ty_extensions._internal import reveal_mro
 
 # Variadic tuple - we can't determine the exact fields statically.
 def get_fields() -> tuple[tuple[str, type[int]], *tuple[tuple[str, type[str]], ...]]:
@@ -369,7 +398,7 @@ Similarly for `collections.namedtuple`:
 
 ```py
 import collections
-from ty_extensions import reveal_mro
+from ty_extensions._internal import reveal_mro
 
 def get_field_names() -> tuple[str, *tuple[str, ...]]:
     return ("x", "y")
@@ -391,7 +420,7 @@ properly inherited:
 
 ```py
 from typing import NamedTuple
-from ty_extensions import reveal_mro
+from ty_extensions._internal import reveal_mro
 
 class Url(NamedTuple("Url", [("host", str), ("path", str)])):
     pass
@@ -399,7 +428,7 @@ class Url(NamedTuple("Url", [("host", str), ("path", str)])):
 reveal_type(Url)  # revealed: <class 'Url'>
 # revealed: (<class 'mdtest_snippet.Url @ src/mdtest_snippet.py:4:7'>, <class 'mdtest_snippet.Url @ src/mdtest_snippet.py:4:11'>, <class 'tuple[str, str]'>, <class 'Sequence[str]'>, <class 'Reversible[str]'>, <class 'Collection[str]'>, <class 'Iterable[str]'>, <class 'Container[Any]'>, typing.Protocol, typing.Generic, <class 'object'>)
 reveal_mro(Url)
-reveal_type(Url.__new__)  # revealed: [Self](cls: type[Self], host: str, path: str) -> Self
+reveal_type(Url.__new__)  # revealed: [Self](_cls: type[Self], host: str, path: str) -> Self
 
 # Constructor works with the inherited fields.
 url = Url("example.com", "/path")
@@ -496,7 +525,7 @@ accepted because the constructor uses a gradual signature:
 
 ```py
 import collections
-from ty_extensions import reveal_mro
+from ty_extensions._internal import reveal_mro
 
 CheckerConfig = ["duration", "video_fps", "audio_sample_rate"]
 GroundTruth = collections.namedtuple("GroundTruth", " ".join(CheckerConfig))
@@ -521,36 +550,36 @@ The `collections.namedtuple` function accepts `str | Iterable[str]` for `field_n
 
 ```py
 import collections
-from ty_extensions import reveal_mro
+from ty_extensions._internal import reveal_mro
 
 # String field names (space-separated)
-Point1 = collections.namedtuple("Point", "x y")
-reveal_type(Point1)  # revealed: <class 'Point'>
-# revealed: (<class 'Point'>, <class 'tuple[Any, Any]'>, <class 'Sequence[Any]'>, <class 'Reversible[Any]'>, <class 'Collection[Any]'>, <class 'Iterable[Any]'>, <class 'Container[Any]'>, typing.Protocol, typing.Generic, <class 'object'>)
+Point1 = collections.namedtuple("Point1", "x y")
+reveal_type(Point1)  # revealed: <class 'Point1'>
+# revealed: (<class 'Point1'>, <class 'tuple[Any, Any]'>, <class 'Sequence[Any]'>, <class 'Reversible[Any]'>, <class 'Collection[Any]'>, <class 'Iterable[Any]'>, <class 'Container[Any]'>, typing.Protocol, typing.Generic, <class 'object'>)
 reveal_mro(Point1)
 
 # String field names with multiple spaces
-Point1a = collections.namedtuple("Point", "x       y")
-reveal_type(Point1a)  # revealed: <class 'Point'>
-# revealed: (<class 'Point'>, <class 'tuple[Any, Any]'>, <class 'Sequence[Any]'>, <class 'Reversible[Any]'>, <class 'Collection[Any]'>, <class 'Iterable[Any]'>, <class 'Container[Any]'>, typing.Protocol, typing.Generic, <class 'object'>)
+Point1a = collections.namedtuple("Point1a", "x       y")
+reveal_type(Point1a)  # revealed: <class 'Point1a'>
+# revealed: (<class 'Point1a'>, <class 'tuple[Any, Any]'>, <class 'Sequence[Any]'>, <class 'Reversible[Any]'>, <class 'Collection[Any]'>, <class 'Iterable[Any]'>, <class 'Container[Any]'>, typing.Protocol, typing.Generic, <class 'object'>)
 reveal_mro(Point1a)
 
 # String field names (comma-separated also works at runtime)
-Point2 = collections.namedtuple("Point", "x, y")
-reveal_type(Point2)  # revealed: <class 'Point'>
-# revealed: (<class 'Point'>, <class 'tuple[Any, Any]'>, <class 'Sequence[Any]'>, <class 'Reversible[Any]'>, <class 'Collection[Any]'>, <class 'Iterable[Any]'>, <class 'Container[Any]'>, typing.Protocol, typing.Generic, <class 'object'>)
+Point2 = collections.namedtuple("Point2", "x, y")
+reveal_type(Point2)  # revealed: <class 'Point2'>
+# revealed: (<class 'Point2'>, <class 'tuple[Any, Any]'>, <class 'Sequence[Any]'>, <class 'Reversible[Any]'>, <class 'Collection[Any]'>, <class 'Iterable[Any]'>, <class 'Container[Any]'>, typing.Protocol, typing.Generic, <class 'object'>)
 reveal_mro(Point2)
 
 # List of strings
-Point3 = collections.namedtuple("Point", ["x", "y"])
-reveal_type(Point3)  # revealed: <class 'Point'>
-# revealed: (<class 'Point'>, <class 'tuple[Any, Any]'>, <class 'Sequence[Any]'>, <class 'Reversible[Any]'>, <class 'Collection[Any]'>, <class 'Iterable[Any]'>, <class 'Container[Any]'>, typing.Protocol, typing.Generic, <class 'object'>)
+Point3 = collections.namedtuple("Point3", ["x", "y"])
+reveal_type(Point3)  # revealed: <class 'Point3'>
+# revealed: (<class 'Point3'>, <class 'tuple[Any, Any]'>, <class 'Sequence[Any]'>, <class 'Reversible[Any]'>, <class 'Collection[Any]'>, <class 'Iterable[Any]'>, <class 'Container[Any]'>, typing.Protocol, typing.Generic, <class 'object'>)
 reveal_mro(Point3)
 
 # Tuple of strings
-Point4 = collections.namedtuple("Point", ("x", "y"))
-reveal_type(Point4)  # revealed: <class 'Point'>
-# revealed: (<class 'Point'>, <class 'tuple[Any, Any]'>, <class 'Sequence[Any]'>, <class 'Reversible[Any]'>, <class 'Collection[Any]'>, <class 'Iterable[Any]'>, <class 'Container[Any]'>, typing.Protocol, typing.Generic, <class 'object'>)
+Point4 = collections.namedtuple("Point4", ("x", "y"))
+reveal_type(Point4)  # revealed: <class 'Point4'>
+# revealed: (<class 'Point4'>, <class 'tuple[Any, Any]'>, <class 'Sequence[Any]'>, <class 'Reversible[Any]'>, <class 'Collection[Any]'>, <class 'Iterable[Any]'>, <class 'Container[Any]'>, typing.Protocol, typing.Generic, <class 'object'>)
 reveal_mro(Point4)
 # Invalid: integer is not a valid typename
 # error: [invalid-argument-type]
@@ -571,12 +600,12 @@ The `typing.NamedTuple` function accepts `Iterable[tuple[str, Any]]` for `fields
 from typing import NamedTuple
 
 # List of tuples
-Person1 = NamedTuple("Person", [("name", str), ("age", int)])
-reveal_type(Person1)  # revealed: <class 'Person'>
+Person1 = NamedTuple("Person1", [("name", str), ("age", int)])
+reveal_type(Person1)  # revealed: <class 'Person1'>
 
 # Tuple of tuples
-Person2 = NamedTuple("Person", (("name", str), ("age", int)))
-reveal_type(Person2)  # revealed: <class 'Person'>
+Person2 = NamedTuple("Person2", (("name", str), ("age", int)))
+reveal_type(Person2)  # revealed: <class 'Person2'>
 
 # Invalid: integer is not a valid typename
 # error: [invalid-argument-type]
@@ -595,7 +624,7 @@ well as `rename`, `defaults`, and `module`:
 
 ```py
 import collections
-from ty_extensions import reveal_mro
+from ty_extensions._internal import reveal_mro
 
 # Both `typename` and `field_names` can be passed as keyword arguments
 NT1 = collections.namedtuple(typename="NT1", field_names="x y")
@@ -618,10 +647,17 @@ reveal_type(nt2.a)  # revealed: Any
 reveal_type(nt2.b)  # revealed: Any
 reveal_type(nt2.c)  # revealed: Any
 
+field_names = ("left", "right")
+NT2Starred = collections.namedtuple("NT2Starred", field_names=[*field_names])
+reveal_type(NT2Starred)  # revealed: <class 'NT2Starred'>
+nt2_starred = NT2Starred(1, 2)
+reveal_type(nt2_starred.left)  # revealed: Any
+reveal_type(nt2_starred.right)  # revealed: Any
+
 # Keyword arguments can be combined with other kwargs like `defaults`
 NT3 = collections.namedtuple(typename="NT3", field_names="x y z", defaults=[None])
 reveal_type(NT3)  # revealed: <class 'NT3'>
-reveal_type(NT3.__new__)  # revealed: [Self](cls: type[Self], x: Any, y: Any, z: Any = None) -> Self
+reveal_type(NT3.__new__)  # revealed: [Self](_cls: type[Self], x: Any, y: Any, z: Any = None) -> Self
 
 nt3 = NT3(1, 2)
 reveal_type(nt3.z)  # revealed: Any
@@ -632,18 +668,21 @@ Bad1 = collections.namedtuple("Bad1", "x y", typename="Bad1")
 
 # error: [parameter-already-assigned] "Multiple values provided for parameter `field_names` of `namedtuple`"
 Bad2 = collections.namedtuple("Bad2", "x y", field_names="a b")
+
+# This is valid at runtime and should not panic.
+collections.namedtuple(typename="NT4", field_names="x", **{})
 ```
 
 The `rename`, `defaults`, and `module` keyword arguments:
 
 ```py
 import collections
-from ty_extensions import reveal_mro
+from ty_extensions._internal import reveal_mro
 
 # `rename=True` replaces invalid identifiers with positional names
 Point = collections.namedtuple("Point", ["x", "class", "_y", "z", "z"], rename=True)
 reveal_type(Point)  # revealed: <class 'Point'>
-reveal_type(Point.__new__)  # revealed: [Self](cls: type[Self], x: Any, _1: Any, _2: Any, z: Any, _4: Any) -> Self
+reveal_type(Point.__new__)  # revealed: [Self](_cls: type[Self], x: Any, _1: Any, _2: Any, z: Any, _4: Any) -> Self
 # revealed: (<class 'Point'>, <class 'tuple[Any, Any, Any, Any, Any]'>, <class 'Sequence[Any]'>, <class 'Reversible[Any]'>, <class 'Collection[Any]'>, <class 'Iterable[Any]'>, <class 'Container[Any]'>, typing.Protocol, typing.Generic, <class 'object'>)
 reveal_mro(Point)
 p = Point(1, 2, 3, 4, 5)
@@ -657,7 +696,7 @@ reveal_type(p._4)  # revealed: Any
 # error: [invalid-argument-type] "Invalid argument to parameter `rename` of `namedtuple()`"
 Point2 = collections.namedtuple("Point2", ["_x", "class"], rename=1)
 reveal_type(Point2)  # revealed: <class 'Point2'>
-reveal_type(Point2.__new__)  # revealed: [Self](cls: type[Self], _0: Any, _1: Any) -> Self
+reveal_type(Point2.__new__)  # revealed: [Self](_cls: type[Self], _0: Any, _1: Any) -> Self
 
 # Without `rename=True`, invalid field names emit diagnostics:
 # - Field names starting with underscore
@@ -683,7 +722,15 @@ reveal_type(Invalid)  # revealed: <class 'Invalid'>
 # `defaults` provides default values for the rightmost fields
 Person = collections.namedtuple("Person", ["name", "age", "city"], defaults=["Unknown"])
 reveal_type(Person)  # revealed: <class 'Person'>
-reveal_type(Person.__new__)  # revealed: [Self](cls: type[Self], name: Any, age: Any, city: Any = "Unknown") -> Self
+reveal_type(Person.__new__)  # revealed: [Self](_cls: type[Self], name: Any, age: Any, city: Any = "Unknown") -> Self
+
+defaults = (0, "Unknown")
+PersonStarred = collections.namedtuple(
+    "PersonStarred",
+    ["name", "age", "city"],
+    defaults=[*defaults],
+)
+reveal_type(PersonStarred.__new__)  # revealed: [Self](_cls: type[Self], name: Any, age: Any = 0, city: Any = "Unknown") -> Self
 
 # revealed: (<class 'Person'>, <class 'tuple[Any, Any, Any]'>, <class 'Sequence[Any]'>, <class 'Reversible[Any]'>, <class 'Collection[Any]'>, <class 'Iterable[Any]'>, <class 'Container[Any]'>, typing.Protocol, typing.Generic, <class 'object'>)
 reveal_mro(Person)
@@ -702,7 +749,7 @@ reveal_type(Config)  # revealed: <class 'Config'>
 # error: [invalid-named-tuple] "Too many defaults for `namedtuple()`"
 TooManyDefaults = collections.namedtuple("TooManyDefaults", ["x", "y"], defaults=("a", "b", "c"))
 reveal_type(TooManyDefaults)  # revealed: <class 'TooManyDefaults'>
-reveal_type(TooManyDefaults.__new__)  # revealed: [Self](cls: type[Self], x: Any = "a", y: Any = "b") -> Self
+reveal_type(TooManyDefaults.__new__)  # revealed: [Self](_cls: type[Self], x: Any = "a", y: Any = "b") -> Self
 
 # Unknown keyword arguments produce an error
 # error: [unknown-argument]
@@ -1025,8 +1072,10 @@ reveal_type(alice.level)  # revealed: int
 alice = SuperUser(1, "Alice", 3)
 ```
 
-TODO: If any fields added by the subclass conflict with those in the base class, that should be
-flagged.
+Any subclass member that reuses an inherited `NamedTuple` field name is rejected. This is a
+special-cased `NamedTuple` diagnostic rather than a Liskov-substitution check: at runtime, these
+overrides can make attribute access disagree with tuple indexing and `repr`, and this pattern is
+usually a mistake.
 
 ```py
 from typing import NamedTuple
@@ -1037,35 +1086,101 @@ class User(NamedTuple):
     age: int | None
     nickname: str
 
-class SuperUser(User):
-    # TODO: this should be an error because it implies that the `id` attribute on
-    # `SuperUser` is mutable, but the read-only `id` property from the superclass
-    # has not been overridden in the class body
+class AnnotatedAttributeChild(User):
+    # error: [invalid-named-tuple-override] "Cannot override NamedTuple field `id` inherited from `User`"
     id: int
 
-    # this is fine; overriding a read-only attribute with a mutable one
-    # does not conflict with the Liskov Substitution Principle
+class AnnotatedDefaultChild(User):
+    # error: [invalid-named-tuple-override] "Cannot override NamedTuple field `name` inherited from `User`"
     name: str = "foo"
 
-    # this is also fine
+class PropertyChild(User):
     @property
+    # error: [invalid-named-tuple-override] "Cannot override NamedTuple field `age` inherited from `User`"
     def age(self) -> int:
         return super().age or 42
 
-    def now_called_robert(self):
-        self.name = "Robert"  # fine because overridden with a mutable attribute
+class MethodChild(User):
+    # error: [invalid-named-tuple-override] "Cannot override NamedTuple field `nickname` inherited from `User`"
+    def nickname(self) -> str:
+        return "Bob"
 
-        # error: 9 [invalid-assignment] "Cannot assign to read-only property `nickname` on object of type `Self@now_called_robert`"
-        self.nickname = "Bob"
+class PlainAssignmentChild(User):
+    # error: [invalid-named-tuple-override] "Cannot override NamedTuple field `name` inherited from `User`"
+    name = "shadowed"
 
-james = SuperUser(0, "James", 42, "Jimmy")
+class DistinctFieldChild(User):
+    title: str = "staff"
 
-# fine because the property on the superclass was overridden with a mutable attribute
-# on the subclass
-james.name = "Robert"
+james = DistinctFieldChild(0, "James", 42, "Jimmy")
+james.title = "Boss"
 
-# error: [invalid-assignment] "Cannot assign to read-only property `nickname` on object of type `SuperUser`"
+# error: [invalid-assignment] "Cannot assign to read-only property `nickname` on object of type `DistinctFieldChild`"
 james.nickname = "Bob"
+```
+
+Even though we reject the override, normal attribute lookup still follows the subclass member while
+tuple indexing preserves the inherited field view:
+
+```py
+from typing import NamedTuple
+
+class Parent(NamedTuple):
+    age: int | None
+
+class Child(Parent):
+    # error: [invalid-named-tuple-override] "Cannot override NamedTuple field `age` inherited from `Parent`"
+    age: int = 42
+
+reveal_type(Child(age=None)[0])  # revealed: int | None
+reveal_type(Child(age=None).age)  # revealed: int
+```
+
+The same conflict check applies when the inherited `NamedTuple` comes from the functional forms:
+
+```py
+from typing import NamedTuple
+
+TypingBase = NamedTuple("TypingBase", [("age", int | None)])
+
+class TypingChild(TypingBase):
+    # error: [invalid-named-tuple-override] "Cannot override NamedTuple field `age` inherited from `TypingBase`"
+    age: int = 42
+
+reveal_type(TypingChild(age=None)[0])  # revealed: int | None
+reveal_type(TypingChild(age=None).age)  # revealed: int
+```
+
+The same check applies through deeper inheritance chains:
+
+```py
+from typing import NamedTuple
+
+class Base(NamedTuple):
+    name: str
+
+class Intermediate(Base):
+    unrelated: bytes
+
+class Sub(Intermediate):
+    # error: [invalid-named-tuple-override] "Cannot override NamedTuple field `name` inherited from `Base`"
+    name: int
+```
+
+Later subclasses still get their own conflict if an earlier base has already overridden the name:
+
+```py
+from typing import NamedTuple
+
+ShadowTupleBase = NamedTuple("ShadowTupleBase", [("name", str)])
+
+class ShadowingMid(ShadowTupleBase):
+    # error: [invalid-named-tuple-override] "Cannot override NamedTuple field `name` inherited from `ShadowTupleBase`"
+    name = "shadowed"
+
+class ShadowedChild(ShadowingMid):
+    # error: [invalid-named-tuple-override] "Cannot override NamedTuple field `name` inherited from `ShadowTupleBase`"
+    name: int
 ```
 
 ### Generic named tuples
@@ -1135,6 +1250,25 @@ reveal_type(Pair(1, 2).second)  # revealed: TypeVar
 
 The following attributes are available on `NamedTuple` classes / instances:
 
+### `__match_args__` before Python 3.10
+
+```toml
+[environment]
+python-version = "3.9"
+```
+
+```py
+from typing import NamedTuple
+
+class Point(NamedTuple):
+    x: int
+
+# error: [unresolved-attribute]
+reveal_type(Point.__match_args__)  # revealed: Unknown
+```
+
+### Other attributes
+
 ```py
 from typing import NamedTuple
 
@@ -1144,6 +1278,7 @@ class Person(NamedTuple):
 
 reveal_type(Person._field_defaults)  # revealed: dict[str, Any]
 reveal_type(Person._fields)  # revealed: tuple[Literal["name"], Literal["age"]]
+reveal_type(Person.__match_args__)  # revealed: tuple[Literal["name"], Literal["age"]]
 reveal_type(Person.__slots__)  # revealed: tuple[()]
 reveal_type(Person._make)  # revealed: bound method <class 'Person'>._make(iterable: Iterable[Any]) -> Person
 reveal_type(Person._asdict)  # revealed: def _asdict(self) -> dict[str, Any]
@@ -1191,6 +1326,23 @@ bob = Person(2, "Bob")
 reveal_type(Person.__slots__)  # revealed: tuple[()]
 ```
 
+Regression test for <https://github.com/astral-sh/ty/issues/3184>: the first parameter of `__new__`
+at runtime for a namedtuple class is `_cls`, meaning that `cls` can be used as a field name:
+
+```py
+from collections import namedtuple
+from typing import NamedTuple
+
+PInfo = namedtuple("PInfo", "inst cls")
+reveal_type(PInfo(inst=None, cls=str))  # revealed: PInfo
+
+class StaticInfo(NamedTuple):
+    inst: object | None
+    cls: type[str]
+
+reveal_type(StaticInfo(inst=None, cls=str))  # revealed: StaticInfo
+```
+
 ## `collections.namedtuple` with tuple variable field names
 
 When field names are passed via a tuple variable, we can extract the literal field names from the
@@ -1230,6 +1382,8 @@ class Url(namedtuple("Url", field_names)):
         reveal_type(self.port)  # revealed: Any
         reveal_type(self.unknown)  # revealed: Any
         return self._replace(port=port)
+
+reveal_type(Url.__match_args__)  # revealed: tuple[str, ...]
 ```
 
 ## `collections.namedtuple` attributes
@@ -1242,6 +1396,7 @@ from collections import namedtuple
 Person = namedtuple("Person", ["name", "age"])
 
 reveal_type(Person._fields)  # revealed: tuple[Literal["name"], Literal["age"]]
+reveal_type(Person.__match_args__)  # revealed: tuple[Literal["name"], Literal["age"]]
 reveal_type(Person._field_defaults)  # revealed: dict[str, Any]
 reveal_type(Person._make)  # revealed: bound method <class 'Person'>._make(iterable: Iterable[Any]) -> Person
 reveal_type(Person._asdict)  # revealed: def _asdict(self) -> dict[str, Any]
@@ -1294,10 +1449,12 @@ satisfy:
 def expects_named_tuple(x: typing.NamedTuple):
     reveal_type(x)  # revealed: tuple[object, ...] & NamedTupleLike
     reveal_type(x._make)  # revealed: bound method type[NamedTupleLike]._make(iterable: Iterable[Any]) -> NamedTupleLike
-    reveal_type(x._replace)  # revealed: bound method NamedTupleLike._replace(...) -> NamedTupleLike
+    # revealed: bound method (tuple[object, ...] & NamedTupleLike)._replace(...) -> tuple[object, ...] & NamedTupleLike
+    reveal_type(x._replace)
     # revealed: Overload[(value: tuple[object, ...], /) -> tuple[object, ...], [_T](value: tuple[_T, ...], /) -> tuple[object, ...]]
     reveal_type(x.__add__)
-    reveal_type(x.__iter__)  # revealed: bound method tuple[object, ...].__iter__() -> Iterator[object]
+    # revealed: bound method (tuple[object, ...] & NamedTupleLike).__iter__() -> Iterator[object]
+    reveal_type(x.__iter__)
 
 def _(y: type[typing.NamedTuple]):
     reveal_type(y)  # revealed: @Todo(unsupported type[X] special form)
@@ -1312,7 +1469,8 @@ all NamedTuple implementations automatically compatible:
 
 ```py
 from typing import NamedTuple, Protocol, Iterable, Any
-from ty_extensions import static_assert, is_assignable_to
+from ty_extensions import static_assert
+from ty_extensions._internal import is_assignable_to
 
 class Point(NamedTuple):
     x: int
@@ -1337,7 +1495,7 @@ The type described by `NamedTuple` in type expressions is understood as being as
 `tuple[object, ...]` and `tuple[Any, ...]`:
 
 ```py
-static_assert(is_assignable_to(NamedTuple, tuple))
+static_assert(is_assignable_to(NamedTuple, tuple))  # error: [missing-type-argument]
 static_assert(is_assignable_to(NamedTuple, tuple[object, ...]))
 static_assert(is_assignable_to(NamedTuple, tuple[Any, ...]))
 
@@ -1725,7 +1883,7 @@ class ConcreteChild(GenericBase[str]):
 class GenericChild(GenericBase[T]):
     def __new__(cls, x: T) -> Self:
         instance = super().__new__(cls, x)
-        reveal_type(instance)  # revealed: @Todo(super in generic class)
+        reveal_type(instance)  # revealed: Self@__new__
         return instance
 
 reveal_type(GenericChild(x=3.14))  # revealed: GenericChild[int | float]

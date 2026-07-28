@@ -1,4 +1,4 @@
-from _curses import window
+from _curses import window as _window
 from typing import Final, final
 
 __version__: Final[str]
@@ -23,20 +23,24 @@ class panel:
     def hide(self) -> None:
         """Hide the panel.
 
-        This does not delete the object, it just makes the window on screen invisible.
+        This does not delete the object, it just makes the window on screen
+        invisible.
         """
 
     def move(self, y: int, x: int, /) -> None:
         """Move the panel to the screen coordinates (y, x)."""
 
-    def replace(self, win: window, /) -> None:
+    def replace(self, win: _window, /) -> None:
         """Change the window associated with the panel to the window win."""
 
     def set_userptr(self, obj: object, /) -> None:
         """Set the panel's user pointer to obj."""
 
     def show(self) -> None:
-        """Display the panel (which might have been hidden)."""
+        """Display the panel (which might have been hidden).
+
+        The panel is placed on top of the panel stack.
+        """
 
     def top(self) -> None:
         """Push panel to the top of the stack."""
@@ -44,14 +48,17 @@ class panel:
     def userptr(self) -> object:
         """Return the user pointer for the panel."""
 
-    def window(self) -> window:
+    def window(self) -> _window:
         """Return the window object associated with the panel."""
 
 def bottom_panel() -> panel:
     """Return the bottom panel in the panel stack."""
 
-def new_panel(win: window, /) -> panel:
-    """Return a panel object, associating it with the given window win."""
+def new_panel(win: _window, /) -> panel:
+    """Return a panel object, associating it with the given window win.
+
+    The new panel is placed on top of the panel stack.
+    """
 
 def top_panel() -> panel:
     """Return the top panel in the panel stack."""
@@ -59,5 +66,6 @@ def top_panel() -> panel:
 def update_panels() -> panel:
     """Updates the virtual screen after changes in the panel stack.
 
-    This does not call curses.doupdate(), so you'll have to do this yourself.
+    This does not call curses.doupdate(), so you'll have to do this
+    yourself.
     """

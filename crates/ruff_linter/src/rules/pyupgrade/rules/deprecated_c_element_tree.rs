@@ -57,6 +57,7 @@ pub(crate) fn deprecated_c_element_tree(checker: &Checker, stmt: &Stmt) {
     match stmt {
         Stmt::Import(ast::StmtImport {
             names,
+            is_lazy: _,
             range: _,
             node_index: _,
         }) => {
@@ -71,6 +72,7 @@ pub(crate) fn deprecated_c_element_tree(checker: &Checker, stmt: &Stmt) {
             module,
             names,
             level,
+            is_lazy: _,
             range: _,
             node_index: _,
         }) => {

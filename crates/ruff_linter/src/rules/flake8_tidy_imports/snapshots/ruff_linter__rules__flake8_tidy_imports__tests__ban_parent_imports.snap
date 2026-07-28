@@ -154,5 +154,4 @@ TID252 Prefer absolute imports over relative imports from parent modules
 27 | from .........parent import ultragrantparent
 28 | from ...........................parent import ultragrantparent
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 help: Replace relative imports from parent modules with absolute imports
