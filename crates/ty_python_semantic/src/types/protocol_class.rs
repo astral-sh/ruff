@@ -1285,7 +1285,7 @@ enum ProtocolMemberKind<'db> {
     Method {
         member: ProtocolMemberType<'db>,
         kind: ProtocolMethodKind,
-        /// Specialized receiver used to bind a callable protocol's `__call__` method.
+        /// Specialized receiver used to bind a receiver-selected protocol instance method.
         receiver: Option<Type<'db>>,
     },
     Property {
@@ -3088,8 +3088,6 @@ fn cached_protocol_interface<'db>(
             bound_on_class,
         } = candidate;
 
-        let receiver = (name == "__call__").then(|| Type::instance(db, class));
-
         let member = match ty {
             Type::PropertyInstance(property) => ProtocolMemberData::property(
                 property.getter(db).map(ProtocolMemberType::property_getter),
@@ -3100,7 +3098,12 @@ fn cached_protocol_interface<'db>(
                 definition,
             ),
             Type::Callable(callable) if bound_on_class.is_yes() && callable.is_method_like(db) => {
-                ProtocolMemberData::method(db, callable, definition, receiver)
+                ProtocolMemberData::method(
+                    db,
+                    callable,
+                    definition,
+                    Some(Type::instance(db, class)),
+                )
             }
             Type::FunctionLiteral(function)
                 if bound_on_class.is_yes()
@@ -3111,7 +3114,7 @@ fn cached_protocol_interface<'db>(
                     db,
                     function.into_callable_type(db),
                     definition,
-                    receiver,
+                    Some(Type::instance(db, class)),
                 )
             }
             _ if bound_on_class.is_yes()
@@ -3160,7 +3163,7 @@ fn protocol_bind_self<'db>(
     callable.bind_self(db, self_type).into_regular(db)
 }
 
-/// Binds a callable protocol member after selecting any receiver-specific overload.
+/// Binds a protocol instance method after selecting any receiver-specific overload.
 ///
 /// This is separate from [`protocol_bind_self`] because `typing.Self` must remain available for
 /// the concrete implementation rather than being replaced by the protocol receiver.

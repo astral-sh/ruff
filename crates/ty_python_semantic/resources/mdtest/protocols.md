@@ -4908,10 +4908,10 @@ def h(obj: InstanceAttrBool):
     reveal_type(bool(obj))  # revealed: Literal[True]
 ```
 
-## Callable protocols with receiver-selected overloads
+## Protocol methods with receiver-selected overloads
 
-A specialized callable protocol only requires overloads whose explicit `self` annotations accept
-that specialization.
+A specialized protocol only requires method overloads whose explicit `self` annotations accept that
+specialization.
 
 ```toml
 [environment]
@@ -4937,6 +4937,27 @@ def handles_int(value: int) -> int:
 
 takes_callback(lambda value: value)
 takes_callback(handles_int)  # error: [invalid-argument-type]
+
+# Receiver selection also applies to ordinary protocol methods.
+class NamedMethodProtocol[T](Protocol):
+    @overload
+    def method(self: "NamedMethodProtocol[int]", value: int, /) -> int: ...
+    @overload
+    def method(self: "NamedMethodProtocol[str]", value: str, /) -> str: ...
+    def method(self, value: Any, /) -> Any: ...
+
+class StringMethod:
+    def method(self, value: str, /) -> str:
+        return value
+
+class IntMethod:
+    def method(self, value: int, /) -> int:
+        return value
+
+def takes_string_method(value: NamedMethodProtocol[str]) -> None: ...
+
+takes_string_method(StringMethod())
+takes_string_method(IntMethod())  # error: [invalid-argument-type]
 
 # Receiver type variables still respect their declared bounds and constraints.
 Bounded = TypeVar("Bounded", bound=str)

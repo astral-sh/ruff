@@ -438,7 +438,7 @@ impl<'db> CallableSignature<'db> {
         self.bind_self_with_receiver(db, self_type, self_type)
     }
 
-    /// Binds the implicit receiver of a callable protocol member.
+    /// Binds the implicit receiver of an overloaded protocol instance method.
     ///
     /// A concrete specialization selects the single overload whose explicit receiver is the same
     /// protocol. For example, binding `Callback[str]` selects the second overload here:
