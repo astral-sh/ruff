@@ -305,7 +305,7 @@ def f(x: dict[str, int] | list[str], y: object):
         reveal_type(x)  # revealed: list[str]
 
     if isinstance(y, t.Callable):
-        reveal_type(y)  # revealed: (...) -> Unknown
+        reveal_type(y)  # revealed: Top[(...) -> object*]
 ```
 
 ## Class types
@@ -858,9 +858,9 @@ strict-generic-narrowing = false
 
 In `relaxed` mode, narrowing to a generic class using `isinstance()` intersects with its top
 materialization, using specially tagged `object*`/`Never*` bounds for gradual type arguments. These
-bounds behave like `object`/`Never` while the intersection is simplified and are then mapped to
-`Unknown`. For example, in the case below, we build the intersection `object & Covariant[object*]`.
-This simplifies to `Covariant[object*]`, which is then mapped to `Covariant[Unknown]`:
+bounds behave like `object`/`Never` while the intersection is simplified and retain their narrowing
+provenance afterwards. For example, in the case below, `object & Covariant[object*]` simplifies to
+`Covariant[object*]`:
 
 ```py
 from typing import Self
@@ -871,11 +871,41 @@ class Covariant[T]:
 
 def _(x: object):
     if isinstance(x, Covariant):
-        reveal_type(x)  # revealed: Covariant[Unknown]
-        reveal_type(x.get())  # revealed: Unknown
+        reveal_type(x)  # revealed: Covariant[object*]
+        reveal_type(x.get())  # revealed: object*
 ```
 
-For contravariant generics, we can now `.push` objects of an arbitrary type:
+A covariant type argument must still respect its upper bound. A narrower default does not limit
+which specializations can pass `isinstance()`:
+
+```py
+from typing import Generic
+from typing_extensions import TypeVar
+
+BoundedT = TypeVar("BoundedT", bound=int, covariant=True)
+DefaultedBoundedT = TypeVar("DefaultedBoundedT", bound=int, default=bool, covariant=True)
+
+class BoundedCovariant(Generic[BoundedT]):
+    def get(self) -> BoundedT:
+        raise NotImplementedError
+
+class DefaultedBoundedCovariant(Generic[DefaultedBoundedT]):
+    def get(self) -> DefaultedBoundedT:
+        raise NotImplementedError
+
+def bounded_covariant_narrowing(value: object) -> None:
+    if isinstance(value, BoundedCovariant):
+        reveal_type(value)  # revealed: BoundedCovariant[int]
+        reveal_type(value.get())  # revealed: int
+        value.get().bit_count()
+
+    if isinstance(value, DefaultedBoundedCovariant):
+        reveal_type(value)  # revealed: DefaultedBoundedCovariant[int]
+        reveal_type(value.get())  # revealed: int
+        value.get().bit_count()
+```
+
+For contravariant generics, the parameter retains its tagged `Never*` lower bound:
 
 ```py
 class Contravariant[T]:
@@ -883,12 +913,15 @@ class Contravariant[T]:
 
 def _(x: object):
     if isinstance(x, Contravariant):
-        reveal_type(x)  # revealed: Contravariant[Unknown]
+        reveal_type(x)  # revealed: Contravariant[Never*]
+        # error: [invalid-argument-type]
         x.push(42)
+        # error: [invalid-argument-type]
         x.push("foo")
 ```
 
-For invariant generics, we have both of these behaviors:
+For invariant generics, the top materialization retains its narrowing provenance. Reading from the
+generic produces `object*`, while writing to it requires `Never*`:
 
 ```py
 class Invariant[T]:
@@ -898,9 +931,13 @@ class Invariant[T]:
 
 def _(x: object):
     if isinstance(x, Invariant):
-        reveal_type(x)  # revealed: Invariant[Unknown]
-        reveal_type(x.get())  # revealed: Unknown
+        reveal_type(x)  # revealed: Top[Invariant[Unknown]]
+        reveal_type(x.get)  # revealed: bound method Top[Invariant[Unknown]].get() -> object*
+        reveal_type(x.get())  # revealed: object*
+        reveal_type(x.push)  # revealed: bound method Top[Invariant[Unknown]].push(x: Never*) -> None
+        # error: [invalid-argument-type]
         x.push(42)
+        # error: [invalid-argument-type]
         x.push("foo")
 ```
 
@@ -909,15 +946,16 @@ The behavior of `issubclass()` is similar.
 ```py
 def _(x: type[object], y: type[object], z: type[object]):
     if issubclass(x, Covariant):
-        reveal_type(x)  # revealed: type[Covariant[Unknown]]
+        reveal_type(x)  # revealed: type[Covariant[object*]]
     if issubclass(y, Contravariant):
-        reveal_type(y)  # revealed: type[Contravariant[Unknown]]
+        reveal_type(y)  # revealed: type[Contravariant[Never*]]
     if issubclass(z, Invariant):
-        reveal_type(z)  # revealed: type[Invariant[Unknown]]
+        reveal_type(z)  # revealed: type[Top[Invariant[Unknown]]]
 ```
 
-The mapping only affects the tagged bounds introduced by narrowing, not existing static type
-arguments:
+Ordinary `object` and `Never` type arguments are not tagged narrowing bounds. Narrowing already
+specialized generics preserves their concrete type arguments and, for invariant generics, their
+method signatures:
 
 ```py
 from typing import Never
@@ -929,6 +967,19 @@ def _(x: Covariant[object], y: Contravariant[Never], z: Invariant[object]):
         reveal_type(y)  # revealed: Contravariant[Never]
     if isinstance(z, Invariant):
         reveal_type(z)  # revealed: Invariant[object]
+
+def preserve_invariant_bounds(value: Invariant[object], bottom: Invariant[Never]) -> None:
+    if isinstance(value, Invariant):
+        reveal_type(value)  # revealed: Invariant[object]
+        reveal_type(value.get)  # revealed: bound method Invariant[object].get() -> object
+        reveal_type(value.get())  # revealed: object
+        reveal_type(value.push)  # revealed: bound method Invariant[object].push(x: object) -> None
+        value.push(42)
+
+    if isinstance(bottom, Invariant):
+        reveal_type(bottom)  # revealed: Invariant[Never]
+        reveal_type(bottom.get)  # revealed: bound method Invariant[Never].get() -> Never
+        reveal_type(bottom.push)  # revealed: bound method Invariant[Never].push(x: Never) -> None
 ```
 
 ## Use cases: `isinstance` narrowing and generics
@@ -1048,9 +1099,9 @@ def _(xs: list[str] | set[str]) -> str:
 ### Relaxed mode
 
 With `analysis.strict-generic-narrowing` disabled, the positive branch is simplified using tagged
-`object*`/`Never*` bounds, which are mapped to `Unknown` afterwards. The negative branch still
-excludes the ordinary top materialization because a negative `isinstance` result excludes every
-specialization of the class:
+`object*`/`Never*` bounds, which retain their narrowing provenance afterwards. The negative branch
+still excludes the ordinary top materialization because a negative `isinstance` result excludes
+every specialization of the class:
 
 ```toml
 [analysis]
@@ -1066,9 +1117,9 @@ from typing import Sequence, final
 
 def _(xs: object):
     if isinstance(xs, Sequence):
-        reveal_type(xs)  # revealed: Sequence[Unknown]
+        reveal_type(xs)  # revealed: Sequence[object*]
         for x in xs:
-            reveal_type(x)  # revealed: Unknown
+            reveal_type(x)  # revealed: object*
     else:
         reveal_type(xs)  # revealed: ~Sequence[object]
 ```
@@ -1095,9 +1146,9 @@ class OpenItem: ...
 
 def _(xs: OpenItem | Sequence[OpenItem]):
     if isinstance(xs, Sequence):
-        reveal_type(xs)  # revealed: (OpenItem & Sequence[Unknown]) | Sequence[OpenItem]
+        reveal_type(xs)  # revealed: (OpenItem & Sequence[object*]) | Sequence[OpenItem]
         for x in xs:
-            reveal_type(x)  # revealed: Unknown | OpenItem
+            reveal_type(x)  # revealed: object
     else:
         reveal_type(xs)  # revealed: OpenItem & ~Sequence[object]
 ```
@@ -1109,11 +1160,11 @@ Narrowing from `object` via `isinstance(.., list)`:
 ```py
 def _(xs: object):
     if isinstance(xs, list):
-        reveal_type(xs)  # revealed: list[Unknown]
+        reveal_type(xs)  # revealed: Top[list[Unknown]]
         for x in xs:
-            reveal_type(x)  # revealed: Unknown
+            reveal_type(x)  # revealed: object*
 
-        # In relaxed mode, this is fine
+        # error: [invalid-argument-type]
         xs.append(1)
 
     else:
@@ -1137,6 +1188,18 @@ def _(xs: Item | list[Item]):
         reveal_type(xs)  # revealed: Item
 ```
 
+A known invariant specialization also remains precise when narrowing a union:
+
+```py
+def preserve_known_list(xs: list[int] | set[str]) -> None:
+    if isinstance(xs, list):
+        reveal_type(xs)  # revealed: list[int]
+        reveal_type(xs.pop())  # revealed: int
+        xs.append(1)
+    else:
+        reveal_type(xs)  # revealed: set[str]
+```
+
 Narrowing from (non-final) `OpenItem | list[OpenItem]` via `isinstance(.., list)`:
 
 ```py
@@ -1144,9 +1207,9 @@ class OpenItem: ...
 
 def _(xs: OpenItem | list[OpenItem]):
     if isinstance(xs, list):
-        reveal_type(xs)  # revealed: (OpenItem & list[Unknown]) | list[OpenItem]
+        reveal_type(xs)  # revealed: (OpenItem & Top[list[Unknown]]) | list[OpenItem]
         for x in xs:
-            reveal_type(x)  # revealed: Unknown | OpenItem
+            reveal_type(x)  # revealed: object
     else:
         reveal_type(xs)  # revealed: OpenItem & ~Top[list[Unknown]]
 ```
@@ -1209,8 +1272,8 @@ def narrow_mutual(value: object) -> None:
 ## Narrowing generic defaults in Python 3.13
 
 When a type parameter has a bare `Any` default, narrowing still materializes the substituted
-typevar. The default isn't used during `isinstance` narrowing (the type parameter gets `Unknown`
-instead), so the default value is irrelevant here:
+typevar. The default isn't used during `isinstance` narrowing: the `Unknown` type argument is
+materialized to `object*` in covariant position, while an unrelated `Any` remains unchanged:
 
 ```toml
 [environment]
@@ -1225,7 +1288,7 @@ class WithAnyDefault[T = Any]:
 
 def _(x: object):
     if isinstance(x, WithAnyDefault):
-        reveal_type(x.y)  # revealed: tuple[Any, Unknown]
+        reveal_type(x.y)  # revealed: tuple[Any, object*]
 ```
 
 Type alias defaults substituted into type parameters still need to be materialized when narrowing:
@@ -1240,7 +1303,7 @@ class WithAliasDefault[T = A]:
 
 def _(x: object):
     if isinstance(x, WithAliasDefault):
-        reveal_type(x.y)  # revealed: tuple[A, Unknown]
+        reveal_type(x.y)  # revealed: tuple[A, object*]
 ```
 
 `isinstance(value, Box)` checks the runtime class, not the type argument used to specialize it.

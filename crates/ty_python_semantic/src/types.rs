@@ -1695,15 +1695,6 @@ impl<'db> Type<'db> {
         )
     }
 
-    #[must_use]
-    pub(crate) fn erase_narrowing_bounds(self, db: &'db dyn Db) -> Type<'db> {
-        self.apply_type_mapping(
-            db,
-            &TypeMapping::EraseNarrowingBounds,
-            TypeContext::default(),
-        )
-    }
-
     /// Returns the bottom materialization (or lower bound materialization) of this type, which is
     /// the most specific form of the type that is fully static.
     #[must_use]
@@ -7099,9 +7090,8 @@ impl<'db> Type<'db> {
             Type::TypeVar(bound_typevar) => bound_typevar.apply_type_mapping_impl(db, type_mapping, visitor),
             Type::KnownInstance(known_instance) => known_instance.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
 
-            Type::FunctionLiteral(function) => match type_mapping {
-                TypeMapping::EraseNarrowingBounds => self,
-                _ => visitor.visit(db, self, type_mapping, || match type_mapping {
+            Type::FunctionLiteral(function) => {
+                visitor.visit(db, self, type_mapping, || match type_mapping {
                     // Promote the types within the signature before promoting the signature to its
                     // callable form.
                     TypeMapping::Promote(PromotionMode::On, PromotionKind::Regular) => {
@@ -7117,7 +7107,7 @@ impl<'db> Type<'db> {
                         tcx,
                         visitor,
                     )),
-                }),
+                })
             },
 
             Type::BoundMethod(method) => Type::BoundMethod(BoundMethodType::new(
@@ -7329,7 +7319,6 @@ impl<'db> Type<'db> {
                 TypeMapping::ReplaceSelf { .. } |
                 TypeMapping::Materialize(_) |
                 TypeMapping::MaterializeForNarrowing(_) |
-                TypeMapping::EraseNarrowingBounds |
                 TypeMapping::ReplaceParameterDefaults |
                 TypeMapping::EagerExpansion |
                 TypeMapping::RescopeReturnCallables(_) |
@@ -7359,7 +7348,6 @@ impl<'db> Type<'db> {
                 TypeMapping::MaterializeForNarrowing(materialization_kind) => {
                     Type::narrowing_bound(*materialization_kind)
                 }
-                TypeMapping::EraseNarrowingBounds => self,
             }
             // `Divergent` is an internal cycle marker rather than a gradual type like `Any` or
             // `Unknown`. Preserve the marker across materialization, while recording whether this
@@ -8524,8 +8512,6 @@ pub enum TypeMapping<'a, 'db> {
     Materialize(MaterializationKind),
     /// Materialize a narrowing constraint, using tagged `object`/`Never` bounds for gradual types.
     MaterializeForNarrowing(MaterializationKind),
-    /// Map tagged narrowing bounds back to `Unknown` after simplifying the intersection.
-    EraseNarrowingBounds,
     /// Replace default types in parameters of callables with `Unknown`. This is used to avoid infinite
     /// recursion when the type of the default value of a parameter depends on the callable itself.
     ReplaceParameterDefaults,
@@ -8581,7 +8567,6 @@ impl<'db> TypeMapping<'_, 'db> {
             | TypeMapping::BindLegacyTypevars(_)
             | TypeMapping::Materialize(_)
             | TypeMapping::MaterializeForNarrowing(_)
-            | TypeMapping::EraseNarrowingBounds
             | TypeMapping::ReplaceParameterDefaults
             | TypeMapping::EagerExpansion
             | TypeMapping::RescopeReturnCallables(_) => context,
@@ -8632,7 +8617,6 @@ impl<'db> TypeMapping<'_, 'db> {
             | TypeMapping::FreshenBoundTypeVars { .. }
             | TypeMapping::BindSelf(..)
             | TypeMapping::ReplaceSelf { .. }
-            | TypeMapping::EraseNarrowingBounds
             | TypeMapping::ReplaceParameterDefaults
             | TypeMapping::EagerExpansion
             | TypeMapping::RescopeReturnCallables(_) => self.clone(),

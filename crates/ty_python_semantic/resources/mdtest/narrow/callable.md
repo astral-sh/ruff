@@ -95,18 +95,22 @@ def resolve(value: str):
 strict-generic-narrowing = false
 ```
 
-In relaxed generic narrowing mode, an `isinstance(.., Callable)` check narrows the type to
-`Callable[..., Unknown]` which is callable with any arguments and returns an unknown type:
+In relaxed generic narrowing mode, an `isinstance(.., Callable)` check retains the tagged top
+callable `Top[(...) -> object*]`. As in strict mode, no particular arguments are guaranteed to be
+valid, but the return type retains its narrowing provenance:
 
 ```py
 from typing import Callable
 
 def call_with_args(y: object):
     if isinstance(y, Callable):
-        reveal_type(y)  # revealed: (...) -> Unknown
+        reveal_type(y)  # revealed: Top[(...) -> object*]
 
+        # error: [call-top-callable]
         y()
+        # error: [call-top-callable]
         y(1, "foo")
+        # error: [call-top-callable]
         y(1, "foo", keyword_arg="bar")
 ```
 
@@ -169,12 +173,12 @@ import collections.abc
 
 def f(x: object):
     if isinstance(x, typing.Callable):
-        reveal_type(x)  # revealed: (...) -> Unknown
+        reveal_type(x)  # revealed: Top[(...) -> object*]
     else:
         reveal_type(x)  # revealed: ~Top[(...) -> object]
 
     if isinstance(x, collections.abc.Callable):
-        reveal_type(x)  # revealed: (...) -> Unknown
+        reveal_type(x)  # revealed: Top[(...) -> object*]
     else:
         reveal_type(x)  # revealed: ~Top[(...) -> object]
 ```

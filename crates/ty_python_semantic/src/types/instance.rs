@@ -53,14 +53,13 @@ impl<'db> Type<'db> {
     pub(crate) const fn is_object(&self) -> bool {
         matches!(
             self,
-            Type::NominalInstance(NominalInstanceType(NominalInstanceInner::Object))
-                | Type::NominalInstance(NominalInstanceType(NominalInstanceInner::NarrowingBound(
-                    MaterializationKind::Top
-                )))
-                | Type::Divergent(DivergentType {
-                    materialization: Some(MaterializationKind::Top),
-                    ..
-                })
+            Type::NominalInstance(NominalInstanceType(
+                NominalInstanceInner::Object
+                    | NominalInstanceInner::NarrowingBound(MaterializationKind::Top)
+            )) | Type::Divergent(DivergentType {
+                materialization: Some(MaterializationKind::Top),
+                ..
+            })
         )
     }
 
@@ -525,13 +524,7 @@ impl<'db> NominalInstanceType<'db> {
             }
             NominalInstanceInner::SysVersionInfo => Type::NominalInstance(self),
             NominalInstanceInner::Object => Type::object(),
-            NominalInstanceInner::NarrowingBound(_) => {
-                if matches!(type_mapping, TypeMapping::EraseNarrowingBounds) {
-                    Type::unknown()
-                } else {
-                    Type::NominalInstance(self)
-                }
-            }
+            NominalInstanceInner::NarrowingBound(_) => Type::NominalInstance(self),
             NominalInstanceInner::NonTuple(class) => {
                 let transformed =
                     class
@@ -1060,7 +1053,7 @@ enum NominalInstanceInner<'db> {
     /// prevalent and foundational, and it's useful to be able to instantiate this without having
     /// to load the definition of `object` from the typeshed.
     Object,
-    /// A tagged `object` or `Never` used only while simplifying a narrowing constraint.
+    /// A tagged `object` or `Never` that preserves generic-narrowing provenance.
     NarrowingBound(MaterializationKind),
     /// A tuple type, e.g. `tuple[int, str]`.
     ///

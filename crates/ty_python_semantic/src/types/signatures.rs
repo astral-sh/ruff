@@ -4772,12 +4772,6 @@ impl<'db> Parameters<'db> {
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Self {
-        if matches!(type_mapping, TypeMapping::EraseNarrowingBounds)
-            && matches!(self.data.kind, ParametersKind::Narrowing(_))
-        {
-            return Parameters::unknown();
-        }
-
         if let TypeMapping::MaterializeForNarrowing(materialization_kind) = type_mapping
             && matches!(
                 self.data.kind,

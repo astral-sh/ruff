@@ -679,14 +679,14 @@ def _(x: Sequence[int], y: object):
         reveal_type(item)  # revealed: int
 
     if isinstance(y, list):
-        reveal_type(y)  # revealed: list[Unknown]
+        reveal_type(y)  # revealed: Top[list[Unknown]]
         for item in y:
-            reveal_type(item)  # revealed: Unknown
+            reveal_type(item)  # revealed: object*
 
     if isinstance(x, list):
-        reveal_type(x)  # revealed: Sequence[int] & list[Unknown]
+        reveal_type(x)  # revealed: Sequence[int] & Top[list[Unknown]]
         for item in x:
-            reveal_type(item)  # revealed: int & Unknown
+            reveal_type(item)  # revealed: int
 ```
 
 ## Intersection where some elements are not iterable
@@ -1540,13 +1540,13 @@ simplify to `Never`, leaving only the iterable parts.
 ```py
 def f[T: tuple[int, ...] | int](x: T):
     if isinstance(x, tuple):
-        reveal_type(x)  # revealed: T@f & tuple[Unknown, ...]
+        reveal_type(x)  # revealed: T@f & tuple[object*, ...]
         for item in x:
-            # The intersection `(tuple[int, ...] | int) & tuple[Unknown, ...]` distributes to:
-            # `(tuple[int, ...] & tuple[Unknown, ...]) | (int & tuple[Unknown, ...])`
-            # which simplifies to `tuple[int, ...] & tuple[Unknown, ...] | Never` = `tuple[int & Unknown, ...]`
-            # so iterating gives `int & Unknown`.
-            reveal_type(item)  # revealed: int & Unknown
+            # The intersection `(tuple[int, ...] | int) & tuple[object*, ...]` distributes to:
+            # `(tuple[int, ...] & tuple[object*, ...]) | (int & tuple[object*, ...])`.
+            # The `int` alternative is disjoint from the tuple, and `object*` behaves like
+            # `object` when simplifying the remaining intersection, so iteration yields `int`.
+            reveal_type(item)  # revealed: int
 ```
 
 ### TypeVar bound with all iterable but disjoint elements
@@ -1557,14 +1557,13 @@ constraint, those parts should also simplify to `Never`.
 ```py
 def g[T: tuple[int, ...] | list[str]](x: T):
     if isinstance(x, tuple):
-        reveal_type(x)  # revealed: T@g & tuple[Unknown, ...]
+        reveal_type(x)  # revealed: T@g & tuple[object*, ...]
         for item in x:
-            # The intersection `(tuple[int, ...] | list[str]) & tuple[Unknown, ...]` distributes to:
-            # `(tuple[int, ...] & tuple[Unknown, ...]) | (list[str] & tuple[Unknown, ...])`
-            # Since `list[str]` is disjoint from `tuple[Unknown, ...]`, this simplifies to:
-            # `tuple[int, ...] & tuple[Unknown, ...] | Never` = `tuple[int & Unknown, ...]`
-            # so iterating gives `int & Unknown`.
-            reveal_type(item)  # revealed: int & Unknown
+            # The intersection `(tuple[int, ...] | list[str]) & tuple[object*, ...]` distributes to:
+            # `(tuple[int, ...] & tuple[object*, ...]) | (list[str] & tuple[object*, ...])`.
+            # The `list[str]` alternative is disjoint from the tuple, and `object*` behaves like
+            # `object` when simplifying the remaining intersection, so iteration yields `int`.
+            reveal_type(item)  # revealed: int
 ```
 
 ## Iterating over a list with a negated type parameter

@@ -83,44 +83,6 @@ any module where the first component contains the substring `test`, use `*test*.
 
 ---
 
-### `generic-narrowing`
-
-Controls how ty narrows to unspecialized generic classes in `isinstance()` and
-`issubclass()` checks.
-
-With `strict`, ty narrows to the top materialization of the class. For example,
-`isinstance(value, list)` narrows a value of type  `object` to `Top[list[Unknown]]`,
-representing the (infinite) union of all possible `list` specializations. Iterating
-over the list would yield values of type `object`.
-
-With `relaxed`, ty narrows to the class's Unknown-specialization instead. The same
-check would narrow a value of type `object` to `list[Unknown]`. Iterating over the list
-would yield values of type `Unknown`, which is more permissive than `object`.
-
-Defaults to `relaxed`.
-
-**Default value**: `relaxed`
-
-**Type**: `strict | relaxed`
-
-**Example usage**:
-
-=== "pyproject.toml"
-
-    ```toml
-    [tool.ty.analysis]
-    generic-narrowing = "strict"
-    ```
-
-=== "ty.toml"
-
-    ```toml
-    [analysis]
-    generic-narrowing = "strict"
-    ```
-
----
-
 ### `replace-imports-with-any`
 
 A list of module glob patterns whose imports should be replaced with `typing.Any`.
@@ -300,6 +262,47 @@ def narrow_match(x: str) -> None:
     [analysis]
     # Preserve broad builtin types instead of narrowing them to literals
     strict-equality-semantics = true
+    ```
+
+---
+
+### `strict-generic-narrowing`
+
+Whether ty should use strict narrowing for unspecialized generic classes in
+`isinstance()` and `issubclass()` checks.
+
+When enabled, ty narrows to the top materialization of the class. For example,
+`isinstance(value, list)` narrows a value of type `object` to `Top[list[Unknown]]`,
+representing the (infinite) union of all possible `list` specializations. Iterating
+over the list would yield values of type `object`.
+
+When disabled, ty instead preserves the provenance of the narrowing with tagged
+`object*` and `Never*` bounds. The same check still narrows a value of type `object`
+to `Top[list[Unknown]]`, but iterating over the list yields values of type `object*`.
+Passing an item to the list requires a value assignable to `Never*`.
+
+Defaults to `false`.
+
+**Default value**: `false`
+
+**Type**: `bool`
+
+**Example usage**:
+
+=== "pyproject.toml"
+
+    ```toml
+    [tool.ty.analysis]
+    # Use the top materialization when narrowing to an unspecialized generic class
+    strict-generic-narrowing = true
+    ```
+
+=== "ty.toml"
+
+    ```toml
+    [analysis]
+    # Use the top materialization when narrowing to an unspecialized generic class
+    strict-generic-narrowing = true
     ```
 
 ---
@@ -721,44 +724,6 @@ any module where the first component contains the substring `test`, use `*test*.
 
 ---
 
-#### `generic-narrowing`
-
-Controls how ty narrows to unspecialized generic classes in `isinstance()` and
-`issubclass()` checks.
-
-With `strict`, ty narrows to the top materialization of the class. For example,
-`isinstance(value, list)` narrows a value of type  `object` to `Top[list[Unknown]]`,
-representing the (infinite) union of all possible `list` specializations. Iterating
-over the list would yield values of type `object`.
-
-With `relaxed`, ty narrows to the class's Unknown-specialization instead. The same
-check would narrow a value of type `object` to `list[Unknown]`. Iterating over the list
-would yield values of type `Unknown`, which is more permissive than `object`.
-
-Defaults to `relaxed`.
-
-**Default value**: `relaxed`
-
-**Type**: `strict | relaxed`
-
-**Example usage**:
-
-=== "pyproject.toml"
-
-    ```toml
-    [tool.ty.overrides.analysis]
-    generic-narrowing = "strict"
-    ```
-
-=== "ty.toml"
-
-    ```toml
-    [overrides.analysis]
-    generic-narrowing = "strict"
-    ```
-
----
-
 #### `replace-imports-with-any`
 
 A list of module glob patterns whose imports should be replaced with `typing.Any`.
@@ -938,6 +903,47 @@ def narrow_match(x: str) -> None:
     [overrides.analysis]
     # Preserve broad builtin types instead of narrowing them to literals
     strict-equality-semantics = true
+    ```
+
+---
+
+#### `strict-generic-narrowing`
+
+Whether ty should use strict narrowing for unspecialized generic classes in
+`isinstance()` and `issubclass()` checks.
+
+When enabled, ty narrows to the top materialization of the class. For example,
+`isinstance(value, list)` narrows a value of type `object` to `Top[list[Unknown]]`,
+representing the (infinite) union of all possible `list` specializations. Iterating
+over the list would yield values of type `object`.
+
+When disabled, ty instead preserves the provenance of the narrowing with tagged
+`object*` and `Never*` bounds. The same check still narrows a value of type `object`
+to `Top[list[Unknown]]`, but iterating over the list yields values of type `object*`.
+Passing an item to the list requires a value assignable to `Never*`.
+
+Defaults to `false`.
+
+**Default value**: `false`
+
+**Type**: `bool`
+
+**Example usage**:
+
+=== "pyproject.toml"
+
+    ```toml
+    [tool.ty.overrides.analysis]
+    # Use the top materialization when narrowing to an unspecialized generic class
+    strict-generic-narrowing = true
+    ```
+
+=== "ty.toml"
+
+    ```toml
+    [overrides.analysis]
+    # Use the top materialization when narrowing to an unspecialized generic class
+    strict-generic-narrowing = true
     ```
 
 ---
