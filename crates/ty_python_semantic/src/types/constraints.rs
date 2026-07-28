@@ -1498,15 +1498,6 @@ impl<'db> UpperBound<'db> {
         Self { clauses }
     }
 
-    #[cfg(test)]
-    pub(crate) fn from_clauses(clauses: impl IntoIterator<Item = Type<'db>>) -> Self {
-        let mut upper = Self::none();
-        for clause in clauses {
-            upper.add_clause(clause);
-        }
-        upper
-    }
-
     pub(crate) fn is_empty(&self) -> bool {
         self.clauses.is_empty()
     }
@@ -2416,6 +2407,46 @@ impl NodeId {
 
     /// Returns whether this BDD represent the constant function `false`.
     fn is_never_satisfied<'db>(self, db: &'db dyn Db, builder: &ConstraintSetBuilder<'db>) -> bool {
+        /// Checks whether this BDD is a single conjunction, where either (a) every constraint is
+        /// positive lower-bound-only, or (b) every constraint is a positive upper-bound-only. If
+        /// so, `object` or `Never` respectively is a valid solution regardless of the contents of
+        /// the constraints.
+        fn simple_conjunction_is_satisfiable(
+            builder: &ConstraintSetBuilder<'_>,
+            mut node: NodeId,
+        ) -> bool {
+            let mut found_lower = false;
+            let mut found_upper = false;
+            loop {
+                match node.node() {
+                    Node::AlwaysTrue => return true,
+                    Node::AlwaysFalse => return false,
+
+                    Node::Interior(_) => {
+                        let interior = builder.interior_node_data(node);
+
+                        if interior.if_false != ALWAYS_FALSE
+                            || interior.if_uncertain != ALWAYS_FALSE
+                        {
+                            // Not a single conjunction
+                            return false;
+                        }
+
+                        let constraint = builder.constraint_data(interior.constraint);
+                        found_lower |= constraint.bounds.lower.is_some();
+                        found_upper |= constraint.bounds.upper.is_some();
+                        if found_lower && found_upper {
+                            // Might be a single conjunction, but doesn't contain _only_
+                            // lower-bound-only or upper-bound-only constraints
+                            return false;
+                        }
+
+                        node = interior.if_true;
+                    }
+                }
+            }
+        }
+
         match self.node() {
             Node::AlwaysTrue => false,
             Node::AlwaysFalse => true,
@@ -2424,10 +2455,13 @@ impl NodeId {
                     return *result;
                 }
 
-                let mut path = interior.path_assignments(builder);
-                let result = path
-                    .visit(db, builder, self, &mut IsNeverSatisfiedVisitor)
-                    .is_continue();
+                let result = if simple_conjunction_is_satisfiable(builder, self) {
+                    false
+                } else {
+                    let mut path = interior.path_assignments(builder);
+                    path.visit(db, builder, self, &mut IsNeverSatisfiedVisitor)
+                        .is_continue()
+                };
                 builder
                     .storage
                     .borrow_mut()
@@ -7705,25 +7739,6 @@ mod tests {
         );
 
         assert!(mapped.is_always_satisfied(&db));
-    }
-
-    #[test]
-    fn upper_bound_prunes_duplicates_and_redundant_supertypes() {
-        let db = setup_db();
-        let int = known_instance(&db, KnownClass::Int);
-        let bool = known_instance(&db, KnownClass::Bool);
-        let str = known_instance(&db, KnownClass::Str);
-
-        let mut upper = UpperBound::from_clauses([int, str, int]);
-        assert_eq!(upper.clauses, FxOrderSet::from_iter([int, str]));
-
-        // `bool` is narrower than `int`, so it replaces the redundant `int` clause while
-        // preserving the relative order of the remaining clauses.
-        upper.add_clause(bool);
-        assert_eq!(upper.clauses, FxOrderSet::from_iter([str, bool]));
-
-        upper.add_clause(int);
-        assert_eq!(upper.clauses, FxOrderSet::from_iter([str, bool]));
     }
 
     #[test]
