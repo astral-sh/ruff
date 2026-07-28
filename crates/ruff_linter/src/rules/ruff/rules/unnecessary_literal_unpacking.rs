@@ -1,3 +1,5 @@
+use std::fmt::{Display, Formatter};
+
 use ruff_diagnostics::IsolationLevel;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::token::TokenKind;
@@ -76,20 +78,13 @@ impl Violation for UnnecessaryLiteralUnpacking {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        match self.kind {
-            SequenceKind::List => "Unnecessary unpacking of list literal".to_string(),
-            SequenceKind::Tuple => "Unnecessary unpacking of tuple literal".to_string(),
-            SequenceKind::Set => "Unnecessary unpacking of set literal".to_string(),
-        }
+        let UnnecessaryLiteralUnpacking { kind } = self;
+        format!("Unnecessary unpacking of {kind} literal")
     }
 
     fn fix_title(&self) -> Option<String> {
-        let title = match self.kind {
-            SequenceKind::List => "Remove unnecessary list",
-            SequenceKind::Tuple => "Remove unnecessary tuple",
-            SequenceKind::Set => "Remove unnecessary set",
-        };
-        Some(title.to_string())
+        let UnnecessaryLiteralUnpacking { kind } = self;
+        Some(format!("Remove unnecessary {kind}"))
     }
 }
 
@@ -472,4 +467,14 @@ enum SequenceKind {
     List,
     Tuple,
     Set,
+}
+
+impl Display for SequenceKind {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            SequenceKind::List => "list",
+            SequenceKind::Tuple => "tuple",
+            SequenceKind::Set => "set",
+        })
+    }
 }
