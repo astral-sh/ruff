@@ -1,6 +1,6 @@
 use ruff_diagnostics::IsolationLevel;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::token::{Token, TokenKind};
+use ruff_python_ast::token::TokenKind;
 use ruff_python_ast::{self as ast, Expr, Stmt};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
@@ -121,38 +121,14 @@ pub(crate) fn unnecessary_literal_unpacking(checker: &Checker, starred: &ast::Ex
 
 /// Build a fix that drops the `*` and the literal's brackets, leaving its elements in place.
 ///
-/// Returns `None` where dropping the brackets would not round-trip: either the result would not be
-/// valid Python, which the `## Fix availability` section of the rule documentation lists, or the
-/// `*` and the literal are separated by something other than redundant parentheses, which this rule
-/// makes no attempt to understand.
+/// Returns `None` where dropping the brackets would not round-trip, which the `## Fix availability`
+/// section of the rule documentation lists.
 fn unnecessary_literal_unpacking_fix(
     checker: &Checker,
     starred: &ast::ExprStarred,
     literal: &SequenceLiteral,
     context: UnpackingContext,
 ) -> Option<Fix> {
-    // Redundant parentheses may sit between the `*` and the literal, as in `foo(*([bar, baz]))`.
-    // They have to go along with the brackets, or they would turn the expanded elements back into
-    // a single tuple argument. Anything else in that gap means the `*` does not apply to the
-    // literal in a shape this rule understands.
-    let before_literal = TextRange::new(starred.start(), literal.start());
-    let mut kinds = checker
-        .tokens()
-        .in_range(before_literal)
-        .iter()
-        .map(Token::kind)
-        .filter(|kind| !kind.is_trivia());
-    if kinds.next() != Some(TokenKind::Star) {
-        return None;
-    }
-    let mut redundant_parens = 0usize;
-    for kind in kinds {
-        if kind != TokenKind::Lpar {
-            return None;
-        }
-        redundant_parens += 1;
-    }
-
     let Some(last_element) = literal.elts.last() else {
         return empty_literal_fix(checker, starred, literal.kind, context);
     };
@@ -185,7 +161,9 @@ fn unnecessary_literal_unpacking_fix(
         return None;
     }
 
-    // Remove the `*` and the opening bracket.
+    // Remove the `*` and the opening bracket, along with anything in between. Only redundant
+    // parentheses can sit in that gap, as in `foo(*([bar, baz]))`, and they have to go along with
+    // the brackets, or they would turn the expanded elements back into a single tuple argument.
     let open_bracket_edit = Edit::range_deletion(TextRange::new(
         starred.start(),
         literal.start() + TextSize::from(1),
@@ -213,24 +191,15 @@ fn unnecessary_literal_unpacking_fix(
         Edit::range_deletion(close_bracket)
     };
 
-    // Each redundant opening parenthesis swallowed above has a closing one waiting after the
-    // literal. Comments are left where they are, since only the parentheses themselves go.
-    let mut paren_edits = Vec::with_capacity(redundant_parens);
-    for token in checker.tokens().after(literal.end()) {
-        if paren_edits.len() == redundant_parens {
-            break;
-        }
-        if token.kind().is_trivia() {
-            continue;
-        }
-        if token.kind() != TokenKind::Rpar {
-            return None;
-        }
-        paren_edits.push(Edit::range_deletion(token.range()));
-    }
-    if paren_edits.len() != redundant_parens {
-        return None;
-    }
+    // The closing parenthesis of each redundant pair swallowed above waits between the literal and
+    // the end of the `*` expression, which the parser extends over those parentheses. Comments are
+    // left where they are, since only the parentheses themselves go.
+    let paren_edits = checker
+        .tokens()
+        .in_range(TextRange::new(literal.end(), starred.end()))
+        .iter()
+        .filter(|token| token.kind() == TokenKind::Rpar)
+        .map(|token| Edit::range_deletion(token.range()));
 
     let rest = comma_edit
         .into_iter()
