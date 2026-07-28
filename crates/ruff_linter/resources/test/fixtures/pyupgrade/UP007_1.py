@@ -153,3 +153,12 @@ if TYPE_CHECKING:
         | Literal["LongLiteralNumberTwo"]
         | Literal["LongLiteralNumberThree"]
     ]
+
+
+# Regression test for https://github.com/astral-sh/ruff/issues/27238
+# `Union[tuple(r)]` must not be rewritten to `tuple(r)`: when `r` is a tuple of
+# types, `Union[X]` unpacks `X` into a union, so stripping the `Union[...]`
+# wrapper changes the runtime semantics. No fix should be offered.
+def f(r):
+    ru = Annotated[Union[tuple(r)], Field(default=None)]
+    return ru

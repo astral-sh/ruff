@@ -272,6 +272,15 @@ pub(crate) fn non_pep604_annotation(
                     }
                     _ => {
                         // Single argument.
+                        //
+                        // Don't fix when the argument is a call expression (e.g.
+                        // `Union[tuple(r)]`). `Union[X]` only equals `X` when `X`
+                        // is a type; when `X` is a *tuple* of types, `Union[X]`
+                        // unpacks it into a union, so stripping the `Union[...]`
+                        // wrapper changes the runtime semantics (#27238).
+                        if matches!(slice, Expr::Call(_)) {
+                            return;
+                        }
                         let inner = checker.locator().slice(slice);
                         let replacement = if checker.locator().contains_line_break(slice.range()) {
                             // If the inner expression spans multiple lines, wrap in

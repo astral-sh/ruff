@@ -335,4 +335,16 @@ help: Convert to `X | Y`
     -         | Literal["LongLiteralNumberThree"]
     -     ]
 153 +         | Literal["LongLiteralNumberThree"])
+154 |
     |
+
+UP007 Use `X | Y` for type annotations
+   --> UP007_1.py:163:20
+    |
+161 | # wrapper changes the runtime semantics. No fix should be offered.
+162 | def f(r):
+163 |     ru = Annotated[Union[tuple(r)], Field(default=None)]
+    |                    ^^^^^^^^^^^^^^^
+164 |     return ru
+    |
+help: Convert to `X | Y`
