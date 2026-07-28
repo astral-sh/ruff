@@ -4908,6 +4908,133 @@ def h(obj: InstanceAttrBool):
     reveal_type(bool(obj))  # revealed: Literal[True]
 ```
 
+## Protocol methods with receiver-selected overloads
+
+A specialized protocol only requires method overloads whose explicit `self` annotations accept that
+specialization.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Any, Protocol, TypeVar, TypeVarTuple, Unpack, overload
+
+P = TypeVarTuple("P")
+V = TypeVar("V")
+
+class Callback(Protocol[Unpack[P]]):
+    @overload
+    def __call__(self: "Callback[()]") -> Any: ...
+    @overload
+    def __call__(self: "Callback[V]", value: V, /) -> Any: ...
+    def __call__(self, *args: Any) -> Any: ...
+
+def takes_callback(callback: Callback[str]) -> None: ...
+def handles_int(value: int) -> int:
+    return value
+
+takes_callback(lambda value: value)
+takes_callback(handles_int)  # error: [invalid-argument-type]
+
+# Receiver selection also applies to ordinary protocol methods.
+class NamedMethodProtocol[T](Protocol):
+    @overload
+    def method(self: "NamedMethodProtocol[int]", value: int, /) -> int: ...
+    @overload
+    def method(self: "NamedMethodProtocol[str]", value: str, /) -> str: ...
+    def method(self, value: Any, /) -> Any: ...
+
+class StringMethod:
+    def method(self, value: str, /) -> str:
+        return value
+
+class IntMethod:
+    def method(self, value: int, /) -> int:
+        return value
+
+def takes_string_method(value: NamedMethodProtocol[str]) -> None: ...
+
+takes_string_method(StringMethod())
+takes_string_method(IntMethod())  # error: [invalid-argument-type]
+
+# Receiver type variables still respect their declared bounds and constraints.
+Bounded = TypeVar("Bounded", bound=str)
+Constrained = TypeVar("Constrained", str, bytes)
+
+class BoundedCallback[T](Protocol):
+    @overload
+    def __call__(self: "BoundedCallback[Bounded]", value: Bounded, /) -> Any: ...
+    @overload
+    def __call__(self: "BoundedCallback[bytes]", value: bytes, /) -> Any: ...
+    def __call__(self, value: object, /) -> Any: ...
+
+class ConstrainedCallback[T](Protocol):
+    @overload
+    def __call__(self: "ConstrainedCallback[Constrained]", value: Constrained, /) -> Any: ...
+    @overload
+    def __call__(self: "ConstrainedCallback[bytes]", value: bytes, /) -> Any: ...
+    def __call__(self, value: object, /) -> Any: ...
+
+def takes_bounded_callback(callback: BoundedCallback[int]) -> None: ...
+def takes_constrained_callback(callback: ConstrainedCallback[int]) -> None: ...
+
+takes_bounded_callback(handles_int)  # error: [invalid-argument-type]
+takes_constrained_callback(handles_int)  # error: [invalid-argument-type]
+
+# Composed and external receiver annotations retain ordinary protocol behavior.
+class Marker(Protocol):
+    marker: int
+
+class ExternalReceiverCallback[T](Protocol):
+    @overload
+    def __call__[S](
+        self: "ExternalReceiverCallback[S] | Marker",
+        value: S,
+        /,
+    ) -> Any: ...
+    @overload
+    def __call__(self: "ExternalReceiverCallback[bytes]", value: bytes, /) -> Any: ...
+    def __call__(self, value: object, /) -> Any: ...
+
+class MarkedIntCallback:
+    marker = 1
+
+    def __call__(self, value: int, /) -> Any:
+        return value
+
+def use_external_receiver(callback: ExternalReceiverCallback[str]) -> None:
+    callback("value")
+
+def takes_external_receiver(callback: ExternalReceiverCallback[str]) -> None: ...
+
+takes_external_receiver(MarkedIntCallback())  # error: [invalid-argument-type]
+
+# Recursive comparisons distinguish protocol specializations.
+class RecursiveCallback[T](Protocol):
+    @overload
+    def __call__(
+        self: "RecursiveCallback[int]",
+        value: "RecursiveCallback[str]",
+        /,
+    ) -> Any: ...
+    @overload
+    def __call__(self: "RecursiveCallback[str]", value: str, /) -> Any: ...
+    def __call__(self, value: object, /) -> Any: ...
+
+class CompatibleRecursiveCallback:
+    def __call__(self, value: RecursiveCallback[str], /) -> Any: ...
+
+class IncompatibleRecursiveCallback:
+    def __call__(self, value: RecursiveCallback[int], /) -> Any: ...
+
+def takes_recursive_callback(callback: RecursiveCallback[int]) -> None: ...
+
+takes_recursive_callback(CompatibleRecursiveCallback())
+takes_recursive_callback(IncompatibleRecursiveCallback())  # error: [invalid-argument-type]
+```
+
 ## Callable protocols
 
 An instance of a protocol type is callable if the protocol defines a `__call__` method:

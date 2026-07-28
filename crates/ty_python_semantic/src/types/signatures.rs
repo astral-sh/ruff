@@ -438,6 +438,71 @@ impl<'db> CallableSignature<'db> {
         self.bind_self_with_receiver(db, self_type, self_type)
     }
 
+    /// Binds the implicit receiver of an overloaded protocol instance method.
+    ///
+    /// A concrete specialization selects the single overload whose explicit receiver is the same
+    /// protocol. For example, binding `Callback[str]` selects the second overload here:
+    ///
+    /// ```python
+    /// class Callback[*P](Protocol):
+    ///     @overload
+    ///     def __call__(self: "Callback[()]") -> None: ...
+    ///     @overload
+    ///     def __call__[T](self: "Callback[T]", value: T) -> None: ...
+    /// ```
+    ///
+    /// Gradual, external, `typing.Self`-dependent, and ambiguous receiver relations retain every
+    /// overload for later comparison with the implementation.
+    pub(crate) fn bind_protocol_receiver(&self, db: &'db dyn Db, receiver_type: Type<'db>) -> Self {
+        let Some(signature) = self.bind_same_protocol_receiver_overload(db, receiver_type) else {
+            return self.bind_self(db, None);
+        };
+        Self::single(signature)
+    }
+
+    /// Selects exactly one overload using a concrete same-protocol receiver annotation.
+    ///
+    /// `None` means selection is unsupported or ambiguous, not that the callable is unsatisfiable.
+    fn bind_same_protocol_receiver_overload(
+        &self,
+        db: &'db dyn Db,
+        receiver_type: Type<'db>,
+    ) -> Option<Signature<'db>> {
+        if self.overloads.len() < 2
+            || receiver_type.has_dynamic(db)
+            || receiver_type.has_typevar_or_typevar_instance(db)
+            || receiver_type
+                .class_specialization(db)
+                .is_some_and(|(_, specialization)| {
+                    specialization
+                        .generic_context(db)
+                        .variables(db)
+                        .zip(specialization.types(db))
+                        .any(|(typevar, ty)| {
+                            typevar.is_typevartuple(db)
+                                && ty
+                                    .exact_tuple_instance_spec(db)
+                                    .is_none_or(|tuple| tuple.is_variadic())
+                        })
+                })
+        {
+            return None;
+        }
+
+        let mut selected = None;
+        for signature in &self.overloads {
+            let (signature, receiver_type) =
+                signature.nominalize_same_protocol_receiver(db, receiver_type)?;
+            if let Some(signature) =
+                signature.bind_self_if_compatible(db, receiver_type, receiver_type)
+                && selected.replace(signature).is_some()
+            {
+                return None;
+            }
+        }
+        selected
+    }
+
     /// Binds the receiver using its runtime type while using `typing_self_type` to replace
     /// occurrences of `typing.Self`.
     ///
@@ -1149,6 +1214,51 @@ impl<'db> Signature<'db> {
                 })
             }
         }
+    }
+
+    /// Returns a temporary copy whose receiver can be compared nominally with `receiver_type`.
+    ///
+    /// Comparing two protocol instances structurally would recurse through the interface currently
+    /// being constructed. The nominal view is valid only when both are specializations of the same
+    /// protocol class. Signatures containing `typing.Self` are excluded because it must remain
+    /// available for the concrete implementation.
+    fn nominalize_same_protocol_receiver(
+        &self,
+        db: &'db dyn Db,
+        receiver_type: Type<'db>,
+    ) -> Option<(Self, Type<'db>)> {
+        if self.return_ty.contains_self(db)
+            || self
+                .parameters
+                .iter()
+                .any(|parameter| parameter.annotated_type().contains_self(db))
+        {
+            return None;
+        }
+
+        let Type::ProtocolInstance(receiver) = receiver_type else {
+            return None;
+        };
+        let parameter = self
+            .parameters
+            .get(0)
+            .filter(|parameter| parameter.is_positional() && !parameter.inferred_annotation)?;
+        let Type::ProtocolInstance(annotation) = parameter.annotated_type().resolve_type_alias(db)
+        else {
+            return None;
+        };
+        let receiver = receiver.to_nominal_instance()?;
+        let annotation = annotation.to_nominal_instance()?;
+        if receiver.class(db).class_literal(db) != annotation.class(db).class_literal(db) {
+            return None;
+        }
+
+        let mut signature = self.clone();
+        Arc::make_mut(&mut signature.parameters.data)
+            .value
+            .first_mut()?
+            .annotated_type = Type::NominalInstance(annotation);
+        Some((signature, Type::NominalInstance(receiver)))
     }
 
     /// Returns this signature bound to `receiver_type` if its explicit receiver annotation is

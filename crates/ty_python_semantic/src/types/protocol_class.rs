@@ -340,7 +340,7 @@ pub(super) fn walk_protocol_instance_member<'db, V: super::visitor::TypeVisitor<
     visitor: &V,
 ) {
     match member.data.kind {
-        ProtocolMemberKind::Method(method, _) => {
+        ProtocolMemberKind::Method { member: method, .. } => {
             let Type::Callable(callable) = method.ty() else {
                 visitor.visit_type(db, method.ty());
                 return;
@@ -407,7 +407,7 @@ impl<'db> ProtocolInterface<'db> {
             .map(|(name, callable)| {
                 (
                     Name::new(name),
-                    ProtocolMemberData::method(db, callable, None),
+                    ProtocolMemberData::method(db, callable, None, None),
                 )
             })
             .collect();
@@ -1076,6 +1076,7 @@ impl<'db> ProtocolMemberData<'db> {
         db: &'db dyn Db,
         callable: CallableType<'db>,
         definition: Option<Definition<'db>>,
+        receiver: Option<Type<'db>>,
     ) -> Self {
         let (method_kind, callable) = if callable.is_classmethod_like(db) {
             (
@@ -1087,12 +1088,21 @@ impl<'db> ProtocolMemberData<'db> {
         } else {
             (ProtocolMethodKind::Instance, callable)
         };
+        let receiver = receiver.filter(|_| {
+            method_kind == ProtocolMethodKind::Instance
+                && callable.signatures(db).overloads.len() > 1
+                && callable
+                    .signatures(db)
+                    .iter()
+                    .any(Signature::has_explicit_positional_receiver_annotation)
+        });
 
         Self {
-            kind: ProtocolMemberKind::Method(
-                ProtocolMemberType::with_definition(Type::Callable(callable), definition),
-                method_kind,
-            ),
+            kind: ProtocolMemberKind::Method {
+                member: ProtocolMemberType::with_definition(Type::Callable(callable), definition),
+                kind: method_kind,
+                receiver,
+            },
             qualifiers: TypeQualifiers::default(),
             definition,
         }
@@ -1130,10 +1140,18 @@ impl<'db> ProtocolMemberData<'db> {
     /// keeping them derived prevents the stored member kind and its capabilities from diverging.
     fn capabilities(&self, db: &'db dyn Db) -> ProtocolMemberCapabilities<'db> {
         match self.kind {
-            ProtocolMemberKind::Method(member, kind) => {
+            ProtocolMemberKind::Method {
+                member,
+                kind,
+                receiver,
+            } => {
                 let instance_method = match (member.ty(), kind) {
                     (Type::Callable(callable), ProtocolMethodKind::Instance) => {
-                        member.with_ty(Type::Callable(protocol_bind_self(db, callable, None)))
+                        let callable = receiver.map_or_else(
+                            || protocol_bind_self(db, callable, None),
+                            |receiver| protocol_bind_receiver(db, callable, receiver),
+                        );
+                        member.with_ty(Type::Callable(callable))
                     }
                     _ => member,
                 };
@@ -1229,7 +1247,7 @@ impl<'db> ProtocolMemberData<'db> {
         impl std::fmt::Display for ProtocolMemberDataDisplay<'_> {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                 match self.kind {
-                    ProtocolMemberKind::Method(member, _) => {
+                    ProtocolMemberKind::Method { member, .. } => {
                         write!(f, "MethodMember(`{}`)", member.ty().display(self.db))
                     }
                     ProtocolMemberKind::Property { read, write } => {
@@ -1264,7 +1282,12 @@ impl<'db> ProtocolMemberData<'db> {
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue)]
 enum ProtocolMemberKind<'db> {
-    Method(ProtocolMemberType<'db>, ProtocolMethodKind),
+    Method {
+        member: ProtocolMemberType<'db>,
+        kind: ProtocolMethodKind,
+        /// Specialized receiver used to bind a receiver-selected protocol instance method.
+        receiver: Option<Type<'db>>,
+    },
     Property {
         read: Option<ProtocolMemberType<'db>>,
         write: Option<ProtocolMemberWrite<'db>>,
@@ -1282,7 +1305,7 @@ enum ProtocolMethodKind {
 impl<'db> ProtocolMemberKind<'db> {
     fn member_types(self) -> impl Iterator<Item = ProtocolMemberType<'db>> {
         match self {
-            Self::Method(method, _) => [Some(method), None, None],
+            Self::Method { member, .. } => [Some(member), None, None],
             Self::Property { read, write } => [
                 read,
                 write.and_then(ProtocolMemberWrite::domain),
@@ -1296,27 +1319,48 @@ impl<'db> ProtocolMemberKind<'db> {
 
     fn cycle_normalized(self, db: &'db dyn Db, previous: Self, cycle: &salsa::Cycle) -> Self {
         match (self, previous) {
-            (Self::Method(current, kind), Self::Method(previous, _)) => {
-                let (Type::Callable(current_callable), Type::Callable(previous_callable)) =
-                    (current.ty(), previous.ty())
-                else {
-                    return Self::Method(current.cycle_normalized(db, previous, cycle), kind);
-                };
-                debug_assert_eq!(current_callable.kind(db), previous_callable.kind(db));
-                let signatures = current_callable.signatures(db).cycle_normalized(
-                    db,
-                    previous_callable.signatures(db),
-                    cycle,
-                );
-                Self::Method(
-                    current.with_ty(Type::Callable(CallableType::new(
-                        db,
-                        signatures,
-                        current_callable.kind(db),
-                        current_callable.provenance(db),
-                    ))),
+            (
+                Self::Method {
+                    member: current,
                     kind,
-                )
+                    receiver: current_receiver,
+                },
+                Self::Method {
+                    member: previous,
+                    receiver: previous_receiver,
+                    ..
+                },
+            ) => {
+                let member =
+                    if let (Type::Callable(current_callable), Type::Callable(previous_callable)) =
+                        (current.ty(), previous.ty())
+                    {
+                        debug_assert_eq!(current_callable.kind(db), previous_callable.kind(db));
+                        let signatures = current_callable.signatures(db).cycle_normalized(
+                            db,
+                            previous_callable.signatures(db),
+                            cycle,
+                        );
+                        current.with_ty(Type::Callable(CallableType::new(
+                            db,
+                            signatures,
+                            current_callable.kind(db),
+                            current_callable.provenance(db),
+                        )))
+                    } else {
+                        current.cycle_normalized(db, previous, cycle)
+                    };
+                Self::Method {
+                    member,
+                    kind,
+                    receiver: match (current_receiver, previous_receiver) {
+                        (Some(current), Some(previous)) => {
+                            Some(current.cycle_normalized(db, previous, cycle))
+                        }
+                        (Some(current), None) => Some(current.recursive_type_normalized(db, cycle)),
+                        (None, _) => None,
+                    },
+                }
             }
             (
                 Self::Property {
@@ -1353,10 +1397,20 @@ impl<'db> ProtocolMemberKind<'db> {
         nested: bool,
     ) -> Option<Self> {
         Some(match self {
-            Self::Method(member, kind) => Self::Method(
-                member.recursive_type_normalized_impl(db, div, nested)?,
+            Self::Method {
+                member,
                 kind,
-            ),
+                receiver,
+            } => Self::Method {
+                member: member.recursive_type_normalized_impl(db, div, nested)?,
+                kind,
+                receiver: match receiver {
+                    Some(receiver) => {
+                        Some(receiver.recursive_type_normalized_impl(db, div, nested)?)
+                    }
+                    None => None,
+                },
+            },
             Self::Property { read, write } => Self::Property {
                 read: match read {
                     Some(read) => Some(read.recursive_type_normalized_impl(db, div, nested)?),
@@ -1381,10 +1435,17 @@ impl<'db> ProtocolMemberKind<'db> {
         visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> Self {
         match self {
-            Self::Method(member, kind) => Self::Method(
-                member.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+            Self::Method {
+                member,
                 kind,
-            ),
+                receiver,
+            } => Self::Method {
+                member: member.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+                kind,
+                receiver: receiver.map(|receiver| {
+                    receiver.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
+                }),
+            },
             Self::Property { read, write } => Self::Property {
                 read: read.map(|read| read.apply_type_mapping_impl(db, type_mapping, tcx, visitor)),
                 write: write
@@ -1438,7 +1499,7 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
     }
 
     pub(super) fn is_method(&self) -> bool {
-        matches!(self.data.kind, ProtocolMemberKind::Method(..))
+        matches!(self.data.kind, ProtocolMemberKind::Method { .. })
     }
 
     /// Returns the priority for structurally comparing this member.
@@ -1452,7 +1513,7 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
             })
         };
 
-        let ProtocolMemberKind::Method(member, _) = self.data.kind else {
+        let ProtocolMemberKind::Method { member, .. } = self.data.kind else {
             let is_finite = self.data.kind.member_types().all(|member| {
                 member
                     .resolve(db)
@@ -1499,7 +1560,10 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
     fn is_instance_method(&self) -> bool {
         matches!(
             self.data.kind,
-            ProtocolMemberKind::Method(_, ProtocolMethodKind::Instance)
+            ProtocolMemberKind::Method {
+                kind: ProtocolMethodKind::Instance,
+                ..
+            }
         )
     }
 
@@ -1621,7 +1685,10 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
     fn is_class_method(&self) -> bool {
         matches!(
             self.data.kind,
-            ProtocolMemberKind::Method(_, ProtocolMethodKind::Class)
+            ProtocolMemberKind::Method {
+                kind: ProtocolMethodKind::Class,
+                ..
+            }
         )
     }
 
@@ -1653,10 +1720,10 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
             (ty, self.data.kind),
             (
                 Type::ModuleLiteral(_),
-                ProtocolMemberKind::Method(
-                    _,
-                    ProtocolMethodKind::Instance | ProtocolMethodKind::Static
-                )
+                ProtocolMemberKind::Method {
+                    kind: ProtocolMethodKind::Instance | ProtocolMethodKind::Static,
+                    ..
+                }
             )
         ) || (is_class_object_type(ty) && self.is_method())
         {
@@ -3031,14 +3098,24 @@ fn cached_protocol_interface<'db>(
                 definition,
             ),
             Type::Callable(callable) if bound_on_class.is_yes() && callable.is_method_like(db) => {
-                ProtocolMemberData::method(db, callable, definition)
+                ProtocolMemberData::method(
+                    db,
+                    callable,
+                    definition,
+                    Some(Type::instance(db, class)),
+                )
             }
             Type::FunctionLiteral(function)
                 if bound_on_class.is_yes()
                     || function.is_staticmethod(db)
                     || function.is_classmethod(db) =>
             {
-                ProtocolMemberData::method(db, function.into_callable_type(db), definition)
+                ProtocolMemberData::method(
+                    db,
+                    function.into_callable_type(db),
+                    definition,
+                    Some(Type::instance(db, class)),
+                )
             }
             _ if bound_on_class.is_yes()
                 && definition.is_some_and(|definition| definition.kind(db).is_function_def()) =>
@@ -3084,6 +3161,27 @@ fn protocol_bind_self<'db>(
     self_type: Option<Type<'db>>,
 ) -> CallableType<'db> {
     callable.bind_self(db, self_type).into_regular(db)
+}
+
+/// Binds a protocol instance method after selecting any receiver-specific overload.
+///
+/// This is separate from [`protocol_bind_self`] because `typing.Self` must remain available for
+/// the concrete implementation rather than being replaced by the protocol receiver.
+#[salsa::tracked(returns(copy), heap_size=ruff_memory_usage::heap_size)]
+fn protocol_bind_receiver<'db>(
+    db: &'db dyn Db,
+    callable: CallableType<'db>,
+    receiver_type: Type<'db>,
+) -> CallableType<'db> {
+    CallableType::new(
+        db,
+        callable
+            .signatures(db)
+            .bind_protocol_receiver(db, receiver_type),
+        callable.kind(db),
+        callable.provenance(db),
+    )
+    .into_regular(db)
 }
 
 /// Return `true` if a callable has at least one overload and none return `Never`.
