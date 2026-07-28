@@ -613,6 +613,32 @@ fn constructor_returns_instance<'db>(
 }
 
 impl<'db> Binding<'db> {
+    /// Whether this overload's declared return constructs an instance of `instance_type`.
+    ///
+    /// Constructor receiver binding happens before constructor context is attached, so classify
+    /// self-like type variables using the original receiver annotation.
+    pub(super) fn returns_constructed_instance(
+        &self,
+        db: &'db dyn Db,
+        instance_type: Type<'db>,
+    ) -> bool {
+        let Some(class_literal) = instance_type
+            .as_nominal_instance()
+            .map(|instance| instance.class(db).class_literal(db))
+        else {
+            return false;
+        };
+
+        let return_ty = self.signature.return_ty.resolve_type_alias(db);
+        if let Type::TypeVar(typevar) = return_ty
+            && self.is_self_like_constructor_return_typevar(db, typevar)
+        {
+            return true;
+        }
+
+        constructor_returns_instance(db, class_literal, return_ty)
+    }
+
     /// Is a type variable returned from a constructor method a representation of the self type?
     ///
     /// Handles `typing.Self` annotations and `__new__` methods returning `T` where `self:

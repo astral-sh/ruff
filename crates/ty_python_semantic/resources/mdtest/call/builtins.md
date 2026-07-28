@@ -411,6 +411,39 @@ def _(rows: Unknown) -> None:
     reveal_type(list(map(dict, rows)))  # revealed: list[Unknown]
 ```
 
+## `reversed` preserves ambiguous non-instance constructor inference
+
+`reversed.__new__` returns an iterator rather than an instance of `reversed`. An index-like object
+can satisfy both constructor overloads with different element types, so optimizing
+instance-returning constructors must not change the existing ambiguous-overload result.
+
+```py
+from collections.abc import Iterator
+from typing import Any, Generic, TypeVar, overload
+
+T = TypeVar("T")
+
+class Labels(Generic[T]):
+    def __len__(self) -> int:
+        return 2
+
+    @overload
+    def __getitem__(self, key: int, /) -> T: ...
+    @overload
+    def __getitem__(self, key: slice, /) -> "Labels[T]": ...
+    def __getitem__(self, key: int | slice, /) -> Any:
+        raise NotImplementedError
+
+    def __iter__(self) -> Iterator[int | str]:
+        return iter((1, "label"))
+
+    def __reversed__(self) -> Iterator[int | str]:
+        return iter((1, "label"))
+
+def _(labels: Labels[Any]) -> None:
+    reveal_type(reversed(labels))  # revealed: Unknown
+```
+
 ## Generic builtins should not overfit upper-bound-only callback constraints
 
 These examples are minimized from ecosystem regressions seen while preserving explicit `Never` and
