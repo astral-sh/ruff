@@ -48,7 +48,9 @@ use crate::types::call::bind::{
 };
 use crate::types::call::{Binding, Bindings, CallArguments, CallError, CallErrorKind};
 use crate::types::callable::{CallableFunctionProvenance, CallableTypeKind};
-use crate::types::class::{ClassLiteral, CodeGeneratorKind, MethodDecorator};
+use crate::types::class::{
+    ClassLiteral, CodeGeneratorKind, FrozenDataclassDispatch, MethodDecorator,
+};
 use crate::types::constraints::{ConstraintSetBuilder, PathBounds, Solutions};
 use crate::types::context::InferContext;
 use crate::types::dedicated::pydantic;
@@ -2887,15 +2889,66 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             | Type::TypeForm(_)
             | Type::TypedDict(_)
             | Type::NewTypeInstance(_) => {
-                let delattr_dunder_call_result = object_ty.try_call_dunder_with_policy(
-                    db,
-                    "__delattr__",
-                    &mut CallArguments::positional([Type::string_literal(db, attribute)]),
-                    TypeContext::default(),
-                    MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
-                );
+                let frozen_dataclass_dispatch = object_ty
+                    .nominal_class(db)
+                    .and_then(|class| class.static_class_literal(db))
+                    .and_then(|(class, specialization)| {
+                        class.inherited_frozen_dataclass_dispatch(
+                            db,
+                            specialization,
+                            "__delattr__",
+                            attribute,
+                        )
+                    });
 
-                let returns_never = match &delattr_dunder_call_result {
+                let delattr_receiver = frozen_dataclass_dispatch
+                    .map_or(object_ty, |dispatch| dispatch.receiver(db, object_ty));
+
+                let mut delattr_arguments =
+                    CallArguments::positional([Type::string_literal(db, attribute)]);
+                let delattr_dunder_call_result = if matches!(delattr_receiver, Type::BoundSuper(_))
+                {
+                    match delattr_receiver
+                        .member_lookup_with_policy(
+                            db,
+                            "__delattr__",
+                            MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
+                        )
+                        .place
+                    {
+                        Place::Defined(DefinedPlace {
+                            ty: delattr,
+                            definedness,
+                            provenance,
+                            ..
+                        }) => match delattr.try_call(db, &delattr_arguments) {
+                            Ok(bindings) if definedness == Definedness::PossiblyUndefined => {
+                                Err(CallDunderError::PossiblyUnbound {
+                                    bindings: Box::new(bindings),
+                                    unbound_on: None,
+                                })
+                            }
+                            Ok(bindings) => Ok(bindings),
+                            Err(CallError(kind, bindings)) => {
+                                Err(CallDunderError::CallError(kind, bindings, provenance))
+                            }
+                        },
+                        Place::Undefined => Err(CallDunderError::MethodNotAvailable),
+                    }
+                } else {
+                    delattr_receiver.try_call_dunder_with_policy(
+                        db,
+                        "__delattr__",
+                        &mut delattr_arguments,
+                        TypeContext::default(),
+                        MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
+                    )
+                };
+
+                let returns_never = matches!(
+                    frozen_dataclass_dispatch,
+                    Some(FrozenDataclassDispatch::FrozenField)
+                ) || match &delattr_dunder_call_result {
                     Ok(result) => result.return_type(db).is_never(),
                     Err(err) => err.return_type(db).is_some_and(|ty| ty.is_never()),
                 };
@@ -2913,7 +2966,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
 
                 match delattr_dunder_call_result {
-                    Ok(_) | Err(CallDunderError::PossiblyUnbound { .. }) => {
+                    Ok(_) | Err(CallDunderError::PossiblyUnbound { .. })
+                        if !matches!(
+                            frozen_dataclass_dispatch,
+                            Some(FrozenDataclassDispatch::Delegate(_))
+                        ) =>
+                    {
                         if self.validate_final_attribute_deletion(
                             target,
                             object_ty,
@@ -2924,6 +2982,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         }
                         return true;
                     }
+                    Ok(_) | Err(CallDunderError::PossiblyUnbound { .. }) => {}
                     Err(CallDunderError::CallError(kind, _bindings, _)) => {
                         if emit_diagnostics {
                             report_bad_dunder_delattr_call(
@@ -2967,7 +3026,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         TypeContext::default(),
                     );
 
-                    if self.property_deleter_returns_never(attr_ty, object_ty) {
+                    // `Never` supports arbitrary operations only because there can be no runtime
+                    // value to mutate; it is not a concrete descriptor with a terminal deleter.
+                    let deleter_returns_never = !attr_ty.is_never()
+                        && match &delete_dunder_call_result {
+                            Ok(bindings) => bindings.return_type(db).is_never(),
+                            Err(error) => error.return_type(db).is_some_and(|ty| ty.is_never()),
+                        };
+                    if deleter_returns_never
+                        || self.property_deleter_returns_never(attr_ty, object_ty)
+                    {
                         if emit_diagnostics
                             && let Some(builder) =
                                 self.context.report_lint(&INVALID_ASSIGNMENT, target)

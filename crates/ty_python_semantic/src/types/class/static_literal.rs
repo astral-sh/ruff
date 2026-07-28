@@ -126,7 +126,7 @@ impl get_size2::GetSize for StaticClassLiteral<'_> {}
 /// non-fields on subclass instances.
 #[derive(Clone, Copy)]
 pub(crate) enum FrozenDataclassDispatch<'db> {
-    /// A reachable frozen dataclass rejects modification of one of its fields.
+    /// A reachable frozen dataclass rejects assignment to or deletion of one of its fields.
     FrozenField,
     /// Every reachable frozen method delegates, with lookup resuming after this base.
     Delegate(StaticClassLiteral<'db>),
@@ -149,6 +149,32 @@ impl<'db> FrozenDataclassDispatch<'db> {
                 object_ty,
             )
             .unwrap_or(object_ty),
+        }
+    }
+}
+
+/// A method synthesized for a frozen dataclass.
+#[derive(Clone, Copy)]
+enum FrozenDataclassMethod {
+    SetAttr,
+    DelAttr,
+}
+
+impl FrozenDataclassMethod {
+    /// Returns the frozen-dataclass method for `name`, if it is `__setattr__` or `__delattr__`.
+    fn from_name(name: &str) -> Option<Self> {
+        match name {
+            "__setattr__" => Some(Self::SetAttr),
+            "__delattr__" => Some(Self::DelAttr),
+            _ => None,
+        }
+    }
+
+    /// Returns the corresponding Python special-method name.
+    const fn name(self) -> &'static str {
+        match self {
+            Self::SetAttr => "__setattr__",
+            Self::DelAttr => "__delattr__",
         }
     }
 }
@@ -1421,12 +1447,13 @@ impl<'db> StaticClassLiteral<'db> {
         // An ordinary subclass of a frozen dataclass is not itself dataclass-like, so the
         // `CodeGeneratorKind::from_class` check below would return `None` before dataclass-like
         // synthesis runs. Still, an instance of such a subclass inherits the frozen dataclass's
-        // generated `__setattr__`, which rejects writes to frozen base fields.
-        if name == "__setattr__"
-            && let Some(synthesized_setattr) =
-                self.own_frozen_dataclass_subclass_setattr(db, specialization)
+        // generated `__setattr__` and `__delattr__`, which reject assignments and deletions of
+        // frozen base fields.
+        if let Some(method) = FrozenDataclassMethod::from_name(name)
+            && let Some(synthesized_method) =
+                self.own_frozen_dataclass_subclass_method(db, specialization, method)
         {
-            return Some(synthesized_setattr);
+            return Some(synthesized_method);
         }
 
         let field_policy = CodeGeneratorKind::from_class(db, self.into())?;
@@ -1856,6 +1883,20 @@ impl<'db> StaticClassLiteral<'db> {
                 }
                 None
             }
+            (CodeGeneratorKind::DataclassLike(_), "__delattr__")
+                if self.is_frozen_dataclass(db) == Some(true) =>
+            {
+                let signature = Signature::new(
+                    Parameters::standard([
+                        Parameter::positional_or_keyword(Name::new_static("self"))
+                            .with_annotated_type(instance_ty),
+                        Parameter::positional_or_keyword(Name::new_static("name")),
+                    ]),
+                    Type::Never,
+                );
+
+                Some(Type::function_like_callable(db, signature))
+            }
             (field_policy @ CodeGeneratorKind::DataclassLike(_), "__slots__")
                 if Program::get(db).python_version(db) >= PythonVersion::PY310 =>
             {
@@ -1878,43 +1919,51 @@ impl<'db> StaticClassLiteral<'db> {
         }
     }
 
-    /// Synthesize a `__setattr__` view for an ordinary subclass of a frozen dataclass.
+    /// Synthesize a `__setattr__` or `__delattr__` view for an ordinary subclass of a frozen
+    /// dataclass.
     ///
-    /// CPython's generated frozen-dataclass `__setattr__` rejects all writes on exact instances of
-    /// the frozen dataclass, but on subclass instances it only rejects writes to that dataclass's
-    /// fields before delegating to the next `__setattr__` in the MRO.
-    fn own_frozen_dataclass_subclass_setattr(
+    /// CPython's generated frozen-dataclass `__setattr__` and `__delattr__` reject all assignments
+    /// and deletions on exact instances of the frozen dataclass, but on subclass instances they
+    /// only reject assignments and deletions of that dataclass's fields before delegating to the
+    /// next method in the MRO.
+    fn own_frozen_dataclass_subclass_method(
         self,
         db: &'db dyn Db,
         specialization: Option<Specialization<'db>>,
+        method: FrozenDataclassMethod,
     ) -> Option<Type<'db>> {
         if CodeGeneratorKind::from_static_class(db, self).is_some() {
             return None;
         }
 
         let frozen_base_fields =
-            self.inherited_non_slotted_frozen_dataclass_fields(db, specialization, "__setattr__")?;
+            self.inherited_non_slotted_frozen_dataclass_fields(db, specialization, method.name())?;
 
         let instance_ty =
             Type::instance(db, self.apply_optional_specialization(db, specialization));
-        let setattr_signature = |name_ty, return_ty| {
-            Signature::new(
-                Parameters::standard([
-                    Parameter::positional_or_keyword(Name::new_static("self"))
-                        .with_annotated_type(instance_ty),
-                    Parameter::positional_or_keyword(Name::new_static("name"))
-                        .with_annotated_type(name_ty),
+        let method_signature = |name_ty, return_ty| {
+            let self_parameter = Parameter::positional_or_keyword(Name::new_static("self"))
+                .with_annotated_type(instance_ty);
+            let name_parameter = Parameter::positional_or_keyword(Name::new_static("name"))
+                .with_annotated_type(name_ty);
+            let parameters = match method {
+                FrozenDataclassMethod::SetAttr => Parameters::standard([
+                    self_parameter,
+                    name_parameter,
                     Parameter::positional_or_keyword(Name::new_static("value")),
                 ]),
-                return_ty,
-            )
+                FrozenDataclassMethod::DelAttr => {
+                    Parameters::standard([self_parameter, name_parameter])
+                }
+            };
+            Signature::new(parameters, return_ty)
         };
 
         let overloads = frozen_base_fields
             .names
             .iter()
-            .map(|field| setattr_signature(Type::string_literal(db, field), Type::Never))
-            .chain([setattr_signature(
+            .map(|field| method_signature(Type::string_literal(db, field), Type::Never))
+            .chain([method_signature(
                 KnownClass::Str.to_instance(db),
                 Type::none(db),
             )]);
@@ -1949,6 +1998,7 @@ impl<'db> StaticClassLiteral<'db> {
     /// Assigning to `Child().x` is rejected because `x` is a field of `Frozen`. Assigning to
     /// `Child().y` instead delegates to `super(Frozen, child).__setattr__`, where a later
     /// `__setattr__` or the descriptor for `y` can still reject the assignment.
+    /// Deletion follows the same lookup through `__delattr__` and `__delete__`.
     ///
     /// If multiple frozen dataclasses are reachable before an explicit implementation of
     /// `method`, a non-field delegates past each generated method. [`FrozenDataclassDispatch::Delegate`]
@@ -1985,7 +2035,7 @@ impl<'db> StaticClassLiteral<'db> {
         }
     }
 
-    /// Returns the inherited fields protected by a generated frozen-dataclass method.
+    /// Returns the inherited fields whose generated `__setattr__` or `__delattr__` still applies.
     fn inherited_non_slotted_frozen_dataclass_fields(
         self,
         db: &'db dyn Db,
@@ -2004,18 +2054,19 @@ impl<'db> StaticClassLiteral<'db> {
                 break;
             };
 
-            // Stop if another class in the MRO replaces the generated frozen setter:
+            // Stop if another class in the MRO replaces the relevant generated frozen method:
             //
             //   @dataclass(frozen=True)
             //   class Frozen: x: int
             //
             //   class Mutable(Frozen):
             //       def __setattr__(self, name: str, value: object) -> None: ...
+            //       def __delattr__(self, name: str) -> None: ...
             //
             //   class Child(Mutable): ...
             //
-            // Writes to `Child().x` dispatch to `Mutable.__setattr__`, not to the synthesized
-            // `Frozen.__setattr__`.
+            // Writes and deletions of `Child().x` dispatch to the corresponding `Mutable` method,
+            // not to the synthesized `Frozen` method.
             if class_member(db, base_class.body_scope(db), method)
                 .ignore_possibly_undefined()
                 .is_some()
