@@ -490,7 +490,7 @@ PLR6104 [*] Use `+=` to perform an augmented assignment directly
 54 | a = a+-1
    | ^^^^^^^^
 55 |
-56 | # Regression tests for https://github.com/astral-sh/ruff/issues/11672
+56 | # Unary operators do not stop the operand from evaluating to a number or a
    |
 help: Replace with augmented assignment
    |
@@ -504,172 +504,360 @@ note: This is an unsafe fix and may change runtime behavior
 PLR6104 [*] Use `+=` to perform an augmented assignment directly
   --> non_augmented_assignment.py:58:1
    |
-56 | # Regression tests for https://github.com/astral-sh/ruff/issues/11672
-57 | test = 0x5
-58 | test = test + 0xBA
-   | ^^^^^^^^^^^^^^^^^^
-59 |
-60 | test2 = b""
+56 | # Unary operators do not stop the operand from evaluating to a number or a
+57 | # boolean, so the commutative operators still commute here.
+58 | to_multiply = -1 + to_multiply
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+59 | to_multiply = +1 * to_multiply
+60 | to_multiply = --1 + to_multiply
    |
 help: Replace with augmented assignment
    |
-57 | test = 0x5
-   - test = test + 0xBA
-58 + test += 0xBA
-59 |
+57 | # boolean, so the commutative operators still commute here.
+   - to_multiply = -1 + to_multiply
+58 + to_multiply += -1
+59 | to_multiply = +1 * to_multiply
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+PLR6104 [*] Use `*=` to perform an augmented assignment directly
+  --> non_augmented_assignment.py:59:1
+   |
+57 | # boolean, so the commutative operators still commute here.
+58 | to_multiply = -1 + to_multiply
+59 | to_multiply = +1 * to_multiply
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+60 | to_multiply = --1 + to_multiply
+61 | to_multiply = -1.5 + to_multiply
+   |
+help: Replace with augmented assignment
+   |
+58 | to_multiply = -1 + to_multiply
+   - to_multiply = +1 * to_multiply
+59 + to_multiply *= +1
+60 | to_multiply = --1 + to_multiply
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+PLR6104 [*] Use `+=` to perform an augmented assignment directly
+  --> non_augmented_assignment.py:60:1
+   |
+58 | to_multiply = -1 + to_multiply
+59 | to_multiply = +1 * to_multiply
+60 | to_multiply = --1 + to_multiply
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+61 | to_multiply = -1.5 + to_multiply
+62 | to_multiply = -1j + to_multiply
+   |
+help: Replace with augmented assignment
+   |
+59 | to_multiply = +1 * to_multiply
+   - to_multiply = --1 + to_multiply
+60 + to_multiply += --1
+61 | to_multiply = -1.5 + to_multiply
    |
 note: This is an unsafe fix and may change runtime behavior
 
 PLR6104 [*] Use `+=` to perform an augmented assignment directly
   --> non_augmented_assignment.py:61:1
    |
-60 | test2 = b""
-61 | test2 = test2 + b"\000"
-   | ^^^^^^^^^^^^^^^^^^^^^^^
-62 |
-63 | test3 = ""
+59 | to_multiply = +1 * to_multiply
+60 | to_multiply = --1 + to_multiply
+61 | to_multiply = -1.5 + to_multiply
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+62 | to_multiply = -1j + to_multiply
+63 | to_multiply = (not True) + to_multiply
    |
 help: Replace with augmented assignment
    |
-60 | test2 = b""
-   - test2 = test2 + b"\000"
-61 + test2 += b"\000"
-62 |
+60 | to_multiply = --1 + to_multiply
+   - to_multiply = -1.5 + to_multiply
+61 + to_multiply += -1.5
+62 | to_multiply = -1j + to_multiply
    |
 note: This is an unsafe fix and may change runtime behavior
 
 PLR6104 [*] Use `+=` to perform an augmented assignment directly
+  --> non_augmented_assignment.py:62:1
+   |
+60 | to_multiply = --1 + to_multiply
+61 | to_multiply = -1.5 + to_multiply
+62 | to_multiply = -1j + to_multiply
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+63 | to_multiply = (not True) + to_multiply
+64 | flags = ~0x1 & flags
+   |
+help: Replace with augmented assignment
+   |
+61 | to_multiply = -1.5 + to_multiply
+   - to_multiply = -1j + to_multiply
+62 + to_multiply += -1j
+63 | to_multiply = (not True) + to_multiply
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+PLR6104 [*] Use `+=` to perform an augmented assignment directly
+  --> non_augmented_assignment.py:63:1
+   |
+61 | to_multiply = -1.5 + to_multiply
+62 | to_multiply = -1j + to_multiply
+63 | to_multiply = (not True) + to_multiply
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+64 | flags = ~0x1 & flags
+65 | flags = -True | flags
+   |
+help: Replace with augmented assignment
+   |
+62 | to_multiply = -1j + to_multiply
+   - to_multiply = (not True) + to_multiply
+63 + to_multiply += (not True)
+64 | flags = ~0x1 & flags
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+PLR6104 [*] Use `&=` to perform an augmented assignment directly
   --> non_augmented_assignment.py:64:1
    |
-63 |   test3 = ""
-64 | / test3 = test3 + (   a := R""
-65 | |                          f"oo"   )
-   | |__________________________________^
+62 | to_multiply = -1j + to_multiply
+63 | to_multiply = (not True) + to_multiply
+64 | flags = ~0x1 & flags
+   | ^^^^^^^^^^^^^^^^^^^^
+65 | flags = -True | flags
+   |
+help: Replace with augmented assignment
+   |
+63 | to_multiply = (not True) + to_multiply
+   - flags = ~0x1 & flags
+64 + flags &= ~0x1
+65 | flags = -True | flags
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+PLR6104 [*] Use `|=` to perform an augmented assignment directly
+  --> non_augmented_assignment.py:65:1
+   |
+63 | to_multiply = (not True) + to_multiply
+64 | flags = ~0x1 & flags
+65 | flags = -True | flags
+   | ^^^^^^^^^^^^^^^^^^^^^
 66 |
-67 |   test4 = []
+67 | # The target is already on the left, so commutativity is irrelevant. The
    |
 help: Replace with augmented assignment
    |
-63 | test3 = ""
+64 | flags = ~0x1 & flags
+   - flags = -True | flags
+65 + flags |= -True
+66 |
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+PLR6104 [*] Use `**=` to perform an augmented assignment directly
+  --> non_augmented_assignment.py:70:1
+   |
+68 | # right-hand side of an augmented assignment accepts any expression, so the
+69 | # moved operand never needs new parentheses.
+70 | to_multiply = to_multiply**-1
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+71 | to_multiply = to_multiply - -1
+   |
+help: Replace with augmented assignment
+   |
+69 | # moved operand never needs new parentheses.
+   - to_multiply = to_multiply**-1
+70 + to_multiply **= -1
+71 | to_multiply = to_multiply - -1
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+PLR6104 [*] Use `-=` to perform an augmented assignment directly
+  --> non_augmented_assignment.py:71:1
+   |
+69 | # moved operand never needs new parentheses.
+70 | to_multiply = to_multiply**-1
+71 | to_multiply = to_multiply - -1
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+72 |
+73 | # Regression tests for https://github.com/astral-sh/ruff/issues/11672
+   |
+help: Replace with augmented assignment
+   |
+70 | to_multiply = to_multiply**-1
+   - to_multiply = to_multiply - -1
+71 + to_multiply -= -1
+72 |
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+PLR6104 [*] Use `+=` to perform an augmented assignment directly
+  --> non_augmented_assignment.py:75:1
+   |
+73 | # Regression tests for https://github.com/astral-sh/ruff/issues/11672
+74 | test = 0x5
+75 | test = test + 0xBA
+   | ^^^^^^^^^^^^^^^^^^
+76 |
+77 | test2 = b""
+   |
+help: Replace with augmented assignment
+   |
+74 | test = 0x5
+   - test = test + 0xBA
+75 + test += 0xBA
+76 |
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+PLR6104 [*] Use `+=` to perform an augmented assignment directly
+  --> non_augmented_assignment.py:78:1
+   |
+77 | test2 = b""
+78 | test2 = test2 + b"\000"
+   | ^^^^^^^^^^^^^^^^^^^^^^^
+79 |
+80 | test3 = ""
+   |
+help: Replace with augmented assignment
+   |
+77 | test2 = b""
+   - test2 = test2 + b"\000"
+78 + test2 += b"\000"
+79 |
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+PLR6104 [*] Use `+=` to perform an augmented assignment directly
+  --> non_augmented_assignment.py:81:1
+   |
+80 |   test3 = ""
+81 | / test3 = test3 + (   a := R""
+82 | |                          f"oo"   )
+   | |__________________________________^
+83 |
+84 |   test4 = []
+   |
+help: Replace with augmented assignment
+   |
+80 | test3 = ""
    - test3 = test3 + (   a := R""
-64 + test3 += (   a := R""
-65 |                          f"oo"   )
+81 + test3 += (   a := R""
+82 |                          f"oo"   )
    |
 note: This is an unsafe fix and may change runtime behavior
 
 PLR6104 [*] Use `+=` to perform an augmented assignment directly
-  --> non_augmented_assignment.py:68:1
+  --> non_augmented_assignment.py:85:1
    |
-67 |   test4 = []
-68 | / test4 = test4 + ( e
-69 | |                   for e in
-70 | |                   range(10)
-71 | |                   )
+84 |   test4 = []
+85 | / test4 = test4 + ( e
+86 | |                   for e in
+87 | |                   range(10)
+88 | |                   )
    | |___________________^
-72 |
-73 |   test5 = test5 + (
-   |
-help: Replace with augmented assignment
-   |
-67 | test4 = []
-   - test4 = test4 + ( e
-68 + test4 += ( e
-69 |                   for e in
-   |
-note: This is an unsafe fix and may change runtime behavior
-
-PLR6104 [*] Use `+=` to perform an augmented assignment directly
-  --> non_augmented_assignment.py:73:1
-   |
-71 |                     )
-72 |
-73 | / test5 = test5 + (
-74 | |     4
-75 | |     *
-76 | |     10
-77 | | )
-   | |_^
-78 |
-79 |   test6 = test6 + \
-   |
-help: Replace with augmented assignment
-   |
-72 |
-   - test5 = test5 + (
-73 + test5 += (
-74 |     4
-   |
-note: This is an unsafe fix and may change runtime behavior
-
-PLR6104 [*] Use `+=` to perform an augmented assignment directly
-  --> non_augmented_assignment.py:79:1
-   |
-77 |   )
-78 |
-79 | / test6 = test6 + \
-80 | |         (
-81 | |             4
-82 | |             *
-83 | |             10
-84 | |         )
-   | |_________^
-85 |
-86 |   test7 = \
-   |
-help: Replace with augmented assignment
-   |
-78 |
-   - test6 = test6 + \
-   -         (
-79 + test6 += (
-80 |             4
-   |
-note: This is an unsafe fix and may change runtime behavior
-
-PLR6104 [*] Use `+=` to perform an augmented assignment directly
-  --> non_augmented_assignment.py:86:1
-   |
-84 |           )
-85 |
-86 | / test7 = \
-87 | |         100 \
-88 | |     + test7
-   | |___________^
 89 |
-90 |   test8 = \
+90 |   test5 = test5 + (
    |
 help: Replace with augmented assignment
    |
-85 |
-   - test7 = \
-   -         100 \
-   -     + test7
-86 + test7 += 100
-87 |
+84 | test4 = []
+   - test4 = test4 + ( e
+85 + test4 += ( e
+86 |                   for e in
    |
 note: This is an unsafe fix and may change runtime behavior
 
 PLR6104 [*] Use `+=` to perform an augmented assignment directly
   --> non_augmented_assignment.py:90:1
    |
-88 |       + test7
+88 |                     )
 89 |
-90 | / test8 = \
-91 | |     886 \
-92 | |     + \
-93 | |  \
-94 | |     test8
-   | |_________^
+90 | / test5 = test5 + (
+91 | |     4
+92 | |     *
+93 | |     10
+94 | | )
+   | |_^
+95 |
+96 |   test6 = test6 + \
    |
 help: Replace with augmented assignment
    |
 89 |
-   - test8 = \
-   -     886 \
-   -     + \
-   -  \
-   -     test8
-90 + test8 += 886
-91 |
+   - test5 = test5 + (
+90 + test5 += (
+91 |     4
    |
+note: This is an unsafe fix and may change runtime behavior
+
+PLR6104 [*] Use `+=` to perform an augmented assignment directly
+   --> non_augmented_assignment.py:96:1
+    |
+ 94 |   )
+ 95 |
+ 96 | / test6 = test6 + \
+ 97 | |         (
+ 98 | |             4
+ 99 | |             *
+100 | |             10
+101 | |         )
+    | |_________^
+102 |
+103 |   test7 = \
+    |
+help: Replace with augmented assignment
+   |
+95 |
+   - test6 = test6 + \
+   -         (
+96 + test6 += (
+97 |             4
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+PLR6104 [*] Use `+=` to perform an augmented assignment directly
+   --> non_augmented_assignment.py:103:1
+    |
+101 |           )
+102 |
+103 | / test7 = \
+104 | |         100 \
+105 | |     + test7
+    | |___________^
+106 |
+107 |   test8 = \
+    |
+help: Replace with augmented assignment
+    |
+102 |
+    - test7 = \
+    -         100 \
+    -     + test7
+103 + test7 += 100
+104 |
+    |
+note: This is an unsafe fix and may change runtime behavior
+
+PLR6104 [*] Use `+=` to perform an augmented assignment directly
+   --> non_augmented_assignment.py:107:1
+    |
+105 |       + test7
+106 |
+107 | / test8 = \
+108 | |     886 \
+109 | |     + \
+110 | |  \
+111 | |     test8
+    | |_________^
+    |
+help: Replace with augmented assignment
+    |
+106 |
+    - test8 = \
+    -     886 \
+    -     + \
+    -  \
+    -     test8
+107 + test8 += 886
+108 |
+    |
 note: This is an unsafe fix and may change runtime behavior

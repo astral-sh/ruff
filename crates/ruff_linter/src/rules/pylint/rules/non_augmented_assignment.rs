@@ -116,10 +116,9 @@ pub(crate) fn non_augmented_assignment(checker: &Checker, assign: &ast::StmtAssi
         return;
     }
 
-    // If the operator is commutative, match, e.g., `x = 1 + x`, but limit such matches to primitive
-    // types.
+    // Match, e.g., `x = 1 + x`.
     if operator.is_commutative()
-        && (value.left.is_number_literal_expr() || value.left.is_boolean_literal_expr())
+        && is_number_or_bool_constant(&value.left)
         && ComparableExpr::from(target) == ComparableExpr::from(&value.right)
     {
         let mut diagnostic =
@@ -133,6 +132,32 @@ pub(crate) fn non_augmented_assignment(checker: &Checker, assign: &ast::StmtAssi
             assign.range,
         )));
     }
+}
+
+/// Returns `true` if `expr` evaluates to a number or a boolean, looking through
+/// any unary operators applied to a number or boolean literal.
+///
+/// Rewriting `x = <operand> op x` as `x op= <operand>` is sound only when `op`
+/// commutes for the type of `<operand>`: `x = 1 + x` is `x += 1`, but
+/// `x = "prefix-" + x` prepends where `x += "prefix-"` appends. Requiring a
+/// literal, rather than any known number, also hides that the rewrite evaluates
+/// the target before the operand rather than after.
+///
+/// The parser does not fold constants, so in `x = -1 + x` the left-hand operand
+/// of the addition is the unary operator `-` applied to the literal `1`, not a
+/// literal in its own right. Applying any number of `+`, `-`, `~` or `not`
+/// operators to a number or boolean literal still yields a number or a boolean,
+/// so peeling them off preserves the guarantee above.
+///
+/// This is deliberately narrower than it could be. `not` evaluates to a boolean
+/// whatever it is applied to, so `not "prefix"` would also qualify, but there is
+/// little value in chasing that case.
+fn is_number_or_bool_constant(mut expr: &Expr) -> bool {
+    while let Expr::UnaryOp(ast::ExprUnaryOp { operand, .. }) = expr {
+        expr = operand;
+    }
+
+    expr.is_number_literal_expr() || expr.is_boolean_literal_expr()
 }
 
 /// Generate a fix to convert an assignment statement to an augmented assignment.

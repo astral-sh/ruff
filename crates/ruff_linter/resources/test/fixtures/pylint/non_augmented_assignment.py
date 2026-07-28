@@ -53,6 +53,23 @@ obj.a = obj.a + 1
 
 a = a+-1
 
+# Unary operators do not stop the operand from evaluating to a number or a
+# boolean, so the commutative operators still commute here.
+to_multiply = -1 + to_multiply
+to_multiply = +1 * to_multiply
+to_multiply = --1 + to_multiply
+to_multiply = -1.5 + to_multiply
+to_multiply = -1j + to_multiply
+to_multiply = (not True) + to_multiply
+flags = ~0x1 & flags
+flags = -True | flags
+
+# The target is already on the left, so commutativity is irrelevant. The
+# right-hand side of an augmented assignment accepts any expression, so the
+# moved operand never needs new parentheses.
+to_multiply = to_multiply**-1
+to_multiply = to_multiply - -1
+
 # Regression tests for https://github.com/astral-sh/ruff/issues/11672
 test = 0x5
 test = test + 0xBA
@@ -100,3 +117,14 @@ index = a_number = a_number + 1
 a_number = index = a_number + 1
 index = index * index + 10
 some_string = "a very long start to the string" + some_string
+
+# The unary operand is not a literal, so its type is unknown and the operator
+# may not commute.
+to_multiply = -a_number + to_multiply
+to_multiply = -to_multiply + 1
+# `-` does not commute, regardless of the operand's type.
+to_multiply = -1 - to_multiply
+# `not` evaluates to a boolean whatever it is applied to, so rewriting this would
+# in fact be safe. The check deliberately stays narrow and only looks for number
+# and boolean literals underneath the unary operators.
+to_multiply = (not "") + to_multiply
