@@ -810,6 +810,215 @@ grandchild.z = 2
 grandchild.unknown = 2
 ```
 
+When another base class rejects assignment, a frozen dataclass must not hide its `__setattr__`
+method:
+
+```py
+from dataclasses import dataclass
+from typing import NoReturn
+
+@dataclass(frozen=True)
+class Frozen:
+    x: int = 1
+
+class RejectsAssignment:
+    y: int = 1
+
+    def __setattr__(self, name: str, value: object) -> NoReturn:
+        raise AttributeError(name)
+
+class ChildWithRejectingAssignmentBase(Frozen, RejectsAssignment): ...
+
+# error: [invalid-assignment] "Cannot assign to attribute `y` on type `ChildWithRejectingAssignmentBase` whose `__setattr__` method returns `Never`/`NoReturn`"
+ChildWithRejectingAssignmentBase().y = 2
+```
+
+A later base class can customize assignment to an ordinary attribute. The value must satisfy both
+the later `__setattr__` and the attribute declaration:
+
+```py
+class AllowsAssignment:
+    y: object = 1
+
+    def __setattr__(self, name: str, value: int) -> None: ...
+
+class ChildWithAllowingAssignmentBase(Frozen, AllowsAssignment): ...
+
+allowed = ChildWithAllowingAssignmentBase()
+allowed.y = 2
+
+# error: [invalid-assignment] "Cannot assign object of type"
+allowed.y = "invalid"
+```
+
+A later `__setattr__` can forward to `object.__setattr__`, which still invokes data descriptors:
+
+```py
+class ForwardsAssignment:
+    def __setattr__(self, name: str, value: object) -> None:
+        super().__setattr__(name, value)
+```
+
+A read-only property therefore remains read-only:
+
+```py
+class ReadOnlyPropertyBase(ForwardsAssignment):
+    @property
+    def y(self) -> int:
+        return 1
+
+class ChildWithReadOnlyProperty(Frozen, ReadOnlyPropertyBase): ...
+
+# error: [invalid-assignment] "Cannot assign to read-only property `y` on object of type `ChildWithReadOnlyProperty`"
+ChildWithReadOnlyProperty().y = 2
+```
+
+The property's setter still determines which values it accepts:
+
+```py
+class TypedPropertyBase(ForwardsAssignment):
+    @property
+    def y(self) -> int:
+        return 1
+
+    @y.setter
+    def y(self, value: int) -> None: ...
+
+class ChildWithTypedProperty(Frozen, TypedPropertyBase): ...
+
+# error: [invalid-assignment] "Expected `int`, found `Literal["invalid"]`"
+ChildWithTypedProperty().y = "invalid"
+```
+
+A property setter that never returns prevents assignment:
+
+```py
+class TerminalPropertyBase(ForwardsAssignment):
+    @property
+    def y(self) -> int:
+        return 1
+
+    @y.setter
+    def y(self, value: int) -> NoReturn:
+        raise AttributeError
+
+class ChildWithTerminalProperty(Frozen, TerminalPropertyBase): ...
+
+# error: [invalid-assignment] "Cannot assign to attribute `y` on type `ChildWithTerminalProperty` whose `__set__` method returns `Never`/`NoReturn`"
+ChildWithTerminalProperty().y = 2
+```
+
+The same rule applies to a custom descriptor whose setter never returns:
+
+```py
+class TerminalDescriptor:
+    def __get__(self, instance: object, owner: type | None = None) -> int:
+        return 1
+
+    def __set__(self, instance: object, value: int) -> NoReturn:
+        raise AttributeError
+
+class TerminalDescriptorBase(ForwardsAssignment):
+    y: TerminalDescriptor = TerminalDescriptor()
+
+class ChildWithTerminalDescriptor(Frozen, TerminalDescriptorBase): ...
+
+# error: [invalid-assignment] "Cannot assign to attribute `y` on type `ChildWithTerminalDescriptor` whose `__set__` method returns `Never`/`NoReturn`"
+ChildWithTerminalDescriptor().y = 2
+```
+
+A later `__setattr__` does not make the declared type of an ordinary attribute disappear:
+
+```py
+class AllowsUntypedAssignment:
+    y: int = 1
+
+    def __setattr__(self, name: str, value: object) -> None: ...
+
+class ChildWithUntypedAssignmentBase(Frozen, AllowsUntypedAssignment): ...
+
+# error: [invalid-assignment]
+ChildWithUntypedAssignmentBase().y = "invalid"
+```
+
+A specialized `Generic[T]` frozen base must also preserve the next `__setattr__` in the MRO:
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+
+@dataclass(frozen=True)
+class GenericFrozen(Generic[T]):
+    value: T
+
+class RejectingGenericAssignmentChild(GenericFrozen[int], RejectsAssignment): ...
+
+# error: [invalid-assignment] "Cannot assign to attribute `y` on type `RejectingGenericAssignmentChild` whose `__setattr__` method returns `Never`/`NoReturn`"
+RejectingGenericAssignmentChild(1).y = 2
+```
+
+The same behavior applies to Python 3.12 type-parameter syntax:
+
+```py
+@dataclass(frozen=True)
+class TypeParameterFrozen[T]:
+    value: T
+
+class RejectingTypeParameterAssignmentChild(TypeParameterFrozen[int], RejectsAssignment): ...
+
+# error: [invalid-assignment] "Cannot assign to attribute `y` on type `RejectingTypeParameterAssignmentChild` whose `__setattr__` method returns `Never`/`NoReturn`"
+RejectingTypeParameterAssignmentChild(1).y = 2
+```
+
+When a subclass inherits from two frozen dataclasses, assignments to fields from both bases remain
+frozen:
+
+```py
+@dataclass(frozen=True)
+class FirstFrozen:
+    first: int = 1
+
+@dataclass(frozen=True)
+class SecondFrozen:
+    second: int = 1
+
+class ChildWithTwoFrozenBases(FirstFrozen, SecondFrozen): ...
+
+multiple = ChildWithTwoFrozenBases()
+# revealed: Overload[(name: Literal["first"], value) -> Never, (name: Literal["second"], value) -> Never, (name: str, value) -> None]
+reveal_type(multiple.__setattr__)
+
+multiple.second = 2  # error: [invalid-assignment]
+```
+
+An `InitVar` is a constructor argument, not a frozen field. A subclass can assign to an attribute
+with the same name:
+
+```py
+from dataclasses import InitVar
+
+@dataclass(frozen=True)
+class FrozenWithInitVar:
+    temporary: InitVar[int] = 0
+
+class ChildWithInitVar(FrozenWithInitVar):
+    temporary: int = 1
+
+init_var_child = ChildWithInitVar()
+init_var_child.temporary = 4
+```
+
+The same rule applies when the `InitVar` belongs to a second frozen base:
+
+```py
+class ChildWithSecondBaseInitVar(Frozen, FrozenWithInitVar):
+    temporary: int = 1
+
+second_init_var_child = ChildWithSecondBaseInitVar()
+second_init_var_child.temporary = 4
+```
+
 Non-field attributes on subclasses of slotted frozen dataclasses are still rejected. This correctly
 models the runtime behavior, but is somewhat surprising and may be a CPython bug, as subclasses of
 slotted classes usually allow arbitrary attributes to be set on them unless the subclass also
