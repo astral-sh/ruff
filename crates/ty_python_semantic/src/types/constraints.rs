@@ -112,9 +112,8 @@ use crate::types::visitor::{
     walk_type_with_recursion_guard,
 };
 use crate::types::{
-    ApplyTypeMappingVisitor, BoundTypeVarInstance, DynamicType, IntersectionType, Type,
-    TypeContext, TypeMapping, TypePair, TypeVarBoundOrConstraints, TypeVarVariance, TypedDictType,
-    UnionType,
+    ApplyTypeMappingVisitor, BoundTypeVarInstance, IntersectionType, Type, TypeContext,
+    TypeMapping, TypePair, TypeVarBoundOrConstraints, TypeVarVariance, UnionType,
 };
 use crate::{Db, FxIndexMap, FxIndexSet, FxOrderSet};
 
@@ -1499,6 +1498,15 @@ impl<'db> UpperBound<'db> {
         Self { clauses }
     }
 
+    #[cfg(test)]
+    pub(crate) fn from_clauses(clauses: impl IntoIterator<Item = Type<'db>>) -> Self {
+        let mut upper = Self::none();
+        for clause in clauses {
+            upper.add_clause(clause);
+        }
+        upper
+    }
+
     pub(crate) fn is_empty(&self) -> bool {
         self.clauses.is_empty()
     }
@@ -2416,14 +2424,10 @@ impl NodeId {
                     return *result;
                 }
 
-                let result = match self.simple_conjunction_is_never_satisfied(db, builder) {
-                    Some(result) => result,
-                    None => {
-                        let mut path = interior.path_assignments(builder);
-                        path.visit(db, builder, self, &mut IsNeverSatisfiedVisitor)
-                            .is_continue()
-                    }
-                };
+                let mut path = interior.path_assignments(builder);
+                let result = path
+                    .visit(db, builder, self, &mut IsNeverSatisfiedVisitor)
+                    .is_continue();
                 builder
                     .storage
                     .borrow_mut()
@@ -2432,102 +2436,6 @@ impl NodeId {
                 result
             }
         }
-    }
-
-    fn bound_requires_sequent_analysis<'db>(db: &'db dyn Db, bound: Type<'db>) -> bool {
-        // A bound that contains a typevar (specialized or not) is not concrete, so the fast paths
-        // that rely on concrete bounds cannot reason about it.
-        //
-        // Type aliases and class-based protocols can hide typevars in lazy attributes. Generic
-        // TypedDicts defined with a class statement and functionally defined TypedDicts can
-        // likewise hide typevars in their lazy fields. Do not expand those attributes here: a
-        // recursively specialized alias can produce a different type at every level, defeating
-        // the normal recursion guard. Nongeneric TypedDicts defined with a class statement
-        // cannot hide a generic specialization, and synthesized TypedDicts and protocols
-        // already expose their fields to the visitor, so none of those need to force sequent
-        // analysis.
-        any_over_type(db, bound, false, |ty| match ty {
-            Type::TypeVar(_)
-            | Type::Dynamic(DynamicType::UnspecializedTypeVar)
-            | Type::TypeAlias(_) => true,
-            Type::ProtocolInstance(protocol) => protocol.class_origin().is_some(),
-            Type::TypedDict(TypedDictType::Class(class)) => class
-                .static_class_literal(db)
-                .is_none_or(|(origin, _)| origin.generic_context(db).is_some()),
-            _ => false,
-        })
-    }
-
-    /// Fast path for [`is_never_satisfied`][Self::is_never_satisfied]: decides satisfiability
-    /// directly when this BDD is a single all-positive conjunction of constraints whose bounds do
-    /// not mention typevars. Large literal unions produce exactly this shape — checking
-    /// `Literal["a", "b", ...] ≤ T` yields one constraint per union element — and the general
-    /// path walk discovers sequents for every pair of constraints, which is quadratic in the
-    /// number of constraints.
-    ///
-    /// With typevar-free bounds, `⋀ᵢ (Lᵢ ≤ T ≤ Uᵢ)` is satisfiable iff, for each constrained
-    /// typevar, `(L₁ | … | Lₙ) ≤ (U₁ & … & Uₙ)`. Assignability distributes over the union on the
-    /// left and the intersection clauses on the right, so this finds exactly the contradictions
-    /// that the walk's pairwise disjointness sequents detect.
-    ///
-    /// Returns `None` if the BDD does not have the required shape, in which case the caller falls
-    /// back to the general path walk.
-    fn simple_conjunction_is_never_satisfied<'db>(
-        self,
-        db: &'db dyn Db,
-        builder: &ConstraintSetBuilder<'db>,
-    ) -> Option<bool> {
-        let mut bounds: FxIndexMap<
-            BoundTypeVarIdentity<'db>,
-            (FxIndexSet<Type<'db>>, FxIndexSet<Type<'db>>),
-        > = FxIndexMap::default();
-        let mut current = self;
-        loop {
-            match current.node() {
-                Node::AlwaysTrue => break,
-                Node::AlwaysFalse => return None,
-                Node::Interior(_) => {
-                    let interior = builder.interior_node_data(current);
-                    if interior.if_uncertain != ALWAYS_FALSE || interior.if_false != ALWAYS_FALSE {
-                        return None;
-                    }
-
-                    let constraint = builder.constraint_data(interior.constraint);
-                    if iter::chain(constraint.bounds.lower, constraint.bounds.upper)
-                        .any(|bound| Self::bound_requires_sequent_analysis(db, bound))
-                    {
-                        return None;
-                    }
-
-                    let (lowers, uppers) =
-                        bounds.entry(constraint.typevar.identity(db)).or_default();
-                    if let Some(lower) = constraint.bounds.lower {
-                        lowers.insert(lower);
-                    }
-                    if let Some(upper) = constraint.bounds.upper {
-                        uppers.insert(upper);
-                    }
-                    current = interior.if_true;
-                }
-            }
-        }
-
-        for (lowers, uppers) in bounds.into_values() {
-            // Without both lower and upper bounds, there is nothing that could conflict.
-            if lowers.is_empty() || uppers.is_empty() {
-                continue;
-            }
-
-            let lower = UnionType::from_elements(db, lowers);
-            let when = uppers.iter().when_all(db, builder, |upper| {
-                let when = lower.when_constraint_set_assignable_to_owned(db, *upper);
-                builder.load(db, &when)
-            });
-            if when.is_never_satisfied(db) {
-                return Some(true);
-            }
-        }
-        Some(false)
     }
 
     fn solutions_with<'db>(
@@ -3791,7 +3699,7 @@ impl<'db> PathBounds<'db> {
                     }
 
                     if iter::chain(constraint.bounds.lower, constraint.bounds.upper)
-                        .any(|bound| NodeId::bound_requires_sequent_analysis(db, bound))
+                        .any(|bound| bound.has_typevar(db) || bound.has_unspecialized_type_var(db))
                     {
                         return None;
                     }
@@ -3806,16 +3714,11 @@ impl<'db> PathBounds<'db> {
             }
         }
 
-        let mut mappings: FxIndexMap<
-            BoundTypeVarIdentity<'db>,
-            (BoundTypeVarInstance<'db>, ConstraintBoundsBuilder<'db>),
-        > = FxIndexMap::default();
+        let mut mappings: FxIndexMap<BoundTypeVarInstance<'db>, ConstraintBoundsBuilder<'db>> =
+            FxIndexMap::default();
         constraints.sort_by_key(|(_, _, source_order)| *source_order);
         for (typevar, constraint, _) in constraints {
-            let identity = typevar.identity(db);
-            let (_, bounds) = mappings
-                .entry(identity)
-                .or_insert_with(|| (typevar, ConstraintBoundsBuilder::default()));
+            let bounds = mappings.entry(typevar).or_default();
             if let Some(lower) = constraint.lower {
                 bounds.add_lower(db, lower);
             }
@@ -3826,7 +3729,7 @@ impl<'db> PathBounds<'db> {
 
         let path = mappings
             .drain(..)
-            .map(|(_, (bound_typevar, bounds))| bounds.finish(db, bound_typevar))
+            .map(|(bound_typevar, bounds)| bounds.finish(db, bound_typevar))
             .collect();
         Some(PathBounds::Constrained(Box::new([path])))
     }
@@ -7734,29 +7637,14 @@ mod tests {
 
     use indoc::indoc;
     use pretty_assertions::assert_eq;
-    use ruff_db::system::DbWithWritableSystem as _;
-    use ruff_python_ast::name::Name;
 
     use crate::db::tests::setup_db;
-    use crate::place::global_symbol;
     use crate::types::generics::ApplySpecialization;
-    use crate::types::typed_dict::TypedDictFieldBuilder;
-    use crate::types::{
-        BoundTypeVarInstance, ClassType, KnownClass, KnownInstanceType, TypeAliasType,
-        TypeVarVariance,
-    };
+    use crate::types::{BoundTypeVarInstance, KnownClass, TypeVarVariance};
+    use ruff_python_ast::name::Name;
 
     fn create_typevar<'db>(db: &'db dyn Db, name: &'static str) -> BoundTypeVarInstance<'db> {
         BoundTypeVarInstance::synthetic(db, Name::new_static(name), TypeVarVariance::Invariant)
-    }
-
-    fn synthesized_typed_dict<'db>(db: &'db dyn Db, value: Type<'db>) -> Type<'db> {
-        let items = std::iter::once((
-            Name::new_static("value"),
-            TypedDictFieldBuilder::new(value).required(true).build(),
-        ))
-        .collect();
-        Type::TypedDict(TypedDictType::from_schema_items(db, items))
     }
 
     fn create_constraint<'db, 'c>(
@@ -7820,6 +7708,25 @@ mod tests {
     }
 
     #[test]
+    fn upper_bound_prunes_duplicates_and_redundant_supertypes() {
+        let db = setup_db();
+        let int = known_instance(&db, KnownClass::Int);
+        let bool = known_instance(&db, KnownClass::Bool);
+        let str = known_instance(&db, KnownClass::Str);
+
+        let mut upper = UpperBound::from_clauses([int, str, int]);
+        assert_eq!(upper.clauses, FxOrderSet::from_iter([int, str]));
+
+        // `bool` is narrower than `int`, so it replaces the redundant `int` clause while
+        // preserving the relative order of the remaining clauses.
+        upper.add_clause(bool);
+        assert_eq!(upper.clauses, FxOrderSet::from_iter([str, bool]));
+
+        upper.add_clause(int);
+        assert_eq!(upper.clauses, FxOrderSet::from_iter([str, bool]));
+    }
+
+    #[test]
     fn upper_bound_collapses_never() {
         let db = setup_db();
         let int = known_instance(&db, KnownClass::Int);
@@ -7866,377 +7773,6 @@ mod tests {
         let storage = builder.storage.borrow();
         assert_eq!(storage.single_sequent_cache.len(), single_sequents);
         assert_eq!(storage.pair_sequent_cache.len(), pair_sequents);
-    }
-
-    #[test]
-    fn simple_concrete_bounds_skip_sequent_analysis() {
-        let mut db = setup_db();
-        db.write_dedented(
-            "/src/concrete_typed_dicts.py",
-            indoc! {r#"
-                from typing import TypedDict
-
-                class Movie(TypedDict):
-                    title: str
-
-                class Track(TypedDict):
-                    artist: str
-            "#},
-        )
-        .expect("write TypedDict source");
-        let file = ruff_db::files::system_path_to_file(&db, "/src/concrete_typed_dicts.py")
-            .expect("TypedDict source should exist");
-        let [movie, track] = ["Movie", "Track"].map(|name| {
-            Type::typed_dict(
-                global_symbol(&db, file, name)
-                    .place
-                    .expect_type()
-                    .expect_class_literal()
-                    .default_specialization(&db),
-            )
-        });
-
-        let int = KnownClass::Int.to_instance(&db);
-        let str = KnownClass::Str.to_instance(&db);
-
-        for (name, left, right) in [
-            ("TypedDicts defined with a class statement", movie, track),
-            (
-                "synthesized TypedDict",
-                synthesized_typed_dict(&db, int),
-                str,
-            ),
-            (
-                "synthesized protocol",
-                Type::protocol_with_readonly_members(&db, [("value", int)]),
-                str,
-            ),
-        ] {
-            let t = create_typevar(&db, "T");
-            let builder = ConstraintSetBuilder::new();
-            let set = ConstraintSet::constrain_typevar_lower_bound(&db, &builder, t, left).and(
-                &db,
-                &builder,
-                || ConstraintSet::constrain_typevar_lower_bound(&db, &builder, t, right),
-            );
-            let inferable = TypeVarSet::from_typevars(&db, [t]);
-            let expected = Solutions::Constrained(vec![vec![TypeVarSolution {
-                bound_typevar: t,
-                solution: UnionType::from_elements(&db, [left, right]),
-            }]]);
-            let sequent_counts = || {
-                let storage = builder.storage.borrow();
-                (
-                    storage.single_sequent_cache.len(),
-                    storage.pair_sequent_cache.len(),
-                )
-            };
-            let before = sequent_counts();
-
-            assert!(!set.is_never_satisfied(&db), "{name}");
-            assert_eq!(set.solutions(&db, &builder, inferable), expected, "{name}");
-            assert_eq!(
-                sequent_counts(),
-                before,
-                "{name} should not require sequent analysis",
-            );
-        }
-    }
-
-    #[test]
-    fn nonconcrete_bounds_require_sequent_analysis() {
-        let mut db = setup_db();
-        db.write_dedented(
-            "/src/lazy_class_bounds.py",
-            indoc! {r#"
-                from typing import Generic, Protocol, TypedDict, TypeVar
-
-                S = TypeVar("S")
-
-                class GenericSchema(TypedDict, Generic[S]):
-                    value: S
-
-                FunctionalSchema = TypedDict("FunctionalSchema", {"value": int})
-                GenericFunctionalSchema = TypedDict(
-                    "GenericFunctionalSchema",
-                    {"director": str, "assistant producer": S},
-                )
-
-                class ValueProtocol(Protocol):
-                    value: int
-            "#},
-        )
-        .expect("write lazy class source");
-        let file = ruff_db::files::system_path_to_file(&db, "/src/lazy_class_bounds.py")
-            .expect("lazy class source should exist");
-
-        let class_for = |name| {
-            global_symbol(&db, file, name)
-                .place
-                .expect_type()
-                .expect_class_literal()
-        };
-        let generic_class = class_for("GenericSchema");
-        let s = create_typevar(&db, "S");
-
-        for (name, bound) in [
-            ("type variable", Type::TypeVar(s)),
-            (
-                "unspecialized type variable",
-                Type::Dynamic(DynamicType::UnspecializedTypeVar),
-            ),
-            (
-                "GenericSchema",
-                Type::instance(&db, generic_class.default_specialization(&db)),
-            ),
-            (
-                "unspecialized GenericSchema",
-                Type::typed_dict(ClassType::NonGeneric(generic_class)),
-            ),
-            (
-                "FunctionalSchema",
-                Type::instance(
-                    &db,
-                    class_for("FunctionalSchema").default_specialization(&db),
-                ),
-            ),
-            (
-                "GenericFunctionalSchema",
-                Type::instance(
-                    &db,
-                    class_for("GenericFunctionalSchema").default_specialization(&db),
-                ),
-            ),
-            (
-                "ValueProtocol",
-                Type::instance(&db, class_for("ValueProtocol").default_specialization(&db)),
-            ),
-            (
-                "synthesized TypedDict containing a type variable",
-                synthesized_typed_dict(&db, Type::TypeVar(s)),
-            ),
-            (
-                "synthesized protocol containing a type variable",
-                Type::protocol_with_readonly_members(&db, [("value", Type::TypeVar(s))]),
-            ),
-        ] {
-            assert!(
-                NodeId::bound_requires_sequent_analysis(&db, bound),
-                "`{name}` must not hide lazy members from the fast path",
-            );
-        }
-    }
-
-    #[test]
-    fn simple_upper_bound_conjunction_skips_sequent_analysis() {
-        let db = setup_db();
-        let t = create_typevar(&db, "T");
-        let builder = ConstraintSetBuilder::new();
-        let mut set = ConstraintSet::always(&builder);
-        for value in 0..8 {
-            set = set.and(&db, &builder, || {
-                ConstraintSet::constrain_typevar_upper_bound(
-                    &db,
-                    &builder,
-                    t,
-                    Type::int_literal(value),
-                )
-            });
-        }
-        let inferable = TypeVarSet::from_typevars(&db, [t]);
-        let (single_sequents, pair_sequents) = {
-            let storage = builder.storage.borrow();
-            (
-                storage.single_sequent_cache.len(),
-                storage.pair_sequent_cache.len(),
-            )
-        };
-
-        assert!(!set.is_never_satisfied(&db));
-        assert_eq!(
-            set.solutions(&db, &builder, inferable),
-            Solutions::Constrained(vec![vec![TypeVarSolution {
-                bound_typevar: t,
-                solution: Type::Never,
-            }]])
-        );
-
-        let storage = builder.storage.borrow();
-        assert_eq!(storage.single_sequent_cache.len(), single_sequents);
-        assert_eq!(storage.pair_sequent_cache.len(), pair_sequents);
-    }
-
-    #[test]
-    fn simple_conjunction_fast_path_matches_path_walk() {
-        let db = setup_db();
-        let t = create_typevar(&db, "T");
-        let builder = ConstraintSetBuilder::new();
-        let int = KnownClass::Int.to_instance(&db);
-        let str = KnownClass::Str.to_instance(&db);
-        let bool = KnownClass::Bool.to_instance(&db);
-
-        // (int ≤ T) ∧ (str ≤ T): satisfiable
-        let lower_bounds = ConstraintSet::constrain_typevar_lower_bound(&db, &builder, t, int).and(
-            &db,
-            &builder,
-            || ConstraintSet::constrain_typevar_lower_bound(&db, &builder, t, str),
-        );
-        // (bool ≤ T) ∧ (T ≤ int): satisfiable
-        let overlapping = ConstraintSet::constrain_typevar_lower_bound(&db, &builder, t, bool).and(
-            &db,
-            &builder,
-            || ConstraintSet::constrain_typevar_upper_bound(&db, &builder, t, int),
-        );
-        // (int ≤ T ≤ int) ∧ (str ≤ T ≤ str): unsatisfiable
-        let contradictory =
-            create_constraint(&db, &builder, t, KnownClass::Int).and(&db, &builder, || {
-                create_constraint(&db, &builder, t, KnownClass::Str)
-            });
-
-        let cases = [
-            ("lower bounds", lower_bounds, false),
-            ("overlapping bounds", overlapping, false),
-            ("contradictory bounds", contradictory, true),
-        ];
-        let sequent_counts = || {
-            let storage = builder.storage.borrow();
-            (
-                storage.single_sequent_cache.len(),
-                storage.pair_sequent_cache.len(),
-            )
-        };
-
-        for &(name, set, expected) in &cases {
-            let before = sequent_counts();
-            assert_eq!(set.is_never_satisfied(&db), expected, "{name}");
-            assert_eq!(
-                sequent_counts(),
-                before,
-                "{name} should not require sequent analysis",
-            );
-        }
-
-        for (name, set, expected) in cases {
-            let Node::Interior(interior) = set.node.node() else {
-                panic!("expected an interior node");
-            };
-
-            assert_eq!(
-                set.node
-                    .simple_conjunction_is_never_satisfied(&db, &builder),
-                Some(expected),
-                "{name}",
-            );
-
-            let mut path = interior.path_assignments(&builder);
-            assert_eq!(
-                path.visit(&db, &builder, set.node, &mut IsNeverSatisfiedVisitor)
-                    .is_continue(),
-                expected,
-                "{name}",
-            );
-        }
-    }
-
-    #[test]
-    fn simple_conjunction_groups_materialized_typevar_by_identity() {
-        let db = setup_db();
-        let t = create_typevar(&db, "T");
-        let int = KnownClass::Int.to_instance(&db);
-        let str = KnownClass::Str.to_instance(&db);
-        let materialized_t =
-            t.map_bound_or_constraints(&db, |_| Some(TypeVarBoundOrConstraints::UpperBound(str)));
-        assert_ne!(t, materialized_t);
-        assert!(t.is_same_typevar_as(&db, materialized_t));
-
-        let builder = ConstraintSetBuilder::new();
-        let set = ConstraintSet::constrain_typevar_lower_bound(&db, &builder, t, int).and(
-            &db,
-            &builder,
-            || ConstraintSet::constrain_typevar_upper_bound(&db, &builder, materialized_t, str),
-        );
-        let Node::Interior(interior) = set.node.node() else {
-            panic!("expected an interior node");
-        };
-
-        let fast_path = set
-            .node
-            .simple_conjunction_is_never_satisfied(&db, &builder)
-            .expect("fast path should apply to concrete bounds");
-        let walked = interior
-            .path_assignments(&builder)
-            .visit(&db, &builder, set.node, &mut IsNeverSatisfiedVisitor)
-            .is_continue();
-
-        assert!(walked);
-        assert_eq!(fast_path, walked);
-
-        let inferable = TypeVarSet::from_typevars(&db, [t]);
-        assert_eq!(
-            set.solutions(&db, &builder, inferable),
-            Solutions::Unsatisfiable
-        );
-    }
-
-    #[test]
-    fn simple_conjunction_rejects_typevar_in_lazy_alias() {
-        let mut db = setup_db();
-        db.write_dedented(
-            "/src/lazy_alias.py",
-            "from collections.abc import Sequence\ntype Alias[X] = Sequence[X]\n",
-        )
-        .expect("write source");
-        let file = ruff_db::files::system_path_to_file(&db, "/src/lazy_alias.py")
-            .expect("source should exist");
-        let alias = global_symbol(&db, file, "Alias").place.expect_type();
-        let Type::KnownInstance(KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(alias))) =
-            alias
-        else {
-            panic!("expected a PEP-695 type alias");
-        };
-
-        let t = create_typevar(&db, "T");
-        let s = create_typevar(&db, "S");
-        let int = KnownClass::Int.to_instance(&db);
-        let str = KnownClass::Str.to_instance(&db);
-        let alias_of_s = Type::TypeAlias(TypeAliasType::PEP695(
-            alias.apply_specialization(&db, |context| {
-                context.specialize(&db, &[Type::TypeVar(s)][..])
-            }),
-        ));
-        let alias_of_int = Type::TypeAlias(TypeAliasType::PEP695(
-            alias.apply_specialization(&db, |context| context.specialize(&db, &[int][..])),
-        ));
-        assert!(!alias_of_s.has_typevar(&db));
-        assert!(NodeId::bound_requires_sequent_analysis(&db, alias_of_s));
-
-        let builder = ConstraintSetBuilder::new();
-        let set = ConstraintSet::constrain_typevar(&db, &builder, t, alias_of_s, alias_of_int).and(
-            &db,
-            &builder,
-            || ConstraintSet::constrain_typevar_lower_bound(&db, &builder, s, str),
-        );
-        let Node::Interior(interior) = set.node.node() else {
-            panic!("expected an interior node");
-        };
-
-        assert!(
-            set.node
-                .simple_conjunction_is_never_satisfied(&db, &builder)
-                .is_none()
-        );
-        let walked = interior
-            .path_assignments(&builder)
-            .visit(&db, &builder, set.node, &mut IsNeverSatisfiedVisitor)
-            .is_continue();
-        assert!(walked);
-        assert!(set.is_never_satisfied(&db));
-
-        let inferable = TypeVarSet::from_typevars(&db, [t, s]);
-        assert_eq!(
-            set.solutions(&db, &builder, inferable),
-            Solutions::Unsatisfiable
-        );
     }
 
     #[test]
