@@ -430,7 +430,7 @@ impl Workspace {
                     .collect();
 
                 let code = if (!is_human_readable_names_enabled(self.settings.linter.preview)
-                    || self.settings.linter.prefer_rule_codes_in_output)
+                    || self.settings.linter.output_prefer_rule_codes)
                     && let Some(code) = msg.secondary_code()
                 {
                     code.as_str()

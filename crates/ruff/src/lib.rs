@@ -375,7 +375,7 @@ pub fn check(args: CheckCommand, global_options: GlobalConfigArgs) -> Result<Exi
     // TODO: this should reference the global preview mode once https://github.com/astral-sh/ruff/issues/8232
     //   is resolved.
     let preview = pyproject_config.settings.linter.preview;
-    let prefer_rule_codes = pyproject_config.settings.linter.prefer_rule_codes_in_output;
+    let prefer_rule_codes = pyproject_config.settings.linter.output_prefer_rule_codes;
 
     if cli.watch {
         // Configure the file watcher.

@@ -158,7 +158,7 @@ pub(crate) fn check(
         stylist.line_ending(),
         &suppressions,
         if is_human_readable_names_enabled(settings.linter.preview)
-            && !settings.linter.prefer_rule_codes_in_output
+            && !settings.linter.output_prefer_rule_codes
         {
             SuppressionKind::Ignore
         } else {
@@ -279,7 +279,7 @@ fn to_lsp_diagnostic(
     let (severity, code) = if let Some(code) = diagnostic.secondary_code() {
         let severity = severity(code);
         let code = if is_human_readable_names_enabled(context.settings.preview)
-            && !context.settings.prefer_rule_codes_in_output
+            && !context.settings.output_prefer_rule_codes
         {
             name.to_string()
         } else {

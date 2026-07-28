@@ -236,7 +236,7 @@ pub struct LinterSettings {
     pub per_file_target_version: CompiledPerFileTargetVersionList,
     pub preview: PreviewMode,
     #[cache_key(ignore)]
-    pub prefer_rule_codes_in_output: bool,
+    pub output_prefer_rule_codes: bool,
     pub explicit_preview_rules: bool,
 
     // Rule-specific settings
@@ -302,7 +302,7 @@ impl Display for LinterSettings {
                 self.unresolved_target_version,
                 self.per_file_target_version,
                 self.preview,
-                self.prefer_rule_codes_in_output,
+                self.output_prefer_rule_codes,
                 self.explicit_preview_rules,
                 self.extension | debug,
 
@@ -854,7 +854,7 @@ impl LinterSettings {
             pyupgrade: pyupgrade::settings::Settings::default(),
             ruff: ruff::settings::Settings::default(),
             preview: PreviewMode::default(),
-            prefer_rule_codes_in_output: false,
+            output_prefer_rule_codes: false,
             explicit_preview_rules: false,
             extension: ExtensionMapping::default(),
             typing_extensions: true,

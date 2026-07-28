@@ -2493,6 +2493,13 @@
             }
           ]
         },
+        "output-prefer-rule-codes": {
+          "description": "Whether to prefer rule codes over human-readable rule names in diagnostic output, even\nwhen preview mode is enabled.\n\nDiagnostics without rule codes, such as syntax errors and formatting diagnostics, will\ncontinue to use the human-readable name, but those corresponding to lint rules will use the\nrule's code. For example, the concise diagnostic for an unused import will use the code\n`F401` instead of the name `unused-import`:\n\n```console\n$ ruff check --preview --config 'lint.output-prefer-rule-codes = true' --output-format=concise example.py\nexample.py:1:8: F401 [*] `math` imported but unused\n$ ruff check --preview --config 'lint.output-prefer-rule-codes = false' --output-format=concise example.py\nexample.py:1:8: unused-import: [*] `math` imported but unused\n```",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
         "pep8-naming": {
           "description": "Options for the `pep8-naming` plugin.",
           "anyOf": [
@@ -2516,13 +2523,6 @@
               "$ref": "#/definitions/RuleSelector"
             }
           }
-        },
-        "prefer-rule-codes-in-output": {
-          "description": "Whether to prefer rule codes over human-readable rule names in diagnostic output, even\nwhen preview mode is enabled.",
-          "type": [
-            "boolean",
-            "null"
-          ]
         },
         "preview": {
           "description": "Whether to enable preview mode. When preview mode is enabled, Ruff will\nuse unstable rules and fixes.",
