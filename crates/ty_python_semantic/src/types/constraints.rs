@@ -1499,18 +1499,6 @@ impl<'db> UpperBound<'db> {
         Self { clauses }
     }
 
-    #[cfg(test)]
-    pub(crate) fn from_clauses(
-        db: &'db dyn Db,
-        clauses: impl IntoIterator<Item = Type<'db>>,
-    ) -> Self {
-        let mut upper = Self::none();
-        for clause in clauses {
-            upper.add_clause(db, clause);
-        }
-        upper
-    }
-
     pub(crate) fn is_empty(&self) -> bool {
         self.clauses.is_empty()
     }
@@ -1530,48 +1518,7 @@ impl<'db> UpperBound<'db> {
         self.clauses.len() == 1 && self.clauses.contains(&Type::Never)
     }
 
-    pub(crate) fn add_clause(&mut self, db: &'db dyn Db, clause: Type<'db>) {
-        // This `Never` fast path is an optimization. The general redundancy-pruning loop below
-        // should also handle it correctly, but spelling it out avoids unnecessary relation checks
-        // and keeps the stored representation canonical.
-        if self.is_never() {
-            return;
-        }
-
-        if clause.is_never() {
-            self.clauses.clear();
-            self.clauses.insert(Type::Never);
-            return;
-        }
-
-        // Do not special-case `object` here. An explicit `object` clause should be preserved when
-        // it is the only clause, so `T <= object` remains distinguishable from a missing upper
-        // bound. If another clause already exists, the general redundancy check below treats
-        // `object` as redundant; if a narrower clause is added later, the retain step removes the
-        // existing `object` clause.
-        //
-        // First check if there's an existing upper bound clause that is a subtype of the new type.
-        // If so, adding the new type does nothing to the intersection.
-        if self
-            .clauses
-            .iter()
-            .any(|existing| existing.is_redundant_with(db, clause))
-        {
-            return;
-        }
-
-        // Otherwise remove any existing clauses that are a supertype of the new type, since the
-        // intersection will clip them to the new type.
-        self.clauses
-            .retain(|existing| !clause.is_redundant_with(db, *existing));
-        self.clauses.insert(clause);
-    }
-
-    /// Adds a clause without checking whether it is redundant with any existing clauses.
-    ///
-    /// This is useful for upper-only bounds: their solution is the intersection of all clauses,
-    /// so pruning them one at a time only adds quadratic work before that intersection is built.
-    fn add_clause_without_pruning(&mut self, clause: Type<'db>) {
+    pub(crate) fn add_clause(&mut self, clause: Type<'db>) {
         if self.is_never() {
             return;
         }
@@ -2089,10 +2036,10 @@ impl ConstraintId {
         };
         let mut merged_upper = UpperBound::none();
         if let Some(upper) = self_constraint.bounds.upper {
-            merged_upper.add_clause(db, upper);
+            merged_upper.add_clause(upper);
         }
         if let Some(upper) = other_constraint.bounds.upper {
-            merged_upper.add_clause(db, upper);
+            merged_upper.add_clause(upper);
         }
         let effective_lower = lower.unwrap_or(Type::Never);
 
@@ -3568,12 +3515,7 @@ impl<'db> ConstraintBoundsBuilder<'db> {
 
     fn add_upper(&mut self, db: &'db dyn Db, ty: Type<'db>) {
         self.classify_evidence(db, ty);
-        self.upper.add_clause(db, ty);
-    }
-
-    fn add_upper_without_pruning(&mut self, db: &'db dyn Db, ty: Type<'db>) {
-        self.classify_evidence(db, ty);
-        self.upper.add_clause_without_pruning(ty);
+        self.upper.add_clause(ty);
     }
 
     fn finish(self, db: &'db dyn Db, bound_typevar: BoundTypeVarInstance<'db>) -> PathBound<'db> {
@@ -3864,11 +3806,6 @@ impl<'db> PathBounds<'db> {
             }
         }
 
-        let typevars_with_lower: FxIndexSet<BoundTypeVarIdentity<'db>> = constraints
-            .iter()
-            .filter(|(_, bounds, _)| bounds.lower.is_some())
-            .map(|(typevar, _, _)| typevar.identity(db))
-            .collect();
         let mut mappings: FxIndexMap<
             BoundTypeVarIdentity<'db>,
             (BoundTypeVarInstance<'db>, ConstraintBoundsBuilder<'db>),
@@ -3883,11 +3820,7 @@ impl<'db> PathBounds<'db> {
                 bounds.add_lower(db, lower);
             }
             if let Some(upper) = constraint.upper {
-                if typevars_with_lower.contains(&identity) {
-                    bounds.add_upper(db, upper);
-                } else {
-                    bounds.add_upper_without_pruning(db, upper);
-                }
+                bounds.add_upper(db, upper);
             }
         }
 
@@ -7826,35 +7759,16 @@ mod tests {
     }
 
     #[test]
-    fn upper_bound_prunes_duplicates_and_redundant_supertypes() {
-        let db = setup_db();
-        let int = known_instance(&db, KnownClass::Int);
-        let bool = known_instance(&db, KnownClass::Bool);
-        let str = known_instance(&db, KnownClass::Str);
-
-        let mut upper = UpperBound::from_clauses(&db, [int, str, int]);
-        assert_eq!(upper.clauses, FxOrderSet::from_iter([int, str]));
-
-        // `bool` is narrower than `int`, so it replaces the redundant `int` clause while
-        // preserving the relative order of the remaining clauses.
-        upper.add_clause(&db, bool);
-        assert_eq!(upper.clauses, FxOrderSet::from_iter([str, bool]));
-
-        upper.add_clause(&db, int);
-        assert_eq!(upper.clauses, FxOrderSet::from_iter([str, bool]));
-    }
-
-    #[test]
     fn upper_bound_collapses_never() {
         let db = setup_db();
         let int = known_instance(&db, KnownClass::Int);
 
         let mut upper = UpperBound::from_clause(int);
-        upper.add_clause(&db, Type::Never);
+        upper.add_clause(Type::Never);
         assert_eq!(upper.clauses, FxOrderSet::from_iter([Type::Never]));
         assert_eq!(upper.materialize_exact(&db), Type::Never);
 
-        upper.add_clause(&db, int);
+        upper.add_clause(int);
         assert_eq!(upper.clauses, FxOrderSet::from_iter([Type::Never]));
     }
 
