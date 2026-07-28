@@ -13,7 +13,6 @@ use crate::types::attribute_write::{
 };
 use crate::types::call::{CallArguments, CallDunderError};
 use crate::types::relation::{DisjointnessChecker, TypeRelationChecker};
-use crate::types::tuple::Tuple;
 use crate::types::visitor::any_over_type;
 use crate::types::{TypeContext, UpcastPolicy};
 use crate::{
@@ -3024,44 +3023,39 @@ impl<'db> ProtocolMemberCandidate<'db> {
     }
 }
 
+/// Selects a single overload using same-protocol receiver annotations.
+///
+/// Unsupported, gradual, and ambiguous receiver relations retain the ordinary protocol binding.
 fn receiver_filtered_protocol_method<'db>(
     db: &'db dyn Db,
     callable: CallableType<'db>,
     receiver_ty: Type<'db>,
 ) -> Option<Type<'db>> {
-    if callable.is_classmethod_like(db) || callable.is_staticmethod_like(db) {
-        return None;
-    }
-
-    if receiver_has_fully_gradual_typevartuple(db, receiver_ty) {
-        return None;
-    }
-
     let signatures = callable.signatures(db);
-    if !signatures
-        .iter()
-        .any(Signature::has_explicit_positional_receiver_annotation)
+    if signatures.overloads.len() < 2
+        || receiver_ty.has_dynamic(db)
+        || receiver_has_non_fixed_typevartuple(db, receiver_ty)
+        || receiver_ty.has_typevar_or_typevar_instance(db)
     {
         return None;
     }
 
-    let filtered_signatures =
-        CallableSignature::from_overloads(signatures.iter().filter_map(|signature| {
-            if signature.receiver_annotation_selects_protocol_overload(db, receiver_ty) {
-                signature.bind_receiver_if_compatible(db, receiver_ty)
-            } else {
-                Some(signature.defer_receiver_binding(db))
-            }
-        }));
-
-    if filtered_signatures.iter().next().is_none() {
-        return Some(Type::Never);
+    let mut selected = None;
+    for signature in signatures {
+        let (signature, receiver_ty) =
+            signature.nominalize_same_protocol_receiver(db, receiver_ty)?;
+        if let Some(signature) = signature.bind_self_if_compatible(db, receiver_ty, receiver_ty)
+            && selected.replace(signature).is_some()
+        {
+            return None;
+        }
     }
+    let signature = selected?;
 
     Some(Type::Callable(
         CallableType::new(
             db,
-            filtered_signatures,
+            CallableSignature::single(signature),
             callable.kind(db),
             callable.provenance(db),
         )
@@ -3069,7 +3063,7 @@ fn receiver_filtered_protocol_method<'db>(
     ))
 }
 
-fn receiver_has_fully_gradual_typevartuple<'db>(db: &'db dyn Db, receiver_ty: Type<'db>) -> bool {
+fn receiver_has_non_fixed_typevartuple<'db>(db: &'db dyn Db, receiver_ty: Type<'db>) -> bool {
     receiver_ty
         .class_specialization(db)
         .is_some_and(|(_, specialization)| {
@@ -3079,18 +3073,9 @@ fn receiver_has_fully_gradual_typevartuple<'db>(db: &'db dyn Db, receiver_ty: Ty
                 .zip(specialization.types(db))
                 .any(|(typevar, ty)| {
                     typevar.is_typevartuple(db)
-                        && ty.exact_tuple_instance_spec(db).is_some_and(|tuple| {
-                            matches!(
-                                tuple.as_ref(),
-                                Tuple::Variable(tuple)
-                                    if tuple.prefix_elements().is_empty()
-                                        && tuple.suffix_elements().is_empty()
-                                        && tuple
-                                            .variable()
-                                            .homogeneous_type()
-                                            .is_some_and(|element| element.is_dynamic())
-                            )
-                        })
+                        && ty
+                            .exact_tuple_instance_spec(db)
+                            .is_none_or(|tuple| tuple.is_variadic())
                 })
         })
 }

@@ -1041,27 +1041,6 @@ impl<'db> Signature<'db> {
         receiver_type: Option<Type<'db>>,
         typing_self_type: Option<Type<'db>>,
     ) -> Self {
-        self.bind_self_with_receiver_impl(db, receiver_type, typing_self_type, false)
-    }
-
-    /// Binds the receiver and uses it to resolve `Self` in the receiver annotation, while
-    /// preserving `Self` everywhere else for a later implementation-specific binding.
-    fn bind_receiver_preserving_self(&self, db: &'db dyn Db, receiver_type: Type<'db>) -> Self {
-        self.bind_self_with_receiver_impl(db, Some(receiver_type), None, true)
-    }
-
-    /// Removes the receiver while preserving its constraint for a later concrete receiver.
-    pub(crate) fn defer_receiver_binding(&self, db: &'db dyn Db) -> Self {
-        self.bind_self_with_receiver_impl(db, None, None, true)
-    }
-
-    fn bind_self_with_receiver_impl(
-        &self,
-        db: &'db dyn Db,
-        receiver_type: Option<Type<'db>>,
-        typing_self_type: Option<Type<'db>>,
-        preserve_self: bool,
-    ) -> Self {
         let removed_receiver = self.parameters.get(0).is_some_and(Parameter::is_positional);
         let explicit_receiver = self
             .parameters
@@ -1085,22 +1064,15 @@ impl<'db> Signature<'db> {
                     BindingContext::Synthetic,
                 ))
             });
-            let annotation = if let Some(receiver_annotation_self_type) =
-                typing_self_type.or_else(|| preserve_self.then_some(receiver))
-            {
-                let mapping = TypeMapping::BindSelf(SelfBinding::new(
-                    db,
-                    receiver_annotation_self_type,
-                    binding_context,
-                ));
+            let annotation = if let Some(typing_self_type) = typing_self_type {
+                let mapping =
+                    TypeMapping::BindSelf(SelfBinding::new(db, typing_self_type, binding_context));
                 parameter
                     .annotated_type()
                     .apply_type_mapping(db, &mapping, TypeContext::default())
             } else {
                 parameter.annotated_type()
             };
-            let (receiver, annotation) =
-                Self::normalize_protocol_receiver_relation(db, receiver, annotation);
             // TODO: Also intersect nested receiver type variables, such as the `T` in
             // `self: list[T]`, with their valid specializations when constructing or solving the
             // receiver constraint set.
@@ -1135,12 +1107,9 @@ impl<'db> Signature<'db> {
             return_ty = return_ty.apply_type_mapping(db, &self_mapping, TypeContext::default());
         }
         Self {
-            generic_context: if preserve_self {
-                self.generic_context
-            } else {
-                self.generic_context
-                    .map(|generic_context| generic_context.remove_self(db, binding_context))
-            },
+            generic_context: self
+                .generic_context
+                .map(|generic_context| generic_context.remove_self(db, binding_context)),
             definition: self.definition,
             receiver_constraints,
             parameters,
@@ -1182,26 +1151,48 @@ impl<'db> Signature<'db> {
         }
     }
 
-    fn normalize_protocol_receiver_relation(
+    /// Returns a copy whose receiver annotation can be compared nominally with `receiver_type`.
+    ///
+    /// This is only valid when both types are specializations of the same protocol class. Signatures
+    /// containing `typing.Self` are excluded because it must remain available for the concrete
+    /// implementation.
+    pub(crate) fn nominalize_same_protocol_receiver(
+        &self,
         db: &'db dyn Db,
-        receiver: Type<'db>,
-        annotation: Type<'db>,
-    ) -> (Type<'db>, Type<'db>) {
-        if let (Type::ProtocolInstance(receiver), Type::ProtocolInstance(annotation)) =
-            (receiver, annotation)
-            && let Some(receiver) = receiver.to_nominal_instance()
-            && let Some(annotation) = annotation.to_nominal_instance()
-            && receiver
-                .class(db)
-                .is_subtype_of_class_literal(db, annotation.class(db).class_literal(db))
+        receiver_type: Type<'db>,
+    ) -> Option<(Self, Type<'db>)> {
+        if self.return_ty.contains_self(db)
+            || self
+                .parameters
+                .iter()
+                .any(|parameter| parameter.annotated_type().contains_self(db))
         {
-            (
-                Type::NominalInstance(receiver),
-                Type::NominalInstance(annotation),
-            )
-        } else {
-            (receiver, annotation)
+            return None;
         }
+
+        let Type::ProtocolInstance(receiver) = receiver_type else {
+            return None;
+        };
+        let parameter = self
+            .parameters
+            .get(0)
+            .filter(|parameter| parameter.is_positional() && !parameter.inferred_annotation)?;
+        let Type::ProtocolInstance(annotation) = parameter.annotated_type().resolve_type_alias(db)
+        else {
+            return None;
+        };
+        let receiver = receiver.to_nominal_instance()?;
+        let annotation = annotation.to_nominal_instance()?;
+        if receiver.class(db).class_literal(db) != annotation.class(db).class_literal(db) {
+            return None;
+        }
+
+        let mut signature = self.clone();
+        Arc::make_mut(&mut signature.parameters.data)
+            .value
+            .first_mut()?
+            .annotated_type = Type::NominalInstance(annotation);
+        Some((signature, Type::NominalInstance(receiver)))
     }
 
     /// Returns this signature bound to `receiver_type` if its explicit receiver annotation is
@@ -1216,36 +1207,12 @@ impl<'db> Signature<'db> {
         receiver_type: Type<'db>,
         typing_self_type: Type<'db>,
     ) -> Option<Self> {
-        self.bind_self_if_compatible_impl(db, receiver_type, Some(typing_self_type))
-    }
-
-    /// Binds a receiver without replacing `typing.Self`, which must remain available for the
-    /// concrete value that later implements a protocol.
-    pub(crate) fn bind_receiver_if_compatible(
-        &self,
-        db: &'db dyn Db,
-        receiver_type: Type<'db>,
-    ) -> Option<Self> {
-        self.bind_self_if_compatible_impl(db, receiver_type, None)
-    }
-
-    fn bind_self_if_compatible_impl(
-        &self,
-        db: &'db dyn Db,
-        receiver_type: Type<'db>,
-        typing_self_type: Option<Type<'db>>,
-    ) -> Option<Self> {
         if !self.can_bind_self_to(db, receiver_type) {
             return None;
         }
 
-        let bind_receiver = |signature: &Self| match typing_self_type {
-            Some(typing_self_type) => {
-                signature.bind_self_with_receiver(db, Some(receiver_type), Some(typing_self_type))
-            }
-            None => signature.bind_receiver_preserving_self(db, receiver_type),
-        };
-        let bound_signature = bind_receiver(self);
+        let bound_signature =
+            self.bind_self_with_receiver(db, Some(receiver_type), Some(typing_self_type));
         let Some(receiver_constraints) = bound_signature.receiver_constraints.as_ref() else {
             return Some(bound_signature);
         };
@@ -1297,9 +1264,10 @@ impl<'db> Signature<'db> {
             Some(Type::TypeVar(typevar))
         });
 
-        Some(bind_receiver(
-            &self.apply_specialization(db, specialization),
-        ))
+        Some(
+            self.apply_specialization(db, specialization)
+                .bind_self_with_receiver(db, Some(receiver_type), Some(typing_self_type)),
+        )
     }
 
     /// Returns `true` if this signature's first parameter can accept the bound `self` type.
@@ -1358,8 +1326,6 @@ impl<'db> Signature<'db> {
             }
         }
 
-        let (self_type, expected_self_ty) =
-            Self::normalize_protocol_receiver_relation(db, self_type, expected_self_ty);
         let constraints = ConstraintSetBuilder::new();
         self_type
             .when_assignable_to(
@@ -1375,36 +1341,6 @@ impl<'db> Signature<'db> {
         self.parameters
             .get(0)
             .is_some_and(|parameter| parameter.is_positional() && !parameter.inferred_annotation)
-    }
-
-    /// Returns whether the explicit receiver annotation belongs to the protocol receiver's class
-    /// hierarchy and can therefore select an overload for that protocol specialization.
-    pub(crate) fn receiver_annotation_selects_protocol_overload(
-        &self,
-        db: &'db dyn Db,
-        receiver_type: Type<'db>,
-    ) -> bool {
-        let Some(parameter) = self
-            .parameters
-            .get(0)
-            .filter(|parameter| parameter.is_positional() && !parameter.inferred_annotation)
-        else {
-            return false;
-        };
-
-        let mut annotation = parameter
-            .annotated_type()
-            .bind_self_typevars(db, receiver_type);
-        if let Some((_, receiver_specialization)) = receiver_type.class_specialization(db) {
-            annotation =
-                annotation.apply_optional_specialization(db, Some(receiver_specialization));
-        }
-        annotation = annotation.resolve_type_alias(db);
-
-        matches!(
-            Self::normalize_protocol_receiver_relation(db, receiver_type, annotation),
-            (Type::NominalInstance(_), Type::NominalInstance(_))
-        )
     }
 
     pub(crate) fn has_implicit_positional_receiver_annotation(&self) -> bool {
