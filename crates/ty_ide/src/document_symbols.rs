@@ -577,6 +577,203 @@ def function():
         "#);
     }
 
+    #[test]
+    fn document_symbols_named_expression_bindings() {
+        let test = cursor_test(
+            "
+(y := []).append(42)
+assignment = (assignment_value := (nested_value := 1))
+
+with (context := object()) as manager:
+    body_target = 1
+
+for item in (iterable := ()):
+    pass
+
+if condition := True:
+    pass
+
+match (subject := 1):
+    case pattern if guard := True:
+        pass
+
+comprehension = [(comprehension_value := value) for value in ()]
+
+@((decorator := identity))
+def function(default=(default_value := 1)):
+    (local := 1)
+
+lambda_value = lambda default=(lambda_default := 1): (lambda_local := default)
+
+class C((base := object)):
+    (field := 1)
+<CURSOR>",
+        );
+
+        assert_snapshot!(test.document_symbols(), @"
+        info[document-symbols]: SymbolInfo
+         --> main.py:2:2
+          |
+        2 | (y := []).append(42)
+          |  ^
+        info: Variable y
+
+        info[document-symbols]: SymbolInfo
+         --> main.py:3:1
+          |
+        3 | assignment = (assignment_value := (nested_value := 1))
+          | ^^^^^^^^^^
+        info: Variable assignment
+
+        info[document-symbols]: SymbolInfo
+         --> main.py:3:15
+          |
+        3 | assignment = (assignment_value := (nested_value := 1))
+          |               ^^^^^^^^^^^^^^^^
+        info: Variable assignment_value
+
+        info[document-symbols]: SymbolInfo
+         --> main.py:3:36
+          |
+        3 | assignment = (assignment_value := (nested_value := 1))
+          |                                    ^^^^^^^^^^^^
+        info: Variable nested_value
+
+        info[document-symbols]: SymbolInfo
+         --> main.py:5:7
+          |
+        5 | with (context := object()) as manager:
+          |       ^^^^^^^
+        info: Variable context
+
+        info[document-symbols]: SymbolInfo
+         --> main.py:5:31
+          |
+        5 | with (context := object()) as manager:
+          |                               ^^^^^^^
+        info: Variable manager
+
+        info[document-symbols]: SymbolInfo
+         --> main.py:6:5
+          |
+        6 |     body_target = 1
+          |     ^^^^^^^^^^^
+        info: Variable body_target
+
+        info[document-symbols]: SymbolInfo
+         --> main.py:8:5
+          |
+        8 | for item in (iterable := ()):
+          |     ^^^^
+        info: Variable item
+
+        info[document-symbols]: SymbolInfo
+         --> main.py:8:14
+          |
+        8 | for item in (iterable := ()):
+          |              ^^^^^^^^
+        info: Variable iterable
+
+        info[document-symbols]: SymbolInfo
+          --> main.py:11:4
+           |
+        11 | if condition := True:
+           |    ^^^^^^^^^
+        info: Variable condition
+
+        info[document-symbols]: SymbolInfo
+          --> main.py:14:8
+           |
+        14 | match (subject := 1):
+           |        ^^^^^^^
+        info: Variable subject
+
+        info[document-symbols]: SymbolInfo
+          --> main.py:15:10
+           |
+        15 |     case pattern if guard := True:
+           |          ^^^^^^^
+        info: Variable pattern
+
+        info[document-symbols]: SymbolInfo
+          --> main.py:15:21
+           |
+        15 |     case pattern if guard := True:
+           |                     ^^^^^
+        info: Variable guard
+
+        info[document-symbols]: SymbolInfo
+          --> main.py:18:1
+           |
+        18 | comprehension = [(comprehension_value := value) for value in ()]
+           | ^^^^^^^^^^^^^
+        info: Variable comprehension
+
+        info[document-symbols]: SymbolInfo
+          --> main.py:18:19
+           |
+        18 | comprehension = [(comprehension_value := value) for value in ()]
+           |                   ^^^^^^^^^^^^^^^^^^^
+        info: Variable comprehension_value
+
+        info[document-symbols]: SymbolInfo
+          --> main.py:20:4
+           |
+        20 | @((decorator := identity))
+           |    ^^^^^^^^^
+        info: Variable decorator
+
+        info[document-symbols]: SymbolInfo
+          --> main.py:21:5
+           |
+        21 | def function(default=(default_value := 1)):
+           |     ^^^^^^^^
+        info: Function function
+
+        info[document-symbols]: SymbolInfo
+          --> main.py:21:23
+           |
+        21 | def function(default=(default_value := 1)):
+           |                       ^^^^^^^^^^^^^
+        info: Variable default_value
+
+        info[document-symbols]: SymbolInfo
+          --> main.py:24:1
+           |
+        24 | lambda_value = lambda default=(lambda_default := 1): (lambda_local := default)
+           | ^^^^^^^^^^^^
+        info: Variable lambda_value
+
+        info[document-symbols]: SymbolInfo
+          --> main.py:24:32
+           |
+        24 | lambda_value = lambda default=(lambda_default := 1): (lambda_local := default)
+           |                                ^^^^^^^^^^^^^^
+        info: Variable lambda_default
+
+        info[document-symbols]: SymbolInfo
+          --> main.py:26:7
+           |
+        26 | class C((base := object)):
+           |       ^
+        info: Class C
+
+        info[document-symbols]: SymbolInfo
+          --> main.py:27:6
+           |
+        27 |     (field := 1)
+           |      ^^^^^
+        info: Field field
+
+        info[document-symbols]: SymbolInfo
+          --> main.py:26:10
+           |
+        26 | class C((base := object)):
+           |          ^^^^
+        info: Variable base
+        ");
+    }
+
     impl CursorTest {
         fn document_symbols(&self) -> String {
             let symbols = document_symbols(&self.db, self.cursor.file).to_hierarchical();
