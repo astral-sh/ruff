@@ -1546,6 +1546,32 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             return self.check_tuple_type_pair(db, source_tuple, target_tuple);
         }
 
+        // A gradual specialization is a subtype of a fully static specialization when all of its
+        // valid materializations are subtypes. Materialize the entire source so declared bounds
+        // and constraints restrict gradual type arguments before comparing each argument. Besides
+        // establishing `C[Any] <: Top[C[Any]]`, this ensures an `isinstance(x, C)` check excludes
+        // every specialization of `C` from its false branch.
+        if matches!(
+            self.relation,
+            TypeRelation::Subtyping
+                | TypeRelation::SubtypingAssuming
+                | TypeRelation::Redundancy { .. }
+        ) && source.materialization_kind(db).is_none()
+            && source.types(db).iter().any(|ty| ty.has_dynamic(db))
+            && target
+                .types(db)
+                .iter()
+                .all(|ty| !ty.has_typevar_or_typevar_instance(db))
+            && (target.materialization_kind(db).is_some()
+                || target.types(db).iter().all(|ty| !ty.has_dynamic(db)))
+        {
+            let source_top =
+                source.materialize_impl(db, MaterializationKind::Top, self.materialization_visitor);
+            if source_top != source {
+                return self.check_specialization_pair(db, source_top, target);
+            }
+        }
+
         let source_materialization_kind = source.materialization_kind(db);
         let target_materialization_kind = target.materialization_kind(db);
 

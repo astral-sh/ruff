@@ -693,7 +693,7 @@ python-version = "3.12"
 
 ```py
 from typing import Any, Generic, Never, TypeVar
-from ty_extensions import Bottom, Intersection, Top, static_assert
+from ty_extensions import Bottom, Intersection, Not, Top, static_assert
 from ty_extensions._internal import is_assignable_to, is_equivalent_to, is_subtype_of
 
 class BoundedCovariant[T: int]:
@@ -707,6 +707,8 @@ static_assert(is_equivalent_to(Top[BoundedCovariant[Any]], BoundedCovariant[int]
 static_assert(is_equivalent_to(Bottom[BoundedCovariant[Any]], BoundedCovariant[Never]))
 static_assert(is_equivalent_to(Top[BoundedContravariant[Any]], BoundedContravariant[Never]))
 static_assert(is_equivalent_to(Bottom[BoundedContravariant[Any]], BoundedContravariant[int]))
+static_assert(is_subtype_of(BoundedCovariant[Any], Top[BoundedCovariant[Any]]))
+static_assert(is_subtype_of(BoundedCovariant[Any], BoundedCovariant[int]))
 
 class BoundedInvariant[T: int]:
     value: T
@@ -807,11 +809,13 @@ def constrained_invariant(
 
 static_assert(is_subtype_of(ConstrainedCovariant[int], Top[ConstrainedCovariant[Any]]))
 static_assert(is_subtype_of(ConstrainedCovariant[str], Top[ConstrainedCovariant[Any]]))
+static_assert(is_subtype_of(ConstrainedCovariant[Any], Top[ConstrainedCovariant[Any]]))
 static_assert(not is_subtype_of(Top[ConstrainedCovariant[Any]], ConstrainedCovariant[int]))
 static_assert(not is_subtype_of(Top[ConstrainedCovariant[Any]], ConstrainedCovariant[str]))
 static_assert(is_subtype_of(Bottom[ConstrainedCovariant[Any]], ConstrainedCovariant[int]))
 static_assert(is_subtype_of(Bottom[ConstrainedCovariant[Any]], ConstrainedCovariant[str]))
 static_assert(is_subtype_of(Bottom[ConstrainedCovariant[Any]], Top[ConstrainedCovariant[Any]]))
+static_assert(not is_equivalent_to(Intersection[ConstrainedCovariant[str], Not[ConstrainedCovariant[int]]], Never))
 
 static_assert(is_assignable_to(ConstrainedCovariant[int], Top[ConstrainedCovariant[Any]]))
 static_assert(not is_assignable_to(Top[ConstrainedCovariant[Any]], ConstrainedCovariant[int]))

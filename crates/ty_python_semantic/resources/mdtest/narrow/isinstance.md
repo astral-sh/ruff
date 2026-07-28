@@ -638,6 +638,74 @@ def _(x: object):
         reveal_type(x.get())  # revealed: int
 ```
 
+Negative narrowing must exclude every instance of the generic class, including gradual
+specializations. In particular, no impossible generic arm should remain after an `isinstance()`
+check has returned.
+
+```py
+from os import PathLike
+from typing import Any, final
+
+@final
+class Image:
+    mode: str
+
+class Array[Shape: tuple[int, ...], Scalar: int | str]:
+    def shape(self) -> Shape:
+        raise NotImplementedError
+
+    def scalar(self) -> Scalar:
+        raise NotImplementedError
+
+def excludes_bounded_generic(value: Array[tuple[Any, ...], Any] | Image) -> str:
+    if isinstance(value, Array):
+        reveal_type(value)  # revealed: Array[tuple[Any, ...], Any]
+        return "array"
+
+    reveal_type(value)  # revealed: Image
+    return value.mode
+
+def excludes_bounded_generic_tuple(
+    value: Array[tuple[Any, ...], Any] | Image | bytes,
+) -> str:
+    if isinstance(value, (Array, bytes)):
+        reveal_type(value)  # revealed: Array[tuple[Any, ...], Any] | bytes
+        return "array or bytes"
+
+    reveal_type(value)  # revealed: Image
+    return value.mode
+
+class ConstrainedPath[T: (str, bytes)]:
+    def __fspath__(self) -> T:
+        raise NotImplementedError
+
+def excludes_constrained_generic(value: ConstrainedPath[Any] | Image) -> str:
+    if isinstance(value, ConstrainedPath):
+        reveal_type(value)  # revealed: ConstrainedPath[Any]
+        return "path"
+
+    reveal_type(value)  # revealed: Image
+    return value.mode
+
+def excludes_constrained_pathlike(value: PathLike[Any] | Image) -> str:
+    if isinstance(value, PathLike):
+        reveal_type(value)  # revealed: PathLike[Any]
+        return "path"
+
+    reveal_type(value)  # revealed: Image
+    return value.mode
+
+def excludes_bounded_generic_subclass(
+    cls: type[Array[tuple[Any, ...], Any]] | type[Image],
+) -> type[Image]:
+    if issubclass(cls, Array):
+        reveal_type(cls)  # revealed: type[Array[tuple[Any, ...], Any]]
+        return Image
+
+    reveal_type(cls)  # revealed: <class 'Image'>
+    return cls
+```
+
 Constrained type parameters preserve the materialization of the generic class while making the union
 of valid constraints available when reading a covariant attribute:
 

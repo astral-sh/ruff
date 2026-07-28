@@ -112,6 +112,40 @@ def f(x: Covariant[int]):
             assert_never(x)
 ```
 
+## Class patterns with bounded generic classes
+
+A bounded generic class pattern matches every specialization, including gradual specializations, and
+excludes all of them from later patterns.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Any, final
+
+@final
+class Image:
+    mode: str
+
+class Array[Shape: tuple[int, ...], Scalar: int | str]:
+    def shape(self) -> Shape:
+        raise NotImplementedError
+
+    def scalar(self) -> Scalar:
+        raise NotImplementedError
+
+def match_bounded_generic(value: Array[tuple[Any, ...], Any] | Image) -> str:
+    match value:
+        case Array():
+            reveal_type(value)  # revealed: Array[tuple[Any, ...], Any]
+            return "array"
+        case image:
+            reveal_type(image)  # revealed: Image
+            return image.mode
+```
+
 ## Generic patterns ignore type parameter defaults
 
 A generic class pattern matches every runtime specialization, not only the specialization described
