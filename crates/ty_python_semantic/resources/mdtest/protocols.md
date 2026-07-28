@@ -4933,19 +4933,29 @@ class Callback(Protocol[Unpack[P]]):
     def __call__(self, *args: Any) -> Any: ...
 
 def takes_callback(callback: Callback[str]) -> None: ...
+def takes_any_callback(callback: Callback[Any]) -> None: ...
 def takes_empty_callback(callback: Callback[()]) -> None: ...
+def takes_unspecialized_callback(callback: Callback) -> None: ...  # error: [missing-type-argument]
 def handles_str(value: str) -> str:
     return value
 
 def handles_int(value: int) -> int:
     return value
 
+def any_args(*args: Any) -> Any:
+    return args
+
 takes_callback(lambda value: value)
 takes_callback(handles_str)
 takes_callback(handles_int)  # error: [invalid-argument-type]
 
+takes_any_callback(lambda value: value)
+takes_any_callback(lambda: None)  # error: [invalid-argument-type]
+
 takes_empty_callback(lambda: None)
 takes_empty_callback(lambda value: value)  # error: [invalid-argument-type]
+
+takes_unspecialized_callback(any_args)
 
 def reveal_callback(callback: Callback[str]) -> None:
     reveal_type(callback.__call__)  # revealed: bound method Callback[str].__call__(value: str, /) -> Any

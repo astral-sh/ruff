@@ -13,6 +13,7 @@ use crate::types::attribute_write::{
 };
 use crate::types::call::{CallArguments, CallDunderError};
 use crate::types::relation::{DisjointnessChecker, TypeRelationChecker};
+use crate::types::tuple::Tuple;
 use crate::types::visitor::any_over_type;
 use crate::types::{TypeContext, UpcastPolicy};
 use crate::{
@@ -3032,6 +3033,10 @@ fn receiver_filtered_protocol_method<'db>(
         return None;
     }
 
+    if receiver_has_fully_gradual_typevartuple(db, receiver_ty) {
+        return None;
+    }
+
     let signatures = callable.signatures(db);
     if !signatures
         .iter()
@@ -3059,6 +3064,32 @@ fn receiver_filtered_protocol_method<'db>(
         )
         .into_regular(db),
     ))
+}
+
+fn receiver_has_fully_gradual_typevartuple<'db>(db: &'db dyn Db, receiver_ty: Type<'db>) -> bool {
+    receiver_ty
+        .class_specialization(db)
+        .is_some_and(|(_, specialization)| {
+            specialization
+                .generic_context(db)
+                .variables(db)
+                .zip(specialization.types(db))
+                .any(|(typevar, ty)| {
+                    typevar.is_typevartuple(db)
+                        && ty.exact_tuple_instance_spec(db).is_some_and(|tuple| {
+                            matches!(
+                                tuple.as_ref(),
+                                Tuple::Variable(tuple)
+                                    if tuple.prefix_elements().is_empty()
+                                        && tuple.suffix_elements().is_empty()
+                                        && tuple
+                                            .variable()
+                                            .homogeneous_type()
+                                            .is_some_and(|element| element.is_dynamic())
+                            )
+                        })
+                })
+        })
 }
 
 /// Inner Salsa query for [`ProtocolClass::interface`].
