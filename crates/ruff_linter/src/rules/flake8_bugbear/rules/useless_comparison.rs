@@ -63,8 +63,9 @@ pub(crate) fn useless_comparison(checker: &Checker, expr: &Expr) {
         let semantic = checker.semantic();
 
         if checker.source_type.is_ipynb()
+            && semantic.at_top_level()
             && at_last_top_level_expression_in_cell(
-                semantic,
+                semantic.current_statement().end(),
                 checker.locator(),
                 checker.cell_offsets(),
             )
