@@ -1178,6 +1178,26 @@ derived = Derived(value=1)
 derived.value = 2  # error: [invalid-assignment]
 ```
 
+Private attributes on models with `frozen=True` can be mutated:
+
+```py
+from pydantic import BaseModel, ConfigDict, PrivateAttr
+
+class FrozenPerson(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    _implicit_private: int
+    _private_with_default: int = 1
+    _explicit_private: int = PrivateAttr(default=0)
+
+person = FrozenPerson()
+
+# TODO: These should not error
+person._implicit_private = 2  # error: [invalid-assignment]
+person._private_with_default = 2  # error: [invalid-assignment]
+person._explicit_private = 2  # error: [invalid-assignment]
+```
+
 ## Validation of default values
 
 At runtime, default values are *not* validated against the field type annotation, unless
