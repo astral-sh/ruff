@@ -47,7 +47,6 @@ FURB140 [*] Use `itertools.starmap` instead of the generator
 12 | # FURB140
 13 | {print(x, y) for x, y in zipped()}
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 help: Replace with `itertools.starmap`
    |
 1  + from itertools import starmap

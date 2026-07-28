@@ -10,7 +10,6 @@ I001 [*] Import block is un-sorted or un-formatted
 4 | | import requests
 5 | | import pandas
   | |_____________^
-  |
 help: Organize imports
   |
 1 + # Standard library imports

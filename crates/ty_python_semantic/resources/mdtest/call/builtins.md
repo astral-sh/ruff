@@ -460,7 +460,6 @@ error[call-non-callable]: `NotImplemented` is not callable
   |           --------------^^
   |           |
   |           Did you mean `NotImplementedError`?
-  |
 ```
 
 ```py
@@ -477,7 +476,6 @@ error[call-non-callable]: `NotImplemented` is not callable
   |           --------------^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
   |           |
   |           Did you mean `NotImplementedError`?
-  |
 ```
 
 ## `map` with generic callbacks

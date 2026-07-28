@@ -182,4 +182,3 @@ S606 Starting a process without a shell
 19 | os.spawnvpe("true")
 20 | os.startfile("true")
    | ^^^^^^^^^^^^
-   |

@@ -8,4 +8,3 @@ PTH124 `py.path` is in maintenance mode, use `pathlib` instead
 2 |
 3 | p = py.path.local("../foo")
   |     ^^^^^^^^^^^^^
-  |

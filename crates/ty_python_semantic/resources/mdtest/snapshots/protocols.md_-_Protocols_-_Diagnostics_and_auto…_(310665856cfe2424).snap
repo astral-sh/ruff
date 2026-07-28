@@ -55,7 +55,6 @@ error[invalid-generic-class]: Cannot both inherit from subscripted `Protocol` an
   |
 5 | class Foo(Protocol[T], Generic[T]): ...  # error: [invalid-generic-class]
   |           ^^^^^^^^^^^
-  |
 help: Remove the type parameters from the `Protocol` base
   |
 4 |
@@ -76,7 +75,6 @@ error[invalid-generic-class]: Cannot both inherit from subscripted `Protocol` an
 11 | |   T,
 12 | | ], Generic[T]): ...
    | |_^
-   |
 help: Remove the type parameters from the `Protocol` base
    |
 9  | # error: [invalid-generic-class]
@@ -100,7 +98,6 @@ error[invalid-generic-class]: Cannot both inherit from subscripted `Protocol` an
 19 | |     # very well documented code
 20 | | ],  # important comma!
    | |_^
-   |
 help: Remove the type parameters from the `Protocol` base
    |
 15 |   # error: [invalid-generic-class]
@@ -122,7 +119,6 @@ error[invalid-generic-class]: Cannot both inherit from subscripted `Protocol` an
    |
 32 | class Foo[T](Protocol[T]): ...  # error: [invalid-generic-class]
    |              ^^^^^^^^^^^
-   |
 help: Remove the type parameters from the `Protocol` base
    |
 31 |

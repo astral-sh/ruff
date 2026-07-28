@@ -27,7 +27,6 @@ AIR302 [*] `airflow.operators.email.EmailOperator` is moved into `smtp` provider
 8 |
 9 | EmailOperator()
   | ^^^^^^^^^^^^^
-  |
 help: Install `apache-airflow-providers-smtp>=1.0.0` and use `EmailOperator` from `airflow.providers.smtp.operators.smtp` instead.
   |
 6 |

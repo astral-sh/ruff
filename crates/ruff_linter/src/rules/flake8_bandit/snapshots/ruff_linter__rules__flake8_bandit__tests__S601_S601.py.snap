@@ -8,4 +8,3 @@ S601 Possible shell injection via Paramiko call; check inputs are properly sanit
 2 |
 3 | paramiko.exec_command('something; really; unsafe')
   | ^^^^^^^^^^^^^^^^^^^^^
-  |

@@ -27,4 +27,3 @@ N814 Camelcase `StillBad` imported as constant `STILL_BAD`
 7 | from mod import BadAllowed as BAD_ALLOWED
 8 | from mod import StillBad as STILL_BAD
   |                 ^^^^^^^^^^^^^^^^^^^^^
-  |

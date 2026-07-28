@@ -69,10 +69,8 @@ Module(
   |
 1 | call(**x := 1)
   |          ^^ Syntax Error: Expected `,`, found `:=`
-  |
 
 
   |
 1 | call(**x := 1)
   |             ^ Syntax Error: Positional argument cannot follow keyword argument unpacking
-  |

@@ -8,7 +8,6 @@ D412 [*] No blank lines allowed between a section header and its content ("Examp
 12 |     """
 13 |     Example:
    |     ^^^^^^^
-   |
 help: Remove blank line(s)
    |
 14 |
@@ -23,7 +22,6 @@ D412 [*] No blank lines allowed between a section header and its content ("Examp
 23 |     """
 24 |     Example:
    |     ^^^^^^^
-   |
 help: Remove blank line(s)
    |
 25 |

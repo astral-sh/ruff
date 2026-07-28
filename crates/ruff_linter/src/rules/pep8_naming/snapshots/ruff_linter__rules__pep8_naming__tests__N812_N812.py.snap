@@ -26,4 +26,3 @@ N812 Lowercase `another_lowercase` imported as non-lowercase `AnotherLowercase`
 2 | from mod import lowercase as Lowercase
 3 | from mod import another_lowercase as AnotherLowercase
   |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  |

@@ -1898,7 +1898,6 @@ error[unresolved-reference]: Name `x` used when not defined
   |
 5 |         y = x  # snapshot
   |             ^
-  |
 info: An attribute `x` is available: consider using `self.x`
 ```
 
@@ -1916,7 +1915,6 @@ error[unresolved-reference]: Name `x` used when not defined
    |
 10 |         y = x  # snapshot
    |             ^
-   |
 info: An attribute `x` is available: consider using `self.x`
 ```
 
@@ -2996,7 +2994,6 @@ error[invalid-assignment]: Cannot assign object of type `tuple[Literal[1], Liter
   |
 5 | c.x = (1, b"")  # snapshot: invalid-assignment
   |       ^^^^^^^^ Expected `tuple[int, str]`, found `tuple[Literal[1], Literal[b""]]`
-  |
 info: Argument to bound method `C.__setattr__` is incorrect
 info: This assignment implicitly calls a custom `__setattr__` method
 info: the second tuple element is not compatible: `Literal[b""]` is not assignable to `str`
@@ -3005,7 +3002,6 @@ info: Method defined here
   |
 2 |     def __setattr__(self, name: str, value: tuple[int, str]): ...
   |         ^^^^^^^^^^^                  ---------------------- Parameter declared here
-  |
 ```
 
 ### Overloaded `__setattr__`
@@ -3030,7 +3026,6 @@ error[invalid-assignment]: Cannot assign object of type `tuple[Literal[1], Liter
    |
 11 | d.x = (1, b"")  # snapshot: invalid-assignment
    | ^^^ No overload of bound method `D.__setattr__` matches arguments
-   |
 info: This assignment implicitly calls a custom `__setattr__` method
 info: First overload defined here
  --> src/mdtest_snippet.py:4:5
@@ -3038,7 +3033,6 @@ info: First overload defined here
 4 | /     @overload
 5 | |     def __setattr__(self, name: str, value: tuple[int, str]): ...
   | |_________________________________________________________________^ First overload defined here
-  |
 info: Possible overloads for bound method `__setattr__`:
 info:   (self, name: str, value: tuple[int, str]) -> Unknown
 info:   (self, name: str, value: int) -> Unknown
@@ -3047,7 +3041,6 @@ info: Overload implementation defined here
   |
 8 |     def __setattr__(self, name: str, value: tuple[int, str] | int): ...
   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  |
 ```
 
 ### Type of the `name` parameter
@@ -3080,7 +3073,6 @@ error[invalid-assignment]: Cannot assign object of type `Literal["May"]` to attr
    |
 13 | date.month = "May"  # snapshot: invalid-assignment
    |              ^^^^^ Expected `int`, found `Literal["May"]`
-   |
 info: Argument to bound method `Date.__setattr__` is incorrect
 info: This assignment implicitly calls a custom `__setattr__` method
 info: Method defined here
@@ -3088,7 +3080,6 @@ info: Method defined here
   |
 5 |     def __setattr__(self, name: Literal["day", "month", "year"], value: int) -> None:
   |         ^^^^^^^^^^^                                              ---------- Parameter declared here
-  |
 
 
 error[invalid-assignment]: Cannot assign object of type `Literal["UTC"]` to attribute `tz` on type `Date`
@@ -3096,7 +3087,6 @@ error[invalid-assignment]: Cannot assign object of type `Literal["UTC"]` to attr
    |
 16 | date.tz = "UTC"
    | ^^^^^^^ Expected `Literal["day", "month", "year"]`, found `Literal["tz"]`
-   |
 info: Argument to bound method `Date.__setattr__` is incorrect
 info: This assignment implicitly calls a custom `__setattr__` method
 info: Method defined here
@@ -3104,7 +3094,6 @@ info: Method defined here
   |
 5 |     def __setattr__(self, name: Literal["day", "month", "year"], value: int) -> None:
   |         ^^^^^^^^^^^       ------------------------------------- Parameter declared here
-  |
 
 
 error[invalid-assignment]: Cannot assign object of type `Literal["UTC"]` to attribute `tz` on type `Date`
@@ -3112,7 +3101,6 @@ error[invalid-assignment]: Cannot assign object of type `Literal["UTC"]` to attr
    |
 16 | date.tz = "UTC"
    |           ^^^^^ Expected `int`, found `Literal["UTC"]`
-   |
 info: Argument to bound method `Date.__setattr__` is incorrect
 info: This assignment implicitly calls a custom `__setattr__` method
 info: Method defined here
@@ -3120,7 +3108,6 @@ info: Method defined here
   |
 5 |     def __setattr__(self, name: Literal["day", "month", "year"], value: int) -> None:
   |         ^^^^^^^^^^^                                              ---------- Parameter declared here
-  |
 ```
 
 ### Return type of `__setattr__`
@@ -4234,7 +4221,6 @@ error[unresolved-attribute]: Module `datetime` has no member `UTC`
   |
 4 | reveal_type(datetime.UTC)  # revealed: Unknown
   |             ^^^^^^^^^^^^
-  |
 info: The member may be available on other Python versions or platforms
 info: Python 3.10 was assumed when resolving the `UTC` attribute because it was specified on the command line
 ```
@@ -4256,7 +4242,6 @@ error[unresolved-attribute]: Module `datetime` has no member `fakenotreal`
   |
 4 | reveal_type(datetime.fakenotreal)  # revealed: Unknown
   |             ^^^^^^^^^^^^^^^^^^^^
-  |
 ```
 
 ## Unimported submodule incorrectly accessed as attribute
@@ -4293,7 +4278,6 @@ warning[possibly-missing-submodule]: Submodule `bar` might not have been importe
   |
 4 | reveal_type(foo.bar)  # revealed: Unknown
   |             ^^^^^^^
-  |
 help: Consider explicitly importing `foo.bar`
 ```
 
@@ -4312,7 +4296,6 @@ warning[possibly-missing-submodule]: Submodule `bar` might not have been importe
   |
 4 | reveal_type(baz.bar)  # revealed: Unknown
   |             ^^^^^^^
-  |
 help: Consider explicitly importing `baz.bar`
 ```
 
@@ -4338,7 +4321,6 @@ error[unresolved-attribute]: Object of type `(...) -> Any` has no attribute `__n
   |
 4 |     x.__name__  # snapshot: unresolved-attribute
   |     ^^^^^^^^^^
-  |
 help: Function objects have a `__name__` attribute, but not all callable objects are functions
 help: See this FAQ for more information: <https://docs.astral.sh/ty/reference/typing-faq/#why-does-ty-say-callable-has-no-attribute-__name__>
 ```
@@ -4354,7 +4336,6 @@ error[unresolved-attribute]: Object of type `(...) -> Any` has no attribute `__a
   |
 6 |     x.__annotate__  # snapshot: unresolved-attribute
   |     ^^^^^^^^^^^^^^
-  |
 help: Function objects have an `__annotate__` attribute, but not all callable objects are functions
 help: See this FAQ for more information: <https://docs.astral.sh/ty/reference/typing-faq/#why-does-ty-say-callable-has-no-attribute-__name__>
 ```

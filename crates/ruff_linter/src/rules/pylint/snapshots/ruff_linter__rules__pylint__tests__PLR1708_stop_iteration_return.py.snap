@@ -8,7 +8,6 @@ PLR1708 Explicit `raise StopIteration` in generator
 37 |     yield 2
 38 |     raise StopIteration  # Should trigger
    |     ^^^^^^^^^^^^^^^^^^^
-   |
 help: Use `return` instead
 
 PLR1708 Explicit `raise StopIteration` in generator
@@ -18,7 +17,6 @@ PLR1708 Explicit `raise StopIteration` in generator
 43 |     yield 2
 44 |     raise StopIteration("finished")  # Should trigger
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 help: Use `return` instead
 
 PLR1708 Explicit `raise StopIteration` in generator
@@ -28,7 +26,6 @@ PLR1708 Explicit `raise StopIteration` in generator
 49 |     yield 2
 50 |     raise StopIteration(1 + 2)  # Should trigger
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 help: Use `return` instead
 
 PLR1708 Explicit `raise StopIteration` in generator
@@ -38,7 +35,6 @@ PLR1708 Explicit `raise StopIteration` in generator
 55 |     yield 2
 56 |     raise StopIteration("async")  # Should trigger
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 help: Use `return` instead
 
 PLR1708 Explicit `raise StopIteration` in generator
@@ -95,7 +91,6 @@ PLR1708 Explicit `raise StopIteration` in generator
 97 |     yield 1
 98 |     raise StopIteration  # Should trigger (no arguments)
    |     ^^^^^^^^^^^^^^^^^^^
-   |
 help: Use `return` instead
 
 PLR1708 Explicit `raise StopIteration` in generator
@@ -105,7 +100,6 @@ PLR1708 Explicit `raise StopIteration` in generator
 104 |         if i == 3:
 105 |             raise StopIteration("loop")  # Should trigger
     |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
-    |
 help: Use `return` instead
 
 PLR1708 Explicit `raise StopIteration` in generator
@@ -126,5 +120,4 @@ PLR1708 Explicit `raise StopIteration` in generator
 153 | def foo():
 154 |     raise StopIteration((yield 1))  # Should trigger
     |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-    |
 help: Use `return` instead

@@ -319,7 +319,6 @@ TC008 [*] Remove quotes from type alias
    |  ___________^
 43 | |     ' | None')
    | |_____________^
-   |
 help: Remove quotes
    |
 41 |     | None)
@@ -519,7 +518,6 @@ TC008 [*] Remove quotes from type alias
 71 | r: TypeAlias = """int | None"""
 72 | type R = """int | None"""
    |          ^^^^^^^^^^^^^^^^
-   |
 help: Remove quotes
    |
 71 | r: TypeAlias = """int | None"""

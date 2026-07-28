@@ -37,7 +37,6 @@ PTH208 Use `pathlib.Path.iterdir()` instead.
  9 | bytes_path = b'.'
 10 | os.listdir(bytes_path)
    | ^^^^^^^^^^
-   |
 
 PTH208 Use `pathlib.Path.iterdir()` instead.
   --> PTH208.py:16:1
@@ -45,7 +44,6 @@ PTH208 Use `pathlib.Path.iterdir()` instead.
 15 | path_path = Path('.')
 16 | os.listdir(path_path)
    | ^^^^^^^^^^
-   |
 
 PTH208 Use `pathlib.Path.iterdir()` instead.
   --> PTH208.py:19:4

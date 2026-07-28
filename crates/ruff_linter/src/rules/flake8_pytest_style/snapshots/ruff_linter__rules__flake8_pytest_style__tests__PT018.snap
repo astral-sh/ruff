@@ -259,7 +259,6 @@ PT018 Assertion should be broken down into multiple parts
 39 |     # detected, but no fix for mixed conditions (e.g. `a or b and c`)
 40 |     assert not (something or something_else and something_third)
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 help: Break down assertion into multiple parts
 
 PT018 [*] Assertion should be broken down into multiple parts
@@ -287,7 +286,6 @@ PT018 [*] Assertion should be broken down into multiple parts
 44 | assert something and something_else  # Error
 45 | assert something and something_else and something_third  # Error
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 help: Break down assertion into multiple parts
    |
 44 | assert something and something_else  # Error
@@ -327,7 +325,6 @@ PT018 Assertion should be broken down into multiple parts
 53 |     x = 1; \
 54 |         assert something and something_else
    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 help: Break down assertion into multiple parts
 
 PT018 [*] Assertion should be broken down into multiple parts
@@ -396,5 +393,4 @@ PT018 Assertion should be broken down into multiple parts
 78 | |         something and something_else
 79 | |     )
    | |_____^
-   |
 help: Break down assertion into multiple parts
