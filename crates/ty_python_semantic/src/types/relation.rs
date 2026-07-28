@@ -351,6 +351,7 @@ impl<'db> Type<'db> {
             typevar_evaluation: TypeVarEvaluation::Eager,
             context_tree: None,
             given: assuming,
+            perform_expensive_checks: true,
             relation_visitor: &relation_visitor,
             disjointness_visitor: &disjointness_visitor,
             signature_relation_visitor: &signature_relation_visitor,
@@ -388,6 +389,7 @@ impl<'db> Type<'db> {
             typevar_evaluation: TypeVarEvaluation::Eager,
             context_tree: Some(ErrorContextTree::new()),
             given: ConstraintSet::from_bool(&builder, false),
+            perform_expensive_checks: true,
             relation_visitor: &HasRelationToVisitor::default(&builder),
             disjointness_visitor: &IsDisjointVisitor::default(&builder),
             signature_relation_visitor: &SignatureRelationVisitor::default(),
@@ -595,6 +597,7 @@ impl<'db> Type<'db> {
             typevar_evaluation,
             context_tree: None,
             given: ConstraintSet::from_bool(constraints, false),
+            perform_expensive_checks: true,
             relation_visitor: &relation_visitor,
             disjointness_visitor: &disjointness_visitor,
             signature_relation_visitor: &signature_relation_visitor,
@@ -663,6 +666,7 @@ impl<'db> Type<'db> {
         let checker = EquivalenceChecker {
             constraints,
             given: ConstraintSet::from_bool(constraints, false),
+            perform_expensive_checks: true,
             relation_visitor: &relation_visitor,
             disjointness_visitor: &disjointness_visitor,
             signature_relation_visitor: &signature_relation_visitor,
@@ -707,6 +711,7 @@ impl<'db> Type<'db> {
             constraints,
             inferable,
             given: ConstraintSet::from_bool(constraints, false),
+            perform_expensive_checks: true,
             disjointness_visitor: &disjointness_visitor,
             relation_visitor: &relation_visitor,
             signature_relation_visitor: &signature_relation_visitor,
@@ -776,6 +781,7 @@ pub(super) struct TypeRelationChecker<'a, 'c, 'db> {
     pub(super) typevar_evaluation: TypeVarEvaluation,
     context_tree: Option<ErrorContextTree<'db>>,
     pub(super) given: ConstraintSet<'db, 'c>,
+    perform_expensive_checks: bool,
 
     // N.B. these fields are private to reduce the risk of
     // "double-visiting" a given pair of types. You should
@@ -805,6 +811,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             typevar_evaluation: TypeVarEvaluation::Eager,
             context_tree: None,
             given: ConstraintSet::from_bool(constraints, false),
+            perform_expensive_checks: true,
             relation_visitor,
             disjointness_visitor,
             signature_relation_visitor,
@@ -826,6 +833,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             typevar_evaluation: TypeVarEvaluation::Lazy,
             context_tree: None,
             given: ConstraintSet::from_bool(constraints, false),
+            perform_expensive_checks: true,
             relation_visitor,
             disjointness_visitor,
             signature_relation_visitor,
@@ -847,6 +855,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             typevar_evaluation: TypeVarEvaluation::Lazy,
             context_tree: Some(ErrorContextTree::new()),
             given: ConstraintSet::from_bool(constraints, false),
+            perform_expensive_checks: true,
             relation_visitor,
             disjointness_visitor,
             signature_relation_visitor,
@@ -868,6 +877,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             typevar_evaluation: TypeVarEvaluation::Eager,
             context_tree: Some(ErrorContextTree::new()),
             given: ConstraintSet::from_bool(constraints, false),
+            perform_expensive_checks: true,
             relation_visitor,
             disjointness_visitor,
             signature_relation_visitor,
@@ -2394,6 +2404,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         EquivalenceChecker {
             constraints: self.constraints,
             given: self.given,
+            perform_expensive_checks: self.perform_expensive_checks,
             relation_visitor: self.relation_visitor,
             disjointness_visitor: self.disjointness_visitor,
             signature_relation_visitor: self.signature_relation_visitor,
@@ -2406,6 +2417,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             constraints: self.constraints,
             inferable: self.inferable,
             given: self.given,
+            perform_expensive_checks: self.perform_expensive_checks,
             relation_visitor: self.relation_visitor,
             disjointness_visitor: self.disjointness_visitor,
             signature_relation_visitor: self.signature_relation_visitor,
@@ -2444,6 +2456,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
 pub(super) struct EquivalenceChecker<'a, 'c, 'db> {
     pub(super) constraints: &'c ConstraintSetBuilder<'db>,
     given: ConstraintSet<'db, 'c>,
+    perform_expensive_checks: bool,
 
     // N.B. these fields are private to reduce the risk of
     // "double-visiting" a given pair of types. You should
@@ -2468,6 +2481,7 @@ impl<'c, 'db> EquivalenceChecker<'_, 'c, 'db> {
             constraints: self.constraints,
             context_tree: None,
             given: self.given,
+            perform_expensive_checks: self.perform_expensive_checks,
             inferable: TypeVarSet::None,
             relation_visitor: self.relation_visitor,
             disjointness_visitor: self.disjointness_visitor,
@@ -2510,6 +2524,7 @@ pub(super) struct DisjointnessChecker<'a, 'c, 'db> {
     pub(super) constraints: &'c ConstraintSetBuilder<'db>,
     pub(super) inferable: TypeVarSet<'db>,
     given: ConstraintSet<'db, 'c>,
+    perform_expensive_checks: bool,
 
     // N.B. these fields are private to reduce the risk of
     // "double-visiting" a given pair of types. You should
@@ -2536,6 +2551,7 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             constraints,
             inferable,
             given: ConstraintSet::from_bool(constraints, false),
+            perform_expensive_checks: true,
             disjointness_visitor,
             relation_visitor,
             signature_relation_visitor,
@@ -2554,6 +2570,7 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             inferable: self.inferable,
             context_tree: None,
             given: self.given,
+            perform_expensive_checks: self.perform_expensive_checks,
             relation_visitor: self.relation_visitor,
             disjointness_visitor: self.disjointness_visitor,
             signature_relation_visitor: self.signature_relation_visitor,
@@ -2565,6 +2582,7 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
         EquivalenceChecker {
             constraints: self.constraints,
             given: self.given,
+            perform_expensive_checks: self.perform_expensive_checks,
             relation_visitor: self.relation_visitor,
             disjointness_visitor: self.disjointness_visitor,
             signature_relation_visitor: self.signature_relation_visitor,
