@@ -854,6 +854,35 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         }
     }
 
+    /// Check receiver assignability while sharing this checker's recursion state.
+    ///
+    /// Fixed receivers use ordinary eager assignability so gradual types remain consistent with
+    /// their possible materializations. Receivers containing type variables use lazy evaluation
+    /// so the resulting bounds can constrain the rest of the selected overload.
+    pub(super) fn check_receiver_assignability_pair(
+        &self,
+        db: &'db dyn Db,
+        source: Type<'db>,
+        target: Type<'db>,
+    ) -> ConstraintSet<'db, 'c> {
+        let typevar_evaluation = if source.has_typevar_or_typevar_instance(db)
+            || target.has_typevar_or_typevar_instance(db)
+        {
+            TypeVarEvaluation::Lazy
+        } else {
+            TypeVarEvaluation::Eager
+        };
+        let checker = Self {
+            inferable: TypeVarSet::None,
+            relation: TypeRelation::Assignability,
+            typevar_evaluation,
+            context_tree: None,
+            given: ConstraintSet::from_bool(self.constraints, false),
+            ..self.clone()
+        };
+        checker.check_type_pair(db, source, target)
+    }
+
     pub(super) fn assignability_with_context(
         constraints: &'c ConstraintSetBuilder<'db>,
         relation_visitor: &'a HasRelationToVisitor<'db, 'c>,

@@ -4919,7 +4919,7 @@ python-version = "3.12"
 ```
 
 ```py
-from typing import Any, Protocol, TypeVar, TypeVarTuple, Unpack, overload
+from typing import Any, Protocol, Self, TypeVar, TypeVarTuple, Unpack, overload
 
 P = TypeVarTuple("P")
 V = TypeVar("V")
@@ -4937,6 +4937,200 @@ def handles_int(value: int) -> int:
 
 takes_callback(lambda value: value)
 takes_callback(handles_int)  # error: [invalid-argument-type]
+
+# A gradual specialization keeps every receiver overload that could apply.
+def any_args(*args: Any) -> Any:
+    return None
+
+def takes_gradual_callback(callback: Callback[Unpack[tuple[Any, ...]]]) -> None: ...
+
+takes_gradual_callback(any_args)
+
+# Receiver conditions outside the declaring protocol are evaluated against the implementation.
+class Marker(Protocol):
+    marker: int
+
+class ConditionalCallback(Protocol):
+    @overload
+    def __call__(self: "ConditionalCallback", value: int, /) -> Any: ...
+    @overload
+    def __call__(self: Marker, value: str, /) -> Any: ...  # error: [invalid-overload]
+    def __call__(self, value: object, /) -> Any: ...
+
+class PlainIntCallback:
+    def __call__(self, value: int, /) -> Any:
+        return None
+
+class MarkedIntCallback(PlainIntCallback):
+    marker = 1
+
+def takes_conditional_callback(callback: ConditionalCallback) -> None: ...
+
+takes_conditional_callback(PlainIntCallback())
+takes_conditional_callback(MarkedIntCallback())  # error: [invalid-argument-type]
+
+# A receiver condition can contain the declaring protocol without causing a relation cycle.
+class UnionReceiverCallback(Protocol):
+    @overload
+    def __call__(self: "UnionReceiverCallback | Marker", value: int, /) -> Any: ...  # error: [invalid-overload]
+    @overload
+    def __call__(self: Marker, value: str, /) -> Any: ...  # error: [invalid-overload]
+    def __call__(self, value: object, /) -> Any: ...
+
+def takes_union_receiver_callback(callback: UnionReceiverCallback) -> None: ...
+
+takes_union_receiver_callback(PlainIntCallback())
+
+# Receiver inference must constrain the type variables that occur in the visible signature.
+T_co = TypeVar("T_co", covariant=True)
+W = TypeVar("W", str, int)
+
+class GenericReceiverCallback(Protocol[T_co]):
+    @overload
+    def __call__(self: "GenericReceiverCallback[W]", value: W, /) -> Any: ...
+    @overload
+    def __call__(self: "GenericReceiverCallback[bytes]", value: bytes, /) -> Any: ...
+    def __call__(self, value: object, /) -> Any: ...
+
+def takes_generic_receiver_callback(callback: GenericReceiverCallback[str]) -> None: ...
+def handles_str(value: str) -> Any:
+    return value
+
+takes_generic_receiver_callback(handles_str)
+takes_generic_receiver_callback(handles_int)  # error: [invalid-argument-type]
+
+# `typing.Self` remains dependent on the concrete implementation.
+class SelfCallback(Protocol):
+    @overload
+    def __call__(self: Self, value: Self, /) -> Self: ...
+    @overload
+    def __call__(self: int) -> None: ...
+    def __call__(self, *args: object) -> object: ...
+
+class SelfCallbackImplementation:
+    def __call__(self, value: Self, /) -> Self:
+        return self
+
+def takes_self_callback(callback: SelfCallback) -> None: ...
+
+takes_self_callback(SelfCallbackImplementation())
+
+# `Self` in the visible signature is also preserved when the receiver names the protocol.
+class ExplicitSelfCallback(Protocol):
+    @overload
+    def __call__(self: "ExplicitSelfCallback", value: Self, /) -> None: ...
+    @overload
+    def __call__(self: int) -> None: ...
+    def __call__(self, *args: object) -> None: ...
+
+class ExplicitSelfCallbackImplementation:
+    def __call__(self, value: Self, /) -> None:
+        pass
+
+def takes_explicit_self_callback(callback: ExplicitSelfCallback) -> None: ...
+
+takes_explicit_self_callback(ExplicitSelfCallbackImplementation())
+
+# Inherited callable members retain both direct and fixed protocol specializations.
+class ChildCallback(Callback[Unpack[P]], Protocol[Unpack[P]]):
+    pass
+
+class FixedCallback(Callback[str], Protocol):
+    pass
+
+def takes_child_callback(callback: ChildCallback[str]) -> None: ...
+def takes_fixed_callback(callback: FixedCallback) -> None: ...
+
+takes_child_callback(handles_str)
+takes_child_callback(handles_int)  # error: [invalid-argument-type]
+takes_fixed_callback(handles_str)
+takes_fixed_callback(handles_int)  # error: [invalid-argument-type]
+
+# Static generic arguments still prune overloads when a TypeVarTuple argument is gradual.
+T = TypeVar("T")
+Q = TypeVarTuple("Q")
+
+class MixedCallback(Protocol[T, Unpack[Q]]):
+    @overload
+    def __call__(self: "MixedCallback[int, Unpack[Q]]", value: int, /) -> Any: ...
+    @overload
+    def __call__(self: "MixedCallback[str, Unpack[Q]]", value: str, /) -> Any: ...
+    def __call__(self, value: object, /) -> Any: ...
+
+def takes_mixed_callback(
+    callback: MixedCallback[str, Unpack[tuple[Any, ...]]],
+) -> None: ...
+
+takes_mixed_callback(handles_str)
+takes_mixed_callback(handles_int)  # error: [invalid-argument-type]
+
+class PrefixCallback(Protocol[Unpack[Q]]):
+    @overload
+    def __call__(self: "PrefixCallback[int, Unpack[Q]]", value: int, /) -> Any: ...
+    @overload
+    def __call__(self: "PrefixCallback[str, Unpack[Q]]", value: str, /) -> Any: ...
+    def __call__(self, value: object, /) -> Any: ...
+
+def takes_prefix_callback(
+    callback: PrefixCallback[str, Unpack[tuple[Any, ...]]],
+) -> None: ...
+
+takes_prefix_callback(handles_str)
+takes_prefix_callback(handles_int)  # error: [invalid-argument-type]
+
+# If no receiver overload accepts the specialization, the protocol cannot be satisfied.
+class ClosedCallback(Protocol[T]):
+    @overload
+    def __call__(self: "ClosedCallback[int]", value: int, /) -> Any: ...
+    @overload
+    def __call__(self: "ClosedCallback[str]", value: str, /) -> Any: ...
+    def __call__(self, value: object, /) -> Any: ...
+
+def takes_closed_callback(callback: ClosedCallback[bytes]) -> None: ...
+
+takes_closed_callback(any_args)  # error: [invalid-argument-type]
+
+# Receiver filtering is shared by ordinary overloaded protocol methods.
+class Visitor(Protocol[T]):
+    @overload
+    def visit(self: "Visitor[int]", value: int, /) -> Any: ...
+    @overload
+    def visit(self: "Visitor[str]", value: str, /) -> Any: ...
+    def visit(self, value: object, /) -> Any: ...
+
+class StrVisitor:
+    def visit(self, value: str, /) -> Any:
+        return value
+
+def takes_str_visitor(visitor: Visitor[str]) -> None: ...
+
+takes_str_visitor(StrVisitor())
+
+# Class-method receivers use the same filtering path.
+class ClassVisitor(Protocol[T]):
+    @overload
+    @classmethod
+    def visit(cls: type["ClassVisitor[int]"], value: int, /) -> Any: ...
+    @overload
+    @classmethod
+    def visit(cls: type["ClassVisitor[str]"], value: str, /) -> Any: ...
+    @classmethod
+    def visit(cls, value: object, /) -> Any: ...
+
+class StrClassVisitor:
+    @classmethod
+    def visit(cls, value: str, /) -> Any:
+        return value
+
+class IntClassVisitor:
+    @classmethod
+    def visit(cls, value: int, /) -> Any:
+        return value
+
+def takes_str_class_visitor(visitor: ClassVisitor[str]) -> None: ...
+
+takes_str_class_visitor(StrClassVisitor())
+takes_str_class_visitor(IntClassVisitor())  # error: [invalid-argument-type]
 ```
 
 ## Callable protocols
