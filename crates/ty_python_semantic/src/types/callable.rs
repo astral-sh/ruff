@@ -151,9 +151,26 @@ impl<'db> Type<'db> {
             // TODO: This is unsound so in future we can consider an opt-in option to disable it.
             Type::SubclassOf(subclass_of_ty) => match subclass_of_ty.subclass_of() {
                 SubclassOfInner::Class(class) => Some(class.into_callable(db)),
-                SubclassOfInner::Protocol(protocol) => protocol
-                    .class_origin()
-                    .map(|origin| (*origin).into_callable(db)),
+                SubclassOfInner::Protocol(protocol) => protocol.class_origin(db).map(|origin| {
+                    let callables = (*origin).into_callable(db);
+                    if protocol.materialization_kind(db).is_none() {
+                        return callables;
+                    }
+
+                    let constructed_type = Type::ProtocolInstance(protocol);
+                    callables.map(|callable| {
+                        let signatures = callable
+                            .signatures(db)
+                            .into_iter()
+                            .map(|signature| signature.clone().with_return_type(constructed_type));
+                        CallableType::new(
+                            db,
+                            CallableSignature::from_overloads(signatures),
+                            callable.kind(db),
+                            callable.provenance(db),
+                        )
+                    })
+                }),
                 SubclassOfInner::TypeVar(tvar) => match tvar.typevar(db).bound_or_constraints(db) {
                     Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
                         let upcast_callables = bound

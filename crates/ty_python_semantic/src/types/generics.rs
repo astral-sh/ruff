@@ -2715,7 +2715,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         // fallback erases; restrict mixed unions to the protocol used by dictionary constructors.
         if !other_types.is_empty()
             && !matches!(formal, Type::ProtocolInstance(protocol)
-            if protocol.class_origin().is_some_and(|class| {
+            if protocol.class_origin(self.db).is_some_and(|class| {
                 class.is_known(self.db, KnownClass::SupportsKeysAndGetItem)
             }))
         {
@@ -3284,12 +3284,37 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             }
 
             (formal, Type::ProtocolInstance(actual_protocol)) => {
+                if actual_protocol.materialization_kind(self.db).is_some()
+                    && let Type::ProtocolInstance(formal_protocol) = formal
+                    && let Some(actual_origin) = actual_protocol.class_origin(self.db)
+                    && let Some(formal_origin) = formal_protocol.class_origin(self.db)
+                    && (actual_origin
+                        .iter_mro(self.db)
+                        .filter_map(ClassBase::into_class)
+                        .any(|base| {
+                            base.class_literal(self.db) == formal_origin.class_literal(self.db)
+                        })
+                        || formal_protocol
+                            .interface(self.db)
+                            .has_only_finite_members(self.db))
+                {
+                    // A materialized protocol can expose different member requirements from its
+                    // nominal origin. Infer explicitly inherited requirements structurally, and
+                    // also infer unrelated protocols when the formal requirements are finite.
+                    // Expanding an unrelated recursive requirement here would otherwise bypass
+                    // the finite-first ordering that keeps protocol comparison terminating.
+                    let when = actual.when_constraint_set_assignable_to_owned(self.db, formal);
+                    let when = self.constraints.load(self.db, &when);
+                    self.infer_from_constraint_set(when)?;
+                    return Ok(());
+                }
+
                 // TODO: This will only handle protocol classes that explicit inherit
                 // from other generic protocol classes by listing it as a base class.
                 // To handle classes that implicitly implement a generic protocol, we
                 // will need to check the types of the protocol members to be able to
                 // infer the specialization of the protocol that the class implements.
-                if let Some(actual_nominal) = actual_protocol.to_nominal_instance() {
+                if let Some(actual_nominal) = actual_protocol.nominal_origin_instance(self.db) {
                     return self.infer_map_impl(
                         formal,
                         Type::NominalInstance(actual_nominal),

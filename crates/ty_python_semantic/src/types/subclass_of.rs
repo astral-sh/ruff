@@ -246,7 +246,7 @@ impl<'db> SubclassOfType<'db> {
         let class_like = match self.subclass_of.with_transposed_type_var(db) {
             SubclassOfInner::Class(class) => Type::from(class),
             SubclassOfInner::Dynamic(dynamic) => Type::Dynamic(dynamic),
-            SubclassOfInner::Protocol(protocol) => Type::from(*protocol.class_origin()?),
+            SubclassOfInner::Protocol(protocol) => Type::from(*protocol.class_origin(db)?),
             SubclassOfInner::TypeVar(bound_typevar) => {
                 match bound_typevar.typevar(db).bound_or_constraints(db) {
                     None => unreachable!(),
