@@ -203,6 +203,10 @@ def int_okay(value=int("12")):
 def slice_okay(value=slice(1,2)):
     pass
 
+# Allow immutable range()
+def range_okay(value=range(3)):
+    pass
+
 # Allow immutable complex() value
 def complex_okay(value=complex(1,2)):
     pass
