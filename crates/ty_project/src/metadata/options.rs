@@ -1449,7 +1449,8 @@ pub struct AnalysisOptions {
     /// When disabled, ty instead preserves the provenance of the narrowing with tagged
     /// `object*` and `Never*` bounds. The same check still narrows a value of type `object`
     /// to `Top[list[Unknown]]`, but iterating over the list yields values of type `object*`.
-    /// Passing an item to the list requires a value assignable to `Never*`.
+    /// Both tagged bounds behave like `Unknown` for assignability, so items of any type can
+    /// be appended to the list.
     ///
     /// Defaults to `false`.
     #[option(

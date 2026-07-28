@@ -858,9 +858,9 @@ strict-generic-narrowing = false
 
 In `relaxed` mode, narrowing to a generic class using `isinstance()` intersects with its top
 materialization, using specially tagged `object*`/`Never*` bounds for gradual type arguments. These
-bounds behave like `object`/`Never` while the intersection is simplified and retain their narrowing
-provenance afterwards. For example, in the case below, `object & Covariant[object*]` simplifies to
-`Covariant[object*]`:
+bounds behave like `object`/`Never` while the intersection is simplified, retain their narrowing
+provenance afterwards, and behave like `Unknown` for assignability. For example, in the case below,
+`object & Covariant[object*]` simplifies to `Covariant[object*]`:
 
 ```py
 from typing import Self
@@ -905,7 +905,8 @@ def bounded_covariant_narrowing(value: object) -> None:
         value.get().bit_count()
 ```
 
-For contravariant generics, the parameter retains its tagged `Never*` lower bound:
+For contravariant generics, the parameter retains its tagged `Never*` lower bound. Since `Never*` is
+gradual for assignability, arguments of any type can be passed:
 
 ```py
 class Contravariant[T]:
@@ -914,14 +915,13 @@ class Contravariant[T]:
 def _(x: object):
     if isinstance(x, Contravariant):
         reveal_type(x)  # revealed: Contravariant[Never*]
-        # error: [invalid-argument-type]
         x.push(42)
-        # error: [invalid-argument-type]
         x.push("foo")
 ```
 
 For invariant generics, the top materialization retains its narrowing provenance. Reading from the
-generic produces `object*`, while writing to it requires `Never*`:
+generic produces `object*`, while writing to it accepts arguments of any type through its gradual
+`Never*` parameter:
 
 ```py
 class Invariant[T]:
@@ -935,10 +935,25 @@ def _(x: object):
         reveal_type(x.get)  # revealed: bound method Top[Invariant[Unknown]].get() -> object*
         reveal_type(x.get())  # revealed: object*
         reveal_type(x.push)  # revealed: bound method Top[Invariant[Unknown]].push(x: Never*) -> None
-        # error: [invalid-argument-type]
         x.push(42)
-        # error: [invalid-argument-type]
         x.push("foo")
+```
+
+Both tagged bounds remain gradual only for assignability. In particular, `object*` is assignable to
+and from `int`, but it is not a subtype of `int`:
+
+```py
+from ty_extensions import static_assert
+from ty_extensions._internal import TypeOf, is_assignable_to, is_subtype_of
+
+def tagged_bounds_are_gradual(value: object) -> None:
+    if isinstance(value, Covariant):
+        item = value.get()
+        reveal_type(item)  # revealed: object*
+
+        static_assert(is_assignable_to(TypeOf[item], int))
+        static_assert(is_assignable_to(int, TypeOf[item]))
+        static_assert(not is_subtype_of(TypeOf[item], int))
 ```
 
 The behavior of `issubclass()` is similar.
@@ -980,6 +995,8 @@ def preserve_invariant_bounds(value: Invariant[object], bottom: Invariant[Never]
         reveal_type(bottom)  # revealed: Invariant[Never]
         reveal_type(bottom.get)  # revealed: bound method Invariant[Never].get() -> Never
         reveal_type(bottom.push)  # revealed: bound method Invariant[Never].push(x: Never) -> None
+        # error: [invalid-argument-type] "Argument to bound method `Invariant.push` is incorrect: Expected `Never`, found `Literal[42]`"
+        bottom.push(42)
 ```
 
 ## Use cases: `isinstance` narrowing and generics
@@ -1099,9 +1116,9 @@ def _(xs: list[str] | set[str]) -> str:
 ### Relaxed mode
 
 With `analysis.strict-generic-narrowing` disabled, the positive branch is simplified using tagged
-`object*`/`Never*` bounds, which retain their narrowing provenance afterwards. The negative branch
-still excludes the ordinary top materialization because a negative `isinstance` result excludes
-every specialization of the class:
+`object*`/`Never*` bounds, which retain their narrowing provenance afterwards and behave like
+`Unknown` for assignability. The negative branch still excludes the ordinary top materialization
+because a negative `isinstance` result excludes every specialization of the class:
 
 ```toml
 [analysis]
@@ -1161,11 +1178,12 @@ Narrowing from `object` via `isinstance(.., list)`:
 def _(xs: object):
     if isinstance(xs, list):
         reveal_type(xs)  # revealed: Top[list[Unknown]]
+        reveal_type(xs.append)  # revealed: bound method Top[list[Unknown]].append(object: Never*, /) -> None
         for x in xs:
             reveal_type(x)  # revealed: object*
 
-        # error: [invalid-argument-type]
         xs.append(1)
+        xs.append("foo")
 
     else:
         reveal_type(xs)  # revealed: ~Top[list[Unknown]]

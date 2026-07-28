@@ -1222,6 +1222,18 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         Some(self.check_type_pair(db, Type::TypeVar(source), target))
     }
 
+    /// Tagged narrowing bounds retain their top/bottom meaning for subtype checks and
+    /// simplification, but remain gradual when checking assignability.
+    fn narrowing_bound_fallback(&self, ty: Type<'db>) -> Option<Type<'db>> {
+        ty.narrowing_bound_fallback().map(|fallback| {
+            if self.relation.is_assignability() {
+                Type::unknown()
+            } else {
+                fallback
+            }
+        })
+    }
+
     /// Return a constraint set indicating the conditions under which `self.relation` holds between `source` and `target`.
     pub(super) fn check_type_pair(
         &self,
@@ -1229,11 +1241,11 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         source: Type<'db>,
         target: Type<'db>,
     ) -> ConstraintSet<'db, 'c> {
-        if let Some(source) = source.narrowing_bound_fallback() {
+        if let Some(source) = self.narrowing_bound_fallback(source) {
             return self.check_type_pair(db, source, target);
         }
 
-        if let Some(target) = target.narrowing_bound_fallback() {
+        if let Some(target) = self.narrowing_bound_fallback(target) {
             return self.check_type_pair(db, source, target);
         }
 
