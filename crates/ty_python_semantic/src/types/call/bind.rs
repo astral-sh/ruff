@@ -6084,7 +6084,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                     break;
                 }
 
-                constrained_typevars.insert(typevar.identity(self.db));
+                constrained_typevars.insert(*typevar);
                 overload_constraints = overload_constraints.and(self.db, constraints, || {
                     ConstraintSet::constrain_typevar_upper_bound(
                         self.db,
@@ -6096,8 +6096,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             }
 
             // Reachability is existential, while final coverage must hold for every choice.
-            let constrained_typevars =
-                InferableTypeVars::from_typevars(self.db, constrained_typevars);
+            let constrained_typevars = TypeVarSet::from_typevars(self.db, constrained_typevars);
             if !overload_constraints.satisfied_by_all_typevars(
                 self.db,
                 constraints,
