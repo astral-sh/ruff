@@ -5375,6 +5375,46 @@ impl SequentMap {
         Ref::map(storage, |storage| &storage.pair_sequent_cache[&key])
     }
 
+    /// Quickly determines whether two constraints cannot possibly produce any sequents when passed
+    /// to [`for_constraint_pair`][Self::for_constraint_pair]. If this returns `true`, it is safe
+    /// to skip calling `for_constraint_pair` for this pair of constraints.
+    fn pair_cannot_produce_sequents<'db>(
+        db: &'db dyn Db,
+        builder: &ConstraintSetBuilder<'db>,
+        left: ConstraintId,
+        right: ConstraintId,
+    ) -> bool {
+        // Currently, the only pattern we look for is when two constraints that have _only_ lower
+        // bounds, where those lower bounds are disjoint. Given `l₁ ≤ T ∧ l₂ ≤ T`, the only
+        // sequent we could theoretically produce is `(l₁ | l₂) ≤ T`. But we don't store that as a
+        // single constraint; we always break that apart into the two smaller constraints that we
+        // started with.
+
+        let left = builder.constraint_data(left);
+        let right = builder.constraint_data(right);
+        if !left.typevar.is_same_typevar_as(db, right.typevar) {
+            return false;
+        }
+
+        let (
+            ConstraintBounds {
+                lower: Some(left_lower),
+                upper: None,
+            },
+            ConstraintBounds {
+                lower: Some(right_lower),
+                upper: None,
+            },
+        ) = (left.bounds, right.bounds)
+        else {
+            return false;
+        };
+
+        left_lower
+            .when_trivially_disjoint_from(db, right_lower, builder, TypeVarSet::None)
+            .is_trivially_always_satisfied()
+    }
+
     fn add_single_tautology(&mut self, ante: ConstraintId) {
         self.sequents.push(Sequent::SingleTautology { ante });
     }
@@ -7093,6 +7133,11 @@ impl PathAssignments {
             if *existing == constraint {
                 continue;
             }
+
+            if SequentMap::pair_cannot_produce_sequents(db, builder, *existing, constraint) {
+                continue;
+            }
+
             let existing_source_order = self
                 .constraint_source_order(*existing)
                 .unwrap_or(existing_index);

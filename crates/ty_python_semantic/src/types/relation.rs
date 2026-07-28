@@ -719,6 +719,33 @@ impl<'db> Type<'db> {
         };
         checker.check_type_pair(db, self, other)
     }
+
+    /// Checks whether `self` is disjoint from `other`, while being more accepting of false
+    /// negatives. Use this when you want to _quickly_ check whether two types are _definitely_
+    /// disjoint, typically for engaging a fast path in some algorithm.
+    pub(crate) fn when_trivially_disjoint_from<'c>(
+        self,
+        db: &'db dyn Db,
+        other: Type<'db>,
+        constraints: &'c ConstraintSetBuilder<'db>,
+        inferable: TypeVarSet<'db>,
+    ) -> ConstraintSet<'db, 'c> {
+        let relation_visitor = HasRelationToVisitor::default(constraints);
+        let disjointness_visitor = IsDisjointVisitor::default(constraints);
+        let signature_relation_visitor = SignatureRelationVisitor::default();
+        let materialization_visitor = ApplyTypeMappingVisitor::default();
+        let checker = DisjointnessChecker {
+            constraints,
+            inferable,
+            given: ConstraintSet::from_bool(constraints, false),
+            perform_expensive_checks: false,
+            disjointness_visitor: &disjointness_visitor,
+            relation_visitor: &relation_visitor,
+            signature_relation_visitor: &signature_relation_visitor,
+            materialization_visitor: &materialization_visitor,
+        };
+        checker.check_type_pair(db, self, other)
+    }
 }
 
 /// A [`CycleDetector`] that is used in `has_relation_to` methods.
