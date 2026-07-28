@@ -469,7 +469,7 @@ impl<'db> ProtocolInterface<'db> {
 
     pub(super) fn non_method_members(self, db: &'db dyn Db) -> Vec<ProtocolMember<'db, 'db>> {
         self.members(db)
-            .filter(|member| !member.is_method() && !member.has_todo_type())
+            .filter(|member| !member.is_method())
             .collect()
     }
 
@@ -539,14 +539,15 @@ impl<'db> ProtocolInterface<'db> {
         receiver_ty: Type<'db>,
         name: &str,
     ) -> Option<(Option<Type<'db>>, TypeQualifiers)> {
-        self.member_by_name(db, name).and_then(|member| {
-            Some((
+        self.member_by_name(db, name).map(|member| {
+            (
                 member
-                    .meta_access(db)?
+                    .capabilities(db)
+                    .class
                     .write
                     .and_then(|write| write.bind_compatibility_type(db, receiver_ty)),
                 member.qualifiers(),
-            ))
+            )
         })
     }
 
@@ -600,16 +601,16 @@ impl<'db> ProtocolInterface<'db> {
         db: &'db dyn Db,
         name: &str,
     ) -> Option<PlaceAndQualifiers<'db>> {
-        self.member_by_name(db, name).and_then(|member| {
-            let read = member.meta_access(db)?.read;
-            Some(PlaceAndQualifiers {
+        self.member_by_name(db, name).map(|member| {
+            let read = member.capabilities(db).class.read;
+            PlaceAndQualifiers {
                 place: read
                     .and_then(|read| read.resolve(db))
                     .map(|read| Place::bound(read.ty()))
                     .unwrap_or(Place::Undefined)
                     .with_provenance(Provenance::from_definition(member.definition())),
                 qualifiers: member.qualifiers(),
-            })
+            }
         })
     }
 
@@ -1148,20 +1149,16 @@ impl<'db> ProtocolMemberData<'db> {
             ProtocolMemberKind::Attribute(member_ty) => {
                 let is_class_var = self.qualifiers.contains(TypeQualifiers::CLASS_VAR);
                 let is_final = self.qualifiers.contains(TypeQualifiers::FINAL);
-                // A `Todo` records a protocol member form that is not modeled yet; do not infer a
-                // write requirement from that temporary representation.
-                let is_todo = member_ty.ty().is_todo();
                 ProtocolMemberCapabilities {
                     instance: ProtocolMemberAccess::new(
                         Some(member_ty),
-                        (!is_class_var && !is_final && !is_todo)
+                        (!is_class_var && !is_final)
                             .then_some(ProtocolMemberWrite::from_type(member_ty)),
                     ),
                     class: if is_class_var {
                         ProtocolMemberAccess::new(
                             Some(member_ty),
-                            (!is_final && !is_todo)
-                                .then_some(ProtocolMemberWrite::from_type(member_ty)),
+                            (!is_final).then_some(ProtocolMemberWrite::from_type(member_ty)),
                         )
                     } else {
                         ProtocolMemberAccess::NONE
@@ -1670,20 +1667,6 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
         } else {
             capabilities
         }
-    }
-
-    fn meta_access(&self, db: &'db dyn Db) -> Option<ProtocolMemberAccess<'db>> {
-        if self.has_todo_type() {
-            return None;
-        }
-        Some(self.capabilities(db).class)
-    }
-
-    fn has_todo_type(&self) -> bool {
-        self.data
-            .kind
-            .member_types()
-            .any(|ty| matches!(ty, ProtocolMemberType::Value { ty, .. } if ty.is_todo()))
     }
 }
 
