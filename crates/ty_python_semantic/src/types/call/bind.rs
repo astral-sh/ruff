@@ -5122,7 +5122,7 @@ struct StarredParameterArguments<'db> {
 struct ForwardedCallableSubCall<'db> {
     /// Overload bindings produced from the exact forwarded positional arguments.
     bindings: Bindings<'db>,
-    /// The callback return type declared by the outer callable parameter.
+    /// The callback return type with the matched variadic pack already substituted.
     expected_return_ty: Type<'db>,
     /// The selected return type, or its symbolic union when all constrained choices are covered.
     provided_return_ty: Option<Type<'db>>,
@@ -5744,9 +5744,16 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                 let specialization_result = if let Some(sub_call) =
                     self.typevartuple_forwarded_sub_call(constraints, declared_type, argument_type)
                 {
-                    let Some(provided_return_ty) = sub_call.provided_return_ty else {
-                        continue;
-                    };
+                    let provided_return_ty = sub_call.provided_return_ty.unwrap_or_else(|| {
+                        argument_type
+                            .try_upcast_to_callable(self.db)
+                            .and_then(CallableTypes::exactly_one)
+                            .map_or_else(Type::unknown, |callable| {
+                                callable
+                                    .signatures(self.db)
+                                    .overload_return_type_or_unknown(self.db)
+                            })
+                    });
                     builder.infer(sub_call.expected_return_ty, provided_return_ty)
                 } else {
                     builder.infer(declared_type, argument_type)
@@ -5974,9 +5981,6 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             .try_upcast_to_callable(self.db)
             .and_then(CallableTypes::exactly_one)?;
         let signatures = &argument_callable.signatures(self.db).overloads;
-        if signatures.len() <= 1 {
-            return None;
-        }
 
         let mut sub_arguments = self
             .arguments
@@ -6019,7 +6023,11 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         let provided_tuple = Type::tuple(TupleType::new(self.db, &arguments.provided_tuple));
         Some(ForwardedCallableSubCall {
             bindings,
-            expected_return_ty: declared_signature.return_ty,
+            expected_return_ty: declared_signature.return_ty.substitute_one_typevar(
+                self.db,
+                typevartuple,
+                provided_tuple,
+            ),
             provided_return_ty,
             argument_indices,
             forwarded_arguments_are_empty: provided_tuple
@@ -6103,6 +6111,9 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         let Some(callable_binding) = sub_call.bindings.single_element() else {
             return false;
         };
+        if callable_binding.overloads().len() <= 1 {
+            return false;
+        }
         let Some(provided_return_ty) = sub_call.provided_return_ty else {
             if sub_call.forwarded_arguments_are_empty {
                 return false;

@@ -699,6 +699,12 @@ def invoke_str[*Ts](
 ) -> str:
     raise NotImplementedError
 
+def invoke_tuple[*Ts](
+    callback: Callable[[*Ts], tuple[*Ts]],
+    *args: *Ts,
+) -> tuple[*Ts]:
+    raise NotImplementedError
+
 def accepts_nothing() -> str:
     return "empty"
 
@@ -711,6 +717,19 @@ def overloaded_value(value: int) -> str: ...
 def overloaded_value(value: str) -> str: ...
 def overloaded_value(value: int | str) -> str:
     return str(value)
+
+@overload
+def returns_string_tuple(value: int, /) -> tuple[str]: ...
+@overload
+def returns_string_tuple(value: str, /) -> tuple[str]: ...
+def returns_string_tuple(value: int | str, /) -> tuple[str]:
+    return (str(value),)
+
+def returns_string_tuple_once(value: object, /) -> tuple[str]:
+    return (str(value),)
+
+def accepts_str_once(value: str, /) -> object:
+    return value
 
 @overload
 def optional_arity() -> str: ...
@@ -727,6 +746,24 @@ def check(value: int, label: str, fixed: tuple[int, str], empty_tuple: tuple[()]
     reveal_type(invoke_pack(optional_arity))  # revealed: tuple[()]
     reveal_type(invoke_pack(optional_arity, *empty_tuple))  # revealed: tuple[()]
     reveal_type(invoke_str(optional_arity, *empty_tuple))  # revealed: str
+
+    result = invoke_tuple(
+        returns_string_tuple,  # error: [invalid-argument-type]
+        value,
+    )
+    reveal_type(result)  # revealed: tuple[int]
+
+    single_result = invoke_tuple(
+        returns_string_tuple_once,  # error: [invalid-argument-type]
+        value,
+    )
+    reveal_type(single_result)  # revealed: tuple[int]
+
+    parameter_result = invoke_pack(
+        accepts_str_once,  # error: [invalid-argument-type]
+        value,
+    )
+    reveal_type(parameter_result)  # revealed: tuple[int]
 
     empty = invoke_pack(
         accepts_int_and_str,  # error: [invalid-argument-type]

@@ -69,6 +69,12 @@ def invoke(
 ) -> R:
     raise NotImplementedError
 
+def invoke_tuple(
+    callback: Callable[[Unpack[Ts]], tuple[Unpack[Ts]]],
+    *args: Unpack[Ts],
+) -> tuple[Unpack[Ts]]:
+    raise NotImplementedError
+
 def invoke_pack(
     callback: Callable[[Unpack[Ts]], object],
     *args: Unpack[Ts],
@@ -110,6 +116,38 @@ def overloaded_value(value: int) -> str: ...
 def overloaded_value(value: str) -> str: ...
 def overloaded_value(value: int | str) -> str:
     return str(value)
+
+@overload
+def returns_string_tuple(value: int, /) -> tuple[str]: ...
+@overload
+def returns_string_tuple(value: str, /) -> tuple[str]: ...
+def returns_string_tuple(value: int | str, /) -> tuple[str]:
+    return (str(value),)
+
+def returns_string_tuple_once(value: object, /) -> tuple[str]:
+    return (str(value),)
+
+def accepts_str_once(value: str, /) -> object:
+    return value
+
+def check_tuple_return(value: int) -> None:
+    result = invoke_tuple(
+        returns_string_tuple,  # error: [invalid-argument-type]
+        value,
+    )
+    reveal_type(result)  # revealed: tuple[int]
+
+    single_result = invoke_tuple(
+        returns_string_tuple_once,  # error: [invalid-argument-type]
+        value,
+    )
+    reveal_type(single_result)  # revealed: tuple[int]
+
+    parameter_result = invoke_pack(
+        accepts_str_once,  # error: [invalid-argument-type]
+        value,
+    )
+    reveal_type(parameter_result)  # revealed: tuple[int]
 
 reveal_type(invoke(overloaded_value, 1))  # revealed: str
 reveal_type(invoke(overloaded_value, "value"))  # revealed: str
