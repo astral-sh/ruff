@@ -257,3 +257,67 @@ help: Replace with `s.replace(r'''abc''', "")`
 100 + s.replace(r'''abc''', "")
 101 |
     |
+
+RUF055 [*] Plain string pattern passed to `re` function
+   --> RUF055_0.py:122:8
+    |
+121 | def bytes_pattern_known_bytes(x: bytes):
+122 |     if re.search(b"ab", x):  # this should be replaced with `b"ab" in x`
+    |        ^^^^^^^^^^^^^^^^^^^
+123 |         pass
+    |
+help: Replace with `b"ab" in x`
+    |
+121 | def bytes_pattern_known_bytes(x: bytes):
+    -     if re.search(b"ab", x):  # this should be replaced with `b"ab" in x`
+122 +     if b"ab" in x:  # this should be replaced with `b"ab" in x`
+123 |         pass
+    |
+
+RUF055 [*] Plain string pattern passed to `re` function
+   --> RUF055_0.py:136:4
+    |
+135 | # this should be replaced with `b"ab" in Source.data`
+136 | if re.search(b"ab", Source.data):
+    |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+137 |     pass
+    |
+help: Replace with `b"ab" in Source.data`
+    |
+135 | # this should be replaced with `b"ab" in Source.data`
+    - if re.search(b"ab", Source.data):
+136 + if b"ab" in Source.data:
+137 |     pass
+    |
+
+RUF055 [*] Plain string pattern passed to `re` function
+   --> RUF055_0.py:140:4
+    |
+140 | if re.search(b"ab", b"abc"):  # this should be replaced with `b"ab" in b"abc"`
+    |    ^^^^^^^^^^^^^^^^^^^^^^^^
+141 |     pass
+    |
+help: Replace with `b"ab" in b"abc"`
+    |
+139 |
+    - if re.search(b"ab", b"abc"):  # this should be replaced with `b"ab" in b"abc"`
+140 + if b"ab" in b"abc":  # this should be replaced with `b"ab" in b"abc"`
+141 |     pass
+    |
+
+RUF055 [*] Plain string pattern passed to `re` function
+   --> RUF055_0.py:147:8
+    |
+145 | # targets, so an unknown target type still gets the diagnostic
+146 | def str_pattern_unknown_target(x):
+147 |     if re.search("abc", x):  # this should be replaced with `"abc" in x`
+    |        ^^^^^^^^^^^^^^^^^^^
+148 |         pass
+    |
+help: Replace with `"abc" in x`
+    |
+146 | def str_pattern_unknown_target(x):
+    -     if re.search("abc", x):  # this should be replaced with `"abc" in x`
+147 +     if "abc" in x:  # this should be replaced with `"abc" in x`
+148 |         pass
+    |

@@ -4,7 +4,7 @@ use ruff_python_ast::{
     Arguments, CmpOp, Expr, ExprAttribute, ExprBytesLiteral, ExprCall, ExprCompare, ExprContext,
     ExprStringLiteral, ExprUnaryOp, Identifier, UnaryOp,
 };
-use ruff_python_semantic::analyze::typing::find_binding_value;
+use ruff_python_semantic::analyze::typing::{self, find_binding_value};
 use ruff_python_semantic::{Modules, SemanticModel};
 use ruff_text_size::TextRange;
 
@@ -46,6 +46,12 @@ use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 /// For `re.sub`, the `repl` (replacement) argument must also be a string literal,
 /// not a function. For `re.match`, `re.search`, and `re.fullmatch`, the return
 /// value must also be used only for its truth value.
+///
+/// For `bytes` patterns, the `string` argument must also be known to be
+/// `bytes`, either as a literal or as a variable or attribute that can be
+/// inferred to be one. The `re` functions accept any buffer type, such as
+/// `memoryview`, for which the suggested replacements would raise or match
+/// differently.
 ///
 /// ## Fix safety
 ///
@@ -121,6 +127,13 @@ pub(crate) fn unnecessary_regular_expression(checker: &Checker, call: &ExprCall)
     // `str.split("")` raises `ValueError: empty separator` while `re.split("", s)` succeeds,
     // so skip the diagnostic for `re.split` with an empty pattern.
     if matches!(re_func.kind, ReFuncKind::Split) && literal.is_empty() {
+        return;
+    }
+
+    // Only `bytes` patterns need this. Given a `str` pattern, `re` raises `TypeError` for any
+    // non-`str` target, so the rewrite is always operating on a `str`.
+    // See https://github.com/astral-sh/ruff/issues/27024
+    if matches!(literal, Literal::Bytes(_)) && !is_bytes(re_func.string, semantic) {
         return;
     }
 
@@ -359,6 +372,25 @@ impl<'a> ReFunc<'a> {
             range: TextRange::default(),
             node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         })
+    }
+}
+
+/// Whether `string` is known to be `bytes`.
+///
+/// `re` accepts any object supporting the buffer protocol as the target for a
+/// `bytes` pattern, but the replacement methods and operators are not
+/// equivalent there: `re.search(b"ab", memoryview(b"abc"))` matches, while
+/// `b"ab" in memoryview(b"abc")` is `False`, and `memoryview` has no
+/// `startswith`, `split`, or `replace`.
+fn is_bytes(string: &Expr, semantic: &SemanticModel) -> bool {
+    if let Expr::Name(name) = string {
+        semantic
+            .only_binding(name)
+            .is_some_and(|binding_id| typing::is_bytes(semantic.binding(binding_id), semantic))
+    } else if let Some(binding_id) = semantic.lookup_attribute(string) {
+        typing::is_bytes(semantic.binding(binding_id), semantic)
+    } else {
+        string.is_bytes_literal_expr()
     }
 }
 
