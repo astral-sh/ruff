@@ -260,6 +260,11 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
                         TypeContext::new(Some(domain.unwrap_or_else(Type::unknown))),
                         emit_diagnostics,
                     );
+                    if let Some(domain) = domain
+                        && !self.check_type_pair(value_ty, *domain, emit_diagnostics)
+                    {
+                        return false;
+                    }
                     self.evaluate_protocol_descriptor_write(
                         *descriptor_ty,
                         *receiver_ty,

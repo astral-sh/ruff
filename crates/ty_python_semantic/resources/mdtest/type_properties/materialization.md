@@ -499,6 +499,12 @@ static_assert(is_equivalent_to(Bottom[type[int | Any]], type[int]))
 def _(top: Top[list[type[Any]]], bottom: Bottom[list[type[Any]]]):
     reveal_type(top)  # revealed: Top[list[type[Any]]]
     reveal_type(bottom)  # revealed: Bottom[list[type[Any]]]
+
+def annotated_materialized_list_classes(top: type[Top[list[Any]]], bottom: type[Bottom[list[Any]]]) -> None:
+    reveal_type(top)  # revealed: type[Top[list[Any]]]
+    reveal_type(bottom)  # revealed: type[Bottom[list[Any]]]
+    reveal_type(top())  # revealed: Top[list[Any]]
+    reveal_type(bottom())  # revealed: Bottom[list[Any]]
 ```
 
 ## Materialized class annotations and constructors
@@ -703,6 +709,10 @@ def _(
     top_two: Top[int, str],  # error: [invalid-type-form]
     bottom_two: Bottom[int, str],  # error: [invalid-type-form]
 ): ...
+def nested_invalid_arity(
+    top_two: type[Top[int, str]],  # error: [invalid-type-form]
+    bottom_two: type[Bottom[int, str]],  # error: [invalid-type-form]
+) -> None: ...
 ```
 
 The argument must be a type expression:
@@ -1075,6 +1085,14 @@ def constructors(top: Top[MutableAny]) -> None:
     reveal_type(type(top))  # revealed: type[Top[MutableAny]]
     reveal_type(type(top)())  # revealed: Top[MutableAny]
     reveal_type(invoke(type(top)))  # revealed: Top[MutableAny]
+
+def annotated_constructors(top: type[Top[MutableAny]], bottom: type[Bottom[MutableAny]]) -> None:
+    reveal_type(top)  # revealed: type[Top[MutableAny]]
+    reveal_type(bottom)  # revealed: type[Bottom[MutableAny]]
+    reveal_type(top())  # revealed: Top[MutableAny]
+    reveal_type(bottom())  # revealed: Bottom[MutableAny]
+    reveal_type(invoke(top))  # revealed: Top[MutableAny]
+    reveal_type(invoke(bottom))  # revealed: Bottom[MutableAny]
 ```
 
 Materialization preserves sound class-member access: an ordinary instance attribute is not available
@@ -1084,6 +1102,10 @@ on `type[Top[MutableAny]]` or `type[Bottom[MutableAny]]`.
 def class_instance_attributes(top: Top[MutableAny], bottom: Bottom[MutableAny]) -> None:
     type(top).value  # error: [unresolved-attribute]
     type(bottom).value  # error: [unresolved-attribute]
+
+def annotated_class_instance_attributes(top: type[Top[MutableAny]], bottom: type[Bottom[MutableAny]]) -> None:
+    top.value  # error: [unresolved-attribute]
+    bottom.value  # error: [unresolved-attribute]
 ```
 
 ### Writable properties
@@ -1223,7 +1245,8 @@ async def narrow_awaitable_union(fn: Callable[[int], int | Awaitable[int]]) -> N
 ### Class variables
 
 Class variables have separate read and write types. `Top` reads `object` and writes `Never`, while
-`Bottom` reads `Never` and writes `object`:
+`Bottom` reads `Never` and writes `object`. These requirements are preserved on both inferred and
+explicitly annotated class objects:
 
 ```py
 from typing import Any, ClassVar, Protocol
@@ -1240,18 +1263,37 @@ def class_writes(top: Top[ClassVarAny], bottom: Bottom[ClassVarAny]) -> None:
 def class_reads(top: Top[ClassVarAny], bottom: Bottom[ClassVarAny]) -> None:
     reveal_type(type(top).value)  # revealed: object
     reveal_type(type(bottom).value)  # revealed: Never
+
+def annotated_class_writes(top: type[Top[ClassVarAny]], bottom: type[Bottom[ClassVarAny]]) -> None:
+    reveal_type(top)  # revealed: type[Top[ClassVarAny]]
+    reveal_type(bottom)  # revealed: type[Bottom[ClassVarAny]]
+    top.value = 1  # error: [invalid-assignment]
+    bottom.value = object()
+
+def annotated_class_reads(top: type[Top[ClassVarAny]], bottom: type[Bottom[ClassVarAny]]) -> None:
+    reveal_type(top.value)  # revealed: object
+    reveal_type(bottom.value)  # revealed: Never
 ```
 
 Structural protocol checks use the mapped read and write types as well. `ClassVarInt` satisfies the
-top-materialized protocol, but not the bottom-materialized one:
+top-materialized protocol, but not the bottom-materialized one; a class missing the class variable
+does not satisfy the top-materialized protocol:
 
 ```py
 class ClassVarInt:
     value: ClassVar[int] = 1
 
+class MissingClassVar: ...
+
 static_assert(is_subtype_of(ClassVarInt, Top[ClassVarAny]))
 static_assert(not is_subtype_of(ClassVarInt, Bottom[ClassVarAny]))
 top_class: type[Top[ClassVarAny]] = ClassVarInt
+missing_top_class: type[Top[ClassVarAny]] = MissingClassVar  # error: [invalid-assignment]
+invalid_bottom_class: type[Bottom[ClassVarAny]] = ClassVarInt  # error: [invalid-assignment]
+
+def materialized_bottom_class(bottom: Bottom[ClassVarAny]) -> None:
+    valid_bottom_class: type[Bottom[ClassVarAny]] = type(bottom)
+    reveal_type(valid_bottom_class)  # revealed: type[Bottom[ClassVarAny]]
 ```
 
 Union simplification preserves the materialized class variable regardless of operand order:
@@ -1366,6 +1408,7 @@ A descriptor can expose separate read and write types. `Top` maps an `Any` read 
 
 ```py
 from typing import Any, Callable, Never, Protocol
+from typing_extensions import TypeIs
 from ty_extensions import Bottom, Top, static_assert
 from ty_extensions._internal import is_subtype_of
 
@@ -1398,6 +1441,23 @@ class NarrowBottomDescriptorProperty:
 
 static_assert(is_subtype_of(TopDescriptorProperty, Top[DescriptorProperty]))
 static_assert(not is_subtype_of(NarrowBottomDescriptorProperty, Bottom[DescriptorProperty]))
+
+def top_descriptor_write(top: Top[DescriptorProperty]) -> None:
+    top.value = 1  # error: [invalid-assignment]
+
+def bottom_descriptor_write(bottom: Bottom[DescriptorProperty]) -> None:
+    bottom.value = object()
+
+def plain_descriptor_write(plain: DescriptorProperty) -> None:
+    plain.value = object()
+
+def is_descriptor_property(value: object) -> TypeIs[DescriptorProperty]:
+    return True
+
+def narrowed_descriptor_write(value: object) -> None:
+    if is_descriptor_property(value):
+        reveal_type(value)  # revealed: Top[DescriptorProperty]
+        value.value = 1  # error: [invalid-assignment]
 ```
 
 ### Property accessor types
@@ -1448,10 +1508,12 @@ def property_assignment_narrowing(top: Top[TransformingProperty]) -> None:
 ### Generic inference through inherited and structural protocols
 
 Generic inference uses a member's materialized type, not its original `Any`. This applies both to
-inherited members and to the finite requirements of independently declared structural protocols:
+inherited members and to the finite requirements of independently declared structural protocols.
+Bounds, constraints, and invariant requirements must still reject an incompatible materialized
+member instead of accepting an invalid call or selecting the wrong overload:
 
 ```py
-from typing import Any, Protocol
+from typing import Any, Literal, Protocol, TypeVar, overload
 from ty_extensions import Top
 
 class InferenceBase[T](Protocol):
@@ -1473,6 +1535,105 @@ def materialized_inference(inherited: Top[InheritedInferenceAny]) -> None:
 
 def materialized_structural_inference(structural: Top[StructuralInferenceAny]) -> None:
     reveal_type(infer_item(structural))  # revealed: object
+
+def bounded_item[T: str](value: InferenceBase[T]) -> T:
+    raise NotImplementedError
+
+def union_bounded_item[T: str | bytes](value: InferenceBase[T]) -> T:
+    raise NotImplementedError
+
+def constrained_item[T: (str, bytes)](value: InferenceBase[T]) -> T:
+    raise NotImplementedError
+
+LegacyConstrained = TypeVar("LegacyConstrained", str, bytes)
+
+def legacy_constrained_item(value: InferenceBase[LegacyConstrained]) -> LegacyConstrained:
+    raise NotImplementedError
+
+def invalid_materialized_bounds(
+    inherited: Top[InheritedInferenceAny],
+    structural: Top[StructuralInferenceAny],
+) -> None:
+    bounded_item(inherited)  # error: [invalid-argument-type]
+    bounded_item(structural)  # error: [invalid-argument-type]
+    union_bounded_item(inherited)  # error: [invalid-argument-type]
+    union_bounded_item(structural)  # error: [invalid-argument-type]
+    constrained_item(inherited)  # error: [invalid-argument-type]
+    constrained_item(structural)  # error: [invalid-argument-type]
+    legacy_constrained_item(inherited)  # error: [invalid-argument-type]
+    legacy_constrained_item(structural)  # error: [invalid-argument-type]
+
+def consistent_item[T](value: InferenceBase[T], values: list[T]) -> T:
+    raise NotImplementedError
+
+def invalid_materialized_invariant_arguments(
+    inherited: Top[InheritedInferenceAny],
+    structural: Top[StructuralInferenceAny],
+    values: list[int],
+) -> None:
+    consistent_item(inherited, values)  # error: [invalid-argument-type]
+    consistent_item(structural, values)  # error: [invalid-argument-type]
+
+class InvariantInferenceBase[T](Protocol):
+    item: T
+
+class InheritedInvariantAny(InvariantInferenceBase[Any], Protocol):
+    marker: Any
+
+class StructuralInvariantAny(Protocol):
+    item: Any
+
+def invariant_item[T](value: InvariantInferenceBase[T], required: T) -> T:
+    raise NotImplementedError
+
+def invalid_materialized_invariant_members(
+    inherited: Top[InheritedInvariantAny],
+    structural: Top[StructuralInvariantAny],
+) -> None:
+    invariant_item(inherited, "required")  # error: [invalid-argument-type]
+    invariant_item(structural, "required")  # error: [invalid-argument-type]
+
+@overload
+def select_item[T: str](value: InferenceBase[T]) -> Literal["bounded"]: ...
+@overload
+def select_item(value: object) -> Literal["fallback"]: ...
+def select_item(value: object) -> Literal["bounded", "fallback"]:
+    return "fallback"
+
+@overload
+def select_specific_item(value: InferenceBase[str]) -> Literal["str"]: ...
+@overload
+def select_specific_item(value: InferenceBase[bytes]) -> Literal["bytes"]: ...
+def select_specific_item(value: object) -> str:
+    raise NotImplementedError
+
+def materialized_overload_resolution(
+    inherited: Top[InheritedInferenceAny],
+    structural: Top[StructuralInferenceAny],
+    valid: InferenceBase[str],
+) -> None:
+    reveal_type(select_item(inherited))  # revealed: Literal["fallback"]
+    reveal_type(select_item(structural))  # revealed: Literal["fallback"]
+    reveal_type(select_item(valid))  # revealed: Literal["bounded"]
+    select_specific_item(inherited)  # error: [no-matching-overload]
+    select_specific_item(structural)  # error: [no-matching-overload]
+
+@overload
+def select_consistent_item[T](value: InferenceBase[T], values: list[T]) -> T: ...
+@overload
+def select_consistent_item(value: object, values: list[int]) -> object: ...
+def select_consistent_item(value: object, values: object) -> object:
+    raise NotImplementedError
+
+def materialized_invariant_overload_resolution(
+    inherited: Top[InheritedInferenceAny],
+    structural: Top[StructuralInferenceAny],
+    valid: InferenceBase[int],
+    values: list[int],
+) -> None:
+    reveal_type(select_consistent_item(inherited, values))  # revealed: object
+    reveal_type(select_consistent_item(structural, values))  # revealed: object
+    reveal_type(select_consistent_item(valid, values))  # revealed: int
 ```
 
 ### Generator delegation
@@ -1574,6 +1735,17 @@ def alias_writes(
 ) -> None:
     top.value = 1  # error: [invalid-assignment]
     bottom.value = object()
+
+def annotated_generic_protocol_classes(
+    top: type[Top[GenericMutable[Any]]],
+    bottom: type[Bottom[GenericMutable[Any]]],
+    aliased_top: type[Top[MutableAlias[Any]]],
+    aliased_bottom: type[Bottom[MutableAlias[Any]]],
+) -> None:
+    reveal_type(top)  # revealed: type[Top[GenericMutable[Any]]]
+    reveal_type(bottom)  # revealed: type[Bottom[GenericMutable[Any]]]
+    reveal_type(aliased_top)  # revealed: type[Top[GenericMutable[Any]]]
+    reveal_type(aliased_bottom)  # revealed: type[Bottom[GenericMutable[Any]]]
 ```
 
 ### Nested generic protocols
