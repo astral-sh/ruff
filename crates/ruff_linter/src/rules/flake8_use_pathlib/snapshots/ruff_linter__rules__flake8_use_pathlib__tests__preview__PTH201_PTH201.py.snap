@@ -366,7 +366,6 @@ PTH201 [*] Do not pass the current directory explicitly to `Path`
 77 | _ = PureWindowsPath(".")
 78 | _ = PackagePath(".")
    |                 ^^^
-   |
 help: Remove the current directory argument
    |
 77 | _ = PureWindowsPath(".")

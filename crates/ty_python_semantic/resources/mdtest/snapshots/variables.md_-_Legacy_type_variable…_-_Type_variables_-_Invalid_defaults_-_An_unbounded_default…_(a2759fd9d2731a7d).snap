@@ -25,7 +25,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/generics/legacy/variable
 
 ```
 error[invalid-type-variable-default]: TypeVar default is not assignable to the TypeVar's upper bound
- --> src/mdtest_snippet.py:3:1
+ --> src/mdtest_snippet.py:6:26
   |
 3 | T1 = TypeVar("T1")
   | ------------------ `T1` defined here
@@ -35,6 +35,5 @@ error[invalid-type-variable-default]: TypeVar default is not assignable to the T
   |                          ^^        --- Upper bound of `S`
   |                          |
   |                          Upper bound `object` of default `T1` is not assignable to upper bound of `S`
-  |
 
 ```

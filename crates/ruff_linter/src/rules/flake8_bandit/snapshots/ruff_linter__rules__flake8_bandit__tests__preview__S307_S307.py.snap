@@ -27,4 +27,3 @@ S307 Use of possibly insecure function; consider using `ast.literal_eval`
 16 | map(eval, [])
 17 | foo = eval
    |       ^^^^
-   |

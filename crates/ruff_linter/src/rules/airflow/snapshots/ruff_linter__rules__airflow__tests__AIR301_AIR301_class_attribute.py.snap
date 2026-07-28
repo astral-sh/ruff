@@ -599,4 +599,3 @@ AIR301 `create_dagrun` is removed in Airflow 3.0
 115 | test_dag = DAG(dag_id="test_dag")
 116 | test_dag.create_dagrun()
     |          ^^^^^^^^^^^^^
-    |

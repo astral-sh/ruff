@@ -31,7 +31,6 @@ error[invalid-legacy-type-variable]: A `TypeVar` definition must be a simple var
   |
 5 | U: TypeVar = TypeVar("U")
   |              ^^^^^^^^^^^^
-  |
 
 ```
 
@@ -41,6 +40,5 @@ error[invalid-legacy-type-variable]: A `TypeVar` definition must be a simple var
   |
 8 | tuple_with_typevar = ("foo", TypeVar("W"))
   |                              ^^^^^^^^^^^^
-  |
 
 ```

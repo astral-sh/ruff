@@ -30,6 +30,5 @@ error[inconsistent-mro]: Cannot create a consistent method resolution order (MRO
   |
 7 | class Baz(Protocol[T], Foo, Bar[T]): ...  # error: [inconsistent-mro]
   |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  |
 
 ```

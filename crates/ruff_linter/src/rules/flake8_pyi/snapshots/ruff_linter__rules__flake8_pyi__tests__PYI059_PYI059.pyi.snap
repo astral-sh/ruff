@@ -52,7 +52,6 @@ PYI059 [*] `Generic[]` should always be the last base class
 21 | # the Generic's position issue persists.
 22 | class Foo(Generic, LinkedList): ...  # PYI059
    |          ^^^^^^^^^^^^^^^^^^^^^
-   |
 help: Move `Generic[]` to the end
    |
 21 | # the Generic's position issue persists.
@@ -101,5 +100,4 @@ PYI059 `Generic[]` should always be the last base class
 39 | # in case of multiple Generic[] inheritance, don't fix it.
 40 | class C(Generic[T], Generic[K, V]): ...  # PYI059
    |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 help: Move `Generic[]` to the end

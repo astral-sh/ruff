@@ -20,5 +20,4 @@ E402 Module level import not at top of file
 8 |
 9 | import c
   | ^^^^^^^^
-  |
 help: Move module level imports to top of file

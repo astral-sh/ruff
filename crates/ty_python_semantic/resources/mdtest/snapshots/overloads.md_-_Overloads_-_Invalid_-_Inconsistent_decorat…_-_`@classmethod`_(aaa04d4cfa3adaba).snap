@@ -95,7 +95,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/overloads.md
 
 ```
 error[invalid-overload]: Overloaded function `try_from1` does not use the `@classmethod` decorator consistently
-  --> src/mdtest_snippet.py:12:5
+  --> src/mdtest_snippet.py:16:9
    |
 12 |     @overload
    |     ---------
@@ -105,7 +105,6 @@ error[invalid-overload]: Overloaded function `try_from1` does not use the `@clas
 15 |     # error: [invalid-overload] "Overloaded function `try_from1` does not use the `@classmethod` decorator consistently"
 16 |     def try_from1(cls, x: int | str) -> CheckClassMethod | None:
    |         ^^^^^^^^^
-   |
 
 ```
 
@@ -122,7 +121,6 @@ error[invalid-overload]: Overloaded function `try_from2` does not use the `@clas
    |     ---------
 22 |     def try_from2(cls, x: int) -> CheckClassMethod: ...
    |         --------- Missing here
-   |
 
 ```
 
@@ -131,10 +129,9 @@ error[invalid-overload]: Overloaded function `try_from3` does not use the `@clas
   --> src/mdtest_snippet.py:40:9
    |
 40 |     def try_from3(cls, x: int | str) -> CheckClassMethod | None:
-   |         ---------
+   |         ^^^^^^^^^
    |         |
    |         Missing here
-   |
 
 ```
 
@@ -144,19 +141,17 @@ error[call-non-callable]: Object of type `CheckClassMethod` is not callable
    |
 43 |             return cls(x)
    |                    ^^^^^^
-   |
 
 ```
 
 ```
 error[invalid-assignment]: Object of type `bound method <class 'Base'>.from_value(x: int) -> int` is not assignable to `(str, /) -> str`
-  --> src/mdtest_snippet.py:76:6
+  --> src/mdtest_snippet.py:76:29
    |
 76 | bad: Callable[[str], str] = Base.from_value
    |      --------------------   ^^^^^^^^^^^^^^^ Incompatible value of type `bound method <class 'Base'>.from_value(x: int) -> int`
    |      |
    |      Declared type
-   |
 info: incompatible return types: `int` is not assignable to `str`
 
 ```

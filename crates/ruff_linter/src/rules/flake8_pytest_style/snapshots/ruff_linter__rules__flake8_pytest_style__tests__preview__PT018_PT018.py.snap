@@ -317,7 +317,6 @@ PT018 Assertion should be broken down into multiple parts
 78 | |         something and something_else
 79 | |     )
    | |_____^
-   |
 help: Break down assertion into multiple parts
 
 
@@ -616,7 +615,6 @@ PT018 [*] Assertion should be broken down into multiple parts
 78 | |         something and something_else
 79 | |     )
    | |_____^
-   |
 help: Break down assertion into multiple parts
    |
 75 | def test_comments():

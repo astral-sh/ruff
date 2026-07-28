@@ -271,13 +271,11 @@ error[invalid-argument-type]: Argument to function `f` is incorrect
   |
 9 | reveal_type(f("string"))  # revealed: Unknown
   |               ^^^^^^^^ Argument type `Literal["string"]` does not satisfy upper bound `int` of type variable `T`
-  |
 info: Type variable defined here
  --> src/mdtest_snippet.py:3:7
   |
 3 | def f[T: int](x: T) -> T:
   |       ^^^^^^
-  |
 ```
 
 ## Inferring a constrained typevar
@@ -301,13 +299,11 @@ error[invalid-argument-type]: Argument to function `f` is incorrect
    |
 10 | reveal_type(f("string"))  # revealed: Unknown
    |               ^^^^^^^^ Argument type `Literal["string"]` does not satisfy constraints (`int`, `None`) of type variable `T`
-   |
 info: Type variable defined here
  --> src/mdtest_snippet.py:3:7
   |
 3 | def f[T: (int, None)](x: T) -> T:
   |       ^^^^^^^^^^^^^^
-  |
 ```
 
 ## Typevar constraints

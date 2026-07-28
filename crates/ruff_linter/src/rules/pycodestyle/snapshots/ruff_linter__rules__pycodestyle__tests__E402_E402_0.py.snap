@@ -8,7 +8,6 @@ E402 Module level import not at top of file
 34 |
 35 | import h
    | ^^^^^^^^
-   |
 help: Move module level imports to top of file
 
 E402 Module level import not at top of file
@@ -18,7 +17,6 @@ E402 Module level import not at top of file
 44 |
 45 | import k; import l
    | ^^^^^^^^
-   |
 help: Move module level imports to top of file
 
 E402 Module level import not at top of file
@@ -28,5 +26,4 @@ E402 Module level import not at top of file
 44 |
 45 | import k; import l
    |           ^^^^^^^^
-   |
 help: Move module level imports to top of file

@@ -27,13 +27,12 @@ a: Number = 1
 
 ```snapshot
 error[invalid-assignment]: Object of type `Literal[1]` is not assignable to `Number`
- --> src/mdtest_snippet.py:4:4
+ --> src/mdtest_snippet.py:4:13
   |
 4 | a: Number = 1
   |    ------   ^ Incompatible value of type `Literal[1]`
   |    |
   |    Declared type
-  |
 info: Types from the `numbers` module aren't supported for static type checking
 help: Consider using a protocol instead, such as `typing.SupportsFloat`
 ```

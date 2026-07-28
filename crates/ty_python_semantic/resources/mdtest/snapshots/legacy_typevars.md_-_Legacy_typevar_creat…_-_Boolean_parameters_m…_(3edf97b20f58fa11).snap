@@ -36,7 +36,6 @@ error[invalid-legacy-type-variable]: The `covariant` parameter of `TypeVar` cann
   |
 7 | T = TypeVar("T", covariant=cond())
   |                            ^^^^^^
-  |
 
 ```
 
@@ -46,7 +45,6 @@ error[invalid-legacy-type-variable]: The `contravariant` parameter of `TypeVar` 
    |
 10 | U = TypeVar("U", contravariant=cond())
    |                                ^^^^^^
-   |
 
 ```
 
@@ -56,6 +54,5 @@ error[invalid-legacy-type-variable]: The `infer_variance` parameter of `TypeVar`
    |
 13 | V = TypeVar("V", infer_variance=cond())
    |                                 ^^^^^^
-   |
 
 ```

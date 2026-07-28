@@ -146,7 +146,6 @@ SIM910 [*] Use `dict.get("Cat")` instead of `dict.get("Cat", None)`
 56 |     dict = {"Tom": 23, "Maria": 23, "Dog": 11}
 57 |     age = dict.get("Cat", None)
    |           ^^^^^^^^^^^^^^^^^^^^^
-   |
 help: Replace `dict.get("Cat", None)` with `dict.get("Cat")`
    |
 56 |     dict = {"Tom": 23, "Maria": 23, "Dog": 11}
@@ -215,7 +214,6 @@ SIM910 [*] Use `ages.get(get_key())` instead of `ages.get(get_key(), None)`
 83 | ages = {"Tom": 23, "Maria": 23, "Dog": 11}
 84 | age = ages.get(get_key(), None)
    |       ^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 help: Replace `ages.get(get_key(), None)` with `ages.get(get_key())`
    |
 83 | ages = {"Tom": 23, "Maria": 23, "Dog": 11}
@@ -234,7 +232,6 @@ SIM910 [*] Use `dict.get()` without default value
 90 | |     None,
 91 | | )
    | |_^
-   |
 help: Remove default value
    |
 86 |

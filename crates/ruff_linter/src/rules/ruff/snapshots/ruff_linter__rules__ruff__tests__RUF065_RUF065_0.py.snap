@@ -158,7 +158,6 @@ RUF065 Unnecessary `hex()` conversion when formatting with `%s`. Use `%#x` inste
 56 | logging.info("Hex: %s", hex(42))
 57 | logging.warning("Hex: %s", hex(255))
    |                            ^^^^^^^^
-   |
 
 RUF065 Unnecessary `ascii()` conversion when formatting with `%s`. Use `%a` instead of `%s`
   --> RUF065_0.py:63:19
@@ -216,4 +215,3 @@ RUF065 Unnecessary `hex()` conversion when formatting with `%s`. Use `%#x` inste
 69 | info("Hex: %s", hex(42))
 70 | log(logging.INFO, "Hex: %s", hex(255))
    |                              ^^^^^^^^
-   |

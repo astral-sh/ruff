@@ -26,4 +26,3 @@ S702 Mako templates allow HTML and JavaScript rendering by default and are inher
 8 | mako.template.Template("hern")
 9 | template.Template("hern")
   | ^^^^^^^^^^^^^^^^^
-  |

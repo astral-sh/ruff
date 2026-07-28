@@ -457,5 +457,4 @@ F601 Dictionary key literal `-1 + 2j` repeated
 81 | x = {-1 + 0j: 1, -1: 2}
 82 | x = {-1 + 2j: 1, -1 + 2j: 2}
    |                  ^^^^^^^
-   |
 help: Remove repeated key literal `-1 + 2j`

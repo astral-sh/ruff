@@ -83,7 +83,6 @@ FURB192 [*] Prefer `min` over `sorted()` to compute the minimum value in a seque
 16 |
 17 |     sorted((yield), reverse=True)[-1]
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 help: Replace with `min`
    |
 16 |

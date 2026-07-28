@@ -48,7 +48,6 @@ AIR302 [*] `airflow.sensors.http_sensor.HttpSensor` is moved into `http` provide
 8 | SimpleHttpOperator()
 9 | HttpSensor()
   | ^^^^^^^^^^
-  |
 help: Install `apache-airflow-providers-http>=1.0.0` and use `HttpSensor` from `airflow.providers.http.sensors.http` instead.
   |
 4 | from airflow.operators.http_operator import SimpleHttpOperator

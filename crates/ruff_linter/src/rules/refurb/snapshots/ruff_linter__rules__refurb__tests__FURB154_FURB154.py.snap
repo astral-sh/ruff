@@ -8,7 +8,6 @@ FURB154 [*] Use of repeated consecutive `global`
 4 | /     global x
 5 | |     global y
   | |____________^
-  |
 help: Merge `global` statements
   |
 3 | def f1():
@@ -26,7 +25,6 @@ FURB154 [*] Use of repeated consecutive `global`
 10 | |     global y
 11 | |     global z
    | |____________^
-   |
 help: Merge `global` statements
    |
 8  | def f3():
@@ -64,7 +62,6 @@ FURB154 [*] Use of repeated consecutive `global`
 18 | /     global x
 19 | |     global y
    | |____________^
-   |
 help: Merge `global` statements
    |
 17 |     pass
@@ -141,7 +138,6 @@ FURB154 [*] Use of repeated consecutive `nonlocal`
 38 | /         nonlocal x
 39 | |         nonlocal y
    | |__________________^
-   |
 help: Merge `nonlocal` statements
    |
 37 |         pass
@@ -198,7 +194,6 @@ FURB154 [*] Use of repeated consecutive `nonlocal`
 53 | /         nonlocal y
 54 | |         nonlocal z
    | |__________________^
-   |
 help: Merge `nonlocal` statements
    |
 52 |         global x
@@ -216,7 +211,6 @@ FURB154 [*] Use of repeated consecutive `global`
 59 | |     global a, b, c
 60 | |     global d, e, f
    | |__________________^
-   |
 help: Merge `global` statements
    |
 57 | def f6():

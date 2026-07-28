@@ -699,7 +699,6 @@ FURB164 [*] Verbose method `from_float` in `Decimal` construction
 81 | |     float("inf")
 82 | | )
    | |_^
-   |
 help: Replace with `Decimal` constructor
    |
 78 |

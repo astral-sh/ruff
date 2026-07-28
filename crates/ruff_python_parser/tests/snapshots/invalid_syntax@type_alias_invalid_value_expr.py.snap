@@ -175,7 +175,6 @@ Module(
 3 | type x = yield from y
 4 | type x = x := 1
   |            ^^ Syntax Error: Expected a statement
-  |
 
 
 ## Semantic Syntax Errors

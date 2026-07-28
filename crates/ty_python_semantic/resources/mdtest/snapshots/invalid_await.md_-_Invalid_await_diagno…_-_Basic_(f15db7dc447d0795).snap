@@ -30,7 +30,6 @@ error[invalid-await]: `Literal[1]` is not awaitable
     |
 349 | class int:
     |       --- type defined here
-    |
 info: `__await__` is missing
 
 ```

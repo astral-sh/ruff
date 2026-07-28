@@ -60,7 +60,6 @@ C410 [*] Unnecessary tuple literal passed to `list()` (rewrite as a single list 
 3 | l3 = list([])
 4 | l4 = list(())
   |      ^^^^^^^^
-  |
 help: Rewrite as a single list literal
   |
 3 | l3 = list([])

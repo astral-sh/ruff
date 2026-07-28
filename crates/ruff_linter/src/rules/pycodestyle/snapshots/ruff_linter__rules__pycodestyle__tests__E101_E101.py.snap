@@ -30,4 +30,3 @@ E101 Indentation contains mixed spaces and tabs
 18 |     # E101
 19 |        print("xyz");
    | ^^^^^^^
-   |
