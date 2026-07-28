@@ -551,6 +551,18 @@ pub struct LintOptions {
 
     /// Whether to prefer rule codes over human-readable rule names in diagnostic output, even
     /// when preview mode is enabled.
+    ///
+    /// Diagnostics without rule codes, such as syntax errors and formatting diagnostics, will
+    /// continue to use the human-readable name, but those corresponding to lint rules will use the
+    /// rule's code. For example, the concise diagnostic for an unused import will use the code
+    /// `F401` instead of the name `unused-import`:
+    ///
+    /// ```console
+    /// $ ruff check --preview --config 'lint.output-prefer-rule-codes = true' --output-format=concise example.py
+    /// example.py:1:8: F401 [*] `math` imported but unused
+    /// $ ruff check --preview --config 'lint.output-prefer-rule-codes = false' --output-format=concise example.py
+    /// example.py:1:8: unused-import: [*] `math` imported but unused
+    /// ```
     #[option(
         default = "false",
         value_type = "bool",
