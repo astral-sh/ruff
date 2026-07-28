@@ -1206,6 +1206,101 @@ def narrow_different_equality_implementations(value: FinalObject | FinalInt, oth
         reveal_type(value)  # revealed: FinalObject
 ```
 
+## Sentinels
+
+Sentinels always compare equal to themselves, since they are singletons:
+
+```py
+from typing_extensions import Sentinel
+
+MISSING = Sentinel("MISSING")
+
+reveal_type(MISSING == MISSING)  # revealed: Literal[True]
+```
+
+## Known typing-object equality behavior
+
+Certain typing APIs are heavily special-cased by ty, which makes it tempting to special case
+equality inference for these symbols. This, however, is error-prone: for example, ty currently
+infers the same type for `typing_extensions.Literal` as it does for `typing.Literal`, even though
+these may not be the same runtime object and may not compare equal. There's also no known use case
+for precisely inferring equality comparisons between these objects.
+
+For most special-cased typing APIs, therefore, we simply fallback to the nominal instance that the
+typing symbol is known to be an instance of:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from functools import partial
+from typing import Literal, NamedTuple
+from typing_extensions import NamedTuple as ExtensionsNamedTuple
+from ty_extensions._internal import generic_context
+
+type Alias = int
+
+class GenericClass[T]: ...
+
+reveal_type(Alias == Alias)  # revealed: bool
+reveal_type(generic_context(GenericClass) == generic_context(GenericClass))  # revealed: bool
+reveal_type((int | str) == (int | str))  # revealed: bool
+reveal_type(Literal[1] == Literal[1])  # revealed: bool
+
+def target(value: int) -> int:
+    return value
+
+# The bound `__call__` methods belong to distinct `partial` objects.
+reveal_type(partial(target, 1).__call__ == partial(target, 1).__call__)  # revealed: bool
+
+reveal_type(NamedTuple == ExtensionsNamedTuple)  # revealed: bool
+reveal_type(NamedTuple != ExtensionsNamedTuple)  # revealed: bool
+```
+
+Repeated construction of `dataclasses.Field` and `typing_extensions.deprecated` produces distinct
+objects that will compare unequal, even when their inferred payloads are identical:
+
+```py
+from dataclasses import dataclass, field
+from typing_extensions import deprecated
+
+@dataclass
+class FieldComparisons:
+    # False at runtime!
+    equals: bool = reveal_type(field(default=1) == field(default=1))  # revealed: bool
+    # True at runtime!
+    not_equals: bool = reveal_type(field(default=1) != field(default=1))  # revealed: bool
+
+# False at runtime!
+reveal_type(deprecated("gone") == deprecated("gone"))  # revealed: bool
+# True at runtime!
+reveal_type(deprecated("gone") != deprecated("gone"))  # revealed: bool
+```
+
+Runtime-significant metadata, spelling, and origin can be erased from the types that ty records for
+many of these APIs. Just because ty infers two of these objects as being of the same type does not
+therefore mean that they are equal:
+
+```py
+import builtins
+from collections.abc import Callable as AbcCallable
+from typing import Annotated, Callable, List, Type, TypeAlias
+
+A: TypeAlias = "int"
+B: TypeAlias = "builtins.int"
+
+# The `Annotated[]` metadata is discarded and ignored by ty, so these are inferred
+# as having the same type, but they will compare unequal at runtime
+reveal_type(Annotated[int, "a"] == Annotated[int, "b"])  # revealed: bool
+
+reveal_type(A == B)  # revealed: bool
+reveal_type(Callable[[int], str] == AbcCallable[[int], str])  # revealed: bool
+reveal_type(List[int] == list[int])  # revealed: bool
+reveal_type(Type[int] == type[int])  # revealed: bool
+```
+
 ## Constrained type variables
 
 Equality analysis expands the constraints of a constrained type variable in either operand position.
@@ -1213,7 +1308,8 @@ The resulting constraint is intersected with the type variable, preserving its i
 
 ```py
 from enum import Enum
-from typing import Literal, TypeVar, final
+from typing import Any, Generic, Literal, TypeVar, final
+from ty_extensions import Intersection, Top
 
 @final
 class ConstraintA: ...
@@ -1252,6 +1348,32 @@ def correlated_typevar_ne(value: E, other: EnumT) -> EnumT:
         return other
     reveal_type(value)  # revealed: EnumT@correlated_typevar_ne
     return value
+
+LiteralT = TypeVar("LiteralT", Literal[1], Literal[2])
+
+def correlated_literal_typevar_eq(value: Literal[1, 2], other: LiteralT) -> LiteralT:
+    if value == other:
+        return value
+    return other
+
+def correlated_literal_typevar_ne(value: Literal[1, 2], other: LiteralT) -> LiteralT:
+    if value != other:
+        return other
+    return value
+
+MaterializedT = TypeVar("MaterializedT", Literal[1], Intersection[Literal[2], Any])
+
+HolderT = TypeVar("HolderT")
+
+class Holder(Generic[HolderT]):
+    def __init__(self, value: HolderT) -> None:
+        self.value = value
+
+def correlated_materialized_pattern(left: Top[MaterializedT], right: MaterializedT) -> int:
+    holder = Holder(right)
+    match left:
+        case holder.value:
+            return 1
 ```
 
 ## `LiteralString` and string-valued enums
@@ -1483,7 +1605,7 @@ def _(x: Literal[1, 2]):
         reveal_type(x)  # revealed: Literal[2]
 ```
 
-## `x != y` where `y` is a single-valued type
+## `x != y` where `y` is a class literal
 
 ```py
 def _(flag: bool):
@@ -1497,7 +1619,7 @@ def _(flag: bool):
         reveal_type(C)  # revealed: <class 'A'>
 ```
 
-## `x != y` where `y` has multiple single-valued options
+## `x != y` where `y` has multiple literal options
 
 ```py
 from typing import Literal
@@ -1528,9 +1650,9 @@ def _(x: Literal[1, 2], y: Y):
         reveal_type(x)  # revealed: Literal[1, 2]
 ```
 
-## `!=` for non-single-valued types
+## `!=` for broad types
 
-Only single-valued types should narrow the type:
+A broad right-hand type cannot narrow `x`:
 
 ```py
 def _(x: int | None, y: int):
@@ -1538,7 +1660,7 @@ def _(x: int | None, y: int):
         reveal_type(x)  # revealed: int | None
 ```
 
-## Mix of single-valued and non-single-valued types
+## Mix of literal and broad types
 
 ```py
 from typing import Literal
@@ -1717,7 +1839,7 @@ def _(x: Any, y: Any | str):
 
 def _(x: Any):
     if x != list[Any]:
-        reveal_type(x)  # revealed: Any & ~<class 'list[Any]'>
+        reveal_type(x)  # revealed: Any
 
 def _(x: Any, y: SingleIntEnum):
     if x == y:
@@ -1734,7 +1856,7 @@ def _(x: Any):
     if x == RUNTIME_TYPE_VAR:
         pass
     else:
-        reveal_type(x)  # revealed: Any & ~TypeVar
+        reveal_type(x)  # revealed: Any
 ```
 
 `Any` must stay `Any` when compared with an enum, on either side of the comparison:
@@ -1976,7 +2098,7 @@ We assume that tuple subclasses don't override `tuple.__eq__`, which only return
 tuples. So they are excluded from the narrowed type when comparing to non-tuple values.
 
 ```py
-from typing import Literal
+from typing import Literal, cast
 
 def _(x: Literal["a", "b"] | tuple[int, int]):
     if x == "a":
@@ -1985,20 +2107,157 @@ def _(x: Literal["a", "b"] | tuple[int, int]):
     else:
         # tuple type remains in the else branch
         reveal_type(x)  # revealed: Literal["b"] | tuple[int, int]
+
+class OpenTupleSubclass(tuple[int, int]): ...
+
+def _(x: Literal["a", "b"] | OpenTupleSubclass):
+    if x == "a":
+        reveal_type(x)  # revealed: Literal["a"]
+    else:
+        reveal_type(x)  # revealed: Literal["b"] | OpenTupleSubclass
+
+def inequality_else(value: str | tuple[str | None, str | None, str] | None) -> None:
+    if value == "files":
+        pass
+    elif value != "response":
+        return
+
+    reveal_type(value)  # revealed: Literal["files", "response"]
+    cast(Literal["files", "response"], value)  # error: [redundant-cast]
 ```
 
-## Narrowing tagged unions of nominal classes by attribute
+Fixed-length tuples compare corresponding elements using identity before equality, so distinct
+inferred element types can still make the result definite. Different lengths cannot compare equal:
 
 ```py
-from typing import Literal
+from enum import Enum
+from typing import Final, Literal, NewType
 
-class A:
+class TupleValues:
+    TRUE: Final = (True,)
+    LONGER: Final = (True, 0)
+
+def equivalent_tuple_pattern(value: tuple[Literal[1]]) -> int:
+    match value:
+        case TupleValues.TRUE:
+            return 1
+
+def different_length_tuple_pattern(value: tuple[Literal[1]]) -> None:
+    match value:
+        case TupleValues.LONGER:
+            reveal_type(value)  # revealed: Never
+
+class NeverEqualTupleElement(Enum):
+    A = 1
+    B = 2
+
+    def __eq__(self, other: object) -> Literal[False]:
+        return False
+
+reveal_type((NeverEqualTupleElement.A,) == (NeverEqualTupleElement.A,))  # revealed: Literal[True]
+reveal_type((NeverEqualTupleElement.A,) != (NeverEqualTupleElement.A,))  # revealed: Literal[False]
+
+def tuple_with_non_reflexive_elements(left: NeverEqualTupleElement, right: NeverEqualTupleElement) -> None:
+    reveal_type((left,) == (right,))  # revealed: bool
+    reveal_type((left,) != (right,))  # revealed: bool
+
+LeftElement = NewType("LeftElement", NeverEqualTupleElement)
+RightElement = NewType("RightElement", NeverEqualTupleElement)
+
+def tuple_with_erased_element_identity(value: NeverEqualTupleElement) -> None:
+    reveal_type((LeftElement(value),) == (RightElement(value),))  # revealed: bool
+    reveal_type((LeftElement(value),) != (RightElement(value),))  # revealed: bool
+```
+
+## Narrowing with NewTypes
+
+`NewType` wrappers erase their distinction at runtime, so comparisons with an identity-based enum
+literal remain ambiguous:
+
+```py
+from enum import Enum
+from typing import NewType
+
+class IdentityEnum(Enum):
+    A = 1
+    B = 2
+
+WrappedIdentityEnum = NewType("WrappedIdentityEnum", IdentityEnum)
+
+def literal_with_erased_identity(value: WrappedIdentityEnum) -> None:
+    reveal_type(IdentityEnum.A == value)  # revealed: bool
+    reveal_type(IdentityEnum.A != value)  # revealed: bool
+```
+
+## Narrowing with enums that have custom `__eq__` methods
+
+Custom enum comparison methods with definite return types determine equality and inequality
+independently:
+
+```py
+from enum import Enum
+from typing import Any, Literal
+
+class AlwaysEqualEnum(Enum):
+    A = 1
+    B = 2
+
+    def __eq__(self, other: object) -> Literal[True]:
+        return True
+
+class NeverUnequalEnum(Enum):
+    A = 1
+    B = 2
+
+    def __ne__(self, other: object) -> Literal[False]:
+        return False
+
+reveal_type(AlwaysEqualEnum.A == AlwaysEqualEnum.B)  # revealed: Literal[True]
+reveal_type(NeverUnequalEnum.A != NeverUnequalEnum.B)  # revealed: Literal[False]
+
+def tuple_with_custom_equality(left: AlwaysEqualEnum, right: AlwaysEqualEnum) -> None:
+    reveal_type((left,) == (right,))  # revealed: Literal[True]
+    reveal_type((left,) != (right,))  # revealed: Literal[False]
+
+def never_unequal_narrowing(x: Any, value: Literal[NeverUnequalEnum.A]) -> None:
+    if x != value:
+        reveal_type(x)  # revealed: Any & ~Literal[NeverUnequalEnum.A]
+```
+
+## Narrowing tagged unions by attribute
+
+```py
+from typing import Literal, Protocol
+
+from ty_extensions import Intersection
+
+class BaseA:
     tag: Literal["a"]
+
+class A(BaseA):
     field_a: int
 
 class B:
     tag: Literal["b"]
     field_b: str
+
+class Marker(Protocol):
+    marked: bool
+
+class TaggedA(Protocol):
+    field_a: int
+
+    @property
+    def tag(self) -> Literal["a"]: ...
+
+class TaggedB(Protocol):
+    field_b: str
+
+    @property
+    def tag(self) -> Literal["b"]: ...
+
+class Container:
+    value: A | B | None
 
 def _(x: A | B):
     if x.tag == "a":
@@ -2017,6 +2276,44 @@ def _(x: A | B):
         reveal_type(x)  # revealed: B
     else:
         reveal_type(x)  # revealed: A
+
+def truthiness_guard(value: A | B | None):
+    if not value:
+        return
+
+    reveal_type(value)  # revealed: (A & ~AlwaysFalsy) | (B & ~AlwaysFalsy)
+
+    if value.tag == "a":
+        reveal_type(value)  # revealed: A & ~AlwaysFalsy
+        reveal_type(value.field_a)  # revealed: int
+    else:
+        reveal_type(value)  # revealed: B & ~AlwaysFalsy
+        reveal_type(value.field_b)  # revealed: str
+
+def nested_attribute_after_truthiness_guard(container: Container):
+    if not container.value:
+        return
+
+    if container.value.tag == "a":
+        reveal_type(container.value)  # revealed: A & ~AlwaysFalsy
+        reveal_type(container.value.field_a)  # revealed: int
+    else:
+        reveal_type(container.value)  # revealed: B & ~AlwaysFalsy
+        reveal_type(container.value.field_b)  # revealed: str
+
+def positive_intersection(value: Intersection[A, Marker] | Intersection[B, Marker]):
+    if value.tag == "a":
+        reveal_type(value)  # revealed: A & Marker
+    else:
+        reveal_type(value)  # revealed: B & Marker
+
+def protocol_union(value: TaggedA | TaggedB):
+    if value.tag == "a":
+        reveal_type(value)  # revealed: TaggedA
+        reveal_type(value.field_a)  # revealed: int
+    else:
+        reveal_type(value)  # revealed: TaggedB
+        reveal_type(value.field_b)  # revealed: str
 ```
 
 Enum literals are also supported as attribute tags:

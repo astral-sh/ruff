@@ -1,0 +1,93 @@
+---
+source: crates/ruff_linter/src/rules/refurb/mod.rs
+---
+FURB192 [*] Prefer `min` over `sorted()` to compute the minimum value in a sequence
+  --> FURB192_1.py:9:5
+   |
+ 8 | def f(l, key_fn):
+ 9 |     sorted((yield))[0]
+   |     ^^^^^^^^^^^^^^^^^^
+10 |
+11 |     sorted((yield l))[-1]
+   |
+help: Replace with `min`
+   |
+8  | def f(l, key_fn):
+   -     sorted((yield))[0]
+9  +     min((yield))
+10 |
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+FURB192 [*] Prefer `max` over `sorted()` to compute the maximum value in a sequence
+  --> FURB192_1.py:11:5
+   |
+ 9 |     sorted((yield))[0]
+10 |
+11 |     sorted((yield l))[-1]
+   |     ^^^^^^^^^^^^^^^^^^^^^
+12 |
+13 |     sorted((yield), key=key_fn)[0]
+   |
+help: Replace with `max`
+   |
+10 |
+   -     sorted((yield l))[-1]
+11 +     max((yield l))
+12 |
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+FURB192 [*] Prefer `min` over `sorted()` to compute the minimum value in a sequence
+  --> FURB192_1.py:13:5
+   |
+11 |     sorted((yield l))[-1]
+12 |
+13 |     sorted((yield), key=key_fn)[0]
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+14 |
+15 |     sorted((yield from l))[0]
+   |
+help: Replace with `min`
+   |
+12 |
+   -     sorted((yield), key=key_fn)[0]
+13 +     min((yield), key=key_fn)
+14 |
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+FURB192 [*] Prefer `min` over `sorted()` to compute the minimum value in a sequence
+  --> FURB192_1.py:15:5
+   |
+13 |     sorted((yield), key=key_fn)[0]
+14 |
+15 |     sorted((yield from l))[0]
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^
+16 |
+17 |     sorted((yield), reverse=True)[-1]
+   |
+help: Replace with `min`
+   |
+14 |
+   -     sorted((yield from l))[0]
+15 +     min((yield from l))
+16 |
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+FURB192 [*] Prefer `min` over `sorted()` to compute the minimum value in a sequence
+  --> FURB192_1.py:17:5
+   |
+15 |     sorted((yield from l))[0]
+16 |
+17 |     sorted((yield), reverse=True)[-1]
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+help: Replace with `min`
+   |
+16 |
+   -     sorted((yield), reverse=True)[-1]
+17 +     min((yield))
+   |
+note: This is an unsafe fix and may change runtime behavior

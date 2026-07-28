@@ -581,8 +581,14 @@ impl<'db> AllMembers<'db> {
                 }
             }
             Some(CodeGeneratorKind::TypedDict) => {}
-            Some(CodeGeneratorKind::DataclassLike(_)) => {
-                for attr in SYNTHETIC_DATACLASS_ATTRIBUTES {
+            Some(kind @ (CodeGeneratorKind::DataclassLike(_) | CodeGeneratorKind::Pydantic(_))) => {
+                let synthetic_attributes: &[&str] = if kind.is_pydantic() {
+                    &["__replace__"]
+                } else {
+                    SYNTHETIC_DATACLASS_ATTRIBUTES
+                };
+
+                for attr in synthetic_attributes {
                     if let Place::Defined(DefinedPlace {
                         ty: synthetic_member,
                         ..
@@ -594,9 +600,6 @@ impl<'db> AllMembers<'db> {
                         });
                     }
                 }
-            }
-            Some(CodeGeneratorKind::Pydantic(_)) => {
-                // Pydantic's special attributes are declared on and inherited from `BaseModel`.
             }
             None => {}
         }

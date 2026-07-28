@@ -566,23 +566,21 @@ E(["foo"])  # error: [invalid-argument-type]
 E(E(E(["foo"])))  # error: [invalid-argument-type]
 ```
 
-## `NewType` wrapping preserves singleton-ness and single-valued-ness
+## `NewType` wrapping preserves singleton-ness
 
 ```py
 from typing_extensions import NewType
 from ty_extensions import static_assert
-from ty_extensions._internal import is_singleton, is_single_valued
+from ty_extensions._internal import is_singleton
 from types import EllipsisType
 
 A = NewType("A", EllipsisType)
 static_assert(is_singleton(A))
-static_assert(is_single_valued(A))
 reveal_type(type(A(...)) is EllipsisType)  # revealed: Literal[True]
 reveal_type(A(...) is ...)  # revealed: Literal[True]
 
 B = NewType("B", int)
 static_assert(not is_singleton(B))
-static_assert(not is_single_valued(B))
 ```
 
 ## `NewType`s of tuples can be iterated/unpacked

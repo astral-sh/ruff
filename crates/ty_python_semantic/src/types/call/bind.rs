@@ -49,8 +49,7 @@ use crate::types::function::{
     OverloadLiteral,
 };
 use crate::types::generics::{
-    GenericContext, InferableTypeVars, Specialization, SpecializationBuilder, SpecializationError,
-    TypeVarInference,
+    GenericContext, Specialization, SpecializationBuilder, SpecializationError, TypeVarInference,
 };
 use crate::types::infer::original_class_type;
 use crate::types::known_instance::{FieldInstance, InternedConstraintSetSolution};
@@ -60,7 +59,7 @@ use crate::types::signatures::{
 };
 use crate::types::tuple::{TupleLength, TupleSpec, TupleSpecBuilder, TupleType, VariableSegment};
 use crate::types::typed_dict::{TypedDictOpenness, extract_unpacked_typed_dict_from_value_type};
-use crate::types::typevar::{BoundTypeVarIdentity, TypeVarNonceGenerator};
+use crate::types::typevar::{BoundTypeVarIdentity, TypeVarNonceGenerator, TypeVarSet};
 use crate::types::visitor::{
     TypeCollector, TypeKind, TypeVisitor, any_over_type, walk_non_atomic_type,
     walk_type_with_recursion_guard,
@@ -212,16 +211,13 @@ fn freshen_generic_contexts_in_type<'db>(
 fn inferable_typevars_from_tuple<'db>(
     db: &'db dyn Db,
     instance: &NominalInstanceType<'db>,
-) -> Option<InferableTypeVars<'db>> {
-    let typevars: Option<FxOrderSet<_>> = instance
+) -> Option<TypeVarSet<'db>> {
+    let typevars: Option<Vec<_>> = instance
         .tuple_spec(db)?
         .fixed_elements()
-        .map(|ty| {
-            ty.as_typevar()
-                .map(|bound_typevar| bound_typevar.identity(db))
-        })
+        .map(|ty| ty.as_typevar())
         .collect();
-    typevars.map(|typevars| InferableTypeVars::from_typevars(db, typevars))
+    typevars.map(|typevars| TypeVarSet::from_typevars(db, typevars))
 }
 
 /// Priority levels for call errors in intersection types.
@@ -2058,12 +2054,7 @@ impl<'db> Bindings<'db> {
                                 let ty_b = ty_b.project_type_form(db);
                                 let constraints = ConstraintSetBuilder::new();
                                 let result = constraints.into_owned(|constraints| {
-                                    ty_a.when_subtype_of(
-                                        db,
-                                        ty_b,
-                                        constraints,
-                                        InferableTypeVars::None,
-                                    )
+                                    ty_a.when_subtype_of(db, ty_b, constraints, TypeVarSet::None)
                                 });
                                 let tracked = InternedConstraintSet::new(db, result);
                                 overload.set_return_type(Type::KnownInstance(
@@ -2078,12 +2069,7 @@ impl<'db> Bindings<'db> {
                                 let ty_b = ty_b.project_type_form(db);
                                 let constraints = ConstraintSetBuilder::new();
                                 let result = constraints.into_owned(|constraints| {
-                                    ty_a.when_assignable_to(
-                                        db,
-                                        ty_b,
-                                        constraints,
-                                        InferableTypeVars::None,
-                                    )
+                                    ty_a.when_assignable_to(db, ty_b, constraints, TypeVarSet::None)
                                 });
                                 let tracked = InternedConstraintSet::new(db, result);
                                 overload.set_return_type(Type::KnownInstance(
@@ -2113,12 +2099,7 @@ impl<'db> Bindings<'db> {
                                 let ty_b = ty_b.project_type_form(db);
                                 let constraints = ConstraintSetBuilder::new();
                                 let result = constraints.into_owned(|constraints| {
-                                    ty_a.when_disjoint_from(
-                                        db,
-                                        ty_b,
-                                        constraints,
-                                        InferableTypeVars::None,
-                                    )
+                                    ty_a.when_disjoint_from(db, ty_b, constraints, TypeVarSet::None)
                                 });
                                 let tracked = InternedConstraintSet::new(db, result);
                                 overload.set_return_type(Type::KnownInstance(
@@ -2131,14 +2112,6 @@ impl<'db> Bindings<'db> {
                             if let [Some(ty)] = overload.parameter_types() {
                                 overload.set_return_type(Type::bool_literal(
                                     ty.project_type_form(db).is_singleton(db),
-                                ));
-                            }
-                        }
-
-                        Some(KnownFunction::IsSingleValued) => {
-                            if let [Some(ty)] = overload.parameter_types() {
-                                overload.set_return_type(Type::bool_literal(
-                                    ty.project_type_form(db).is_single_valued(db),
                                 ));
                             }
                         }
@@ -2779,7 +2752,7 @@ impl<'db> Bindings<'db> {
                                 ty_b,
                                 constraints.load(db, tracked.constraints(db)),
                                 constraints,
-                                InferableTypeVars::None,
+                                TypeVarSet::None,
                             )
                         });
                         let tracked = InternedConstraintSet::new(db, result);
@@ -2846,14 +2819,14 @@ impl<'db> Bindings<'db> {
                         let extract_inferable = |instance: &NominalInstanceType<'db>| {
                             if instance.has_known_class(db, KnownClass::NoneType) {
                                 // Caller explicitly passed None, so no typevars are inferable.
-                                return Some(InferableTypeVars::None);
+                                return Some(TypeVarSet::None);
                             }
                             inferable_typevars_from_tuple(db, instance)
                         };
 
                         let inferable = match overload.parameter_types() {
                             // Caller did not provide argument, so no typevars are inferable.
-                            [None] => InferableTypeVars::None,
+                            [None] => TypeVarSet::None,
                             [Some(ty)] => {
                                 let Type::NominalInstance(instance) = ty.project_type_form(db)
                                 else {
@@ -5080,6 +5053,7 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
 struct ArgumentTypeChecker<'a, 'db> {
     db: &'db dyn Db,
     signature_type: Type<'db>,
+    constructor_kind: Option<ConstructorCallableKind>,
     signature: &'a Signature<'db>,
     arguments: &'a CallArguments<'a, 'db>,
     argument_matches: &'a [MatchedArgument<'db>],
@@ -5089,7 +5063,7 @@ struct ArgumentTypeChecker<'a, 'db> {
     return_ty: Type<'db>,
     errors: &'a mut Vec<BindingError<'db>>,
 
-    inferable_typevars: InferableTypeVars<'db>,
+    inferable_typevars: TypeVarSet<'db>,
     inference: Option<TypeVarInference<'db>>,
 
     /// Argument indices for which specialization inference has already produced a sufficiently
@@ -5168,7 +5142,7 @@ fn validate_keyword_unpack_key_type<'db>(
     db: &'db dyn Db,
     constraints: &ConstraintSetBuilder<'db>,
     argument_type: Type<'db>,
-    inferable_typevars: InferableTypeVars<'db>,
+    inferable_typevars: TypeVarSet<'db>,
 ) -> KeywordUnpackKeyTypeCheck<'db> {
     if matches!(argument_type, Type::TypedDict(_))
         || argument_type.as_paramspec_typevar(db).is_some()
@@ -5200,6 +5174,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
     fn new(
         db: &'db dyn Db,
         signature_type: Type<'db>,
+        constructor_kind: Option<ConstructorCallableKind>,
         signature: &'a Signature<'db>,
         arguments: &'a CallArguments<'a, 'db>,
         argument_matches: &'a [MatchedArgument<'db>],
@@ -5211,6 +5186,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         Self {
             db,
             signature_type,
+            constructor_kind,
             signature,
             arguments,
             argument_matches,
@@ -5219,7 +5195,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             call_expression_tcx,
             return_ty,
             errors,
-            inferable_typevars: InferableTypeVars::None,
+            inferable_typevars: TypeVarSet::None,
             inference: None,
             constraint_set_errors: vec![false; arguments.len()],
             starred_constraint_error_parameter: None,
@@ -5836,9 +5812,51 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             return;
         }
 
+        // Constraint inference has already checked the synthetic `cls`. For example:
+        //
+        // ```py
+        // from collections.abc import Callable
+        // from typing import Any, Self, overload
+        //
+        // @overload
+        // def callback[T](value: frozenset[T]) -> T: ...
+        // @overload
+        // def callback[T](value: T) -> T: ...
+        //
+        // class Mapper[R]:
+        //     def __new__[T](cls, callback: Callable[[T], R], values: list[T]) -> Self: ...
+        //
+        // values: Any
+        // Mapper(callback, values)
+        // ```
+        //
+        // The overloads provide alternative, correlated solutions for `T` and `R`. The current
+        // solver merges each TypeVar's solutions separately, losing that correlation. Applying
+        // the merged specialization to `cls` a second time then changes the receiver from
+        // `type[Mapper[frozenset[Never]]]` to
+        // `type[Mapper[frozenset[frozenset[Never]]]]`, incorrectly rejecting the valid call.
+        //
+        // A decorator using `Concatenate[type[U], P]` can also replace the inferred `type[Self]`
+        // receiver with its own `type[U]`, possibly through a type alias. Constraint inference has
+        // already checked the actual class against `type[U]`. If the other arguments cannot solve
+        // `U`, independently checking the class against `type[U]` again would reject the call
+        // solely because `U` remains unsolved.
+        //
+        // TODO: Remove this special case once solution extraction preserves correlations between
+        // TypeVars across alternative inference paths and constructor calls are solved in a single
+        // constraint set, so decorator-scoped receiver variables are not rechecked independently.
+        let constructor_receiver = matches!(argument, Argument::Synthetic)
+            && self.constructor_kind == Some(ConstructorCallableKind::New)
+            && matches!(
+                parameter.annotated_type().resolve_type_alias(self.db),
+                Type::SubclassOf(subclass_of) if subclass_of.into_type_var().is_some()
+            );
+
         let mut expected_ty = parameter.annotated_type();
         if let Some(specialization) = self.specialization() {
-            argument_type = argument_type.apply_specialization(self.db, specialization);
+            if !constructor_receiver {
+                argument_type = argument_type.apply_specialization(self.db, specialization);
+            }
             expected_ty = expected_ty.apply_specialization(self.db, specialization);
         }
 
@@ -5874,6 +5892,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         // Starred annotations are validated as a single tuple by
         // `check_starred_parameter_arguments`.
         if !self.constraint_set_errors[argument_index]
+            && !constructor_receiver
             && !parameter.has_starred_annotation()
             && !is_valid_isinstance_target()
             && argument_type
@@ -6473,13 +6492,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         }
     }
 
-    fn finish(
-        self,
-    ) -> (
-        InferableTypeVars<'db>,
-        Option<TypeVarInference<'db>>,
-        Type<'db>,
-    ) {
+    fn finish(self) -> (TypeVarSet<'db>, Option<TypeVarInference<'db>>, Type<'db>) {
         for (parameter_ty, builder) in self
             .parameter_tys
             .iter_mut()
@@ -6667,10 +6680,10 @@ struct ParamSpecArgumentContext<'a, 'call, 'db> {
 fn inferable_typevar_occurrences<'db>(
     db: &'db dyn Db,
     ty: Type<'db>,
-    inferable: InferableTypeVars<'db>,
+    inferable: TypeVarSet<'db>,
 ) -> usize {
     struct InferableTypeVarVisitor<'db> {
-        inferable: InferableTypeVars<'db>,
+        inferable: TypeVarSet<'db>,
         count: Cell<usize>,
         stack: RefCell<SmallVec<[Type<'db>; 8]>>,
     }
@@ -6748,7 +6761,7 @@ pub(crate) struct Binding<'db> {
     constructor_context: Option<ConstructorContext<'db>>,
 
     /// The inferable typevars in this signature.
-    inferable_typevars: InferableTypeVars<'db>,
+    inferable_typevars: TypeVarSet<'db>,
 
     /// The type-variable inference result for this binding, if the callable is generic.
     inference: Option<TypeVarInference<'db>>,
@@ -6811,7 +6824,7 @@ impl<'db> Binding<'db> {
             signature_type,
             return_ty,
             constructor_context: None,
-            inferable_typevars: InferableTypeVars::None,
+            inferable_typevars: TypeVarSet::None,
             inference: None,
             argument_matches: Box::from([]),
             variadic_argument_matched_to_variadic_parameter: false,
@@ -7246,6 +7259,7 @@ impl<'db> Binding<'db> {
         let mut checker = ArgumentTypeChecker::new(
             db,
             self.signature_type,
+            self.constructor_context.map(ConstructorContext::kind),
             &self.signature,
             arguments,
             &self.argument_matches,
@@ -7285,12 +7299,7 @@ impl<'db> Binding<'db> {
 
             let argument_type = argument_types.get_default().unwrap_or(Type::unknown());
             if let KeywordUnpackKeyTypeCheck::Invalid(provided_ty) =
-                validate_keyword_unpack_key_type(
-                    db,
-                    constraints,
-                    argument_type,
-                    InferableTypeVars::None,
-                )
+                validate_keyword_unpack_key_type(db, constraints, argument_type, TypeVarSet::None)
             {
                 self.errors.push(BindingError::InvalidKeyType {
                     argument_index: adjusted_argument_index,
@@ -7574,7 +7583,7 @@ impl<'db> Binding<'db> {
     /// Resets the state of this binding to its initial state.
     fn reset(&mut self, db: &'db dyn Db) {
         self.return_ty = self.initial_return_type(db);
-        self.inferable_typevars = InferableTypeVars::None;
+        self.inferable_typevars = TypeVarSet::None;
         self.inference = None;
         self.argument_matches = Box::from([]);
         self.parameter_tys = Box::from([]);
@@ -7585,7 +7594,7 @@ impl<'db> Binding<'db> {
 #[derive(Clone, Debug)]
 struct BindingSnapshot<'db> {
     return_ty: Type<'db>,
-    inferable_typevars: InferableTypeVars<'db>,
+    inferable_typevars: TypeVarSet<'db>,
     inference: Option<TypeVarInference<'db>>,
     argument_matches: Box<[MatchedArgument<'db>]>,
     parameter_tys: Box<[Option<Type<'db>>]>,

@@ -8,9 +8,9 @@ use crate::types::constraints::ConstraintSetBuilder;
 use crate::types::context::InferContext;
 use crate::types::cyclic::CycleDetector;
 use crate::types::equality::{
-    ComparisonSoundnessPolicy, equality_truthiness, inequality_truthiness,
+    ComparisonSoundnessPolicy, TupleEqualityEvaluator, equality_truthiness, inequality_truthiness,
 };
-use crate::types::tuple::TupleSpec;
+use crate::types::tuple::{Tuple, TupleSpec};
 use crate::types::{
     DynamicType, IntersectionBuilder, IntersectionType, KnownClass, KnownInstanceType,
     LiteralValueType, LiteralValueTypeKind, MemberLookupPolicy, Type, TypeContext, TypeTransformer,
@@ -319,6 +319,47 @@ fn infer_binary_type_comparison_inner<'db>(
 
     let soundness_policy =
         ComparisonSoundnessPolicy::from_analysis_settings(db.analysis_settings(context.file()));
+
+    if let NonIdentityOperator::Rich(rich_op) = op
+        && let Some(left_tuple) = left.tuple_instance_spec(db)
+        && let Some(right_tuple) = right.tuple_instance_spec(db)
+    {
+        return visitor.visit(db, (left, op, right), || {
+            infer_tuple_rich_comparison(context, &left_tuple, rich_op, &right_tuple, range, visitor)
+        });
+    }
+
+    if let NonIdentityOperator::Membership(op) = op
+        && let Some(right_tuple) = right.tuple_instance_spec(db)
+        && let Tuple::Fixed(right_tuple) = &*right_tuple
+    {
+        let mut any_eq = false;
+        let mut any_ambiguous = false;
+        let mut equality = TupleEqualityEvaluator::new(db, soundness_policy);
+
+        for &element_ty in right_tuple.elements_slice() {
+            // It's okay to ignore errors here because Python doesn't call `__bool__`
+            // for different union variants. Instead, this is just for us to
+            // evaluate a possibly truthy value to `false` or `true`.
+            match equality
+                .element_truthiness(element_ty, left)
+                .unwrap_or_else(|error| error.fallback_truthiness())
+            {
+                Truthiness::AlwaysTrue => any_eq = true,
+                Truthiness::AlwaysFalse => (),
+                Truthiness::Ambiguous => any_ambiguous = true,
+            }
+        }
+
+        return Ok(if any_eq {
+            Type::bool_literal(op.is_in())
+        } else if !any_ambiguous {
+            Type::bool_literal(op.is_not_in())
+        } else {
+            KnownClass::Bool.to_instance(db)
+        });
+    }
+
     let comparison_truthiness = match op {
         NonIdentityOperator::Rich(RichCompareOperator::Eq) => {
             equality_truthiness(db, left, right, soundness_policy)
@@ -760,8 +801,7 @@ fn infer_binary_type_comparison_inner<'db>(
             let constraints = ConstraintSetBuilder::new();
             let left = constraints.load(db, left.constraints(db));
             let right = constraints.load(db, right.constraints(db));
-            let result = left.iff(db, &constraints, right);
-            let equivalent = result.is_always_satisfied(db);
+            let equivalent = left.iff(db, &constraints, right).is_always_satisfied(db);
             match op {
                 NonIdentityOperator::Rich(RichCompareOperator::Eq) => {
                     Some(Ok(Type::bool_literal(equivalent)))
@@ -771,61 +811,6 @@ fn infer_binary_type_comparison_inner<'db>(
                 }
                 _ => None,
             }
-        }
-
-        (Type::NominalInstance(nominal1), Type::NominalInstance(nominal2))
-            if let Some(lhs_tuple) = nominal1.tuple_spec(db)
-                && let Some(rhs_tuple) = nominal2.tuple_spec(db) =>
-        {
-            let tuple_rich_comparison = |rich_op| {
-                visitor.visit(db, (left, op, right), || {
-                    infer_tuple_rich_comparison(
-                        context, &lhs_tuple, rich_op, &rhs_tuple, range, visitor,
-                    )
-                })
-            };
-
-            let result = match op {
-                NonIdentityOperator::Rich(rich_op) => tuple_rich_comparison(rich_op),
-                NonIdentityOperator::Membership(membership_op) => {
-                    let mut any_eq = false;
-                    let mut any_ambiguous = false;
-
-                    for ty in rhs_tuple.iter_element_types(db) {
-                        let eq_result = infer_binary_type_comparison_inner(
-                            context,
-                            left,
-                            NonIdentityOperator::Rich(RichCompareOperator::Eq),
-                            ty,
-                            range,
-                            visitor,
-                        )
-                        .expect("infer_binary_type_comparison should never return None for `==`");
-
-                        match eq_result {
-                            todo @ Type::Dynamic(DynamicType::Todo(_)) => return Ok(todo),
-                            // It's okay to ignore errors here because Python doesn't call `__bool__`
-                            // for different union variants. Instead, this is just for us to
-                            // evaluate a possibly truthy value to `false` or `true`.
-                            ty => match ty.bool(db) {
-                                Truthiness::AlwaysTrue => any_eq = true,
-                                Truthiness::AlwaysFalse => (),
-                                Truthiness::Ambiguous => any_ambiguous = true,
-                            },
-                        }
-                    }
-
-                    if any_eq {
-                        Ok(Type::bool_literal(membership_op.is_in()))
-                    } else if !any_ambiguous {
-                        Ok(Type::bool_literal(membership_op.is_not_in()))
-                    } else {
-                        Ok(KnownClass::Bool.to_instance(db))
-                    }
-                }
-            };
-
-            Some(result)
         }
 
         _ => None,
@@ -1011,26 +996,14 @@ fn infer_rich_comparison<'db>(
     op: RichCompareOperator,
     policy: MemberLookupPolicy,
 ) -> Result<Type<'db>, UnsupportedComparisonError<'db>> {
-    // The following resource has details about the rich comparison algorithm:
-    // https://snarky.ca/unravelling-rich-comparison-operators/
-    let call_dunder = |op: RichCompareOperator, left: Type<'db>, right: Type<'db>| {
-        left.try_call_dunder_with_policy(
-            db,
-            op.dunder(),
-            &mut CallArguments::positional([right]),
-            TypeContext::default(),
-            policy,
-        )
-        .map(|outcome| outcome.return_type(db))
-        .ok()
-    };
-
-    // The reflected dunder has priority if the right-hand side is a strict subclass of the left-hand side.
-    if left != right && right.is_subtype_of(db, left) {
-        call_dunder(op.reflect(), right, left).or_else(|| call_dunder(op, left, right))
-    } else {
-        call_dunder(op, left, right).or_else(|| call_dunder(op.reflect(), right, left))
-    }
+    Type::try_call_rich_comparison_dunder(
+        db,
+        left,
+        right,
+        op.dunder(),
+        op.reflect().dunder(),
+        policy,
+    )
     .or_else(|| {
         // When no appropriate method returns any value other than NotImplemented,
         // the `==` and `!=` operators will fall back to `is` and `is not`, respectively.
@@ -1126,24 +1099,22 @@ fn infer_tuple_rich_comparison<'db>(
             let right_iter = right.iter_all_elements();
 
             let mut builder = UnionBuilder::new(db);
+            let soundness_policy = ComparisonSoundnessPolicy::from_analysis_settings(
+                db.analysis_settings(context.file()),
+            );
+            let mut equality = TupleEqualityEvaluator::new(db, soundness_policy);
 
             for (l_ty, r_ty) in left_iter.zip(right_iter) {
-                let pairwise_eq_result = infer_binary_type_comparison_inner(
-                    context,
-                    l_ty,
-                    NonIdentityOperator::Rich(RichCompareOperator::Eq),
-                    r_ty,
-                    range,
-                    visitor,
-                )
-                .expect("infer_binary_type_comparison should never return None for `==`");
+                let eq_truthiness = equality
+                    .element_truthiness(l_ty, r_ty)
+                    .unwrap_or_else(|err| {
+                        // TODO: We should, whenever possible, pass the range of the left and right elements
+                        //   instead of the range of the whole tuple.
+                        err.report_diagnostic(context, range);
+                        Truthiness::Ambiguous
+                    });
 
-                match pairwise_eq_result.try_bool(db).unwrap_or_else(|err| {
-                    // TODO: We should, whenever possible, pass the range of the left and right elements
-                    //   instead of the range of the whole tuple.
-                    err.report_diagnostic(context, range);
-                    err.fallback_truthiness()
-                }) {
+                match eq_truthiness {
                     // - AlwaysTrue : Continue to the next pair for lexicographic comparison
                     Truthiness::AlwaysTrue => continue,
                     // - AlwaysFalse:
@@ -1166,7 +1137,8 @@ fn infer_tuple_rich_comparison<'db>(
                                 range,
                                 visitor,
                             )?,
-                            // For `==` and `!=`, we already figure out the result from `pairwise_eq_result`
+                            // For `==` and `!=`, the equality evaluator has already determined
+                            // that these elements may differ.
                             // NOTE: The CPython implementation does not account for non-boolean return types
                             // or cases where `!=` is not the negation of `==`, we also do not consider these cases.
                             RichCompareOperator::Eq => Type::bool_literal(false),
