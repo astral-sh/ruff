@@ -7039,6 +7039,19 @@ impl PathAssignments {
             || self.assignment_holds(constraint.when_unconstrained())
     }
 
+    fn constraint_source_order(&self, constraint: ConstraintId) -> Option<usize> {
+        if let Some((source_order, _)) = self.assignments.get(&constraint.when_true()) {
+            return Some(*source_order);
+        }
+        if let Some((source_order, _)) = self.assignments.get(&constraint.when_false()) {
+            return Some(*source_order);
+        }
+        if let Some((source_order, _)) = self.assignments.get(&constraint.when_unconstrained()) {
+            return Some(*source_order);
+        }
+        None
+    }
+
     /// Returns the greatest remaining fuel for any derivation of `assignment` on this path.
     fn max_remaining_fuel_for(&self, assignment: ConstraintAssignment) -> Option<u16> {
         let (index, _, (_, first_fuel)) = self.assignments.get_full(&assignment)?;
@@ -7063,7 +7076,7 @@ impl PathAssignments {
         constraint: ConstraintId,
     ) {
         // If we've already processed this constraint, we can skip it.
-        let existing = self.discovered.insert(constraint, true);
+        let (constraint_index, existing) = self.discovered.insert_full(constraint, true);
         let already_processed = existing.is_some_and(|existing| existing);
         if already_processed {
             return;
@@ -7073,8 +7086,22 @@ impl PathAssignments {
         self.sequents.extend_from_slice(&single_map.sequents);
         drop(single_map);
 
-        for existing in self.discovered.keys().dropping_back(1) {
-            let pair_map = SequentMap::for_constraint_pair(db, builder, *existing, constraint);
+        let constraint_source_order = self
+            .constraint_source_order(constraint)
+            .unwrap_or(constraint_index);
+        for (existing_index, (existing, _)) in self.discovered.iter().enumerate() {
+            if *existing == constraint {
+                continue;
+            }
+            let existing_source_order = self
+                .constraint_source_order(*existing)
+                .unwrap_or(existing_index);
+            let (a, b) = if existing_source_order < constraint_source_order {
+                (*existing, constraint)
+            } else {
+                (constraint, *existing)
+            };
+            let pair_map = SequentMap::for_constraint_pair(db, builder, a, b);
             self.sequents.extend_from_slice(&pair_map.sequents);
         }
     }
