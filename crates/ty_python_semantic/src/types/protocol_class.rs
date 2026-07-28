@@ -32,7 +32,7 @@ use crate::{
         context::InferContext,
         diagnostic::report_undeclared_protocol_member,
         generics::Specialization,
-        signatures::{CallableSignature, walk_signature},
+        signatures::walk_signature,
     },
 };
 use ty_python_core::{definition::Definition, place::ScopedPlaceId, place_table, use_def_map};
@@ -1076,7 +1076,7 @@ impl<'db> ProtocolMemberData<'db> {
         db: &'db dyn Db,
         callable: CallableType<'db>,
         definition: Option<Definition<'db>>,
-        protocol_receiver: Option<Type<'db>>,
+        receiver: Option<Type<'db>>,
     ) -> Self {
         let (method_kind, callable) = if callable.is_classmethod_like(db) {
             (
@@ -1089,19 +1089,11 @@ impl<'db> ProtocolMemberData<'db> {
             (ProtocolMethodKind::Instance, callable)
         };
 
-        let bound_instance_method = if method_kind == ProtocolMethodKind::Instance {
-            protocol_receiver
-                .and_then(|receiver| receiver_filtered_protocol_method(db, callable, receiver))
-                .map(|ty| ProtocolMemberType::with_definition(ty, definition))
-        } else {
-            None
-        };
-
         Self {
             kind: ProtocolMemberKind::Method {
                 member: ProtocolMemberType::with_definition(Type::Callable(callable), definition),
                 kind: method_kind,
-                bound_instance_method,
+                receiver,
             },
             qualifiers: TypeQualifiers::default(),
             definition,
@@ -1143,13 +1135,15 @@ impl<'db> ProtocolMemberData<'db> {
             ProtocolMemberKind::Method {
                 member,
                 kind,
-                bound_instance_method,
+                receiver,
             } => {
                 let instance_method = match (member.ty(), kind) {
                     (Type::Callable(callable), ProtocolMethodKind::Instance) => {
-                        bound_instance_method.unwrap_or_else(|| {
-                            member.with_ty(Type::Callable(protocol_bind_self(db, callable, None)))
-                        })
+                        let callable = receiver.map_or_else(
+                            || protocol_bind_self(db, callable, None),
+                            |receiver| protocol_bind_receiver_overload(db, callable, receiver),
+                        );
+                        member.with_ty(Type::Callable(callable))
                     }
                     _ => member,
                 };
@@ -1283,7 +1277,7 @@ enum ProtocolMemberKind<'db> {
     Method {
         member: ProtocolMemberType<'db>,
         kind: ProtocolMethodKind,
-        bound_instance_method: Option<ProtocolMemberType<'db>>,
+        receiver: Option<Type<'db>>,
     },
     Property {
         read: Option<ProtocolMemberType<'db>>,
@@ -1320,11 +1314,11 @@ impl<'db> ProtocolMemberKind<'db> {
                 Self::Method {
                     member: current,
                     kind,
-                    bound_instance_method: current_bound,
+                    receiver: current_receiver,
                 },
                 Self::Method {
                     member: previous,
-                    bound_instance_method: previous_bound,
+                    receiver: previous_receiver,
                     ..
                 },
             ) => {
@@ -1350,12 +1344,13 @@ impl<'db> ProtocolMemberKind<'db> {
                 Self::Method {
                     member,
                     kind,
-                    bound_instance_method: cycle_normalized_optional_type(
-                        db,
-                        current_bound,
-                        previous_bound,
-                        cycle,
-                    ),
+                    receiver: match (current_receiver, previous_receiver) {
+                        (Some(current), Some(previous)) => {
+                            Some(current.cycle_normalized(db, previous, cycle))
+                        }
+                        (Some(current), None) => Some(current.recursive_type_normalized(db, cycle)),
+                        (None, _) => None,
+                    },
                 }
             }
             (
@@ -1396,12 +1391,14 @@ impl<'db> ProtocolMemberKind<'db> {
             Self::Method {
                 member,
                 kind,
-                bound_instance_method,
+                receiver,
             } => Self::Method {
                 member: member.recursive_type_normalized_impl(db, div, nested)?,
                 kind,
-                bound_instance_method: match bound_instance_method {
-                    Some(member) => Some(member.recursive_type_normalized_impl(db, div, nested)?),
+                receiver: match receiver {
+                    Some(receiver) => {
+                        Some(receiver.recursive_type_normalized_impl(db, div, nested)?)
+                    }
                     None => None,
                 },
             },
@@ -1432,12 +1429,13 @@ impl<'db> ProtocolMemberKind<'db> {
             Self::Method {
                 member,
                 kind,
-                bound_instance_method,
+                receiver,
             } => Self::Method {
                 member: member.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
                 kind,
-                bound_instance_method: bound_instance_method
-                    .map(|member| member.apply_type_mapping_impl(db, type_mapping, tcx, visitor)),
+                receiver: receiver.map(|receiver| {
+                    receiver.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
+                }),
             },
             Self::Property { read, write } => Self::Property {
                 read: read.map(|read| read.apply_type_mapping_impl(db, type_mapping, tcx, visitor)),
@@ -3055,63 +3053,6 @@ impl<'db> ProtocolMemberCandidate<'db> {
     }
 }
 
-/// Selects a single overload using same-protocol receiver annotations.
-///
-/// Unsupported, gradual, and ambiguous receiver relations retain the ordinary protocol binding.
-fn receiver_filtered_protocol_method<'db>(
-    db: &'db dyn Db,
-    callable: CallableType<'db>,
-    receiver_ty: Type<'db>,
-) -> Option<Type<'db>> {
-    let signatures = callable.signatures(db);
-    if signatures.overloads.len() < 2
-        || receiver_ty.has_dynamic(db)
-        || receiver_has_non_fixed_typevartuple(db, receiver_ty)
-        || receiver_ty.has_typevar_or_typevar_instance(db)
-    {
-        return None;
-    }
-
-    let mut selected = None;
-    for signature in signatures {
-        let (signature, receiver_ty) =
-            signature.nominalize_same_protocol_receiver(db, receiver_ty)?;
-        if let Some(signature) = signature.bind_self_if_compatible(db, receiver_ty, receiver_ty)
-            && selected.replace(signature).is_some()
-        {
-            return None;
-        }
-    }
-    let signature = selected?;
-
-    Some(Type::Callable(
-        CallableType::new(
-            db,
-            CallableSignature::single(signature),
-            callable.kind(db),
-            callable.provenance(db),
-        )
-        .into_regular(db),
-    ))
-}
-
-fn receiver_has_non_fixed_typevartuple<'db>(db: &'db dyn Db, receiver_ty: Type<'db>) -> bool {
-    receiver_ty
-        .class_specialization(db)
-        .is_some_and(|(_, specialization)| {
-            specialization
-                .generic_context(db)
-                .variables(db)
-                .zip(specialization.types(db))
-                .any(|(typevar, ty)| {
-                    typevar.is_typevartuple(db)
-                        && ty
-                            .exact_tuple_instance_spec(db)
-                            .is_none_or(|tuple| tuple.is_variadic())
-                })
-        })
-}
-
 /// Inner Salsa query for [`ProtocolClass::interface`].
 #[salsa::tracked(
     returns(copy),
@@ -3138,7 +3079,7 @@ fn cached_protocol_interface<'db>(
             bound_on_class,
         } = candidate;
 
-        let protocol_receiver = (name == "__call__").then(|| Type::instance(db, class));
+        let receiver = (name == "__call__").then(|| Type::instance(db, class));
 
         let member = match ty {
             Type::PropertyInstance(property) => ProtocolMemberData::property(
@@ -3150,7 +3091,7 @@ fn cached_protocol_interface<'db>(
                 definition,
             ),
             Type::Callable(callable) if bound_on_class.is_yes() && callable.is_method_like(db) => {
-                ProtocolMemberData::method(db, callable, definition, protocol_receiver)
+                ProtocolMemberData::method(db, callable, definition, receiver)
             }
             Type::FunctionLiteral(function)
                 if bound_on_class.is_yes()
@@ -3161,7 +3102,7 @@ fn cached_protocol_interface<'db>(
                     db,
                     function.into_callable_type(db),
                     definition,
-                    protocol_receiver,
+                    receiver,
                 )
             }
             _ if bound_on_class.is_yes()
@@ -3208,6 +3149,27 @@ fn protocol_bind_self<'db>(
     self_type: Option<Type<'db>>,
 ) -> CallableType<'db> {
     callable.bind_self(db, self_type).into_regular(db)
+}
+
+/// Binds a callable protocol member after selecting any receiver-specific overload.
+///
+/// This is separate from [`protocol_bind_self`] because `typing.Self` must remain available for
+/// the concrete implementation rather than being replaced by the protocol receiver.
+#[salsa::tracked(returns(copy), heap_size=ruff_memory_usage::heap_size)]
+fn protocol_bind_receiver_overload<'db>(
+    db: &'db dyn Db,
+    callable: CallableType<'db>,
+    receiver_type: Type<'db>,
+) -> CallableType<'db> {
+    CallableType::new(
+        db,
+        callable
+            .signatures(db)
+            .bind_protocol_self(db, receiver_type),
+        callable.kind(db),
+        callable.provenance(db),
+    )
+    .into_regular(db)
 }
 
 /// Return `true` if a callable has at least one overload and none return `Never`.

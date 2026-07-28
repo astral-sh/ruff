@@ -438,6 +438,58 @@ impl<'db> CallableSignature<'db> {
         self.bind_self_with_receiver(db, self_type, self_type)
     }
 
+    /// Binds a callable protocol member after selecting an overload using its receiver.
+    ///
+    /// This only selects among concrete specializations of the same protocol. Other receiver
+    /// relations retain the ordinary binding behavior so they can be checked against the
+    /// implementation later.
+    pub(crate) fn bind_protocol_self(&self, db: &'db dyn Db, receiver_type: Type<'db>) -> Self {
+        let Some(signature) = self.bind_same_protocol_receiver_overload(db, receiver_type) else {
+            return self.bind_self(db, None);
+        };
+        Self::single(signature)
+    }
+
+    fn bind_same_protocol_receiver_overload(
+        &self,
+        db: &'db dyn Db,
+        receiver_type: Type<'db>,
+    ) -> Option<Signature<'db>> {
+        if self.overloads.len() < 2
+            || receiver_type.has_dynamic(db)
+            || receiver_type.has_typevar_or_typevar_instance(db)
+            || receiver_type
+                .class_specialization(db)
+                .is_some_and(|(_, specialization)| {
+                    specialization
+                        .generic_context(db)
+                        .variables(db)
+                        .zip(specialization.types(db))
+                        .any(|(typevar, ty)| {
+                            typevar.is_typevartuple(db)
+                                && ty
+                                    .exact_tuple_instance_spec(db)
+                                    .is_none_or(|tuple| tuple.is_variadic())
+                        })
+                })
+        {
+            return None;
+        }
+
+        let mut selected = None;
+        for signature in &self.overloads {
+            let (signature, receiver_type) =
+                signature.nominalize_same_protocol_receiver(db, receiver_type)?;
+            if let Some(signature) =
+                signature.bind_self_if_compatible(db, receiver_type, receiver_type)
+                && selected.replace(signature).is_some()
+            {
+                return None;
+            }
+        }
+        selected
+    }
+
     /// Binds the receiver using its runtime type while using `typing_self_type` to replace
     /// occurrences of `typing.Self`.
     ///
@@ -1156,7 +1208,7 @@ impl<'db> Signature<'db> {
     /// This is only valid when both types are specializations of the same protocol class. Signatures
     /// containing `typing.Self` are excluded because it must remain available for the concrete
     /// implementation.
-    pub(crate) fn nominalize_same_protocol_receiver(
+    fn nominalize_same_protocol_receiver(
         &self,
         db: &'db dyn Db,
         receiver_type: Type<'db>,
