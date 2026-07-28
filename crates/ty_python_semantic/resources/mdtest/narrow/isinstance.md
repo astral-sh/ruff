@@ -625,6 +625,33 @@ def _(x: object):
         reveal_type(x.get())  # revealed: object
 ```
 
+A bounded covariant generic uses its declared upper bound rather than `object`:
+
+```py
+class BoundedCovariant[T: int]:
+    def get(self) -> T:
+        raise NotImplementedError
+
+def _(x: object):
+    if isinstance(x, BoundedCovariant):
+        reveal_type(x)  # revealed: BoundedCovariant[int]
+        reveal_type(x.get())  # revealed: int
+```
+
+Constrained type parameters preserve the materialization of the generic class while making the union
+of valid constraints available when reading a covariant attribute:
+
+```py
+class ConstrainedCovariant[T: (int, str)]:
+    def get(self) -> T:
+        raise NotImplementedError
+
+def _(x: object):
+    if isinstance(x, ConstrainedCovariant):
+        reveal_type(x)  # revealed: Top[ConstrainedCovariant[Unknown]]
+        reveal_type(x.get())  # revealed: int | str
+```
+
 Similarly, contravariant type parameters use their lower bound of `Never`:
 
 ```py
@@ -686,7 +713,7 @@ class InvariantWithAny[T: int]:
 def _(x: object):
     if isinstance(x, InvariantWithAny):
         reveal_type(x)  # revealed: Top[InvariantWithAny[Unknown]]
-        reveal_type(x.a)  # revealed: object
+        reveal_type(x.a)  # revealed: int
         reveal_type(x.b)  # revealed: Any
 ```
 
@@ -773,6 +800,29 @@ class WithAliasDefault[T = A]:
 def _(x: object):
     if isinstance(x, WithAliasDefault):
         reveal_type(x.y)  # revealed: tuple[A, object]
+```
+
+A default never restricts which specialization matches at runtime. In particular, a `Never` default
+must not prevent narrowing a bounded generic or recovering its original type argument.
+
+```py
+from typing import Any, Never
+
+class Unit[T: str = Never]:
+    mapping: dict[T, Any]
+
+    def __init__(self, key: T | None = None) -> None: ...
+
+def unit_with_default[T: str = Never](unit: Unit[T] | T) -> Unit[T]:
+    if isinstance(unit, Unit):
+        reveal_type(unit)  # revealed: Unit[T@unit_with_default]
+        return unit
+
+    if not isinstance(unit, Unit):
+        reveal_type(unit)  # revealed: T@unit_with_default & ~Top[Unit[Unknown]]
+        return Unit[T](unit)
+
+    raise AssertionError("Unreachable")
 ```
 
 ## Narrowing generic `classmethod`

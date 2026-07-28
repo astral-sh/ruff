@@ -112,6 +112,34 @@ def f(x: Covariant[int]):
             assert_never(x)
 ```
 
+## Generic patterns ignore type parameter defaults
+
+A generic class pattern matches every runtime specialization, not only the specialization described
+by its type parameter's default.
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+from typing import Any, Never
+
+class Unit[T: str = Never]:
+    mapping: dict[T, Any]
+
+    def __init__(self, key: T | None = None) -> None: ...
+
+def unit_with_default[T: str = Never](unit: Unit[T] | T) -> Unit[T]:
+    match unit:
+        case Unit():
+            reveal_type(unit)  # revealed: Unit[T@unit_with_default]
+            return unit
+        case key:
+            reveal_type(key)  # revealed: T@unit_with_default & ~Top[Unit[Unknown]]
+            return Unit[T](key)
+```
+
 ## Class patterns with generic `@final` classes
 
 These work the same as non-`@final` classes.

@@ -1035,7 +1035,7 @@ pub struct Specialization<'db> {
     /// `Bottom[A[Any]]` is a subtype of all materializations of `A[Any]`, and is represented
     /// with `Some(MaterializationKind::Bottom)`.
     /// The `materialization_kind` field may be non-`None` only if the specialization contains
-    /// dynamic types in invariant positions.
+    /// dynamic types in invariant positions or positions with constrained type variables.
     #[returns(copy)]
     pub(crate) materialization_kind: Option<MaterializationKind>,
 
@@ -1416,26 +1416,46 @@ impl<'db> Specialization<'db> {
         if self.materialization_kind(db).is_some() {
             return self;
         }
-        let mut has_dynamic_invariant_typevar = false;
+        let mut has_unsimplified_dynamic_typevar = false;
         let types = self.map_types(db, |_, bound_typevar, vartype| {
-            match specialization_variance(db, bound_typevar) {
+            let variance = specialization_variance(db, bound_typevar);
+            let top_materialization = vartype.materialize(db, MaterializationKind::Top, visitor);
+            let has_dynamic_type =
+                !visitor.is_equivalent_to_materialization(db, vartype, top_materialization);
+
+            match variance {
                 TypeVarVariance::Bivariant => {
                     // With bivariance, all specializations are subtypes of each other,
                     // so any materialization is acceptable.
-                    vartype.materialize(db, MaterializationKind::Top, visitor)
+                    top_materialization
                 }
-                TypeVarVariance::Covariant => {
-                    vartype.materialize(db, materialization_kind, visitor)
+                TypeVarVariance::Covariant | TypeVarVariance::Contravariant
+                    if has_dynamic_type && bound_typevar.typevar(db).is_constrained(db) =>
+                {
+                    has_unsimplified_dynamic_typevar = true;
+                    vartype
                 }
-                TypeVarVariance::Contravariant => {
-                    vartype.materialize(db, materialization_kind.flip(), visitor)
+                TypeVarVariance::Covariant | TypeVarVariance::Contravariant => {
+                    let effective_materialization_kind = if variance.is_covariant() {
+                        materialization_kind
+                    } else {
+                        materialization_kind.flip()
+                    };
+                    let materialized =
+                        vartype.materialize(db, effective_materialization_kind, visitor);
+
+                    if has_dynamic_type
+                        && effective_materialization_kind == MaterializationKind::Top
+                        && let Some(upper_bound) =
+                            bound_typevar.typevar(db).top_materialized_upper_bound(db)
+                    {
+                        IntersectionType::from_two_elements(db, materialized, upper_bound)
+                    } else {
+                        materialized
+                    }
                 }
                 TypeVarVariance::Invariant => {
-                    let top_materialization =
-                        vartype.materialize(db, MaterializationKind::Top, visitor);
-                    if !visitor.is_equivalent_to_materialization(db, vartype, top_materialization) {
-                        has_dynamic_invariant_typevar = true;
-                    }
+                    has_unsimplified_dynamic_typevar |= has_dynamic_type;
                     vartype
                 }
             }
@@ -1450,11 +1470,8 @@ impl<'db> Specialization<'db> {
                 visitor,
             )
         });
-        let new_materialization_kind = if has_dynamic_invariant_typevar {
-            Some(materialization_kind)
-        } else {
-            None
-        };
+        let new_materialization_kind =
+            has_unsimplified_dynamic_typevar.then_some(materialization_kind);
         // Keep this check in sync with every field that can be transformed above.
         let specialization_unchanged = matches!(&types, Cow::Borrowed(_))
             && tuple_inner == original_tuple_inner
@@ -1542,13 +1559,15 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             db,
             self.constraints,
             |(bound_typevar, source_type, target_type)| {
+                let variance = specialization_variance(db, bound_typevar);
+
                 // Subtyping/assignability of each type in the specialization depends on the variance
                 // of the corresponding typevar:
                 //   - covariant: verify that source_type <: target_type
                 //   - contravariant: verify that target_type <: source_type
                 //   - invariant: verify that source_type <: target_type AND target_type <: source_type
                 //   - bivariant: skip, can't make subtyping/assignability false
-                match specialization_variance(db, bound_typevar) {
+                match variance {
                     TypeVarVariance::Invariant => self.check_relation_in_invariant_position(
                         db,
                         *source_type,
@@ -1556,16 +1575,128 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         *target_type,
                         target_materialization_kind,
                     ),
-                    TypeVarVariance::Covariant => {
-                        self.check_type_pair(db, *source_type, *target_type)
-                    }
-                    TypeVarVariance::Contravariant => {
-                        self.check_type_pair(db, *target_type, *source_type)
+                    TypeVarVariance::Covariant | TypeVarVariance::Contravariant => {
+                        let (
+                            (source_type, source_materialization),
+                            (target_type, target_materialization),
+                        ) = if variance.is_covariant() {
+                            (
+                                (*source_type, source_materialization_kind),
+                                (*target_type, target_materialization_kind),
+                            )
+                        } else {
+                            (
+                                (*target_type, target_materialization_kind),
+                                (*source_type, source_materialization_kind),
+                            )
+                        };
+
+                        self.check_type_pair(
+                            db,
+                            self.materialize_constrained_type_argument(
+                                db,
+                                bound_typevar,
+                                source_type,
+                                variance,
+                                source_materialization,
+                            ),
+                            self.materialize_constrained_type_argument(
+                                db,
+                                bound_typevar,
+                                target_type,
+                                variance,
+                                target_materialization,
+                            ),
+                        )
                     }
                     TypeVarVariance::Bivariant => self.always(),
                 }
             },
         )
+    }
+
+    /// Materializes a constrained covariant or contravariant argument for a relation check.
+    ///
+    /// A constrained type variable can only take one of its declared alternatives. For example,
+    /// replacing `Any` with `int | str` for `class C[T: (int, str)]` would create the invalid
+    /// specialization `C[int | str]`. Preserve the enclosing materialization instead, and combine
+    /// only the constraints reachable within the argument's materialization range.
+    fn materialize_constrained_type_argument(
+        &self,
+        db: &'db dyn Db,
+        bound_typevar: BoundTypeVarInstance<'db>,
+        ty: Type<'db>,
+        variance: TypeVarVariance,
+        materialization: Option<MaterializationKind>,
+    ) -> Type<'db> {
+        let Some(materialization) = materialization else {
+            return ty;
+        };
+
+        // A lazy upper bound may refer back to the enclosing specialization. Check whether this
+        // type variable is constrained before evaluating its bounds or constraints.
+        let typevar = bound_typevar.typevar(db);
+        if !typevar.is_constrained(db) {
+            return ty;
+        }
+
+        let argument_top =
+            ty.materialize(db, MaterializationKind::Top, self.materialization_visitor);
+        if self
+            .materialization_visitor
+            .is_equivalent_to_materialization(db, ty, argument_top)
+        {
+            return ty;
+        }
+        let Some(constraints) = typevar.constraints(db) else {
+            return ty;
+        };
+        let argument_bottom = ty.materialize(
+            db,
+            MaterializationKind::Bottom,
+            self.materialization_visitor,
+        );
+        let effective_materialization = if variance.is_covariant() {
+            materialization
+        } else {
+            materialization.flip()
+        };
+
+        let viable_constraints = constraints.iter().filter_map(|constraint| {
+            let constraint_top =
+                constraint.materialize(db, MaterializationKind::Top, self.materialization_visitor);
+
+            // A viable constraint must overlap the argument's upper materialization and contain
+            // its lower materialization. The upper check matters for `Intersection[int, Any]`,
+            // and the lower check matters for `Any | int`.
+            if argument_top.is_disjoint_from(db, constraint_top)
+                || !argument_bottom.is_subtype_of(db, constraint_top)
+            {
+                return None;
+            }
+
+            Some(match effective_materialization {
+                MaterializationKind::Top => constraint_top,
+                MaterializationKind::Bottom => constraint.materialize(
+                    db,
+                    MaterializationKind::Bottom,
+                    self.materialization_visitor,
+                ),
+            })
+        });
+
+        match effective_materialization {
+            MaterializationKind::Top => IntersectionType::from_two_elements(
+                db,
+                argument_top,
+                UnionType::from_elements(db, viable_constraints),
+            ),
+            MaterializationKind::Bottom => UnionType::from_two_elements(
+                db,
+                argument_bottom,
+                IntersectionType::from_elements(db, viable_constraints),
+            ),
+        }
     }
 
     /// Whether two types encountered in an invariant position
