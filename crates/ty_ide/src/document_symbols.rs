@@ -263,6 +263,84 @@ class Aliases:
         ");
     }
 
+    #[test]
+    fn document_symbols_with_statement_targets() {
+        let test = cursor_test(
+            "
+from contextlib import nullcontext
+
+with nullcontext() as module_target, nullcontext((1, 2)) as (left, right):
+    body_target = 1
+
+class C:
+    with nullcontext() as class_target:
+        body_field = 1
+
+def function():
+    with nullcontext() as local_target:
+        pass
+<CURSOR>",
+        );
+
+        assert_snapshot!(test.document_symbols(), @"
+        info[document-symbols]: SymbolInfo
+         --> main.py:4:23
+          |
+        4 | with nullcontext() as module_target, nullcontext((1, 2)) as (left, right):
+          |                       ^^^^^^^^^^^^^
+        info: Variable module_target
+
+        info[document-symbols]: SymbolInfo
+         --> main.py:4:62
+          |
+        4 | with nullcontext() as module_target, nullcontext((1, 2)) as (left, right):
+          |                                                              ^^^^
+        info: Variable left
+
+        info[document-symbols]: SymbolInfo
+         --> main.py:4:68
+          |
+        4 | with nullcontext() as module_target, nullcontext((1, 2)) as (left, right):
+          |                                                                    ^^^^^
+        info: Variable right
+
+        info[document-symbols]: SymbolInfo
+         --> main.py:5:5
+          |
+        5 |     body_target = 1
+          |     ^^^^^^^^^^^
+        info: Variable body_target
+
+        info[document-symbols]: SymbolInfo
+         --> main.py:7:7
+          |
+        7 | class C:
+          |       ^
+        info: Class C
+
+        info[document-symbols]: SymbolInfo
+         --> main.py:8:27
+          |
+        8 |     with nullcontext() as class_target:
+          |                           ^^^^^^^^^^^^
+        info: Field class_target
+
+        info[document-symbols]: SymbolInfo
+         --> main.py:9:9
+          |
+        9 |         body_field = 1
+          |         ^^^^^^^^^^
+        info: Field body_field
+
+        info[document-symbols]: SymbolInfo
+          --> main.py:11:5
+           |
+        11 | def function():
+           |     ^^^^^^^^
+        info: Function function
+        ");
+    }
+
     impl CursorTest {
         fn document_symbols(&self) -> String {
             let symbols = document_symbols(&self.db, self.cursor.file).to_hierarchical();
