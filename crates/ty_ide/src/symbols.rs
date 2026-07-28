@@ -1366,6 +1366,10 @@ impl<'db> SourceOrderVisitor<'db> for SymbolVisitor<'db> {
 
                 source_order::walk_stmt(self, stmt);
             }
+            ast::Stmt::For(for_stmt) => {
+                self.add_assignment_target(stmt, &for_stmt.target);
+                source_order::walk_stmt(self, stmt);
+            }
             ast::Stmt::AugAssign(ast::StmtAugAssign {
                 target, op, value, ..
             }) => {
@@ -1600,6 +1604,39 @@ def function():
         left :: Variable
         right :: Variable
         body_target :: Variable
+        C :: Class
+        function :: Function
+        ",
+        );
+    }
+
+    #[test]
+    fn exports_for_statement_targets() {
+        insta::assert_snapshot!(
+            public_test("\
+for module_target in ():
+    body_target = 1
+else:
+    fallback_target = 2
+
+for [left, *middle, right] in ():
+    pass
+
+class C:
+    for class_target in ():
+        body_field = 1
+
+def function():
+    for local_target in ():
+        pass
+").exports(),
+            @"
+        module_target :: Variable
+        body_target :: Variable
+        fallback_target :: Variable
+        left :: Variable
+        middle :: Variable
+        right :: Variable
         C :: Class
         function :: Function
         ",
