@@ -479,6 +479,42 @@ def check(
     mixed((i,), i, s)
 ```
 
+### Resizing starred variadic tuple boundaries
+
+An open splat can supply fixed prefix and suffix values. Resizing its tuple must preserve any fixed
+values that are already present rather than folding them into the open middle.
+
+```py
+def prefixed[*Ts](*args: *tuple[int, *Ts]) -> tuple[*Ts]:
+    raise NotImplementedError
+
+def suffixed[*Ts](*args: *tuple[*Ts, str]) -> tuple[*Ts]:
+    raise NotImplementedError
+
+def bounded[*Ts](*args: *tuple[int, *Ts, int]) -> tuple[*Ts]:
+    raise NotImplementedError
+
+def check(
+    ints: list[int],
+    strings: list[str],
+    extra_prefix: tuple[int, bool, *tuple[str, ...], bytes],
+    extra_suffix: tuple[bool, *tuple[int, ...], bytes, str],
+    extra_boundaries: tuple[int, bool, *tuple[str, ...], bytes, int],
+    missing_prefix: tuple[*tuple[int, ...], bytes],
+    missing_suffix: tuple[bool, *tuple[str, ...]],
+) -> None:
+    reveal_type(prefixed(*ints))  # revealed: tuple[int, ...]
+    reveal_type(prefixed(*extra_prefix))  # revealed: tuple[bool, *tuple[str, ...], bytes]
+    reveal_type(prefixed(*missing_prefix))  # revealed: tuple[*tuple[int, ...], bytes]
+
+    reveal_type(suffixed(*strings))  # revealed: tuple[str, ...]
+    reveal_type(suffixed(*extra_suffix))  # revealed: tuple[bool, *tuple[int, ...], bytes]
+    reveal_type(suffixed(*missing_suffix))  # revealed: tuple[bool, *tuple[str, ...]]
+
+    reveal_type(bounded(*ints))  # revealed: tuple[int, ...]
+    reveal_type(bounded(*extra_boundaries))  # revealed: tuple[bool, *tuple[str, ...], bytes]
+```
+
 ### Diagnostic deduplication for ordinary `TypeVar`s
 
 A bound or constraint on an ordinary `TypeVar` inside a starred tuple is checked by tuple-level
@@ -616,6 +652,7 @@ reveal_type(invoke(positional_only, 1))  # revealed: tuple[int, str]
 reveal_type(invoke(positional_only, 1, 2))  # revealed: tuple[int, str]
 
 reveal_type(invoke(standard, 1, "a"))  # revealed: tuple[int, str]
+# error: [invalid-argument-type]
 # error: [unknown-argument] "Argument `x` does not match any known parameter of function `invoke`"
 # error: [unknown-argument] "Argument `y` does not match any known parameter of function `invoke`"
 reveal_type(invoke(standard, x=1, y="a"))  # revealed: tuple[int, str]
@@ -638,6 +675,124 @@ def forward_mixed[*Ts](
     *args: *tuple[int, *Ts, str],
 ) -> None:
     accept_mixed_forwarded(callback, args)
+```
+
+### Matched positional pack with rejected keywords
+
+A starred `TypeVarTuple` is inferred only from the positional arguments that matched its variadic
+parameter. Rejected keywords cannot supply missing positional elements or let a callback overwrite
+the matched pack.
+
+```py
+from collections.abc import Callable
+from typing import overload
+
+def invoke_pack[*Ts](
+    callback: Callable[[*Ts], object],
+    *args: *Ts,
+) -> tuple[*Ts]:
+    raise NotImplementedError
+
+def invoke_str[*Ts](
+    callback: Callable[[*Ts], str],
+    *args: *Ts,
+) -> str:
+    raise NotImplementedError
+
+def accepts_nothing() -> str:
+    return "empty"
+
+def accepts_int_and_str(value: int, label: str, /) -> str:
+    return label
+
+@overload
+def overloaded_value(value: int) -> str: ...
+@overload
+def overloaded_value(value: str) -> str: ...
+def overloaded_value(value: int | str) -> str:
+    return str(value)
+
+@overload
+def optional_arity() -> str: ...
+@overload
+def optional_arity(value: int) -> str: ...
+def optional_arity(value: int | None = None) -> str:
+    return "empty" if value is None else str(value)
+
+def check(value: int, label: str, fixed: tuple[int, str], empty_tuple: tuple[()]) -> None:
+    reveal_type(invoke_pack(accepts_nothing))  # revealed: tuple[()]
+    reveal_type(invoke_pack(accepts_int_and_str, value, label))  # revealed: tuple[int, str]
+    reveal_type(invoke_pack(accepts_int_and_str, *fixed))  # revealed: tuple[int, str]
+    reveal_type(invoke_pack(overloaded_value, value))  # revealed: tuple[int]
+    reveal_type(invoke_pack(optional_arity))  # revealed: tuple[()]
+    reveal_type(invoke_pack(optional_arity, *empty_tuple))  # revealed: tuple[()]
+    reveal_type(invoke_str(optional_arity, *empty_tuple))  # revealed: str
+
+    empty = invoke_pack(
+        accepts_int_and_str,  # error: [invalid-argument-type]
+        value=value,  # error: [unknown-argument]
+        label=label,  # error: [unknown-argument]
+    )
+    reveal_type(empty)  # revealed: tuple[()]
+
+    partial = invoke_pack(
+        accepts_int_and_str,  # error: [invalid-argument-type]
+        value,
+        label=label,  # error: [unknown-argument]
+    )
+    reveal_type(partial)  # revealed: tuple[int]
+
+    overloaded_empty = invoke_pack(
+        overloaded_value,  # error: [invalid-argument-type]
+        value=value,  # error: [unknown-argument]
+    )
+    reveal_type(overloaded_empty)  # revealed: tuple[()]
+
+    empty_splat = invoke_pack(
+        overloaded_value,  # error: [invalid-argument-type]
+        *empty_tuple,
+    )
+    reveal_type(empty_splat)  # revealed: tuple[()]
+
+    multiple_empty_splats = invoke_pack(
+        overloaded_value,  # error: [invalid-argument-type]
+        *empty_tuple,
+        *empty_tuple,
+    )
+    reveal_type(multiple_empty_splats)  # revealed: tuple[()]
+
+    invoke_str(
+        overloaded_value,  # error: [invalid-argument-type]
+        *empty_tuple,
+    )
+
+    invoke_str(
+        overloaded_value,  # error: [invalid-argument-type]
+        *empty_tuple,
+        *empty_tuple,
+    )
+```
+
+### Starred variadic tuple normalization
+
+A fixed provided tuple containing `Never` normalizes to `Never` before tuple-level constraint
+inference. The impossible argument must not become an empty tuple or remain a constructible tuple
+containing `Never`.
+
+```py
+from typing import Never
+
+def collect[*Ts](*args: *Ts) -> tuple[*Ts]:
+    raise NotImplementedError
+
+def collect_prefixed[*Ts](*args: *tuple[int, *Ts]) -> tuple[*Ts]:
+    raise NotImplementedError
+
+def check_never(value: Never) -> None:
+    reveal_type(collect(value))  # revealed: tuple[Unknown, ...]
+
+def check_prefixed_never(value: Never) -> None:
+    reveal_type(collect_prefixed(1, value))  # revealed: tuple[Unknown, ...]
 ```
 
 ### Callable checks
@@ -705,7 +860,9 @@ invalid_wrapper(1.0)
 
 ### Callable forwarding through a sub-call
 
-Forwarded positional arguments are checked against the callback's actual overloads. This preserves overload correlations without expanding every combination of constrained outer type variables, and a splat that first fills a wrapper parameter forwards only its residual tuple.
+Forwarded positional arguments are checked against the callback's actual overloads. This preserves
+overload correlations without expanding every combination of constrained outer type variables, and a
+splat that first fills a wrapper parameter forwards only its residual tuple.
 
 ```py
 from collections.abc import Callable
@@ -717,9 +874,7 @@ def invoke[*Ts, R](callback: Callable[[*Ts], R], *args: *Ts) -> R:
 def invoke_str[*Ts](callback: Callable[[*Ts], str], *args: *Ts) -> str:
     raise NotImplementedError
 
-def invoke_after_header[*Ts](
-    callback: Callable[[*Ts], str], header: int, *args: *Ts
-) -> str:
+def invoke_after_header[*Ts](callback: Callable[[*Ts], str], header: int, *args: *Ts) -> str:
     raise NotImplementedError
 
 @overload

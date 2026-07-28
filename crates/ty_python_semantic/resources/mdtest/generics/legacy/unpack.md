@@ -69,12 +69,40 @@ def invoke(
 ) -> R:
     raise NotImplementedError
 
+def invoke_pack(
+    callback: Callable[[Unpack[Ts]], object],
+    *args: Unpack[Ts],
+) -> tuple[Unpack[Ts]]:
+    raise NotImplementedError
+
+def no_arguments() -> str:
+    return "empty"
+
 def format_value(value: int, label: str, /) -> str:
     return f"{label}: {value}"
 
 reveal_type(invoke(format_value, 1, "value"))  # revealed: str
 # error: [invalid-argument-type]
 reveal_type(invoke(format_value, 1))  # revealed: str
+
+reveal_type(invoke_pack(no_arguments))  # revealed: tuple[()]
+
+def check_pack(value: int, label: str) -> None:
+    reveal_type(invoke_pack(format_value, value, label))  # revealed: tuple[int, str]
+
+empty = invoke_pack(
+    format_value,  # error: [invalid-argument-type]
+    value=1,  # error: [unknown-argument]
+    label="value",  # error: [unknown-argument]
+)
+reveal_type(empty)  # revealed: tuple[()]
+
+partial = invoke_pack(
+    format_value,  # error: [invalid-argument-type]
+    1,
+    label="value",  # error: [unknown-argument]
+)
+reveal_type(partial)  # revealed: tuple[Literal[1]]
 
 @overload
 def overloaded_value(value: int) -> str: ...
@@ -87,6 +115,12 @@ reveal_type(invoke(overloaded_value, 1))  # revealed: str
 reveal_type(invoke(overloaded_value, "value"))  # revealed: str
 # error: [invalid-argument-type]
 invoke(overloaded_value, 1.0)
+
+overloaded_empty = invoke_pack(
+    overloaded_value,  # error: [invalid-argument-type]
+    value=1,  # error: [unknown-argument]
+)
+reveal_type(overloaded_empty)  # revealed: tuple[()]
 ```
 
 ## Type aliases
