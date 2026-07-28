@@ -3018,7 +3018,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
 
                 match delattr_dunder_call_result {
-                    Ok(_) | Err(CallDunderError::PossiblyUnbound { .. }) => {
+                    Ok(_) | Err(CallDunderError::PossiblyUnbound { .. })
+                        if !matches!(
+                            frozen_dataclass_dispatch,
+                            Some(FrozenDataclassDispatch::Delegate(_))
+                        ) =>
+                    {
                         if self.validate_final_attribute_deletion(
                             target,
                             object_ty,
@@ -3029,6 +3034,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         }
                         return true;
                     }
+                    Ok(_) | Err(CallDunderError::PossiblyUnbound { .. }) => {}
                     Err(CallDunderError::CallError(kind, _bindings, _)) => {
                         if emit_diagnostics {
                             report_bad_dunder_delattr_call(
@@ -3072,7 +3078,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         TypeContext::default(),
                     );
 
-                    if self.property_deleter_returns_never(attr_ty, object_ty) {
+                    // `Never` supports arbitrary operations only because there can be no runtime
+                    // value to mutate; it is not a concrete descriptor with a terminal deleter.
+                    let deleter_returns_never = !attr_ty.is_never()
+                        && match &delete_dunder_call_result {
+                            Ok(bindings) => bindings.return_type(db).is_never(),
+                            Err(error) => error.return_type(db).is_some_and(|ty| ty.is_never()),
+                        };
+                    if deleter_returns_never
+                        || self.property_deleter_returns_never(attr_ty, object_ty)
+                    {
                         if emit_diagnostics
                             && let Some(builder) =
                                 self.context.report_lint(&INVALID_ASSIGNMENT, target)

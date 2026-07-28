@@ -1133,19 +1133,76 @@ class ChildWithRejectingBase(Frozen, RejectsDeletion): ...
 del ChildWithRejectingBase().y
 ```
 
-A second base class can instead allow deletion, even if the attribute is a read-only property:
+A second base class can customize deletion of an ordinary attribute:
 
 ```py
 class AllowsDeletion:
-    @property
-    def y(self) -> int:
-        return 1
+    y: int = 1
 
     def __delattr__(self, name: str) -> None: ...
 
 class ChildWithAllowingBase(Frozen, AllowsDeletion): ...
 
 del ChildWithAllowingBase().y
+```
+
+A later `__delattr__` can forward to `object.__delattr__`, which still invokes data descriptors:
+
+```py
+class ForwardsDeletion:
+    def __delattr__(self, name: str) -> None:
+        super().__delattr__(name)
+```
+
+A read-only property therefore remains read-only:
+
+```py
+class ReadOnlyDeletionBase(ForwardsDeletion):
+    @property
+    def y(self) -> int:
+        return 1
+
+class ChildWithReadOnlyDeletion(Frozen, ReadOnlyDeletionBase): ...
+
+# error: [invalid-assignment] "Cannot delete read-only property `y` on object of type `ChildWithReadOnlyDeletion`"
+del ChildWithReadOnlyDeletion().y
+```
+
+A property deleter that never returns also prevents deletion:
+
+```py
+class TerminalDeletionBase(ForwardsDeletion):
+    @property
+    def y(self) -> int:
+        return 1
+
+    @y.deleter
+    def y(self) -> NoReturn:
+        raise AttributeError
+
+class ChildWithTerminalDeletion(Frozen, TerminalDeletionBase): ...
+
+# error: [invalid-assignment] "Cannot delete attribute `y` on type `ChildWithTerminalDeletion` whose `__delete__` method returns `Never`/`NoReturn`"
+del ChildWithTerminalDeletion().y
+```
+
+The same rule applies to a custom descriptor whose deleter never returns:
+
+```py
+class TerminalDeleteDescriptor:
+    def __get__(self, instance: object, owner: type | None = None) -> int:
+        return 1
+
+    def __delete__(self, instance: object) -> NoReturn:
+        raise AttributeError
+
+class TerminalDescriptorDeletionBase(ForwardsDeletion):
+    y: TerminalDeleteDescriptor = TerminalDeleteDescriptor()
+
+class ChildWithTerminalDescriptorDeletion(Frozen, TerminalDescriptorDeletionBase): ...
+
+# error: [invalid-assignment] "Cannot delete attribute `y` on type `ChildWithTerminalDescriptorDeletion` whose `__delete__` method returns `Never`/`NoReturn`"
+del ChildWithTerminalDescriptorDeletion().y
 ```
 
 An ordinary attribute defined on a subclass can also be deleted:
