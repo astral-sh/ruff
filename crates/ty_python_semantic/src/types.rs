@@ -6594,16 +6594,12 @@ impl<'db> Type<'db> {
                 }))
             }),
 
-            // Class-backed protocols map through their class specialization without traversing
-            // the interface. Entering the recursive visitor here would make a protocol interface
-            // under construction depend on itself without helping to break the cycle.
+            // A non-materializing mapping on `Protocol::FromClass` only maps the class
+            // specialization, without traversing the protocol interface. Avoid the recursive
+            // visitor in that case: computing its protocol identity inspects the interface, which
+            // can re-enter `cached_protocol_interface` while it is being constructed.
             Type::ProtocolInstance(instance)
-                if instance.is_class_backed()
-                    && !matches!(
-                        type_mapping,
-                        TypeMapping::Materialize(_)
-                            | TypeMapping::ApplySpecializationWithMaterialization { .. }
-                    ) =>
+                if !instance.mapping_traverses_interface(type_mapping) =>
             {
                 Type::ProtocolInstance(
                     instance.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
@@ -7898,6 +7894,26 @@ pub enum TypeMapping<'a, 'db> {
 }
 
 impl<'db> TypeMapping<'_, 'db> {
+    /// Returns the materialization requested by this mapping, if any.
+    const fn materialization_kind(&self) -> Option<MaterializationKind> {
+        match self {
+            Self::Materialize(kind)
+            | Self::ApplySpecializationWithMaterialization {
+                materialization_kind: kind,
+                ..
+            } => Some(*kind),
+            Self::ApplySpecialization(_)
+            | Self::Promote(..)
+            | Self::BindLegacyTypevars(_)
+            | Self::FreshenBoundTypeVars { .. }
+            | Self::BindSelf(_)
+            | Self::ReplaceSelf { .. }
+            | Self::ReplaceParameterDefaults
+            | Self::EagerExpansion
+            | Self::RescopeReturnCallables(_) => None,
+        }
+    }
+
     /// Update the generic context of a [`Signature`] according to the current type mapping
     pub(crate) fn update_signature_generic_context(
         &self,

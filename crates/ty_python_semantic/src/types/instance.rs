@@ -1000,8 +1000,15 @@ fn interface_references_protocol_origin<'db>(
 }
 
 impl<'db> ProtocolInstanceType<'db> {
-    pub(super) const fn is_class_backed(self) -> bool {
-        matches!(self.inner, Protocol::FromClass(_))
+    /// Returns whether applying `type_mapping` descends into this protocol's interface.
+    pub(super) const fn mapping_traverses_interface(
+        self,
+        type_mapping: &TypeMapping<'_, 'db>,
+    ) -> bool {
+        match self.inner {
+            Protocol::FromClass(_) => type_mapping.materialization_kind().is_some(),
+            Protocol::Synthesized(_) | Protocol::Materialized(_) => true,
+        }
     }
 
     /// Return whether this protocol has an interface produced by materialization.
@@ -1263,20 +1270,13 @@ impl<'db> ProtocolInstanceType<'db> {
     ) -> Self {
         match self.inner {
             Protocol::FromClass(class) => {
-                let materialization_kind = match type_mapping {
-                    TypeMapping::Materialize(kind)
-                    | TypeMapping::ApplySpecializationWithMaterialization {
-                        materialization_kind: kind,
-                        ..
-                    } => *kind,
-                    _ => {
-                        return Self::from_class(class.apply_type_mapping_impl(
-                            db,
-                            type_mapping,
-                            tcx,
-                            visitor,
-                        ));
-                    }
+                let Some(materialization_kind) = type_mapping.materialization_kind() else {
+                    return Self::from_class(class.apply_type_mapping_impl(
+                        db,
+                        type_mapping,
+                        tcx,
+                        visitor,
+                    ));
                 };
                 let interface = class.interface(db);
                 let mapped_class = class.apply_type_mapping_impl(db, type_mapping, tcx, visitor);

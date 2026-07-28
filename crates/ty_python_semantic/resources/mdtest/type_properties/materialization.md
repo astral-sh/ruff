@@ -947,6 +947,32 @@ writes are contravariant.
 python-version = "3.12"
 ```
 
+### Class-backed protocol specialization during interface construction
+
+An ordinary specialization of a class-backed protocol only maps its class specialization. It must
+not inspect the protocol interface, because the specialization can occur while that same interface
+is being constructed:
+
+```py
+from __future__ import annotations
+
+from typing import Generic, Protocol, TypeVar, overload
+
+S = TypeVar("S")
+T = TypeVar("T")
+
+class Unit(Protocol):
+    def __mul__(self, other: S | Quantity[S]): ...
+
+class Vector(Protocol): ...
+
+class Quantity(Generic[T], Protocol):
+    @overload
+    def __mul__(self, other: Unit | Quantity[S]): ...
+    @overload
+    def __mul__(self, other: Vector) -> Vector: ...
+```
+
 ### Instance attributes
 
 For a mutable `Any` attribute, `Top` reads `object` and writes `Never`; `Bottom` does the reverse:
