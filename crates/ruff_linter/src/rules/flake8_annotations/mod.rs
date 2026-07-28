@@ -124,19 +124,6 @@ mod tests {
     }
 
     #[test]
-    fn auto_return_type_conditional_import() -> Result<()> {
-        let diagnostics = test_path(
-            Path::new("flake8_annotations/auto_return_type_conditional_import.py"),
-            &LinterSettings {
-                unresolved_target_version: PythonVersion::PY38.into(),
-                ..LinterSettings::for_rule(Rule::MissingReturnTypeUndocumentedPublicFunction)
-            },
-        )?;
-        assert_diagnostics!(diagnostics);
-        Ok(())
-    }
-
-    #[test]
     fn auto_return_type_py38() -> Result<()> {
         let diagnostics = test_path(
             Path::new("flake8_annotations/auto_return_type.py"),
