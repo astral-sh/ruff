@@ -5,11 +5,10 @@ use std::time::{Duration, Instant};
 use lsp_server::RequestId;
 use lsp_types::WorkspaceDiagnosticRequest;
 use lsp_types::{
-    FullDocumentDiagnosticReport, PreviousResultId, ProgressNotification, ProgressParams,
-    ProgressToken, UnchangedDocumentDiagnosticReport, Uri, WorkspaceDiagnosticParams,
-    WorkspaceDiagnosticReport, WorkspaceDiagnosticReportPartialResult,
-    WorkspaceDocumentDiagnosticReport, WorkspaceFullDocumentDiagnosticReport,
-    WorkspaceUnchangedDocumentDiagnosticReport,
+    FullDocumentDiagnosticReport, PreviousResultId, ProgressToken,
+    UnchangedDocumentDiagnosticReport, Uri, WorkspaceDiagnosticParams, WorkspaceDiagnosticReport,
+    WorkspaceDiagnosticReportPartialResult, WorkspaceDocumentDiagnosticReport,
+    WorkspaceFullDocumentDiagnosticReport, WorkspaceUnchangedDocumentDiagnosticReport,
 };
 use ruff_db::diagnostic::Diagnostic;
 use ruff_db::files::File;
@@ -624,12 +623,17 @@ impl Streaming {
             .map(WorkspaceDocumentDiagnosticReport::WorkspaceFullDocumentDiagnosticReport)
             .collect();
 
-        let report = self.create_result(items);
+        let partial_result = match self.create_result(items) {
+            WorkspaceDiagnosticReportResult::PartialReport(partial_report) => partial_report,
+            WorkspaceDiagnosticReportResult::Report(WorkspaceDiagnosticReport { items }) => {
+                // WorkspaceDiagnosticReport and WorkspaceDiagnosticReportPartialResult have the
+                // same serialization in the LSP.
+                // https://github.com/microsoft/language-server-protocol/issues/2281
+                WorkspaceDiagnosticReportPartialResult { items }
+            }
+        };
         self.client
-            .send_notification::<ProgressNotification>(ProgressParams {
-                token: self.token.clone(),
-                value: json!(report),
-            });
+            .send_partial_result::<WorkspaceDiagnosticRequest>(self.token.clone(), partial_result);
         self.last_flush = Instant::now();
     }
 
