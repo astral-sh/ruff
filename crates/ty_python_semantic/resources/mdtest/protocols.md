@@ -5019,6 +5019,22 @@ def takes_self_callback(callback: SelfCallback) -> None: ...
 
 takes_self_callback(SelfImplementation())
 takes_self_callback(InvalidSelfImplementation())  # error: [invalid-argument-type]
+
+class ExplicitSelfCallback(Protocol):
+    def __call__(self: Self, value: Self) -> Self: ...
+
+class ExplicitSelfImplementation:
+    def __call__(self, value: Self) -> Self:
+        return self
+
+class InvalidExplicitSelfImplementation:
+    def __call__(self, value: str) -> str:
+        return value
+
+def takes_explicit_self_callback(callback: ExplicitSelfCallback) -> None: ...
+
+takes_explicit_self_callback(ExplicitSelfImplementation())
+takes_explicit_self_callback(InvalidExplicitSelfImplementation())  # error: [invalid-argument-type]
 ```
 
 ## Callable protocols

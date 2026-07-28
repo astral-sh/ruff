@@ -1041,6 +1041,22 @@ impl<'db> Signature<'db> {
         receiver_type: Option<Type<'db>>,
         typing_self_type: Option<Type<'db>>,
     ) -> Self {
+        self.bind_self_with_receiver_impl(db, receiver_type, typing_self_type, false)
+    }
+
+    /// Binds the receiver and uses it to resolve `Self` in the receiver annotation, while
+    /// preserving `Self` everywhere else for a later implementation-specific binding.
+    fn bind_receiver_preserving_self(&self, db: &'db dyn Db, receiver_type: Type<'db>) -> Self {
+        self.bind_self_with_receiver_impl(db, Some(receiver_type), None, true)
+    }
+
+    fn bind_self_with_receiver_impl(
+        &self,
+        db: &'db dyn Db,
+        receiver_type: Option<Type<'db>>,
+        typing_self_type: Option<Type<'db>>,
+        preserve_self: bool,
+    ) -> Self {
         let removed_receiver = self.parameters.get(0).is_some_and(Parameter::is_positional);
         let explicit_receiver = self
             .parameters
@@ -1064,9 +1080,14 @@ impl<'db> Signature<'db> {
                     BindingContext::Synthetic,
                 ))
             });
-            let annotation = if let Some(typing_self_type) = typing_self_type {
-                let mapping =
-                    TypeMapping::BindSelf(SelfBinding::new(db, typing_self_type, binding_context));
+            let annotation = if let Some(receiver_annotation_self_type) =
+                typing_self_type.or_else(|| preserve_self.then_some(receiver))
+            {
+                let mapping = TypeMapping::BindSelf(SelfBinding::new(
+                    db,
+                    receiver_annotation_self_type,
+                    binding_context,
+                ));
                 parameter
                     .annotated_type()
                     .apply_type_mapping(db, &mapping, TypeContext::default())
@@ -1109,9 +1130,12 @@ impl<'db> Signature<'db> {
             return_ty = return_ty.apply_type_mapping(db, &self_mapping, TypeContext::default());
         }
         Self {
-            generic_context: self
-                .generic_context
-                .map(|generic_context| generic_context.remove_self(db, binding_context)),
+            generic_context: if preserve_self {
+                self.generic_context
+            } else {
+                self.generic_context
+                    .map(|generic_context| generic_context.remove_self(db, binding_context))
+            },
             definition: self.definition,
             receiver_constraints,
             parameters,
@@ -1210,8 +1234,13 @@ impl<'db> Signature<'db> {
             return None;
         }
 
-        let bound_signature =
-            self.bind_self_with_receiver(db, Some(receiver_type), typing_self_type);
+        let bind_receiver = |signature: &Self| match typing_self_type {
+            Some(typing_self_type) => {
+                signature.bind_self_with_receiver(db, Some(receiver_type), Some(typing_self_type))
+            }
+            None => signature.bind_receiver_preserving_self(db, receiver_type),
+        };
+        let bound_signature = bind_receiver(self);
         let Some(receiver_constraints) = bound_signature.receiver_constraints.as_ref() else {
             return Some(bound_signature);
         };
@@ -1263,10 +1292,9 @@ impl<'db> Signature<'db> {
             Some(Type::TypeVar(typevar))
         });
 
-        Some(
-            self.apply_specialization(db, specialization)
-                .bind_self_with_receiver(db, Some(receiver_type), typing_self_type),
-        )
+        Some(bind_receiver(
+            &self.apply_specialization(db, specialization),
+        ))
     }
 
     /// Returns `true` if this signature's first parameter can accept the bound `self` type.
