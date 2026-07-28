@@ -33,22 +33,15 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// bar = [1, *foo, 5, 6]
 /// ```
 ///
-/// ## Known issues
-/// When the concatenation is itself the operand of a `*` unpacking, the fix rewrites it into a
-/// literal that the `*` then immediately takes apart again:
-///
-/// ```python
-/// foo(*(bar + [baz]))  # becomes `foo(*([*bar, baz]))`
-/// ```
-///
-/// [`unnecessary-literal-unpacking`][RUF077] reports that leftover unpacking and
-/// removes it, arriving at `foo(*bar, baz)`.
-///
 /// ## Fix safety
 ///
 /// The fix is always marked as unsafe because the `+` operator uses the `__add__` magic method and
 /// `*`-unpacking uses the `__iter__` magic method. Both of these could have custom
 /// implementations, causing the fix to change program behaviour.
+///
+/// ## See also
+/// [`unnecessary-literal-unpacking`][RUF077] removes the leftover unpacking this fix leaves behind
+/// when the concatenation is itself the operand of a `*` unpacking.
 ///
 /// ## References
 /// - [PEP 448 – Additional Unpacking Generalizations](https://peps.python.org/pep-0448/)

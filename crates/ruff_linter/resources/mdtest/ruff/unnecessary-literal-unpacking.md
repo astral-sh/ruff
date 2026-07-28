@@ -17,7 +17,7 @@ baz = 2
 rest = [3, 4]
 
 foo(*[bar])  # snapshot: unnecessary-literal-unpacking
-foo(*(bar,))  # snapshot: unnecessary-literal-unpacking
+foo(*(bar,))  # error: [unnecessary-literal-unpacking]
 foo(*[bar, *rest])  # error: [unnecessary-literal-unpacking]
 foo(*(bar, *rest))  # error: [unnecessary-literal-unpacking]
 foo(*[*rest, bar])  # error: [unnecessary-literal-unpacking]
@@ -27,9 +27,9 @@ foo(baz, *[bar])  # error: [unnecessary-literal-unpacking]
 foo(*[bar], *rest)  # error: [unnecessary-literal-unpacking]
 foo(*[bar], keyword=baz)  # error: [unnecessary-literal-unpacking]
 foo(*[bar], **{"keyword": baz})  # error: [unnecessary-literal-unpacking]
-foo(*[bar,])  # snapshot: unnecessary-literal-unpacking
-foo(* [bar])  # snapshot: unnecessary-literal-unpacking
-# snapshot: unnecessary-literal-unpacking
+foo(*[bar,])  # error: [unnecessary-literal-unpacking]
+foo(* [bar])  # error: [unnecessary-literal-unpacking]
+# error: [unnecessary-literal-unpacking]
 foo(*
     [bar])
 ```
@@ -46,70 +46,8 @@ help: Remove unnecessary list
 7 |
   - foo(*[bar])  # snapshot: unnecessary-literal-unpacking
 8 + foo(bar)  # snapshot: unnecessary-literal-unpacking
-9 | foo(*(bar,))  # snapshot: unnecessary-literal-unpacking
+9 | foo(*(bar,))  # error: [unnecessary-literal-unpacking]
   |
-
-
-error[RUF077]: Unnecessary unpacking of tuple literal
- --> src/mdtest_snippet.py:9:5
-  |
-9 | foo(*(bar,))  # snapshot: unnecessary-literal-unpacking
-  |     ^^^^^^^
-  |
-help: Remove unnecessary tuple
-   |
-8  | foo(*[bar])  # snapshot: unnecessary-literal-unpacking
-   - foo(*(bar,))  # snapshot: unnecessary-literal-unpacking
-9  + foo(bar)  # snapshot: unnecessary-literal-unpacking
-10 | foo(*[bar, *rest])  # error: [unnecessary-literal-unpacking]
-   |
-
-
-error[RUF077]: Unnecessary unpacking of list literal
-  --> src/mdtest_snippet.py:19:5
-   |
-19 | foo(*[bar,])  # snapshot: unnecessary-literal-unpacking
-   |     ^^^^^^^
-   |
-help: Remove unnecessary list
-   |
-18 | foo(*[bar], **{"keyword": baz})  # error: [unnecessary-literal-unpacking]
-   - foo(*[bar,])  # snapshot: unnecessary-literal-unpacking
-19 + foo(bar)  # snapshot: unnecessary-literal-unpacking
-20 | foo(* [bar])  # snapshot: unnecessary-literal-unpacking
-   |
-
-
-error[RUF077]: Unnecessary unpacking of list literal
-  --> src/mdtest_snippet.py:20:5
-   |
-20 | foo(* [bar])  # snapshot: unnecessary-literal-unpacking
-   |     ^^^^^^^
-   |
-help: Remove unnecessary list
-   |
-19 | foo(*[bar,])  # snapshot: unnecessary-literal-unpacking
-   - foo(* [bar])  # snapshot: unnecessary-literal-unpacking
-20 + foo(bar)  # snapshot: unnecessary-literal-unpacking
-21 | # snapshot: unnecessary-literal-unpacking
-   |
-
-
-error[RUF077]: Unnecessary unpacking of list literal
-  --> src/mdtest_snippet.py:22:5
-   |
-22 |   foo(*
-   |  _____^
-23 | |     [bar])
-   | |_________^
-   |
-help: Remove unnecessary list
-   |
-21 | # snapshot: unnecessary-literal-unpacking
-   - foo(*
-   -     [bar])
-22 + foo(bar)
-   |
 ```
 
 ## Collection displays
@@ -122,7 +60,7 @@ rest = [3, 4]
 [*[bar, baz], *rest]  # snapshot: unnecessary-literal-unpacking
 (*[bar, baz], *rest)  # error: [unnecessary-literal-unpacking]
 {*[bar, baz], *rest}  # error: [unnecessary-literal-unpacking]
-[*(bar,)]  # snapshot: unnecessary-literal-unpacking
+[*(bar,)]  # error: [unnecessary-literal-unpacking]
 [bar, *[baz]]  # error: [unnecessary-literal-unpacking]
 ```
 
@@ -139,21 +77,6 @@ help: Remove unnecessary list
   - [*[bar, baz], *rest]  # snapshot: unnecessary-literal-unpacking
 5 + [bar, baz, *rest]  # snapshot: unnecessary-literal-unpacking
 6 | (*[bar, baz], *rest)  # error: [unnecessary-literal-unpacking]
-  |
-
-
-error[RUF077]: Unnecessary unpacking of tuple literal
- --> src/mdtest_snippet.py:8:2
-  |
-8 | [*(bar,)]  # snapshot: unnecessary-literal-unpacking
-  |  ^^^^^^^
-  |
-help: Remove unnecessary tuple
-  |
-7 | {*[bar, baz], *rest}  # error: [unnecessary-literal-unpacking]
-  - [*(bar,)]  # snapshot: unnecessary-literal-unpacking
-8 + [bar]  # snapshot: unnecessary-literal-unpacking
-9 | [bar, *[baz]]  # error: [unnecessary-literal-unpacking]
   |
 ```
 
@@ -212,7 +135,7 @@ foo(*( [bar, baz] ))  # error: [unnecessary-literal-unpacking]
 foo(*([bar]))  # error: [unnecessary-literal-unpacking]
 foo(*([]))  # error: [unnecessary-literal-unpacking]
 [*([bar, baz]), bar]  # error: [unnecessary-literal-unpacking]
-values = *([bar]),  # snapshot: unnecessary-literal-unpacking
+values = *([bar]),  # error: [unnecessary-literal-unpacking]
 ```
 
 ```snapshot
@@ -229,21 +152,6 @@ help: Remove unnecessary list
 5 + foo(bar, baz)  # snapshot: unnecessary-literal-unpacking
 6 | foo(*((bar, baz)))  # error: [unnecessary-literal-unpacking]
   |
-
-
-error[RUF077]: Unnecessary unpacking of list literal
-  --> src/mdtest_snippet.py:12:10
-   |
-12 | values = *([bar]),  # snapshot: unnecessary-literal-unpacking
-   |          ^^^^^^^^
-   |
-help: Remove unnecessary list
-   |
-11 | [*([bar, baz]), bar]  # error: [unnecessary-literal-unpacking]
-   - values = *([bar]),  # snapshot: unnecessary-literal-unpacking
-12 + values = bar,  # snapshot: unnecessary-literal-unpacking
-13 | foo = print
-   |
 ```
 
 A comment after the literal is left where it is, since only the parentheses themselves go:
@@ -335,38 +243,9 @@ Each level is reported separately, so repeated fix passes unwrap the whole nest.
 bar = 1
 
 foo = print
-# snapshot: unnecessary-literal-unpacking
-# snapshot: unnecessary-literal-unpacking
+# error: [unnecessary-literal-unpacking]
+# error: [unnecessary-literal-unpacking]
 foo(*[*[bar]])
-```
-
-```snapshot
-error[RUF077]: Unnecessary unpacking of list literal
- --> src/mdtest_snippet.py:6:5
-  |
-6 | foo(*[*[bar]])
-  |     ^^^^^^^^^
-  |
-help: Remove unnecessary list
-  |
-5 | # snapshot: unnecessary-literal-unpacking
-  - foo(*[*[bar]])
-6 + foo(*[bar])
-  |
-
-
-error[RUF077]: Unnecessary unpacking of list literal
- --> src/mdtest_snippet.py:6:7
-  |
-6 | foo(*[*[bar]])
-  |       ^^^^^^
-  |
-help: Remove unnecessary list
-  |
-5 | # snapshot: unnecessary-literal-unpacking
-  - foo(*[*[bar]])
-6 + foo(*[bar])
-  |
 ```
 
 ## Set literals
@@ -431,24 +310,8 @@ foo = print
 bar = 1
 
 # error: [unnecessary-literal-unpacking]
-# snapshot: unnecessary-literal-unpacking
+# error: [unnecessary-literal-unpacking]
 foo(*[*{bar}])
-```
-
-```snapshot
-error[RUF077]: Unnecessary unpacking of set literal
-  --> src/mdtest_snippet.py:29:7
-   |
-29 | foo(*[*{bar}])
-   |       ^^^^^^
-   |
-help: Remove unnecessary set
-   |
-28 | # snapshot: unnecessary-literal-unpacking
-   - foo(*[*{bar}])
-29 + foo(*[bar])
-   |
-note: This is an unsafe fix and may change runtime behavior
 ```
 
 ## Comments inside the literal
@@ -505,31 +368,16 @@ def foo(*args): ...
 bar = 1
 baz = 2
 
-foo(*[])  # snapshot: unnecessary-literal-unpacking
+foo(*[])  # error: [unnecessary-literal-unpacking]
 foo(*(), bar)  # snapshot: unnecessary-literal-unpacking
 foo(bar, *[])  # error: [unnecessary-literal-unpacking]
-[*[]]  # snapshot: unnecessary-literal-unpacking
+[*[]]  # error: [unnecessary-literal-unpacking]
 [bar, *[]]  # error: [unnecessary-literal-unpacking]
 {bar, *[]}  # error: [unnecessary-literal-unpacking]
 (*[], bar, baz)  # error: [unnecessary-literal-unpacking]
 ```
 
 ```snapshot
-error[RUF077]: Unnecessary unpacking of list literal
- --> src/mdtest_snippet.py:7:5
-  |
-7 | foo(*[])  # snapshot: unnecessary-literal-unpacking
-  |     ^^^
-  |
-help: Remove unnecessary list
-  |
-6 |
-  - foo(*[])  # snapshot: unnecessary-literal-unpacking
-7 + foo()  # snapshot: unnecessary-literal-unpacking
-8 | foo(*(), bar)  # snapshot: unnecessary-literal-unpacking
-  |
-
-
 error[RUF077]: Unnecessary unpacking of tuple literal
  --> src/mdtest_snippet.py:8:5
   |
@@ -538,26 +386,11 @@ error[RUF077]: Unnecessary unpacking of tuple literal
   |
 help: Remove unnecessary tuple
   |
-7 | foo(*[])  # snapshot: unnecessary-literal-unpacking
+7 | foo(*[])  # error: [unnecessary-literal-unpacking]
   - foo(*(), bar)  # snapshot: unnecessary-literal-unpacking
 8 + foo(bar)  # snapshot: unnecessary-literal-unpacking
 9 | foo(bar, *[])  # error: [unnecessary-literal-unpacking]
   |
-
-
-error[RUF077]: Unnecessary unpacking of list literal
-  --> src/mdtest_snippet.py:10:2
-   |
-10 | [*[]]  # snapshot: unnecessary-literal-unpacking
-   |  ^^^
-   |
-help: Remove unnecessary list
-   |
-9  | foo(bar, *[])  # error: [unnecessary-literal-unpacking]
-   - [*[]]  # snapshot: unnecessary-literal-unpacking
-10 + []  # snapshot: unnecessary-literal-unpacking
-11 | [bar, *[]]  # error: [unnecessary-literal-unpacking]
-   |
 ```
 
 A tuple shrinking to a single element gets its trailing comma back, so `(*[], bar)` becomes
@@ -568,11 +401,11 @@ instead of a second one being added:
 bar = 1
 
 (*[], bar)  # snapshot: unnecessary-literal-unpacking
-(bar, *[])  # snapshot: unnecessary-literal-unpacking
-(*[], bar,)  # snapshot: unnecessary-literal-unpacking
+(bar, *[])  # error: [unnecessary-literal-unpacking]
+(*[], bar,)  # error: [unnecessary-literal-unpacking]
 (bar, *[],)  # snapshot: unnecessary-literal-unpacking
-values = *[], bar  # snapshot: unnecessary-literal-unpacking
-values = bar, *[]  # snapshot: unnecessary-literal-unpacking
+values = *[], bar  # error: [unnecessary-literal-unpacking]
+values = bar, *[]  # error: [unnecessary-literal-unpacking]
 ```
 
 ```snapshot
@@ -587,37 +420,7 @@ help: Remove unnecessary list
 15 |
    - (*[], bar)  # snapshot: unnecessary-literal-unpacking
 16 + (bar,)  # snapshot: unnecessary-literal-unpacking
-17 | (bar, *[])  # snapshot: unnecessary-literal-unpacking
-   |
-
-
-error[RUF077]: Unnecessary unpacking of list literal
-  --> src/mdtest_snippet.py:17:7
-   |
-17 | (bar, *[])  # snapshot: unnecessary-literal-unpacking
-   |       ^^^
-   |
-help: Remove unnecessary list
-   |
-16 | (*[], bar)  # snapshot: unnecessary-literal-unpacking
-   - (bar, *[])  # snapshot: unnecessary-literal-unpacking
-17 + (bar,)  # snapshot: unnecessary-literal-unpacking
-18 | (*[], bar,)  # snapshot: unnecessary-literal-unpacking
-   |
-
-
-error[RUF077]: Unnecessary unpacking of list literal
-  --> src/mdtest_snippet.py:18:2
-   |
-18 | (*[], bar,)  # snapshot: unnecessary-literal-unpacking
-   |  ^^^
-   |
-help: Remove unnecessary list
-   |
-17 | (bar, *[])  # snapshot: unnecessary-literal-unpacking
-   - (*[], bar,)  # snapshot: unnecessary-literal-unpacking
-18 + (bar,)  # snapshot: unnecessary-literal-unpacking
-19 | (bar, *[],)  # snapshot: unnecessary-literal-unpacking
+17 | (bar, *[])  # error: [unnecessary-literal-unpacking]
    |
 
 
@@ -629,40 +432,10 @@ error[RUF077]: Unnecessary unpacking of list literal
    |
 help: Remove unnecessary list
    |
-18 | (*[], bar,)  # snapshot: unnecessary-literal-unpacking
+18 | (*[], bar,)  # error: [unnecessary-literal-unpacking]
    - (bar, *[],)  # snapshot: unnecessary-literal-unpacking
 19 + (bar,)  # snapshot: unnecessary-literal-unpacking
-20 | values = *[], bar  # snapshot: unnecessary-literal-unpacking
-   |
-
-
-error[RUF077]: Unnecessary unpacking of list literal
-  --> src/mdtest_snippet.py:20:10
-   |
-20 | values = *[], bar  # snapshot: unnecessary-literal-unpacking
-   |          ^^^
-   |
-help: Remove unnecessary list
-   |
-19 | (bar, *[],)  # snapshot: unnecessary-literal-unpacking
-   - values = *[], bar  # snapshot: unnecessary-literal-unpacking
-20 + values = bar,  # snapshot: unnecessary-literal-unpacking
-21 | values = bar, *[]  # snapshot: unnecessary-literal-unpacking
-   |
-
-
-error[RUF077]: Unnecessary unpacking of list literal
-  --> src/mdtest_snippet.py:21:15
-   |
-21 | values = bar, *[]  # snapshot: unnecessary-literal-unpacking
-   |               ^^^
-   |
-help: Remove unnecessary list
-   |
-20 | values = *[], bar  # snapshot: unnecessary-literal-unpacking
-   - values = bar, *[]  # snapshot: unnecessary-literal-unpacking
-21 + values = bar,  # snapshot: unnecessary-literal-unpacking
-22 | {*[]}  # snapshot: unnecessary-literal-unpacking
+20 | values = *[], bar  # error: [unnecessary-literal-unpacking]
    |
 ```
 
@@ -673,7 +446,7 @@ leave `(,)` behind, and a set display cannot shrink to `{}`, which is an empty d
 {*[]}  # snapshot: unnecessary-literal-unpacking
 (*[],)  # snapshot: unnecessary-literal-unpacking
 values = *[],  # snapshot: unnecessary-literal-unpacking
-values = (*(),)  # snapshot: unnecessary-literal-unpacking
+values = (*(),)  # error: [unnecessary-literal-unpacking]
 ```
 
 ```snapshot
@@ -685,7 +458,7 @@ error[RUF077]: Unnecessary unpacking of list literal
    |
 help: Remove unnecessary list
    |
-21 | values = bar, *[]  # snapshot: unnecessary-literal-unpacking
+21 | values = bar, *[]  # error: [unnecessary-literal-unpacking]
    - {*[]}  # snapshot: unnecessary-literal-unpacking
 22 + set()  # snapshot: unnecessary-literal-unpacking
 23 | (*[],)  # snapshot: unnecessary-literal-unpacking
@@ -718,22 +491,7 @@ help: Remove unnecessary list
 23 | (*[],)  # snapshot: unnecessary-literal-unpacking
    - values = *[],  # snapshot: unnecessary-literal-unpacking
 24 + values = ()  # snapshot: unnecessary-literal-unpacking
-25 | values = (*(),)  # snapshot: unnecessary-literal-unpacking
-   |
-
-
-error[RUF077]: Unnecessary unpacking of tuple literal
-  --> src/mdtest_snippet.py:25:11
-   |
-25 | values = (*(),)  # snapshot: unnecessary-literal-unpacking
-   |           ^^^
-   |
-help: Remove unnecessary tuple
-   |
-24 | values = *[],  # snapshot: unnecessary-literal-unpacking
-   - values = (*(),)  # snapshot: unnecessary-literal-unpacking
-25 + values = ()  # snapshot: unnecessary-literal-unpacking
-26 | # snapshot: unnecessary-literal-unpacking
+25 | values = (*(),)  # error: [unnecessary-literal-unpacking]
    |
 ```
 
@@ -854,7 +612,7 @@ with_keyword(keyword=qux, *[])
 # snapshot: unnecessary-literal-unpacking
 values = *[
 ], qux
-# snapshot: unnecessary-literal-unpacking
+# error: [unnecessary-literal-unpacking]
 values = qux, *[
 ]
 ```
@@ -889,25 +647,7 @@ help: Remove unnecessary list
    - values = *[
    - ], qux
 52 + values = qux,
-53 | # snapshot: unnecessary-literal-unpacking
-   |
-
-
-error[RUF077]: Unnecessary unpacking of list literal
-  --> src/mdtest_snippet.py:55:15
-   |
-55 |   values = qux, *[
-   |  _______________^
-56 | | ]
-   | |_^
-   |
-help: Remove unnecessary list
-   |
-54 | # snapshot: unnecessary-literal-unpacking
-   - values = qux, *[
-   - ]
-55 + values = qux,
-56 | bar = 1
+53 | # error: [unnecessary-literal-unpacking]
    |
 ```
 
@@ -987,8 +727,8 @@ baz = 2
 # snapshot: unnecessary-literal-unpacking
 # snapshot: unnecessary-literal-unpacking
 (*[], *[bar])
-# snapshot: unnecessary-literal-unpacking
-# snapshot: unnecessary-literal-unpacking
+# error: [unnecessary-literal-unpacking]
+# error: [unnecessary-literal-unpacking]
 {*[], *{bar}}
 ```
 
@@ -1004,7 +744,7 @@ help: Remove unnecessary list
 88 | # snapshot: unnecessary-literal-unpacking
    - (*[], *[bar])
 89 + (*[bar],)
-90 | # snapshot: unnecessary-literal-unpacking
+90 | # error: [unnecessary-literal-unpacking]
    |
 
 
@@ -1019,37 +759,8 @@ help: Remove unnecessary list
 88 | # snapshot: unnecessary-literal-unpacking
    - (*[], *[bar])
 89 + (*[], bar)
-90 | # snapshot: unnecessary-literal-unpacking
+90 | # error: [unnecessary-literal-unpacking]
    |
-
-
-error[RUF077]: Unnecessary unpacking of list literal
-  --> src/mdtest_snippet.py:92:2
-   |
-92 | {*[], *{bar}}
-   |  ^^^
-   |
-help: Remove unnecessary list
-   |
-91 | # snapshot: unnecessary-literal-unpacking
-   - {*[], *{bar}}
-92 + {*{bar}}
-   |
-
-
-error[RUF077]: Unnecessary unpacking of set literal
-  --> src/mdtest_snippet.py:92:7
-   |
-92 | {*[], *{bar}}
-   |       ^^^^^^
-   |
-help: Remove unnecessary set
-   |
-91 | # snapshot: unnecessary-literal-unpacking
-   - {*[], *{bar}}
-92 + {*[], bar}
-   |
-note: This is an unsafe fix and may change runtime behavior
 ```
 
 ## Subscripts
@@ -1081,7 +792,7 @@ w: A[*()]  # snapshot: unnecessary-literal-unpacking
 # A slice that keeps fewer than two elements is no longer a tuple, so `A[*(), int]` cannot become
 # `A[int]`.
 v: A[*(), int]  # snapshot: unnecessary-literal-unpacking
-u: A[*(), int, str]  # snapshot: unnecessary-literal-unpacking
+u: A[*(), int, str]  # error: [unnecessary-literal-unpacking]
 # Redundant parentheses and the comma a one-element slice needs, at the same time.
 t: A[*((int,))]  # snapshot: unnecessary-literal-unpacking
 s: A[*((int, str))]  # error: [unnecessary-literal-unpacking]
@@ -1144,22 +855,7 @@ help: Remove unnecessary tuple
 14 | # `A[int]`.
    - v: A[*(), int]  # snapshot: unnecessary-literal-unpacking
 15 + v: A[int,]  # snapshot: unnecessary-literal-unpacking
-16 | u: A[*(), int, str]  # snapshot: unnecessary-literal-unpacking
-   |
-
-
-error[RUF077]: Unnecessary unpacking of tuple literal
-  --> src/mdtest_snippet.py:16:6
-   |
-16 | u: A[*(), int, str]  # snapshot: unnecessary-literal-unpacking
-   |      ^^^
-   |
-help: Remove unnecessary tuple
-   |
-15 | v: A[*(), int]  # snapshot: unnecessary-literal-unpacking
-   - u: A[*(), int, str]  # snapshot: unnecessary-literal-unpacking
-16 + u: A[int, str]  # snapshot: unnecessary-literal-unpacking
-17 | # Redundant parentheses and the comma a one-element slice needs, at the same time.
+16 | u: A[*(), int, str]  # error: [unnecessary-literal-unpacking]
    |
 
 

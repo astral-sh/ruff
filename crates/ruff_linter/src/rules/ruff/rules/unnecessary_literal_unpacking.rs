@@ -37,11 +37,6 @@ use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 /// ```
 ///
 /// ## Fix safety
-/// For a literal that has elements, the fix deletes only the `*`, the literal's brackets, and any
-/// redundant parentheses around it, so the elements and any comments between them are left
-/// untouched. An empty literal has nothing worth keeping, so the fix removes the unpacking or, if
-/// it was the only element, replaces the enclosing collection with `()` or `set()`.
-///
 /// The fix is marked unsafe when:
 ///
 /// - The literal is a **set**. `foo(*{bar})` is not equivalent to `foo(bar)`: building the set
@@ -51,6 +46,7 @@ use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 ///   removing an empty unpacking takes along with the neighbouring comma, or inside a collection
 ///   that the fix rewrites wholesale. The comment does not survive the fix.
 ///
+/// ## Fix availability
 /// No fix is offered at all where writing the elements out would not be valid Python. Neither case
 /// applies to an empty literal, which is removed whole rather than written out:
 ///
