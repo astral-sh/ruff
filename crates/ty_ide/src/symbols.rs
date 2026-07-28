@@ -698,6 +698,8 @@ struct SymbolVisitor<'db> {
     /// This is true even when we're inside a function definition
     /// that is inside a class.
     in_class: bool,
+    /// The enclosing match statement while visiting one of its patterns.
+    current_match_stmt: Option<&'db ast::Stmt>,
     /// When enabled, the visitor should only try to extract
     /// symbols from a module that we believed form the "exported"
     /// interface for that module. i.e., `__all__` is only respected
@@ -727,6 +729,7 @@ impl<'db> SymbolVisitor<'db> {
             symbol_stack: vec![],
             in_function: false,
             in_class: false,
+            current_match_stmt: None,
             exports_only: false,
             all_origin: None,
             all_names: FxHashSet::default(),
@@ -836,26 +839,44 @@ impl<'db> SymbolVisitor<'db> {
 
     /// Adds a symbol for a name definition.
     fn add_name_symbol(&mut self, stmt: &ast::Stmt, name: &ast::ExprName, kind: SymbolKind) {
-        let symbol = SymbolTree {
+        self.add_named_symbol(stmt, &name.id, name.range(), kind);
+    }
+
+    fn add_named_symbol(
+        &mut self,
+        stmt: &ast::Stmt,
+        name: &Name,
+        name_range: TextRange,
+        kind: SymbolKind,
+    ) {
+        self.add_symbol(SymbolTree {
             parent: None,
-            name: name.id.to_string(),
+            name: name.to_string(),
             kind,
             deprecated: false,
-            name_range: name.range(),
+            name_range,
             full_range: stmt.range(),
             imported_from: None,
-        };
-        self.add_symbol(symbol);
+        });
     }
 
     /// Adds a symbol introduced via an assignment.
     fn add_assignment(&mut self, stmt: &ast::Stmt, name: &ast::ExprName) {
+        self.add_assignment_name(stmt, &name.id, name.range());
+    }
+
+    /// Adds a symbol introduced via an assignment to an identifier.
+    fn add_assignment_identifier(&mut self, stmt: &ast::Stmt, name: &ast::Identifier) {
+        self.add_assignment_name(stmt, &name.id, name.range());
+    }
+
+    fn add_assignment_name(&mut self, stmt: &ast::Stmt, name: &Name, name_range: TextRange) {
         // Include assignments only when we're in global or class scope.
         if self.in_function {
             return;
         }
 
-        let kind = if Self::is_constant_name(name.id.as_str()) {
+        let kind = if Self::is_constant_name(name.as_str()) {
             SymbolKind::Constant
         } else if self
             .iter_symbol_stack()
@@ -865,7 +886,7 @@ impl<'db> SymbolVisitor<'db> {
         } else {
             SymbolKind::Variable
         };
-        self.add_name_symbol(stmt, name, kind);
+        self.add_named_symbol(stmt, name, name_range, kind);
     }
 
     /// Adds symbols introduced by an assignment target.
@@ -1370,6 +1391,11 @@ impl<'db> SourceOrderVisitor<'db> for SymbolVisitor<'db> {
                 self.add_assignment_target(stmt, &for_stmt.target);
                 source_order::walk_stmt(self, stmt);
             }
+            ast::Stmt::Match(_) => {
+                let previous_match_stmt = self.current_match_stmt.replace(stmt);
+                source_order::walk_stmt(self, stmt);
+                self.current_match_stmt = previous_match_stmt;
+            }
             ast::Stmt::AugAssign(ast::StmtAugAssign {
                 target, op, value, ..
             }) => {
@@ -1488,6 +1514,51 @@ impl<'db> SourceOrderVisitor<'db> for SymbolVisitor<'db> {
     // TODO: We might consider handling walrus expressions
     // here, since they can be used to introduce new names.
     fn visit_expr(&mut self, _expr: &ast::Expr) {}
+
+    fn visit_pattern(&mut self, pattern: &'db ast::Pattern) {
+        let Some(stmt) = self.current_match_stmt else {
+            source_order::walk_pattern(self, pattern);
+            return;
+        };
+
+        match pattern {
+            ast::Pattern::MatchStar(ast::PatternMatchStar {
+                name: Some(name), ..
+            }) => {
+                self.add_assignment_identifier(stmt, name);
+                source_order::walk_pattern(self, pattern);
+            }
+            ast::Pattern::MatchAs(ast::PatternMatchAs { name, .. }) => {
+                source_order::walk_pattern(self, pattern);
+                if let Some(name) = name {
+                    self.add_assignment_identifier(stmt, name);
+                }
+            }
+            ast::Pattern::MatchMapping(mapping) => {
+                let rest_before_keys = mapping.rest.as_ref().filter(|rest| {
+                    mapping
+                        .keys
+                        .first()
+                        .is_some_and(|key| rest.start() < key.start())
+                });
+                let rest_after_keys = mapping.rest.as_ref().filter(|rest| {
+                    mapping
+                        .keys
+                        .first()
+                        .is_none_or(|key| rest.start() >= key.start())
+                });
+
+                if let Some(rest) = rest_before_keys {
+                    self.add_assignment_identifier(stmt, rest);
+                }
+                source_order::walk_pattern(self, pattern);
+                if let Some(rest) = rest_after_keys {
+                    self.add_assignment_identifier(stmt, rest);
+                }
+            }
+            _ => source_order::walk_pattern(self, pattern),
+        }
+    }
 }
 
 /// Represents where an `__all__` has been defined.
@@ -1637,6 +1708,48 @@ def function():
         left :: Variable
         middle :: Variable
         right :: Variable
+        C :: Class
+        function :: Function
+        ",
+        );
+    }
+
+    #[test]
+    fn exports_match_pattern_bindings() {
+        insta::assert_snapshot!(
+            public_test("\
+match subject:
+    case [first, *middle, last] as sequence:
+        body_target = 1
+    case {\"key\": mapping_value, **remaining}:
+        fallback_target = 2
+    case Point(positional, named=keyword):
+        pass
+    case (0 as alternative) | (1 as alternative):
+        pass
+
+class C:
+    match subject:
+        case class_capture:
+            body_field = 1
+
+def function():
+    match subject:
+        case local_capture:
+            pass
+").exports(),
+            @"
+        first :: Variable
+        middle :: Variable
+        last :: Variable
+        sequence :: Variable
+        body_target :: Variable
+        mapping_value :: Variable
+        remaining :: Variable
+        fallback_target :: Variable
+        positional :: Variable
+        keyword :: Variable
+        alternative :: Variable
         C :: Class
         function :: Function
         ",

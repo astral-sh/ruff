@@ -436,6 +436,147 @@ def function():
         ");
     }
 
+    #[test]
+    fn document_symbols_match_pattern_bindings() {
+        let test = cursor_test(
+            "
+match subject:
+    case [first, *middle, last] as sequence:
+        body_target = 1
+    case {\"key\": mapping_value, **remaining}:
+        fallback_target = 2
+    case Point(positional, named=keyword):
+        pass
+    case (0 as alternative) | (1 as alternative):
+        pass
+
+class C:
+    match subject:
+        case class_capture:
+            body_field = 1
+
+def function():
+    match subject:
+        case local_capture:
+            pass
+<CURSOR>",
+        );
+
+        assert_snapshot!(test.document_symbols(), @r#"
+        info[document-symbols]: SymbolInfo
+         --> main.py:3:11
+          |
+        3 |     case [first, *middle, last] as sequence:
+          |           ^^^^^
+        info: Variable first
+
+        info[document-symbols]: SymbolInfo
+         --> main.py:3:19
+          |
+        3 |     case [first, *middle, last] as sequence:
+          |                   ^^^^^^
+        info: Variable middle
+
+        info[document-symbols]: SymbolInfo
+         --> main.py:3:27
+          |
+        3 |     case [first, *middle, last] as sequence:
+          |                           ^^^^
+        info: Variable last
+
+        info[document-symbols]: SymbolInfo
+         --> main.py:3:36
+          |
+        3 |     case [first, *middle, last] as sequence:
+          |                                    ^^^^^^^^
+        info: Variable sequence
+
+        info[document-symbols]: SymbolInfo
+         --> main.py:4:9
+          |
+        4 |         body_target = 1
+          |         ^^^^^^^^^^^
+        info: Variable body_target
+
+        info[document-symbols]: SymbolInfo
+         --> main.py:5:18
+          |
+        5 |     case {"key": mapping_value, **remaining}:
+          |                  ^^^^^^^^^^^^^
+        info: Variable mapping_value
+
+        info[document-symbols]: SymbolInfo
+         --> main.py:5:35
+          |
+        5 |     case {"key": mapping_value, **remaining}:
+          |                                   ^^^^^^^^^
+        info: Variable remaining
+
+        info[document-symbols]: SymbolInfo
+         --> main.py:6:9
+          |
+        6 |         fallback_target = 2
+          |         ^^^^^^^^^^^^^^^
+        info: Variable fallback_target
+
+        info[document-symbols]: SymbolInfo
+         --> main.py:7:16
+          |
+        7 |     case Point(positional, named=keyword):
+          |                ^^^^^^^^^^
+        info: Variable positional
+
+        info[document-symbols]: SymbolInfo
+         --> main.py:7:34
+          |
+        7 |     case Point(positional, named=keyword):
+          |                                  ^^^^^^^
+        info: Variable keyword
+
+        info[document-symbols]: SymbolInfo
+         --> main.py:9:16
+          |
+        9 |     case (0 as alternative) | (1 as alternative):
+          |                ^^^^^^^^^^^
+        info: Variable alternative
+
+        info[document-symbols]: SymbolInfo
+         --> main.py:9:37
+          |
+        9 |     case (0 as alternative) | (1 as alternative):
+          |                                     ^^^^^^^^^^^
+        info: Variable alternative
+
+        info[document-symbols]: SymbolInfo
+          --> main.py:12:7
+           |
+        12 | class C:
+           |       ^
+        info: Class C
+
+        info[document-symbols]: SymbolInfo
+          --> main.py:14:14
+           |
+        14 |         case class_capture:
+           |              ^^^^^^^^^^^^^
+        info: Field class_capture
+
+        info[document-symbols]: SymbolInfo
+          --> main.py:15:13
+           |
+        15 |             body_field = 1
+           |             ^^^^^^^^^^
+        info: Field body_field
+
+        info[document-symbols]: SymbolInfo
+          --> main.py:17:5
+           |
+        17 | def function():
+           |     ^^^^^^^^
+        info: Function function
+        "#);
+    }
+
     impl CursorTest {
         fn document_symbols(&self) -> String {
             let symbols = document_symbols(&self.db, self.cursor.file).to_hierarchical();
