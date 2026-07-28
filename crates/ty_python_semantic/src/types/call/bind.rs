@@ -3188,16 +3188,51 @@ impl<'db> CallableBinding<'db> {
             Type::BoundMethod(bound_method) => bound_method.typing_self_type(db),
             _ => bound_self,
         };
+        self.bake_receiver_into_overloads(db, bound_self, typing_self);
+    }
+
+    /// Binds an inferred constructor receiver before resolving an overloaded `__new__`.
+    ///
+    /// Explicit receiver annotations can constrain overload selection, so mixed or explicitly
+    /// annotated overloads keep their synthetic class argument. A single inferred receiver also
+    /// remains synthetic because prebinding it can change constructor specialization.
+    pub(crate) fn bind_constructor_receiver(
+        &mut self,
+        db: &'db dyn Db,
+        receiver_type: Type<'db>,
+        typing_self_type: Type<'db>,
+    ) {
+        if self.overloads.len() < 2
+            || self.overloads.iter().any(|overload| {
+                !overload
+                    .signature
+                    .has_implicit_positional_receiver_annotation()
+            })
+        {
+            self.bound_type = Some(receiver_type);
+            return;
+        }
+
+        self.bake_receiver_into_overloads(db, receiver_type, typing_self_type);
+    }
+
+    fn bake_receiver_into_overloads(
+        &mut self,
+        db: &'db dyn Db,
+        receiver_type: Type<'db>,
+        typing_self_type: Type<'db>,
+    ) {
         for overload in &mut self.overloads {
             let removed_receiver = overload
                 .signature
                 .parameters()
                 .get(0)
                 .is_some_and(Parameter::is_positional);
-            overload.signature =
-                overload
-                    .signature
-                    .bind_self_with_receiver(db, Some(bound_self), Some(typing_self));
+            overload.signature = overload.signature.bind_self_with_receiver(
+                db,
+                Some(receiver_type),
+                Some(typing_self_type),
+            );
             overload.return_ty = overload.initial_return_type(db);
             overload.source_parameter_index_offset += usize::from(removed_receiver);
         }

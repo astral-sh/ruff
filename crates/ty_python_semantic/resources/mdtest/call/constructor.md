@@ -374,6 +374,44 @@ class Simple:
 reveal_type(Simple())  # revealed: Simple
 ```
 
+## Overloaded implicit `__new__` receivers
+
+An overloaded constructor can infer `cls` without using that inferred receiver to select an
+overload. Its other arguments must still determine both the selected overload and the constructed
+generic specialization.
+
+```pyi
+from typing import Generic, TypeVar, overload
+from typing_extensions import Self
+
+T = TypeVar("T")
+
+class DTypeLike(Generic[T]):
+    @overload
+    def __new__(cls, value: int) -> DTypeLike[int]: ...
+    @overload
+    def __new__(cls, value: str) -> DTypeLike[str]: ...
+
+reveal_type(DTypeLike(1))  # revealed: DTypeLike[int]
+reveal_type(DTypeLike("value"))  # revealed: DTypeLike[str]
+
+# error: [no-matching-overload]
+reveal_type(DTypeLike(1.0))  # revealed: DTypeLike[T@DTypeLike]
+
+class SelfLike(Generic[T]):
+    @overload
+    def __new__(cls, value: T, /) -> Self: ...
+    @overload
+    def __new__(cls, value: T, /, *, copy: bool) -> Self: ...
+
+reveal_type(SelfLike(1))  # revealed: SelfLike[int]
+reveal_type(SelfLike("value", copy=True))  # revealed: SelfLike[str]
+reveal_type(SelfLike[int](1, copy=False))  # revealed: SelfLike[int]
+
+# error: [invalid-argument-type]
+reveal_type(SelfLike[int]("value"))  # revealed: SelfLike[int]
+```
+
 ## `__new__` defined as a classmethod
 
 Marking it as a classmethod, on the other hand, breaks at runtime.
