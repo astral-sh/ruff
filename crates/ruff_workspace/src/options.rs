@@ -116,9 +116,9 @@ pub struct Options {
     /// `F401` instead of the name `unused-import`:
     ///
     /// ```console
-    /// $ ruff check --preview --config 'lint.output-prefer-rule-codes = true' --output-format=concise example.py
+    /// $ ruff check --preview --config 'output-prefer-rule-codes = true' --output-format=concise example.py
     /// example.py:1:8: F401 [*] `math` imported but unused
-    /// $ ruff check --preview --config 'lint.output-prefer-rule-codes = false' --output-format=concise example.py
+    /// $ ruff check --preview --config 'output-prefer-rule-codes = false' --output-format=concise example.py
     /// example.py:1:8: unused-import: [*] `math` imported but unused
     /// ```
     #[option(
