@@ -1044,8 +1044,7 @@ reveal_type(lazy_frame.collect(background=False))  # revealed: DataFrame
 reveal_type(lazy_frame.collect(background=True))  # revealed: InProcessQuery
 ```
 
-The transparent decorator can be one overload among several. The workaround only inspects the
-overload selected by the decorator call.
+A transparent decorator may be overloaded; the call selects the matching overload.
 
 ```py
 from typing import Any, Callable, overload, reveal_type
