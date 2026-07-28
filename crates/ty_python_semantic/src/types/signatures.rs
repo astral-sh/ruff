@@ -438,18 +438,31 @@ impl<'db> CallableSignature<'db> {
         self.bind_self_with_receiver(db, self_type, self_type)
     }
 
-    /// Binds a callable protocol member after selecting an overload using its receiver.
+    /// Binds the implicit receiver of a callable protocol member.
     ///
-    /// This only selects among concrete specializations of the same protocol. Other receiver
-    /// relations retain the ordinary binding behavior so they can be checked against the
-    /// implementation later.
-    pub(crate) fn bind_protocol_self(&self, db: &'db dyn Db, receiver_type: Type<'db>) -> Self {
+    /// A concrete specialization selects the single overload whose explicit receiver is the same
+    /// protocol. For example, binding `Callback[str]` selects the second overload here:
+    ///
+    /// ```python
+    /// class Callback[*P](Protocol):
+    ///     @overload
+    ///     def __call__(self: "Callback[()]") -> None: ...
+    ///     @overload
+    ///     def __call__[T](self: "Callback[T]", value: T) -> None: ...
+    /// ```
+    ///
+    /// Gradual, external, `typing.Self`-dependent, and ambiguous receiver relations retain every
+    /// overload for later comparison with the implementation.
+    pub(crate) fn bind_protocol_receiver(&self, db: &'db dyn Db, receiver_type: Type<'db>) -> Self {
         let Some(signature) = self.bind_same_protocol_receiver_overload(db, receiver_type) else {
             return self.bind_self(db, None);
         };
         Self::single(signature)
     }
 
+    /// Selects exactly one overload using a concrete same-protocol receiver annotation.
+    ///
+    /// `None` means selection is unsupported or ambiguous, not that the callable is unsatisfiable.
     fn bind_same_protocol_receiver_overload(
         &self,
         db: &'db dyn Db,
@@ -1203,11 +1216,12 @@ impl<'db> Signature<'db> {
         }
     }
 
-    /// Returns a copy whose receiver annotation can be compared nominally with `receiver_type`.
+    /// Returns a temporary copy whose receiver can be compared nominally with `receiver_type`.
     ///
-    /// This is only valid when both types are specializations of the same protocol class. Signatures
-    /// containing `typing.Self` are excluded because it must remain available for the concrete
-    /// implementation.
+    /// Comparing two protocol instances structurally would recurse through the interface currently
+    /// being constructed. The nominal view is valid only when both are specializations of the same
+    /// protocol class. Signatures containing `typing.Self` are excluded because it must remain
+    /// available for the concrete implementation.
     fn nominalize_same_protocol_receiver(
         &self,
         db: &'db dyn Db,

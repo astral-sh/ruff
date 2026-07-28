@@ -1141,7 +1141,7 @@ impl<'db> ProtocolMemberData<'db> {
                     (Type::Callable(callable), ProtocolMethodKind::Instance) => {
                         let callable = receiver.map_or_else(
                             || protocol_bind_self(db, callable, None),
-                            |receiver| protocol_bind_receiver_overload(db, callable, receiver),
+                            |receiver| protocol_bind_receiver(db, callable, receiver),
                         );
                         member.with_ty(Type::Callable(callable))
                     }
@@ -1277,6 +1277,7 @@ enum ProtocolMemberKind<'db> {
     Method {
         member: ProtocolMemberType<'db>,
         kind: ProtocolMethodKind,
+        /// Specialized receiver used to bind a callable protocol's `__call__` method.
         receiver: Option<Type<'db>>,
     },
     Property {
@@ -3156,7 +3157,7 @@ fn protocol_bind_self<'db>(
 /// This is separate from [`protocol_bind_self`] because `typing.Self` must remain available for
 /// the concrete implementation rather than being replaced by the protocol receiver.
 #[salsa::tracked(returns(copy), heap_size=ruff_memory_usage::heap_size)]
-fn protocol_bind_receiver_overload<'db>(
+fn protocol_bind_receiver<'db>(
     db: &'db dyn Db,
     callable: CallableType<'db>,
     receiver_type: Type<'db>,
@@ -3165,7 +3166,7 @@ fn protocol_bind_receiver_overload<'db>(
         db,
         callable
             .signatures(db)
-            .bind_protocol_self(db, receiver_type),
+            .bind_protocol_receiver(db, receiver_type),
         callable.kind(db),
         callable.provenance(db),
     )
