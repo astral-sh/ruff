@@ -1447,6 +1447,8 @@ pub struct DisplayDiagnosticConfig {
     merge_window: usize,
     /// Whether to use preview formatting for Ruff diagnostics.
     preview: bool,
+    /// Whether to prefer rule codes over human-readable rule names in Ruff diagnostic output.
+    prefer_rule_codes: bool,
     /// Whether to hide the real `Severity` of diagnostics.
     ///
     /// This is intended for temporary use by Ruff, which only has a single `error` severity at the
@@ -1471,6 +1473,7 @@ impl DisplayDiagnosticConfig {
             context: 2,
             merge_window: 2,
             preview: false,
+            prefer_rule_codes: false,
             hide_severity: false,
             show_fix_status: false,
             fix_applicability: Applicability::Safe,
@@ -1533,6 +1536,19 @@ impl DisplayDiagnosticConfig {
 
     pub fn preview_enabled(&self) -> bool {
         self.preview
+    }
+
+    /// Whether to prefer rule codes over human-readable rule names, even in preview mode.
+    pub fn prefer_rule_codes(self, yes: bool) -> DisplayDiagnosticConfig {
+        DisplayDiagnosticConfig {
+            prefer_rule_codes: yes,
+            ..self
+        }
+    }
+
+    /// Whether rule codes are explicitly preferred over human-readable rule names.
+    pub fn is_prefer_rule_codes_enabled(&self) -> bool {
+        self.prefer_rule_codes
     }
 
     /// Whether to hide a diagnostic's severity or not.

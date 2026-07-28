@@ -238,9 +238,8 @@ impl<'a> ResolvedDiagnostic<'a> {
             })
             .collect();
 
-        let id = if !config.preview
-            && let Some(code) = diag.secondary_code()
-        {
+        let use_code = !config.preview || config.prefer_rule_codes;
+        let id = if use_code && let Some(code) = diag.secondary_code() {
             code.to_string()
         } else if config.hide_severity {
             // When Ruff gets real severities, we should put the colon back in

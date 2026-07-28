@@ -26,7 +26,8 @@ impl<'a> GithubRenderer<'a> {
                 Severity::Warning => "warning",
                 Severity::Error | Severity::Fatal => "error",
             };
-            let code = if self.config.preview {
+            let use_name = self.config.preview && !self.config.prefer_rule_codes;
+            let code = if use_name {
                 diagnostic.id().as_str()
             } else {
                 diagnostic.secondary_code_or_id()
@@ -90,9 +91,7 @@ impl<'a> GithubRenderer<'a> {
                 write!(f, "::")?;
             }
 
-            if !self.config.preview
-                && let Some(code) = diagnostic.secondary_code()
-            {
+            if !use_name && let Some(code) = diagnostic.secondary_code() {
                 write!(f, "{code}")?;
             } else {
                 write!(f, "{id}:", id = diagnostic.id())?;
