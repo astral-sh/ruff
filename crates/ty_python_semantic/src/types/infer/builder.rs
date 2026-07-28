@@ -2441,61 +2441,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         const MAX_EXACT_NESTED_BINDING_REACHABILITY_NODES: usize = 2048;
 
         let db = self.db();
-        let scope = definition.scope(db);
-        let scope_id = scope.file_scope_id(db);
-        let symbol_id = definition
-            .place(db)
-            .as_symbol()
-            .expect("nested bindings definition should be a symbol");
-        let symbol = self.index.place_table(scope_id).symbol(symbol_id);
-
-        // At the point where a nested bindings definition is first synthesized, we don't
-        // necessarily know whether the current scope will see global or nonlocal bindings.
-        // Consider this example:
-        //
-        //     def outer():
-        //         def inner1():
-        //             global x
-        //             x = 1
-        //         def inner2():
-        //             nonlocal x
-        //             x = 2
-        //         # Nested bindings of both kinds are potentially visible here, but we can't
-        //         # actually use both kinds in the same scope. If `print(x)` comes next, we should
-        //         # only see 2. But if `global x; print(x)` comes next, we should only see 1.
-        //         ...
-        //
-        // By the time we get here in type inference, though, we can ask the semantic index whether
-        // the symbol resolves to the global scope or not. (For free variables, this currently
-        // requires walking ancestor scopes.) If so, we see any nested `global` bindings that were
-        // recorded. If not, we see any nested `nonlocal` ones.
-        //
-        // Note that if `x` is a free variable in this scope, then this synthetic binding will not
-        // shadow `UNBOUND`, and `infer_place_load` will walk to the defining scope and see all the
-        // nested bindings from there via the symbol's public type. However, we still want to
-        // respect locally visible nested bindings in that case, because there might be narrowing
-        // constraints that apply to the public type but not these nested bindings.
-        let this_scope_sees_global_bindings = self
-            .index
-            .symbol_resolves_to_global_scope(symbol_id, scope_id);
-
-        // If a function body binds `x`, it's interested in nested `nonlocal` bindings of `x` too,
-        // because those resolve to the same variable. But if a *class* body binds `x`, it does
-        // *not* want to consider nested bindings of `x`, because those do *not* resolve to the
-        // same variable.
-        let this_scope_sees_nonlocal_bindings = !(this_scope_sees_global_bindings
-            || (scope.scope(db).kind().is_class() && symbol.is_local()));
-
+        let scope_id = definition.file_scope(db);
         let mut binding_sources = nested_bindings_kind
-            .binding_sources(self.index)
-            .filter_map(|(is_global, bindings)| {
-                (if is_global {
-                    this_scope_sees_global_bindings
-                } else {
-                    this_scope_sees_nonlocal_bindings
-                })
-                .then_some(bindings)
-            })
+            .visible_binding_sources(self.index, scope_id)
             .peekable();
         if binding_sources.peek().is_some()
             && self

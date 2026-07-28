@@ -44,6 +44,36 @@ fn should_consider_definition(kind: &DefinitionKind<'_>) -> bool {
     }
 }
 
+/// Returns whether a comprehension walrus belongs to an enclosing function or lambda.
+///
+/// ```python
+/// def last_item(items):
+///     [(last := item) for item in items]
+///     return last
+/// ```
+///
+/// A module-level walrus, or one declared `global` or `nonlocal` in its containing
+/// function, is not a local binding and must not receive an unused-binding diagnostic.
+fn comprehension_named_expression_is_local(
+    index: &SemanticIndex<'_>,
+    comprehension_scope: FileScopeId,
+    name: &str,
+) -> bool {
+    index
+        .ancestor_scopes(comprehension_scope)
+        .skip(1)
+        .find(|(_, scope)| scope.kind() != ScopeKind::Comprehension)
+        .is_some_and(|(scope_id, scope)| {
+            matches!(scope.kind(), ScopeKind::Function | ScopeKind::Lambda)
+                && index
+                    .place_table(scope_id)
+                    .symbol_id(name)
+                    .is_some_and(|symbol_id| {
+                        index.place_table(scope_id).symbol(symbol_id).is_local()
+                    })
+        })
+}
+
 fn function_scope_is_overload_declaration(
     db: &dyn Db,
     index: &SemanticIndex<'_>,
@@ -77,6 +107,14 @@ pub fn unused_bindings(db: &dyn Db, file: ruff_db::files::File) -> Box<[UnusedBi
     let is_stub_file = file.is_stub(db);
     let index = semantic_index(db, file);
     let mut unused = Vec::new();
+    // A used synthetic definition counts as a use of the user-visible definitions it represents.
+    let used_definitions = index.scope_ids().flat_map(|scope_id| {
+        index
+            .use_def_map(scope_id.file_scope_id(db))
+            .all_definitions_with_usage()
+            .filter_map(|(_, state, is_used)| is_used.then_some(state.definition()).flatten())
+    });
+    let used_user_visible_definitions = super::user_visible_definitions(db, used_definitions);
 
     for scope_id in index.scope_ids() {
         let file_scope_id = scope_id.file_scope_id(db);
@@ -107,6 +145,7 @@ pub fn unused_bindings(db: &dyn Db, file: ruff_db::files::File) -> Box<[UnusedBi
             let DefinitionState::Defined(definition) = state else {
                 continue;
             };
+            let is_used = is_used || used_user_visible_definitions.contains(&definition);
 
             if is_used {
                 let DefinitionKind::LoopHeader(loop_header_definition) = definition.kind(db) else {
@@ -158,7 +197,12 @@ pub fn unused_bindings(db: &dyn Db, file: ruff_db::files::File) -> Box<[UnusedBi
 
             // Global and nonlocal assignments target bindings from outer scopes.
             // Treat them as externally managed to avoid false positives here.
-            if symbol.is_global() || symbol.is_nonlocal() {
+            let is_local_comprehension_named_expression = scope_kind == ScopeKind::Comprehension
+                && matches!(kind, DefinitionKind::NamedExpression(_))
+                && comprehension_named_expression_is_local(index, file_scope_id, name);
+            if (symbol.is_global() || symbol.is_nonlocal())
+                && !is_local_comprehension_named_expression
+            {
                 continue;
             }
 
@@ -278,6 +322,8 @@ mod tests {
         let source = dedent(
             "
             module_dead = 1
+            [(module_walrus := item) for item in [1]]
+            [[(nested_module_walrus := item) for item in [1]] for _ in [1]]
 
             class C:
                 class_dead = 1
@@ -320,6 +366,7 @@ mod tests {
             def mutate_global():
                 global global_value
                 global_value = 1
+                [(global_value := item) for item in [1]]
                 local_dead = 1
 
             def outer():
@@ -328,6 +375,7 @@ mod tests {
                 def inner():
                     nonlocal captured
                     captured = 1
+                    [(captured := item) for item in [1]]
 
                 inner()
                 return captured
@@ -336,6 +384,44 @@ mod tests {
 
         let names = collect_unused_names(&source)?;
         assert_eq!(names, vec!["local_dead"]);
+        Ok(())
+    }
+
+    #[test]
+    fn tracks_comprehension_walruses_in_local_scopes() -> anyhow::Result<()> {
+        let source = dedent(
+            "
+            def used(items):
+                [(used_walrus := item) for item in items]
+                return used_walrus
+
+            def unused(items):
+                [(unused_walrus := item) for item in items]
+
+            def nested_used(items):
+                [[(nested_used_walrus := item) for item in items] for _ in [1]]
+                return nested_used_walrus
+
+            def nested_unused(items):
+                [[(nested_unused_walrus := item) for item in items] for _ in [1]]
+
+            used_lambda = lambda items: (
+                [(used_lambda_walrus := item) for item in items],
+                used_lambda_walrus,
+            )
+            unused_lambda = lambda items: [(unused_lambda_walrus := item) for item in items]
+            ",
+        );
+
+        let names = collect_unused_names(&source)?;
+        assert_eq!(
+            names,
+            vec![
+                "nested_unused_walrus",
+                "unused_lambda_walrus",
+                "unused_walrus",
+            ]
+        );
         Ok(())
     }
 

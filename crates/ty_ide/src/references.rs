@@ -253,10 +253,16 @@ pub(crate) fn has_any_external_visible_definitions(
     definitions.iter().any(|definition| match definition {
         ResolvedDefinition::Definition(definition) => match definition.scope(db).scope(db).kind() {
             ScopeKind::Module | ScopeKind::Class => true,
+            ScopeKind::Comprehension => {
+                matches!(definition.kind(db), DefinitionKind::NamedExpression(_))
+                    && definition.place(db).as_symbol().is_some_and(|symbol_id| {
+                        ty_python_core::semantic_index(db, definition.file(db))
+                            .symbol_resolves_to_global_scope(symbol_id, definition.file_scope(db))
+                    })
+            }
             ScopeKind::TypeParams
             | ScopeKind::Function
             | ScopeKind::Lambda
-            | ScopeKind::Comprehension
             | ScopeKind::TypeAlias => false,
         },
         ResolvedDefinition::Module(_) | ResolvedDefinition::FileWithRange(_) => true,
@@ -813,6 +819,23 @@ mod tests {
         for (case, source) in [
             ("module-global", "x<CURSOR> = 1"),
             (
+                "module comprehension walrus",
+                "[(x<CURSOR> := item) for item in [1]]",
+            ),
+            (
+                "nested module comprehension walrus",
+                "[[(x<CURSOR> := item) for item in [1]] for _ in [1]]",
+            ),
+            (
+                "explicit global comprehension walrus",
+                "
+x = 0
+def f():
+    global x
+    [(x<CURSOR> := item) for item in [1]]
+",
+            ),
+            (
                 "class",
                 "
 class C:
@@ -838,6 +861,38 @@ def f():
             ),
             ("lambda", "f = lambda x<CURSOR>: x"),
             ("comprehension", "xs = [x for x<CURSOR> in range(3)]"),
+            (
+                "function comprehension walrus",
+                "
+def f():
+    [(x<CURSOR> := item) for item in [1]]
+    return x
+",
+            ),
+            (
+                "nested function comprehension walrus",
+                "
+def f():
+    [[(x<CURSOR> := item) for item in [1]] for _ in [1]]
+    return x
+",
+            ),
+            (
+                "lambda comprehension walrus",
+                "f = lambda: [(x<CURSOR> := item) for item in [1]]",
+            ),
+            (
+                "explicit nonlocal comprehension walrus",
+                "
+def outer():
+    x = 0
+    def inner():
+        nonlocal x
+        [(x<CURSOR> := item) for item in [1]]
+    inner()
+    return x
+",
+            ),
             ("type parameters", "type Alias[T<CURSOR>] = list[T]"),
         ] {
             let test = cursor_test(source);
