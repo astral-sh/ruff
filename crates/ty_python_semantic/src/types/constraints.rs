@@ -6744,6 +6744,8 @@ pub(crate) struct PathAssignments {
     /// ensures a stable order for all of the derived constraints that we create, while still
     /// letting us create them lazily.)
     discovered: FxIndexMap<ConstraintId, bool>,
+    /// Constraint pairs that we have already checked and added to `sequents`.
+    elaborated_pairs: FxHashSet<(ConstraintId, ConstraintId)>,
 
     /// Derived assignments that have been queued up to be added to the current path.
     assignment_queue: VecDeque<(ConstraintAssignment, AssignmentFuel)>,
@@ -6819,6 +6821,7 @@ impl PathAssignments {
             assignments: FxIndexMap::default(),
             additional_fuels: Vec::default(),
             discovered,
+            elaborated_pairs: FxHashSet::default(),
             remaining_overall_fuel: OVERALL_FUEL_BUDGET,
             assignment_queue: VecDeque::default(),
             new_assignments: FxIndexMap::default(),
@@ -7079,19 +7082,6 @@ impl PathAssignments {
             || self.assignment_holds(constraint.when_unconstrained())
     }
 
-    fn constraint_source_order(&self, constraint: ConstraintId) -> Option<usize> {
-        if let Some((source_order, _)) = self.assignments.get(&constraint.when_true()) {
-            return Some(*source_order);
-        }
-        if let Some((source_order, _)) = self.assignments.get(&constraint.when_false()) {
-            return Some(*source_order);
-        }
-        if let Some((source_order, _)) = self.assignments.get(&constraint.when_unconstrained()) {
-            return Some(*source_order);
-        }
-        None
-    }
-
     /// Returns the greatest remaining fuel for any derivation of `assignment` on this path.
     fn max_remaining_fuel_for(&self, assignment: ConstraintAssignment) -> Option<u16> {
         let (index, _, (_, first_fuel)) = self.assignments.get_full(&assignment)?;
@@ -7126,9 +7116,6 @@ impl PathAssignments {
         self.sequents.extend_from_slice(&single_map.sequents);
         drop(single_map);
 
-        let constraint_source_order = self
-            .constraint_source_order(constraint)
-            .unwrap_or(constraint_index);
         for (existing_index, (existing, _)) in self.discovered.iter().enumerate() {
             if *existing == constraint {
                 continue;
@@ -7138,14 +7125,16 @@ impl PathAssignments {
                 continue;
             }
 
-            let existing_source_order = self
-                .constraint_source_order(*existing)
-                .unwrap_or(existing_index);
-            let (a, b) = if existing_source_order < constraint_source_order {
+            let (a, b) = if existing_index < constraint_index {
                 (*existing, constraint)
             } else {
                 (constraint, *existing)
             };
+            if !self.elaborated_pairs.insert((a, b)) {
+                // We've already elaborated this pair of constraints.
+                continue;
+            }
+
             let pair_map = SequentMap::for_constraint_pair(db, builder, a, b);
             self.sequents.extend_from_slice(&pair_map.sequents);
         }
