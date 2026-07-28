@@ -28,6 +28,7 @@ use crate::cst::matchers::match_indented_block;
 use crate::cst::matchers::match_module;
 use crate::fix::codemods::CodegenStylist;
 use crate::importer::ImportRequest;
+use crate::preview::is_fix_pytest_composite_assertion_enabled;
 use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 
 use super::unittest_assert::UnittestAssert;
@@ -829,19 +830,22 @@ pub(crate) fn composite_condition(checker: &Checker, stmt: &Stmt, test: &Expr, m
     let composite = is_composite_condition(test);
     if matches!(composite, CompositionKind::Simple | CompositionKind::Mixed) {
         let mut diagnostic = checker.report_diagnostic(PytestCompositeAssertion, stmt.range());
+        let preview_fix = is_fix_pytest_composite_assertion_enabled(checker.settings());
         if matches!(composite, CompositionKind::Simple)
             && msg.is_none()
+            && (preview_fix || !checker.comment_ranges().intersects(stmt.range()))
             && !checker
                 .indexer()
                 .in_multi_statement_line(stmt, checker.source())
         {
             diagnostic.try_set_fix(|| {
                 fix_composite_condition(stmt, checker.locator(), checker.stylist()).map(|edit| {
-                    let applicability = if checker.comment_ranges().intersects(edit.range()) {
-                        Applicability::Unsafe
-                    } else {
-                        Applicability::Safe
-                    };
+                    let applicability =
+                        if preview_fix && !checker.comment_ranges().intersects(edit.range()) {
+                            Applicability::Safe
+                        } else {
+                            Applicability::Unsafe
+                        };
                     Fix::applicable_edit(edit, applicability)
                 })
             });
