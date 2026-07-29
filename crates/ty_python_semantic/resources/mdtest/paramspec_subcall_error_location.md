@@ -595,3 +595,188 @@ info: Function defined here
 3 | def wrapper[**P](callback: Callable[P, None], *args: P.args, **kwargs: P.kwargs) -> None: ...
   |     ^^^^^^^                                                  ------------------ Parameter declared here
 ```
+
+## Callback protocols
+
+Unlike a plain `Callable` annotation, a callback protocol includes a declaration for `__call__`. The
+diagnostic should point to the parameter on that method.
+
+```py
+from typing import Callable, Protocol
+
+def wrapper[**P](callback: Callable[P, object], *args: P.args, **kwargs: P.kwargs) -> None: ...
+
+class Callback(Protocol):
+    def __call__(self, *, value: int) -> None: ...
+
+def run(callback: Callback) -> None:
+    wrapper(callback, value="incorrect")  # snapshot: invalid-argument-type
+```
+
+```snapshot
+error[invalid-argument-type]: Argument to function `wrapper` is incorrect
+ --> src/mdtest_snippet.py:9:23
+  |
+9 |     wrapper(callback, value="incorrect")  # snapshot: invalid-argument-type
+  |                       ^^^^^^^^^^^^^^^^^ Expected `int`, found `Literal["incorrect"]`
+info: Method defined here
+ --> src/mdtest_snippet.py:6:9
+  |
+6 |     def __call__(self, *, value: int) -> None: ...
+  |         ^^^^^^^^          ---------- Parameter declared here
+```
+
+## Callable objects
+
+A callable object declares its accepted arguments on `__call__`. Point to that method when the
+object is passed to a forwarding function.
+
+```py
+from typing import Callable
+
+def wrapper[**P](callback: Callable[P, object], *args: P.args, **kwargs: P.kwargs) -> None: ...
+
+class Callback:
+    def __call__(self, *, value: int) -> None: ...
+
+wrapper(Callback(), value="incorrect")  # snapshot: invalid-argument-type
+```
+
+```snapshot
+error[invalid-argument-type]: Argument to function `wrapper` is incorrect
+ --> src/mdtest_snippet.py:8:21
+  |
+8 | wrapper(Callback(), value="incorrect")  # snapshot: invalid-argument-type
+  |                     ^^^^^^^^^^^^^^^^^ Expected `int`, found `Literal["incorrect"]`
+info: Method defined here
+ --> src/mdtest_snippet.py:6:9
+  |
+6 |     def __call__(self, *, value: int) -> None: ...
+  |         ^^^^^^^^          ---------- Parameter declared here
+```
+
+## Constructors defined by __init__
+
+A class passed as the callback receives the forwarded arguments in its constructor. A class that
+declares `__init__` should identify the matching constructor parameter.
+
+```py
+from typing import Callable
+
+def wrapper[**P](callback: Callable[P, object], *args: P.args, **kwargs: P.kwargs) -> None: ...
+
+class Factory:
+    def __init__(self, value: int) -> None: ...
+
+wrapper(Factory, "incorrect")  # snapshot: invalid-argument-type
+```
+
+```snapshot
+error[invalid-argument-type]: Argument to function `wrapper` is incorrect
+ --> src/mdtest_snippet.py:8:18
+  |
+8 | wrapper(Factory, "incorrect")  # snapshot: invalid-argument-type
+  |                  ^^^^^^^^^^^ Expected `int`, found `Literal["incorrect"]`
+info: Method defined here
+ --> src/mdtest_snippet.py:6:9
+  |
+6 |     def __init__(self, value: int) -> None: ...
+  |         ^^^^^^^^       ---------- Parameter declared here
+```
+
+## Constructors defined by a metaclass
+
+A custom metaclass can determine the accepted constructor arguments through its own `__call__`. That
+declaration takes precedence over the class's `__init__` method.
+
+```py
+from typing import Callable
+
+def wrapper[**P](callback: Callable[P, object], *args: P.args, **kwargs: P.kwargs) -> None: ...
+
+class Meta(type):
+    def __call__(cls, value: int) -> object:
+        return object()
+
+class Factory(metaclass=Meta):
+    def __init__(self, value: str) -> None: ...
+
+wrapper(Factory, "incorrect")  # snapshot: invalid-argument-type
+```
+
+```snapshot
+error[invalid-argument-type]: Argument to function `wrapper` is incorrect
+  --> src/mdtest_snippet.py:12:18
+   |
+12 | wrapper(Factory, "incorrect")  # snapshot: invalid-argument-type
+   |                  ^^^^^^^^^^^ Expected `int`, found `Literal["incorrect"]`
+info: Method defined here
+ --> src/mdtest_snippet.py:6:9
+  |
+6 |     def __call__(cls, value: int) -> object:
+  |         ^^^^^^^^      ---------- Parameter declared here
+```
+
+## Constructors defined by __new__
+
+A constructor defined by `__new__` consumes `cls` before checking the forwarded arguments. The
+diagnostic should point to `value`, not `cls`.
+
+```py
+from typing import Callable, Self
+
+def wrapper[**P](callback: Callable[P, object], *args: P.args, **kwargs: P.kwargs) -> None: ...
+
+class Factory:
+    def __new__(cls, value: int) -> Self:
+        return super().__new__(cls)
+
+wrapper(Factory, "incorrect")  # snapshot: invalid-argument-type
+```
+
+```snapshot
+error[invalid-argument-type]: Argument to function `wrapper` is incorrect
+ --> src/mdtest_snippet.py:9:18
+  |
+9 | wrapper(Factory, "incorrect")  # snapshot: invalid-argument-type
+  |                  ^^^^^^^^^^^ Expected `int`, found `Literal["incorrect"]`
+info: Function defined here
+ --> src/mdtest_snippet.py:6:9
+  |
+6 |     def __new__(cls, value: int) -> Self:
+  |         ^^^^^^^      ---------- Parameter declared here
+```
+
+## Overloaded constructors defined by __new__
+
+When `__new__` is overloaded, the diagnostic must both select the matching overload and account for
+its `cls` parameter.
+
+```py
+from typing import Callable, Self, overload
+
+def wrapper[**P](callback: Callable[P, object], *args: P.args, **kwargs: P.kwargs) -> None: ...
+
+class Factory:
+    @overload
+    def __new__(cls, value: str) -> Self: ...
+    @overload
+    def __new__(cls, value: int, flag: int) -> Self: ...
+    def __new__(cls, value: str | int, flag: int | None = None) -> Self:
+        return super().__new__(cls)
+
+wrapper(Factory, 1, "incorrect")  # snapshot: invalid-argument-type
+```
+
+```snapshot
+error[invalid-argument-type]: Argument to function `wrapper` is incorrect
+  --> src/mdtest_snippet.py:13:21
+   |
+13 | wrapper(Factory, 1, "incorrect")  # snapshot: invalid-argument-type
+   |                     ^^^^^^^^^^^ Expected `int`, found `Literal["incorrect"]`
+info: Function defined here
+ --> src/mdtest_snippet.py:9:9
+  |
+9 |     def __new__(cls, value: int, flag: int) -> Self: ...
+  |         ^^^^^^^                  --------- Parameter declared here
+```

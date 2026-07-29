@@ -5183,6 +5183,8 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
     ///
     /// Return `None` when the callback has no source declaration, so diagnostics can fall back to
     /// the forwarding function's actual variadic parameter instead of an unrelated parameter.
+    /// Callable objects and constructors use their existing bindings to preserve the active
+    /// constructor stage and any consumed receiver.
     ///
     /// ```python
     /// from typing import Callable
@@ -5234,16 +5236,24 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                         } else {
                             paramspec_prefix_len(declared_type)
                         }?;
-                        let (function, is_bound_method) = match argument_type {
+                        let argument_bindings = argument_type.bindings(self.db);
+                        let callable = argument_bindings.single_item()?.callable();
+                        let (function, is_bound_method) = match callable.signature_type {
                             Type::FunctionLiteral(function) => (function, false),
                             Type::BoundMethod(method) => (method.function(self.db), true),
                             _ => return None,
                         };
+                        let source_parameter_index_offset = callable
+                            .overloads()
+                            .get(overload_index)
+                            .or_else(|| callable.overloads().first())
+                            .map_or(0, |binding| binding.source_parameter_index_offset)
+                            + usize::from(callable.bound_type.is_some());
 
                         Some(ForwardedParameterSource {
                             function,
                             is_bound_method,
-                            parameter_index_offset: prefix_len + usize::from(is_bound_method),
+                            parameter_index_offset: prefix_len + source_parameter_index_offset,
                             overload_index,
                         })
                     })
