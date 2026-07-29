@@ -137,6 +137,95 @@ reveal_type(s)  # revealed: dict[int | str, int | str]
 reveal_type(s)  # revealed: dict[int | str, int | str]
 ```
 
+### Exact float types in covariant contexts
+
+A covariant collection context must preserve an exact float when numeric promotion would introduce
+an `int` that the expected element type rejects.
+
+```py
+from collections.abc import Iterable, Sequence
+from ty_extensions import JustFloat
+
+def takes_exact_sequence(values: Sequence[JustFloat]) -> None: ...
+def takes_exact_iterable(values: Iterable[JustFloat]) -> None: ...
+def takes_exact_list(values: list[JustFloat]) -> None: ...
+
+takes_exact_sequence([1.0])
+takes_exact_sequence((1.0,))
+takes_exact_sequence([1])  # error: [invalid-argument-type]
+
+takes_exact_iterable([1.0])
+takes_exact_iterable((1.0,))
+takes_exact_iterable([1])  # error: [invalid-argument-type]
+
+takes_exact_list([1.0])
+
+annotated: list[JustFloat] = [1.0]
+takes_exact_sequence(annotated)
+```
+
+Ordinary `float` contexts and unannotated mutable lists must retain numeric promotion.
+
+```py
+def takes_float_sequence(values: Sequence[float]) -> None: ...
+
+takes_float_sequence([1.0])
+takes_float_sequence([1])
+
+mutable_floats = [1.0]
+mutable_floats.append(1)
+reveal_type(mutable_floats)  # revealed: list[int | float]
+```
+
+### Exact complex types in covariant contexts
+
+The same contextual restriction applies when promoting an exact complex number would introduce `int`
+and `float`.
+
+```py
+from collections.abc import Sequence
+from ty_extensions import JustComplex
+
+def takes_exact_complexes(values: Sequence[JustComplex]) -> None: ...
+
+takes_exact_complexes([1j])
+takes_exact_complexes((1j,))
+takes_exact_complexes([1])  # error: [invalid-argument-type]
+takes_exact_complexes([1.0])  # error: [invalid-argument-type]
+```
+
+### Exact-type protocols in covariant contexts
+
+A writable `__class__` property allows an invariant protocol to distinguish a runtime float from an
+integer. A covariant sequence of a union containing this protocol must preserve that distinction.
+
+```py
+from collections.abc import Sequence
+from typing import Generic, Protocol, TypeVar
+
+T = TypeVar("T")
+
+class Just(Protocol, Generic[T]):
+    @property
+    def __class__(self, /) -> type[T]: ...
+    @__class__.setter
+    def __class__(self, value: type[T], /) -> None: ...
+
+def takes_exact_float(value: Just[float]) -> None: ...
+def takes_exact_values(values: Sequence[str | Just[float]]) -> None: ...
+
+takes_exact_float(1.0)
+takes_exact_float(1)  # error: [invalid-argument-type]
+
+takes_exact_values(["1", 1.0])
+takes_exact_values(["1", float("nan")])
+takes_exact_values(("1", 1.0))
+takes_exact_values(["1", 1])  # error: [invalid-argument-type]
+
+annotated: list[str | Just[float]] = ["1", 1.0]
+takes_exact_values(annotated)
+```
+
 ### Optional unions
 
 ```py

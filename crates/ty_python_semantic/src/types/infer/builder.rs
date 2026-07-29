@@ -7380,9 +7380,20 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     continue;
                 }
 
-                // We promote element literal types in invariant position by default, unless they were
-                // inferred with an explicit literal annotation.
-                let inferred_elt_ty = inferred_elt_ty.promote(self.db());
+                // A covariant context is an upper bound, so promotion must not widen an otherwise
+                // compatible element beyond that bound. In particular, promoting an exact float
+                // introduces `int`, which is not assignable to an exact-float context.
+                let promoted_elt_ty = inferred_elt_ty.promote(self.db());
+                let inferred_elt_ty = if let Some(elt_tcx) = elt_tcx
+                    && elt_tcx_variance[&elt_ty_identity].is_covariant()
+                    && promoted_elt_ty != inferred_elt_ty
+                    && !promoted_elt_ty.is_assignable_to(self.db(), elt_tcx)
+                    && inferred_elt_ty.is_assignable_to(self.db(), elt_tcx)
+                {
+                    inferred_elt_ty
+                } else {
+                    promoted_elt_ty
+                };
 
                 let inferred_type_for_typevar = if elt.is_starred_expr() {
                     inferred_elt_ty
