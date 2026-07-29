@@ -340,7 +340,11 @@ pub(crate) fn unnecessary_encode_utf8(checker: &Checker, call: &ast::ExprCall) {
                 }
             }
         }
-        _ => {}
+        _ => {
+            if let Some(encoding_arg) = match_encoding_arg(&call.arguments) {
+                report_unnecessary_default_argument(checker, call, encoding_arg);
+            }
+        }
     }
 }
 /// In a string, there are two kinds of escape sequences: "single" and "multi".
