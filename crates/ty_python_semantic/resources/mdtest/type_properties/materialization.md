@@ -1012,32 +1012,6 @@ writes are contravariant.
 python-version = "3.12"
 ```
 
-### Class-backed protocol specialization during interface construction
-
-An ordinary specialization of a class-backed protocol only maps its class specialization. It must
-not inspect the protocol interface, because the specialization can occur while that same interface
-is being constructed:
-
-```py
-from __future__ import annotations
-
-from typing import Generic, Protocol, TypeVar, overload
-
-S = TypeVar("S")
-T = TypeVar("T")
-
-class Unit(Protocol):
-    def __mul__(self, other: S | Quantity[S]): ...
-
-class Vector(Protocol): ...
-
-class Quantity(Generic[T], Protocol):
-    @overload
-    def __mul__(self, other: Unit | Quantity[S]): ...
-    @overload
-    def __mul__(self, other: Vector) -> Vector: ...
-```
-
 ### Instance attributes
 
 For a mutable `Any` attribute, `Top` reads `object` and writes `Never`; `Bottom` does the reverse:
@@ -1054,12 +1028,10 @@ def mutable_top_attributes(top: Top[MutableAny]) -> None:
     reveal_type(top.value)  # revealed: object
     top.value = 1  # error: [invalid-assignment]
 
-def mutable_bottom_attribute_read(bottom: Bottom[MutableAny]) -> None:
+def mutable_bottom_attributes(bottom: Bottom[MutableAny]) -> None:
     reveal_type(bottom)  # revealed: Bottom[MutableAny]
-    reveal_type(bottom.value)  # revealed: Never
-
-def mutable_bottom_attribute_write(bottom: Bottom[MutableAny]) -> None:
     bottom.value = object()
+    reveal_type(bottom.value)  # revealed: Never
 ```
 
 The class object of a materialized protocol preserves its instance type when called directly or
@@ -1116,11 +1088,9 @@ def writable_top_property(top: Top[WritableAny]) -> None:
     reveal_type(top.value)  # revealed: object
     top.value = 1  # error: [invalid-assignment]
 
-def writable_bottom_property_read(bottom: Bottom[WritableAny]) -> None:
-    reveal_type(bottom.value)  # revealed: Never
-
-def writable_bottom_property_write(bottom: Bottom[WritableAny]) -> None:
+def writable_bottom_property(bottom: Bottom[WritableAny]) -> None:
     bottom.value = object()
+    reveal_type(bottom.value)  # revealed: Never
 ```
 
 ### Protocol relations
@@ -1187,19 +1157,19 @@ override is structurally incompatible with the base protocol. Materializing the 
 also preserves the nominal relationship:
 
 ```py
-class NominalBase(Protocol):
+class BaseProtocol(Protocol):
     @property
     def value(self) -> int: ...
 
-class NominalChild(NominalBase, Protocol):
+class ChildProtocol(BaseProtocol, Protocol):
     marker: Any
 
     @property
     def value(self) -> str: ...
 
-static_assert(is_subtype_of(Top[NominalChild], NominalBase))
-static_assert(is_subtype_of(NominalChild, Top[NominalBase]))
-static_assert(is_subtype_of(NominalChild, Bottom[NominalBase]))
+static_assert(is_subtype_of(Top[ChildProtocol], BaseProtocol))
+static_assert(is_subtype_of(ChildProtocol, Top[BaseProtocol]))
+static_assert(is_subtype_of(ChildProtocol, Bottom[BaseProtocol]))
 ```
 
 A covariant `Awaitable[int]` satisfies the top-materialized `Awaitable[object]` protocol. Narrowing
@@ -1756,6 +1726,32 @@ def nested_specialization(
     holder.outer.leaf = top_leaf  # error: [invalid-assignment]
 ```
 
+### Class-backed protocol specialization during interface construction
+
+An ordinary specialization of a class-backed protocol only maps its class specialization. It must
+not inspect the protocol interface, because the specialization can occur while that same interface
+is being constructed:
+
+```py
+from __future__ import annotations
+
+from typing import Generic, Protocol, TypeVar, overload
+
+S = TypeVar("S")
+T = TypeVar("T")
+
+class Unit(Protocol):
+    def __mul__(self, other: S | Quantity[S]): ...
+
+class Vector(Protocol): ...
+
+class Quantity(Generic[T], Protocol):
+    @overload
+    def __mul__(self, other: Unit | Quantity[S]): ...
+    @overload
+    def __mul__(self, other: Vector) -> Vector: ...
+```
+
 ### Recursive protocols
 
 Materializing a recursive protocol preserves its wrapper without eagerly expanding its recursive
@@ -1794,16 +1790,12 @@ def recursive_bottom_children(bottom: Bottom[RecursiveProtocol]) -> None:
     reveal_type(bottom)  # revealed: Bottom[RecursiveProtocol]
     reveal_type(bottom.child)  # revealed: Bottom[RecursiveProtocol]
     reveal_type(bottom.child.child)  # revealed: Bottom[RecursiveProtocol]
+    bottom.child.marker = object()
     reveal_type(bottom.child.marker)  # revealed: Never
 
 def recursive_bottom_marker(bottom: Bottom[RecursiveProtocol]) -> None:
-    reveal_type(bottom.marker)  # revealed: Never
-
-def recursive_bottom_marker_write(bottom: Bottom[RecursiveProtocol]) -> None:
     bottom.marker = object()
-
-def recursive_bottom_child_write(bottom: Bottom[RecursiveProtocol]) -> None:
-    bottom.child.marker = object()
+    reveal_type(bottom.marker)  # revealed: Never
 
 def recursive_nested_materialization(
     nested_top: Top[Top[RecursiveProtocol]],
