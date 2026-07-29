@@ -12,7 +12,7 @@ use crate::fix::edits::{Parentheses, pad, remove_argument};
 use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
-/// Checks for unnecessary calls to `encode` as UTF-8.
+/// Checks for unnecessary calls to `ncode` as UTF-8, including unnecessary explicit encoding arguments.
 ///
 /// ## Why is this bad?
 /// UTF-8 is the default encoding in Python, so there is no need to call
