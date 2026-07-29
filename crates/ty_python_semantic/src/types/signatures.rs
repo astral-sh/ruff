@@ -243,7 +243,10 @@ impl<'db> CallableSignature<'db> {
                 overload.inference,
                 overload.unspecialized_return_ty,
             );
-            let dedup_key = signature.clone().with_definition(None);
+            let dedup_key = signature
+                .clone()
+                .with_definition(None)
+                .with_source_overload_index(None);
             if seen_overloads.insert(dedup_key) {
                 new_overloads.push(signature);
             }
@@ -325,6 +328,7 @@ impl<'db> CallableSignature<'db> {
                             type_mapping.update_signature_generic_context(db, context)
                         }),
                         definition: self_signature.definition,
+                        source_overload_index: self_signature.source_overload_index,
                         receiver_constraints: self_signature.map_receiver_constraints(
                             db,
                             type_mapping,
@@ -353,6 +357,7 @@ impl<'db> CallableSignature<'db> {
                                 }),
                             ),
                             definition: signature.definition,
+                            source_overload_index: signature.source_overload_index,
                             receiver_constraints: {
                                 let mapped = self_signature.map_receiver_constraints(
                                     db,
@@ -554,6 +559,12 @@ pub struct Signature<'db> {
     /// This is useful for locating and extracting docstring information for the signature.
     pub(crate) definition: Option<Definition<'db>>,
 
+    /// Position of this overload in the original function definition.
+    ///
+    /// Filtering, receiver binding, and partial application can leave a signature at a different
+    /// position in the active overload list. Preserve its source position for call diagnostics.
+    source_overload_index: Option<NonZeroU32>,
+
     /// The constraint introduced by binding an explicitly annotated receiver, if any.
     receiver_constraints: Option<OwnedConstraintSet<'db>>,
 
@@ -694,6 +705,7 @@ impl<'db> Signature<'db> {
         Self {
             generic_context: None,
             definition: None,
+            source_overload_index: None,
             receiver_constraints: None,
             parameters,
             return_ty,
@@ -708,6 +720,7 @@ impl<'db> Signature<'db> {
         Self {
             generic_context,
             definition: None,
+            source_overload_index: None,
             receiver_constraints: None,
             parameters,
             return_ty,
@@ -719,6 +732,7 @@ impl<'db> Signature<'db> {
         Signature {
             generic_context: None,
             definition: None,
+            source_overload_index: None,
             receiver_constraints: None,
             parameters: Parameters::gradual_form(),
             return_ty: signature_type,
@@ -772,6 +786,7 @@ impl<'db> Signature<'db> {
         Self {
             generic_context,
             definition: Some(definition),
+            source_overload_index: None,
             receiver_constraints: None,
             parameters,
             return_ty,
@@ -845,6 +860,7 @@ impl<'db> Signature<'db> {
         Self {
             generic_context: self.generic_context,
             definition: self.definition,
+            source_overload_index: self.source_overload_index,
             receiver_constraints: self.receiver_constraints.clone(),
             parameters,
             return_ty,
@@ -875,6 +891,7 @@ impl<'db> Signature<'db> {
         Some(Self {
             generic_context: self.generic_context,
             definition: self.definition,
+            source_overload_index: self.source_overload_index,
             receiver_constraints: self.receiver_constraints.clone(),
             parameters,
             return_ty,
@@ -893,6 +910,7 @@ impl<'db> Signature<'db> {
                 .generic_context
                 .map(|context| type_mapping.update_signature_generic_context(db, context)),
             definition: self.definition,
+            source_overload_index: self.source_overload_index,
             receiver_constraints: self.map_receiver_constraints(db, type_mapping, tcx, visitor),
             parameters: self
                 .parameters
@@ -1112,6 +1130,7 @@ impl<'db> Signature<'db> {
                 .generic_context
                 .map(|generic_context| generic_context.remove_self(db, binding_context)),
             definition: self.definition,
+            source_overload_index: self.source_overload_index,
             receiver_constraints,
             parameters,
             return_ty,
@@ -1362,6 +1381,7 @@ impl<'db> Signature<'db> {
         Self {
             generic_context: self.generic_context,
             definition: self.definition,
+            source_overload_index: self.source_overload_index,
             receiver_constraints,
             parameters,
             return_ty,
@@ -1736,6 +1756,21 @@ impl<'db> Signature<'db> {
         Self { definition, ..self }
     }
 
+    /// Records this signature's position in its defining function's overload list.
+    pub(crate) fn with_source_overload_index(mut self, index: Option<usize>) -> Self {
+        self.source_overload_index = index
+            .and_then(|index| u32::try_from(index).ok())
+            .and_then(|index| index.checked_add(1))
+            .and_then(NonZeroU32::new);
+        self
+    }
+
+    /// Returns this signature's position in its defining function's overload list.
+    pub(crate) fn source_overload_index(&self) -> Option<usize> {
+        self.source_overload_index
+            .map(|index| index.get() as usize - 1)
+    }
+
     /// Create a new signature with the given parameters.
     pub(crate) fn with_parameters(self, parameters: Parameters<'db>) -> Self {
         Self { parameters, ..self }
@@ -1928,6 +1963,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                                     signature.parameters().clone(),
                                     Type::unknown(),
                                 )
+                                .with_source_overload_index(signature.source_overload_index())
                             },
                         )),
                         CallableTypeKind::ParamSpecValue,
@@ -1980,6 +2016,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                                         signature.parameters().clone(),
                                         Type::unknown(),
                                     )
+                                    .with_source_overload_index(signature.source_overload_index())
                                 }),
                         ),
                         CallableTypeKind::ParamSpecValue,
@@ -2550,17 +2587,20 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     if let Some(source_param) = source_params.next() {
                         let lower = Type::Callable(CallableType::new(
                             db,
-                            CallableSignature::single(Signature::new_generic(
-                                source.generic_context,
-                                Parameters::concatenate(
-                                    db,
-                                    std::iter::once(source_param.clone())
-                                        .chain(source_params.cloned())
-                                        .collect(),
-                                    ConcatenateTail::ParamSpec(source_bound_typevar),
-                                ),
-                                Type::unknown(),
-                            )),
+                            CallableSignature::single(
+                                Signature::new_generic(
+                                    source.generic_context,
+                                    Parameters::concatenate(
+                                        db,
+                                        std::iter::once(source_param.clone())
+                                            .chain(source_params.cloned())
+                                            .collect(),
+                                        ConcatenateTail::ParamSpec(source_bound_typevar),
+                                    ),
+                                    Type::unknown(),
+                                )
+                                .with_source_overload_index(source.source_overload_index()),
+                            ),
                             CallableTypeKind::ParamSpecValue,
                             CallableFunctionProvenance::None,
                         ));
@@ -2575,17 +2615,20 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     } else if let Some(target_param) = target_params.next() {
                         let upper = Type::Callable(CallableType::new(
                             db,
-                            CallableSignature::single(Signature::new_generic(
-                                target.generic_context,
-                                Parameters::concatenate(
-                                    db,
-                                    std::iter::once(target_param.clone())
-                                        .chain(target_params.cloned())
-                                        .collect(),
-                                    ConcatenateTail::ParamSpec(target_bound_typevar),
-                                ),
-                                Type::unknown(),
-                            )),
+                            CallableSignature::single(
+                                Signature::new_generic(
+                                    target.generic_context,
+                                    Parameters::concatenate(
+                                        db,
+                                        std::iter::once(target_param.clone())
+                                            .chain(target_params.cloned())
+                                            .collect(),
+                                        ConcatenateTail::ParamSpec(target_bound_typevar),
+                                    ),
+                                    Type::unknown(),
+                                )
+                                .with_source_overload_index(target.source_overload_index()),
+                            ),
                             CallableTypeKind::ParamSpecValue,
                             CallableFunctionProvenance::None,
                         ));
@@ -2616,11 +2659,14 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 (None, Some(([], target_bound_typevar))) => {
                     let lower = Type::Callable(CallableType::new(
                         db,
-                        CallableSignature::single(Signature::new_generic(
-                            source.generic_context,
-                            source.parameters.clone(),
-                            Type::unknown(),
-                        )),
+                        CallableSignature::single(
+                            Signature::new_generic(
+                                source.generic_context,
+                                source.parameters.clone(),
+                                Type::unknown(),
+                            )
+                            .with_source_overload_index(source.source_overload_index()),
+                        ),
                         CallableTypeKind::ParamSpecValue,
                         CallableFunctionProvenance::None,
                     ));
@@ -2768,7 +2814,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                                 source_params,
                                 Type::unknown(),
                             )
-                            .with_definition(source.definition),
+                            .with_source_overload_index(source.source_overload_index()),
                         ),
                         CallableTypeKind::ParamSpecValue,
                         CallableFunctionProvenance::None,
@@ -2789,11 +2835,14 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 (Some(([], source_bound_typevar)), None) => {
                     let upper = Type::Callable(CallableType::new(
                         db,
-                        CallableSignature::single(Signature::new_generic(
-                            target.generic_context,
-                            target.parameters.clone(),
-                            Type::unknown(),
-                        )),
+                        CallableSignature::single(
+                            Signature::new_generic(
+                                target.generic_context,
+                                target.parameters.clone(),
+                                Type::unknown(),
+                            )
+                            .with_source_overload_index(target.source_overload_index()),
+                        ),
                         CallableTypeKind::ParamSpecValue,
                         CallableFunctionProvenance::None,
                     ));
@@ -2903,11 +2952,14 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         .with_transformed_parameters(target_params.cloned());
                     let upper = Type::Callable(CallableType::new(
                         db,
-                        CallableSignature::single(Signature::new_generic(
-                            target.generic_context,
-                            target_params,
-                            Type::unknown(),
-                        )),
+                        CallableSignature::single(
+                            Signature::new_generic(
+                                target.generic_context,
+                                target_params,
+                                Type::unknown(),
+                            )
+                            .with_source_overload_index(target.source_overload_index()),
+                        ),
                         CallableTypeKind::ParamSpecValue,
                         CallableFunctionProvenance::None,
                     ));

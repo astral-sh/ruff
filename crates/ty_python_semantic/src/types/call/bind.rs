@@ -3128,7 +3128,15 @@ impl<'db> CallableBinding<'db> {
         signature_type: Type<'db>,
         overloads: impl IntoIterator<Item = Signature<'db>>,
     ) -> Self {
-        Self::from_indexed_overloads(signature_type, overloads.into_iter().enumerate())
+        Self::from_indexed_overloads(
+            signature_type,
+            overloads.into_iter().enumerate().map(|(index, signature)| {
+                (
+                    signature.source_overload_index().unwrap_or(index),
+                    signature,
+                )
+            }),
+        )
     }
 
     /// Constructs a callable binding from overloads while preserving each overload's position in
@@ -5242,14 +5250,20 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                             Type::KnownInstance(
                                 KnownInstanceType::FunctoolsPartial(partial)
                                 | KnownInstanceType::FunctoolsPartialCall(partial),
-                            ) => (
-                                partial.wrapped(self.db).inner(self.db),
-                                partial
-                                    .partial(self.db)
-                                    .signatures(self.db)
-                                    .overloads
-                                    .get(overload_index),
-                            ),
+                            ) => {
+                                let signatures =
+                                    &partial.partial(self.db).signatures(self.db).overloads;
+                                (
+                                    partial.wrapped(self.db).inner(self.db),
+                                    signatures
+                                        .iter()
+                                        .find(|signature| {
+                                            signature.source_overload_index()
+                                                == Some(overload_index)
+                                        })
+                                        .or_else(|| signatures.get(overload_index)),
+                                )
+                            }
                             _ => (argument_type, None),
                         };
                         let argument_bindings = source_type.bindings(self.db);
@@ -5259,13 +5273,10 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                             Type::BoundMethod(method) => (method.function(self.db), true),
                             _ => return None,
                         };
-                        let source_binding = partial_signature
-                            .and_then(Signature::definition)
-                            .and_then(|definition| {
-                                callable.overloads().iter().find(|binding| {
-                                    binding.signature.definition() == Some(definition)
-                                })
-                            })
+                        let source_binding = callable
+                            .overloads()
+                            .iter()
+                            .find(|binding| binding.source_overload_index() == overload_index)
                             .or_else(|| callable.overloads().get(overload_index))
                             .or_else(|| callable.overloads().first());
                         let overload_index =
@@ -6028,14 +6039,6 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                 .find(|error| matches!(error, BindingError::InvalidArgumentType { .. }))
                 .and_then(|_| {
                     self.paramspec_parameter_source(paramspec, binding.source_overload_index())
-                })
-                .and_then(|source| {
-                    let overload_index =
-                        source.source_overload_index(self.db, &binding.signature)?;
-                    Some(ForwardedParameterSource {
-                        overload_index,
-                        ..source
-                    })
                 });
             let argument_matches = self.argument_matches;
 
@@ -7560,50 +7563,6 @@ pub(crate) struct ForwardedParameterSource<'db> {
 }
 
 impl<'db> ForwardedParameterSource<'db> {
-    /// Recovers an overload's original index after specialization filters earlier declarations.
-    ///
-    /// `overload_index` initially refers to the specialized overload list. Match the overload by
-    /// its function definition when possible, since its position in the original function can
-    /// differ after filtering. In this example, both overloads refer to the same `Config` fields,
-    /// but their function definitions are distinct:
-    ///
-    /// ```python
-    /// @overload
-    /// def callback(prefix: str, **options: Unpack[Config]) -> None: ...
-    /// @overload
-    /// def callback(prefix: int, **options: Unpack[Config]) -> None: ...
-    /// ```
-    fn source_overload_index(self, db: &'db dyn Db, signature: &Signature<'db>) -> Option<usize> {
-        let source_signatures = &self.function.signature(db).overloads;
-
-        if let Some(definition) = signature.definition() {
-            return source_signatures
-                .iter()
-                .position(|source_signature| source_signature.definition() == Some(definition));
-        }
-
-        let parameter_definition = signature
-            .parameters()
-            .iter()
-            .find_map(Parameter::definition)?;
-
-        let contains_parameter = |source_signature: &Signature<'db>| {
-            source_signature
-                .parameters()
-                .iter()
-                .any(|parameter| parameter.definition() == Some(parameter_definition))
-        };
-
-        if source_signatures
-            .get(self.overload_index)
-            .is_some_and(contains_parameter)
-        {
-            Some(self.overload_index)
-        } else {
-            source_signatures.iter().position(contains_parameter)
-        }
-    }
-
     /// Locates the source parameter that accepted a forwarded argument.
     ///
     /// An unpacked variadic annotation can expand one source declaration into several callable

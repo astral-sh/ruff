@@ -742,7 +742,10 @@ impl<'db> CallableTypes<'db> {
         for callable in self.0 {
             for signature in callable.signatures(db) {
                 let signature = signature.clone();
-                let dedup_key = signature.clone().with_definition(None);
+                let dedup_key = signature
+                    .clone()
+                    .with_definition(None)
+                    .with_source_overload_index(None);
                 if seen_overloads.insert(dedup_key) {
                     overloads.push(signature);
                 }

@@ -909,14 +909,22 @@ impl<'db> FunctionLiteral<'db> {
             return CallableSignature::single(implementation.signature(db));
         }
 
-        CallableSignature::from_overloads(overloads.iter().flat_map(|overload| {
-            // The last overload may still be inferred, so querying its binding would create a cycle.
-            if *overload == self.last_definition {
-                Either::Left(std::iter::once(overload.signature(db)))
-            } else {
-                Either::Right(overload.decorated_signatures(db))
-            }
-        }))
+        CallableSignature::from_overloads(overloads.iter().enumerate().flat_map(
+            |(source_overload_index, overload)| {
+                // The last overload may still be inferred, so querying its binding would create a cycle.
+                if *overload == self.last_definition {
+                    Either::Left(std::iter::once(
+                        overload
+                            .signature(db)
+                            .with_source_overload_index(Some(source_overload_index)),
+                    ))
+                } else {
+                    Either::Right(overload.decorated_signatures(db).map(move |signature| {
+                        signature.with_source_overload_index(Some(source_overload_index))
+                    }))
+                }
+            },
+        ))
     }
 
     /// Typed externally-visible signature of the last overload or implementation of this function.
