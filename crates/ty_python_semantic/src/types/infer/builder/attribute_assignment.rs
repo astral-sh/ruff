@@ -394,6 +394,10 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
             Ok(bindings) => bindings.return_type(db).is_never(),
             Err(error) => error.return_type(db).is_some_and(|ty| ty.is_never()),
         };
+
+        // We could also model this more precisely by synthesizing a `__setattr__`overload set
+        // that only disallows mutation on non-private fields, but for now, we just suppress the
+        // diagnostic here. This is much easier and faster.
         let is_private_pydantic_attribute =
             matches!(member, InstanceAttributeWriteMember::Explicit { .. })
                 && pydantic::is_private_attribute(self.attribute)
