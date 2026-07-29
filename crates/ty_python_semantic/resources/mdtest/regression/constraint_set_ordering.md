@@ -23,6 +23,25 @@ the `wobbling-ty-constraint-order` agent skill to automate this process.
 python-version = "3.13"
 ```
 
+## Constraint absorption is independent of source order
+
+```py
+from ty_extensions._internal import ConstraintSet
+
+def absorption[T]() -> None:
+    scalar = ConstraintSet.range(str, T, object)
+    tuple_ = ConstraintSet.range(tuple[str, ...], T, object)
+
+    # revealed: tuple[Solution[T=str]]
+    reveal_type((scalar & (scalar | tuple_)).solutions_for(T, inferable=tuple[T]))
+    # revealed: tuple[Solution[T=str]]
+    reveal_type(((scalar | tuple_) & scalar).solutions_for(T, inferable=tuple[T]))
+
+    # A genuine alternative still produces both solutions; absorption does not prefer one match.
+    # revealed: tuple[Solution[T=str], Solution[T=tuple[str, ...]]]
+    reveal_type((scalar | tuple_).solutions_for(T, inferable=tuple[T]))
+```
+
 ## Solution binding order follows constraint source order
 
 The order of bindings within a path must follow the first constraint that introduced each typevar.
@@ -49,6 +68,16 @@ def bindings_reverse_source[T, U, V]() -> None:
     constraints = ConstraintSet.range(bytes, V, bytes) & ConstraintSet.range(str, U, str) & ConstraintSet.range(int, T, int)
     # revealed: tuple[Solution[V=bytes, U=str, T=int]]
     reveal_type(constraints.solutions(inferable=tuple[T, U, V]))
+
+def bindings_absorbed[T, U, X]() -> None:
+    t = ConstraintSet.range(str, T, object)
+    u = ConstraintSet.range(bytes, U, object)
+    x = ConstraintSet.range(int, X, object)
+
+    # ((X ≥ int) ∧ (T ≥ str) ∧ (U ≥ bytes)) | ((U ≥ bytes) ∧ (T ≥ str))
+    constraints = (x & t & u) | (u & t)
+    # revealed: tuple[Solution[T=str, U=bytes]]
+    reveal_type(constraints.solutions(inferable=tuple[T, U, X]))
 ```
 
 ## Nested transitive constraints and an unrelated alternative
