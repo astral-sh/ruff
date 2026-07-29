@@ -1685,15 +1685,12 @@ impl<'db> UpperBound<'db> {
         !self.is_empty()
     }
 
-    /// Returns the effective upper bound if its clauses simplify to one type.
+    /// Returns an existing upper-bound clause if every other clause is redundant with it.
     ///
-    /// First look for a clause that makes every other clause redundant. In addition to avoiding
-    /// union distribution, this preserves constrained type variables: expanding
+    /// This preserves constrained type variables without distributing unions: expanding
     /// `S & (int | str)` into `(S & int) | (S & str)` would otherwise lose `S` as the single
-    /// effective bound. If no existing clause suffices, simplify the intersection within the
-    /// normal expansion budget and reject any remaining nontrivial intersection.
-    ///
-    /// A missing bound remains distinct from an explicit `object`.
+    /// effective bound. Returns `None` instead of materializing intersections when no existing
+    /// clause dominates the others. A missing bound remains distinct from an explicit `object`.
     pub(crate) fn as_single_bound(&self, db: &'db dyn Db) -> Option<Type<'db>> {
         let mut clauses = self.clauses.iter().copied();
         let first = clauses.next()?;
@@ -1704,16 +1701,11 @@ impl<'db> UpperBound<'db> {
                 clause
             }
         });
-        if self
-            .clauses
+
+        self.clauses
             .iter()
             .all(|clause| candidate.is_redundant_with(db, *clause))
-        {
-            return Some(candidate);
-        }
-
-        let bound = IntersectionType::bounded_from_elements(db, self.clauses.iter().copied())?;
-        (!bound.is_nontrivial_intersection(db)).then_some(bound)
+            .then_some(candidate)
     }
 
     fn is_never(&self) -> bool {
@@ -7735,9 +7727,7 @@ mod tests {
         let int = known_instance(&db, KnownClass::Int);
         let bool = known_instance(&db, KnownClass::Bool);
         let str = known_instance(&db, KnownClass::Str);
-        let bytes = known_instance(&db, KnownClass::Bytes);
         let int_or_str = UnionType::from_two_elements(&db, int, str);
-        let int_or_bytes = UnionType::from_two_elements(&db, int, bytes);
         let u = create_typevar(&db, "U").map_bound_or_constraints(&db, |_| {
             Some(TypeVarBoundOrConstraints::UpperBound(int_or_str))
         });
@@ -7750,8 +7740,6 @@ mod tests {
             ([bool, int], bool),
             ([int_or_str, u], u),
             ([u, int_or_str], u),
-            ([int_or_str, int_or_bytes], int),
-            ([int_or_bytes, int_or_str], int),
         ] {
             let mut upper = UpperBound::none();
             for clause in clauses {
@@ -7772,6 +7760,26 @@ mod tests {
             UpperBound::from_clause(Type::object()).as_single_bound(&db),
             Some(Type::object())
         );
+    }
+
+    #[test]
+    fn upper_bound_does_not_materialize_overlapping_union_clauses() {
+        let db = setup_db();
+        let int = known_instance(&db, KnownClass::Int);
+        let str = known_instance(&db, KnownClass::Str);
+        let bytes = known_instance(&db, KnownClass::Bytes);
+        let int_or_str = UnionType::from_two_elements(&db, int, str);
+        let int_or_bytes = UnionType::from_two_elements(&db, int, bytes);
+
+        for clauses in [[int_or_str, int_or_bytes], [int_or_bytes, int_or_str]] {
+            let mut upper = UpperBound::none();
+            for clause in clauses {
+                upper.add_clause(clause);
+            }
+
+            assert_eq!(upper.materialize_exact(&db), int);
+            assert_eq!(upper.as_single_bound(&db), None);
+        }
     }
 
     #[test]
