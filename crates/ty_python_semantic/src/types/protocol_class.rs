@@ -2355,14 +2355,16 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     self.check_callables_vs_callable(
                         db,
                         &callables.map(|callable| {
-                            callable.apply_self_with_receiver(
+                            protocol_apply_self_with_receiver(
                                 db,
+                                callable,
                                 implementation_receiver_binding_ty,
                                 implementation_self_binding_ty,
                             )
                         }),
-                        required_callable.apply_self_with_receiver(
+                        protocol_apply_self_with_receiver(
                             db,
+                            required_callable,
                             protocol_receiver_binding_ty,
                             protocol_self_binding_ty,
                         ),
@@ -2404,8 +2406,9 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             self.check_type_pair(
                 db,
                 attribute_type,
-                Type::Callable(required_callable.apply_self_with_receiver(
+                Type::Callable(protocol_apply_self_with_receiver(
                     db,
+                    required_callable,
                     protocol_receiver_binding_ty,
                     protocol_self_binding_ty,
                 )),
@@ -2678,7 +2681,12 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     if member.is_method()
                         && let Type::Callable(callable) = member_type.ty()
                     {
-                        Some(Type::Callable(callable.apply_self(db, source_type)))
+                        Some(Type::Callable(protocol_apply_self_with_receiver(
+                            db,
+                            callable,
+                            source_type,
+                            source_type,
+                        )))
                     } else {
                         member_type.bind_self(db, source_type)
                     }
@@ -3084,6 +3092,25 @@ fn protocol_bind_self<'db>(
     self_type: Option<Type<'db>>,
 ) -> CallableType<'db> {
     callable.bind_self(db, self_type).into_regular(db)
+}
+
+/// Cache receiver and `Self` binding only for protocol-member compatibility checks.
+#[salsa::tracked(
+    returns(copy),
+    cycle_initial=|db, _, _, _, _| CallableType::bottom(db),
+    heap_size=ruff_memory_usage::heap_size
+)]
+fn protocol_apply_self_with_receiver<'db>(
+    db: &'db dyn Db,
+    callable: CallableType<'db>,
+    receiver_type: Type<'db>,
+    self_type: Type<'db>,
+) -> CallableType<'db> {
+    if receiver_type == self_type {
+        callable.apply_self(db, self_type)
+    } else {
+        callable.apply_self_with_receiver(db, receiver_type, self_type)
+    }
 }
 
 /// Return `true` if a callable has at least one overload and none return `Never`.

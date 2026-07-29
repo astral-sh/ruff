@@ -3771,6 +3771,34 @@ static_assert(is_subtype_of(Text, ConsoleRenderable))
 static_assert(is_assignable_to(Text, ConsoleRenderable))
 ```
 
+## Recursive protocol receiver binding
+
+A classmethod on a generic protocol can cause receiver binding for another method to depend on
+itself. The cached receiver-binding query must reach a fixed point and report the ordinary
+return-type error instead of panicking.
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+```py
+from __future__ import annotations
+
+from datetime import datetime, timedelta, tzinfo
+from typing import ClassVar, Optional, Protocol, TypeVar
+
+T = TypeVar("T", bound=Optional[tzinfo], covariant=True)
+
+class DateTime(Protocol[T]):
+    resolution: ClassVar[timedelta]
+
+    def __sub__(self: DateTime[tzinfo], other: DateTime[tzinfo]) -> timedelta: ...
+    @classmethod
+    def now(cls, tz: Optional[tzinfo] = None) -> DateTime[Optional[tzinfo]]:
+        return datetime.now(tz)  # error: [invalid-return-type]
+```
+
 ## Subtyping of protocols with generic method members
 
 Protocol method members can be generic. They can have generic contexts scoped to the class:
