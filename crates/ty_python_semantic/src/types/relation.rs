@@ -2259,7 +2259,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                         .unwrap_or_else(|| {
                             ConstraintSet::from_bool(
                                 self.constraints,
-                                self.is_eager_assignability(),
+                                self.relation.is_assignability(),
                             )
                         }),
                 }
@@ -2300,7 +2300,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                         .unwrap_or_else(|| {
                             ConstraintSet::from_bool(
                                 self.constraints,
-                                self.is_eager_assignability(),
+                                self.relation.is_assignability(),
                             )
                         }),
                 }
