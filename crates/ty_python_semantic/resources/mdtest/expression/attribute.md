@@ -47,3 +47,53 @@ def f() -> None:
     box = StrBox()
     reveal_type(box.attr)  # revealed: str
 ```
+
+## Local prefixes block enclosing whole-place bindings
+
+An enclosing binding for an entire member access refers to a different object when the nested scope
+binds the root locally. The local object's member type takes precedence.
+
+```py
+class OuterBox:
+    attr: int
+
+class InnerBox:
+    attr: str
+
+def outer_root() -> None:
+    box = OuterBox()
+    box.attr = 1
+
+    def inner() -> None:
+        box = InnerBox()
+        reveal_type(box.attr)  # revealed: str
+```
+
+The same rule applies when an intermediate member, rather than the root, is bound in the nested
+scope.
+
+```py
+class Holder:
+    box: OuterBox | InnerBox
+
+def outer_member() -> None:
+    holder = Holder()
+    holder.box = OuterBox()
+    holder.box.attr = 1
+
+    def inner() -> None:
+        holder.box = InnerBox()
+        reveal_type(holder.box.attr)  # revealed: str
+```
+
+If none of the prefixes are bound in the nested scope, the enclosing whole-place binding remains
+visible.
+
+```py
+def outer_fallback() -> None:
+    box = OuterBox()
+    box.attr = 1
+
+    def inner() -> None:
+        reveal_type(box.attr)  # revealed: int
+```
