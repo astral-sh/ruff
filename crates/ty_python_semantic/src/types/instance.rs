@@ -14,7 +14,7 @@ use super::{
 };
 use crate::place::PlaceAndQualifiers;
 use crate::types::constraints::{
-    ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension,
+    ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension, OwnedConstraintSet,
 };
 use crate::types::enums::is_single_member_enum;
 use crate::types::generics::walk_specialization;
@@ -796,6 +796,43 @@ fn non_recursive_protocol_interface<'db>(
     })
 }
 
+/// Infers protocol constraints without expanding recursive member requirements.
+///
+/// The target view retains its materialization, so readable and writable members are still
+/// materialized in their respective variance positions. The complete target protocol must be
+/// checked separately after generic inference.
+#[salsa::tracked(
+    returns(ref),
+    cycle_initial = |_, _, _, _| OwnedConstraintSet::always(),
+    heap_size = ruff_memory_usage::heap_size,
+)]
+fn non_recursive_protocol_constraints<'db>(
+    db: &'db dyn Db,
+    source: ProtocolInstanceType<'db>,
+    target: ProtocolInterfaceView<'db>,
+) -> OwnedConstraintSet<'db> {
+    let constraints = ConstraintSetBuilder::new();
+    constraints.into_owned(|constraints| {
+        let relation_visitor = HasRelationToVisitor::default(constraints);
+        let disjointness_visitor = IsDisjointVisitor::default(constraints);
+        let signature_relation_visitor = SignatureRelationVisitor::default();
+        let materialization_visitor = ApplyTypeMappingVisitor::default();
+        let checker = TypeRelationChecker::constraint_set_assignability(
+            constraints,
+            &relation_visitor,
+            &disjointness_visitor,
+            &signature_relation_visitor,
+            &materialization_visitor,
+        );
+        checker.check_protocol_interface_pair(
+            db,
+            Type::ProtocolInstance(source),
+            source.interface(db),
+            target,
+        )
+    })
+}
+
 impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
     /// Return `true` if this protocol type is disjoint from the protocol `other`.
     ///
@@ -1279,6 +1316,31 @@ impl<'db> ProtocolInstanceType<'db> {
 
     pub(super) fn interface(self, db: &'db dyn Db) -> ProtocolInterfaceView<'db> {
         self.inner.interface(db)
+    }
+
+    /// Returns constraints inferred from the nonrecursive requirements of `target`.
+    ///
+    /// Recursive requirements are omitted only while inferring a generic specialization. The
+    /// eventual argument check must still compare against the complete protocol interface.
+    pub(super) fn when_non_recursive_members_assignable_to_owned(
+        self,
+        db: &'db dyn Db,
+        target: Self,
+    ) -> Option<&'db OwnedConstraintSet<'db>> {
+        let origin = target.class_origin(db)?;
+        let interface = target.interface(db);
+        let non_recursive = non_recursive_protocol_interface(
+            db,
+            interface.base(),
+            origin,
+            Type::ProtocolInstance(target),
+        );
+        let target = ProtocolInterfaceView::new(non_recursive, interface.materialization_kind());
+        if target.member_count(db) == 0 {
+            return None;
+        }
+
+        Some(non_recursive_protocol_constraints(db, self, target))
     }
 }
 

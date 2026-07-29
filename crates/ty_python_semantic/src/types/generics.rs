@@ -3287,25 +3287,37 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 if let Type::ProtocolInstance(formal_protocol) = formal
                     && let Some(actual_origin) = actual_protocol.materialized_origin(self.db)
                     && let Some(formal_origin) = formal_protocol.class_origin(self.db)
-                    && (actual_origin
+                {
+                    let nominally_inherited = actual_origin
                         .iter_mro(self.db)
                         .filter_map(ClassBase::into_class)
                         .any(|base| {
                             base.class_literal(self.db) == formal_origin.class_literal(self.db)
-                        })
+                        });
+                    let when = if nominally_inherited
                         || formal_protocol
                             .interface(self.db)
-                            .has_only_finite_members(self.db))
-                {
-                    // A materialized protocol can expose different member requirements from its
-                    // nominal origin. Infer explicitly inherited requirements structurally, and
-                    // also infer unrelated protocols when the formal requirements are finite.
-                    // Expanding an unrelated recursive requirement here would otherwise bypass
-                    // the finite-first ordering that keeps protocol comparison terminating.
-                    let when = actual.when_constraint_set_assignable_to_owned(self.db, formal);
-                    let when = self.constraints.load(self.db, &when);
-                    self.infer_from_constraint_set(when)?;
-                    return Ok(());
+                            .has_only_finite_members(self.db)
+                    {
+                        Some(actual.when_constraint_set_assignable_to_owned(self.db, formal))
+                    } else {
+                        actual_protocol
+                            .when_non_recursive_members_assignable_to_owned(
+                                self.db,
+                                formal_protocol,
+                            )
+                            .map(Cow::Borrowed)
+                    };
+
+                    // Materialized protocols cannot be replaced by their nominal origin: doing
+                    // so would recover the original `Any` requirements. Infer from the complete
+                    // interface when doing so is cycle-safe; otherwise use its nonrecursive
+                    // requirements and leave full recursive compatibility to argument checking.
+                    if let Some(when) = when {
+                        let when = self.constraints.load(self.db, &when);
+                        self.infer_from_constraint_set(when)?;
+                        return Ok(());
+                    }
                 }
 
                 // TODO: This will only handle protocol classes that explicit inherit

@@ -1584,6 +1584,138 @@ def materialized_invariant_overload_resolution(
     reveal_type(select_consistent_item(valid, values))  # revealed: int
 ```
 
+### Generic inference through recursive structural protocols
+
+A recursive protocol requirement must not cause inference to discard a structurally matching
+protocol's materialization. The nonrecursive property establishes the correct specialization without
+expanding the recursive property.
+
+```py
+from __future__ import annotations
+
+from typing import Any, Literal, Protocol, overload
+from ty_extensions import Bottom, Top, static_assert
+from ty_extensions._internal import is_subtype_of
+
+class RecursiveValue[T](Protocol):
+    @property
+    def value(self) -> T: ...
+    @property
+    def child(self) -> RecursiveValue[T]: ...
+
+class RecursiveAny(Protocol):
+    @property
+    def value(self) -> Any: ...
+    @property
+    def child(self) -> RecursiveAny: ...
+
+static_assert(is_subtype_of(Top[RecursiveAny], RecursiveValue[object]))
+static_assert(not is_subtype_of(Top[RecursiveAny], RecursiveValue[str]))
+static_assert(is_subtype_of(Bottom[RecursiveAny], RecursiveValue[str]))
+```
+
+Inference preserves both materialization polarities: the top-materialized property infers `object`,
+while the bottom-materialized property infers `Never`.
+
+```py
+def infer_recursive_value[T](value: RecursiveValue[T]) -> T:
+    raise NotImplementedError
+
+def recursive_materialized_inference(
+    top: Top[RecursiveAny],
+    bottom: Bottom[RecursiveAny],
+    valid: RecursiveValue[str],
+) -> None:
+    reveal_type(top.value)  # revealed: object
+    reveal_type(infer_recursive_value(top))  # revealed: object
+    reveal_type(infer_recursive_value(valid))  # revealed: str
+    reveal_type(infer_recursive_value(bottom))  # revealed: Never
+```
+
+The nonrecursive property is used only to infer the specialization. The complete protocol must still
+be checked, so a matching `value` cannot hide an incompatible `child`.
+
+```py
+class WrongRecursiveAny(Protocol):
+    @property
+    def value(self) -> Any: ...
+    @property
+    def child(self) -> int: ...
+
+static_assert(not is_subtype_of(Top[WrongRecursiveAny], RecursiveValue[object]))
+
+def reject_incompatible_recursive_child(wrong: Top[WrongRecursiveAny]) -> None:
+    infer_recursive_value(wrong)  # error: [invalid-argument-type]
+```
+
+A top-materialized `object` cannot satisfy a `str` bound or a `str`/`bytes` constraint. An ordinary
+`RecursiveValue[str]` still satisfies both.
+
+```py
+def bounded_recursive_value[T: str](value: RecursiveValue[T]) -> T:
+    raise NotImplementedError
+
+def constrained_recursive_value[T: (str, bytes)](value: RecursiveValue[T]) -> T:
+    raise NotImplementedError
+
+def recursive_materialized_bounds(
+    top: Top[RecursiveAny],
+    valid: RecursiveValue[str],
+) -> None:
+    bounded_recursive_value(top)  # error: [invalid-argument-type]
+    constrained_recursive_value(top)  # error: [invalid-argument-type]
+    reveal_type(bounded_recursive_value(valid))  # revealed: str
+    reveal_type(constrained_recursive_value(valid))  # revealed: str
+```
+
+An invariant `list[T]` cannot narrow the materialized `object` property to `int`.
+
+```py
+def infer_recursive_with_list[T](value: RecursiveValue[T], values: list[T]) -> T:
+    raise NotImplementedError
+
+def recursive_materialized_invariant_arguments(
+    top: Top[RecursiveAny],
+    valid: RecursiveValue[str],
+    ints: list[int],
+    strings: list[str],
+) -> None:
+    infer_recursive_with_list(top, ints)  # error: [invalid-argument-type]
+    reveal_type(infer_recursive_with_list(valid, strings))  # revealed: str
+```
+
+Overload resolution also respects the bound and the complete recursive requirement. Both an
+incompatible materialized property and an incompatible child select the fallback or fail when no
+fallback is available; the valid `str` specialization selects the bounded overload.
+
+```py
+@overload
+def select_recursive_value[T: str](value: RecursiveValue[T]) -> Literal["bounded"]: ...
+@overload
+def select_recursive_value(value: object) -> Literal["fallback"]: ...
+def select_recursive_value(value: object) -> Literal["bounded", "fallback"]:
+    return "fallback"
+
+@overload
+def select_specific_recursive_value(value: RecursiveValue[str]) -> Literal["str"]: ...
+@overload
+def select_specific_recursive_value(value: RecursiveValue[bytes]) -> Literal["bytes"]: ...
+def select_specific_recursive_value(value: object) -> str:
+    raise NotImplementedError
+
+def recursive_materialized_overload_resolution(
+    top: Top[RecursiveAny],
+    wrong: Top[WrongRecursiveAny],
+    valid: RecursiveValue[str],
+) -> None:
+    reveal_type(select_recursive_value(top))  # revealed: Literal["fallback"]
+    reveal_type(select_recursive_value(wrong))  # revealed: Literal["fallback"]
+    reveal_type(select_recursive_value(valid))  # revealed: Literal["bounded"]
+    select_specific_recursive_value(top)  # error: [no-matching-overload]
+    select_specific_recursive_value(wrong)  # error: [no-matching-overload]
+    reveal_type(select_specific_recursive_value(valid))  # revealed: Literal["str"]
+```
+
 ### Generator delegation
 
 `yield from` uses the same materialized yield and return types as direct generator methods. Applying
