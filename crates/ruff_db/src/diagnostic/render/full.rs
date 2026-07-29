@@ -69,6 +69,7 @@ impl<'a> FullRenderer<'a> {
                     Diff::from_diagnostic(diag, &stylesheet, self.resolver, self.config)
             {
                 write!(f, "{diff}")?;
+                write_applicability_note(diff.fix, &stylesheet, f)?;
             }
 
             writeln!(f)?;
@@ -294,8 +295,6 @@ impl<'a> Diff<'a> {
 
             self.write_gutter(f, digit_with)?;
         }
-
-        write_applicability_note(self.fix, self.stylesheet, f)?;
 
         Ok(())
     }
