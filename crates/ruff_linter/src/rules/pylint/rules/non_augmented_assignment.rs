@@ -68,6 +68,13 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// foo += [2]
 /// assert (foo, bar) == ([1, 2], [1, 2])
 /// ```
+///
+/// An augmented assignment can also fail where the plain form succeeds. NumPy
+/// writes the result into the target's buffer, so `a *= b` raises where
+/// `a = a * b` would broadcast to a new shape or promote the dtype. The same
+/// applies to `a @= b`, which requires the product to have the target's shape.
+///
+/// The fix replaces the whole statement, so any comments inside it are lost.
 #[derive(ViolationMetadata)]
 #[violation_metadata(preview_since = "v0.3.7")]
 pub(crate) struct NonAugmentedAssignment {

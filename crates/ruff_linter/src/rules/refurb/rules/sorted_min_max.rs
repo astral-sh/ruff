@@ -1,5 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::Number;
+use ruff_python_ast::token::parenthesized_range;
 use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::Ranged;
 
@@ -187,14 +188,17 @@ pub(crate) fn sorted_min_max(checker: &Checker, subscript: &ast::ExprSubscript) 
 
     if checker.semantic().has_builtin_binding(min_max.as_str()) {
         diagnostic.set_fix({
+            // Preserve any parentheses around the argument. Some expressions are
+            // only valid as a call argument when parenthesized (e.g., `yield`),
+            // so slicing the bare node would produce invalid syntax.
+            let list_expr = checker.locator().slice(
+                parenthesized_range(list_expr.into(), arguments.into(), checker.tokens())
+                    .unwrap_or(list_expr.range()),
+            );
             let replacement = if let Some(key) = key_keyword_expr {
-                format!(
-                    "{min_max}({}, {})",
-                    checker.locator().slice(list_expr),
-                    checker.locator().slice(key),
-                )
+                format!("{min_max}({list_expr}, {})", checker.locator().slice(key))
             } else {
-                format!("{min_max}({})", checker.locator().slice(list_expr))
+                format!("{min_max}({list_expr})")
             };
 
             let replacement = Edit::range_replacement(replacement, subscript.range());

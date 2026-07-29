@@ -176,7 +176,6 @@ C417 [*] Unnecessary `map()` usage (rewrite using a generator expression)
 12 | all(map(lambda v: isinstance(v, dict), nums))
 13 | filter(func, map(lambda v: v, nums))
    |              ^^^^^^^^^^^^^^^^^^^^^^
-   |
 help: Replace `map()` with a generator expression
    |
 12 | all(map(lambda v: isinstance(v, dict), nums))
@@ -319,7 +318,6 @@ C417 [*] Unnecessary `map()` usage (rewrite using a dict comprehension)
 75 | _ = t"{set(map(lambda x: x % 2 == 0, nums))}"
 76 | _ = t"{dict(map(lambda v: (v, v**2), nums))}"
    |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 help: Replace `map()` with a dict comprehension
    |
 75 | _ = t"{set(map(lambda x: x % 2 == 0, nums))}"

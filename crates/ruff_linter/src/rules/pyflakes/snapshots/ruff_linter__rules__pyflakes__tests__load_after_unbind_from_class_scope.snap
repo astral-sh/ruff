@@ -25,4 +25,3 @@ F821 Undefined name `x`
 12 |         # `x` in `x = 1`.
 13 |         print(x)
    |               ^
-   |

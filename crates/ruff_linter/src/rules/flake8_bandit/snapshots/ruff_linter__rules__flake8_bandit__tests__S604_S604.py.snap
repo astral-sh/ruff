@@ -90,4 +90,3 @@ S604 Function call with truthy `shell` parameter identified, security issue
 23 | x = 1
 24 | foo(shell=f"{x=}")
    | ^^^
-   |

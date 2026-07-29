@@ -101,4 +101,3 @@ PLC0415 `import` should be at the top-level of a file
 39 |         # this should still trigger an error due to multiple imports
 40 |         from pkg import foo_allowed, bar_banned # [import-outside-toplevel]
    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |

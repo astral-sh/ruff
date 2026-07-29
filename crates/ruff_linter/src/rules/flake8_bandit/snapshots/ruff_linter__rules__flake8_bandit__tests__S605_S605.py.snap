@@ -149,7 +149,6 @@ S605 Starting a process with a shell: seems safe, but may be changed in the futu
 20 | subprocess.getoutput("true")
 21 | subprocess.getstatusoutput("true")
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 
 S605 Starting a process with a shell, possible injection detected
   --> S605.py:26:1
@@ -179,4 +178,3 @@ S605 Starting a process with a shell, possible injection detected
 27 | os.system([var_string])
 28 | os.system([var_string, ""])
    | ^^^^^^^^^
-   |

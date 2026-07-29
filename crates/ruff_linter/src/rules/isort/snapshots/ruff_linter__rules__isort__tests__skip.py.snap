@@ -9,7 +9,6 @@ I001 [*] Import block is un-sorted or un-formatted
 20 | /     import collections
 21 | |     import abc
    | |______________^
-   |
 help: Organize imports
    |
 19 |     import os  # isort: skip
@@ -27,7 +26,6 @@ I001 [*] Import block is un-sorted or un-formatted
 27 | /     import collections
 28 | |     import abc
    | |______________^
-   |
 help: Organize imports
    |
 26 |     import os  # isort:skip
@@ -44,7 +42,6 @@ I001 [*] Import block is un-sorted or un-formatted
 33 |     import sys; import os  # isort:skip  # isort:skip
 34 |     import sys; import os
    |     ^^^^^^^^^^^^^^^^^^^^^
-   |
 help: Organize imports
    |
 33 |     import sys; import os  # isort:skip  # isort:skip

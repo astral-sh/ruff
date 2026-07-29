@@ -32,7 +32,6 @@ error[invalid-legacy-type-variable]: Starred arguments are not supported in `Typ
   |
 6 | T = TypeVar("T", *types)
   |                  ^^^^^^
-  |
 
 ```
 
@@ -42,6 +41,5 @@ error[invalid-legacy-type-variable]: Starred arguments are not supported in `Typ
   |
 9 | S = TypeVar("S", **{"bound": int})
   |                  ^^^^^^^^^^^^^^^^
-  |
 
 ```

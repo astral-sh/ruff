@@ -1066,13 +1066,11 @@ warning[ambiguous-protocol-member]: Cannot assign to an undeclared attribute in 
     |
 326 |         self.augmented += 1  # snapshot: ambiguous-protocol-member
     |         ^^^^^^^^^^^^^^ `augmented` is not declared as a protocol member
-    |
 info: Assigning to an undeclared attribute in a protocol method leads to an ambiguous interface
    --> src/mdtest_snippet.py:318:7
     |
 318 | class AssignmentForms(Protocol):
     |       ^^^^^^^^^^^^^^^^^^^^^^^^^ `AssignmentForms` declared as a protocol here
-    |
 info: No declarations found for `augmented` in the body of `AssignmentForms` or any of its superclasses
 ```
 
@@ -3773,6 +3771,34 @@ static_assert(is_subtype_of(Text, ConsoleRenderable))
 static_assert(is_assignable_to(Text, ConsoleRenderable))
 ```
 
+## Recursive protocol receiver binding
+
+A classmethod on a generic protocol can cause receiver binding for another method to depend on
+itself. The cached receiver-binding query must reach a fixed point and report the ordinary
+return-type error instead of panicking.
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+```py
+from __future__ import annotations
+
+from datetime import datetime, timedelta, tzinfo
+from typing import ClassVar, Optional, Protocol, TypeVar
+
+T = TypeVar("T", bound=Optional[tzinfo], covariant=True)
+
+class DateTime(Protocol[T]):
+    resolution: ClassVar[timedelta]
+
+    def __sub__(self: DateTime[tzinfo], other: DateTime[tzinfo]) -> timedelta: ...
+    @classmethod
+    def now(cls, tz: Optional[tzinfo] = None) -> DateTime[Optional[tzinfo]]:
+        return datetime.now(tz)  # error: [invalid-return-type]
+```
+
 ## Subtyping of protocols with generic method members
 
 Protocol method members can be generic. They can have generic contexts scoped to the class:
@@ -4235,13 +4261,12 @@ iterable: Iterable[int] = DirectIterable  # snapshot
 
 ```snapshot
 error[invalid-assignment]: Object of type `<class 'DirectIterable'>` is not assignable to `Iterable[int]`
-  --> src/mdtest_snippet.py:20:11
+  --> src/mdtest_snippet.py:20:27
    |
 20 | iterable: Iterable[int] = DirectIterable  # snapshot
    |           -------------   ^^^^^^^^^^^^^^ Incompatible value of type `<class 'DirectIterable'>`
    |           |
    |           Declared type
-   |
 info: type `<class 'DirectIterable'>` is not assignable to protocol `Iterable[int]`
 info: └── protocol member `__iter__` is not defined on type `<class 'DirectIterable'>`
 info:     └── special methods must be defined on the meta-type when matching a protocol

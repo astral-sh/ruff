@@ -271,13 +271,11 @@ error[invalid-argument-type]: Argument to function `f` is incorrect
   |
 9 | reveal_type(f("string"))  # revealed: Unknown
   |               ^^^^^^^^ Argument type `Literal["string"]` does not satisfy upper bound `int` of type variable `T`
-  |
 info: Type variable defined here
  --> src/mdtest_snippet.py:3:7
   |
 3 | def f[T: int](x: T) -> T:
   |       ^^^^^^
-  |
 ```
 
 ## Inferring a constrained typevar
@@ -301,13 +299,11 @@ error[invalid-argument-type]: Argument to function `f` is incorrect
    |
 10 | reveal_type(f("string"))  # revealed: Unknown
    |               ^^^^^^^^ Argument type `Literal["string"]` does not satisfy constraints (`int`, `None`) of type variable `T`
-   |
 info: Type variable defined here
  --> src/mdtest_snippet.py:3:7
   |
 3 | def f[T: (int, None)](x: T) -> T:
   |       ^^^^^^^^^^^^^^
-  |
 ```
 
 ## Typevar constraints
@@ -1224,6 +1220,65 @@ def my_iter[T](f: Callable[[], T | None]) -> Box[T]:
 def get_int() -> int | None: ...
 
 reveal_type(my_iter(get_int))  # revealed: Box[int]
+```
+
+### Callable return union order does not affect inference
+
+```py
+from typing import Callable
+
+class Box[T]:
+    def get(self) -> T:
+        raise NotImplementedError
+
+def ensure_tuple[T](func: Callable[[], tuple[T, ...] | T]) -> tuple[T, ...]:
+    raise NotImplementedError
+
+def ensure_tuple_reversed[T](func: Callable[[], T | tuple[T, ...]]) -> tuple[T, ...]:
+    raise NotImplementedError
+
+def ensure_box[T](func: Callable[[], Box[T] | T]) -> Box[T]:
+    raise NotImplementedError
+
+def ensure_box_reversed[T](func: Callable[[], T | Box[T]]) -> Box[T]:
+    raise NotImplementedError
+
+def check(
+    scalar_first: Callable[[], str | tuple[str, ...]],
+    tuple_first: Callable[[], tuple[str, ...] | str],
+    nested_member_first: Callable[[], Box[str] | tuple[Box[str], ...]],
+    nested_tuple_first: Callable[[], tuple[Box[str], ...] | Box[str]],
+    box_scalar_first: Callable[[], str | Box[str]],
+    box_first: Callable[[], Box[str] | str],
+) -> None:
+    reveal_type(ensure_tuple(scalar_first))  # revealed: tuple[str, ...]
+    reveal_type(ensure_tuple(tuple_first))  # revealed: tuple[str, ...]
+    reveal_type(ensure_tuple_reversed(scalar_first))  # revealed: tuple[str, ...]
+    reveal_type(ensure_tuple_reversed(tuple_first))  # revealed: tuple[str, ...]
+    reveal_type(ensure_tuple(nested_member_first))  # revealed: tuple[Box[str], ...]
+    reveal_type(ensure_tuple(nested_tuple_first))  # revealed: tuple[Box[str], ...]
+    reveal_type(ensure_tuple_reversed(nested_member_first))  # revealed: tuple[Box[str], ...]
+    reveal_type(ensure_tuple_reversed(nested_tuple_first))  # revealed: tuple[Box[str], ...]
+    reveal_type(ensure_box(box_scalar_first))  # revealed: Box[str]
+    reveal_type(ensure_box(box_first))  # revealed: Box[str]
+    reveal_type(ensure_box_reversed(box_scalar_first))  # revealed: Box[str]
+    reveal_type(ensure_box_reversed(box_first))  # revealed: Box[str]
+```
+
+### Gradual container constraints preserve inference evidence
+
+`Collection` inherits from `Container[Any]`, so inferring a type variable from a collection passed
+to a contravariant `Container` must preserve the gradual constraint.
+
+```py
+from collections.abc import Container
+from typing import Any
+
+def value[T](items: Container[T]) -> T:
+    raise NotImplementedError
+
+items: list[str] = []
+reveal_type(value(items))  # revealed: Any
 ```
 
 ### Don't include identical lower/upper bounds in type mapping multiple times

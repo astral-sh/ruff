@@ -68,7 +68,6 @@ N806 Variable `ValidationError` in function should be lowercase
 59 |     Address: Type = apps.get_model("zerver", variable)  # OK
 60 |     ValidationError = import_string(variable)  # N806
    |     ^^^^^^^^^^^^^^^
-   |
 
 N806 Variable `BadName` in function should be lowercase
   --> N806.py:65:14

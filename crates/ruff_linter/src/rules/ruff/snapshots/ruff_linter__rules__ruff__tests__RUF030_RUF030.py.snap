@@ -350,7 +350,6 @@ RUF030 [*] `print()` call in `assert` statement is likely unintentional
 107 | # - single StringLiteral
 108 | assert True, builtins.print("This print should be removed.")
     |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-    |
 help: Remove `print`
     |
 107 | # - single StringLiteral

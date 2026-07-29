@@ -246,7 +246,7 @@ impl<'db> SubclassOfType<'db> {
         let class_like = match self.subclass_of.with_transposed_type_var(db) {
             SubclassOfInner::Class(class) => Type::from(class),
             SubclassOfInner::Dynamic(dynamic) => Type::Dynamic(dynamic),
-            SubclassOfInner::Protocol(protocol) => Type::from(*protocol.class_origin()?),
+            SubclassOfInner::Protocol(protocol) => Type::from(*protocol.class_origin(db)?),
             SubclassOfInner::TypeVar(bound_typevar) => {
                 match bound_typevar.typevar(db).bound_or_constraints(db) {
                     None => unreachable!(),
@@ -374,11 +374,11 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             (SubclassOfInner::Dynamic(_), SubclassOfInner::Class(target_class)) => {
                 ConstraintSet::from_bool(
                     self.constraints,
-                    target_class.is_object(db) || self.is_eager_assignability(),
+                    target_class.is_object(db) || self.relation.is_assignability(),
                 )
             }
             (SubclassOfInner::Class(_), SubclassOfInner::Dynamic(_)) => {
-                ConstraintSet::from_bool(self.constraints, self.is_eager_assignability())
+                ConstraintSet::from_bool(self.constraints, self.relation.is_assignability())
             }
 
             // For example, `type[bool]` describes all possible runtime subclasses of the class `bool`,

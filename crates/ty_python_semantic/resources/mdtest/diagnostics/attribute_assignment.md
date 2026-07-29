@@ -29,7 +29,6 @@ error[invalid-assignment]: Object of type `Literal["wrong"]` is not assignable t
   |
 8 | instance.attr = "wrong"  # snapshot: invalid-assignment
   | ^^^^^^^^^^^^^
-  |
 ```
 
 And on the class object:
@@ -44,7 +43,6 @@ error[invalid-assignment]: Object of type `Literal["wrong"]` is not assignable t
   |
 9 | C.attr = "wrong"  # snapshot: invalid-assignment
   | ^^^^^^
-  |
 ```
 
 ## Pure instance attributes
@@ -74,7 +72,6 @@ error[invalid-attribute-access]: Cannot assign to instance attribute `attr` from
   |
 8 | C.attr = 1  # snapshot: invalid-attribute-access
   | ^^^^^^
-  |
 ```
 
 ## Invalid annotated assignment to attribute
@@ -96,23 +93,21 @@ class C:
 
 ```snapshot
 error[invalid-assignment]: Object of type `None` is not assignable to `str`
- --> src/mdtest_snippet.py:3:20
+ --> src/mdtest_snippet.py:3:26
   |
 3 |         self.attr: str = None  # snapshot: invalid-assignment
   |                    ---   ^^^^ Incompatible value of type `None`
   |                    |
   |                    Declared type
-  |
 
 
 error[invalid-assignment]: Object of type `None` is not assignable to `str`
- --> src/mdtest_snippet.py:8:26
+ --> src/mdtest_snippet.py:8:32
   |
 8 |         cls.class_attr1: str = None  # snapshot: invalid-assignment
   |                          ---   ^^^^ Incompatible value of type `None`
   |                          |
   |                          Declared type
-  |
 ```
 
 Annotations on other attribute targets are ignored, and the assignment is checked against the
@@ -180,7 +175,6 @@ error[invalid-attribute-access]: Cannot assign to ClassVar `attr` from an instan
   |
 9 | instance.attr = 1  # snapshot: invalid-attribute-access
   | ^^^^^^^^^^^^^
-  |
 ```
 
 ## Unknown attributes
@@ -199,7 +193,6 @@ error[unresolved-attribute]: Unresolved attribute `non_existent` on type `<class
   |
 3 | C.non_existent = 1  # snapshot: unresolved-attribute
   | ^^^^^^^^^^^^^^
-  |
 ```
 
 And on instances:
@@ -215,7 +208,6 @@ error[unresolved-attribute]: Unresolved attribute `non_existent` on type `C`
   |
 5 | instance.non_existent = 1  # snapshot: unresolved-attribute
   | ^^^^^^^^^^^^^^^^^^^^^
-  |
 ```
 
 ## Possibly-missing attributes
@@ -237,7 +229,6 @@ info[possibly-missing-attribute]: Attribute `attr` may be missing on class `C`
   |
 6 |     C.attr = 1  # snapshot: possibly-missing-attribute
   |     ^^^^^^
-  |
 ```
 
 And on instances:
@@ -253,7 +244,6 @@ info[possibly-missing-attribute]: Attribute `attr` may be missing on object of t
   |
 8 |     instance.attr = 1  # snapshot: possibly-missing-attribute
   |     ^^^^^^^^^^^^^
-  |
 ```
 
 ## Data descriptors
@@ -287,7 +277,6 @@ error[invalid-assignment]: Invalid assignment to data descriptor attribute `attr
    |
 11 | instance.attr = "wrong"  # snapshot: invalid-assignment
    |                 ^^^^^^^ Expected `int`, found `Literal["wrong"]`
-   |
 info: Argument to function `Descriptor.__set__` is incorrect
 info: This assignment implicitly calls `__set__` on a descriptor of type `Descriptor`
 info: Function defined here
@@ -295,7 +284,6 @@ info: Function defined here
   |
 2 |     def __set__(self, instance: object, value: int) -> None:
   |         ^^^^^^^                         ---------- Parameter declared here
-  |
 ```
 
 ### Invalid `__set__` method signature
@@ -319,14 +307,12 @@ error[invalid-assignment]: Invalid assignment to data descriptor attribute `attr
    |
 10 | instance.attr = 1  # snapshot: invalid-assignment
    | ^^^^^^^^^^^^^ No argument provided for required parameter `extra` of function `WrongDescriptor.__set__`
-   |
 info: This assignment implicitly calls `__set__` on a descriptor of type `WrongDescriptor`
 info: Parameter declared here
  --> src/mdtest_snippet.py:2:53
   |
 2 |     def __set__(self, instance: object, value: int, extra: int) -> None:
   |                                                     ^^^^^^^^^^
-  |
 ```
 
 ### Invalid property setter argument type
@@ -355,7 +341,6 @@ error[invalid-assignment]: Invalid assignment to data descriptor attribute `docu
    |
 11 |         self.document = None  # snapshot: invalid-assignment
    |                         ^^^^ Expected `Document`, found `None`
-   |
 info: Argument to function `HasDocumentRef.document` is incorrect
 info: This assignment implicitly calls `__set__` on a descriptor of type `property`
 info: Function defined here
@@ -363,7 +348,6 @@ info: Function defined here
   |
 7 |     def document(self, document: Document) -> None: ...
   |         ^^^^^^^^       ------------------ Parameter declared here
-  |
 ```
 
 ### Nested argument type
@@ -385,7 +369,6 @@ error[invalid-assignment]: Invalid assignment to data descriptor attribute `x` o
   |
 8 | c.x = (1, b"")  # snapshot: invalid-assignment
   |       ^^^^^^^^ Expected `tuple[int, str]`, found `tuple[Literal[1], Literal[b""]]`
-  |
 info: Argument to function `Descriptor.__set__` is incorrect
 info: This assignment implicitly calls `__set__` on a descriptor of type `Descriptor`
 info: the second tuple element is not compatible: `Literal[b""]` is not assignable to `str`
@@ -394,7 +377,6 @@ info: Function defined here
   |
 2 |     def __set__(self, instance, value: tuple[int, str]) -> None: ...
   |         ^^^^^^^                 ---------------------- Parameter declared here
-  |
 ```
 
 ## Setting attributes on union types
@@ -429,5 +411,4 @@ error[invalid-assignment]: Object of type `Literal[1]` is not assignable to attr
    |
 10 |     C1.attr = 1  # snapshot: invalid-assignment
    |     ^^^^^^^
-   |
 ```

@@ -18,7 +18,7 @@ Foo.method()
 
 ```snapshot
 error[call-abstract-method]: Cannot call `method` on class object
- --> src/mdtest_snippet.py:4:5
+ --> src/mdtest_snippet.py:9:1
   |
 4 | /     @classmethod
 5 | |     @abstractmethod
@@ -28,7 +28,6 @@ error[call-abstract-method]: Cannot call `method` on class object
 8 |   # snapshot: call-abstract-method
 9 |   Foo.method()
   |   ^^^^^^^^^^^^ `method` is an abstract classmethod with a trivial body
-  |
 ```
 
 ## Abstract staticmethod with trivial body on class literal

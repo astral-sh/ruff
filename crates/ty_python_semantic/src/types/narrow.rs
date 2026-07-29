@@ -4324,8 +4324,12 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
         }
 
         let narrowed = union.filter(self.db, |element| {
-            nominal_attribute_type(self.db, *element, attribute_name).is_none_or(|attribute_type| {
-                match (comparison, is_positive) {
+            element
+                .resolve_type_alias(self.db)
+                .member(self.db, attribute_name)
+                .place
+                .ignore_possibly_undefined()
+                .is_none_or(|attribute_type| match (comparison, is_positive) {
                     (NominalAttributeComparison::Equality, true) => {
                         !is_supported_tag_literal(attribute_type)
                             || !attribute_type.is_disjoint_from(self.db, rhs_type)
@@ -4337,8 +4341,7 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
                         .identity_comparison_truthiness(self.db, rhs_type)
                         .negate_if(!is_positive)
                         .may_be_true(),
-                }
-            })
+                })
         });
 
         if narrowed == Type::Union(union) {
@@ -4362,14 +4365,19 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
         };
 
         let narrowed = union.filter(self.db, |element| {
-            nominal_attribute_type(self.db, *element, attribute_name).is_none_or(|attribute_type| {
-                let truthiness = attribute_type.bool(self.db);
-                if is_positive {
-                    !truthiness.is_always_false()
-                } else {
-                    !truthiness.is_always_true()
-                }
-            })
+            element
+                .resolve_type_alias(self.db)
+                .member(self.db, attribute_name)
+                .place
+                .ignore_possibly_undefined()
+                .is_none_or(|attribute_type| {
+                    let truthiness = attribute_type.bool(self.db);
+                    if is_positive {
+                        !truthiness.is_always_false()
+                    } else {
+                        !truthiness.is_always_true()
+                    }
+                })
         });
 
         if narrowed == Type::Union(union) {
@@ -4516,22 +4524,6 @@ fn is_supported_tag_literal(ty: Type) -> bool {
                 | LiteralValueTypeKind::Enum(_)
         )
     )
-}
-
-fn nominal_attribute_type<'db>(
-    db: &'db dyn Db,
-    ty: Type<'db>,
-    attribute_name: &str,
-) -> Option<Type<'db>> {
-    let resolved_ty = ty.resolve_type_alias(db);
-    if resolved_ty.is_nominal_instance() {
-        resolved_ty
-            .member(db, attribute_name)
-            .place
-            .ignore_possibly_undefined()
-    } else {
-        None
-    }
 }
 
 // Return true if the given type is a `TypedDict` whose `field_name` field has a supported tag literal

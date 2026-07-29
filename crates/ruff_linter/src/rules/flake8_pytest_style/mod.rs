@@ -379,6 +379,7 @@ mod tests {
     }
 
     #[test_case(Rule::PytestExtraneousScopeFunction, Path::new("PT003.py"))]
+    #[test_case(Rule::PytestCompositeAssertion, Path::new("PT018.py"))]
     fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!(
             "preview__{}_{}",

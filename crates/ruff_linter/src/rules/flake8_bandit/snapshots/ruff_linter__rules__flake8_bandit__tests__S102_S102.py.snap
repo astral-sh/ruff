@@ -19,7 +19,6 @@ S102 Use of `exec` detected
 4 |
 5 | exec('y = 3')
   | ^^^^
-  |
 
 S102 Use of `exec` detected
   --> S102.py:11:5

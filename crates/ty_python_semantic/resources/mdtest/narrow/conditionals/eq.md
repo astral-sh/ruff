@@ -2224,18 +2224,40 @@ def never_unequal_narrowing(x: Any, value: Literal[NeverUnequalEnum.A]) -> None:
         reveal_type(x)  # revealed: Any & ~Literal[NeverUnequalEnum.A]
 ```
 
-## Narrowing tagged unions of nominal classes by attribute
+## Narrowing tagged unions by attribute
 
 ```py
-from typing import Literal
+from typing import Literal, Protocol
 
-class A:
+from ty_extensions import Intersection
+
+class BaseA:
     tag: Literal["a"]
+
+class A(BaseA):
     field_a: int
 
 class B:
     tag: Literal["b"]
     field_b: str
+
+class Marker(Protocol):
+    marked: bool
+
+class TaggedA(Protocol):
+    field_a: int
+
+    @property
+    def tag(self) -> Literal["a"]: ...
+
+class TaggedB(Protocol):
+    field_b: str
+
+    @property
+    def tag(self) -> Literal["b"]: ...
+
+class Container:
+    value: A | B | None
 
 def _(x: A | B):
     if x.tag == "a":
@@ -2254,6 +2276,44 @@ def _(x: A | B):
         reveal_type(x)  # revealed: B
     else:
         reveal_type(x)  # revealed: A
+
+def truthiness_guard(value: A | B | None):
+    if not value:
+        return
+
+    reveal_type(value)  # revealed: (A & ~AlwaysFalsy) | (B & ~AlwaysFalsy)
+
+    if value.tag == "a":
+        reveal_type(value)  # revealed: A & ~AlwaysFalsy
+        reveal_type(value.field_a)  # revealed: int
+    else:
+        reveal_type(value)  # revealed: B & ~AlwaysFalsy
+        reveal_type(value.field_b)  # revealed: str
+
+def nested_attribute_after_truthiness_guard(container: Container):
+    if not container.value:
+        return
+
+    if container.value.tag == "a":
+        reveal_type(container.value)  # revealed: A & ~AlwaysFalsy
+        reveal_type(container.value.field_a)  # revealed: int
+    else:
+        reveal_type(container.value)  # revealed: B & ~AlwaysFalsy
+        reveal_type(container.value.field_b)  # revealed: str
+
+def positive_intersection(value: Intersection[A, Marker] | Intersection[B, Marker]):
+    if value.tag == "a":
+        reveal_type(value)  # revealed: A & Marker
+    else:
+        reveal_type(value)  # revealed: B & Marker
+
+def protocol_union(value: TaggedA | TaggedB):
+    if value.tag == "a":
+        reveal_type(value)  # revealed: TaggedA
+        reveal_type(value.field_a)  # revealed: int
+    else:
+        reveal_type(value)  # revealed: TaggedB
+        reveal_type(value.field_b)  # revealed: str
 ```
 
 Enum literals are also supported as attribute tags:

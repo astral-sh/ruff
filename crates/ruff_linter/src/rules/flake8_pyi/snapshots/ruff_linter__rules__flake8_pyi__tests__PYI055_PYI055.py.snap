@@ -132,7 +132,6 @@ PYI055 [*] Multiple `type` members in a union. Combine them into one, e.g., `typ
 10 | y: Union[Union[Union[type[float | int], type[complex]]]]
 11 | z: Union[type[complex], Union[Union[type[Union[float, int]]]]]
    |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 help: Combine multiple `type` members
    |
 10 | y: Union[Union[Union[type[float | int], type[complex]]]]
@@ -162,7 +161,6 @@ PYI055 [*] Multiple `type` members in a union. Combine them into one, e.g., `typ
 28 | # OK
 29 | item: type[requests_mock.Mocker] | type[httpretty] = requests_mock.Mocker
    |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 help: Combine multiple `type` members
    |
 28 | # OK
@@ -217,7 +215,6 @@ PYI055 [*] Multiple `type` members in a union. Combine them into one, e.g., `typ
 37 | |         type[requests_mock.Mocker], # another comment
 38 | |         type[httpretty], type[str]] = requests_mock.Mocker
    | |___________________________________^
-   |
 help: Combine multiple `type` members
    |
 35 |     y: Union[type[requests_mock.Mocker], type[httpretty], type[str]] = requests_mock.Mocker
@@ -235,7 +232,6 @@ PYI055 [*] Multiple `type` members in a union. Combine them into one, e.g., `typ
 44 |     # PYI055
 45 |     x: Union[type[requests_mock.Mocker], type[httpretty], type[str]] = requests_mock.Mocker
    |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 help: Combine multiple `type` members
    |
 44 |     # PYI055

@@ -9,6 +9,8 @@ use crate::types::attribute_write::{
     ProtocolMemberWriteRequirement, attribute_write_requirement, property_setter_returns_never,
 };
 use crate::types::call::{Bindings, CallArguments, CallDiagnosticOverride, CallError};
+use crate::types::class::FrozenDataclassDispatch;
+use crate::types::dedicated::pydantic;
 use crate::types::diagnostic::{
     INVALID_ASSIGNMENT, INVALID_ATTRIBUTE_ACCESS, UNRESOLVED_ATTRIBUTE, report_bad_dunder_set_call,
     report_invalid_attribute_assignment, report_possibly_missing_attribute,
@@ -126,11 +128,17 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
             ast::ArgOrKeyword::Arg(self.value),
         ];
         let mut call_arguments = CallArguments::positional([name_ty, Type::unknown()]);
+        // A bound `super` must use its own MRO lookup rather than the normal instance fallback.
+        let lookup_policy = if matches!(object_ty, Type::BoundSuper(_)) {
+            MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK
+        } else {
+            MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK | MemberLookupPolicy::NO_INSTANCE_FALLBACK
+        };
         let setattr_result = self.builder.infer_and_try_call_dunder(
             db,
             object_ty,
             "__setattr__",
-            MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK | MemberLookupPolicy::NO_INSTANCE_FALLBACK,
+            lookup_policy,
             ArgumentsIter::synthesized(&ast_arguments),
             &mut call_arguments,
             &mut |builder, (argument_index, _, tcx)| {
@@ -252,6 +260,11 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
                         TypeContext::new(Some(domain.unwrap_or_else(Type::unknown))),
                         emit_diagnostics,
                     );
+                    if let Some(domain) = domain
+                        && !self.check_type_pair(value_ty, *domain, emit_diagnostics)
+                    {
+                        return false;
+                    }
                     self.evaluate_protocol_descriptor_write(
                         *descriptor_ty,
                         *receiver_ty,
@@ -343,12 +356,29 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
         emit_diagnostics: bool,
     ) -> bool {
         let db = self.builder.db();
+        let frozen_dataclass_dispatch = object_ty
+            .nominal_class(db)
+            .and_then(|class| class.static_class_literal(db))
+            .and_then(|(class, specialization)| {
+                class.inherited_frozen_dataclass_dispatch(
+                    db,
+                    specialization,
+                    "__setattr__",
+                    self.attribute,
+                )
+            });
+        let setattr_receiver = frozen_dataclass_dispatch
+            .map_or(object_ty, |dispatch| dispatch.receiver(db, object_ty));
+
         let (setattr_result, value_ty) = if matches!(member, InstanceAttributeWriteMember::SetAttr)
-        {
-            self.infer_and_try_call_setattr(object_ty, emit_diagnostics)
+            || matches!(
+                frozen_dataclass_dispatch,
+                Some(FrozenDataclassDispatch::Delegate(_))
+            ) {
+            self.infer_and_try_call_setattr(setattr_receiver, emit_diagnostics)
         } else {
             let value_ty = self.infer_value(TypeContext::default(), emit_diagnostics);
-            let setattr_result = object_ty.try_call_dunder_with_policy(
+            let setattr_result = setattr_receiver.try_call_dunder_with_policy(
                 db,
                 "__setattr__",
                 &mut CallArguments::positional([
@@ -362,13 +392,28 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
         };
 
         // A terminal `__setattr__` blocks even explicitly declared attributes.
-        let setattr_returns_never = match &setattr_result {
+        let setattr_returns_never = matches!(
+            frozen_dataclass_dispatch,
+            Some(FrozenDataclassDispatch::FrozenField)
+        ) || match &setattr_result {
             Ok(bindings) => bindings.return_type(db).is_never(),
             Err(error) => error.return_type(db).is_some_and(|ty| ty.is_never()),
         };
-        if setattr_returns_never {
+
+        // We could also model this more precisely by synthesizing a `__setattr__`overload set
+        // that only disallows mutation on non-private fields, but for now, we just suppress the
+        // diagnostic here. This is much easier and faster.
+        let is_private_pydantic_attribute =
+            matches!(member, InstanceAttributeWriteMember::Explicit { .. })
+                && pydantic::is_private_attribute(self.attribute)
+                && pydantic::is_model_instance(db, object_ty);
+
+        if setattr_returns_never && !is_private_pydantic_attribute {
             if emit_diagnostics {
-                let is_setattr_synthesized = match object_ty.class_member_with_policy(
+                let is_setattr_synthesized = !matches!(
+                    frozen_dataclass_dispatch,
+                    Some(FrozenDataclassDispatch::Delegate(_))
+                ) && match object_ty.class_member_with_policy(
                     db,
                     "__setattr__",
                     MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
@@ -400,6 +445,19 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
                 {
                     return false;
                 }
+                if matches!(
+                    frozen_dataclass_dispatch,
+                    Some(FrozenDataclassDispatch::Delegate(_))
+                ) && let Err(CallDunderError::CallError(kind, bindings, _)) = setattr_result
+                {
+                    if emit_diagnostics {
+                        self.report(AssignmentAttributeWriteDiagnostic::BadSetAttr {
+                            value_ty,
+                            failure: CallError(kind, bindings),
+                        });
+                    }
+                    return false;
+                }
                 let member_valid =
                     self.evaluate_explicit_member(object_ty, member, value_ty, emit_diagnostics);
                 if let Some(fallback) = fallback {
@@ -423,6 +481,14 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
                         });
                     }
                     false
+                }
+                Err(CallDunderError::MethodNotAvailable)
+                    if matches!(
+                        frozen_dataclass_dispatch,
+                        Some(FrozenDataclassDispatch::Delegate(_))
+                    ) =>
+                {
+                    true
                 }
                 Err(CallDunderError::MethodNotAvailable) => {
                     if emit_diagnostics {
@@ -616,17 +682,27 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
         emit_diagnostics: bool,
     ) -> bool {
         let db = self.builder.db();
-        if property_setter_returns_never(db, descriptor_ty, object_ty, value_ty) {
+        let setter_result = setter_ty.try_call(
+            db,
+            &CallArguments::positional([descriptor_ty, object_ty, value_ty]),
+        );
+        // `Never` supports arbitrary operations only because there can be no runtime value to
+        // mutate; it is not a concrete descriptor with a terminal setter.
+        let setter_returns_never = !descriptor_ty.is_never()
+            && match &setter_result {
+                Ok(bindings) => bindings.return_type(db).is_never(),
+                Err(error) => error.return_type(db).is_never(),
+            };
+        if setter_returns_never
+            || property_setter_returns_never(db, descriptor_ty, object_ty, value_ty)
+        {
             if emit_diagnostics {
                 self.report(AssignmentAttributeWriteDiagnostic::TerminalDescriptor);
             }
             return false;
         }
 
-        match setter_ty.try_call(
-            db,
-            &CallArguments::positional([descriptor_ty, object_ty, value_ty]),
-        ) {
+        match setter_result {
             Ok(_) => true,
             Err(error) => {
                 if emit_diagnostics {

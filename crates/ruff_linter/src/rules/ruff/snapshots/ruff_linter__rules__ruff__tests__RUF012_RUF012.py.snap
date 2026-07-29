@@ -126,7 +126,6 @@ RUF012 Mutable default value for class attribute
 133 |     class_variable_without_subscript: 'ClassVar' = []
 134 |     final_variable_without_subscript: 'Final' = []
     |                                                 ^^
-    |
 help: Consider initializing in `__init__` or annotating with `typing.ClassVar`
 
 RUF012 Mutable default value for class attribute

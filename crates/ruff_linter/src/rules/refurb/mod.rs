@@ -53,6 +53,7 @@ mod tests {
     #[test_case(Rule::WriteWholeFile, Path::new("FURB103_2.py"))]
     #[test_case(Rule::FStringNumberFormat, Path::new("FURB116.py"))]
     #[test_case(Rule::SortedMinMax, Path::new("FURB192.py"))]
+    #[test_case(Rule::SortedMinMax, Path::new("FURB192_1.py"))]
     #[test_case(Rule::SliceToRemovePrefixOrSuffix, Path::new("FURB188.py"))]
     #[test_case(Rule::SubclassBuiltin, Path::new("FURB189.py"))]
     #[test_case(Rule::FromisoformatReplaceZ, Path::new("FURB162.py"))]

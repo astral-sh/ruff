@@ -1130,7 +1130,6 @@ UP035 [*] Import from `re` instead: `Pattern`
 133 | # UP035 on py37+ only
 134 | from typing.re import Pattern
     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-    |
 help: Import from `re`
     |
 133 | # UP035 on py37+ only

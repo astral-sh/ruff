@@ -430,7 +430,6 @@ RUF015 [*] Prefer `next(iter(zip(x, y)))` over single element slice
 72 |     zip = list  # Overwrite the builtin zip
 73 |     list(zip(x, y))[0]
    |     ^^^^^^^^^^^^^^^^^^
-   |
 help: Replace with `next(iter(zip(x, y)))`
    |
 72 |     zip = list  # Overwrite the builtin zip

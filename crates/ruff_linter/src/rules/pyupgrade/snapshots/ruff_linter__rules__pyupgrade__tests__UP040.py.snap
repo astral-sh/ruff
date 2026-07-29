@@ -215,7 +215,6 @@ UP040 [*] Type alias `Decorator` uses `TypeAlias` annotation instead of the `typ
 56 | T = typing.TypeVar["T"]
 57 | Decorator: TypeAlias = typing.Callable[[T], T]
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 help: Use the `type` keyword
    |
 56 | T = typing.TypeVar["T"]
@@ -352,7 +351,6 @@ UP040 [*] Type alias `PositiveList` uses `TypeAliasType` assignment instead of t
 105 | |     "PositiveList", list[Annotated[T, Gt(0)]], type_params=(T,)
 106 | | ) # this comment should be okay
     | |_^
-    |
 help: Use the `type` keyword
     |
 103 | T = TypeVar("T")

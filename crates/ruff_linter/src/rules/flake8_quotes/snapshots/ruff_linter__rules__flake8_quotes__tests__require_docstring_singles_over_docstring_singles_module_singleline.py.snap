@@ -25,7 +25,6 @@ Q001 [*] Single quote multiline found but double quotes preferred
 5 |     pass
 6 | ''' this is not a docstring '''
   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  |
 help: Replace single multiline quotes with double quotes
   |
 5 |     pass

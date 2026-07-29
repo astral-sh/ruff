@@ -107,6 +107,30 @@ pub struct Options {
     )]
     pub output_format: Option<OutputFormat>,
 
+    /// Whether to prefer rule codes over human-readable rule names in diagnostic output, even
+    /// when preview mode is enabled.
+    ///
+    /// Diagnostics without rule codes, such as syntax errors and formatting diagnostics, will
+    /// continue to use the human-readable name, but those corresponding to lint rules will use the
+    /// rule's code. For example, the concise diagnostic for an unused import will use the code
+    /// `F401` instead of the name `unused-import`:
+    ///
+    /// ```console
+    /// $ ruff check --preview --config 'output-prefer-rule-codes = true' --output-format=concise example.py
+    /// example.py:1:8: F401 [*] `math` imported but unused
+    /// $ ruff check --preview --config 'output-prefer-rule-codes = false' --output-format=concise example.py
+    /// example.py:1:8: unused-import: [*] `math` imported but unused
+    /// ```
+    #[option(
+        default = "false",
+        value_type = "bool",
+        example = r#"
+            # Display rule codes instead of human-readable rule names.
+            output-prefer-rule-codes = true
+        "#
+    )]
+    pub output_prefer_rule_codes: Option<bool>,
+
     /// Enable fix behavior by-default when running `ruff` (overridden
     /// by the `--fix` and `--no-fix` command-line flags).
     /// Only includes automatic fixes unless `--unsafe-fixes` is provided.
@@ -1623,7 +1647,8 @@ pub struct Flake8ImportConventionsOptions {
     pub aliases: Option<FxHashMap<ModuleName, Alias>>,
 
     /// A mapping from module to conventional import alias. These aliases will
-    /// be added to the [`aliases`](#lint_flake8-import-conventions_aliases) mapping.
+    /// be added to the [`aliases`](#lint_flake8-import-conventions_aliases) mapping
+    /// and will override any existing `aliases` if the two settings overlap.
     #[option(
         default = r#"{}"#,
         value_type = "dict[str, str]",

@@ -3992,7 +3992,15 @@ impl<'db> CallableBinding<'db> {
                 }),
             );
 
-            if top_materialized_argument_type.is_assignable_to(db, parameter_types) {
+            if top_materialized_argument_type
+                .when_assignable_to(
+                    db,
+                    parameter_types,
+                    constraints,
+                    self.overloads[*current_index].inferable_typevars,
+                )
+                .is_always_satisfied(db)
+            {
                 filter_remaining_overloads = true;
             }
         }
@@ -5167,6 +5175,123 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             .collect()
     }
 
+    /// Returns the source callable whose parameters supplied a `ParamSpec` specialization.
+    ///
+    /// Forwarded arguments are checked against the wrapped callable, not the wrapper's
+    /// `Callable[P, R]` parameter. Retaining that callable also lets diagnostics account for bound
+    /// receivers and leading parameters consumed by `Concatenate`.
+    ///
+    /// Return `None` when the callback has no source declaration, so diagnostics can fall back to
+    /// the forwarding function's actual variadic parameter instead of an unrelated parameter.
+    /// Callable objects and constructors use their existing bindings to preserve the active
+    /// constructor stage and any consumed receiver.
+    /// A `functools.partial` also requires accounting for arguments that were supplied before the
+    /// remaining signature was forwarded.
+    ///
+    /// ```python
+    /// from typing import Callable
+    ///
+    /// def wrapper[**P](fn: Callable[P, None], *args: P.args, **kwargs: P.kwargs): ...
+    /// def target(*, value: int) -> None: ...
+    /// wrapper(target, value="bad")  # The parameter source is `target`.
+    /// ```
+    fn paramspec_parameter_source(
+        &self,
+        paramspec: BoundTypeVarInstance<'db>,
+        overload_index: usize,
+    ) -> Option<ForwardedParameterSource<'db>> {
+        self.enumerate_argument_types()
+            .find_map(|(argument_index, _, argument, argument_types)| {
+                if matches!(argument, Argument::Synthetic) {
+                    return None;
+                }
+
+                self.argument_matches[argument_index]
+                    .iter()
+                    .find_map(|matched_parameter| {
+                        let declared_type =
+                            self.signature.parameters()[matched_parameter.index].annotated_type();
+                        let argument_type = argument_types.get_for_declared_type(declared_type);
+                        let paramspec_prefix_len = |candidate: Type<'db>| {
+                            candidate
+                                .try_upcast_to_callable(self.db)?
+                                .iter()
+                                .find_map(|callable| {
+                                    callable.signatures(self.db).iter().find_map(|signature| {
+                                        let (prefix, declared_paramspec) =
+                                            signature.parameters().as_paramspec_with_prefix()?;
+                                        (declared_paramspec == paramspec).then_some(prefix.len())
+                                    })
+                                })
+                        };
+                        let prefix_len = if let Type::Union(union) =
+                            declared_type.resolve_type_alias(self.db)
+                        {
+                            union.elements(self.db).iter().find_map(|candidate| {
+                                let specialized_candidate = candidate
+                                    .apply_optional_specialization(self.db, self.specialization());
+                                argument_type
+                                    .is_assignable_to(self.db, specialized_candidate)
+                                    .then_some(*candidate)
+                                    .and_then(paramspec_prefix_len)
+                            })
+                        } else {
+                            paramspec_prefix_len(declared_type)
+                        }?;
+                        let (source_type, partial_signature) = match argument_type {
+                            Type::KnownInstance(
+                                KnownInstanceType::FunctoolsPartial(partial)
+                                | KnownInstanceType::FunctoolsPartialCall(partial),
+                            ) => (
+                                partial.wrapped(self.db).inner(self.db),
+                                partial
+                                    .partial(self.db)
+                                    .signatures(self.db)
+                                    .overloads
+                                    .get(overload_index),
+                            ),
+                            _ => (argument_type, None),
+                        };
+                        let argument_bindings = source_type.bindings(self.db);
+                        let callable = argument_bindings.single_item()?.callable();
+                        let (function, is_bound_method) = match callable.signature_type {
+                            Type::FunctionLiteral(function) => (function, false),
+                            Type::BoundMethod(method) => (method.function(self.db), true),
+                            _ => return None,
+                        };
+                        let source_binding = callable
+                            .overloads()
+                            .get(overload_index)
+                            .or_else(|| callable.overloads().first());
+                        let source_parameter_index_offset = source_binding
+                            .map_or(0, |binding| binding.source_parameter_index_offset)
+                            + usize::from(callable.bound_type.is_some());
+                        let source_parameter_index_offset =
+                            partial_signature
+                                .zip(source_binding)
+                                .and_then(|(partial_signature, source_binding)| {
+                                    let definition = partial_signature
+                                        .parameters()
+                                        .iter()
+                                        .find_map(Parameter::definition)?;
+                                    source_binding.signature.parameters().iter().position(
+                                        |parameter| parameter.definition() == Some(definition),
+                                    )
+                                })
+                                .map_or(source_parameter_index_offset, |index| {
+                                    index.max(source_parameter_index_offset)
+                                });
+
+                        Some(ForwardedParameterSource {
+                            function,
+                            is_bound_method,
+                            parameter_index_offset: prefix_len + source_parameter_index_offset,
+                            overload_index,
+                        })
+                    })
+            })
+    }
+
     fn specialization(&self) -> Option<Specialization<'db>> {
         self.inference
             .map(|inference| inference.specialization(self.db))
@@ -5611,6 +5736,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                 expected_ty,
                 provided_ty: argument_type,
                 provenance: matched_parameter.provenance,
+                parameter_source: None,
             });
         }
         // We still update the actual type of the parameter in this binding to match the argument,
@@ -5868,7 +5994,6 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             };
         let error_argument_indices = error_argument_indices.as_deref();
 
-        // Create Bindings with all overloads and perform full overload resolution
         let callable_binding =
             CallableBinding::from_overloads(self.signature_type, signatures.iter().cloned());
         let bindings = match Bindings::from(callable_binding)
@@ -5889,13 +6014,49 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             .single_element()
             .expect("ParamSpec sub-call should only contain a single CallableBinding");
 
-        let mut extend_errors = |errors: &[BindingError<'db>]| {
-            self.errors.extend(
-                errors
-                    .iter()
-                    .cloned()
-                    .map(|err| err.maybe_remap_argument_indices(error_argument_indices)),
-            );
+        let mut extend_errors = |binding: &Binding<'db>| {
+            let parameter_source = binding
+                .errors
+                .iter()
+                .find(|error| matches!(error, BindingError::InvalidArgumentType { .. }))
+                .and_then(|_| {
+                    self.paramspec_parameter_source(paramspec, binding.source_overload_index())
+                })
+                .and_then(|source| {
+                    let overload_index =
+                        source.source_overload_index(self.db, &binding.signature)?;
+                    Some(ForwardedParameterSource {
+                        overload_index,
+                        ..source
+                    })
+                });
+            let argument_matches = self.argument_matches;
+
+            self.errors
+                .extend(binding.errors.iter().cloned().map(|mut error| {
+                    if let BindingError::InvalidArgumentType {
+                        parameter,
+                        argument_index,
+                        parameter_source: error_parameter_source,
+                        ..
+                    } = &mut error
+                        && error_parameter_source.is_none()
+                    {
+                        if let Some(parameter_source) = parameter_source
+                            && parameter_source.contains_parameter(self.db, parameter.index)
+                        {
+                            *error_parameter_source = Some(parameter_source);
+                        } else if let Some(parameter_index) = argument_index
+                            .and_then(|index| paramspec_arguments?.get(index))
+                            .and_then(|(index, _)| argument_matches[*index].parameters.first())
+                            .map(|parameter| parameter.index)
+                        {
+                            parameter.index = parameter_index;
+                        }
+                    }
+
+                    error.maybe_remap_argument_indices(error_argument_indices)
+                }));
         };
 
         let mut matching_overloads = callable_binding.matching_overloads();
@@ -5904,7 +6065,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                 if let [binding] = callable_binding.overloads() {
                     // This is not an overloaded function, so we can propagate its errors to the
                     // outer bindings.
-                    extend_errors(&binding.errors);
+                    extend_errors(binding);
                 } else {
                     let index = callable_binding
                         .best_failing_overload_index(
@@ -5913,20 +6074,20 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                         .unwrap_or(0);
                     // TODO: We should also update the specialization for the `ParamSpec` to reflect
                     // the matching overload here.
-                    extend_errors(&callable_binding.overloads()[index].errors);
+                    extend_errors(&callable_binding.overloads()[index]);
                 }
             }
             (Some((_, binding)), None) => {
                 // TODO: We should also update the specialization for the `ParamSpec` to reflect the
                 // matching overload here.
-                extend_errors(&binding.errors);
+                extend_errors(binding);
             }
             (Some(_), Some(_)) => {
                 if !matches!(
                     callable_binding.overload_call_return_type,
                     Some(OverloadCallReturnType::ArgumentTypeExpansion(_))
                 ) {
-                    extend_errors(&callable_binding.overloads()[0].errors);
+                    extend_errors(&callable_binding.overloads()[0]);
                 }
             }
         }
@@ -7374,6 +7535,69 @@ impl std::fmt::Display for ParameterContexts {
     }
 }
 
+/// The function and source offsets used to locate a forwarded `ParamSpec` parameter.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct ForwardedParameterSource<'db> {
+    function: FunctionType<'db>,
+    is_bound_method: bool,
+    parameter_index_offset: usize,
+    overload_index: usize,
+}
+
+impl<'db> ForwardedParameterSource<'db> {
+    /// Recovers an overload's original index after specialization filters earlier declarations.
+    ///
+    /// `overload_index` initially refers to the specialized overload list. This method finds the
+    /// corresponding position in the original function, which can differ after filtering.
+    fn source_overload_index(self, db: &'db dyn Db, signature: &Signature<'db>) -> Option<usize> {
+        let parameter_definition = signature
+            .parameters()
+            .iter()
+            .find_map(Parameter::definition)?;
+
+        self.function
+            .signature(db)
+            .overloads
+            .iter()
+            .position(|source_signature| {
+                source_signature
+                    .parameters()
+                    .iter()
+                    .any(|parameter| parameter.definition() == Some(parameter_definition))
+            })
+    }
+
+    /// Returns whether the forwarded parameter maps to a specific source parameter.
+    ///
+    /// Out-of-range indices otherwise resolve to the entire signature, which would produce a
+    /// misleading diagnostic annotation.
+    fn contains_parameter(self, db: &'db dyn Db, parameter_index: usize) -> bool {
+        let parameter_index = parameter_index + self.parameter_index_offset;
+        let (overloads, implementation) = self.function.overloads_and_implementation(db);
+        let Some(overload) = overloads
+            .get(self.overload_index)
+            .copied()
+            .or(implementation)
+        else {
+            return false;
+        };
+
+        let (_, parameter_span) = overload.parameter_span(db, Some(parameter_index));
+        let (_, all_parameters_span) = overload.parameter_span(db, None);
+        parameter_span != all_parameters_span
+    }
+
+    /// Locates the matched source overload after restoring omitted receiver and prefix parameters.
+    fn parameter_span(self, db: &'db dyn Db, parameter_index: usize) -> (Span, Span) {
+        let parameter_index = parameter_index + self.parameter_index_offset;
+        let (overloads, _) = self.function.overloads_and_implementation(db);
+        overloads
+            .get(self.overload_index)
+            .map(|overload| overload.parameter_span(db, Some(parameter_index)))
+            .unwrap_or_else(|| self.function.parameter_span(db, Some(parameter_index)))
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum InvalidArgumentTypeProvenance {
     Argument,
@@ -7402,6 +7626,8 @@ pub(crate) enum BindingError<'db> {
         expected_ty: Type<'db>,
         provided_ty: Type<'db>,
         provenance: InvalidArgumentTypeProvenance,
+        /// The callable that actually declared the parameter, when reached through a `ParamSpec`.
+        parameter_source: Option<ForwardedParameterSource<'db>>,
     },
     /// The type of the keyword-variadic argument's key is not `str`.
     InvalidKeyType {
@@ -7679,6 +7905,7 @@ impl<'db> BindingError<'db> {
                 expected_ty,
                 provided_ty,
                 provenance,
+                parameter_source,
             } => {
                 // TODO: Ideally we would not emit diagnostics for `TypedDict` literal arguments
                 // here (see `diagnostic::is_invalid_typed_dict_literal`). However, we may have
@@ -7722,15 +7949,57 @@ impl<'db> BindingError<'db> {
                     provided_ty.assignability_error_context(context.db(), *expected_ty);
                 error_context.attach_to(context.db(), &mut diag);
 
+                if let Some(parameter_source) = parameter_source {
+                    let (name_span, parameter_span) =
+                        parameter_source.parameter_span(context.db(), parameter.index);
+                    let callable_kind = if parameter_source.is_bound_method {
+                        "Method"
+                    } else {
+                        "Function"
+                    };
+                    let mut sub = SubDiagnostic::new(
+                        SubDiagnosticSeverity::Info,
+                        format_args!("{callable_kind} defined here"),
+                    );
+                    sub.annotate(Annotation::primary(name_span));
+                    sub.annotate(
+                        Annotation::secondary(parameter_span).message("Parameter declared here"),
+                    );
+                    diag.sub(sub);
+                }
+
                 if let Some(matching_overload) = matching_overload {
                     if let Some(overload_literal) = matching_overload.get(context.db()) {
                         let mut sub = SubDiagnostic::new(
                             SubDiagnosticSeverity::Info,
                             "Matching overload defined here",
                         );
+                        let parameter_index = if parameter_source.is_some() {
+                            let argument_is_positional = Self::get_argument_node(
+                                node,
+                                argument_index.map(|index| index + context.argument_index_offset),
+                            )
+                            .map_or(parameter.positional, |argument| {
+                                matches!(argument, ArgOrKeyword::Arg(_))
+                            });
+                            overload_literal
+                                .signature(context.db())
+                                .parameters()
+                                .iter()
+                                .position(|candidate| {
+                                    if argument_is_positional {
+                                        candidate.is_variadic()
+                                    } else {
+                                        candidate.is_keyword_variadic()
+                                    }
+                                })
+                                .unwrap_or(parameter.index)
+                        } else {
+                            parameter.index
+                        };
                         let (name_span, parameter_span) = overload_literal.parameter_span(
                             context.db(),
-                            Some(parameter.index + source_parameter_index_offset),
+                            Some(parameter_index + source_parameter_index_offset),
                         );
                         sub.annotate(Annotation::primary(name_span));
                         sub.annotate(
@@ -7762,10 +8031,12 @@ impl<'db> BindingError<'db> {
                             ));
                         }
                     }
-                } else if let Some((name_span, parameter_span)) = callable_ty.parameter_span(
-                    context.db(),
-                    Some(parameter.index + source_parameter_index_offset),
-                ) {
+                } else if parameter_source.is_none()
+                    && let Some((name_span, parameter_span)) = callable_ty.parameter_span(
+                        context.db(),
+                        Some(parameter.index + source_parameter_index_offset),
+                    )
+                {
                     let mut sub = SubDiagnostic::new(
                         SubDiagnosticSeverity::Info,
                         format_args!("{callable_kind} defined here"),

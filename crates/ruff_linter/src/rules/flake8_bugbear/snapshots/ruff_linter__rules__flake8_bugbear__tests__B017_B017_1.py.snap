@@ -18,7 +18,6 @@ B017 Do not assert blind exception: `BaseException`
 20 |         self.assertRaises(Exception, something_else)
 21 |         self.assertRaises(BaseException, something_else)
    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 
 B017 Do not assert blind exception: `Exception`
   --> B017_1.py:25:5
