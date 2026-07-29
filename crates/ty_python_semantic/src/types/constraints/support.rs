@@ -8,7 +8,8 @@
 
 use std::ops::BitOrAssign;
 
-use crate::types::constraints::TypeVarId;
+use crate::types::constraints::{ConstraintSetStorage, TypeVarId};
+use crate::types::typevar::BoundTypeVarIdentity;
 
 use bitvec::prelude::BitVec;
 use ruff_index::newtype_index;
@@ -34,6 +35,18 @@ impl Support {
             self.bits.resize(index + 1, false);
         }
         self.bits.set(index, true);
+    }
+
+    pub(super) fn contains_any<'db>(
+        &self,
+        storage: &ConstraintSetStorage<'db>,
+        mut predicate: impl FnMut(BoundTypeVarIdentity<'db>) -> bool,
+    ) -> bool {
+        self.bits.iter_ones().any(|index| {
+            let typevar = TypeVarId::from_usize(index);
+            let typevar = storage.typevar_data(typevar);
+            predicate(typevar)
+        })
     }
 }
 

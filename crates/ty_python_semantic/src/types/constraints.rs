@@ -106,7 +106,7 @@ use ty_static::EnvVars;
 
 use crate::types::class::GenericAlias;
 use crate::types::constraints::support::{Support, SupportId};
-use crate::types::typevar::{BoundTypeVarIdentity, TypeVarSet, walk_bound_type_var_type};
+use crate::types::typevar::{BoundTypeVarIdentity, TypeVarSet};
 use crate::types::variance::VarianceInferable;
 use crate::types::visitor::{
     TypeCollector, TypeKind, TypeVisitor, any_over_type, walk_non_atomic_type,
@@ -1280,18 +1280,6 @@ impl<'db> ConstraintSetStorage<'db> {
                 false
             }
 
-            fn visit_bound_type_var_type(
-                &self,
-                db: &'db dyn Db,
-                bound_typevar: BoundTypeVarInstance<'db>,
-            ) {
-                let mut storage = self.storage.borrow_mut();
-                let typevar = storage.intern_typevar(db, bound_typevar);
-                drop(storage);
-                self.support.borrow_mut().set(typevar);
-                walk_bound_type_var_type(db, bound_typevar, self);
-            }
-
             fn visit_generic_alias_type(&self, db: &'db dyn Db, alias: GenericAlias<'db>) {
                 for ty in alias.specialization(db).types(db) {
                     self.visit_type(db, *ty);
@@ -1299,6 +1287,12 @@ impl<'db> ConstraintSetStorage<'db> {
             }
 
             fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
+                if let Type::TypeVar(bound_typevar) = ty {
+                    let mut storage = self.storage.borrow_mut();
+                    let typevar = storage.intern_typevar(db, bound_typevar);
+                    let mut support = self.support.borrow_mut();
+                    support.set(typevar);
+                }
                 walk_type_with_recursion_guard(db, ty, self, &self.recursion_guard);
             }
         }
@@ -1543,6 +1537,18 @@ impl<'db> ConstraintSetStorage<'db> {
     fn intern_support(&mut self, data: Support) -> SupportId {
         let id = self.supports.push(data);
         self.adjusted_support_id(id)
+    }
+
+    fn typevar_data(&self, typevar: TypeVarId) -> BoundTypeVarIdentity<'db> {
+        if let Some(compacted) = &self.compacted {
+            let index = typevar.index();
+            let split = compacted.typevars.len();
+            if index < split {
+                return compacted.typevars[typevar];
+            }
+            return self.typevars[TypeVarId::from_usize(index - split)];
+        }
+        self.typevars[typevar]
     }
 
     fn support_data(&self, support: SupportId) -> &Support {
@@ -4415,10 +4421,6 @@ impl InteriorNode {
         bound_typevars: TypeVarSet<'db>,
         source_order: Option<SourceOrderId>,
     ) -> (NodeId, Option<SourceOrderId>) {
-        let mentions_typevar = |ty: Type<'_>| match ty {
-            Type::TypeVar(typevar) => typevar.is_inferable(db, bound_typevars),
-            _ => false,
-        };
         self.abstract_inner(
             db,
             storage,
@@ -4428,16 +4430,8 @@ impl InteriorNode {
             // the sequent map can propagate any derived constraints that do not mention the
             // quantified typevars.
             &mut |storage: &ConstraintSetStorage<'_>, constraint| {
-                let constraint = storage.constraint_data(constraint);
-                constraint.typevar.is_inferable(db, bound_typevars)
-                    || constraint
-                        .bounds
-                        .lower
-                        .is_some_and(|lower| any_over_type(db, lower, false, mentions_typevar))
-                    || constraint
-                        .bounds
-                        .upper
-                        .is_some_and(|upper| any_over_type(db, upper, false, mentions_typevar))
+                let support = storage.constraint_support(constraint);
+                support.contains_any(storage, |typevar| typevar.is_inferable(db, bound_typevars))
             },
         )
     }
