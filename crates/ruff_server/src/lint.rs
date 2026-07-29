@@ -3,13 +3,13 @@
 use std::fmt::Write;
 use std::path::Path;
 
-use ruff_python_ast::SourceType;
+use ruff_python_ast::{SourceType, TomlSourceType};
 use ruff_workspace::Settings;
 use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    DIAGNOSTIC_NAME, PositionEncoding,
+    DIAGNOSTIC_NAME, PositionEncoding, TextDocument,
     edit::{NotebookDocument, NotebookRange, ToRangeExt},
     resolve::is_document_excluded_for_linting,
     session::DocumentQuery,
@@ -27,6 +27,7 @@ use ruff_linter::{
     settings::flags,
     source_kind::SourceKind,
     suppression::Suppressions,
+    toml::lint_toml,
 };
 use ruff_notebook::{Notebook, NotebookIndex};
 use ruff_python_codegen::Stylist;
@@ -77,13 +78,6 @@ pub(crate) fn check(
     let settings = query.settings();
     let document_path = query.virtual_file_path();
 
-    let SourceType::Python(source_type) = query.source_type_for_lint() else {
-        return DiagnosticsMap::default();
-    };
-    let source_kind = query.make_python_source_kind(source_type);
-    let document_uri = query.make_key().into_uri();
-    let notebook = query.as_notebook();
-
     // If the document is excluded, return an empty list of diagnostics.
     if is_document_excluded_for_linting(
         &document_path,
@@ -94,20 +88,31 @@ pub(crate) fn check(
         return DiagnosticsMap::default();
     }
 
-    // Map row and column locations to byte slices (lazily).
-    let locator = Locator::new(source_kind.source_code());
+    let result = match query.source_type_for_lint() {
+        SourceType::Python(source_type) => check_python(query, source_type),
+        SourceType::Toml(source_type @ (TomlSourceType::Pyproject | TomlSourceType::Ruff)) => {
+            let Ok(document) = query.as_single_document() else {
+                return DiagnosticsMap::default();
+            };
+            check_toml(query, document, source_type)
+        }
+        SourceType::Toml(_) | SourceType::Markdown => return DiagnosticsMap::default(),
+    };
+
     let CheckResult {
         diagnostics,
         suppression_edits,
-    } = check_python(query, source_type, &source_kind, &locator);
+        document,
+    } = result;
+    let document_uri = query.make_key().into_uri();
     let context = LspDiagnosticContext {
-        source: source_kind.source_code(),
-        index: locator.to_index(),
-        notebook_index: source_kind.as_ipy_notebook().map(Notebook::index),
+        source: document.source(),
+        index: document.index(),
+        notebook_index: document.notebook_index(),
         encoding,
-        document_path: document_path.as_ref(),
+        document_path: &document_path,
         document_uri: &document_uri,
-        notebook,
+        notebook: query.as_notebook(),
         supports_related_information,
         settings,
     };
@@ -126,17 +131,15 @@ pub(crate) fn check(
             .or_default();
     }
 
-    let lsp_diagnostics =
-        diagnostics
-            .into_iter()
-            .zip(suppression_edits)
-            .filter_map(|(message, noqa_edit)| {
-                if message.is_invalid_syntax() && !show_syntax_errors {
-                    None
-                } else {
-                    Some(to_lsp_diagnostic(&message, noqa_edit, &context))
-                }
-            });
+    let mut suppression_edits = suppression_edits.into_iter();
+    let lsp_diagnostics = diagnostics.into_iter().filter_map(|message| {
+        let suppression_edit = suppression_edits.next().flatten();
+        if message.is_invalid_syntax() && !show_syntax_errors {
+            None
+        } else {
+            Some(to_lsp_diagnostic(&message, suppression_edit, &context))
+        }
+    });
 
     if let Some(notebook) = query.as_notebook() {
         for (index, diagnostic) in lsp_diagnostics {
@@ -162,11 +165,10 @@ pub(crate) fn check(
 fn check_python(
     query: &DocumentQuery,
     source_type: ruff_python_ast::PySourceType,
-    source_kind: &SourceKind,
-    locator: &Locator<'_>,
-) -> CheckResult {
+) -> CheckResult<'_> {
     let settings = query.settings();
     let document_path = query.virtual_file_path();
+    let source_kind = query.make_python_source_kind(source_type);
 
     let file_path = query.file_path();
     let package = if let Some(file_path) = &file_path {
@@ -184,7 +186,10 @@ fn check_python(
     let target_version = settings.linter.resolve_target_version(&document_path);
 
     // Parse once.
-    let parsed = parse_unchecked_source(source_kind, source_type, target_version.parser_version());
+    let parsed = parse_unchecked_source(&source_kind, source_type, target_version.parser_version());
+
+    // Map row and column locations to byte slices (lazily).
+    let locator = Locator::new(source_kind.source_code());
 
     // Detect the current code style (lazily).
     let stylist = Stylist::from_tokens(parsed.tokens(), locator.contents());
@@ -193,7 +198,7 @@ fn check_python(
     let indexer = Indexer::from_tokens(parsed.tokens(), locator.contents());
 
     // Extract the `# noqa` and `# isort: skip` directives from the source.
-    let directives = extract_directives(parsed.tokens(), Flags::all(), locator, &indexer);
+    let directives = extract_directives(parsed.tokens(), Flags::all(), &locator, &indexer);
 
     // Parse range suppression comments
     let suppressions = Suppressions::from_tokens(
@@ -207,13 +212,13 @@ fn check_python(
     let diagnostics = check_path(
         &document_path,
         package,
-        locator,
+        &locator,
         &stylist,
         &indexer,
         &directives,
         &settings.linter,
         flags::Noqa::Enabled,
-        source_kind,
+        &source_kind,
         source_type,
         &parsed,
         target_version,
@@ -223,7 +228,7 @@ fn check_python(
     let suppression_edits = generate_suppression_edits(
         &document_path,
         &diagnostics,
-        locator,
+        &locator,
         indexer.comment_ranges(),
         &settings.linter.external,
         &directives.noqa_line_for,
@@ -238,9 +243,44 @@ fn check_python(
         },
         settings.linter.preview,
     );
+    let index = locator.to_index().clone();
+
     CheckResult {
         diagnostics,
         suppression_edits,
+        document: CheckedDocument::Python {
+            source: source_kind,
+            index,
+        },
+    }
+}
+
+fn check_toml<'a>(
+    query: &DocumentQuery,
+    document: &'a TextDocument,
+    source_type: TomlSourceType,
+) -> CheckResult<'a> {
+    let settings = query.settings();
+    let diagnostics = if settings
+        .linter
+        .rules
+        .iter_enabled()
+        .any(|rule| rule.lint_source().is_toml())
+    {
+        lint_toml(
+            &query.virtual_file_path(),
+            document.contents(),
+            &settings.linter,
+            source_type,
+        )
+    } else {
+        Vec::new()
+    };
+
+    CheckResult {
+        diagnostics,
+        suppression_edits: Vec::new(),
+        document: CheckedDocument::Toml(document),
     }
 }
 
@@ -272,9 +312,41 @@ pub(crate) fn fixes_for_diagnostics(
         .collect()
 }
 
-struct CheckResult {
+enum CheckedDocument<'a> {
+    Python {
+        source: SourceKind,
+        index: LineIndex,
+    },
+    Toml(&'a TextDocument),
+}
+
+impl CheckedDocument<'_> {
+    fn source(&self) -> &str {
+        match self {
+            Self::Python { source, .. } => source.source_code(),
+            Self::Toml(document) => document.contents(),
+        }
+    }
+
+    fn index(&self) -> &LineIndex {
+        match self {
+            Self::Python { index, .. } => index,
+            Self::Toml(document) => document.index(),
+        }
+    }
+
+    fn notebook_index(&self) -> Option<&NotebookIndex> {
+        match self {
+            Self::Python { source, .. } => source.as_ipy_notebook().map(Notebook::index),
+            Self::Toml(_) => None,
+        }
+    }
+}
+
+struct CheckResult<'a> {
     diagnostics: Vec<Diagnostic>,
     suppression_edits: Vec<Option<Edit>>,
+    document: CheckedDocument<'a>,
 }
 
 struct LspDiagnosticContext<'a> {
