@@ -3333,7 +3333,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
 
             // Preserve concrete set-operation branches until the gradual relation distributes
             // across them. Disjoint filtering can otherwise remove a valid constraint path.
-            let when = actual.has_relation_to_with(
+            let when = actual.has_relation_to_with_variance(
                 self.db,
                 formal,
                 self.constraints,
@@ -3341,10 +3341,9 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 TypeRelation::Assignability,
                 TypeVarEvaluation::Lazy,
                 GradualEvaluation::Lazy,
+                polarity,
             );
-            if self.add_type_mappings_from_constraint_set(when).is_ok() {
-                self.pending.intersect(self.db, self.constraints, when);
-            }
+            self.infer_from_constraint_set(when)?;
             return Ok(());
         }
 

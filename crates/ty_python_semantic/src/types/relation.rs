@@ -696,6 +696,30 @@ impl<'db> Type<'db> {
         typevar_evaluation: TypeVarEvaluation,
         gradual_evaluation: GradualEvaluation,
     ) -> ConstraintSet<'db, 'c> {
+        self.has_relation_to_with_variance(
+            db,
+            target,
+            constraints,
+            inferable,
+            relation,
+            typevar_evaluation,
+            gradual_evaluation,
+            TypeVarVariance::Covariant,
+        )
+    }
+
+    #[expect(clippy::too_many_arguments)]
+    pub(super) fn has_relation_to_with_variance<'c>(
+        self,
+        db: &'db dyn Db,
+        target: Type<'db>,
+        constraints: &'c ConstraintSetBuilder<'db>,
+        inferable: TypeVarSet<'db>,
+        relation: TypeRelation,
+        typevar_evaluation: TypeVarEvaluation,
+        gradual_evaluation: GradualEvaluation,
+        variance: TypeVarVariance,
+    ) -> ConstraintSet<'db, 'c> {
         let relation_visitor = HasRelationToVisitor::default(constraints);
         let disjointness_visitor = IsDisjointVisitor::default(constraints);
         let signature_relation_visitor = SignatureRelationVisitor::default();
@@ -715,7 +739,18 @@ impl<'db> Type<'db> {
             signature_relation_visitor: &signature_relation_visitor,
             materialization_visitor: &materialization_visitor,
         };
-        checker.check_type_pair(db, self, target)
+        match variance {
+            TypeVarVariance::Covariant => checker.check_type_pair(db, self, target),
+            TypeVarVariance::Contravariant => checker.check_type_pair(db, target, self),
+            TypeVarVariance::Invariant => {
+                checker
+                    .check_type_pair(db, self, target)
+                    .and(db, constraints, || {
+                        checker.check_type_pair(db, target, self)
+                    })
+            }
+            TypeVarVariance::Bivariant => ConstraintSet::from_bool(constraints, true),
+        }
     }
 
     /// Return true if this type is [equivalent to] type `other`.

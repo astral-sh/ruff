@@ -431,6 +431,40 @@ def _(
     reveal_type(takes_list(value))  # revealed: Any
 ```
 
+## Gradual specializations
+
+Specializations involving gradual types respect the variance of their outer type.
+
+```py
+from typing import Any
+
+class Producer[T]:
+    def produce(self) -> T:
+        raise NotImplementedError
+
+class Consumer[T]:
+    def consume(self, value: T) -> None:
+        raise NotImplementedError
+
+def takes_producer[T](value: Producer[T]) -> T:
+    raise NotImplementedError
+
+def takes_consumer[T](value: Consumer[T]) -> T:
+    raise NotImplementedError
+
+def _(
+    producer_lower: Producer[str | Any],
+    producer_upper: Producer[str & Any],
+    consumer_lower: Consumer[str | Any],
+    consumer_upper: Consumer[str & Any],
+):
+    reveal_type(takes_producer(producer_lower))  # revealed: str | Any
+    # TODO: This should reveal `str & Any`.
+    reveal_type(takes_producer(producer_upper))  # revealed: Any
+    reveal_type(takes_consumer(consumer_lower))  # revealed: Any
+    reveal_type(takes_consumer(consumer_upper))  # revealed: str & Any
+```
+
 ## Union and intersection gradual constraints
 
 Gradual constraints are distributed across unions and intersections.
