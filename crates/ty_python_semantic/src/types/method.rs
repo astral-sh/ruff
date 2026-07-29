@@ -450,7 +450,7 @@ impl<'db> KnownBoundMethodType<'db> {
                             .with_annotated_type(UnionType::from_two_elements(
                                 env,
                                 KnownClass::Str.to_instance(env),
-                                Type::homogeneous_tuple(db, KnownClass::Str.to_instance(env)),
+                                Type::homogeneous_tuple(env, KnownClass::Str.to_instance(env)),
                             )),
                         Parameter::positional_only(Some(Name::new_static("start")))
                             .with_annotated_type(UnionType::from_two_elements(
@@ -523,7 +523,7 @@ impl<'db> KnownBoundMethodType<'db> {
                     )))
                     .with_annotated_type(TypeFormType::from_type_expression(
                         db,
-                        Type::homogeneous_tuple(db, Type::object()),
+                        Type::homogeneous_tuple(env, Type::object()),
                     ))]),
                     KnownClass::ConstraintSet.to_instance(env),
                 )))
@@ -536,7 +536,7 @@ impl<'db> KnownBoundMethodType<'db> {
                             env,
                             TypeFormType::from_type_expression(
                                 db,
-                                Type::homogeneous_tuple(db, Type::object()),
+                                Type::homogeneous_tuple(env, Type::object()),
                             ),
                             Type::none(env),
                         ))
@@ -553,14 +553,14 @@ impl<'db> KnownBoundMethodType<'db> {
                         Parameter::keyword_only(Name::new_static("inferable")).with_annotated_type(
                             TypeFormType::from_type_expression(
                                 db,
-                                Type::homogeneous_tuple(db, Type::object()),
+                                Type::homogeneous_tuple(env, Type::object()),
                             ),
                         ),
                     ]),
                     UnionType::from_two_elements(
                         env,
                         Type::homogeneous_tuple(
-                            db,
+                            env,
                             KnownClass::ConstraintSetSolution.to_instance(env),
                         ),
                         Type::none(env),
@@ -573,12 +573,12 @@ impl<'db> KnownBoundMethodType<'db> {
                     Parameters::standard([Parameter::keyword_only(Name::new_static("inferable"))
                         .with_annotated_type(TypeFormType::from_type_expression(
                             db,
-                            Type::homogeneous_tuple(db, Type::object()),
+                            Type::homogeneous_tuple(env, Type::object()),
                         ))]),
                     UnionType::from_two_elements(
                         env,
                         Type::homogeneous_tuple(
-                            db,
+                            env,
                             KnownClass::ConstraintSetSolution.to_instance(env),
                         ),
                         Type::none(env),

@@ -70,7 +70,7 @@ impl<'db> Type<'db> {
                 let specialization = class.into_generic_alias().map(|g| g.specialization(db));
                 match class_literal.known(db) {
                     Some(KnownClass::Tuple) => Type::tuple(TupleType::new(
-                        db,
+                        env,
                         specialization
                             .and_then(|spec| Some(Cow::Borrowed(spec.tuple(db)?)))
                             .unwrap_or_else(|| Cow::Owned(TupleSpec::homogeneous(Type::unknown())))
@@ -102,23 +102,23 @@ impl<'db> Type<'db> {
         Type::tuple_instance(tuple)
     }
 
-    pub fn homogeneous_tuple(db: &'db dyn Db, element: Type<'db>) -> Self {
-        Type::tuple_instance(TupleType::homogeneous(db, element))
+    pub fn homogeneous_tuple(env: &SemanticEnvironment<'db>, element: Type<'db>) -> Self {
+        Type::tuple_instance(TupleType::homogeneous(env, element))
     }
 
-    pub(crate) fn heterogeneous_tuple<I, T>(db: &'db dyn Db, elements: I) -> Self
+    pub(crate) fn heterogeneous_tuple<I, T>(env: &SemanticEnvironment<'db>, elements: I) -> Self
     where
         I: IntoIterator<Item = T>,
         T: Into<Type<'db>>,
     {
         Type::tuple(TupleType::heterogeneous(
-            db,
+            env,
             elements.into_iter().map(Into::into),
         ))
     }
 
-    pub(crate) fn empty_tuple(db: &'db dyn Db) -> Self {
-        Type::tuple_instance(TupleType::empty(db))
+    pub(crate) fn empty_tuple(env: &SemanticEnvironment<'db>) -> Self {
+        Type::tuple_instance(TupleType::empty(env))
     }
 
     /// **Private** helper function to create a `Type::NominalInstance` from a tuple.
@@ -244,7 +244,7 @@ impl<'db> NominalInstanceType<'db> {
     pub(super) fn class(&self, env: &SemanticEnvironment<'db>) -> ClassType<'db> {
         let db = env.db();
         match self.0 {
-            NominalInstanceInner::ExactTuple(tuple) => tuple.to_class_type(db, env.program()),
+            NominalInstanceInner::ExactTuple(tuple) => tuple.to_class_type(db),
             NominalInstanceInner::NonTuple(class) => class.class(db),
             NominalInstanceInner::SysVersionInfo => {
                 sys_version_info_class(env).unwrap_or_else(|| ClassType::object(env))

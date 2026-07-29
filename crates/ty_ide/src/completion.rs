@@ -1356,7 +1356,6 @@ impl<'m> ContextCursor<'m> {
     /// The return value is always `None` if the cursor is not
     /// inside a `raise` or `except` context.
     fn exception_ty<'db>(&self, env: &SemanticEnvironment<'db>) -> Option<Type<'db>> {
-        let db = env.db();
         let base_exception_ty = KnownClass::BaseException.to_subclass_of(env);
         let base_exception_instance = KnownClass::BaseException.to_instance(env);
         let raise_ty = UnionType::from_elements(env, [base_exception_ty, base_exception_instance]);
@@ -1365,7 +1364,7 @@ impl<'m> ContextCursor<'m> {
             env,
             [
                 base_exception_ty,
-                Type::homogeneous_tuple(db, base_exception_ty),
+                Type::homogeneous_tuple(env, base_exception_ty),
             ],
         );
 

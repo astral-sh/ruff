@@ -222,8 +222,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let tuple_generic_alias =
             |env: &SemanticEnvironment<'db>, tuple: Option<TupleType<'db>>| {
                 let db = env.db();
-                let tuple = tuple.unwrap_or_else(|| TupleType::homogeneous(db, Type::unknown()));
-                Type::from(tuple.to_class_type(db, env.program()))
+                let tuple = tuple.unwrap_or_else(|| TupleType::homogeneous(env, Type::unknown()));
+                Type::from(tuple.to_class_type(db))
             };
 
         match value_ty {
@@ -889,7 +889,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     node: expanded_type_arguments
                         .get(typevartuple_index)
                         .map_or(slice_node, |argument| argument.node),
-                    ty: Some(Type::tuple(TupleType::new(db, &tuple_builder.build()))),
+                    ty: Some(Type::tuple(TupleType::new(env, &tuple_builder.build()))),
                     source_index: expanded_type_arguments
                         .get(typevartuple_index)
                         .map_or(0, |argument| argument.source_index),
@@ -1147,7 +1147,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             self.store_expression_type(
                 slice_node,
                 Type::heterogeneous_tuple(
-                    db,
+                    env,
                     inferred_type_arguments
                         .into_iter()
                         .map(|ty| ty.unwrap_or(Type::unknown())),
@@ -1167,7 +1167,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         Some(if typevar.is_paramspec(db) {
                             Type::paramspec_value_callable(db, Parameters::unknown())
                         } else if typevar.is_typevartuple(db) {
-                            Type::homogeneous_tuple(db, Type::unknown())
+                            Type::homogeneous_tuple(env, Type::unknown())
                         } else {
                             Type::unknown()
                         })

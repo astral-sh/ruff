@@ -3450,7 +3450,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         if !check_types(
                             &mut result,
                             target_parameter.annotated_type(),
-                            Type::empty_tuple(db),
+                            Type::empty_tuple(env),
                             target_parameter.name(),
                             target_index,
                         ) {
@@ -3655,7 +3655,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                                             element => VariableSegment::Homogeneous(element),
                                         };
                                         Type::tuple(TupleType::mixed_with_segment(
-                                            db,
+                                            env,
                                             captured_source_parameters()
                                                 .take(source_variadic_index)
                                                 .map(Parameter::annotated_type),
@@ -3666,7 +3666,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                                         ))
                                     } else {
                                         Type::heterogeneous_tuple(
-                                            db,
+                                            env,
                                             captured_source_parameters()
                                                 .map(Parameter::annotated_type),
                                         )

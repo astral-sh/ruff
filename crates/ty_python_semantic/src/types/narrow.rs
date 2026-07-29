@@ -1054,7 +1054,7 @@ fn refine_exact_tuple_for_sequence_pattern<'db>(
         TupleSpecBuilder::from(tuple.as_ref())
             .intersect(env, &pattern_tuple)
             .map_or(Type::Never, |refined| {
-                Type::tuple(TupleType::new(db, &refined.build()))
+                Type::tuple(TupleType::new(env, &refined.build()))
             }),
     )
 }
@@ -2949,7 +2949,7 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
             _ => {
                 if is_equality && let Some(tuple) = resolved.exact_tuple_instance_spec(db) {
                     match tuple.resize(env, TupleLength::Fixed(length)) {
-                        Ok(tuple) => Type::tuple(TupleType::new(db, &tuple)),
+                        Ok(tuple) => Type::tuple(TupleType::new(env, &tuple)),
                         Err(_) => Type::Never,
                     }
                 } else {
@@ -3145,7 +3145,7 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
         }
 
         Some(Type::heterogeneous_tuple(
-            self.env.db(),
+            &self.env,
             elements
                 .iter()
                 .map(|element| inference.expression_type(element)),

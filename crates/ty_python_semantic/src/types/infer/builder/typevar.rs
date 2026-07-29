@@ -117,7 +117,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     })
                     .collect();
 
-                let tuple_ty = Type::heterogeneous_tuple(db, constraint_tys.clone());
+                let tuple_ty = Type::heterogeneous_tuple(env, constraint_tys.clone());
                 self.store_expression_type(expr, tuple_ty);
                 // Mirror the `< 2` guard from `infer_typevar_definition` to avoid
                 // a cascading `invalid-type-variable-default` diagnostic for tuples
@@ -628,7 +628,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 );
                 // N.B. We cannot represent a heterogeneous list of types in our type system, so we
                 // use a heterogeneous tuple type to represent the list of types instead.
-                self.store_expression_type(default_expr, Type::heterogeneous_tuple(db, types));
+                let ty = Type::heterogeneous_tuple(self.semantic_environment(), types);
+                self.store_expression_type(default_expr, ty);
                 return;
             }
             ast::Expr::Name(_) => {

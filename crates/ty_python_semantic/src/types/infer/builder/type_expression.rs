@@ -571,7 +571,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             .collect();
 
                         if inner_types.iter().all(|ty| ty.is_hintable(self.db())) {
-                            let hinted_type = Type::heterogeneous_tuple(self.db(), inner_types);
+                            let hinted_type = Type::heterogeneous_tuple(env, inner_types);
                             diagnostic.set_primary_annotation_message(format_args!(
                                 "Did you mean `{}`?",
                                 hinted_type.display(env),
@@ -985,7 +985,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     builder.into_diagnostic("`*` can only unpack a tuple type or `TypeVarTuple`"),
                 );
             }
-            Type::homogeneous_tuple(self.db(), Type::unknown())
+            Type::homogeneous_tuple(self.semantic_environment(), Type::unknown())
         }
     }
 
@@ -1087,7 +1087,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             "`...` cannot be used after an unpacked element",
                         );
                     }
-                    let result = TupleType::homogeneous(self.db(), element_ty);
+                    let result = TupleType::homogeneous(env, element_ty);
                     self.store_expression_type(&tuple.slice, Type::tuple(Some(result)));
                     return Some(result);
                 }
@@ -1175,7 +1175,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     }
                 }
 
-                let ty = TupleType::new(self.db(), &element_types.build());
+                let ty = TupleType::new(env, &element_types.build());
 
                 // Here, we store the type for the inner `int, str` tuple-expression,
                 // while the type for the outer `tuple[int, str]` slice-expression is
@@ -1195,7 +1195,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         );
                     }
                     self.store_expression_type(single_element, Type::unknown());
-                    return TupleType::heterogeneous(self.db(), std::iter::once(Type::unknown()));
+                    return TupleType::heterogeneous(env, std::iter::once(Type::unknown()));
                 }
                 let previously_in_valid_unpack_context = self
                     .context
@@ -1217,19 +1217,19 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     if let Some(inner_tuple) =
                         single_element_ty.exact_tuple_instance_spec(self.db())
                     {
-                        return TupleType::new(self.db(), &inner_tuple);
+                        return TupleType::new(env, &inner_tuple);
                     } else if let Type::TypeVar(typevar) = single_element_ty
                         && typevar.is_typevartuple(self.db())
                     {
                         return TupleType::new(
-                            self.db(),
+                            env,
                             &TupleSpecBuilder::with_capacity(0)
                                 .concat_variadic_typevar(env, typevar)
                                 .build(),
                         );
                     }
                 }
-                TupleType::heterogeneous(self.db(), std::iter::once(single_element_ty))
+                TupleType::heterogeneous(env, std::iter::once(single_element_ty))
             }
         }
     }
@@ -1307,9 +1307,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         if class_literal.is_tuple(self.db()) {
                             let class_type = self
                                 .infer_tuple_type_expression(subscript)
-                                .map(|tuple_type| {
-                                    tuple_type.to_class_type(self.db(), self.program())
-                                })
+                                .map(|tuple_type| tuple_type.to_class_type(self.db()))
                                 .unwrap_or_else(|| class_literal.default_specialization(env));
                             SubclassOfType::from(env, class_type)
                         } else {
@@ -2537,7 +2535,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             "`Unpack` can only unpack a tuple type or `TypeVarTuple`",
                         ));
                     }
-                    Type::homogeneous_tuple(self.db(), Type::unknown())
+                    Type::homogeneous_tuple(env, Type::unknown())
                 }
             }
             SpecialFormType::NoReturn

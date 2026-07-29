@@ -52,7 +52,7 @@ pub(super) fn synthesize_typed_dict_method<'db>(
         ),
         "popitem" if typed_dict.supports_arbitrary_key_deletion(env) => {
             let return_ty = Type::heterogeneous_tuple(
-                db,
+                env,
                 [KnownClass::Str.to_instance(env), typed_dict.value_type(env)],
             );
             Some(synthesize_typed_dict_no_argument_method(
@@ -513,7 +513,7 @@ fn synthesize_typed_dict_update<'db>(
             .to_specialized_instance(env, &[KnownClass::Str.to_instance(env), value_ty])
     });
     let iterable_ty = typed_dict.arbitrary_key_mutation_type(env).map(|value_ty| {
-        let item_ty = Type::heterogeneous_tuple(db, [KnownClass::Str.to_instance(env), value_ty]);
+        let item_ty = Type::heterogeneous_tuple(env, [KnownClass::Str.to_instance(env), value_ty]);
         KnownClass::Iterable.to_specialized_instance(env, &[item_ty])
     });
     let value_ty = UnionType::from_elements(

@@ -74,16 +74,16 @@ pub(super) fn synthesize_namedtuple_class_member<'db>(
 
             // __match_args__: tuple[Literal["field1"], Literal["field2"], ...]
             let field_types = fields.map(|field| Type::string_literal(db, &field.name));
-            Some(Type::heterogeneous_tuple(db, field_types))
+            Some(Type::heterogeneous_tuple(env, field_types))
         }
         "_fields" => {
             // _fields: tuple[Literal["field1"], Literal["field2"], ...]
             let field_types = fields.map(|field| Type::string_literal(db, &field.name));
-            Some(Type::heterogeneous_tuple(db, field_types))
+            Some(Type::heterogeneous_tuple(env, field_types))
         }
         "__slots__" => {
             // __slots__: tuple[()] - always empty for namedtuples
-            Some(Type::empty_tuple(db))
+            Some(Type::empty_tuple(env))
         }
         "_replace" | "__replace__" => {
             if name == "__replace__" && env.python_version() < PythonVersion::PY313 {
@@ -281,12 +281,12 @@ impl<'db> DynamicNamedTupleLiteral<'db> {
         // If fields are unknown, return `tuple[Unknown, ...]` to avoid false positives
         // like index-out-of-bounds errors.
         if !self.has_known_fields(env) {
-            return TupleType::homogeneous(db, Type::unknown()).to_class_type(db, env.program());
+            return TupleType::homogeneous(env, Type::unknown()).to_class_type(db);
         }
 
         let field_types = self.fields(env).iter().map(|field| field.ty);
-        TupleType::heterogeneous(db, field_types)
-            .map(|t| t.to_class_type(db, env.program()))
+        TupleType::heterogeneous(env, field_types)
+            .map(|tuple| tuple.to_class_type(db))
             .unwrap_or_else(|| {
                 KnownClass::Tuple
                     .to_class_literal(env)

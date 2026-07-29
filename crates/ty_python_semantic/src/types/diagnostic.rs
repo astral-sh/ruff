@@ -3033,7 +3033,6 @@ pub(crate) fn report_invalid_or_unsupported_base(
     base_type: Type,
     class: StaticClassLiteral,
 ) {
-    let db = context.db();
     let env = &context.semantic_environment();
     let instance_of_type = KnownClass::Type.to_instance(env);
 
@@ -3060,7 +3059,7 @@ pub(crate) fn report_invalid_or_unsupported_base(
         return;
     }
 
-    let tuple_of_types = Type::homogeneous_tuple(db, instance_of_type);
+    let tuple_of_types = Type::homogeneous_tuple(env, instance_of_type);
 
     let explain_mro_entries = |diagnostic: &mut LintDiagnosticGuard| {
         diagnostic.info(

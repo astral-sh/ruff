@@ -1223,7 +1223,7 @@ impl<'db> StaticClassLiteral<'db> {
                 }
             } else {
                 let name = Type::string_literal(db, class.name(db));
-                let bases = Type::heterogeneous_tuple(db, class.explicit_bases(&env));
+                let bases = Type::heterogeneous_tuple(&env, class.explicit_bases(&env));
                 let namespace = KnownClass::Dict.to_specialized_instance(
                     &env,
                     &[KnownClass::Str.to_instance(&env), Type::any()],
@@ -1961,7 +1961,7 @@ impl<'db> StaticClassLiteral<'db> {
                         }
                     })
                     .map(|(name, _)| Type::string_literal(db, name));
-                Some(Type::heterogeneous_tuple(db, match_args))
+                Some(Type::heterogeneous_tuple(env, match_args))
             }
             (field_policy @ CodeGeneratorKind::DataclassLike(_), "__weakref__")
                 if env.python_version() >= PythonVersion::PY311 =>
@@ -2056,7 +2056,7 @@ impl<'db> StaticClassLiteral<'db> {
                     .then(|| {
                         let fields = self.fields(env, specialization, field_policy);
                         let slots = fields.keys().map(|name| Type::string_literal(db, name));
-                        Type::heterogeneous_tuple(db, slots)
+                        Type::heterogeneous_tuple(env, slots)
                     })
             }
             (CodeGeneratorKind::TypedDict, name) => synthesize_typed_dict_method(

@@ -157,11 +157,6 @@ impl<'db, 'ast> InferContext<'db, 'ast> {
         self.semantic_environment
     }
 
-    #[inline]
-    pub(crate) fn program(&self) -> Program {
-        self.semantic_environment.program()
-    }
-
     /// The module for which the types are inferred.
     pub(crate) fn module(&self) -> &'ast ParsedModuleRef {
         self.module

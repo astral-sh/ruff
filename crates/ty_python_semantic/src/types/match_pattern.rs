@@ -416,7 +416,7 @@ pub(crate) fn class_pattern_positional_result<'db>(
                 Some(ClassPatternPositionalResult::Limit(limit))
             } else {
                 match_args
-                    .is_disjoint_from(env, Type::homogeneous_tuple(db, Type::unknown()))
+                    .is_disjoint_from(env, Type::homogeneous_tuple(env, Type::unknown()))
                     .then_some(ClassPatternPositionalResult::InvalidType(match_args))
             }
         }
@@ -996,7 +996,7 @@ fn exact_tuple_sequence_pattern_fallthrough_type<'db>(
         budget.add_alternative(tuple.len())?;
         let mut elements = tuple.all_elements().to_vec();
         elements[index] = remaining;
-        alternatives.push(Type::heterogeneous_tuple(db, elements));
+        alternatives.push(Type::heterogeneous_tuple(env, elements));
     }
 
     Ok(Some(UnionType::from_elements(env, alternatives)))
@@ -1153,7 +1153,6 @@ fn build_definite_sequence_pattern_type<'db>(
     kind: &SequencePatternPredicateKind<'db>,
     mut element_type: impl FnMut(&PatternPredicateKind<'db>) -> Option<Type<'db>>,
 ) -> Option<Type<'db>> {
-    let db = env.db();
     if kind.is_irrefutable() {
         return Some(sequence_pattern_type_builder(env).build());
     }
@@ -1168,7 +1167,7 @@ fn build_definite_sequence_pattern_type<'db>(
             .map(&mut element_type)
             .collect::<Option<Vec<_>>>()?;
         return Some(Type::tuple(TupleType::mixed(
-            db,
+            env,
             prefix_types,
             Type::object(),
             suffix_types,

@@ -57,7 +57,7 @@ pub(crate) fn expand_type<'db>(
                             let expanded = per_element
                                 .into_iter()
                                 .multi_cartesian_product()
-                                .map(|types| Type::heterogeneous_tuple(db, types))
+                                .map(|types| Type::heterogeneous_tuple(env, types))
                                 .collect::<Vec<_>>();
                             Some(expanded)
                         }
@@ -140,37 +140,37 @@ mod tests {
         let false_ty = Type::bool_literal(false);
 
         // Empty tuple
-        let empty_tuple = Type::empty_tuple(&db);
+        let empty_tuple = Type::empty_tuple(&env);
         let expanded = expand_type(&env, empty_tuple);
         assert!(expanded.is_none());
 
         // None of the elements can be expanded.
-        let tuple_type1 = Type::heterogeneous_tuple(&db, [int_ty, str_ty]);
+        let tuple_type1 = Type::heterogeneous_tuple(&env, [int_ty, str_ty]);
         let expanded = expand_type(&env, tuple_type1);
         assert!(expanded.is_none());
 
         // All elements can be expanded.
         let tuple_type2 = Type::heterogeneous_tuple(
-            &db,
+            &env,
             [
                 bool_ty,
                 UnionType::from_elements(&env, [int_ty, str_ty, bytes_ty]),
             ],
         );
         let expected_types = [
-            Type::heterogeneous_tuple(&db, [true_ty, int_ty]),
-            Type::heterogeneous_tuple(&db, [true_ty, str_ty]),
-            Type::heterogeneous_tuple(&db, [true_ty, bytes_ty]),
-            Type::heterogeneous_tuple(&db, [false_ty, int_ty]),
-            Type::heterogeneous_tuple(&db, [false_ty, str_ty]),
-            Type::heterogeneous_tuple(&db, [false_ty, bytes_ty]),
+            Type::heterogeneous_tuple(&env, [true_ty, int_ty]),
+            Type::heterogeneous_tuple(&env, [true_ty, str_ty]),
+            Type::heterogeneous_tuple(&env, [true_ty, bytes_ty]),
+            Type::heterogeneous_tuple(&env, [false_ty, int_ty]),
+            Type::heterogeneous_tuple(&env, [false_ty, str_ty]),
+            Type::heterogeneous_tuple(&env, [false_ty, bytes_ty]),
         ];
         let expanded = expand_type(&env, tuple_type2).unwrap();
         assert_eq!(expanded, expected_types);
 
         // Mixed set of elements where some can be expanded while others cannot be.
         let tuple_type3 = Type::heterogeneous_tuple(
-            &db,
+            &env,
             [
                 bool_ty,
                 int_ty,
@@ -179,17 +179,17 @@ mod tests {
             ],
         );
         let expected_types = [
-            Type::heterogeneous_tuple(&db, [true_ty, int_ty, str_ty, str_ty]),
-            Type::heterogeneous_tuple(&db, [true_ty, int_ty, bytes_ty, str_ty]),
-            Type::heterogeneous_tuple(&db, [false_ty, int_ty, str_ty, str_ty]),
-            Type::heterogeneous_tuple(&db, [false_ty, int_ty, bytes_ty, str_ty]),
+            Type::heterogeneous_tuple(&env, [true_ty, int_ty, str_ty, str_ty]),
+            Type::heterogeneous_tuple(&env, [true_ty, int_ty, bytes_ty, str_ty]),
+            Type::heterogeneous_tuple(&env, [false_ty, int_ty, str_ty, str_ty]),
+            Type::heterogeneous_tuple(&env, [false_ty, int_ty, bytes_ty, str_ty]),
         ];
         let expanded = expand_type(&env, tuple_type3).unwrap();
         assert_eq!(expanded, expected_types);
 
         // Variable-length tuples are not expanded.
         let variable_length_tuple = Type::tuple(TupleType::mixed(
-            &db,
+            &env,
             [bool_ty],
             int_ty,
             [UnionType::from_elements(&env, [str_ty, bytes_ty]), str_ty],

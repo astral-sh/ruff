@@ -1612,7 +1612,7 @@ impl<'db> Bindings<'db> {
                                 }
                                 Some(getter) if getter.name(db) == "__constraints__" => {
                                     overload.set_return_type(Type::heterogeneous_tuple(
-                                        db,
+                                        env,
                                         typevar.constraints(env).into_iter().flatten(),
                                     ));
                                 }
@@ -2233,7 +2233,7 @@ impl<'db> Bindings<'db> {
                                                 let mut names = names.iter().collect::<Vec<_>>();
                                                 names.sort();
                                                 Type::heterogeneous_tuple(
-                                                    db,
+                                                    env,
                                                     names.iter().map(|name| {
                                                         Type::string_literal(db, *name)
                                                     }),
@@ -2255,7 +2255,7 @@ impl<'db> Bindings<'db> {
                                             && metadata.aliases_are_known
                                         {
                                             Type::heterogeneous_tuple(
-                                                db,
+                                                env,
                                                 metadata
                                                     .members
                                                     .keys()
@@ -2275,7 +2275,7 @@ impl<'db> Bindings<'db> {
                         Some(KnownFunction::AllMembers) => {
                             if let [Some(ty)] = overload.parameter_types() {
                                 overload.set_return_type(Type::heterogeneous_tuple(
-                                    db,
+                                    env,
                                     list_members::all_members(env, *ty)
                                         .into_iter()
                                         .sorted()
@@ -2580,8 +2580,8 @@ impl<'db> Bindings<'db> {
                             };
 
                             let return_type = parse_struct_format(env, format_literal.value(db))
-                                .map(|elements| Type::heterogeneous_tuple(db, elements))
-                                .unwrap_or_else(|| Type::homogeneous_tuple(db, Type::unknown()));
+                                .map(|elements| Type::heterogeneous_tuple(env, elements))
+                                .unwrap_or_else(|| Type::homogeneous_tuple(env, Type::unknown()));
 
                             overload.set_return_type(return_type);
                         }
@@ -2899,7 +2899,7 @@ impl<'db> Bindings<'db> {
                         let set = constraints.load(env, tracked.constraints(db));
                         let result = match set.solutions(env, &constraints, inferable) {
                             Solutions::Constrained(paths) => Type::heterogeneous_tuple(
-                                db,
+                                env,
                                 paths.into_iter().map(|path| {
                                     let path: Box<[_]> = path
                                         .into_iter()
@@ -2911,7 +2911,7 @@ impl<'db> Bindings<'db> {
                                 }),
                             ),
                             Solutions::Unsatisfiable => Type::none(env),
-                            Solutions::Unconstrained => Type::empty_tuple(db),
+                            Solutions::Unconstrained => Type::empty_tuple(env),
                         };
                         overload.set_return_type(result);
                     }
@@ -2934,7 +2934,7 @@ impl<'db> Bindings<'db> {
                         let set = constraints.load(env, tracked.constraints(db));
                         let result = match set.solutions(env, &constraints, inferable) {
                             Solutions::Constrained(paths) => Type::heterogeneous_tuple(
-                                db,
+                                env,
                                 paths.into_iter().map(|path| {
                                     Type::KnownInstance(KnownInstanceType::ConstraintSetSolution(
                                         InternedConstraintSetSolution::new(
@@ -2945,7 +2945,7 @@ impl<'db> Bindings<'db> {
                                 }),
                             ),
                             Solutions::Unsatisfiable => Type::none(env),
-                            Solutions::Unconstrained => Type::empty_tuple(db),
+                            Solutions::Unconstrained => Type::empty_tuple(env),
                         };
                         overload.set_return_type(result);
                     }
@@ -3017,10 +3017,10 @@ impl<'db> Bindings<'db> {
                                 // need to be able to handle it without crashing.
                                 let return_type = if let Type::Union(union) = argument {
                                     union.map(env, |element| {
-                                        Type::tuple(TupleType::new(db, &element.iterate(env)))
+                                        Type::tuple(TupleType::new(env, &element.iterate(env)))
                                     })
                                 } else {
-                                    Type::tuple(TupleType::new(db, &argument.iterate(env)))
+                                    Type::tuple(TupleType::new(env, &argument.iterate(env)))
                                 };
                                 overload.set_return_type(return_type);
                             }
@@ -4008,7 +4008,7 @@ impl<'db> CallableBinding<'db> {
             }
 
             let top_materialized_argument_type = Type::heterogeneous_tuple(
-                db,
+                env,
                 union_argument_type_builders
                     .into_iter()
                     .filter_map(|builder| {
@@ -4032,7 +4032,7 @@ impl<'db> CallableBinding<'db> {
             }
 
             let parameter_types = Type::heterogeneous_tuple(
-                db,
+                env,
                 union_parameter_types.into_iter().filter_map(|builder| {
                     if builder.is_empty() {
                         None

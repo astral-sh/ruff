@@ -305,10 +305,10 @@ impl<'db> ClassBase<'db> {
                     Self::try_from_type(
                         env,
                         TupleType::heterogeneous(
-                            db,
+                            env,
                             fields.values().map(|field| field.declared_ty),
                         )?
-                        .to_class_type(db, env.program())
+                        .to_class_type(db)
                         .into(),
                         subclass,
                     )

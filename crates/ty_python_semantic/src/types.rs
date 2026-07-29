@@ -5198,7 +5198,7 @@ impl<'db> Type<'db> {
                                     .with_annotated_type(object_type_form(db)),
                                 Parameter::keyword_only(Name::new_static("type_params"))
                                     .with_annotated_type(Type::homogeneous_tuple(
-                                        db,
+                                        env,
                                         UnionType::from_elements(
                                             env,
                                             [
@@ -5208,7 +5208,7 @@ impl<'db> Type<'db> {
                                             ],
                                         ),
                                     ))
-                                    .with_default_type(Type::empty_tuple(db)),
+                                    .with_default_type(Type::empty_tuple(env)),
                             ]),
                             Type::unknown(),
                         ),
@@ -5335,7 +5335,7 @@ impl<'db> Type<'db> {
                     CallableBinding::from_overloads(
                         self,
                         [
-                            Signature::new(Parameters::empty(), Type::empty_tuple(db)),
+                            Signature::new(Parameters::empty(), Type::empty_tuple(env)),
                             Signature::new_generic(
                                 Some(GenericContext::from_typevar_instances(env, [element_ty])),
                                 Parameters::standard([Parameter::positional_only(Some(
@@ -5345,7 +5345,7 @@ impl<'db> Type<'db> {
                                     KnownClass::Iterable
                                         .to_specialized_instance(env, &[Type::TypeVar(element_ty)]),
                                 )]),
-                                Type::homogeneous_tuple(db, Type::TypeVar(element_ty)),
+                                Type::homogeneous_tuple(env, Type::TypeVar(element_ty)),
                             ),
                         ],
                     )

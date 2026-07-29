@@ -115,12 +115,11 @@ use crate::types::{
     CallableTypes, ClassType, DynamicType, InferenceFlags, InternedConstraintSet, InternedType,
     IntersectionBuilder, IntersectionType, KnownClass, KnownInstanceType, KnownUnion,
     LiteralValueType, LiteralValueTypeKind, MemberLookupPolicy, ParamSpecAttrKind, Parameter,
-    Parameters, Program, SemanticEnvironment, SentinelInstance, Signature, SpecialFormType,
-    SubclassOfType, Type, TypeAliasType, TypeAndQualifiers, TypeContext, TypeQualifiers,
-    TypeVarBoundOrConstraints, TypeVarKind, TypeVarVariance, TypedDictModule, TypedDictType,
-    UnionAccumulator, UnionBuilder, UnionType, any_over_type, binding_type,
-    extract_fixed_length_iterable_element_types, infer_complete_scope_types, infer_scope_types,
-    is_discarded_dict_key_assignment, todo_type,
+    Parameters, SemanticEnvironment, SentinelInstance, Signature, SpecialFormType, SubclassOfType,
+    Type, TypeAliasType, TypeAndQualifiers, TypeContext, TypeQualifiers, TypeVarBoundOrConstraints,
+    TypeVarKind, TypeVarVariance, TypedDictModule, TypedDictType, UnionAccumulator, UnionBuilder,
+    UnionType, any_over_type, binding_type, extract_fixed_length_iterable_element_types,
+    infer_complete_scope_types, infer_scope_types, is_discarded_dict_key_assignment, todo_type,
 };
 use crate::{AnalysisSettings, Db, FxIndexSet, FxOrderSet};
 use ty_python_core::ast_ids::ScopedUseId;
@@ -780,11 +779,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     #[inline]
     fn semantic_environment(&self) -> &'ast SemanticEnvironment<'db> {
         self.context.semantic_environment()
-    }
-
-    #[inline]
-    fn program(&self) -> Program {
-        self.context.program()
     }
 
     fn module(&self) -> &'ast ParsedModuleRef {
@@ -2321,7 +2315,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             UnionType::from_two_elements(
                 env,
                 type_base_exception,
-                Type::homogeneous_tuple(self.db(), type_base_exception),
+                Type::homogeneous_tuple(env, type_base_exception),
             ),
         ) {
             // TODO: Handle valid handler expressions that are opaque to the structural helper
@@ -2373,8 +2367,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 "`Type::to_instance()` should always return `Some()` \
                     if called on a type assignable to `type[BaseException]`",
             ))
-        } else if ty.is_assignable_to(env, Type::homogeneous_tuple(self.db(), type_base_exception))
-        {
+        } else if ty.is_assignable_to(env, Type::homogeneous_tuple(env, type_base_exception)) {
             // `except exception_types as e:`, where
             // `exception_types: tuple[type[ValueError], ...]`
             Some(
@@ -6637,7 +6630,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .unwrap_or(TypeVarSet::None);
             annotation.filter_disjoint_elements(
                 env,
-                Type::homogeneous_tuple(self.db(), Type::unknown()),
+                Type::homogeneous_tuple(env, Type::unknown()),
                 inferable,
             )
         });
@@ -6675,8 +6668,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .map(|tuple| tuple.iter_element_types(self.db()).collect::<Vec<_>>())
             .unwrap_or_default();
         let mut annotated_elt_tys = annotated_elt_tys.into_iter();
-
-        let db = env.db();
 
         let mut infer_element = |elt: &ast::Expr| {
             let annotated_elt_ty = annotated_elt_tys.by_ref().next();
@@ -6735,7 +6726,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         }
 
-        Type::tuple(TupleType::new(db, &builder.build()))
+        Type::tuple(TupleType::new(env, &builder.build()))
     }
 
     fn infer_list_expression(&mut self, list: &ast::ExprList, tcx: TypeContext<'db>) -> Type<'db> {
@@ -7237,7 +7228,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 {
                     let Some(elt) = elt else { continue };
                     let elt_tcx = if elt.is_starred_expr() && collection_class != KnownClass::Dict {
-                        Type::homogeneous_tuple(self.db(), elt_tcx)
+                        Type::homogeneous_tuple(env, elt_tcx)
                     } else {
                         elt_tcx
                     };
@@ -7415,7 +7406,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     .copied()
                     .map(|tcx| {
                         if elt.is_starred_expr() && collection_class != KnownClass::Dict {
-                            Type::homogeneous_tuple(self.db(), tcx)
+                            Type::homogeneous_tuple(env, tcx)
                         } else {
                             tcx
                         }
@@ -9162,7 +9153,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         };
         if let Some(typevartuple) = typevartuple {
             return Type::tuple(TupleType::new(
-                db,
+                env,
                 &TupleSpecBuilder::with_capacity(0)
                     .concat_variadic_typevar(env, typevartuple)
                     .build(),
@@ -9170,10 +9161,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
         iterable_type
             .try_iterate(env)
-            .map(|spec| Type::tuple(TupleType::new(db, &spec)))
+            .map(|spec| Type::tuple(TupleType::new(env, &spec)))
             .unwrap_or_else(|err| {
                 err.report_diagnostic(&self.context, iterable_type, value.as_ref().into());
-                Type::homogeneous_tuple(db, err.fallback_element_type(env))
+                Type::homogeneous_tuple(env, err.fallback_element_type(env))
             })
     }
 

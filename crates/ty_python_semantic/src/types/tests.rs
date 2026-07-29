@@ -323,14 +323,14 @@ fn divergent_type() {
     );
 
     let recursive_tuple = Type::heterogeneous_tuple(
-        &db,
+        &env,
         [
             UnionType::from_elements(
                 &env,
                 [
                     KnownClass::Int.to_instance(&env),
                     Type::heterogeneous_tuple(
-                        &db,
+                        &env,
                         [
                             UnionType::from_elements(
                                 &env,

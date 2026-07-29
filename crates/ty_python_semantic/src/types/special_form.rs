@@ -263,12 +263,12 @@ impl SpecialFormType {
             Self::AlwaysFalsy => Some(Type::AlwaysFalsy),
             Self::NamedTuple => Some(IntersectionType::from_two_elements(
                 env,
-                Type::homogeneous_tuple(db, Type::object()),
+                Type::homogeneous_tuple(env, Type::object()),
                 KnownClass::NamedTupleLike.to_instance(env),
             )),
             Self::Type => Some(KnownClass::Type.to_instance(env)),
             Self::TypeForm => Some(TypeFormType::from_type_expression(db, Type::any())),
-            Self::Tuple => Some(Type::homogeneous_tuple(db, Type::unknown())),
+            Self::Tuple => Some(Type::homogeneous_tuple(env, Type::unknown())),
             Self::TypingCallable | Self::CollectionsAbcCallable => {
                 Some(Type::Callable(CallableType::unknown(db)))
             }
@@ -861,7 +861,7 @@ impl SpecialFormType {
             // See conversation in https://github.com/astral-sh/ruff/pull/19915.
             Self::NamedTuple => Ok(IntersectionType::from_two_elements(
                 env,
-                Type::homogeneous_tuple(db, Type::object()),
+                Type::homogeneous_tuple(env, Type::object()),
                 KnownClass::NamedTupleLike.to_instance(env),
             )),
 
@@ -953,7 +953,7 @@ impl SpecialFormType {
             // We treat `typing.Type` exactly the same as `builtins.type`:
             SpecialFormType::Type => Ok(KnownClass::Type.to_instance(env)),
             SpecialFormType::TypeForm => Ok(TypeFormType::from_type_expression(db, Type::any())),
-            SpecialFormType::Tuple => Ok(Type::homogeneous_tuple(db, Type::unknown())),
+            SpecialFormType::Tuple => Ok(Type::homogeneous_tuple(env, Type::unknown())),
             SpecialFormType::TypingCallable | SpecialFormType::CollectionsAbcCallable => {
                 Ok(Type::Callable(CallableType::unknown(db)))
             }

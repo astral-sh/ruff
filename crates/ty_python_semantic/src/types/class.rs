@@ -1996,7 +1996,7 @@ impl<'db> ClassType<'db> {
                                 env,
                                 &[slice_bound, slice_bound, slice_bound],
                             ),
-                            Type::homogeneous_tuple(db, all_elements_unioned),
+                            Type::homogeneous_tuple(env, all_elements_unioned),
                         ));
 
                         let getitem_signature =
@@ -2066,7 +2066,7 @@ impl<'db> ClassType<'db> {
                 // - a tuple with no minimum length
                 if tuple.is_none_or(|tuple| tuple.len().minimum() == 0) {
                     iterable_parameter =
-                        iterable_parameter.with_default_type(Type::empty_tuple(db));
+                        iterable_parameter.with_default_type(Type::empty_tuple(env));
                 }
 
                 let parameters = Parameters::standard([

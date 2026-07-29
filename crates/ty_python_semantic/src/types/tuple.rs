@@ -130,6 +130,9 @@ impl TupleLength {
 
 #[salsa::interned(debug, constructor=new_internal, heap_size=ruff_memory_usage::heap_size)]
 pub struct TupleType<'db> {
+    #[returns(copy)]
+    pub(crate) program: Program,
+
     #[returns(ref)]
     pub(crate) tuple: TupleSpec<'db>,
 }
@@ -170,7 +173,7 @@ impl get_size2::GetSize for TupleType<'_> {}
 
 #[salsa::tracked]
 impl<'db> TupleType<'db> {
-    pub(crate) fn new(db: &'db dyn Db, spec: &TupleSpec<'db>) -> Option<Self> {
+    pub(crate) fn new(env: &SemanticEnvironment<'db>, spec: &TupleSpec<'db>) -> Option<Self> {
         // If a fixed-length (i.e., mandatory) element of the tuple is `Never`, then it's not
         // possible to instantiate the tuple as a whole.
         if spec.fixed_elements().any(Type::is_never) {
@@ -187,56 +190,62 @@ impl<'db> TupleType<'db> {
                     .iter_prefix_elements()
                     .chain(tuple.iter_suffix_elements()),
             ));
-            return Some(TupleType::new_internal::<_, TupleSpec<'db>>(db, tuple));
+            return Some(TupleType::new_internal(env.db(), env.program(), tuple));
         }
 
-        Some(TupleType::new_internal(db, spec))
+        Some(TupleType::new_internal(env.db(), env.program(), spec))
     }
 
-    pub(crate) fn empty(db: &'db dyn Db) -> Self {
-        TupleType::new_internal(db, TupleSpec::from(FixedLengthTuple::empty()))
+    pub(crate) fn empty(env: &SemanticEnvironment<'db>) -> Self {
+        TupleType::new_internal(
+            env.db(),
+            env.program(),
+            TupleSpec::from(FixedLengthTuple::empty()),
+        )
     }
 
     pub(crate) fn heterogeneous(
-        db: &'db dyn Db,
+        env: &SemanticEnvironment<'db>,
         types: impl IntoIterator<Item = Type<'db>>,
     ) -> Option<Self> {
-        TupleType::new(db, &TupleSpec::heterogeneous(types))
+        TupleType::new(env, &TupleSpec::heterogeneous(types))
     }
 
     pub(crate) fn mixed(
-        db: &'db dyn Db,
+        env: &SemanticEnvironment<'db>,
         prefix: impl IntoIterator<Item = Type<'db>>,
         variable: Type<'db>,
         suffix: impl IntoIterator<Item = Type<'db>>,
     ) -> Option<Self> {
-        Self::mixed_with_segment(db, prefix, VariableSegment::Homogeneous(variable), suffix)
+        Self::mixed_with_segment(env, prefix, VariableSegment::Homogeneous(variable), suffix)
     }
 
     pub(crate) fn mixed_with_segment(
-        db: &'db dyn Db,
+        env: &SemanticEnvironment<'db>,
         prefix: impl IntoIterator<Item = Type<'db>>,
         variable: VariableSegment<'db>,
         suffix: impl IntoIterator<Item = Type<'db>>,
     ) -> Option<Self> {
-        TupleType::new(db, &VariableLengthTuple::mixed(prefix, variable, suffix))
+        TupleType::new(env, &VariableLengthTuple::mixed(prefix, variable, suffix))
     }
 
-    pub(crate) fn homogeneous(db: &'db dyn Db, element: Type<'db>) -> Self {
+    pub(crate) fn homogeneous(env: &SemanticEnvironment<'db>, element: Type<'db>) -> Self {
         match element {
-            Type::Never => TupleType::empty(db),
-            _ => TupleType::new_internal(db, TupleSpec::homogeneous(element)),
+            Type::Never => TupleType::empty(env),
+            _ => TupleType::new_internal(env.db(), env.program(), TupleSpec::homogeneous(element)),
         }
     }
 
     /// Packs a `TypeVarTuple` into the tuple value used for generic specialization relations.
     pub(crate) fn unpacked_typevartuple(
-        db: &'db dyn Db,
+        env: &SemanticEnvironment<'db>,
         typevar: BoundTypeVarInstance<'db>,
     ) -> Self {
+        let db = env.db();
         debug_assert!(typevar.is_typevartuple(db));
         TupleType::new_internal(
             db,
+            env.program(),
             VariableLengthTuple::mixed([], VariableSegment::TypeVarTuple(typevar), []),
         )
     }
@@ -245,8 +254,8 @@ impl<'db> TupleType<'db> {
     // `static-frame` as part of the ecosystem analysis. This is because it's called
     // from `NominalInstanceType::class()`, which is a very hot method.
     #[salsa::tracked(returns(copy), cycle_initial=to_class_type_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
-    pub(crate) fn to_class_type(self, db: &'db dyn Db, program: Program) -> ClassType<'db> {
-        let env = &SemanticEnvironment::from_program(db, program);
+    pub(crate) fn to_class_type(self, db: &'db dyn Db) -> ClassType<'db> {
+        let env = &SemanticEnvironment::from_program(db, self.program(db));
         let tuple_class = KnownClass::Tuple
             .try_to_class_literal(env)
             .expect("Typeshed should always have a `tuple` class in `builtins.pyi`");
@@ -270,6 +279,7 @@ impl<'db> TupleType<'db> {
         let db = env.db();
         Some(Self::new_internal(
             db,
+            env.program(),
             self.tuple(db)
                 .recursive_type_normalized_impl(env, div, nested)?,
         ))
@@ -284,7 +294,7 @@ impl<'db> TupleType<'db> {
     ) -> Option<Self> {
         let db = env.db();
         TupleType::new(
-            db,
+            env,
             &self
                 .tuple(db)
                 .apply_type_mapping_impl(env, type_mapping, tcx, visitor),
@@ -414,7 +424,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
 
                 match target.variable() {
                     VariableSegment::TypeVarTuple(typevartuple) => {
-                        let packed = Type::heterogeneous_tuple(db, source_iter.copied());
+                        let packed = Type::heterogeneous_tuple(env, source_iter.copied());
                         result.and(env, self.constraints, || {
                             self.check_type_pair(env, packed, Type::TypeVar(typevartuple))
                         })
@@ -550,7 +560,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         });
 
                     let packed = Type::tuple(TupleType::new(
-                        db,
+                        env,
                         &VariableLengthTuple::mixed(
                             source_prefix[target_prefix.len()..].iter().copied(),
                             source.variable(),
@@ -735,9 +745,8 @@ fn to_class_type_cycle_initial<'db>(
     db: &'db dyn Db,
     id: salsa::Id,
     self_: TupleType<'db>,
-    program: Program,
 ) -> ClassType<'db> {
-    let env = &SemanticEnvironment::from_program(db, program);
+    let env = &SemanticEnvironment::from_program(db, self_.program(db));
     let tuple_class = KnownClass::Tuple
         .try_to_class_literal(env)
         .expect("Typeshed should always have a `tuple` class in `builtins.pyi`");
@@ -1350,14 +1359,13 @@ impl VariableTupleSlicePlan {
         env: &SemanticEnvironment<'db>,
         tuple: &VariableLengthTuple<Type<'db>, VariableSegment<'db>>,
     ) -> Type<'db> {
-        let db = env.db();
         match self {
             VariableTupleSlicePlan::Empty => {
-                Type::heterogeneous_tuple(db, std::iter::empty::<Type<'db>>())
+                Type::heterogeneous_tuple(env, std::iter::empty::<Type<'db>>())
             }
 
             VariableTupleSlicePlan::Fixed(fixed) => {
-                Type::heterogeneous_tuple(db, tuple.slice_fixed_position(env, fixed))
+                Type::heterogeneous_tuple(env, tuple.slice_fixed_position(env, fixed))
             }
 
             VariableTupleSlicePlan::Mixed {
@@ -1372,7 +1380,7 @@ impl VariableTupleSlicePlan {
                     }
                 };
                 Type::tuple(TupleType::new(
-                    db,
+                    env,
                     &VariableLengthTuple::mixed(
                         VariableLengthTuple::optional_fixed_slice(
                             tuple.prefix_elements(),
@@ -1956,7 +1964,7 @@ impl<'db> VariableLengthTuple<Type<'db>, VariableSegment<'db>> {
     fn homogeneous_type(&self, env: &SemanticEnvironment<'db>) -> Type<'db> {
         let db = env.db();
         let element = UnionType::from_elements_leave_aliases(env, self.iter_all_elements(db));
-        Type::homogeneous_tuple(db, element)
+        Type::homogeneous_tuple(env, element)
     }
 
     fn variable_and_suffix_type(
@@ -2408,7 +2416,7 @@ impl<'db> Tuple<Type<'db>, VariableSegment<'db>> {
         let db = env.db();
         match self {
             Tuple::Fixed(tuple) => Ok(Type::heterogeneous_tuple(
-                db,
+                env,
                 tuple.py_slice(db, start, stop, step)?,
             )),
             Tuple::Variable(tuple) => tuple.py_slice_type(env, start, stop, step),

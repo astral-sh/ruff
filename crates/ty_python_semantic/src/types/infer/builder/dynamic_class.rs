@@ -48,10 +48,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         kind: DynamicClassKind,
     ) -> Option<Box<[Type<'db>]>> {
         let env = self.semantic_environment();
-        let db = self.db();
         let fn_name = kind.function_name();
         let formal_parameter_type = match kind {
-            DynamicClassKind::TypeCall => Type::homogeneous_tuple(db, Type::object()),
+            DynamicClassKind::TypeCall => Type::homogeneous_tuple(env, Type::object()),
             DynamicClassKind::NewClass => {
                 KnownClass::Iterable.to_specialized_instance(env, &[Type::object()])
             }

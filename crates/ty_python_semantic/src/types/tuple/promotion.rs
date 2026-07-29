@@ -201,7 +201,7 @@ impl<'db> Type<'db> {
 
         for group in tuple_groups {
             if group.has_multiple_lengths {
-                builder = builder.add(Type::homogeneous_tuple(env.db(), group.element_type));
+                builder = builder.add(Type::homogeneous_tuple(env, group.element_type));
             } else {
                 for element in group.original_tuple_types {
                     builder = builder.add(element);

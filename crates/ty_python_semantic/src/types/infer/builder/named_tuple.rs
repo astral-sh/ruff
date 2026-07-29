@@ -47,7 +47,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             IntersectionType::from_elements(
                 env,
                 [
-                    Type::homogeneous_tuple(db, Type::unknown()).to_meta_type(env),
+                    Type::homogeneous_tuple(env, Type::unknown()).to_meta_type(env),
                     KnownClass::NamedTupleLike.to_subclass_of(env),
                     Type::unknown(),
                 ],
@@ -596,7 +596,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         }
                         SequenceKind::Tuple => self.store_expression_type(
                             fields_arg,
-                            Type::homogeneous_tuple(db, Type::unknown()),
+                            Type::homogeneous_tuple(env, Type::unknown()),
                         ),
                     }
                     if let Some(builder) =
@@ -624,7 +624,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     }
                     SequenceKind::Tuple => self.store_expression_type(
                         fields_arg,
-                        Type::homogeneous_tuple(db, Type::unknown()),
+                        Type::homogeneous_tuple(env, Type::unknown()),
                     ),
                 }
                 if let Some(builder) = self.context.report_lint(&INVALID_NAMED_TUPLE, fields_arg) {
@@ -642,7 +642,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             let declared_type = self.infer_type_expression(declaration_expr);
 
             let element_type = match field_spec_kind {
-                SequenceKind::Tuple => Type::heterogeneous_tuple(db, [name_type, declared_type]),
+                SequenceKind::Tuple => Type::heterogeneous_tuple(env, [name_type, declared_type]),
                 SequenceKind::List => KnownClass::List.to_specialized_instance(
                     env,
                     &[UnionType::from_two_elements(env, name_type, declared_type)],
@@ -661,7 +661,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     }
                     SequenceKind::Tuple => self.store_expression_type(
                         fields_arg,
-                        Type::homogeneous_tuple(db, Type::unknown()),
+                        Type::homogeneous_tuple(env, Type::unknown()),
                     ),
                 }
                 if let Some(builder) = self.context.report_lint(&INVALID_NAMED_TUPLE, name_expr) {

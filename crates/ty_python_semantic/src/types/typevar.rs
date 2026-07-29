@@ -1042,7 +1042,7 @@ impl<'db> BoundTypeVarInstance<'db> {
         );
 
         let upper_bound = TypeVarBoundOrConstraints::UpperBound(match kind {
-            ParamSpecAttrKind::Args => Type::homogeneous_tuple(db, Type::object()),
+            ParamSpecAttrKind::Args => Type::homogeneous_tuple(env, Type::object()),
             ParamSpecAttrKind::Kwargs => KnownClass::Dict
                 .to_specialized_instance(env, &[KnownClass::Str.to_instance(env), Type::any()])
                 .top_materialization(env),

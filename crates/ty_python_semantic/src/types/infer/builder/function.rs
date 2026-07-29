@@ -969,7 +969,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     if has_unpacked_annotation && typevar.is_typevartuple(db) =>
                 {
                     Type::tuple(TupleType::new(
-                        db,
+                        self.semantic_environment(),
                         &TupleSpecBuilder::with_capacity(0)
                             .concat_variadic_typevar(self.semantic_environment(), typevar)
                             .build(),
@@ -997,17 +997,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 ));
                                 add_type_expression_reference_link(diag);
                             }
-                            Type::homogeneous_tuple(db, Type::unknown())
+                            Type::homogeneous_tuple(self.semantic_environment(), Type::unknown())
                         }
 
                         // `*args: P`
                         None => {
                             // The diagnostic for this case is handled in `in_type_expression`.
-                            Type::homogeneous_tuple(db, Type::unknown())
+                            Type::homogeneous_tuple(self.semantic_environment(), Type::unknown())
                         }
                     }
                 }
-                _ => Type::homogeneous_tuple(db, annotated_type),
+                _ => Type::homogeneous_tuple(self.semantic_environment(), annotated_type),
             };
 
             self.add_declaration_with_binding(
@@ -1016,7 +1016,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 &DeclaredAndInferredType::are_the_same_type(ty),
             );
         } else {
-            let inferred_ty = Type::homogeneous_tuple(db, Type::unknown());
+            let inferred_ty = Type::homogeneous_tuple(self.semantic_environment(), Type::unknown());
             self.add_binding(parameter.into(), definition)
                 .insert(self, inferred_ty);
         }
@@ -1217,7 +1217,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let ty = if let Some(parameter_type) = self.annotated_lambda_parameter_type(index, lambda) {
             parameter_type
         } else {
-            Type::homogeneous_tuple(self.db(), Type::unknown())
+            Type::homogeneous_tuple(self.semantic_environment(), Type::unknown())
         };
         self.add_binding(parameter.into(), definition)
             .insert(self, ty);

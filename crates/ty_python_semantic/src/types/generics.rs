@@ -827,7 +827,7 @@ impl<'db> GenericContext<'db> {
                 self,
                 partial.types(db),
                 None,
-                Some(TupleType::homogeneous(db, Type::unknown())),
+                Some(TupleType::homogeneous(env, Type::unknown())),
             )
         } else {
             partial
@@ -856,16 +856,17 @@ impl<'db> GenericContext<'db> {
     /// materialization can preserve its element type.
     pub(crate) fn unknown_specialization(
         self,
-        db: &'db dyn Db,
+        env: &SemanticEnvironment<'db>,
         known_class: Option<KnownClass>,
     ) -> Specialization<'db> {
+        let db = env.db();
         Specialization::new(
             db,
             self,
             self.variables(db)
                 .map(|typevar| match typevar.kind(db) {
                     TypeVarKind::LegacyTypeVarTuple | TypeVarKind::Pep695TypeVarTuple => {
-                        Type::homogeneous_tuple(db, Type::unknown())
+                        Type::homogeneous_tuple(env, Type::unknown())
                     }
                     TypeVarKind::LegacyParamSpec | TypeVarKind::Pep695ParamSpec => {
                         Type::paramspec_value_callable(db, Parameters::unknown())
@@ -875,7 +876,7 @@ impl<'db> GenericContext<'db> {
                 .collect::<Box<[_]>>(),
             None,
             (known_class == Some(KnownClass::Tuple))
-                .then(|| TupleType::homogeneous(db, Type::unknown())),
+                .then(|| TupleType::homogeneous(env, Type::unknown())),
         )
     }
 
@@ -1022,7 +1023,7 @@ impl<'db> GenericContext<'db> {
         for typevar in variables.clone() {
             expanded.push(match typevar.kind(db) {
                 TypeVarKind::LegacyTypeVarTuple | TypeVarKind::Pep695TypeVarTuple => {
-                    Type::homogeneous_tuple(db, Type::unknown())
+                    Type::homogeneous_tuple(env, Type::unknown())
                 }
                 TypeVarKind::LegacyParamSpec | TypeVarKind::Pep695ParamSpec => {
                     Type::paramspec_value_callable(db, Parameters::unknown())
@@ -2672,10 +2673,8 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                         let unioned = TupleSpecBuilder::from(existing_tuple.as_ref())
                             .union(self.env, &new_tuple)
                             .build();
-                        *accumulator = UnionAccumulator::new(Type::tuple(TupleType::new(
-                            self.env.db(),
-                            &unioned,
-                        )));
+                        *accumulator =
+                            UnionAccumulator::new(Type::tuple(TupleType::new(self.env, &unioned)));
                     }
                     _ => {
                         entry.get_mut().add(self.env, ty);
@@ -3642,7 +3641,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                             (
                                 &elements[..formal_prefix_len],
                                 Type::heterogeneous_tuple(
-                                    self.env.db(),
+                                    self.env,
                                     elements[formal_prefix_len..middle_end].iter().copied(),
                                 ),
                                 &elements[middle_end..],
@@ -3661,7 +3660,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                             (
                                 &actual_prefix_elements[..formal_prefix_len],
                                 Type::tuple(TupleType::mixed_with_segment(
-                                    self.env.db(),
+                                    self.env,
                                     actual_prefix_elements[formal_prefix_len..].iter().copied(),
                                     actual.variable(),
                                     actual_suffix_elements[..suffix_start].iter().copied(),
