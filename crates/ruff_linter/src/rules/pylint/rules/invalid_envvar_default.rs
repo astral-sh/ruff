@@ -23,7 +23,7 @@ use crate::checkers::ast::Checker;
 /// ```python
 /// import os
 ///
-/// int(os.getenv("FOO", 1))
+/// os.getenv("FOO", 1)
 /// ```
 ///
 /// Use instead:
