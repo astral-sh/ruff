@@ -1,6 +1,8 @@
+use std::fmt;
+
 use ruff_diagnostics::{Applicability, Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{ArgOrKeyword, ExprCall, PythonVersion};
+use ruff_python_ast::{self as ast, ArgOrKeyword, Arguments, Expr, ExprCall, PythonVersion};
 use ruff_text_size::Ranged;
 
 use crate::{
@@ -9,7 +11,7 @@ use crate::{
     importer::ImportRequest,
     preview::is_fix_os_stat_enabled,
     rules::flake8_use_pathlib::helpers::{
-        has_unknown_keywords_or_starred_expr, is_boolean_literal_or_default,
+        has_unknown_keywords_or_starred_expr, is_file_descriptor,
         is_keyword_only_argument_non_default, is_pathlib_path_call,
     },
 };
@@ -63,7 +65,9 @@ use crate::{
 /// - [No really, pathlib is great](https://treyhunner.com/2019/01/no-really-pathlib-is-great/)
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.231")]
-pub(crate) struct OsStat;
+pub(crate) struct OsStat {
+    method: StatMethod,
+}
 
 impl Violation for OsStat {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
@@ -75,7 +79,28 @@ impl Violation for OsStat {
     }
 
     fn fix_title(&self) -> Option<String> {
-        Some("Replace with `Path(...).stat()`".to_string())
+        Some(format!("Replace with `Path(...).{}()`", self.method))
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum StatMethod {
+    Stat,
+    LStat,
+}
+
+impl StatMethod {
+    fn as_str(self) -> &'static str {
+        match self {
+            StatMethod::Stat => "stat",
+            StatMethod::LStat => "lstat",
+        }
+    }
+}
+
+impl fmt::Display for StatMethod {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.as_str())
     }
 }
 
@@ -95,31 +120,35 @@ pub(crate) fn os_stat(checker: &Checker, call: &ExprCall, segment: &[&str]) {
         return;
     }
 
-    if has_unknown_keywords_or_starred_expr(&call.arguments, &["path", "dir_fd", "follow_symlinks"])
-    {
-        return;
-    }
-
     let Some(path_args) = call.arguments.find_argument_value("path", 0) else {
         return;
     };
 
+    if is_file_descriptor(path_args, checker.semantic()) {
+        return;
+    }
+
+    let method = if checker.target_version() >= PythonVersion::PY310 {
+        StatMethod::Stat
+    } else {
+        match is_boolean_literal_or_default(&call.arguments, "follow_symlinks") {
+            Some(true) => StatMethod::Stat,
+            Some(false) => StatMethod::LStat,
+            None => return,
+        }
+    };
+
     let range = call.range();
-    let mut diagnostic = checker.report_diagnostic(OsStat, call.func.range());
+    let mut diagnostic = checker.report_diagnostic(OsStat { method }, call.func.range());
 
     if !is_fix_os_stat_enabled(checker.settings()) {
         return;
     }
 
-    let method = if checker.target_version() >= PythonVersion::PY310 {
-        "stat"
-    } else {
-        match is_boolean_literal_or_default(&call.arguments, "follow_symlinks") {
-            Some(true) => "stat",
-            Some(false) => "lstat",
-            None => return,
-        }
-    };
+    if has_unknown_keywords_or_starred_expr(&call.arguments, &["path", "dir_fd", "follow_symlinks"])
+    {
+        return;
+    }
 
     diagnostic.try_set_fix(|| {
         let (import_edit, binding) = checker.importer().get_or_import_symbol(
@@ -164,4 +193,19 @@ pub(crate) fn os_stat(checker: &Checker, call: &ExprCall, segment: &[&str]) {
             applicability,
         ))
     });
+}
+
+/// Returns the value of the given boolean keyword argument.
+///
+/// If the keyword is omitted, returns `Some(true)` (its default value).
+/// Returns `None` if the keyword argument is present but not a boolean literal.
+pub(crate) fn is_boolean_literal_or_default(argument: &Arguments, name: &str) -> Option<bool> {
+    let Some(kw) = argument.find_keyword(name) else {
+        return Some(true);
+    };
+
+    match &kw.value {
+        Expr::BooleanLiteral(ast::ExprBooleanLiteral { value, .. }) => Some(*value),
+        _ => None,
+    }
 }
