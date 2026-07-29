@@ -5019,6 +5019,18 @@ impl ConstraintAssignment {
         }
     }
 
+    fn as_constrained(self) -> Option<ConstraintId> {
+        match self {
+            ConstraintAssignment::Positive(constraint)
+            | ConstraintAssignment::Negative(constraint) => Some(constraint),
+            ConstraintAssignment::Unconstrained(_) => None,
+        }
+    }
+
+    fn is_positive(self) -> bool {
+        matches!(self, ConstraintAssignment::Positive(_))
+    }
+
     fn negated(self) -> Self {
         match self {
             ConstraintAssignment::Positive(constraint) => {
