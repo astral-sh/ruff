@@ -114,6 +114,7 @@ ignored = [
     "ruff_python_parser",
     "ruff_python_trivia",
     "ty_module_resolver",
+    "ty_python_core",
     "mimalloc",
     "tikv-jemallocator"
 ]
