@@ -1300,6 +1300,73 @@ reveal_type(narrow(1))  # revealed: int
 reveal_type(narrow("hello"))  # revealed: str
 ```
 
+## Redundant callback bounds preserve constrained type-variable relationships
+
+A contravariant callback can contribute both another constrained type variable and a redundant
+`object` upper bound. The inferred result must retain the other type variable in either callback
+order.
+
+```py
+from collections.abc import Callable
+from typing import TypeVar
+
+T = TypeVar("T", int, str)
+S = TypeVar("S", int, str)
+
+def select(first: Callable[[T], None], second: Callable[[T], None]) -> T:
+    raise NotImplementedError
+
+def forward_object(specific: Callable[[S], None], redundant: Callable[[object], None]) -> S:
+    result = select(specific, redundant)
+    reveal_type(result)  # revealed: S@forward_object
+    return result
+
+def forward_object_reversed(specific: Callable[[S], None], redundant: Callable[[object], None]) -> S:
+    result = select(redundant, specific)
+    reveal_type(result)  # revealed: S@forward_object_reversed
+    return result
+```
+
+A union of the type variable's constraints is also a redundant upper bound, even though it is not
+`object`.
+
+```py
+def forward_union(specific: Callable[[S], None], redundant: Callable[[int | str], None]) -> S:
+    result = select(specific, redundant)
+    reveal_type(result)  # revealed: S@forward_union
+    return result
+
+def forward_union_reversed(specific: Callable[[S], None], redundant: Callable[[int | str], None]) -> S:
+    result = select(redundant, specific)
+    reveal_type(result)  # revealed: S@forward_union_reversed
+    return result
+```
+
+The same relationship must survive a redundant, non-`object` nominal superclass shared by both
+constraints.
+
+```py
+class Base: ...
+class Left(Base): ...
+class Right(Base): ...
+
+TNominal = TypeVar("TNominal", Left, Right)
+SNominal = TypeVar("SNominal", Left, Right)
+
+def select_nominal(first: Callable[[TNominal], None], second: Callable[[TNominal], None]) -> TNominal:
+    raise NotImplementedError
+
+def forward_nominal(specific: Callable[[SNominal], None], redundant: Callable[[Base], None]) -> SNominal:
+    result = select_nominal(specific, redundant)
+    reveal_type(result)  # revealed: SNominal@forward_nominal
+    return result
+
+def forward_nominal_reversed(specific: Callable[[SNominal], None], redundant: Callable[[Base], None]) -> SNominal:
+    result = select_nominal(redundant, specific)
+    reveal_type(result)  # revealed: SNominal@forward_nominal_reversed
+    return result
+```
+
 ## Incompatible constraint sets
 
 But a constrained TypeVar with constraints not satisfied by the formal TypeVar should still error:
