@@ -634,19 +634,19 @@ The same overload identity must survive `functools.partial`, which removes the b
 forwarding the remaining arguments.
 
 ```py
-import asyncio
 from functools import partial
 
-async def run() -> None:
-    await asyncio.to_thread(partial(callback, 1), value="incorrect")  # snapshot: invalid-argument-type
+def forward[**P](callback: Callable[P, None], *args: P.args, **kwargs: P.kwargs) -> None: ...
+
+forward(partial(callback, 1), value="incorrect")  # snapshot: invalid-argument-type
 ```
 
 ```snapshot
-error[invalid-argument-type]: Argument to function `to_thread` is incorrect
-  --> src/mdtest_snippet.py:18:51
+error[invalid-argument-type]: Argument to function `forward` is incorrect
+  --> src/mdtest_snippet.py:18:31
    |
-18 |     await asyncio.to_thread(partial(callback, 1), value="incorrect")  # snapshot: invalid-argument-type
-   |                                                   ^^^^^^^^^^^^^^^^^ Expected `int`, found `Literal["incorrect"]`
+18 | forward(partial(callback, 1), value="incorrect")  # snapshot: invalid-argument-type
+   |                               ^^^^^^^^^^^^^^^^^ Expected `int`, found `Literal["incorrect"]`
 info: Function defined here
   --> src/mdtest_snippet.py:10:5
    |
@@ -660,20 +660,20 @@ info: Function defined here
 in the second argument should point to that declaration.
 
 ```py
-import asyncio
-from typing import Unpack
+from typing import Callable, Unpack
 
+def wrapper[**P](callback: Callable[P, None], *args: P.args, **kwargs: P.kwargs) -> None: ...
 def callback(*values: Unpack[tuple[int, str]]) -> None: ...
-async def run() -> None:
-    await asyncio.to_thread(callback, 1, 2)  # snapshot: invalid-argument-type
+
+wrapper(callback, 1, 2)  # snapshot: invalid-argument-type
 ```
 
 ```snapshot
-error[invalid-argument-type]: Argument to function `to_thread` is incorrect
- --> src/mdtest_snippet.py:6:42
+error[invalid-argument-type]: Argument to function `wrapper` is incorrect
+ --> src/mdtest_snippet.py:6:22
   |
-6 |     await asyncio.to_thread(callback, 1, 2)  # snapshot: invalid-argument-type
-  |                                          ^ Expected `str`, found `Literal[2]`
+6 | wrapper(callback, 1, 2)  # snapshot: invalid-argument-type
+  |                      ^ Expected `str`, found `Literal[2]`
 info: Function defined here
  --> src/mdtest_snippet.py:4:5
   |
