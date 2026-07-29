@@ -132,28 +132,41 @@ pub(crate) fn fix_all(
         }
         Ok(fixes)
     } else {
-        let source_index = LineIndex::from_source_text(source_kind.source_code());
-
-        let modified = transformed.source_code();
-        let modified_index = LineIndex::from_source_text(modified);
-
-        let Replacement {
-            source_range,
-            modified_range,
-        } = Replacement::between(
+        Ok(text_document_fixes(
+            query,
             source_kind.source_code(),
-            source_index.line_starts(),
-            modified,
-            modified_index.line_starts(),
-        );
-        Ok([(
-            query.make_key().into_uri(),
-            vec![lsp_types::TextEdit {
-                range: source_range.to_range(source_kind.source_code(), &source_index, encoding),
-                new_text: modified[modified_range].to_owned(),
-            }],
-        )]
-        .into_iter()
-        .collect())
+            transformed.source_code(),
+            encoding,
+        ))
     }
+}
+
+fn text_document_fixes(
+    query: &DocumentQuery,
+    source: &str,
+    modified: &str,
+    encoding: PositionEncoding,
+) -> Fixes {
+    let source_index = LineIndex::from_source_text(source);
+    let modified_index = LineIndex::from_source_text(modified);
+
+    let Replacement {
+        source_range,
+        modified_range,
+    } = Replacement::between(
+        source,
+        source_index.line_starts(),
+        modified,
+        modified_index.line_starts(),
+    );
+
+    [(
+        query.make_key().into_uri(),
+        vec![lsp_types::TextEdit {
+            range: source_range.to_range(source, &source_index, encoding),
+            new_text: modified[modified_range].to_owned(),
+        }],
+    )]
+    .into_iter()
+    .collect()
 }
