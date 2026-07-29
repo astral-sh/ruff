@@ -333,6 +333,7 @@ mod tests {
     #[test_case(Path::new("deduplicate_imports.py"))]
     #[test_case(Path::new("fit_line_length.py"))]
     #[test_case(Path::new("fit_line_length_comment.py"))]
+    #[test_case(Path::new("fit_line_length_pragma.py"))]
     #[test_case(Path::new("force_sort_within_sections.py"))]
     #[test_case(Path::new("force_to_top.py"))]
     #[test_case(Path::new("force_wrap_aliases.py"))]

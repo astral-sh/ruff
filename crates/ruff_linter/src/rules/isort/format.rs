@@ -1,4 +1,5 @@
 use ruff_python_codegen::Stylist;
+use ruff_python_trivia::is_pragma_comment;
 
 use crate::line_width::{LineLength, LineWidthBuilder};
 
@@ -104,6 +105,26 @@ pub(crate) fn format_import_from(
     format_multi_line(import_from, comments, aliases, is_first, stylist)
 }
 
+/// Add the width of an inline comment (including its two leading spaces) to `line_width`.
+///
+/// Pragma comments (e.g., `# noqa: F401` or `# type: ignore`) are excluded from the width, for
+/// consistency with how `line-too-long` (E501) and the formatter measure line width. Counting them
+/// would cause an import that otherwise fits on one line to be wrapped, moving the pragma to a
+/// position where it no longer applies to the import statement:
+///
+/// ```python
+/// from module import (
+///     member,  # noqa: PLC0415
+/// )
+/// ```
+fn add_comment_width(line_width: LineWidthBuilder, comment: &str) -> LineWidthBuilder {
+    if is_pragma_comment(comment) {
+        line_width
+    } else {
+        line_width.add_width(2).add_str(comment)
+    }
+}
+
 /// Format an import-from statement in single-line format.
 ///
 /// This method assumes that the output source code is syntactically valid.
@@ -156,7 +177,7 @@ fn format_single_line(
         output.push(' ');
         output.push(' ');
         output.push_str(comment);
-        line_width = line_width.add_width(2).add_str(comment);
+        line_width = add_comment_width(line_width, comment);
     }
 
     for (_, comments) in aliases {
@@ -164,21 +185,21 @@ fn format_single_line(
             output.push(' ');
             output.push(' ');
             output.push_str(comment);
-            line_width = line_width.add_width(2).add_str(comment);
+            line_width = add_comment_width(line_width, comment);
         }
 
         for comment in &comments.inline {
             output.push(' ');
             output.push(' ');
             output.push_str(comment);
-            line_width = line_width.add_width(2).add_str(comment);
+            line_width = add_comment_width(line_width, comment);
         }
 
         for comment in &comments.trailing {
             output.push(' ');
             output.push(' ');
             output.push_str(comment);
-            line_width = line_width.add_width(2).add_str(comment);
+            line_width = add_comment_width(line_width, comment);
         }
     }
 
@@ -186,7 +207,7 @@ fn format_single_line(
         output.push(' ');
         output.push(' ');
         output.push_str(comment);
-        line_width = line_width.add_width(2).add_str(comment);
+        line_width = add_comment_width(line_width, comment);
     }
 
     output.push_str(&stylist.line_ending());
