@@ -21,6 +21,9 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// checkers, the primary consumers of stub files. Replace very long constants
 /// with ellipses (`...`) to simplify the stub.
 ///
+/// The rule does not apply to long entries in `__all__`, which are assumed to
+/// be outside the stub author's control.
+///
 /// ## Example
 ///
 /// ```pyi
@@ -51,8 +54,10 @@ impl AlwaysFixableViolation for StringOrBytesTooLong {
 pub(crate) fn string_or_bytes_too_long(checker: &Checker, string: StringLike) {
     let semantic = checker.semantic();
 
+    let parent = semantic.current_statement();
+
     // Ignore docstrings.
-    if is_docstring_stmt(semantic.current_statement()) {
+    if is_docstring_stmt(parent) {
         return;
     }
 
@@ -61,6 +66,10 @@ pub(crate) fn string_or_bytes_too_long(checker: &Checker, string: StringLike) {
     }
 
     if semantic.in_type_definition() | semantic.in_deferred_type_definition() {
+        return;
+    }
+
+    if checker.in_dunder_all_assignment(parent) {
         return;
     }
 

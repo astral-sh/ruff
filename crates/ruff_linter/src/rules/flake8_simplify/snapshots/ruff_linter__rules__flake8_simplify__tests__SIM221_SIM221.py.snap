@@ -9,11 +9,11 @@ SIM221 [*] Use `True` instead of `a or not a`
 2 |     pass
   |
 help: Replace with `True`
+  |
   - if a or not a:
 1 + if True:
 2 |     pass
-3 |
-4 | if (a or not a) or b:
+  |
 note: This is an unsafe fix and may change runtime behavior
 
 SIM221 [*] Use `True` instead of `a or not a`
@@ -26,14 +26,12 @@ SIM221 [*] Use `True` instead of `a or not a`
 5 |     pass
   |
 help: Replace with `True`
-1 | if a or not a:
-2 |     pass
+  |
 3 |
   - if (a or not a) or b:
 4 + if (True) or b:
 5 |     pass
-6 |
-7 | if (a or not a) and b:
+  |
 note: This is an unsafe fix and may change runtime behavior
 
 SIM221 [*] Use `True` instead of `a or not a`
@@ -46,12 +44,10 @@ SIM221 [*] Use `True` instead of `a or not a`
 8 |     pass
   |
 help: Replace with `True`
-4  | if (a or not a) or b:
-5  |     pass
-6  |
-   - if (a or not a) and b:
-7  + if (True) and b:
-8  |     pass
-9  |
-10 | if a:
+  |
+6 |
+  - if (a or not a) and b:
+7 + if (True) and b:
+8 |     pass
+  |
 note: This is an unsafe fix and may change runtime behavior

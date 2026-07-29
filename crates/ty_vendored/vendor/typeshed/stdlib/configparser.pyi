@@ -505,6 +505,7 @@ class RawConfigParser(_Parser):
         Optional second argument is the `source` specifying the name of the
         dictionary being read.
         """
+
     if sys.version_info < (3, 12):
         @deprecated("Deprecated since Python 3.2; removed in Python 3.12. Use `parser.read_file()` instead.")
         def readfp(self, fp: Iterable[str], filename: str | None = None) -> None:

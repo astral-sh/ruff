@@ -125,7 +125,6 @@ error[invalid-argument-type]: Invalid second argument to `isinstance`
   |        ^^^^^^^^^^^^^^---------------^
   |                      |
   |                      This `UnionType` instance contains non-class elements
-  |
 info: A `UnionType` instance can only be used as the second argument to `isinstance` if all elements are class objects
 info: Element `<class 'list[int]'>` in the union is not a class object
 ```
@@ -144,7 +143,6 @@ error[invalid-argument-type]: Invalid second argument to `isinstance`
   |          ^^^^^^^^^^^^^^-------------------------------^
   |                        |
   |                        This `UnionType` instance contains non-class elements
-  |
 info: A `UnionType` instance can only be used as the second argument to `isinstance` if all elements are class objects
 info: Elements `<special-form 'Literal[42]'>` and `<class 'list[int]'>` in the union are not class objects
 ```
@@ -163,7 +161,6 @@ error[invalid-argument-type]: Invalid second argument to `isinstance`
    |          ^^^^^^^^^^^^^^----------------------------^
    |                        |
    |                        This `UnionType` instance contains non-class elements
-   |
 info: A `UnionType` instance can only be used as the second argument to `isinstance` if all elements are class objects
 info: Element `<special-form 'typing.Any'>` in the union, and 2 more elements, are not class objects
 ```
@@ -192,7 +189,6 @@ error[invalid-argument-type]: Invalid second argument to `isinstance`
    |        ^^^^^^^^^^^^^^^^^^^^-----------------^^
    |                            |
    |                            This `UnionType` instance contains non-class elements
-   |
 info: A `UnionType` instance can only be used as the second argument to `isinstance` if all elements are class objects
 info: Element `<class 'list[int]'>` in the union is not a class object
 ```
@@ -216,7 +212,6 @@ error[invalid-argument-type]: Invalid second argument to `isinstance`
    |        ^^^^^^^^^^^^^^^^^^^^^^^^^^-----------------^^^
    |                                  |
    |                                  This `UnionType` instance contains non-class elements
-   |
 info: A `UnionType` instance can only be used as the second argument to `isinstance` if all elements are class objects
 info: Element `<class 'list[int]'>` in the union is not a class object
 ```
@@ -240,7 +235,6 @@ error[invalid-argument-type]: Invalid second argument to `isinstance`
    |
 31 |     if isinstance(x, classes):
    |        ^^^^^^^^^^^^^^^^^^^^^^
-   |
 info: A `UnionType` instance can only be used as the second argument to `isinstance` if all elements are class objects
 info: Element `<class 'list[int]'>` in the union `list[int] | bytes` is not a class object
 ```
@@ -591,6 +585,22 @@ def i[T: Intersection[type[Bar], type[Baz | Spam]], U: (type[Eggs], type[Ham])](
     return (y, z)
 ```
 
+If some (but not all) positive members of the intersection are not valid `isinstance()` targets --
+for example a parametrized generic alias such as `type[list[int]]`, which raises `TypeError` at
+runtime -- we skip those members and narrow using the remaining valid ones, rather than declining to
+narrow at all:
+
+```py
+from ty_extensions import Intersection
+
+def f(x: Foo, y: Intersection[type[Bar], type[list[int]]]):
+    if isinstance(x, y):
+        # `type[list[int]]` is not a valid `isinstance()` target and contributes no
+        # constraint, but `type[Bar]` still narrows.
+        reveal_type(x)  # revealed: Foo & Bar
+        reveal_type(x.attribute)  # revealed: int
+```
+
 ## Narrowing with generics
 
 ```toml
@@ -821,7 +831,8 @@ def test(a: Any, items: list[T]) -> None:
 ## Narrowing with named expressions (walrus operator)
 
 When `isinstance()` is used with a named expression, the target of the named expression should be
-narrowed.
+narrowed. When the `isinstance()` check is the value of a named expression, its argument should also
+be narrowed.
 
 ```py
 def get_value() -> int | str:
@@ -832,4 +843,12 @@ def f():
         reveal_type(x)  # revealed: int
     else:
         reveal_type(x)  # revealed: str
+
+    value = get_value()
+    if result := isinstance(value, int):
+        reveal_type(value)  # revealed: int
+        reveal_type(result)  # revealed: Literal[True]
+    else:
+        reveal_type(value)  # revealed: str
+        reveal_type(result)  # revealed: Literal[False]
 ```

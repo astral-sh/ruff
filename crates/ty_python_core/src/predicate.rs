@@ -11,6 +11,7 @@ use ruff_db::files::File;
 use ruff_index::{FrozenIndexVec, Idx, IndexVec};
 use ruff_python_ast::{Singleton, name::Name};
 
+use crate::ast_ids::ExpressionNodeKey;
 use crate::db::Db;
 use crate::expression::Expression;
 use crate::global_scope;
@@ -66,19 +67,18 @@ impl<'db> PredicatesBuilder<'db> {
         self.predicates.push(predicate)
     }
 
-    pub(crate) fn build(mut self) -> Predicates<'db> {
-        self.predicates.shrink_to_fit();
+    pub(crate) fn build(self) -> Predicates<'db> {
         self.predicates.into()
     }
 }
 
-#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
+#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
 pub struct Predicate<'db> {
     pub node: PredicateNode<'db>,
     pub is_positive: bool,
 }
 
-#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
+#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, get_size2::GetSize)]
 pub(crate) enum PredicateOrLiteral<'db> {
     Literal(bool),
     Predicate(Predicate<'db>),
@@ -98,7 +98,7 @@ impl PredicateOrLiteral<'_> {
     }
 }
 
-#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
+#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
 pub struct CallableAndCallExpr<'db> {
     pub callable: Expression<'db>,
     pub call_expr: Expression<'db>,
@@ -108,7 +108,7 @@ pub struct CallableAndCallExpr<'db> {
     pub is_await: bool,
 }
 
-#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
+#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
 pub enum PredicateNode<'db> {
     Expression(Expression<'db>),
     /// These predicates are recorded for statements with call expressions. As part of
@@ -129,49 +129,124 @@ pub enum PredicateNode<'db> {
     /// call is `Unknown`/`Any`, because that would result in too many false
     /// positives.
     IsNonTerminalCall(CallableAndCallExpr<'db>),
+    /// Whether an iterable is statically known to yield at least one item.
+    ///
+    /// Currently, this predicate is only emitted for direct `range(...)` calls. It is resolved
+    /// semantically during type checking, so calls to a shadowed `range` remain ambiguous.
+    IsNonEmptyIterable(Expression<'db>),
     Pattern(PatternPredicate<'db>),
+    SubjectElementPattern(SubjectElementPatternPredicate<'db>),
     StarImportPlaceholder(StarImportPlaceholderPredicate<'db>),
 }
 
-#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
-pub enum ClassPatternKind {
-    Irrefutable,
-    Refutable,
+/// A pattern predicate applied to one expression in a sequence-display subject.
+///
+/// The full pattern determines the predicate's truth value, while `target` selects the subject
+/// occurrence whose aligned pattern constraint should be applied to a binding.
+#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
+pub struct SubjectElementPatternPredicate<'db> {
+    pub pattern: PatternPredicate<'db>,
+    pub target: ExpressionNodeKey,
 }
 
-impl ClassPatternKind {
-    pub fn is_irrefutable(self) -> bool {
-        matches!(self, ClassPatternKind::Irrefutable)
+/// Structural details for sequence patterns that affect narrowing and reachability.
+#[derive(Debug, Clone, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
+pub struct SequencePatternPredicateKind<'db> {
+    pub patterns: Box<[PatternPredicateKind<'db>]>,
+}
+
+impl<'db> SequencePatternPredicateKind<'db> {
+    /// Return `true` for `case [*rest]`, the only sequence pattern with no
+    /// length or element constraints.
+    pub fn is_irrefutable(&self) -> bool {
+        matches!(self.patterns.as_ref(), [PatternPredicateKind::Star(_)])
+    }
+
+    /// Return the patterns before and after the starred element.
+    pub fn split_around_star(
+        &self,
+    ) -> Option<(&[PatternPredicateKind<'db>], &[PatternPredicateKind<'db>])> {
+        let star_index = self
+            .patterns
+            .iter()
+            .position(|pattern| matches!(pattern, PatternPredicateKind::Star(_)))?;
+        let (prefix, star_and_suffix) = self.patterns.split_at(star_index);
+        Some((prefix, &star_and_suffix[1..]))
     }
 }
 
-/// Pattern kinds for which we support type narrowing and/or static reachability analysis.
-#[derive(Debug, Clone, Hash, PartialEq, salsa::Update, get_size2::GetSize)]
+/// Structural details for a class pattern.
+#[derive(Debug, Clone, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
+pub struct ClassPatternPredicateKind<'db> {
+    pub class: Expression<'db>,
+    pub positional: Box<[PatternPredicateKind<'db>]>,
+    pub keywords: Box<[ClassPatternKeywordPredicateKind<'db>]>,
+}
+
+impl ClassPatternPredicateKind<'_> {
+    pub fn is_empty(&self) -> bool {
+        self.positional.is_empty() && self.keywords.is_empty()
+    }
+}
+
+#[derive(Debug, Clone, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
+pub struct ClassPatternKeywordPredicateKind<'db> {
+    pub attr: Name,
+    pub pattern: PatternPredicateKind<'db>,
+}
+
+/// Structural details for a mapping pattern.
+#[derive(Debug, Clone, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
+pub struct MappingPatternPredicateKind<'db> {
+    pub entries: Box<[MappingPatternEntryPredicateKind<'db>]>,
+    pub rest: Option<Name>,
+}
+
+impl MappingPatternPredicateKind<'_> {
+    pub fn is_irrefutable(&self) -> bool {
+        self.entries.is_empty()
+    }
+}
+
+#[derive(Debug, Clone, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
+pub struct MappingPatternEntryPredicateKind<'db> {
+    pub key: Expression<'db>,
+    pub pattern: PatternPredicateKind<'db>,
+}
+
+/// Pattern structure used for type narrowing, static reachability, and inferring the types of
+/// names bound by a successful match.
+#[derive(Debug, Clone, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 pub enum PatternPredicateKind<'db> {
     Singleton(Singleton),
     Value(Expression<'db>),
-    Or(Vec<PatternPredicateKind<'db>>),
-    Class(Expression<'db>, ClassPatternKind),
-    Mapping(ClassPatternKind),
-    Sequence(ClassPatternKind),
+    Or(Box<[PatternPredicateKind<'db>]>),
+    Class(ClassPatternPredicateKind<'db>),
+    Mapping(MappingPatternPredicateKind<'db>),
+    Sequence(SequencePatternPredicateKind<'db>),
     As(Option<Box<PatternPredicateKind<'db>>>, Option<Name>),
-    Unsupported,
+    Star(Option<Name>),
 }
 
 #[salsa::tracked(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct PatternPredicate<'db> {
+    #[returns(copy)]
     pub file: File,
 
+    #[returns(copy)]
     pub file_scope: FileScopeId,
 
+    #[returns(copy)]
     pub subject: Expression<'db>,
 
     #[returns(ref)]
     pub kind: PatternPredicateKind<'db>,
 
+    #[returns(copy)]
     pub guard: Option<Expression<'db>>,
 
     /// A reference to the pattern of the previous match case
+    #[returns(as_deref)]
     pub previous_predicate: Option<Box<PatternPredicate<'db>>>,
 }
 
@@ -226,6 +301,7 @@ impl<'db> PatternPredicate<'db> {
 /// [Truthiness]: [crate::types::Truthiness]
 #[salsa::tracked(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct StarImportPlaceholderPredicate<'db> {
+    #[returns(copy)]
     pub importing_file: File,
 
     /// Each symbol imported by a `*` import has a separate predicate associated with it:
@@ -237,8 +313,10 @@ pub struct StarImportPlaceholderPredicate<'db> {
     /// for valid `*`-import definitions, and valid `*`-import definitions can only ever
     /// exist in the global scope; thus, we know that the `symbol_id` here will be relative
     /// to the global scope of the importing file.
+    #[returns(copy)]
     pub symbol_id: ScopedSymbolId,
 
+    #[returns(copy)]
     pub referenced_file: File,
 }
 

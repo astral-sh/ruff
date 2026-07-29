@@ -8,5 +8,4 @@ C418 Unnecessary dict comprehension passed to `dict()` (remove the outer call to
 2 |
 3 | dict({**d for d in dicts})
   | ^^^^^^^^^^^^^^^^^^^^^^^^^^
-  |
 help: Remove outer `dict()` call

@@ -101,20 +101,6 @@ where
     }
 }
 
-#[expect(unsafe_code)]
-unsafe impl<T> salsa::Update for AstNodeRef<T> {
-    unsafe fn maybe_update(old_pointer: *mut Self, new_value: Self) -> bool {
-        let old_ref = unsafe { &mut (*old_pointer) };
-
-        // The equality of an `AstNodeRef` depends on both the module address and the node index,
-        // but the former is not stored in release builds to save memory. As such, AST nodes
-        // are always considered change when the AST is reparsed, which is acceptable because
-        // any change to the AST is likely to invalidate most node indices anyways.
-        *old_ref = new_value;
-        true
-    }
-}
-
 impl<T> get_size2::GetSize for AstNodeRef<T> {}
 
 #[expect(clippy::missing_fields_in_debug)]
@@ -124,18 +110,17 @@ where
     for<'ast> &'ast T: TryFrom<AnyRootNodeRef<'ast>>,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        #[cfg(debug_assertions)]
-        {
-            f.debug_struct("AstNodeRef")
-                .field("kind", &self.kind)
-                .field("range", &self.range)
-                .finish()
-        }
-
-        #[cfg(not(debug_assertions))]
-        {
-            // Unfortunately we have no access to the AST here.
-            f.debug_tuple("AstNodeRef").finish_non_exhaustive()
+        cfg_select! {
+            debug_assertions => {
+                f.debug_struct("AstNodeRef")
+                    .field("kind", &self.kind)
+                    .field("range", &self.range)
+                    .finish()
+            },
+            _ => {
+                // Unfortunately we have no access to the AST here.
+                f.debug_tuple("AstNodeRef").finish_non_exhaustive()
+            },
         }
     }
 }

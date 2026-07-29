@@ -1,5 +1,6 @@
 use crate::{
     Program,
+    reachability::is_reachable,
     types::{
         BindingContext, KnownClass, KnownInstanceType, LintDiagnosticGuard, Truthiness, Type,
         TypeContext, TypeVarBoundOrConstraints, TypeVarKind, TypeVarVariance,
@@ -10,10 +11,9 @@ use crate::{
             report_mismatched_type_name,
         },
         infer::{
-            InferenceFlags, TypeInferenceBuilder,
+            InferenceFlags, TypeExpressionFlags, TypeInferenceBuilder,
             builder::{BoundOrConstraintsNodes, DeclaredAndInferredType, DeferredExpressionState},
         },
-        todo_type,
         typevar::{
             TypeVarBoundOrConstraintsEvaluation, TypeVarConstraints, TypeVarDefaultEvaluation,
             TypeVarIdentity, TypeVarInstance,
@@ -27,7 +27,10 @@ use ruff_db::{
 };
 use ruff_python_ast::{self as ast, PythonVersion};
 use ruff_text_size::{Ranged, TextRange};
-use ty_python_core::{definition::Definition, scope::NodeWithScopeKind};
+use ty_python_core::{
+    definition::{Definition, DefinitionKind},
+    scope::NodeWithScopeKind,
+};
 
 impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     pub(super) fn infer_typevar_definition(
@@ -65,7 +68,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         if bound_or_constraint.is_some() || default.is_some() {
             self.deferred.insert(definition);
         }
-        let identity = TypeVarIdentity::new(db, &name.id, Some(definition), TypeVarKind::Pep695);
+        let identity =
+            TypeVarIdentity::new(db, &name.id, Some(definition), TypeVarKind::Pep695TypeVar);
         let ty = Type::KnownInstance(KnownInstanceType::TypeVar(TypeVarInstance::new(
             db,
             identity,
@@ -257,7 +261,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 if let Some(mut diagnostic) = not_assignable_to_upper_bound() {
                                     annotate_default_definition(&mut diagnostic);
                                     if let Some(name) = name {
-                                        diagnostic.set_primary_message(format_args!(
+                                        diagnostic.set_primary_annotation_message(format_args!(
                                             "Constraint `{constraint}` of default \
                                             `{default_name}` is not assignable to upper \
                                             bound of `{name}`",
@@ -273,7 +277,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                             constraint = constraint.display(db),
                                         ));
                                     } else {
-                                        diagnostic.set_primary_message(format_args!(
+                                        diagnostic.set_primary_annotation_message(format_args!(
                                             "Constraint `{constraint}` of `{default_name}` is \
                                             not assignable to upper bound `{bound}` of \
                                             outer TypeVar",
@@ -299,7 +303,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             if let Some(mut diagnostic) = not_assignable_to_upper_bound() {
                                 annotate_default_definition(&mut diagnostic);
                                 if let Some(name) = name {
-                                    diagnostic.set_primary_message(format_args!(
+                                    diagnostic.set_primary_annotation_message(format_args!(
                                         "Upper bound `{default_bound}` of default \
                                             `{default_name}` is not assignable to upper \
                                             bound of `{name}`",
@@ -315,7 +319,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                         default_bound = default_bound.display(db),
                                     ));
                                 } else {
-                                    diagnostic.set_primary_message(format_args!(
+                                    diagnostic.set_primary_annotation_message(format_args!(
                                         "Upper bound `{default_bound}` of default \
                                             `{default_name}` is not assignable to upper \
                                             bound of outer TypeVar",
@@ -348,7 +352,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 if let Some(mut diagnostic) = inconsistent_with_constraints() {
                                     annotate_default_definition(&mut diagnostic);
                                     if let Some(name) = name {
-                                        diagnostic.set_primary_message(format_args!(
+                                        diagnostic.set_primary_annotation_message(format_args!(
                                             "Constraint `{constraint}` of default \
                                                 `{default_name}` is not one of the constraints \
                                                 of `{name}`",
@@ -363,7 +367,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                             constraint = default_constraint.display(db),
                                         ));
                                     } else {
-                                        diagnostic.set_primary_message(format_args!(
+                                        diagnostic.set_primary_annotation_message(format_args!(
                                             "Constraint `{constraint}` of outer TypeVar default \
                                                 `{default_name}` is not one of the constraints \
                                                 of the outer TypeVar",
@@ -388,7 +392,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         if let Some(mut diagnostic) = inconsistent_with_constraints() {
                             annotate_default_definition(&mut diagnostic);
                             if let Some(default_bound) = default_typevar.upper_bound(db) {
-                                diagnostic.set_primary_message(
+                                diagnostic.set_primary_annotation_message(
                                     "Bounded TypeVar cannot be used as the default \
                                     for a constrained TypeVar",
                                 );
@@ -397,7 +401,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                     default_bound = default_bound.display(db),
                                 ));
                             } else {
-                                diagnostic.set_primary_message(
+                                diagnostic.set_primary_annotation_message(
                                     "Unbounded TypeVar cannot be used as the default \
                                     for a constrained TypeVar",
                                 );
@@ -418,9 +422,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 if !default_ty.is_assignable_to(db, bound) {
                     if let Some(mut diagnostic) = not_assignable_to_upper_bound() {
                         if let Some(name) = name {
-                            diagnostic.set_primary_message(format_args!("Default of `{name}`"));
+                            diagnostic.set_primary_annotation_message(format_args!(
+                                "Default of `{name}`"
+                            ));
                         } else {
-                            diagnostic.set_primary_message("TypeVar default");
+                            diagnostic.set_primary_annotation_message("TypeVar default");
                         }
                         diagnostic.set_concise_message(not_assignable_message);
                     }
@@ -435,12 +441,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 {
                     if let Some(mut diagnostic) = inconsistent_with_constraints() {
                         if let Some(name) = name {
-                            diagnostic.set_primary_message(format_args!(
+                            diagnostic.set_primary_annotation_message(format_args!(
                                 "`{default}` is not one of the constraints of `{name}`",
                                 default = default_ty.display(db),
                             ));
                         } else {
-                            diagnostic.set_primary_message(format_args!(
+                            diagnostic.set_primary_annotation_message(format_args!(
                                 "`{default}` is not one of the constraints",
                                 default = default_ty.display(db),
                             ));
@@ -506,7 +512,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let mut diagnostic = builder.into_diagnostic(format_args!(
             "Invalid default for type parameter `{typevar_name}`"
         ));
-        diagnostic.set_primary_message(format_args!(
+        diagnostic.set_primary_annotation_message(format_args!(
             "`{outer_name}` is a type parameter bound in an outer scope"
         ));
         diagnostic.set_concise_message(format_args!(
@@ -659,16 +665,348 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let ast::TypeParamTypeVarTuple {
             range: _,
             node_index: _,
-            name: _,
+            name,
             default,
         } = node;
-        self.infer_optional_expression(default.as_deref(), TypeContext::default());
-        let pep_695_todo = todo_type!("PEP-695 TypeVarTuple definition types");
+
+        let db = self.db();
+
+        if default.is_some() {
+            self.deferred.insert(definition);
+        }
+        let identity = TypeVarIdentity::new(
+            db,
+            &name.id,
+            Some(definition),
+            TypeVarKind::Pep695TypeVarTuple,
+        );
+        let ty = Type::KnownInstance(KnownInstanceType::TypeVar(TypeVarInstance::new(
+            db,
+            identity,
+            None,
+            None, // explicit_variance
+            default.as_deref().map(|_| TypeVarDefaultEvaluation::Lazy),
+        )));
         self.add_declaration_with_binding(
             node.into(),
             definition,
-            &DeclaredAndInferredType::are_the_same_type(pep_695_todo),
+            &DeclaredAndInferredType::are_the_same_type(ty),
         );
+    }
+
+    pub(super) fn infer_typevartuple_deferred(&mut self, node: &ast::TypeParamTypeVarTuple) {
+        let ast::TypeParamTypeVarTuple {
+            range: _,
+            node_index: _,
+            name,
+            default: Some(default),
+        } = node
+        else {
+            return;
+        };
+        let previous_deferred_state =
+            std::mem::replace(&mut self.deferred_state, DeferredExpressionState::Deferred);
+        self.infer_typevartuple_default(default, Some(&name.id));
+        self.deferred_state = previous_deferred_state;
+    }
+
+    pub(super) fn infer_typevartuple_default(
+        &mut self,
+        default_expr: &ast::Expr,
+        typevartuple_name: Option<&str>,
+    ) {
+        let previously_in_valid_unpack_context = self
+            .context
+            .inference_flags
+            .replace(InferenceFlags::IN_VALID_UNPACK_CONTEXT, true);
+        let default_ty = self.infer_type_expression(default_expr);
+        self.context.inference_flags.set(
+            InferenceFlags::IN_VALID_UNPACK_CONTEXT,
+            previously_in_valid_unpack_context,
+        );
+
+        if let Some(name) = typevartuple_name
+            && self.check_default_for_outer_scope_typevars(default_ty, default_expr, name)
+        {
+            return;
+        }
+
+        if !self
+            .type_expression_flags(default_expr)
+            .contains(TypeExpressionFlags::UNPACK)
+            && !matches!(
+                default_ty,
+                Type::TypeVar(typevar) if typevar.is_typevartuple(self.db())
+            )
+            && let Some(builder) = self
+                .context
+                .report_lint(&INVALID_LEGACY_TYPE_VARIABLE, default_expr)
+        {
+            builder.into_diagnostic(
+                "The default value for `TypeVarTuple` must be an unpacked tuple type \
+                    or another TypeVarTuple",
+            );
+        }
+    }
+
+    pub(super) fn infer_legacy_typevartuple(
+        &mut self,
+        target: &ast::Expr,
+        call_expr: &ast::ExprCall,
+        definition: Definition<'db>,
+        known_class: KnownClass,
+    ) -> Type<'db> {
+        fn error<'db>(
+            context: &InferContext<'db, '_>,
+            message: impl std::fmt::Display,
+            node: impl Ranged,
+        ) -> Type<'db> {
+            if let Some(builder) = context.report_lint(&INVALID_LEGACY_TYPE_VARIABLE, node) {
+                builder.into_diagnostic(message);
+            }
+            KnownClass::TypeVarTuple.to_instance(context.db())
+        }
+
+        let db = self.db();
+        let arguments = &call_expr.arguments;
+        let is_typing_extensions = known_class == KnownClass::ExtensionsTypeVarTuple;
+        let assume_all_features = self.in_stub() || is_typing_extensions;
+        let python_version = Program::get(db).python_version(db);
+        let have_features_from =
+            |version: PythonVersion| assume_all_features || python_version >= version;
+
+        let mut default = None;
+        let mut covariant = false;
+        let mut contravariant = false;
+        let mut infer_variance = false;
+        let mut name_param_ty = None;
+        let mut name_param_node = None;
+
+        if arguments.args.len() > 1 {
+            return error(
+                &self.context,
+                "`TypeVarTuple` can only have one positional argument",
+                call_expr,
+            );
+        }
+
+        if let Some(starred) = arguments.args.iter().find(|arg| arg.is_starred_expr()) {
+            return error(
+                &self.context,
+                "Starred arguments are not supported in `TypeVarTuple` creation",
+                starred,
+            );
+        }
+
+        for kwarg in &arguments.keywords {
+            let Some(identifier) = kwarg.arg.as_ref() else {
+                return error(
+                    &self.context,
+                    "Starred arguments are not supported in `TypeVarTuple` creation",
+                    kwarg,
+                );
+            };
+            match identifier.id().as_str() {
+                "name" => {
+                    if !arguments.args.is_empty() {
+                        return error(
+                            &self.context,
+                            "The `name` parameter of `TypeVarTuple` can only be provided once",
+                            kwarg,
+                        );
+                    }
+                    name_param_node = Some(&kwarg.value);
+                    name_param_ty =
+                        Some(self.infer_expression(&kwarg.value, TypeContext::default()));
+                }
+                "default" => {
+                    if !have_features_from(PythonVersion::PY313) {
+                        error(
+                            &self.context,
+                            "The `default` parameter of `typing.TypeVarTuple` was added in Python 3.13",
+                            kwarg,
+                        );
+                    }
+                    default = Some(TypeVarDefaultEvaluation::Lazy);
+                }
+                "bound" => {
+                    if !have_features_from(PythonVersion::PY315) {
+                        return error(
+                            &self.context,
+                            "The `bound` parameter of `typing.TypeVarTuple` was added in Python 3.15",
+                            kwarg,
+                        );
+                    }
+                    return error(
+                        &self.context,
+                        "The `bound` argument for `TypeVarTuple` is not supported",
+                        call_expr,
+                    );
+                }
+                "covariant" => {
+                    if !have_features_from(PythonVersion::PY315) {
+                        error(
+                            &self.context,
+                            "The `covariant` parameter of `typing.TypeVarTuple` was added in Python 3.15",
+                            kwarg,
+                        );
+                    }
+                    match self
+                        .infer_expression(&kwarg.value, TypeContext::default())
+                        .bool(db)
+                    {
+                        Truthiness::AlwaysTrue => covariant = true,
+                        Truthiness::AlwaysFalse => {}
+                        Truthiness::Ambiguous => {
+                            return error(
+                                &self.context,
+                                "The `covariant` parameter of `TypeVarTuple` \
+                                cannot have an ambiguous truthiness",
+                                &kwarg.value,
+                            );
+                        }
+                    }
+                }
+                "contravariant" => {
+                    if !have_features_from(PythonVersion::PY315) {
+                        error(
+                            &self.context,
+                            "The `contravariant` parameter of `typing.TypeVarTuple` was added in Python 3.15",
+                            kwarg,
+                        );
+                    }
+                    match self
+                        .infer_expression(&kwarg.value, TypeContext::default())
+                        .bool(db)
+                    {
+                        Truthiness::AlwaysTrue => contravariant = true,
+                        Truthiness::AlwaysFalse => {}
+                        Truthiness::Ambiguous => {
+                            return error(
+                                &self.context,
+                                "The `contravariant` parameter of `TypeVarTuple` \
+                                cannot have an ambiguous truthiness",
+                                &kwarg.value,
+                            );
+                        }
+                    }
+                }
+                "infer_variance" => {
+                    if !have_features_from(PythonVersion::PY315) {
+                        error(
+                            &self.context,
+                            "The `infer_variance` parameter of `typing.TypeVarTuple` was added in Python 3.15",
+                            kwarg,
+                        );
+                    }
+                    match self
+                        .infer_expression(&kwarg.value, TypeContext::default())
+                        .bool(db)
+                    {
+                        Truthiness::AlwaysTrue => infer_variance = true,
+                        Truthiness::AlwaysFalse => {}
+                        Truthiness::Ambiguous => {
+                            return error(
+                                &self.context,
+                                "The `infer_variance` parameter of `TypeVarTuple` \
+                                cannot have an ambiguous truthiness",
+                                &kwarg.value,
+                            );
+                        }
+                    }
+                }
+                name => {
+                    error(
+                        &self.context,
+                        format_args!(
+                            "Unknown keyword argument `{name}` in `TypeVarTuple` creation"
+                        ),
+                        kwarg,
+                    );
+                    self.infer_expression(&kwarg.value, TypeContext::default());
+                }
+            }
+        }
+
+        let variance = match (covariant, contravariant, infer_variance) {
+            (true, true, _) => {
+                return error(
+                    &self.context,
+                    "A `TypeVarTuple` cannot be both covariant and contravariant",
+                    call_expr,
+                );
+            }
+            (true, false, true) | (false, true, true) => {
+                return error(
+                    &self.context,
+                    "A `TypeVarTuple` cannot specify variance when `infer_variance=True`",
+                    call_expr,
+                );
+            }
+            (true, false, false) => Some(TypeVarVariance::Covariant),
+            (false, true, false) => Some(TypeVarVariance::Contravariant),
+            (false, false, false) => Some(TypeVarVariance::Invariant),
+            (false, false, true) => None,
+        };
+
+        let Some(name_param_ty) = name_param_ty.or_else(|| {
+            arguments
+                .find_positional(0)
+                .map(|arg| self.infer_expression(arg, TypeContext::default()))
+        }) else {
+            return error(
+                &self.context,
+                "The `name` parameter of `TypeVarTuple` is required.",
+                call_expr,
+            );
+        };
+
+        let Some(name_param) = name_param_ty.as_string_literal().map(|name| name.value(db)) else {
+            return error(
+                &self.context,
+                "The first argument to `TypeVarTuple` must be a string literal",
+                call_expr,
+            );
+        };
+        let name_param_node = name_param_node.or_else(|| arguments.find_positional(0));
+
+        let ast::Expr::Name(ast::ExprName {
+            id: target_name, ..
+        }) = target
+        else {
+            return error(
+                &self.context,
+                "A `TypeVarTuple` definition must be a simple variable assignment",
+                target,
+            );
+        };
+
+        if name_param != target_name {
+            report_mismatched_type_name(
+                &self.context,
+                name_param_node
+                    .map(Ranged::range)
+                    .unwrap_or_else(|| call_expr.range()),
+                "TypeVarTuple",
+                target_name,
+                Some(name_param),
+                name_param_ty,
+            );
+        }
+
+        if default.is_some() {
+            self.deferred.insert(definition);
+        }
+
+        let identity = TypeVarIdentity::new(
+            db,
+            target_name.clone(),
+            Some(definition),
+            TypeVarKind::LegacyTypeVarTuple,
+        );
+        Type::KnownInstance(KnownInstanceType::TypeVar(TypeVarInstance::new(
+            db, identity, None, variance, default,
+        )))
     }
 
     pub(super) fn infer_legacy_paramspec(
@@ -909,9 +1247,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let identity = TypeVarIdentity::new(
             db,
-            target_name.clone(),
+            target_name,
             Some(definition),
-            TypeVarKind::ParamSpec,
+            TypeVarKind::LegacyParamSpec,
         );
         Type::KnownInstance(KnownInstanceType::TypeVar(TypeVarInstance::new(
             db, identity, None, variance, default,
@@ -1140,6 +1478,82 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             );
         }
 
+        let previous_definition_in = |scope, place, before| {
+            let use_def = self.index.use_def_map(scope);
+            use_def
+                .reachable_bindings(place)
+                .map(|binding| {
+                    (
+                        binding.binding_order,
+                        binding.binding,
+                        binding.reachability_constraint,
+                    )
+                })
+                .chain(use_def.reachable_declarations(place).map(|declaration| {
+                    (
+                        declaration.declaration_order,
+                        declaration.declaration,
+                        declaration.reachability_constraint,
+                    )
+                }))
+                .filter(|(order, _, _)| *order < before)
+                .filter(|(_, _, reachability)| is_reachable(db, use_def, *reachability))
+                .filter_map(|(order, definition, _)| {
+                    definition
+                        .definition()
+                        .map(|definition| (order, definition))
+                })
+                .filter(|(_, definition)| definition.kind(db).is_user_visible())
+                .max_by_key(|(order, _)| *order)
+                .map(|(_, definition)| definition)
+        };
+
+        let scope = definition.file_scope(db);
+        let place = definition.place(db);
+        let use_def = self.index.use_def_map(scope);
+        let definition_order = use_def.reachable_bindings(place).find_map(|binding| {
+            (binding.binding.definition() == Some(definition)).then_some(binding.binding_order)
+        });
+        debug_assert!(definition_order.is_some());
+
+        let previous_definition = definition_order
+            .and_then(|before| previous_definition_in(scope, place, before))
+            .or_else(|| {
+                self.forwarded_assignment_owner(scope, place.expect_symbol())
+                    .and_then(|(owner_scope, owner_place)| {
+                        let owner_use_def = self.index.use_def_map(owner_scope);
+                        let before = owner_use_def
+                            .reachable_bindings(owner_place.into())
+                            .find_map(|binding| {
+                                let definition = binding.binding.definition()?;
+                                let DefinitionKind::NestedBindings(nested) = definition.kind(db)
+                                else {
+                                    return None;
+                                };
+                                nested
+                                    .nested_declarations
+                                    .iter()
+                                    .any(|declaration| declaration.file_scope_id == scope)
+                                    .then_some(binding.binding_order)
+                            })?;
+                        previous_definition_in(owner_scope, owner_place.into(), before)
+                    })
+            });
+        if let Some(previous_definition) = previous_definition
+            && let Some(builder) = self
+                .context
+                .report_lint(&INVALID_LEGACY_TYPE_VARIABLE, target)
+        {
+            let mut diagnostic = builder.into_diagnostic(format_args!(
+                "Cannot redefine `{target_name}` as a type variable"
+            ));
+            diagnostic.annotate(
+                self.context
+                    .secondary(previous_definition.focus_range(db, self.module()))
+                    .message("Previously defined here"),
+            );
+        }
+
         // Inference of bounds, constraints, and defaults must be deferred, to avoid cycles. So we
         // only check presence/absence/number here.
 
@@ -1171,9 +1585,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let identity = TypeVarIdentity::new(
             db,
-            target_name.clone(),
+            target_name,
             Some(definition),
-            TypeVarKind::Legacy,
+            TypeVarKind::LegacyTypeVar,
         );
         Type::KnownInstance(KnownInstanceType::TypeVar(TypeVarInstance::new(
             db,

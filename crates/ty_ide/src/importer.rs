@@ -366,10 +366,23 @@ impl<'ast> MembersInScope<'ast> {
     }
 
     pub(crate) fn find_member(&self, symbol_name: &str) -> Option<&MemberInScope> {
-        self.map
-            .iter()
-            .find(|(name, _)| *name == symbol_name)
-            .map(|(_, member)| member)
+        self.map.get(symbol_name)
+    }
+
+    pub(crate) fn satisfies(
+        &self,
+        db: &dyn Db,
+        importing_file: File,
+        request: &ImportRequest<'_>,
+    ) -> bool {
+        let symbol_text = request.member.unwrap_or(request.module);
+        let Some(member) = self.find_member(symbol_text) else {
+            return false;
+        };
+        let MemberImportKind::Imported(ref ast_import) = member.kind else {
+            return false;
+        };
+        ast_import.start() < self.at && member.satisfies_anywhere(db, importing_file, request)
     }
 }
 
@@ -392,7 +405,12 @@ impl<'ast> MemberInScope<'ast> {
 
     /// Returns true if this symbol satisfies the given import request. This
     /// attempts to take the definition site of the symbol into account.
-    fn satisfies(&self, db: &dyn Db, importing_file: File, request: &ImportRequest<'_>) -> bool {
+    fn satisfies_anywhere(
+        &self,
+        db: &dyn Db,
+        importing_file: File,
+        request: &ImportRequest<'_>,
+    ) -> bool {
         let MemberImportKind::Imported(ref ast_import) = self.kind else {
             return false;
         };
@@ -479,6 +497,13 @@ enum AstImportKind<'ast> {
 }
 
 impl<'ast> AstImportKind<'ast> {
+    fn start(&self) -> TextSize {
+        match self {
+            AstImportKind::Import(ast) => ast.start(),
+            AstImportKind::ImportFrom(ast) => ast.start(),
+        }
+    }
+
     /// Returns whether this import satisfies the given request.
     ///
     /// If it does, then this returns *how* the import satisfies
@@ -627,7 +652,7 @@ impl<'a> ImportRequest<'a> {
             (None, Some(member)) => {
                 // ... unless the symbol we want is already
                 // imported, then leave it as-is.
-                if member.satisfies(db, importing_file, &self) {
+                if member.satisfies_anywhere(db, importing_file, &self) {
                     return self;
                 }
                 Self {

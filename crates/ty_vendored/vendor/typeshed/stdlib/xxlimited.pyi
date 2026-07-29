@@ -11,6 +11,7 @@ class Xxo:
 
     def demo(self) -> None:
         """demo(o) -> o"""
+
     if sys.version_info >= (3, 11) and sys.platform != "win32":
         x_exports: int
 

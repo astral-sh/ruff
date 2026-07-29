@@ -289,4 +289,3 @@ Module(
 5 | t"{"
 6 | t"""{"""
   |      ^^^ Syntax Error: Expected an expression
-  |

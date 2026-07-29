@@ -206,6 +206,7 @@ class Pickler:
         pickled by reference and not by value.  This method is useful when
         re-using picklers.
         """
+
     # this method has no default implementation for Python < 3.13
     def persistent_id(self, obj: Any, /) -> Any: ...
     # The following method is not defined on _Pickler, but can be defined on
@@ -275,5 +276,6 @@ class Unpickler:
         This method is called whenever a class or a function object is
         needed.  Both arguments passed are str objects.
         """
+
     # this method has no default implementation for Python < 3.13
     def persistent_load(self, pid: Any, /) -> Any: ...

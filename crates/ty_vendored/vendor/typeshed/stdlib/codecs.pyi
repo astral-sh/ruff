@@ -446,6 +446,7 @@ class IncrementalEncoder:
         """
         Resets the encoder to the initial state.
         """
+
     # documentation says int but str is needed for the subclass.
     def getstate(self) -> int | str:
         """
@@ -721,6 +722,7 @@ class StreamReaderWriter(TextIO):
     def __exit__(self, type: type[BaseException] | None, value: BaseException | None, tb: types.TracebackType | None) -> None: ...
     def __getattr__(self, name: str) -> Any:
         """Inherit all other methods from the underlying stream."""
+
     # These methods don't actually exist directly, but they are needed to satisfy the TextIO
     # interface. At runtime, they are delegated through __getattr__.
     def close(self) -> None: ...

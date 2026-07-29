@@ -1,9 +1,10 @@
 use std::collections::HashMap;
 
-use lsp_types::Url;
+use lsp_types::Uri;
 use ruff_db::system::{System, SystemPath, SystemPathBuf};
 use ruff_macros::Combine;
 use ruff_python_ast::PythonVersion;
+use ruff_ranged_value::{RangedValue, ValueSource};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use strum::IntoEnumIterator;
@@ -11,9 +12,9 @@ use ty_combine::Combine;
 use ty_ide::{CompletionSettings, InlayHintSettings};
 use ty_project::CheckMode;
 use ty_project::metadata::Options as TyOptions;
-use ty_project::metadata::options::ProjectOptionsOverrides;
+use ty_project::metadata::options::EnvironmentOptions;
 use ty_project::metadata::python_version::SupportedPythonVersion;
-use ty_project::metadata::value::{RangedValue, RelativePathBuf, ValueSource};
+use ty_project::metadata::value::RelativePathBuf;
 
 use super::settings::{ExperimentalSettings, GlobalSettings, WorkspaceSettings};
 use crate::logging::LogLevel;
@@ -255,23 +256,25 @@ impl WorkspaceOptions {
                 }
             });
 
-        let mut overrides =
-            ProjectOptionsOverrides::new(configuration_file, options_overrides.unwrap_or_default());
+        let override_options = options_overrides
+            .filter(|options| options != &TyOptions::default())
+            .map(Box::new);
+        let mut fallback_environment = EnvironmentOptions::default();
 
         if let Some(extension) = self.python_extension
             && let Some(active_environment) = extension.active_environment
         {
-            overrides.fallback_python = Some(RelativePathBuf::python_extension(
+            fallback_environment.python = Some(RelativePathBuf::python_extension(
                 active_environment.executable.sys_prefix,
             ));
 
-            overrides.fallback_python_version = active_environment
+            fallback_environment.python_version = active_environment
                 .version
                 .as_ref()
                 .and_then(resolve_editor_python_version)
                 .map(RangedValue::python_extension);
 
-            if let Some(python) = &overrides.fallback_python {
+            if let Some(python) = &fallback_environment.python {
                 tracing::debug!(
                     "Using the Python environment selected in your editor \
                     in case the configuration doesn't specify a Python environment: {python}",
@@ -279,7 +282,7 @@ impl WorkspaceOptions {
                 );
             }
 
-            if let Some(version) = &overrides.fallback_python_version {
+            if let Some(version) = &fallback_environment.python_version {
                 tracing::debug!(
                     "Using the Python version selected in your editor: {version} \
                     in case the configuration doesn't specify a Python version",
@@ -287,10 +290,13 @@ impl WorkspaceOptions {
             }
         }
 
-        let overrides = if overrides == ProjectOptionsOverrides::default() {
+        let fallback_options = if fallback_environment == EnvironmentOptions::default() {
             None
         } else {
-            Some(overrides)
+            Some(Box::new(TyOptions {
+                environment: Some(fallback_environment),
+                ..TyOptions::default()
+            }))
         };
 
         WorkspaceSettings {
@@ -303,7 +309,9 @@ impl WorkspaceOptions {
                 .completions
                 .map(CompletionOptions::into_settings)
                 .unwrap_or_default(),
-            overrides,
+            configuration_file,
+            override_options,
+            fallback_options,
         }
     }
 }
@@ -504,7 +512,7 @@ pub(crate) struct EnvironmentVersion {
 #[serde(rename_all = "camelCase")]
 pub(crate) struct PythonEnvironment {
     #[deprecated]
-    pub(crate) folder_uri: Option<Url>,
+    pub(crate) folder_uri: Option<Uri>,
     #[deprecated]
     #[serde(rename = "type")]
     pub(crate) kind: Option<String>,
@@ -516,6 +524,6 @@ pub(crate) struct PythonEnvironment {
 #[serde(rename_all = "camelCase")]
 pub(crate) struct PythonExecutable {
     #[deprecated]
-    pub(crate) uri: Option<Url>,
+    pub(crate) uri: Option<Uri>,
     pub(crate) sys_prefix: SystemPathBuf,
 }

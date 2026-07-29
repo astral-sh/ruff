@@ -11,10 +11,8 @@ D408 [*] Section underline should be in the line following the section's name ("
 99 |     A value of some sort.
    |
 help: Add underline to "Returns"
-94 |     """Toggle the gizmo.
-95 |
+   |
 96 |     Returns
    -
 97 |     -------
-98 |     A value of some sort.
-99 |
+   |

@@ -2295,6 +2295,7 @@ class Treeview(Widget, tkinter.XView, tkinter.YView):
         beginning, if greater than or equal to the number of children,
         it is moved to the end. If item was detached it is reattached.
         """
+
     reattach = move
     def next(self, item: str | int) -> str:  # returning empty string means last item
         """Returns the identifier of item's next sibling, or '' if item
@@ -2454,6 +2455,7 @@ class LabeledScale(Frame):
                 Specifies how to display the label relative to the scale.
                 Defaults to 'top'.
         """
+
     # destroy is overridden, signature does not change
     value: Any
     """Return current scale value."""
@@ -2490,6 +2492,7 @@ class OptionMenu(Menubutton):
                 command: callback
                     A callback that will be invoked after selecting an item.
             """
+
     else:
         def __init__(
             self,
@@ -2516,6 +2519,7 @@ class OptionMenu(Menubutton):
                 command: callback
                     A callback that will be invoked after selecting an item.
             """
+
     # configure, config, cget, destroy are inherited from Menubutton
     # destroy and __setitem__ are overridden, signature does not change
     def set_menu(self, default: str | None = None, *values: str) -> None:

@@ -17,15 +17,14 @@ I001 [*] Import block is un-sorted or un-formatted
 10 |   del sin, cos, tan, pi, nan
    |
 help: Organize imports
-1  | # If the file doesn't contain a logical indent token, we should still detect two-space indentation on imports.
-2  | from math import (
-   -   sin,
-   -   tan,
-3  |   cos,
-4  |   nan,
-5  |   pi,
-6  +   sin,
-7  +   tan,
-8  | )
-9  |
-10 | del sin, cos, tan, pi, nan
+  |
+2 | from math import (
+  -   sin,
+  -   tan,
+3 |   cos,
+4 |   nan,
+5 |   pi,
+6 +   sin,
+7 +   tan,
+8 | )
+  |

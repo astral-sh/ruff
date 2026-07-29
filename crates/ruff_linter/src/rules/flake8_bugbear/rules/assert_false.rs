@@ -67,7 +67,7 @@ fn assertion_error(msg: Option<&Expr>) -> Stmt {
                 } else {
                     Box::from([])
                 },
-                keywords: Box::from([]),
+                keywords: std::iter::empty().collect(),
                 range: TextRange::default(),
                 node_index: ruff_python_ast::AtomicNodeIndex::NONE,
             },

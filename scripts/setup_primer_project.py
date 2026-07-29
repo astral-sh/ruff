@@ -5,18 +5,10 @@
 # dependencies = ["mypy-primer"]
 #
 # [tool.uv]
-# # The only direct dependency of this script is mypy-primer,
-# # and mypy-primer is a git dependency, so it is unaffected
-# # by the `exclude-newer` setting:
-# #
-# # > The --exclude-newer option is only applied to packages
-# # > that are read from a registry (as opposed to, e.g., Git dependencies).
-# # -- https://docs.astral.sh/uv/concepts/resolution/#reproducible-resolutions
-# #
-# # That's probably desirable: we usually want the latest
-# # version of mypy-primer anyway. But it's still worth setting
-# # `exclude-newer` here for any transitive dependencies of
-# # mypy-primer.
+# # This is the default for ad hoc use. Historical ecosystem reproduction must
+# # bypass the adjacent lock and select ecosystem-analyzer's exact mypy-primer
+# # revision and project Python version, as shown in the module docstring.
+# # `exclude-newer` still constrains mypy-primer's registry dependencies.
 # exclude-newer = "7 days"
 #
 # [tool.uv.sources]
@@ -25,7 +17,9 @@
 
 """Clone a mypy-primer project and set up a virtualenv with its dependencies installed.
 
-Usage: uv run --no-project scripts/setup_primer_project.py <project-name> [directory] [options]
+For ecosystem-report reproduction, always select the project's ecosystem-analyzer Python version and bypass the adjacent lock with the exact mypy-primer revision pinned by ecosystem-analyzer:
+
+uv run --python <version> --with "mypy-primer @ git+https://github.com/hauntsaninja/mypy_primer@<mypy-primer-revision>" --no-project python scripts/setup_primer_project.py <project-name> [directory] [options]
 """
 
 from __future__ import annotations
@@ -157,7 +151,8 @@ def main() -> None:
     print(f"Activate the venv with: source {venv_dir}/bin/activate")
     print("\nProject-specific ty command:")
     print("  ty_binary=/path/to/ty")
-    print(f"  {get_ty_command(project, ty_binary='"$ty_binary"', venv_dir=venv_dir)}")
+    ty_command = get_ty_command(project, ty_binary='"$ty_binary"', venv_dir=venv_dir)
+    print(f"  {ty_command}")
 
 
 if __name__ == "__main__":

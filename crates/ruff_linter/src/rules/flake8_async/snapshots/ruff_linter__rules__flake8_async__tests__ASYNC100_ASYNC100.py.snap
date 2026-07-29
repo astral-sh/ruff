@@ -8,7 +8,6 @@ ASYNC100 A `with trio.fail_after(...):` context does not contain any `await` sta
 8 | /     with trio.fail_after():
 9 | |         ...
   | |___________^
-  |
 
 ASYNC100 A `with trio.move_on_after(...):` context does not contain any `await` statements. This makes it pointless, as the timeout can only be triggered by a checkpoint.
   --> ASYNC100.py:18:5
@@ -17,7 +16,6 @@ ASYNC100 A `with trio.move_on_after(...):` context does not contain any `await` 
 18 | /     with trio.move_on_after():
 19 | |         ...
    | |___________^
-   |
 
 ASYNC100 A `with anyio.move_on_after(...):` context does not contain any `await` statements. This makes it pointless, as the timeout can only be triggered by a checkpoint.
   --> ASYNC100.py:45:5
@@ -26,7 +24,6 @@ ASYNC100 A `with anyio.move_on_after(...):` context does not contain any `await`
 45 | /     with anyio.move_on_after(delay=0.2):
 46 | |         ...
    | |___________^
-   |
 
 ASYNC100 A `with anyio.fail_after(...):` context does not contain any `await` statements. This makes it pointless, as the timeout can only be triggered by a checkpoint.
   --> ASYNC100.py:50:5
@@ -35,7 +32,6 @@ ASYNC100 A `with anyio.fail_after(...):` context does not contain any `await` st
 50 | /     with anyio.fail_after():
 51 | |         ...
    | |___________^
-   |
 
 ASYNC100 A `with anyio.CancelScope(...):` context does not contain any `await` statements. This makes it pointless, as the timeout can only be triggered by a checkpoint.
   --> ASYNC100.py:55:5
@@ -44,7 +40,6 @@ ASYNC100 A `with anyio.CancelScope(...):` context does not contain any `await` s
 55 | /     with anyio.CancelScope():
 56 | |         ...
    | |___________^
-   |
 
 ASYNC100 A `with anyio.CancelScope(...):` context does not contain any `await` statements. This makes it pointless, as the timeout can only be triggered by a checkpoint.
   --> ASYNC100.py:60:5
@@ -53,7 +48,6 @@ ASYNC100 A `with anyio.CancelScope(...):` context does not contain any `await` s
 60 | /     with anyio.CancelScope(), nullcontext():
 61 | |         ...
    | |___________^
-   |
 
 ASYNC100 A `with anyio.CancelScope(...):` context does not contain any `await` statements. This makes it pointless, as the timeout can only be triggered by a checkpoint.
   --> ASYNC100.py:65:5
@@ -62,7 +56,6 @@ ASYNC100 A `with anyio.CancelScope(...):` context does not contain any `await` s
 65 | /     with nullcontext(), anyio.CancelScope():
 66 | |         ...
    | |___________^
-   |
 
 ASYNC100 A `with asyncio.timeout(...):` context does not contain any `await` statements. This makes it pointless, as the timeout can only be triggered by a checkpoint.
   --> ASYNC100.py:70:5
@@ -71,7 +64,6 @@ ASYNC100 A `with asyncio.timeout(...):` context does not contain any `await` sta
 70 | /     async with asyncio.timeout(delay=0.2):
 71 | |         ...
    | |___________^
-   |
 
 ASYNC100 A `with asyncio.timeout_at(...):` context does not contain any `await` statements. This makes it pointless, as the timeout can only be triggered by a checkpoint.
   --> ASYNC100.py:75:5
@@ -80,7 +72,6 @@ ASYNC100 A `with asyncio.timeout_at(...):` context does not contain any `await` 
 75 | /     async with asyncio.timeout_at(when=0.2):
 76 | |         ...
    | |___________^
-   |
 
 ASYNC100 A `with asyncio.timeout(...):` context does not contain any `await` statements. This makes it pointless, as the timeout can only be triggered by a checkpoint.
   --> ASYNC100.py:85:5
@@ -89,7 +80,6 @@ ASYNC100 A `with asyncio.timeout(...):` context does not contain any `await` sta
 85 | /     async with asyncio.timeout(delay=0.2), asyncio.TaskGroup(), asyncio.timeout(delay=0.2):
 86 | |         ...
    | |___________^
-   |
 
 ASYNC100 A `with asyncio.timeout(...):` context does not contain any `await` statements. This makes it pointless, as the timeout can only be triggered by a checkpoint.
   --> ASYNC100.py:95:5
@@ -98,4 +88,3 @@ ASYNC100 A `with asyncio.timeout(...):` context does not contain any `await` sta
 95 | /     async with asyncio.timeout(delay=0.2), asyncio.timeout(delay=0.2):
 96 | |         ...
    | |___________^
-   |

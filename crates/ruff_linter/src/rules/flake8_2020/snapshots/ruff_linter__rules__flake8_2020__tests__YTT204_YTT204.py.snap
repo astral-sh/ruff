@@ -17,4 +17,3 @@ YTT204 `sys.version_info.minor` compared to integer (python4), compare `sys.vers
 4 | sys.version_info.minor <= 7
 5 | version_info.minor > 8
   | ^^^^^^^^^^^^^^^^^^
-  |

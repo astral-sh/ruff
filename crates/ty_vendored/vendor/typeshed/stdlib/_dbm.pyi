@@ -52,6 +52,7 @@ if sys.platform != "win32":
               If creating a new file, the mode bits for the new file
               (e.g. os.O_RDWR).
             """
+
     else:
         def open(filename: str, flags: str = "r", mode: int = 0o666, /) -> _dbm:
             """Return a database object.

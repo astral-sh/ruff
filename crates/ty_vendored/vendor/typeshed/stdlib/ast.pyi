@@ -159,8 +159,8 @@ class stmt(AST):
     | Try(stmt* body, excepthandler* handlers, stmt* orelse, stmt* finalbody)
     | TryStar(stmt* body, excepthandler* handlers, stmt* orelse, stmt* finalbody)
     | Assert(expr test, expr? msg)
-    | Import(alias* names)
-    | ImportFrom(identifier? module, alias* names, int? level)
+    | Import(alias* names, int? is_lazy)
+    | ImportFrom(identifier? module, alias* names, int? level, int? is_lazy)
     | Global(identifier* names)
     | Nonlocal(identifier* names)
     | Expr(expr value)
@@ -840,7 +840,7 @@ class Assert(stmt):
             """Return a copy of the AST node with new values for the specified fields."""
 
 class Import(stmt):
-    """Import(alias* names)"""
+    """Import(alias* names, int? is_lazy)"""
 
     if sys.version_info >= (3, 15):
         __match_args__ = ("names", "is_lazy")
@@ -858,14 +858,15 @@ class Import(stmt):
         def __init__(self, names: list[alias], **kwargs: Unpack[_Attributes]) -> None: ...
 
     if sys.version_info >= (3, 15):
-        def __replace__(self, *, names: list[alias] = ..., is_lazy: bool | None = ..., **kwargs: Unpack[_Attributes]) -> Self: ...
+        def __replace__(self, *, names: list[alias] = ..., is_lazy: bool | None = ..., **kwargs: Unpack[_Attributes]) -> Self:
+            """Return a copy of the AST node with new values for the specified fields."""
 
     elif sys.version_info >= (3, 14):
         def __replace__(self, *, names: list[alias] = ..., **kwargs: Unpack[_Attributes]) -> Self:
             """Return a copy of the AST node with new values for the specified fields."""
 
 class ImportFrom(stmt):
-    """ImportFrom(identifier? module, alias* names, int? level)"""
+    """ImportFrom(identifier? module, alias* names, int? level, int? is_lazy)"""
 
     if sys.version_info >= (3, 15):
         __match_args__ = ("module", "names", "level", "is_lazy")
@@ -915,7 +916,8 @@ class ImportFrom(stmt):
             level: int = ...,
             is_lazy: bool | None = ...,
             **kwargs: Unpack[_Attributes],
-        ) -> Self: ...
+        ) -> Self:
+            """Return a copy of the AST node with new values for the specified fields."""
 
     elif sys.version_info >= (3, 14):
         def __replace__(
@@ -982,7 +984,7 @@ class expr(AST):
     | Set(expr* elts)
     | ListComp(expr elt, comprehension* generators)
     | SetComp(expr elt, comprehension* generators)
-    | DictComp(expr key, expr value, comprehension* generators)
+    | DictComp(expr key, expr? value, comprehension* generators)
     | GeneratorExp(expr elt, comprehension* generators)
     | Await(expr value)
     | Yield(expr? value)
@@ -1150,7 +1152,7 @@ class SetComp(expr):
             """Return a copy of the AST node with new values for the specified fields."""
 
 class DictComp(expr):
-    """DictComp(expr key, expr value, comprehension* generators)"""
+    """DictComp(expr key, expr? value, comprehension* generators)"""
 
     __match_args__ = ("key", "value", "generators")
     key: expr
@@ -1159,14 +1161,29 @@ class DictComp(expr):
     else:
         value: expr
     generators: list[comprehension]
-    if sys.version_info >= (3, 13):
+    if sys.version_info >= (3, 15):
+        def __init__(
+            self, key: expr, value: expr | None = None, generators: list[comprehension] = ..., **kwargs: Unpack[_Attributes]
+        ) -> None: ...
+    elif sys.version_info >= (3, 13):
         def __init__(
             self, key: expr, value: expr, generators: list[comprehension] = ..., **kwargs: Unpack[_Attributes]
         ) -> None: ...
     else:
         def __init__(self, key: expr, value: expr, generators: list[comprehension], **kwargs: Unpack[_Attributes]) -> None: ...
 
-    if sys.version_info >= (3, 14):
+    if sys.version_info >= (3, 15):
+        def __replace__(
+            self,
+            *,
+            key: expr = ...,
+            value: expr | None = ...,
+            generators: list[comprehension] = ...,
+            **kwargs: Unpack[_Attributes],
+        ) -> Self:
+            """Return a copy of the AST node with new values for the specified fields."""
+
+    elif sys.version_info >= (3, 14):
         def __replace__(
             self, *, key: expr = ..., value: expr = ..., generators: list[comprehension] = ..., **kwargs: Unpack[_Attributes]
         ) -> Self:
@@ -2166,7 +2183,12 @@ if sys.version_info >= (3, 15):
         feature_version: None | int | tuple[int, int] = None,
         optimize: Literal[-1, 0, 1, 2] = -1,
         module: str | None = None,
-    ) -> _T: ...
+    ) -> _T:
+        """
+        Parse the source into an AST node.
+        Equivalent to compile(source, filename, mode, PyCF_ONLY_AST).
+        Pass type_comments=True to get back type comments where the syntax allows.
+        """
     @overload
     def parse(
         source: str | ReadableBuffer,
@@ -2449,7 +2471,29 @@ if sys.version_info >= (3, 15):
         indent: int | str | None = None,
         show_empty: bool = False,
         color: bool = False,
-    ) -> str: ...
+    ) -> str:
+        """
+        Return a formatted dump of the tree in node.  This is mainly useful for
+        debugging purposes.
+
+        If annotate_fields is true (by default), the returned string will show the
+        names and the values for fields. If annotate_fields is false, the result
+        string will be more compact by omitting unambiguous field names.
+
+        Attributes such as line numbers and column offsets are not dumped by default.
+        If this is wanted, include_attributes can be set to true.
+
+        If color is true, the returned string is syntax highlighted using ANSI
+        escape sequences. If color is false (the default), colored output is always
+        disabled.
+
+        If indent is a non-negative integer or string, then the tree will be
+        pretty-printed with that indent level. If indent is None (the default),
+        the tree is dumped on a single line.
+
+        If show_empty is False, then empty lists and fields that are None
+        will be omitted from the output for better readability.
+        """
 
 elif sys.version_info >= (3, 13):
     def dump(
@@ -2589,6 +2633,7 @@ class NodeVisitor:
 
     def generic_visit(self, node: AST) -> Any:
         """Called if no explicit visitor function exists for a node."""
+
     # The following visit methods are not defined on NodeVisitor, but can
     # be implemented by subclasses and are called during a visit if defined.
     def visit_Module(self, node: Module) -> Any: ...
@@ -2705,6 +2750,10 @@ class NodeVisitor:
         def visit_ParamSpec(self, node: ParamSpec) -> Any: ...
         def visit_TypeVarTuple(self, node: TypeVarTuple) -> Any: ...
         def visit_TypeAlias(self, node: TypeAlias) -> Any: ...
+
+    if sys.version_info >= (3, 14):
+        def visit_TemplateStr(self, node: TemplateStr) -> Any: ...
+        def visit_Interpolation(self, node: Interpolation) -> Any: ...
 
     # visit methods for deprecated nodes
     def visit_ExtSlice(self, node: ExtSlice) -> Any: ...

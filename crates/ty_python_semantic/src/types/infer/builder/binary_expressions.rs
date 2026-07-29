@@ -1,3 +1,4 @@
+use compact_str::CompactString;
 use ruff_python_ast::{self as ast, AnyNodeRef};
 
 use super::TypeInferenceBuilder;
@@ -22,7 +23,7 @@ enum BinaryExpressionOperandTypes<'db> {
 }
 
 type BinaryExpressionVisitor<'db> =
-    CycleDetector<ast::Operator, (Type<'db>, ast::Operator, Type<'db>), Option<Type<'db>>>;
+    CycleDetector<'db, ast::Operator, (Type<'db>, ast::Operator, Type<'db>), Option<Type<'db>>, 1>;
 
 impl<'db> TypeInferenceBuilder<'db, '_> {
     pub(super) fn infer_binary_expression(
@@ -182,7 +183,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     ) -> Option<Type<'db>> {
         let db = self.db();
 
-        let update_ty = self.speculate().infer_expression(
+        let update_ty = self.speculate_without_diagnostics().infer_expression(
             update,
             TypeContext::new(Some(Type::TypedDict(update_context_typed_dict))),
         );
@@ -204,9 +205,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     /// (e.g., `missing-typed-dict-key`, `invalid-key`) when the RHS doesn't exactly match
     /// the `TypedDict` schema. We probe here to decide the outcome without those side effects.
     ///
-    /// Returns `None` when the exact `__ior__` would succeed, letting the normal path run
-    /// (which handles bidirectional inference, `reveal_type`, and other diagnostics properly).
-    /// Returns `Some` for subset updates or incompatible operands.
+    /// Returns `Some` after handling either a compatible or incompatible operand.
     pub(super) fn try_infer_typed_dict_pep_584_augmented_assignment(
         &mut self,
         assignment: &ast::StmtAugAssign,
@@ -222,33 +221,30 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             return None;
         };
 
-        // If the exact `__ior__` would succeed, let the normal path handle it so that
-        // bidirectional inference, `reveal_type`, and other diagnostics work properly.
+        let typed_dict_ty = Type::TypedDict(typed_dict);
+
+        // Prefer the full TypedDict as context when possible so exact-shape literals preserve the
+        // named type in bidirectional inference.
         if self
             .try_typed_dict_pep_584_dunder(value_expr, typed_dict, typed_dict, "__ior__")
             .is_some()
         {
-            return None;
+            infer_value_ty(self, TypeContext::new(Some(typed_dict_ty)));
+            return Some(typed_dict_ty);
         }
 
-        // The exact path failed. Try patch-style semantics for subset updates
-        // (e.g., a TypedDict with fewer keys or a partial dict literal).
+        // Subset updates use the mutation-safe patch as context.
+        let update_patch = typed_dict.to_update_patch(self.db());
         if self
-            .try_typed_dict_pep_584_dunder(
-                value_expr,
-                typed_dict.to_partial(self.db()),
-                typed_dict,
-                "__or__",
-            )
-            .is_some_and(|return_ty| {
-                return_ty.is_assignable_to(self.db(), Type::TypedDict(typed_dict))
-            })
+            .try_typed_dict_pep_584_dunder(value_expr, update_patch, typed_dict, "__ior__")
+            .is_some()
         {
-            return Some(Type::TypedDict(typed_dict));
+            infer_value_ty(self, TypeContext::new(Some(Type::TypedDict(update_patch))));
+            return Some(typed_dict_ty);
         }
 
-        // Both probes failed. Infer the RHS without TypedDict context so we
-        // report only the operator failure, not spurious typed-dict diagnostics.
+        // The probe failed. Infer the RHS without TypedDict context so we report only the operator
+        // failure, not spurious typed-dict diagnostics.
         let value_ty = infer_value_ty(self, TypeContext::default());
         report_unsupported_augmented_assignment(&self.context, assignment, target_type, value_ty);
         Some(target_type)
@@ -347,7 +343,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 )
             }),
 
-            (Type::TypeAlias(alias), rhs, _) => visitor.visit((left_ty, op, right_ty), || {
+            (Type::TypeAlias(alias), rhs, _) => visitor.visit(db, (left_ty, op, right_ty), || {
                 self.infer_binary_expression_type_impl(
                     node,
                     emitted_division_by_zero_diagnostic,
@@ -358,7 +354,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 )
             }),
 
-            (lhs, Type::TypeAlias(alias), _) => visitor.visit((left_ty, op, right_ty), || {
+            (lhs, Type::TypeAlias(alias), _) => visitor.visit(db, (left_ty, op, right_ty), || {
                 self.infer_binary_expression_type_impl(
                     node,
                     emitted_division_by_zero_diagnostic,
@@ -384,6 +380,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             // Non-todo Anys take precedence over Todos (as if we fix this `Todo` in the future,
             // the result would then become Any or Unknown, respectively).
             (div @ Type::Divergent(_), _, _) | (_, div @ Type::Divergent(_), _) => Some(div),
+
+            (unknown @ Type::Dynamic(DynamicType::AmbiguousOverload), _, _)
+            | (_, unknown @ Type::Dynamic(DynamicType::AmbiguousOverload), _) => Some(unknown),
 
             (any @ Type::Dynamic(DynamicType::Any), _, _)
             | (_, any @ Type::Dynamic(DynamicType::Any), _) => Some(any),
@@ -527,26 +526,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 })
             }
 
-            (
-                todo @ Type::Dynamic(
-                    DynamicType::Todo(_)
-                    | DynamicType::TodoUnpack
-                    | DynamicType::TodoStarredExpression
-                    | DynamicType::TodoTypeVarTuple,
-                ),
-                _,
-                _,
-            )
-            | (
-                _,
-                todo @ Type::Dynamic(
-                    DynamicType::Todo(_)
-                    | DynamicType::TodoUnpack
-                    | DynamicType::TodoStarredExpression
-                    | DynamicType::TodoTypeVarTuple,
-                ),
-                _,
-            ) => Some(todo),
+            (todo @ Type::Dynamic(DynamicType::Todo(_)), _, _)
+            | (_, todo @ Type::Dynamic(DynamicType::Todo(_)), _) => Some(todo),
 
             (Type::Never, _, _) | (_, Type::Never, _) => Some(Type::Never),
 
@@ -682,14 +663,17 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         LiteralValueTypeKind::String(rhs),
                         ast::Operator::Add,
                     ) => {
-                        let lhs_value = lhs.value(db).to_string();
+                        let lhs_value = lhs.value(db);
                         let rhs_value = rhs.value(db);
-                        let ty =
-                            if lhs_value.len() + rhs_value.len() <= Self::MAX_STRING_LITERAL_SIZE {
-                                Type::string_literal(db, &(lhs_value + rhs_value))
-                            } else {
-                                Type::literal_string()
-                            };
+                        let new_length = lhs_value.len() + rhs_value.len();
+                        let ty = if new_length <= Self::MAX_STRING_LITERAL_SIZE {
+                            let mut value = CompactString::with_capacity(new_length);
+                            value.push_str(lhs_value);
+                            value.push_str(rhs_value);
+                            Type::string_literal(db, value)
+                        } else {
+                            Type::literal_string()
+                        };
                         Some(ty)
                     }
 
@@ -712,12 +696,13 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         let ty = if n.as_i64() < 1 {
                             Type::string_literal(db, "")
                         } else if let Ok(n) = usize::try_from(n.as_i64())
-                            && n.checked_mul(s.value(db).len()).is_some_and(|new_length| {
+                            && let value = s.value(db)
+                            && n.checked_mul(value.len()).is_some_and(|new_length| {
                                 new_length <= Self::MAX_STRING_LITERAL_SIZE
                             })
                         {
-                            let new_literal = s.value(db).repeat(n);
-                            Type::string_literal(db, &new_literal)
+                            let new_literal = value.repeat(n);
+                            Type::string_literal(db, &*new_literal)
                         } else {
                             Type::literal_string()
                         };

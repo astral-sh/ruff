@@ -107,6 +107,7 @@ class IMAP4:
         This connection will be used by the routines:
             read, readline, send, shutdown.
         """
+
     if sys.version_info >= (3, 14):
         @property
         @deprecated("IMAP4.file is unsupported, can cause errors, and may be removed.")
@@ -278,6 +279,7 @@ class IMAP4:
 
         (typ, [[QUOTAROOT responses...], [QUOTA responses]]) = <instance>.getquotaroot(mailbox)
         """
+
     if sys.version_info >= (3, 14):
         def idle(self, duration: float | None = None) -> Idler:
             """Return an iterable IDLE context manager producing untagged responses.

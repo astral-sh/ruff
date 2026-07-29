@@ -46,6 +46,19 @@ reveal_type(Foo())  # revealed: Foo
 reveal_type(Foo(1))  # revealed: Foo
 ```
 
+## Class-based protocol constructors
+
+Constructing a class-based protocol through `type` must not count the implicit receiver in an arity
+diagnostic.
+
+```py
+from collections.abc import Hashable
+
+def construct(value: Hashable) -> None:
+    # error: [too-many-positional-arguments] "Too many positional arguments to `object.__init__`: expected 0, got 3"
+    type(value)(1970, 1, 1)
+```
+
 ## `__new__` present on the class itself
 
 ```py
@@ -264,11 +277,110 @@ class Foo:
 reveal_type(Foo(1))  # revealed: Foo
 ```
 
+## Implicit `__new__` receivers
+
+An unannotated `cls` parameter on `__new__` is inferred as `type[Self]`. Constructor calls must be
+accepted when a generic callback determines the class's type argument. Here, the correlated callback
+overloads, covariant `frozenset`, and fully dynamic `values` exercise a path-merged specialization.
+Reapplying that specialization to the synthetic `cls` would introduce an extra `frozenset` layer and
+incorrectly reject both ordinary and signature-preserving `Callable` constructors.
+
+```pyi
+from collections.abc import Callable
+from typing import Any, Generic, ParamSpec, Protocol, TypeVar, overload
+from typing_extensions import Self
+
+P = ParamSpec("P")
+R = TypeVar("R")
+R_co = TypeVar("R_co", covariant=True)
+T = TypeVar("T")
+
+@overload
+def callback(value: frozenset[T]) -> T: ...
+@overload
+def callback(value: T) -> T: ...
+
+class Mapper(Generic[R]):
+    def __new__(cls, callback: Callable[[T], R], values: list[T], /) -> Self: ...
+
+values: Any
+
+# TODO: Preserve correlated overload solutions so dynamic values do not infer an extra
+# `frozenset` layer or an element type of `Never`.
+reveal_type(Mapper(callback, values))  # revealed: Mapper[frozenset[frozenset[Never]]]
+
+def wrap(function: Callable[P, R]) -> Callable[P, R]: ...
+
+class Wrapped(Generic[R]):
+    @wrap
+    def __new__(cls, callback: Callable[[T], R], values: list[T]) -> Self: ...
+
+# TODO: Preserve the callback's correlated overload solutions through the decorator.
+reveal_type(Wrapped(callback, values))  # revealed: Wrapped[frozenset[frozenset[Never]]]
+```
+
+A decorator can preserve `cls` explicitly with `Concatenate`, re-expressing the receiver with its
+own type variable. Constraint inference checks the synthetic receiver; the later assignability pass
+must not reject it merely because that decorator-scoped type variable remains unsolved:
+
+```pyi
+from typing_extensions import Concatenate
+
+def wrap_cls(function: Callable[Concatenate[type[T], P], R]) -> Callable[Concatenate[type[T], P], R]: ...
+
+class WrappedCls:
+    @wrap_cls
+    def __new__(cls) -> Self: ...
+
+reveal_type(WrappedCls())  # revealed: WrappedCls
+```
+
+A decorator can also return a callback protocol instead of `Callable`. Its inferred `type[Self]`
+receiver must likewise not be rejected by the later assignability pass:
+
+```pyi
+class CallableObject(Protocol[P, R_co]):
+    def __call__(self, *args: P.args, **kwargs: P.kwargs) -> R_co: ...
+
+def wrap_object(function: Callable[P, R_co]) -> CallableObject[P, R_co]: ...
+
+class WrappedObject:
+    @wrap_object
+    def __new__(cls) -> Self: ...
+
+reveal_type(WrappedObject())  # revealed: WrappedObject
+```
+
+The explicit `cls` type in a signature-preserving decorator can also be expressed with a generic
+type alias. The alias must be resolved when identifying the constructor receiver, or the later
+assignability pass rejects the synthetic argument against the decorator's unsolved receiver type:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```pyi
+type Receiver[X] = type[X]
+
+def preserve[U, **P, R](
+    function: Callable[Concatenate[Receiver[U], P], R],
+) -> Callable[Concatenate[Receiver[U], P], R]: ...
+
+class Simple:
+    @preserve
+    def __new__(cls) -> Self: ...
+
+reveal_type(Simple())  # revealed: Simple
+```
+
 ## `__new__` defined as a classmethod
 
 Marking it as a classmethod, on the other hand, breaks at runtime.
 
 ```py
+from typing_extensions import Self
+
 class Foo:
     @classmethod
     def __new__(cls, x: int):
@@ -277,6 +389,14 @@ class Foo:
 # error: [invalid-argument-type] "Argument to bound method `Foo.__new__` is incorrect: Expected `int`, found `<class 'Foo'>`"
 # error: [too-many-positional-arguments] "Too many positional arguments to bound method `Foo.__new__`: expected 1, got 2"
 Foo(1)
+
+class Bar:
+    @classmethod
+    def __new__(cls) -> Self:
+        raise NotImplementedError
+
+# error: [too-many-positional-arguments] "Too many positional arguments to bound method `Bar.__new__`: expected 0, got 1"
+reveal_type(Bar())  # revealed: Bar
 ```
 
 ## A callable instance in place of `__new__`
@@ -603,7 +723,7 @@ class Tracer:
 from typing import Generic, TypeVar
 
 S = TypeVar("S")
-T = TypeVar("T", bound="Box")
+T = TypeVar("T", bound="Box")  # error: [missing-type-argument]
 
 class Box(Generic[S]):
     def __new__(cls: type[T], x: S) -> T:
@@ -739,7 +859,7 @@ class C[T]:
     x: T
 
     def __new__[S](cls, x: S) -> "C[tuple[S, S]]":
-        return object.__new__(cls)
+        raise NotImplementedError()
 
 reveal_type(C(1))  # revealed: C[tuple[int, int]]
 reveal_type(C("hello"))  # revealed: C[tuple[str, str]]
@@ -871,6 +991,75 @@ reveal_type(SimpleMixed(1))  # revealed: int
 reveal_type(SimpleMixed("foo"))  # revealed: SimpleMixed
 ```
 
+### Overlapping generic `__new__` overloads preserve first-match selection
+
+A synthetic constructor receiver can still contain inferable class type variables, even though each
+overload specializes `cls` differently. Step 5 of the overload evaluation algorithm must preserve
+the overload's inferable variables when checking whether the argument types are covered; otherwise a
+concrete constructor call appears ambiguous. In particular, both overloads below accept `list[int]`,
+but the first one must win. The non-instance return case verifies that this is not specific to
+`Self` or to returning the constructed class.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from __future__ import annotations
+
+from typing import Self, overload
+
+class MixedSelf[T]:
+    @overload
+    def __new__(cls, value: list[T]) -> Self: ...
+    @overload
+    def __new__(cls, value: T) -> T: ...
+    def __new__(cls, value: object) -> object:
+        return object.__new__(cls)
+
+reveal_type(MixedSelf([1]))  # revealed: MixedSelf[int]
+reveal_type(MixedSelf(1))  # revealed: Literal[1]
+
+class DistinctNonInstanceReturns[T]:
+    @overload
+    def __new__(cls, value: list[T]) -> str: ...
+    @overload
+    def __new__(cls, value: T) -> T: ...
+    def __new__(cls, value: object) -> object:
+        return object.__new__(cls)
+
+reveal_type(DistinctNonInstanceReturns([1]))  # revealed: str
+```
+
+### A gradual constructor receiver participates in overload filtering
+
+The synthetic `cls` argument must participate in overload filtering because it can be the only
+gradual argument. A concrete class specialization selects its matching receiver overload, but an
+`Any` specialization can match receivers with different return types and must remain ambiguous.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from __future__ import annotations
+
+from typing import Any, overload
+
+class Foo[T]:
+    @overload
+    def __new__(cls: type[Foo[int]]) -> int: ...
+    @overload
+    def __new__(cls: type[Foo[str]]) -> str: ...
+    def __new__(cls) -> object: ...
+
+reveal_type(Foo[int]())  # revealed: int
+reveal_type(Foo[str]())  # revealed: str
+reveal_type(Foo[Any]())  # revealed: Unknown
+```
+
 ### Multiple matching `__new__` overloads
 
 If overload resolution for `__new__` falls back to `Unknown` because the argument is `Any` or
@@ -999,7 +1188,7 @@ from __future__ import annotations
 from typing import Generic, TypeVar, overload
 
 S = TypeVar("S")
-T = TypeVar("T", bound="E")
+T = TypeVar("T", bound="E")  # error: [missing-type-argument]
 
 class E(Generic[S]):
     @overload
@@ -1445,7 +1634,7 @@ def _(flag: bool) -> None:
 ### Compatible signatures
 
 But they can also be compatible, but not identical. We should correctly report errors only for the
-mthod that would fail.
+method that would fail.
 
 ```py
 class Foo:

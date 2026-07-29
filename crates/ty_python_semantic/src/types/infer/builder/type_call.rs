@@ -12,7 +12,6 @@ use crate::types::infer::builder::{
     },
 };
 use crate::types::{KnownClass, SubclassOfType, Type, TypeContext, definition_expression_type};
-use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast, HasNodeIndex, NodeIndex};
 use ty_python_core::definition::Definition;
 
@@ -185,7 +184,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         {
             let mut diagnostic = builder
                 .into_diagnostic("Invalid argument to parameter 3 (`namespace`) of `type()`");
-            diagnostic.set_primary_message(format_args!(
+            diagnostic.set_primary_annotation_message(format_args!(
                 "Expected `dict[str, Any]`, found `{}`",
                 namespace_type.display(db)
             ));
@@ -193,19 +192,19 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
         // Extract name and base classes.
         let name = if let Some(literal) = name_type.as_string_literal() {
-            Name::new(literal.value(db))
+            literal.value(db)
         } else {
             if !name_type.is_assignable_to(db, KnownClass::Str.to_instance(db))
                 && let Some(builder) = self.context.report_lint(&INVALID_ARGUMENT_TYPE, name_arg)
             {
                 let mut diagnostic =
                     builder.into_diagnostic("Invalid argument to parameter 1 (`name`) of `type()`");
-                diagnostic.set_primary_message(format_args!(
+                diagnostic.set_primary_annotation_message(format_args!(
                     "Expected `str`, found `{}`",
                     name_type.display(db)
                 ));
             }
-            Name::new_static("<unknown>")
+            "<unknown>"
         };
 
         let scope = self.scope();
@@ -253,14 +252,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             }
         };
 
-        let dynamic_class = DynamicClassLiteral::new(
-            db,
-            name.clone(),
-            anchor,
-            members,
-            has_dynamic_namespace,
-            None,
-        );
+        let dynamic_class =
+            DynamicClassLiteral::new(db, name, anchor, members, has_dynamic_namespace, None);
 
         // For dangling calls, validate bases eagerly. For assigned calls, validation is
         // deferred along with bases inference.
@@ -269,7 +262,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             let mut disjoint_bases = self.validate_dynamic_type_bases(
                 bases_arg,
                 explicit_bases,
-                &name,
+                dynamic_class.name(db),
                 DynamicClassKind::TypeCall,
             );
 

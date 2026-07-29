@@ -150,7 +150,11 @@ def invalid_binary_operators(
     i: 1 << 2,  # error: [invalid-type-form] "Invalid binary operator `<<` in type annotation"
     j: 4 >> 42,  # error: [invalid-type-form] "Invalid binary operator `>>` in type annotation"
     k: 5 ^ 3,  # error: [invalid-type-form] "Invalid binary operator `^` in type annotation"
-    l: 5 & 3,  # error: [invalid-type-form] "Invalid binary operator `&` in type annotation"
+    # error: [invalid-type-form] "Int literals are not allowed in this context in a parameter annotation"
+    # error: [invalid-type-form] "Int literals are not allowed in this context in a parameter annotation"
+    l: 5 & 3,
+    # error: [invalid-type-form] "Int literals are not allowed in this context in a parameter annotation"
+    m: ~3,
 ):
     reveal_type(a)  # revealed: Unknown
     reveal_type(b)  # revealed: Unknown
@@ -164,6 +168,7 @@ def invalid_binary_operators(
     reveal_type(j)  # revealed: Unknown
     reveal_type(k)  # revealed: Unknown
     reveal_type(l)  # revealed: Unknown
+    reveal_type(m)  # revealed: Unknown
 ```
 
 ## Error recovery upon encountering invalid AST nodes
@@ -244,6 +249,10 @@ python-version = "3.11"
 ```
 
 ```py
+from typing import TypeVarTuple, Unpack
+
+Ts = TypeVarTuple("Ts")
+
 t1: tuple[int, ...]
 # error: [invalid-type-form] "Invalid `tuple` specialization: `...` can only be used as the second element in a two-element `tuple` specialization"
 t2: tuple[int, int, ...]
@@ -257,6 +266,13 @@ t5: tuple[int, ..., int]
 t6: tuple[*tuple[str], ...]
 # error: [invalid-type-form] "Invalid `tuple` specialization: `...` cannot be used after an unpacked element"
 t7: tuple[*tuple[str, ...], ...]
+
+def invalid_typevartuple_ellipsis(
+    # error: [invalid-type-form] "Invalid `tuple` specialization: `...` cannot be used after an unpacked element"
+    starred: tuple[*Ts, ...],
+    # error: [invalid-type-form] "Invalid `tuple` specialization: `...` cannot be used after an unpacked element"
+    unpacked: tuple[Unpack[Ts], ...],
+) -> None: ...
 ```
 
 ## Invalid AST nodes in string annotations

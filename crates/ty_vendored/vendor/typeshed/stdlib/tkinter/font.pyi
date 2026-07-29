@@ -125,6 +125,7 @@ class Font:
         overstrike: bool = ...,
     ) -> _FontDict | None:
         """Modify font attributes"""
+
     configure = config
     def copy(self) -> Font:
         """Return a distinct copy of the current font"""

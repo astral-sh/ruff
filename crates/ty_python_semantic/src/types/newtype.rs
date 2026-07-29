@@ -29,6 +29,7 @@ pub struct NewType<'db> {
     pub name: ast::name::Name,
 
     /// The binding where this NewType is first created.
+    #[returns(copy)]
     pub definition: Definition<'db>,
 
     // The base type of this NewType, if it's eagerly specified. This is typically `None` when a
@@ -36,6 +37,7 @@ pub struct NewType<'db> {
     // the recursive case. This becomes `Some` when a `NewType` is modified by methods like
     // `.normalize()`. Callers should use the `base` method instead of accessing this field
     // directly.
+    #[returns(copy)]
     eager_base: Option<NewTypeBase<'db>>,
 }
 
@@ -51,6 +53,7 @@ impl<'db> NewType<'db> {
     }
 
     #[salsa::tracked(
+        returns(copy),
         cycle_initial=|db, _, _| NewTypeBase::ClassType(ClassType::object(db)),
         heap_size=ruff_memory_usage::heap_size
     )]
@@ -144,14 +147,14 @@ impl<'db> NewType<'db> {
                     for inner_newtype in inner_newtype_stack.into_iter().rev() {
                         mapped_base = NewTypeBase::NewType(NewType::new(
                             db,
-                            inner_newtype.name(db).clone(),
+                            inner_newtype.name(db),
                             inner_newtype.definition(db),
                             Some(mapped_base),
                         ));
                     }
                     return Some(NewType::new(
                         db,
-                        self.name(db).clone(),
+                        self.name(db),
                         self.definition(db),
                         Some(mapped_base),
                     ));
@@ -189,7 +192,7 @@ impl<'db> NewType<'db> {
 
         Some(NewType::new(
             db,
-            self.name(db).clone(),
+            self.name(db),
             self.definition(db),
             eager_base,
         ))
@@ -245,11 +248,18 @@ pub(crate) fn walk_newtype_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Si
     newtype: NewType<'db>,
     visitor: &V,
 ) {
-    visitor.visit_type(db, newtype.base(db).instance_type(db));
+    let base = if visitor.should_visit_lazy_type_attributes() {
+        Some(newtype.base(db))
+    } else {
+        newtype.eager_base(db)
+    };
+    if let Some(base) = base {
+        visitor.visit_type(db, base.instance_type(db));
+    }
 }
 
 /// `typing.NewType` typically wraps a class type, but it can also wrap another newtype.
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::Update)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 pub enum NewTypeBase<'db> {
     ClassType(ClassType<'db>),
     NewType(NewType<'db>),

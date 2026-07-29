@@ -12,14 +12,12 @@ E273 [*] Tab after keyword
 13 | True        and    False
    |
 help: Replace with single space
-8  | if   1:
-9  |     pass
+   |
 10 | #: E273
    - True and		False
 11 + True and False
 12 | #: E273 E274
-13 | True		and	False
-14 | #: E271
+   |
 
 E273 [*] Tab after keyword
   --> E27.py:13:5
@@ -32,14 +30,12 @@ E273 [*] Tab after keyword
 15 | a and  b
    |
 help: Replace with single space
-10 | #: E273
-11 | True and		False
+   |
 12 | #: E273 E274
    - True		and	False
 13 + True and	False
 14 | #: E271
-15 | a and  b
-16 | #: E271
+   |
 
 E273 [*] Tab after keyword
   --> E27.py:13:10
@@ -52,14 +48,12 @@ E273 [*] Tab after keyword
 15 | a and  b
    |
 help: Replace with single space
-10 | #: E273
-11 | True and		False
+   |
 12 | #: E273 E274
    - True		and	False
 13 + True		and False
 14 | #: E271
-15 | a and  b
-16 | #: E271
+   |
 
 E273 [*] Tab after keyword
   --> E27.py:27:6
@@ -72,14 +66,12 @@ E273 [*] Tab after keyword
 29 | a        and b
    |
 help: Replace with single space
-24 | #: E272
-25 | this  and False
+   |
 26 | #: E273
    - a and	b
 27 + a and b
 28 | #: E274
-29 | a		and b
-30 | #: E273 E274
+   |
 
 E273 [*] Tab after keyword
   --> E27.py:31:10
@@ -92,14 +84,12 @@ E273 [*] Tab after keyword
 33 | from u import (a, b)
    |
 help: Replace with single space
-28 | #: E274
-29 | a		and b
+   |
 30 | #: E273 E274
    - this		and	False
 31 + this		and False
 32 | #: Okay
-33 | from u import (a, b)
-34 | from v import c, d
+   |
 
 E273 [*] Tab after keyword
   --> E27.py:74:5
@@ -111,11 +101,9 @@ E273 [*] Tab after keyword
 76 | #: E275
    |
 help: Replace with single space
-71 | type  Number = int
-72 |
+   |
 73 | #: E273
    - type	Number = int
 74 + type Number = int
 75 |
-76 | #: E275
-77 | match(foo):
+   |

@@ -17,6 +17,7 @@ expression: env.render_diagnostics(&diagnostics)
       "row": 1
     },
     "message": "Expected one or more symbol names after import",
+    "name": "invalid-syntax",
     "noqa_row": null,
     "severity": "error",
     "url": null
@@ -35,6 +36,7 @@ expression: env.render_diagnostics(&diagnostics)
       "row": 3
     },
     "message": "Expected ')', found newline",
+    "name": "invalid-syntax",
     "noqa_row": null,
     "severity": "error",
     "url": null

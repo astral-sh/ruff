@@ -12,7 +12,7 @@ PYI025 [*] Use `from collections.abc import Set as AbstractSet` to avoid confusi
 5 | __all__ = ["Set"]
   |
 help: Alias `Set` to `AbstractSet`
-1  | """Tests to ensure we correctly rename references inside `__all__`"""
+   |
 2  |
    - from collections.abc import Set
 3  + from collections.abc import Set as AbstractSet
@@ -31,4 +31,5 @@ help: Alias `Set` to `AbstractSet`
 13 | if not False:
    -     __all__ += ["Se" 't']
 14 +     __all__ += ["AbstractSet"]
+   |
 note: This is an unsafe fix and may change runtime behavior

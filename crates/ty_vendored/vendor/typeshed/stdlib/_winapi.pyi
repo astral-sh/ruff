@@ -270,9 +270,17 @@ if sys.platform == "win32":
     def ExitProcess(ExitCode: int, /) -> NoReturn: ...
     def GetACP() -> int:
         """Get the current Windows ANSI code page identifier."""
+
     if sys.version_info >= (3, 15):
-        def DeregisterEventSource(handle: int, /) -> None: ...
-        def GetOEMCP() -> int: ...
+        def DeregisterEventSource(handle: int, /) -> None:
+            """Closes the specified event log.
+
+            handle
+              The handle to the event log to be deregistered.
+            """
+
+        def GetOEMCP() -> int:
+            """Get the current Windows ANSI code page identifier."""
 
     def GetFileType(handle: int) -> int: ...
     def GetCurrentProcess() -> int:
@@ -312,8 +320,30 @@ if sys.platform == "win32":
     def PeekNamedPipe(handle: int, size: int = 0, /) -> tuple[int, int] | tuple[bytes, int, int]: ...
     def LCMapStringEx(locale: str, flags: int, src: str) -> str: ...
     if sys.version_info >= (3, 15):
-        def RegisterEventSource(unc_server_name: str | None, source_name: str, /) -> int: ...
-        def ReportEvent(handle: int, type: int, category: int, event_id: int, string: str, /) -> None: ...
+        def RegisterEventSource(unc_server_name: str | None, source_name: str, /) -> int:
+            """Retrieves a registered handle to the specified event log.
+
+            unc_server_name
+              The UNC name of the server on which the event source should be registered.
+              If None, registers the event source on the local computer.
+            source_name
+              The name of the event source to register.
+            """
+
+        def ReportEvent(handle: int, type: int, category: int, event_id: int, string: str, /) -> None:
+            """Writes an entry at the end of the specified event log.
+
+            handle
+              The handle to the event log.
+            type
+              The type of event being reported.
+            category
+              The event category.
+            event_id
+              The event identifier.
+            string
+              A string to be inserted into the event message.
+            """
 
     def UnmapViewOfFile(address: int, /) -> None: ...
 

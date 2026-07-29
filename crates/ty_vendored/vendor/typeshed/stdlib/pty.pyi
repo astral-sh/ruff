@@ -18,6 +18,7 @@ if sys.platform != "win32":
         """openpty() -> (master_fd, slave_fd)
         Open a pty master/slave pair, using os.openpty() if possible.
         """
+
     if sys.version_info < (3, 14):
         @deprecated("Deprecated since Python 3.12; removed in Python 3.14. Use `openpty()` instead.")
         def master_open() -> tuple[int, str]:

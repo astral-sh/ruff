@@ -817,6 +817,7 @@ class TurtleScreen(TurtleScreenBase):
             Example (for a TurtleScreen instance named screen):
             >>> screen.save('my_drawing.eps')
             """
+
     onscreenclick = onclick
     resetscreen = reset
     clearscreen = clear
@@ -846,6 +847,7 @@ class TurtleScreen(TurtleScreenBase):
         the up-arrow key, or by keeping pressed the up-arrow key.
         consequently drawing a hexagon.
         """
+
     onkeyrelease = onkey
 
 class TNavigator:
@@ -899,6 +901,7 @@ class TNavigator:
         >>> turtle.heading()
         1.5707963267948966
         """
+
     if sys.version_info >= (3, 12):
         def teleport(self, x: float | None = None, y: float | None = None, *, fill_gap: bool = False) -> None:
             """To be overwritten by child class RawTurtle.
@@ -1224,6 +1227,7 @@ class TNavigator:
 
     def speed(self, s: int | None = 0) -> int | None:
         """dummy method - to be overwritten by child class"""
+
     fd = forward
     bk = back
     backward = back
@@ -1790,6 +1794,7 @@ class RawTurtle(TPen, TNavigator):  # type: ignore[misc]  # Conflicting methods 
         ((50, -20), (30, 20), (-50, 20), (-30, -20))
 
         """
+
     if sys.version_info < (3, 13):
         @deprecated("Deprecated since Python 3.1; removed in Python 3.13. Use `tiltangle()` instead.")
         def settiltangle(self, angle: float) -> None:
@@ -1863,6 +1868,7 @@ class RawTurtle(TPen, TNavigator):  # type: ignore[misc]  # Conflicting methods 
         >>> turtle.tilt(30)
         >>> turtle.fd(50)
         """
+
     # Can return either 'int' or Tuple[int, ...] based on if the stamp is
     # a compound stamp or not. So, as per the "no Union return" policy,
     # we return Any.
@@ -1926,6 +1932,7 @@ class RawTurtle(TPen, TNavigator):  # type: ignore[misc]  # Conflicting methods 
         ... else:
         ...     turtle.pensize(3)
         """
+
     if sys.version_info >= (3, 14):
         @contextmanager
         def fill(self) -> Generator[None]:
@@ -2005,6 +2012,7 @@ class RawTurtle(TPen, TNavigator):  # type: ignore[misc]  # Conflicting methods 
         >>> turtle.write('Home = ', True, align="center")
         >>> turtle.write((0,0), True)
         """
+
     if sys.version_info >= (3, 14):
         @contextmanager
         def poly(self) -> Generator[None]:
@@ -2086,6 +2094,7 @@ class RawTurtle(TPen, TNavigator):  # type: ignore[misc]  # Conflicting methods 
         >>> turtles()
         [<turtle.Turtle object at 0x0187D810>]
         """
+
     getpen = getturtle
     def onclick(self, fun: Callable[[float, float], object], btn: int = 1, add: bool | None = None) -> None:
         """Bind fun to mouse-click event on this turtle on canvas.
@@ -2165,6 +2174,7 @@ class RawTurtle(TPen, TNavigator):  # type: ignore[misc]  # Conflicting methods 
         ...     turtle.undo()
         ...
         """
+
     turtlesize = shapesize
 
 class _Screen(TurtleScreen):

@@ -9,9 +9,10 @@ in fact override anything, a type checker should report a diagnostic on that met
 <!-- snapshot-diagnostics -->
 
 ```pyi
-from typing_extensions import override, Callable, TypeVar
+from typing_extensions import Any, Callable, TypeVar, override
 
-def lossy_decorator(fn: Callable) -> Callable: ...
+# Decorator intentionally erases the wrapped signature.
+def lossy_decorator(fn: Callable[..., Any]) -> Callable[..., Any]: ...
 
 class A:
     @override
@@ -132,10 +133,10 @@ class Invalid:
     def bad_settable_property(self, x: int) -> None: ...
     @lossy_decorator
     @override
-    def lossy(self): ...  # TODO: should emit `invalid-explicit-override` here
+    def lossy(self): ...  # error: [invalid-explicit-override]
     @override
     @lossy_decorator
-    def lossy2(self): ...  # TODO: should emit `invalid-explicit-override` here
+    def lossy2(self): ...  # error: [invalid-explicit-override]
 
 # TODO: all overrides in this class should cause us to emit *Liskov* violations,
 # but not `@override` violations
@@ -354,6 +355,154 @@ class DynamicParent(Any): ...
 class DynamicChild(DynamicParent):
     def method(self) -> int:
         return 1
+
+class SameFilePropertyParent:
+    @property
+    def prop(self) -> int:
+        return 1
+
+class SameFilePropertyChild(SameFilePropertyParent):
+    @SameFilePropertyParent.prop.deleter
+    def prop(self) -> None:  # error: [missing-override-decorator]
+        pass
+```
+
+`base_property.py`:
+
+```py
+# This padding makes the inherited getter's AST index larger than the entire child module's AST,
+# so attempting to resolve the getter in the (incorrect) context of the child module will induce a panic.
+# This reproduces the bug reported in astral-sh/ty#3653.
+_padding = (
+    None,
+    None,
+    None,
+    None,
+    None,
+    None,
+    None,
+    None,
+    None,
+    None,
+    None,
+    None,
+    None,
+    None,
+    None,
+    None,
+    None,
+    None,
+    None,
+    None,
+    None,
+    None,
+    None,
+    None,
+    None,
+    None,
+    None,
+    None,
+    None,
+    None,
+    None,
+    None,
+    None,
+    None,
+    None,
+    None,
+    None,
+    None,
+    None,
+    None,
+    None,
+    None,
+    None,
+    None,
+    None,
+    None,
+    None,
+    None,
+    None,
+    None,
+    None,
+    None,
+    None,
+    None,
+    None,
+    None,
+    None,
+    None,
+    None,
+    None,
+)
+
+class BaseProperty:
+    @property
+    def prop(self) -> int:
+        return 1
+
+    def method(self) -> int:
+        return 1
+```
+
+`property_setter.py`:
+
+```py
+from typing_extensions import Callable, TypeVar, override
+
+from base_property import BaseProperty
+
+_T = TypeVar("_T")
+
+def wrap(f: _T) -> Callable[[object], _T]:
+    return lambda _: f
+
+def coinflip() -> bool:
+    return True
+
+class MissingOverride(BaseProperty):
+    @BaseProperty.prop.setter
+    def prop(self, value: int) -> None:  # error: [missing-override-decorator]
+        pass
+
+class InvalidExplicitOverride:
+    @BaseProperty.prop.setter
+    @override
+    def prop(self, value: int) -> None:  # error: [invalid-explicit-override]
+        pass
+
+class WrappedMethod(BaseProperty):
+    @wrap(BaseProperty.method)
+    def method(self) -> int:  # error: [missing-override-decorator]
+        return 2
+
+class WrappedInvalidExplicitOverride:
+    @wrap(BaseProperty.method)
+    @override
+    def method(self) -> int:  # error: [invalid-explicit-override]
+        return 2
+
+class WrappedMethodWithOverrideBranch(BaseProperty):
+    if coinflip():
+        @wrap(BaseProperty.method)
+        def method(self) -> int:  # error: [missing-override-decorator]
+            return 2
+
+    else:
+        @override
+        def method(self) -> int:
+            return 3
+
+class WrappedInvalidExplicitOverrideWithUndecoratedBranch:
+    if coinflip():
+        @wrap(BaseProperty.method)
+        @override
+        def method(self) -> int:  # error: [invalid-explicit-override]
+            return 2
+
+    else:
+        def method(self) -> int:
+            return 3
 ```
 
 `stub.pyi`:
@@ -407,6 +556,80 @@ class StubAbstractInterface(ABC):
 
 class StubAbstractImplementation(StubAbstractInterface):
     def method(self) -> int: ...  # error: [missing-override-decorator]
+```
+
+## Missing `@override` decorator on Python 3.11
+
+```toml
+[environment]
+python-version = "3.11"
+
+[rules]
+missing-override-decorator = "error"
+```
+
+```py
+from typing_extensions import override
+
+class Parent:
+    def method(self) -> None: ...
+
+class Child(Parent):
+    def method(self) -> None: ...  # snapshot: missing-override-decorator
+
+class ExplicitChild(Parent):
+    @override
+    def method(self) -> None: ...
+```
+
+```snapshot
+error[missing-override-decorator]: Method `method` overrides `Parent.method` but is not decorated with `@override`
+ --> src/mdtest_snippet.py:7:9
+  |
+4 |     def method(self) -> None: ...
+  |         ------ `Parent.method` defined here
+5 |
+6 | class Child(Parent):
+7 |     def method(self) -> None: ...  # snapshot: missing-override-decorator
+  |         ^^^^^^
+info: Decorate the method with `@typing_extensions.override` to make the override explicit
+```
+
+## Missing `@override` decorator on Python 3.12
+
+```toml
+[environment]
+python-version = "3.12"
+
+[rules]
+missing-override-decorator = "error"
+```
+
+```py
+from typing import override
+
+class Parent:
+    def method(self) -> None: ...
+
+class Child(Parent):
+    def method(self) -> None: ...  # snapshot: missing-override-decorator
+
+class ExplicitChild(Parent):
+    @override
+    def method(self) -> None: ...
+```
+
+```snapshot
+error[missing-override-decorator]: Method `method` overrides `Parent.method` but is not decorated with `@override`
+ --> src/mdtest_snippet.py:7:9
+  |
+4 |     def method(self) -> None: ...
+  |         ------ `Parent.method` defined here
+5 |
+6 | class Child(Parent):
+7 |     def method(self) -> None: ...  # snapshot: missing-override-decorator
+  |         ^^^^^^
+info: Decorate the method with `@typing.override` to make the override explicit
 ```
 
 ## Possibly-unbound definitions
@@ -592,10 +815,13 @@ class Child(Parent):
 
 The typing spec states that for an overloaded method, `@override` should only be applied to the
 implementation function. However, we nonetheless respect the decorator in this situation, even
-though we also emit `invalid-overload` on these methods.
+though we may also emit `invalid-overload` on these methods.
 
 ```py
-from typing_extensions import override, overload
+from typing_extensions import Any, Callable, override, overload
+
+def lossy_decorator(fn: Callable[..., Any]) -> Callable[..., Any]:
+    return fn
 
 class Spam:
     @overload
@@ -627,6 +853,17 @@ class Spam:
     def baz(self, x: int) -> int: ...
     # error: [invalid-explicit-override]
     def baz(self, x: str | int) -> str | int:
+        return x
+
+    @overload
+    @override
+    # error: [invalid-overload] "`@override` decorator should be applied only to the overload implementation"
+    def quux(self, x: str) -> str: ...
+    @overload
+    def quux(self, x: int) -> int: ...
+    @lossy_decorator
+    # error: [invalid-explicit-override]
+    def quux(self, x: str | int) -> str | int:
         return x
 ```
 
@@ -755,4 +992,86 @@ class Parent(Grandparent, NamedTuple):  # error: [invalid-named-tuple]
 class Child(Parent):
     @override
     def foo(self): ...  # fine because `Any` is in the MRO
+```
+
+## Overloaded methods with explicit receiver annotations
+
+When checking an override, overloads with explicit receiver annotations only need to be considered
+if the receiver can be an instance of the subclass. For example, `Child` cannot also be an instance
+of the unrelated `@final` class `Restricted`, so the `Restricted`-specific overload does not
+constrain `Child.method`.
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+from __future__ import annotations
+
+from collections.abc import Iterable, Iterator, MutableMapping
+from typing import Protocol, TypeVar, final, overload
+
+class Base:
+    @overload
+    def method(self: Restricted, extra: str) -> None: ...
+    @overload
+    def method(self) -> None: ...
+    def method(self, extra: str = "") -> None: ...
+
+@final
+class Restricted(Base): ...
+
+class Child(Base):
+    def method(self) -> None: ...
+
+# Regression test for https://github.com/astral-sh/ty/issues/2612: the
+# `LiteralString`-specific overload of `str.__iter__` does not constrain a
+# method override on a user-defined `str` subclass.
+class MyStr(str):
+    def __iter__(self) -> Iterator[str]:
+        raise NotImplementedError
+
+# Regression test for https://github.com/astral-sh/ty/issues/2693: the
+# receiver-specific overloads of `MutableMapping.update` that use protocols
+# should not cause a false-positive Liskov violation.
+KT = TypeVar("KT")
+VT = TypeVar("VT")
+VT_co = TypeVar("VT_co", covariant=True)
+
+class Maplike(Protocol[KT, VT_co]):
+    def keys(self) -> Iterable[KT]: ...
+    def __getitem__(self, key: KT, /) -> VT_co: ...
+
+MapOrItems = Maplike[KT, VT] | Iterable[tuple[KT, VT]]
+
+class MyMapping(MutableMapping[KT, VT]):
+    def __getitem__(self, key: KT) -> VT:
+        raise NotImplementedError
+    def __setitem__(self, key: KT, value: VT) -> None: ...
+    def __delitem__(self, key: KT) -> None: ...
+    def __iter__(self) -> Iterator[KT]:
+        raise NotImplementedError
+    def __len__(self) -> int:
+        raise NotImplementedError
+    def update(self, arg: MapOrItems[KT, VT] = (), /, **kw: VT) -> None: ...
+
+# TODO: We should emit an `invalid-method-override` diagnostic on
+# `DeferredChild1.method`. The `DeferredChild1`-specific overload applies to
+# this subclass, so its override cannot remove the `extra` parameter.
+class DeferredBase:
+    @overload
+    def method(self) -> None: ...
+    @overload
+    def method(self: DeferredChild1, extra: str) -> None: ...
+    def method(self, extra: str = "") -> None: ...
+
+class DeferredChild1(DeferredBase):
+    def method(self) -> None: ...
+
+# TODO: A strict Liskov check would emit an `invalid-method-override`
+# diagnostic here too. A subclass could inherit from both `DeferredChild1`
+# and `DeferredChild2`, making the receiver-specific overload applicable.
+class DeferredChild2(DeferredBase):
+    def method(self) -> None: ...
 ```

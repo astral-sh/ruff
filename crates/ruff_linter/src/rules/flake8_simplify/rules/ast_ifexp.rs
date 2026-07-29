@@ -192,7 +192,7 @@ pub(crate) fn if_expr_with_true_false(
                     ),
                     arguments: Arguments {
                         args: Box::from([test.clone()]),
-                        keywords: Box::from([]),
+                        keywords: std::iter::empty().collect(),
                         range: TextRange::default(),
                         node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                     },

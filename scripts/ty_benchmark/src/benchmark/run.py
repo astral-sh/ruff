@@ -150,7 +150,10 @@ def main() -> None:
             venv = Venv.create(
                 project=project.name, parent=cwd, python_version=project.python_version
             )
-            venv.install(project.install_arguments)
+            venv.install(
+                project.install_arguments,
+                include_mypy=any(isinstance(suite, Mypy) for suite in suites),
+            )
 
             commands = []
 

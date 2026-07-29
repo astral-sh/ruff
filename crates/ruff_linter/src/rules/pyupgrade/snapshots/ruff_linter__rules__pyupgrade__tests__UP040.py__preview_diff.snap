@@ -7,7 +7,7 @@ source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
 
 --- Summary ---
 Removed: 0
-Added: 2
+Added: 3
 
 --- Added ---
 UP040 [*] Type alias `x` uses `TypeAlias` annotation instead of the `type` keyword
@@ -21,15 +21,32 @@ UP040 [*] Type alias `x` uses `TypeAlias` annotation instead of the `type` keywo
 50 | # OK
    |
 help: Use the `type` keyword
-45 |
-46 | # `default` was added in Python 3.13
+   |
 47 | T = typing.TypeVar("T", default=Any)
    - x: typing.TypeAlias = list[T]
 48 + type x[T = Any] = list[T]
 49 |
-50 | # OK
-51 | x: TypeAlias
+   |
 note: This is an unsafe fix and may change runtime behavior
+
+
+UP040 [*] Type alias `AnyList` uses `TypeAliasType` assignment instead of the `type` keyword
+  --> UP040.py:95:1
+   |
+93 | # `default` was added in Python 3.13
+94 | T = typing.TypeVar("T", default=Any)
+95 | AnyList = TypeAliasType("AnyList", list[T], type_params=(T,))
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+96 |
+97 | # unsafe fix if comments within the fix
+   |
+help: Use the `type` keyword
+   |
+94 | T = typing.TypeVar("T", default=Any)
+   - AnyList = TypeAliasType("AnyList", list[T], type_params=(T,))
+95 + type AnyList[T = Any] = list[T]
+96 |
+   |
 
 
 UP040 [*] Type alias `DefaultList` uses `TypeAlias` annotation instead of the `type` keyword
@@ -39,11 +56,10 @@ UP040 [*] Type alias `DefaultList` uses `TypeAlias` annotation instead of the `t
 133 | T_default = TypeVar("T_default", default=int)
 134 | DefaultList: TypeAlias = list[T_default]
     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-    |
 help: Use the `type` keyword
-131 |
-132 | # Test case for TypeVar with default - should be converted when preview mode is enabled
+    |
 133 | T_default = TypeVar("T_default", default=int)
     - DefaultList: TypeAlias = list[T_default]
 134 + type DefaultList[T_default = int] = list[T_default]
+    |
 note: This is an unsafe fix and may change runtime behavior

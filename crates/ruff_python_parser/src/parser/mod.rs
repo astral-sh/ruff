@@ -1,16 +1,25 @@
+use std::borrow::Cow;
 use std::cmp::Ordering;
+use std::str::FromStr;
 
 use bitflags::bitflags;
+use ruff_python_ast::name::Name;
 use ruff_python_ast::token::TokenKind;
-use ruff_python_ast::{AtomicNodeIndex, Mod, ModExpression, ModModule};
+use ruff_python_ast::{
+    Alias, AtomicNodeIndex, ElifElseClause, Expr, Int, IpyEscapeKind, Keyword, Mod, ModExpression,
+    ModModule, ParameterWithDefault, Stmt, StringFlags,
+};
+use ruff_python_trivia::is_python_whitespace;
 use ruff_text_size::{Ranged, TextRange, TextSize};
+use rustc_hash::FxHashSet;
 use thin_vec::ThinVec;
+use unicode_normalization::UnicodeNormalization;
 
 use crate::error::UnsupportedSyntaxError;
 use crate::parser::expression::ExpressionContext;
 use crate::parser::progress::{ParserProgress, TokenId};
+use crate::parser::scratch_buffer::ScratchBuffer;
 use crate::string::InterpolatedStringKind;
-use crate::token::TokenValue;
 use crate::token_set::TokenSet;
 use crate::token_source::{TokenSource, TokenSourceCheckpoint};
 use crate::{Mode, ParseError, ParseErrorType, UnsupportedSyntaxErrorKind};
@@ -24,9 +33,32 @@ mod options;
 mod pattern;
 mod progress;
 mod recovery;
+mod scratch_buffer;
 mod statement;
 #[cfg(test)]
 mod tests;
+
+#[derive(Debug, Default)]
+struct NameInterner {
+    names: FxHashSet<Name>,
+}
+
+impl NameInterner {
+    /// Returns an inline name directly, or a shared clone of a heap-allocated name.
+    fn intern(&mut self, text: &str) -> Name {
+        if let Some(name) = Name::new_inline(text) {
+            return name;
+        }
+
+        if let Some(name) = self.names.get(text) {
+            return name.clone();
+        }
+
+        let name = Name::new_heap(text);
+        self.names.insert(name.clone());
+        name
+    }
+}
 
 #[derive(Debug)]
 pub(crate) struct Parser<'src> {
@@ -34,6 +66,12 @@ pub(crate) struct Parser<'src> {
 
     /// Token source for the parser that skips over any non-trivia token.
     tokens: TokenSource<'src>,
+
+    /// Deduplicates the backing allocations for repeated names that do not fit inline.
+    name_interner: NameInterner,
+
+    /// Reusable storage for names that need to be constructed by the parser.
+    name_buffer: String,
 
     /// Stores all the syntax errors found during the parsing.
     errors: Vec<ParseError>,
@@ -62,6 +100,24 @@ pub(crate) struct Parser<'src> {
 
     /// Maximum lexer nesting depth before postfix calls and subscripts should stop recursing.
     max_nesting_depth: u32,
+
+    /// Reusable, nesting-safe scratch storage for expression lists.
+    expr_scratch: ScratchBuffer<Expr>,
+
+    /// Reusable, nesting-safe scratch storage for call keywords.
+    keyword_scratch: ScratchBuffer<Keyword>,
+
+    /// Reusable, nesting-safe scratch storage for function and lambda parameters.
+    parameter_scratch: ScratchBuffer<ParameterWithDefault>,
+
+    /// Reusable, nesting-safe scratch storage for statement lists.
+    stmt_scratch: ScratchBuffer<Stmt>,
+
+    /// Reusable scratch storage for import aliases.
+    alias_scratch: ScratchBuffer<Alias>,
+
+    /// Reusable, nesting-safe scratch storage for `elif` and `else` clauses.
+    elif_else_scratch: ScratchBuffer<ElifElseClause>,
 }
 
 impl<'src> Parser<'src> {
@@ -86,12 +142,20 @@ impl<'src> Parser<'src> {
             errors: Vec::new(),
             unsupported_syntax_errors: Vec::new(),
             tokens,
+            name_interner: NameInterner::default(),
+            name_buffer: String::new(),
             recovery_context: RecoveryContext::empty(),
             prev_token_end: TextSize::new(0),
             start_offset,
             current_token_id: TokenId::default(),
             depth_remaining,
             max_nesting_depth,
+            expr_scratch: ScratchBuffer::with_capacity(16),
+            keyword_scratch: ScratchBuffer::new(),
+            parameter_scratch: ScratchBuffer::new(),
+            stmt_scratch: ScratchBuffer::with_capacity(32),
+            alias_scratch: ScratchBuffer::new(),
+            elif_else_scratch: ScratchBuffer::new(),
         }
     }
 
@@ -201,7 +265,6 @@ impl<'src> Parser<'src> {
             TokenKind::EndOfFile,
             "Parser should be at the end of the file."
         );
-
         // TODO consider re-integrating lexical error handling into the parser?
         let parse_errors = self.errors;
         let (tokens, lex_errors) = self.tokens.finish();
@@ -386,15 +449,157 @@ impl<'src> Parser<'src> {
         self.do_bump(kind);
     }
 
-    /// Take the token value from the underlying token source and bump the current token.
-    ///
-    /// # Panics
-    ///
-    /// If the current token is not of the given kind.
-    fn bump_value(&mut self, kind: TokenKind) -> TokenValue {
-        let value = self.tokens.take_value();
-        self.bump(kind);
+    fn bump_name(&mut self) -> Name {
+        let text = self.current_token_text();
+        let name = if !self.tokens.current_flags().is_non_ascii_name() {
+            self.intern_name(text)
+        } else {
+            self.intern_normalized_name(text)
+        };
+        self.bump(TokenKind::Name);
+        name
+    }
+
+    fn intern_name(&mut self, text: &str) -> Name {
+        self.name_interner.intern(text)
+    }
+
+    fn intern_normalized_name(&mut self, text: &str) -> Name {
+        let snapshot = self.name_buffer.len();
+        self.name_buffer.extend(text.nfkc());
+
+        let name = self.name_interner.intern(&self.name_buffer[snapshot..]);
+
+        self.name_buffer.truncate(snapshot);
+        name
+    }
+
+    fn bump_int(&mut self) -> Int {
+        let text = self.current_token_text();
+        let value = if let Some(digits) =
+            text.strip_prefix("0x").or_else(|| text.strip_prefix("0X"))
+        {
+            Int::from_str_radix(&strip_underscores(digits), 16, text)
+        } else if let Some(digits) = text.strip_prefix("0o").or_else(|| text.strip_prefix("0O")) {
+            Int::from_str_radix(&strip_underscores(digits), 8, text)
+        } else if let Some(digits) = text.strip_prefix("0b").or_else(|| text.strip_prefix("0B")) {
+            Int::from_str_radix(&strip_underscores(digits), 2, text)
+        } else {
+            Int::from_str(&strip_underscores(text))
+        }
+        .expect("lexer validated integer literal");
+        self.bump(TokenKind::Int);
         value
+    }
+
+    fn bump_float(&mut self) -> f64 {
+        let value = f64::from_str(&strip_underscores(self.current_token_text()))
+            .expect("lexer validated float literal");
+        self.bump(TokenKind::Float);
+        value
+    }
+
+    fn bump_complex(&mut self) -> (f64, f64) {
+        let text = self.current_token_text();
+        let value = f64::from_str(&strip_underscores(&text[..text.len() - 1]))
+            .expect("lexer validated complex literal");
+        self.bump(TokenKind::Complex);
+        (0.0, value)
+    }
+
+    fn bump_string_value(&mut self) -> &'src str {
+        let range = self.current_token_range();
+        let flags = self.tokens.current_flags().as_any_string_flags();
+        let value_range = TextRange::new(
+            range.start() + flags.opener_len(),
+            range.end() - flags.closer_len(),
+        );
+        let value = &self.source[value_range];
+        self.bump(TokenKind::String);
+        value
+    }
+
+    fn bump_ipython_escape_command(
+        &mut self,
+        context: IpyEscapeContext,
+    ) -> (Box<str>, IpyEscapeKind) {
+        let (value, kind) = self.parse_ipython_escape_command_value(context);
+        self.bump(TokenKind::IpyEscapeCommand);
+        (value, kind)
+    }
+
+    fn current_token_text(&self) -> &'src str {
+        self.src_text(self.current_token_range())
+    }
+
+    fn parse_ipython_escape_command_value(
+        &self,
+        context: IpyEscapeContext,
+    ) -> (Box<str>, IpyEscapeKind) {
+        let raw = self.current_token_text();
+        let initial_kind = if context.is_logical_line_start()
+            && let Ok(kind) = IpyEscapeKind::try_from([
+                raw.as_bytes()[0] as char,
+                raw[1..].chars().next().unwrap_or('\0'),
+            ]) {
+            kind
+        } else {
+            IpyEscapeKind::try_from(raw.as_bytes()[0] as char).expect("IPython escape token")
+        };
+
+        let mut value = String::new();
+        let mut chars = raw[initial_kind.as_str().len()..].chars().peekable();
+        while let Some(c) = chars.next() {
+            match c {
+                '\\' if matches!(chars.peek(), Some('\r' | '\n')) => {
+                    if chars.next() == Some('\r') && matches!(chars.peek(), Some('\n')) {
+                        chars.next();
+                    }
+                }
+                '?' => {
+                    let mut question_count = 1;
+                    while matches!(chars.peek(), Some('?')) {
+                        chars.next();
+                        question_count += 1;
+                    }
+
+                    // At logical-line start, IPython treats one or two terminal `?` after a
+                    // nonempty help or magic command as the command kind. Strict `foo?` syntax
+                    // is parsed separately.
+                    // https://github.com/ipython/ipython/blob/292e3a23459ca965b8c1bfe2c3707044c510209a/IPython/core/inputtransformer2.py#L454-L462
+                    if !context.is_logical_line_start()
+                        || !(initial_kind.is_magic() || initial_kind.is_help())
+                        || question_count > 2
+                        || value.chars().last().is_none_or(is_python_whitespace)
+                        || !matches!(chars.peek(), None | Some('\n' | '\r'))
+                    {
+                        value.extend(std::iter::repeat_n('?', question_count));
+                        continue;
+                    }
+
+                    let kind = if question_count == 1 {
+                        IpyEscapeKind::Help
+                    } else {
+                        IpyEscapeKind::Help2
+                    };
+
+                    // A help suffix replaces a leading help prefix, but takes precedence over a
+                    // magic prefix, which remains part of the value (`%foo?` becomes help for
+                    // `%foo`).
+                    if initial_kind.is_help() {
+                        value = value.trim_start_matches([' ', '?']).to_string();
+                    } else {
+                        value.insert_str(0, initial_kind.as_str());
+                    }
+
+                    return (value.into_boxed_str(), kind);
+                }
+                '\n' | '\r' => break,
+                c => value.push(c),
+            }
+        }
+
+        (value.into_boxed_str(), initial_kind)
     }
 
     /// Bumps the current token assuming it is found in the given token set.
@@ -531,6 +736,7 @@ impl<'src> Parser<'src> {
         mut parse_element: impl FnMut(&mut Parser<'src>),
     ) {
         let mut progress = ParserProgress::default();
+        let mut unexpected_indents = 0;
 
         let saved_context = self.recovery_context;
         self.recovery_context = self
@@ -540,7 +746,12 @@ impl<'src> Parser<'src> {
         loop {
             progress.assert_progressing(self);
 
-            if recovery_context_kind.is_list_element(self) {
+            if 0 < unexpected_indents && self.at(TokenKind::Dedent) {
+                // Ignore this `Dedent` like we ignored the `Indent`, avoiding extra errors from
+                // being imbalanced
+                unexpected_indents -= 1;
+                self.bump(TokenKind::Dedent);
+            } else if recovery_context_kind.is_list_element(self) {
                 parse_element(self);
             } else if recovery_context_kind.is_regular_list_terminator(self) {
                 break;
@@ -558,6 +769,14 @@ impl<'src> Parser<'src> {
                     self.current_token_range(),
                 );
 
+                if matches!(
+                    recovery_context_kind,
+                    RecoveryContextKind::ModuleStatements | RecoveryContextKind::BlockStatements
+                ) && self.at(TokenKind::Indent)
+                {
+                    // For this invalid `Indent`, ensure the matching `Dedent` gets consumed as well
+                    unexpected_indents += 1;
+                }
                 self.bump_any();
             }
         }
@@ -572,7 +791,21 @@ impl<'src> Parser<'src> {
         recovery_context_kind: RecoveryContextKind,
         parse_element: impl Fn(&mut Parser<'src>) -> T,
     ) -> Vec<T> {
-        let mut elements = Vec::new();
+        self.parse_comma_separated_list_into_vec_with_capacity(
+            recovery_context_kind,
+            parse_element,
+            0,
+        )
+    }
+
+    /// Parses a comma separated list of elements into a vector with an initial capacity.
+    fn parse_comma_separated_list_into_vec_with_capacity<T>(
+        &mut self,
+        recovery_context_kind: RecoveryContextKind,
+        parse_element: impl Fn(&mut Parser<'src>) -> T,
+        capacity: usize,
+    ) -> Vec<T> {
+        let mut elements = Vec::with_capacity(capacity);
         self.parse_comma_separated_list(recovery_context_kind, |p| elements.push(parse_element(p)));
         elements
     }
@@ -745,6 +978,26 @@ impl<'src> Parser<'src> {
         self.current_token_id = current_token_id;
         self.prev_token_end = prev_token_end;
         self.recovery_context = recovery_context;
+    }
+}
+
+fn strip_underscores(text: &str) -> Cow<'_, str> {
+    if text.as_bytes().contains(&b'_') {
+        Cow::Owned(text.chars().filter(|&c| c != '_').collect())
+    } else {
+        Cow::Borrowed(text)
+    }
+}
+
+#[derive(Copy, Clone)]
+enum IpyEscapeContext {
+    Assignment,
+    LogicalLineStart,
+}
+
+impl IpyEscapeContext {
+    const fn is_logical_line_start(self) -> bool {
+        matches!(self, Self::LogicalLineStart)
     }
 }
 
@@ -1009,6 +1262,8 @@ impl RecoveryContextKind {
 
     /// Returns `true` if the parser is at a token that terminates the list as per the context but
     /// the token isn't part of the error recovery set.
+    #[expect(clippy::inline_always, reason = "reduces list-parser branch misses")]
+    #[inline(always)]
     fn is_regular_list_terminator(self, p: &Parser) -> bool {
         matches!(
             self.list_terminator_kind(p),
@@ -1018,6 +1273,8 @@ impl RecoveryContextKind {
 
     /// Checks the current token the parser is at and returns the list terminator kind if the token
     /// terminates the list as per the context.
+    #[expect(clippy::inline_always, reason = "reduces list-parser branch misses")]
+    #[inline(always)]
     fn list_terminator_kind(self, p: &Parser) -> Option<ListTerminatorKind> {
         // The end of file marker ends all lists.
         if p.at(TokenKind::EndOfFile) {
@@ -1195,6 +1452,8 @@ impl RecoveryContextKind {
         }
     }
 
+    #[expect(clippy::inline_always, reason = "reduces list-parser branch misses")]
+    #[inline(always)]
     fn is_list_element(self, p: &Parser) -> bool {
         match self {
             RecoveryContextKind::ModuleStatements => p.at_stmt(),

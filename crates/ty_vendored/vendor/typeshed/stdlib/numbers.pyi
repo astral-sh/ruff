@@ -170,6 +170,7 @@ class Complex(Number, _ComplexLike):
     @abstractmethod
     def __eq__(self, other: object) -> bool:
         """self == other"""
+
     __hash__: ClassVar[None]  # type: ignore[assignment]
 
 # See comment at the top of the file
@@ -277,6 +278,7 @@ class Real(Complex, _RealLike):
 
     def conjugate(self) -> _RealLike:
         """Conjugate is a no-op for Reals."""
+
     # Not actually overridden at runtime,
     # but we override these in the stub to give them more precise return types:
     @abstractmethod
@@ -400,6 +402,7 @@ class Integral(Rational, _IntegralLike):
     @property
     def denominator(self) -> Literal[1]:
         """Integers have a denominator of 1."""
+
     # Not actually overridden at runtime,
     # but we override these in the stub to give them more precise return types:
     @abstractmethod

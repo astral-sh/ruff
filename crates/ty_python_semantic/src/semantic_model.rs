@@ -1,3 +1,4 @@
+use compact_str::CompactString;
 use ruff_db::files::{File, FilePath};
 use ruff_db::parsed::{parsed_module, parsed_string_annotation};
 use ruff_db::source::{line_index, source_text};
@@ -17,9 +18,10 @@ use crate::place::implicit_globals::all_implicit_module_globals;
 use crate::types::ide_support::{ImportAliasResolution, definition_for_name};
 use crate::types::list_members::{Member, all_members, all_reachable_members};
 use crate::types::{
-    CycleDetector, Type, TypeQualifiers, binding_type, declaration_type, infer_complete_scope_types,
+    CycleDetector, SpecialFormType, Type, TypeQualifiers, binding_type, infer_complete_scope_types,
+    inferred_declaration,
 };
-use ty_python_core::definition::Definition;
+use ty_python_core::definition::{Definition, DefinitionKind};
 use ty_python_core::place_table;
 use ty_python_core::scope::{FileScopeId, Scope};
 use ty_python_core::semantic_index;
@@ -79,8 +81,17 @@ impl<'db> SemanticModel<'db> {
         node: ast::AnyNodeRef<'_>,
     ) -> FxHashMap<Name, MemberDefinition<'db>> {
         let mut members = FxHashMap::default();
+        let index = semantic_index(self.db, self.file);
+        let Some(file_scope) = self.scope(node) else {
+            return members;
+        };
 
-        for (file_scope, _) in self.ancestor_scopes(node) {
+        for (file_scope, _) in index
+            .visible_ancestor_scopes(file_scope)
+            .collect::<Vec<_>>()
+            .into_iter()
+            .rev()
+        {
             for memberdef in
                 all_reachable_members(self.db, file_scope.to_scope_id(self.db, self.file))
             {
@@ -124,7 +135,7 @@ impl<'db> SemanticModel<'db> {
                 let builtin = module.is_known(self.db, KnownModule::Builtins);
                 let ty = Type::module_literal(self.db, self.file, module);
                 Completion {
-                    name: Name::new(module.name(self.db).as_str()),
+                    name: CompactString::new(module.name(self.db).as_str()),
                     ty: Some(ty),
                     builtin,
                 }
@@ -171,9 +182,13 @@ impl<'db> SemanticModel<'db> {
         let builtin = module.is_known(self.db, KnownModule::Builtins);
 
         let mut completions = vec![];
+        #[expect(
+            clippy::iter_over_hash_type,
+            reason = "completion order is determined later by relevance ranking"
+        )]
         for Member { name, ty } in all_members(self.db, ty) {
             completions.push(Completion {
-                name,
+                name: CompactString::new(name),
                 ty: Some(ty),
                 builtin,
             });
@@ -191,7 +206,7 @@ impl<'db> SemanticModel<'db> {
             let ty = Type::module_literal(self.db, self.file, *submodule);
             let base = submodule.name(self.db).last_component();
             completions.push(Completion {
-                name: Name::new(base),
+                name: CompactString::new(base),
                 ty: Some(ty),
                 builtin,
             });
@@ -208,7 +223,7 @@ impl<'db> SemanticModel<'db> {
         all_members(self.db, ty)
             .into_iter()
             .map(|member| Completion {
-                name: member.name,
+                name: CompactString::new(member.name),
                 ty: Some(member.ty),
                 builtin: false,
             })
@@ -230,7 +245,7 @@ impl<'db> SemanticModel<'db> {
             completions.extend(
                 all_reachable_members(self.db, file_scope.to_scope_id(self.db, self.file)).map(
                     |memberdef| Completion {
-                        name: memberdef.member.name,
+                        name: CompactString::new(memberdef.member.name),
                         ty: Some(memberdef.member.ty),
                         builtin: false,
                     },
@@ -243,8 +258,8 @@ impl<'db> SemanticModel<'db> {
         // keeps the correct types (e.g., `__file__` is `str` for the current module,
         // not `str | None`).
         completions.extend(
-            all_implicit_module_globals(self.db).map(|(name, ty)| Completion {
-                name,
+            all_implicit_module_globals(self.db, self.file).map(|(name, ty)| Completion {
+                name: CompactString::new(name),
                 ty: Some(ty),
                 builtin: true,
             }),
@@ -448,6 +463,27 @@ impl<'db> SemanticModel<'db> {
         Some((ast, model))
     }
 
+    /// Returns whether `annotation` declares a PEP 613 type alias.
+    pub fn is_type_alias_annotation(&self, annotation: &Expr) -> bool {
+        matches!(
+            annotation.inferred_type(self),
+            Some(Type::SpecialForm(SpecialFormType::TypeAlias))
+        )
+    }
+
+    /// Returns whether `definition` defines a PEP 613 or PEP 695 type alias.
+    pub fn is_type_alias_definition(&self, definition: Definition<'db>) -> bool {
+        match definition.kind(self.db) {
+            DefinitionKind::TypeAlias(_) => true,
+            DefinitionKind::AnnotatedAssignment(assignment) => {
+                let parsed = parsed_module(self.db, definition.file(self.db));
+                let model = Self::new(self.db, definition.file(self.db));
+                model.is_type_alias_annotation(assignment.annotation(&parsed.load(self.db)))
+            }
+            _ => false,
+        }
+    }
+
     /// Returns the type qualifiers (e.g. `Final`, `ClassVar`) for a given expression,
     /// if the expression refers to a name or attribute with declared qualifiers.
     pub fn type_qualifiers(&self, expr: ExprRef<'_>) -> TypeQualifiers {
@@ -458,15 +494,19 @@ impl<'db> SemanticModel<'db> {
                 else {
                     return TypeQualifiers::empty();
                 };
-                let module = parsed_module(self.db, self.file).load(self.db);
+                let definition_file = definition.file(self.db);
+                let module = parsed_module(self.db, definition_file).load(self.db);
                 if !definition
                     .kind(self.db)
-                    .category(self.file.is_stub(self.db), &module)
+                    .category(definition_file.is_stub(self.db), &module)
                     .is_declaration()
                 {
                     return TypeQualifiers::empty();
                 }
-                declaration_type(self.db, definition).qualifiers()
+                let Some(declared) = inferred_declaration(self.db, definition).declared() else {
+                    return TypeQualifiers::empty();
+                };
+                declared.qualifiers()
             }
             ExprRef::Attribute(attr) => {
                 let Some(value_ty) = attr.value.inferred_type(self) else {
@@ -475,7 +515,7 @@ impl<'db> SemanticModel<'db> {
                 value_ty
                     .member_lookup_with_policy(
                         self.db,
-                        attr.attr.id.clone(),
+                        &attr.attr.id,
                         crate::types::MemberLookupPolicy::default(),
                     )
                     .qualifiers
@@ -491,9 +531,11 @@ impl<'db> SemanticModel<'db> {
     ) -> Vec<ExpectedStringLiteralCompletion<'db>> {
         struct StringLiteralCandidates;
         type StringLiteralCandidatesVisitor<'db> = CycleDetector<
+            'db,
             StringLiteralCandidates,
             Type<'db>,
             Vec<ExpectedStringLiteralCompletion<'db>>,
+            3,
         >;
 
         fn collect<'db>(
@@ -507,7 +549,7 @@ impl<'db> SemanticModel<'db> {
                     .map(|string_literal| {
                         let value = string_literal.value(db).to_string();
                         vec![ExpectedStringLiteralCompletion {
-                            ty: Type::string_literal(db, &value),
+                            ty: Type::string_literal(db, &*value),
                             value,
                         }]
                     })
@@ -523,7 +565,7 @@ impl<'db> SemanticModel<'db> {
                     .flat_map(|element| collect(db, *element, visitor))
                     .collect(),
                 Type::TypeAlias(alias) => {
-                    visitor.visit(ty, || collect(db, alias.value_type(db), visitor))
+                    visitor.visit(db, ty, || collect(db, alias.value_type(db), visitor))
                 }
                 _ => Vec::new(),
             }
@@ -579,7 +621,7 @@ pub enum NameKind {
 }
 
 impl NameKind {
-    pub fn classify(name: &Name) -> NameKind {
+    pub fn classify(name: &str) -> NameKind {
         // Dunder needs a prefix and suffix double underscore.
         // When there's only a prefix double underscore, this
         // results in explicit name mangling. We let that be
@@ -600,7 +642,7 @@ impl NameKind {
 #[derive(Clone, Debug)]
 pub struct Completion<'db> {
     /// The label shown to the user for this suggestion.
-    pub name: Name,
+    pub name: CompactString,
     /// The type of this completion, if available.
     ///
     /// Generally speaking, this is always available

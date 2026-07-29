@@ -22,13 +22,19 @@ use ty_python_semantic::lint::{LintRegistry, RuleSelection};
 use ty_python_semantic::{AnalysisSettings, Db as SemanticDb};
 
 mod changes;
-mod ignore;
 
 #[salsa::db]
 pub trait Db: SemanticDb {
     fn project(&self) -> Project;
 
     fn dyn_clone(&self) -> Box<dyn Db>;
+}
+
+/// Tracked so that a change to the open-file set only invalidates queries
+/// for files whose open state actually changed.
+#[salsa::tracked(heap_size=ruff_memory_usage::heap_size, returns(copy))]
+fn is_open_file_impl(db: &dyn Db, file: File) -> bool {
+    db.project().open_files(db).contains(&file)
 }
 
 #[salsa::db]
@@ -75,6 +81,27 @@ impl ProjectDatabase {
         db
     }
 
+    /// Permanently freezes the most heavily read inputs that are immutable during a one-shot check.
+    ///
+    /// This is intentionally not exhaustive. It includes every [`Program`] input, the most heavily
+    /// read immutable [`Project`] inputs, and every field on files created after this call. Existing
+    /// files retain their durability. This must not be used by incremental consumers or checks that
+    /// apply fixes.
+    pub fn freeze(&mut self) {
+        let program = Program::try_get(self).expect("the program should be initialized");
+        let project = self.project();
+
+        program.freeze(self);
+        project.freeze(self);
+        self.files.freeze();
+    }
+
+    /// See [`Project::freeze_open_files`].
+    pub fn freeze_open_files(&mut self) {
+        let project = self.project();
+        project.freeze_open_files(self);
+    }
+
     fn new<S, Strategy: MisconfigurationStrategy>(
         project_metadata: ProjectMetadata,
         system: S,
@@ -105,19 +132,27 @@ impl ProjectDatabase {
         // TODO: Use the `program_settings` to compute the key for the database's persistent
         //   cache and load the cache if it exists.
         //   we may want to have a dedicated method for this?
+        // Important: For persistent caching it's essential that we can compute the
+        // cache key before loading the DB. Because of that, access to the `db` (other than system and vendored) is
+        // strictly forbidden before resolving the `program_settings`.
+
+        let merged_options = project_metadata.to_merged_options();
 
         // Initialize the `Program` singleton
-        let (program_settings, program_settings_diagnostics) = strategy.to_anyhow(
-            project_metadata.to_program_settings(db.system(), db.vendored(), strategy),
-        )?;
+        let (program_settings, program_settings_diagnostics) = strategy
+            .to_anyhow(merged_options.to_program_settings(db.system(), db.vendored(), strategy))?;
+
+        // This must be called before `from_settings`, or the `SearchPath` root
+        // will take precedence over the `Project` root, resulting in
+        // all project files having HIGH durability.
+        project_metadata.try_add_project_root(&db);
+
         Program::from_settings(&db, program_settings);
 
-        let (settings, settings_diagnostics) = strategy.map_err(
-            project_metadata
-                .options()
-                .to_settings(&db, project_metadata.root(), strategy),
-            |error| anyhow::anyhow!("{}", error.pretty(&db)),
-        )?;
+        let (settings, settings_diagnostics) = strategy
+            .map_err(merged_options.to_settings(&db, strategy), |error| {
+                anyhow::anyhow!("{}", error.pretty(&db))
+            })?;
 
         db.project = Some(Project::from_metadata(
             &db,
@@ -152,7 +187,7 @@ impl ProjectDatabase {
 
     #[tracing::instrument(level = "debug", skip(self))]
     pub fn check_file(&self, file: File) -> Vec<Diagnostic> {
-        self.project().check_file(self, file)
+        crate::check_file(self, file)
     }
 
     /// Set the check mode for the project.
@@ -529,6 +564,10 @@ impl SemanticDb for ProjectDatabase {
         self.project().verbose(self)
     }
 
+    fn is_open_file(&self, file: File) -> bool {
+        is_open_file_impl(self, file)
+    }
+
     fn dyn_clone(&self) -> Box<dyn SemanticDb> {
         Box::new(self.clone())
     }
@@ -537,8 +576,13 @@ impl SemanticDb for ProjectDatabase {
 #[salsa::db]
 impl ty_python_core::Db for ProjectDatabase {
     fn should_check_file(&self, file: File) -> bool {
+        // Avoid creating a dependency on the `should_check_file` query for vendored files.
+        if file.path(self).is_vendored_path() {
+            return false;
+        }
+
         self.project
-            .is_some_and(|project| project.should_check_file(self, file))
+            .is_some_and(|_| crate::should_check_file(self, file))
     }
 }
 
@@ -591,7 +635,8 @@ mod format {
 }
 
 #[cfg(any(test, feature = "testing"))]
-pub(crate) mod tests {
+#[cfg_attr(not(feature = "testing"), expect(unreachable_pub))]
+pub(crate) mod testing {
     use std::sync::{Arc, Mutex};
 
     use ruff_db::Db as SourceDb;
@@ -641,8 +686,8 @@ pub(crate) mod tests {
             };
 
             let (settings, settings_diagnostics) = project
-                .options()
-                .to_settings(&db, project.root(), &FallibleStrategy)
+                .to_merged_options()
+                .to_settings(&db, &FallibleStrategy)
                 .unwrap();
             let project =
                 Project::from_metadata(&db, project, settings, settings_diagnostics, Vec::new());
@@ -664,6 +709,8 @@ pub(crate) mod tests {
                 .to_search_paths(self.system(), self.vendored(), &FallibleStrategy)
                 .expect("Valid search path settings");
 
+            self.files().try_add_root(self, root, FileRootKind::Project);
+
             Program::from_settings(
                 self,
                 ProgramSettings {
@@ -675,8 +722,6 @@ pub(crate) mod tests {
                     search_paths,
                 },
             );
-
-            self.files().try_add_root(self, root, FileRootKind::Project);
 
             Ok(())
         }
@@ -730,7 +775,7 @@ pub(crate) mod tests {
     #[salsa::db]
     impl ty_python_core::Db for TestDb {
         fn should_check_file(&self, file: ruff_db::files::File) -> bool {
-            !file.path(self).is_vendored_path()
+            crate::should_check_file(self, file)
         }
     }
 
@@ -738,7 +783,7 @@ pub(crate) mod tests {
     impl ty_python_semantic::Db for TestDb {
         #[inline]
         fn check_file(&self, file: File) -> Vec<Diagnostic> {
-            self.project().check_file(self, file)
+            crate::check_file(self, file)
         }
 
         fn rule_selection(&self, _file: ruff_db::files::File) -> &RuleSelection {
@@ -755,6 +800,10 @@ pub(crate) mod tests {
 
         fn verbose(&self) -> bool {
             false
+        }
+
+        fn is_open_file(&self, file: File) -> bool {
+            super::is_open_file_impl(self, file)
         }
 
         fn dyn_clone(&self) -> Box<dyn ty_python_semantic::Db> {
@@ -775,4 +824,93 @@ pub(crate) mod tests {
 
     #[salsa::db]
     impl salsa::Database for TestDb {}
+}
+
+#[cfg(test)]
+mod tests {
+    use ruff_db::Db as _;
+    use ruff_db::files::FileRootKind;
+    use ruff_db::system::{SystemPathBuf, TestSystem};
+    use ty_module_resolver::list_modules;
+
+    use crate::{ProjectDatabase, ProjectMetadata};
+
+    #[test]
+    fn frozen_inputs_support_a_one_shot_check() -> anyhow::Result<()> {
+        let system = TestSystem::default();
+        let project = SystemPathBuf::from("/project");
+        system
+            .memory_file_system()
+            .write_file_all(project.join("main.py"), "x: int = 'not an int'")?;
+
+        let metadata = ProjectMetadata::discover(&project, &system)?;
+        let mut db = ProjectDatabase::fallible(metadata, system)?;
+        db.freeze();
+
+        assert_eq!(db.check().len(), 1);
+
+        Ok(())
+    }
+
+    #[test]
+    fn search_root_registration() -> anyhow::Result<()> {
+        let system = TestSystem::default();
+        let project = SystemPathBuf::from("/project");
+        let project_src = project.join("src");
+        let external = SystemPathBuf::from("/external");
+        let venv = project.join(".venv");
+
+        system.memory_file_system().write_files_all([
+            (
+                project.join("ty.toml"),
+                r#"
+                [environment]
+                root = ["src", "../external"]
+                extra-paths = [".venv"]
+                "#,
+            ),
+            (project_src.join("foo.py"), ""),
+            (external.join("bar.py"), ""),
+            (venv.join("baz.py"), ""),
+        ])?;
+
+        let metadata = ProjectMetadata::discover(&project, &system)?;
+        let db = ProjectDatabase::fallible(metadata, system)?;
+
+        let modules = list_modules(&db);
+        assert!(
+            modules
+                .iter()
+                .any(|module| module.name(&db).as_str() == "bar")
+        );
+
+        let project_src_root = db
+            .files()
+            .root(&db, &project_src)
+            .expect("project source file root");
+        assert_eq!(project_src_root.path(&db), &*project);
+        assert_eq!(
+            project_src_root.kind_at_time_of_creation(&db),
+            FileRootKind::Project
+        );
+
+        let external_root = db
+            .files()
+            .root(&db, &external)
+            .expect("external first-party file root");
+        assert_eq!(external_root.path(&db), &*external);
+        assert_eq!(
+            external_root.kind_at_time_of_creation(&db),
+            FileRootKind::SearchPath
+        );
+
+        let venv_root = db.files().root(&db, &venv).expect("virtualenv file root");
+        assert_eq!(venv_root.path(&db), &*venv);
+        assert_eq!(
+            venv_root.kind_at_time_of_creation(&db),
+            FileRootKind::SearchPath
+        );
+
+        Ok(())
+    }
 }

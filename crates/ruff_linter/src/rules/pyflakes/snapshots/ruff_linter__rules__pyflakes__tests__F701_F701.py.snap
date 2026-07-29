@@ -19,7 +19,6 @@ F701 `break` outside loop
 15 |
 16 |     break
    |     ^^^^^
-   |
 
 F701 `break` outside loop
   --> F701.py:20:5
@@ -27,11 +26,9 @@ F701 `break` outside loop
 19 | class Foo:
 20 |     break
    |     ^^^^^
-   |
 
 F701 `break` outside loop
   --> F701.py:23:1
    |
 23 | break
    | ^^^^^
-   |

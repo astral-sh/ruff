@@ -12,13 +12,11 @@ D413 [*] Missing blank line after last section ("Returns")
 9 | """
   |
 help: Add blank line after "Returns"
-6  |
-7  | Returns:
+   |
 8  |     the value
 9  +
 10 | """
-11 |
-12 |
+   |
 
 D413 [*] Missing blank line after last section ("Returns")
   --> D413.py:19:5
@@ -31,13 +29,11 @@ D413 [*] Missing blank line after last section ("Returns")
 21 |     """
    |
 help: Add blank line after "Returns"
-18 |
-19 |     Returns:
+   |
 20 |         the value
 21 +
 22 |     """
-23 |
-24 |
+   |
 
 D413 [*] Missing blank line after last section ("Returns")
   --> D413.py:58:5
@@ -49,16 +45,14 @@ D413 [*] Missing blank line after last section ("Returns")
 59 |         the value"""
    |
 help: Add blank line after "Returns"
-56 |             with a hanging indent
-57 |
+   |
 58 |     Returns:
    -         the value"""
 59 +         the value
 60 +
 61 +     """
 62 |
-63 |
-64 | def func():
+   |
 
 D413 [*] Missing blank line after last section ("Returns")
   --> D413.py:69:5
@@ -71,16 +65,14 @@ D413 [*] Missing blank line after last section ("Returns")
 71 |         """
    |
 help: Add blank line after "Returns"
-68 |
-69 |     Returns:
+   |
 70 |         the value
    -         """
 71 |
 72 +     """
 73 +
 74 |
-75 | def func():
-76 |     ("""Docstring.
+   |
 
 D413 [*] Missing blank line after last section ("Raises")
   --> D413.py:77:5
@@ -93,8 +85,8 @@ D413 [*] Missing blank line after last section ("Raises")
 79 |     """)
    |
 help: Add blank line after "Raises"
-76 |
-77 |     Raises:
+   |
 78 |         ValueError: An error.
 79 +
 80 |     """)
+   |

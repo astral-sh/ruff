@@ -174,7 +174,6 @@ error[invalid-context-manager]: Object of type `Manager` cannot be used with `as
   |
 7 |     async with Manager():
   |                ^^^^^^^^^
-  |
 info: Objects of type `Manager` can be used as sync context managers
 info: Consider using `with` here
 ```
@@ -245,6 +244,36 @@ reveal_type(connect_iterator)
 async def main_iterator():
     async with connect_iterator() as session:
         reveal_type(session)  # revealed: Session
+```
+
+Generic type parameters are preserved through the decorator:
+
+Regression test for <https://github.com/astral-sh/ty/issues/3692>.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from collections.abc import AsyncGenerator, AsyncIterator
+from contextlib import asynccontextmanager
+
+@asynccontextmanager
+async def nullcontext[T](value: T) -> AsyncGenerator[T, None]:
+    yield value
+
+# revealed: [T](value: T) -> _AsyncGeneratorContextManager[T, None]
+reveal_type(nullcontext)
+
+async def gen() -> AsyncIterator[str]:
+    yield "hello"
+
+async def main_generic():
+    async with nullcontext(gen()) as lines:
+        reveal_type(lines)  # revealed: AsyncIterator[str]
+        async for line in lines:
+            reveal_type(line)  # revealed: str
 ```
 
 And with `AsyncGeneratorType` return types:

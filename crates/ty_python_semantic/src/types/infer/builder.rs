@@ -1,8 +1,9 @@
-use std::cell::RefCell;
+use std::cell::{OnceCell, RefCell};
+use std::collections::hash_map;
 use std::rc::Rc;
 
+use compact_str::CompactString;
 use itertools::Itertools;
-use ruff_db::diagnostic::{Annotation, DiagnosticId, Severity};
 use ruff_db::files::File;
 use ruff_db::parsed::ParsedModuleRef;
 use ruff_db::source::source_text;
@@ -18,60 +19,71 @@ use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::{FxHashMap, FxHashSet};
 use smallvec::SmallVec;
 use strum::IntoEnumIterator;
-use ty_module_resolver::{KnownModule, ModuleName, resolve_module};
+use ty_module_resolver::{ModuleName, resolve_module};
 use ty_python_core::ast_ids::HasScopedUseId;
 use ty_python_core::statement::StatementInner;
 
 use super::{
-    DefinitionInference, DefinitionInferenceExtra, ExpressionInference, ExpressionInferenceExtra,
-    FrozenMap, FunctionDecoratorInference, InferenceRegion, ScopeInference, ScopeInferenceExtra,
-    infer_deferred_types, infer_definition_types, infer_expression_types,
-    infer_same_file_expression_type, infer_unpack_types,
+    CollectionUseConstraints, DeferredAndUndecorated, DefinitionInference,
+    DefinitionInferenceExtra, DefinitionTypes, ExpressionInference, ExpressionInferenceExtra,
+    FrozenMap, FrozenSet, FrozenValueMap, FunctionDecoratorInference, InferenceRegion,
+    OtherDefinitionInferenceExtra, ScopeInference, ScopeInferenceExtra, infer_deferred_types,
+    infer_definition_types, infer_expression_types, infer_same_file_expression_type,
+    infer_unpack_types,
 };
 use crate::diagnostic::format_enumeration;
 use crate::place::{
     ConsideredDefinitions, DefinedPlace, Definedness, LookupError, Place, PlaceAndQualifiers,
-    TypeOrigin, builtins_module_scope, builtins_symbol, class_body_implicit_symbol,
-    explicit_global_symbol, loop_header_reachability, module_type_implicit_global_declaration,
-    module_type_implicit_global_symbol, place, place_from_bindings, place_from_declarations,
+    RequiresExplicitReExport, TypeOrigin, builtins_module_scope, builtins_symbol,
+    class_body_implicit_symbol, explicit_global_symbol, loop_header_reachability,
+    module_type_implicit_global_declaration, module_type_implicit_global_symbol, place_by_id,
+    place_from_bindings_with_reachability_cache, place_from_declarations_with_reachability_cache,
     typing_extensions_symbol,
 };
-use crate::reachability::ReachabilityConstraintsExtension;
+use crate::reachability::{ReachabilityEvaluationCache, evaluate_reachability_with_cache};
 use crate::types::add_inferred_python_version_hint_to_diagnostic;
-use crate::types::call::bind::MatchingOverloadIndex;
+use crate::types::attribute_write::{AssignmentAttributeMembers, assignment_attribute_members};
+use crate::types::call::bind::{
+    ArgumentTypeContext, CheckTypesMode, OverloadSet, requires_overload_evaluation,
+};
 use crate::types::call::{Binding, Bindings, CallArguments, CallError, CallErrorKind};
 use crate::types::callable::{CallableFunctionProvenance, CallableTypeKind};
-use crate::types::class::{ClassLiteral, CodeGeneratorKind, MethodDecorator};
+use crate::types::class::{
+    ClassLiteral, CodeGeneratorKind, FrozenDataclassDispatch, MethodDecorator,
+};
 use crate::types::constraints::{ConstraintSetBuilder, PathBounds, Solutions};
 use crate::types::context::InferContext;
+use crate::types::dedicated::pydantic;
 use crate::types::diagnostic::{
     self, CALL_NON_CALLABLE, CONFLICTING_DECLARATIONS, CYCLIC_TYPE_ALIAS_DEFINITION,
     GeneratorMismatchKind, INEFFECTIVE_FINAL, INVALID_ARGUMENT_TYPE, INVALID_ASSIGNMENT,
-    INVALID_ATTRIBUTE_ACCESS, INVALID_DECLARATION, INVALID_ENUM_MEMBER_ANNOTATION,
-    INVALID_LEGACY_TYPE_VARIABLE, INVALID_NEWTYPE, INVALID_PARAMSPEC, INVALID_TYPE_ALIAS_TYPE,
-    INVALID_TYPE_FORM, INVALID_TYPE_GUARD_CALL, INVALID_TYPE_VARIABLE_BOUND,
-    INVALID_TYPE_VARIABLE_CONSTRAINTS, POSSIBLY_MISSING_IMPLICIT_CALL, POSSIBLY_MISSING_SUBMODULE,
+    INVALID_DECLARATION, INVALID_ENUM_MEMBER_ANNOTATION, INVALID_LEGACY_TYPE_VARIABLE,
+    INVALID_NEWTYPE, INVALID_PARAMSPEC, INVALID_TYPE_ALIAS_TYPE, INVALID_TYPE_FORM,
+    INVALID_TYPE_VARIABLE_BOUND, INVALID_TYPE_VARIABLE_CONSTRAINTS, INVALID_TYPE_VARIABLE_DEFAULT,
+    POSSIBLY_MISSING_IMPLICIT_CALL, POSSIBLY_MISSING_SUBMODULE, TypeCheckDiagnostics,
     UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE, UNRESOLVED_GLOBAL, UNRESOLVED_REFERENCE,
     UNSUPPORTED_OPERATOR, UNUSED_AWAITABLE, hint_if_stdlib_attribute_exists_on_other_versions,
     report_attempted_protocol_instantiation, report_bad_dunder_delattr_call,
-    report_bad_dunder_delete_call, report_bad_dunder_set_call, report_call_to_abstract_method,
+    report_bad_dunder_delete_call, report_call_to_abstract_method,
     report_cannot_pop_required_field_on_typed_dict, report_invalid_assignment,
-    report_invalid_attribute_assignment, report_invalid_class_match_pattern,
-    report_invalid_exception_caught, report_invalid_exception_cause,
-    report_invalid_exception_raised, report_invalid_exception_tuple_caught,
-    report_invalid_generator_yield_type, report_invalid_key_on_typed_dict,
+    report_invalid_class_match_pattern, report_invalid_exception_caught,
+    report_invalid_exception_cause, report_invalid_exception_raised,
+    report_invalid_exception_tuple_caught, report_invalid_generator_yield_type,
+    report_invalid_key_on_typed_dict, report_invalid_match_args_type,
     report_invalid_type_checking_constant,
     report_match_pattern_against_non_runtime_checkable_protocol,
     report_match_pattern_against_typed_dict, report_mismatched_type_name,
     report_possibly_missing_attribute, report_possibly_unresolved_reference,
-    report_unsupported_augmented_assignment, report_unsupported_comparison,
+    report_too_many_positional_patterns_for_class_pattern, report_unsupported_augmented_assignment,
+    report_unsupported_comparison,
 };
 use crate::types::enums::{enum_ignored_names, is_enum_class_by_inheritance};
 use crate::types::function::{
     FunctionDecorators, FunctionType, KnownFunction, report_revealed_type,
+    same_module_uncached_raw_signature,
 };
 use crate::types::generics::{
-    GenericContext, InferableTypeVars, Specialization, SpecializationBuilder, bind_typevar,
+    GenericContext, Specialization, SpecializationBuilder, bind_typevar, enclosing_binding_contexts,
 };
 use crate::types::infer::builder::named_tuple::NamedTupleKind;
 use crate::types::infer::builder::paramspec_validation::validate_paramspec_components;
@@ -81,47 +93,57 @@ use crate::types::infer::{
     TypeExpressionFlags, infer_statement_types, nearest_enclosing_class,
     nearest_enclosing_function, original_class_type,
 };
+use crate::types::match_pattern::{ClassPatternPositionalResult, class_pattern_positional_result};
 use crate::types::narrow::NarrowingEvaluatorExtension;
+use crate::types::narrow::pattern_success_types;
 use crate::types::newtype::NewType;
 use crate::types::set_theoretic::RecursivelyDefined;
 use crate::types::signatures::{CallableSignature, ReturnCallableTypeVarScope};
 use crate::types::special_form::TypeQualifier;
 use crate::types::subclass_of::SubclassOfInner;
 use crate::types::tuple::promotion::TupleSizePromotionConstraints;
-use crate::types::tuple::{Tuple, TupleLength, TupleSpecBuilder, TupleType};
+use crate::types::tuple::{Tuple, TupleLength, TupleSpecBuilder, TupleType, VariableSegment};
 use crate::types::type_alias::{ManualPEP695TypeAliasType, PEP695TypeAliasType};
-use crate::types::typevar::{BoundTypeVarIdentity, TypeVarConstraints, TypeVarIdentity};
-use crate::types::{
-    BoundTypeVarInstance, CallDunderError, CallableBinding, CallableType, CallableTypes, ClassType,
-    DynamicType, InferenceFlags, InternedConstraintSet, InternedType, IntersectionBuilder,
-    IntersectionType, KnownClass, KnownInstanceType, KnownUnion, LiteralValueTypeKind,
-    MemberLookupPolicy, ParamSpecAttrKind, Parameter, ParameterForm, Parameters, SentinelInstance,
-    Signature, SpecialFormType, SubclassOfType, Type, TypeAliasType, TypeAndQualifiers,
-    TypeContext, TypeQualifiers, TypeVarBoundOrConstraints, TypeVarKind, TypeVarVariance,
-    TypedDictType, UnionAccumulator, UnionBuilder, UnionType, any_over_type, binding_type,
-    infer_complete_scope_types, infer_scope_types, todo_type,
+use crate::types::typed_dict::{TypedDictAssignmentKind, TypedDictKeyAssignment};
+use crate::types::typevar::{
+    BoundTypeVarIdentity, TypeVarConstraints, TypeVarIdentity, TypeVarInstance, TypeVarSet,
 };
-use crate::{AnalysisSettings, Db, FxIndexSet, Program};
+use crate::types::unpacker::UnpackResult;
+use crate::types::{
+    BindingContext, BoundTypeVarInstance, CallDunderError, CallableBinding, CallableType,
+    CallableTypes, ClassType, DynamicType, InferenceFlags, InternedConstraintSet, InternedType,
+    IntersectionBuilder, IntersectionType, KnownClass, KnownInstanceType, KnownUnion,
+    LiteralValueType, LiteralValueTypeKind, MemberLookupPolicy, ParamSpecAttrKind, Parameter,
+    Parameters, SentinelInstance, Signature, SpecialFormType, SubclassOfType, Type, TypeAliasType,
+    TypeAndQualifiers, TypeContext, TypeQualifiers, TypeVarBoundOrConstraints, TypeVarKind,
+    TypeVarVariance, TypedDictModule, TypedDictType, UnionAccumulator, UnionBuilder, UnionType,
+    any_over_type, binding_type, extract_fixed_length_iterable_element_types,
+    infer_complete_scope_types, infer_scope_types, is_discarded_dict_key_assignment, todo_type,
+};
+use crate::{AnalysisSettings, Db, FxIndexSet, FxOrderSet, Program};
 use ty_python_core::ast_ids::ScopedUseId;
 use ty_python_core::definition::{
     AnnotatedAssignmentDefinitionKind, AssignmentDefinitionKind, ComprehensionDefinitionKind,
     Definition, DefinitionKind, DefinitionNodeKey, DefinitionState, ExceptHandlerDefinitionKind,
     ForStmtDefinitionKind, LambdaParameterDefinitionNodeKind, LoopHeaderDefinitionKind,
-    ParameterDefinitionNodeKind, TargetKind, WithItemDefinitionKind,
+    NestedBindingExecution, NestedBindingsDefinitionKind, ParameterDefinitionNodeKind, TargetKind,
+    WithItemDefinitionKind,
 };
 use ty_python_core::expression::{Expression, ExpressionKind};
 use ty_python_core::narrowing_constraints::ConstraintKey;
 use ty_python_core::node_key::NodeKey;
 use ty_python_core::place::{PlaceExpr, PlaceExprRef};
+use ty_python_core::predicate::PatternPredicate;
 use ty_python_core::scope::{FileScopeId, NodeWithScopeKind, NodeWithScopeRef, ScopeId, ScopeKind};
 use ty_python_core::symbol::{ScopedSymbolId, Symbol};
 use ty_python_core::{
     ApplicableConstraints, EnclosingSnapshotResult, EvaluationMode, SemanticIndex, Truthiness,
-    place_table, unpack::UnpackPosition,
+    unpack::UnpackPosition,
 };
 use ty_python_core::{ExpressionNodeKey, Statement};
 
 mod annotation_expression;
+mod attribute_assignment;
 mod binary_expressions;
 mod class;
 mod dict;
@@ -139,9 +161,10 @@ mod type_call;
 mod type_expression;
 mod type_form;
 mod typed_dict;
+mod typeguard;
 mod typevar;
 
-use super::comparisons::{self, BinaryComparisonVisitor};
+use super::comparisons;
 
 /// A helper to track if we already know that declared and inferred types are the same.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -237,6 +260,13 @@ pub(super) struct TypeInferenceBuilder<'db, 'ast> {
     /// An expression cache shared across builders during multi-inference.
     expression_cache: Option<Rc<RefCell<ExpressionCache<'db>>>>,
 
+    /// Reachability evaluations reused while inferring this region.
+    ///
+    /// Most inference regions never evaluate reachability, so allocate the cache lazily. Speculative
+    /// builders share an initialized cache with their parent so repeated place lookups performed
+    /// during multi-inference can reuse predicate truthiness computed by the parent builder.
+    reachability_cache: OnceCell<Rc<ReachabilityEvaluationCache<'db>>>,
+
     /// Type qualifiers (`Required`, `NotRequired`, etc.) for annotation expressions.
     /// Only populated for expressions that have non-empty qualifiers.
     qualifiers: FxHashMap<ExpressionNodeKey, TypeQualifiers>,
@@ -245,12 +275,12 @@ pub(super) struct TypeInferenceBuilder<'db, 'ast> {
     /// Only populated for expressions that have non-empty flags.
     type_expression_flags: FxHashMap<ExpressionNodeKey, TypeExpressionFlags>,
 
-    /// The constraints on any collection literals that are accessed in this region.
+    /// The constraints on any collection initializers that are accessed in this region.
     //
     // TODO: Store projected constraint sets directly here instead of specialized receiver types.
-    // Bound-method calls on unconstrained collection literals can introduce method-local typevars
+    // Bound-method calls on unconstrained collection initializers can introduce method-local typevars
     // (for example, `list.sort` constrains `T@list` using `SupportsRichComparisonT@sort`). A
-    // principled representation would store an owned constraint set over the collection literal's
+    // principled representation would store an owned constraint set over the collection initializer's
     // generic context and existentially quantify away the method-local typevars, so combining
     // `xs.append("x")` with `xs.sort()` yields `str ≤ T ≤ SupportsRichComparison` instead of
     // leaking `SupportsRichComparisonT@sort` into the inferred list element type.
@@ -271,7 +301,7 @@ pub(super) struct TypeInferenceBuilder<'db, 'ast> {
     /// The list should only contain one entry per binding at most.
     bindings: VecMap<Definition<'db>, Type<'db>>,
 
-    /// The types and type qualifiers of every declaration in this region.
+    /// The types and type qualifiers of every valid declaration in this region.
     ///
     /// The list should only contain one entry per declaration at most.
     declarations: VecMap<Definition<'db>, TypeAndQualifiers<'db>>,
@@ -329,13 +359,93 @@ pub(super) struct TypeInferenceBuilder<'db, 'ast> {
     /// The fallback type for missing expressions/bindings/declarations or recursive type inference.
     cycle_recovery: Option<Type<'db>>,
 
+    /// If the inference region refers to a definition, whether synthesized dictionary-key
+    /// assignments derived from its right-hand side should be discarded.
+    discards_dict_key_assignments: bool,
+
     /// A list of `dataclass_transform` field specifiers that are "active" (when inferring
     /// the right hand side of an annotated assignment in a class that is a dataclass).
     dataclass_field_specifiers: SmallVec<[Type<'db>; NUM_FIELD_SPECIFIERS_INLINE]>,
 }
 
-/// An expression cache shared across builders during multi-inference.
-type ExpressionCache<'db> = FxHashMap<(ExpressionNodeKey, TypeContext<'db>), Type<'db>>;
+fn transparent_callable_decorator_result<'db>(
+    db: &'db dyn Db,
+    bindings: &Bindings<'db>,
+    decorated_ty: Type<'db>,
+) -> Option<Type<'db>> {
+    enum TransparentCallableReturn<'db> {
+        TypeVar(BoundTypeVarInstance<'db>),
+        Awaitable(BoundTypeVarInstance<'db>),
+    }
+
+    impl<'db> TransparentCallableReturn<'db> {
+        fn matches(self, db: &'db dyn Db, other: Self) -> bool {
+            match (self, other) {
+                (Self::TypeVar(left), Self::TypeVar(right))
+                | (Self::Awaitable(left), Self::Awaitable(right)) => {
+                    left.is_same_typevar_as(db, right)
+                }
+                _ => false,
+            }
+        }
+    }
+
+    fn callable_paramspec_and_return<'db>(
+        db: &'db dyn Db,
+        ty: Type<'db>,
+    ) -> Option<(BoundTypeVarInstance<'db>, TransparentCallableReturn<'db>)> {
+        let callable = ty.resolve_type_alias(db).as_callable()?;
+        if callable.kind(db) != CallableTypeKind::Regular {
+            return None;
+        }
+        let [signature] = callable.signatures(db).overloads.as_slice() else {
+            return None;
+        };
+        let paramspec = signature.parameters().as_paramspec()?;
+        let return_typevar = if let Some(typevar) = signature.return_ty.as_typevar() {
+            TransparentCallableReturn::TypeVar(typevar)
+        } else {
+            let specialization = signature
+                .return_ty
+                .known_specialization(db, KnownClass::Awaitable)?;
+            let [inner] = specialization.types(db) else {
+                return None;
+            };
+            TransparentCallableReturn::Awaitable(inner.as_typevar()?)
+        };
+        Some((paramspec, return_typevar))
+    }
+
+    if !matches!(decorated_ty, Type::FunctionLiteral(_) | Type::Callable(_)) {
+        return None;
+    }
+    let binding = bindings.single_element()?;
+    let (_, overload) = binding.matching_overloads().exactly_one().ok()?;
+    let decorator_signature = &overload.signature;
+    let bound_signature = binding
+        .bound_type
+        .map(|bound_type| decorator_signature.bind_self(db, Some(bound_type)));
+    let decorator_signature = bound_signature.as_ref().unwrap_or(decorator_signature);
+    let [parameter] = decorator_signature.parameters().as_slice() else {
+        return None;
+    };
+
+    let (parameter_callable_paramspec, parameter_callable_return) =
+        callable_paramspec_and_return(db, parameter.annotated_type())?;
+    let (return_callable_paramspec, return_callable_return) =
+        callable_paramspec_and_return(db, decorator_signature.return_ty)?;
+    if !parameter_callable_paramspec.is_same_typevar_as(db, return_callable_paramspec)
+        || !parameter_callable_return.matches(db, return_callable_return)
+    {
+        return None;
+    }
+
+    match decorated_ty {
+        Type::FunctionLiteral(function) => Some(Type::Callable(function.into_callable_type(db))),
+        Type::Callable(_) => Some(decorated_ty),
+        _ => None,
+    }
+}
 
 impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     /// How big a string do we build before bailing?
@@ -352,7 +462,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         module: &'ast ParsedModuleRef,
     ) -> Self {
         let scope = region.scope(db);
-
         Self {
             context: InferContext::new(db, scope, module),
             index,
@@ -363,6 +472,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             deferred_state: DeferredExpressionState::None,
             expressions: FxHashMap::default(),
             expression_cache: None,
+            reachability_cache: OnceCell::new(),
             qualifiers: FxHashMap::default(),
             type_expression_flags: FxHashMap::default(),
             collection_use_constraints: FxHashMap::default(),
@@ -374,7 +484,30 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             deferred: VecSet::default(),
             undecorated_type: None,
             cycle_recovery: None,
+            discards_dict_key_assignments: false,
             dataclass_field_specifiers: SmallVec::new(),
+        }
+    }
+
+    fn reachability_cache(&self) -> &ReachabilityEvaluationCache<'db> {
+        self.reachability_cache
+            .get_or_init(|| {
+                let scope = self.scope();
+                let reachability_constraints = self
+                    .index
+                    .use_def_map(scope.file_scope_id(self.db()))
+                    .reachability_constraints();
+                Rc::new(ReachabilityEvaluationCache::new(
+                    scope,
+                    reachability_constraints,
+                ))
+            })
+            .as_ref()
+    }
+
+    fn discard_dict_key_assignments_for(&mut self, definition: Definition<'db>) {
+        if matches!(self.region, InferenceRegion::Definition(d) if d == definition) {
+            self.discards_dict_key_assignments = true;
         }
     }
 
@@ -408,36 +541,74 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
     }
 
-    fn extend_definition(&mut self, inference: &DefinitionInference<'db>) {
+    fn extend_definition(
+        &mut self,
+        definition: Definition<'db>,
+        inference: &DefinitionInference<'db>,
+    ) {
         #[cfg(debug_assertions)]
         assert_eq!(self.scope, inference.scope);
 
         self.expressions
             .extend(inference.expressions.iter().copied());
-        self.declarations.extend(inference.declarations());
+        self.declarations.extend(inference.declarations(definition));
 
         if !matches!(self.region, InferenceRegion::Scope(..)) {
-            self.bindings.extend(inference.bindings());
+            self.bindings.extend(inference.bindings(definition));
         }
 
         if let Some(extra) = &inference.extra {
-            self.called_functions
-                .extend(extra.called_functions.iter().copied());
-            self.extend_cycle_recovery(extra.cycle_recovery);
-            self.context.extend(&extra.diagnostics);
-            self.deferred.extend(extra.deferred.iter().copied());
-            self.string_annotations
-                .extend(extra.string_annotations.iter().copied());
-            self.expected_types.extend(extra.expected_types.iter());
-            self.qualifiers.extend(extra.qualifiers.iter());
-            self.type_expression_flags
-                .extend(extra.type_expression_flags.iter());
+            match extra.as_ref() {
+                DefinitionInferenceExtra::Qualifiers(qualifiers) => {
+                    self.qualifiers.extend(qualifiers.iter().copied());
+                }
+                DefinitionInferenceExtra::Deferred(deferred) => {
+                    self.deferred.extend(deferred.iter().copied());
+                }
+                DefinitionInferenceExtra::Diagnostics(diagnostics) => {
+                    self.context.extend(diagnostics);
+                }
+                DefinitionInferenceExtra::DeferredAndUndecorated(extra) => {
+                    self.deferred.extend(extra.deferred.iter().copied());
+                }
+                DefinitionInferenceExtra::CalledFunctions(called_functions) => {
+                    self.called_functions
+                        .extend(called_functions.iter().copied());
+                }
+                DefinitionInferenceExtra::ExpectedTypes(expected_types) => {
+                    self.expected_types.extend(expected_types.iter().copied());
+                }
+                DefinitionInferenceExtra::StringAnnotations(string_annotations) => {
+                    self.string_annotations
+                        .extend(string_annotations.iter().copied());
+                }
+                DefinitionInferenceExtra::Undecorated(_)
+                | DefinitionInferenceExtra::DiscardsDictKeyAssignments => {}
+                DefinitionInferenceExtra::Other(extra) => {
+                    self.called_functions
+                        .extend(extra.called_functions.iter().copied());
+                    self.extend_cycle_recovery(extra.cycle_recovery);
+                    self.context.extend(&extra.diagnostics);
+                    self.deferred.extend(extra.deferred.iter().copied());
+                    self.string_annotations
+                        .extend(extra.string_annotations.iter().copied());
+                    self.expected_types
+                        .extend(extra.expected_types.iter().copied());
+                    self.qualifiers.extend(extra.qualifiers.iter().copied());
+                    self.type_expression_flags
+                        .extend(extra.type_expression_flags.iter().copied());
 
-            for (collection_def, constraints) in &extra.collection_use_constraints {
-                self.collection_use_constraints
-                    .entry(*collection_def)
-                    .and_modify(|this| this.extend(constraints))
-                    .or_insert(constraints.clone());
+                    #[expect(
+                        clippy::iter_over_hash_type,
+                        reason = "constraints for distinct collection definitions are merged independently"
+                    )]
+                    for (collection_def, constraints) in &extra.collection_use_constraints {
+                        self.collection_use_constraints
+                            .entry(*collection_def)
+                            .and_modify(|this| this.extend(constraints))
+                            .or_insert(constraints.clone());
+                    }
+                }
             }
         }
     }
@@ -446,7 +617,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let inference = match inference {
             StatementInference::Other(inference) => inference,
             StatementInference::Expression(inference) => return self.extend_expression(inference),
-            StatementInference::Definition(inference) => return self.extend_definition(inference),
+            StatementInference::Definition(definition, inference) => {
+                return self.extend_definition(*definition, inference);
+            }
         };
 
         #[cfg(debug_assertions)]
@@ -470,10 +643,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             self.deferred.extend(extra.deferred.iter().copied());
             self.string_annotations
                 .extend(extra.string_annotations.iter().copied());
-            self.expected_types.extend(extra.expected_types.iter());
-            self.qualifiers.extend(extra.qualifiers.iter());
+            self.expected_types
+                .extend(extra.expected_types.iter().copied());
+            self.qualifiers.extend(extra.qualifiers.iter().copied());
             self.type_expression_flags
-                .extend(extra.type_expression_flags.iter());
+                .extend(extra.type_expression_flags.iter().copied());
         }
     }
 
@@ -491,12 +665,19 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         if let Some(extra) = &inference.extra {
             self.context.extend(&extra.diagnostics);
             self.extend_cycle_recovery(extra.cycle_recovery);
+            self.called_functions
+                .extend(extra.called_functions.iter().copied());
             self.string_annotations
                 .extend(extra.string_annotations.iter().copied());
-            self.expected_types.extend(extra.expected_types.iter());
+            self.expected_types
+                .extend(extra.expected_types.iter().copied());
             self.type_expression_flags
-                .extend(extra.type_expression_flags.iter());
+                .extend(extra.type_expression_flags.iter().copied());
 
+            #[expect(
+                clippy::iter_over_hash_type,
+                reason = "constraints for distinct collection definitions are merged independently"
+            )]
             for (collection_def, constraints) in &extra.collection_use_constraints {
                 self.collection_use_constraints
                     .entry(*collection_def)
@@ -510,19 +691,65 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
     }
 
-    fn extend_scope(&mut self, inference: &ScopeInference<'db>) {
+    fn extend_expression_cache_entry(&mut self, inference: &FullExpressionCacheEntry<'db>) {
+        #[cfg(debug_assertions)]
+        assert_eq!(self.scope, inference.scope);
+
         self.expressions
-            .extend(inference.expressions.iter().copied());
+            .extend(inference.expressions.iter().map(|(key, ty)| (*key, *ty)));
+        self.context.extend(&inference.diagnostics);
+        self.extend_cycle_recovery(inference.cycle_recovery);
+        self.called_functions
+            .extend(inference.called_functions.iter().copied());
+        self.string_annotations
+            .extend(inference.string_annotations.iter().copied());
+        self.expected_types
+            .extend(inference.expected_types.iter().map(|(key, ty)| (*key, *ty)));
+        self.type_expression_flags.extend(
+            inference
+                .type_expression_flags
+                .iter()
+                .map(|(key, flags)| (*key, *flags)),
+        );
+
+        #[expect(
+            clippy::iter_over_hash_type,
+            reason = "constraints for distinct collection definitions are merged independently"
+        )]
+        for (collection_def, constraints) in &inference.collection_use_constraints {
+            self.collection_use_constraints
+                .entry(*collection_def)
+                .and_modify(|this| this.extend(constraints))
+                .or_insert(constraints.clone());
+        }
+
+        if !matches!(self.region, InferenceRegion::Scope(..)) {
+            self.bindings.extend(
+                inference
+                    .bindings
+                    .iter()
+                    .map(|(definition, ty)| (*definition, *ty)),
+            );
+        }
+    }
+
+    fn extend_scope(&mut self, inference: &ScopeInference<'db>) {
+        self.expressions.extend(inference.expressions.iter());
 
         if let Some(extra) = &inference.extra {
             self.context.extend(&extra.diagnostics);
             self.extend_cycle_recovery(extra.cycle_recovery);
             self.string_annotations
                 .extend(extra.string_annotations.iter().copied());
-            self.expected_types.extend(extra.expected_types.iter());
+            self.expected_types
+                .extend(extra.expected_types.iter().copied());
             self.type_expression_flags
-                .extend(extra.type_expression_flags.iter());
+                .extend(extra.type_expression_flags.iter().copied());
 
+            #[expect(
+                clippy::iter_over_hash_type,
+                reason = "constraints for distinct collection definitions are merged independently"
+            )]
             for (collection_def, constraints) in &extra.collection_use_constraints {
                 self.collection_use_constraints
                     .entry(*collection_def)
@@ -546,6 +773,20 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     fn scope(&self) -> ScopeId<'db> {
         self.scope
+    }
+
+    /// Returns call bindings annotated with the call site's enclosing binding contexts.
+    ///
+    /// Call binding uses this as an optimization hint to avoid freshening generic callable
+    /// signatures when the callable's generic context cannot collide with a containing scope.
+    fn bindings_for_call(&self, callable_type: Type<'db>) -> Bindings<'db> {
+        let db = self.db();
+        callable_type
+            .bindings(db)
+            .with_enclosing_binding_contexts(enclosing_binding_contexts(
+                self.index,
+                self.scope().file_scope_id(db),
+            ))
     }
 
     fn settings(&self) -> &AnalysisSettings {
@@ -578,9 +819,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .map(|params| SmallVec::from(params.field_specifiers(db)))
                 .or_else(|| {
                     Some(SmallVec::from(
-                        CodeGeneratorKind::from_class(db, class_literal.into(), None)?
-                            .dataclass_transformer_params()?
-                            .field_specifiers(db),
+                        CodeGeneratorKind::from_class(db, class_literal.into())?
+                            .field_specifiers(db)?,
                     ))
                 })
         }
@@ -597,7 +837,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         if self.expression_cache.is_some() {
             false
         } else {
-            self.expression_cache = Some(Rc::new(RefCell::new(FxHashMap::default())));
+            self.expression_cache = Some(Rc::new(RefCell::new(ExpressionCache::default())));
             true
         }
     }
@@ -812,7 +1052,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // Infer deferred types for all definitions.
         let deferred_definitions: Vec<_> = std::mem::take(&mut self.deferred).into_iter().collect();
         for definition in &deferred_definitions {
-            self.extend_definition(infer_deferred_types(self.db(), *definition));
+            self.extend_definition(*definition, infer_deferred_types(self.db(), *definition));
         }
 
         assert!(
@@ -1033,7 +1273,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             DefinitionKind::MatchPattern(match_pattern) => {
                 self.infer_match_pattern_definition(
                     match_pattern.pattern(self.module()),
-                    match_pattern.index(),
+                    match_pattern.predicate(),
                     definition,
                 );
             }
@@ -1051,6 +1291,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
             DefinitionKind::LoopHeader(loop_header) => {
                 self.infer_loop_header_definition(loop_header, definition);
+            }
+            DefinitionKind::NestedBindings(nested_bindings) => {
+                self.infer_nested_bindings_definition(nested_bindings, definition);
             }
         }
     }
@@ -1094,6 +1337,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
             DefinitionKind::ParamSpec(paramspec) => {
                 self.infer_paramspec_deferred(paramspec.node(self.module()));
+            }
+            DefinitionKind::TypeVarTuple(typevartuple) => {
+                self.infer_typevartuple_deferred(typevartuple.node(self.module()));
             }
             DefinitionKind::Assignment(assignment) => {
                 self.infer_assignment_deferred(
@@ -1140,83 +1386,29 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let place_table = self.index.place_table(file_scope_id);
         let use_def = self.index.use_def_map(file_scope_id);
 
-        let global_use_def_map = self.index.use_def_map(FileScopeId::global());
         let place_id = binding.place(self.db());
         let place = place_table.place(place_id);
 
-        let (declarations, is_local) = if let Some(symbol) = place.as_symbol() {
-            let symbol_id = place_id.expect_symbol();
-            let skip_non_global_scopes = self.skip_non_global_scopes(file_scope_id, symbol_id);
-
-            if skip_non_global_scopes {
-                match self
-                    .index
-                    .place_table(FileScopeId::global())
-                    .symbol_id(symbol.name())
-                {
-                    Some(id) => (
-                        global_use_def_map.end_of_scope_symbol_declarations(id),
-                        false,
-                    ),
-                    // This variable shows up in `global` declarations but doesn't have an explicit
-                    // binding in the global scope.
-                    None => (use_def.declarations_at_binding(binding), true),
-                }
-            } else if self
-                .index
-                .symbol_is_nonlocal_in_scope(symbol_id, file_scope_id)
-            {
-                // If we run out of ancestor scopes without finding a definition, we'll fall back to
-                // the local scope. This will also be a syntax error in `infer_nonlocal_statement` (no
-                // binding for `nonlocal` found), but ignore that here.
-                let mut declarations = use_def.declarations_at_binding(binding);
-                let mut is_local = true;
-                // Walk up parent scopes looking for the enclosing scope that has definition of this
-                // name. `ancestor_scopes` includes the current scope, so skip that one.
-                for (enclosing_scope_file_id, enclosing_scope) in
-                    self.index.ancestor_scopes(file_scope_id).skip(1)
-                {
-                    // Ignore class scopes and the global scope.
-                    if !enclosing_scope.kind().is_function_like() {
-                        continue;
-                    }
-                    let enclosing_place_table = self.index.place_table(enclosing_scope_file_id);
-                    let Some(enclosing_symbol_id) = enclosing_place_table.symbol_id(symbol.name())
-                    else {
-                        // This ancestor scope doesn't have a binding. Keep going.
-                        continue;
-                    };
-
-                    let enclosing_symbol = enclosing_place_table.symbol(enclosing_symbol_id);
-                    if enclosing_symbol.is_nonlocal() {
-                        // The variable is `nonlocal` in this ancestor scope. Keep going.
-                        continue;
-                    }
-                    if enclosing_symbol.is_global() {
-                        // The variable is `global` in this ancestor scope. This breaks the `nonlocal`
-                        // chain, and it's a syntax error in `infer_nonlocal_statement`. Ignore that
-                        // here and just bail out of this loop.
-                        break;
-                    }
-                    // We found the closest definition. Note that (as in `infer_place_load`) this does
-                    // *not* need to be a binding. It could be just a declaration, e.g. `x: int`.
-                    declarations = self
-                        .index
-                        .use_def_map(enclosing_scope_file_id)
-                        .end_of_scope_symbol_declarations(enclosing_symbol_id);
-                    is_local = false;
-                    break;
-                }
-                (declarations, is_local)
-            } else {
-                (use_def.declarations_at_binding(binding), true)
-            }
+        let (declarations, is_local) = if let Some(symbol) = place_id.as_symbol()
+            && let Some((owner_scope, owner_symbol)) =
+                self.forwarded_assignment_owner(file_scope_id, symbol)
+        {
+            (
+                self.index
+                    .use_def_map(owner_scope)
+                    .end_of_scope_symbol_declarations(owner_symbol),
+                false,
+            )
         } else {
             (use_def.declarations_at_binding(binding), true)
         };
 
-        let (mut place_and_quals, conflicting) = place_from_declarations(self.db(), declarations)
-            .into_place_and_conflicting_declarations();
+        let (mut place_and_quals, conflicting) = place_from_declarations_with_reachability_cache(
+            self.db(),
+            declarations,
+            self.reachability_cache(),
+        )
+        .into_place_and_conflicting_declarations();
 
         if let Some(conflicting) = conflicting {
             // TODO point out the conflicting declarations in the diagnostic?
@@ -1249,40 +1441,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             qualifiers,
         } = place_and_quals;
 
-        // If the place is unbound and its an attribute or subscript place, fall back to normal
-        // attribute/subscript inference on the root type.
-        let declared_ty =
-            if resolved_place.is_undefined() && !place_table.place(place_id).is_symbol() {
-                if let AnyNodeRef::ExprAttribute(ast::ExprAttribute { value, attr, .. }) = node {
-                    let value_type =
-                        self.infer_maybe_standalone_expression(value, TypeContext::default());
-                    if let Place::Defined(DefinedPlace {
-                        ty,
-                        definedness: Definedness::AlwaysDefined,
-                        ..
-                    }) = value_type.member(db, attr).place
-                    {
-                        // TODO: also consider qualifiers on the attribute
-                        Some(ty)
-                    } else {
-                        None
-                    }
-                } else if let AnyNodeRef::ExprSubscript(
-                    subscript @ ast::ExprSubscript {
-                        value, slice, ctx, ..
-                    },
-                ) = node
-                {
-                    let value_ty = self.infer_expression(value, TypeContext::default());
-                    let slice_ty = self.infer_expression(slice, TypeContext::default());
-                    Some(self.infer_subscript_expression_types(subscript, value_ty, slice_ty, *ctx))
-                } else {
-                    None
-                }
-            } else {
-                None
-            }
-            .or_else(|| resolved_place.ignore_possibly_undefined());
+        let declared_ty = if resolved_place.is_undefined() && !place.is_symbol() {
+            self.fallback_member_declared_type(node)
+        } else {
+            None
+        }
+        .or_else(|| resolved_place.ignore_possibly_undefined());
 
         AddBinding {
             declared_ty,
@@ -1291,6 +1455,115 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             qualifiers,
             is_local,
         }
+    }
+
+    /// For a member binding without a live place declaration, obtain its declared type from
+    /// normal attribute or subscript lookup on its receiver.
+    fn fallback_member_declared_type(&mut self, node: AnyNodeRef<'_>) -> Option<Type<'db>> {
+        let db = self.db();
+
+        if let AnyNodeRef::ExprAttribute(ast::ExprAttribute { value, attr, .. }) = node {
+            let value_type = self.infer_maybe_standalone_expression(value, TypeContext::default());
+            if let Place::Defined(DefinedPlace {
+                ty,
+                definedness: Definedness::AlwaysDefined,
+                ..
+            }) = value_type.member(db, attr).place
+            {
+                // TODO: also consider qualifiers on the attribute
+                Some(ty)
+            } else {
+                None
+            }
+        } else if let AnyNodeRef::ExprSubscript(
+            subscript @ ast::ExprSubscript {
+                value, slice, ctx, ..
+            },
+        ) = node
+        {
+            let value_ty = self.infer_expression(value, TypeContext::default());
+            let slice_ty = self.infer_expression(slice, TypeContext::default());
+            Some(self.infer_subscript_expression_types(subscript, value_ty, slice_ty, *ctx))
+        } else {
+            None
+        }
+    }
+
+    /// Returns the owner of an assignment redirected by `global` or `nonlocal`.
+    ///
+    /// `global` assignments target the module symbol, while `nonlocal` assignments target the
+    /// closest owning function-like scope. Local assignments and forwarding declarations whose
+    /// owner cannot be resolved return `None`.
+    ///
+    /// ```python
+    /// x = 0
+    ///
+    /// def outer():
+    ///     y = 0
+    ///
+    ///     def inner():
+    ///         global x
+    ///         nonlocal y
+    ///         x = 1  # owned by the module scope
+    ///         y = 1  # owned by `outer`
+    /// ```
+    fn forwarded_assignment_owner(
+        &self,
+        scope: FileScopeId,
+        symbol: ScopedSymbolId,
+    ) -> Option<(FileScopeId, ScopedSymbolId)> {
+        let scoped_symbol = self.index.place_table(scope).symbol(symbol);
+
+        if scope.is_global() || scoped_symbol.is_local() {
+            return None;
+        }
+
+        if scoped_symbol.is_global() {
+            let global_scope = FileScopeId::global();
+            // If this variable appears in a `global` declaration but has no explicit binding in
+            // the global scope, return `None` so the caller can fall back to the local scope.
+            return self
+                .index
+                .place_table(global_scope)
+                .symbol_id(scoped_symbol.name())
+                .map(|symbol| (global_scope, symbol));
+        }
+
+        debug_assert!(scoped_symbol.is_nonlocal());
+
+        // Walk up parent scopes looking for the enclosing scope that defines this name.
+        // `ancestor_scopes` includes the current scope, so skip that one.
+        for (enclosing_scope, enclosing) in self.index.ancestor_scopes(scope).skip(1) {
+            // Ignore class scopes and the global scope.
+            if !enclosing.kind().is_function_like() {
+                continue;
+            }
+            let place_table = self.index.place_table(enclosing_scope);
+            let Some(enclosing_symbol) = place_table.symbol_id(scoped_symbol.name()) else {
+                // This ancestor scope doesn't have a binding. Keep going.
+                continue;
+            };
+            let symbol = place_table.symbol(enclosing_symbol);
+            if symbol.is_global() {
+                // The variable is `global` in this ancestor scope. This breaks the `nonlocal`
+                // chain, and it's a syntax error in `infer_nonlocal_statement`. Ignore that here
+                // and bail out of this loop.
+                break;
+            }
+            if !symbol.is_local() {
+                // The variable is either explicitly `nonlocal` or just a free read in this
+                // ancestor scope. Keep going.
+                continue;
+            }
+
+            // We found the closest definition. Note that (as in `infer_place_load`) this does not
+            // need to be a binding. It could be just a declaration, e.g. `x: int`.
+            return Some((enclosing_scope, enclosing_symbol));
+        }
+
+        // If no ancestor owns the name, return `None` so the caller can fall back to the local
+        // scope. This will also be reported as a syntax error in `infer_nonlocal_statement`.
+        None
     }
 
     /// Returns `true` if `symbol_id` should be looked up in the global scope, skipping intervening
@@ -1321,28 +1594,32 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let use_def = self.index.use_def_map(declaration.file_scope(self.db()));
         let prior_bindings = use_def.bindings_at_definition(declaration);
         // unbound_ty is Never because for this check we don't care about unbound
-        let inferred_ty = place_from_bindings(self.db(), prior_bindings)
-            .place
-            .with_qualifiers(TypeQualifiers::empty())
-            .or_fall_back_to(self.db(), || {
-                // Fallback to bindings declared on `types.ModuleType` if it's a global symbol
-                let scope = self.scope().file_scope_id(self.db());
-                let place = self
-                    .index
-                    .place_table(scope)
-                    .place(declaration.place(self.db()));
+        let inferred_ty = place_from_bindings_with_reachability_cache(
+            self.db(),
+            prior_bindings,
+            self.reachability_cache(),
+        )
+        .place
+        .with_qualifiers(TypeQualifiers::empty())
+        .or_fall_back_to(self.db(), || {
+            // Fallback to bindings declared on `types.ModuleType` if it's a global symbol
+            let scope = self.scope().file_scope_id(self.db());
+            let place = self
+                .index
+                .place_table(scope)
+                .place(declaration.place(self.db()));
 
-                if let PlaceExprRef::Symbol(symbol) = &place
-                    && scope.is_global()
-                {
-                    module_type_implicit_global_symbol(self.db(), symbol.name())
-                } else {
-                    Place::Undefined.into()
-                }
-            })
-            .place
-            .ignore_possibly_undefined()
-            .unwrap_or(Type::Never);
+            if let PlaceExprRef::Symbol(symbol) = &place
+                && scope.is_global()
+            {
+                module_type_implicit_global_symbol(self.db(), self.file(), symbol.name())
+            } else {
+                Place::Undefined.into()
+            }
+        })
+        .place
+        .ignore_possibly_undefined()
+        .unwrap_or(Type::Never);
         let ty = if inferred_ty.is_assignable_to(self.db(), ty.inner_type()) {
             ty
         } else {
@@ -1389,9 +1666,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 if file_scope_id.is_global() {
                     let place_table = self.index.place_table(file_scope_id);
                     let place = place_table.place(definition.place(self.db()));
+                    let file = self.file();
                     if let Some(module_type_implicit_declaration) = place
                         .as_symbol()
-                        .map(|symbol| module_type_implicit_global_symbol(self.db(), symbol.name()))
+                        .map(|symbol| {
+                            module_type_implicit_global_symbol(self.db(), file, symbol.name())
+                        })
                         .and_then(|place| place.place.ignore_possibly_undefined())
                     {
                         let declared_type = declared_ty.inner_type();
@@ -1428,6 +1708,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         (declared_ty, inferred_ty)
                     }
                 } else {
+                    self.discard_dict_key_assignments_for(definition);
                     report_invalid_assignment(
                         &self.context,
                         node,
@@ -1517,7 +1798,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             {
                 builder.into_diagnostic(format_args!(
                     "Cyclic definition of `{}`",
-                    &type_alias.name.as_name_expr().unwrap().id,
+                    type_alias.name.as_name_expr().unwrap().id,
                 ));
             }
             // Replace with `Divergent`.
@@ -1541,6 +1822,61 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let class_definition = self.index.class_definition_of_method(current_scope_id)?;
         original_class_type(self.db(), class_definition)
             .map(|class_literal| class_literal.default_specialization(self.db()))
+    }
+
+    /// Report an undeclared protocol attribute written through a method receiver.
+    ///
+    /// The instance or class receiver may be referenced directly, from an eager nested scope, or
+    /// through a capture in a nested function.
+    fn report_undeclared_protocol_attribute(&self, target: &ast::ExprAttribute) {
+        let db = self.db();
+        let Some(receiver) = target.value.as_name_expr() else {
+            return;
+        };
+        let Some(method_scope_id) = self.receiver_method_scope(receiver) else {
+            return;
+        };
+        let Some(protocol) = self
+            .index
+            .class_definition_of_method(method_scope_id)
+            .and_then(|definition| original_class_type(db, definition))
+            .map(|class| class.default_specialization(db))
+            .and_then(|class| class.into_protocol_class(db))
+        else {
+            return;
+        };
+        if protocol.interface(db).includes_member(db, target.attr.id())
+            || protocol.has_member_declaration(db, target.attr.id())
+        {
+            return;
+        }
+
+        diagnostic::report_undeclared_protocol_attribute(&self.context, target, protocol);
+    }
+
+    /// Returns the implicit `__class__` cell in the current direct method body or
+    /// lazy scope defined directly in a class body.
+    fn dunder_class_cell_type(&self) -> Option<ClassLiteral<'db>> {
+        let current_scope_id = self.scope().file_scope_id(self.db());
+        let class_definition =
+            if let Some(definition) = self.index.class_definition_of_method(current_scope_id) {
+                definition
+            } else {
+                let current_scope = self.index.scope(current_scope_id);
+                if !matches!(
+                    current_scope.node(),
+                    NodeWithScopeKind::Lambda(_) | NodeWithScopeKind::GeneratorExpression(_)
+                ) {
+                    return None;
+                }
+                let class = self
+                    .index
+                    .parent_scope(current_scope_id)?
+                    .node()
+                    .as_class()?;
+                self.index.expect_single_definition(class)
+            };
+        original_class_type(self.db(), class_definition)
     }
 
     /// If the current scope is a (non-lambda) function, return that function's AST node.
@@ -1664,9 +2000,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             ast::Stmt::Raise(raise) => self.infer_raise_statement(raise),
             ast::Stmt::Return(ret) => self.infer_return_statement(ret),
             ast::Stmt::Delete(delete) => self.infer_delete_statement(delete),
-            ast::Stmt::Nonlocal(nonlocal) => self.infer_nonlocal_statement(nonlocal),
             ast::Stmt::Global(global) => self.infer_global_statement(global),
-            ast::Stmt::Break(_)
+            ast::Stmt::Nonlocal(_)
+            | ast::Stmt::Break(_)
             | ast::Stmt::Continue(_)
             | ast::Stmt::Pass(_)
             | ast::Stmt::IpyEscapeCommand(_) => {
@@ -1678,7 +2014,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     fn infer_definition(&mut self, node: impl Into<DefinitionNodeKey> + std::fmt::Debug + Copy) {
         let definition = self.index.expect_single_definition(node);
         let result = infer_definition_types(self.db(), definition);
-        self.extend_definition(result);
+        self.extend_definition(definition, result);
     }
 
     fn infer_type_alias_definition(
@@ -1686,9 +2022,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         type_alias: &ast::StmtTypeAlias,
         definition: Definition<'db>,
     ) {
+        let alias_name = &type_alias.name.as_name_expr().unwrap().id;
+
         // Check that no type parameter with a default follows a TypeVarTuple
         // in the type alias's PEP 695 type parameter list.
         if let Some(type_params) = type_alias.type_params.as_deref() {
+            post_inference::type_param_validation::check_single_typevar_tuple_pep695(
+                &self.context,
+                type_params,
+                post_inference::type_param_validation::TypeParameterOwner::TypeAlias(alias_name),
+            );
             post_inference::type_param_validation::check_no_default_after_typevar_tuple_pep695(
                 &self.context,
                 type_params,
@@ -1700,14 +2043,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .node_scope(NodeWithScopeRef::TypeAlias(type_alias))
             .to_scope_id(self.db(), self.file());
 
-        let type_alias_ty = Type::KnownInstance(KnownInstanceType::TypeAliasType(
-            TypeAliasType::PEP695(PEP695TypeAliasType::new(
-                self.db(),
-                &type_alias.name.as_name_expr().unwrap().id,
-                rhs_scope,
-                None,
-            )),
-        ));
+        let type_alias_ty =
+            Type::KnownInstance(KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(
+                PEP695TypeAliasType::new(self.db(), alias_name, rhs_scope, None),
+            )));
 
         self.store_expression_type(&type_alias.name, type_alias_ty);
 
@@ -1899,10 +2238,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             let mut builder = UnionBuilder::new(self.db());
             let mut invalid_elements = vec![];
 
-            for (index, element) in tuple_spec.all_elements().iter().enumerate() {
+            for (index, element) in tuple_spec.iter_element_types(self.db()).enumerate() {
                 builder = builder.add(
                     if element.is_assignable_to(self.db(), type_base_exception) {
-                        element.to_instance(self.db()).expect(
+                        element.to_instance_approximation(self.db()).expect(
                             "`Type::to_instance()` should always return `Some()` \
                                 if called on a type assignable to `type[BaseException]`",
                         )
@@ -1922,7 +2261,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 {
                     let invalid_elements = invalid_elements
                         .iter()
-                        .map(|(index, ty)| (&tuple.elts[*index], **ty));
+                        .map(|(index, ty)| (&tuple.elts[*index], *ty));
 
                     report_invalid_exception_tuple_caught(
                         &self.context,
@@ -1981,9 +2320,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // `except (ValueError, TypeError) as e:`
             UnionType::try_from_elements(
                 self.db(),
-                tuple_spec.all_elements().iter().map(|element| {
+                tuple_spec.iter_element_types(self.db()).map(|element| {
                     if element.is_assignable_to(self.db(), type_base_exception) {
-                        Some(element.to_instance(self.db()).expect(
+                        Some(element.to_instance_approximation(self.db()).expect(
                             "`Type::to_instance()` should always return `Some()` \
                                 if called on a type assignable to `type[BaseException]`",
                         ))
@@ -1994,7 +2333,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             )
         } else if ty.is_assignable_to(self.db(), type_base_exception) {
             // `except ValueError as e:`
-            Some(ty.to_instance(self.db()).expect(
+            Some(ty.to_instance_approximation(self.db()).expect(
                 "`Type::to_instance()` should always return `Some()` \
                     if called on a type assignable to `type[BaseException]`",
             ))
@@ -2009,7 +2348,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     .and_then(|spec| {
                         let specialization = spec
                             .homogeneous_element_type(self.db())
-                            .to_instance(self.db());
+                            .to_instance_approximation(self.db());
 
                         debug_assert!(specialization.is_some_and(|specialization_type| {
                             specialization_type.is_assignable_to(
@@ -2057,7 +2396,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     /// LoopHeader` in the semantic index for more on how all this fits together.
     fn infer_loop_header_definition(
         &mut self,
-        loop_header_kind: &LoopHeaderDefinitionKind<'db>,
+        loop_header_kind: &LoopHeaderDefinitionKind,
         definition: Definition<'db>,
     ) {
         // This cutoff was chosen by benchmarking real isort to keep loop analysis
@@ -2096,6 +2435,76 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.bindings.insert(definition, union.build());
     }
 
+    fn infer_nested_bindings_definition(
+        &mut self,
+        nested_bindings_kind: &NestedBindingsDefinitionKind,
+        definition: Definition<'db>,
+    ) {
+        const MAX_EXACT_NESTED_BINDING_REACHABILITY_NODES: usize = 2048;
+
+        let db = self.db();
+        let scope_id = definition.file_scope(db);
+        let mut binding_sources = nested_bindings_kind
+            .visible_binding_sources(self.index, scope_id)
+            .peekable();
+        if binding_sources.peek().is_some()
+            && self
+                .index
+                .use_def_map(scope_id)
+                .reachability_constraints()
+                .used_interiors()
+                .len()
+                > MAX_EXACT_NESTED_BINDING_REACHABILITY_NODES
+        {
+            // As with loop header definitions above, use a reachability cutoff to avoid excessive
+            // perf costs in complicated projects like `isort`.
+            self.bindings.insert(definition, Type::unknown());
+            return;
+        }
+
+        let recursively_defined = match nested_bindings_kind.execution {
+            NestedBindingExecution::Lazy => RecursivelyDefined::Yes,
+            NestedBindingExecution::Eager => RecursivelyDefined::No,
+        };
+        let mut union = UnionBuilder::new(db).recursively_defined(recursively_defined);
+        for bindings in binding_sources {
+            if nested_bindings_kind.execution == NestedBindingExecution::Eager {
+                // A comprehension can execute repeatedly, so a source that is unreachable in the
+                // first modeled iteration may become reachable in a later one. Preserve each
+                // source's narrowed type and let the proxy's outer use-def state track boundness.
+                for binding in bindings {
+                    let DefinitionState::Defined(source) = binding.binding else {
+                        continue;
+                    };
+                    let ty = binding_type(db, source);
+                    union.add_in_place(binding.narrowing_constraint.narrow(
+                        db,
+                        ty,
+                        source.place(db),
+                    ));
+                }
+                continue;
+            }
+
+            let Some(ty) = place_from_bindings_with_reachability_cache(
+                db,
+                bindings,
+                self.reachability_cache(),
+            )
+            .place
+            .raw_type() else {
+                continue;
+            };
+            union.add_in_place(ty);
+        }
+        let ty = union.build();
+        let ty = match nested_bindings_kind.execution {
+            NestedBindingExecution::Lazy => ty,
+            NestedBindingExecution::Eager => ty.promote(db),
+        };
+        self.bindings.insert(definition, ty);
+    }
+
     fn infer_match_statement(&mut self, match_statement: &ast::StmtMatch) {
         let ast::StmtMatch {
             range: _,
@@ -2131,22 +2540,35 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     fn infer_match_pattern_definition(
         &mut self,
         pattern: &'ast ast::Pattern,
-        _index: u32,
+        predicate: PatternPredicate<'db>,
         definition: Definition<'db>,
     ) {
-        // TODO(dhruvmanila): The correct way to infer types here is to perform structural matching
-        // against the subject expression type (which we can query via `infer_expression_types`)
-        // and extract the type at the `index` position if the pattern matches. This will be
-        // similar to the logic in `self.infer_assignment_definition`.
+        let ty =
+            pattern_success_types(self.db(), predicate).binding_type(definition.place(self.db()));
         self.add_binding(pattern.into(), definition)
-            .insert(self, todo_type!("`match` pattern definition types"));
+            .insert(self, ty);
     }
 
     fn validate_class_pattern(&mut self, pattern: &ast::PatternMatchClass, cls_ty: Type<'db>) {
+        if let Type::SpecialForm(SpecialFormType::CollectionsAbcCallable) = cls_ty {
+            if let Some(first_excess_pattern) = pattern.arguments.patterns.first() {
+                report_too_many_positional_patterns_for_class_pattern(
+                    &self.context,
+                    first_excess_pattern,
+                    0,
+                    pattern.arguments.patterns.len(),
+                    "collections.abc.Callable",
+                );
+            }
+            return;
+        }
+
         if let Type::ClassLiteral(class) = cls_ty {
             if class.is_typed_dict(self.db()) {
                 report_match_pattern_against_typed_dict(&self.context, &*pattern.cls, class);
-            } else if let Some(protocol_class) = class.into_protocol_class(self.db())
+                return;
+            }
+            if let Some(protocol_class) = class.into_protocol_class(self.db())
                 && !protocol_class.is_runtime_checkable(self.db())
             {
                 report_match_pattern_against_non_runtime_checkable_protocol(
@@ -2154,6 +2576,34 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     &*pattern.cls,
                     protocol_class,
                 );
+                return;
+            }
+
+            let positional_patterns = &pattern.arguments.patterns;
+            if let [first_positional_pattern, ..] = positional_patterns.as_slice()
+                && let Some(result) = class_pattern_positional_result(self.db(), class)
+            {
+                match result {
+                    ClassPatternPositionalResult::Limit(limit) => {
+                        if let Some(first_excess_pattern) = positional_patterns.get(limit) {
+                            report_too_many_positional_patterns_for_class_pattern(
+                                &self.context,
+                                first_excess_pattern,
+                                limit,
+                                positional_patterns.len(),
+                                cls_ty.display(self.db()),
+                            );
+                        }
+                    }
+                    ClassPatternPositionalResult::InvalidType(match_args_ty) => {
+                        report_invalid_match_args_type(
+                            &self.context,
+                            first_positional_pattern,
+                            match_args_ty,
+                            cls_ty,
+                        );
+                    }
+                }
             }
         } else if !cls_ty.is_assignable_to(self.db(), KnownClass::Type.to_instance(self.db())) {
             report_invalid_class_match_pattern(&self.context, &*pattern.cls, cls_ty);
@@ -2169,22 +2619,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // we need to choose an Expr that can “stand in” for the pattern, which we can wrap in a
         // standalone expression.
         //
-        // That said, when inferring the type of a standalone expression, we don't have access to
-        // its parent or sibling nodes.  That means, for instance, that in a class pattern, where
-        // we are currently using the class name as the standalone expression, we do not have
-        // access to the class pattern's arguments in the standalone expression inference scope.
-        // At the moment, we aren't trying to do anything with those arguments when creating a
-        // narrowing constraint for the pattern.  But in the future, if we do, we will have to
-        // either wrap those arguments in their own standalone expressions, or update Expression to
-        // be able to wrap other AST node types besides just ast::Expr.
+        // The structural pattern is stored separately on `PatternPredicate`, so analyses that need
+        // the complete pattern can inspect its arguments without making them standalone
+        // expressions.
         //
         // This function is only called for the top-level pattern of a match arm, and is
         // responsible for inferring the standalone expression for each supported pattern type. It
         // then hands off to `infer_nested_match_pattern` for any subexpressions and subpatterns,
         // where we do NOT have any additional standalone expressions to infer through.
         //
-        // TODO(dhruvmanila): Add a Salsa query for inferring pattern types and matching against
-        // the subject expression: https://github.com/astral-sh/ruff/pull/13147#discussion_r1739424510
         match pattern {
             ast::Pattern::MatchValue(match_value) => {
                 self.infer_standalone_expression(&match_value.value, TypeContext::default());
@@ -2232,13 +2675,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     node_index: _,
                     keys,
                     patterns,
-                    rest: _,
+                    rest,
                 } = match_mapping;
                 for key in keys {
-                    self.infer_expression(key, TypeContext::default());
+                    self.infer_maybe_standalone_expression(key, TypeContext::default());
                 }
                 for pattern in patterns {
                     self.infer_nested_match_pattern(pattern);
+                }
+                if let Some(rest) = rest {
+                    self.infer_definition(rest);
                 }
             }
             ast::Pattern::MatchClass(match_class) => {
@@ -2261,13 +2707,21 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 if let Some(pattern) = &match_as.pattern {
                     self.infer_nested_match_pattern(pattern);
                 }
+                if let Some(name) = &match_as.name {
+                    self.infer_definition(name);
+                }
             }
             ast::Pattern::MatchOr(match_or) => {
                 for pattern in &match_or.patterns {
                     self.infer_nested_match_pattern(pattern);
                 }
             }
-            ast::Pattern::MatchStar(_) | ast::Pattern::MatchSingleton(_) => {}
+            ast::Pattern::MatchStar(match_star) => {
+                if let Some(name) = &match_star.name {
+                    self.infer_definition(name);
+                }
+            }
+            ast::Pattern::MatchSingleton(_) => {}
         }
     }
 
@@ -2280,9 +2734,41 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         } = assignment;
 
         for target in targets {
-            self.infer_target(target, value, &|builder, tcx| {
-                builder.infer_standalone_expression(value, tcx)
-            });
+            if let Some(unpack) = self.index.try_unpack(target) {
+                // Infer the standalone expression here to include its diagnostics in this region.
+                self.infer_standalone_expression(value, TypeContext::default());
+
+                let unpacked = infer_unpack_types(self.db(), unpack);
+                self.context.extend(unpacked.diagnostics());
+                self.infer_unpacked_assignment_target(target, value, unpacked);
+            } else {
+                self.infer_target(target, value, &|builder, tcx| {
+                    builder.infer_standalone_expression(value, tcx)
+                });
+            }
+        }
+    }
+
+    fn infer_unpacked_assignment_target(
+        &mut self,
+        target: &ast::Expr,
+        value: &ast::Expr,
+        unpacked: &UnpackResult<'db>,
+    ) {
+        match target {
+            ast::Expr::Starred(ast::ExprStarred { value: target, .. }) => {
+                self.infer_unpacked_assignment_target(target, value, unpacked);
+            }
+            ast::Expr::List(ast::ExprList { elts, .. })
+            | ast::Expr::Tuple(ast::ExprTuple { elts, .. }) => {
+                for target in elts {
+                    self.infer_unpacked_assignment_target(target, value, unpacked);
+                }
+            }
+            _ => {
+                let assigned_ty = unpacked.expression_type(target);
+                self.infer_target_impl(target, value, Some(&|_, _| assigned_ty));
+            }
         }
     }
 
@@ -2310,25 +2796,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
     }
 
-    /// Returns `true` if `property_ty` is a property whose setter returns `Never`/`NoReturn`
-    /// when called for an assignment to `object_ty` with `value_ty`.
-    fn property_setter_returns_never(
-        &self,
-        property_ty: Type<'db>,
-        object_ty: Type<'db>,
-        value_ty: Type<'db>,
-    ) -> bool {
-        let db = self.db();
-        property_ty.as_property_instance().is_some_and(|property| {
-            property.setter(db).is_some_and(|setter| {
-                match setter.try_call(db, &CallArguments::positional([object_ty, value_ty])) {
-                    Ok(result) => result.return_type(db).is_never(),
-                    Err(err) => err.return_type(db).is_never(),
-                }
-            })
-        })
-    }
-
     /// Returns `true` if `property_ty` is a property whose deleter returns `Never`/`NoReturn`
     /// when called for deletion on `object_ty`.
     fn property_deleter_returns_never(&self, property_ty: Type<'db>, object_ty: Type<'db>) -> bool {
@@ -2341,742 +2808,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             })
         })
-    }
-
-    /// Make sure that the attribute assignment `obj.attribute = value` is valid.
-    ///
-    /// `target` is the node for the left-hand side, `object_ty` is the type of `obj`, `attribute` is
-    /// the name of the attribute being assigned, and `value_ty` is the type of the right-hand side of
-    /// the assignment. If the assignment is invalid, emit diagnostics.
-    fn validate_attribute_assignment(
-        &mut self,
-        target: &ast::ExprAttribute,
-        object_ty: Type<'db>,
-        attribute: &str,
-        infer_value_ty: &mut dyn FnMut(&mut Self, TypeContext<'db>) -> Type<'db>,
-        emit_diagnostics: bool,
-    ) -> bool {
-        let db = self.db();
-
-        // This closure should only be called if `value_ty` was inferred with `attr_ty` as type context.
-        let ensure_assignable_to =
-            |builder: &Self, value_ty: Type<'db>, attr_ty: Type<'db>| -> bool {
-                let assignable = value_ty.is_assignable_to(db, attr_ty);
-                if !assignable && emit_diagnostics {
-                    report_invalid_attribute_assignment(
-                        &builder.context,
-                        target.range(),
-                        attr_ty,
-                        value_ty,
-                        attribute,
-                    );
-                }
-                assignable
-            };
-
-        // For dataclass fields with converters, the write type is the converter's
-        // input type (the type of the first positional parameter), not the field's
-        // declared type.
-        let effective_write_type = |attr_ty: Type<'db>| -> Type<'db> {
-            if let Type::NominalInstance(instance) = object_ty {
-                if let Some(converter_ty) = instance
-                    .class(db)
-                    .converter_input_type_for_field(db, attribute)
-                {
-                    return converter_ty;
-                }
-            }
-            attr_ty
-        };
-
-        match object_ty {
-            Type::Union(union) => {
-                let mut infer_value_ty = MultiInferenceGuard::new(infer_value_ty);
-
-                // Perform loud inference without type context, as there may be multiple
-                // equally applicable type contexts for each union member.
-                let value_ty = infer_value_ty.infer_loud(self, TypeContext::default());
-
-                if union.elements(self.db()).iter().all(|elem| {
-                    self.validate_attribute_assignment(
-                        target,
-                        *elem,
-                        attribute,
-                        &mut |builder, tcx| infer_value_ty.infer_silent(builder, tcx),
-                        false,
-                    )
-                }) {
-                    if emit_diagnostics {
-                        self.validate_final_attribute_assignment(target, object_ty, attribute);
-                    }
-                    true
-                } else {
-                    // TODO: This is not a very helpful error message, as it does not include the underlying reason
-                    // why the assignment is invalid. This would be a good use case for sub-diagnostics.
-                    if emit_diagnostics
-                        && let Some(builder) = self.context.report_lint(&INVALID_ASSIGNMENT, target)
-                    {
-                        builder.into_diagnostic(format_args!(
-                            "Object of type `{}` is not assignable \
-                                 to attribute `{attribute}` on type `{}`",
-                            value_ty.display(self.db()),
-                            object_ty.display(self.db()),
-                        ));
-                    }
-
-                    false
-                }
-            }
-
-            Type::Intersection(intersection) => {
-                let mut infer_value_ty = MultiInferenceGuard::new(infer_value_ty);
-
-                // TODO: Handle negative intersection elements
-                if intersection.positive(db).iter().any(|elem| {
-                    self.validate_attribute_assignment(
-                        target,
-                        *elem,
-                        attribute,
-                        &mut |builder, tcx| infer_value_ty.infer_silent(builder, tcx),
-                        false,
-                    )
-                }) {
-                    // Perform loud inference using the narrowed type context.
-                    infer_value_ty.infer_loud(self, infer_value_ty.last_tcx());
-                    if emit_diagnostics {
-                        self.validate_final_attribute_assignment(target, object_ty, attribute);
-                    }
-                    true
-                } else {
-                    // Otherwise, perform loud inference without type context, as we failed to
-                    // narrow to any given intersection element.
-                    let value_ty = infer_value_ty.infer_loud(self, TypeContext::default());
-
-                    if emit_diagnostics
-                        && let Some(builder) = self.context.report_lint(&INVALID_ASSIGNMENT, target)
-                    {
-                        // TODO: same here, see above
-                        builder.into_diagnostic(format_args!(
-                            "Object of type `{}` is not assignable \
-                                 to attribute `{attribute}` on type `{}`",
-                            value_ty.display(self.db()),
-                            object_ty.display(self.db()),
-                        ));
-                    }
-
-                    false
-                }
-            }
-
-            Type::EnumComplement(complement) => self.validate_attribute_assignment(
-                target,
-                complement.remaining_literal_union(db),
-                attribute,
-                infer_value_ty,
-                emit_diagnostics,
-            ),
-
-            Type::TypeAlias(alias) => self.validate_attribute_assignment(
-                target,
-                alias.value_type(self.db()),
-                attribute,
-                infer_value_ty,
-                emit_diagnostics,
-            ),
-
-            // Super instances do not allow attribute assignment
-            Type::NominalInstance(instance) if instance.has_known_class(db, KnownClass::Super) => {
-                infer_value_ty(self, TypeContext::default());
-
-                if emit_diagnostics
-                    && let Some(builder) = self.context.report_lint(&INVALID_ASSIGNMENT, target)
-                {
-                    builder.into_diagnostic(format_args!(
-                        "Cannot assign to attribute `{attribute}` on type `{}`",
-                        object_ty.display(self.db()),
-                    ));
-                }
-
-                false
-            }
-            Type::BoundSuper(_) => {
-                infer_value_ty(self, TypeContext::default());
-
-                if emit_diagnostics
-                    && let Some(builder) = self.context.report_lint(&INVALID_ASSIGNMENT, target)
-                {
-                    builder.into_diagnostic(format_args!(
-                        "Cannot assign to attribute `{attribute}` on type `{}`",
-                        object_ty.display(self.db()),
-                    ));
-                }
-                false
-            }
-
-            Type::Dynamic(..) | Type::Divergent(_) | Type::Never => {
-                infer_value_ty(self, TypeContext::default());
-                true
-            }
-
-            Type::NominalInstance(..)
-            | Type::ProtocolInstance(_)
-            | Type::LiteralValue(..)
-            | Type::SpecialForm(..)
-            | Type::KnownInstance(..)
-            | Type::PropertyInstance(..)
-            | Type::FunctionLiteral(..)
-            | Type::Callable(..)
-            | Type::BoundMethod(_)
-            | Type::KnownBoundMethod(_)
-            | Type::WrapperDescriptor(_)
-            | Type::DataclassDecorator(_)
-            | Type::DataclassTransformer(_)
-            | Type::TypeVar(..)
-            | Type::AlwaysTruthy
-            | Type::AlwaysFalsy
-            | Type::TypeIs(_)
-            | Type::TypeGuard(_)
-            | Type::TypeForm(_)
-            | Type::TypedDict(_)
-            | Type::NewTypeInstance(_) => {
-                // We may infer the value type multiple times with distinct type context during
-                // attribute resolution.
-                let mut infer_value_ty = MultiInferenceGuard::new(infer_value_ty);
-
-                // Perform loud inference without type context, as we may encounter multiple equally
-                // applicable type contexts during attribute resolution.
-                let value_ty = infer_value_ty.infer_loud(self, TypeContext::default());
-
-                // Infer `__setattr__` once upfront. We use this result for:
-                // 1. Checking if it returns `Never` (indicating an immutable class)
-                // 2. As a fallback when no explicit attribute is found
-                //
-                // TODO: We could re-infer `value_ty` with type context here.
-                let setattr_dunder_call_result = object_ty.try_call_dunder_with_policy(
-                    db,
-                    "__setattr__",
-                    &mut CallArguments::positional([Type::string_literal(db, attribute), value_ty]),
-                    TypeContext::default(),
-                    MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
-                );
-
-                // Check if `__setattr__` returns `Never` (indicating an immutable class).
-                // If so, block all attribute assignments regardless of explicit attributes.
-                let setattr_returns_never = match &setattr_dunder_call_result {
-                    Ok(result) => result.return_type(db).is_never(),
-                    Err(err) => err.return_type(db).is_some_and(|ty| ty.is_never()),
-                };
-
-                if setattr_returns_never {
-                    if emit_diagnostics {
-                        if let Some(builder) = self.context.report_lint(&INVALID_ASSIGNMENT, target)
-                        {
-                            let is_setattr_synthesized = match object_ty.class_member_with_policy(
-                                db,
-                                "__setattr__".into(),
-                                MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
-                            ) {
-                                PlaceAndQualifiers {
-                                    place: Place::Defined(DefinedPlace { ty: attr_ty, .. }),
-                                    qualifiers: _,
-                                } => attr_ty.is_callable_type(),
-                                _ => false,
-                            };
-
-                            let member_exists =
-                                !object_ty.member(db, attribute).place.is_undefined();
-
-                            let msg = if !member_exists {
-                                format!(
-                                    "Cannot assign to unresolved attribute `{attribute}` on type `{}`",
-                                    object_ty.display(db)
-                                )
-                            } else if is_setattr_synthesized {
-                                format!(
-                                    "Property `{attribute}` defined in `{}` is read-only",
-                                    object_ty.display(db)
-                                )
-                            } else {
-                                format!(
-                                    "Cannot assign to attribute `{attribute}` on type `{}` \
-                                     whose `__setattr__` method returns `Never`/`NoReturn`",
-                                    object_ty.display(db)
-                                )
-                            };
-
-                            builder.into_diagnostic(msg);
-                        }
-                    }
-                    return false;
-                }
-
-                // Now check for explicit attributes (class member or instance member).
-                // If an explicit attribute exists, validate against its type.
-                // Only fall back to `__setattr__` when no explicit attribute is found.
-                let Some((meta_attr, fallback_attr)) =
-                    self.assignment_attribute_members(object_ty, attribute)
-                else {
-                    infer_value_ty.infer_loud(self, TypeContext::default());
-                    return true;
-                };
-
-                match meta_attr {
-                    meta_attr @ PlaceAndQualifiers { .. } if meta_attr.is_class_var() => {
-                        if emit_diagnostics
-                            && let Some(builder) =
-                                self.context.report_lint(&INVALID_ATTRIBUTE_ACCESS, target)
-                        {
-                            builder.into_diagnostic(format_args!(
-                                "Cannot assign to ClassVar `{attribute}` \
-                                from an instance of type `{ty}`",
-                                ty = object_ty.display(self.db()),
-                            ));
-                        }
-                        false
-                    }
-                    PlaceAndQualifiers {
-                        place:
-                            Place::Defined(DefinedPlace {
-                                ty: meta_attr_ty, ..
-                            }),
-                        qualifiers,
-                    } => {
-                        // Resolve `Self` type variables to the concrete instance type.
-                        let meta_attr_ty = meta_attr_ty.bind_self_typevars(db, object_ty);
-
-                        if emit_diagnostics
-                            && self.invalid_assignment_to_final_attribute(
-                                object_ty, target, attribute, qualifiers,
-                            )
-                        {
-                            return false;
-                        }
-
-                        let assignable_to_meta_attr = if let Place::Defined(DefinedPlace {
-                            ty: meta_dunder_set,
-                            ..
-                        }) =
-                            meta_attr_ty.class_member(db, "__set__".into()).place
-                        {
-                            // TODO: We could use the annotated parameter type of `__set__` as
-                            // type context here.
-                            let dunder_set_result = meta_dunder_set.try_call(
-                                db,
-                                &CallArguments::positional([meta_attr_ty, object_ty, value_ty]),
-                            );
-
-                            if self.property_setter_returns_never(meta_attr_ty, object_ty, value_ty)
-                            {
-                                if emit_diagnostics
-                                    && let Some(builder) =
-                                        self.context.report_lint(&INVALID_ASSIGNMENT, target)
-                                {
-                                    builder.into_diagnostic(format_args!(
-                                        "Cannot assign to attribute `{attribute}` on type `{}` \
-                                         whose `__set__` method returns `Never`/`NoReturn`",
-                                        object_ty.display(db),
-                                    ));
-                                }
-                                return false;
-                            }
-
-                            if emit_diagnostics
-                                && let Err(dunder_set_failure) = dunder_set_result.as_ref()
-                            {
-                                report_bad_dunder_set_call(
-                                    &self.context,
-                                    dunder_set_failure,
-                                    attribute,
-                                    object_ty,
-                                    target,
-                                );
-                            }
-
-                            dunder_set_result.is_ok()
-                        } else {
-                            let write_ty = effective_write_type(meta_attr_ty);
-                            let value_ty =
-                                infer_value_ty.infer_silent(self, TypeContext::new(Some(write_ty)));
-
-                            ensure_assignable_to(self, value_ty, write_ty)
-                        };
-
-                        let assignable_to_instance_attribute =
-                            if let Some(fallback_attr) = fallback_attr {
-                                let (assignable, boundness) = if let PlaceAndQualifiers {
-                                    place:
-                                        Place::Defined(DefinedPlace {
-                                            ty: instance_attr_ty,
-                                            definedness: instance_attr_boundness,
-                                            ..
-                                        }),
-                                    qualifiers,
-                                } = fallback_attr
-                                {
-                                    // Bind `Self` via MRO matching.
-                                    let instance_attr_ty =
-                                        instance_attr_ty.bind_self_typevars(db, object_ty);
-                                    let write_ty = effective_write_type(instance_attr_ty);
-                                    let value_ty = infer_value_ty
-                                        .infer_silent(self, TypeContext::new(Some(write_ty)));
-                                    if emit_diagnostics
-                                        && self.invalid_assignment_to_final_attribute(
-                                            object_ty, target, attribute, qualifiers,
-                                        )
-                                    {
-                                        return false;
-                                    }
-
-                                    (
-                                        ensure_assignable_to(self, value_ty, write_ty),
-                                        instance_attr_boundness,
-                                    )
-                                } else {
-                                    (true, Definedness::PossiblyUndefined)
-                                };
-
-                                if boundness == Definedness::PossiblyUndefined {
-                                    report_possibly_missing_attribute(
-                                        &self.context,
-                                        target,
-                                        attribute,
-                                        object_ty,
-                                    );
-                                }
-
-                                assignable
-                            } else {
-                                true
-                            };
-
-                        assignable_to_meta_attr && assignable_to_instance_attribute
-                    }
-
-                    PlaceAndQualifiers {
-                        place: Place::Undefined,
-                        ..
-                    } => {
-                        if let Some(PlaceAndQualifiers {
-                            place:
-                                Place::Defined(DefinedPlace {
-                                    ty: instance_attr_ty,
-                                    definedness: instance_attr_boundness,
-                                    ..
-                                }),
-                            qualifiers,
-                        }) = fallback_attr
-                        {
-                            // Bind `Self` via MRO matching.
-                            let instance_attr_ty =
-                                instance_attr_ty.bind_self_typevars(db, object_ty);
-                            let write_ty = effective_write_type(instance_attr_ty);
-                            let value_ty =
-                                infer_value_ty.infer_silent(self, TypeContext::new(Some(write_ty)));
-                            if emit_diagnostics
-                                && self.invalid_assignment_to_final_attribute(
-                                    object_ty, target, attribute, qualifiers,
-                                )
-                            {
-                                return false;
-                            }
-
-                            if instance_attr_boundness == Definedness::PossiblyUndefined {
-                                report_possibly_missing_attribute(
-                                    &self.context,
-                                    target,
-                                    attribute,
-                                    object_ty,
-                                );
-                            }
-
-                            ensure_assignable_to(self, value_ty, write_ty)
-                        } else {
-                            // No explicit attribute found. Use `__setattr__` (already inferred
-                            // above) as a fallback for dynamic attribute assignment.
-                            match setattr_dunder_call_result {
-                                // If __setattr__ succeeded, allow the assignment.
-                                Ok(_) | Err(CallDunderError::PossiblyUnbound { .. }) => true,
-                                Err(CallDunderError::CallError(..)) => {
-                                    if emit_diagnostics
-                                        && let Some(builder) =
-                                            self.context.report_lint(&UNRESOLVED_ATTRIBUTE, target)
-                                    {
-                                        builder.into_diagnostic(format_args!(
-                                            "Cannot assign object of type `{}` to attribute \
-                                            `{attribute}` on type `{}` with \
-                                            custom `__setattr__` method.",
-                                            value_ty.display(db),
-                                            object_ty.display(db)
-                                        ));
-                                    }
-                                    false
-                                }
-                                Err(CallDunderError::MethodNotAvailable) => {
-                                    if emit_diagnostics
-                                        && let Some(builder) =
-                                            self.context.report_lint(&UNRESOLVED_ATTRIBUTE, target)
-                                    {
-                                        builder.into_diagnostic(format_args!(
-                                            "Unresolved attribute `{}` on type `{}`",
-                                            attribute,
-                                            object_ty.display(db)
-                                        ));
-                                    }
-                                    false
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            Type::ClassLiteral(..) | Type::GenericAlias(..) | Type::SubclassOf(..) => {
-                let Some((meta_attr, fallback_attr)) =
-                    self.assignment_attribute_members(object_ty, attribute)
-                else {
-                    infer_value_ty(self, TypeContext::default());
-                    return true;
-                };
-                let Some(class_attr_self_ty) = object_ty.to_instance(db) else {
-                    infer_value_ty(self, TypeContext::default());
-                    return true;
-                };
-
-                match meta_attr {
-                    PlaceAndQualifiers {
-                        place:
-                            Place::Defined(DefinedPlace {
-                                ty: meta_attr_ty, ..
-                            }),
-                        qualifiers,
-                    } => {
-                        if emit_diagnostics
-                            && self.invalid_assignment_to_final_attribute(
-                                object_ty, target, attribute, qualifiers,
-                            )
-                        {
-                            infer_value_ty(self, TypeContext::default());
-                            return false;
-                        }
-
-                        // We may infer the value type multiple times with distinct type context during
-                        // attribute resolution.
-                        let mut infer_value_ty = MultiInferenceGuard::new(infer_value_ty);
-
-                        // Perform loud inference without type context, as we may encounter multiple equally
-                        // applicable type contexts during attribute resolution.
-                        let value_ty = infer_value_ty.infer_loud(self, TypeContext::default());
-
-                        let assignable_to_meta_attr = if let Place::Defined(DefinedPlace {
-                            ty: meta_dunder_set,
-                            ..
-                        }) =
-                            meta_attr_ty.class_member(db, "__set__".into()).place
-                        {
-                            // TODO: We could use the annotated parameter type of `__set__` as
-                            // type context here.
-                            let dunder_set_result = meta_dunder_set.try_call(
-                                db,
-                                &CallArguments::positional([meta_attr_ty, object_ty, value_ty]),
-                            );
-
-                            if self.property_setter_returns_never(meta_attr_ty, object_ty, value_ty)
-                            {
-                                if emit_diagnostics
-                                    && let Some(builder) =
-                                        self.context.report_lint(&INVALID_ASSIGNMENT, target)
-                                {
-                                    builder.into_diagnostic(format_args!(
-                                        "Cannot assign to attribute `{attribute}` on type `{}` \
-                                         whose `__set__` method returns `Never`/`NoReturn`",
-                                        object_ty.display(db),
-                                    ));
-                                }
-                                return false;
-                            }
-
-                            if emit_diagnostics
-                                && let Err(dunder_set_failure) = dunder_set_result.as_ref()
-                            {
-                                report_bad_dunder_set_call(
-                                    &self.context,
-                                    dunder_set_failure,
-                                    attribute,
-                                    object_ty,
-                                    target,
-                                );
-                            }
-
-                            dunder_set_result.is_ok()
-                        } else {
-                            let value_ty = infer_value_ty
-                                .infer_silent(self, TypeContext::new(Some(meta_attr_ty)));
-                            ensure_assignable_to(self, value_ty, meta_attr_ty)
-                        };
-
-                        let assignable_to_class_attr = if let Some(fallback_attr) = fallback_attr {
-                            let (assignable, boundness) = if let PlaceAndQualifiers {
-                                place:
-                                    Place::Defined(DefinedPlace {
-                                        ty: class_attr_ty,
-                                        definedness: class_attr_boundness,
-                                        ..
-                                    }),
-                                ..
-                            } = fallback_attr
-                            {
-                                let class_attr_ty =
-                                    class_attr_ty.bind_self_typevars(db, class_attr_self_ty);
-                                let value_ty = infer_value_ty
-                                    .infer_silent(self, TypeContext::new(Some(class_attr_ty)));
-                                (
-                                    ensure_assignable_to(self, value_ty, class_attr_ty),
-                                    class_attr_boundness,
-                                )
-                            } else {
-                                (true, Definedness::PossiblyUndefined)
-                            };
-
-                            if boundness == Definedness::PossiblyUndefined {
-                                report_possibly_missing_attribute(
-                                    &self.context,
-                                    target,
-                                    attribute,
-                                    object_ty,
-                                );
-                            }
-
-                            assignable
-                        } else {
-                            true
-                        };
-
-                        assignable_to_meta_attr && assignable_to_class_attr
-                    }
-                    PlaceAndQualifiers {
-                        place: Place::Undefined,
-                        ..
-                    } => {
-                        if let Some(PlaceAndQualifiers {
-                            place:
-                                Place::Defined(DefinedPlace {
-                                    ty: class_attr_ty,
-                                    definedness: class_attr_boundness,
-                                    ..
-                                }),
-                            qualifiers,
-                        }) = fallback_attr
-                        {
-                            let class_attr_ty =
-                                class_attr_ty.bind_self_typevars(db, class_attr_self_ty);
-                            let value_ty =
-                                infer_value_ty(self, TypeContext::new(Some(class_attr_ty)));
-                            if emit_diagnostics
-                                && self.invalid_assignment_to_final_attribute(
-                                    object_ty, target, attribute, qualifiers,
-                                )
-                            {
-                                return false;
-                            }
-
-                            if class_attr_boundness == Definedness::PossiblyUndefined {
-                                report_possibly_missing_attribute(
-                                    &self.context,
-                                    target,
-                                    attribute,
-                                    object_ty,
-                                );
-                            }
-
-                            ensure_assignable_to(self, value_ty, class_attr_ty)
-                        } else {
-                            infer_value_ty(self, TypeContext::default());
-
-                            let attribute_is_bound_on_instance =
-                                object_ty.to_instance(self.db()).is_some_and(|instance| {
-                                    !instance
-                                        .instance_member(self.db(), attribute)
-                                        .place
-                                        .is_undefined()
-                                });
-
-                            // Attribute is declared or bound on instance. Forbid access from the class object
-                            if emit_diagnostics {
-                                if attribute_is_bound_on_instance {
-                                    if let Some(builder) =
-                                        self.context.report_lint(&INVALID_ATTRIBUTE_ACCESS, target)
-                                    {
-                                        builder.into_diagnostic(format_args!(
-                                            "Cannot assign to instance attribute \
-                                             `{attribute}` from the class object `{ty}`",
-                                            ty = object_ty.display(self.db()),
-                                        ));
-                                    }
-                                } else {
-                                    if let Some(builder) =
-                                        self.context.report_lint(&UNRESOLVED_ATTRIBUTE, target)
-                                    {
-                                        builder.into_diagnostic(format_args!(
-                                            "Unresolved attribute `{}` on type `{}`.",
-                                            attribute,
-                                            object_ty.display(db)
-                                        ));
-                                    }
-                                }
-                            }
-
-                            false
-                        }
-                    }
-                }
-            }
-
-            Type::ModuleLiteral(module) => {
-                let sym = if module
-                    .module(db)
-                    .known(db)
-                    .is_some_and(KnownModule::is_builtins)
-                {
-                    builtins_symbol(db, attribute)
-                } else {
-                    module.static_member(db, attribute)
-                };
-                if let Place::Defined(DefinedPlace { ty: attr_ty, .. }) = sym.place {
-                    let value_ty = infer_value_ty(self, TypeContext::new(Some(attr_ty)));
-
-                    let assignable = value_ty.is_assignable_to(db, attr_ty);
-                    if assignable {
-                        true
-                    } else {
-                        if emit_diagnostics {
-                            report_invalid_attribute_assignment(
-                                &self.context,
-                                target.range(),
-                                attr_ty,
-                                value_ty,
-                                attribute,
-                            );
-                        }
-                        false
-                    }
-                } else {
-                    infer_value_ty(self, TypeContext::default());
-
-                    if emit_diagnostics
-                        && let Some(builder) =
-                            self.context.report_lint(&UNRESOLVED_ATTRIBUTE, target)
-                    {
-                        builder.into_diagnostic(format_args!(
-                            "Unresolved attribute `{}` on type `{}`.",
-                            attribute,
-                            object_ty.display(db)
-                        ));
-                    }
-
-                    false
-                }
-            }
-        }
     }
 
     fn validate_attribute_deletion(
@@ -3104,13 +2835,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
 
             Type::Intersection(intersection) => {
-                if intersection.positive(db).iter().any(|element_ty| {
+                let positive = intersection.positive(db);
+                if positive.iter().any(|element_ty| {
                     self.validate_attribute_deletion(target, *element_ty, attribute, false)
                 }) {
                     true
                 } else {
-                    if emit_diagnostics && let Some(element_ty) = intersection.positive(db).first()
-                    {
+                    if emit_diagnostics && let Some(element_ty) = positive.first() {
                         self.validate_attribute_deletion(target, *element_ty, attribute, true);
                     }
                     false
@@ -3158,15 +2889,66 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             | Type::TypeForm(_)
             | Type::TypedDict(_)
             | Type::NewTypeInstance(_) => {
-                let delattr_dunder_call_result = object_ty.try_call_dunder_with_policy(
-                    db,
-                    "__delattr__",
-                    &mut CallArguments::positional([Type::string_literal(db, attribute)]),
-                    TypeContext::default(),
-                    MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
-                );
+                let frozen_dataclass_dispatch = object_ty
+                    .nominal_class(db)
+                    .and_then(|class| class.static_class_literal(db))
+                    .and_then(|(class, specialization)| {
+                        class.inherited_frozen_dataclass_dispatch(
+                            db,
+                            specialization,
+                            "__delattr__",
+                            attribute,
+                        )
+                    });
 
-                let returns_never = match &delattr_dunder_call_result {
+                let delattr_receiver = frozen_dataclass_dispatch
+                    .map_or(object_ty, |dispatch| dispatch.receiver(db, object_ty));
+
+                let mut delattr_arguments =
+                    CallArguments::positional([Type::string_literal(db, attribute)]);
+                let delattr_dunder_call_result = if matches!(delattr_receiver, Type::BoundSuper(_))
+                {
+                    match delattr_receiver
+                        .member_lookup_with_policy(
+                            db,
+                            "__delattr__",
+                            MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
+                        )
+                        .place
+                    {
+                        Place::Defined(DefinedPlace {
+                            ty: delattr,
+                            definedness,
+                            provenance,
+                            ..
+                        }) => match delattr.try_call(db, &delattr_arguments) {
+                            Ok(bindings) if definedness == Definedness::PossiblyUndefined => {
+                                Err(CallDunderError::PossiblyUnbound {
+                                    bindings: Box::new(bindings),
+                                    unbound_on: None,
+                                })
+                            }
+                            Ok(bindings) => Ok(bindings),
+                            Err(CallError(kind, bindings)) => {
+                                Err(CallDunderError::CallError(kind, bindings, provenance))
+                            }
+                        },
+                        Place::Undefined => Err(CallDunderError::MethodNotAvailable),
+                    }
+                } else {
+                    delattr_receiver.try_call_dunder_with_policy(
+                        db,
+                        "__delattr__",
+                        &mut delattr_arguments,
+                        TypeContext::default(),
+                        MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
+                    )
+                };
+
+                let returns_never = matches!(
+                    frozen_dataclass_dispatch,
+                    Some(FrozenDataclassDispatch::FrozenField)
+                ) || match &delattr_dunder_call_result {
                     Ok(result) => result.return_type(db).is_never(),
                     Err(err) => err.return_type(db).is_some_and(|ty| ty.is_never()),
                 };
@@ -3184,7 +2966,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
 
                 match delattr_dunder_call_result {
-                    Ok(_) | Err(CallDunderError::PossiblyUnbound { .. }) => {
+                    Ok(_) | Err(CallDunderError::PossiblyUnbound { .. })
+                        if !matches!(
+                            frozen_dataclass_dispatch,
+                            Some(FrozenDataclassDispatch::Delegate(_))
+                        ) =>
+                    {
                         if self.validate_final_attribute_deletion(
                             target,
                             object_ty,
@@ -3195,7 +2982,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         }
                         return true;
                     }
-                    Err(CallDunderError::CallError(kind, _bindings)) => {
+                    Ok(_) | Err(CallDunderError::PossiblyUnbound { .. }) => {}
+                    Err(CallDunderError::CallError(kind, _bindings, _)) => {
                         if emit_diagnostics {
                             report_bad_dunder_delattr_call(
                                 &self.context,
@@ -3227,9 +3015,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             ..
                         }),
                     ..
-                }) = self
-                    .assignment_attribute_members(object_ty, attribute)
-                    .map(|(meta_attr, _)| meta_attr)
+                }) = assignment_attribute_members(db, object_ty, attribute)
+                    .and_then(AssignmentAttributeMembers::type_member)
                 {
                     let attr_ty = attr_ty.bind_self_typevars(db, object_ty);
                     let delete_dunder_call_result = attr_ty.try_call_dunder(
@@ -3239,7 +3026,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         TypeContext::default(),
                     );
 
-                    if self.property_deleter_returns_never(attr_ty, object_ty) {
+                    // `Never` supports arbitrary operations only because there can be no runtime
+                    // value to mutate; it is not a concrete descriptor with a terminal deleter.
+                    let deleter_returns_never = !attr_ty.is_never()
+                        && match &delete_dunder_call_result {
+                            Ok(bindings) => bindings.return_type(db).is_never(),
+                            Err(error) => error.return_type(db).is_some_and(|ty| ty.is_never()),
+                        };
+                    if deleter_returns_never
+                        || self.property_deleter_returns_never(attr_ty, object_ty)
+                    {
                         if emit_diagnostics
                             && let Some(builder) =
                                 self.context.report_lint(&INVALID_ASSIGNMENT, target)
@@ -3255,7 +3051,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                     match delete_dunder_call_result {
                         Ok(_) | Err(CallDunderError::PossiblyUnbound { .. }) => return true,
-                        Err(CallDunderError::CallError(kind, bindings)) => {
+                        Err(CallDunderError::CallError(kind, bindings, _)) => {
                             if emit_diagnostics {
                                 let failure = CallError(kind, bindings);
                                 report_bad_dunder_delete_call(
@@ -3281,63 +3077,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             | Type::ModuleLiteral(..)
             | Type::BoundSuper(..) => true,
         }
-    }
-
-    fn assignment_attribute_members(
-        &self,
-        object_ty: Type<'db>,
-        attribute: &str,
-    ) -> Option<(PlaceAndQualifiers<'db>, Option<PlaceAndQualifiers<'db>>)> {
-        let db = self.db();
-        let meta_attr = object_ty.class_member(db, attribute.into());
-        let needs_fallback = matches!(
-            meta_attr.place,
-            Place::Defined(DefinedPlace {
-                definedness: Definedness::PossiblyUndefined,
-                ..
-            }) | Place::Undefined
-        );
-        let fallback_attr = if needs_fallback {
-            Some(match object_ty {
-                Type::NominalInstance(..)
-                | Type::ProtocolInstance(_)
-                | Type::LiteralValue(..)
-                | Type::SpecialForm(..)
-                | Type::KnownInstance(..)
-                | Type::PropertyInstance(..)
-                | Type::FunctionLiteral(..)
-                | Type::Callable(..)
-                | Type::BoundMethod(_)
-                | Type::KnownBoundMethod(_)
-                | Type::WrapperDescriptor(_)
-                | Type::DataclassDecorator(_)
-                | Type::DataclassTransformer(_)
-                | Type::EnumComplement(_)
-                | Type::TypeVar(..)
-                | Type::AlwaysTruthy
-                | Type::AlwaysFalsy
-                | Type::TypeIs(_)
-                | Type::TypeGuard(_)
-                | Type::TypeForm(_)
-                | Type::TypedDict(_)
-                | Type::NewTypeInstance(_) => object_ty.instance_member(db, attribute),
-                Type::ClassLiteral(..) | Type::GenericAlias(..) | Type::SubclassOf(..) => {
-                    object_ty.class_object_member(db, attribute, MemberLookupPolicy::default())
-                }
-                Type::Union(..)
-                | Type::Intersection(..)
-                | Type::TypeAlias(..)
-                | Type::Dynamic(..)
-                | Type::Divergent(_)
-                | Type::Never
-                | Type::ModuleLiteral(..)
-                | Type::BoundSuper(..) => return None,
-            })
-        } else {
-            None
-        };
-
-        Some((meta_attr, fallback_attr))
     }
 
     #[expect(clippy::type_complexity)]
@@ -3368,7 +3107,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 if let Some(tuple_spec) =
                     assigned_ty.and_then(|ty| ty.tuple_instance_spec(self.db()))
                 {
-                    let assigned_tys = tuple_spec.all_elements().to_vec();
+                    let assigned_tys = tuple_spec.iter_element_types(self.db()).collect::<Vec<_>>();
 
                     for (i, element) in elts.iter().enumerate() {
                         match assigned_tys.get(i).copied() {
@@ -3391,6 +3130,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 },
             ) => {
                 let object_ty = self.infer_expression(object, TypeContext::default());
+                self.report_undeclared_protocol_attribute(attr_expr);
 
                 if let Some(infer_assigned_ty) = infer_assigned_ty {
                     let infer_assigned_ty = &mut |builder: &mut Self, tcx| {
@@ -3401,6 +3141,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                     self.validate_attribute_assignment(
                         attr_expr,
+                        value,
                         object_ty,
                         attr.id(),
                         infer_assigned_ty,
@@ -3445,6 +3186,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         add.insert(self, target_ty);
     }
 
+    fn stub_placeholder_binding_type(&self, value: &ast::Expr) -> Option<Type<'db>> {
+        if self.in_stub() && value.is_ellipsis_literal_expr() {
+            Some(Type::unknown())
+        } else {
+            None
+        }
+    }
+
     fn infer_assignment_definition_impl(
         &mut self,
         assignment: &AssignmentDefinitionKind<'db>,
@@ -3454,18 +3203,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let value = assignment.value(self.module());
         let target = assignment.target(self.module());
 
-        let mut target_ty = match assignment.target_kind() {
-            TargetKind::Sequence(unpack_position, unpack) => {
+        let mut target_ty = match assignment.unpack() {
+            Some(unpack) => {
+                // The assignment statement owns unpacking diagnostics so that targets without a
+                // name definition are still checked, and each diagnostic is reported only once.
                 let unpacked = infer_unpack_types(self.db(), unpack);
-                // Only copy the diagnostics if this is the first assignment to avoid duplicating the
-                // unpack assignments.
-                if unpack_position == UnpackPosition::First {
-                    self.context.extend(unpacked.diagnostics());
-                }
-
                 unpacked.expression_type(target)
             }
-            TargetKind::Single => {
+            None => {
                 // This could be an implicit type alias (OptionalList = list[T] | None). Use the definition
                 // of `OptionalList` as the binding context while inferring the RHS (`list[T] | None`), in
                 // order to bind `T` to `OptionalList`.
@@ -3492,8 +3237,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             Some(definition),
                             namedtuple_kind,
                         )
-                    } else if callable_type == Type::SpecialForm(SpecialFormType::TypedDict) {
-                        self.infer_typeddict_call_expression(call_expr, Some(definition))
+                    } else if let Some(typed_dict_module) =
+                        TypedDictModule::from_type(self.db(), callable_type)
+                    {
+                        self.infer_typeddict_call_expression(
+                            call_expr,
+                            Some(definition),
+                            typed_dict_module,
+                        )
                     } else if let Some(function) = callable_type.as_function_literal()
                         && function.is_known(self.db(), KnownFunction::NewClass)
                     {
@@ -3527,6 +3278,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 definition,
                                 paramspec_class,
                             ),
+                            Some(
+                                typevartuple_class @ (KnownClass::TypeVarTuple
+                                | KnownClass::ExtensionsTypeVarTuple),
+                            ) => self.infer_legacy_typevartuple(
+                                target,
+                                call_expr,
+                                definition,
+                                typevartuple_class,
+                            ),
                             Some(KnownClass::NewType) => {
                                 self.infer_newtype_expression(target, call_expr, definition)
                             }
@@ -3550,6 +3310,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         }
                     };
 
+                    let ty = if target.as_name_expr().is_some()
+                        && self
+                            .index
+                            .scope(self.scope().file_scope_id(self.db()))
+                            .kind()
+                            == ScopeKind::Class
+                    {
+                        self.apply_desugared_decorator(callable_type, call_expr, ty)
+                    } else {
+                        ty
+                    };
+
                     self.store_expression_type(value, ty);
                     ty
                 } else {
@@ -3569,10 +3341,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         report_invalid_type_checking_constant(&self.context, target.into());
                     }
                     Type::bool_literal(true)
-                } else if self.in_stub() && value.is_ellipsis_literal_expr() {
-                    Type::unknown()
                 } else {
-                    value_ty
+                    self.stub_placeholder_binding_type(value)
+                        .unwrap_or(value_ty)
                 }
             }
         };
@@ -3669,10 +3440,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.deferred.insert(definition);
 
         Type::KnownInstance(KnownInstanceType::NewType(NewType::new(
-            db,
-            ast::name::Name::from(name),
-            definition,
-            None,
+            db, name, definition, None,
         )))
     }
 
@@ -3728,7 +3496,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let Some(repr_arg) = repr_arg else {
             return Some(Type::KnownInstance(KnownInstanceType::Sentinel(
-                SentinelInstance::new(self.db(), target_name.clone(), definition),
+                SentinelInstance::new(self.db(), target_name, definition),
             )));
         };
 
@@ -3737,7 +3505,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         Some(Type::KnownInstance(KnownInstanceType::Sentinel(
-            SentinelInstance::new(self.db(), target_name.clone(), definition),
+            SentinelInstance::new(self.db(), target_name, definition),
         )))
     }
 
@@ -3800,7 +3568,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
             _ => {}
         }
-        if func_ty == Type::SpecialForm(SpecialFormType::TypedDict) {
+        if TypedDictModule::from_type(self.db(), func_ty).is_some() {
             self.infer_functional_typeddict_deferred(arguments);
             return;
         }
@@ -3846,6 +3614,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         if let Some(default) = arguments.find_keyword("default") {
             if matches!(
                 known_class,
+                Some(KnownClass::TypeVarTuple | KnownClass::ExtensionsTypeVarTuple)
+            ) {
+                self.infer_typevartuple_default(&default.value, None);
+            } else if matches!(
+                known_class,
                 Some(KnownClass::ParamSpec | KnownClass::ExtensionsParamSpec)
             ) {
                 // Pass `None` for the name: the outer-scope typevar check inside
@@ -3888,7 +3661,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .report_lint(&INVALID_NEWTYPE, &arguments.args[1])
             {
                 let mut diag = builder.into_diagnostic("invalid base for `typing.NewType`");
-                diag.set_primary_message("A `NewType` base cannot be generic");
+                diag.set_primary_annotation_message("A `NewType` base cannot be generic");
             }
             return;
         }
@@ -3914,7 +3687,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .report_lint(&INVALID_NEWTYPE, &arguments.args[1])
         {
             let mut diag = builder.into_diagnostic("invalid base for `typing.NewType`");
-            diag.set_primary_message(format!("type `{}`", inferred.display(self.db())));
+            diag.set_primary_annotation_message(format!("type `{}`", inferred.display(self.db())));
             if matches!(inferred, Type::ProtocolInstance(_)) {
                 diag.info("The base of a `NewType` is not allowed to be a protocol class.");
             } else if matches!(inferred, Type::TypedDict(_)) {
@@ -4005,11 +3778,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.deferred.insert(definition);
 
         Type::KnownInstance(KnownInstanceType::TypeAliasType(
-            TypeAliasType::ManualPEP695(ManualPEP695TypeAliasType::new(
-                db,
-                ast::name::Name::new(name),
-                definition,
-            )),
+            TypeAliasType::ManualPEP695(ManualPEP695TypeAliasType::new(db, name, definition, None)),
         ))
     }
 
@@ -4023,13 +3792,157 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // in the alias value are bound to the alias definition.
         let previous_context = self.typevar_binding_context.replace(definition);
 
-        self.infer_type_expression(&arguments.args[1]);
+        let value_ty = self.infer_type_expression(&arguments.args[1]);
+        let mut type_params = FxHashSet::default();
+        let mut valid_type_params = true;
         // Infer keyword arguments (e.g. `type_params`) so their types are stored.
         for keyword in &arguments.keywords {
             self.infer_expression(&keyword.value, TypeContext::default());
+
+            if keyword.arg.as_deref() != Some("type_params") {
+                continue;
+            }
+
+            let Some(tuple) = keyword.value.as_tuple_expr() else {
+                valid_type_params = false;
+                if let Some(builder) = self
+                    .context
+                    .report_lint(&INVALID_TYPE_ALIAS_TYPE, &keyword.value)
+                {
+                    builder.into_diagnostic(
+                        "The `type_params` argument to `TypeAliasType` must be a tuple literal",
+                    );
+                }
+                continue;
+            };
+
+            let db = self.db();
+            let mut typevar_with_default = None;
+            let mut typevar_tuple: Option<TypeVarInstance> = None;
+            let mut reported_default_order_error = false;
+
+            for element in &tuple.elts {
+                let bound_typevar = match self.expression_type(element) {
+                    Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) => bind_typevar(
+                        db,
+                        self.index,
+                        definition.file_scope(db),
+                        Some(definition),
+                        typevar,
+                    ),
+                    _ => None,
+                };
+                let Some(bound_typevar) = bound_typevar else {
+                    valid_type_params = false;
+                    if let Some(builder) =
+                        self.context.report_lint(&INVALID_TYPE_ALIAS_TYPE, element)
+                    {
+                        builder.into_diagnostic(
+                            "Each `type_params` entry for `TypeAliasType` must be a type variable",
+                        );
+                    }
+                    continue;
+                };
+                let typevar = bound_typevar.typevar(db);
+
+                if bound_typevar.binding_context(db) != BindingContext::Definition(definition) {
+                    valid_type_params = false;
+                    if let Some(builder) =
+                        self.context.report_lint(&INVALID_TYPE_ALIAS_TYPE, element)
+                    {
+                        builder.into_diagnostic(format_args!(
+                            "Type parameter `{}` is bound in an outer scope and cannot be used in `type_params`",
+                            typevar.name(db),
+                        ));
+                    }
+                    continue;
+                }
+
+                if !type_params.insert(bound_typevar.identity(db)) {
+                    valid_type_params = false;
+                    if let Some(builder) =
+                        self.context.report_lint(&INVALID_TYPE_ALIAS_TYPE, element)
+                    {
+                        builder.into_diagnostic(format_args!(
+                            "Type parameter `{}` is duplicated in `type_params`",
+                            typevar.name(db),
+                        ));
+                    }
+                }
+
+                if typevar.default_type(db).is_some() {
+                    if let Some(typevar_tuple) = typevar_tuple {
+                        valid_type_params = false;
+                        if let Some(builder) = self
+                            .context
+                            .report_lint(&INVALID_TYPE_VARIABLE_DEFAULT, element)
+                        {
+                            builder.into_diagnostic(format_args!(
+                                "Type parameter `{}` with a default follows TypeVarTuple `{}`",
+                                typevar.name(db),
+                                typevar_tuple.name(db),
+                            ));
+                        }
+                    }
+                    typevar_with_default.get_or_insert(typevar);
+                } else if let Some(typevar_with_default) = typevar_with_default {
+                    valid_type_params = false;
+                    if !reported_default_order_error
+                        && let Some(builder) = self
+                            .context
+                            .report_lint(&INVALID_TYPE_VARIABLE_DEFAULT, element)
+                    {
+                        reported_default_order_error = true;
+                        builder.into_diagnostic(format_args!(
+                            "Type parameter `{}` without a default cannot follow earlier parameter `{}` with a default",
+                            typevar.name(db),
+                            typevar_with_default.name(db),
+                        ));
+                    }
+                }
+
+                if typevar.is_typevartuple(db) {
+                    if typevar_tuple.is_some() {
+                        valid_type_params = false;
+                        if let Some(builder) =
+                            self.context.report_lint(&INVALID_TYPE_ALIAS_TYPE, element)
+                        {
+                            builder.into_diagnostic(
+                                "Only one `TypeVarTuple` parameter is allowed in `type_params`",
+                            );
+                        }
+                    } else {
+                        typevar_tuple = Some(typevar);
+                    }
+                }
+            }
+        }
+
+        if valid_type_params {
+            let mut value_typevars = FxOrderSet::default();
+            value_ty.find_legacy_typevars(self.db(), Some(definition), &mut value_typevars);
+
+            for typevar in value_typevars {
+                if !type_params.contains(&typevar.identity(self.db()))
+                    && let Some(builder) = self
+                        .context
+                        .report_lint(&INVALID_TYPE_ALIAS_TYPE, &arguments.args[1])
+                {
+                    builder.into_diagnostic(format_args!(
+                        "Type parameter `{}` used in the alias value must be included in `type_params`",
+                        typevar.name(self.db()),
+                    ));
+                }
+            }
         }
 
         self.typevar_binding_context = previous_context;
+    }
+
+    fn is_valid_receiver_annotation_target(&self, target: &ast::Expr) -> bool {
+        target
+            .as_attribute_expr()
+            .is_some_and(|target| self.is_receiver_attribute_annotation_target(target))
     }
 
     fn infer_annotated_assignment_statement(&mut self, assignment: &ast::StmtAnnAssign) {
@@ -4113,10 +4026,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             // Disallow annotations on non-name targets unless they are valid receivers (e.g.
             // `self.x: int` or `cls.x: int`).
-            let is_receiver_attribute = target
-                .as_attribute_expr()
-                .is_some_and(|target| self.is_receiver_attribute_annotation_target(target));
-            if !is_receiver_attribute {
+            if !self.is_valid_receiver_annotation_target(target) {
                 let message = match target.as_ref() {
                     ast::Expr::Attribute(_) => {
                         "Type annotations are not allowed on this attribute expression"
@@ -4164,6 +4074,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // If we have an annotated assignment like `self.attr: int = 1`, we still need to
             // do type inference on the `self.attr` target to get types for all sub-expressions.
             self.infer_expression(target, TypeContext::default());
+            if let ast::Expr::Attribute(target) = target.as_ref() {
+                self.report_undeclared_protocol_attribute(target);
+            }
 
             // For annotated assignments like `self.x: Final[int] = 1`, the `Final` qualifier
             // comes from the annotation itself, so we can check it directly rather than
@@ -4207,7 +4120,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 .secondary(annotation.as_ref())
                                 .message("Declared type"),
                         );
-                        diag.set_primary_message(format_args!(
+                        diag.set_primary_annotation_message(format_args!(
                             "Incompatible value of type `{}`",
                             value_ty.display(self.db()),
                         ));
@@ -4227,14 +4140,52 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         assignment: &'db AnnotatedAssignmentDefinitionKind,
         definition: Definition<'db>,
     ) {
-        let annotation = assignment.annotation(self.module());
         let target = assignment.target(self.module());
         let value = assignment.value(self.module());
 
+        if !target.is_name_expr() && !self.is_valid_receiver_annotation_target(target) {
+            // Omit this definition from `self.declarations`; declaration lookup treats an absent
+            // inferred declaration as rejected.
+            if !definition
+                .kind(self.db())
+                .category(self.in_stub(), self.module())
+                .is_binding()
+            {
+                return;
+            }
+
+            let node = target.into();
+            let add = AddBinding {
+                declared_ty: self.fallback_member_declared_type(node),
+                binding: definition,
+                node,
+                qualifiers: TypeQualifiers::empty(),
+                is_local: true,
+            };
+            let target_ty = if let Some(value) = value {
+                // Infer the value as an ordinary assignment without using the rejected annotation
+                // as its declared type.
+                let value_ty = self.infer_maybe_standalone_expression(value, add.type_context());
+                self.stub_placeholder_binding_type(value)
+                    .unwrap_or(value_ty)
+            } else {
+                // Annotation-only definitions are bindings in stubs.
+                add.declared_ty.unwrap_or(Type::unknown())
+            };
+            self.store_expression_type(target, target_ty);
+            add.insert(self, target_ty);
+
+            return;
+        }
+
+        let annotation = assignment.annotation(self.module());
+        // Pydantic supports field specifiers in annotations via `Annotated[T, Field(...)]`.
+        self.setup_dataclass_field_specifiers();
         let mut declared = self.infer_annotation_expression_allow_pep_613(
             annotation,
             DeferredExpressionState::from(self.defer_annotations()),
         );
+        self.dataclass_field_specifiers.clear();
 
         // P.args and P.kwargs are only valid as annotations on *args and **kwargs,
         // not as variable annotations. Check both resolved type and AST form.
@@ -4328,7 +4279,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 let nearest_enclosing_class =
                     nearest_enclosing_class(self.db(), self.index, self.scope());
                 let class_kind = nearest_enclosing_class.and_then(|class| {
-                    CodeGeneratorKind::from_class(self.db(), ClassLiteral::Static(class), None)
+                    CodeGeneratorKind::from_class(self.db(), ClassLiteral::Static(class))
                 });
 
                 match class_kind {
@@ -4343,7 +4294,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             ));
                         }
                     }
-                    Some(CodeGeneratorKind::DataclassLike(_)) => match qualifier {
+                    Some(
+                        class_kind @ (CodeGeneratorKind::DataclassLike(_)
+                        | CodeGeneratorKind::Pydantic(_)),
+                    ) => match qualifier {
                         TypeQualifier::NotRequired
                         | TypeQualifier::ReadOnly
                         | TypeQualifier::Required => {
@@ -4352,9 +4306,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             else {
                                 continue;
                             };
+                            let field_kind = class_kind.name();
                             builder.into_diagnostic(format_args!(
-                                "`{name}` is not allowed in dataclass fields",
-                                name = qualifier.name()
+                                "`{name}` is not allowed in {field_kind} fields",
+                                name = qualifier.name(),
                             ));
                         }
                         TypeQualifier::ClassVar | TypeQualifier::Final | TypeQualifier::InitVar => {
@@ -4452,6 +4407,26 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 value,
                 TypeContext::new(Some(declared.inner_type())),
             );
+            let inferred_ty = if is_pep_613_type_alias && target.is_name_expr() {
+                // The post-inference pass emits the diagnostic, but this first-pass value is
+                // retained as the alias binding.
+                match inferred_ty {
+                    Type::SpecialForm(SpecialFormType::TypingSelf) => {
+                        self.expressions.insert(value.into(), Type::unknown());
+                        Type::unknown()
+                    }
+                    Type::KnownInstance(KnownInstanceType::LiteralStringAlias(ty))
+                        if ty.inner(self.db()).contains_self(self.db()) =>
+                    {
+                        Type::KnownInstance(KnownInstanceType::LiteralStringAlias(
+                            InternedType::new(self.db(), Type::unknown()),
+                        ))
+                    }
+                    _ => inferred_ty,
+                }
+            } else {
+                inferred_ty
+            };
 
             self.typevar_binding_context = previous_typevar_binding_context;
             self.deferred_state = previous_deferred_state;
@@ -4521,7 +4496,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     {
                         let mut diag = builder.into_diagnostic(format_args!(
                             "Type annotation on enum member `{}` is not allowed",
-                            &name_expr.id
+                            name_expr.id
                         ));
                         diag.info(
                             "See: https://typing.python.org/en/latest/spec/enums.html#enum-members",
@@ -4572,6 +4547,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             if let ast::Expr::Attribute(attr_expr) = assignment.target.as_ref() {
                 let object_ty = self.expression_type(&attr_expr.value);
+                self.report_undeclared_protocol_attribute(attr_expr);
                 self.validate_final_attribute_assignment(attr_expr, object_ty, attr_expr.attr.id());
             }
         }
@@ -4641,6 +4617,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     db,
                     target_type,
                     op.in_place_dunder(),
+                    MemberLookupPolicy::NO_INSTANCE_FALLBACK,
                     ArgumentsIter::synthesized(&ast_arguments),
                     &mut call_arguments,
                     &mut |builder, (_, _, tcx)| infer_value_ty(builder, tcx),
@@ -4663,7 +4640,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             binary_return_ty(self, value_ty),
                         )
                     }
-                    Err(CallDunderError::CallError(_, bindings)) => {
+                    Err(CallDunderError::CallError(_, bindings, _)) => {
                         let value_ty = bindings.type_for_argument(&call_arguments, 0);
                         report_unsupported_augmented_assignment(
                             &self.context,
@@ -4738,6 +4715,24 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.infer_definition(node);
     }
 
+    fn fixed_length_iterable_element_type(
+        &self,
+        iterable: &ast::Expr,
+        expression_type: impl FnMut(&ast::Expr) -> Type<'db>,
+    ) -> Option<Type<'db>> {
+        let element_types =
+            extract_fixed_length_iterable_element_types(self.db(), iterable, expression_type)?;
+
+        if element_types.is_empty() {
+            None
+        } else {
+            Some(UnionType::from_elements(
+                self.db(),
+                element_types.iter().copied(),
+            ))
+        }
+    }
+
     fn infer_for_statement(&mut self, for_statement: &ast::StmtFor) {
         let ast::StmtFor {
             range: _,
@@ -4746,17 +4741,24 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             iter,
             body,
             orelse,
-            is_async: _,
+            is_async,
         } = for_statement;
 
         self.infer_target(target, iter, &|builder, tcx| {
             // TODO: `infer_for_statement_definition` reports a diagnostic if `iter_ty` isn't iterable
             //  but only if the target is a name. We should report a diagnostic here if the target isn't a name:
             //  `for a.x in not_iterable: ...
-            builder
-                .infer_standalone_expression(iter, tcx)
-                .iterate(builder.db())
-                .homogeneous_element_type(builder.db())
+            let iterable_type = builder.infer_standalone_expression(iter, tcx);
+            if !*is_async
+                && let Some(element_type) = builder
+                    .fixed_length_iterable_element_type(iter, |expr| builder.expression_type(expr))
+            {
+                element_type
+            } else {
+                iterable_type
+                    .iterate(builder.db())
+                    .homogeneous_element_type(builder.db())
+            }
         });
 
         self.infer_body(body);
@@ -4784,16 +4786,25 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 let iterable_type =
                     self.infer_standalone_expression(iterable, TypeContext::default());
 
-                iterable_type
-                    .try_iterate_with_mode(
-                        self.db(),
-                        EvaluationMode::from_is_async(for_stmt.is_async()),
-                    )
-                    .map(|tuple| tuple.homogeneous_element_type(self.db()))
-                    .unwrap_or_else(|err| {
-                        err.report_diagnostic(&self.context, iterable_type, iterable.into());
-                        err.fallback_element_type(self.db())
-                    })
+                if !for_stmt.is_async()
+                    && let Some(element_type) = self
+                        .fixed_length_iterable_element_type(iterable, |expr| {
+                            self.expression_type(expr)
+                        })
+                {
+                    element_type
+                } else {
+                    iterable_type
+                        .try_iterate_with_mode(
+                            self.db(),
+                            EvaluationMode::from_is_async(for_stmt.is_async()),
+                        )
+                        .map(|tuple| tuple.homogeneous_element_type(self.db()))
+                        .unwrap_or_else(|err| {
+                            err.report_diagnostic(&self.context, iterable_type, iterable.into());
+                            err.fallback_element_type(self.db())
+                        })
+                }
             }
         };
 
@@ -4879,12 +4890,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     // the expected type passed should be the "raw" type,
                     // i.e. type variables in the return type are non-inferable,
                     // and the return types of async functions are not wrapped in `CoroutineType[...]`.
-                    let return_ty = func
-                        .last_definition_raw_signature(
-                            self.db(),
-                            ReturnCallableTypeVarScope::Lexical,
-                        )
-                        .return_ty;
+                    let return_ty = same_module_uncached_raw_signature(
+                        self.db(),
+                        func,
+                        ReturnCallableTypeVarScope::Lexical,
+                    )
+                    .return_ty;
 
                     // For generator functions, the declared return type is e.g.
                     // `Generator[YieldType, SendType, ReturnType]`. The type context
@@ -4957,7 +4968,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     continue;
                 }
             }
-            if !module_type_implicit_global_symbol(self.db(), name)
+            if !module_type_implicit_global_symbol(self.db(), self.file(), name)
                 .place
                 .is_undefined()
             {
@@ -4971,82 +4982,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             };
             let mut diag =
                 builder.into_diagnostic(format_args!("Invalid global declaration of `{name}`"));
-            diag.set_primary_message(format_args!(
+            diag.set_primary_annotation_message(format_args!(
                 "`{name}` has no declarations or bindings in the global scope"
             ));
             diag.info("This limits ty's ability to make accurate inferences about the boundness and types of global-scope symbols");
             diag.info(format_args!(
                 "Consider adding a declaration to the global scope, e.g. `{name}: int`"
             ));
-        }
-    }
-
-    fn infer_nonlocal_statement(&mut self, nonlocal: &ast::StmtNonlocal) {
-        let ast::StmtNonlocal {
-            node_index: _,
-            range,
-            names,
-        } = nonlocal;
-        let db = self.db();
-        let scope = self.scope();
-        let file_scope_id = scope.file_scope_id(db);
-
-        'names: for name in names {
-            // Walk up parent scopes looking for a possible enclosing scope that may have a
-            // definition of this name visible to us. Note that we skip the scope containing the
-            // use that we are resolving, since we already looked for the place there up above.
-            for (enclosing_scope_file_id, _) in self.index.ancestor_scopes(file_scope_id).skip(1) {
-                // Class scopes are not visible to nested scopes, and `nonlocal` cannot refer to
-                // globals, so check only function-like scopes.
-                let enclosing_scope = self.index.scope(enclosing_scope_file_id);
-                if !enclosing_scope.kind().is_function_like() {
-                    continue;
-                }
-                let enclosing_place_table = self.index.place_table(enclosing_scope_file_id);
-                let Some(enclosing_symbol_id) = enclosing_place_table.symbol_id(name) else {
-                    // This scope doesn't define this name. Keep going.
-                    continue;
-                };
-                let enclosing_symbol = enclosing_place_table.symbol(enclosing_symbol_id);
-                // We've found a definition for this name in an enclosing function-like scope.
-                // Either this definition is the valid place this name refers to, or else we'll
-                // emit a syntax error. Either way, we won't walk any more enclosing scopes. Note
-                // that there are differences here compared to `infer_place_load`: A regular load
-                // (e.g. `print(x)`) is allowed to refer to a global variable (e.g. `x = 1` in the
-                // global scope), and similarly it's allowed to refer to a local variable in an
-                // enclosing function that's declared `global` (e.g. `global x`). However, the
-                // `nonlocal` keyword can't refer to global variables (that's a `SyntaxError`), and
-                // it also can't refer to local variables in enclosing functions that are declared
-                // `global` (also a `SyntaxError`).
-                if enclosing_symbol.is_global() {
-                    // A "chain" of `nonlocal` statements is "broken" by a `global` statement. Stop
-                    // looping and report that this `nonlocal` statement is invalid.
-                    break;
-                }
-                if !enclosing_symbol.is_bound()
-                    && !enclosing_symbol.is_declared()
-                    && !enclosing_symbol.is_nonlocal()
-                {
-                    debug_assert!(enclosing_symbol.is_used());
-                    // The name is only referenced here, not defined. Keep going.
-                    continue;
-                }
-                // We found a definition. We've checked that the name isn't `global` in this scope,
-                // but it's ok if it's `nonlocal`. If a "chain" of `nonlocal` statements fails to
-                // lead to a valid binding, the outermost one will be an error; we don't need to
-                // walk the whole chain for each one.
-                continue 'names;
-            }
-            // There's no matching binding in an enclosing scope. This `nonlocal` statement is
-            // invalid.
-            if let Some(builder) = self
-                .context
-                .report_diagnostic(DiagnosticId::InvalidSyntax, Severity::Error)
-            {
-                builder
-                    .into_diagnostic(format_args!("no binding for nonlocal `{name}` found"))
-                    .annotate(Annotation::primary(self.context.span(*range)));
-            }
         }
     }
 
@@ -5063,6 +5005,33 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         } = decorator;
 
         self.infer_expression(expression, TypeContext::default())
+    }
+
+    /// Preserve the descriptor behavior of a transparent callable decorator when it is written
+    /// as the equivalent assignment form in a class body.
+    fn apply_desugared_decorator(
+        &mut self,
+        decorator_ty: Type<'db>,
+        call_expression: &ast::ExprCall,
+        return_ty: Type<'db>,
+    ) -> Type<'db> {
+        let arguments = &call_expression.arguments;
+        let [decorated_expression] = &arguments.args[..] else {
+            return return_ty;
+        };
+        if !arguments.keywords.is_empty() || decorated_expression.is_starred_expr() {
+            return return_ty;
+        }
+
+        let decorated_ty =
+            self.get_or_infer_expression(decorated_expression, TypeContext::default());
+        let call_arguments = CallArguments::positional([decorated_ty]);
+        let Ok(bindings) = decorator_ty.try_call(self.db(), &call_arguments) else {
+            return return_ty;
+        };
+
+        transparent_callable_decorator_result(self.db(), &bindings, decorated_ty)
+            .unwrap_or(return_ty)
     }
 
     /// Apply a decorator to a function or class type and return the resulting type.
@@ -5154,13 +5123,23 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         };
 
         let call_arguments = CallArguments::positional([decorated_ty]);
-        let return_ty = decorator_ty
-            .try_call(self.db(), &call_arguments)
-            .map(|bindings| bindings.return_type(self.db()))
-            .unwrap_or_else(|CallError(_, bindings)| {
-                bindings.report_diagnostics(&self.context, decorator_node.into());
-                bindings.return_type(self.db())
-            });
+        let (return_ty, decorator_bindings) =
+            match decorator_ty.try_call(self.db(), &call_arguments) {
+                Ok(bindings) => (bindings.return_type(self.db()), Some(bindings)),
+                Err(CallError(_, bindings)) => {
+                    bindings.report_diagnostics(&self.context, decorator_node.into());
+                    (bindings.return_type(self.db()), None)
+                }
+            };
+
+        // TODO: Remove this special case once the new constraint solver can preserve
+        // per-overload ParamSpec/return correlations for transparent callable decorators.
+        if let Some(decorator_bindings) = decorator_bindings.as_ref()
+            && let Some(result) =
+                transparent_callable_decorator_result(self.db(), decorator_bindings, decorated_ty)
+        {
+            return result;
+        }
 
         // When a method on a class is decorated with a function that returns a
         // `Callable`, assume that the returned callable is also function-like (or
@@ -5174,61 +5153,30 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .unwrap_or(return_ty)
     }
 
-    /// Infer the argument types for a single binding.
-    fn infer_argument_types<'a>(
-        &mut self,
-        ast_arguments: &ast::Arguments,
-        arguments: &mut CallArguments<'a, 'db>,
-        argument_forms: &[Option<ParameterForm>],
-    ) {
-        debug_assert!(
-            ast_arguments.len() == arguments.len() && arguments.len() == argument_forms.len()
-        );
-
-        let iter = itertools::izip!(
-            arguments.iter_mut(),
-            argument_forms.iter().copied(),
-            ast_arguments.iter_source_order()
-        );
-
-        for ((_, argument_types), argument_form, ast_argument) in iter {
-            // Splatted arguments are inferred before parameter matching to
-            // determine their length.
-            if ast_argument.is_variadic() {
-                continue;
-            }
-
-            let ty = self.infer_argument_type(
-                ast_argument.value(),
-                argument_form,
-                TypeContext::default(),
-            );
-            argument_types.insert(TypeContext::default(), ty);
-        }
-    }
-
     #[expect(clippy::too_many_arguments)]
     fn infer_and_try_call_dunder(
         &mut self,
         db: &'db dyn Db,
         object: Type<'db>,
         name: &str,
+        lookup_policy: MemberLookupPolicy,
         ast_arguments: ArgumentsIter<'_>,
         argument_types: &mut CallArguments<'_, 'db>,
         infer_argument_ty: &mut dyn FnMut(&mut Self, ArgExpr<'db, '_>) -> Type<'db>,
         call_expression_tcx: TypeContext<'db>,
     ) -> Result<Bindings<'db>, CallDunderError<'db>> {
         match object
-            .member_lookup_with_policy(db, name.into(), MemberLookupPolicy::NO_INSTANCE_FALLBACK)
+            .member_lookup_with_policy(db, name, lookup_policy)
             .place
         {
             Place::Defined(DefinedPlace {
                 ty: dunder_callable,
                 definedness: boundness,
+                provenance,
                 ..
             }) => {
-                let mut bindings = dunder_callable
-                    .bindings(db)
+                let mut bindings = self
+                    .bindings_for_call(dunder_callable)
                     .match_parameters(db, argument_types);
 
                 if let Err(call_error) = self.infer_and_check_argument_types(
@@ -5238,7 +5186,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     &mut bindings,
                     call_expression_tcx,
                 ) {
-                    return Err(CallDunderError::CallError(call_error, Box::new(bindings)));
+                    return Err(CallDunderError::CallError(
+                        call_error,
+                        Box::new(bindings),
+                        provenance,
+                    ));
                 }
 
                 if boundness == Definedness::PossiblyUndefined {
@@ -5263,11 +5215,67 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     ) -> Result<(), CallErrorKind> {
         let db = self.db();
         let constraints = ConstraintSetBuilder::new();
+        let initial_argument_types = argument_types.clone();
 
-        let has_generic_context = bindings
-            .iter_flat()
-            .flat_map(CallableBinding::overloads)
-            .any(|overload| overload.signature.generic_context.is_some());
+        // Keep track of which arguments match generic parameters.
+        let mut generic_arguments = SmallVec::<[bool; 8]>::with_capacity(argument_types.len());
+        generic_arguments.resize(argument_types.len(), false);
+
+        let mut max_typevar_occurrences = 0;
+        let mut has_generic_context = false;
+        let mut overload_candidates = OverloadSet::new();
+
+        // Compute the upper bound on fixpoint iteration, based on the maximum number of inferable
+        // typevar occurrences across all overload candidates. Note that the set of overload candidates
+        // stays stable across all iterations.
+        bindings.visit_type_context_callables(&mut |binding| {
+            let candidate_overload_indices = binding.candidate_overload_indices(db, argument_types);
+
+            has_generic_context |= candidate_overload_indices.iter().any(|&overload_index| {
+                binding.overloads()[overload_index]
+                    .signature
+                    .generic_context
+                    .is_some()
+            });
+
+            for overload_index in &candidate_overload_indices {
+                let overload = &binding.overloads()[*overload_index];
+                if overload.signature.generic_context.is_none() {
+                    continue;
+                }
+
+                let mut overload_typevar_occurrences = 0;
+                for (argument_index, is_generic) in generic_arguments.iter_mut().enumerate() {
+                    if argument_types.is_variadic(argument_index) {
+                        continue;
+                    }
+
+                    let typevar_occurrences =
+                        overload.typevar_occurrences_for_parameter(db, binding, argument_index);
+                    *is_generic |= typevar_occurrences > 0;
+                    overload_typevar_occurrences += typevar_occurrences;
+                }
+
+                max_typevar_occurrences = max_typevar_occurrences.max(overload_typevar_occurrences);
+            }
+
+            overload_candidates.push(candidate_overload_indices);
+        });
+
+        let generic_arguments: SmallVec<_> = generic_arguments
+            .into_iter()
+            .enumerate()
+            .filter_map(|(index, is_generic)| is_generic.then_some(index))
+            .collect();
+
+        // Enable the expression cache if we are going to perform multi-inference.
+        let teardown_expression_cache = if !generic_arguments.is_empty()
+            || requires_overload_evaluation(&overload_candidates)
+        {
+            self.setup_expression_cache()
+        } else {
+            false
+        };
 
         // If the type context is a union, attempt to narrow to a specific element.
         let narrow_targets = call_expression_tcx
@@ -5284,7 +5292,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     .signature
                     .generic_context
                     .map(|generic_context| generic_context.inferable_typevars(db))
-                    .unwrap_or(InferableTypeVars::None);
+                    .unwrap_or(TypeVarSet::None);
 
                 !overload
                     .return_ty
@@ -5298,27 +5306,39 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             let mut speculative_bindings = bindings.clone();
             let mut speculative_builder = self.speculate();
+            let mut speculative_argument_types = initial_argument_types.clone();
 
             // Attempt to infer the argument types using the narrowed type context.
-            speculative_builder.infer_all_argument_types(
-                ast_arguments.clone(),
-                argument_types,
-                infer_argument_ty,
-                bindings,
-                narrowed_tcx,
-            );
-
-            // Ensure the argument types match their annotated types.
-            if speculative_bindings
-                .check_types_impl(
-                    db,
+            //
+            // If there are matching generic parameters on any overload, we perform fixpoint
+            // iteration to allow call arguments to contribute type context constraints to
+            // other siblings.
+            let result = if !generic_arguments.is_empty() {
+                speculative_builder.infer_and_check_argument_types_unified(
+                    &ast_arguments,
+                    &mut speculative_argument_types,
+                    infer_argument_ty,
+                    &mut speculative_bindings,
                     &constraints,
-                    argument_types,
                     narrowed_tcx,
-                    &self.dataclass_field_specifiers,
+                    &generic_arguments,
+                    max_typevar_occurrences,
+                    &overload_candidates,
                 )
-                .is_err()
-            {
+            } else {
+                speculative_builder.infer_and_check_argument_types_simple(
+                    ast_arguments.clone(),
+                    &mut speculative_argument_types,
+                    &initial_argument_types,
+                    infer_argument_ty,
+                    &mut speculative_bindings,
+                    &constraints,
+                    narrowed_tcx,
+                    &overload_candidates,
+                )
+            };
+
+            if result.is_err() {
                 return None;
             }
 
@@ -5335,155 +5355,440 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
 
             // Successfully narrowed to an element of the union.
+            *bindings = speculative_bindings;
+            *argument_types = speculative_argument_types;
             self.extend(speculative_builder);
-            Some(bindings.check_types_impl(
-                db,
-                &constraints,
-                argument_types,
-                narrowed_tcx,
-                &self.dataclass_field_specifiers,
-            ))
+
+            Some(result)
         };
 
         // Prefer the declared type of generic classes or callables when narrowing.
         //
         // Splitting up this loop is not necessary for correctness, but leads to a slight
         // performance improvement.
-        for narrowed_ty in narrow_targets
-            .iter()
-            .filter(|ty| ty.may_prefer_declared_type(db))
-        {
+        for narrowed_ty in std::iter::chain(
+            narrow_targets
+                .iter()
+                .filter(|ty| ty.may_prefer_declared_type(db)),
+            narrow_targets
+                .iter()
+                .filter(|ty| !ty.may_prefer_declared_type(db)),
+        ) {
             if let Some(result) = try_narrow(*narrowed_ty) {
+                if teardown_expression_cache {
+                    self.teardown_expression_cache();
+                }
+
                 return result;
             }
         }
-        for narrowed_ty in narrow_targets
-            .iter()
-            .filter(|ty| !ty.may_prefer_declared_type(db))
-        {
-            if let Some(result) = try_narrow(*narrowed_ty) {
-                return result;
-            }
-        }
+
+        *argument_types = initial_argument_types.clone();
 
         // Infer against the entire union as a fallback.
         //
         // TODO: We could also attempt an inference without type context, but this
         // leads to similar performance issues.
-        self.infer_all_argument_types(
-            ast_arguments,
-            argument_types,
-            infer_argument_ty,
+        let result = if !generic_arguments.is_empty() {
+            self.infer_and_check_argument_types_unified(
+                &ast_arguments,
+                argument_types,
+                infer_argument_ty,
+                bindings,
+                &constraints,
+                call_expression_tcx,
+                &generic_arguments,
+                max_typevar_occurrences,
+                &overload_candidates,
+            )
+        } else {
+            self.infer_and_check_argument_types_simple(
+                ast_arguments,
+                argument_types,
+                &initial_argument_types,
+                infer_argument_ty,
+                bindings,
+                &constraints,
+                call_expression_tcx,
+                &overload_candidates,
+            )
+        };
+
+        if teardown_expression_cache {
+            self.teardown_expression_cache();
+        }
+
+        result
+    }
+
+    #[expect(clippy::too_many_arguments)]
+    fn infer_and_check_argument_types_simple<'call>(
+        &mut self,
+        ast_arguments: ArgumentsIter<'_>,
+        argument_types: &mut CallArguments<'call, 'db>,
+        baseline_argument_types: &CallArguments<'call, 'db>,
+        infer_argument_ty: &mut dyn FnMut(&mut Self, ArgExpr<'db, '_>) -> Type<'db>,
+        bindings: &mut Bindings<'db>,
+        constraints: &ConstraintSetBuilder<'db>,
+        call_expression_tcx: TypeContext<'db>,
+        candidates: &OverloadSet,
+    ) -> Result<(), CallErrorKind> {
+        let requires_overload_evaluation = requires_overload_evaluation(candidates);
+        let arguments_tcx = self.collect_call_arguments_type_context(
+            baseline_argument_types,
             bindings,
+            requires_overload_evaluation.then_some(candidates),
+            constraints,
             call_expression_tcx,
         );
 
-        bindings.check_types_impl(
-            db,
-            &constraints,
+        // If we are not inferring against multiple overloads, we can infer the arguments
+        // and check the binding directly.
+        if !requires_overload_evaluation {
+            self.infer_all_argument_types(
+                ast_arguments,
+                argument_types,
+                &arguments_tcx,
+                infer_argument_ty,
+                CallArgumentInferenceMode::Commit,
+            );
+
+            return bindings.check_types_impl(
+                self.db(),
+                constraints,
+                argument_types,
+                call_expression_tcx,
+                &self.dataclass_field_specifiers,
+                CheckTypesMode::Finalize,
+            );
+        }
+
+        // Otherwise, we first infer the argument types speculatively.
+        let mut speculative_builder = self.speculate();
+        speculative_builder.infer_all_argument_types(
+            ast_arguments.clone(),
+            argument_types,
+            &arguments_tcx,
+            infer_argument_ty,
+            // If there are multiple matching overloads, we will re-infer with the final set
+            // of matching overloads after overload evaluation, and so can avoid the default
+            // inference here.
+            CallArgumentInferenceMode::Speculate,
+        );
+
+        let result = bindings.check_types_impl(
+            self.db(),
+            constraints,
             argument_types,
             call_expression_tcx,
             &self.dataclass_field_specifiers,
-        )
+            CheckTypesMode::Finalize,
+        );
+
+        let checked_argument_types = argument_types.clone();
+        *argument_types = baseline_argument_types.clone();
+
+        // And re-infer argument types after overload evaluation, ensuring that only
+        // inferred types and diagnostics from matching overloads are preserved.
+        let arguments_tcx = self.collect_call_arguments_type_context(
+            &checked_argument_types,
+            bindings,
+            None,
+            constraints,
+            call_expression_tcx,
+        );
+        self.infer_all_argument_types(
+            ast_arguments,
+            argument_types,
+            &arguments_tcx,
+            infer_argument_ty,
+            CallArgumentInferenceMode::Commit,
+        );
+        self.union_expected_types(&speculative_builder.expected_types);
+
+        result
     }
 
-    /// Infer the argument types for all bindings.
-    ///
-    /// Note that this method may infer the type of a given argument expression multiple times with
-    /// distinct type context. The provided `MultiInferenceState` can be used to dictate multi-inference
-    /// behavior.
-    fn infer_all_argument_types<'bindings>(
+    /// Infer generic call arguments under fixpoint iteration, allowing arguments to contribute
+    /// type context constraints to other siblings.
+    #[expect(clippy::too_many_arguments)]
+    fn infer_and_check_argument_types_unified(
         &mut self,
-        ast_arguments: ArgumentsIter<'_>,
-        arguments_types: &mut CallArguments<'_, 'db>,
+        ast_arguments: &ArgumentsIter<'_>,
+        argument_types: &mut CallArguments<'_, 'db>,
         infer_argument_ty: &mut dyn FnMut(&mut Self, ArgExpr<'db, '_>) -> Type<'db>,
-        bindings: &'bindings Bindings<'db>,
+        bindings: &mut Bindings<'db>,
+        constraints: &ConstraintSetBuilder<'db>,
         call_expression_tcx: TypeContext<'db>,
-    ) {
+        generic_arguments: &SmallVec<[usize; 4]>,
+        typevar_occurrences: usize,
+        candidates: &OverloadSet,
+    ) -> Result<(), CallErrorKind> {
+        let db = self.db();
+        let requires_overload_evaluation = requires_overload_evaluation(candidates);
+
+        let mut arguments_tcx = self.collect_call_arguments_type_context(
+            argument_types,
+            bindings,
+            Some(candidates),
+            constraints,
+            call_expression_tcx,
+        );
+
+        let mut iteration = 0;
+        let mut next_bindings = bindings.clone();
+        let mut prev_argument_types = argument_types.clone();
+
+        let (converged_builder, converged_argument_types) = loop {
+            let mut next_argument_types = argument_types.clone();
+
+            // Infer the argument types for the current iteration.
+            let mut speculative_builder = self.speculate();
+            speculative_builder.infer_all_argument_types(
+                ast_arguments.clone(),
+                &mut next_argument_types,
+                &arguments_tcx,
+                infer_argument_ty,
+                if requires_overload_evaluation {
+                    // If there are multiple matching overloads, we will re-infer with the final set
+                    // of matching overloads after overload evaluation, and so can avoid the default
+                    // inference here.
+                    CallArgumentInferenceMode::Speculate
+                } else {
+                    CallArgumentInferenceMode::Commit
+                },
+            );
+
+            let inferred_types_converged = next_argument_types
+                .inferred_types_equal_at(&prev_argument_types, generic_arguments);
+
+            // If the inferred types have converged, and already evaluated the bindings from the
+            // previous iteration, we are done.
+            if iteration > 0 && inferred_types_converged {
+                break (speculative_builder, next_argument_types);
+            }
+
+            // Otherwise, we have to evaluate the bindings against the newly inferred types.
+            next_bindings = bindings.clone();
+            let _ = next_bindings.check_types_impl(
+                db,
+                constraints,
+                &next_argument_types,
+                call_expression_tcx,
+                &self.dataclass_field_specifiers,
+                CheckTypesMode::Provisional,
+            );
+
+            // The number of occurrences of inferable typevars forms an upper bound for the number
+            // of fixpoint iterations, and so if the types have converged, or we have reached the
+            // upper bound, we are done.
+            if inferred_types_converged || iteration == typevar_occurrences {
+                break (speculative_builder, next_argument_types);
+            }
+
+            // Collect the argument constraints based on the newly inferred types.
+            let next_arguments_tcx = self.collect_call_arguments_type_context(
+                &next_argument_types,
+                &next_bindings,
+                Some(candidates),
+                constraints,
+                call_expression_tcx,
+            );
+
+            // If the argument constraints have converged, the inferred types will be identical,
+            // and so we can exit early.
+            if generic_arguments
+                .iter()
+                .all(|&index| arguments_tcx.get(index) == next_arguments_tcx.get(index))
+            {
+                break (speculative_builder, next_argument_types);
+            }
+
+            iteration += 1;
+            arguments_tcx = next_arguments_tcx;
+            prev_argument_types = next_argument_types;
+        };
+
+        // Discard any non-matching constructors overloads now that the inferred types have converged.
+        let result = next_bindings.finalize_argument_inference(
+            db,
+            &converged_argument_types,
+            &self.dataclass_field_specifiers,
+        );
+
+        // If the set of candidate bindings contained multiple matching overloads, re-infer the argument
+        // types against the final set of matching overloads, such that only the relevant diagnostics
+        // and inferred types are preserved.
+        if requires_overload_evaluation {
+            let arguments_tcx = self.collect_call_arguments_type_context(
+                &converged_argument_types,
+                &next_bindings,
+                None,
+                constraints,
+                call_expression_tcx,
+            );
+
+            self.infer_all_argument_types(
+                ast_arguments.clone(),
+                argument_types,
+                &arguments_tcx,
+                infer_argument_ty,
+                CallArgumentInferenceMode::Commit,
+            );
+
+            self.union_expected_types(&converged_builder.expected_types);
+        } else {
+            // Otherwise, we can simply use the newly inferred types.
+            *argument_types = converged_argument_types;
+            self.extend(converged_builder);
+        }
+
+        *bindings = next_bindings;
+        result
+    }
+
+    /// Collects the type contexts used to infer the arguments of a call expression.
+    fn collect_call_arguments_type_context<'bindings>(
+        &self,
+        argument_types: &CallArguments<'_, 'db>,
+        bindings: &'bindings Bindings<'db>,
+        candidates: Option<&'bindings OverloadSet>,
+        constraints: &ConstraintSetBuilder<'db>,
+        call_expression_tcx: TypeContext<'db>,
+    ) -> Vec<Option<MatchingArgumentTypeContext<'db>>> {
+        type OverloadsWithBinding<'a, 'db> = Vec<(
+            &'a Binding<'db>,
+            &'a CallableBinding<'db>,
+            Option<Specialization<'db>>,
+        )>;
+
         fn add_overloads_from_binding<'a, 'db>(
-            overloads_with_binding: &mut Vec<(&'a Binding<'db>, &'a CallableBinding<'db>)>,
+            db: &'db dyn Db,
+            overloads_with_binding: &mut OverloadsWithBinding<'a, 'db>,
             binding: &'a CallableBinding<'db>,
+            constraints: &ConstraintSetBuilder<'db>,
+            call_expression_tcx: TypeContext<'db>,
         ) {
-            match binding.matching_overload_index() {
-                MatchingOverloadIndex::Single(_) | MatchingOverloadIndex::Multiple(_) => {
-                    overloads_with_binding.extend(
-                        binding
-                            .matching_overloads()
-                            .map(|(_, overload)| (overload, binding)),
+            let mut matching_overloads = binding.matching_overloads().peekable();
+            if matching_overloads.peek().is_some() {
+                overloads_with_binding.extend(matching_overloads.map(|(_, overload)| {
+                    let specialization = overload.argument_type_context_specialization(
+                        db,
+                        constraints,
+                        call_expression_tcx,
                     );
-                }
+
+                    (overload, binding, specialization)
+                }));
+            } else if let Some(overload) = binding.best_failing_overload() {
+                let specialization = overload.argument_type_context_specialization(
+                    db,
+                    constraints,
+                    call_expression_tcx,
+                );
 
                 // If there is a single overload that does not match, we still infer the argument
                 // types for better diagnostics.
-                MatchingOverloadIndex::None => {
-                    if let [overload] = binding.overloads() {
-                        overloads_with_binding.push((overload, binding));
-                    }
-                }
+                overloads_with_binding.push((overload, binding, specialization));
             }
         }
-
-        debug_assert_eq!(arguments_types.len(), bindings.argument_forms().len());
 
         let db = self.db();
-        let constraints = ConstraintSetBuilder::new();
 
-        let mut overloads_with_binding: Vec<(&Binding<'db>, &CallableBinding<'db>)> = Vec::new();
-
-        bindings.visit_type_context_callables(&mut |binding| {
-            add_overloads_from_binding(&mut overloads_with_binding, binding);
-        });
-
-        // A keyword argument matched to `**P.kwargs` can appear before the keyword argument that
-        // binds `P`, e.g. `wrapper(TagSet=[...], func=put_object)`. Seed those binder argument
-        // types first so the normal ParamSpec context path below is not source-order dependent.
-        for (argument_index, (argument_form, ast_argument)) in bindings
-            .argument_forms()
-            .iter()
-            .copied()
-            .zip(ast_arguments.clone())
-            .enumerate()
-        {
-            if ast_argument.is_variadic() {
-                continue;
-            }
-            let ast_argument = ast_argument.value();
-
-            if matches!(argument_form, Some(ParameterForm::Type)) {
-                continue;
-            }
-
-            let mut inferred_declared_types = FxHashSet::default();
-            for declared_type in overloads_with_binding
-                .iter()
-                .filter_map(|(overload, binding)| {
-                    overload.paramspec_binder_parameter_type(db, binding, argument_index)
-                })
-            {
-                if !inferred_declared_types.insert(declared_type) {
-                    continue;
-                }
-
-                let mut speculative_builder = self.speculate();
-                let inferred_ty = infer_argument_ty(
-                    &mut speculative_builder,
-                    (
-                        argument_index,
-                        ast_argument,
-                        TypeContext::new(Some(declared_type)),
-                    ),
+        // Collect the set of candidate overloads and bindings.
+        let mut overloads_with_binding: OverloadsWithBinding = Vec::new();
+        if let Some(candidates) = candidates {
+            bindings.visit_overload_set(candidates, &mut |overload, binding| {
+                let specialization = overload.argument_type_context_specialization(
+                    db,
+                    constraints,
+                    call_expression_tcx,
                 );
-                arguments_types.insert_type(argument_index, declared_type, inferred_ty);
-            }
+
+                overloads_with_binding.push((overload, binding, specialization));
+            });
+        } else {
+            bindings.visit_type_context_callables(&mut |binding| {
+                add_overloads_from_binding(
+                    db,
+                    &mut overloads_with_binding,
+                    binding,
+                    constraints,
+                    call_expression_tcx,
+                );
+            });
         }
 
-        for (argument_index, (argument_form, ast_argument)) in bindings
-            .argument_forms()
-            .iter()
-            .copied()
-            .zip(ast_arguments)
-            .enumerate()
-        {
+        // Collect the type context of each argument from each matching overload.
+        (0..argument_types.len())
+            .map(|argument_index| {
+                if argument_types.is_variadic(argument_index) {
+                    return None;
+                }
+
+                let parameter_tcx =
+                    |overload: &Binding<'db>, binding: &CallableBinding<'db>, specialization| {
+                        overload.argument_type_context(
+                            db,
+                            constraints,
+                            binding,
+                            argument_types,
+                            argument_index,
+                            call_expression_tcx,
+                            specialization,
+                        )
+                    };
+
+                let parameter_contexts = if let Ok((overload, binding, specialization)) =
+                    overloads_with_binding.iter().exactly_one()
+                {
+                    MatchingArgumentTypeContext::Unique(parameter_tcx(
+                        overload,
+                        binding,
+                        *specialization,
+                    ))
+                } else {
+                    MatchingArgumentTypeContext::Many(
+                        overloads_with_binding
+                            .iter()
+                            .map(|(overload, binding, specialization)| {
+                                parameter_tcx(overload, binding, *specialization)
+                            })
+                            .collect(),
+                    )
+                };
+
+                Some(parameter_contexts)
+            })
+            .collect()
+    }
+
+    /// Infers every call argument using the provided set of type context.
+    fn infer_all_argument_types(
+        &mut self,
+        ast_arguments: ArgumentsIter<'_>,
+        argument_types: &mut CallArguments<'_, 'db>,
+        arguments_tcx: &[Option<MatchingArgumentTypeContext<'db>>],
+        infer_argument_ty: &mut dyn FnMut(&mut Self, ArgExpr<'db, '_>) -> Type<'db>,
+        mode: CallArgumentInferenceMode,
+    ) {
+        let insert_argument_ty =
+            |argument_index,
+             inferred_ty,
+             argument_tcx: &Option<ArgumentTypeContext<'db>>,
+             argument_types: &mut CallArguments<'_, 'db>| {
+                if let Some(argument_tcx) = argument_tcx {
+                    argument_tcx.insert_inferred_type_into(
+                        argument_types,
+                        argument_index,
+                        inferred_ty,
+                    );
+                } else {
+                    argument_types.insert_type(argument_index, TypeContext::default(), inferred_ty);
+                }
+            };
+
+        for (argument_index, ast_argument) in ast_arguments.enumerate() {
             // Splatted arguments are inferred before parameter matching to
             // determine their length.
             //
@@ -5493,134 +5798,91 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
             let ast_argument = ast_argument.value();
 
-            // Type-form arguments are inferred without type context, so we can infer the argument type directly.
-            if let Some(ParameterForm::Type) = argument_form {
-                arguments_types.insert_type(
-                    argument_index,
-                    TypeContext::default(),
-                    self.infer_type_expression(ast_argument),
-                );
-
+            let Some(argument_tcx) = &arguments_tcx[argument_index] else {
                 continue;
-            }
-
-            let parameter_tcx = |overload: &'bindings Binding<'db>,
-                                 binding: &CallableBinding<'db>| {
-                overload.argument_type_context(
-                    db,
-                    &constraints,
-                    binding,
-                    arguments_types,
-                    argument_index,
-                    call_expression_tcx,
-                )
             };
 
-            // If there is only a single binding and overload, we can infer the argument directly with
-            // the unique parameter type annotation.
-            if let Ok((overload, binding)) = overloads_with_binding.iter().exactly_one() {
-                let parameter_context = parameter_tcx(overload, binding);
-
-                if let Some(parameter_context) = parameter_context {
-                    let inferred_ty = infer_argument_ty(
-                        self,
-                        (
-                            argument_index,
-                            ast_argument,
-                            parameter_context.type_context(),
-                        ),
-                    );
-                    parameter_context.insert_inferred_type(
-                        arguments_types,
-                        argument_index,
-                        inferred_ty,
-                    );
-                } else {
-                    let inferred_ty = infer_argument_ty(
-                        self,
-                        (argument_index, ast_argument, TypeContext::default()),
-                    );
-                    arguments_types.insert_type(
-                        argument_index,
-                        TypeContext::default(),
-                        inferred_ty,
-                    );
+            match argument_tcx {
+                MatchingArgumentTypeContext::Unique(argument_tcx) => {
+                    let tcx = argument_tcx
+                        .map(ArgumentTypeContext::type_context)
+                        .unwrap_or_default();
+                    let inferred_ty = infer_argument_ty(self, (argument_index, ast_argument, tcx));
+                    insert_argument_ty(argument_index, inferred_ty, argument_tcx, argument_types);
                 }
-            } else {
-                // Infer the type of each argument once with each distinct parameter type as type context.
-                let parameter_contexts: Vec<_> = overloads_with_binding
-                    .iter()
-                    .filter_map(|(overload, binding)| parameter_tcx(overload, binding))
-                    .collect();
 
-                // We perform inference once without any type context, emitting any diagnostics that are unrelated
-                // to bidirectional type inference.
-                let default_ty =
-                    infer_argument_ty(self, (argument_index, ast_argument, TypeContext::default()));
-                arguments_types.insert_type(argument_index, TypeContext::default(), default_ty);
+                MatchingArgumentTypeContext::Many(argument_tcx) => {
+                    let mut inferred_by_cache_key = FxHashMap::default();
 
-                let mut inferred_by_cache_key = FxHashMap::default();
+                    // If there are multiple applicable type contexts and we are not in
+                    // speculative mode, infer the argument without type context as the
+                    // default inference.
+                    if mode.requires_default_inference() {
+                        let inferred_ty = infer_argument_ty(
+                            self,
+                            (argument_index, ast_argument, TypeContext::default()),
+                        );
 
-                // Cache expressions inferred across speculative inference attempts.
-                //
-                // This is important to avoid exponential blowup for deeply nested generic calls,
-                // as inner expressions are repeatedly inferred with the same type context.
-                let teardown = self.setup_expression_cache();
-
-                for parameter_context in parameter_contexts {
-                    let inference_cache_key = parameter_context.inference_cache_key();
-                    if let Some(inferred_ty) =
-                        inferred_by_cache_key.get(&inference_cache_key).copied()
-                    {
-                        // Even when the inference cache key is identical, this overload may later
-                        // look up the inferred type through a different original `ParamSpec`
-                        // annotation, so insert through its own context.
-                        parameter_context.insert_inferred_type(
-                            arguments_types,
+                        argument_types.insert_type(
                             argument_index,
+                            TypeContext::default(),
                             inferred_ty,
                         );
-                        continue;
+
+                        inferred_by_cache_key.insert(None, inferred_ty);
                     }
 
-                    // We use a speculative builder to silence any diagnostics emitted during multi-inference, as the
-                    // type context is only used as a hint to infer a more assignable argument type, and should not lead
-                    // to diagnostics for non-matching overloads.
-                    let mut speculative_builder = self.speculate();
-                    let inferred_ty = infer_argument_ty(
-                        &mut speculative_builder,
-                        (
+                    // Cache expressions inferred across speculative inference attempts.
+                    //
+                    // This is important to avoid exponential blowup for deeply nested generic calls,
+                    // as inner expressions are repeatedly inferred with the same type context.
+                    let teardown_expression_cache = self.setup_expression_cache();
+
+                    for argument_tcx in argument_tcx {
+                        let inference_cache_key =
+                            argument_tcx.map(ArgumentTypeContext::inference_cache_key);
+                        if let Some(inferred_ty) =
+                            inferred_by_cache_key.get(&inference_cache_key).copied()
+                        {
+                            // Even when the inference cache key is identical, this overload may later
+                            // look up the inferred type through a different original `ParamSpec`
+                            // annotation, so insert through its own context.
+                            insert_argument_ty(
+                                argument_index,
+                                inferred_ty,
+                                argument_tcx,
+                                argument_types,
+                            );
+
+                            continue;
+                        }
+
+                        let tcx = argument_tcx
+                            .map(ArgumentTypeContext::type_context)
+                            .unwrap_or_default();
+
+                        let mut speculative_builder = self.speculate();
+                        let inferred_ty = infer_argument_ty(
+                            &mut speculative_builder,
+                            (argument_index, ast_argument, tcx),
+                        );
+
+                        insert_argument_ty(
                             argument_index,
-                            ast_argument,
-                            parameter_context.type_context(),
-                        ),
-                    );
+                            inferred_ty,
+                            argument_tcx,
+                            argument_types,
+                        );
 
-                    inferred_by_cache_key.insert(inference_cache_key, inferred_ty);
-                    self.union_expected_types(&speculative_builder.expected_types);
-                    parameter_context.insert_inferred_type(
-                        arguments_types,
-                        argument_index,
-                        inferred_ty,
-                    );
-                }
+                        inferred_by_cache_key.insert(inference_cache_key, inferred_ty);
+                        self.union_expected_types(&speculative_builder.expected_types);
+                    }
 
-                if teardown {
-                    self.teardown_expression_cache();
+                    if teardown_expression_cache {
+                        self.teardown_expression_cache();
+                    }
                 }
             }
-        }
-    }
-
-    fn infer_argument_type(
-        &mut self,
-        ast_argument: &ast::Expr,
-        form: Option<ParameterForm>,
-        tcx: TypeContext<'db>,
-    ) -> Type<'db> {
-        match form {
-            None | Some(ParameterForm::Value) => self.infer_expression(ast_argument, tcx),
-            Some(ParameterForm::Type) => self.infer_type_expression(ast_argument),
         }
     }
 
@@ -5679,6 +5941,57 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
     }
 
+    fn infer_expression_with_collection_literal_peer_context(
+        &mut self,
+        expression: &ast::Expr,
+        tcx: TypeContext<'db>,
+        peer_ty: Option<Type<'db>>,
+    ) -> Type<'db> {
+        self.infer_with_collection_literal_peer_context(expression, tcx, peer_ty, |builder, tcx| {
+            builder.infer_expression(expression, tcx)
+        })
+    }
+
+    fn infer_maybe_standalone_expression_with_collection_literal_peer_context(
+        &mut self,
+        expression: &ast::Expr,
+        tcx: TypeContext<'db>,
+        peer_ty: Option<Type<'db>>,
+    ) -> Type<'db> {
+        self.infer_with_collection_literal_peer_context(expression, tcx, peer_ty, |builder, tcx| {
+            builder.infer_maybe_standalone_expression(expression, tcx)
+        })
+    }
+
+    fn infer_with_collection_literal_peer_context(
+        &mut self,
+        expression: &ast::Expr,
+        tcx: TypeContext<'db>,
+        peer_ty: Option<Type<'db>>,
+        mut infer_expression: impl FnMut(&mut Self, TypeContext<'db>) -> Type<'db>,
+    ) -> Type<'db> {
+        let peer_tcx = if is_empty_collection_type_context(tcx)
+            && is_collection_literal(expression)
+            && let Some(peer_ty) = peer_ty
+        {
+            TypeContext::new(Some(peer_ty))
+        } else {
+            return infer_expression(self, tcx);
+        };
+
+        let mut speculative_builder = self.speculate();
+        let ty = infer_expression(&mut speculative_builder, peer_tcx);
+
+        // Peer context is only an inference hint. If it introduces diagnostics, discard it and
+        // infer normally so that only diagnostics intrinsic to the expression are reported.
+        if speculative_builder.context.has_diagnostics() {
+            infer_expression(self, tcx)
+        } else {
+            self.extend(speculative_builder);
+            ty
+        }
+    }
+
     #[track_caller]
     fn infer_standalone_expression(
         &mut self,
@@ -5711,27 +6024,60 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         expression: &ast::Expr,
         tcx: TypeContext<'db>,
     ) -> Type<'db> {
-        if let Some(ty) = self.expression_cache.as_ref().and_then(|expression_cache| {
-            expression_cache
-                .borrow()
-                .get(&(expression.into(), tcx))
-                .copied()
-        }) {
-            self.store_expression_type(expression, ty);
-            return ty;
-        }
+        let Some(expression_cache) = &self.expression_cache else {
+            return self.infer_expression_uncached(expression, tcx);
+        };
 
+        // See if we already have a cached entry for this expression.
+        let expression_key = expression.into();
+        let cache_entry = expression_cache.borrow().get(expression_key, tcx).cloned();
+
+        match cache_entry {
+            Some(ExpressionCacheEntry::Small(ty)) => {
+                self.store_expression_type(expression, ty);
+                ty
+            }
+
+            Some(ExpressionCacheEntry::Full(inference)) => {
+                let ty = inference.expression_type(expression_key);
+                self.extend_expression_cache_entry(&inference);
+                ty
+            }
+
+            _ => {
+                // The expression is uncached, infer it independently and cache the inference results.
+                let mut speculative_builder = self.speculate();
+                let ty = speculative_builder.infer_expression_uncached(expression, tcx);
+                let inference = speculative_builder.into_expression_cache_entry();
+
+                let cached = if inference.is_single_expression(expression_key, ty) {
+                    self.store_expression_type(expression, ty);
+                    ExpressionCacheEntry::Small(ty)
+                } else {
+                    self.extend_expression_cache_entry(&inference);
+                    ExpressionCacheEntry::Full(Rc::new(inference))
+                };
+
+                if let Some(expression_cache) = &self.expression_cache {
+                    expression_cache
+                        .borrow_mut()
+                        .insert(expression_key, tcx, cached);
+                }
+
+                ty
+            }
+        }
+    }
+
+    fn infer_expression_uncached(
+        &mut self,
+        expression: &ast::Expr,
+        tcx: TypeContext<'db>,
+    ) -> Type<'db> {
         if let Some(target) = tcx.annotation
             && let Some(ty) = self.infer_type_form_contextual_expression(expression, target)
         {
             self.store_expression_type(expression, ty);
-
-            if let Some(expression_cache) = &self.expression_cache {
-                expression_cache
-                    .borrow_mut()
-                    .insert((expression.into(), tcx), ty);
-            }
-
             return ty;
         }
 
@@ -5747,7 +6093,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         expression: &ast::Expr,
         tcx: TypeContext<'db>,
     ) -> Type<'db> {
-        let mut ty = match expression {
+        let ty = match expression {
             ast::Expr::NoneLiteral(ast::ExprNoneLiteral {
                 range: _,
                 node_index: _,
@@ -5773,8 +6119,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 self.infer_dict_comprehension_expression(dictcomp, tcx)
             }
             ast::Expr::SetComp(setcomp) => self.infer_set_comprehension_expression(setcomp, tcx),
-            ast::Expr::Name(name) => self.infer_name_expression(name),
-            ast::Expr::Attribute(attribute) => self.infer_attribute_expression(attribute),
+            ast::Expr::Name(name) => {
+                let ty = self.infer_name_expression(name);
+                tcx.annotation.map_or(ty, |target| {
+                    self.specialize_generic_class_from_context(ty, target)
+                })
+            }
+            ast::Expr::Attribute(attribute) => {
+                let ty = self.infer_attribute_expression(attribute);
+                tcx.annotation.map_or(ty, |target| {
+                    self.specialize_generic_class_from_context(ty, target)
+                })
+            }
             ast::Expr::UnaryOp(unary_op) => self.infer_unary_expression(unary_op),
             ast::Expr::BinOp(binary) => self.infer_binary_expression(binary, tcx),
             ast::Expr::BoolOp(bool_op) => self.infer_boolean_expression(bool_op, tcx),
@@ -5798,19 +6154,31 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         };
 
+        let ty = self.apply_type_context(expression, ty, tcx);
+        self.store_expression_type(expression, ty);
+        ty
+    }
+
+    /// Applies the provided type context to an already inferred type.
+    fn apply_type_context(
+        &mut self,
+        expression: &ast::Expr,
+        mut ty: Type<'db>,
+        tcx: TypeContext<'db>,
+    ) -> Type<'db> {
         // Avoid promoting explicitly annotated literal values.
         if let Type::LiteralValue(literal) = ty
             && let Some(tcx) = tcx.annotation
-            && let Type::Union(_) | Type::LiteralValue(_) = tcx
+            && let literal_tcx @ (Type::Union(_) | Type::LiteralValue(_)) = tcx
                 .resolve_type_alias(self.db())
                 .filter_union(self.db(), |ty| ty.as_literal_value().is_some())
-            && ty.is_assignable_to(self.db(), tcx)
+            && ty.is_assignable_to(self.db(), literal_tcx)
         {
             ty = Type::LiteralValue(literal.to_unpromotable());
         }
 
         if let Some(tcx) = tcx.annotation
-            && let Some(collection_def) = self.index.unconstrained_collection_binding(expression)
+            && let Some(collection_def) = self.index.unannotated_collection_initializer(expression)
         {
             self.collection_use_constraints
                 .entry(collection_def)
@@ -5818,15 +6186,148 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .insert(tcx);
         }
 
-        self.store_expression_type(expression, ty);
+        ty
+    }
 
-        if let Some(expression_cache) = &self.expression_cache {
-            expression_cache
-                .borrow_mut()
-                .insert((expression.into(), tcx), ty);
+    /// Specialize a bare generic class value based on type context.
+    ///
+    /// Currently supports only Callable type contexts.
+    ///
+    /// This lets `list` in a `Callable[[], list[str]]` context be treated as `list[str]`.
+    fn specialize_generic_class_from_context(&self, ty: Type<'db>, target: Type<'db>) -> Type<'db> {
+        // TODO: The constraint-set assignability rules should already be
+        // able to determine that `list` (coerced into a callable) is assignable
+        // to `Callable[[], list[str]]` when `_T@list = str`. However, when
+        // comparing callables, if either is generic, we existentially quantify
+        // away its typevars, transforming `∃ _T@list . _T@list = str` into
+        // `always`. If we _didn't_ perform that quantification, we would have
+        // the information we need to choose an appropriate specialization of
+        // `list` given the type context, and we wouldn't have to duplicate all
+        // of the logic below.
+        let Type::ClassLiteral(class) = ty else {
+            return ty;
+        };
+        let db = self.db();
+        let exactly_one_callable = |union: UnionType<'db>| {
+            union
+                .elements(db)
+                .iter()
+                .filter_map(|element| element.resolve_type_alias(db).as_callable())
+                .exactly_one()
+                .ok()
+        };
+        let Some(target_callable) = (match target {
+            Type::Callable(callable) => Some(callable),
+            Type::Union(union) => exactly_one_callable(union),
+            Type::TypeAlias(_) => match target.resolve_type_alias(db) {
+                Type::Callable(callable) => Some(callable),
+                Type::Union(union) => exactly_one_callable(union),
+                _ => None,
+            },
+            _ => None,
+        }) else {
+            return ty;
+        };
+        // Callables made entirely of dynamic types provide no constraints for specializing the
+        // class. The same is true for a parameterless context whose return type is an
+        // unspecialized variable from an enclosing generic call.
+        if target_callable.signatures(db).iter().all(|signature| {
+            let parameters = signature.parameters().as_slice();
+            (signature.return_ty.is_dynamic()
+                && parameters
+                    .iter()
+                    .all(|parameter| parameter.annotated_type().is_dynamic()))
+                || (parameters.is_empty()
+                    && matches!(
+                        signature.return_ty,
+                        Type::Dynamic(DynamicType::UnspecializedTypeVar)
+                    ))
+        }) {
+            return ty;
+        }
+        let Some(class_generic_context) = class.generic_context(db) else {
+            return ty;
+        };
+        let Some(source_callable) = ty.try_upcast_to_callable(db) else {
+            return ty;
+        };
+        // The callable relation existentially solves variables bound by each signature. Keep
+        // method-local constructor variables scoped there, but expose class variables to this
+        // outer contextual-specialization solve.
+        let source_callable = source_callable.map(|callable| {
+            let signatures = CallableSignature::from_overloads(
+                callable.signatures(db).overloads.iter().map(|signature| {
+                    let signature_generic_context = signature.generic_context.and_then(|context| {
+                        let mut variables = context
+                            .variables(db)
+                            .filter(|typevar| {
+                                !class_generic_context.contains(db, typevar.identity(db))
+                            })
+                            .peekable();
+                        variables
+                            .peek()
+                            .is_some()
+                            .then(|| GenericContext::from_typevar_instances(db, variables))
+                    });
+                    Signature::new_generic(
+                        signature_generic_context,
+                        signature.parameters().clone(),
+                        signature.return_ty,
+                    )
+                    .with_definition(signature.definition())
+                }),
+            );
+            CallableType::new(db, signatures, callable.kind(db), callable.provenance(db))
+        });
+        let inferable = class_generic_context.inferable_typevars(db);
+        let constraints = ConstraintSetBuilder::new();
+        let path_bounds = source_callable
+            .into_type(db)
+            .assignable_solutions_with_inferable(db, Type::Callable(target_callable), inferable);
+        let Solutions::Constrained(solutions) = path_bounds.solve(db, &constraints) else {
+            return ty;
+        };
+
+        let mut type_context_mappings: FxHashMap<BoundTypeVarIdentity<'db>, UnionAccumulator<'db>> =
+            FxHashMap::default();
+        for solution in solutions {
+            for binding in solution {
+                let inferred_ty = binding
+                    .solution
+                    .filter_union(db, |ty| !ty.has_unspecialized_type_var(db));
+                if inferred_ty.has_unspecialized_type_var(db) {
+                    continue;
+                }
+
+                type_context_mappings
+                    .entry(binding.bound_typevar.identity(db))
+                    .and_modify(|existing| existing.add(db, inferred_ty))
+                    .or_insert_with(|| UnionAccumulator::new(inferred_ty));
+            }
         }
 
-        ty
+        if type_context_mappings.is_empty() {
+            return ty;
+        }
+
+        let type_context_mappings: FxHashMap<BoundTypeVarIdentity<'db>, Type<'db>> =
+            type_context_mappings
+                .into_iter()
+                .map(|(identity, accumulator)| (identity, accumulator.into_type(db)))
+                .collect();
+        let specialized = Type::from(class.apply_specialization(db, |generic_context| {
+            generic_context.specialize_recursive(
+                db,
+                generic_context
+                    .variables(db)
+                    .map(|typevar| type_context_mappings.get(&typevar.identity(db)).copied()),
+            )
+        }));
+        if specialized.is_assignable_to(db, Type::Callable(target_callable)) {
+            specialized
+        } else {
+            ty
+        }
     }
 
     #[track_caller]
@@ -5835,11 +6336,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         assert_eq!(previous, None);
     }
 
+    /// Whether this region's inference should record expected types for string-literal
+    /// completions. They're only ever read for files open in the editor.
+    fn collects_expected_types(&self) -> bool {
+        self.db().is_open_file(self.file())
+    }
+
     fn store_maybe_expected_type(
         &mut self,
         expression: impl Into<ExpressionNodeKey>,
         ty: Type<'db>,
     ) {
+        // Cheaper check first so most queries never depend on the open-file state
         if !self.has_string_literal_completion_candidates(ty) {
             return;
         }
@@ -5848,6 +6356,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     fn store_expected_type(&mut self, expression: impl Into<ExpressionNodeKey>, ty: Type<'db>) {
+        if !self.collects_expected_types() {
+            return;
+        }
+
         self.expected_types.insert(expression.into(), ty);
     }
 
@@ -5867,7 +6379,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     fn union_expected_types(&mut self, expected_types: &FxHashMap<ExpressionNodeKey, Type<'db>>) {
+        // Non-empty only if the producing inference collected, i.e. the file is open
+        if expected_types.is_empty() {
+            return;
+        }
+
         let db = self.db();
+        #[expect(
+            clippy::iter_over_hash_type,
+            reason = "expected types for distinct expressions are unioned independently"
+        )]
         for (expression, ty) in expected_types {
             self.expected_types
                 .entry(*expression)
@@ -6063,7 +6584,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .try_to_class_literal(self.db())
                 .and_then(|class| class.generic_context(self.db()))
                 .map(|generic_context| generic_context.inferable_typevars(self.db()))
-                .unwrap_or(InferableTypeVars::None);
+                .unwrap_or(TypeVarSet::None);
             annotation.filter_disjoint_elements(
                 self.db(),
                 Type::homogeneous_tuple(self.db(), Type::unknown()),
@@ -6083,6 +6604,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 if let Tuple::Variable(tuple) = spec
                     && tuple.prefix_elements().is_empty()
                     && tuple.suffix_elements().is_empty()
+                    && matches!(tuple.variable(), VariableSegment::Homogeneous(_))
                 {
                     is_homogeneous_tuple_annotation = true;
                 }
@@ -6098,12 +6620,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let can_use_type_context =
             is_homogeneous_tuple_annotation || elts.iter().all(|elt| !elt.is_starred_expr());
 
-        let mut annotated_elt_tys = annotated_tuple
+        let annotated_elt_tys = annotated_tuple
             .as_ref()
-            .map(Tuple::all_elements)
-            .unwrap_or_default()
-            .iter()
-            .copied();
+            .map(|tuple| tuple.iter_element_types(self.db()).collect::<Vec<_>>())
+            .unwrap_or_default();
+        let mut annotated_elt_tys = annotated_elt_tys.into_iter();
 
         let db = self.db();
 
@@ -6301,7 +6822,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     } else if !has_dict_compatible_fallback {
                         // Suppress `TypedDict` diagnostics only if this literal is assignable to
                         // the non-`TypedDict` arm of the union.
-                        let mut speculative_builder = self.speculate();
+                        let mut speculative_builder = self.speculate_without_diagnostics();
                         has_dict_compatible_fallback = speculative_builder
                             .infer_dict_expression(dict, TypeContext::new(Some(element)))
                             .is_assignable_to(self.db(), element);
@@ -6332,20 +6853,23 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                     let mut narrowed_tys = Vec::new();
                     let mut item_types = FxHashMap::default();
+                    // Reuse nested expressions that receive the same field context across candidates.
+                    let teardown_expression_cache = self.setup_expression_cache();
                     for typed_dict in typed_dicts {
-                        // Disable diagnostics as we attempt to narrow to specific `TypedDict`
-                        // elements of the union. Mixed unions like `TypedDict | dict[str, Any]`
-                        // should not emit `TypedDict` diagnostics if a non-`TypedDict` arm accepts
+                        // Suppress diagnostics for discarded candidates. A mixed union like
+                        // `TypedDict | dict[str, Any]` should remain quiet when the dict arm accepts
                         // the literal.
-                        if let Some(inferred_ty) = self.speculate().infer_typed_dict_expression(
-                            dict,
-                            typed_dict,
-                            &mut item_types,
-                        ) {
+                        if let Some(inferred_ty) = self
+                            .speculate_without_diagnostics()
+                            .infer_typed_dict_expression(dict, typed_dict, &mut item_types)
+                        {
                             narrowed_tys.push(inferred_ty);
                         }
 
                         item_types.clear();
+                    }
+                    if teardown_expression_cache {
+                        self.teardown_expression_cache();
                     }
 
                     // Successfully narrowed to a subset of typed dicts.
@@ -6420,6 +6944,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // If the type context is a union, attempt to narrow to a specific element.
         for narrowed_ty in tcx
             .narrow_targets(db)
+            .as_deref()
             .into_iter()
             .flatten()
             .filter(|ty| ty.class_specialization(db).is_some())
@@ -6478,6 +7003,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let constraints = ConstraintSetBuilder::new();
         let inferable = generic_context.inferable_typevars(self.db());
         let identity_instance = Type::instance(self.db(), ClassType::Generic(collection_alias));
+        let mut builder = SpecializationBuilder::new(self.db(), &constraints, inferable);
 
         // Remove any union elements of that are unrelated to the collection type.
         //
@@ -6501,20 +7027,53 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             let mut elt_tcx_variance: FxHashMap<BoundTypeVarIdentity<'_>, TypeVarVariance> =
                 FxHashMap::default();
 
-            if let Some(tcx) = tcx.annotation
+            if let Some(tcx) = tcx.annotation.map(|tcx| tcx.resolve_type_alias(self.db()))
+                && matches!(tcx, Type::NominalInstance(_))
+                && let Some(specialization) = tcx.known_specialization(self.db(), collection_class)
+                && specialization.generic_context(self.db()) == generic_context
+                && generic_context.variables(self.db()).all(|typevar| {
+                    !typevar.is_paramspec(self.db())
+                        && typevar
+                            .typevar(self.db())
+                            .bound_or_constraints(self.db())
+                            .is_none()
+                })
+            {
+                // For an instance of the collection class itself, the identity specialization
+                // maps directly to the contextual specialization. Avoid constructing and solving
+                // a general assignability constraint set for this common case.
+                for (typevar, inferred_ty) in generic_context
+                    .variables(self.db())
+                    .zip(specialization.types(self.db()))
+                {
+                    let inferred_ty = inferred_ty
+                        .filter_union(self.db(), |ty| {
+                            !ty.as_typevar()
+                                .is_some_and(|tv| tv.is_inferable(self.db(), inferable))
+                        })
+                        .filter_union(self.db(), |ty| !ty.has_unspecialized_type_var(self.db()));
+                    if inferred_ty.has_unspecialized_type_var(self.db()) {
+                        continue;
+                    }
+
+                    let identity = typevar.identity(self.db());
+                    elt_tcx_constraints.insert(identity, UnionAccumulator::new(inferred_ty));
+                    elt_tcx_variance.insert(identity, typevar.variance(self.db()));
+                }
+            } else if let Some(tcx) = tcx.annotation
                 && tcx.class_specialization(self.db()).is_some()
             {
                 let db = self.db();
 
                 let path_bounds =
                     identity_instance.assignable_solutions_with_inferable(db, tcx, inferable);
-                let solutions = path_bounds.solve_with(|typevar, variance, lower, upper| {
-                    let identity = typevar.identity(db);
+                let solutions = path_bounds.solve_with(|variance, path_bound| {
+                    let identity = path_bound.bound_typevar.identity(db);
                     elt_tcx_variance
                         .entry(identity)
                         .and_modify(|current| *current = current.join(variance))
                         .or_insert(variance);
-                    PathBounds::default_solve(db, &constraints, typevar, lower, upper)
+                    PathBounds::default_solve(db, &constraints, path_bound)
                 });
 
                 match solutions {
@@ -6530,13 +7089,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 // The SequentMap's transitivity reasoning can inject
                                 // cross-typevar references into the solution bounds.
                                 // For example, `_KT ≤ str ∧ str ≤ _VT` derives `_KT ≤ _VT`,
-                                // which adds `_KT` to `_VT`'s lower bound. Filter out any
-                                // inferable typevars from the solution, since they represent
+                                // which adds `_KT` to `_VT`'s lower bound. Remove inferable
+                                // typevars from the same generic context, since they represent
                                 // cross-typevar relationships that are resolved independently.
-                                let inferred_ty = binding.solution.filter_union(db, |ty| {
-                                    !ty.as_typevar()
-                                        .is_some_and(|tv| tv.is_inferable(db, inferable))
-                                });
+                                let inferred_ty = builder
+                                    .remove_inferable_typevar_artifacts_from_solution(
+                                        binding.bound_typevar,
+                                        binding.solution,
+                                    );
 
                                 // Avoid inferring a preferred type based on partially specialized
                                 // type context from an outer generic call. If the type context is
@@ -6574,9 +7134,81 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             (elt_tcx_constraints, elt_tcx_variance)
         };
 
-        // Create a set of constraints to infer a precise type for `T`.
-        let mut builder = SpecializationBuilder::new(self.db(), &constraints, inferable);
+        // Dictionary unpacking always contributes constraints on the inferred key and value types,
+        // even when the unpacked mapping is assignable to the context. Keep it on the general path
+        // so gradual types such as `Any` are preserved.
+        let has_dict_unpack = collection_class == KnownClass::Dict
+            && elts
+                .iter()
+                .any(|elts| matches!(elts.as_slice(), [None, Some(_)]));
 
+        let mut pre_inferred_elt_tys = None;
+
+        // Avoid projecting and solving a constraint set when contextual inference has already
+        // provided the complete specialization and every literal element is compatible with it.
+        if !has_dict_unpack
+            && tcx.annotation.is_some()
+            && let Some(specialization) = generic_context
+                .variables(self.db())
+                .map(|typevar| {
+                    let identity = typevar.identity(self.db());
+                    // Keep this parallel with the slow path below: a covariant context provides
+                    // only an upper bound, which does not determine the specialization for an empty
+                    // literal. A contravariant context provides a lower bound, for which inference
+                    // selects the narrowest valid solution.
+                    if elt_tcx_variance
+                        .get(&identity)
+                        .is_some_and(|variance| variance.is_covariant())
+                    {
+                        return None;
+                    }
+                    elt_tcx_constraints.get(&identity).copied()
+                })
+                .collect::<Option<Vec<_>>>()
+        {
+            // The slow path below adds the contextual specialization as an invariant mapping,
+            // then discards every element constraint that is already assignable to its context.
+            // Infer the elements once here and retain their types so that a failed fast-path check
+            // does not recursively re-infer nested collection literals on the slow path.
+            let mut inferred_elts = Vec::with_capacity(elts.len());
+            let mut compatible = true;
+
+            for elts in elts {
+                let mut inferred_elt_tys = [None; N];
+                for (i, elt, elt_tcx) in itertools::izip!(0.., elts, specialization.iter().copied())
+                {
+                    let Some(elt) = elt else { continue };
+                    let elt_tcx = if elt.is_starred_expr() && collection_class != KnownClass::Dict {
+                        Type::homogeneous_tuple(self.db(), elt_tcx)
+                    } else {
+                        elt_tcx
+                    };
+                    let inferred_elt_ty =
+                        infer_elt_expression(self, (i, elt, TypeContext::new(Some(elt_tcx))));
+                    inferred_elt_tys[i] = Some(inferred_elt_ty);
+
+                    if !inferred_elt_ty.is_assignable_to(self.db(), elt_tcx) {
+                        compatible = false;
+                    }
+                }
+                inferred_elts.push(inferred_elt_tys);
+            }
+
+            if compatible {
+                let class_type = collection_alias.origin(self.db()).apply_specialization(
+                    self.db(),
+                    |generic_context| {
+                        generic_context
+                            .specialize_recursive(self.db(), specialization.into_iter().map(Some))
+                    },
+                );
+                return Type::from(class_type).to_instance_approximation(self.db());
+            }
+
+            pre_inferred_elt_tys = Some(inferred_elts);
+        }
+
+        // Create a set of constraints to infer a precise type for `T`.
         let mut tuple_size_promotion_constraints = TupleSizePromotionConstraints::default();
 
         for elt_ty in elt_tys.clone() {
@@ -6625,7 +7257,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 DefinitionNodeKey::from_assignment(assignment.node(self.module())).exactly_one()
             && let Some(collection_def) = self.index.try_definition(collection_def)
         {
-            // For unconstrained collection literals, collect any constraints created by later uses
+            // For unannotated collection literals, collect any constraints created by later uses
             // of this definition in the scope.
             for (statement, use_expression) in
                 self.index.constraining_collection_uses(collection_def)
@@ -6664,7 +7296,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         }
 
-        for elts in elts {
+        for (elts_index, elts) in elts.iter().enumerate() {
             // An unpacking expression for a dictionary.
             if let &[None, Some(value_expr)] = elts.as_slice() {
                 let unpack_ty = infer_elt_expression(self, (1, value_expr, tcx));
@@ -6678,7 +7310,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         let mut diag = builder
                             .into_diagnostic("Argument expression after ** must be a mapping type");
 
-                        diag.set_primary_message(format_args!(
+                        diag.set_primary_annotation_message(format_args!(
                             "Found `{}`",
                             unpack_ty.display(self.db())
                         ));
@@ -6733,8 +7365,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         }
                     });
 
-                let inferred_elt_ty =
-                    infer_elt_expression(self, (i, elt, TypeContext::new(elt_tcx)));
+                let inferred_elt_ty = pre_inferred_elt_tys
+                    .as_ref()
+                    .and_then(|inferred_elts| inferred_elts[elts_index][i])
+                    .unwrap_or_else(|| {
+                        infer_elt_expression(self, (i, elt, TypeContext::new(elt_tcx)))
+                    });
 
                 // Simplify the inference based on a non-covariant declared type.
                 if let Some(elt_tcx) =
@@ -6773,12 +7409,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .origin(self.db())
             .apply_specialization(self.db(), |_| {
                 builder.build_with(generic_context, |current_typevar, bounds| {
-                    let (lower, _upper) = bounds?;
+                    let lower = bounds?.lower?;
 
-                    let lower = if tcx.annotation.is_none() {
-                        // Constraints learned from later collection uses should follow the same
-                        // promotion policy as literal elements: promote element literal types in
-                        // invariant position unless an explicit annotation made them unpromotable.
+                    let lower = if is_empty_collection_type_context(tcx) {
+                        // Constraints learned from later collection uses follow the same promotion
+                        // policy as literal elements: promote element literal types in invariant
+                        // position unless an explicit annotation made them unpromotable.
                         lower.promote(self.db())
                     } else {
                         lower
@@ -6792,7 +7428,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         lower
                     };
 
-                    let lower = if elt_tcx_constraints.is_empty() {
+                    let lower = if is_empty_collection_type_context(tcx) {
                         lower
                             // Promote singleton types to `T | Unknown` in inferred type parameters,
                             // so that e.g. `[None]` is inferred as `list[None | Unknown]`.
@@ -6805,26 +7441,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 })
             });
 
-        Type::from(class_type).to_instance(self.db())
+        Type::from(class_type).to_instance_approximation(self.db())
     }
 
     /// Infer the type of the `iter` expression of the first comprehension.
-    /// Returns the evaluation mode (async or sync) of the comprehension.
-    fn infer_first_comprehension_iter(
-        &mut self,
-        comprehensions: &[ast::Comprehension],
-    ) -> EvaluationMode {
+    fn infer_first_comprehension_iter(&mut self, comprehensions: &[ast::Comprehension]) {
         let mut comprehensions_iter = comprehensions.iter();
         let Some(first_comprehension) = comprehensions_iter.next() else {
             unreachable!("Comprehension must contain at least one generator");
         };
         self.infer_maybe_standalone_expression(&first_comprehension.iter, TypeContext::default());
-
-        if first_comprehension.is_async {
-            EvaluationMode::Async
-        } else {
-            EvaluationMode::Sync
-        }
     }
 
     /// Derive the type context for a generator expression's yielded element from the expected type
@@ -6898,8 +7524,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             parenthesized: _,
         } = generator;
 
-        let evaluation_mode = self.infer_first_comprehension_iter(generators);
-        let yield_tcx = self.generator_yield_type_context(tcx, evaluation_mode);
+        self.infer_first_comprehension_iter(generators);
 
         let Some(scope_id) = self
             .index
@@ -6907,6 +7532,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         else {
             return Type::unknown();
         };
+        let evaluation_mode =
+            EvaluationMode::from_is_async(scope_id.is_async_comprehension(self.index));
+        let yield_tcx = self.generator_yield_type_context(tcx, evaluation_mode);
         let scope = scope_id.to_scope_id(self.db(), self.file());
         let inference = infer_scope_types(self.db(), scope, yield_tcx);
         self.extend_scope(inference);
@@ -7229,6 +7857,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let mut infer_iterable_type = || {
             let expression = self.index.expression(iterable);
             let result = infer_expression_types(self.db(), expression, TypeContext::default());
+            let iterable_type = result.expression_type(iterable);
+            let element_type = if comprehension.is_async() {
+                None
+            } else {
+                self.fixed_length_iterable_element_type(iterable, |expr| {
+                    result.expression_type(expr)
+                })
+            };
 
             // Two things are different if it's the first comprehension:
             // (1) We must lookup the `ScopedExpressionId` of the iterable expression in the outer scope,
@@ -7236,12 +7872,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // (2) We must *not* call `self.extend()` on the result of the type inference,
             //     because `ScopedExpressionId`s are only meaningful within their own scope, so
             //     we'd add types for random wrong expressions in the current scope
-            if comprehension.is_first() && target.is_name_expr() {
-                result.expression_type(iterable)
-            } else {
+            if !(comprehension.is_first() && target.is_name_expr()) {
                 self.extend_expression_unchecked(result);
-                result.expression_type(iterable)
             }
+
+            (iterable_type, element_type)
         };
 
         let target_type = match comprehension.target_kind() {
@@ -7254,18 +7889,22 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 unpacked.expression_type(target)
             }
             TargetKind::Single => {
-                let iterable_type = infer_iterable_type();
+                let (iterable_type, element_type) = infer_iterable_type();
 
-                iterable_type
-                    .try_iterate_with_mode(
-                        self.db(),
-                        EvaluationMode::from_is_async(comprehension.is_async()),
-                    )
-                    .map(|tuple| tuple.homogeneous_element_type(self.db()))
-                    .unwrap_or_else(|err| {
-                        err.report_diagnostic(&self.context, iterable_type, iterable.into());
-                        err.fallback_element_type(self.db())
-                    })
+                if let Some(element_type) = element_type {
+                    element_type
+                } else {
+                    iterable_type
+                        .try_iterate_with_mode(
+                            self.db(),
+                            EvaluationMode::from_is_async(comprehension.is_async()),
+                        )
+                        .map(|tuple| tuple.homogeneous_element_type(self.db()))
+                        .unwrap_or_else(|err| {
+                            err.report_diagnostic(&self.context, iterable_type, iterable.into());
+                            err.fallback_element_type(self.db())
+                        })
+                }
             }
         };
 
@@ -7279,7 +7918,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         if named.target.is_name_expr() {
             let definition = self.index.expect_single_definition(named);
             let result = infer_definition_types(self.db(), definition);
-            self.extend_definition(result);
+            self.extend_definition(definition, result);
             result.binding_type(definition)
         } else {
             // For syntactically invalid targets, we still need to run type inference:
@@ -7322,8 +7961,25 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         } = if_expression;
 
         let test_ty = self.infer_maybe_standalone_expression(test, TypeContext::default());
-        let body_ty = self.infer_expression(body, tcx);
-        let orelse_ty = self.infer_expression(orelse, tcx);
+        let (body_ty, orelse_ty) =
+            if is_empty_collection_type_context(tcx) && is_collection_literal(body) {
+                // Infer the peer branch first so the body can use its type as context.
+                let orelse_ty = self.infer_expression(orelse, tcx);
+                let body_ty = self.infer_expression_with_collection_literal_peer_context(
+                    body,
+                    tcx,
+                    Some(orelse_ty),
+                );
+                (body_ty, orelse_ty)
+            } else {
+                let body_ty = self.infer_expression(body, tcx);
+                let orelse_ty = self.infer_expression_with_collection_literal_peer_context(
+                    orelse,
+                    tcx,
+                    Some(body_ty),
+                );
+                (body_ty, orelse_ty)
+            };
 
         match test_ty.try_bool(self.db()).unwrap_or_else(|err| {
             err.report_diagnostic(&self.context, &**test);
@@ -7443,7 +8099,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .chain(keyword_only)
                 .chain(keyword_variadic);
 
-            Parameters::new(self.db(), parameters)
+            Parameters::from_annotation(self.db(), parameters)
         } else {
             Parameters::empty()
         };
@@ -7526,8 +8182,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // Collect the types of each distinct key.
         let mut elements: Vec<(&str, Type<'db>)> = Vec::new();
 
-        for bindings in use_def.multi_bindings_at_use(keyword.scoped_use_id(db, self.scope())) {
-            let place = place_from_bindings(db, bindings.clone());
+        for bindings in use_def.multi_bindings_at_use(keyword.scoped_use_id(db, self.file())) {
+            let place = place_from_bindings_with_reachability_cache(
+                db,
+                bindings.clone(),
+                self.reachability_cache(),
+            );
             let Some(key) = place.first_definition.and_then(definition_key) else {
                 continue;
             };
@@ -7549,14 +8209,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // Synthesize overloads for `__getitem__` based on known dictionary elements.
         let getitem_overloads = elements.into_iter().map(|(name, ty)| {
             Signature::new(
-                Parameters::new(
-                    db,
-                    [
-                        Parameter::positional_only(Some(Name::new_static("self"))),
-                        Parameter::positional_or_keyword(Name::new_static("key"))
-                            .with_annotated_type(Type::string_literal(db, name)),
-                    ],
-                ),
+                Parameters::standard([
+                    Parameter::positional_only(Some(Name::new_static("self"))),
+                    Parameter::positional_or_keyword(Name::new_static("key"))
+                        .with_annotated_type(Type::string_literal(db, name)),
+                ]),
                 ty,
             )
         });
@@ -7633,7 +8290,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             builder
                 .into_diagnostic("Argument expression after ** must be a mapping type")
-                .set_primary_message(format_args!("Found `{}`", mapping_type.display(self.db())));
+                .set_primary_annotation_message(format_args!(
+                    "Found `{}`",
+                    mapping_type.display(self.db())
+                ));
         }
 
         call_arguments
@@ -7679,6 +8339,83 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.infer_call_expression_impl(call_expression, callable_type, tcx)
     }
 
+    fn infer_empty_list_or_set_constructor(
+        &mut self,
+        collection_class: KnownClass,
+        call_expression: &ast::ExprCall,
+        tcx: TypeContext<'db>,
+    ) -> Option<Type<'db>> {
+        let elements: [[Option<&ast::Expr>; 1]; 0] = [];
+        let mut infer_element_ty = |_: &mut Self, _| Type::unknown();
+
+        self.infer_collection_literal(
+            collection_class,
+            Some(call_expression.into()),
+            &elements,
+            &mut infer_element_ty,
+            tcx,
+        )
+    }
+
+    /// Infers a truthiness-refined `range` instance for literal built-in `range(...)` calls.
+    ///
+    /// The refinement only records whether the constructed range is statically non-empty. Dynamic
+    /// arguments, keyword arguments, starred arguments, shadowed `range` callables, and invalid
+    /// literal forms fall back to the ordinary `range` instance.
+    ///
+    /// This uses the argument types inferred by normal call binding; it does not re-infer
+    /// arguments just to compute the refinement.
+    ///
+    /// ```python
+    /// range(3)        # known non-empty
+    /// range(3, 0, -1) # known non-empty
+    /// range(n)        # ordinary range
+    /// ```
+    fn infer_builtin_range_instance_type(
+        &self,
+        callable_type: Type<'db>,
+        arguments: &ast::Arguments,
+        call_arguments: &CallArguments<'_, 'db>,
+    ) -> Option<Type<'db>> {
+        let Type::ClassLiteral(class) = callable_type else {
+            return None;
+        };
+        if !class.is_known(self.db(), KnownClass::Range)
+            || !arguments.keywords.is_empty()
+            || arguments.args.iter().any(ast::Expr::is_starred_expr)
+        {
+            return None;
+        }
+
+        let int_literal = |argument_index: usize| {
+            call_arguments
+                .argument_types(argument_index)?
+                .get_default()?
+                .as_int_literal()
+        };
+
+        let is_non_empty = match arguments.args.len() {
+            1 => int_literal(0)? > 0,
+            2 => int_literal(0)? < int_literal(1)?,
+            3 => {
+                let start = int_literal(0)?;
+                let stop = int_literal(1)?;
+                let step = int_literal(2)?;
+
+                match step.cmp(&0) {
+                    std::cmp::Ordering::Greater => start < stop,
+                    std::cmp::Ordering::Less => start > stop,
+                    std::cmp::Ordering::Equal => return None,
+                }
+            }
+            _ => return None,
+        };
+
+        Some(Type::KnownInstance(KnownInstanceType::Range {
+            is_non_empty,
+        }))
+    }
+
     fn infer_call_expression_impl(
         &mut self,
         call_expression: &ast::ExprCall,
@@ -7722,11 +8459,37 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             arguments,
         } = call_expression;
 
+        // Semantic indexing recognizes only bare empty constructor calls. Confirm that the name
+        // still resolves to the corresponding builtin before using later collection constraints.
+        let collection_initializer_class = if arguments.is_empty()
+            && self
+                .index
+                .try_expression(call_expression)
+                .and_then(|expression| expression.assigned_to(self.db()))
+                .is_some()
+            && let Some(name) = func.as_name_expr()
+            && let Some(known_class) = callable_type
+                .as_class_literal()
+                .and_then(|class| class.known(self.db()))
+            && matches!(
+                (name.id.as_str(), known_class),
+                ("list", KnownClass::List) | ("set", KnownClass::Set) | ("dict", KnownClass::Dict)
+            ) {
+            Some(known_class)
+        } else {
+            None
+        };
+
         if callable_type
             .as_class_literal()
             .is_some_and(|class_literal| class_literal.is_known(self.db(), KnownClass::Dict))
-            && let Some(ty) =
-                self.infer_keyword_only_dict_call(func, arguments, call_expression_tcx)
+            && let Some(ty) = self.infer_keyword_only_dict_call(
+                func,
+                arguments,
+                (collection_initializer_class == Some(KnownClass::Dict))
+                    .then_some(call_expression.into()),
+                call_expression_tcx,
+            )
         {
             return ty;
         }
@@ -7757,8 +8520,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return ty;
         }
 
-        if callable_type == Type::SpecialForm(SpecialFormType::TypedDict) {
-            return self.infer_typeddict_call_expression(call_expression, None);
+        if let Some(typed_dict_module) = TypedDictModule::from_type(self.db(), callable_type) {
+            return self.infer_typeddict_call_expression(call_expression, None, typed_dict_module);
         }
 
         if callable_type == Type::SpecialForm(SpecialFormType::TypeForm) {
@@ -7814,28 +8577,32 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // Special handling for `TypedDict` method calls
         if let ast::Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = func.as_ref() {
             let value_type = self.expression_type(value);
+            let method_name = attr.id.as_str();
 
             if let Type::TypedDict(typed_dict_ty) = value_type
-                && matches!(attr.id.as_str(), "pop" | "setdefault")
+                && matches!(method_name, "get" | "pop" | "setdefault")
                 && !arguments.args.is_empty()
 
                 // Validate the key argument for `TypedDict` methods
                 && let Some(first_arg) = arguments.args.first()
-                    && let ast::Expr::StringLiteral(ast::ExprStringLiteral {
+                && let Some(key) = (match first_arg {
+                    ast::Expr::StringLiteral(ast::ExprStringLiteral {
                         value: key_literal,
                         ..
-                    }) = first_arg
+                    }) => Some(key_literal.to_str()),
+                    _ => self
+                        .speculate_without_diagnostics()
+                        .get_or_infer_expression(first_arg, TypeContext::default())
+                        .as_string_literal()
+                        .map(|key_literal| key_literal.value(self.db())),
+                })
             {
-                let key = key_literal.to_str();
                 let items = typed_dict_ty.items(self.db());
+                let is_declared = items.contains_key(key);
 
-                // Check if key exists
-                if let Some((_, field)) = items
-                    .iter()
-                    .find(|(field_name, _)| field_name.as_str() == key)
-                {
+                if let Some(field) = typed_dict_ty.item(self.db(), key) {
                     // Key exists - check if it's a `pop()` on a required field
-                    if attr.id.as_str() == "pop" && field.is_required() {
+                    if is_declared && method_name == "pop" && field.is_required() {
                         report_cannot_pop_required_field_on_typed_dict(
                             &self.context,
                             first_arg.into(),
@@ -7844,7 +8611,104 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         );
                         return Type::unknown();
                     }
-                } else {
+
+                    if !is_declared
+                        && method_name == "get"
+                        && arguments.keywords.is_empty()
+                        && matches!(arguments.args.len(), 1 | 2)
+                    {
+                        let default_ty = if let Some(default) = arguments.args.get(1) {
+                            self.get_or_infer_expression(
+                                default,
+                                TypeContext::new(Some(field.declared_ty)),
+                            )
+                        } else {
+                            Type::none(self.db())
+                        };
+                        return UnionType::from_two_elements(
+                            self.db(),
+                            field.declared_ty,
+                            default_ty,
+                        );
+                    }
+
+                    if !is_declared && field.is_read_only() {
+                        let mutation = match method_name {
+                            "pop"
+                                if arguments.keywords.is_empty()
+                                    && matches!(arguments.args.len(), 1 | 2) =>
+                            {
+                                Some(("pop", "from"))
+                            }
+                            "setdefault"
+                                if arguments.keywords.is_empty() && arguments.args.len() == 2 =>
+                            {
+                                Some(("set default for", "on"))
+                            }
+                            _ => None,
+                        };
+                        if let Some((action, preposition)) = mutation {
+                            if let Some(builder) =
+                                self.context.report_lint(&INVALID_ARGUMENT_TYPE, first_arg)
+                            {
+                                builder.into_diagnostic(format_args!(
+                                    "Cannot {action} read-only extra item \"{key}\" {preposition} TypedDict `{}`",
+                                    Type::TypedDict(typed_dict_ty).display(self.db()),
+                                ));
+                            }
+                            return Type::unknown();
+                        }
+                    }
+
+                    // Unknown literal keys are concrete extra items, so mutating operations can
+                    // use their extra-items type even when arbitrary `str` keys are unsafe.
+                    if !is_declared && !field.is_read_only() {
+                        match method_name {
+                            "pop"
+                                if arguments.keywords.is_empty()
+                                    && matches!(arguments.args.len(), 1 | 2) =>
+                            {
+                                return arguments.args.get(1).map_or(
+                                    field.declared_ty,
+                                    |default| {
+                                        UnionType::from_two_elements(
+                                            self.db(),
+                                            field.declared_ty,
+                                            self.get_or_infer_expression(
+                                                default,
+                                                TypeContext::new(Some(field.declared_ty)),
+                                            ),
+                                        )
+                                    },
+                                );
+                            }
+                            "setdefault"
+                                if arguments.keywords.is_empty() && arguments.args.len() == 2 =>
+                            {
+                                let default = &arguments.args[1];
+                                let default_ty = self.get_or_infer_expression(
+                                    default,
+                                    TypeContext::new(Some(field.declared_ty)),
+                                );
+                                TypedDictKeyAssignment {
+                                    context: &self.context,
+                                    typed_dict: typed_dict_ty,
+                                    full_object_ty: None,
+                                    key,
+                                    value_ty: default_ty,
+                                    typed_dict_node: value.as_ref().into(),
+                                    key_node: first_arg.into(),
+                                    value_node: default.into(),
+                                    assignment_kind: TypedDictAssignmentKind::Constructor,
+                                    emit_diagnostic: true,
+                                }
+                                .validate();
+                                return field.declared_ty;
+                            }
+                            _ => {}
+                        }
+                    }
+                } else if method_name != "get" {
                     // Key not found, report error with suggestion and return early
                     let key_ty = Type::string_literal(self.db(), key);
                     report_invalid_key_on_typed_dict(
@@ -7970,6 +8834,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         );
                     }
                 }
+                Some(KnownClass::TypeVarTuple | KnownClass::ExtensionsTypeVarTuple) => {
+                    if let Some(builder) = self
+                        .context
+                        .report_lint(&INVALID_LEGACY_TYPE_VARIABLE, call_expression)
+                    {
+                        builder.into_diagnostic(
+                            "A `TypeVarTuple` definition must be a simple variable assignment",
+                        );
+                    }
+                }
                 Some(KnownClass::NewType) => {
                     if let Some(builder) =
                         self.context.report_lint(&INVALID_NEWTYPE, call_expression)
@@ -7993,8 +8867,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         }
 
-        let mut bindings = callable_type
-            .bindings(self.db())
+        let mut bindings = self
+            .bindings_for_call(callable_type)
             .match_parameters(self.db(), &call_arguments);
 
         report_missing_implicit_constructor_call(
@@ -8026,6 +8900,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 return bindings.return_type(self.db());
             }
         };
+
+        if let Some(class) = class {
+            pydantic::report_discarded_extra_arguments(&self.context, class, arguments, &bindings);
+        }
 
         for binding in bindings.iter_flat_mut() {
             let binding_type = binding.callable_type;
@@ -8075,11 +8953,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         // Record the constraints for the receiver of a bound method call, if the receiver is an
-        // unconstrained collection literal.
+        // unannotated collection initializer.
         if let ast::Expr::Attribute(attribute @ ast::ExprAttribute { value, .. }) = func.as_ref() {
             let value_type = self.expression_type(value);
 
-            if let Some(collection_def) = self.index.unconstrained_collection_binding(value)
+            if let Some(collection_def) = self.index.unannotated_collection_initializer(value)
                 && let Some((collection_literal, _)) = value_type.class_specialization(self.db())
             {
                 let identity_instance = Type::instance(
@@ -8095,25 +8973,28 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     // Perform inference against the type variables on the receiver's generic context.
                     .with_generic_context(self.db(), collection_generic_context);
 
-                let call_result = self.speculate().infer_and_check_argument_types(
-                    ArgumentsIter::from_ast(arguments),
-                    &mut call_arguments,
-                    // TODO: The argument types have already been inferred and stored in `call_arguments`.
-                    // However, `value` would have been inferred to a be a collection with `Divergent`
-                    // element types, meaning the type context for a given argument, by which the inferred
-                    // type is keyed, may not be the same as the type context we get here. It is not immediately
-                    // clear how to retrieve those types, and so we just re-infer the argument expressions
-                    // for simplicity.
-                    &mut |builder, (_, expr, tcx)| builder.infer_expression(expr, tcx),
-                    &mut identity_bindings,
-                    call_expression_tcx,
-                );
+                let call_result = self
+                    .speculate_without_diagnostics()
+                    .infer_and_check_argument_types(
+                        ArgumentsIter::from_ast(arguments),
+                        &mut call_arguments,
+                        // TODO: The argument types have already been inferred and stored in `call_arguments`.
+                        // However, `value` would have been inferred to a be a collection with `Divergent`
+                        // element types, meaning the type context for a given argument, by which the inferred
+                        // type is keyed, may not be the same as the type context we get here. It is not immediately
+                        // clear how to retrieve those types, and so we just re-infer the argument expressions
+                        // for simplicity.
+                        &mut |builder, (_, expr, tcx)| builder.infer_expression(expr, tcx),
+                        &mut identity_bindings,
+                        call_expression_tcx,
+                    );
 
                 if call_result.is_ok() {
+                    let db = self.db();
                     for call_specialization in identity_bindings
                         .iter_flat()
                         .flat_map(CallableBinding::matching_overloads)
-                        .filter_map(|(_, identity_overload)| identity_overload.specialization())
+                        .filter_map(|(_, identity_overload)| identity_overload.specialization(db))
                     {
                         // Record the constraints on the receiver's generic context formed by
                         // the arguments to this bound method call.
@@ -8134,64 +9015,33 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         }
 
-        let db = self.db();
-        let scope = self.scope();
-        let return_ty = bindings.return_type(db);
-
-        let find_narrowed_place = |argument_index: usize| match arguments.args.get(argument_index) {
-            None => {
-                // This branch looks extraneous, especially in the face of `missing-arguments`.
-                // However, that lint won't be able to catch this:
-                //
-                // ```python
-                // def f(v: object = object()) -> TypeIs[int]: ...
-                //
-                // if f(): ...
-                // ```
-                //
-                // TODO: Will this report things that is actually fine?
-                if let Some(builder) = self
-                    .context
-                    .report_lint(&INVALID_TYPE_GUARD_CALL, arguments)
-                {
-                    builder.into_diagnostic("Type guard call does not have a target");
-                }
-                None
-            }
-            Some(expr) => match PlaceExpr::try_from_expr(expr) {
-                Some(place_expr) => place_table(db, scope).place_id(&place_expr),
-                None => None,
-            },
-        };
-
-        let narrowed_argument_index = || {
-            bindings
-                .single_element()
-                .and_then(|binding| {
-                    binding
-                        .signature_type
-                        .as_function_literal()
-                        .or_else(|| binding.callable_type.as_function_literal())
-                        .map(|function| {
-                            usize::from(
-                                function.has_implicit_receiver(db) && binding.bound_type.is_none(),
-                            )
-                        })
-                })
-                .unwrap_or(0)
-        };
-
-        match return_ty {
-            Type::TypeIs(type_is) => match find_narrowed_place(narrowed_argument_index()) {
-                Some(place) => type_is.bind(db, scope, place),
-                None => return_ty,
-            },
-            Type::TypeGuard(type_guard) => match find_narrowed_place(narrowed_argument_index()) {
-                Some(place) => type_guard.bind(db, scope, place),
-                None => return_ty,
-            },
-            _ => return_ty,
+        // `range(...)` always constructs a `range`, but with literal arguments we can preserve
+        // whether that range is statically non-empty on the constructed instance itself.
+        if let Some(instance_ty) =
+            self.infer_builtin_range_instance_type(callable_type, arguments, &call_arguments)
+        {
+            bindings = bindings.with_constructed_instance_type(self.db(), instance_ty);
         }
+
+        let db = self.db();
+        let return_ty = bindings.return_type(db);
+        let return_ty = match collection_initializer_class {
+            Some(collection_class @ (KnownClass::List | KnownClass::Set))
+                if return_ty
+                    .class_specialization(db)
+                    .is_some_and(|(class, _)| class.is_known(db, collection_class)) =>
+            {
+                self.infer_empty_list_or_set_constructor(
+                    collection_class,
+                    call_expression,
+                    call_expression_tcx,
+                )
+                .unwrap_or(return_ty)
+            }
+            _ => return_ty,
+        };
+
+        typeguard::bind_type_guard_return_type(db, self.scope(), return_ty, &bindings, arguments)
     }
 
     fn infer_starred_expression(
@@ -8208,6 +9058,29 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let db = self.db();
         let iterable_type = self.infer_expression(value, tcx);
+        let typevartuple = match iterable_type {
+            Type::KnownInstance(KnownInstanceType::TypeVar(typevar))
+                if typevar.is_typevartuple(db) =>
+            {
+                bind_typevar(
+                    db,
+                    self.index,
+                    self.scope().file_scope_id(db),
+                    self.typevar_binding_context,
+                    typevar,
+                )
+            }
+            Type::TypeVar(typevar) if typevar.is_typevartuple(db) => Some(typevar),
+            _ => None,
+        };
+        if let Some(typevartuple) = typevartuple {
+            return Type::tuple(TupleType::new(
+                db,
+                &TupleSpecBuilder::with_capacity(0)
+                    .concat_variadic_typevar(db, typevartuple)
+                    .build(),
+            ));
+        }
         iterable_type
             .try_iterate(db)
             .map(|spec| Type::tuple(TupleType::new(db, &spec)))
@@ -8229,9 +9102,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             let _ = self.infer_optional_expression(value.as_deref(), TypeContext::default());
             return Type::unknown();
         };
-        let declared_return_ty = enclosing_function
-            .last_definition_raw_signature(self.db(), ReturnCallableTypeVarScope::Public)
-            .return_ty;
+        let declared_return_ty = same_module_uncached_raw_signature(
+            self.db(),
+            enclosing_function,
+            ReturnCallableTypeVarScope::Public,
+        )
+        .return_ty;
         let return_type_span = enclosing_function.spans(self.db()).return_type;
 
         let Some(generator_type_params) = declared_return_ty.generator_types(self.db()) else {
@@ -8277,9 +9153,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             let _ = self.infer_expression(value, TypeContext::default());
             return Type::unknown();
         };
-        let annotated_return_ty = enclosing_function
-            .last_definition_raw_signature(self.db(), ReturnCallableTypeVarScope::Public)
-            .return_ty;
+        let annotated_return_ty = same_module_uncached_raw_signature(
+            self.db(),
+            enclosing_function,
+            ReturnCallableTypeVarScope::Public,
+        )
+        .return_ty;
 
         let Some(outer_expected) = annotated_return_ty.generator_types(self.db()) else {
             let _ = self.infer_expression(value, TypeContext::default());
@@ -8398,8 +9277,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     let predicates = bindings.predicates();
                     let mut union = UnionBuilder::new(db);
                     for binding in bindings {
-                        let static_reachability = reachability_constraints.evaluate(
+                        let static_reachability = evaluate_reachability_with_cache(
                             db,
+                            Some(self.reachability_cache()),
+                            reachability_constraints,
                             predicates,
                             binding.reachability_constraint,
                         );
@@ -8407,13 +9288,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             continue;
                         }
                         match binding.binding {
-                            DefinitionState::Defined(definition) => {
+                            DefinitionState::Defined(definition)
+                                if !is_discarded_dict_key_assignment(db, definition) =>
+                            {
                                 let binding_ty = binding_type(db, definition);
                                 union = union.add(
                                     binding.narrowing_constraint.narrow(db, binding_ty, place),
                                 );
                             }
-                            DefinitionState::Undefined | DefinitionState::Deleted => {
+                            DefinitionState::Defined(_)
+                            | DefinitionState::Undefined
+                            | DefinitionState::Deleted => {
                                 union =
                                     union.add(binding.narrowing_constraint.narrow(db, ty, place));
                             }
@@ -8446,7 +9331,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             let mut diag =
                 builder.into_diagnostic(format_args!(r#"The class `{class_name}` is deprecated"#));
             if let Some(message) = deprecated.message {
-                diag.set_primary_message(message.value(self.db()));
+                diag.set_primary_annotation_message(message.value(self.db()));
             }
             diag.add_primary_tag(ruff_db::diagnostic::DiagnosticTag::Deprecated);
             return;
@@ -8478,7 +9363,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let mut diag =
             builder.into_diagnostic(format_args!(r#"The function `{func_name}` is deprecated"#));
         if let Some(message) = deprecated.message {
-            diag.set_primary_message(message.value(self.db()));
+            diag.set_primary_annotation_message(message.value(self.db()));
         }
         diag.add_primary_tag(ruff_db::diagnostic::DiagnosticTag::Deprecated);
     }
@@ -8501,7 +9386,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // Check the "implicit globals" such as `__doc__`, `__file__`, `__name__`, etc.
             // These are looked up as attributes on `types.ModuleType`.
             .or_fall_back_to(db, || {
-                module_type_implicit_global_symbol(db, symbol_name).map_type(|ty| {
+                module_type_implicit_global_symbol(db, self.file(), symbol_name).map_type(|ty| {
                     self.narrow_place_with_applicable_constraints(
                         PlaceExprRef::from(&expr),
                         ty,
@@ -8563,7 +9448,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // If we're inferring types of deferred expressions, look them up from end-of-scope.
         if self.is_deferred() {
             let place = if let Some(place_id) = place_table.place_id(expr) {
-                place_from_bindings(db, use_def.reachable_bindings(place_id)).place
+                place_from_bindings_with_reachability_cache(
+                    db,
+                    use_def.reachable_bindings(place_id),
+                    self.reachability_cache(),
+                )
+                .place
             } else {
                 assert!(
                     self.in_string_annotation(),
@@ -8586,15 +9476,20 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             if let ast::ExprRef::Named(named) = expr_ref {
                 let place = if named.target.is_name_expr() {
                     let definition = self.index.expect_single_definition(named);
-                    Place::bound(binding_type(db, definition))
+                    Place::bound(binding_type(db, definition)).with_definition(definition)
                 } else {
                     Place::Undefined
                 };
                 return (place, None);
             }
 
-            let use_id = expr_ref.scoped_use_id(db, scope);
-            let place = place_from_bindings(db, use_def.bindings_at_use(use_id)).place;
+            let use_id = expr_ref.scoped_use_id(db, self.file());
+            let place = place_from_bindings_with_reachability_cache(
+                db,
+                use_def.bindings_at_use(use_id),
+                self.reachability_cache(),
+            )
+            .place;
 
             (place, Some(use_id))
         }
@@ -8643,7 +9538,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     return Place::Undefined.into();
                 }
                 EnclosingSnapshotResult::FoundBindings(bindings) => {
-                    let mut place_and_qualifiers = place_from_bindings(db, bindings);
+                    let mut place_and_qualifiers = place_from_bindings_with_reachability_cache(
+                        db,
+                        bindings,
+                        self.reachability_cache(),
+                    );
                     if assume_bound && let Place::Defined(defined) = place_and_qualifiers.place {
                         place_and_qualifiers.place =
                             Place::Defined(defined.with_definedness(Definedness::AlwaysDefined));
@@ -8729,6 +9628,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 return Place::Undefined.into();
             }
 
+            if let PlaceExprRef::Symbol(symbol) = place_expr
+                && symbol.name() == "__class__"
+                && let Some(class) = self.dunder_class_cell_type()
+            {
+                return Place::bound(class).into();
+            }
+
             for parent_id in place_table.parents(place_expr) {
                 let parent_expr = place_table.place(parent_id);
                 let mut expr_ref = expr_ref;
@@ -8749,12 +9655,49 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             }
 
-            // Walk up parent scopes looking for a possible enclosing scope that may have a
-            // definition of this name visible to us (would be `LOAD_DEREF` at runtime.)
-            // Note that we skip the scope containing the use that we are resolving, since we
-            // already looked for the place there up above.
-            let mut nonlocal_union_builder = UnionBuilder::new(db);
-            let mut found_some_definition = false;
+            // Walk enclosing scopes to resolve a free-variable load (`LOAD_DEREF` at runtime).
+            // There are two main ways we try to model these loads:
+            //
+            // 1. "Snapshots" record the bindings/constraints in the enclosing scope at the point
+            //    just before a nested scope begins. For variables that aren't modified after that
+            //    point, that's the only value that the nested scope can see. If a variable is
+            //    reassigned later, lazy snapshots for that variable can be updated or swept.
+            //
+            // 2. Otherwise, we keep walking until we get to the variable's original defining
+            //    scope, and we use its "public type" there, which respects all reachable bindings,
+            //    not just end-of-scope bindings. That includes the synthetic `NestedBindings`
+            //    definitions that we install after each nested scope is closed, so it has
+            //    a complete view of the nested `global` and `nonlocal` writes beneath it.
+            //
+            // This walk only resolves free variables and explicit `nonlocal`s. A symbol that is
+            // local to the current scope never falls back to an enclosing scope, even if it's only
+            // possibly bound at the current use: Python would raise `UnboundLocalError` instead.
+            //
+            // Note that we only get to this walk via `or_fall_back_to` above. In other words, for
+            // definitely-locally-bound variables, we defer to the current scope's bindings instead
+            // of looking at enclosing scopes. Concretely:
+            //
+            // def f():
+            //     x = None
+            //
+            //     def g():
+            //         nonlocal x
+            //         if flag:
+            //             x = 42
+            //
+            //         # `x` is possibly unbound here, so we walk enclosing scopes and see the
+            //         # public type in `f`.
+            //         reveal_type(x)  # revealed: Literal[42, 99] | None
+            //
+            //         x = 99
+            //         # But now `x` is definitely bound, so we don't do the walk.
+            //         reveal_type(x)  # revealed: Literal[99]
+            //
+            // Importantly, this approach isn't generally sound. The public type could include
+            // nested bindings from sibling scopes, which really could run at any time, and in some
+            // cases we're being too deferential to local bindings. Unfortunately the fully sound
+            // treatment would reveal `Literal[42, 99] | None` even immediately after `x = 99`,
+            // which is too frustrating for users in practice.
             for (enclosing_scope_file_id, _) in self.index.ancestor_scopes(file_scope_id).skip(1) {
                 // If the current enclosing scope is global, no place lookup is performed here,
                 // instead falling back to the module's explicit global lookup below.
@@ -8811,7 +9754,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             }
                         }
                         EnclosingSnapshotResult::FoundBindings(bindings) => {
-                            let place = place_from_bindings(db, bindings).place.map_type(|ty| {
+                            let place = place_from_bindings_with_reachability_cache(
+                                db,
+                                bindings,
+                                self.reachability_cache(),
+                            )
+                            .place
+                            .map_type(|ty| {
                                 self.narrow_place_with_applicable_constraints(
                                     place_expr,
                                     ty,
@@ -8851,65 +9800,46 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                 let enclosing_place = enclosing_place_table.place(enclosing_place_id);
 
-                // Reads of "free" variables terminate at any enclosing scope that marks the
-                // variable `global`, whether or not that scope actually binds the variable. If we
-                // see a `global` declaration, stop walking scopes and proceed to the global
-                // handling below. (If we're walking from a prior/inner scope where this variable
-                // is `nonlocal`, then this is a semantic syntax error, but we don't enforce that
-                // here. See `infer_nonlocal_statement`.)
+                // Reads of "free" or `nonlocal` variables terminate at any enclosing scope that
+                // marks the variable `global`, whether or not that scope actually binds the
+                // variable. If we see a `global` declaration, stop walking scopes and proceed to
+                // the global handling below. (If we're walking from a prior/inner scope where this
+                // variable is `nonlocal`, then this is a semantic syntax error, but we don't
+                // enforce that here. See `SemanticIndexBuilder::pop_scope`.)
                 if enclosing_place.as_symbol().is_some_and(Symbol::is_global) {
                     break;
                 }
 
-                let enclosing_scope_id = enclosing_scope_file_id.to_scope_id(db, self.file());
-
-                // If the name is declared or bound in this scope, figure out its type. This might
-                // resolve the name and end the walk. But if the name is declared `nonlocal` in
-                // this scope, we'll keep walking enclosing scopes and union this type with the
-                // other types we find. (It's a semantic syntax error to declare a type for a
-                // `nonlocal` variable, but we don't enforce that here. See the
-                // `ast::Stmt::AnnAssign` handling in `SemanticIndexBuilder::visit_stmt`.)
-                if enclosing_place.is_bound() || enclosing_place.is_declared() {
-                    let local_place_and_qualifiers = eagerly_resolved_place.unwrap_or_else(|| {
-                        place(
-                            db,
-                            enclosing_scope_id,
-                            place_expr,
-                            ConsideredDefinitions::AllReachable,
-                        )
-                        .map_type(|ty| {
-                            self.narrow_place_with_applicable_constraints(
-                                place_expr,
-                                ty,
-                                &constraint_keys,
-                            )
-                        })
-                    });
-                    // We could have `Place::Undefined` here, despite the checks above, for example if
-                    // this scope contains a `del` statement but no binding or declaration.
-                    if let Place::Defined(DefinedPlace {
-                        ty: type_,
-                        definedness: boundness,
-                        ..
-                    }) = local_place_and_qualifiers.place
-                    {
-                        nonlocal_union_builder.add_in_place(type_);
-                        // `ConsideredDefinitions::AllReachable` never returns PossiblyUnbound
-                        debug_assert_eq!(boundness, Definedness::AlwaysDefined);
-                        found_some_definition = true;
-                    }
-
-                    if !enclosing_place.as_symbol().is_some_and(Symbol::is_nonlocal) {
-                        // We've reached a function-like scope that marks this name bound or
-                        // declared but doesn't mark it `nonlocal`. The name is therefore resolved,
-                        // and we won't consider any scopes outside of this one.
-                        return if found_some_definition {
-                            Place::bound(nonlocal_union_builder.build()).into()
-                        } else {
-                            Place::Undefined.into()
-                        };
-                    }
+                // Keep walking until we reach the defining scope of the variable. The synthetic
+                // nested bindings definitions installed there will see everything below it.
+                if enclosing_place.as_symbol().is_some_and(Symbol::is_nonlocal) {
+                    continue;
                 }
+                if !(enclosing_place.is_bound() || enclosing_place.is_declared()) {
+                    // Note that this check includes members like `x.y` and `x[0]`, which aren't
+                    // symbols and can't be explicitly `nonlocal`.
+                    continue;
+                }
+
+                // We've reached the defining scope of the variable. Infer its public type.
+                debug_assert!(enclosing_place.is_bound() || enclosing_place.is_declared());
+                let enclosing_scope_id = enclosing_scope_file_id.to_scope_id(db, self.file());
+                return eagerly_resolved_place.unwrap_or_else(|| {
+                    place_by_id(
+                        db,
+                        enclosing_scope_id,
+                        enclosing_place_id,
+                        RequiresExplicitReExport::No,
+                        ConsideredDefinitions::AllReachable,
+                    )
+                    .map_type(|ty| {
+                        self.narrow_place_with_applicable_constraints(
+                            place_expr,
+                            ty,
+                            &constraint_keys,
+                        )
+                    })
+                });
             }
 
             PlaceAndQualifiers::default()
@@ -8985,7 +9915,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // because it's already caught by typing.Type.
         if Program::get(self.db()).python_version(self.db()) >= PythonVersion::PY39 {
             if let Some(("", builtin_name)) = as_pep_585_generic("typing", id) {
-                diagnostic.set_primary_message(format_args!("Did you mean `{builtin_name}`?"));
+                diagnostic
+                    .set_primary_annotation_message(format_args!("Did you mean `{builtin_name}`?"));
             }
         }
 
@@ -9021,7 +9952,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let attribute_exists = match MethodDecorator::try_from_fn_type(self.db(), function_type) {
             Some(MethodDecorator::ClassMethod) => !Type::instance(self.db(), class)
-                .class_member(self.db(), id.clone())
+                .class_member(self.db(), id)
                 .place
                 .is_undefined(),
             Some(MethodDecorator::None) => !Type::instance(self.db(), class)
@@ -9160,6 +10091,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                     "Attribute lookup on a dynamic `SubclassOf` type \
                                     should always return a bound symbol"
                                 ),
+                                SubclassOfInner::Protocol(_) => false,
                                 SubclassOfInner::TypeVar(_) => false,
                             }
                         }
@@ -9323,7 +10255,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     // the attribute but others definitely don't. That's a very different case, and
                     // we want it to be an error. Use `as_union_like` here to handle type aliases
                     // of unions and `NewType`s of float/complex in addition to explicit unions.
-                    if let Some(union) = value_type.as_union_like(db) {
+                    //
+                    // Attribute lookup on a bounded type variable delegates to its upper bound, so
+                    // use that bound here too when determining whether the lookup was on a union.
+                    let union_like_type = if let Type::TypeVar(typevar) = value_type
+                        && let Some(bound) = typevar.typevar(db).upper_bound(db)
+                    {
+                        bound
+                    } else {
+                        value_type
+                    };
+
+                    if let Some(union) = union_like_type.as_union_like(db) {
                         let mut elements_missing_the_attribute = FxIndexSet::default();
                         for element in union.elements(db) {
                             union_elements_missing_attribute(
@@ -9345,9 +10288,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                     .join(", ");
 
                                 builder.into_diagnostic(format_args!(
-                                    "Attribute `{attr_name}` is not defined on {} in union `{value_type}`",
+                                    "Attribute `{attr_name}` is not defined on {} in union `{union_like_type}`",
                                     missing_types,
-                                    value_type = value_type.display(db),
+                                    union_like_type = union_like_type.display(db),
                                 ));
                             }
                             return type_when_bound;
@@ -9666,14 +10609,23 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             op,
             values,
         } = bool_op;
+        // The first operand has no peers. If no later operand is a collection literal,
+        // accumulating prior types cannot affect inference.
+        let track_peer_types = is_empty_collection_type_context(tcx)
+            && values.iter().skip(1).any(is_collection_literal);
         self.infer_chained_boolean_types(
             *op,
+            track_peer_types,
             values.iter().enumerate(),
-            |builder, (index, value)| {
+            |(_, value)| is_collection_literal(value),
+            |builder, (index, value), peer_ty| {
                 let ty = if index == values.len() - 1 {
-                    builder.infer_expression(value, tcx)
+                    builder
+                        .infer_expression_with_collection_literal_peer_context(value, tcx, peer_ty)
                 } else {
-                    builder.infer_maybe_standalone_expression(value, tcx)
+                    builder.infer_maybe_standalone_expression_with_collection_literal_peer_context(
+                        value, tcx, peer_ty,
+                    )
                 };
 
                 (ty, value.range())
@@ -9685,29 +10637,42 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     /// of operations and calling the `infer_ty` for each to infer their types.
     /// The iterator is consumed even if the boolean evaluation can be short-circuited,
     /// in order to ensure the invariant that all expressions are evaluated when inferring types.
-    fn infer_chained_boolean_types<Iterator, Item, F>(
+    ///
+    /// `infer_ty` receives the unguarded union of previous operand types that may contribute to the
+    /// result. This can be used as a type context without losing generic specialization information
+    /// to the truthiness guards applied to the final result type. `needs_peer_type` determines
+    /// whether that union is materialized for each operand.
+    fn infer_chained_boolean_types<Iterator, Item, NeedsPeerType, InferType>(
         &mut self,
         op: ast::BoolOp,
+        track_peer_types: bool,
         operations: Iterator,
-        infer_ty: F,
+        needs_peer_type: NeedsPeerType,
+        infer_ty: InferType,
     ) -> Type<'db>
     where
         Iterator: IntoIterator<Item = Item>,
-        F: Fn(&mut Self, Item) -> (Type<'db>, TextRange),
+        NeedsPeerType: Fn(&Item) -> bool,
+        InferType: Fn(&mut Self, Item, Option<Type<'db>>) -> (Type<'db>, TextRange),
     {
         let mut done = false;
+        let mut peer_types: Option<UnionAccumulator<'db>> = None;
         let db = self.db();
 
         let elements = operations
             .into_iter()
             .with_position()
             .map(|(position, item)| {
-                let (ty, range) = infer_ty(self, item);
+                let peer_ty = if done || !track_peer_types || !needs_peer_type(&item) {
+                    None
+                } else {
+                    peer_types
+                        .as_mut()
+                        .map(|peer_types| peer_types.get_or_build(db))
+                };
+                let (ty, range) = infer_ty(self, item, peer_ty);
 
-                let is_last = matches!(
-                    position,
-                    itertools::Position::Last | itertools::Position::Only
-                );
+                let is_last = position.is_last();
 
                 if is_last {
                     if done { Type::Never } else { ty }
@@ -9731,13 +10696,21 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             ty
                         }
 
-                        (Truthiness::Ambiguous, _) => IntersectionBuilder::new(db)
-                            .add_positive(ty)
-                            .add_negative(match op {
-                                ast::BoolOp::And => Type::AlwaysTruthy,
-                                ast::BoolOp::Or => Type::AlwaysFalsy,
-                            })
-                            .build(),
+                        (Truthiness::Ambiguous, _) => {
+                            if track_peer_types {
+                                match &mut peer_types {
+                                    Some(peer_types) => peer_types.add(db, ty),
+                                    None => peer_types = Some(UnionAccumulator::new(ty)),
+                                }
+                            }
+                            IntersectionBuilder::new(db)
+                                .add_positive(ty)
+                                .add_negative(match op {
+                                    ast::BoolOp::And => Type::AlwaysTruthy,
+                                    ast::BoolOp::Or => Type::AlwaysFalsy,
+                                })
+                                .build()
+                        }
                     }
                 }
             });
@@ -9765,11 +10738,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // is shared with the one in `infer_binary_type_comparison`.
         self.infer_chained_boolean_types(
             ast::BoolOp::And,
+            false,
             std::iter::once(&**left)
                 .chain(comparators)
                 .tuple_windows::<(_, _)>()
                 .zip(ops),
-            |builder, ((left, right), op)| {
+            |_| false,
+            |builder, ((left, right), op), _peer_ty| {
                 let left_ty = builder.expression_type(left);
                 let right_ty = builder.infer_expression(right, TypeContext::default());
 
@@ -9781,7 +10756,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     *op,
                     right_ty,
                     range,
-                    &BinaryComparisonVisitor::new(Ok(Type::bool_literal(true))),
                 )
                 .unwrap_or_else(|error| {
                     report_unsupported_comparison(
@@ -9826,15 +10800,26 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     pub(super) fn finish_expression(mut self) -> ExpressionInference<'db> {
         self.infer_region();
+        self.into_expression_inference()
+    }
 
+    /// Consume the results already collected by this builder without inferring its region.
+    fn into_expression_inference(self) -> ExpressionInference<'db> {
+        let region = self.region;
+        self.into_expression_cache_entry()
+            .into_expression_inference(region)
+    }
+
+    /// Consume the results already collected by this builder without compacting them.
+    fn into_expression_cache_entry(self) -> FullExpressionCacheEntry<'db> {
         let Self {
             context,
             expressions,
             qualifiers: _,
-            mut type_expression_flags,
-            mut collection_use_constraints,
-            mut string_annotations,
-            mut expected_types,
+            type_expression_flags,
+            collection_use_constraints,
+            string_annotations,
+            expected_types,
             scope,
             bindings,
             declarations,
@@ -9844,18 +10829,20 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             // Ignored; only relevant to definition regions
             undecorated_type: _,
+            discards_dict_key_assignments: _,
 
             // builder only state
             expression_cache: _,
+            reachability_cache: _,
             typevar_binding_context: _,
             deferred_state: _,
-            called_functions: _,
+            called_functions,
             index: _,
             region: _,
             return_types_and_ranges: _,
         } = self;
 
-        let diagnostics = context.finish();
+        let diagnostics = context.finish_uncompacted();
         let _ = scope;
 
         assert!(
@@ -9867,40 +10854,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             "Expression region can't have deferred definitions"
         );
 
-        let extra =
-            (!string_annotations.is_empty()
-                || !type_expression_flags.is_empty()
-                || !collection_use_constraints.is_empty()
-                || !expected_types.is_empty()
-                || cycle_recovery.is_some()
-                || !bindings.is_empty()
-                || !diagnostics.is_empty()).then(|| {
-                if bindings.len() > 20 {
-                    tracing::debug!(
-                        "Inferred expression region `{:?}` contains {} bindings. Lookups by linear scan might be slow.",
-                        self.region,
-                        bindings.len()
-                    );
-                }
-
-                type_expression_flags.shrink_to_fit();
-                expected_types.shrink_to_fit();
-                string_annotations.shrink_to_fit();
-                collection_use_constraints.shrink_to_fit();
-                Box::new(ExpressionInferenceExtra {
-                    string_annotations,
-                    expected_types,
-                    type_expression_flags,
-                    bindings: bindings.into_boxed_slice(),
-                    diagnostics,
-                    cycle_recovery,
-                    collection_use_constraints
-                })
-            });
-
-        ExpressionInference {
-            expressions: FrozenMap::from(expressions),
-            extra,
+        FullExpressionCacheEntry {
+            expressions,
+            type_expression_flags,
+            collection_use_constraints,
+            string_annotations,
+            expected_types,
+            bindings,
+            diagnostics,
+            called_functions,
+            cycle_recovery,
             #[cfg(debug_assertions)]
             scope,
         }
@@ -9912,11 +10875,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let Self {
             context,
             expressions,
-            mut qualifiers,
-            mut type_expression_flags,
+            qualifiers,
+            type_expression_flags,
             mut collection_use_constraints,
-            mut string_annotations,
-            mut expected_types,
+            string_annotations,
+            expected_types,
             scope,
             bindings,
             declarations,
@@ -9927,9 +10890,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             // Ignored; only relevant to definition regions
             undecorated_type: _,
+            discards_dict_key_assignments: _,
 
             // builder only state
             expression_cache: _,
+            reachability_cache: _,
             dataclass_field_specifiers: _,
             typevar_binding_context: _,
             deferred_state: _,
@@ -9952,25 +10917,21 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             || !collection_use_constraints.is_empty())
         .then(|| {
             collection_use_constraints.shrink_to_fit();
-            qualifiers.shrink_to_fit();
-            expected_types.shrink_to_fit();
-            type_expression_flags.shrink_to_fit();
-            string_annotations.shrink_to_fit();
             return_types_and_ranges.shrink_to_fit();
             Box::new(StatementInferenceInnerExtra {
-                string_annotations,
-                expected_types,
+                string_annotations: FrozenSet::from(string_annotations),
+                expected_types: FrozenMap::from(expected_types),
                 called_functions: called_functions
                     .into_iter()
                     .collect::<Vec<_>>()
                     .into_boxed_slice(),
                 return_types_and_ranges: return_types_and_ranges.into_boxed_slice(),
-                type_expression_flags,
+                type_expression_flags: FrozenMap::from(type_expression_flags),
                 collection_use_constraints,
                 cycle_recovery,
                 deferred: deferred.into_boxed_slice(),
                 diagnostics,
-                qualifiers,
+                qualifiers: FrozenMap::from(qualifiers),
             })
         });
 
@@ -10028,6 +10989,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             bindings,
             called_functions,
             expression_cache: _,
+            reachability_cache: _,
             declarations: _,
             deferred: _,
             scope: _,
@@ -10037,6 +10999,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             collection_use_constraints: _,
             dataclass_field_specifiers: _,
             undecorated_type: _,
+            discards_dict_key_assignments: _,
             typevar_binding_context: _,
             deferred_state: _,
             index: _,
@@ -10059,27 +11022,32 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
     }
 
-    pub(super) fn finish_definition(mut self) -> DefinitionInference<'db> {
+    pub(super) fn finish_definition(
+        mut self,
+        definition: Definition<'db>,
+    ) -> DefinitionInference<'db> {
         self.infer_region();
 
         let Self {
             context,
             expressions,
-            mut qualifiers,
-            mut type_expression_flags,
+            qualifiers,
+            type_expression_flags,
             mut collection_use_constraints,
-            mut string_annotations,
-            mut expected_types,
+            string_annotations,
+            expected_types,
             scope,
             bindings,
             declarations,
             deferred,
             cycle_recovery,
             undecorated_type,
+            discards_dict_key_assignments,
             called_functions,
 
             // builder only state
             expression_cache: _,
+            reachability_cache: _,
             dataclass_field_specifiers: _,
             typevar_binding_context: _,
             deferred_state: _,
@@ -10091,38 +11059,77 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let _ = scope;
         let diagnostics = context.finish();
 
-        let extra = (!diagnostics.is_empty()
-            || !string_annotations.is_empty()
-            || !expected_types.is_empty()
-            || cycle_recovery.is_some()
-            || undecorated_type.is_some()
-            || !deferred.is_empty()
-            || !called_functions.is_empty()
-            || !qualifiers.is_empty()
-            || !type_expression_flags.is_empty()
-            || !collection_use_constraints.is_empty())
-        .then(|| {
-            collection_use_constraints.shrink_to_fit();
-            qualifiers.shrink_to_fit();
-            type_expression_flags.shrink_to_fit();
-            expected_types.shrink_to_fit();
-            string_annotations.shrink_to_fit();
-            Box::new(DefinitionInferenceExtra {
-                string_annotations,
-                expected_types,
-                collection_use_constraints,
-                called_functions: called_functions
-                    .into_iter()
-                    .collect::<Vec<_>>()
-                    .into_boxed_slice(),
-                type_expression_flags,
-                cycle_recovery,
-                deferred: deferred.into_boxed_slice(),
-                diagnostics,
-                undecorated_type,
-                qualifiers,
-            })
-        });
+        let non_undecorated_extra_field_count = usize::from(!string_annotations.is_empty())
+            + usize::from(!expected_types.is_empty())
+            + usize::from(!collection_use_constraints.is_empty())
+            + usize::from(!called_functions.is_empty())
+            + usize::from(!type_expression_flags.is_empty())
+            + usize::from(cycle_recovery.is_some())
+            + usize::from(!deferred.is_empty())
+            + usize::from(!diagnostics.is_empty())
+            + usize::from(discards_dict_key_assignments)
+            + usize::from(!qualifiers.is_empty());
+
+        let extra = match (non_undecorated_extra_field_count, undecorated_type) {
+            (0, None) => None,
+            (1, None) if !qualifiers.is_empty() => Some(Box::new(
+                DefinitionInferenceExtra::Qualifiers(FrozenMap::from(qualifiers)),
+            )),
+            (1, None) if !deferred.is_empty() => Some(Box::new(
+                DefinitionInferenceExtra::Deferred(deferred.into_boxed_slice()),
+            )),
+            (1, None) if !diagnostics.is_empty() => Some(Box::new(
+                DefinitionInferenceExtra::Diagnostics(Box::new(diagnostics)),
+            )),
+            (1, None) if !called_functions.is_empty() => {
+                Some(Box::new(DefinitionInferenceExtra::CalledFunctions(
+                    called_functions
+                        .into_iter()
+                        .collect::<Vec<_>>()
+                        .into_boxed_slice(),
+                )))
+            }
+            (1, None) if !expected_types.is_empty() => Some(Box::new(
+                DefinitionInferenceExtra::ExpectedTypes(FrozenMap::from(expected_types)),
+            )),
+            (1, None) if !string_annotations.is_empty() => Some(Box::new(
+                DefinitionInferenceExtra::StringAnnotations(FrozenSet::from(string_annotations)),
+            )),
+            (1, None) if discards_dict_key_assignments => Some(Box::new(
+                DefinitionInferenceExtra::DiscardsDictKeyAssignments,
+            )),
+            (0, Some(undecorated_type)) => Some(Box::new(DefinitionInferenceExtra::Undecorated(
+                Box::new(undecorated_type),
+            ))),
+            (1, Some(undecorated_type)) if !deferred.is_empty() => {
+                Some(Box::new(DefinitionInferenceExtra::DeferredAndUndecorated(
+                    Box::new(DeferredAndUndecorated {
+                        deferred: deferred.into_boxed_slice(),
+                        undecorated_type,
+                    }),
+                )))
+            }
+            (_, undecorated_type) => {
+                collection_use_constraints.shrink_to_fit();
+                let extra = OtherDefinitionInferenceExtra {
+                    string_annotations: FrozenSet::from(string_annotations),
+                    expected_types: FrozenMap::from(expected_types),
+                    collection_use_constraints,
+                    called_functions: called_functions
+                        .into_iter()
+                        .collect::<Vec<_>>()
+                        .into_boxed_slice(),
+                    type_expression_flags: FrozenMap::from(type_expression_flags),
+                    cycle_recovery,
+                    deferred: deferred.into_boxed_slice(),
+                    diagnostics,
+                    undecorated_type,
+                    discards_dict_key_assignments,
+                    qualifiers: FrozenMap::from(qualifiers),
+                };
+                Some(Box::new(DefinitionInferenceExtra::Other(Box::new(extra))))
+            }
+        };
 
         if bindings.len() > 20 {
             tracing::debug!(
@@ -10144,8 +11151,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             expressions: FrozenMap::from(expressions),
             #[cfg(debug_assertions)]
             scope,
-            bindings: bindings.into_boxed_slice(),
-            declarations: declarations.into_boxed_slice(),
+            types: DefinitionTypes::from_parts(
+                definition,
+                bindings.into_vec(),
+                declarations.into_vec(),
+            ),
             extra,
         }
     }
@@ -10155,25 +11165,27 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let Self {
             context,
-            mut string_annotations,
-            mut expected_types,
-            mut type_expression_flags,
+            string_annotations,
+            expected_types,
+            type_expression_flags,
             mut collection_use_constraints,
             expressions,
             scope,
             cycle_recovery,
+            qualifiers,
 
             // Ignored, never leaked into other scopes
             deferred: _,
             bindings: _,
             declarations: _,
-            qualifiers: _,
 
             // Ignored; only relevant to definition regions
             undecorated_type: _,
+            discards_dict_key_assignments: _,
 
             // Builder only state
             expression_cache: _,
+            reachability_cache: _,
             dataclass_field_specifiers: _,
             typevar_binding_context: _,
             deferred_state: _,
@@ -10191,16 +11203,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             || !diagnostics.is_empty()
             || cycle_recovery.is_some()
             || !type_expression_flags.is_empty()
-            || !collection_use_constraints.is_empty())
+            || !collection_use_constraints.is_empty()
+            || !qualifiers.is_empty())
         .then(|| {
-            type_expression_flags.shrink_to_fit();
-            expected_types.shrink_to_fit();
-            string_annotations.shrink_to_fit();
             collection_use_constraints.shrink_to_fit();
             Box::new(ScopeInferenceExtra {
-                string_annotations,
-                expected_types,
-                type_expression_flags,
+                string_annotations: FrozenSet::from(string_annotations),
+                qualifiers: FrozenMap::from(qualifiers),
+                expected_types: FrozenMap::from(expected_types),
+                type_expression_flags: FrozenMap::from(type_expression_flags),
                 collection_use_constraints,
                 cycle_recovery,
                 diagnostics,
@@ -10208,7 +11219,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         });
 
         ScopeInference {
-            expressions: FrozenMap::from(expressions),
+            expressions: FrozenValueMap::from(expressions),
             extra,
         }
     }
@@ -10230,6 +11241,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             deferred_state,
             typevar_binding_context,
             ref expression_cache,
+            ref reachability_cache,
             ref return_types_and_ranges,
             ref dataclass_field_specifiers,
 
@@ -10246,6 +11258,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             deferred: _,
             called_functions: _,
             undecorated_type: _,
+            discards_dict_key_assignments: _,
             qualifiers: _,
             type_expression_flags: _,
         } = *self;
@@ -10261,6 +11274,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         builder.typevar_binding_context = typevar_binding_context;
         builder.context.inference_flags = self.inference_flags();
         builder.expression_cache.clone_from(expression_cache);
+        builder.reachability_cache.clone_from(reachability_cache);
         builder
             .return_types_and_ranges
             .clone_from(return_types_and_ranges);
@@ -10268,6 +11282,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .dataclass_field_specifiers
             .clone_from(dataclass_field_specifiers);
 
+        builder
+    }
+
+    /// Returns a speculative builder that does not construct diagnostics.
+    ///
+    /// Note that this method may lead to lost diagnostics if the expression cache
+    /// is enabled, as future multi-inference attempts may reuse inference results
+    /// in which diagnostics were suppressed.
+    fn speculate_without_diagnostics(&self) -> Self {
+        let mut builder = self.speculate();
+        builder.context.suppress_diagnostics();
         builder
     }
 
@@ -10289,12 +11314,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             // Ignored; only relevant to definition regions
             undecorated_type: _,
+            discards_dict_key_assignments: _,
 
             // builder only state
             expression_cache: _,
+            reachability_cache: _,
             typevar_binding_context: _,
             deferred_state: _,
-            called_functions: _,
+            called_functions,
             index: _,
             region: _,
             return_types_and_ranges: _,
@@ -10321,17 +11348,185 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.expected_types.extend(expected_types.iter());
         self.type_expression_flags
             .extend(type_expression_flags.iter());
+        self.called_functions.extend(called_functions);
 
         if !matches!(self.region, InferenceRegion::Scope(..)) {
             self.bindings
                 .extend(bindings.iter().map(|(def, ty)| (*def, *ty)));
         }
 
+        #[expect(
+            clippy::iter_over_hash_type,
+            reason = "constraints for distinct collection definitions are merged independently"
+        )]
         for (collection_def, constraints) in &collection_use_constraints {
             self.collection_use_constraints
                 .entry(*collection_def)
                 .and_modify(|this| this.extend(constraints))
                 .or_insert(constraints.clone());
+        }
+    }
+}
+
+/// An expression cache shared across builders during multi-inference.
+///
+/// This provides a cheap way of reusing inference results without the overhead
+/// of Salsa standalone expressions.
+#[derive(Default)]
+struct ExpressionCache<'db> {
+    entries: FxHashMap<ExpressionNodeKey, ExpressionCacheEntries<'db>>,
+}
+
+impl<'db> ExpressionCache<'db> {
+    fn get(
+        &self,
+        expression: ExpressionNodeKey,
+        tcx: TypeContext<'db>,
+    ) -> Option<&ExpressionCacheEntry<'db>> {
+        self.entries.get(&expression)?.get(tcx)
+    }
+
+    fn insert(
+        &mut self,
+        expression: ExpressionNodeKey,
+        tcx: TypeContext<'db>,
+        value: ExpressionCacheEntry<'db>,
+    ) {
+        match self.entries.entry(expression) {
+            hash_map::Entry::Occupied(mut entry) => {
+                entry.get_mut().insert(tcx, value);
+            }
+            hash_map::Entry::Vacant(entry) => {
+                entry.insert(ExpressionCacheEntries::Single(tcx, value));
+            }
+        }
+    }
+}
+
+/// The inferred types of a given expression, keyed by type context.
+enum ExpressionCacheEntries<'db> {
+    Single(TypeContext<'db>, ExpressionCacheEntry<'db>),
+    Many(FxHashMap<TypeContext<'db>, ExpressionCacheEntry<'db>>),
+}
+
+impl<'db> ExpressionCacheEntries<'db> {
+    fn get(&self, tcx: TypeContext<'db>) -> Option<&ExpressionCacheEntry<'db>> {
+        match self {
+            Self::Single(cached_tcx, value) if *cached_tcx == tcx => Some(value),
+            Self::Single(_, _) => None,
+            Self::Many(values) => values.get(&tcx),
+        }
+    }
+
+    fn insert(&mut self, tcx: TypeContext<'db>, value: ExpressionCacheEntry<'db>) {
+        if let Self::Single(cached_tcx, cached_value) = self
+            && *cached_tcx == tcx
+        {
+            *cached_value = value;
+            return;
+        }
+
+        let previous = std::mem::replace(self, Self::Many(FxHashMap::default()));
+        *self = match previous {
+            Self::Single(cached_tcx, cached_value) => Self::Many(FxHashMap::from_iter([
+                (cached_tcx, cached_value),
+                (tcx, value),
+            ])),
+            Self::Many(mut values) => {
+                values.insert(tcx, value);
+                Self::Many(values)
+            }
+        };
+    }
+}
+
+/// The inferred types for an expression region under a given type context.
+#[derive(Clone)]
+enum ExpressionCacheEntry<'db> {
+    Small(Type<'db>),
+    Full(Rc<FullExpressionCacheEntry<'db>>),
+}
+
+/// The full inference results for an expression region.
+///
+/// Unlike [`ExpressionInference`], this type is short-lived, and avoids the cost of compaction
+/// that is otherwise performed for Salsa results.
+struct FullExpressionCacheEntry<'db> {
+    expressions: FxHashMap<ExpressionNodeKey, Type<'db>>,
+    type_expression_flags: FxHashMap<ExpressionNodeKey, TypeExpressionFlags>,
+    collection_use_constraints: CollectionUseConstraints<'db>,
+    string_annotations: FxHashSet<ExpressionNodeKey>,
+    expected_types: FxHashMap<ExpressionNodeKey, Type<'db>>,
+    bindings: VecMap<Definition<'db>, Type<'db>>,
+    diagnostics: TypeCheckDiagnostics,
+    called_functions: FxIndexSet<FunctionType<'db>>,
+    cycle_recovery: Option<Type<'db>>,
+    #[cfg(debug_assertions)]
+    scope: ScopeId<'db>,
+}
+
+impl<'db> FullExpressionCacheEntry<'db> {
+    fn expression_type(&self, expression: ExpressionNodeKey) -> Type<'db> {
+        self.expressions
+            .get(&expression)
+            .copied()
+            .or(self.cycle_recovery)
+            .unwrap_or_else(Type::unknown)
+    }
+
+    fn is_single_expression(&self, expression: ExpressionNodeKey, ty: Type<'db>) -> bool {
+        self.expressions.len() == 1
+            && self.expressions.get(&expression) == Some(&ty)
+            && self.type_expression_flags.is_empty()
+            && self.collection_use_constraints.is_empty()
+            && self.string_annotations.is_empty()
+            && self.expected_types.is_empty()
+            && self.bindings.is_empty()
+            && self.diagnostics.is_empty()
+            && self.called_functions.is_empty()
+            && self.cycle_recovery.is_none()
+    }
+
+    fn into_expression_inference(
+        mut self,
+        region: InferenceRegion<'db>,
+    ) -> ExpressionInference<'db> {
+        let extra = (!self.string_annotations.is_empty()
+            || !self.type_expression_flags.is_empty()
+            || !self.collection_use_constraints.is_empty()
+            || !self.expected_types.is_empty()
+            || self.cycle_recovery.is_some()
+            || !self.bindings.is_empty()
+            || !self.called_functions.is_empty()
+            || !self.diagnostics.is_empty())
+        .then(|| {
+            if self.bindings.len() > 20 {
+                tracing::debug!(
+                    "Inferred expression region `{:?}` contains {} bindings. Lookups by linear scan might be slow.",
+                    region,
+                    self.bindings.len()
+                );
+            }
+
+            self.collection_use_constraints.shrink_to_fit();
+            self.diagnostics.shrink_to_fit();
+            Box::new(ExpressionInferenceExtra {
+                string_annotations: FrozenSet::from(self.string_annotations),
+                expected_types: FrozenMap::from(self.expected_types),
+                type_expression_flags: FrozenMap::from(self.type_expression_flags),
+                bindings: self.bindings.into_boxed_slice(),
+                diagnostics: self.diagnostics,
+                called_functions: self.called_functions.into_iter().collect(),
+                cycle_recovery: self.cycle_recovery,
+                collection_use_constraints: self.collection_use_constraints,
+            })
+        });
+
+        ExpressionInference {
+            expressions: FrozenMap::from(self.expressions),
+            extra,
+            #[cfg(debug_assertions)]
+            scope: self.scope,
         }
     }
 }
@@ -10385,7 +11580,7 @@ impl<'db, 'ast, 'infer> MultiInferenceGuard<'db, 'ast, 'infer> {
         tcx: TypeContext<'db>,
     ) -> Type<'db> {
         self.last_tcx = Some(tcx);
-        (self.infer_expr)(&mut builder.speculate(), tcx)
+        (self.infer_expr)(&mut builder.speculate_without_diagnostics(), tcx)
     }
 
     fn last_tcx(&self) -> TypeContext<'db> {
@@ -10405,6 +11600,55 @@ impl Drop for MultiInferenceGuard<'_, '_, '_> {
 /// An expression representing the function argument at the given index, along with its type
 /// context.
 type ArgExpr<'db, 'ast> = (usize, &'ast ast::Expr, TypeContext<'db>);
+
+#[derive(Clone, Copy)]
+enum CallArgumentInferenceMode {
+    /// Infer against every candidate type context entirely speculatively.
+    Speculate,
+
+    /// Commit a default inference without type context, if there are multiple
+    /// applicable type contexts.
+    Commit,
+}
+
+impl CallArgumentInferenceMode {
+    fn requires_default_inference(self) -> bool {
+        matches!(self, Self::Commit)
+    }
+}
+
+/// The set of type contexts to use when inferring a call-site argument, across all matching overloads.
+#[derive(Debug, PartialEq, Eq)]
+enum MatchingArgumentTypeContext<'db> {
+    Unique(Option<ArgumentTypeContext<'db>>),
+    Many(Vec<Option<ArgumentTypeContext<'db>>>),
+}
+
+fn is_collection_literal(expression: &ast::Expr) -> bool {
+    matches!(
+        expression,
+        ast::Expr::List(_) | ast::Expr::Set(_) | ast::Expr::Dict(_)
+    )
+}
+
+/// Returns `true` if `tcx` cannot provide useful type context for a collection literal.
+///
+/// During generic call argument inference, type variables that cannot yet be specialized are
+/// replaced by `UnspecializedTypeVar`. This marker intentionally carries neither type-variable
+/// identity nor a concrete expected type, and collection literal inference ignores it rather than
+/// using it as a constraint.
+///
+/// A bare generic parameter, such as the parameter to `reveal_type`, therefore provides an exact
+/// `UnspecializedTypeVar` context that should not prevent a peer expression from providing context
+/// instead.
+///
+/// This deliberately matches only the bare marker: a partially specialized context such as
+/// `list[UnspecializedTypeVar | int]` still carries useful collection structure and concrete type
+/// information.
+fn is_empty_collection_type_context(tcx: TypeContext<'_>) -> bool {
+    tcx.annotation
+        .is_none_or(|annotation| annotation == Type::Dynamic(DynamicType::UnspecializedTypeVar))
+}
 
 /// An iterator over arguments to a functional call.
 #[derive(Clone)]
@@ -10504,14 +11748,14 @@ impl From<bool> for DeferredExpressionState {
 /// infers an instance of `builtins.str`.
 #[derive(Debug)]
 struct StringPartsCollector {
-    concatenated: Option<String>,
+    concatenated: Option<CompactString>,
     contains_non_literal_str: bool,
 }
 
 impl StringPartsCollector {
     fn new() -> Self {
         Self {
-            concatenated: Some(String::new()),
+            concatenated: Some(CompactString::new("")),
             contains_non_literal_str: false,
         }
     }
@@ -10549,7 +11793,9 @@ impl StringPartsCollector {
         } else if let Some(concatenated) = self.concatenated {
             Type::string_literal(db, &concatenated)
         } else {
-            Type::literal_string()
+            Type::LiteralValue(LiteralValueType::promotable(
+                LiteralValueTypeKind::LiteralString,
+            ))
         }
     }
 }
@@ -10581,6 +11827,10 @@ impl<K, V> VecMap<K, V> {
 
     fn into_boxed_slice(self) -> Box<[(K, V)]> {
         self.0.into_boxed_slice()
+    }
+
+    fn into_vec(self) -> Vec<(K, V)> {
+        self.0
     }
 }
 
@@ -10757,7 +12007,7 @@ impl<'db, 'ast> AddBinding<'db, 'ast> {
                         "Reassignment of `Final` symbol `{place}` is not allowed"
                     ));
 
-                    diagnostic.set_primary_message("Reassignment of `Final` symbol");
+                    diagnostic.set_primary_annotation_message("Reassignment of `Final` symbol");
 
                     if let Some(previous_definition) = previous_definition {
                         // It is not very helpful to show the previous definition if it results from
@@ -10784,7 +12034,8 @@ impl<'db, 'ast> AddBinding<'db, 'ast> {
                                         .message("Symbol declared as `Final` here"),
                                 );
                             }
-                            diagnostic.set_primary_message("Symbol later reassigned here");
+                            diagnostic
+                                .set_primary_annotation_message("Symbol later reassigned here");
                         }
                     }
                 }
@@ -10792,6 +12043,7 @@ impl<'db, 'ast> AddBinding<'db, 'ast> {
         }
 
         if !bound_ty.is_assignable_to(db, declared_ty) {
+            builder.discard_dict_key_assignments_for(self.binding);
             report_invalid_assignment(
                 &builder.context,
                 self.node,
@@ -10809,12 +12061,12 @@ impl<'db, 'ast> AddBinding<'db, 'ast> {
                 builder.infer_maybe_standalone_expression(value, TypeContext::default())
             });
             // If the member is a data descriptor, the RHS value may differ from the value actually assigned.
-            if value_ty
-                .class_member(db, attr.id.clone())
-                .place
-                .ignore_possibly_undefined()
+            if assignment_attribute_members(db, value_ty, &attr.id)
+                .and_then(AssignmentAttributeMembers::type_member)
+                .and_then(|member| member.place.ignore_possibly_undefined())
                 .is_some_and(|ty| ty.may_be_data_descriptor(db))
             {
+                builder.discard_dict_key_assignments_for(self.binding);
                 bound_ty = declared_ty;
             }
         } else if let AnyNodeRef::ExprSubscript(ast::ExprSubscript { value, .. }) = self.node {
@@ -10823,6 +12075,7 @@ impl<'db, 'ast> AddBinding<'db, 'ast> {
                 .unwrap_or_else(|| builder.infer_expression(value, TypeContext::default()));
 
             if !value_ty.is_typed_dict() && !Self::is_safe_mutable_class(db, value_ty) {
+                builder.discard_dict_key_assignments_for(self.binding);
                 bound_ty = declared_ty;
             }
         }

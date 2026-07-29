@@ -183,6 +183,7 @@ class TestCase:
 
     def debug(self) -> None:
         """Run the test without collecting errors in a TestResult"""
+
     if sys.version_info < (3, 11):
         def _addSkip(self, result: unittest.result.TestResult, test_case: TestCase, reason: str) -> None: ...
 
@@ -392,7 +393,29 @@ class TestCase:
             logger: str | logging.Logger | None = None,
             level: int | str | None = None,
             formatter: logging.Formatter | None = None,
-        ) -> _AssertLogsContext[_LoggingWatcher]: ...
+        ) -> _AssertLogsContext[_LoggingWatcher]:
+            """Fail unless a log message of level *level* or higher is emitted
+            on *logger_name* or its children.  If omitted, *level* defaults to
+            INFO and *logger* defaults to the root logger.
+
+            This method must be used as a context manager, and will yield
+            a recording object with two attributes: `output` and `records`.
+            At the end of the context manager, the `output` attribute will
+            be a list of the matching formatted log messages and the
+            `records` attribute will be a list of the corresponding LogRecord
+            objects.
+
+            Optionally supply `formatter` to control how messages are formatted.
+
+            Example::
+
+                with self.assertLogs('foo', level='INFO') as cm:
+                    logging.getLogger('foo').info('first message')
+                    logging.getLogger('foo.bar').error('second message')
+                self.assertEqual(cm.output, ['INFO:foo:first message',
+                                             'ERROR:foo.bar:second message'])
+            """
+
     else:
         def assertLogs(
             self, logger: str | logging.Logger | None = None, level: int | str | None = None
@@ -585,6 +608,7 @@ class TestCase:
         is optimized for sets specifically (parameters must support a
         difference method).
         """
+
     # assertDictEqual accepts only true dict instances. We can't use that here, since that would make
     # assertDictEqual incompatible with TypedDict.
     def assertDictEqual(self, d1: Mapping[Any, object], d2: Mapping[Any, object], msg: Any = None) -> None: ...
@@ -609,6 +633,7 @@ class TestCase:
 
         Cleanup items are called even if setUp fails (unlike tearDown).
         """
+
     if sys.version_info >= (3, 11):
         def enterContext(self, cm: AbstractContextManager[_T]) -> _T:
             """Enters the supplied context manager.
@@ -633,6 +658,7 @@ class TestCase:
         """Execute all class cleanup functions. Normally called for you after
         tearDownClass.
         """
+
     if sys.version_info >= (3, 11):
         @classmethod
         def enterClassContext(cls, cm: AbstractContextManager[_T]) -> _T:
@@ -656,6 +682,7 @@ class TestCase:
         raise a failure exception if first != second with a useful human
         readable error message for those types.
         """
+
     if sys.version_info < (3, 12):
         failUnlessEqual = assertEqual
         assertEquals = assertEqual
@@ -674,6 +701,7 @@ class TestCase:
         assertRaisesRegexp = assertRaisesRegex
         def assertDictContainsSubset(self, subset: Mapping[Any, Any], dictionary: Mapping[Any, Any], msg: object = None) -> None:
             """Checks whether dictionary is a superset of subset."""
+
     # Runtime has *args, **kwargs, but will error if any are supplied
     def __init_subclass__(cls, *args: Never, **kwargs: Never) -> None: ...
 
@@ -718,7 +746,8 @@ class _AssertRaisesContext(_AssertRaisesBaseContext, Generic[_E]):
     def __class_getitem__(cls, item: Any, /) -> GenericAlias:
         """Represent a PEP 585 generic type
 
-        E.g. for t = list[int], t.__origin__ is list and t.__args__ is (int,).
+        For example, for t = list[int], t.__origin__ is list and t.__args__
+        is (int,).
         """
 
 class _AssertWarnsContext(_AssertRaisesBaseContext):

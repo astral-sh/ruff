@@ -5,21 +5,9 @@ expression: lex_source(source)
 ## Tokens
 ```
 [
-    (
-        Comment,
-        0..6,
-    ),
-    (
-        NonLogicalNewline,
-        6..7,
-    ),
-    (
-        Comment,
-        7..13,
-    ),
-    (
-        NonLogicalNewline,
-        13..14,
-    ),
+    Comment 0..6,
+    NonLogicalNewline 6..7,
+    Comment 7..13,
+    NonLogicalNewline 13..14,
 ]
 ```

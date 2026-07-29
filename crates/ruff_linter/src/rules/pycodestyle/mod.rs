@@ -76,6 +76,22 @@ mod tests {
     }
 
     #[test_case(Rule::LineTooLong, Path::new("E501_5.py"))]
+    #[test_case(Rule::ModuleImportNotAtTopOfFile, Path::new("E40.py"))]
+    #[test_case(Rule::ModuleImportNotAtTopOfFile, Path::new("E402_0.py"))]
+    #[test_case(Rule::ModuleImportNotAtTopOfFile, Path::new("E402_1.py"))]
+    #[test_case(Rule::ModuleImportNotAtTopOfFile, Path::new("E402_2.py"))]
+    #[test_case(Rule::ModuleImportNotAtTopOfFile, Path::new("E402_3.py"))]
+    #[test_case(Rule::ModuleImportNotAtTopOfFile, Path::new("E402_4.py"))]
+    #[test_case(Rule::ModuleImportNotAtTopOfFile, Path::new("E402_5.py"))]
+    #[test_case(Rule::ModuleImportNotAtTopOfFile, Path::new("E402_docstring.py"))]
+    #[test_case(Rule::ModuleImportNotAtTopOfFile, Path::new("E402_comments.py"))]
+    #[test_case(Rule::ModuleImportNotAtTopOfFile, Path::new("E402_future.py"))]
+    #[test_case(Rule::ModuleImportNotAtTopOfFile, Path::new("E402_shebang.py"))]
+    #[test_case(
+        Rule::ModuleImportNotAtTopOfFile,
+        Path::new("E402_shebang_docstring_and_future.py")
+    )]
+    #[test_case(Rule::ModuleImportNotAtTopOfFile, Path::new("E402.ipynb"))]
     #[test_case(Rule::RedundantBackslash, Path::new("E502.py"))]
     #[test_case(Rule::TooManyNewlinesAtEndOfFile, Path::new("W391_0.py"))]
     #[test_case(Rule::TooManyNewlinesAtEndOfFile, Path::new("W391_1.py"))]
@@ -117,6 +133,28 @@ mod tests {
         )?;
 
         assert_eq!(tested_notebook.diagnostics.len(), 3);
+
+        Ok(())
+    }
+
+    #[test]
+    fn w391_after_fix_empties_cell_ipynb() -> Result<()> {
+        let actual =
+            test_resource_path("fixtures").join("pycodestyle/W391_after_empty_cell_fix.ipynb");
+        let expected = test_resource_path("fixtures")
+            .join("pycodestyle/W391_after_empty_cell_fix_expected.ipynb");
+
+        assert_notebook_path(
+            &actual,
+            &expected,
+            &settings::LinterSettings {
+                preview: PreviewMode::Enabled,
+                ..settings::LinterSettings::for_rules([
+                    Rule::UnusedImport,
+                    Rule::TooManyNewlinesAtEndOfFile,
+                ])
+            },
+        )?;
 
         Ok(())
     }

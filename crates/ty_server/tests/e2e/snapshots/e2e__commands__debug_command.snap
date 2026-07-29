@@ -24,7 +24,9 @@ Settings: WorkspaceSettings {
         auto_import: true,
         complete_function_parentheses: false,
     },
-    overrides: None,
+    configuration_file: None,
+    override_options: None,
+    fallback_options: None,
 }
 
 Project at XXX
@@ -40,10 +42,11 @@ Settings: Settings {
     rules: <RULES>,
     terminal: TerminalSettings {
         output_format: Full,
-        error_on_warning: false,
+        error_on_warning: true,
     },
     src: SrcSettings {
         respect_ignore_files: true,
+        exclude_scripts: false,
         files: IncludeExcludeFilter {
             include: IncludeFilter(
                 [
@@ -161,6 +164,7 @@ Settings: Settings {
         },
     },
     analysis: AnalysisSettings {
+        strict_equality_semantics: false,
         respect_type_ignore_comments: true,
         allowed_unresolved_imports: ModuleGlobSet {
             regex_set: RegexSet([]),

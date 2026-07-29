@@ -2,11 +2,11 @@ use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::path::Path;
 
-use full::FullRenderer;
-use ruff_annotate_snippets::{
-    Annotation as AnnotateAnnotation, Level as AnnotateLevel, Message as AnnotateMessage,
-    Snippet as AnnotateSnippet,
+use annotate_snippets::{
+    Annotation as AnnotateAnnotation, AnnotationKind, Group as AnnotateGroup,
+    Level as AnnotateLevel, Snippet as AnnotateSnippet,
 };
+use full::FullRenderer;
 use ruff_notebook::{Notebook, NotebookIndex};
 use ruff_source_file::{LineIndex, OneIndexed, SourceCode};
 use ruff_text_size::{TextLen, TextRange, TextSize};
@@ -117,7 +117,7 @@ impl std::fmt::Display for DisplayDiagnostics<'_> {
                 FullRenderer::new(self.resolver, self.config).render(f, self.diagnostics)?;
             }
             DiagnosticFormat::Azure => {
-                AzureRenderer::new(self.resolver).render(f, self.diagnostics)?;
+                AzureRenderer::new(self.resolver, self.config).render(f, self.diagnostics)?;
             }
             #[cfg(feature = "serde")]
             DiagnosticFormat::Json => {
@@ -130,23 +130,24 @@ impl std::fmt::Display for DisplayDiagnostics<'_> {
             }
             #[cfg(feature = "serde")]
             DiagnosticFormat::Rdjson => {
-                rdjson::RdjsonRenderer::new(self.resolver).render(f, self.diagnostics)?;
+                rdjson::RdjsonRenderer::new(self.resolver, self.config)
+                    .render(f, self.diagnostics)?;
             }
             DiagnosticFormat::Pylint => {
-                PylintRenderer::new(self.resolver).render(f, self.diagnostics)?;
+                PylintRenderer::new(self.resolver, self.config).render(f, self.diagnostics)?;
             }
             #[cfg(feature = "junit")]
             DiagnosticFormat::Junit => {
-                junit::JunitRenderer::new(self.resolver, self.config.program)
+                junit::JunitRenderer::new(self.resolver, self.config)
                     .render(f, self.diagnostics)?;
             }
             #[cfg(feature = "serde")]
             DiagnosticFormat::Gitlab => {
-                gitlab::GitlabRenderer::new(self.resolver).render(f, self.diagnostics)?;
+                gitlab::GitlabRenderer::new(self.resolver, self.config)
+                    .render(f, self.diagnostics)?;
             }
             DiagnosticFormat::Github => {
-                GithubRenderer::new(self.resolver, self.config.program)
-                    .render(f, self.diagnostics)?;
+                GithubRenderer::new(self.resolver, self.config).render(f, self.diagnostics)?;
             }
         }
 
@@ -205,7 +206,7 @@ impl<'a> Resolved<'a> {
 /// both.)
 #[derive(Debug)]
 struct ResolvedDiagnostic<'a> {
-    level: AnnotateLevel,
+    level: AnnotateLevel<'static>,
     id: Option<String>,
     documentation_url: Option<String>,
     message: String,
@@ -237,24 +238,24 @@ impl<'a> ResolvedDiagnostic<'a> {
             })
             .collect();
 
-        let id = if config.hide_severity {
-            // Either the rule code alone (e.g. `F401`), or the lint id with a colon (e.g.
-            // `invalid-syntax:`). When Ruff gets real severities, we should put the colon back in
-            // `DisplaySet::format_annotation` for both cases, but this is a small hack to improve
-            // the formatting of syntax errors for now. This should also be kept consistent with the
+        let use_code = !config.preview || config.prefer_rule_codes;
+        let id = if use_code && let Some(code) = diag.secondary_code() {
+            code.to_string()
+        } else if config.hide_severity {
+            // When Ruff gets real severities, we should put the colon back in
+            // `DisplaySet::format_annotation` for both cases, but this is a small hack to improve the
+            // formatting of human-readable names for now. This should also be kept consistent with the
             // concise formatting.
-            diag.secondary_code().map_or_else(
-                || format!("{id}:", id = diag.inner.id),
-                |code| code.to_string(),
-            )
+            format!("{id}:", id = diag.id())
         } else {
-            diag.secondary_code_or_id().to_string()
+            diag.id().to_string()
         };
 
+        let level = diag.inner.severity.to_annotate();
         let level = if config.hide_severity {
-            AnnotateLevel::None
+            level.no_name()
         } else {
-            diag.inner.severity.to_annotate()
+            level
         };
 
         ResolvedDiagnostic {
@@ -395,7 +396,7 @@ impl<'a> ResolvedDiagnostic<'a> {
         snippets_by_input
             .sort_by(|snips1, snips2| snips1.has_primary.cmp(&snips2.has_primary).reverse());
         RenderableDiagnostic {
-            level: self.level,
+            level: self.level.clone(),
             id: self.id.as_deref(),
             documentation_url: self.documentation_url.as_deref(),
             message: &self.message,
@@ -491,7 +492,7 @@ struct Renderable<'r> {
 #[derive(Debug)]
 struct RenderableDiagnostic<'r> {
     /// The severity of the diagnostic.
-    level: AnnotateLevel,
+    level: AnnotateLevel<'static>,
     /// The ID of the diagnostic. The ID can usually be used on the CLI or in a
     /// config file to change the severity of a lint.
     ///
@@ -519,7 +520,7 @@ struct RenderableDiagnostic<'r> {
 
 impl RenderableDiagnostic<'_> {
     /// Convert this to an "annotate" snippet.
-    fn to_annotate(&self) -> AnnotateMessage<'_> {
+    fn to_annotate(&self) -> AnnotateGroup<'_> {
         let snippets = self.snippets_by_input.iter().flat_map(|snippets| {
             let path = snippets.path;
             snippets
@@ -527,15 +528,18 @@ impl RenderableDiagnostic<'_> {
                 .iter()
                 .map(|snippet| snippet.to_annotate(path))
         });
-        let mut message = self
+        let mut title = self
             .level
-            .title(self.message)
-            .is_fixable(self.is_fixable)
-            .lineno_offset(self.header_offset);
+            .clone()
+            .primary_title(self.message)
+            .is_fixable(self.is_fixable);
         if let Some(id) = self.id {
-            message = message.id_with_url(id, self.documentation_url);
+            title = title.id(id);
+            if let Some(url) = self.documentation_url {
+                title = title.id_url(url);
+            }
         }
-        message.snippets(snippets)
+        title.elements(snippets).lineno_offset(self.header_offset)
     }
 }
 
@@ -712,10 +716,11 @@ impl<'r> RenderableSnippet<'r> {
     }
 
     /// Convert this to an "annotate" snippet.
-    fn to_annotate<'a>(&'a self, path: &'a str) -> AnnotateSnippet<'a> {
-        AnnotateSnippet::source(&self.snippet)
-            .origin(path)
+    fn to_annotate<'a>(&'a self, path: &'a str) -> AnnotateSnippet<'a, AnnotateAnnotation<'a>> {
+        AnnotateSnippet::source(self.snippet.as_ref())
+            .path(path)
             .line_start(self.line_start.get())
+            .fold(false)
             .annotations(
                 self.annotations
                     .iter()
@@ -765,23 +770,12 @@ impl<'r> RenderableAnnotation<'r> {
 
     /// Convert this to an "annotate" annotation.
     fn to_annotate(&self) -> AnnotateAnnotation<'_> {
-        // This is not really semantically meaningful, but
-        // it does currently result in roughly the message
-        // we want to convey.
-        //
-        // TODO: While this means primary annotations use `^` and
-        // secondary annotations use `-` (which is fine), this does
-        // result in coloring for primary annotations that looks like
-        // an error (red) and coloring for secondary annotations that
-        // looks like a warning (yellow). This is perhaps not quite in
-        // line with what we want, but fixing this probably requires
-        // changes to `ruff_annotate_snippets`, so we punt for now.
-        let level = if self.is_primary {
-            AnnotateLevel::Error
+        let kind = if self.is_primary {
+            AnnotationKind::Primary
         } else {
-            AnnotateLevel::Warning
+            AnnotationKind::Context
         };
-        let mut ann = level.span(self.range.into());
+        let mut ann = kind.span(self.range.into());
         if let Some(message) = self.message {
             ann = ann.label(message);
         }
@@ -1397,7 +1391,6 @@ watermelon
           |
         5 | elephant
           | ^^^^^^^^
-          |
         ",
         );
 
@@ -1431,7 +1424,6 @@ watermelon
         10 | jackrabbit
         11 | kangaroo
            | ^^^^^^^^
-           |
         ",
         );
 
@@ -1488,7 +1480,6 @@ watermelon
         10 | jackrabbit
         11 | kangaroo
            | ^^^^^^^^
-           |
         ",
         );
     }
@@ -1778,7 +1769,6 @@ watermelon
           |
         5 | canary
           | ^^^^^^
-          |
         ",
         );
     }
@@ -1962,7 +1952,6 @@ watermelon
         10 | jackrabbit
         11 | kangaroo
            | ^^^^^^^^
-           |
         ",
         );
 
@@ -1991,7 +1980,6 @@ watermelon
         10 | jackrabbit
         11 | kangaroo
            | ^^^^^^^^
-           |
         warning: sub-diagnostic message
          --> fruits:3:1
           |
@@ -2088,7 +2076,7 @@ watermelon
         4 |   dog
         5 | / elephant
         6 | | finch
-          | |______^
+          | |_____^
         7 |   gorilla
         8 |   hippopotamus
           |
@@ -2180,10 +2168,8 @@ watermelon
           |
         2 |    beetle
         3 |    canary
-        4 |    dog
-          |  __^
-        5 | |  elephant
-          | | _^
+        4 | /  dog
+        5 | |/ elephant
         6 | || finch
           | ||_____^
         7 | |  gorilla
@@ -2209,10 +2195,8 @@ watermelon
           |
         2 |    beetle
         3 |    canary
-        4 |    dog
-          |  __^
-        5 | |  elephant
-          | | _^
+        4 | /  dog
+        5 | |/ elephant
         6 | || finch
           | ||_____^
         7 | |  gorilla
@@ -2240,10 +2224,8 @@ watermelon
           |
         3 |    canary
         4 |    dog
-        5 |    elephant
-          |  __^
-        6 | |  finch
-          | | _^
+        5 | /  elephant
+        6 | |/ finch
         7 | || gorilla
           | ||_______^
           |  |_______|
@@ -2275,13 +2257,11 @@ watermelon
           |
         3 |    canary
         4 |    dog
-        5 |    elephant
-          |   _^
-          |  |_|
+        5 | // elephant
         6 | || finch
           | ||_____^
-        7 |  | gorilla
-          |  |_______^
+        7 | |  gorilla
+          | |________^
         8 |    hippopotamus
         9 |    inchworm
           |
@@ -2303,8 +2283,7 @@ watermelon
           |
         3 |    canary
         4 |    dog
-        5 |    elephant
-          |  __^
+        5 | /  elephant
         6 | |  finch
           | |__^___^
           |   _|
@@ -2358,7 +2337,7 @@ watermelon
         3 | canary
         4 | dog
         5 | elephant
-          |   ----
+          |   ^^^^
           |   |
           |   giant land mammal
           |   but afraid of mice
@@ -2450,7 +2429,6 @@ watermelon
           |
         7 | gorilla
           | ------- secondary 7
-          |
         ",
         );
     }
@@ -2534,7 +2512,6 @@ watermelon
            |
          2 | banana
            | ------ secondary fruits 2
-           |
         ",
         );
     }
@@ -2560,7 +2537,7 @@ watermelon
         assert_eq!(
             diagnostics
                 .iter()
-                .map(Diagnostic::primary_message)
+                .map(Diagnostic::headline_message)
                 .collect::<Vec<_>>(),
             ["checking main.py", "checking mod.py"]
         );
@@ -2590,7 +2567,7 @@ watermelon
 
         /// Set the number of contextual lines to include for each snippet
         /// in diagnostic rendering.
-        fn context(&mut self, lines: usize) {
+        pub(super) fn context(&mut self, lines: usize) {
             // Kind of annoying. I considered making `DisplayDiagnosticConfig`
             // be `Copy` (which it could be, at time of writing, 2025-03-07),
             // but it seems likely to me that it will grow non-`Copy`
@@ -2599,11 +2576,11 @@ watermelon
             self.config = config.context(lines);
         }
 
-        /// Set the "merge window" for annotations in this test.
+        /// Set the "merge window" for annotations and fix diff hunks in this test.
         ///
-        /// If two annotations have fewer than this number of lines between them,
-        /// they will be merged into a single annotation.
-        fn merge_window(&mut self, lines: usize) {
+        /// Nearby annotations or fix edits are rendered in a single source frame even when their
+        /// configured context windows would not otherwise overlap.
+        pub(super) fn merge_window(&mut self, lines: usize) {
             let config = self.config.clone();
             self.config = config.merge_window(lines);
         }
@@ -2634,12 +2611,6 @@ watermelon
         pub(super) fn show_fix_status(&mut self, yes: bool) {
             let config = self.config.clone();
             self.config = config.with_show_fix_status(yes);
-        }
-
-        /// Show a diff for the fix when rendering.
-        pub(super) fn show_fix_diff(&mut self, yes: bool) {
-            let config = self.config.clone();
-            self.config = config.show_fix_diff(yes);
         }
 
         /// The lowest fix applicability to show when rendering.

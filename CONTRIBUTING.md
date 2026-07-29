@@ -78,8 +78,7 @@ You can optionally install hooks to automatically run the validation checks
 when making a commit:
 
 ```shell
-uv tool install prek
-prek install
+uv run --only-group dev --locked prek install
 ```
 
 We recommend [nextest](https://nexte.st/) to run Ruff's test suite (via `cargo nextest run`),
@@ -106,7 +105,7 @@ and that it passes both the lint and test validation checks:
 ```shell
 cargo clippy --workspace --all-targets --all-features -- -D warnings  # Rust linting
 RUFF_UPDATE_SCHEMA=1 cargo test  # Rust testing and updating ruff.schema.json
-uvx prek run -a  # Rust and Python formatting, Markdown and Python linting, etc.
+uv run --only-group dev --locked prek run --all-files  # Rust and Python formatting, Markdown and Python linting, etc.
 ```
 
 These checks will run on GitHub Actions when you open your pull request, but running them locally
@@ -170,6 +169,34 @@ At the time of writing, the repository includes the following crates:
 - `crates/ruff_python_parser`: library crate containing the Python parser.
 - `crates/ruff_wasm`: library crate for exposing Ruff as a WebAssembly module. Powers the
     [Ruff Playground](https://play.ruff.rs/).
+
+#### Adding a new crate
+
+When adding a workspace crate under `crates/`, first decide whether it should be published to
+crates.io as part of Ruff's releases:
+
+- Test, benchmark, development, and other non-release crates must set `publish = false` in their
+    `Cargo.toml`.
+- Publishable crates should inherit the workspace package metadata and follow Ruff's [crate
+    versioning policy](https://docs.astral.sh/ruff/versioning/#crate-versioning). If the crate is
+    listed under `[workspace.dependencies]`, specify both its path and matching version.
+
+For a publishable crate, generate its README and verify that the workspace can still be packaged:
+
+```shell
+uv run --script scripts/generate-crate-readmes.py
+cargo publish --workspace --dry-run
+```
+
+Before merging a publishable crate, ask a crates.io owner to bootstrap it by running:
+
+```shell
+CARGO_REGISTRY_TOKEN=<token> uv run --no-config --script scripts/setup-crates-io-publish.py
+```
+
+The bootstrap script reserves the crate name, configures the release workflow as its trusted
+publisher, requires trusted publishing for future versions, and adds the crate to `.known-crates`.
+Commit the generated README and `.known-crates` update with the new crate.
 
 ### Example: Adding a new lint rule
 

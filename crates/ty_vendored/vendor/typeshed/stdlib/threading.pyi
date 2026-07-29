@@ -147,15 +147,77 @@ def getprofile() -> ProfileFunction | None:
 if sys.version_info >= (3, 15):
     @final
     class serialize_iterator(Iterator[_T]):
+        """Wrap a non-concurrent iterator with a lock to enforce sequential access.
+
+        Applies a non-reentrant lock around calls to __next__.  If the
+        wrapped iterator also defines send(), throw(), or close(), those
+        calls are serialized as well.
+
+        Allows iterator and generator instances to be shared by multiple consumer
+        threads.
+
+        For example, itertools.count does not make thread-safe instances,
+        but that is easily fixed with:
+
+            atomic_counter = serialize_iterator(itertools.count())
+
+        """
+
         def __init__(self, iterable: Iterable[_T]) -> None: ...
         def __iter__(self) -> Self: ...
         def __next__(self) -> _T: ...
-        def send(self, value: Any, /) -> _T: ...
-        def throw(self, typ: type[BaseException], val: BaseException | object = ..., tb: TracebackType | None = ...) -> _T: ...
-        def close(self) -> None: ...
+        def send(self, value: Any, /) -> _T:
+            """Send a value to a generator.
 
-    def synchronized_iterator(func: Callable[..., Iterable[_T]]) -> Callable[..., Iterator[_T]]: ...
-    def concurrent_tee(iterable: Iterable[_T], n: int = 2) -> tuple[Iterator[_T], ...]: ...
+            Raises AttributeError if not a generator.
+            """
+
+        def throw(self, typ: type[BaseException], val: BaseException | object = ..., tb: TracebackType | None = ...) -> _T:
+            """Call throw() on a generator.
+
+            Raises AttributeError if not a generator.
+            """
+
+        def close(self) -> None:
+            """Call close() on a generator.
+
+            Raises AttributeError if not a generator.
+            """
+
+    def synchronized_iterator(func: Callable[..., Iterable[_T]]) -> Callable[..., Iterator[_T]]:
+        """Wrap an iterator-returning callable to make its iterators thread-safe.
+
+        Existing itertools and more-itertools can be wrapped so that their
+        iterator instances are serialized.
+
+        For example, itertools.count does not make thread-safe instances,
+        but that is easily fixed with:
+
+            atomic_counter = synchronized_iterator(itertools.count)
+
+        Can also be used as a decorator for generator function definitions
+        so that the generator instances are serialized::
+
+            import time
+
+            @synchronized_iterator
+            def enumerate_and_timestamp(iterable):
+                for count, value in enumerate(iterable):
+                    yield count, time.time_ns(), value
+
+        """
+
+    def concurrent_tee(iterable: Iterable[_T], n: int = 2) -> tuple[Iterator[_T], ...]:
+        """Variant of itertools.tee() but with guaranteed threading semantics.
+
+        Takes a non-threadsafe iterator as an input and creates concurrent
+        tee objects for other threads to have reliable independent copies of
+        the data stream.
+
+        The new iterators are only thread-safe if consumed within a single thread.
+        To share just one of the new iterators across multiple threads, wrap it
+        with threading.serialize_iterator().
+        """
 
 def stack_size(size: int = 0, /) -> int:
     """Return the thread stack size used when creating new threads.  The
@@ -207,6 +269,7 @@ class Thread:
         created. The identifier is available even after the thread has exited.
 
         """
+
     daemon: bool
     """A boolean value indicating whether this thread is a daemon thread.
 
@@ -260,6 +323,7 @@ class Thread:
             else to the thread.
 
             """
+
     else:
         def __init__(
             self,
@@ -451,6 +515,7 @@ class _RLock:
         There is no return value.
 
         """
+
     __enter__ = acquire
     def __exit__(self, t: type[BaseException] | None, v: BaseException | None, tb: TracebackType | None) -> None: ...
 

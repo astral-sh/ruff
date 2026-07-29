@@ -1,7 +1,7 @@
 use std::borrow::Cow;
 
-use lsp_types::request::FoldingRangeRequest;
-use lsp_types::{FoldingRange, FoldingRangeKind, FoldingRangeParams, Url};
+use lsp_types::FoldingRangeRequest;
+use lsp_types::{FoldingRange, FoldingRangeKind, FoldingRangeParams, Uri};
 use ruff_db::source::source_text;
 use ruff_text_size::TextRange;
 use ty_ide::folding_ranges;
@@ -22,7 +22,7 @@ impl RequestHandler for FoldingRangeRequestHandler {
 }
 
 impl BackgroundDocumentRequestHandler for FoldingRangeRequestHandler {
-    fn document_url(params: &FoldingRangeParams) -> Cow<'_, Url> {
+    fn document_uri(params: &FoldingRangeParams) -> Cow<'_, Uri> {
         Cow::Borrowed(&params.text_document.uri)
     }
 
@@ -52,7 +52,7 @@ impl BackgroundDocumentRequestHandler for FoldingRangeRequestHandler {
             && let Some(notebook_document) = db.notebook_document(file)
             && let Some(notebook) = source_text(db, file).as_notebook()
         {
-            let cell_index = notebook_document.cell_index_by_uri(snapshot.url());
+            let cell_index = notebook_document.cell_index_by_uri(snapshot.uri());
             cell_range = cell_index.and_then(|index| notebook.cell_range(index));
         }
 

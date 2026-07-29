@@ -110,11 +110,6 @@ fn generate_markdown() -> String {
                     r#"Added in <a href="https://github.com/astral-sh/ty/releases/tag/{since}">{since}</a>"#
                 )
             }
-            ty_python_semantic::lint::LintStatus::Preview { since } => {
-                format!(
-                    r#"Preview (since <a href="https://github.com/astral-sh/ty/releases/tag/{since}">{since}</a>)"#
-                )
-            }
             ty_python_semantic::lint::LintStatus::Deprecated { since, .. } => {
                 format!(
                     r#"Deprecated (since <a href="https://github.com/astral-sh/ty/releases/tag/{since}">{since}</a>)"#

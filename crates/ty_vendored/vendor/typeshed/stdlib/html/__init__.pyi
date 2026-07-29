@@ -2,6 +2,8 @@
 General functions for HTML manipulation.
 """
 
+import re
+
 __all__ = ["escape", "unescape"]
 
 def escape(s: str, quote: bool = True) -> str:
@@ -20,3 +22,5 @@ def unescape(s: str) -> str:
     for both valid and invalid character references, and the list of
     HTML 5 named character references defined in html.entities.html5.
     """
+
+def _replace_charref(s: re.Match[str]) -> str: ...

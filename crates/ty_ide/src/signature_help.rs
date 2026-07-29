@@ -7,6 +7,7 @@
 //! and overloads.
 
 use crate::Db;
+use crate::FxIndexMap;
 use crate::docstring::Docstring;
 use crate::goto::docstring_for_call_definition;
 use ruff_db::files::File;
@@ -236,7 +237,7 @@ fn create_parameters<'db>(
     let param_docs = if let Some(docstring) = docstring {
         docstring.parameter_documentation()
     } else {
-        std::collections::HashMap::new()
+        FxIndexMap::default()
     };
 
     parameters
@@ -351,6 +352,27 @@ mod tests {
             let active_signature = &result.signatures[active_sig_index];
             assert_eq!(active_signature.active_parameter, Some(0));
         }
+    }
+
+    #[test]
+    fn signature_help_bound_method_overload_self_type() {
+        let test = cursor_test(
+            r#"
+        def f(string: str):
+            string.removesuffix("suffix"<CURSOR>)
+        "#,
+        );
+
+        assert_snapshot!(test.signature_help_render(), @"
+
+        ============== active signature =============
+        (suffix: str, /) -> str
+        ---------------------------------------------
+
+        -------------- active parameter -------------
+        suffix: str
+        ---------------------------------------------
+        ");
     }
 
     #[test]
@@ -937,19 +959,19 @@ def ab(a: int, *, c: int):
         let test = cursor_test(
             r#"
         d: dict[str, int] = {"a": 1}
-        d.get(<CURSOR>
+        d.pop(<CURSOR>
         "#,
         );
 
         let result = test.signature_help().expect("Should have signature help");
 
-        // dict.get has multiple overloads; use the active signature
+        // dict.pop has multiple overloads; use the active signature
         let active_idx = result
             .active_signature
             .expect("Should have an active signature");
         let signature = &result.signatures[active_idx];
 
-        // The first parameter of dict.get is `key`, whose annotation is
+        // The first parameter of dict.pop is `key`, whose annotation is
         // the TypeVar `_KT`. After TypeVar resolution at this call site,
         // the parameter type should be `str` (not `_KT`).
         let key_param = &signature.parameters[0];

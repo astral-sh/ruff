@@ -67,6 +67,10 @@ pub(crate) fn redefined_slots_in_subclass(checker: &Checker, class_def: &ast::St
         return;
     }
 
+    #[expect(
+        clippy::iter_over_hash_type,
+        reason = "each slot is checked independently against the base classes"
+    )]
     for slot in class_slots {
         check_super_slots(checker, class_def, &slot);
     }

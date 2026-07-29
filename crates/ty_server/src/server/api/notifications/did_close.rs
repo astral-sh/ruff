@@ -1,5 +1,5 @@
 use lsp_server::ErrorCode;
-use lsp_types::notification::DidCloseTextDocument;
+use lsp_types::DidCloseTextDocumentNotification;
 use lsp_types::{DidCloseTextDocumentParams, TextDocumentIdentifier};
 
 use crate::server::Result;
@@ -11,7 +11,7 @@ use crate::session::client::Client;
 pub(crate) struct DidCloseTextDocumentHandler;
 
 impl NotificationHandler for DidCloseTextDocumentHandler {
-    type NotificationType = DidCloseTextDocument;
+    type NotificationType = DidCloseTextDocumentNotification;
 }
 
 impl SyncNotificationHandler for DidCloseTextDocumentHandler {

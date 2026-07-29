@@ -85,13 +85,21 @@ mod tests {
     #[test_case(Rule::MissingSectionNameColon, Path::new("D.py"))]
     #[test_case(Rule::OverindentedSection, Path::new("sections.py"))]
     #[test_case(Rule::OverindentedSection, Path::new("D214_module.py"))]
+    #[test_case(Rule::OverindentedSection, Path::new("sphinx_directive.py"))]
+    #[test_case(Rule::NonCapitalizedSectionName, Path::new("sphinx_directive.py"))]
+    #[test_case(
+        Rule::MissingBlankLineAfterLastSection,
+        Path::new("sphinx_directive.py")
+    )]
     #[test_case(Rule::OverindentedSectionUnderline, Path::new("D215.py"))]
     #[test_case(Rule::MissingSectionUnderlineAfterName, Path::new("sections.py"))]
     #[test_case(Rule::MismatchedSectionUnderlineLength, Path::new("sections.py"))]
     #[test_case(Rule::OverindentedSectionUnderline, Path::new("sections.py"))]
     #[test_case(Rule::OverloadWithDocstring, Path::new("D.py"))]
+    #[test_case(Rule::OverloadWithDocstring, Path::new("D418.pyi"))]
     #[test_case(Rule::EscapeSequenceInDocstring, Path::new("D.py"))]
     #[test_case(Rule::EscapeSequenceInDocstring, Path::new("D301.py"))]
+    #[test_case(Rule::PropertyDocstringStartsWithVerb, Path::new("D421.py"))]
     #[test_case(Rule::TripleSingleQuotes, Path::new("D.py"))]
     #[test_case(Rule::TripleSingleQuotes, Path::new("D300.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {

@@ -38,7 +38,8 @@ if sys.version_info >= (3, 15):
 if sys.version_info >= (3, 15):
     @overload
     @deprecated("Deprecated since Python 3.15; use os.path.commonpath() for path prefixes.")
-    def commonprefix(m: Sequence[LiteralString], /) -> LiteralString: ...
+    def commonprefix(m: Sequence[LiteralString], /) -> LiteralString:
+        """Given a list of pathnames, returns the longest common leading component"""
     @overload
     @deprecated("Deprecated since Python 3.15; use os.path.commonpath() for path prefixes.")
     def commonprefix(m: Sequence[StrPath], /) -> str: ...
@@ -83,12 +84,27 @@ def sameopenfile(fp1: int, fp2: int) -> bool:
     """Test whether two open file objects reference the same file"""
 
 if sys.version_info >= (3, 15):
-    def getsize(filename: FileDescriptorOrPath, /) -> int: ...
-    def getatime(filename: FileDescriptorOrPath, /) -> float: ...
-    def getmtime(filename: FileDescriptorOrPath, /) -> float: ...
-    def getctime(filename: FileDescriptorOrPath, /) -> float: ...
-    def samefile(f1: FileDescriptorOrPath, f2: FileDescriptorOrPath, /) -> bool: ...
-    def samestat(s1: os.stat_result, s2: os.stat_result, /) -> bool: ...
+    def getsize(filename: FileDescriptorOrPath, /) -> int:
+        """Return the size of a file, reported by os.stat()."""
+
+    def getatime(filename: FileDescriptorOrPath, /) -> float:
+        """Return the last access time of a file, reported by os.stat()."""
+
+    def getmtime(filename: FileDescriptorOrPath, /) -> float:
+        """Return the last modification time of a file, reported by os.stat()."""
+
+    def getctime(filename: FileDescriptorOrPath, /) -> float:
+        """Return the metadata change time of a file, reported by os.stat()."""
+
+    def samefile(f1: FileDescriptorOrPath, f2: FileDescriptorOrPath, /) -> bool:
+        """Test whether two pathnames reference the same actual file or directory
+
+        This is determined by the device number and i-node number and
+        raises an exception if an os.stat() call on either pathname fails.
+        """
+
+    def samestat(s1: os.stat_result, s2: os.stat_result, /) -> bool:
+        """Test whether two stat buffers reference the same file"""
 
 else:
     def getsize(filename: FileDescriptorOrPath) -> int:

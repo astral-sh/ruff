@@ -152,7 +152,8 @@ class LibraryLoader(Generic[_DLLT]):
     def __class_getitem__(cls, item: Any, /) -> GenericAlias:
         """Represent a PEP 585 generic type
 
-        E.g. for t = list[int], t.__origin__ is list and t.__args__ is (int,).
+        For example, for t = list[int], t.__origin__ is list and t.__args__
+        is (int,).
         """
 
 cdll: LibraryLoader[CDLL]
@@ -297,7 +298,8 @@ class py_object(_CanCastTo, _SimpleCData[_T]):
         def __class_getitem__(cls, item: Any, /) -> GenericAlias:
             """Represent a PEP 585 generic type
 
-            E.g. for t = list[int], t.__origin__ is list and t.__args__ is (int,).
+            For example, for t = list[int], t.__origin__ is list and t.__args__
+            is (int,).
             """
 
 class c_bool(_SimpleCData[bool]):

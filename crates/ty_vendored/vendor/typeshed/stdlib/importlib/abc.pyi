@@ -183,6 +183,7 @@ class MetaPathFinder(metaclass=ABCMeta):
         """An optional method for clearing the finder's cache, if any.
         This method is used by importlib.invalidate_caches().
         """
+
     # Not defined on the actual class, but expected to exist.
     def find_spec(
         self, fullname: str, path: Sequence[str] | None, target: types.ModuleType | None = ..., /
@@ -222,6 +223,7 @@ class PathEntryFinder(metaclass=ABCMeta):
         """An optional method for clearing the finder's cache, if any.
         This method is used by PathFinder.invalidate_caches().
         """
+
     # Not defined on the actual class, but expected to exist.
     def find_spec(self, fullname: str, target: types.ModuleType | None = ...) -> ModuleSpec | None: ...
 
@@ -306,6 +308,7 @@ if sys.version_info < (3, 11):
             """
             Yield Traversable objects in self
             """
+
         if sys.version_info >= (3, 11):
             @abstractmethod
             def joinpath(self, *descendants: str) -> Traversable: ...

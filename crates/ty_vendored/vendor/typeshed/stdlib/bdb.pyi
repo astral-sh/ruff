@@ -61,6 +61,7 @@ class Bdb:
 
     def reset(self) -> None:
         """Set values of attributes as ready to start debugging."""
+
     if sys.version_info >= (3, 12):
         @contextmanager
         def set_enterframe(self, frame: FrameType) -> Iterator[None]: ...
@@ -80,12 +81,9 @@ class Bdb:
                   is entered.
             return: A function or other code block is about to return.
             exception: An exception has occurred.
-            c_call: A C function is about to be called.
-            c_return: A C function has returned.
-            c_exception: A C function has raised an exception.
 
-        For the Python events, specialized functions (see the dispatch_*()
-        methods) are called.  For the C events, no action is taken.
+        For all the events, specialized functions (see the dispatch_*()
+        methods) are called.
 
         The arg parameter depends on the previous event.
         """
@@ -121,6 +119,7 @@ class Bdb:
         self.user_exception(). Raise BdbQuit if self.quitting is set.
         Return self.trace_dispatch to continue tracing in this scope.
         """
+
     if sys.version_info >= (3, 13):
         def dispatch_opcode(self, frame: FrameType, arg: Unused) -> Callable[[FrameType, str, Any], TraceFunction]:
             """Invoke user function and return trace function for opcode event.
@@ -171,12 +170,14 @@ class Bdb:
         """Stop when the line with the lineno greater than the current one is
         reached or when returning from current frame.
         """
+
     if sys.version_info >= (3, 13):
         def user_opcode(self, frame: FrameType) -> None:  # undocumented
             """Called when we are about to execute an opcode."""
 
     def set_step(self) -> None:
         """Stop after one line of code."""
+
     if sys.version_info >= (3, 13):
         def set_stepinstr(self) -> None:  # undocumented
             """Stop before the next instruction."""
@@ -312,6 +313,7 @@ class Bdb:
 
         Return the result of the function call.
         """
+
     if sys.version_info >= (3, 14):
         def start_trace(self) -> None: ...
         def stop_trace(self) -> None: ...

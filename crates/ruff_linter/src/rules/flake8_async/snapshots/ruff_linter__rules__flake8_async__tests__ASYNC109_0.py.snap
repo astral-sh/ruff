@@ -26,5 +26,4 @@ ASYNC109 Async function definition with a `timeout` parameter
 19 |     @abstractmethod
 20 |     async def foo(self, timeout: float): ...
    |                         ^^^^^^^^^^^^^^
-   |
 help: Use `trio.fail_after` instead

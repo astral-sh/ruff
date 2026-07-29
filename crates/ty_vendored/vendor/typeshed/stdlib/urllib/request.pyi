@@ -721,6 +721,7 @@ if sys.version_info < (3, 14):
             self, url: str, fp: IO[bytes], errcode: int, errmsg: str, headers: HTTPMessage, data: ReadableBuffer | None = None
         ) -> _UrlopenRet | addinfourl | None:  # undocumented
             """Error 307 -- relocated, but turn POST into error."""
+
         if sys.version_info >= (3, 11):
             def http_error_308(
                 self, url: str, fp: IO[bytes], errcode: int, errmsg: str, headers: HTTPMessage, data: ReadableBuffer | None = None

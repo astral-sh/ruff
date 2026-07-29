@@ -20,7 +20,8 @@ type (i.e. not an alias).
 
 ```py
 from typing_extensions import NewType
-from ty_extensions import static_assert, is_subtype_of, is_equivalent_to, Not, Intersection, AlwaysFalsy, is_assignable_to
+from ty_extensions import static_assert, Not, Intersection, AlwaysFalsy
+from ty_extensions._internal import is_subtype_of, is_equivalent_to, is_assignable_to
 
 Foo = NewType("Foo", int)
 Bar = NewType("Bar", Foo)
@@ -109,7 +110,7 @@ reveal_type(Baz.__supertype__)  # revealed: type | NewType
 ```py
 from collections.abc import Callable
 from typing_extensions import NewType
-from ty_extensions import RegularCallableTypeOf
+from ty_extensions._internal import RegularCallableTypeOf
 
 Foo = NewType("Foo", int)
 
@@ -141,14 +142,14 @@ reveal_type(str | Foo)  # revealed: <types.UnionType special-form 'str | Foo'>
 
 ```py
 from typing import NewType, Callable, Any
-from ty_extensions import RegularCallableTypeOf
+from ty_extensions._internal import RegularCallableTypeOf
 
 N = NewType("N", int)
 i = N(42)
 
 y: Callable[..., Any] = i  # error: [invalid-assignment] "Object of type `N` is not assignable to `(...) -> Any`"
 
-# error: [invalid-type-form] "Expected the first argument to `ty_extensions.RegularCallableTypeOf` to be a callable object, but got an object of type `N`"
+# error: [invalid-type-form] "Expected the first argument to `ty_extensions._internal.RegularCallableTypeOf` to be a callable object, but got an object of type `N`"
 def f(x: RegularCallableTypeOf[i]):
     reveal_type(x)  # revealed: Unknown
 
@@ -186,7 +187,7 @@ reveal_type(Foo)  # revealed: <NewType pseudo-class 'Foo'>
 
 ```py
 from typing_extensions import NewType
-from ty_extensions import is_subtype_of
+from ty_extensions._internal import is_subtype_of
 
 # snapshot: mismatched-type-name
 UserId = NewType("Id", int)
@@ -200,7 +201,6 @@ warning[mismatched-type-name]: The name passed to `NewType` must match the varia
   |
 5 | UserId = NewType("Id", int)
   |                  ^^^^ Expected "UserId", got "Id"
-  |
 ```
 
 ```py
@@ -216,7 +216,6 @@ warning[mismatched-type-name]: The name passed to `NewType` must match the varia
    |
 10 | UsesExistingId = NewType("Id", "Id")
    |                          ^^^^ Expected "UsesExistingId", got "Id"
-   |
 ```
 
 ## The base must be a class type or another newtype
@@ -301,7 +300,8 @@ and we accept the unions they expand into.
 
 ```py
 from typing import NewType
-from ty_extensions import static_assert, is_assignable_to
+from ty_extensions import static_assert
+from ty_extensions._internal import is_assignable_to
 
 Foo = NewType("Foo", float)
 Foo(3.14)
@@ -564,23 +564,21 @@ E(["foo"])  # error: [invalid-argument-type]
 E(E(E(["foo"])))  # error: [invalid-argument-type]
 ```
 
-## `NewType` wrapping preserves singleton-ness and single-valued-ness
+## `NewType` wrapping preserves singleton-ness
 
 ```py
 from typing_extensions import NewType
-from ty_extensions import is_singleton, is_single_valued, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import is_singleton
 from types import EllipsisType
 
 A = NewType("A", EllipsisType)
 static_assert(is_singleton(A))
-static_assert(is_single_valued(A))
 reveal_type(type(A(...)) is EllipsisType)  # revealed: Literal[True]
-# TODO: This should be `Literal[True]` also.
-reveal_type(A(...) is ...)  # revealed: bool
+reveal_type(A(...) is ...)  # revealed: Literal[True]
 
 B = NewType("B", int)
 static_assert(not is_singleton(B))
-static_assert(not is_single_valued(B))
 ```
 
 ## `NewType`s of tuples can be iterated/unpacked
@@ -642,7 +640,6 @@ error[invalid-base]: Cannot subclass an instance of NewType
   |
 6 | class Foo(X): ...
   |           ^
-  |
 info: Perhaps you were looking for: `Foo = NewType('Foo', X)`
 info: Definition of class `Foo` will raise `TypeError` at runtime
 ```
@@ -689,7 +686,6 @@ error[invalid-newtype]: invalid base for `typing.NewType`
   |
 7 | UserId = NewType("UserId", Id)
   |                            ^^ type `Id`
-  |
 info: The base of a `NewType` is not allowed to be a protocol class.
 ```
 
@@ -707,7 +703,6 @@ error[invalid-newtype]: invalid base for `typing.NewType`
    |
 12 | Bar = NewType("Bar", Foo)
    |                      ^^^ type `Foo`
-   |
 info: The base of a `NewType` is not allowed to be a `TypedDict`.
 ```
 
@@ -717,7 +712,7 @@ info: The base of a `NewType` is not allowed to be a `TypedDict`.
 from typing import Any, NewType, TypeVar, Generic
 
 # All of these are allowed.
-A = NewType("A", list)
+A = NewType("A", list)  # error: [missing-type-argument]
 B = NewType("B", list[int])
 B = NewType("B", list[Any])
 

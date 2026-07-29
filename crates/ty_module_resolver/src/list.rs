@@ -1,5 +1,7 @@
+use std::borrow::Cow;
 use std::collections::btree_map::{BTreeMap, Entry};
 
+use ruff_db::files::directory_listing;
 use ruff_python_ast::PythonVersion;
 
 use crate::db::Db;
@@ -26,8 +28,8 @@ pub fn all_modules(db: &dyn Db) -> Vec<Module<'_>> {
 #[salsa::tracked(returns(deref))]
 pub fn list_modules(db: &dyn Db) -> Box<[Module<'_>]> {
     let mut modules: BTreeMap<&ModuleName, ListedModule<'_>> = BTreeMap::new();
-    for search_path in search_paths(db, ModuleResolveMode::StubsAllowed) {
-        for new in list_modules_in(db, SearchPathIngredient::new(db, search_path.clone())) {
+    for search_path in search_paths(db, ModuleResolveMode::Typing) {
+        for &new in list_modules_in(db, SearchPathIngredient::new(db, search_path.clone())) {
             match modules.entry(new.module(db).name(db)) {
                 Entry::Vacant(entry) => {
                     entry.insert(new);
@@ -68,28 +70,22 @@ struct SearchPathIngredient<'db> {
 }
 
 /// List all available top-level modules in the given `SearchPath`.
-#[salsa::tracked]
+#[salsa::tracked(returns(deref))]
 fn list_modules_in<'db>(
     db: &'db dyn Db,
     search_path: SearchPathIngredient<'db>,
 ) -> Vec<ListedModule<'db>> {
-    tracing::debug!("Listing modules in search path '{}'", search_path.path(db));
-    let mut lister = Lister::new(db, search_path.path(db));
-    match search_path.path(db).as_path() {
+    let path = search_path.path(db);
+    tracing::debug!("Listing modules in search path '{}'", path);
+    let mut lister = Lister::new(db, path);
+    match path.as_path() {
         SystemOrVendoredPathRef::System(system_search_path) => {
-            // Read the revision on the corresponding file root to
-            // register an explicit dependency on this directory. When
-            // the revision gets bumped, the cache that Salsa creates
-            // for this routine will be invalidated.
-            let root = db.files().expect_root(db, system_search_path);
-            let _ = root.revision(db);
-
-            let Ok(it) = db.system().read_directory(system_search_path) else {
+            let Ok(listing) = directory_listing(db, system_search_path) else {
                 return vec![];
             };
-            for result in it {
-                let Ok(entry) = result else { continue };
-                lister.add_path(&entry.path().into(), entry.file_type().into());
+            for (name, file_type) in listing.iter() {
+                let path = system_search_path.join(name);
+                lister.add_path(&path.as_path().into(), file_type.into());
             }
         }
         SystemOrVendoredPathRef::Vendored(vendored_search_path) => {
@@ -104,7 +100,9 @@ fn list_modules_in<'db>(
 /// A module paired with whether it came from a stub package.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 struct ListedModule<'db> {
+    #[returns(copy)]
     module: Module<'db>,
+    #[returns(copy)]
     is_stub_package: bool,
 }
 
@@ -181,7 +179,7 @@ impl<'db> Lister<'db> {
                         &module_path,
                         Module::file_module(
                             self.db,
-                            module_name,
+                            Cow::Owned(module_name),
                             ModuleKind::Package,
                             self.search_path.clone(),
                             file,
@@ -225,7 +223,7 @@ impl<'db> Lister<'db> {
                 if !self.search_path.is_standard_library() {
                     self.add_module(
                         &module_path,
-                        Module::namespace_package(self.db, module_name),
+                        Module::namespace_package(self.db, Cow::Owned(module_name)),
                     );
                 }
                 return;
@@ -253,7 +251,7 @@ impl<'db> Lister<'db> {
             &module_path,
             Module::file_module(
                 self.db,
-                module_name,
+                Cow::Owned(module_name),
                 ModuleKind::Module,
                 self.search_path.clone(),
                 file,
@@ -297,17 +295,12 @@ impl<'db> Lister<'db> {
                 // the same directory, the former takes precedent.
                 // (This case can only occur when both have a search
                 // path.)
-                if existing.kind(self.db) == ModuleKind::Module
-                    && module.kind(self.db) == ModuleKind::Package
-                {
-                    entry.insert(listed);
-                    return;
-                }
                 // Or if we have two file modules and the new one
                 // is a stub, then the stub takes priority.
                 if existing.kind(self.db) == ModuleKind::Module
-                    && module.kind(self.db) == ModuleKind::Module
-                    && path.is_stub_file()
+                    && let module_kind = module.kind(self.db)
+                    && (module_kind == ModuleKind::Package
+                        || module_kind == ModuleKind::Module && path.is_stub_file())
                 {
                     entry.insert(listed);
                     return;
@@ -324,8 +317,7 @@ impl<'db> Lister<'db> {
 
     /// Returns true if the given module name cannot be shadowable.
     fn is_non_shadowable(&self, name: &ModuleName) -> bool {
-        ModuleResolveMode::StubsAllowed
-            .is_non_shadowable(self.python_version().minor, name.as_str())
+        ModuleResolveMode::Typing.is_non_shadowable(self.python_version().minor, name.as_str())
     }
 
     /// Returns the Python version we want to perform module resolution
@@ -341,7 +333,7 @@ impl<'db> Lister<'db> {
             python_version: self.python_version(),
             // We don't currently support listing modules
             // in a "no stubs allowed" mode.
-            mode: ModuleResolveMode::StubsAllowed,
+            mode: ModuleResolveMode::Typing,
         }
     }
 }
@@ -400,8 +392,11 @@ mod tests {
     use ruff_db::Db as _;
     use ruff_db::files::{File, FilePath, FileRootKind};
     use ruff_db::system::{DbWithTestSystem, DbWithWritableSystem, SystemPath, SystemPathBuf};
-    use ruff_db::testing::assert_function_query_was_not_run;
+    use ruff_db::testing::{
+        assert_function_query_was_not_run, assert_function_query_was_not_run_by_name,
+    };
     use ruff_python_ast::PythonVersion;
+    use salsa::plumbing::AsId as _;
 
     use crate::db::{Db, tests::TestDb};
     use crate::module::Module;
@@ -429,8 +424,8 @@ mod tests {
                     // For snapshots, just normalize all paths to using
                     // Unix slashes for simplicity.
                     let path_components = match module.file(self.db).path(self.db) {
-                        FilePath::System(path) => path.as_path().components(),
-                        FilePath::Vendored(path) => path.as_path().components(),
+                        FilePath::System(path) => path.components(),
+                        FilePath::Vendored(path) => path.components(),
                         FilePath::SystemVirtual(path) => Utf8Path::new(path.as_str()).components(),
                     };
                     let nice_path = path_components
@@ -1050,6 +1045,60 @@ mod tests {
     }
 
     #[test]
+    fn deeply_nested_file_does_not_invalidate_top_level_listing() -> anyhow::Result<()> {
+        let TestCase { mut db, src, .. } = TestCaseBuilder::new()
+            .with_src_files(&[("package/__init__.py", ""), ("package/sub/__init__.py", "")])
+            .build();
+
+        list_modules(&db);
+        db.clear_salsa_events();
+
+        db.write_file(src.join("package/sub/nested.py"), "")?;
+        list_modules(&db);
+
+        let events = db.take_salsa_events();
+        assert_function_query_was_not_run_by_name(&db, "list_modules_in", None, &events);
+
+        Ok(())
+    }
+
+    #[test]
+    fn sibling_file_does_not_invalidate_package_submodules() -> anyhow::Result<()> {
+        let TestCase { mut db, src, .. } = TestCaseBuilder::new()
+            .with_src_files(&[("package/__init__.py", "")])
+            .build();
+
+        let package_id = {
+            let package = list_modules(&db)
+                .iter()
+                .find(|module| module.name(&db).as_str() == "package")
+                .copied()
+                .expect("package to exist");
+            package.all_submodules(&db);
+            package.as_id()
+        };
+        db.clear_salsa_events();
+
+        db.write_file(src.join("sibling.py"), "")?;
+        let package = list_modules(&db)
+            .iter()
+            .find(|module| module.name(&db).as_str() == "package")
+            .copied()
+            .expect("package to exist");
+        package.all_submodules(&db);
+
+        let events = db.take_salsa_events();
+        assert_function_query_was_not_run_by_name(
+            &db,
+            "all_submodule_names_for_package",
+            Some(package_id),
+            &events,
+        );
+
+        Ok(())
+    }
+
+    #[test]
     fn removing_file_on_which_module_resolution_depends_invalidates_previously_successful_query_that_now_fails()
     -> anyhow::Result<()> {
         const SRC: &[FileSpec] = &[("foo.py", "x = 1"), ("foo/__init__.py", "x = 2")];
@@ -1387,7 +1436,7 @@ not_a_directory
         assert_function_query_was_not_run(
             &db,
             dynamic_resolution_paths,
-            ModuleResolveModeIngredient::new(&db, ModuleResolveMode::StubsAllowed),
+            ModuleResolveModeIngredient::new(&db, ModuleResolveMode::Typing),
             &events,
         );
     }

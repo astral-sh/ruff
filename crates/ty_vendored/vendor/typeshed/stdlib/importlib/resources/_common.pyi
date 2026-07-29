@@ -49,6 +49,7 @@ if sys.version_info >= (3, 11):
         """
         Return the package's loader if it's a ResourceReader.
         """
+
     if sys.version_info >= (3, 12):
         def resolve(cand: Anchor | None) -> types.ModuleType: ...
 

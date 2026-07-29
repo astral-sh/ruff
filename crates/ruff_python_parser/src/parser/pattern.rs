@@ -9,7 +9,6 @@ use ruff_text_size::{Ranged, TextSize};
 use crate::ParseErrorType;
 use crate::parser::progress::ParserProgress;
 use crate::parser::{Parser, RecoveryContextKind, SequenceMatchPatternParentheses, recovery};
-use crate::token::TokenValue;
 use crate::token_set::TokenSet;
 
 use super::expression::ExpressionContext;
@@ -147,7 +146,7 @@ impl Parser<'_> {
                 self.add_error(ParseErrorType::InvalidStarPatternUsage, &lhs);
             }
 
-            let ident = self.parse_identifier();
+            let ident = self.parse_match_pattern_target();
             lhs = Pattern::MatchAs(ast::PatternMatchAs {
                 range: self.node_range(start),
                 name: Some(ident),
@@ -211,7 +210,7 @@ impl Parser<'_> {
             let mapping_item_start = parser.node_start();
 
             if parser.eat(TokenKind::DoubleStar) {
-                let identifier = parser.parse_identifier();
+                let identifier = parser.parse_match_pattern_target();
                 if rest.is_some() {
                     parser.add_error(
                         ParseErrorType::OtherError(
@@ -305,6 +304,20 @@ impl Parser<'_> {
             },
             node_index: AtomicNodeIndex::NONE,
         }
+    }
+
+    /// Parses a binding target in an `as` or mapping pattern.
+    fn parse_match_pattern_target(&mut self) -> ast::Identifier {
+        // test_err invalid_match_pattern_target
+        // match value:
+        //     case 1 as _: ...
+        //     case {**_}: ...
+        // after = 1
+        let identifier = self.parse_identifier();
+        if identifier.is_valid() && identifier.id == "_" {
+            self.add_error(ParseErrorType::InvalidMatchPatternTarget, &identifier);
+        }
+        identifier
     }
 
     /// Parses a parenthesized pattern or a sequence pattern.
@@ -442,9 +455,7 @@ impl Parser<'_> {
                 })
             }
             TokenKind::Complex => {
-                let TokenValue::Complex { real, imag } = self.bump_value(TokenKind::Complex) else {
-                    unreachable!()
-                };
+                let (real, imag) = self.bump_complex();
                 let range = self.node_range(start);
 
                 Pattern::MatchValue(ast::PatternMatchValue {
@@ -458,9 +469,7 @@ impl Parser<'_> {
                 })
             }
             TokenKind::Int => {
-                let TokenValue::Int(value) = self.bump_value(TokenKind::Int) else {
-                    unreachable!()
-                };
+                let value = self.bump_int();
                 let range = self.node_range(start);
 
                 Pattern::MatchValue(ast::PatternMatchValue {
@@ -474,9 +483,7 @@ impl Parser<'_> {
                 })
             }
             TokenKind::Float => {
-                let TokenValue::Float(value) = self.bump_value(TokenKind::Float) else {
-                    unreachable!()
-                };
+                let value = self.bump_float();
                 let range = self.node_range(start);
 
                 Pattern::MatchValue(ast::PatternMatchValue {

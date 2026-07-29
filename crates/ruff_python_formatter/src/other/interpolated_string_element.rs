@@ -303,7 +303,7 @@ fn needs_bracket_spacing(expr: &Expr, context: &PyFormatContext) -> bool {
     }
 
     matches!(
-        left_most(expr, context.comments().ranges(), context.source()),
+        left_most(expr, context.trivia()),
         Expr::Dict(_) | Expr::DictComp(_) | Expr::Set(_) | Expr::SetComp(_)
     )
 }

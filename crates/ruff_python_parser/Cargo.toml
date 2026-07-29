@@ -1,7 +1,7 @@
 [package]
 name = "ruff_python_parser"
-version = "0.0.0"
-publish = false
+version = "0.0.6"
+description = "This is an internal component crate of Ruff"
 authors = ["Charlie Marsh <charlie.r.marsh@gmail.com>", "RustPython Team"]
 edition = { workspace = true }
 rust-version = { workspace = true }
@@ -19,7 +19,7 @@ ruff_text_size = { workspace = true, features = ["get-size"] }
 
 bitflags = { workspace = true }
 bstr = { workspace = true }
-compact_str = { workspace = true }
+drop_bomb = { workspace = true }
 get-size2 = { workspace = true }
 memchr = { workspace = true }
 rustc-hash = { workspace = true }

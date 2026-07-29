@@ -203,6 +203,7 @@ class DocumentFragment(Node):
     @property
     def lastChild(self) -> _DocumentFragmentChildren | None:
         """Last child node, or None."""
+
     namespaceURI: None
     prefix: None
     @property
@@ -243,11 +244,13 @@ class Attr(Node):
     @property
     def lastChild(self) -> _AttrChildren | None:
         """Last child node, or None."""
+
     namespaceURI: str | None
     prefix: str | None
     @property
     def localName(self) -> str:
         """Namespace-local name of this attribute."""
+
     name: str
     value: str
     specified: bool
@@ -349,6 +352,7 @@ class Element(Node):
     @property
     def attributes(self) -> NamedNodeMap:  # type: ignore[override]
         """NamedNodeMap of attributes on the element."""
+
     parentNode: Document | Element | DocumentFragment | None
     nextSibling: _DocumentChildren | _ElementChildren | _DocumentFragmentChildren | None
     previousSibling: _DocumentChildren | _ElementChildren | _DocumentFragmentChildren | None
@@ -360,11 +364,13 @@ class Element(Node):
     @property
     def lastChild(self) -> _ElementChildren | None:
         """Last child node, or None."""
+
     namespaceURI: str | None
     prefix: str | None
     @property
     def localName(self) -> str:
         """Namespace-local name of this element."""
+
     schemaType: TypeInfo
     tagName: str
 
@@ -476,6 +482,7 @@ class ProcessingInstruction(Childless, Node):
     @property
     def localName(self) -> None:
         """Namespace-local name of this node."""
+
     target: str
     data: str
 
@@ -494,6 +501,7 @@ class CharacterData(Childless, Node):
     @property
     def localName(self) -> None:
         """Namespace-local name of this node."""
+
     ownerDocument: Document | None
     data: str
 
@@ -530,6 +538,7 @@ class Text(CharacterData):
     @property
     def localName(self) -> None:
         """Namespace-local name of this node."""
+
     data: str
     def splitText(self, offset: int) -> Self: ...
     def writexml(self, writer: SupportsWrite[str], indent: str = "", addindent: str = "", newl: str = "") -> None: ...
@@ -622,6 +631,7 @@ class DocumentType(Identified, Childless, Node):
     @property
     def localName(self) -> None:
         """Namespace-local name of this node."""
+
     name: str | None
     internalSubset: str | None
     entities: ReadOnlySequentialNamedNodeMap[Entity]
@@ -648,11 +658,13 @@ class Entity(Identified, Node):
     @property
     def lastChild(self) -> _EntityChildren | None:
         """Last child node, or None."""
+
     namespaceURI: None
     prefix: None
     @property
     def localName(self) -> None:
         """Namespace-local name of this node."""
+
     actualEncoding: str | None
     encoding: str | None
     version: str | None
@@ -739,11 +751,13 @@ class Document(Node, DocumentLS):
     @property
     def lastChild(self) -> _DocumentChildren | None:
         """Last child node, or None."""
+
     namespaceURI: None
     prefix: None
     @property
     def localName(self) -> None:
         """Namespace-local name of this node."""
+
     implementation: DOMImplementation
     actualEncoding: str | None
     encoding: str | None

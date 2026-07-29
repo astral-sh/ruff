@@ -1,7 +1,7 @@
 [package]
 name = "ty_python_semantic"
-version = "0.0.0"
-publish = false
+version = "0.0.6"
+description = "This is an internal component crate of Ruff"
 authors = { workspace = true }
 edition = { workspace = true }
 rust-version = { workspace = true }
@@ -25,9 +25,11 @@ ruff_source_file = { workspace = true }
 ruff_text_size = { workspace = true }
 ty_module_resolver = { workspace = true }
 ty_site_packages = { workspace = true }
-ty_python_core = { workspace = true, features = ["serde"] }
+ty_python_core = { workspace = true }
+ty_static = { workspace = true }
 
 bitflags = { workspace = true }
+char_str = { workspace = true }
 compact_str = { workspace = true }
 drop_bomb = { workspace = true }
 get-size2 = { workspace = true, features = ["indexmap", "ordermap"] }
@@ -48,8 +50,7 @@ thiserror = { workspace = true }
 tracing = { workspace = true }
 
 [dev-dependencies]
-ruff_db = { workspace = true, features = ["testing", "os"] }
-ruff_python_parser = { workspace = true }
+ruff_db = { workspace = true, features = ["testing"] }
 test-case = { workspace = true }
 ty_test = { workspace = true }
 ty_vendored = { workspace = true }

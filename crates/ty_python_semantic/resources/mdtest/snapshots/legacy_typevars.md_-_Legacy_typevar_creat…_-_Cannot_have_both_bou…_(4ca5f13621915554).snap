@@ -27,6 +27,5 @@ error[invalid-legacy-type-variable]: A `TypeVar` cannot have both a bound and co
   |
 4 | T = TypeVar("T", int, str, bound=bytes)
   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  |
 
 ```

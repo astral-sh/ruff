@@ -985,7 +985,7 @@ fn new_logical_line_between_statements(source: &str, between_statement_range: Te
 mod tests {
     use ruff_formatter::format;
     use ruff_python_parser::parse_module;
-    use ruff_python_trivia::CommentRanges;
+    use ruff_python_trivia::TriviaRanges;
 
     use crate::PyFormatOptions;
     use crate::comments::Comments;
@@ -1015,12 +1015,13 @@ def trailing_func():
 ";
 
         let parsed = parse_module(source).unwrap();
-        let comment_ranges = CommentRanges::from(parsed.tokens());
+        let trivia = TriviaRanges::from(parsed.tokens());
 
         let context = PyFormatContext::new(
             PyFormatOptions::default(),
             source,
-            Comments::from_ranges(&comment_ranges),
+            Comments::empty(),
+            &trivia,
             parsed.tokens(),
         );
 

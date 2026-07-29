@@ -22,6 +22,7 @@ from ruff_ecosystem.markdown import (
     markdown_plus_minus,
     markdown_project_section,
 )
+from ruff_ecosystem.projects import rule_name_to_code
 from ruff_ecosystem.types import (
     Comparison,
     Diff,
@@ -45,11 +46,8 @@ CHECK_DIFF_LINE_RE = re.compile(
     r"^(?P<pre>[+-]) (?P<inner>(?P<path>[^:]+):(?P<lnum>\d+):\d+:) (?P<post>.*)$",
 )
 
-# A little permissive - it allows mismatched brackets around
-# the severity. But should be good enough while we support both
-# the old and new rendering with severities.
 CHECK_DIAGNOSTIC_LINE_RE = re.compile(
-    r"^(?P<diff>[+-])? ?(?P<location>.*): (?:(?P<severity>[a-z]+)\[)?(?P<code>[A-Z]{1,4}[0-9]{3,4}|[a-z\-]+:)\]?(?P<fixable> \[\*\])? (?P<message>.*)"
+    r"^(?P<diff>[+-])? ?(?P<location>.*?): (?P<code>[A-Z]{1,5}[0-9]{3,4}|[a-z0-9\-]+):?(?P<fixable> \[\*\])? (?P<message>.*)"
 )
 
 PANIC_DIAGNOSTIC_LINE_RE = re.compile(r"^[^:]+: panic: Panicked at ")
@@ -511,7 +509,13 @@ async def compare_check(
     config_overrides: ConfigOverrides,
     cloned_repo: ClonedRepository,
 ) -> Comparison:
-    with config_overrides.patch_config(cloned_repo.path, options.preview):
+    # TODO(brent) Remove this workaround when human-readable rule names are stabilized.
+    rule_names = (
+        rule_name_to_code(ruff_comparison_executable.resolve())
+        if not options.preview
+        else {}
+    )
+    with config_overrides.patch_config(cloned_repo.path, options.preview, rule_names):
         async with asyncio.TaskGroup() as tg:
             baseline_task = tg.create_task(
                 ruff_check(
@@ -568,9 +572,10 @@ async def ruff_check(
     if proc.returncode != 0:
         raise ToolError(err.decode("utf8"))
 
-    # Strip summary lines so the diff is only diagnostic lines
-    return [
+    # Strip summary lines so the diff is only diagnostic lines. Also sort the lines so that
+    # reordering isn't presented as an addition/deletion pair.
+    return sorted(
         line
         for line in result.decode("utf8").splitlines()
         if not CHECK_SUMMARY_LINE_RE.match(line)
-    ]
+    )

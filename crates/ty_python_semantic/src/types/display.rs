@@ -27,14 +27,14 @@ use crate::types::generics::{GenericContext, Specialization};
 use crate::types::signatures::{
     CallableSignature, Parameter, Parameters, ParametersKind, Signature,
 };
-use crate::types::tuple::TupleSpec;
+use crate::types::tuple::{TupleSpec, VariableSegment};
 use crate::types::typevar::BoundTypeVarIdentity;
 use crate::types::visitor::TypeVisitor;
 use crate::types::{
-    BindingContext, CallableType, IntersectionType, KnownBoundMethodType, KnownClass,
-    KnownInstanceType, LiteralValueType, LiteralValueTypeKind, MaterializationKind, Protocol,
-    ProtocolInstanceType, SpecialFormType, StringLiteralType, SubclassOfInner, SubclassOfType,
-    Type, TypeAliasType, TypeGuardLike, TypedDictType, UnionType, WrapperDescriptorKind, visitor,
+    CallableType, IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType,
+    LiteralValueType, LiteralValueTypeKind, MaterializationKind, PropertyInstanceType, Protocol,
+    SpecialFormType, StringLiteralType, SubclassOfInner, SubclassOfType, Type, TypeAliasType,
+    TypeGuardLike, TypedDictModule, TypedDictType, UnionType, WrapperDescriptorKind, visitor,
 };
 use ty_python_core::definition::Definition;
 use ty_python_core::scope::{FileScopeId, ScopeKind};
@@ -45,13 +45,24 @@ use ty_python_core::semantic_index;
 /// This wrapper allows tracking both classes and type aliases together for
 /// disambiguation, since a class and type alias with the same name in different
 /// modules need to be distinguished in error messages.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug)]
 enum NamedItem<'db> {
     Class(ClassLiteral<'db>),
     TypeAlias(TypeAliasType<'db>),
 }
 
 impl<'db> NamedItem<'db> {
+    fn is_same_item(self, db: &'db dyn Db, other: Self) -> bool {
+        match (self, other) {
+            (NamedItem::Class(left), NamedItem::Class(right)) => left == right,
+            (NamedItem::TypeAlias(left), NamedItem::TypeAlias(right)) => {
+                // Specializations of the same alias share a display name.
+                left.definition(db) == right.definition(db)
+            }
+            _ => false,
+        }
+    }
+
     fn name(self, db: &'db dyn Db) -> &'db str {
         match self {
             NamedItem::Class(class) => class.name(db),
@@ -174,6 +185,23 @@ impl<'db> DisplaySettings<'db> {
         Self {
             active_scopes: Rc::new(active_scopes),
             ..self.clone()
+        }
+    }
+
+    #[must_use]
+    fn with_generic_context(
+        &self,
+        db: &'db dyn Db,
+        generic_context: Option<&GenericContext<'db>>,
+    ) -> Self {
+        if let Some(generic_context) = generic_context {
+            self.with_active_scopes(
+                generic_context
+                    .variables(db)
+                    .filter_map(|bound| bound.binding_context(db).definition()),
+            )
+        } else {
+            self.clone()
         }
     }
 
@@ -465,7 +493,7 @@ impl<'db> AmbiguousNameCollector<'db> {
                 let value = entry.get_mut();
                 match value {
                     AmbiguityState::Unambiguous(existing) => {
-                        if *existing != item {
+                        if !existing.is_same_item(db, item) {
                             let qualified_name_components = item.qualified_name_components(db);
                             if existing.qualified_name_components(db) == qualified_name_components {
                                 *value = AmbiguityState::RequiresFileAndLineNumber;
@@ -481,7 +509,7 @@ impl<'db> AmbiguousNameCollector<'db> {
                         item: existing,
                         qualified_name_components,
                     } => {
-                        if *existing != item {
+                        if !existing.is_same_item(db, item) {
                             let new_components = item.qualified_name_components(db);
                             if *qualified_name_components == new_components {
                                 *value = AmbiguityState::RequiresFileAndLineNumber;
@@ -519,7 +547,7 @@ impl<'db> AmbiguousNameCollector<'db> {
 
 /// Whether or not an item can be unambiguously identified by its *unqualified* name
 /// given the other types that are present in the same context.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone)]
 enum AmbiguityState<'db> {
     /// The item can be displayed unambiguously using its unqualified name.
     Unambiguous(NamedItem<'db>),
@@ -553,10 +581,9 @@ impl<'db> TypeVisitor<'db> for AmbiguousNameCollector<'db> {
             // Visit the class (as if it were a nominal-instance type)
             // rather than the protocol members, if it is a class-based protocol.
             // (For the purposes of displaying the type, we'll use the class name.)
-            Type::ProtocolInstance(ProtocolInstanceType {
-                inner: Protocol::FromClass(class),
-                ..
-            }) => return self.visit_type(db, Type::from(class)),
+            Type::ProtocolInstance(protocol) if let Some(class) = protocol.class_origin(db) => {
+                return self.visit_type(db, Type::from(class));
+            }
             // no need to recurse into TypeVar bounds/constraints
             Type::TypeVar(_) => return,
             _ => {}
@@ -663,7 +690,7 @@ fn fmt_file_location<'db>(
 ) -> fmt::Result {
     let path = file.path(db);
     let path = match path {
-        FilePath::System(path) => Cow::Owned(FilePath::System(
+        FilePath::System(path) => Cow::Owned(FilePath::from(
             path.strip_prefix(db.system().current_directory())
                 .unwrap_or(path)
                 .to_path_buf(),
@@ -780,6 +807,20 @@ impl<'db> TypeAliasType<'db> {
             settings,
         }
     }
+
+    /// Returns a source-style display of this type alias's declaration.
+    pub fn display_declaration(self, db: &'db dyn Db) -> impl Display + 'db {
+        let value_ty = self.raw_value_type(db);
+        DisplayTypeAliasDeclaration {
+            db,
+            type_alias: self,
+            value_ty,
+            settings: DisplaySettings::from_possibly_ambiguous_types(
+                db,
+                [Type::TypeAlias(self), value_ty],
+            ),
+        }
+    }
 }
 
 struct TypeAliasDisplay<'db> {
@@ -822,6 +863,43 @@ impl Display for TypeAliasDisplay<'_> {
     }
 }
 
+/// A source-style display of a type alias declaration.
+struct DisplayTypeAliasDeclaration<'db> {
+    db: &'db dyn Db,
+    type_alias: TypeAliasType<'db>,
+    value_ty: Type<'db>,
+    settings: DisplaySettings<'db>,
+}
+
+impl<'db> FmtDetailed<'db> for DisplayTypeAliasDeclaration<'db> {
+    fn fmt_detailed(&self, f: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result {
+        let generic_context = self.type_alias.generic_context(self.db);
+        let settings = self
+            .settings
+            .with_generic_context(self.db, generic_context.as_ref());
+
+        f.write_str("type ")?;
+        self.type_alias
+            .display_with(self.db, settings.clone())
+            .fmt_detailed(f)?;
+        if let Some(generic_context) = generic_context {
+            generic_context
+                .display_with(self.db, settings.clone())
+                .fmt_detailed(f)?;
+        }
+        f.write_str(" = ")?;
+        self.value_ty
+            .display_with(self.db, settings)
+            .fmt_detailed(f)
+    }
+}
+
+impl Display for DisplayTypeAliasDeclaration<'_> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        self.fmt_detailed(&mut TypeWriter::Formatter(f))
+    }
+}
+
 /// Helper for displaying `TypeGuardLike` types `TypeIs` and `TypeGuard`.
 fn fmt_type_guard_like<'db, T: TypeGuardLike<'db>>(
     db: &'db dyn Db,
@@ -851,6 +929,14 @@ struct DisplayRepresentation<'db> {
     ty: Type<'db>,
     db: &'db dyn Db,
     settings: DisplaySettings<'db>,
+}
+
+fn property_display_name(db: &dyn Db, property: PropertyInstanceType<'_>) -> &'static str {
+    if property.instance_class(db) == KnownClass::EnumProperty {
+        "enum.property"
+    } else {
+        "property"
+    }
 }
 
 impl Display for DisplayRepresentation<'_> {
@@ -897,6 +983,31 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                         .display_with(self.db, self.settings.clone())
                         .fmt_detailed(f),
                 },
+                Protocol::Materialized(materialized) => {
+                    let materialization_kind = protocol.display_materialization_kind(self.db);
+                    if let Some(kind) = materialization_kind {
+                        let (name, form) = match kind {
+                            MaterializationKind::Top => ("Top", SpecialFormType::Top),
+                            MaterializationKind::Bottom => ("Bottom", SpecialFormType::Bottom),
+                        };
+                        f.with_type(Type::SpecialForm(form)).write_str(name)?;
+                        f.write_char('[')?;
+                    }
+
+                    match *materialized.origin(self.db) {
+                        ClassType::NonGeneric(class) => class
+                            .display_with(self.db, self.settings.clone())
+                            .fmt_detailed(f),
+                        ClassType::Generic(alias) => alias
+                            .display_with(self.db, self.settings.clone())
+                            .fmt_detailed(f),
+                    }?;
+
+                    if materialization_kind.is_some() {
+                        f.write_char(']')?;
+                    }
+                    Ok(())
+                }
                 Protocol::Synthesized(synthetic) => {
                     f.set_invalid_type_annotation();
                     f.write_char('<')?;
@@ -916,7 +1027,9 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                     f.write_char('>')
                 }
             },
-            Type::PropertyInstance(_) => f.with_type(self.ty).write_str("property"),
+            Type::PropertyInstance(property) => f
+                .with_type(self.ty)
+                .write_str(property_display_name(self.db, property)),
             Type::ModuleLiteral(module) => {
                 f.set_invalid_type_annotation();
                 f.write_char('<')?;
@@ -971,6 +1084,15 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                     write!(f.with_type(Type::Dynamic(dynamic)), "{dynamic}")?;
                     f.write_char(']')
                 }
+                SubclassOfInner::Protocol(protocol) => {
+                    f.with_type(KnownClass::Type.to_class_literal(self.db))
+                        .write_str("type")?;
+                    f.write_char('[')?;
+                    Type::ProtocolInstance(protocol)
+                        .display_with(self.db, self.settings.clone())
+                        .fmt_detailed(f)?;
+                    f.write_char(']')
+                }
                 SubclassOfInner::TypeVar(bound_typevar) => {
                     f.set_invalid_type_annotation();
                     f.with_type(KnownClass::Type.to_class_literal(self.db))
@@ -1002,28 +1124,29 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
             Type::BoundMethod(bound_method) => {
                 let function = bound_method.function(self.db);
                 let self_ty = bound_method.self_instance(self.db);
-                let typing_self_ty = bound_method.typing_self_type(self.db);
+                let bound_signatures = bound_method.bound_signatures(self.db);
 
-                match function.signature(self.db).overloads.as_slice() {
+                match bound_signatures.overloads.as_slice() {
                     [signature] => {
-                        let bound_signature = signature.bind_self(self.db, Some(typing_self_ty));
-                        let hide_unused_self =
-                            bound_signature.should_hide_self_from_display(self.db);
+                        let hide_unused_self = signature.should_hide_self_from_display(self.db);
                         let type_parameters = DisplayOptionalGenericContext {
-                            generic_context: bound_signature.generic_context.as_ref(),
+                            generic_context: signature.generic_context.as_ref(),
                             db: self.db,
                             settings: self.settings.clone(),
                             hide_unused_self,
                         };
                         f.set_invalid_type_annotation();
                         f.write_str("bound method ")?;
-                        self_ty
-                            .display_with(self.db, self.settings.singleline())
-                            .fmt_detailed(f)?;
+                        DisplayMaybeParenthesizedType {
+                            ty: self_ty,
+                            db: self.db,
+                            settings: self.settings.singleline(),
+                        }
+                        .fmt_detailed(f)?;
                         f.write_char('.')?;
                         f.with_type(self.ty).write_str(function.name(self.db))?;
                         type_parameters.fmt_detailed(f)?;
-                        bound_signature
+                        signature
                             .display_with(self.db, self.settings.disallow_signature_name())
                             .fmt_detailed(f)
                     }
@@ -1038,11 +1161,7 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                         let separator = if self.settings.multiline { "\n" } else { ", " };
                         let mut join = f.join(separator);
                         for signature in signatures {
-                            join.entry(
-                                &signature
-                                    .bind_self(self.db, Some(typing_self_ty))
-                                    .display_with(self.db, self.settings.clone()),
-                            );
+                            join.entry(&signature.display_with(self.db, self.settings.clone()));
                         }
                         join.finish()?;
                         if !self.settings.multiline {
@@ -1070,9 +1189,9 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                         Some(&**function.name(self.db)),
                     ),
                     KnownBoundMethodType::PropertyDunderGet(property) => (
-                        KnownClass::Property,
+                        property.instance_class(self.db),
                         "__get__",
-                        "property",
+                        property_display_name(self.db, property),
                         Type::PropertyInstance(property),
                         property
                             .getter(self.db)
@@ -1080,9 +1199,9 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                             .map(|getter| &**getter.name(self.db)),
                     ),
                     KnownBoundMethodType::PropertyDunderSet(property) => (
-                        KnownClass::Property,
+                        property.instance_class(self.db),
                         "__set__",
-                        "property",
+                        property_display_name(self.db, property),
                         Type::PropertyInstance(property),
                         property
                             .setter(self.db)
@@ -1090,9 +1209,9 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                             .map(|setter| &**setter.name(self.db)),
                     ),
                     KnownBoundMethodType::PropertyDunderDelete(property) => (
-                        KnownClass::Property,
+                        property.instance_class(self.db),
                         "__delete__",
-                        "property",
+                        property_display_name(self.db, property),
                         Type::PropertyInstance(property),
                         property
                             .deleter(self.db)
@@ -1123,9 +1242,24 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                     KnownBoundMethodType::ConstraintSetSatisfies(_) => {
                         return f.write_str("bound method `ConstraintSet.satisfies`");
                     }
+                    KnownBoundMethodType::ConstraintSetExists(_) => {
+                        return f.write_str("bound method `ConstraintSet.exists`");
+                    }
+                    KnownBoundMethodType::ConstraintSetForAll(_) => {
+                        return f.write_str("bound method `ConstraintSet.for_all`");
+                    }
                     KnownBoundMethodType::ConstraintSetSatisfiedByAllTypeVars(_) => {
                         return f
                             .write_str("bound method `ConstraintSet.satisfied_by_all_typevars`");
+                    }
+                    KnownBoundMethodType::ConstraintSetSolutionsFor(_) => {
+                        return f.write_str("bound method `ConstraintSet.solutions_for`");
+                    }
+                    KnownBoundMethodType::ConstraintSetSolutions(_) => {
+                        return f.write_str("bound method `ConstraintSet.solutions`");
+                    }
+                    KnownBoundMethodType::ConstraintSetWithDetailedDisplay(_) => {
+                        return f.write_str("bound method `ConstraintSet.with_detailed_display`");
                     }
                 };
 
@@ -1222,9 +1356,9 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                     )
                 }
                 // We used to return `str` as the type here because that feels generally more useful.
-                // However, the inoncistency between the type shown in the inlay hint and its hover, and the
+                // However, the inconsistency between the type shown in the inlay hint and its hover, and the
                 // inconsistency to what's shown when hovering the backed inlay hint of a `LiteralString`
-                // convinvced us that we should change the type to `LiteralString`.
+                // convinced us that we should change the type to `LiteralString`.
                 LiteralValueTypeKind::LiteralString => f
                     .with_type(Type::SpecialForm(SpecialFormType::LiteralString))
                     .write_str("LiteralString"),
@@ -1302,8 +1436,10 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
             Type::TypedDict(TypedDictType::Synthesized(synthesized)) => {
                 f.set_invalid_type_annotation();
                 f.write_char('<')?;
-                f.with_type(Type::SpecialForm(SpecialFormType::TypedDict))
-                    .write_str("TypedDict")?;
+                f.with_type(Type::SpecialForm(SpecialFormType::TypedDict(
+                    TypedDictModule::Typing,
+                )))
+                .write_str("TypedDict")?;
                 f.write_str(" with items ")?;
                 let items = synthesized.items(self.db);
                 for (i, name) in items.keys().enumerate() {
@@ -1431,20 +1567,33 @@ impl<'db> FmtDetailed<'db> for DisplayTuple<'_, 'db> {
                         .fmt_detailed(f)?;
                     f.write_str(", ")?;
                 }
-                if !tuple.prefix_elements().is_empty() || !tuple.suffix_elements().is_empty() {
-                    f.write_char('*')?;
-                    // Might as well link the type again here too
-                    f.with_type(KnownClass::Tuple.to_class_literal(self.db))
-                        .write_str("tuple")?;
-                    f.write_char('[')?;
-                }
-                tuple
-                    .variable()
-                    .display_with(self.db, self.settings.singleline())
-                    .fmt_detailed(f)?;
-                f.write_str(", ...")?;
-                if !tuple.prefix_elements().is_empty() || !tuple.suffix_elements().is_empty() {
-                    f.write_str("]")?;
+                match tuple.variable() {
+                    VariableSegment::TypeVarTuple(typevar) => {
+                        f.write_char('*')?;
+                        Type::TypeVar(typevar)
+                            .display_with(self.db, self.settings.singleline())
+                            .fmt_detailed(f)?;
+                    }
+                    VariableSegment::Homogeneous(variable) => {
+                        if !tuple.prefix_elements().is_empty()
+                            || !tuple.suffix_elements().is_empty()
+                        {
+                            f.write_char('*')?;
+                            // Might as well link the type again here too
+                            f.with_type(KnownClass::Tuple.to_class_literal(self.db))
+                                .write_str("tuple")?;
+                            f.write_char('[')?;
+                        }
+                        variable
+                            .display_with(self.db, self.settings.singleline())
+                            .fmt_detailed(f)?;
+                        f.write_str(", ...")?;
+                        if !tuple.prefix_elements().is_empty()
+                            || !tuple.suffix_elements().is_empty()
+                        {
+                            f.write_str("]")?;
+                        }
+                    }
                 }
                 if !tuple.suffix_elements().is_empty() {
                     f.write_str(", ")?;
@@ -1770,6 +1919,8 @@ impl<'db> DisplayGenericContext<'_, 'db> {
             let typevar = bound_typevar.typevar(self.db);
             if typevar.is_paramspec(self.db) {
                 f.write_str("**")?;
+            } else if typevar.is_typevartuple(self.db) {
+                f.write_char('*')?;
             }
             write!(
                 f.with_type(Type::TypeVar(bound_typevar)),
@@ -1855,13 +2006,64 @@ struct DisplaySpecialization<'db> {
 impl<'db> DisplaySpecialization<'db> {
     fn fmt_normal(&self, f: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result {
         f.write_char('[')?;
+        let variables = self
+            .specialization
+            .generic_context(self.db)
+            .variables(self.db)
+            .collect::<Vec<_>>();
         let types = self.specialization.types(self.db);
-        for (idx, ty) in types.iter().enumerate() {
-            if idx > 0 {
+        let mut wrote_any = false;
+        for (typevar, ty) in variables.iter().zip(types) {
+            if typevar.is_typevartuple(self.db) {
+                let Some(tuple) = ty.exact_tuple_instance_spec(self.db) else {
+                    if wrote_any {
+                        f.write_str(", ")?;
+                    }
+                    ty.display_with(self.db, self.settings.clone())
+                        .fmt_detailed(f)?;
+                    wrote_any = true;
+                    continue;
+                };
+                match tuple.as_ref() {
+                    TupleSpec::Fixed(fixed) if fixed.elements_slice().is_empty() => {
+                        if variables.len() == 1 {
+                            if wrote_any {
+                                f.write_str(", ")?;
+                            }
+                            f.write_str("()")?;
+                            wrote_any = true;
+                        }
+                    }
+                    TupleSpec::Fixed(fixed) => {
+                        for element in fixed.elements_slice() {
+                            if wrote_any {
+                                f.write_str(", ")?;
+                            }
+                            element
+                                .display_with(self.db, self.settings.clone())
+                                .fmt_detailed(f)?;
+                            wrote_any = true;
+                        }
+                    }
+                    TupleSpec::Variable(_) => {
+                        if wrote_any {
+                            f.write_str(", ")?;
+                        }
+                        f.write_char('*')?;
+                        ty.display_with(self.db, self.settings.clone())
+                            .fmt_detailed(f)?;
+                        wrote_any = true;
+                    }
+                }
+                continue;
+            }
+
+            if wrote_any {
                 f.write_str(", ")?;
             }
             ty.display_with(self.db, self.settings.clone())
                 .fmt_detailed(f)?;
+            wrote_any = true;
         }
         if self.tuple_specialization.is_yes() {
             f.write_str(", ...")?;
@@ -2079,17 +2281,9 @@ impl<'db> FmtDetailed<'db> for DisplaySignature<'_, 'db> {
             f.write_str(&name)?;
         }
 
-        let settings = if let Some(generic_context) = self.generic_context {
-            self.settings
-                .with_active_scopes(generic_context.variables(self.db).filter_map(|bound| {
-                    match bound.binding_context(self.db) {
-                        BindingContext::Definition(def) => Some(def),
-                        BindingContext::Synthetic => None,
-                    }
-                }))
-        } else {
-            self.settings.clone()
-        };
+        let settings = self
+            .settings
+            .with_generic_context(self.db, self.generic_context);
 
         // Display type parameters if present, but only when the caller hasn't
         // already displayed them.
@@ -2190,11 +2384,16 @@ impl<'db> FmtDetailed<'db> for DisplayParameters<'_, 'db> {
         ) -> fmt::Result {
             let mut star_added = false;
             let mut needs_slash = false;
+            let mut after_synthetic_unpack = false;
             let mut first = true;
 
             for parameter in parameters {
+                let is_synthetic_unpack = parameter.definition().is_none()
+                    && parameter.is_variadic()
+                    && parameter.has_starred_annotation();
+
                 // Handle special separators
-                if parameter.is_positional_only() {
+                if parameter.is_positional_only() && !after_synthetic_unpack {
                     needs_slash = true;
                 } else if needs_slash {
                     if !first {
@@ -2227,6 +2426,7 @@ impl<'db> FmtDetailed<'db> for DisplayParameters<'_, 'db> {
                     .display_with(display.db, display.settings.singleline())
                     .fmt_detailed(&mut f.with_detail(TypeDetail::Parameter(param_name)))?;
 
+                after_synthetic_unpack |= is_synthetic_unpack;
                 first = false;
             }
 
@@ -2339,8 +2539,20 @@ struct DisplayParameter<'a, 'db> {
 
 impl<'db> FmtDetailed<'db> for DisplayParameter<'_, 'db> {
     fn fmt_detailed(&self, f: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result {
+        if self.param.definition().is_none()
+            && self.param.is_variadic()
+            && self.param.has_starred_annotation()
+        {
+            f.write_str("*")?;
+            self.param
+                .annotated_type()
+                .display_with(self.db, self.settings.clone())
+                .fmt_detailed(f)?;
+            return Ok(());
+        }
+
         if let Some(name) = self.param.display_name() {
-            f.write_str(&name)?;
+            write!(f, "{name}")?;
             if self.param.should_annotation_be_displayed() {
                 let annotated_type = self.param.annotated_type();
                 f.write_str(": ")?;
@@ -2676,6 +2888,11 @@ impl<'db> FmtDetailed<'db> for DisplaySubclassOfGroup<'db> {
                         Type::Dynamic(dynamic).representation(self.db, self.settings.singleline());
                     join.entry(&rep);
                 }
+                SubclassOfInner::Protocol(protocol) => {
+                    let rep = Type::ProtocolInstance(protocol)
+                        .representation(self.db, self.settings.singleline());
+                    join.entry(&rep);
+                }
                 SubclassOfInner::TypeVar(bound_typevar) => {
                     let rep = Type::TypeVar(bound_typevar)
                         .representation(self.db, self.settings.singleline());
@@ -3009,17 +3226,19 @@ impl Display for DisplayStringLiteralType<'_> {
 pub(crate) struct DisplayKnownInstanceRepr<'db> {
     pub(crate) known_instance: KnownInstanceType<'db>,
     pub(crate) db: &'db dyn Db,
+    pub(crate) settings: DisplaySettings<'db>,
 }
 
 impl<'db> KnownInstanceType<'db> {
     pub(crate) fn display_with(
         self,
         db: &'db dyn Db,
-        _settings: DisplaySettings<'db>,
+        settings: DisplaySettings<'db>,
     ) -> DisplayKnownInstanceRepr<'db> {
         DisplayKnownInstanceRepr {
             known_instance: self,
             db,
+            settings,
         }
     }
 }
@@ -3069,6 +3288,8 @@ impl<'db> FmtDetailed<'db> for DisplayKnownInstanceRepr<'db> {
             KnownInstanceType::TypeVar(typevar_instance) => {
                 if typevar_instance.kind(self.db).is_paramspec() {
                     f.with_type(ty).write_str("ParamSpec")
+                } else if typevar_instance.kind(self.db).is_typevartuple() {
+                    f.with_type(ty).write_str("TypeVarTuple")
                 } else {
                     f.with_type(ty).write_str("TypeVar")
                 }
@@ -3093,7 +3314,9 @@ impl<'db> FmtDetailed<'db> for DisplayKnownInstanceRepr<'db> {
                 f.with_type(ty).write_str("ConstraintSet")?;
                 let constraints = ConstraintSetBuilder::new();
                 let set = constraints.load(self.db, interned_set.constraints(self.db));
-                if set.is_always_satisfied(self.db) {
+                if interned_set.detailed_display(self.db) {
+                    write!(f, "[{}]", set.display(self.db))
+                } else if set.is_always_satisfied(self.db) {
                     f.write_str("[Literal[True]]")
                 } else if set.is_never_satisfied(self.db) {
                     f.write_str("[Literal[False]]")
@@ -3101,13 +3324,30 @@ impl<'db> FmtDetailed<'db> for DisplayKnownInstanceRepr<'db> {
                     f.write_str("[bool]")
                 }
             }
+            KnownInstanceType::ConstraintSetSolution(solution) => {
+                f.set_invalid_type_annotation();
+                f.with_type(ty).write_str("Solution[")?;
+                for (index, binding) in solution.bindings(self.db).iter().enumerate() {
+                    if index > 0 {
+                        f.write_str(", ")?;
+                    }
+                    write!(f, "{}=", binding.bound_typevar.name(self.db))?;
+                    binding
+                        .solution
+                        .display_with(self.db, self.settings.clone())
+                        .fmt_detailed(f)?;
+                }
+                f.write_char(']')
+            }
             KnownInstanceType::GenericContext(generic_context) => {
-                f.with_type(ty).write_str("ty_extensions.GenericContext")?;
+                f.with_type(ty)
+                    .write_str("ty_extensions._internal.GenericContext")?;
                 write!(f, "{}", generic_context.display_full(self.db))
             }
             KnownInstanceType::Specialization(specialization) => {
                 // Normalize for consistent output across CI platforms
-                f.with_type(ty).write_str("ty_extensions.Specialization")?;
+                f.with_type(ty)
+                    .write_str("ty_extensions._internal.Specialization")?;
                 write!(f, "{}", specialization.display_full(self.db))
             }
             KnownInstanceType::UnionType(union) => {
@@ -3141,8 +3381,12 @@ impl<'db> FmtDetailed<'db> for DisplayKnownInstanceRepr<'db> {
             KnownInstanceType::Callable(callable) => {
                 f.set_invalid_type_annotation();
                 f.write_char('<')?;
-                f.with_type(Type::SpecialForm(SpecialFormType::Callable))
-                    .write_str("typing.Callable")?;
+                // Ensure that when we go-to-definition on an inlay hint for a `Callable`,
+                // regardless of whether it's imported from `collections.abc` or `typing`,
+                // we go to `typing.pyi` because in typeshed there is no `Callable` in
+                // `collections.abc`.
+                f.with_type(Type::SpecialForm(SpecialFormType::TypingCallable))
+                    .write_str("Callable")?;
                 f.write_str(" special-form '")?;
                 callable.display(self.db).fmt_detailed(f)?;
                 f.write_str("'>")
@@ -3178,6 +3422,14 @@ impl<'db> FmtDetailed<'db> for DisplayKnownInstanceRepr<'db> {
                     .display_with(self.db, DisplaySettings::default().singleline())
                     .fmt_detailed(f)?;
                 f.write_str("]")
+            }
+            KnownInstanceType::Range { .. } => f
+                .with_type(KnownClass::Range.to_class_literal(self.db))
+                .write_str("range"),
+            KnownInstanceType::FunctoolsPartialCall(partial) => {
+                Type::Callable(partial.partial(self.db))
+                    .display_with(self.db, DisplaySettings::default().singleline())
+                    .fmt_detailed(f)
             }
         }
     }
@@ -3216,7 +3468,7 @@ mod tests {
         return_ty: Option<Type<'db>>,
     ) -> String {
         Signature::new(
-            Parameters::new(db, parameters),
+            Parameters::from_annotation(db, parameters),
             return_ty.unwrap_or(Type::unknown()),
         )
         .display(db)
@@ -3229,7 +3481,7 @@ mod tests {
         return_ty: Option<Type<'db>>,
     ) -> String {
         Signature::new(
-            Parameters::new(db, parameters),
+            Parameters::from_annotation(db, parameters),
             return_ty.unwrap_or(Type::unknown()),
         )
         .display_with(db, super::DisplaySettings::default().multiline())

@@ -4,18 +4,18 @@ use ruff_db::{
     source::source_text,
 };
 use ruff_diagnostics::{Edit, Fix};
-use ruff_python_ast::{self as ast, name::Name};
+use ruff_python_ast::{self as ast, PythonVersion, name::Name};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 use rustc_hash::FxHashSet;
 
 use crate::{
-    Db, TypeQualifiers,
+    Db, Program, TypeQualifiers,
     diagnostic::format_enumeration,
     place::{DefinedPlace, Place, TypeOrigin, place_from_bindings, place_from_declarations},
     types::{
-        CallArguments, ClassBase, ClassLiteral, ClassType, KnownClass, KnownInstanceType,
-        MemberLookupPolicy, MetaclassCandidate, Parameters, Signature, SpecialFormType,
-        StaticClassLiteral, Type, TypeVarVariance, binding_type,
+        CallArguments, ClassBase, ClassLiteral, ClassType, DataclassFlags, KnownClass,
+        KnownInstanceType, MemberLookupPolicy, MetaclassCandidate, Parameters, Signature,
+        SpecialFormType, StaticClassLiteral, Type, TypeVarVariance, TypedDictModule, binding_type,
         call::Argument,
         class::{
             AbstractMethod, CodeGeneratorKind, FieldKind, MetaclassErrorKind,
@@ -35,7 +35,7 @@ use crate::{
             report_instance_layout_conflict, report_invalid_attribute_assignment,
             report_invalid_or_unsupported_base, report_invalid_total_ordering,
             report_invalid_type_param_order, report_invalid_typevar_default_reference,
-            report_named_tuple_field_with_leading_underscore,
+            report_missing_type_arguments, report_named_tuple_field_with_leading_underscore,
             report_namedtuple_field_without_default_after_field_with_default,
             report_shadowed_type_variable,
             report_subclass_of_class_with_non_callable_init_subclass, report_unsupported_base,
@@ -111,7 +111,7 @@ pub(crate) fn check_static_class_definitions<'db>(
         }
     }
 
-    let class_kind = CodeGeneratorKind::from_class(db, class.into(), None);
+    let class_kind = CodeGeneratorKind::from_class(db, class.into());
 
     // If it's a `NamedTuple` class, check that no field without a default value
     // appears after a field with a default value.
@@ -229,6 +229,7 @@ pub(crate) fn check_static_class_definitions<'db>(
     for (i, entry) in expanded_base_entries.iter().enumerate() {
         let source_node = entry.source_node();
         let base_class = entry.ty();
+        report_missing_type_arguments(context, base_class, source_node);
 
         if class_kind == Some(CodeGeneratorKind::NamedTuple)
             && !matches!(
@@ -236,8 +237,7 @@ pub(crate) fn check_static_class_definitions<'db>(
                 Type::SpecialForm(SpecialFormType::NamedTuple)
                     | Type::KnownInstance(KnownInstanceType::SubscriptedGeneric(_))
             )
-            && let Some(node) = source_node
-            && let Some(builder) = context.report_lint(&INVALID_NAMED_TUPLE, node)
+            && let Some(builder) = context.report_lint(&INVALID_NAMED_TUPLE, source_node)
         {
             builder.into_diagnostic(format_args!(
                 "NamedTuple class `{}` cannot use multiple inheritance except with `Generic[]`",
@@ -247,9 +247,7 @@ pub(crate) fn check_static_class_definitions<'db>(
 
         let base_class = match base_class {
             Type::SpecialForm(SpecialFormType::Generic) => {
-                if let Some(node) = source_node
-                    && let Some(builder) = context.report_lint(&INVALID_BASE, node)
-                {
+                if let Some(builder) = context.report_lint(&INVALID_BASE, source_node) {
                     // Unsubscripted `Generic` can appear in the MRO of many classes,
                     // but it is never valid as an explicit base class in user code.
                     builder.into_diagnostic("Cannot inherit from plain `Generic`");
@@ -285,9 +283,7 @@ pub(crate) fn check_static_class_definitions<'db>(
             // but it is semantically invalid.
             Type::KnownInstance(KnownInstanceType::SubscriptedProtocol(generic_context)) => {
                 if let Some(type_params) = class_node.type_params.as_deref() {
-                    let Some(node) = source_node else {
-                        continue;
-                    };
+                    let node = source_node;
                     let Some(builder) = context.report_lint(&INVALID_GENERIC_CLASS, node) else {
                         continue;
                     };
@@ -308,17 +304,14 @@ pub(crate) fn check_static_class_definitions<'db>(
                             )));
                         }
                     }
-                } else if let Some(node) = source_node
-                    && protocol_base_with_generic_context.is_none()
-                {
-                    protocol_base_with_generic_context = Some((node, generic_context));
+                } else if protocol_base_with_generic_context.is_none() {
+                    protocol_base_with_generic_context = Some((source_node, generic_context));
                 }
                 continue;
             }
             Type::ClassLiteral(class) => ClassType::NonGeneric(class),
             Type::GenericAlias(base_alias) => {
                 if check_explicit_base_variance
-                    && let Some(node) = source_node
                     && let Some(generic_context) = class.generic_context(db)
                     && let Some((typevar, declared_variance, required_variance)) =
                         generic_context.variables(db).find_map(|typevar| {
@@ -326,14 +319,15 @@ pub(crate) fn check_static_class_definitions<'db>(
                             if declared_variance == TypeVarVariance::Invariant {
                                 return None;
                             }
-                            let required_variance = base_alias.variance_of(db, typevar);
+                            let required_variance =
+                                base_alias.variance_of(db, typevar.identity(db));
                             if declared_variance.join(required_variance) != declared_variance {
                                 Some((typevar, declared_variance, required_variance))
                             } else {
                                 None
                             }
                         })
-                    && let Some(builder) = context.report_lint(&INVALID_GENERIC_CLASS, node)
+                    && let Some(builder) = context.report_lint(&INVALID_GENERIC_CLASS, source_node)
                 {
                     let mut diagnostic = builder.into_diagnostic(format_args!(
                         "Variance of type variable `{}` is incompatible with base class `{}`",
@@ -361,8 +355,7 @@ pub(crate) fn check_static_class_definitions<'db>(
         if is_protocol {
             if !base_class.is_protocol(db)
                 && !base_class.is_object(db)
-                && let Some(node) = source_node
-                && let Some(builder) = context.report_lint(&INVALID_PROTOCOL, node)
+                && let Some(builder) = context.report_lint(&INVALID_PROTOCOL, source_node)
             {
                 builder.into_diagnostic(format_args!(
                     "Protocol class `{}` cannot inherit from non-protocol class `{}`",
@@ -372,14 +365,13 @@ pub(crate) fn check_static_class_definitions<'db>(
             }
         } else if class_kind == Some(CodeGeneratorKind::TypedDict) {
             if !base_class.class_literal(db).is_typed_dict(db)
-                && let Some(node) = source_node
-                && let Some(builder) = context.report_lint(&INVALID_TYPED_DICT_HEADER, node)
+                && let Some(builder) = context.report_lint(&INVALID_TYPED_DICT_HEADER, source_node)
             {
                 let mut diagnostic = builder.into_diagnostic(format_args!(
                     "TypedDict class `{}` can only inherit from TypedDict classes",
                     class.name(db),
                 ));
-                diagnostic.set_primary_message(format_args!(
+                diagnostic.set_primary_annotation_message(format_args!(
                     "`{}` is not a `TypedDict` class",
                     base_class.name(db)
                 ));
@@ -394,8 +386,7 @@ pub(crate) fn check_static_class_definitions<'db>(
         }
 
         if base_class.is_final(db)
-            && let Some(node) = source_node
-            && let Some(builder) = context.report_lint(&SUBCLASS_OF_FINAL_CLASS, node)
+            && let Some(builder) = context.report_lint(&SUBCLASS_OF_FINAL_CLASS, source_node)
         {
             builder.into_diagnostic(format_args!(
                 "Class `{}` cannot inherit from final class `{}`",
@@ -410,25 +401,23 @@ pub(crate) fn check_static_class_definitions<'db>(
                 class.is_frozen_dataclass(db),
             )
             && base_is_frozen != class_is_frozen
-            && let Some(node) = source_node
         {
             report_bad_frozen_dataclass_inheritance(
                 context,
                 class,
                 class_node,
                 base_class_literal,
-                node,
+                source_node,
                 base_is_frozen,
             );
         }
 
-        if let Some(ordered_base_class) = ordered_dataclass_base_class(db, base_class)
-            && let Some(node) = source_node
-        {
+        if let Some(ordered_base_class) = ordered_dataclass_base_class(db, base_class) {
             // Suppress the diagnostic if the child class manually overrides all comparison
             // methods, since the user has explicitly fixed the LSP violation.
             if !class.has_own_comparison_methods(db)
-                && let Some(builder) = context.report_lint(&SUBCLASS_OF_DATACLASS_WITH_ORDER, node)
+                && let Some(builder) =
+                    context.report_lint(&SUBCLASS_OF_DATACLASS_WITH_ORDER, source_node)
             {
                 let mut diagnostic = builder.into_diagnostic(format_args!(
                     "Class `{}` inherits from dataclass `{}` which has `order=True`",
@@ -455,6 +444,7 @@ pub(crate) fn check_static_class_definitions<'db>(
     }
 
     // Check that the class's MRO is resolvable
+    let mut inconsistent_generic_bases = false;
     match class.try_mro(db, None) {
         Err(mro_error) => match mro_error.reason() {
             StaticMroErrorKind::DuplicateBases(duplicates) => {
@@ -464,9 +454,8 @@ pub(crate) fn check_static_class_definitions<'db>(
             }
             StaticMroErrorKind::InvalidBases(bases) => {
                 for (index, base_ty) in bases {
-                    if let Some(base_node) = expanded_base_entries[*index].source_node() {
-                        report_invalid_or_unsupported_base(context, base_node, *base_ty, class);
-                    }
+                    let base_node = expanded_base_entries[*index].source_node();
+                    report_invalid_or_unsupported_base(context, base_node, *base_ty, class);
                 }
             }
             StaticMroErrorKind::UnresolvableMro {
@@ -542,7 +531,7 @@ pub(crate) fn check_static_class_definitions<'db>(
             let base_nodes = (class_node.bases().len() == explicit_bases.len()
                 && !class_node.bases().iter().any(ast::Expr::is_starred_expr))
             .then_some(class_node.bases());
-            report_inconsistent_generic_bases(
+            inconsistent_generic_bases = report_inconsistent_generic_bases(
                 context,
                 class.header_range(db),
                 explicit_bases,
@@ -651,13 +640,24 @@ pub(crate) fn check_static_class_definitions<'db>(
     // base class `__init_subclass__` method.
     if let Some(args) = class_node.arguments.as_deref() {
         if class_kind == Some(CodeGeneratorKind::TypedDict) {
+            let supports_pep_728 = context.in_stub()
+                || class.typed_dict_module(db) == Some(TypedDictModule::TypingExtensions)
+                || Program::get(db).python_version(db) >= PythonVersion::PY315;
+
             for keyword in &args.keywords {
+                if !supports_pep_728
+                    && let Some(arg_name @ ("closed" | "extra_items")) = keyword.arg.as_deref()
+                    && let Some(builder) = context.report_lint(&UNKNOWN_ARGUMENT, keyword)
+                {
+                    builder.into_diagnostic(format_args!(
+                        "The `{arg_name}` parameter of `typing.TypedDict` was added in Python 3.15"
+                    ));
+                }
+
                 match keyword.arg.as_deref() {
                     Some(arg_name @ ("total" | "closed")) => {
                         let passed_type = file_expression_type(&keyword.value);
-                        if passed_type
-                            .as_literal_value()
-                            .is_none_or(|literal| !literal.is_bool())
+                        if !keyword.value.is_boolean_literal_expr()
                             && let Some(builder) =
                                 context.report_lint(&INVALID_ARGUMENT_TYPE, keyword)
                         {
@@ -665,7 +665,7 @@ pub(crate) fn check_static_class_definitions<'db>(
                                 "Invalid argument to parameter `{arg_name}` \
                                     in `TypedDict` definition",
                             ));
-                            diagnostic.set_primary_message(format_args!(
+                            diagnostic.set_primary_annotation_message(format_args!(
                                 "Expected either `True` or `False`, got object of type `{}`",
                                 passed_type.display(db)
                             ));
@@ -744,6 +744,19 @@ pub(crate) fn check_static_class_definitions<'db>(
 
     // If the class is generic, verify that its generic context does not violate any of
     // the typevar scoping rules.
+    if class.has_pep_695_type_params(db)
+        && let Some(generic_context) = class.inherited_legacy_generic_context(db)
+        && let Some(typevar) = generic_context
+            .variables(db)
+            .find(|typevar| !typevar.typevar(db).is_self(db))
+        && let Some(builder) = context.report_lint(&INVALID_GENERIC_CLASS, class_node)
+    {
+        builder.into_diagnostic(format_args!(
+            "Legacy type variable `{}` cannot be used in a PEP 695 class base",
+            typevar.name(db),
+        ));
+    }
+
     if let (Some(legacy), Some(inherited)) = (
         class.legacy_generic_context(db),
         class.inherited_legacy_generic_context(db),
@@ -762,6 +775,11 @@ pub(crate) fn check_static_class_definitions<'db>(
     // This is prohibited by the typing spec because a TypeVarTuple consumes
     // all remaining positional type arguments.
     if let Some(type_params) = class_node.type_params.as_deref() {
+        super::type_param_validation::check_single_typevar_tuple_pep695(
+            context,
+            type_params,
+            super::type_param_validation::TypeParameterOwner::GenericClass(&class_node.name.id),
+        );
         super::type_param_validation::check_no_default_after_typevar_tuple_pep695(
             context,
             type_params,
@@ -863,6 +881,7 @@ pub(crate) fn check_static_class_definitions<'db>(
                                 "class",
                                 &class_node.name.id,
                                 class.header_range(db),
+                                self_typevar.kind(db),
                                 other_typevar,
                             );
                         }
@@ -882,6 +901,7 @@ pub(crate) fn check_static_class_definitions<'db>(
                             "class",
                             &class_node.name.id,
                             class.header_range(db),
+                            base_typevar.kind(db),
                             other_typevar,
                         );
                     }
@@ -893,9 +913,10 @@ pub(crate) fn check_static_class_definitions<'db>(
     // Check that a dataclass does not have more than one `KW_ONLY`
     // and that required fields are defined before default fields.
     if let Some(field_policy @ CodeGeneratorKind::DataclassLike(_)) =
-        CodeGeneratorKind::from_class(db, class.into(), None)
+        CodeGeneratorKind::from_class(db, class.into())
     {
         let specialization = None;
+        let class_init = class.has_dataclass_param(db, field_policy, DataclassFlags::INIT);
 
         let mut kw_only_sentinel_fields = vec![];
         let mut required_after_default_field_names = vec![];
@@ -918,8 +939,8 @@ pub(crate) fn check_static_class_definitions<'db>(
                 continue;
             };
 
-            // Fields with init=False or kw_only=true don't participate in ordering check
-            if !init || *kw_only == Some(true) {
+            // Classes or fields with init=False and kw_only fields don't participate in ordering.
+            if !class_init || !init || *kw_only == Some(true) {
                 continue;
             }
 
@@ -984,7 +1005,7 @@ pub(crate) fn check_static_class_definitions<'db>(
 
     // (13) Check for violations of the Liskov Substitution Principle,
     // and for violations of other rules relating to invalid overrides of some sort.
-    overrides::check_class(context, class);
+    overrides::check_class(context, class, inconsistent_generic_bases);
 
     // (14) Check compatibility between class namespace values and metaclass-populated attributes.
     check_class_namespace_against_metaclass_members(context, class, index);
@@ -1025,7 +1046,7 @@ fn check_class_namespace_against_metaclass_members<'db>(
         return;
     }
 
-    let Some(metaclass_instance) = metaclass.to_instance(db) else {
+    let Some(metaclass_instance) = metaclass.to_instance_approximation(db) else {
         return;
     };
 
@@ -1048,22 +1069,22 @@ fn check_class_namespace_against_metaclass_members<'db>(
     {
         let body_scope = metaclass.body_scope(db);
         let metaclass_index = semantic_index(db, body_scope.file(db));
-        let body_scope = body_scope.file_scope_id(db);
-        let metaclass_table = metaclass_index.place_table(body_scope);
-        let metaclass_use_def = metaclass_index.use_def_map(body_scope);
+        let body_scope_id = body_scope.file_scope_id(db);
+        let metaclass_table = metaclass_index.place_table(body_scope_id);
+        let metaclass_use_def = metaclass_index.use_def_map(body_scope_id);
 
         for (symbol_id, _) in metaclass_use_def.all_end_of_scope_symbol_declarations() {
             metaclass_instance_members.insert(metaclass_table.symbol(symbol_id).name().clone());
         }
 
-        for function_scope in attribute_scopes(db, metaclass.body_scope(db)) {
+        for function_scope in attribute_scopes(db, body_scope) {
             for member in metaclass_index.place_table(function_scope).members() {
                 if let Some(name) = member.as_instance_attribute() {
                     // A method-scope member may only be declared, as in `cls.attr: int`.
                     // Only an assignment such as `cls.attr: int = 1` writes a value onto the
                     // newly created class object, potentially overwriting a class-body value.
-                    let is_assigned = attribute_assignments(db, metaclass.body_scope(db), name)
-                        .any(|(bindings, _)| {
+                    let is_assigned =
+                        attribute_assignments(db, body_scope, name).any(|(bindings, _)| {
                             bindings
                                 .into_iter()
                                 .any(|binding| binding.binding.definition().is_some())
@@ -1078,6 +1099,10 @@ fn check_class_namespace_against_metaclass_members<'db>(
         }
     }
 
+    #[expect(
+        clippy::iter_over_hash_type,
+        reason = "each metaclass member is checked independently"
+    )]
     for name in metaclass_instance_members {
         let Some(symbol_id) = table.symbol_id(name.as_str()) else {
             continue;
@@ -1245,7 +1270,8 @@ fn check_final_class_abstract_methods<'db>(
             "Final class `{class_name}` has unimplemented abstract method \
                 `{first_method_name}`",
         ));
-        diagnostic.set_primary_message(format_args!("`{first_method_name}` is unimplemented"));
+        diagnostic
+            .set_primary_annotation_message(format_args!("`{first_method_name}` is unimplemented"));
     } else {
         let verbose = db.verbose();
         let max_abstract_methods_to_print = if verbose { num_abstract_methods } else { 3 };
@@ -1253,7 +1279,7 @@ fn check_final_class_abstract_methods<'db>(
             format_enumeration(abstract_methods.keys().take(max_abstract_methods_to_print));
 
         if num_abstract_methods > max_abstract_methods_to_print {
-            diagnostic.set_primary_message(format_args!(
+            diagnostic.set_primary_annotation_message(format_args!(
                 "{num_abstract_methods} abstract methods are unimplemented, \
                         including {formatted_methods}",
             ));
@@ -1270,7 +1296,7 @@ fn check_final_class_abstract_methods<'db>(
                 "Final class `{class_name}` has unimplemented \
                     abstract methods {formatted_methods}",
             ));
-            diagnostic.set_primary_message(format_args!(
+            diagnostic.set_primary_annotation_message(format_args!(
                 "Abstract methods {formatted_methods} are unimplemented"
             ));
         }
@@ -1360,8 +1386,10 @@ fn check_class_final_without_value<'db>(
     let place_table = index.place_table(body_scope_id);
 
     // In dataclasses (and similar code-generated classes), Final fields without
-    // defaults are initialized by the synthesized __init__, so they are valid.
-    if CodeGeneratorKind::from_class(db, class.into(), None).is_some() {
+    // defaults are initialized by the synthesized __init__. In protocols, the
+    // declaration describes a required instance attribute rather than storage
+    // that must be initialized by the protocol class itself.
+    if CodeGeneratorKind::from_class(db, class.into()).is_some() || class.is_protocol(db) {
         return;
     }
 

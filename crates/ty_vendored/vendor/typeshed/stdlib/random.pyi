@@ -107,6 +107,7 @@ class Random(_random.Random):
 
         Optional argument x controls seeding, as for Random.seed().
         """
+
     # Using other `seed` types is deprecated since 3.9 and removed in 3.11
     # Ignore Y041, since random.seed doesn't treat int like a float subtype. Having an explicit
     # int better documents conventional usage of random.seed.
@@ -166,9 +167,11 @@ class Random(_random.Random):
         the selections are made with equal probability.
 
         """
+
     if sys.version_info >= (3, 11):
         def shuffle(self, x: MutableSequence[Any]) -> None:
             """Shuffle list x in place, and return None."""
+
     else:
         @overload
         def shuffle(self, x: MutableSequence[Any]) -> None:
@@ -213,6 +216,7 @@ class Random(_random.Random):
                 sample(range(10000000), 60)
 
             """
+
     else:
         def sample(self, population: Sequence[_T] | AbstractSet[_T], k: int, *, counts: Iterable[int] | None = None) -> list[_T]:
             """Chooses k unique random elements from a population sequence or set.
@@ -268,6 +272,7 @@ class Random(_random.Random):
             Var[X] = (low**2 + high**2 + mode**2 - low*high - low*mode - high*mode) / 18
 
         """
+
     if sys.version_info >= (3, 12):
         def binomialvariate(self, n: int = 1, p: float = 0.5) -> int:
             """Binomial random variable.
@@ -304,6 +309,7 @@ class Random(_random.Random):
             Var[X] = alpha * beta / ((alpha + beta)**2 * (alpha + beta + 1))
 
         """
+
     if sys.version_info >= (3, 12):
         def expovariate(self, lambd: float = 1.0) -> float:
             """Exponential distribution.
@@ -320,6 +326,7 @@ class Random(_random.Random):
                 Var[X] = 1 / lambd ** 2
 
             """
+
     else:
         def expovariate(self, lambd: float) -> float:
             """Exponential distribution.
@@ -349,6 +356,7 @@ class Random(_random.Random):
             Var[X] = alpha * beta ** 2
 
         """
+
     if sys.version_info >= (3, 11):
         def gauss(self, mu: float = 0.0, sigma: float = 1.0) -> float:
             """Gaussian distribution.
@@ -366,6 +374,7 @@ class Random(_random.Random):
             mu is the mean, and sigma is the standard deviation.
 
             """
+
     else:
         def gauss(self, mu: float, sigma: float) -> float:
             """Gaussian distribution.

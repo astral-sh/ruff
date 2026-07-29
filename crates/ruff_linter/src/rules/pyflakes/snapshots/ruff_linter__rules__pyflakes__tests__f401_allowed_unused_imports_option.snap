@@ -7,9 +7,8 @@ F401 [*] `hvplot.pandas_alias.scatter_matrix` imported but unused
 11 | # Errors
 12 | from hvplot.pandas_alias import scatter_matrix
    |                                 ^^^^^^^^^^^^^^
-   |
 help: Remove unused import: `hvplot.pandas_alias.scatter_matrix`
-9  | from hvplot.pandas.plots import scatter_matrix
-10 |
+   |
 11 | # Errors
    - from hvplot.pandas_alias import scatter_matrix
+   |

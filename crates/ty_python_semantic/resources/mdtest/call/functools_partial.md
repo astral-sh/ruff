@@ -156,6 +156,54 @@ p = partial(f, 1)
 reveal_type(p)  # revealed: partial[(**kwargs: str) -> bool]
 ```
 
+### Specialized generic variadics remain non-gradual
+
+Specializing variadic parameter types to `Any` does not make them gradual when constructing a
+`partial`:
+
+```py
+from functools import partial
+from typing import Any, Callable, Generic, TypeVar
+from ty_extensions import static_assert
+from ty_extensions._internal import TypeOf, is_subtype_of
+
+T = TypeVar("T")
+
+class C(Generic[T]):
+    def method(self, *args: T, **kwargs: T) -> None: ...
+
+callback = partial(C[Any]().method)
+reveal_type(callback)  # revealed: partial[(*args: Any, **kwargs: Any) -> None]
+# Unlike a gradual callable, this standard variadic callable is a subtype of a no-argument callable.
+static_assert(is_subtype_of(TypeOf[callback], Callable[[], None]))
+```
+
+### Expanded ParamSpec variadics preserve non-gradual parameters
+
+When a `partial` expands specialized `P.args` and `P.kwargs`, it preserves the kind of the
+parameters inferred for `P`:
+
+```py
+from functools import partial
+from typing import Any, Callable, Generic, ParamSpec, TypeVar
+from ty_extensions import static_assert
+from ty_extensions._internal import TypeOf, is_subtype_of
+
+P = ParamSpec("P")
+T = TypeVar("T")
+
+class C(Generic[T]):
+    def method(self, *args: T, **kwargs: T) -> None: ...
+
+def invoke(callback: Callable[P, None], *args: P.args, **kwargs: P.kwargs) -> None:
+    callback(*args, **kwargs)
+
+callback = partial(invoke, C[Any]().method)
+reveal_type(callback)  # revealed: partial[(*args: Any, **kwargs: Any) -> None]
+# Unlike a gradual callable, this standard variadic callable is a subtype of a no-argument callable.
+static_assert(is_subtype_of(TypeOf[callback], Callable[[], None]))
+```
+
 ### Defaults preserved
 
 ```py
@@ -691,6 +739,9 @@ reveal_type(p)  # revealed: partial[bool]
 
 ### Kwargs splat with TypedDict
 
+An open `TypedDict` may contain hidden extra items, so it cannot be normalized to a precise partial
+signature.
+
 ```py
 from functools import partial
 from typing import TypedDict
@@ -703,7 +754,47 @@ def f(a: int, b: str) -> bool:
 
 kwargs: MyKwargs = {"b": "hello"}
 p = partial(f, **kwargs)
-reveal_type(p)  # revealed: partial[(a: int, *, b: str = ...) -> bool]
+reveal_type(p)  # revealed: partial[bool]
+```
+
+Known items are still checked against their corresponding parameters, even when the partial
+signature cannot be represented precisely.
+
+```py
+from functools import partial
+from typing import TypedDict
+
+class MyKwargs(TypedDict):
+    b: int
+
+def f(*, b: str) -> bool:
+    return True
+
+kwargs: MyKwargs = {"b": 1}
+# error: [invalid-argument-type] "Argument to class `partial` is incorrect: Expected `str`, found `int`"
+p = partial(f, **kwargs)
+reveal_type(p)  # revealed: partial[bool]
+```
+
+### Kwargs splat with closed TypedDict
+
+A closed `TypedDict` has no hidden extra items, so we should still be able to normalize it to a
+precise partial signature.
+
+```py
+from functools import partial
+from typing_extensions import TypedDict
+
+class MyKwargs(TypedDict, closed=True):
+    b: str
+
+def f(a: int, b: str) -> bool:
+    return True
+
+kwargs: MyKwargs = {"b": "hello"}
+p = partial(f, **kwargs)
+# TODO: should be `partial[(a: int, *, b: str = ...) -> bool]`
+reveal_type(p)  # revealed: partial[bool]
 ```
 
 ### Kwargs splat with union of TypedDicts
@@ -723,7 +814,28 @@ def f(*, b: str) -> bool:
 
 def make(kwargs: KwargsA | KwargsB) -> None:
     p = partial(f, **kwargs)
-    reveal_type(p)  # revealed: partial[(*, b: str = ...) -> bool]
+    reveal_type(p)  # revealed: partial[bool]
+```
+
+### Kwargs splat with union of closed TypedDicts
+
+```py
+from functools import partial
+from typing_extensions import TypedDict
+
+class KwargsA(TypedDict, closed=True):
+    b: str
+
+class KwargsB(TypedDict, closed=True):
+    b: str
+
+def f(*, b: str) -> bool:
+    return True
+
+def make(kwargs: KwargsA | KwargsB) -> None:
+    p = partial(f, **kwargs)
+    # TODO: should be `partial[(*, b: str = ...) -> bool]`
+    reveal_type(p)  # revealed: partial[bool]
 ```
 
 ### Mixed keywords and kwargs splat
@@ -740,7 +852,25 @@ def f(a: int, b: str, c: float) -> bool:
 
 kwargs: MyKwargs = {"c": 3.14}
 p = partial(f, b="hello", **kwargs)
-reveal_type(p)  # revealed: partial[(a: int, *, b: str = "hello", c: int | float = ...) -> bool]
+reveal_type(p)  # revealed: partial[bool]
+```
+
+### Mixed keywords and closed TypedDict splat
+
+```py
+from functools import partial
+from typing_extensions import TypedDict
+
+class MyKwargs(TypedDict, closed=True):
+    c: float
+
+def f(a: int, b: str, c: float) -> bool:
+    return True
+
+kwargs: MyKwargs = {"c": 3.14}
+p = partial(f, b="hello", **kwargs)
+# TODO: should be `partial[(a: int, *, b: str = "hello", c: int | float = ...) -> bool]`
+reveal_type(p)  # revealed: partial[bool]
 ```
 
 ### Fallback for kwargs splat with dict
@@ -1126,7 +1256,7 @@ reveal_type(p)  # revealed: partial[(a: int, b: str) -> bool]
 
 ### Generic function with multiple type variables
 
-TODO: preserve uninferred type variables in the resulting partial signature.
+Unresolved type variables remain generic in the resulting partial signature.
 
 ```py
 from functools import partial
@@ -1139,7 +1269,7 @@ def combine(a: T, b: U) -> tuple[T, U]:
     return (a, b)
 
 p = partial(combine, 1)
-reveal_type(p)  # revealed: partial[(b: Unknown) -> tuple[Literal[1], Unknown]]
+reveal_type(p)  # revealed: partial[[U](b: U) -> tuple[Literal[1], U]]
 ```
 
 ### Callable object (class with `__call__`)
@@ -1209,7 +1339,8 @@ reveal_type(p(1, b="world", c=3.14))  # revealed: bool
 
 ### Overriding keyword-bound generic args at call time
 
-TODO: preserve the override branch when a keyword-bound generic is rebound at call time.
+TODO: preserve the override branch when a keyword-bound generic is rebound at call time. Currently,
+bound keyword arguments specialize the stored partial signature.
 
 ```py
 from functools import partial
@@ -1223,9 +1354,7 @@ def pair(a: T, b: T) -> tuple[T, T]:
 p = partial(pair, b=1)
 reveal_type(p)  # revealed: partial[(a: int, *, b: int = 1) -> tuple[int, int]]
 p("x")  # error: [invalid-argument-type]
-# error: [invalid-argument-type]
-# error: [invalid-argument-type]
-p("x", b="y")
+p(1, b="y")  # error: [invalid-argument-type]
 ```
 
 ## Assignability and partial object behavior
@@ -1472,6 +1601,31 @@ def handle(
 handler: Handler = partial(handle, context=Context())
 ```
 
+A `partial` result is also assignable to a protocol that models `__call__` as a callable attribute.
+
+```py
+from functools import partial
+from typing import Any, Callable, Protocol, TypeVar
+
+T = TypeVar("T")
+
+class PartialLike(Protocol[T]):
+    __call__: Callable[..., T]
+
+    @property
+    def func(self) -> Callable[..., T]: ...
+    @property
+    def args(self) -> tuple[Any, ...]: ...
+    @property
+    def keywords(self) -> dict[str, Any]: ...
+
+def f(x: int) -> int:
+    return x
+
+partial_like: PartialLike[int] = partial(f)
+partial_like_bad: PartialLike[str] = partial(f)  # error: [invalid-assignment]
+```
+
 ### Accessing `__call__` directly
 
 `__call__` on a `partial` result should reflect the refined callable signature, not the broad
@@ -1491,11 +1645,13 @@ reveal_type(p.__call__("hello"))  # revealed: bool
 
 ### Attribute access on partial results
 
-Standard `partial` attributes like `.func`, `.args`, and `.keywords` should be accessible:
+Standard `partial` attributes like `.func`, `.args`, and `.keywords` should be accessible. As with
+other intersection types, runtime protocol narrowing preserves the full receiver while looking up
+attributes provided by `partial`.
 
 ```py
 from functools import partial
-from typing import Callable
+from typing import Protocol, runtime_checkable
 
 def f(a: int, b: str) -> bool:
     return True
@@ -1505,6 +1661,17 @@ reveal_type(p.func)  # revealed: def f(a: int, b: str) -> bool
 reveal_type(p.func(2, "hello"))  # revealed: bool
 reveal_type(p.args)  # revealed: tuple[Any, ...]
 reveal_type(p.keywords)  # revealed: dict[str, Any]
+
+@runtime_checkable
+class PartialMarker(Protocol):
+    def __call__(self, value: str) -> bool: ...
+
+if isinstance(p, PartialMarker):
+    reveal_type(p)  # revealed: partial[(b: str) -> bool] & PartialMarker
+    # revealed: bound method (partial[(b: str) -> bool] & PartialMarker).__str__() -> str
+    reveal_type(p.__str__)
+    reveal_type(p.args)  # revealed: tuple[Any, ...]
+    reveal_type(p.keywords)  # revealed: dict[str, Any]
 ```
 
 ### `partial.func` keeps the original callable type

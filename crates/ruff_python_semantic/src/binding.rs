@@ -457,6 +457,11 @@ pub struct BindingId;
 pub struct Bindings<'a>(IndexVec<BindingId, Binding<'a>>);
 
 impl<'a> Bindings<'a> {
+    /// Reserves capacity for at least `additional` more bindings.
+    pub(crate) fn reserve_exact(&mut self, additional: usize) {
+        self.0.raw.reserve_exact(additional);
+    }
+
     /// Pushes a new [`Binding`] and returns its [`BindingId`].
     pub fn push(&mut self, binding: Binding<'a>) -> BindingId {
         self.0.push(binding)

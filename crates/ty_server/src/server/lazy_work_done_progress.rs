@@ -1,9 +1,8 @@
 use crate::capabilities::ResolvedClientCapabilities;
 use crate::session::client::Client;
-use lsp_types::request::WorkDoneProgressCreate;
 use lsp_types::{
-    ProgressParams, ProgressParamsValue, ProgressToken, WorkDoneProgress, WorkDoneProgressBegin,
-    WorkDoneProgressCreateParams, WorkDoneProgressEnd, WorkDoneProgressReport,
+    ProgressParams, ProgressToken, WorkDoneProgressBegin, WorkDoneProgressCreateParams,
+    WorkDoneProgressCreateRequest, WorkDoneProgressEnd, WorkDoneProgressReport,
 };
 use std::fmt::Display;
 use std::sync::Arc;
@@ -83,7 +82,7 @@ impl LazyWorkDoneProgress {
             let work_done = work_done.clone();
             let title = title.to_string();
 
-            client.send_deferred_request::<WorkDoneProgressCreate>(
+            client.send_deferred_request::<WorkDoneProgressCreateRequest>(
                 WorkDoneProgressCreateParams {
                     token: token.clone(),
                 },
@@ -106,14 +105,15 @@ impl LazyWorkDoneProgress {
     }
 
     fn send_begin(client: &Client, token: ProgressToken, title: String) {
-        client.send_notification::<lsp_types::notification::Progress>(ProgressParams {
+        client.send_notification::<lsp_types::ProgressNotification>(ProgressParams {
             token,
-            value: ProgressParamsValue::WorkDone(WorkDoneProgress::Begin(WorkDoneProgressBegin {
+            value: serde_json::to_value(WorkDoneProgressBegin {
                 title,
                 cancellable: Some(false),
                 message: None,
                 percentage: Some(0),
-            })),
+            })
+            .expect("Failed to serialize work done progress begin"),
         });
     }
 
@@ -125,15 +125,14 @@ impl LazyWorkDoneProgress {
 
         self.inner
             .client
-            .send_notification::<lsp_types::notification::Progress>(ProgressParams {
+            .send_notification::<lsp_types::ProgressNotification>(ProgressParams {
                 token: token.clone(),
-                value: ProgressParamsValue::WorkDone(WorkDoneProgress::Report(
-                    WorkDoneProgressReport {
-                        cancellable: Some(false),
-                        message: Some(message.to_string()),
-                        percentage,
-                    },
-                )),
+                value: serde_json::to_value(WorkDoneProgressReport {
+                    cancellable: Some(false),
+                    message: Some(message.to_string()),
+                    percentage,
+                })
+                .expect("Failed to serialize work done progress report"),
             });
     }
 }
@@ -157,11 +156,12 @@ impl Drop for Inner {
             .and_then(|mut message| message.take());
 
         self.client
-            .send_notification::<lsp_types::notification::Progress>(ProgressParams {
+            .send_notification::<lsp_types::ProgressNotification>(ProgressParams {
                 token: token.clone(),
-                value: ProgressParamsValue::WorkDone(WorkDoneProgress::End(WorkDoneProgressEnd {
+                value: serde_json::to_value(WorkDoneProgressEnd {
                     message: finish_message,
-                })),
+                })
+                .expect("Failed to serialize work done progress end"),
             });
     }
 }

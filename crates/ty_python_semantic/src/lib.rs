@@ -4,7 +4,8 @@
 )]
 use crate::lint::{LintRegistry, LintRegistryBuilder};
 use crate::suppression::{
-    IGNORE_COMMENT_UNKNOWN_RULE, INVALID_IGNORE_COMMENT, UNUSED_TYPE_IGNORE_COMMENT,
+    BLANKET_IGNORE_COMMENT, IGNORE_COMMENT_UNKNOWN_RULE, INVALID_IGNORE_COMMENT,
+    UNUSED_TYPE_IGNORE_COMMENT,
 };
 use crate::types::check_types;
 pub use db::Db;
@@ -40,9 +41,10 @@ pub use ty_site_packages::{
     SitePackagesPaths, SysPrefixPathOrigin,
 };
 pub use types::ide_support::{
-    ImportAliasResolution, ResolvedDefinition, TypeHierarchyClass, definitions_for_attribute,
-    definitions_for_bin_op, definitions_for_imported_symbol, definitions_for_name,
-    definitions_for_unary_op, map_stub_definition, type_hierarchy_prepare, type_hierarchy_subtypes,
+    ImplementationsFinder, ImportAliasResolution, ResolvedDefinition, TypeHierarchyClass,
+    contains_identifier, definitions_for_attribute, definitions_for_bin_op,
+    definitions_for_imported_symbol, definitions_for_name, definitions_for_unary_op,
+    map_stub_definition, type_hierarchy_prepare, type_hierarchy_subtypes,
     type_hierarchy_supertypes,
 };
 pub use types::{DisplaySettings, TypeQualifiers};
@@ -85,10 +87,14 @@ pub fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&UNUSED_TYPE_IGNORE_COMMENT);
     registry.register_lint(&IGNORE_COMMENT_UNKNOWN_RULE);
     registry.register_lint(&INVALID_IGNORE_COMMENT);
+    registry.register_lint(&BLANKET_IGNORE_COMMENT);
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize)]
 pub struct AnalysisSettings {
+    /// Whether ty should use conservative equality and inequality semantics.
+    pub strict_equality_semantics: bool,
+
     /// Whether errors can be suppressed with `type: ignore` comments.
     ///
     /// If set to false, ty won't:
@@ -106,6 +112,7 @@ pub struct AnalysisSettings {
 impl Default for AnalysisSettings {
     fn default() -> Self {
         Self {
+            strict_equality_semantics: false,
             respect_type_ignore_comments: true,
             allowed_unresolved_imports: ModuleGlobSet::empty(),
             replace_imports_with_any: ModuleGlobSet::empty(),
@@ -227,4 +234,4 @@ impl IOErrorDiagnostic {
 /// values that will soon converge, but where unioning in the early value causes an
 /// unrecoverable loss of precision. This constant controls how many iterations
 /// are considered likely to produce "tainted" results that should be discarded.
-pub(crate) const TAINTED_CYCLES: u32 = 1;
+pub(crate) const TAINTED_CYCLES: u32 = 3;

@@ -13,7 +13,9 @@ Valid severities are:
 * `ignore`: Disable the rule.
 * `warn`: Enable the rule and create a warning diagnostic.
 * `error`: Enable the rule and create an error diagnostic.
-  ty will exit with a non-zero code if any error diagnostics are emitted.
+
+By default, ty exits with code 1 if it emits any warning or error diagnostics.
+Set `terminal.error-on-warning` to `false` to exit with code 0 if all diagnostics have `warning` severity.
 
 **Default value**: `{...}`
 
@@ -158,6 +160,112 @@ Defaults to `true`.
 
 ---
 
+### `strict-equality-semantics`
+
+Configure ty's behavior regarding type inference and narrowing of equality
+checks. Defaults to `false`.
+
+By default, ty makes various assumptions about equality checks that match the
+intuitions of most Python programmers, but may not be fully sound in all situations.
+Enabling this option makes ty more conservative about these assumptions, making it
+less likely to infer `Literal[True]` or `Literal[False]` as the result of an
+equality check. This has various effects on type checking, including fewer type
+narrowing opportunities and more conservative assumptions regarding control flow.
+
+One way in which ty will by default make unsound assumptions is by narrowing an
+object `x` of type `str` to `Literal["a"]` after an `if x == "a"` check. This is
+unsound because a subclass of `str` with value `"a"` will (by default) compare equal
+to `"a"`, but will not be of type `Literal["a"]`:
+
+```pycon
+>>> # `Literal["a"]` can only be inhabited by instances of exactly `str`, not
+>>> # subclasses, but str subclasses compare equal by default:
+>>> class StringSubclass(str): ...
+...
+>>> StringSubclass("a") == "a"
+True
+>>>
+>>> # This also applies to `StrEnum`s:
+>>> from enum import StrEnum
+>>> class MyEnum(StrEnum):
+...     A = "a"
+...
+>>> MyEnum.A == "a"
+True
+```
+
+Enabling this option prevents the unsound narrowing of `x` to `Literal["a"]`,
+and instead keeps it as `str`:
+
+```python
+from typing import Literal
+
+def parse(value: str) -> Literal["a"] | None:
+    # with `strict-equality-semantics = true`, no narrowing will occur here,
+    # and an error will be emitted on the `return` statement.
+    if value == "a":
+        return value
+    return None
+```
+
+Another assumption ty makes by default is that subclasses will never override `__eq__` or
+`__ne__`. This allows ty to narrow the following union based on an equality check, despite
+the fact that an instance of a subclass of `Foo` could compare equal to `None`, and it's
+perfectly valid to pass an instance of a subclass into the `x` parameter of this function:
+
+```python
+def narrow(x: Foo | None, other: Foo) -> None:
+    if x == other:
+        # with this option enabled, `x` will still have type `Foo | None` here,
+        # since it is legal to subclass `Foo` and override its `__eq__` method.
+        reveal_type(x)
+```
+
+Many operations in Python implicitly call `__eq__` under the hood; enabling this option
+will also impact those operations. For example, this option will also impact narrowing from
+`in` checks, and narrowing in `match` statements that use value patterns:
+
+```python
+def narrow_in(x: Foo | None, other: list[Foo]) -> None:
+    if x in other:
+        # with this option enabled, `x` will still have type `Foo | None` here,
+        # since the `in` operator implicitly calls `__eq__` on each element of `other`.
+        reveal_type(x)
+
+
+def narrow_match(x: str) -> None:
+    match x:
+        case "a":
+            # with this option enabled, `x` will still have type `str` here,
+            # since this `case` branch will be taken by any object that compares
+            # equal to `"a"`, including subclasses of `str`.
+            reveal_type(x)
+```
+
+**Default value**: `false`
+
+**Type**: `bool`
+
+**Example usage**:
+
+=== "pyproject.toml"
+
+    ```toml
+    [tool.ty.analysis]
+    # Preserve broad builtin types instead of narrowing them to literals
+    strict-equality-semantics = true
+    ```
+
+=== "ty.toml"
+
+    ```toml
+    [analysis]
+    # Preserve broad builtin types instead of narrowing them to literals
+    strict-equality-semantics = true
+    ```
+
+---
+
 ## `environment`
 
 ### `extra-paths`
@@ -282,6 +390,10 @@ The version should be specified as a string in the format `M.m` where `M` is the
 and `m` is the minor (e.g. `"3.7"` or `"3.12"`).
 If a version is provided, ty will generate errors if the source code makes use of language features
 that are not supported in that version.
+
+ty officially supports type checking code that targets Python 3.10 and later. Python 3.7
+through 3.9 can still be selected, but ty may produce false positives or false negatives for
+standard-library APIs because its bundled stubs do not fully describe those versions.
 
 If a version is not specified, ty will try the following techniques in order of preference
 to determine a value:
@@ -648,6 +760,112 @@ Defaults to `true`.
 
 ---
 
+#### `strict-equality-semantics`
+
+Configure ty's behavior regarding type inference and narrowing of equality
+checks. Defaults to `false`.
+
+By default, ty makes various assumptions about equality checks that match the
+intuitions of most Python programmers, but may not be fully sound in all situations.
+Enabling this option makes ty more conservative about these assumptions, making it
+less likely to infer `Literal[True]` or `Literal[False]` as the result of an
+equality check. This has various effects on type checking, including fewer type
+narrowing opportunities and more conservative assumptions regarding control flow.
+
+One way in which ty will by default make unsound assumptions is by narrowing an
+object `x` of type `str` to `Literal["a"]` after an `if x == "a"` check. This is
+unsound because a subclass of `str` with value `"a"` will (by default) compare equal
+to `"a"`, but will not be of type `Literal["a"]`:
+
+```pycon
+>>> # `Literal["a"]` can only be inhabited by instances of exactly `str`, not
+>>> # subclasses, but str subclasses compare equal by default:
+>>> class StringSubclass(str): ...
+...
+>>> StringSubclass("a") == "a"
+True
+>>>
+>>> # This also applies to `StrEnum`s:
+>>> from enum import StrEnum
+>>> class MyEnum(StrEnum):
+...     A = "a"
+...
+>>> MyEnum.A == "a"
+True
+```
+
+Enabling this option prevents the unsound narrowing of `x` to `Literal["a"]`,
+and instead keeps it as `str`:
+
+```python
+from typing import Literal
+
+def parse(value: str) -> Literal["a"] | None:
+    # with `strict-equality-semantics = true`, no narrowing will occur here,
+    # and an error will be emitted on the `return` statement.
+    if value == "a":
+        return value
+    return None
+```
+
+Another assumption ty makes by default is that subclasses will never override `__eq__` or
+`__ne__`. This allows ty to narrow the following union based on an equality check, despite
+the fact that an instance of a subclass of `Foo` could compare equal to `None`, and it's
+perfectly valid to pass an instance of a subclass into the `x` parameter of this function:
+
+```python
+def narrow(x: Foo | None, other: Foo) -> None:
+    if x == other:
+        # with this option enabled, `x` will still have type `Foo | None` here,
+        # since it is legal to subclass `Foo` and override its `__eq__` method.
+        reveal_type(x)
+```
+
+Many operations in Python implicitly call `__eq__` under the hood; enabling this option
+will also impact those operations. For example, this option will also impact narrowing from
+`in` checks, and narrowing in `match` statements that use value patterns:
+
+```python
+def narrow_in(x: Foo | None, other: list[Foo]) -> None:
+    if x in other:
+        # with this option enabled, `x` will still have type `Foo | None` here,
+        # since the `in` operator implicitly calls `__eq__` on each element of `other`.
+        reveal_type(x)
+
+
+def narrow_match(x: str) -> None:
+    match x:
+        case "a":
+            # with this option enabled, `x` will still have type `str` here,
+            # since this `case` branch will be taken by any object that compares
+            # equal to `"a"`, including subclasses of `str`.
+            reveal_type(x)
+```
+
+**Default value**: `false`
+
+**Type**: `bool`
+
+**Example usage**:
+
+=== "pyproject.toml"
+
+    ```toml
+    [tool.ty.overrides.analysis]
+    # Preserve broad builtin types instead of narrowing them to literals
+    strict-equality-semantics = true
+    ```
+
+=== "ty.toml"
+
+    ```toml
+    [overrides.analysis]
+    # Preserve broad builtin types instead of narrowing them to literals
+    strict-equality-semantics = true
+    ```
+
+---
+
 ## `src`
 
 ### `exclude`
@@ -726,6 +944,33 @@ to re-include `dist` use `exclude = ["!dist"]`
         "tests/fixtures/**",
         "!tests/fixtures/important.py"  # Include this one file
     ]
+    ```
+
+---
+
+### `exclude-scripts`
+
+Whether to exclude files containing PEP 723 inline script metadata unless they are
+explicitly passed on the command line.
+
+**Default value**: `false`
+
+**Type**: `bool`
+
+**Example usage**:
+
+=== "pyproject.toml"
+
+    ```toml
+    [tool.ty.src]
+    exclude-scripts = true
+    ```
+
+=== "ty.toml"
+
+    ```toml
+    [src]
+    exclude-scripts = true
     ```
 
 ---
@@ -850,11 +1095,11 @@ if they exist and are not packages (i.e. they do not contain `__init__.py` or `_
 
 ### `error-on-warning`
 
-Use exit code 1 if there are any warning-level diagnostics.
+Use exit code 1, even if all diagnostics only had `warning` severity.
 
-Defaults to `false`.
+Defaults to `true`.
 
-**Default value**: `false`
+**Default value**: `true`
 
 **Type**: `bool`
 
@@ -864,16 +1109,16 @@ Defaults to `false`.
 
     ```toml
     [tool.ty.terminal]
-    # Error if ty emits any warning-level diagnostics.
-    error-on-warning = true
+    # Exit with code 0 if all diagnostics had `warning` severity.
+    error-on-warning = false
     ```
 
 === "ty.toml"
 
     ```toml
     [terminal]
-    # Error if ty emits any warning-level diagnostics.
-    error-on-warning = true
+    # Exit with code 0 if all diagnostics had `warning` severity.
+    error-on-warning = false
     ```
 
 ---

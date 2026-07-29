@@ -6,7 +6,7 @@ Many items that are callable can also be generic. Generic functions are the most
 
 ```py
 from typing import Callable, ParamSpec, TypeVar
-from ty_extensions import generic_context
+from ty_extensions._internal import generic_context
 
 P = ParamSpec("P")
 T = TypeVar("T")
@@ -14,7 +14,7 @@ T = TypeVar("T")
 def identity(t: T) -> T:
     return t
 
-# revealed: ty_extensions.GenericContext[T@identity]
+# revealed: ty_extensions._internal.GenericContext[T@identity]
 reveal_type(generic_context(identity))
 # revealed: Literal[1]
 reveal_type(identity(1))
@@ -22,10 +22,17 @@ reveal_type(identity(1))
 def identity2(c: Callable[P, T]) -> Callable[P, T]:
     return c
 
-# revealed: ty_extensions.GenericContext[P@identity2, T@identity2]
+# revealed: ty_extensions._internal.GenericContext[P@identity2, T@identity2]
 reveal_type(generic_context(identity2))
 # revealed: [T](t: T) -> T
 reveal_type(identity2(identity))
+
+class CallableInstance:
+    def __call__(self, value: int, /) -> str:
+        return str(value)
+
+# revealed: (value: int, /) -> str
+reveal_type(identity2(CallableInstance()))
 ```
 
 Generic classes are another example, since you invoke the class to instantiate it:
@@ -36,7 +43,7 @@ from typing import Generic
 class C(Generic[T]):
     def __init__(self, t: T) -> None: ...
 
-# revealed: ty_extensions.GenericContext[T@C]
+# revealed: ty_extensions._internal.GenericContext[T@C]
 reveal_type(generic_context(C))
 # revealed: C[int]
 reveal_type(C(1))
@@ -45,25 +52,25 @@ reveal_type(C(1))
 When we coerce a generic callable into a `Callable` type, it remembers that it is generic:
 
 ```py
-from ty_extensions import into_regular_callable
+from ty_extensions._internal import into_regular_callable
 
 # revealed: [T](t: T) -> T
 reveal_type(into_regular_callable(identity))
-# revealed: ty_extensions.GenericContext[T@identity]
+# revealed: ty_extensions._internal.GenericContext[T@identity]
 reveal_type(generic_context(into_regular_callable(identity)))
 # revealed: Literal[1]
 reveal_type(into_regular_callable(identity)(1))
 
 # revealed: [**P, T](c: (**P) -> T) -> ((**P) -> T)
 reveal_type(into_regular_callable(identity2))
-# revealed: ty_extensions.GenericContext[P@identity2, T@identity2]
+# revealed: ty_extensions._internal.GenericContext[P@identity2, T@identity2]
 reveal_type(generic_context(into_regular_callable(identity2)))
 # revealed: [T](t: T) -> T
 reveal_type(into_regular_callable(identity2)(identity))
 
 # revealed: [T](t: T) -> C[T]
 reveal_type(into_regular_callable(C))
-# revealed: ty_extensions.GenericContext[T@C]
+# revealed: ty_extensions._internal.GenericContext[T@C]
 reveal_type(generic_context(into_regular_callable(C)))
 # revealed: C[int]
 reveal_type(into_regular_callable(C)(1))
@@ -75,7 +82,7 @@ The easiest way to refer to a generic `Callable` type directly is via a type ali
 
 ```py
 from typing import Callable, TypeVar
-from ty_extensions import generic_context
+from ty_extensions._internal import generic_context
 
 T = TypeVar("T")
 
@@ -84,7 +91,7 @@ IdentityCallable = Callable[[T], T]
 def decorator_factory() -> IdentityCallable[T]:
     def decorator(fn: T) -> T:
         return fn
-    # revealed: ty_extensions.GenericContext[T@decorator]
+    # revealed: ty_extensions._internal.GenericContext[T@decorator]
     reveal_type(generic_context(decorator))
 
     return decorator
@@ -95,7 +102,7 @@ reveal_type(generic_context(decorator_factory))
 
 # revealed: [T'return](T'return, /) -> T'return
 reveal_type(decorator_factory())
-# revealed: ty_extensions.GenericContext[T'return@decorator_factory]
+# revealed: ty_extensions._internal.GenericContext[T'return@decorator_factory]
 reveal_type(generic_context(decorator_factory()))
 # revealed: Literal[1]
 reveal_type(decorator_factory()(1))
@@ -107,7 +114,7 @@ The same pattern holds if the callable involves a paramspec.
 
 ```py
 from typing import Callable, ParamSpec, TypeVar
-from ty_extensions import generic_context
+from ty_extensions._internal import generic_context
 
 P = ParamSpec("P")
 T = TypeVar("T")
@@ -117,7 +124,7 @@ IdentityCallable = Callable[[Callable[P, T]], Callable[P, T]]
 def decorator_factory() -> IdentityCallable[P, T]:
     def decorator(fn: Callable[P, T]) -> Callable[P, T]:
         return fn
-    # revealed: ty_extensions.GenericContext[P@decorator, T@decorator]
+    # revealed: ty_extensions._internal.GenericContext[P@decorator, T@decorator]
     reveal_type(generic_context(decorator))
 
     return decorator
@@ -131,7 +138,7 @@ def identity(t: T) -> T:
 
 # revealed: [**P'return, T'return]((**P'return) -> T'return, /) -> ((**P'return) -> T'return)
 reveal_type(decorator_factory())
-# revealed: ty_extensions.GenericContext[P'return@decorator_factory, T'return@decorator_factory]
+# revealed: ty_extensions._internal.GenericContext[P'return@decorator_factory, T'return@decorator_factory]
 reveal_type(generic_context(decorator_factory()))
 # revealed: [T](t: T) -> T
 reveal_type(decorator_factory()(identity))
@@ -147,14 +154,14 @@ function, just like above.
 
 ```py
 from typing import Callable, TypeVar
-from ty_extensions import generic_context
+from ty_extensions._internal import generic_context
 
 T = TypeVar("T")
 
 def decorator_factory() -> Callable[[T], T]:
     def decorator(fn: T) -> T:
         return fn
-    # revealed: ty_extensions.GenericContext[T@decorator]
+    # revealed: ty_extensions._internal.GenericContext[T@decorator]
     reveal_type(generic_context(decorator))
 
     return decorator
@@ -165,7 +172,7 @@ reveal_type(generic_context(decorator_factory))
 
 # revealed: [T'return](T'return, /) -> T'return
 reveal_type(decorator_factory())
-# revealed: ty_extensions.GenericContext[T'return@decorator_factory]
+# revealed: ty_extensions._internal.GenericContext[T'return@decorator_factory]
 reveal_type(generic_context(decorator_factory()))
 # revealed: Literal[1]
 reveal_type(decorator_factory()(1))
@@ -178,7 +185,7 @@ If the typevar also appears in a parameter, it is the function that is generic, 
 def outside_callable(t: T) -> Callable[[T], T]:
     raise NotImplementedError
 
-# revealed: ty_extensions.GenericContext[T@outside_callable]
+# revealed: ty_extensions._internal.GenericContext[T@outside_callable]
 reveal_type(generic_context(outside_callable))
 
 # revealed: (int, /) -> int
@@ -195,7 +202,7 @@ The same pattern holds if the callable involves a paramspec.
 
 ```py
 from typing import Callable, ParamSpec, TypeVar
-from ty_extensions import generic_context
+from ty_extensions._internal import generic_context
 
 P = ParamSpec("P")
 T = TypeVar("T")
@@ -203,7 +210,7 @@ T = TypeVar("T")
 def decorator_factory() -> Callable[[Callable[P, T]], Callable[P, T]]:
     def decorator(fn: Callable[P, T]) -> Callable[P, T]:
         return fn
-    # revealed: ty_extensions.GenericContext[P@decorator, T@decorator]
+    # revealed: ty_extensions._internal.GenericContext[P@decorator, T@decorator]
     reveal_type(generic_context(decorator))
 
     return decorator
@@ -217,7 +224,7 @@ def identity(t: T) -> T:
 
 # revealed: [**P'return, T'return]((**P'return) -> T'return, /) -> ((**P'return) -> T'return)
 reveal_type(decorator_factory())
-# revealed: ty_extensions.GenericContext[P'return@decorator_factory, T'return@decorator_factory]
+# revealed: ty_extensions._internal.GenericContext[P'return@decorator_factory, T'return@decorator_factory]
 reveal_type(generic_context(decorator_factory()))
 # revealed: [T](t: T) -> T
 reveal_type(decorator_factory()(identity))
@@ -232,7 +239,7 @@ If the typevar also appears in a parameter, it is the function that is generic, 
 def outside_callable(func: Callable[P, T]) -> Callable[P, T]:
     raise NotImplementedError
 
-# revealed: ty_extensions.GenericContext[P@outside_callable, T@outside_callable]
+# revealed: ty_extensions._internal.GenericContext[P@outside_callable, T@outside_callable]
 reveal_type(generic_context(outside_callable))
 
 def int_identity(x: int) -> int:
@@ -273,6 +280,8 @@ def f(val: str | bytes) -> None:
 reveal_type(accepts_callable(f))  # revealed: str | bytes
 ```
 
+## Overloaded callable with a constrained type variable
+
 When `T` is constrained to a union by other arguments, the overloaded callable must still be treated
 as a whole to satisfy `Callable[[T], T]`.
 
@@ -299,6 +308,8 @@ result = apply_twice(f, x, y)
 reveal_type(result)
 ```
 
+## Overloaded callable returned by a generic factory
+
 An overloaded callable returned from a generic callable factory should still be assignable to the
 declared generic callable return type.
 
@@ -319,6 +330,88 @@ def singleton(flag: bool = False) -> Callable[[Callable[[int], S]], Callable[[in
         return func
 
     return wrapper
+```
+
+## Multiple occurrences of a higher-order generic callable
+
+If a generic callable is used more than once in a higher-order call, each occurrence should get its
+own fresh typevars. In this example, the outer `partial` call receives a second, independent
+occurrence of `partial` as its first argument, and `drop` as its second argument.
+
+```py
+from typing import Callable, TypeVar
+
+A = TypeVar("A")
+B = TypeVar("B")
+C = TypeVar("C")
+X = TypeVar("X")
+Y = TypeVar("Y")
+
+def partial(c: Callable[[A, B], C], a: A) -> Callable[[B], C]:
+    def inner(b: B) -> C:
+        return c(a, b)
+    return inner
+
+def drop(x: X, y: Y) -> Y:
+    return y
+
+# TODO: revealed: Literal["x"]
+# We are correctly combining the constraint sets from both arguments of the outer
+# `partial(partial, drop)` call: one from passing `partial` as `c`, and one from passing `drop` as
+# `a`. However, we do that after having existentially quantified away the typevars from the generic
+# `partial` when it's used as an argument, so this remains `Unknown` even after generic callable
+# occurrences are freshened.
+reveal_type(partial(partial, drop)(1)("x"))  # revealed: Unknown
+# TODO: revealed: Literal[1]
+reveal_type(partial(partial, drop)("x")(1))  # revealed: Unknown
+```
+
+## ParamSpec substitution preserves non-gradual variadic parameters
+
+Specializing variadic parameter types to `Any` does not make the parameter list gradual when it is
+substituted for a `ParamSpec`:
+
+```py
+from typing import Any, Callable, Generic, ParamSpec, TypeVar
+from ty_extensions import static_assert
+from ty_extensions._internal import TypeOf, is_subtype_of
+
+P = ParamSpec("P")
+T = TypeVar("T")
+
+class C(Generic[T]):
+    def method(self, *args: T, **kwargs: T) -> None: ...
+
+def identity(callback: Callable[P, None]) -> Callable[P, None]:
+    return callback
+
+callback = identity(C[Any]().method)
+reveal_type(callback)  # revealed: (*args: Any, **kwargs: Any) -> None
+static_assert(is_subtype_of(TypeOf[callback], Callable[[], None]))
+```
+
+## ParamSpec inference preserves non-gradual residual parameters
+
+Removing a `Concatenate` prefix while inferring a `ParamSpec` also preserves whether the remaining
+parameters are gradual:
+
+```py
+from typing import Any, Callable, Concatenate, Generic, ParamSpec, TypeVar
+from ty_extensions import static_assert
+from ty_extensions._internal import TypeOf, is_subtype_of
+
+P = ParamSpec("P")
+T = TypeVar("T")
+
+class C(Generic[T]):
+    def method(self, first: int, *args: T, **kwargs: T) -> None: ...
+
+def strip_first(callback: Callable[Concatenate[int, P], None]) -> Callable[P, None]:
+    raise NotImplementedError
+
+callback = strip_first(C[Any]().method)
+reveal_type(callback)  # revealed: (*args: Any, **kwargs: Any) -> None
+static_assert(is_subtype_of(TypeOf[callback], Callable[[], None]))
 ```
 
 ## SymPy one-import MRE scaffold (multi-file)

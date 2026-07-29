@@ -97,10 +97,11 @@ if sys.version_info >= (3, 13):
         Run the supplied awaitables concurrently. The returned object can be
         iterated to obtain the results of the awaitables as they finish.
 
-        The object returned can be iterated as an asynchronous iterator or a plain
-        iterator. When asynchronous iteration is used, the originally-supplied
-        awaitables are yielded if they are tasks or futures. This makes it easy to
-        correlate previously-scheduled tasks with their results:
+        The object returned can be iterated as an asynchronous iterator or
+        a plain iterator.  When asynchronous iteration is used, the
+        originally-supplied awaitables are yielded if they are tasks or
+        futures.  This makes it easy to correlate previously-scheduled tasks
+        with their results:
 
             ipv4_connect = create_task(open_connection("127.0.0.1", 80))
             ipv6_connect = create_task(open_connection("::1", 80))
@@ -116,26 +117,27 @@ if sys.version_info >= (3, 13):
                 else:
                     print("IPv4 connection established.")
 
-        During asynchronous iteration, implicitly-created tasks will be yielded for
-        supplied awaitables that aren't tasks or futures.
+        During asynchronous iteration, implicitly-created tasks will be
+        yielded for supplied awaitables that aren't tasks or futures.
 
-        When used as a plain iterator, each iteration yields a new coroutine that
-        returns the result or raises the exception of the next completed awaitable.
-        This pattern is compatible with Python versions older than 3.13:
+        When used as a plain iterator, each iteration yields a new coroutine
+        that returns the result or raises the exception of the next completed
+        awaitable.  This pattern is compatible with Python versions older than
+        3.13:
 
             ipv4_connect = create_task(open_connection("127.0.0.1", 80))
             ipv6_connect = create_task(open_connection("::1", 80))
             tasks = [ipv4_connect, ipv6_connect]
 
             for next_connect in as_completed(tasks):
-                # next_connect is not one of the original task objects. It must be
-                # awaited to obtain the result value or raise the exception of the
-                # awaitable that finishes next.
+                # next_connect is not one of the original task objects. It must
+                # be awaited to obtain the result value or raise the exception
+                # of the awaitable that finishes next.
                 reader, writer = await next_connect
 
-        A TimeoutError is raised if the timeout occurs before all awaitables are
-        done. This is raised by the async for loop during asynchronous iteration or
-        by the coroutines yielded during plain iteration.
+        A TimeoutError is raised if the timeout occurs before all awaitables
+        are done.  This is raised by the async for loop during asynchronous
+        iteration or by the coroutines yielded during plain iteration.
         """
 
 else:
@@ -511,9 +513,10 @@ if sys.version_info >= (3, 12):
                 asyncio.create_eager_task_factory(my_task_constructor))
 
         Now, tasks created will be started immediately (rather than being first
-        scheduled to an event loop). The constructor argument can be any callable
-        that returns a Task-compatible object and has a signature compatible
-        with `Task.__init__`; it must have the `eager_start` keyword argument.
+        scheduled to an event loop).  The constructor argument can be any
+        callable that returns a Task-compatible object and has a signature
+        compatible with `Task.__init__`; it must have the `eager_start`
+        keyword argument.
 
         Most applications will use `Task` for `custom_task_constructor` and in
         this case there's no need to call `create_eager_task_factory()`

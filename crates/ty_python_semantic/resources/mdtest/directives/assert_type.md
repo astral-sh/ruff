@@ -19,7 +19,6 @@ error[type-assertion-failure]: Argument does not have asserted type `str`
   |     ^^^^^^^^^^^^-^^^^^^
   |                 |
   |                 Inferred type is `int`
-  |
 info: `str` and `int` are not equivalent types
 ```
 
@@ -38,7 +37,6 @@ error[type-assertion-failure]: Argument does not have asserted type `int`
    |     ^^^^^^^^^^^^-^^^^^^
    |                 |
    |                 Inferred type is `bool`
-   |
 info: `bool` is a subtype of `int`, but they are not equivalent
 ```
 
@@ -106,7 +104,6 @@ error[type-assertion-failure]: Argument does not have asserted type `Bar`
   |     ^^^^^^^^^^^^-^^^^^^
   |                 |
   |                 Inferred type is `Foo`
-  |
 info: `Bar` and `Foo` are not equivalent types
 ```
 
@@ -123,7 +120,6 @@ error[assert-type-unspellable-subtype]: Argument does not have asserted type `Ba
    |         ^^^^^^^^^^^^-^^^^^^
    |                     |
    |                     Inferred type is `Foo & Bar`
-   |
 info: `Foo & Bar` is a subtype of `Bar`, but they are not equivalent
 ```
 
@@ -141,17 +137,16 @@ error[type-assertion-failure]: Argument does not have asserted type `Baz`
    |         ^^^^^^^^^^^^-^^^^^^
    |                     |
    |                     Inferred type is `Foo & Bar`
-   |
 info: `Baz` and `Foo & Bar` are not equivalent types
 ```
 
 Compact enum complements that are equivalent to a literal union are still spellable.
 
 ```py
-from enum import Flag
+from enum import Enum
 from typing_extensions import assert_type
 
-class F(Flag):
+class F(Enum):
     A = 1
     B = 2
     C = 4

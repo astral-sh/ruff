@@ -20,7 +20,29 @@ use ty_python_core::scope::ScopeId;
 pub struct EnumSpec<'db> {
     #[returns(deref)]
     pub(crate) members: Box<[(Name, Type<'db>)]>,
+    #[returns(copy)]
     pub(crate) has_known_members: bool,
+}
+
+impl<'db> EnumSpec<'db> {
+    fn recursive_type_normalized_impl(
+        self,
+        db: &'db dyn Db,
+        div: Type<'db>,
+        nested: bool,
+    ) -> Option<Self> {
+        let members = self
+            .members(db)
+            .iter()
+            .map(|(name, ty)| {
+                let ty = ty.recursive_type_normalized_impl(db, div, true);
+                let ty = if nested { ty? } else { ty.unwrap_or(div) };
+                Some((name.clone(), ty))
+            })
+            .collect::<Option<Box<_>>>()?;
+
+        Some(Self::new(db, members, self.has_known_members(db)))
+    }
 }
 
 impl get_size2::GetSize for EnumSpec<'_> {}
@@ -30,7 +52,7 @@ impl get_size2::GetSize for EnumSpec<'_> {}
 /// This mirrors the dynamic `TypedDict` / `NamedTuple` pattern:
 /// - assigned calls use the `Definition` as stable identity;
 /// - dangling calls use a relative offset within the enclosing scope.
-#[derive(Clone, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue)]
 pub enum DynamicEnumAnchor<'db> {
     Definition {
         definition: Definition<'db>,
@@ -43,6 +65,31 @@ pub enum DynamicEnumAnchor<'db> {
     },
 }
 
+impl<'db> DynamicEnumAnchor<'db> {
+    fn recursive_type_normalized_impl(
+        &self,
+        db: &'db dyn Db,
+        div: Type<'db>,
+        nested: bool,
+    ) -> Option<Self> {
+        match self {
+            Self::Definition { definition, spec } => Some(Self::Definition {
+                definition: *definition,
+                spec: spec.recursive_type_normalized_impl(db, div, nested)?,
+            }),
+            Self::ScopeOffset {
+                scope,
+                offset,
+                spec,
+            } => Some(Self::ScopeOffset {
+                scope: *scope,
+                offset: *offset,
+                spec: spec.recursive_type_normalized_impl(db, div, nested)?,
+            }),
+        }
+    }
+}
+
 /// A class created via the functional enum syntax, e.g. `Enum("Color", "RED GREEN BLUE")`.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct DynamicEnumLiteral<'db> {
@@ -50,11 +97,39 @@ pub struct DynamicEnumLiteral<'db> {
     pub name: Name,
     #[returns(ref)]
     pub anchor: DynamicEnumAnchor<'db>,
+    #[returns(copy)]
     pub base_class: KnownClass,
+    #[returns(copy)]
     pub mixin_type: Option<Type<'db>>,
 }
 
 impl get_size2::GetSize for DynamicEnumLiteral<'_> {}
+
+impl<'db> DynamicEnumLiteral<'db> {
+    pub(super) fn recursive_type_normalized_impl(
+        self,
+        db: &'db dyn Db,
+        div: Type<'db>,
+        nested: bool,
+    ) -> Option<Self> {
+        let mixin_type = match self.mixin_type(db) {
+            Some(mixin) => {
+                let mixin = mixin.recursive_type_normalized_impl(db, div, true);
+                Some(if nested { mixin? } else { mixin.unwrap_or(div) })
+            }
+            None => None,
+        };
+
+        Some(Self::new(
+            db,
+            self.name(db),
+            self.anchor(db)
+                .recursive_type_normalized_impl(db, div, nested)?,
+            self.base_class(db),
+            mixin_type,
+        ))
+    }
+}
 
 #[salsa::tracked]
 impl<'db> DynamicEnumLiteral<'db> {
@@ -169,14 +244,11 @@ impl<'db> DynamicEnumLiteral<'db> {
     pub(super) fn own_class_member(self, db: &'db dyn Db, name: &str) -> Member<'db> {
         let spec = self.spec(db);
         if spec.has_known_members(db)
-            && spec
-                .members(db)
-                .iter()
-                .any(|(member_name, _)| member_name == name)
+            && let Some(enum_class) = ClassLiteral::DynamicEnum(self).into_enum_class(db)
+            && let Some(canonical_name) = enum_class.resolve_member(db, &Name::new(name))
         {
-            let class_lit = ClassLiteral::DynamicEnum(self);
             let enum_lit =
-                crate::types::literal::EnumLiteralType::new(db, class_lit, Name::new(name));
+                crate::types::literal::EnumLiteralType::new(db, enum_class, canonical_name);
             return Member::definitely_declared(Type::enum_literal(enum_lit));
         }
         Member::unbound()

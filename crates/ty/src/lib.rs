@@ -5,7 +5,7 @@ mod python_version;
 mod rule;
 mod version;
 
-use std::fmt::Write;
+use std::io::{BufWriter, Write};
 use std::process::{ExitCode, Termination};
 use std::sync::Mutex;
 
@@ -20,11 +20,10 @@ use ruff_db::diagnostic::{
     Diagnostic, DiagnosticId, DisplayDiagnosticConfig, DisplayDiagnostics, Severity,
 };
 use ruff_db::files::File;
-use ruff_db::system::{OsSystem, SystemPath, SystemPathBuf};
+use ruff_db::system::{OsSystem, System, SystemPath, SystemPathBuf};
 use ruff_db::{STACK_SIZE, max_parallelism};
 use ruff_diagnostics::Applicability;
 use salsa::Database;
-use ty_project::metadata::options::ProjectOptionsOverrides;
 use ty_project::metadata::settings::TerminalSettings;
 use ty_project::watch::ProjectWatcher;
 use ty_project::{CollectReporter, Db, watch};
@@ -79,7 +78,7 @@ pub(crate) fn version(output_format: HelpFormat) -> Result<()> {
 
     match output_format {
         HelpFormat::Text => {
-            writeln!(stdout, "ty {}", &version_info)?;
+            writeln!(stdout, "ty {version_info}")?;
         }
         HelpFormat::Json => {
             serde_json::to_writer_pretty(&mut stdout, &version_info)?;
@@ -146,6 +145,7 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
     let system = OsSystem::new(&cwd);
     let watch = args.watch;
     let exit_zero = args.exit_zero;
+    let memory_report = std::env::var(EnvVars::TY_MEMORY_REPORT).ok();
     let config_file = args
         .config_file
         .as_ref()
@@ -156,13 +156,23 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
         Some(config_file) => {
             ProjectMetadata::from_config_file(config_file.clone(), &project_path, &system)?
         }
+        None if check_paths.iter().any(|path| system.is_file(path)) => {
+            // `uv check --script` passes a file as its check path. Disable uv workspace metadata
+            // for scripts until script integration is implemented in a follow-up.
+            ProjectMetadata::discover_without_uv(&project_path, &system)?
+        }
         None => ProjectMetadata::discover(&project_path, &system)?,
     };
 
+    if watch && project_metadata.has_uv_workspace() {
+        return Err(anyhow!(
+            "`--watch` is not supported with uv workspace integration"
+        ));
+    }
+
     project_metadata.apply_configuration_files(&system)?;
 
-    let project_options_overrides = ProjectOptionsOverrides::new(config_file, args.into_options());
-    project_metadata.apply_overrides(&project_options_overrides);
+    project_metadata.apply_override_options(args.into_options());
 
     let mut db = ProjectDatabase::fallible(project_metadata, system)?;
     let project = db.project();
@@ -174,8 +184,24 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
         project.set_included_paths(&mut db, check_paths);
     }
 
-    let (main_loop, main_loop_cancellation_token) =
-        MainLoop::new(mode, project_options_overrides, printer);
+    // Disabling LRU only assumes that the database is short-lived; unlike freezing below, it does
+    // not require immutable inputs.
+    if !watch {
+        ruff_db::disable_lru(&mut db);
+    }
+
+    // The CLI never opens files, so this is safe even where the freeze below isn't
+    db.freeze_open_files();
+
+    // A one-shot check never mutates these heavily read inputs, so freezing them avoids recording
+    // unnecessary Salsa dependencies. Watch mode updates inputs incrementally, fix modes apply
+    // source-text overrides, and memory reports measure the database without this optimization, so
+    // they must keep the inputs mutable.
+    if !watch && matches!(mode, MainLoopMode::Check) && memory_report.is_none() {
+        db.freeze();
+    }
+
+    let (main_loop, main_loop_cancellation_token) = MainLoop::new(mode, printer);
 
     // Listen to Ctrl+C and abort the watch mode.
     let main_loop_cancellation_token = Mutex::new(Some(main_loop_cancellation_token));
@@ -194,19 +220,23 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
     };
 
     let mut stdout = printer.stream_for_requested_summary().lock();
-    match std::env::var(EnvVars::TY_MEMORY_REPORT).as_deref() {
-        Ok("short") => write!(stdout, "{}", db.salsa_memory_dump().display_short())?,
-        Ok("full") => write!(stdout, "{}", db.salsa_memory_dump().display_full())?,
-        Ok("json") => writeln!(stdout, "{}", db.salsa_memory_dump().to_json())?,
-        Ok(other) => {
+    match memory_report.as_deref() {
+        Some("short") => write!(stdout, "{}", db.salsa_memory_dump().display_short())?,
+        Some("full") => write!(stdout, "{}", db.salsa_memory_dump().display_full())?,
+        Some("json") => writeln!(stdout, "{}", db.salsa_memory_dump().to_json())?,
+        Some(other) => {
             tracing::warn!(
                 "Unknown value for `TY_MEMORY_REPORT`: `{other}`. Valid values are `short`, `full`, and `json`."
             );
         }
-        Err(_) => {}
+        None => {}
     }
 
     std::mem::forget(db);
+
+    if matches!(exit_status, ExitStatus::Interrupted) {
+        return Ok(ExitStatus::Interrupted);
+    }
 
     if exit_zero {
         Ok(ExitStatus::Success)
@@ -229,6 +259,9 @@ pub enum ExitStatus {
     /// Internal ty error (panic, or any other error that isn't due to the user using the
     /// program incorrectly or transient environment errors).
     InternalError = 101,
+
+    /// Checking was interrupted by Ctrl+C.
+    Interrupted = 130,
 }
 
 impl ExitStatus {
@@ -258,8 +291,6 @@ struct MainLoop {
     /// Interface for displaying information to the user.
     printer: Printer,
 
-    project_options_overrides: ProjectOptionsOverrides,
-
     /// Cancellation token that gets set by Ctrl+C.
     /// Used for long-running operations on the main thread. Operations on background threads
     /// use Salsa's cancellation mechanism.
@@ -267,11 +298,7 @@ struct MainLoop {
 }
 
 impl MainLoop {
-    fn new(
-        mode: MainLoopMode,
-        project_options_overrides: ProjectOptionsOverrides,
-        printer: Printer,
-    ) -> (Self, MainLoopCancellationToken) {
+    fn new(mode: MainLoopMode, printer: Printer) -> (Self, MainLoopCancellationToken) {
         let (sender, receiver) = crossbeam_channel::bounded(10);
 
         let cancellation_token_source = CancellationTokenSource::new();
@@ -283,7 +310,6 @@ impl MainLoop {
                 sender: sender.clone(),
                 receiver,
                 watcher: None,
-                project_options_overrides,
                 printer,
                 cancellation_token,
             },
@@ -302,9 +328,7 @@ impl MainLoop {
         })?;
 
         self.watcher = Some(ProjectWatcher::new(watcher, db));
-        self.run(db)?;
-
-        Ok(ExitStatus::Success)
+        self.run(db)
     }
 
     fn run(self, db: &mut ProjectDatabase) -> Result<ExitStatus> {
@@ -435,7 +459,7 @@ impl MainLoop {
                             let terminal_settings = db.project().settings(db).terminal();
                             exit_status_from_diagnostics(diagnostics, terminal_settings)
                         }
-                        Err(Canceled) => ExitStatus::Success,
+                        Err(Canceled) => ExitStatus::Interrupted,
                     };
 
                     if exit_status.is_internal_error() {
@@ -456,7 +480,7 @@ impl MainLoop {
 
                     revision += 1;
                     // Automatically cancels any pending queries and waits for them to complete.
-                    db.apply_changes(&changes, Some(&self.project_options_overrides));
+                    db.apply_changes(&changes);
                     if let Some(watcher) = self.watcher.as_mut() {
                         watcher.update(db);
                     }
@@ -466,7 +490,7 @@ impl MainLoop {
                 MainLoopMessage::Exit => {
                     // Cancel any pending queries and wait for them to complete.
                     db.trigger_cancellation();
-                    return Ok(ExitStatus::Success);
+                    return Ok(ExitStatus::Interrupted);
                 }
             }
 
@@ -496,16 +520,16 @@ impl MainLoop {
             diagnostics => {
                 let diagnostics_count = diagnostics.len();
 
-                let mut stdout = self.printer.stream_for_details().lock();
+                let stdout = self.printer.stream_for_details().lock();
 
                 // Only render diagnostics if they're going to be displayed, since doing
                 // so is expensive.
                 if stdout.is_enabled() {
+                    let mut stdout = BufWriter::new(stdout);
                     let display_config = DisplayDiagnosticConfig::new("ty")
                         .format(terminal_settings.output_format.into())
                         .color(colored::control::SHOULD_COLORIZE.should_colorize())
                         .with_cancellation_token(Some(self.cancellation_token.clone()))
-                        .show_fix_diff(true)
                         .context(0);
 
                     write!(
@@ -513,6 +537,7 @@ impl MainLoop {
                         "{}",
                         DisplayDiagnostics::new(db, &display_config, diagnostics)
                     )?;
+                    stdout.flush()?;
                 }
 
                 if !self.cancellation_token.is_cancelled() && is_human_readable {

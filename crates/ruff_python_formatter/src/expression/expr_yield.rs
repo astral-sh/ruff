@@ -5,8 +5,7 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::expression::maybe_parenthesize_expression;
 use crate::expression::parentheses::{
-    NeedsParentheses, OptionalParentheses, Parenthesize, is_expression_parenthesized,
-    is_type_annotation_of,
+    NeedsParentheses, OptionalParentheses, Parenthesize, is_type_annotation_of,
 };
 use crate::prelude::*;
 
@@ -55,11 +54,7 @@ impl NeedsParentheses for AnyExpressionYield<'_> {
         // FormatStmtExpr, does not add parenthesis
         if parent.is_stmt_assign() || parent.is_stmt_ann_assign() || parent.is_stmt_aug_assign() {
             if let Some(value) = self.value() {
-                if is_expression_parenthesized(
-                    value.into(),
-                    context.comments().ranges(),
-                    context.source(),
-                ) {
+                if context.is_expression_parenthesized(value.into()) {
                     // Ex) `x = yield (1)`
                     OptionalParentheses::Never
                 } else {

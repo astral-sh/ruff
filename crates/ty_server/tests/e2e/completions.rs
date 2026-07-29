@@ -1,5 +1,5 @@
 use anyhow::Result;
-use lsp_types::Position;
+use lsp_types::{Documentation, MarkupKind, Position};
 use ruff_db::system::SystemPath;
 use ty_server::ClientOptions;
 
@@ -591,4 +591,78 @@ take({\"\"})
     "#);
 
     Ok(())
+}
+
+#[test]
+fn documentation_prefers_markdown_when_listed_first() -> Result<()> {
+    assert_eq!(
+        documentation_format(vec![MarkupKind::Markdown, MarkupKind::PlainText])?,
+        MarkupKind::Markdown,
+    );
+    Ok(())
+}
+
+#[test]
+fn documentation_prefers_plain_text_when_listed_first() -> Result<()> {
+    assert_eq!(
+        documentation_format(vec![MarkupKind::PlainText, MarkupKind::Markdown])?,
+        MarkupKind::PlainText,
+    );
+    Ok(())
+}
+
+#[test]
+fn documentation_supports_only_markdown() -> Result<()> {
+    assert_eq!(
+        documentation_format(vec![MarkupKind::Markdown])?,
+        MarkupKind::Markdown
+    );
+    Ok(())
+}
+
+#[test]
+fn documentation_supports_only_plain_text() -> Result<()> {
+    assert_eq!(
+        documentation_format(vec![MarkupKind::PlainText])?,
+        MarkupKind::PlainText
+    );
+    Ok(())
+}
+
+fn documentation_format(formats: Vec<MarkupKind>) -> Result<MarkupKind> {
+    let workspace_root = SystemPath::new("src");
+    let document_path = SystemPath::new("src/foo.py");
+    let document_content = r#"def foo_with_documentation() -> None:
+    """
+    Example doc comment
+    """
+    ...
+
+foo_
+"#;
+    let mut server = TestServerBuilder::new()?
+        .with_workspace(workspace_root, None)?
+        .with_file(document_path, document_content)?
+        .with_completion_documentation_format(formats)
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    server.open_text_document(document_path, document_content, 1);
+
+    let completions =
+        server.completion_request(&server.file_uri(document_path), Position::new(6, 4));
+
+    let completion = completions
+        .into_iter()
+        .find(|completion| completion.label == "foo_with_documentation")
+        .expect("Completion of function should exist");
+    let documentation = completion
+        .documentation
+        .expect("Expected documentation in completion");
+
+    let Documentation::MarkupContent(markup) = documentation else {
+        panic!("Expected markup documentation");
+    };
+
+    Ok(markup.kind)
 }

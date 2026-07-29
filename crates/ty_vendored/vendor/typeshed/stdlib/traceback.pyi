@@ -110,10 +110,10 @@ def extract_tb(tb: TracebackType | None, limit: int | None = None) -> StackSumma
     This is useful for alternate formatting of stack traces.  If
     'limit' is omitted or None, all entries are extracted.  A
     pre-processed stack trace entry is a FrameSummary object
-    containing attributes filename, lineno, name, and line
-    representing the information that is usually printed for a stack
-    trace.  The line is a string with leading and trailing
-    whitespace stripped; if the source is not available it is None.
+    representing the information that is usually printed for a
+    stack trace. The line attribute is a string with
+    leading and trailing whitespace stripped; if the source is not
+    available the corresponding attribute is None.
     """
 
 def extract_stack(f: FrameType | None = None, limit: int | None = None) -> StackSummary:
@@ -121,9 +121,8 @@ def extract_stack(f: FrameType | None = None, limit: int | None = None) -> Stack
 
     The return value has the same format as for extract_tb().  The
     optional 'f' and 'limit' arguments have the same meaning as for
-    print_stack().  Each item in the list is a quadruple (filename,
-    line number, function name, text), and the entries are in order
-    from oldest to newest stack frame.
+    print_stack().  Each item in the list is a FrameSummary object,
+    and the entries are in order from oldest to newest stack frame.
     """
 
 def format_list(extracted_list: Iterable[FrameSummary | _FrameSummaryTuple]) -> list[str]:
@@ -363,6 +362,7 @@ class TracebackException:
             The message indicating which exception occurred is always the last
             string in the output.
             """
+
     else:
         def format(self, *, chain: bool = True) -> Generator[str]:
             """Format the exception.
@@ -376,6 +376,7 @@ class TracebackException:
             The message indicating which exception occurred is always the last
             string in the output.
             """
+
     if sys.version_info >= (3, 13):
         def format_exception_only(self, *, show_group: bool = False, _depth: int = 0) -> Generator[str]:
             """Format the exception part of the traceback.
@@ -394,6 +395,7 @@ class TracebackException:
             :exc:`BaseExceptionGroup`, the nested exceptions are included as
             well, recursively, with indentation relative to their nesting depth.
             """
+
     else:
         def format_exception_only(self) -> Generator[str]:
             """Format the exception part of the traceback.
@@ -408,6 +410,7 @@ class TracebackException:
             Following the message, generator also yields
             all the exception's ``__notes__``.
             """
+
     if sys.version_info >= (3, 11):
         def print(self, *, file: SupportsWrite[str] | None = None, chain: bool = True) -> None:
             """Print the result of self.format(chain=chain) to 'file'."""
@@ -420,10 +423,16 @@ class FrameSummary:
       active when the frame was captured.
     - :attr:`name` The name of the function or method that was executing
       when the frame was captured.
-    - :attr:`line` The text from the linecache module for the
+    - :attr:`line` The text from the linecache module for the line
       of code that was running when the frame was captured.
     - :attr:`locals` Either None if locals were not supplied, or a dict
       mapping the name to the repr() of the variable.
+    - :attr:`end_lineno` The last line number of the source code for this frame.
+      By default, it is set to lineno and indexation starts from 1.
+    - :attr:`colno` The column number of the source code for this frame.
+      By default, it is None and indexation starts from 0.
+    - :attr:`end_colno` The last column number of the source code for this frame.
+      By default, it is None and indexation starts from 0.
     """
 
     if sys.version_info >= (3, 13):
@@ -466,6 +475,7 @@ class FrameSummary:
             :param line: If provided, use this instead of looking up the line in
                 the linecache.
             """
+
         end_lineno: int | None
         colno: int | None
         end_colno: int | None
@@ -489,6 +499,7 @@ class FrameSummary:
             :param line: If provided, use this instead of looking up the line in
                 the linecache.
             """
+
     filename: str
     lineno: int | None
     name: str
@@ -544,6 +555,7 @@ class StackSummary(list[FrameSummary]):
         Create a StackSummary object from a supplied list of
         FrameSummary objects or old-style list of tuples.
         """
+
     if sys.version_info >= (3, 11):
         def format_frame_summary(self, frame_summary: FrameSummary) -> str:
             """Format the lines for a single FrameSummary.

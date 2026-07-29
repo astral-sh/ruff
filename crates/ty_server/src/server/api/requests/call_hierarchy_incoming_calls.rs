@@ -1,4 +1,4 @@
-use lsp_types::request::CallHierarchyIncomingCalls;
+use lsp_types::CallHierarchyIncomingCallsRequest;
 use lsp_types::{CallHierarchyIncomingCall, CallHierarchyIncomingCallsParams};
 
 use crate::document::{ToRangeExt as _, resolve_file_uri_range};
@@ -17,7 +17,7 @@ use crate::session::client::Client;
 pub(crate) struct CallHierarchyIncomingCallsRequestHandler;
 
 impl RequestHandler for CallHierarchyIncomingCallsRequestHandler {
-    type RequestType = CallHierarchyIncomingCalls;
+    type RequestType = CallHierarchyIncomingCallsRequest;
 }
 
 impl BackgroundRequestHandler for CallHierarchyIncomingCallsRequestHandler {

@@ -13,7 +13,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/mro.md
 ## mdtest_snippet.py
 
 ```
- 1 | from ty_extensions import reveal_mro
+ 1 | from ty_extensions._internal import reveal_mro
  2 | 
  3 | def returns_bool() -> bool:
  4 |     return True
@@ -51,7 +51,6 @@ warning[unsupported-base]: Unsupported class base
    |
 17 | class Foo(x): ...
    |           ^ Has type `<class 'A'> | <class 'B'>`
-   |
 info: ty cannot resolve a consistent method resolution order (MRO) for class `Foo` due to this base
 info: Only class objects or `Any` are supported as class bases
 
@@ -63,7 +62,6 @@ warning[unsupported-base]: Unsupported class base
    |
 28 |     class D(C): ...  # error: [unsupported-base]
    |             ^ Has type `<class 'mdtest_snippet.<locals of function 'f'>.C @ src/mdtest_snippet.py:23:15'> | <class 'mdtest_snippet.<locals of function 'f'>.C @ src/mdtest_snippet.py:26:15'>`
-   |
 info: ty cannot resolve a consistent method resolution order (MRO) for class `D` due to this base
 info: Only class objects or `Any` are supported as class bases
 

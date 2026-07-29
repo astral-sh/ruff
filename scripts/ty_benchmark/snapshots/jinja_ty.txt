@@ -1,22 +1,104 @@
-src/jinja2/async_utils.py:68:22: warning[redundant-cast] Value is already of type `Awaitable[V@auto_await]`
+src/jinja2/async_utils.py:15:34: warning[unused-type-ignore-comment] Unused blanket `type: ignore` directive
+src/jinja2/async_utils.py:16:33: warning[unused-type-ignore-comment] Unused blanket `type: ignore` directive
+src/jinja2/async_utils.py:39:40: warning[unused-type-ignore-comment] Unused blanket `type: ignore` directive
+src/jinja2/async_utils.py:53:9: error[unresolved-attribute] Unresolved attribute `jinja_async_variant` on type `_Wrapped[(...), Unknown, (...), Unknown]`
 src/jinja2/async_utils.py:91:16: error[call-non-callable] Object of type `object` is not callable
+src/jinja2/compiler.py:58:12: error[invalid-return-type] Return type does not match returned value: expected `F@optimizeconst`, found `_Wrapped[(...), Unknown, (self: CodeGenerator, node: Expr, frame: Frame, **kwargs: Any), Any]`
+src/jinja2/compiler.py:1257:27: warning[possibly-unresolved-reference] Name `loop_filter_func` used when possibly not defined
+src/jinja2/compiler.py:1280:31: warning[possibly-unresolved-reference] Name `iteration_indicator` used when possibly not defined
+src/jinja2/compiler.py:1287:34: warning[possibly-unresolved-reference] Name `iteration_indicator` used when possibly not defined
+src/jinja2/compiler.py:1422:50: warning[unused-type-ignore-comment] Unused blanket `type: ignore` directive
+src/jinja2/compiler.py:1534:33: error[invalid-argument-type] Argument to bound method `list.append` is incorrect: Expected `Never`, found `str`
+src/jinja2/debug.py:76:22: warning[unused-type-ignore-comment] Unused blanket `type: ignore` directive
 src/jinja2/debug.py:78:6: error[invalid-return-type] Function can implicitly return `None`, which is not assignable to return type `TracebackType`
-src/jinja2/defaults.py:24:19: error[escape-character-in-forward-annotation] Type expressions cannot contain escape characters
-src/jinja2/environment.py:307:27: error[escape-character-in-forward-annotation] Type expressions cannot contain escape characters
-src/jinja2/environment.py:399:27: error[escape-character-in-forward-annotation] Type expressions cannot contain escape characters
-src/jinja2/environment.py:1177:27: error[escape-character-in-forward-annotation] Type expressions cannot contain escape characters
-src/jinja2/environment.py:1617:17: error[no-matching-overload] No overload of bound method `writelines` matches arguments
-src/jinja2/exceptions.py:43:23: error[invalid-assignment] Object of type `str | Undefined | None` is not assignable to `str | None`
+src/jinja2/defaults.py:24:19: error[escape-character-in-forward-annotation] Escape characters are not allowed in type expressions
+src/jinja2/environment.py:93:28: warning[unused-type-ignore-comment] Unused blanket `type: ignore` directive
+src/jinja2/environment.py:307:27: error[escape-character-in-forward-annotation] Escape characters are not allowed in parameter annotations
+src/jinja2/environment.py:399:27: error[escape-character-in-forward-annotation] Escape characters are not allowed in parameter annotations
+src/jinja2/environment.py:514:35: warning[unused-type-ignore-comment] Unused blanket `type: ignore` directive
+src/jinja2/environment.py:674:49: warning[unused-type-ignore-comment] Unused blanket `type: ignore` directive
+src/jinja2/environment.py:894:17: warning[possibly-unresolved-reference] Name `zip_file` used when possibly not defined
+src/jinja2/environment.py:1177:27: error[escape-character-in-forward-annotation] Escape characters are not allowed in parameter annotations
+src/jinja2/environment.py:1187:37: warning[unused-type-ignore-comment] Unused blanket `type: ignore` directive
+src/jinja2/environment.py:1202:25: warning[unused-type-ignore-comment] Unused blanket `type: ignore` directive
+src/jinja2/environment.py:1290:73: warning[unused-type-ignore-comment] Unused blanket `type: ignore` directive
+src/jinja2/environment.py:1311:46: warning[unused-type-ignore-comment] Unused blanket `type: ignore` directive
+src/jinja2/environment.py:1361:49: error[invalid-assignment] Object of type `Iterator[str]` is not assignable to `AsyncGenerator[str, None]`
+src/jinja2/environment.py:1496:20: error[invalid-return-type] Return type does not match returned value: expected `list[tuple[int, int]]`, found `list[tuple[int, ...]]`
+src/jinja2/environment.py:1497:48: warning[unused-type-ignore-comment] Unused blanket `type: ignore` directive
+src/jinja2/environment.py:1614:34: warning[unused-type-ignore-comment] Unused blanket `type: ignore` directive
+src/jinja2/environment.py:1617:17: error[no-matching-overload] No overload of bound method `IO.writelines` matches arguments
+src/jinja2/environment.py:1661:30: warning[unused-type-ignore-comment] Unused blanket `type: ignore` directive
+src/jinja2/exceptions.py:131:28: warning[unused-type-ignore-comment] Unused blanket `type: ignore` directive
+src/jinja2/ext.py:14:30: warning[unused-type-ignore-comment] Unused blanket `type: ignore` directive
+src/jinja2/ext.py:178:32: warning[unused-type-ignore-comment] Unused blanket `type: ignore` directive
+src/jinja2/ext.py:197:32: warning[unused-type-ignore-comment] Unused blanket `type: ignore` directive
+src/jinja2/ext.py:214:32: warning[unused-type-ignore-comment] Unused blanket `type: ignore` directive
+src/jinja2/ext.py:239:32: warning[unused-type-ignore-comment] Unused blanket `type: ignore` directive
+src/jinja2/ext.py:258:9: error[invalid-assignment] Invalid subscript assignment with key of type `Literal["_"]` and value of type `def _gettext_alias(__context: Unknown, /, *args: Any, **kwargs: Any) -> Any | Undefined` on object of type `dict[str, <class 'range'> | <class 'dict'> | ((n: int = ..., html: bool = ..., min: int = ..., max: int = ...) -> str) | ... omitted 3 union elements]`
+src/jinja2/ext.py:319:13: error[invalid-argument-type] Argument to bound method `MutableMapping.update` is incorrect: Expected `<class 'range'> | <class 'dict'> | ((n: int = ..., html: bool = ..., min: int = ..., max: int = ...) -> str) | ... omitted 3 union elements`, found `((str, /) -> str) | ((...) -> str)`
+src/jinja2/ext.py:319:30: error[invalid-argument-type] Argument to bound method `MutableMapping.update` is incorrect: Expected `<class 'range'> | <class 'dict'> | ((n: int = ..., html: bool = ..., min: int = ..., max: int = ...) -> str) | ... omitted 3 union elements`, found `((str, str, int, /) -> str) | ((...) -> str)`
+src/jinja2/ext.py:319:49: error[invalid-argument-type] Argument to bound method `MutableMapping.update` is incorrect: Expected `<class 'range'> | <class 'dict'> | ((n: int = ..., html: bool = ..., min: int = ..., max: int = ...) -> str) | ... omitted 3 union elements`, found `((str, str, /) -> str) | None | ((...) -> str)`
+src/jinja2/ext.py:319:68: error[invalid-argument-type] Argument to bound method `MutableMapping.update` is incorrect: Expected `<class 'range'> | <class 'dict'> | ((n: int = ..., html: bool = ..., min: int = ..., max: int = ...) -> str) | ... omitted 3 union elements`, found `((str, str, str, int, /) -> str) | None | ((...) -> str)`
 src/jinja2/filters.py:169:48: error[invalid-assignment] Object of type `dict_items[object, object]` is not assignable to `Iterable[tuple[str, Any]]`
-src/jinja2/filters.py:1352:9: error[unsupported-operator] Operator `+=` is unsupported between objects of type `V@do_sum` and `Any | V@do_sum`
-src/jinja2/lexer.py:667:40: error[invalid-argument-type] Argument is incorrect: Expected `str`, found `str | int | Any`
+src/jinja2/filters.py:171:24: warning[unused-type-ignore-comment] Unused blanket `type: ignore` directive
+src/jinja2/filters.py:474:33: warning[unused-type-ignore-comment] Unused blanket `type: ignore` directive
+src/jinja2/filters.py:637:31: warning[unused-type-ignore-comment] Unused blanket `type: ignore` directive
+src/jinja2/filters.py:661:32: warning[unused-type-ignore-comment] Unused blanket `type: ignore` directive
+src/jinja2/filters.py:730:34: warning[possibly-unresolved-reference] Name `unit` used when possibly not defined
+src/jinja2/filters.py:730:45: warning[possibly-unresolved-reference] Name `prefix` used when possibly not defined
+src/jinja2/filters.py:1098:32: warning[unused-type-ignore-comment] Unused blanket `type: ignore` directive
+src/jinja2/filters.py:1281:34: warning[unused-type-ignore-comment] Unused blanket `type: ignore` directive
+src/jinja2/filters.py:1332:12: error[no-matching-overload] No overload of function `sum` matches arguments
+src/jinja2/filters.py:1335:30: warning[unused-type-ignore-comment] Unused blanket `type: ignore` directive
+src/jinja2/filters.py:1352:9: error[unsupported-operator] Operator `+=` is not supported between objects of type `V@do_sum` and `Any | V@do_sum`
+src/jinja2/filters.py:1364:31: warning[unused-type-ignore-comment] Unused blanket `type: ignore` directive
+src/jinja2/filters.py:1520:30: warning[unused-type-ignore-comment] Unused blanket `type: ignore` directive
+src/jinja2/filters.py:1565:33: warning[unused-type-ignore-comment] Unused blanket `type: ignore` directive
+src/jinja2/filters.py:1601:33: warning[unused-type-ignore-comment] Unused blanket `type: ignore` directive
+src/jinja2/filters.py:1641:37: warning[unused-type-ignore-comment] Unused blanket `type: ignore` directive
+src/jinja2/filters.py:1679:37: warning[unused-type-ignore-comment] Unused blanket `type: ignore` directive
+src/jinja2/lexer.py:24:64: warning[unused-type-ignore-comment] Unused blanket `type: ignore` directive
+src/jinja2/lexer.py:167:16: error[invalid-argument-type] Method `__getitem__` of type `bound method dict[LiteralString, str].__getitem__(key: LiteralString, /) -> str` cannot be called with key of type `str` on object of type `dict[LiteralString, str]`
+src/jinja2/lexer.py:461:44: warning[unused-type-ignore-comment] Unused blanket `type: ignore` directive
+src/jinja2/lexer.py:531:62: warning[unused-type-ignore-comment] Unused blanket `type: ignore` directive
+src/jinja2/lexer.py:578:65: warning[unused-type-ignore-comment] Unused blanket `type: ignore` directive
+src/jinja2/lexer.py:667:40: error[invalid-argument-type] Argument is incorrect: Expected `str`, found `Any | str | int`
+src/jinja2/loaders.py:143:32: warning[possibly-unresolved-reference] Name `bucket` used when possibly not defined
+src/jinja2/loaders.py:144:13: warning[possibly-unresolved-reference] Name `bucket` used when possibly not defined
+src/jinja2/loaders.py:145:28: warning[possibly-unresolved-reference] Name `bucket` used when possibly not defined
 src/jinja2/loaders.py:190:28: error[no-matching-overload] No overload of function `fspath` matches arguments
 src/jinja2/loaders.py:639:25: error[no-matching-overload] No overload of function `fspath` matches arguments
-src/jinja2/parser.py:429:9: error[invalid-assignment] Object of type `Expr` is not assignable to attribute `call` of type `Call`
-src/jinja2/parser.py:1024:37: error[invalid-argument-type] Argument to bound method `extend` is incorrect: Expected `Iterable[Node]`, found `(Node & Top[list[Unknown]]) | list[Node]`
+src/jinja2/meta.py:80:47: warning[unused-type-ignore-comment] Unused blanket `type: ignore` directive
+src/jinja2/nativetypes.py:92:43: warning[unused-type-ignore-comment] Unused blanket `type: ignore` directive
+src/jinja2/nativetypes.py:108:52: warning[unused-type-ignore-comment] Unused blanket `type: ignore` directive
+src/jinja2/nativetypes.py:123:52: warning[unused-type-ignore-comment] Unused blanket `type: ignore` directive
+src/jinja2/nodes.py:59:40: warning[unused-type-ignore-comment] Unused blanket `type: ignore` directive
+src/jinja2/nodes.py:203:30: warning[unused-type-ignore-comment] Unused blanket `type: ignore` directive
+src/jinja2/nodes.py:217:25: error[invalid-argument-type] Argument to bound method `deque.extend` is incorrect: Expected `Iterable[Self@set_ctx]`, found `Iterator[Node]`
+src/jinja2/nodes.py:228:25: error[invalid-argument-type] Argument to bound method `deque.extend` is incorrect: Expected `Iterable[Self@set_lineno]`, found `Iterator[Node]`
+src/jinja2/nodes.py:237:25: error[invalid-argument-type] Argument to bound method `deque.extend` is incorrect: Expected `Iterable[Self@set_environment]`, found `Iterator[Node]`
+src/jinja2/nodes.py:791:24: warning[unused-type-ignore-comment] Unused blanket `type: ignore` directive
+src/jinja2/parser.py:173:29: warning[unused-type-ignore-comment] Unused blanket `type: ignore` directive
+src/jinja2/parser.py:1024:37: error[invalid-argument-type] Argument to bound method `list.extend` is incorrect: Expected `Iterable[Node]`, found `(Node & Top[list[Unknown]]) | list[Node]`
 src/jinja2/runtime.py:144:2: error[unresolved-attribute] Class `Mapping` has no attribute `register`
-src/jinja2/runtime.py:690:38: error[invalid-assignment] Object of type `(Unknown & ~(() -> object)) | bool | (((str | None, /) -> bool) & ~(() -> object))` is not assignable to `bool | None`
-src/jinja2/runtime.py:770:40: error[invalid-argument-type] Argument to bound method `_invoke` is incorrect: Expected `bool`, found `@Todo | bool | None`
+src/jinja2/runtime.py:370:49: warning[unused-type-ignore-comment] Unused blanket `type: ignore` directive
+src/jinja2/runtime.py:384:49: warning[unused-type-ignore-comment] Unused blanket `type: ignore` directive
+src/jinja2/runtime.py:592:40: warning[unused-type-ignore-comment] Unused blanket `type: ignore` directive
+src/jinja2/runtime.py:601:37: warning[unused-type-ignore-comment] Unused blanket `type: ignore` directive
+src/jinja2/runtime.py:615:40: warning[unused-type-ignore-comment] Unused blanket `type: ignore` directive
+src/jinja2/runtime.py:619:39: warning[unused-type-ignore-comment] Unused blanket `type: ignore` directive
+src/jinja2/runtime.py:634:36: warning[unused-type-ignore-comment] Unused blanket `type: ignore` directive
+src/jinja2/runtime.py:778:20: warning[unused-type-ignore-comment] Unused blanket `type: ignore` directive
+src/jinja2/runtime.py:946:42: warning[unused-type-ignore-comment] Unused blanket `type: ignore` directive
 src/jinja2/runtime.py:948:14: error[invalid-return-type] Function always implicitly returns `None`, which is not assignable to return type `Never`
+src/jinja2/runtime.py:952:65: warning[unused-type-ignore-comment] Unused blanket `type: ignore` directive
+src/jinja2/runtime.py:957:39: warning[unused-type-ignore-comment] Unused blanket `type: ignore` directive
+src/jinja2/runtime.py:961:40: warning[unused-type-ignore-comment] Unused blanket `type: ignore` directive
+src/jinja2/runtime.py:965:40: warning[unused-type-ignore-comment] Unused blanket `type: ignore` directive
+src/jinja2/runtime.py:1003:9: error[invalid-method-override] Invalid override of method `__getitem__`: Definition is incompatible with `Undefined.__getitem__`
+src/jinja2/runtime.py:1028:45: warning[unused-type-ignore-comment] Unused blanket `type: ignore` directive
+src/jinja2/sandbox.py:244:9: error[invalid-assignment] Invalid subscript assignment with key of type `Literal["range"]` and value of type `def safe_range(*args: int) -> range` on object of type `dict[str, <class 'range'> | <class 'dict'> | ((n: int = ..., html: bool = ..., min: int = ..., max: int = ...) -> str) | ... omitted 3 union elements]`
+src/jinja2/utils.py:100:23: error[unresolved-attribute] Object of type `F@internalcode` has no attribute `__code__`
 src/jinja2/utils.py:431:2: error[unresolved-attribute] Class `MutableMapping` has no attribute `register`
-Found 21 diagnostics
+Found 103 diagnostics

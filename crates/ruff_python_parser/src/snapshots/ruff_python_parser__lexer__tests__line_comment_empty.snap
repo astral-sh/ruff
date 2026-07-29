@@ -5,19 +5,8 @@ expression: lex_source(&source)
 ## Tokens
 ```
 [
-    (
-        Int(
-            99232,
-        ),
-        0..5,
-    ),
-    (
-        Comment,
-        7..8,
-    ),
-    (
-        Newline,
-        8..8,
-    ),
+    Int 0..5,
+    Comment 7..8,
+    Newline 8..8,
 ]
 ```

@@ -3,7 +3,6 @@ use crate::server::{Action, ConnectionSender, SendRequest};
 use crate::server::{Event, MainLoopSender};
 use lsp_server::{ErrorCode, Message, Notification, RequestId, ResponseError};
 use serde_json::Value;
-use std::any::TypeId;
 use std::fmt::Display;
 
 #[derive(Debug, Clone)]
@@ -40,7 +39,7 @@ impl Client {
         params: R::Params,
         response_handler: impl FnOnce(&Client, R::Result) + Send + 'static,
     ) where
-        R: lsp_types::request::Request,
+        R: lsp_types::Request,
     {
         self.send_request_raw(
             session,
@@ -64,7 +63,7 @@ impl Client {
         params: R::Params,
         response_handler: impl FnOnce(&Client, R::Result) + Send + 'static,
     ) where
-        R: lsp_types::request::Request,
+        R: lsp_types::Request,
     {
         self.main_loop_sender
             .send(Event::Action(Action::SendRequest(SendRequest {
@@ -99,7 +98,7 @@ impl Client {
     /// Sends a notification to the client.
     pub(crate) fn send_notification<N>(&self, params: N::Params)
     where
-        N: lsp_types::notification::Notification,
+        N: lsp_types::Notification,
     {
         if let Err(err) =
             self.client_sender
@@ -159,8 +158,7 @@ impl Client {
     pub(crate) fn respond_err(&self, id: RequestId, error: lsp_server::ResponseError) {
         let response = lsp_server::Response {
             id,
-            result: None,
-            error: Some(error),
+            response_result: Err(error),
         };
 
         self.main_loop_sender
@@ -172,9 +170,9 @@ impl Client {
     ///
     /// This opens a pop up in VS Code showing `message`.
     pub(crate) fn show_message(&self, message: impl Display, message_type: lsp_types::MessageType) {
-        self.send_notification::<lsp_types::notification::ShowMessage>(
+        self.send_notification::<lsp_types::ShowMessageNotification>(
             lsp_types::ShowMessageParams {
-                typ: message_type,
+                kind: message_type,
                 message: message.to_string(),
             },
         );
@@ -185,7 +183,7 @@ impl Client {
     ///
     /// Logs an error if the message could not be sent.
     pub(crate) fn show_warning_message(&self, message: impl Display) {
-        self.show_message(message, lsp_types::MessageType::WARNING);
+        self.show_message(message, lsp_types::MessageType::Warning);
     }
 
     /// Sends a request to display an error to the client with a formatted message. The error is
@@ -193,7 +191,7 @@ impl Client {
     ///
     /// Logs an error if the message could not be sent.
     pub(crate) fn show_error_message(&self, message: impl Display) {
-        self.show_message(message, lsp_types::MessageType::ERROR);
+        self.show_message(message, lsp_types::MessageType::Error);
     }
 
     /// Re-queues this request after a salsa cancellation for a retry.
@@ -226,8 +224,7 @@ impl Client {
                 .client_sender
                 .send(Message::Response(lsp_server::Response {
                     id,
-                    result: None,
-                    error: Some(error),
+                    response_result: Err(error),
                 }))
             {
                 tracing::error!(
@@ -245,16 +242,16 @@ pub(crate) struct ClientResponseHandler(Box<dyn FnOnce(&Client, lsp_server::Resp
 impl ClientResponseHandler {
     fn for_request<R>(response_handler: impl FnOnce(&Client, R::Result) + Send + 'static) -> Self
     where
-        R: lsp_types::request::Request,
+        R: lsp_types::Request,
     {
         Self(Box::new(
             move |client: &Client, response: lsp_server::Response| {
                 let _span =
-                    tracing::debug_span!("client_response", id=%response.id, method = R::METHOD)
+                    tracing::debug_span!("client_response", id=%response.id, method = %R::METHOD)
                         .entered();
 
-                match (response.error, response.result) {
-                    (Some(err), _) => {
+                match response.response_result {
+                    Err(err) => {
                         tracing::error!(
                             "Got an error from the client (code {code}, method {method}): {message}",
                             code = err.code,
@@ -262,7 +259,7 @@ impl ClientResponseHandler {
                             method = R::METHOD
                         );
                     }
-                    (None, Some(response)) => match serde_json::from_value(response) {
+                    Ok(response) => match serde_json::from_value(response) {
                         Ok(response) => response_handler(client, response),
                         Err(error) => {
                             tracing::error!(
@@ -271,21 +268,6 @@ impl ClientResponseHandler {
                             );
                         }
                     },
-                    (None, None) => {
-                        if TypeId::of::<R::Result>() == TypeId::of::<()>() {
-                            // We can't call `response_handler(())` directly here, but
-                            // since we _know_ the type expected is `()`, we can use
-                            // `from_value(Value::Null)`. `R::Result` implements `DeserializeOwned`,
-                            // so this branch works in the general case but we'll only
-                            // hit it if the concrete type is `()`, so the `unwrap()` is safe here.
-                            response_handler(client, serde_json::from_value(Value::Null).unwrap());
-                        } else {
-                            tracing::error!(
-                                "Invalid client response: did not contain a result or error (method={method})",
-                                method = R::METHOD
-                            );
-                        }
-                    }
                 }
             },
         ))

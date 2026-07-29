@@ -62,6 +62,7 @@ class BaseContext:
         The managers methods such as `Lock()`, `Condition()` and `Queue()`
         can be used to create shared objects.
         """
+
     # N.B. Keep this in sync with multiprocessing.connection.Pipe.
     # _ConnectionBase is the common base class of Connection and PipeConnection
     # and can be used in cross-platform code.
@@ -71,6 +72,7 @@ class BaseContext:
     if sys.platform != "win32":
         def Pipe(self, duplex: bool = True) -> tuple[Connection[Any, Any], Connection[Any, Any]]:
             """Returns two connection object connected by a pipe"""
+
     else:
         def Pipe(self, duplex: bool = True) -> tuple[PipeConnection[Any, Any], PipeConnection[Any, Any]]:
             """Returns two connection object connected by a pipe"""
@@ -191,10 +193,18 @@ class BaseContext:
         child processes instead of sys.executable when using the 'spawn'
         start method.  Useful for people embedding Python.
         """
+
     if sys.version_info >= (3, 15):
         def set_forkserver_preload(
             self, module_names: list[str], *, on_error: Literal["ignore", "warn", "fail"] = "ignore"
-        ) -> None: ...
+        ) -> None:
+            """Set list of module names to try to load in forkserver process.
+
+            The on_error parameter controls how import failures are handled:
+            "ignore" (default) silently ignores failures, "warn" emits warnings,
+            and "fail" raises exceptions breaking the forkserver context.
+            """
+
     else:
         def set_forkserver_preload(self, module_names: list[str]) -> None:
             """Set list of module names to try to load in forkserver process.

@@ -487,7 +487,7 @@ while random():
 This reduced example from issue #3057 used to panic with "too many cycle iterations":
 
 ```py
-def fetch(req) -> tuple:
+def fetch(req) -> tuple:  # error: [missing-type-argument]
     return (True, None)
 
 def paginate():

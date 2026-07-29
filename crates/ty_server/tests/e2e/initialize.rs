@@ -1,6 +1,6 @@
 use anyhow::Result;
-use lsp_types::notification::ShowMessage;
-use lsp_types::{Position, request::RegisterCapability};
+use lsp_types::ShowMessageNotification;
+use lsp_types::{Position, RegistrationRequest};
 use ruff_db::system::SystemPath;
 use serde_json::Value;
 use ty_server::{ClientOptions, DiagnosticMode};
@@ -53,7 +53,7 @@ fn workspace_diagnostic_registration_without_configuration() -> Result<()> {
     // No need to wait for workspaces to initialize as the client does not support workspace
     // configuration.
 
-    let (_, params) = server.await_request::<RegisterCapability>();
+    let (_, params) = server.await_request::<RegistrationRequest>();
     let [registration] = params.registrations.as_slice() else {
         panic!(
             "Expected a single registration, got: {:#?}",
@@ -96,7 +96,7 @@ fn open_files_diagnostic_registration_without_configuration() -> Result<()> {
     // No need to wait for workspaces to initialize as the client does not support workspace
     // configuration.
 
-    let (_, params) = server.await_request::<RegisterCapability>();
+    let (_, params) = server.await_request::<RegistrationRequest>();
     let [registration] = params.registrations.as_slice() else {
         panic!(
             "Expected a single registration, got: {:#?}",
@@ -135,7 +135,7 @@ fn workspace_diagnostic_registration_via_initialization() -> Result<()> {
         .build()
         .wait_until_workspaces_are_initialized();
 
-    let (_, params) = server.await_request::<RegisterCapability>();
+    let (_, params) = server.await_request::<RegistrationRequest>();
     let [registration] = params.registrations.as_slice() else {
         panic!(
             "Expected a single registration, got: {:#?}",
@@ -174,7 +174,7 @@ fn open_files_diagnostic_registration_via_initialization() -> Result<()> {
         .build()
         .wait_until_workspaces_are_initialized();
 
-    let (_, params) = server.await_request::<RegisterCapability>();
+    let (_, params) = server.await_request::<RegistrationRequest>();
     let [registration] = params.registrations.as_slice() else {
         panic!(
             "Expected a single registration, got: {:#?}",
@@ -213,7 +213,7 @@ fn workspace_diagnostic_registration() -> Result<()> {
         .build()
         .wait_until_workspaces_are_initialized();
 
-    let (_, params) = server.await_request::<RegisterCapability>();
+    let (_, params) = server.await_request::<RegistrationRequest>();
     let [registration] = params.registrations.as_slice() else {
         panic!(
             "Expected a single registration, got: {:#?}",
@@ -252,7 +252,7 @@ fn open_files_diagnostic_registration() -> Result<()> {
         .build()
         .wait_until_workspaces_are_initialized();
 
-    let (_, params) = server.await_request::<RegisterCapability>();
+    let (_, params) = server.await_request::<RegistrationRequest>();
     let [registration] = params.registrations.as_slice() else {
         panic!(
             "Expected a single registration, got: {:#?}",
@@ -395,7 +395,7 @@ fn unknown_initialization_options() -> Result<()> {
         .build()
         .wait_until_workspaces_are_initialized();
 
-    let show_message_params = server.await_notification::<ShowMessage>();
+    let show_message_params = server.await_notification::<ShowMessageNotification>();
 
     insta::assert_json_snapshot!(show_message_params, @r#"
     {
@@ -420,7 +420,7 @@ fn unknown_options_in_workspace_configuration() -> Result<()> {
         .build()
         .wait_until_workspaces_are_initialized();
 
-    let show_message_params = server.await_notification::<ShowMessage>();
+    let show_message_params = server.await_notification::<ShowMessageNotification>();
 
     insta::assert_json_snapshot!(show_message_params, @r#"
     {
@@ -451,7 +451,7 @@ fn register_multiple_capabilities() -> Result<()> {
         .build()
         .wait_until_workspaces_are_initialized();
 
-    let (_, params) = server.await_request::<RegisterCapability>();
+    let (_, params) = server.await_request::<RegistrationRequest>();
     let registrations = params.registrations;
 
     insta::assert_json_snapshot!(registrations, @r#"
@@ -487,7 +487,7 @@ fn missing_virtual_env_does_not_panic() -> Result<()> {
         .build()
         .wait_until_workspaces_are_initialized();
 
-    let show_message_params = server.await_notification::<ShowMessage>();
+    let show_message_params = server.await_notification::<ShowMessageNotification>();
 
     insta::assert_snapshot!(show_message_params.message, @"Failed to load project for workspace file://<temp_dir>/project. Please refer to the logs for more details.");
 

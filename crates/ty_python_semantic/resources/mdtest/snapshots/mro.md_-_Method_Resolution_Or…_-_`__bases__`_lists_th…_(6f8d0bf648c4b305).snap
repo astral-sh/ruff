@@ -47,7 +47,6 @@ error[invalid-base]: Invalid class base with type `Literal[2]`
   |
 1 | class Foo(2): ...  # error: [invalid-base]
   |           ^
-  |
 info: Definition of class `Foo` will raise `TypeError` at runtime
 
 ```
@@ -58,7 +57,6 @@ warning[unsupported-base]: Unsupported class base
   |
 6 | class Bar(Foo()): ...  # error: [unsupported-base]
   |           ^^^^^ Has type `Foo`
-  |
 info: ty cannot resolve a consistent method resolution order (MRO) for class `Bar` due to this base
 info: Only class objects or `Any` are supported as class bases
 
@@ -70,7 +68,6 @@ error[invalid-base]: Invalid class base with type `Bad1`
    |
 15 | class BadSub1(Bad1()): ...  # error: [invalid-base]
    |               ^^^^^^
-   |
 info: Definition of class `BadSub1` will raise `TypeError` at runtime
 info: An instance type is only a valid class base if it has a valid `__mro_entries__` method
 info: Type `Bad1` has an `__mro_entries__` method, but it cannot be called with the expected arguments
@@ -84,7 +81,6 @@ error[invalid-base]: Invalid class base with type `Bad2`
    |
 16 | class BadSub2(Bad2()): ...  # error: [invalid-base]
    |               ^^^^^^
-   |
 info: Definition of class `BadSub2` will raise `TypeError` at runtime
 info: An instance type is only a valid class base if it has a valid `__mro_entries__` method
 info: Type `Bad2` has an `__mro_entries__` method, but it does not return a tuple of types
@@ -97,7 +93,6 @@ error[invalid-base]: Invalid class base with type `HasMroEntries | NoMroEntries`
    |
 24 |     class Foo(base): ...  # error: [invalid-base]
    |               ^^^^
-   |
 info: Definition of class `Foo` will raise `TypeError` at runtime
 info: An instance type is only a valid class base if it has a valid `__mro_entries__` method
 info: Type `HasMroEntries | NoMroEntries` may have an `__mro_entries__` attribute, but it may be missing

@@ -12,13 +12,11 @@ T203 [*] `pprint` found
 7 | pprint("Hello, world!", stream=sys.stdout)  # T203
   |
 help: Remove `pprint`
-2 | import tempfile
-3 | from pprint import pprint
+  |
 4 |
   - pprint("Hello, world!")  # T203
 5 | pprint("Hello, world!", stream=None)  # T203
-6 | pprint("Hello, world!", stream=sys.stdout)  # T203
-7 | pprint("Hello, world!", stream=sys.stderr)  # T203
+  |
 note: This is an unsafe fix and may change runtime behavior
 
 T203 [*] `pprint` found
@@ -31,13 +29,11 @@ T203 [*] `pprint` found
 8 | pprint("Hello, world!", stream=sys.stderr)  # T203
   |
 help: Remove `pprint`
-3 | from pprint import pprint
-4 |
+  |
 5 | pprint("Hello, world!")  # T203
   - pprint("Hello, world!", stream=None)  # T203
 6 | pprint("Hello, world!", stream=sys.stdout)  # T203
-7 | pprint("Hello, world!", stream=sys.stderr)  # T203
-8 |
+  |
 note: This is an unsafe fix and may change runtime behavior
 
 T203 [*] `pprint` found
@@ -50,13 +46,11 @@ T203 [*] `pprint` found
 8 | pprint("Hello, world!", stream=sys.stderr)  # T203
   |
 help: Remove `pprint`
-4 |
-5 | pprint("Hello, world!")  # T203
+  |
 6 | pprint("Hello, world!", stream=None)  # T203
   - pprint("Hello, world!", stream=sys.stdout)  # T203
 7 | pprint("Hello, world!", stream=sys.stderr)  # T203
-8 |
-9 | with tempfile.NamedTemporaryFile() as fp:
+  |
 note: This is an unsafe fix and may change runtime behavior
 
 T203 [*] `pprint` found
@@ -70,13 +64,11 @@ T203 [*] `pprint` found
 10 | with tempfile.NamedTemporaryFile() as fp:
    |
 help: Remove `pprint`
-5  | pprint("Hello, world!")  # T203
-6  | pprint("Hello, world!", stream=None)  # T203
-7  | pprint("Hello, world!", stream=sys.stdout)  # T203
-   - pprint("Hello, world!", stream=sys.stderr)  # T203
-8  |
-9  | with tempfile.NamedTemporaryFile() as fp:
-10 |     pprint("Hello, world!", stream=fp)  # OK
+  |
+7 | pprint("Hello, world!", stream=sys.stdout)  # T203
+  - pprint("Hello, world!", stream=sys.stderr)  # T203
+8 |
+  |
 note: This is an unsafe fix and may change runtime behavior
 
 T203 [*] `pprint` found
@@ -90,13 +82,11 @@ T203 [*] `pprint` found
 17 | pprint.pprint("Hello, world!", stream=sys.stdout)  # T203
    |
 help: Remove `pprint`
-12 |
-13 | import pprint
+   |
 14 |
    - pprint.pprint("Hello, world!")  # T203
 15 | pprint.pprint("Hello, world!", stream=None)  # T203
-16 | pprint.pprint("Hello, world!", stream=sys.stdout)  # T203
-17 | pprint.pprint("Hello, world!", stream=sys.stderr)  # T203
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 T203 [*] `pprint` found
@@ -109,13 +99,11 @@ T203 [*] `pprint` found
 18 | pprint.pprint("Hello, world!", stream=sys.stderr)  # T203
    |
 help: Remove `pprint`
-13 | import pprint
-14 |
+   |
 15 | pprint.pprint("Hello, world!")  # T203
    - pprint.pprint("Hello, world!", stream=None)  # T203
 16 | pprint.pprint("Hello, world!", stream=sys.stdout)  # T203
-17 | pprint.pprint("Hello, world!", stream=sys.stderr)  # T203
-18 |
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 T203 [*] `pprint` found
@@ -128,13 +116,11 @@ T203 [*] `pprint` found
 18 | pprint.pprint("Hello, world!", stream=sys.stderr)  # T203
    |
 help: Remove `pprint`
-14 |
-15 | pprint.pprint("Hello, world!")  # T203
+   |
 16 | pprint.pprint("Hello, world!", stream=None)  # T203
    - pprint.pprint("Hello, world!", stream=sys.stdout)  # T203
 17 | pprint.pprint("Hello, world!", stream=sys.stderr)  # T203
-18 |
-19 | with tempfile.NamedTemporaryFile() as fp:
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 T203 [*] `pprint` found
@@ -148,11 +134,9 @@ T203 [*] `pprint` found
 20 | with tempfile.NamedTemporaryFile() as fp:
    |
 help: Remove `pprint`
-15 | pprint.pprint("Hello, world!")  # T203
-16 | pprint.pprint("Hello, world!", stream=None)  # T203
+   |
 17 | pprint.pprint("Hello, world!", stream=sys.stdout)  # T203
    - pprint.pprint("Hello, world!", stream=sys.stderr)  # T203
 18 |
-19 | with tempfile.NamedTemporaryFile() as fp:
-20 |     pprint.pprint("Hello, world!", stream=fp)  # OK
+   |
 note: This is an unsafe fix and may change runtime behavior

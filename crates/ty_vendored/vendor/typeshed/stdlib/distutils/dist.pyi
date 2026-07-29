@@ -172,6 +172,7 @@ class Distribution:
         The file in the user's home directory can be disabled with the
         --no-user-cfg option.
         """
+
     commands: Incomplete
     def parse_command_line(self):
         """Parse the setup script's command line, taken from the

@@ -137,6 +137,7 @@ class POP3:
 
     def rpop(self, user: str) -> bytes:
         """Send RPOP command to access the mailbox with an alternate user."""
+
     timestamp: Pattern[str]
     def apop(self, user: str, password: str) -> bytes:
         """Authorisation
@@ -212,6 +213,7 @@ class POP3_SSL(POP3):
             STLS command doesn't make any sense on an already established
             SSL/TLS session.
             """
+
     else:
         @overload
         def __init__(

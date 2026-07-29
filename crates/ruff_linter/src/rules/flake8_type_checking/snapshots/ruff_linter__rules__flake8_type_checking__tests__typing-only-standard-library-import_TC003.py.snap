@@ -11,8 +11,7 @@ TC003 [*] Move standard library import `os` into a type-checking block
 10 |     x: os
    |
 help: Move into type-checking block
-2  |
-3  | For typing-only import detection tests, see `TC002.py`.
+   |
 4  | """
 5  + from typing import TYPE_CHECKING
 6  +
@@ -23,6 +22,5 @@ help: Move into type-checking block
 11 | def f():
    -     import os
 12 |
-13 |     x: os
-14 |
+   |
 note: This is an unsafe fix and may change runtime behavior

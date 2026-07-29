@@ -53,6 +53,7 @@ class StdoutRefactoringTool(refactor.MultiprocessRefactoringTool):
                 this appended to their filename.  Useful for changing .py to
                 .py3 for example by passing append_suffix='3'.
         """
+
     # Same as super.log_error and Logger.error
     def log_error(  # type: ignore[override]
         self,

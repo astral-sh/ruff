@@ -7,13 +7,14 @@ use ruff_db::files::{File, FilePath, FileRange, system_path_to_file, vendored_pa
 use ruff_db::source::{SourceText, line_index, source_text};
 use ruff_db::system::walk_directory::WalkDirectoryBuilder;
 use ruff_db::system::{
-    CaseSensitivity, DirectoryEntry, MemoryFileSystem, Metadata, System, SystemPath, SystemPathBuf,
+    DirectoryEntry, MemoryFileSystem, Metadata, System, SystemPath, SystemPathBuf,
     SystemVirtualPath, WhichError, WhichResult, WritableSystem,
 };
 use ruff_db::vendored::VendoredPath;
 use ruff_diagnostics::{Applicability, Edit};
 use ruff_notebook::Notebook;
 use ruff_python_formatter::formatted_file;
+use ruff_ranged_value::ValueSource;
 use ruff_source_file::{LineIndex, OneIndexed, SourceLocation};
 use ruff_text_size::{Ranged, TextSize};
 use ty_ide::{
@@ -23,7 +24,6 @@ use ty_ide::{
 };
 use ty_ide::{NavigationTarget, NavigationTargets, hints, signature_help};
 use ty_project::metadata::options::Options;
-use ty_project::metadata::value::ValueSource;
 use ty_project::watch::{ChangeEvent, ChangedKind, CreatedKind, DeletedKind};
 use ty_project::{CheckMode, ProjectMetadata};
 use ty_project::{Db, ProjectDatabase};
@@ -165,12 +165,13 @@ impl Workspace {
         )
         .map_err(into_error)?;
 
-        let (program_settings, program_settings_diagnostics) = project
+        let merged_options = project.to_merged_options();
+        let (program_settings, program_settings_diagnostics) = merged_options
             .to_program_settings(&self.system, self.db.vendored(), &FallibleStrategy)
             .map_err(into_error)?;
         Program::get(&self.db).update_from_settings(&mut self.db, program_settings);
 
-        let (settings, settings_diagnostics) = project
+        let (settings, settings_diagnostics) = merged_options
             .to_settings(&self.db, &FallibleStrategy)
             .map_err(into_error)?;
 
@@ -194,13 +195,10 @@ impl Workspace {
             .write_file_all(&path, contents)
             .map_err(into_error)?;
 
-        self.db.apply_changes(
-            &[ChangeEvent::Created {
-                path: path.clone(),
-                kind: CreatedKind::File,
-            }],
-            None,
-        );
+        self.db.apply_changes(&[ChangeEvent::Created {
+            path: path.clone(),
+            kind: CreatedKind::File,
+        }]);
 
         let file = system_path_to_file(&self.db, &path).expect("File to exist");
 
@@ -227,19 +225,16 @@ impl Workspace {
             .write_file(system_path, contents)
             .map_err(into_error)?;
 
-        self.db.apply_changes(
-            &[
-                ChangeEvent::Changed {
-                    path: system_path.to_path_buf(),
-                    kind: ChangedKind::FileContent,
-                },
-                ChangeEvent::Changed {
-                    path: system_path.to_path_buf(),
-                    kind: ChangedKind::FileMetadata,
-                },
-            ],
-            None,
-        );
+        self.db.apply_changes(&[
+            ChangeEvent::Changed {
+                path: system_path.to_path_buf(),
+                kind: ChangedKind::FileContent,
+            },
+            ChangeEvent::Changed {
+                path: system_path.to_path_buf(),
+                kind: ChangedKind::FileMetadata,
+            },
+        ]);
 
         Ok(())
     }
@@ -261,13 +256,10 @@ impl Workspace {
                 .remove_file(system_path)
                 .map_err(into_error)?;
 
-            self.db.apply_changes(
-                &[ChangeEvent::Deleted {
-                    path: system_path.to_path_buf(),
-                    kind: DeletedKind::File,
-                }],
-                None,
-            );
+            self.db.apply_changes(&[ChangeEvent::Deleted {
+                path: system_path.to_path_buf(),
+                kind: DeletedKind::File,
+            }]);
         }
 
         Ok(())
@@ -538,7 +530,7 @@ impl Workspace {
         Ok(completions
             .into_iter()
             .map(|comp| {
-                let name = comp.label.to_string();
+                let name = comp.label().to_string();
                 let kind = comp.kind.map(CompletionKind::from);
                 let type_display = comp.ty.map(|ty| ty.display(&self.db).to_string());
                 let import_edit = comp.import.as_ref().map(|edit| {
@@ -857,7 +849,6 @@ impl FileHandle {
 
 #[wasm_bindgen]
 pub struct Diagnostic {
-    #[wasm_bindgen(readonly)]
     inner: diagnostic::Diagnostic,
 }
 
@@ -900,6 +891,36 @@ impl Diagnostic {
     }
 
     #[wasm_bindgen]
+    pub fn annotations(&self, workspace: &Workspace) -> Vec<DiagnosticAnnotation> {
+        self.inner
+            .annotations()
+            .iter()
+            .map(|annotation| DiagnosticAnnotation::from_db(workspace, annotation))
+            .collect()
+    }
+
+    #[wasm_bindgen(js_name = "subDiagnostics")]
+    pub fn sub_diagnostics(&self, workspace: &Workspace) -> Vec<SubDiagnostic> {
+        self.inner
+            .sub_diagnostics()
+            .iter()
+            .map(|sub_diagnostic| {
+                let annotations = sub_diagnostic
+                    .annotations()
+                    .iter()
+                    .map(|annotation| DiagnosticAnnotation::from_db(workspace, annotation))
+                    .collect();
+
+                SubDiagnostic {
+                    severity: sub_diagnostic.severity().into(),
+                    message: sub_diagnostic.headline_message().to_string(),
+                    annotations,
+                }
+            })
+            .collect()
+    }
+
+    #[wasm_bindgen]
     pub fn id(&self) -> JsString {
         JsString::from(self.inner.id().to_string())
     }
@@ -907,6 +928,16 @@ impl Diagnostic {
     #[wasm_bindgen]
     pub fn severity(&self) -> Severity {
         Severity::from(self.inner.severity())
+    }
+
+    #[wasm_bindgen]
+    pub fn tags(&self) -> Vec<DiagnosticTag> {
+        self.inner
+            .primary_tags()
+            .unwrap_or_default()
+            .iter()
+            .map(DiagnosticTag::from)
+            .collect()
     }
 
     #[wasm_bindgen(js_name = "textRange")]
@@ -965,6 +996,55 @@ impl Diagnostic {
             preferred: true,
         })
     }
+}
+
+#[wasm_bindgen]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SubDiagnostic {
+    pub severity: SubDiagnosticSeverity,
+    #[wasm_bindgen(getter_with_clone)]
+    pub message: String,
+    #[wasm_bindgen(getter_with_clone)]
+    pub annotations: Vec<DiagnosticAnnotation>,
+}
+
+#[wasm_bindgen]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DiagnosticAnnotation {
+    pub primary: bool,
+    #[wasm_bindgen(getter_with_clone)]
+    pub message: Option<String>,
+    #[wasm_bindgen(getter_with_clone)]
+    pub location: Option<Location>,
+}
+
+impl DiagnosticAnnotation {
+    fn from_db(workspace: &Workspace, annotation: &diagnostic::Annotation) -> Self {
+        let location = FileRange::try_from(annotation.get_span())
+            .ok()
+            .map(|file_range| Location {
+                path: file_range.file().path(&workspace.db).to_string(),
+                range: Range::from_file_range(
+                    &workspace.db,
+                    file_range,
+                    workspace.position_encoding,
+                ),
+            });
+
+        Self {
+            primary: annotation.is_primary(),
+            message: annotation.get_message().map(ToOwned::to_owned),
+            location,
+        }
+    }
+}
+
+#[wasm_bindgen]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Location {
+    #[wasm_bindgen(getter_with_clone)]
+    pub path: String,
+    pub range: Range,
 }
 
 fn edit_to_text_edit(workspace: &Workspace, file: File, edit: &Edit) -> TextEdit {
@@ -1124,6 +1204,44 @@ impl From<diagnostic::Severity> for Severity {
             diagnostic::Severity::Warning => Self::Warning,
             diagnostic::Severity::Error => Self::Error,
             diagnostic::Severity::Fatal => Self::Fatal,
+        }
+    }
+}
+
+#[wasm_bindgen]
+#[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]
+pub enum DiagnosticTag {
+    Unnecessary,
+    Deprecated,
+}
+
+impl From<&diagnostic::DiagnosticTag> for DiagnosticTag {
+    fn from(value: &diagnostic::DiagnosticTag) -> Self {
+        match value {
+            diagnostic::DiagnosticTag::Unnecessary => Self::Unnecessary,
+            diagnostic::DiagnosticTag::Deprecated => Self::Deprecated,
+        }
+    }
+}
+
+#[wasm_bindgen]
+#[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]
+pub enum SubDiagnosticSeverity {
+    Help,
+    Info,
+    Warning,
+    Error,
+    Fatal,
+}
+
+impl From<diagnostic::SubDiagnosticSeverity> for SubDiagnosticSeverity {
+    fn from(value: diagnostic::SubDiagnosticSeverity) -> Self {
+        match value {
+            diagnostic::SubDiagnosticSeverity::Help => Self::Help,
+            diagnostic::SubDiagnosticSeverity::Info => Self::Info,
+            diagnostic::SubDiagnosticSeverity::Warning => Self::Warning,
+            diagnostic::SubDiagnosticSeverity::Error => Self::Error,
+            diagnostic::SubDiagnosticSeverity::Fatal => Self::Fatal,
         }
     }
 }
@@ -1487,6 +1605,16 @@ impl System for WasmSystem {
         self.fs.canonicalize(path)
     }
 
+    fn is_same_file(
+        &self,
+        first: &SystemPath,
+        second: &SystemPath,
+    ) -> ruff_db::system::Result<bool> {
+        // The in-memory file system does not support hard links, so canonical paths uniquely
+        // identify files.
+        Ok(self.canonicalize_path(first)? == self.canonicalize_path(second)?)
+    }
+
     fn read_to_string(&self, path: &SystemPath) -> ruff_db::system::Result<String> {
         self.fs.read_to_string(path)
     }
@@ -1511,14 +1639,6 @@ impl System for WasmSystem {
         _path: &SystemVirtualPath,
     ) -> Result<Notebook, ruff_notebook::NotebookError> {
         Err(ruff_notebook::NotebookError::Io(not_found()))
-    }
-
-    fn path_exists_case_sensitive(&self, path: &SystemPath, _prefix: &SystemPath) -> bool {
-        self.path_exists(path)
-    }
-
-    fn case_sensitivity(&self) -> CaseSensitivity {
-        CaseSensitivity::CaseSensitive
     }
 
     fn which(&self, _name: &str) -> WhichResult {

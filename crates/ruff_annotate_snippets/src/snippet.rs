@@ -1,75 +1,99 @@
 //! Structures used as an input for the library.
-//!
-//! Example:
-//!
-//! ```
-//! use ruff_annotate_snippets::*;
-//!
-//! Level::Error.title("mismatched types")
-//!     .snippet(Snippet::source("Foo").line_start(51).origin("src/format.rs"))
-//!     .snippet(Snippet::source("Faa").line_start(129).origin("src/display.rs"));
-//! ```
 
-use std::ops::Range;
+use alloc::borrow::{Cow, ToOwned};
+use alloc::string::String;
+use alloc::{vec, vec::Vec};
+use core::ops::Range;
 
-#[derive(Copy, Clone, Debug, Default, PartialEq)]
+use crate::Level;
+use crate::renderer::source_map::{TrimmedPatch, as_substr};
+
+pub(crate) const ERROR_TXT: &str = "error";
+pub(crate) const HELP_TXT: &str = "help";
+pub(crate) const INFO_TXT: &str = "info";
+pub(crate) const NOTE_TXT: &str = "note";
+pub(crate) const WARNING_TXT: &str = "warning";
+
+/// A [diagnostic message][Title] and any associated [context][Element] to help users
+/// understand it
+///
+/// The first [`Group`] is the ["primary" group][Level::primary_title], ie it contains the diagnostic
+/// message.
+///
+/// All subsequent [`Group`]s are for distinct pieces of [context][Level::secondary_title].
+/// The primary group will be visually distinguished to help tell them apart.
+pub type Report<'a> = &'a [Group<'a>];
+
+#[derive(Clone, Debug, Default)]
 pub(crate) struct Id<'a> {
-    pub(crate) id: &'a str,
-    pub(crate) url: Option<&'a str>,
+    pub(crate) id: Option<Cow<'a, str>>,
+    pub(crate) url: Option<Cow<'a, str>>,
 }
 
-/// Primary structure provided for formatting
+/// A [`Title`] with supporting [context][Element] within a [`Report`]
 ///
-/// See [`Level::title`] to create a [`Message`]
-#[derive(Debug)]
-pub struct Message<'a> {
-    pub(crate) level: Level,
-    pub(crate) id: Option<Id<'a>>,
-    pub(crate) title: &'a str,
-    pub(crate) snippets: Vec<Snippet<'a>>,
-    pub(crate) footer: Vec<Message<'a>>,
-    pub(crate) is_fixable: bool,
+/// [Decor][crate::renderer::DecorStyle] is used to visually connect [`Element`]s of a `Group`.
+///
+/// Generally, you will create separate group's for:
+/// - New [`Snippet`]s, especially if they need their own [`AnnotationKind::Primary`]
+/// - Each logically distinct set of [suggestions][Patch`]
+///
+/// # Example
+///
+/// ```rust
+/// # #[allow(clippy::needless_doctest_main)]
+#[doc = include_str!("../examples/highlight_message.rs")]
+/// ```
+#[doc = include_str!("../examples/highlight_message.svg")]
+#[derive(Clone, Debug)]
+pub struct Group<'a> {
+    pub(crate) primary_level: Level<'a>,
+    pub(crate) title: Option<Title<'a>>,
+    pub(crate) elements: Vec<Element<'a>>,
     pub(crate) lineno_offset: usize,
 }
 
-impl<'a> Message<'a> {
-    pub fn id(mut self, id: &'a str) -> Self {
-        self.id = Some(Id { id, url: None });
-        self
+impl<'a> Group<'a> {
+    /// Create group with a [`Title`], deriving [`AnnotationKind::Primary`] from its [`Level`]
+    pub fn with_title(title: Title<'a>) -> Self {
+        let level = title.level.clone();
+        let mut x = Self::with_level(level);
+        x.title = Some(title);
+        x
     }
 
-    pub fn id_with_url(mut self, id: &'a str, url: Option<&'a str>) -> Self {
-        self.id = Some(Id { id, url });
-        self
-    }
-
-    pub fn snippet(mut self, slice: Snippet<'a>) -> Self {
-        self.snippets.push(slice);
-        self
-    }
-
-    pub fn snippets(mut self, slice: impl IntoIterator<Item = Snippet<'a>>) -> Self {
-        self.snippets.extend(slice);
-        self
-    }
-
-    pub fn footer(mut self, footer: Message<'a>) -> Self {
-        self.footer.push(footer);
-        self
-    }
-
-    pub fn footers(mut self, footer: impl IntoIterator<Item = Message<'a>>) -> Self {
-        self.footer.extend(footer);
-        self
-    }
-
-    /// Whether or not the diagnostic for this message is fixable.
+    /// Create a title-less group with a primary [`Level`] for [`AnnotationKind::Primary`]
     ///
-    /// This is rendered as a `[*]` indicator after the `id` in an annotation header, if the
-    /// annotation also has `Level::None`.
-    pub fn is_fixable(mut self, yes: bool) -> Self {
-        self.is_fixable = yes;
+    /// # Example
+    ///
+    /// ```rust
+    /// # #[allow(clippy::needless_doctest_main)]
+    #[doc = include_str!("../examples/elide_header.rs")]
+    /// ```
+    #[doc = include_str!("../examples/elide_header.svg")]
+    pub fn with_level(level: Level<'a>) -> Self {
+        Self {
+            primary_level: level,
+            title: None,
+            elements: vec![],
+            lineno_offset: 0,
+        }
+    }
+
+    /// Append an [`Element`] that adds context to the [`Title`]
+    pub fn element(mut self, section: impl Into<Element<'a>>) -> Self {
+        self.elements.push(section.into());
         self
+    }
+
+    /// Append [`Element`]s that adds context to the [`Title`]
+    pub fn elements(mut self, sections: impl IntoIterator<Item = impl Into<Element<'a>>>) -> Self {
+        self.elements.extend(sections.into_iter().map(Into::into));
+        self
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.elements.is_empty() && self.title.is_none()
     }
 
     /// Add an offset used for aligning the header sigil (`-->`) with the line number separators.
@@ -83,61 +107,193 @@ impl<'a> Message<'a> {
     }
 }
 
-/// Structure containing the slice of text to be annotated and
-/// basic information about the location of the slice.
+/// A section of content within a [`Group`]
+#[derive(Clone, Debug)]
+#[non_exhaustive]
+pub enum Element<'a> {
+    Message(Message<'a>),
+    Cause(Snippet<'a, Annotation<'a>>),
+    Suggestion(Snippet<'a, Patch<'a>>),
+    Origin(Origin<'a>),
+    Padding(Padding),
+}
+
+impl<'a> From<Message<'a>> for Element<'a> {
+    fn from(value: Message<'a>) -> Self {
+        Element::Message(value)
+    }
+}
+
+impl<'a> From<Snippet<'a, Annotation<'a>>> for Element<'a> {
+    fn from(value: Snippet<'a, Annotation<'a>>) -> Self {
+        Element::Cause(value)
+    }
+}
+
+impl<'a> From<Snippet<'a, Patch<'a>>> for Element<'a> {
+    fn from(value: Snippet<'a, Patch<'a>>) -> Self {
+        Element::Suggestion(value)
+    }
+}
+
+impl<'a> From<Origin<'a>> for Element<'a> {
+    fn from(value: Origin<'a>) -> Self {
+        Element::Origin(value)
+    }
+}
+
+impl From<Padding> for Element<'_> {
+    fn from(value: Padding) -> Self {
+        Self::Padding(value)
+    }
+}
+
+/// A whitespace [`Element`] in a [`Group`]
+#[derive(Clone, Debug)]
+pub struct Padding;
+
+/// A title that introduces a [`Group`], describing the main point
 ///
-/// One `Snippet` is meant to represent a single, continuous,
-/// slice of source code that you want to annotate.
-#[derive(Debug)]
-pub struct Snippet<'a> {
-    pub(crate) origin: Option<&'a str>,
-    pub(crate) line_start: usize,
+/// To create a `Title`, see [`Level::primary_title`] or [`Level::secondary_title`].
+///
+/// # Example
+///
+/// ```rust
+/// # use annotate_snippets::*;
+/// let report = &[
+///     Group::with_title(
+///         Level::ERROR.primary_title("mismatched types").id("E0308")
+///     ),
+///     Group::with_title(
+///         Level::HELP.secondary_title("function defined here")
+///     ),
+/// ];
+/// ```
+#[derive(Clone, Debug)]
+pub struct Title<'a> {
+    pub(crate) level: Level<'a>,
+    pub(crate) id: Option<Id<'a>>,
+    pub(crate) text: Cow<'a, str>,
+    pub(crate) allows_styling: bool,
+    pub(crate) is_fixable: bool,
+}
 
-    pub(crate) source: &'a str,
-    pub(crate) annotations: Vec<Annotation<'a>>,
+impl<'a> Title<'a> {
+    /// The category for this [`Report`]
+    ///
+    /// Useful for looking searching for more information to resolve the diagnostic.
+    ///
+    /// <div class="warning">
+    ///
+    /// Text passed to this function is considered "untrusted input", as such
+    /// all text is passed through a normalization function. Styled text is
+    /// not allowed to be passed to this function.
+    ///
+    /// </div>
+    pub fn id(mut self, id: impl Into<Cow<'a, str>>) -> Self {
+        self.id.get_or_insert(Id::default()).id = Some(id.into());
+        self
+    }
 
-    pub(crate) fold: bool,
+    /// Provide a URL for [`Title::id`] for more information on this diagnostic
+    ///
+    /// <div class="warning">
+    ///
+    /// This is only relevant if `id` is present
+    ///
+    /// </div>
+    pub fn id_url(mut self, url: impl Into<Cow<'a, str>>) -> Self {
+        self.id.get_or_insert(Id::default()).url = Some(url.into());
+        self
+    }
 
+    /// Append an [`Element`] that adds context to the [`Title`]
+    pub fn element(self, section: impl Into<Element<'a>>) -> Group<'a> {
+        Group::with_title(self).element(section)
+    }
+
+    /// Append [`Element`]s that adds context to the [`Title`]
+    pub fn elements(self, sections: impl IntoIterator<Item = impl Into<Element<'a>>>) -> Group<'a> {
+        Group::with_title(self).elements(sections)
+    }
+
+    /// Whether or not the diagnostic for this message is fixable.
+    ///
+    /// This is rendered as a `[*]` indicator after the `id` in an annotation header, if the
+    /// annotation also has `Level::None`.
+    pub fn is_fixable(mut self, yes: bool) -> Self {
+        self.is_fixable = yes;
+        self
+    }
+}
+
+/// A text [`Element`] in a [`Group`]
+///
+/// See [`Level::message`] to create this.
+#[derive(Clone, Debug)]
+pub struct Message<'a> {
+    pub(crate) level: Level<'a>,
+    pub(crate) text: Cow<'a, str>,
+}
+
+/// A source view [`Element`] in a [`Group`]
+///
+/// If you do not have [source][Snippet::source] available, see instead [`Origin`]
+///
+/// `Snippet`s come in the following styles (`T`):
+/// - With [`Annotation`]s, see [`Snippet::annotation`]
+/// - With [`Patch`]s, see [`Snippet::patch`]
+#[derive(Clone, Debug)]
+pub struct Snippet<'a, T> {
+    pub(crate) path: Option<Cow<'a, str>>,
     /// The optional cell index in a Jupyter notebook, used for reporting source locations along
     /// with the ranges on `annotations`.
     pub(crate) cell_index: Option<usize>,
+    pub(crate) line_start: usize,
+    pub(crate) source: Cow<'a, str>,
+    pub(crate) markers: Vec<T>,
+    pub(crate) fold: bool,
 }
 
-impl<'a> Snippet<'a> {
-    pub fn source(source: &'a str) -> Self {
+impl<'a, T: Clone> Snippet<'a, T> {
+    /// The source code to be rendered
+    ///
+    /// <div class="warning">
+    ///
+    /// Text passed to this function is considered "untrusted input", as such
+    /// all text is passed through a normalization function. Pre-styled text is
+    /// not allowed to be passed to this function.
+    ///
+    /// </div>
+    pub fn source(source: impl Into<Cow<'a, str>>) -> Self {
         Self {
-            origin: None,
+            path: None,
             line_start: 1,
-            source,
-            annotations: vec![],
-            fold: false,
             cell_index: None,
+            source: source.into(),
+            markers: vec![],
+            fold: true,
         }
     }
 
+    /// When manually [`fold`][Self::fold]ing,
+    /// the [`source`][Self::source]s line offset from the original start
     pub fn line_start(mut self, line_start: usize) -> Self {
         self.line_start = line_start;
         self
     }
 
-    pub fn origin(mut self, origin: &'a str) -> Self {
-        self.origin = Some(origin);
-        self
-    }
-
-    pub fn annotation(mut self, annotation: Annotation<'a>) -> Self {
-        self.annotations.push(annotation);
-        self
-    }
-
-    pub fn annotations(mut self, annotation: impl IntoIterator<Item = Annotation<'a>>) -> Self {
-        self.annotations.extend(annotation);
-        self
-    }
-
-    /// Hide lines without [`Annotation`]s
-    pub fn fold(mut self, fold: bool) -> Self {
-        self.fold = fold;
+    /// The location of the [`source`][Self::source] (e.g. a path)
+    ///
+    /// <div class="warning">
+    ///
+    /// Text passed to this function is considered "untrusted input", as such
+    /// all text is passed through a normalization function. Pre-styled text is
+    /// not allowed to be passed to this function.
+    ///
+    /// </div>
+    pub fn path(mut self, path: impl Into<OptionCow<'a>>) -> Self {
+        self.path = path.into().0;
         self
     }
 
@@ -146,23 +302,89 @@ impl<'a> Snippet<'a> {
         self.cell_index = index;
         self
     }
+
+    /// Control whether lines without [`Annotation`]s are shown
+    ///
+    /// The default is `fold(true)`, collapsing uninteresting lines.
+    ///
+    /// See [`AnnotationKind::Visible`] to force specific spans to be shown.
+    pub fn fold(mut self, fold: bool) -> Self {
+        self.fold = fold;
+        self
+    }
 }
 
-/// An annotation for a [`Snippet`].
+impl<'a> Snippet<'a, Annotation<'a>> {
+    /// Highlight and describe a span of text within the [`source`][Self::source]
+    pub fn annotation(mut self, annotation: Annotation<'a>) -> Snippet<'a, Annotation<'a>> {
+        self.markers.push(annotation);
+        self
+    }
+
+    /// Highlight and describe spans of text within the [`source`][Self::source]
+    pub fn annotations(mut self, annotation: impl IntoIterator<Item = Annotation<'a>>) -> Self {
+        self.markers.extend(annotation);
+        self
+    }
+}
+
+impl<'a> Snippet<'a, Patch<'a>> {
+    /// Suggest to the user an edit to the [`source`][Self::source]
+    pub fn patch(mut self, patch: Patch<'a>) -> Snippet<'a, Patch<'a>> {
+        self.markers.push(patch);
+        self
+    }
+
+    /// Suggest to the user edits to the [`source`][Self::source]
+    pub fn patches(mut self, patches: impl IntoIterator<Item = Patch<'a>>) -> Self {
+        self.markers.extend(patches);
+        self
+    }
+}
+
+/// Highlight and describe a span of text within a [`Snippet`]
 ///
-/// See [`Level::span`] to create a [`Annotation`]
-#[derive(Debug)]
+/// See [`AnnotationKind`] to create an annotation.
+///
+/// # Example
+///
+/// ```rust
+/// # #[allow(clippy::needless_doctest_main)]
+#[doc = include_str!("../examples/expected_type.rs")]
+/// ```
+///
+#[doc = include_str!("../examples/expected_type.svg")]
+#[derive(Clone, Debug)]
 pub struct Annotation<'a> {
-    /// The byte range of the annotation in the `source` string
-    pub(crate) range: Range<usize>,
-    pub(crate) label: Option<&'a str>,
-    pub(crate) level: Level,
+    pub(crate) span: Range<usize>,
+    pub(crate) label: Option<Cow<'a, str>>,
+    pub(crate) kind: AnnotationKind,
+    pub(crate) highlight_source: bool,
     pub(crate) is_file_level: bool,
 }
 
 impl<'a> Annotation<'a> {
-    pub fn label(mut self, label: &'a str) -> Self {
-        self.label = Some(label);
+    /// Describe the reason the span is highlighted
+    ///
+    /// This will be styled according to the [`AnnotationKind`]
+    ///
+    /// <div class="warning">
+    ///
+    /// Text passed to this function is considered "untrusted input", as such
+    /// all text is passed through a normalization function. Pre-styled text is
+    /// not allowed to be passed to this function.
+    ///
+    /// </div>
+    pub fn label(mut self, label: impl Into<OptionCow<'a>>) -> Self {
+        self.label = label.into().0;
+        self
+    }
+
+    /// Style the source according to the [`AnnotationKind`]
+    ///
+    /// This gives extra emphasis to this annotation
+    pub fn highlight_source(mut self, highlight_source: bool) -> Self {
+        self.highlight_source = highlight_source;
         self
     }
 
@@ -172,40 +394,225 @@ impl<'a> Annotation<'a> {
     }
 }
 
-/// Types of annotations.
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub enum Level {
-    /// Do not attach any annotation.
-    None,
-    /// Error annotations are displayed using red color and "^" character.
-    Error,
-    /// Warning annotations are displayed using blue color and "-" character.
-    Warning,
-    Info,
-    Note,
-    Help,
+/// The type of [`Annotation`] being applied to a [`Snippet`]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[non_exhaustive]
+pub enum AnnotationKind {
+    /// For showing the source that the [Group's Title][Group::with_title] references
+    ///
+    /// For [`Title`]-less groups, see [`Group::with_level`]
+    Primary,
+    /// Additional context to better understand the [`Primary`][Self::Primary]
+    /// [`Annotation`]
+    ///
+    /// See also [`Renderer::context`].
+    ///
+    /// [`Renderer::context`]: crate::renderer::Renderer
+    Context,
+    /// Prevents the annotated text from getting [folded][Snippet::fold]
+    ///
+    /// By default, [`Snippet`]s will [fold][`Snippet::fold`] (remove) lines
+    /// that do not contain any annotations. [`Visible`][Self::Visible] makes
+    /// it possible to selectively prevent this behavior for specific text,
+    /// allowing context to be preserved without adding any annotation
+    /// characters.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// # #[allow(clippy::needless_doctest_main)]
+    #[doc = include_str!("../examples/struct_name_as_context.rs")]
+    /// ```
+    ///
+    #[doc = include_str!("../examples/struct_name_as_context.svg")]
+    ///
+    Visible,
 }
 
-impl Level {
-    pub fn title(self, title: &str) -> Message<'_> {
-        Message {
-            level: self,
-            id: None,
-            title,
-            snippets: vec![],
-            footer: vec![],
-            is_fixable: false,
-            lineno_offset: 0,
+impl AnnotationKind {
+    /// Annotate a byte span within [`Snippet`]
+    pub fn span<'a>(self, span: Range<usize>) -> Annotation<'a> {
+        Annotation {
+            span,
+            label: None,
+            kind: self,
+            highlight_source: false,
+            is_file_level: false,
         }
     }
 
-    /// Create a [`Annotation`] with the given span for a [`Snippet`]
-    pub fn span<'a>(self, span: Range<usize>) -> Annotation<'a> {
-        Annotation {
-            range: span,
-            label: None,
-            level: self,
-            is_file_level: false,
+    pub(crate) fn is_primary(&self) -> bool {
+        matches!(self, AnnotationKind::Primary)
+    }
+}
+
+/// Suggested edit to the [`Snippet`]
+///
+/// See [`Snippet::patch`]
+///
+/// # Example
+///
+/// ```rust
+/// # #[allow(clippy::needless_doctest_main)]
+#[doc = include_str!("../examples/multi_suggestion.rs")]
+/// ```
+///
+#[doc = include_str!("../examples/multi_suggestion.svg")]
+#[derive(Clone, Debug)]
+pub struct Patch<'a> {
+    pub(crate) span: Range<usize>,
+    pub(crate) replacement: Cow<'a, str>,
+}
+
+impl<'a> Patch<'a> {
+    /// Splice `replacement` into the [`Snippet`] at the specified byte span
+    ///
+    /// <div class="warning">
+    ///
+    /// Text passed to this function is considered "untrusted input", as such
+    /// all text is passed through a normalization function. Pre-styled text is
+    /// not allowed to be passed to this function.
+    ///
+    /// </div>
+    pub fn new(span: Range<usize>, replacement: impl Into<Cow<'a, str>>) -> Self {
+        Self {
+            span,
+            replacement: replacement.into(),
         }
+    }
+
+    /// Try to turn a replacement into an addition when the span that is being
+    /// overwritten matches either the prefix or suffix of the replacement.
+    pub(crate) fn trim_trivial_replacements(self, source: &str) -> TrimmedPatch<'a> {
+        let mut trimmed = TrimmedPatch {
+            original_span: self.span.clone(),
+            span: self.span,
+            replacement: self.replacement,
+        };
+
+        if trimmed.replacement.is_empty() {
+            return trimmed;
+        }
+        let Some(snippet) = source.get(trimmed.original_span.clone()) else {
+            return trimmed;
+        };
+
+        if let Some((prefix, substr, suffix)) = as_substr(snippet, &trimmed.replacement) {
+            trimmed.span = trimmed.original_span.start + prefix
+                ..trimmed.original_span.end.saturating_sub(suffix);
+            trimmed.replacement = Cow::Owned(substr.to_owned());
+        }
+        trimmed
+    }
+}
+
+/// A source location [`Element`] in a [`Group`]
+///
+/// If you have source available, see instead [`Snippet`]
+///
+/// # Example
+///
+/// ```rust
+/// # use annotate_snippets::{Group, Snippet, AnnotationKind, Level, Origin};
+/// let report = &[
+///     Level::ERROR.primary_title("mismatched types").id("E0308")
+///         .element(
+///             Origin::path("$DIR/mismatched-types.rs")
+///         )
+/// ];
+/// ```
+#[derive(Clone, Debug)]
+pub struct Origin<'a> {
+    pub(crate) path: Cow<'a, str>,
+    /// The optional cell index in a Jupyter notebook, used for reporting source locations along
+    /// with the ranges on `annotations`.
+    pub(crate) cell_index: Option<usize>,
+    pub(crate) line: Option<usize>,
+    pub(crate) char_column: Option<usize>,
+}
+
+impl<'a> Origin<'a> {
+    /// <div class="warning">
+    ///
+    /// Text passed to this function is considered "untrusted input", as such
+    /// all text is passed through a normalization function. Pre-styled text is
+    /// not allowed to be passed to this function.
+    ///
+    /// </div>
+    pub fn path(path: impl Into<Cow<'a, str>>) -> Self {
+        Self {
+            path: path.into(),
+            cell_index: None,
+            line: None,
+            char_column: None,
+        }
+    }
+
+    /// Attach a Jupyter notebook cell index.
+    pub fn cell_index(mut self, index: Option<usize>) -> Self {
+        self.cell_index = index;
+        self
+    }
+
+    /// Set the default line number to display
+    pub fn line(mut self, line: usize) -> Self {
+        self.line = Some(line);
+        self
+    }
+
+    /// Set the default column to display
+    ///
+    /// <div class="warning">
+    ///
+    /// `char_column` is only be respected if [`Origin::line`] is also set.
+    ///
+    /// </div>
+    pub fn char_column(mut self, char_column: usize) -> Self {
+        self.char_column = Some(char_column);
+        self
+    }
+}
+
+impl<'a> From<Cow<'a, str>> for Origin<'a> {
+    fn from(origin: Cow<'a, str>) -> Self {
+        Self::path(origin)
+    }
+}
+
+#[derive(Debug)]
+pub struct OptionCow<'a>(pub(crate) Option<Cow<'a, str>>);
+
+impl<'a, T: Into<Cow<'a, str>>> From<Option<T>> for OptionCow<'a> {
+    fn from(value: Option<T>) -> Self {
+        Self(value.map(Into::into))
+    }
+}
+
+impl<'a> From<&'a Cow<'a, str>> for OptionCow<'a> {
+    fn from(value: &'a Cow<'a, str>) -> Self {
+        Self(Some(Cow::Borrowed(value)))
+    }
+}
+
+impl<'a> From<Cow<'a, str>> for OptionCow<'a> {
+    fn from(value: Cow<'a, str>) -> Self {
+        Self(Some(value))
+    }
+}
+
+impl<'a> From<&'a str> for OptionCow<'a> {
+    fn from(value: &'a str) -> Self {
+        Self(Some(Cow::Borrowed(value)))
+    }
+}
+impl<'a> From<String> for OptionCow<'a> {
+    fn from(value: String) -> Self {
+        Self(Some(Cow::Owned(value)))
+    }
+}
+
+impl<'a> From<&'a String> for OptionCow<'a> {
+    fn from(value: &'a String) -> Self {
+        Self(Some(Cow::Borrowed(value.as_str())))
     }
 }

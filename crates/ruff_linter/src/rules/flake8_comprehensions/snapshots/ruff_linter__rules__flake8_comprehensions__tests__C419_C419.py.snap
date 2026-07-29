@@ -10,11 +10,11 @@ C419 [*] Unnecessary list comprehension
 3 | any(  # first comment
   |
 help: Remove unnecessary comprehension
+  |
   - any([x.id for x in bar])
 1 + any(x.id for x in bar)
 2 | all([x.id for x in bar])
-3 | any(  # first comment
-4 |     [x.id for x in bar],  # second comment
+  |
 note: This is an unsafe fix and may change runtime behavior
 
 C419 [*] Unnecessary list comprehension
@@ -27,12 +27,12 @@ C419 [*] Unnecessary list comprehension
 4 |     [x.id for x in bar],  # second comment
   |
 help: Remove unnecessary comprehension
+  |
 1 | any([x.id for x in bar])
   - all([x.id for x in bar])
 2 + all(x.id for x in bar)
 3 | any(  # first comment
-4 |     [x.id for x in bar],  # second comment
-5 | )  # third comment
+  |
 note: This is an unsafe fix and may change runtime behavior
 
 C419 [*] Unnecessary list comprehension
@@ -46,14 +46,12 @@ C419 [*] Unnecessary list comprehension
 6 | all(  # first comment
   |
 help: Remove unnecessary comprehension
-1 | any([x.id for x in bar])
-2 | all([x.id for x in bar])
+  |
 3 | any(  # first comment
   -     [x.id for x in bar],  # second comment
 4 +     x.id for x in bar  # second comment
 5 | )  # third comment
-6 | all(  # first comment
-7 |     [x.id for x in bar],  # second comment
+  |
 note: This is an unsafe fix and may change runtime behavior
 
 C419 [*] Unnecessary list comprehension
@@ -67,14 +65,12 @@ C419 [*] Unnecessary list comprehension
 9 | any({x.id for x in bar})
   |
 help: Remove unnecessary comprehension
-4  |     [x.id for x in bar],  # second comment
-5  | )  # third comment
-6  | all(  # first comment
-   -     [x.id for x in bar],  # second comment
-7  +     x.id for x in bar  # second comment
-8  | )  # third comment
-9  | any({x.id for x in bar})
-10 |
+  |
+6 | all(  # first comment
+  -     [x.id for x in bar],  # second comment
+7 +     x.id for x in bar  # second comment
+8 | )  # third comment
+  |
 note: This is an unsafe fix and may change runtime behavior
 
 C419 [*] Unnecessary set comprehension
@@ -88,14 +84,12 @@ C419 [*] Unnecessary set comprehension
 11 | # OK
    |
 help: Remove unnecessary comprehension
-6  | all(  # first comment
-7  |     [x.id for x in bar],  # second comment
+   |
 8  | )  # third comment
    - any({x.id for x in bar})
 9  + any(x.id for x in bar)
 10 |
-11 | # OK
-12 | all(x.id for x in bar)
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 C419 [*] Unnecessary list comprehension
@@ -114,8 +108,7 @@ C419 [*] Unnecessary list comprehension
 35 |   )
    |
 help: Remove unnecessary comprehension
-25 |
-26 | # Special comment handling
+   |
 27 | any(
    -     [  # lbracket comment
    -         # second line comment
@@ -128,8 +121,7 @@ help: Remove unnecessary comprehension
    -     ]  # rpar comment
 32 +         for i in range(5)  # rbracket comment  # rpar comment
 33 |     # trailing comment
-34 | )
-35 |
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 C419 [*] Unnecessary list comprehension
@@ -146,8 +138,7 @@ C419 [*] Unnecessary list comprehension
 43 |   )
    |
 help: Remove unnecessary comprehension
-36 |
-37 | # Weird case where the function call, opening bracket, and comment are all
+   |
 38 | # on the same line.
    - any([  # lbracket comment
    -         # second line comment
@@ -158,8 +149,7 @@ help: Remove unnecessary comprehension
 41 + # second line comment
 42 + i.bit_count() for i in range(5)  # rbracket comment  # rpar comment
 43 | )
-44 |
-45 | ## Set comprehensions should only be linted
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 C419 [*] Unnecessary set comprehension
@@ -171,14 +161,12 @@ C419 [*] Unnecessary set comprehension
 50 | all({x.id for x in bar})
    |
 help: Remove unnecessary comprehension
-46 | ## when function is invariant under duplication of inputs
-47 |
+   |
 48 | # should be linted...
    - any({x.id for x in bar})
 49 + any(x.id for x in bar)
 50 | all({x.id for x in bar})
-51 |
-52 | # should be linted in preview...
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 C419 [*] Unnecessary set comprehension
@@ -192,12 +180,10 @@ C419 [*] Unnecessary set comprehension
 52 | # should be linted in preview...
    |
 help: Remove unnecessary comprehension
-47 |
-48 | # should be linted...
+   |
 49 | any({x.id for x in bar})
    - all({x.id for x in bar})
 50 + all(x.id for x in bar)
 51 |
-52 | # should be linted in preview...
-53 | min({x.id for x in bar})
+   |
 note: This is an unsafe fix and may change runtime behavior

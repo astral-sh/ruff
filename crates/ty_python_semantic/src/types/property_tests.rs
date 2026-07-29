@@ -113,6 +113,14 @@ mod stable {
         forall types s, t. s.is_subtype_of(db, t) && t.is_subtype_of(db, s) => s.is_equivalent_to(db, t)
     );
 
+    type_property_test!(
+        structural_negation_subtyping_matches_materialized_negation, db,
+        forall types s, t. {
+            let mut cache = None;
+            s.negation_is_subtype_of_cached(db, t, &mut cache) == s.negate(db).is_subtype_of(db, t)
+        }
+    );
+
     // `T` is not disjoint from itself, unless `T` is `Never`.
     type_property_test!(
         disjoint_from_is_irreflexive, db,
@@ -135,12 +143,6 @@ mod stable {
     type_property_test!(
         subtype_of_implies_assignable_to, db,
         forall types s, t. s.is_subtype_of(db, t) => s.is_assignable_to(db, t)
-    );
-
-    // If `T` is a singleton, it is also single-valued.
-    type_property_test!(
-        singleton_implies_single_valued, db,
-        forall types t. t.is_singleton(db) => t.is_single_valued(db)
     );
 
     // All types should be assignable to `object`

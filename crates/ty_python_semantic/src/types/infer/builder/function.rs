@@ -3,17 +3,18 @@ use crate::{
     reachability::ReachabilityConstraintsExtension,
     types::{
         KnownClass, KnownInstanceType, ParamSpecAttrKind, SubclassOfInner, SubclassOfType, Type,
-        TypeContext, UnionType,
+        TypeContext, TypeVarKind, UnionType,
         diagnostic::{
-            FINAL_ON_NON_METHOD, INVALID_PARAMETER_DEFAULT, INVALID_PARAMSPEC, INVALID_TYPE_FORM,
-            USELESS_OVERLOAD_BODY, add_type_expression_reference_link,
-            is_invalid_typed_dict_literal, report_implicit_return_type,
-            report_invalid_generator_function_return_type, report_invalid_return_type,
-            report_shadowed_type_variable,
+            ABSTRACT_AND_FINAL_METHOD, FINAL_ON_NON_METHOD, INVALID_PARAMETER_DEFAULT,
+            INVALID_PARAMSPEC, INVALID_TYPE_FORM, USELESS_OVERLOAD_BODY,
+            add_type_expression_reference_link, is_invalid_typed_dict_literal,
+            report_implicit_return_type, report_invalid_generator_function_return_type,
+            report_invalid_return_type, report_shadowed_type_variable,
         },
         function::{
             FunctionBodyKind, FunctionDecorators, FunctionLiteral, FunctionType, KnownFunction,
             OverloadLiteral, function_body_kind, is_implicit_classmethod,
+            same_module_uncached_raw_signature,
         },
         generics::{enclosing_generic_contexts, typing_self},
         infer::{
@@ -27,7 +28,7 @@ use crate::{
         },
         infer_definition_types, infer_scope_types,
         signatures::ReturnCallableTypeVarScope,
-        todo_type,
+        tuple::{TupleSpecBuilder, TupleType},
         typed_dict::extract_unpacked_typed_dict_keys_from_kwargs_annotation,
     },
 };
@@ -80,16 +81,18 @@ impl<'db> ExpectedReturnType<'db> {
 
         let public = normalize(
             db,
-            function
-                .last_definition_raw_signature(db, ReturnCallableTypeVarScope::Public)
+            same_module_uncached_raw_signature(db, function, ReturnCallableTypeVarScope::Public)
                 .return_ty,
         );
         let lexical = function_node.type_params.is_some().then(|| {
             normalize(
                 db,
-                function
-                    .last_definition_raw_signature(db, ReturnCallableTypeVarScope::Lexical)
-                    .return_ty,
+                same_module_uncached_raw_signature(
+                    db,
+                    function,
+                    ReturnCallableTypeVarScope::Lexical,
+                )
+                .return_ty,
             )
         });
 
@@ -167,9 +170,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             let enclosing_function = nearest_enclosing_function(db, self.index, self.scope())
                 .expect("should be in a function body scope");
-            let declared_ty = enclosing_function
-                .last_definition_raw_signature(db, ReturnCallableTypeVarScope::Public)
-                .return_ty;
+            let declared_ty = same_module_uncached_raw_signature(
+                db,
+                enclosing_function,
+                ReturnCallableTypeVarScope::Public,
+            )
+            .return_ty;
             let expected_return =
                 ExpectedReturnType::from_function(db, enclosing_function, function);
             let expected_ty = expected_return.public();
@@ -317,7 +323,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let mut decorator_types_and_nodes = Vec::with_capacity(decorator_list.len());
         let mut function_decorators = FunctionDecorators::empty();
-        let mut deprecated = None;
         let mut dataclass_transformer_params = None;
         let mut final_decorator = None;
 
@@ -346,9 +351,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     }
                     _ => {}
                 },
-                Type::KnownInstance(KnownInstanceType::Deprecated(deprecated_inst)) => {
-                    deprecated = Some(deprecated_inst);
-                }
                 Type::DataclassTransformer(params) => {
                     dataclass_transformer_params = Some(params);
                 }
@@ -377,6 +379,20 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 "`@final` cannot be applied to non-method function `{name}`",
             ));
             diagnostic.info("`@final` is only meaningful on methods and classes");
+        }
+
+        if function_decorators
+            .contains(FunctionDecorators::ABSTRACT_METHOD | FunctionDecorators::FINAL)
+            && self
+                .index
+                .scope(self.scope().file_scope_id(db))
+                .kind()
+                .is_class()
+            && let Some(builder) = self.context.report_lint(&ABSTRACT_AND_FINAL_METHOD, name)
+        {
+            builder.into_diagnostic(format_args!(
+                "Method `{name}` cannot be both `@abstractmethod` and `@final`",
+            ));
         }
 
         let has_defaults = parameters
@@ -413,16 +429,24 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             known_function,
             body_scope,
             function_decorators,
-            deprecated,
+            None,
             dataclass_transformer_params,
             function.returns.is_some(),
         );
-        let function_literal = FunctionLiteral {
-            last_definition: overload_literal,
-        };
+        let function_literal = FunctionLiteral::new(db, overload_literal);
+        let function_type = FunctionType::new(db, function_literal, None);
+        let is_decorated_overload_implementation = !decorator_types_and_nodes.is_empty()
+            && function_literal.has_separate_implementation(db);
+        let is_decorated_overload =
+            !decorator_types_and_nodes.is_empty() && overload_literal.is_overload(db);
 
-        let mut inferred_ty =
-            Type::FunctionLiteral(FunctionType::new(db, function_literal, None, None));
+        let mut inferred_ty = Type::FunctionLiteral(
+            if is_decorated_overload_implementation || is_decorated_overload {
+                FunctionType::new(db, function_literal.without_overloads(), None)
+            } else {
+                function_type
+            },
+        );
         if !decorator_list.is_empty() {
             self.undecorated_type = Some(inferred_ty);
         }
@@ -435,12 +459,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 let param_name = type_param.name();
                 for enclosing in enclosing_generic_contexts(db, self.index, current_scope) {
                     if let Some(other_typevar) = enclosing.binds_named_typevar(db, &param_name.id) {
+                        let kind = match type_param {
+                            ast::TypeParam::TypeVar(_) => TypeVarKind::Pep695TypeVar,
+                            ast::TypeParam::ParamSpec(_) => TypeVarKind::Pep695ParamSpec,
+                            ast::TypeParam::TypeVarTuple(_) => TypeVarKind::Pep695TypeVarTuple,
+                        };
                         report_shadowed_type_variable(
                             &self.context,
                             &param_name.id,
                             "function",
                             &function.name.id,
                             function.name.range(),
+                            kind,
                             other_typevar,
                         );
                     }
@@ -449,7 +479,42 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         for (decorator_ty, decorator_node) in decorator_types_and_nodes.iter().rev() {
-            inferred_ty = self.apply_decorator(*decorator_ty, inferred_ty, decorator_node);
+            inferred_ty = if let Type::KnownInstance(KnownInstanceType::Deprecated(deprecated)) =
+                decorator_ty
+                && let Type::FunctionLiteral(function) = inferred_ty
+            {
+                Type::FunctionLiteral(function.with_deprecated(db, *deprecated))
+            } else {
+                self.apply_decorator(*decorator_ty, inferred_ty, decorator_node)
+            };
+        }
+
+        if is_decorated_overload_implementation {
+            let function_type = if let Type::FunctionLiteral(function) = inferred_ty {
+                FunctionType::new(
+                    db,
+                    function_literal
+                        .with_last_definition_metadata(db, function.literal(db).last_definition),
+                    None,
+                )
+            } else {
+                function_type
+            };
+            let implementation_callables = inferred_ty
+                .try_upcast_to_callable(db)
+                .map_or_else(Box::default, |callables| {
+                    callables.iter().copied().collect()
+                });
+            inferred_ty = Type::FunctionLiteral(
+                function_type.with_implementation_callables(db, implementation_callables),
+            );
+        } else if is_decorated_overload && let Type::FunctionLiteral(function) = inferred_ty {
+            inferred_ty = Type::FunctionLiteral(FunctionType::new(
+                db,
+                function_literal
+                    .with_last_definition_metadata(db, function.literal(db).last_definition),
+                None,
+            ));
         }
 
         self.add_declaration_with_binding(
@@ -477,9 +542,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 };
                 let mut diagnostic = builder.into_diagnostic(format_args!(
                     "Useless body for `@overload`-decorated function `{}`",
-                    &function.name
+                    function.name
                 ));
-                diagnostic.set_primary_message("This statement will never be executed");
+                diagnostic.set_primary_annotation_message("This statement will never be executed");
                 diagnostic.info(
                     "`@overload`-decorated functions are solely for type checkers \
                     and must be overwritten at runtime by a non-`@overload`-decorated implementation",
@@ -881,13 +946,23 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let db = self.db();
 
         if let Some(annotation) = parameter.annotation() {
-            let ty = if annotation.is_starred_expr() {
-                todo_type!("PEP 646")
-            } else {
-                let annotated_type = self.file_expression_type(annotation);
-                if let Type::TypeVar(typevar) = annotated_type
-                    && typevar.is_paramspec(db)
+            let annotated_type = self.file_expression_type(annotation);
+            let has_unpacked_annotation = self
+                .file_type_expression_flags(annotation)
+                .contains(TypeExpressionFlags::UNPACK);
+            let ty = match annotated_type {
+                Type::TypeVar(typevar)
+                    if has_unpacked_annotation && typevar.is_typevartuple(db) =>
                 {
+                    Type::tuple(TupleType::new(
+                        db,
+                        &TupleSpecBuilder::with_capacity(0)
+                            .concat_variadic_typevar(db, typevar)
+                            .build(),
+                    ))
+                }
+                _ if has_unpacked_annotation => annotated_type,
+                Type::TypeVar(typevar) if typevar.is_paramspec(db) => {
                     match typevar.paramspec_attr(db) {
                         // `*args: P.args`
                         Some(ParamSpecAttrKind::Args) => annotated_type,
@@ -903,7 +978,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 let mut diag = builder.into_diagnostic(format_args!(
                                     "`{name}.kwargs` is valid only in `**kwargs` annotation",
                                 ));
-                                diag.set_primary_message(format_args!(
+                                diag.set_primary_annotation_message(format_args!(
                                     "Did you mean `{name}.args`?"
                                 ));
                                 add_type_expression_reference_link(diag);
@@ -917,9 +992,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             Type::homogeneous_tuple(db, Type::unknown())
                         }
                     }
-                } else {
-                    Type::homogeneous_tuple(db, annotated_type)
                 }
+                _ => Type::homogeneous_tuple(db, annotated_type),
             };
 
             self.add_declaration_with_binding(
@@ -983,7 +1057,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .as_class_literal()
                 .and_then(|class| class.known(db))
             {
-                if known_class == KnownClass::Staticmethod {
+                if known_class == KnownClass::Staticmethod && function_name != "__new__" {
                     return None;
                 }
 
@@ -1033,7 +1107,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             let mut diag = builder.into_diagnostic(format_args!(
                                 "`{name}.args` is valid only in `*args` annotation",
                             ));
-                            diag.set_primary_message(format_args!("Did you mean `{name}.kwargs`?"));
+                            diag.set_primary_annotation_message(format_args!(
+                                "Did you mean `{name}.kwargs`?"
+                            ));
                             add_type_expression_reference_link(diag);
                         }
                         KnownClass::Dict.to_specialized_instance(
@@ -1084,7 +1160,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     /// in the lambda body scope.
     pub(super) fn infer_lambda_parameter_definition(
         &mut self,
-        index: usize,
+        index: u32,
         parameter_with_default: &'ast ast::ParameterWithDefault,
         lambda: &'ast ast::ExprLambda,
         definition: Definition<'db>,
@@ -1114,7 +1190,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     /// in a lambda expression.
     pub(super) fn infer_variadic_positional_lambda_parameter_definition(
         &mut self,
-        index: usize,
+        index: u32,
         parameter: &'ast ast::Parameter,
         lambda: &'ast ast::ExprLambda,
         definition: Definition<'db>,
@@ -1150,7 +1226,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     /// lambda expression, based on a `Callable` type annotation, if present.
     fn annotated_lambda_parameter_type(
         &mut self,
-        index: usize,
+        index: u32,
         lambda: &'ast ast::ExprLambda,
     ) -> Option<Type<'db>> {
         let enclosing_stmt = infer_statement_types(
@@ -1163,7 +1239,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return None;
         };
 
-        let parameter_type = signature.parameters().as_slice()[index].annotated_type();
+        let parameter_type = signature.parameters().as_slice()[index as usize].annotated_type();
         if parameter_type.is_unknown() || parameter_type.has_unspecialized_type_var(self.db()) {
             None
         } else {

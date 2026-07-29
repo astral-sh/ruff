@@ -8,7 +8,6 @@ PLE0307 `__str__` does not return `str`
 5 |     def __str__(self):
 6 |         return 3.05
   |                ^^^^
-  |
 
 PLE0307 `__str__` does not return `str`
   --> invalid_return_type_str.py:11:16
@@ -17,7 +16,6 @@ PLE0307 `__str__` does not return `str`
 10 |     def __str__(self):
 11 |         return 1
    |                ^
-   |
 
 PLE0307 `__str__` does not return `str`
   --> invalid_return_type_str.py:16:16
@@ -26,7 +24,6 @@ PLE0307 `__str__` does not return `str`
 15 |     def __str__(self):
 16 |         return 0
    |                ^
-   |
 
 PLE0307 `__str__` does not return `str`
   --> invalid_return_type_str.py:21:16
@@ -35,7 +32,6 @@ PLE0307 `__str__` does not return `str`
 20 |     def __str__(self):
 21 |         return False
    |                ^^^^^
-   |
 
 PLE0307 `__str__` does not return `str`
   --> invalid_return_type_str.py:58:9

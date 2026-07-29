@@ -1,10 +1,10 @@
 """This module provides access to the Unicode Character Database which
 defines character properties for all Unicode characters. The data in
 this database is based on the UnicodeData.txt file version
-16.0.0 which is publicly available from ftp://ftp.unicode.org/.
+17.0.0 which is publicly available from ftp://ftp.unicode.org/.
 
 The module uses the same names and symbols as defined by the
-UnicodeData File Format 16.0.0.
+UnicodeData File Format 17.0.0.
 """
 
 import sys
@@ -74,13 +74,29 @@ def is_normalized(form: _NormalizationForm, unistr: str, /) -> bool:
     """
 
 if sys.version_info >= (3, 15):
-    def block(chr: str, /) -> str: ...
-    def extended_pictographic(chr: str, /) -> bool: ...
-    def grapheme_cluster_break(chr: str, /) -> str: ...
-    def indic_conjunct_break(chr: str, /) -> str: ...
-    def isxidstart(chr: str, /) -> bool: ...
-    def isxidcontinue(chr: str, /) -> bool: ...
-    def iter_graphemes(unistr: str, start: int = 0, end: int = sys.maxsize, /) -> Iterator[str]: ...
+    def block(chr: str, /) -> str:
+        """Return block assigned to the character chr."""
+
+    def extended_pictographic(chr: str, /) -> bool:
+        """Returns the Extended_Pictographic property assigned to the character, as boolean."""
+
+    def grapheme_cluster_break(chr: str, /) -> str:
+        """Returns the Grapheme_Cluster_Break property assigned to the character."""
+
+    def indic_conjunct_break(chr: str, /) -> str:
+        """Returns the Indic_Conjunct_Break property assigned to the character."""
+
+    def isxidstart(chr: str, /) -> bool:
+        """Return True if the character has the XID_Start property, else False."""
+
+    def isxidcontinue(chr: str, /) -> bool:
+        """Return True if the character has the XID_Continue property, else False."""
+
+    def iter_graphemes(unistr: str, start: int = 0, end: int = sys.maxsize, /) -> Iterator[str]:
+        """Returns an iterator to iterate over grapheme clusters.
+
+        It uses extended grapheme cluster rules from TR29.
+        """
 
 def lookup(name: str | ReadOnlyBuffer, /) -> str:
     """Look up character by name.

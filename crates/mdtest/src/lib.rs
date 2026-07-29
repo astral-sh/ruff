@@ -35,6 +35,13 @@ mod diagnostic;
 pub mod matcher;
 pub mod parser;
 
+/// Options that customize how an mdtest suite is run.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct RunOptions {
+    /// The rule expected by an otherwise unqualified `# error` assertion.
+    pub default_error_rule: Option<&'static str>,
+}
+
 /// Run `path` as a markdown test suite with given `title`.
 ///
 /// Panic on test failure, and print failure details.
@@ -310,7 +317,6 @@ impl TestFile<'_> {
 pub(crate) fn diagnostic_display_config(tool_name: &'static str) -> DisplayDiagnosticConfig {
     DisplayDiagnosticConfig::new(tool_name)
         .color(false)
-        .show_fix_diff(true)
         .with_fix_applicability(Applicability::DisplayOnly)
         // Surrounding context in source annotations can be confusing in mdtests,
         // since you may get to see context from the *subsequent* code block (all
@@ -531,7 +537,15 @@ pub fn create_diagnostic_snapshot<'d, C>(
     writeln!(snapshot, "---").unwrap();
     writeln!(snapshot).unwrap();
 
-    writeln!(snapshot, "# Python source files").unwrap();
+    let source_heading = if test
+        .files()
+        .all(|file| matches!(file.lang, "py" | "python" | "pyi" | "ipynb"))
+    {
+        "Python source files"
+    } else {
+        "Source files"
+    };
+    writeln!(snapshot, "# {source_heading}").unwrap();
     writeln!(snapshot).unwrap();
     for file in test.files() {
         writeln!(snapshot, "## {}", file.relative_path()).unwrap();

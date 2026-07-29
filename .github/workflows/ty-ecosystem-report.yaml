@@ -20,6 +20,7 @@ env:
   RUST_BACKTRACE: 1
   # Line-tables-only debug info: faster builds, backtraces still work.
   CARGO_PROFILE_PROFILING_DEBUG: line-tables-only
+  ECOSYSTEM_ANALYZER_COMMIT: e2c5b76149b147fae104a7d8fa0997a9eb7f7754
 
 jobs:
   ty-ecosystem-report:
@@ -27,15 +28,15 @@ jobs:
     runs-on: ${{ github.repository == 'astral-sh/ruff' && 'depot-ubuntu-22.04-32' || 'ubuntu-latest' }}
     timeout-minutes: 40
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
       - name: Install the latest version of uv
-        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
         with:
           enable-cache: true
-          version: "0.11.16"
+          version: "0.12.0"
 
       - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
         with:
@@ -57,7 +58,7 @@ jobs:
           mkdir -p ~/.config/ty
           cp .github/ty-ecosystem.toml ~/.config/ty/ty.toml
 
-          uv tool install "git+https://github.com/astral-sh/ecosystem-analyzer@296347b07a34b0b1fffc1cb3e03abacf0fd5df70"
+          uv tool install "git+https://github.com/astral-sh/ecosystem-analyzer@$ECOSYSTEM_ANALYZER_COMMIT"
 
           ecosystem-analyzer \
             --verbose \
@@ -65,7 +66,6 @@ jobs:
             --flaky-runs 20 \
             analyze \
             --profile=profiling \
-            --projects crates/ty_python_semantic/resources/primer/good.txt \
             --output ecosystem-diagnostics.json
 
           mkdir dist

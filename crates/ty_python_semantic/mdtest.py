@@ -34,6 +34,11 @@ DIRS_TO_WATCH: Final = (
     CRATE_ROOT.parent / "mdtest/src",
 )
 MDTEST_DIR: Final = CRATE_ROOT / "resources" / "mdtest"
+LINT_DOCS_DIR: Final = CRATE_ROOT / "resources" / "lint_docs"
+MDTEST_SUITES: Final = (
+    ("mdtest", MDTEST_DIR),
+    ("lint_doc", LINT_DOCS_DIR),
+)
 SNAPSHOTS_DIR: Final = MDTEST_DIR / "snapshots"
 MDTEST_README: Final = CRATE_ROOT / "resources" / "README.md"
 
@@ -55,10 +60,7 @@ class MDTestRunner:
     ) -> None:
         self.mdtest_executable = None
         self.console = Console()
-        self.filters = [
-            f.removesuffix(".md").replace("/", "_").replace("-", "_")
-            for f in (filters or [])
-        ]
+        self.filters = [f.removesuffix(".md") for f in (filters or [])]
         self.enable_external = enable_external
         self.upgrade_lockfiles = upgrade_lockfiles
         self.update_snapshots = update_snapshots
@@ -152,7 +154,7 @@ class MDTestRunner:
         )
 
     @staticmethod
-    def _md_file_for_snapshot(snapshot_path: Path) -> Path | None:
+    def _md_file_for_snapshot(snapshot_path: Path) -> tuple[str, Path] | None:
         """Given a deleted .snap.new path, find the source .md file it belongs to.
 
         Snapshot filenames follow the pattern:
@@ -168,16 +170,24 @@ class MDTestRunner:
         if is_truncated:
             md_filename = md_filename[:-1]
 
-        for md_file in MDTEST_DIR.rglob("*.md"):
-            if is_truncated:
-                if md_file.name.startswith(md_filename):
-                    return md_file.relative_to(MDTEST_DIR)
-            elif md_file.name == md_filename:
-                return md_file.relative_to(MDTEST_DIR)
+        for test_function, mdtest_dir in MDTEST_SUITES:
+            for md_file in mdtest_dir.rglob("*.md"):
+                if is_truncated:
+                    if md_file.name.startswith(md_filename):
+                        return test_function, md_file.relative_to(mdtest_dir)
+                elif md_file.name == md_filename:
+                    return test_function, md_file.relative_to(mdtest_dir)
         return None
 
-    def _run_mdtests_for_file(self, markdown_file: Path) -> None:
-        test_name = f"mdtest::{markdown_file}"
+    @staticmethod
+    def _mdtest_for_path(path: Path) -> tuple[str, Path] | None:
+        for test_function, mdtest_dir in MDTEST_SUITES:
+            if path.is_relative_to(mdtest_dir):
+                return test_function, path.relative_to(mdtest_dir)
+        return None
+
+    def _run_mdtests_for_file(self, test_function: str, markdown_file: Path) -> None:
+        test_name = f"{test_function}::{markdown_file}"
 
         output = self._run_mdtest(["--exact", test_name], capture_output=True)
 
@@ -234,9 +244,9 @@ class MDTestRunner:
         self.console.print("[dim]Ready to watch for changes...[/dim]")
 
         for changes in watch(*DIRS_TO_WATCH):
-            new_md_files: set[Path] = set()
-            changed_md_files: set[Path] = set()
-            rejected_snapshot_md_files: set[Path] = set()
+            new_mdtests: set[tuple[str, Path]] = set()
+            changed_mdtests: set[tuple[str, Path]] = set()
+            rejected_snapshot_mdtests: set[tuple[str, Path]] = set()
             rust_code_has_changed = False
             vendored_typeshed_has_changed = False
 
@@ -261,7 +271,7 @@ class MDTestRunner:
                 ):
                     md_file = self._md_file_for_snapshot(path)
                     if md_file is not None:
-                        rejected_snapshot_md_files.add(md_file)
+                        rejected_snapshot_mdtests.add(md_file)
                     continue
 
                 match path.suffix:
@@ -274,9 +284,8 @@ class MDTestRunner:
                     case _:
                         continue
 
-                try:
-                    relative_path = Path(path).relative_to(MDTEST_DIR)
-                except ValueError:
+                mdtest = self._mdtest_for_path(path)
+                if mdtest is None:
                     continue
 
                 match change:
@@ -286,11 +295,11 @@ class MDTestRunner:
                         # it to the final name. This creates a `deleted` and `added` change.
                         # We treat those files as `changed` here.
                         if (Change.deleted, path_str) in changes:
-                            changed_md_files.add(relative_path)
+                            changed_mdtests.add(mdtest)
                         else:
-                            new_md_files.add(relative_path)
+                            new_mdtests.add(mdtest)
                     case Change.modified:
-                        changed_md_files.add(relative_path)
+                        changed_mdtests.add(mdtest)
                     case Change.deleted:
                         # No need to do anything when a Markdown test is deleted
                         pass
@@ -305,8 +314,10 @@ class MDTestRunner:
             ):
                 self._run_mdtest(self.filters)
 
-            for path in new_md_files | changed_md_files | rejected_snapshot_md_files:
-                self._run_mdtests_for_file(path)
+            for test_function, path in (
+                new_mdtests | changed_mdtests | rejected_snapshot_mdtests
+            ):
+                self._run_mdtests_for_file(test_function, path)
 
 
 def main() -> None:
@@ -316,7 +327,7 @@ def main() -> None:
     parser.add_argument(
         "filters",
         nargs="*",
-        help="Partial paths or mangled names, e.g., 'loops/for.md' or 'loops_for'",
+        help="Partial paths, e.g., 'loops/for.md' or 'invalid-argument-type.md'",
     )
     parser.add_argument(
         "--enable-external",

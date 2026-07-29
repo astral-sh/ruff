@@ -36,13 +36,14 @@ use ruff_linter::rules::{
 use ruff_linter::settings::types::{
     IdentifierPattern, Language, OutputFormat, PreviewMode, PythonVersion, RequiredVersion,
 };
-use ruff_linter::{RuleSelector, warn_user_once};
+use ruff_linter::{UnresolvedRuleSelector, warn_user_once};
 use ruff_macros::{CombineOptions, OptionsMetadata};
 use ruff_options_metadata::{OptionsMetadata, Visit};
 use ruff_python_ast::name::Name;
 use ruff_python_formatter::{DocstringCodeLineWidth, QuoteStyle};
 use ruff_python_semantic::NameImports;
 use ruff_python_stdlib::identifiers::is_identifier;
+use ruff_ranged_value::ValueSourceGuard;
 
 #[derive(Clone, Debug, PartialEq, Eq, Default, OptionsMetadata, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
@@ -105,6 +106,30 @@ pub struct Options {
         "#
     )]
     pub output_format: Option<OutputFormat>,
+
+    /// Whether to prefer rule codes over human-readable rule names in diagnostic output, even
+    /// when preview mode is enabled.
+    ///
+    /// Diagnostics without rule codes, such as syntax errors and formatting diagnostics, will
+    /// continue to use the human-readable name, but those corresponding to lint rules will use the
+    /// rule's code. For example, the concise diagnostic for an unused import will use the code
+    /// `F401` instead of the name `unused-import`:
+    ///
+    /// ```console
+    /// $ ruff check --preview --config 'output-prefer-rule-codes = true' --output-format=concise example.py
+    /// example.py:1:8: F401 [*] `math` imported but unused
+    /// $ ruff check --preview --config 'output-prefer-rule-codes = false' --output-format=concise example.py
+    /// example.py:1:8: unused-import: [*] `math` imported but unused
+    /// ```
+    #[option(
+        default = "false",
+        value_type = "bool",
+        example = r#"
+            # Display rule codes instead of human-readable rule names.
+            output-prefer-rule-codes = true
+        "#
+    )]
+    pub output_prefer_rule_codes: Option<bool>,
 
     /// Enable fix behavior by-default when running `ruff` (overridden
     /// by the `--fix` and `--no-fix` command-line flags).
@@ -256,15 +281,16 @@ pub struct Options {
     /// A list of file patterns to include when linting.
     ///
     /// Inclusion are based on globs, and should be single-path patterns, like
-    /// `*.pyw`, to include any file with the `.pyw` extension. `pyproject.toml` is
-    /// included here not for configuration but because we lint whether e.g. the
-    /// `[project]` matches the schema.
+    /// `*.pyw`, to include any file with the `.pyw` extension.
+    /// `pyproject.toml`, `ruff.toml`, and `.ruff.toml` are included here not for
+    /// configuration but because we lint whether e.g. the `[project]` matches
+    /// the schema in `pyproject.toml` or that rule names are used as selectors.
     ///
     /// Notebook files (`.ipynb` extension) are included by default on Ruff 0.6.0+.
     ///
     /// For more information on the glob syntax, refer to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).
     #[option(
-        default = r#"["*.py", "*.pyi", "*.pyw", "*.ipynb", "*.md", "**/pyproject.toml"]"#,
+        default = r#"["*.py", "*.pyi", "*.pyw", "*.ipynb", "*.md", "**/pyproject.toml", "**/ruff.toml", "**/.ruff.toml"]"#,
         value_type = "list[str]",
         example = r#"
             include = ["*.py"]
@@ -592,9 +618,20 @@ pub fn validate_required_version(required_version: &RequiredVersion) -> anyhow::
 }
 
 /// Newtype wrapper for [`LintCommonOptions`] that allows customizing the JSON schema and omitting the fields from the [`OptionsMetadata`].
-#[derive(Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Default, Serialize)]
 #[serde(transparent)]
 pub struct DeprecatedTopLevelLintOptions(pub LintCommonOptions);
+
+impl<'de> Deserialize<'de> for DeprecatedTopLevelLintOptions {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        // Temporarily disable span information because the flattened values don't retain spans.
+        let _guard = ValueSourceGuard::without_spans();
+        LintCommonOptions::deserialize(deserializer).map(Self)
+    }
+}
 
 impl OptionsMetadata for DeprecatedTopLevelLintOptions {
     fn record(_visit: &mut dyn Visit) {
@@ -696,7 +733,7 @@ pub struct LintCommonOptions {
     #[deprecated(
         note = "The `extend-ignore` option is now interchangeable with [`ignore`](#lint_ignore). Please update your configuration to use the [`ignore`](#lint_ignore) option instead."
     )]
-    pub extend_ignore: Option<Vec<RuleSelector>>,
+    pub extend_ignore: Option<Vec<UnresolvedRuleSelector>>,
 
     /// A list of rule codes or prefixes to enable, in addition to those
     /// specified by [`select`](#lint_select).
@@ -711,7 +748,7 @@ pub struct LintCommonOptions {
     ///
     /// ```toml
     /// [tool.ruff.lint]
-    /// # Adds flake8-bugbear on top of the default rules (E4, E7, E9, F).
+    /// # Adds flake8-bugbear on top of the default rules.
     /// extend-select = ["B"]
     /// ```
     ///
@@ -721,11 +758,11 @@ pub struct LintCommonOptions {
         default = "[]",
         value_type = "list[RuleSelector]",
         example = r#"
-            # On top of the default `select` (`E4`, E7`, `E9`, and `F`), enable flake8-bugbear (`B`) and flake8-quotes (`Q`).
+            # On top of the default `select`, enable flake8-bugbear (`B`) and flake8-quotes (`Q`).
             extend-select = ["B", "Q"]
         "#
     )]
-    pub extend_select: Option<Vec<RuleSelector>>,
+    pub extend_select: Option<Vec<UnresolvedRuleSelector>>,
 
     /// A list of rule codes or prefixes to consider fixable, in addition to those
     /// specified by [`fixable`](#lint_fixable).
@@ -737,14 +774,14 @@ pub struct LintCommonOptions {
             extend-fixable = ["B"]
         "#
     )]
-    pub extend_fixable: Option<Vec<RuleSelector>>,
+    pub extend_fixable: Option<Vec<UnresolvedRuleSelector>>,
 
     /// A list of rule codes or prefixes to consider non-auto-fixable, in addition to those
     /// specified by [`unfixable`](#lint_unfixable).
     #[deprecated(
         note = "The `extend-unfixable` option is now interchangeable with [`unfixable`](#lint_unfixable). Please update your configuration to use the `unfixable` option instead."
     )]
-    pub extend_unfixable: Option<Vec<RuleSelector>>,
+    pub extend_unfixable: Option<Vec<UnresolvedRuleSelector>>,
 
     /// A list of rule codes or prefixes that are unsupported by Ruff, but should be
     /// preserved when (e.g.) validating `# noqa` directives. Useful for
@@ -771,7 +808,7 @@ pub struct LintCommonOptions {
             fixable = ["E", "F"]
         "#
     )]
-    pub fixable: Option<Vec<RuleSelector>>,
+    pub fixable: Option<Vec<UnresolvedRuleSelector>>,
 
     /// A list of rule codes or prefixes to ignore. Prefixes can specify exact
     /// rules (like `F841`), entire categories (like `F`), or anything in
@@ -789,7 +826,7 @@ pub struct LintCommonOptions {
             ignore = ["F841"]
         "#
     )]
-    pub ignore: Option<Vec<RuleSelector>>,
+    pub ignore: Option<Vec<UnresolvedRuleSelector>>,
 
     /// A list of rule codes or prefixes for which unsafe fixes should be considered
     /// safe.
@@ -801,7 +838,7 @@ pub struct LintCommonOptions {
             extend-safe-fixes = ["E", "F401"]
         "#
     )]
-    pub extend_safe_fixes: Option<Vec<RuleSelector>>,
+    pub extend_safe_fixes: Option<Vec<UnresolvedRuleSelector>>,
 
     /// A list of rule codes or prefixes for which safe fixes should be considered
     /// unsafe.
@@ -813,7 +850,7 @@ pub struct LintCommonOptions {
             extend-unsafe-fixes = ["E", "F401"]
         "#
     )]
-    pub extend_unsafe_fixes: Option<Vec<RuleSelector>>,
+    pub extend_unsafe_fixes: Option<Vec<UnresolvedRuleSelector>>,
 
     /// Avoid automatically removing unused imports in `__init__.py` files. Such
     /// imports will still be flagged, but with a dedicated message suggesting
@@ -869,14 +906,14 @@ pub struct LintCommonOptions {
     /// specific prefixes. `ignore` takes precedence over `select` if the
     /// same prefix appears in both.
     #[option(
-        default = r#"["E4", "E7", "E9", "F"]"#,
+        default = r#"See https://docs.astral.sh/ruff/default-rules/ or run `ruff check --show-settings --isolated`"#,
         value_type = "list[RuleSelector]",
         example = r#"
-            # On top of the defaults (`E4`, E7`, `E9`, and `F`), enable flake8-bugbear (`B`) and flake8-quotes (`Q`).
-            select = ["E4", "E7", "E9", "F", "B", "Q"]
+            # On top of the defaults, enable flake8-bugbear (`B`) and flake8-quotes (`Q`).
+            extend-select = ["B", "Q"]
         "#
     )]
-    pub select: Option<Vec<RuleSelector>>,
+    pub select: Option<Vec<UnresolvedRuleSelector>>,
 
     /// Whether to require exact codes to select preview rules. When enabled,
     /// preview rules will not be selected by prefixes — the full code of each
@@ -929,7 +966,7 @@ pub struct LintCommonOptions {
             unfixable = ["F401"]
         "#
     )]
-    pub unfixable: Option<Vec<RuleSelector>>,
+    pub unfixable: Option<Vec<UnresolvedRuleSelector>>,
 
     // WARNING: Don't add new options to this type. Add them to `LintOptions` instead.
     /// Options for the `flake8-annotations` plugin.
@@ -1050,7 +1087,7 @@ pub struct LintCommonOptions {
             "!src/**.py" = ["D"]
         "#
     )]
-    pub per_file_ignores: Option<FxHashMap<String, Vec<RuleSelector>>>,
+    pub per_file_ignores: Option<FxHashMap<String, Vec<UnresolvedRuleSelector>>>,
 
     /// A list of mappings from file pattern to rule codes or prefixes to
     /// exclude, in addition to any rules excluded by [`per-file-ignores`](#lint_per-file-ignores).
@@ -1063,7 +1100,7 @@ pub struct LintCommonOptions {
             "__init__.py" = ["E402"]
         "#
     )]
-    pub extend_per_file_ignores: Option<FxHashMap<String, Vec<RuleSelector>>>,
+    pub extend_per_file_ignores: Option<FxHashMap<String, Vec<UnresolvedRuleSelector>>>,
     // WARNING: Don't add new options to this type. Add them to `LintOptions` instead.
 }
 
@@ -1610,7 +1647,8 @@ pub struct Flake8ImportConventionsOptions {
     pub aliases: Option<FxHashMap<ModuleName, Alias>>,
 
     /// A mapping from module to conventional import alias. These aliases will
-    /// be added to the [`aliases`](#lint_flake8-import-conventions_aliases) mapping.
+    /// be added to the [`aliases`](#lint_flake8-import-conventions_aliases) mapping
+    /// and will override any existing `aliases` if the two settings overlap.
     #[option(
         default = r#"{}"#,
         value_type = "dict[str, str]",
@@ -1734,6 +1772,10 @@ impl Flake8ImportConventionsOptions {
         }
 
         let mut normalized_aliases: FxHashMap<String, String> = FxHashMap::default();
+        #[expect(
+            clippy::iter_over_hash_type,
+            reason = "every invalid alias is rejected, regardless of which one is reported first"
+        )]
         for (module, alias) in aliases {
             let normalized_alias = alias.nfkc().collect::<String>();
             if normalized_alias == "__debug__" {
@@ -3019,7 +3061,9 @@ impl IsortOptions {
         let import_heading = self.import_heading.unwrap_or_default();
 
         // Verify that all sections listed in `import_heading` are defined in `sections`.
-        for section in import_heading.keys() {
+        let mut import_heading_sections = import_heading.keys().collect::<Vec<_>>();
+        import_heading_sections.sort_unstable();
+        for section in import_heading_sections {
             if let ImportSection::UserDefined(section_name) = section {
                 if !sections.contains_key(section_name) {
                     warn_user_once!("`import-heading` contains unknown section: `{:?}`", section,);
@@ -3312,6 +3356,53 @@ pub struct PydocstyleOptions {
     /// [tool.ruff.lint.pydocstyle]
     /// convention = "google"
     /// ```
+    ///
+    /// The PEP 257 convention includes all `D` errors apart from:
+    /// [`D203`](rules/incorrect-blank-line-before-class.md),
+    /// [`D212`](rules/multi-line-summary-first-line.md),
+    /// [`D213`](rules/multi-line-summary-second-line.md),
+    /// [`D214`](rules/overindented-section.md),
+    /// [`D215`](rules/overindented-section-underline.md),
+    /// [`D404`](rules/docstring-starts-with-this.md),
+    /// [`D405`](rules/non-capitalized-section-name.md),
+    /// [`D406`](rules/missing-new-line-after-section-name.md),
+    /// [`D407`](rules/missing-dashed-underline-after-section.md),
+    /// [`D408`](rules/missing-section-underline-after-name.md),
+    /// [`D409`](rules/mismatched-section-underline-length.md),
+    /// [`D410`](rules/no-blank-line-after-section.md),
+    /// [`D411`](rules/no-blank-line-before-section.md),
+    /// [`D413`](rules/missing-blank-line-after-last-section.md),
+    /// [`D415`](rules/missing-terminal-punctuation.md),
+    /// [`D416`](rules/missing-section-name-colon.md),
+    /// [`D417`](rules/undocumented-param.md), and
+    /// [`D420`](rules/incorrect-section-order.md).
+    ///
+    /// The NumPy convention includes all `D` errors apart from:
+    /// [`D107`](rules/undocumented-public-init.md),
+    /// [`D203`](rules/incorrect-blank-line-before-class.md),
+    /// [`D212`](rules/multi-line-summary-first-line.md),
+    /// [`D213`](rules/multi-line-summary-second-line.md),
+    /// [`D402`](rules/signature-in-docstring.md),
+    /// [`D413`](rules/missing-blank-line-after-last-section.md),
+    /// [`D415`](rules/missing-terminal-punctuation.md),
+    /// [`D416`](rules/missing-section-name-colon.md), and
+    /// [`D417`](rules/undocumented-param.md).
+    ///
+    /// The Google convention includes all `D` errors apart from:
+    /// [`D203`](rules/incorrect-blank-line-before-class.md),
+    /// [`D204`](rules/incorrect-blank-line-after-class.md),
+    /// [`D213`](rules/multi-line-summary-second-line.md),
+    /// [`D215`](rules/overindented-section-underline.md),
+    /// [`D400`](rules/missing-trailing-period.md),
+    /// [`D401`](rules/non-imperative-mood.md),
+    /// [`D404`](rules/docstring-starts-with-this.md),
+    /// [`D406`](rules/missing-new-line-after-section-name.md),
+    /// [`D407`](rules/missing-dashed-underline-after-section.md),
+    /// [`D408`](rules/missing-section-underline-after-name.md),
+    /// [`D409`](rules/mismatched-section-underline-length.md), and
+    /// [`D413`](rules/missing-blank-line-after-last-section.md).
+    ///
+    /// For more information see the [FAQ](faq.md#does-ruff-support-numpy-or-google-style-docstrings) entry.
     ///
     /// To enable an additional rule that's excluded from the convention,
     /// select the desired rule via its fully qualified rule code (e.g.,
@@ -4161,22 +4252,22 @@ pub struct LintOptionsWire {
     // common: LintCommonOptions
     allowed_confusables: Option<Vec<char>>,
     dummy_variable_rgx: Option<String>,
-    extend_ignore: Option<Vec<RuleSelector>>,
-    extend_select: Option<Vec<RuleSelector>>,
-    extend_fixable: Option<Vec<RuleSelector>>,
-    extend_unfixable: Option<Vec<RuleSelector>>,
+    extend_ignore: Option<Vec<UnresolvedRuleSelector>>,
+    extend_select: Option<Vec<UnresolvedRuleSelector>>,
+    extend_fixable: Option<Vec<UnresolvedRuleSelector>>,
+    extend_unfixable: Option<Vec<UnresolvedRuleSelector>>,
     external: Option<Vec<String>>,
-    fixable: Option<Vec<RuleSelector>>,
-    ignore: Option<Vec<RuleSelector>>,
-    extend_safe_fixes: Option<Vec<RuleSelector>>,
-    extend_unsafe_fixes: Option<Vec<RuleSelector>>,
+    fixable: Option<Vec<UnresolvedRuleSelector>>,
+    ignore: Option<Vec<UnresolvedRuleSelector>>,
+    extend_safe_fixes: Option<Vec<UnresolvedRuleSelector>>,
+    extend_unsafe_fixes: Option<Vec<UnresolvedRuleSelector>>,
     ignore_init_module_imports: Option<bool>,
     logger_objects: Option<Vec<String>>,
-    select: Option<Vec<RuleSelector>>,
+    select: Option<Vec<UnresolvedRuleSelector>>,
     explicit_preview_rules: Option<bool>,
     task_tags: Option<Vec<String>>,
     typing_modules: Option<Vec<String>>,
-    unfixable: Option<Vec<RuleSelector>>,
+    unfixable: Option<Vec<UnresolvedRuleSelector>>,
     flake8_annotations: Option<Flake8AnnotationsOptions>,
     flake8_bandit: Option<Flake8BanditOptions>,
     flake8_boolean_trap: Option<Flake8BooleanTrapOptions>,
@@ -4202,8 +4293,8 @@ pub struct LintOptionsWire {
     pyflakes: Option<PyflakesOptions>,
     pylint: Option<PylintOptions>,
     pyupgrade: Option<PyUpgradeOptions>,
-    per_file_ignores: Option<FxHashMap<String, Vec<RuleSelector>>>,
-    extend_per_file_ignores: Option<FxHashMap<String, Vec<RuleSelector>>>,
+    per_file_ignores: Option<FxHashMap<String, Vec<UnresolvedRuleSelector>>>,
+    extend_per_file_ignores: Option<FxHashMap<String, Vec<UnresolvedRuleSelector>>>,
 
     exclude: Option<Vec<String>>,
     pydoclint: Option<PydoclintOptions>,

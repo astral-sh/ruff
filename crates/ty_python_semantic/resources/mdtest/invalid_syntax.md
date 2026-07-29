@@ -41,7 +41,6 @@ type pass = 1
 # error: [invalid-syntax]
 def True(for):
     # error: [invalid-syntax]
-    # error: [invalid-syntax]
     pass
 ```
 
@@ -76,7 +75,6 @@ match while:
     # error: [invalid-syntax]
     # error: [unresolved-reference] "Name `case` used when not defined"
     case in:
-        # error: [invalid-syntax]
         # error: [invalid-syntax]
         pass
 ```
@@ -116,7 +114,7 @@ out = (obj[0] := obj).attr
 from typing import Callable
 
 # error: [invalid-syntax] "Expected index or slice expression"
-# error: [invalid-type-form] "Special form `typing.Callable` expected exactly two arguments (parameter types and return type)"
+# error: [invalid-type-form] "Special form `Callable` expected exactly two arguments (parameter types and return type)"
 def _(c: Callable[]):
     reveal_type(c)  # revealed: (...) -> Unknown
 ```

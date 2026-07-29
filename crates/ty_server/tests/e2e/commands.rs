@@ -1,5 +1,5 @@
 use anyhow::Result;
-use lsp_types::{ExecuteCommandParams, WorkDoneProgressParams, request::ExecuteCommand};
+use lsp_types::{ExecuteCommandParams, ExecuteCommandRequest, WorkDoneProgressParams};
 use ruff_db::system::SystemPath;
 
 use crate::{TestServer, TestServerBuilder};
@@ -12,11 +12,11 @@ fn execute_command(
 ) -> Option<serde_json::Value> {
     let params = ExecuteCommandParams {
         command,
-        arguments,
+        arguments: Some(arguments),
         work_done_progress_params: WorkDoneProgressParams::default(),
     };
-    let id = server.send_request::<ExecuteCommand>(params);
-    server.await_response::<ExecuteCommand>(&id)
+    let id = server.send_request::<ExecuteCommandRequest>(params);
+    server.await_response::<ExecuteCommandRequest>(&id)
 }
 
 #[test]

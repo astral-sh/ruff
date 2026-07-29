@@ -79,9 +79,10 @@ class dict_keys(KeysView[_KT_co], Generic[_KT_co, _VT_co]):  # undocumented
     def __eq__(self, value: object, /) -> bool: ...
     def __reversed__(self) -> Iterator[_KT_co]:
         """Return a reverse iterator over the dict keys."""
+
     __hash__: ClassVar[None]  # type: ignore[assignment]
     if sys.version_info >= (3, 13):
-        def isdisjoint(self, other: Iterable[_KT_co], /) -> bool:
+        def isdisjoint(self, other: object, /) -> bool:
             """Return True if the view and the given iterable have a null intersection."""
 
     @property
@@ -102,9 +103,10 @@ class dict_items(ItemsView[_KT_co, _VT_co]):  # undocumented
     def __eq__(self, value: object, /) -> bool: ...
     def __reversed__(self) -> Iterator[tuple[_KT_co, _VT_co]]:
         """Return a reverse iterator over the dict items."""
+
     __hash__: ClassVar[None]  # type: ignore[assignment]
     if sys.version_info >= (3, 13):
-        def isdisjoint(self, other: Iterable[tuple[_KT_co, _VT_co]], /) -> bool:
+        def isdisjoint(self, other: object, /) -> bool:
             """Return True if the view and the given iterable have a null intersection."""
 
     @property

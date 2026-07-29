@@ -5,67 +5,16 @@ expression: lex_source(source)
 ## Tokens
 ```
 [
-    (
-        FStringStart,
-        0..4,
-        TokenFlags(
-            DOUBLE_QUOTES | TRIPLE_QUOTED_STRING | F_STRING,
-        ),
-    ),
-    (
-        InterpolatedStringMiddle(
-            "\n# not a comment ",
-        ),
-        4..21,
-        TokenFlags(
-            DOUBLE_QUOTES | TRIPLE_QUOTED_STRING | F_STRING,
-        ),
-    ),
-    (
-        Lbrace,
-        21..22,
-    ),
-    (
-        Comment,
-        23..34,
-    ),
-    (
-        NonLogicalNewline,
-        34..35,
-    ),
-    (
-        Name(
-            Name("x"),
-        ),
-        39..40,
-    ),
-    (
-        NonLogicalNewline,
-        40..41,
-    ),
-    (
-        Rbrace,
-        41..42,
-    ),
-    (
-        InterpolatedStringMiddle(
-            " # not a comment\n",
-        ),
-        42..59,
-        TokenFlags(
-            DOUBLE_QUOTES | TRIPLE_QUOTED_STRING | F_STRING,
-        ),
-    ),
-    (
-        FStringEnd,
-        59..62,
-        TokenFlags(
-            DOUBLE_QUOTES | TRIPLE_QUOTED_STRING | F_STRING,
-        ),
-    ),
-    (
-        Newline,
-        62..62,
-    ),
+    FStringStart 0..4 (flags = DOUBLE_QUOTES | TRIPLE_QUOTED_STRING | F_STRING),
+    FStringMiddle 4..21 (flags = DOUBLE_QUOTES | TRIPLE_QUOTED_STRING | F_STRING),
+    Lbrace 21..22,
+    Comment 23..34,
+    NonLogicalNewline 34..35,
+    Name 39..40,
+    NonLogicalNewline 40..41,
+    Rbrace 41..42,
+    FStringMiddle 42..59 (flags = DOUBLE_QUOTES | TRIPLE_QUOTED_STRING | F_STRING),
+    FStringEnd 59..62 (flags = DOUBLE_QUOTES | TRIPLE_QUOTED_STRING | F_STRING),
+    Newline 62..62,
 ]
 ```

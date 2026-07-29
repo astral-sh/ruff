@@ -166,6 +166,7 @@ class DatagramProtocol(BaseProtocol):
         To receive data, wait for data_received() calls.
         When the connection is closed, connection_lost() is called.
         """
+
     # addr can be a tuple[int, int] for some unusual protocols like socket.AF_NETLINK.
     # Use tuple[str | Any, int] to not cause typechecking issues on most usual cases.
     # This could be improved by using tuple[AnyOf[str, int], int] if the AnyOf feature is accepted.

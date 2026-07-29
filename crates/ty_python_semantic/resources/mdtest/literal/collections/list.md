@@ -67,7 +67,7 @@ yy = reveal_type([None])  # revealed: list[None | Unknown]
 reveal_type(yy)  # revealed: list[None | Unknown]
 
 # Bare `list` in a type expression is equivalent to `list[Unknown]`
-zz: list = [None]
+zz: list = [None]  # error: [missing-type-argument]
 reveal_type(zz)  # revealed: list[Unknown]
 
 # Promotion only happens if we're in invariant contexts,

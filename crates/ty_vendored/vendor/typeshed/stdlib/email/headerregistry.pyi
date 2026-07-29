@@ -337,6 +337,7 @@ class Address:
         without any Content Transfer Encoding.
 
         """
+
     __hash__: ClassVar[None]  # type: ignore[assignment]
     def __eq__(self, other: object) -> bool: ...
 
@@ -360,5 +361,6 @@ class Group:
         the addresses list.
 
         """
+
     __hash__: ClassVar[None]  # type: ignore[assignment]
     def __eq__(self, other: object) -> bool: ...

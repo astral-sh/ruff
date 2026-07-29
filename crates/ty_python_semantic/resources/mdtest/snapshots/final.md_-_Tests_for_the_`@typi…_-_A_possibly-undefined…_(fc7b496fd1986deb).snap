@@ -96,7 +96,6 @@ error[override-of-final-method]: Cannot override `A.method1`
    |
 40 |     def method1(self) -> None: ...  # error: [override-of-final-method]
    |         ^^^^^^^ Overrides a definition from superclass `A`
-   |
 info: `A.method1` is decorated with `@final`, forbidding overrides
  --> src/mdtest_snippet.py:8:9
   |
@@ -104,16 +103,13 @@ info: `A.method1` is decorated with `@final`, forbidding overrides
   |         ------
 9 |         def method1(self) -> None: ...
   |             ------- `A.method1` defined here
-  |
 help: Remove the override of `method1`
-37 |         def method4(self) -> None: ...
-38 |
+   |
 39 | class B(A):
    -     def method1(self) -> None: ...  # error: [override-of-final-method]
 40 +       # error: [override-of-final-method]
 41 |     def method2(self) -> None: ...  # error: [override-of-final-method]
-42 |     def method3(self) -> None: ...  # error: [override-of-final-method]
-43 |
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 ```
@@ -124,7 +120,6 @@ error[override-of-final-method]: Cannot override `A.method2`
    |
 41 |     def method2(self) -> None: ...  # error: [override-of-final-method]
    |         ^^^^^^^ Overrides a definition from superclass `A`
-   |
 info: `A.method2` is decorated with `@final`, forbidding overrides
   --> src/mdtest_snippet.py:18:9
    |
@@ -132,16 +127,13 @@ info: `A.method2` is decorated with `@final`, forbidding overrides
    |         ------
 19 |         def method2(self) -> None: ...
    |             ------- `A.method2` defined here
-   |
 help: Remove the override of `method2`
-38 |
-39 | class B(A):
+   |
 40 |     def method1(self) -> None: ...  # error: [override-of-final-method]
    -     def method2(self) -> None: ...  # error: [override-of-final-method]
 41 +       # error: [override-of-final-method]
 42 |     def method3(self) -> None: ...  # error: [override-of-final-method]
-43 |
-44 |     # check that autofixes don't introduce invalid syntax
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 ```
@@ -152,7 +144,6 @@ error[override-of-final-method]: Cannot override `A.method3`
    |
 42 |     def method3(self) -> None: ...  # error: [override-of-final-method]
    |         ^^^^^^^ Overrides a definition from superclass `A`
-   |
 info: `A.method3` is decorated with `@final`, forbidding overrides
   --> src/mdtest_snippet.py:22:9
    |
@@ -160,16 +151,13 @@ info: `A.method3` is decorated with `@final`, forbidding overrides
    |         ------
 23 |         def method3(self) -> None: ...
    |             ------- `A.method3` defined here
-   |
 help: Remove the override of `method3`
-39 | class B(A):
-40 |     def method1(self) -> None: ...  # error: [override-of-final-method]
+   |
 41 |     def method2(self) -> None: ...  # error: [override-of-final-method]
    -     def method3(self) -> None: ...  # error: [override-of-final-method]
 42 +       # error: [override-of-final-method]
 43 |
-44 |     # check that autofixes don't introduce invalid syntax
-45 |     # if there are multiple statements on one line
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 ```
@@ -180,7 +168,6 @@ error[override-of-final-method]: Cannot override `A.method4`
    |
 49 |     method4 = 42
    |     ^^^^^^^ Overrides a definition from superclass `A`
-   |
 info: `A.method4` is decorated with `@final`, forbidding overrides
   --> src/mdtest_snippet.py:33:9
    |
@@ -188,7 +175,6 @@ info: `A.method4` is decorated with `@final`, forbidding overrides
    |         ------
 34 |         def method4(self) -> None: ...
    |             ------- `A.method4` defined here
-   |
 help: Remove the override of `method4`
 
 ```
@@ -199,7 +185,6 @@ error[override-of-final-method]: Cannot override `A.method1`
    |
 55 |         def method1(self) -> None: ...  # error: [override-of-final-method]
    |             ^^^^^^^ Overrides a definition from superclass `A`
-   |
 info: `A.method1` is decorated with `@final`, forbidding overrides
  --> src/mdtest_snippet.py:8:9
   |
@@ -207,7 +192,6 @@ info: `A.method1` is decorated with `@final`, forbidding overrides
   |         ------
 9 |         def method1(self) -> None: ...
   |             ------- `A.method1` defined here
-  |
 help: Remove the override of `method1`
 
 ```
@@ -218,7 +202,6 @@ error[override-of-final-method]: Cannot override `A.method2`
    |
 61 |         def method2(self) -> None: ...  # error: [override-of-final-method]
    |             ^^^^^^^ Overrides a definition from superclass `A`
-   |
 info: `A.method2` is decorated with `@final`, forbidding overrides
   --> src/mdtest_snippet.py:18:9
    |
@@ -226,7 +209,6 @@ info: `A.method2` is decorated with `@final`, forbidding overrides
    |         ------
 19 |         def method2(self) -> None: ...
    |             ------- `A.method2` defined here
-   |
 help: Remove the override of `method2`
 
 ```
@@ -237,7 +219,6 @@ error[override-of-final-method]: Cannot override `A.method3`
    |
 67 |         def method3(self) -> None: ...  # error: [override-of-final-method]
    |             ^^^^^^^ Overrides a definition from superclass `A`
-   |
 info: `A.method3` is decorated with `@final`, forbidding overrides
   --> src/mdtest_snippet.py:22:9
    |
@@ -245,7 +226,6 @@ info: `A.method3` is decorated with `@final`, forbidding overrides
    |         ------
 23 |         def method3(self) -> None: ...
    |             ------- `A.method3` defined here
-   |
 help: Remove the override of `method3`
 
 ```
@@ -256,7 +236,6 @@ error[override-of-final-method]: Cannot override `A.method4`
    |
 71 |         method4 = 42  # error: [override-of-final-method]
    |         ^^^^^^^ Overrides a definition from superclass `A`
-   |
 info: `A.method4` is decorated with `@final`, forbidding overrides
   --> src/mdtest_snippet.py:33:9
    |
@@ -264,7 +243,6 @@ info: `A.method4` is decorated with `@final`, forbidding overrides
    |         ------
 34 |         def method4(self) -> None: ...
    |             ------- `A.method4` defined here
-   |
 help: Remove the override of `method4`
 
 ```

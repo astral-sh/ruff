@@ -27,7 +27,6 @@ PLW0244 Slot `a` redefined from base class `AnotherBase`
 22 | class AnotherChild(AnotherBase):
 23 |     __slots__ = ["a","b","e","f"]
    |                  ^^^
-   |
 
 PLW0244 Slot `b` redefined from base class `AnotherBase`
   --> redefined_slots_in_subclass.py:23:22
@@ -35,4 +34,3 @@ PLW0244 Slot `b` redefined from base class `AnotherBase`
 22 | class AnotherChild(AnotherBase):
 23 |     __slots__ = ["a","b","e","f"]
    |                      ^^^
-   |

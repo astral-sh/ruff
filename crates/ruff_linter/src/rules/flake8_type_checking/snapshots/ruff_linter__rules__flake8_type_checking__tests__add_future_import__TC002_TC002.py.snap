@@ -11,18 +11,18 @@ TC002 [*] Move third-party import `pandas` into a type-checking block
 7 |     x: pd.DataFrame
   |
 help: Move into type-checking block
-1  | """Tests to determine accurate detection of typing-only imports."""
-2  + from typing import TYPE_CHECKING
-3  +
-4  + if TYPE_CHECKING:
-5  +     import pandas as pd
-6  |
-7  |
-8  | def f():
-   -     import pandas as pd  # TC002
-9  |
-10 |     x: pd.DataFrame
-11 |
+  |
+1 | """Tests to determine accurate detection of typing-only imports."""
+2 + from typing import TYPE_CHECKING
+3 +
+4 + if TYPE_CHECKING:
+5 +     import pandas as pd
+6 |
+7 |
+8 | def f():
+  -     import pandas as pd  # TC002
+9 |
+  |
 note: This is an unsafe fix and may change runtime behavior
 
 TC002 [*] Move third-party import `pandas.DataFrame` into a type-checking block
@@ -35,22 +35,18 @@ TC002 [*] Move third-party import `pandas.DataFrame` into a type-checking block
 13 |     x: DataFrame
    |
 help: Move into type-checking block
+   |
 1  | """Tests to determine accurate detection of typing-only imports."""
 2  + from typing import TYPE_CHECKING
 3  +
 4  + if TYPE_CHECKING:
 5  +     from pandas import DataFrame
 6  |
-7  |
-8  | def f():
 --------------------------------------------------------------------------------
-12 |
-13 |
 14 | def f():
    -     from pandas import DataFrame  # TC002
 15 |
-16 |     x: DataFrame
-17 |
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 TC002 [*] Move third-party import `pandas.DataFrame` into a type-checking block
@@ -63,22 +59,18 @@ TC002 [*] Move third-party import `pandas.DataFrame` into a type-checking block
 19 |     x: df
    |
 help: Move into type-checking block
+   |
 1  | """Tests to determine accurate detection of typing-only imports."""
 2  + from typing import TYPE_CHECKING
 3  +
 4  + if TYPE_CHECKING:
 5  +     from pandas import DataFrame as df
 6  |
-7  |
-8  | def f():
 --------------------------------------------------------------------------------
-18 |
-19 |
 20 | def f():
    -     from pandas import DataFrame as df  # TC002
 21 |
-22 |     x: df
-23 |
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 TC002 [*] Move third-party import `pandas` into a type-checking block
@@ -91,22 +83,18 @@ TC002 [*] Move third-party import `pandas` into a type-checking block
 25 |     x: pd.DataFrame = 1
    |
 help: Move into type-checking block
+   |
 1  | """Tests to determine accurate detection of typing-only imports."""
 2  + from typing import TYPE_CHECKING
 3  +
 4  + if TYPE_CHECKING:
 5  +     import pandas as pd
 6  |
-7  |
-8  | def f():
 --------------------------------------------------------------------------------
-24 |
-25 |
 26 | def f():
    -     import pandas as pd  # TC002
 27 |
-28 |     x: pd.DataFrame = 1
-29 |
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 TC002 [*] Move third-party import `pandas.DataFrame` into a type-checking block
@@ -119,22 +107,18 @@ TC002 [*] Move third-party import `pandas.DataFrame` into a type-checking block
 31 |     x: DataFrame = 2
    |
 help: Move into type-checking block
+   |
 1  | """Tests to determine accurate detection of typing-only imports."""
 2  + from typing import TYPE_CHECKING
 3  +
 4  + if TYPE_CHECKING:
 5  +     from pandas import DataFrame
 6  |
-7  |
-8  | def f():
 --------------------------------------------------------------------------------
-30 |
-31 |
 32 | def f():
    -     from pandas import DataFrame  # TC002
 33 |
-34 |     x: DataFrame = 2
-35 |
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 TC002 [*] Move third-party import `pandas.DataFrame` into a type-checking block
@@ -147,22 +131,18 @@ TC002 [*] Move third-party import `pandas.DataFrame` into a type-checking block
 37 |     x: df = 3
    |
 help: Move into type-checking block
+   |
 1  | """Tests to determine accurate detection of typing-only imports."""
 2  + from typing import TYPE_CHECKING
 3  +
 4  + if TYPE_CHECKING:
 5  +     from pandas import DataFrame as df
 6  |
-7  |
-8  | def f():
 --------------------------------------------------------------------------------
-36 |
-37 |
 38 | def f():
    -     from pandas import DataFrame as df  # TC002
 39 |
-40 |     x: df = 3
-41 |
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 TC002 [*] Move third-party import `pandas` into a type-checking block
@@ -175,22 +155,18 @@ TC002 [*] Move third-party import `pandas` into a type-checking block
 43 |     x: "pd.DataFrame" = 1
    |
 help: Move into type-checking block
+   |
 1  | """Tests to determine accurate detection of typing-only imports."""
 2  + from typing import TYPE_CHECKING
 3  +
 4  + if TYPE_CHECKING:
 5  +     import pandas as pd
 6  |
-7  |
-8  | def f():
 --------------------------------------------------------------------------------
-42 |
-43 |
 44 | def f():
    -     import pandas as pd  # TC002
 45 |
-46 |     x: "pd.DataFrame" = 1
-47 |
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 TC002 [*] Move third-party import `pandas` into a type-checking block
@@ -203,20 +179,16 @@ TC002 [*] Move third-party import `pandas` into a type-checking block
 49 |     x = dict["pd.DataFrame", "pd.DataFrame"]
    |
 help: Move into type-checking block
+   |
 1  | """Tests to determine accurate detection of typing-only imports."""
 2  + from typing import TYPE_CHECKING
 3  +
 4  + if TYPE_CHECKING:
 5  +     import pandas as pd
 6  |
-7  |
-8  | def f():
 --------------------------------------------------------------------------------
-48 |
-49 |
 50 | def f():
    -     import pandas as pd  # TC002
 51 |
-52 |     x = dict["pd.DataFrame", "pd.DataFrame"]
-53 |
+   |
 note: This is an unsafe fix and may change runtime behavior

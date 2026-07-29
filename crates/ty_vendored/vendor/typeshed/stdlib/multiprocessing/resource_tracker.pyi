@@ -18,6 +18,7 @@ class ResourceTracker:
 
     def unregister(self, name: Sized, rtype: str) -> None:
         """Unregister name of resource with resource tracker."""
+
     if sys.version_info >= (3, 12):
         def __del__(self) -> None: ...
 

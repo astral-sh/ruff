@@ -5,87 +5,24 @@ expression: double_dedent_with_eol(MAC_EOL)
 ## Tokens
 ```
 [
-    (
-        Def,
-        0..3,
-    ),
-    (
-        Name(
-            Name("foo"),
-        ),
-        4..7,
-    ),
-    (
-        Lpar,
-        7..8,
-    ),
-    (
-        Rpar,
-        8..9,
-    ),
-    (
-        Colon,
-        9..10,
-    ),
-    (
-        Newline,
-        10..11,
-    ),
-    (
-        Indent,
-        11..12,
-    ),
-    (
-        If,
-        12..14,
-    ),
-    (
-        Name(
-            Name("x"),
-        ),
-        15..16,
-    ),
-    (
-        Colon,
-        16..17,
-    ),
-    (
-        Newline,
-        17..18,
-    ),
-    (
-        NonLogicalNewline,
-        18..19,
-    ),
-    (
-        Indent,
-        19..21,
-    ),
-    (
-        Return,
-        21..27,
-    ),
-    (
-        Int(
-            99,
-        ),
-        28..30,
-    ),
-    (
-        Newline,
-        30..31,
-    ),
-    (
-        NonLogicalNewline,
-        31..32,
-    ),
-    (
-        Dedent,
-        32..32,
-    ),
-    (
-        Dedent,
-        32..32,
-    ),
+    Def 0..3,
+    Name 4..7,
+    Lpar 7..8,
+    Rpar 8..9,
+    Colon 9..10,
+    Newline 10..11,
+    Indent 11..12,
+    If 12..14,
+    Name 15..16,
+    Colon 16..17,
+    Newline 17..18,
+    NonLogicalNewline 18..19,
+    Indent 19..21,
+    Return 21..27,
+    Int 28..30,
+    Newline 30..31,
+    NonLogicalNewline 31..32,
+    Dedent 32..32,
+    Dedent 32..32,
 ]
 ```

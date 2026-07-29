@@ -95,6 +95,7 @@ class TestResult:
         'err' is None if the subtest ended successfully, otherwise it's a
         tuple of values as returned by sys.exc_info().
         """
+
     if sys.version_info >= (3, 12):
         def addDuration(self, test: unittest.case.TestCase, elapsed: float) -> None:
             """Called when a test finished to run, regardless of its outcome.

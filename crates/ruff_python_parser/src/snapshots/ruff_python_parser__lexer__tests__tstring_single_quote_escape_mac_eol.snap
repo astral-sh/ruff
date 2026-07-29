@@ -5,32 +5,9 @@ expression: tstring_single_quote_escape_eol(MAC_EOL)
 ## Tokens
 ```
 [
-    (
-        TStringStart,
-        0..2,
-        TokenFlags(
-            T_STRING,
-        ),
-    ),
-    (
-        InterpolatedStringMiddle(
-            "text \\\r more text",
-        ),
-        2..19,
-        TokenFlags(
-            T_STRING,
-        ),
-    ),
-    (
-        TStringEnd,
-        19..20,
-        TokenFlags(
-            T_STRING,
-        ),
-    ),
-    (
-        Newline,
-        20..20,
-    ),
+    TStringStart 0..2 (flags = T_STRING),
+    TStringMiddle 2..19 (flags = T_STRING),
+    TStringEnd 19..20 (flags = T_STRING),
+    Newline 20..20,
 ]
 ```

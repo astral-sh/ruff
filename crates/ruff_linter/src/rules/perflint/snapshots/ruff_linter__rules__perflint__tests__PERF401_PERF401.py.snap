@@ -8,7 +8,6 @@ PERF401 Use a list comprehension to create a transformed list
 5 |         if i % 2:
 6 |             result.append(i)  # PERF401
   |             ^^^^^^^^^^^^^^^^
-  |
 help: Replace for loop with list comprehension
 
 PERF401 Use a list comprehension to create a transformed list
@@ -18,7 +17,6 @@ PERF401 Use a list comprehension to create a transformed list
 12 |     for i in items:
 13 |         result.append(i * i)  # PERF401
    |         ^^^^^^^^^^^^^^^^^^^^
-   |
 help: Replace for loop with list comprehension
 
 PERF401 Use an async list comprehension to create a transformed list
@@ -28,7 +26,6 @@ PERF401 Use an async list comprehension to create a transformed list
 81 |         if i % 2:
 82 |             result.append(i)  # PERF401
    |             ^^^^^^^^^^^^^^^^
-   |
 help: Replace for loop with list comprehension
 
 PERF401 Use an async list comprehension to create a transformed list
@@ -38,7 +35,6 @@ PERF401 Use an async list comprehension to create a transformed list
 88 |     async for i in items:
 89 |         result.append(i)  # PERF401
    |         ^^^^^^^^^^^^^^^^
-   |
 help: Replace for loop with list comprehension
 
 PERF401 Use `list.extend` with an async comprehension to create a transformed list
@@ -48,7 +44,6 @@ PERF401 Use `list.extend` with an async comprehension to create a transformed li
 95 |     async for i in items:
 96 |         result.append(i)  # PERF401
    |         ^^^^^^^^^^^^^^^^
-   |
 help: Replace for loop with list.extend
 
 PERF401 Use `list.extend` to create a transformed list
@@ -58,7 +53,6 @@ PERF401 Use `list.extend` to create a transformed list
 101 |     for i in range(10):
 102 |         result.append(i * 2)  # PERF401
     |         ^^^^^^^^^^^^^^^^^^^^
-    |
 help: Replace for loop with list.extend
 
 PERF401 Use `list.extend` to create a transformed list
@@ -68,7 +62,6 @@ PERF401 Use `list.extend` to create a transformed list
 110 |             if i % 2:  # single-line comment 3 should be protected
 111 |                 result.append(i)  # PERF401
     |                 ^^^^^^^^^^^^^^^^
-    |
 help: Replace for loop with list.extend
 
 PERF401 Use a list comprehension to create a transformed list
@@ -78,7 +71,6 @@ PERF401 Use a list comprehension to create a transformed list
 118 |         if i % 2:  # single-line comment 3 should be protected
 119 |             result.append(i)  # PERF401
     |             ^^^^^^^^^^^^^^^^
-    |
 help: Replace for loop with list comprehension
 
 PERF401 Use a list comprehension to create a transformed list
@@ -88,7 +80,6 @@ PERF401 Use a list comprehension to create a transformed list
 134 |         for value in param:
 135 |             new_layers.append(value * 3)
     |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-    |
 help: Replace for loop with list comprehension
 
 PERF401 Use a list comprehension to create a transformed list
@@ -98,7 +89,6 @@ PERF401 Use a list comprehension to create a transformed list
 141 |     for _ in range(10):
 142 |         result.append(var + 1)  # PERF401
     |         ^^^^^^^^^^^^^^^^^^^^^^
-    |
 help: Replace for loop with list comprehension
 
 PERF401 Use a list comprehension to create a transformed list
@@ -108,7 +98,6 @@ PERF401 Use a list comprehension to create a transformed list
 148 |     for i in range(10):
 149 |         result.append(i + 1)  # PERF401
     |         ^^^^^^^^^^^^^^^^^^^^
-    |
 help: Replace for loop with list comprehension
 
 PERF401 Use a list comprehension to create a transformed list
@@ -118,7 +107,6 @@ PERF401 Use a list comprehension to create a transformed list
 155 |     for i in range(10):
 156 |         result.append(i + 1)  # PERF401
     |         ^^^^^^^^^^^^^^^^^^^^
-    |
 help: Replace for loop with list comprehension
 
 PERF401 Use a list comprehension to create a transformed list
@@ -128,7 +116,6 @@ PERF401 Use a list comprehension to create a transformed list
 161 |     for i in range(10):
 162 |         result.append(i * 2)  # PERF401
     |         ^^^^^^^^^^^^^^^^^^^^
-    |
 help: Replace for loop with list comprehension
 
 PERF401 Use `list.extend` to create a transformed list
@@ -138,7 +125,6 @@ PERF401 Use `list.extend` to create a transformed list
 168 |     for i in range(10):
 169 |         result.append(i * 2)  # PERF401
     |         ^^^^^^^^^^^^^^^^^^^^
-    |
 help: Replace for loop with list.extend
 
 PERF401 Use a list comprehension to create a transformed list
@@ -160,7 +146,6 @@ PERF401 Use a list comprehension to create a transformed list
 197 |     for i in i:
 198 |         result.append(i + 1)  # PERF401
     |         ^^^^^^^^^^^^^^^^^^^^
-    |
 help: Replace for loop with list comprehension
 
 PERF401 Use a list comprehension to create a transformed list
@@ -176,7 +161,6 @@ PERF401 Use a list comprehension to create a transformed list
 215 | |                 )
 216 | |             )  # PERF401
     | |_____________^
-    |
 help: Replace for loop with list comprehension
 
 PERF401 Use a list comprehension to create a transformed list
@@ -186,7 +170,6 @@ PERF401 Use a list comprehension to create a transformed list
 221 |     for i in range(10):
 222 |         result.append(i * 2)  # PERF401
     |         ^^^^^^^^^^^^^^^^^^^^
-    |
 help: Replace for loop with list comprehension
 
 PERF401 Use a list comprehension to create a transformed list
@@ -314,5 +297,4 @@ PERF401 Use a list comprehension to create a transformed list
 327 |         if i > 0:
 328 |             filtered.append(i)
     |             ^^^^^^^^^^^^^^^^^^
-    |
 help: Replace for loop with list comprehension

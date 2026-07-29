@@ -95,6 +95,7 @@ class Frame:
 
         def __le__(self, other: Frame) -> bool:
             """Return a <= b.  Computed by @total_ordering from (a < b) or (a == b)."""
+
     else:
         def __gt__(self, other: Frame, NotImplemented: Any = ...) -> bool:
             """Return a > b.  Computed by @total_ordering from (not a < b) and (a != b)."""
@@ -154,6 +155,7 @@ class Traceback(Sequence[Frame]):
 
         def __le__(self, other: Traceback) -> bool:
             """Return a <= b.  Computed by @total_ordering from (a < b) or (a == b)."""
+
     else:
         def __gt__(self, other: Traceback, NotImplemented: Any = ...) -> bool:
             """Return a > b.  Computed by @total_ordering from (not a < b) and (a != b)."""
@@ -200,5 +202,6 @@ class Snapshot:
         Group statistics by key_type. Return a sorted list of Statistic
         instances.
         """
+
     traceback_limit: int
     traces: Sequence[Trace]

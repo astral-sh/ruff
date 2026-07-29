@@ -16,7 +16,10 @@ use ruff_db::source::{SourceText, line_index, source_text};
 use ruff_source_file::{LineIndex, OneIndexed};
 use smallvec::SmallVec;
 
-use crate::assertion::{InlineFileAssertions, LineAssertions, ParsedAssertion, UnparsedAssertion};
+use crate::RunOptions;
+use crate::assertion::{
+    AssertionSource, InlineFileAssertions, LineAssertions, ParsedAssertion, UnparsedAssertion,
+};
 use crate::diagnostic::SortedDiagnostics;
 
 #[derive(Debug, Default)]
@@ -91,29 +94,39 @@ pub fn match_file(
     db: &dyn Db,
     file: File,
     diagnostics: &[Diagnostic],
+    options: RunOptions,
 ) -> Result<Vec<Diagnostic>, FailuresByLine> {
     // Parse assertions from comments in the file, and get diagnostics from the file; both
     // ordered by line number.
     let source = source_text(db, file);
-    let parsed = parsed_module(db, file).load(db);
     let line_index = line_index(db, file);
-    let assertions = InlineFileAssertions::from_file(&source, &parsed, &line_index);
+    let (assertions, diagnostics) = if file.path(db).extension() == Some("toml") {
+        let assertions =
+            InlineFileAssertions::from_file(source.as_str(), AssertionSource::Toml, &line_index);
+        let diagnostics = SortedDiagnostics::new(diagnostics, &|diagnostic_range| {
+            line_index.line_index(diagnostic_range.start())
+        });
+        (assertions, diagnostics)
+    } else {
+        let parsed = parsed_module(db, file).load(db);
+        let assertions = InlineFileAssertions::from_file(
+            source.as_str(),
+            AssertionSource::Python(&parsed),
+            &line_index,
+        );
 
-    // Sort diagnostics according to the line number of the starting offset of the token in which the diagnostic appears.
-    //
-    // This can be different to the line number of the starting offset of the diagnostic range!
-    // For example, if the diagnostic is a syntax error inside a stringized annotation,
-    // the syntax error's range will likely point to a sub-range of the string literal,
-    // which will make the error unmatchable by mdtest unless we look at the token in which
-    // the diagnostic occurs (the string-literal) and use the token start as the basis for
-    // the line number.
-    let diagnostics = SortedDiagnostics::new(diagnostics, &|diagnostic_range| {
-        let token_start = parsed
-            .tokens()
-            .token_range(diagnostic_range.start())
-            .start();
-        line_index.line_index(token_start)
-    });
+        // Sort diagnostics according to the line number of the starting offset of the token in
+        // which the diagnostic appears. This can differ from the line containing the start of the
+        // diagnostic range, for example for syntax errors inside stringized annotations.
+        let diagnostics = SortedDiagnostics::new(diagnostics, &|diagnostic_range| {
+            let token_start = parsed
+                .tokens()
+                .token_range(diagnostic_range.start())
+                .start();
+            line_index.line_index(token_start)
+        });
+        (assertions, diagnostics)
+    };
 
     let mut line_diagnostics = diagnostics.iter_lines();
 
@@ -122,7 +135,7 @@ pub fn match_file(
     let mut current_assertions = line_assertions.next();
     let mut current_diagnostics = line_diagnostics.next();
 
-    let matcher = Matcher::from_file(db, file);
+    let matcher = Matcher::from_file(db, file, options);
     let mut failures = FailuresByLine::default();
     let mut snapshot_diagnostics: Vec<Diagnostic> = Vec::new();
 
@@ -260,31 +273,13 @@ impl UnmatchedWithColumn for &Diagnostic {
 
 /// Discard `@Todo`-type metadata from expected types, which is not available
 /// when running in release mode.
-///
-/// Some `@Todo` variants (like `@Todo(StarredExpression)` and `@Todo(typing.Unpack)`)
-/// are hardcoded enum variants that always display their message, so we preserve those.
 fn discard_todo_metadata(ty: &str) -> Cow<'_, str> {
     #[cfg(not(debug_assertions))]
     {
-        /// `@Todo` variants that are hardcoded and always display their message,
-        /// even in release mode.
-        const PRESERVED_TODO_VARIANTS: &[&str] = &[
-            "@Todo(StarredExpression)",
-            "@Todo(typing.Unpack)",
-            "@Todo(TypeVarTuple)",
-        ];
-
         static TODO_METADATA_REGEX: LazyLock<regex::Regex> =
             LazyLock::new(|| regex::Regex::new(r"@Todo\([^)]*\)").unwrap());
 
-        TODO_METADATA_REGEX.replace_all(ty, |caps: &regex::Captures| {
-            let matched = caps.get(0).unwrap().as_str();
-            if PRESERVED_TODO_VARIANTS.contains(&matched) {
-                matched.to_string()
-            } else {
-                "@Todo".to_string()
-            }
-        })
+        TODO_METADATA_REGEX.replace_all(ty, "@Todo")
     }
 
     #[cfg(debug_assertions)]
@@ -317,13 +312,15 @@ fn normalize_paths(ty: &str) -> Cow<'_, str> {
 struct Matcher {
     line_index: LineIndex,
     source: SourceText,
+    options: RunOptions,
 }
 
 impl Matcher {
-    fn from_file(db: &dyn Db, file: File) -> Self {
+    fn from_file(db: &dyn Db, file: File, options: RunOptions) -> Self {
         Self {
             line_index: line_index(db, file),
             source: source_text(db, file),
+            options,
         }
     }
 
@@ -344,7 +341,7 @@ impl Matcher {
         let mut unmatched = diagnostics.to_vec();
         let mut snapshot_diagnostics: SmallVec<[Diagnostic; 2]> = SmallVec::new();
         for assertion in &assertions.assertions {
-            match assertion.parse() {
+            match assertion.parse(self.options) {
                 Ok(assertion) => match self.matches(&assertion, &mut unmatched) {
                     Some(diagnostic) => {
                         if matches!(assertion, ParsedAssertion::Snapshot(_)) {
@@ -465,7 +462,7 @@ fn match_reveal_type_diagnostic(
             return false;
         }
 
-        let primary_message = diagnostic.primary_message();
+        let headline_message = diagnostic.headline_message();
         let Some(primary_annotation) =
             (diagnostic.primary_annotation()).and_then(|a| a.get_message())
         else {
@@ -476,7 +473,7 @@ fn match_reveal_type_diagnostic(
 
         // reveal_type, reveal_protocol_interface
         if matches!(
-            primary_message,
+            headline_message,
             "Revealed type" | "Revealed protocol interface"
         ) && expected_reveal_type_message.is_none_or(|expected_reveal_type_message| {
             primary_annotation == expected_reveal_type_message
@@ -486,7 +483,7 @@ fn match_reveal_type_diagnostic(
 
         // reveal_when_assignable_to, reveal_when_subtype_of, reveal_mro
         if matches!(
-            primary_message,
+            headline_message,
             "Assignability holds" | "Subtyping holds" | "Revealed MRO"
         ) && expected_reveal_type
             .is_none_or(|expected_reveal_type| primary_annotation == expected_reveal_type)
@@ -525,7 +522,7 @@ fn match_reveal_type_diagnostic(
 
 #[cfg(test)]
 mod tests {
-    use crate::tests::TestDb;
+    use crate::{RunOptions, tests::TestDb};
 
     use super::FailuresByLine;
     use ruff_db::diagnostic::{Annotation, Diagnostic, DiagnosticId, Severity, Span};
@@ -573,6 +570,14 @@ mod tests {
         source: &str,
         expected_diagnostics: Vec<ExpectedDiagnostic>,
     ) -> Result<Vec<Diagnostic>, FailuresByLine> {
+        get_result_with_options(source, expected_diagnostics, RunOptions::default())
+    }
+
+    fn get_result_with_options(
+        source: &str,
+        expected_diagnostics: Vec<ExpectedDiagnostic>,
+        options: RunOptions,
+    ) -> Result<Vec<Diagnostic>, FailuresByLine> {
         colored::control::set_override(false);
 
         let mut db = TestDb::setup();
@@ -583,7 +588,7 @@ mod tests {
             .into_iter()
             .map(|diagnostic| diagnostic.into_diagnostic(file))
             .collect();
-        super::match_file(&db, file, &diagnostics)
+        super::match_file(&db, file, &diagnostics, options)
     }
 
     fn assert_fail(result: Result<Vec<Diagnostic>, FailuresByLine>, messages: &[(usize, &[&str])]) {
@@ -631,6 +636,29 @@ mod tests {
         );
 
         assert_ok(&result);
+    }
+
+    #[test]
+    fn default_error_rule() {
+        let diagnostic = |offset| {
+            ExpectedDiagnostic::new(DiagnosticId::lint("example-rule"), "Example error", offset)
+        };
+        let options = RunOptions {
+            default_error_rule: Some("example-rule"),
+        };
+
+        assert_ok(&get_result_with_options(
+            "value  # error",
+            vec![diagnostic(0)],
+            options,
+        ));
+
+        let source = "# error: \"Example\"\nvalue";
+        assert_ok(&get_result_with_options(
+            source,
+            vec![diagnostic(source.find("value").unwrap())],
+            options,
+        ));
     }
 
     #[test]

@@ -525,6 +525,7 @@ class Pdb(Bdb, Cmd):
         Returns True if the normal interaction function must be called,
         False otherwise.
         """
+
     if sys.version_info >= (3, 13):
         def interaction(self, frame: FrameType | None, tb_or_exc: TracebackType | BaseException | None) -> None: ...
     else:
@@ -549,6 +550,7 @@ class Pdb(Bdb, Cmd):
             Return `lineno` if it is, 0 if not (e.g. a docstring, comment, blank
             line or EOF). Warning: testing is not comprehensive.
             """
+
     else:
         def checkline(self, filename: str, lineno: int) -> int:
             """Check whether specified line seems to be executable.
@@ -581,6 +583,7 @@ class Pdb(Bdb, Cmd):
 
         files and modules will be searched in sys.path.
         """
+
     if sys.version_info < (3, 11):
         def _runscript(self, filename: str) -> None: ...
 
@@ -627,6 +630,7 @@ class Pdb(Bdb, Cmd):
         print anything, you will see no sign that the breakpoint was
         reached.
         """
+
     if sys.version_info >= (3, 14):
         def do_break(self, arg: str, temporary: bool = False) -> bool | None:
             """b(reak) [ ([filename:]lineno | function) [, condition] ]
@@ -644,6 +648,7 @@ class Pdb(Bdb, Cmd):
             hasn't been loaded yet).  The file is searched for on
             sys.path; the .py suffix may be omitted.
             """
+
     else:
         def do_break(self, arg: str, temporary: bool | Literal[0, 1] = 0) -> bool | None:
             """b(reak) [ ([filename:]lineno | function) [, condition] ]
@@ -725,6 +730,7 @@ class Pdb(Bdb, Cmd):
         An arrow indicates the "current frame", which determines the
         context of most commands.  'bt' is an alias for this command.
         """
+
     if sys.version_info >= (3, 13):
         def do_exceptions(self, arg: str) -> bool | None:
             """exceptions [number]
@@ -917,6 +923,7 @@ class Pdb(Bdb, Cmd):
         "help pdb" shows the full pdb documentation.
         "help exec" gives help on the ! command.
         """
+
     do_b = do_break
     do_cl = do_clear
     do_w = do_where
@@ -1017,6 +1024,7 @@ class Pdb(Bdb, Cmd):
 
         Without expression, clear all display expressions for the current frame.
         """
+
     do_ll = do_longlist
     def _complete_location(self, text: str, line: str, begidx: int, endidx: int) -> list[str]: ...
     def _complete_bpnumber(self, text: str, line: str, begidx: int, endidx: int) -> list[str]: ...
