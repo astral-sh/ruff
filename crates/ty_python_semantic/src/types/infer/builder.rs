@@ -366,6 +366,85 @@ pub(super) struct TypeInferenceBuilder<'db, 'ast> {
     dataclass_field_specifiers: SmallVec<[Type<'db>; NUM_FIELD_SPECIFIERS_INLINE]>,
 }
 
+fn transparent_callable_decorator_result<'db>(
+    db: &'db dyn Db,
+    bindings: &Bindings<'db>,
+    decorated_ty: Type<'db>,
+) -> Option<Type<'db>> {
+    enum TransparentCallableReturn<'db> {
+        TypeVar(BoundTypeVarInstance<'db>),
+        Awaitable(BoundTypeVarInstance<'db>),
+    }
+
+    impl<'db> TransparentCallableReturn<'db> {
+        fn matches(self, db: &'db dyn Db, other: Self) -> bool {
+            match (self, other) {
+                (Self::TypeVar(left), Self::TypeVar(right))
+                | (Self::Awaitable(left), Self::Awaitable(right)) => {
+                    left.is_same_typevar_as(db, right)
+                }
+                _ => false,
+            }
+        }
+    }
+
+    fn callable_paramspec_and_return<'db>(
+        db: &'db dyn Db,
+        ty: Type<'db>,
+    ) -> Option<(BoundTypeVarInstance<'db>, TransparentCallableReturn<'db>)> {
+        let callable = ty.resolve_type_alias(db).as_callable()?;
+        if callable.kind(db) != CallableTypeKind::Regular {
+            return None;
+        }
+        let [signature] = callable.signatures(db).overloads.as_slice() else {
+            return None;
+        };
+        let paramspec = signature.parameters().as_paramspec()?;
+        let return_typevar = if let Some(typevar) = signature.return_ty.as_typevar() {
+            TransparentCallableReturn::TypeVar(typevar)
+        } else {
+            let specialization = signature
+                .return_ty
+                .known_specialization(db, KnownClass::Awaitable)?;
+            let [inner] = specialization.types(db) else {
+                return None;
+            };
+            TransparentCallableReturn::Awaitable(inner.as_typevar()?)
+        };
+        Some((paramspec, return_typevar))
+    }
+
+    if !matches!(decorated_ty, Type::FunctionLiteral(_) | Type::Callable(_)) {
+        return None;
+    }
+    let binding = bindings.single_element()?;
+    let (_, overload) = binding.matching_overloads().exactly_one().ok()?;
+    let decorator_signature = &overload.signature;
+    let bound_signature = binding
+        .bound_type
+        .map(|bound_type| decorator_signature.bind_self(db, Some(bound_type)));
+    let decorator_signature = bound_signature.as_ref().unwrap_or(decorator_signature);
+    let [parameter] = decorator_signature.parameters().as_slice() else {
+        return None;
+    };
+
+    let (parameter_callable_paramspec, parameter_callable_return) =
+        callable_paramspec_and_return(db, parameter.annotated_type())?;
+    let (return_callable_paramspec, return_callable_return) =
+        callable_paramspec_and_return(db, decorator_signature.return_ty)?;
+    if !parameter_callable_paramspec.is_same_typevar_as(db, return_callable_paramspec)
+        || !parameter_callable_return.matches(db, return_callable_return)
+    {
+        return None;
+    }
+
+    match decorated_ty {
+        Type::FunctionLiteral(function) => Some(Type::Callable(function.into_callable_type(db))),
+        Type::Callable(_) => Some(decorated_ty),
+        _ => None,
+    }
+}
+
 impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     /// How big a string do we build before bailing?
     ///
@@ -3222,7 +3301,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             .kind()
                             == ScopeKind::Class
                     {
-                        self.apply_desugared_decorator(call_expr, ty)
+                        self.apply_desugared_decorator(callable_type, call_expr, ty)
                     } else {
                         ty
                     };
@@ -4912,16 +4991,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.infer_expression(expression, TypeContext::default())
     }
 
-    /// Preserve method binding when an assignment-form decorator returns an equivalent callable.
+    /// Preserve the descriptor behavior of a transparent callable decorator when it is written
+    /// as the equivalent assignment form in a class body.
     fn apply_desugared_decorator(
         &mut self,
+        decorator_ty: Type<'db>,
         call_expression: &ast::ExprCall,
         return_ty: Type<'db>,
     ) -> Type<'db> {
-        let Type::Callable(returned_callable) = return_ty else {
-            return return_ty;
-        };
-
         let arguments = &call_expression.arguments;
         let [decorated_expression] = &arguments.args[..] else {
             return return_ty;
@@ -4932,28 +5009,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let decorated_ty =
             self.get_or_infer_expression(decorated_expression, TypeContext::default());
-        let Some(decorated_callable) = decorated_ty
-            .try_upcast_to_callable(self.db())
-            .and_then(CallableTypes::exactly_one)
-        else {
+        let call_arguments = CallArguments::positional([decorated_ty]);
+        let Ok(bindings) = decorator_ty.try_call(self.db(), &call_arguments) else {
             return return_ty;
         };
 
-        if !decorated_callable.is_method_like(self.db())
-            || !return_ty.is_equivalent_to(
-                self.db(),
-                Type::Callable(decorated_callable.into_regular(self.db())),
-            )
-        {
-            return return_ty;
-        }
-
-        Type::Callable(CallableType::new(
-            self.db(),
-            returned_callable.signatures(self.db()),
-            decorated_callable.kind(self.db()),
-            decorated_callable.provenance(self.db()),
-        ))
+        transparent_callable_decorator_result(self.db(), &bindings, decorated_ty)
+            .unwrap_or(return_ty)
     }
 
     /// Apply a decorator to a function or class type and return the resulting type.
