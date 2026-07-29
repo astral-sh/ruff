@@ -263,8 +263,9 @@ impl<'db> TypedDictType<'db> {
                 }
             };
 
-            let env = SemanticEnvironment::from_file(db, static_class.python_file(db));
-            let module = parsed_module(db, static_class.python_file(db)).load(db);
+            let python_file = static_class.python_file(db);
+            let env = SemanticEnvironment::from_file(db, python_file);
+            let module = parsed_module(db, python_file).load(db);
             let class_definition = static_class.definition(db);
             let class_stmt = class_definition
                 .kind(db)
@@ -1326,8 +1327,9 @@ fn deferred_functional_typed_dict_schema_inner<'db>(
     db: &'db dyn Db,
     definition: Definition<'db>,
 ) -> TypedDictSchema<'db> {
-    let env = SemanticEnvironment::from_file(db, definition.python_file(db));
-    let module = parsed_module(db, definition.python_file(db)).load(db);
+    let python_file = definition.python_file(db);
+    let env = SemanticEnvironment::from_file(db, python_file);
+    let module = parsed_module(db, python_file).load(db);
     let node = definition
         .kind(db)
         .value(&module)
@@ -1398,8 +1400,9 @@ fn deferred_functional_typed_dict_openness_inner<'db>(
     db: &'db dyn Db,
     definition: Definition<'db>,
 ) -> TypedDictOpenness<'db> {
-    let env = SemanticEnvironment::from_file(db, definition.python_file(db));
-    let module = parsed_module(db, definition.python_file(db)).load(db);
+    let python_file = definition.python_file(db);
+    let env = SemanticEnvironment::from_file(db, python_file);
+    let module = parsed_module(db, python_file).load(db);
     let node = definition
         .kind(db)
         .value(&module)

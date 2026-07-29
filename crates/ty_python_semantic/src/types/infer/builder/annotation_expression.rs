@@ -277,11 +277,15 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                                     _ => false,
                                 };
                                 if classvar_and_final
-                                    && nearest_enclosing_class(self.db(), self.index, self.scope())
-                                        .is_none_or(|class| {
-                                            !class.is_dataclass_like(self.semantic_environment())
-                                                && !class.is_protocol(self.semantic_environment())
-                                        })
+                                    && nearest_enclosing_class(
+                                        self.semantic_environment(),
+                                        self.index,
+                                        self.scope(),
+                                    )
+                                    .is_none_or(|class| {
+                                        !class.is_dataclass_like(self.semantic_environment())
+                                            && !class.is_protocol(self.semantic_environment())
+                                    })
                                     && let Some(builder) = self
                                         .context
                                         .report_lint(&REDUNDANT_FINAL_CLASSVAR, subscript)

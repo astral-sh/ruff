@@ -4743,7 +4743,7 @@ impl<'db> Type<'db> {
                     Binding::single(
                         self,
                         Signature::new_generic(
-                            Some(GenericContext::from_typevar_instances(db, [val_ty])),
+                            Some(GenericContext::from_typevar_instances(env, [val_ty])),
                             Parameters::standard([
                                 Parameter::positional_only(Some(Name::new_static("value")))
                                     .with_annotated_type(Type::TypeVar(val_ty)),
@@ -5002,7 +5002,7 @@ impl<'db> Type<'db> {
                     TypeVarVariance::Invariant,
                 );
                 let typevar_meta = SubclassOfType::from(env, typevar);
-                let context = GenericContext::from_typevar_instances(db, [typevar]);
+                let context = GenericContext::from_typevar_instances(env, [typevar]);
                 let parameters = [Parameter::positional_only(Some(Name::new_static("cls")))
                     .with_annotated_type(typevar_meta)];
                 // Intersect with `Any` for the return type to reflect the fact that the `dataclass()`
@@ -5294,7 +5294,7 @@ impl<'db> Type<'db> {
                     Binding::single(
                         self,
                         Signature::new_generic(
-                            Some(GenericContext::from_typevar_instances(db, [return_ty])),
+                            Some(GenericContext::from_typevar_instances(env, [return_ty])),
                             Parameters::concatenate(
                                 env,
                                 vec![
@@ -5337,7 +5337,7 @@ impl<'db> Type<'db> {
                         [
                             Signature::new(Parameters::empty(), Type::empty_tuple(db)),
                             Signature::new_generic(
-                                Some(GenericContext::from_typevar_instances(db, [element_ty])),
+                                Some(GenericContext::from_typevar_instances(env, [element_ty])),
                                 Parameters::standard([Parameter::positional_only(Some(
                                     Name::new_static("iterable"),
                                 ))
@@ -7573,10 +7573,9 @@ impl<'db> Type<'db> {
     ///
     /// This is used when an implicit type alias is referenced without explicitly specializing it.
     fn default_specialize(self, env: &SemanticEnvironment<'db>) -> Type<'db> {
-        let db = env.db();
         let mut variables = FxOrderSet::default();
         self.find_legacy_typevars(env, None, &mut variables);
-        let generic_context = GenericContext::from_typevar_instances(db, variables);
+        let generic_context = GenericContext::from_typevar_instances(env, variables);
         self.apply_specialization(env, generic_context.default_specialization(env, None))
     }
 
@@ -8066,7 +8065,7 @@ impl<'db> TypeMapping<'_, 'db> {
         let db = env.db();
         match self {
             TypeMapping::FreshenBoundTypeVars { .. } => GenericContext::from_typevar_instances(
-                db,
+                env,
                 context.variables(db).map(|bound_typevar| {
                     Type::TypeVar(bound_typevar)
                         .apply_type_mapping(env, self, TypeContext::default())
@@ -8079,7 +8078,7 @@ impl<'db> TypeMapping<'_, 'db> {
                 // Filter out type variables that are already specialized
                 // (i.e., mapped to a non-TypeVar type)
                 GenericContext::from_typevar_instances(
-                    db,
+                    env,
                     context.variables(db).filter(|bound_typevar| {
                         // Keep the type variable if it's not in the specialization
                         // or if it's mapped to itself (still a TypeVar)
@@ -8108,7 +8107,7 @@ impl<'db> TypeMapping<'_, 'db> {
                 }
             }
             TypeMapping::ReplaceSelf { new_upper_bound } => GenericContext::from_typevar_instances(
-                db,
+                env,
                 context.variables(db).map(|typevar| {
                     if typevar.typevar(db).is_self(db) {
                         BoundTypeVarInstance::synthetic_self(

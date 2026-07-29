@@ -402,7 +402,7 @@ fn synthesize_typed_dict_get<'db>(
                     .with_annotated_type(Type::TypeVar(t_default)),
             ];
             let get_with_default_sig = Signature::new_generic(
-                Some(GenericContext::from_typevar_instances(db, [t_default])),
+                Some(GenericContext::from_typevar_instances(env, [t_default])),
                 Parameters::standard(get_with_default_sig_params),
                 if field.is_required() {
                     field.declared_ty
@@ -461,7 +461,7 @@ fn synthesize_typed_dict_get<'db>(
             ];
 
             Signature::new_generic(
-                Some(GenericContext::from_typevar_instances(db, [t_default])),
+                Some(GenericContext::from_typevar_instances(env, [t_default])),
                 Parameters::standard(parameters),
                 UnionType::from_two_elements(env, fallback_value_ty, Type::TypeVar(t_default)),
             )
@@ -576,7 +576,7 @@ fn synthesize_typed_dict_pop<'db>(
                 .with_annotated_type(Type::TypeVar(t_default)),
         ];
         let pop_with_default_sig = Signature::new_generic(
-            Some(GenericContext::from_typevar_instances(db, [t_default])),
+            Some(GenericContext::from_typevar_instances(env, [t_default])),
             Parameters::standard(pop_with_default_parameters),
             UnionType::from_two_elements(env, value_ty, Type::TypeVar(t_default)),
         );

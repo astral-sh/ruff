@@ -428,11 +428,12 @@ impl<'db> StaticClassLiteral<'db> {
     )]
     fn pep695_generic_context_inner(self, db: &'db dyn Db) -> Option<GenericContext<'db>> {
         let scope = self.body_scope(db);
-        let env = SemanticEnvironment::from_file(db, scope.python_file(db));
-        let parsed = parsed_module(db, scope.python_file(db)).load(db);
+        let python_file = scope.python_file(db);
+        let env = SemanticEnvironment::from_file(db, python_file);
+        let parsed = parsed_module(db, python_file).load(db);
         let class_def_node = scope.node(db).expect_class().node(&parsed);
         class_def_node.type_params.as_ref().map(|type_params| {
-            let index = semantic_index(db, scope.python_file(db));
+            let index = semantic_index(db, python_file);
             let definition = index.expect_single_definition(class_def_node);
             GenericContext::from_type_params(&env, index, definition, type_params)
         })
@@ -809,8 +810,7 @@ impl<'db> StaticClassLiteral<'db> {
         let python_file = self.python_file(db);
         let module = parsed_module(db, python_file).load(db);
         let class_stmt = self.node(db, &module);
-        let class_definition =
-            semantic_index(db, self.python_file(db)).expect_single_definition(class_stmt);
+        let class_definition = semantic_index(db, python_file).expect_single_definition(class_stmt);
 
         class_stmt.decorator_list.iter().position(|decorator| {
             let decorator_callable = decorator

@@ -792,16 +792,17 @@ fn infer_unpack_types_inner<'db>(db: &'db dyn Db, unpack: Unpack<'db>) -> Unpack
 ///
 /// Returns `None` if no enclosing class is found.
 pub(crate) fn nearest_enclosing_class<'db>(
-    db: &'db dyn Db,
+    env: &SemanticEnvironment<'db>,
     semantic: &SemanticIndex<'db>,
     scope: ScopeId,
 ) -> Option<StaticClassLiteral<'db>> {
+    let db = env.db();
     semantic
         .ancestor_scopes(scope.file_scope_id(db))
         .find_map(|(_, ancestor_scope)| {
             let class = ancestor_scope.node().as_class()?;
             let definition = semantic.expect_single_definition(class);
-            original_class_type(db, definition).and_then(ClassLiteral::as_static)
+            original_class_type(env, definition).and_then(ClassLiteral::as_static)
         })
 }
 
@@ -822,11 +823,10 @@ pub(crate) fn nearest_enclosing_class<'db>(
 ///     def method(self) -> None: ...
 /// ```
 pub(crate) fn original_class_type<'db>(
-    db: &'db dyn Db,
+    env: &SemanticEnvironment<'db>,
     definition: Definition<'db>,
 ) -> Option<ClassLiteral<'db>> {
-    let env = SemanticEnvironment::from_file(db, definition.python_file(db));
-    let inference = infer_definition_types(&env, definition);
+    let inference = infer_definition_types(env, definition);
     inference
         .undecorated_type()
         .unwrap_or_else(|| inference.binding_type(definition))
@@ -840,17 +840,17 @@ pub(crate) fn original_class_type<'db>(
 ///
 /// Returns `None` if no enclosing function is found.
 pub(crate) fn nearest_enclosing_function<'db>(
-    db: &'db dyn Db,
+    env: &SemanticEnvironment<'db>,
     semantic: &SemanticIndex<'db>,
     scope: ScopeId,
 ) -> Option<FunctionType<'db>> {
+    let db = env.db();
     semantic
         .ancestor_scopes(scope.file_scope_id(db))
         .find_map(|(_, ancestor_scope)| {
             let func = ancestor_scope.node().as_function()?;
             let definition = semantic.expect_single_definition(func);
-            let env = SemanticEnvironment::from_file(db, definition.python_file(db));
-            infer_definition_types(&env, definition).function_type(definition)
+            infer_definition_types(env, definition).function_type(definition)
         })
 }
 

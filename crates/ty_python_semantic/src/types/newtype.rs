@@ -72,9 +72,10 @@ impl<'db> NewType<'db> {
         // in assignments, but invalid definitions still get here, and also `NewType` might show up
         // in places that aren't definitions at all. Fall back to `object` in all error cases.
         let definition = self.definition(db);
-        let env = SemanticEnvironment::from_file(db, definition.python_file(db));
+        let python_file = definition.python_file(db);
+        let env = SemanticEnvironment::from_file(db, python_file);
         let object_fallback = NewTypeBase::ClassType(ClassType::object(&env));
-        let module = parsed_module(db, definition.python_file(db)).load(db);
+        let module = parsed_module(db, python_file).load(db);
         let DefinitionKind::Assignment(assignment) = definition.kind(db) else {
             return object_fallback;
         };

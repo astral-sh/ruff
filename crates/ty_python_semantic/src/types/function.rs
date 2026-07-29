@@ -616,7 +616,7 @@ impl<'db> OverloadLiteral<'db> {
             // or there is but it isn't using the PEP-484 convention,
             // then `self`/`cls` are only implicitly positional-only if
             // it is a protocol class.
-            original_class_type(db, class_definition)
+            original_class_type(env, class_definition)
                 .map(|class_literal| class_literal.default_specialization(env))
                 .is_some_and(|class| class.is_protocol(env))
         }
@@ -651,7 +651,7 @@ impl<'db> OverloadLiteral<'db> {
         );
 
         let generic_context = raw_signature.generic_context;
-        raw_signature.add_implicit_self_annotation(db, || {
+        raw_signature.add_implicit_self_annotation(env, || {
             let is_staticmethod = self.is_staticmethod(db);
             let is_dunder_new = self.name(db) == "__new__";
             if is_staticmethod && !is_dunder_new {
@@ -668,7 +668,7 @@ impl<'db> OverloadLiteral<'db> {
             let class_scope = index.scope(class_scope_id.file_scope_id(db));
             let class_node = class_scope.node().as_class()?;
             let class_def = index.expect_single_definition(class_node);
-            let class_literal = original_class_type(db, class_def)?;
+            let class_literal = original_class_type(env, class_def)?;
             let class_is_generic = class_literal.generic_context(env).is_some();
             let class_is_fallback = class_literal
                 .known(db)
@@ -694,7 +694,7 @@ impl<'db> OverloadLiteral<'db> {
                 let scope_id = definition.scope(db);
                 let typevar_binding_context = Some(definition);
                 let index = semantic_index(db, scope_id.python_file(db));
-                let class = nearest_enclosing_class(db, index, scope_id).unwrap();
+                let class = nearest_enclosing_class(env, index, scope_id).unwrap();
 
                 let typing_self = typing_self(env, scope_id, typevar_binding_context, class.into())
                     .expect(
@@ -1036,9 +1036,10 @@ impl<'db> FunctionLiteral<'db> {
             implementation: OverloadLiteral<'db>,
         ) -> FunctionBodyKind {
             let definition = implementation.definition(db);
-            let env = SemanticEnvironment::from_file(db, definition.python_file(db));
-            let file = definition.file(db);
-            let module = parsed_module(db, definition.python_file(db)).load(db);
+            let python_file = definition.python_file(db);
+            let env = SemanticEnvironment::from_file(db, python_file);
+            let file = python_file.file(db);
+            let module = parsed_module(db, python_file).load(db);
             let node = implementation.node(db, file, &module);
             function_body_kind(&env, node, |expr| {
                 definition_expression_type(&env, definition, expr)

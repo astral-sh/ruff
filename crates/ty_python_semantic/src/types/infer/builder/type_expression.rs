@@ -1407,7 +1407,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
         let mut variables = FxOrderSet::default();
         value_ty.find_legacy_typevars(env, None, &mut variables);
-        let generic_context = GenericContext::from_typevar_instances(db, variables);
+        let generic_context = GenericContext::from_typevar_instances(env, variables);
 
         let scope_id = self.scope();
         let current_typevar_binding_context = self.typevar_binding_context;

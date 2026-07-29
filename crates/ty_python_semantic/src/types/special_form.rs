@@ -872,7 +872,7 @@ impl SpecialFormType {
 
                 let python_file = scope_id.python_file(db);
                 let index = semantic_index(db, python_file);
-                let Some(class) = nearest_enclosing_class(db, index, scope_id) else {
+                let Some(class) = nearest_enclosing_class(env, index, scope_id) else {
                     return Err(InvalidTypeExpression::InvalidType(
                         Type::SpecialForm(self),
                         scope_id,

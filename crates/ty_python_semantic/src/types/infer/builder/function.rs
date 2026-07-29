@@ -172,7 +172,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             }
 
-            let enclosing_function = nearest_enclosing_function(db, self.index, self.scope())
+            let enclosing_function = nearest_enclosing_function(env, self.index, self.scope())
                 .expect("should be in a function body scope");
             let declared_ty = same_module_uncached_raw_signature(
                 env,
@@ -1081,7 +1081,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         let class_definition = self.index.expect_single_definition(class);
-        let class_literal = original_class_type(db, class_definition)?;
+        let class_literal = original_class_type(env, class_definition)?;
         let typing_self = typing_self(env, self.scope(), Some(method_definition), class_literal);
         if is_classmethod || function_name == "__new__" {
             typing_self

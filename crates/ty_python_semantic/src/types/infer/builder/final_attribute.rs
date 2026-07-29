@@ -108,7 +108,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             return false;
         };
         place_table.member(member_id).is_instance_attribute()
-            && nearest_enclosing_function(self.db(), self.index, self.scope())
+            && nearest_enclosing_function(self.semantic_environment(), self.index, self.scope())
                 .is_some_and(|function| function.has_implicit_receiver(self.db()))
     }
 

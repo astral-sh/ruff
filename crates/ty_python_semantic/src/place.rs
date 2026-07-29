@@ -2146,7 +2146,7 @@ pub(crate) mod implicit_globals {
     fn module_type_body_scope_inner(
         db: &dyn Db,
         program: Program,
-        _: (), // TODO: Remove once this is a query over `Program`.
+        _: (), // FIXME: Remove once `Program` is a Salsa-interned struct.
     ) -> Option<ScopeId<'_>> {
         let env = SemanticEnvironment::from_program(db, program);
         let module_scope = core_module_scope(&env, KnownModule::Types)?;
@@ -2321,7 +2321,7 @@ pub(crate) mod implicit_globals {
     fn module_type_symbols_inner(
         db: &dyn Db,
         program: Program,
-        _: (), // TODO: Remove once this is a query over `Program`.
+        _: (), // FIXME: Remove once `Program` is a Salsa-interned struct.
     ) -> smallvec::SmallVec<[ast::name::Name; 8]> {
         let env = SemanticEnvironment::from_program(db, program);
         let Some(module_type_scope) = module_type_body_scope(&env) else {

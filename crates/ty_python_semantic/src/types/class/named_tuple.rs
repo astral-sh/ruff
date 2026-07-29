@@ -46,7 +46,7 @@ pub(super) fn synthesize_namedtuple_class_member<'db>(
                 .flat_map(|ctx| ctx.variables(db))
                 .chain(std::iter::once(self_typevar));
 
-            let generic_context = GenericContext::from_typevar_instances(db, variables);
+            let generic_context = GenericContext::from_typevar_instances(env, variables);
 
             // CPython generates namedtuple `__new__` as `(_cls, field1, ...)` so field names like
             // `cls` remain usable as keyword arguments at call sites.

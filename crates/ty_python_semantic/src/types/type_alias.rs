@@ -84,8 +84,9 @@ impl<'db> PEP695TypeAliasType<'db> {
     )]
     fn raw_value_type_inner(self, db: &'db dyn Db) -> Type<'db> {
         let scope = self.rhs_scope(db);
-        let env = SemanticEnvironment::from_file(db, scope.python_file(db));
-        let module = parsed_module(db, scope.python_file(db)).load(db);
+        let python_file = scope.python_file(db);
+        let env = SemanticEnvironment::from_file(db, python_file);
+        let module = parsed_module(db, python_file).load(db);
         let type_alias_stmt_node = scope.node(db).expect_type_alias();
         let definition = self.definition(db);
 
@@ -130,8 +131,9 @@ impl<'db> PEP695TypeAliasType<'db> {
     #[salsa::tracked(returns(copy), cycle_initial=|_, _, _| None, heap_size=ruff_memory_usage::heap_size)]
     fn generic_context_inner(self, db: &'db dyn Db) -> Option<GenericContext<'db>> {
         let scope = self.rhs_scope(db);
-        let env = SemanticEnvironment::from_file(db, scope.python_file(db));
-        let parsed = parsed_module(db, scope.python_file(db)).load(db);
+        let python_file = scope.python_file(db);
+        let env = SemanticEnvironment::from_file(db, python_file);
+        let parsed = parsed_module(db, python_file).load(db);
         let type_alias_stmt_node = scope.node(db).expect_type_alias();
 
         type_alias_stmt_node
@@ -139,7 +141,7 @@ impl<'db> PEP695TypeAliasType<'db> {
             .type_params
             .as_ref()
             .map(|type_params| {
-                let index = semantic_index(db, scope.python_file(db));
+                let index = semantic_index(db, python_file);
                 let definition = index.expect_single_definition(type_alias_stmt_node);
                 GenericContext::from_type_params(&env, index, definition, type_params)
             })
@@ -287,7 +289,7 @@ impl<'db> ManualPEP695TypeAliasType<'db> {
             variables.insert(typevar);
         }
 
-        (!variables.is_empty()).then(|| GenericContext::from_typevar_instances(db, variables))
+        (!variables.is_empty()).then(|| GenericContext::from_typevar_instances(&env, variables))
     }
 }
 

@@ -145,7 +145,7 @@ pub(crate) fn check_overloaded_function<'db>(
             implementation_required = false;
         } else if let NodeWithScopeKind::Class(class_node_ref) = scope
             && let Some(class) = original_class_type(
-                db,
+                env,
                 index.expect_single_definition(class_node_ref.node(context.module())),
             )
         {

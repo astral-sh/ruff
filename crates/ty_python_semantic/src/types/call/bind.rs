@@ -4268,7 +4268,7 @@ impl<'db> CallableBinding<'db> {
             [] => {}
             [overload] => {
                 let callable_description =
-                    CallableDescription::new(context.db(), self.signature_type);
+                    CallableDescription::new(context.semantic_environment(), self.signature_type);
                 overload.report_diagnostics(
                     context,
                     node,
@@ -4298,8 +4298,10 @@ impl<'db> CallableBinding<'db> {
 
                 // If only one overload passed arity check, report its errors directly.
                 if let Some(matching_overload_index) = self.matching_overload_before_type_checking {
-                    let callable_description =
-                        CallableDescription::new(context.db(), self.signature_type);
+                    let callable_description = CallableDescription::new(
+                        context.semantic_environment(),
+                        self.signature_type,
+                    );
                     let matching_overload =
                         function_type_and_kind.map(|(kind, function)| MatchingOverloadLiteral {
                             index: self.overloads[matching_overload_index].source_overload_index(),
@@ -4326,8 +4328,10 @@ impl<'db> CallableBinding<'db> {
                 // (possibly with semantic errors), report its errors directly instead
                 // of the generic "no matching overload" message.
                 if let Ok((matching_overload_index, _)) = self.matching_overloads().exactly_one() {
-                    let callable_description =
-                        CallableDescription::new(context.db(), self.signature_type);
+                    let callable_description = CallableDescription::new(
+                        context.semantic_environment(),
+                        self.signature_type,
+                    );
                     let matching_overload =
                         function_type_and_kind.map(|(kind, function)| MatchingOverloadLiteral {
                             index: self.overloads[matching_overload_index].source_overload_index(),
@@ -4355,7 +4359,7 @@ impl<'db> CallableBinding<'db> {
                     return;
                 };
                 let callable_description =
-                    CallableDescription::new(context.db(), self.callable_type);
+                    CallableDescription::new(context.semantic_environment(), self.callable_type);
                 let mut diag = builder.into_diagnostic(format_args!(
                     "No overload{} matches arguments",
                     callable_description
@@ -7475,18 +7479,19 @@ pub(crate) struct CallableDescription<'a> {
 
 impl<'db> CallableDescription<'db> {
     pub(crate) fn new(
-        db: &'db dyn Db,
+        env: &SemanticEnvironment<'db>,
         callable_type: Type<'db>,
     ) -> Option<CallableDescription<'db>> {
         fn qualified_function_name<'db>(
-            db: &'db dyn Db,
+            env: &SemanticEnvironment<'db>,
             function: FunctionType<'db>,
         ) -> Cow<'db, str> {
+            let db = env.db();
             let semantic_index = semantic_index(db, function.python_file(db));
             let enclosing_scope = semantic_index.scope(function.definition(db).file_scope(db));
             if let Some(class_node) = enclosing_scope.node().as_class()
                 && let Some(class) =
-                    original_class_type(db, semantic_index.expect_single_definition(class_node))
+                    original_class_type(env, semantic_index.expect_single_definition(class_node))
             {
                 Cow::Owned(format!("{}.{}", class.name(db), function.name(db)))
             } else {
@@ -7494,6 +7499,7 @@ impl<'db> CallableDescription<'db> {
             }
         }
 
+        let db = env.db();
         match callable_type {
             Type::FunctionLiteral(function) => Some(CallableDescription {
                 kind: Some(if function.name(db) == "__new__" {
@@ -7501,7 +7507,7 @@ impl<'db> CallableDescription<'db> {
                 } else {
                     "function"
                 }),
-                name: qualified_function_name(db, function),
+                name: qualified_function_name(env, function),
             }),
             Type::ClassLiteral(class_type) => Some(CallableDescription {
                 kind: Some("class"),
@@ -7516,7 +7522,7 @@ impl<'db> CallableDescription<'db> {
                 };
                 CallableDescription {
                     kind,
-                    name: qualified_function_name(db, function),
+                    name: qualified_function_name(env, function),
                 }
             }),
             Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderGet(function)) => {

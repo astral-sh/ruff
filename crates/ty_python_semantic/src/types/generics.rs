@@ -252,6 +252,9 @@ pub(crate) fn typing_self<'db>(
 /// generic context can coexist without collapsing into each other.
 #[salsa::interned(debug, constructor=new_internal, heap_size=ruff_memory_usage::heap_size)]
 pub struct GenericContext<'db> {
+    #[returns(copy)]
+    pub(crate) program: Program,
+
     #[returns(ref)]
     variables_inner: FxOrderMap<BoundTypeVarIdentity<'db>, BoundTypeVarInstance<'db>>,
 }
@@ -278,12 +281,11 @@ impl<'db> GenericContext<'db> {
         binding_context: Definition<'db>,
         type_params_node: &ast::TypeParams,
     ) -> Self {
-        let db = env.db();
         let variables = type_params_node.iter().filter_map(|type_param| {
             Self::variable_from_type_param(env, index, binding_context, type_param)
         });
 
-        Self::from_typevar_instances(db, variables)
+        Self::from_typevar_instances(env, variables)
     }
 
     pub(crate) fn of_node(
@@ -294,8 +296,7 @@ impl<'db> GenericContext<'db> {
         match node {
             NodeWithScopeKind::Class(class) => {
                 let definition = index.expect_single_definition(class);
-                let db = env.db();
-                original_class_type(db, definition)?.generic_context(env)
+                original_class_type(env, definition)?.generic_context(env)
             }
             NodeWithScopeKind::Function(function) => {
                 let definition = index.expect_single_definition(function);
@@ -317,11 +318,20 @@ impl<'db> GenericContext<'db> {
 
     /// Creates a generic context from a list of `BoundTypeVarInstance`s.
     pub(crate) fn from_typevar_instances(
+        env: &SemanticEnvironment<'db>,
+        type_params: impl IntoIterator<Item = BoundTypeVarInstance<'db>>,
+    ) -> Self {
+        Self::from_typevar_instances_in_program(env.db(), env.program(), type_params)
+    }
+
+    fn from_typevar_instances_in_program(
         db: &'db dyn Db,
+        program: Program,
         type_params: impl IntoIterator<Item = BoundTypeVarInstance<'db>>,
     ) -> Self {
         Self::new_internal(
             db,
+            program,
             type_params
                 .into_iter()
                 .map(|variable| (variable.identity(db), variable))
@@ -332,8 +342,11 @@ impl<'db> GenericContext<'db> {
     /// Merge this generic context with another, returning a new generic context that
     /// contains type variables from both contexts.
     pub(crate) fn merge(self, db: &'db dyn Db, other: Self) -> Self {
-        Self::from_typevar_instances(
+        let program = self.program(db);
+        debug_assert_eq!(program, other.program(db));
+        Self::from_typevar_instances_in_program(
             db,
+            program,
             self.variables_inner(db)
                 .values()
                 .chain(other.variables_inner(db).values())
@@ -364,8 +377,9 @@ impl<'db> GenericContext<'db> {
             generic_context: GenericContext<'db>,
             binding_context: Option<BindingContext<'db>>,
         ) -> GenericContext<'db> {
-            GenericContext::from_typevar_instances(
+            GenericContext::from_typevar_instances_in_program(
                 db,
+                generic_context.program(db),
                 generic_context.variables(db).filter(|bound_typevar| {
                     !(bound_typevar.typevar(db).is_self(db)
                         && binding_context.is_none_or(|binding_context| {
@@ -425,15 +439,14 @@ impl<'db> GenericContext<'db> {
 
         #[salsa::tracked(
             returns(copy),
-            cycle_initial=|_, _, _, _| TypeVarSet::None,
+            cycle_initial=|_, _, _| TypeVarSet::None,
             heap_size=ruff_memory_usage::heap_size,
         )]
         fn inferable_typevars_inner<'db>(
             db: &'db dyn Db,
-            program: Program,
             generic_context: GenericContext<'db>,
         ) -> TypeVarSet<'db> {
-            let env = SemanticEnvironment::from_program(db, program);
+            let env = SemanticEnvironment::from_program(db, generic_context.program(db));
             let visitor = CollectTypeVars::default();
             for bound_typevar in generic_context.variables(db) {
                 visitor.visit_bound_type_var_type(&env, bound_typevar);
@@ -442,8 +455,8 @@ impl<'db> GenericContext<'db> {
         }
 
         let db = env.db();
-        let program = env.program();
-        inferable_typevars_inner(db, program, self)
+        debug_assert_eq!(env.program(), self.program(db));
+        inferable_typevars_inner(db, self)
     }
 
     pub(crate) fn variables(
@@ -529,7 +542,6 @@ impl<'db> GenericContext<'db> {
         parameters: &Parameters<'db>,
         return_type: Type<'db>,
     ) -> Option<Self> {
-        let db = env.db();
         // Find all of the legacy typevars mentioned in the function signature.
         let mut variables = FxOrderSet::default();
         for param in parameters {
@@ -545,7 +557,7 @@ impl<'db> GenericContext<'db> {
         if variables.is_empty() {
             return None;
         }
-        Some(Self::from_typevar_instances(db, variables))
+        Some(Self::from_typevar_instances(env, variables))
     }
 
     pub(crate) fn merge_pep695_and_legacy(
@@ -578,7 +590,6 @@ impl<'db> GenericContext<'db> {
         definition: Definition<'db>,
         bases: impl Iterator<Item = Type<'db>>,
     ) -> Option<Self> {
-        let db = env.db();
         let mut variables = FxOrderSet::default();
         for base in bases {
             base.find_legacy_typevars(env, Some(definition), &mut variables);
@@ -586,7 +597,7 @@ impl<'db> GenericContext<'db> {
         if variables.is_empty() {
             return None;
         }
-        Some(Self::from_typevar_instances(db, variables))
+        Some(Self::from_typevar_instances(env, variables))
     }
 
     pub(crate) fn remove_callable_only_typevars(
@@ -663,7 +674,7 @@ impl<'db> GenericContext<'db> {
                             &ApplyTypeMappingVisitor::default(),
                         );
                         let generic_context = GenericContext::from_typevar_instances(
-                            db,
+                            env,
                             typevar_replacements.values().copied(),
                         );
                         let signatures =
@@ -793,7 +804,7 @@ impl<'db> GenericContext<'db> {
         let generic_context = if kept_typevars.peek().is_none() {
             None
         } else {
-            Some(GenericContext::from_typevar_instances(db, kept_typevars))
+            Some(GenericContext::from_typevar_instances(env, kept_typevars))
         };
 
         (generic_context, return_type)
@@ -2217,8 +2228,6 @@ pub(crate) struct SpecializationBuilder<'db, 'c> {
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub(crate) struct TypeVarInference<'db> {
     #[returns(copy)]
-    pub(crate) program: Program,
-    #[returns(copy)]
     pub(crate) generic_context: GenericContext<'db>,
     #[returns(deref)]
     types: Box<[Option<Type<'db>>]>,
@@ -2235,7 +2244,8 @@ impl<'db> TypeVarInference<'db> {
             db: &'db dyn Db,
             inference: TypeVarInference<'db>,
         ) -> Specialization<'db> {
-            let env = SemanticEnvironment::from_program(db, inference.program(db));
+            let env =
+                SemanticEnvironment::from_program(db, inference.generic_context(db).program(db));
             inference.specialization_with(&env, |_, _| None)
         }
 
@@ -2374,7 +2384,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             .map(|identity| types.get(identity).copied())
             .collect();
 
-        TypeVarInference::new(self.env.db(), self.env.program(), generic_context, inferred)
+        TypeVarInference::new(self.env.db(), generic_context, inferred)
     }
 
     fn solve_pending_with(
@@ -3863,7 +3873,7 @@ mod tests {
                 .map_bound_or_constraints(&env, |_| {
                     Some(TypeVarBoundOrConstraints::UpperBound(Type::TypeVar(u)))
                 });
-        let context = GenericContext::from_typevar_instances(&db, [t]);
+        let context = GenericContext::from_typevar_instances(&env, [t]);
 
         let inferable = context.inferable_typevars(&env);
         assert_eq!(inferable.iter(&db).collect::<Vec<_>>(), [t, u]);

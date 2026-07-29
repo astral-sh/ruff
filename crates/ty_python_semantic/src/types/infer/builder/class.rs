@@ -432,9 +432,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         if let Some(arguments) = class.arguments.as_deref()
             && let Some(extra_items_keyword) = arguments.find_keyword("extra_items")
         {
-            if original_class_type(self.db(), definition).is_some_and(|class_literal| {
-                class_literal.is_typed_dict(self.semantic_environment())
-            }) {
+            if original_class_type(self.semantic_environment(), definition).is_some_and(
+                |class_literal| class_literal.is_typed_dict(self.semantic_environment()),
+            ) {
                 self.infer_extra_items_kwarg(&extra_items_keyword.value);
             } else if self.in_stub() {
                 self.infer_expression_with_state(

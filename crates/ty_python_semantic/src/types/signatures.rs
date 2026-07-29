@@ -1012,9 +1012,10 @@ impl<'db> Signature<'db> {
     /// annotation.
     pub(crate) fn add_implicit_self_annotation(
         &mut self,
-        db: &'db dyn Db,
+        env: &SemanticEnvironment<'db>,
         self_type: impl FnOnce() -> Option<Type<'db>>,
     ) {
+        let db = env.db();
         if let Some(first_parameter) = self.parameters.data.value.first()
             && first_parameter.is_positional()
             && first_parameter.annotated_type.is_unknown()
@@ -1043,13 +1044,13 @@ impl<'db> Signature<'db> {
                             .is_some() => {}
                     Some(generic_context) => {
                         *generic_context = GenericContext::from_typevar_instances(
-                            db,
+                            env,
                             std::iter::once(self_typevar).chain(generic_context.variables(db)),
                         );
                     }
                     None => {
                         self.generic_context = Some(GenericContext::from_typevar_instances(
-                            db,
+                            env,
                             std::iter::once(self_typevar),
                         ));
                     }

@@ -530,8 +530,9 @@ impl<'db> TypeVarInstance<'db> {
     )]
     fn lazy_bound_unchecked_inner(self, db: &'db dyn Db) -> Option<Type<'db>> {
         let definition = self.definition(db)?;
-        let env = SemanticEnvironment::from_file(db, definition.python_file(db));
-        let module = parsed_module(db, definition.python_file(db)).load(db);
+        let python_file = definition.python_file(db);
+        let env = SemanticEnvironment::from_file(db, python_file);
+        let module = parsed_module(db, python_file).load(db);
         let ty = match definition.kind(db) {
             // PEP 695 typevar
             DefinitionKind::TypeVar(typevar) => {
@@ -581,8 +582,9 @@ impl<'db> TypeVarInstance<'db> {
     )]
     fn lazy_constraints_unchecked_inner(self, db: &'db dyn Db) -> Option<TypeVarConstraints<'db>> {
         let definition = self.definition(db)?;
-        let env = SemanticEnvironment::from_file(db, definition.python_file(db));
-        let module = parsed_module(db, definition.python_file(db)).load(db);
+        let python_file = definition.python_file(db);
+        let env = SemanticEnvironment::from_file(db, python_file);
+        let module = parsed_module(db, python_file).load(db);
         let constraints = match definition.kind(db) {
             // PEP 695 typevar
             DefinitionKind::TypeVar(typevar) => {
@@ -689,8 +691,9 @@ impl<'db> TypeVarInstance<'db> {
         }
 
         let definition = self.definition(db)?;
-        let env = SemanticEnvironment::from_file(db, definition.python_file(db));
-        let module = parsed_module(db, definition.python_file(db)).load(db);
+        let python_file = definition.python_file(db);
+        let env = SemanticEnvironment::from_file(db, python_file);
+        let module = parsed_module(db, python_file).load(db);
         let ty = match definition.kind(db) {
             // PEP 695 typevar
             DefinitionKind::TypeVar(typevar) => {

@@ -837,7 +837,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             let enclosing_scope = index.scope(scope.file_scope_id(db));
             let class_node = enclosing_scope.node().as_class()?;
             let class_definition = index.expect_single_definition(class_node);
-            let class_literal = original_class_type(db, class_definition)?.as_static()?;
+            let class_literal = original_class_type(env, class_definition)?.as_static()?;
 
             class_literal
                 .dataclass_params(db)
@@ -1123,7 +1123,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             InferenceRegion::Definition(current) if current == definition => {
                                 self.undecorated_type
                             }
-                            _ => original_class_type(self.db(), definition).map(Type::ClassLiteral),
+                            _ => original_class_type(self.semantic_environment(), definition)
+                                .map(Type::ClassLiteral),
                         };
                         let ty = original_ty.unwrap_or(ty);
                         post_inference::static_class::check_static_class_definitions(
@@ -1852,7 +1853,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     fn class_context_of_current_method(&self) -> Option<ClassType<'db>> {
         let current_scope_id = self.scope().file_scope_id(self.db());
         let class_definition = self.index.class_definition_of_method(current_scope_id)?;
-        original_class_type(self.db(), class_definition)
+        original_class_type(self.semantic_environment(), class_definition)
             .map(|class_literal| class_literal.default_specialization(self.semantic_environment()))
     }
 
@@ -1872,7 +1873,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let Some(protocol) = self
             .index
             .class_definition_of_method(method_scope_id)
-            .and_then(|definition| original_class_type(db, definition))
+            .and_then(|definition| original_class_type(env, definition))
             .map(|class| class.default_specialization(env))
             .and_then(|class| class.into_protocol_class(env))
         else {
@@ -1911,7 +1912,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     .as_class()?;
                 self.index.expect_single_definition(class)
             };
-        original_class_type(self.db(), class_definition)
+        original_class_type(self.semantic_environment(), class_definition)
     }
 
     /// If the current scope is a (non-lambda) function, return that function's AST node.
@@ -4319,7 +4320,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
 
                 let nearest_enclosing_class =
-                    nearest_enclosing_class(self.db(), self.index, self.scope());
+                    nearest_enclosing_class(env, self.index, self.scope());
                 let class_kind = nearest_enclosing_class.and_then(|class| {
                     CodeGeneratorKind::from_class(
                         self.semantic_environment(),
@@ -4532,8 +4533,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     let current_scope_id = self.scope().file_scope_id(self.db());
                     let current_scope = self.index.scope(current_scope_id);
                     if current_scope.kind() == ScopeKind::Class
-                        && let Some(class) =
-                            nearest_enclosing_class(self.db(), self.index, self.scope())
+                        && let Some(class) = nearest_enclosing_class(env, self.index, self.scope())
                         && is_enum_class_by_inheritance(env, class)
                         && !enum_ignored_names(self.semantic_environment(), self.scope())
                             .contains(&name_expr.id)
@@ -4930,7 +4930,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     fn infer_return_statement(&mut self, ret: &ast::StmtReturn) {
         let env = self.semantic_environment();
         let tcx = if ret.value.is_some() {
-            nearest_enclosing_function(self.db(), self.index, self.scope())
+            nearest_enclosing_function(env, self.index, self.scope())
                 .map(|func| {
                     // When inferring expressions within a function body,
                     // the expected type passed should be the "raw" type,
@@ -6316,7 +6316,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         variables
                             .peek()
                             .is_some()
-                            .then(|| GenericContext::from_typevar_instances(db, variables))
+                            .then(|| GenericContext::from_typevar_instances(env, variables))
                     });
                     Signature::new_generic(
                         signature_generic_context,
@@ -7550,7 +7550,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             KnownClass::GeneratorType.to_specialized_instance(env, &[yield_ty, none, none])
         };
 
-        let generic_context = GenericContext::from_typevar_instances(db, [yield_typevar]);
+        let generic_context = GenericContext::from_typevar_instances(env, [yield_typevar]);
         let path_bounds = generator_ty.assignable_solutions_with_inferable(
             env,
             annotation,
@@ -9184,8 +9184,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             node_index: _,
             value,
         } = yield_expression;
-        let Some(enclosing_function) =
-            nearest_enclosing_function(self.db(), self.index, self.scope())
+        let Some(enclosing_function) = nearest_enclosing_function(env, self.index, self.scope())
         else {
             let _ = self.infer_optional_expression(value.as_deref(), TypeContext::default());
             return Type::unknown();
@@ -9236,8 +9235,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             value,
         } = yield_from;
 
-        let Some(enclosing_function) =
-            nearest_enclosing_function(self.db(), self.index, self.scope())
+        let Some(enclosing_function) = nearest_enclosing_function(env, self.index, self.scope())
         else {
             let _ = self.infer_expression(value, TypeContext::default());
             return Type::unknown();

@@ -1809,7 +1809,8 @@ impl KnownClass {
                 //   2. The first parameter of the current function (typically `self` or `cls`)
                 match overload.parameter_types() {
                     [] => {
-                        let Some(enclosing_class) = nearest_enclosing_class(db, index, scope)
+                        let Some(enclosing_class) =
+                            nearest_enclosing_class(context.semantic_environment(), index, scope)
                         else {
                             BoundSuperError::UnavailableImplicitArguments
                                 .report_diagnostic(context, call_expression.into());
@@ -1873,7 +1874,9 @@ impl KnownClass {
                     }
                     [Some(pivot_class_type), Some(owner_type)] => {
                         // Check if the enclosing class is a `NamedTuple`, which forbids the use of `super()`.
-                        if let Some(enclosing_class) = nearest_enclosing_class(db, index, scope) {
+                        if let Some(enclosing_class) =
+                            nearest_enclosing_class(context.semantic_environment(), index, scope)
+                        {
                             if CodeGeneratorKind::NamedTuple
                                 .matches(context.semantic_environment(), enclosing_class.into())
                             {
