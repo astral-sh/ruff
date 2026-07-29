@@ -1258,26 +1258,6 @@ def class_union_order(
     reveal_type(top_first.value)  # revealed: object
 ```
 
-### `TypeIs` narrowing
-
-`TypeIs` uses the top materialization of its protocol when narrowing, so an `Any` class variable is
-read as `object` through the narrowed class object.
-
-```py
-from typing import Any, ClassVar, Protocol
-from typing_extensions import TypeIs
-
-class HasClassVar(Protocol):
-    value: ClassVar[Any]
-
-def is_has_class_var(value: object) -> TypeIs[HasClassVar]:
-    return True
-
-def narrowed_class_variable(value: object) -> None:
-    if is_has_class_var(value):
-        reveal_type(type(value).value)  # revealed: object
-```
-
 ### Methods through the class object
 
 Ordinary, static, and class methods use their materialized signatures when accessed through the
@@ -1337,7 +1317,7 @@ class ReadOnlyProperty(Protocol):
     @property
     def property(self) -> Any: ...
 
-def is_read_only_property(value: object) -> TypeIs[ReadOnlyProperty]:
+def is_read_only_property(value: object) -> TypeIs[Top[ReadOnlyProperty]]:
     return True
 
 def property_deletion(
@@ -1399,7 +1379,7 @@ def bottom_descriptor_write(bottom: Bottom[DescriptorProperty]) -> None:
 def plain_descriptor_write(plain: DescriptorProperty) -> None:
     plain.value = object()
 
-def is_descriptor_property(value: object) -> TypeIs[DescriptorProperty]:
+def is_descriptor_property(value: object) -> TypeIs[Top[DescriptorProperty]]:
     return True
 
 def narrowed_descriptor_write(value: object) -> None:
