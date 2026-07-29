@@ -2726,8 +2726,9 @@ impl<'db> StaticClassLiteral<'db> {
     /// annotation that introduced it, including when declarations occur in different branches.
     pub(crate) fn own_annotated_qualifiers(
         self,
-        db: &'db dyn Db,
+        env: &SemanticEnvironment<'db>,
     ) -> Vec<(Name, TypeQualifiers, Definition<'db>)> {
+        let db = env.db();
         let body_scope = self.body_scope(db);
         let table = place_table(db, body_scope);
         let use_def = use_def_map(db, body_scope);
@@ -2740,7 +2741,7 @@ impl<'db> StaticClassLiteral<'db> {
 
             for declaration in declarations {
                 if reachability_constraints
-                    .evaluate(db, predicates, declaration.reachability_constraint)
+                    .evaluate(env, predicates, declaration.reachability_constraint)
                     .is_always_false()
                 {
                     continue;
@@ -2753,7 +2754,7 @@ impl<'db> StaticClassLiteral<'db> {
                     continue;
                 }
 
-                let Some(declared) = inferred_declaration(db, definition).declared() else {
+                let Some(declared) = inferred_declaration(env, definition).declared() else {
                     continue;
                 };
                 annotated_qualifiers.push((

@@ -208,7 +208,10 @@ impl<'db> DisplaySettings<'db> {
     }
 
     #[must_use]
-    pub(crate) fn from_possibly_ambiguous_types<I, T>(env: &SemanticEnvironment<'db>, types: I) -> Self
+    pub(crate) fn from_possibly_ambiguous_types<I, T>(
+        env: &SemanticEnvironment<'db>,
+        types: I,
+    ) -> Self
     where
         I: IntoIterator<Item = T>,
         T: Into<Type<'db>>,

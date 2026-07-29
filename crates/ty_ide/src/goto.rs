@@ -14,13 +14,13 @@ use ruff_python_ast::{self as ast, AnyNodeRef, ExprRef};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use ty_python_core::definition::{Definition, DefinitionKind};
-use ty_python_semantic::ResolvedDefinition;
 use ty_python_semantic::types::Type;
 use ty_python_semantic::types::ide_support::{
     call_signature_details, call_type_simplified_by_overloads, constructor_signature,
     definitions_and_overloads_for_function, definitions_for_keyword_argument,
     typed_dict_key_definition,
 };
+use ty_python_semantic::{Db as SemanticDb, ResolvedDefinition};
 use ty_python_semantic::{
     HasDefinition, HasType, ImportAliasResolution, SemanticEnvironment, SemanticModel,
     TypeQualifiers, definitions_for_imported_symbol, definitions_for_name,
@@ -412,7 +412,7 @@ impl<'db> Definitions<'db> {
     /// Typically documentation only appears on implementations and not stubs,
     /// so this will check both the goto-declarations and goto-definitions (in that order)
     /// and return the first one found.
-    pub(crate) fn docstring(self, db: &'db dyn crate::Db) -> Option<Docstring> {
+    pub(crate) fn docstring(self, db: &'db dyn SemanticDb) -> Option<Docstring> {
         for definition in &self {
             // If we got a docstring from the original definition, use it
             if let Some(docstring) = definition.docstring(db) {
@@ -470,13 +470,14 @@ impl<'a, 'db> IntoIterator for &'a Definitions<'db> {
 /// Shared by hover and signature help so both surfaces render the same
 /// docstring for a given call site.
 pub(crate) fn docstring_for_call_definition<'db>(
-    db: &'db dyn crate::Db,
+    env: &SemanticEnvironment<'db>,
     definition: Definition<'db>,
 ) -> Option<Docstring> {
+    let db = env.db();
     let resolved = ResolvedDefinition::Definition(definition);
     Definitions::new(vec![resolved.clone()])
         .docstring(db)
-        .or_else(|| resolved.implementation_docstring(db).map(Docstring::new))
+        .or_else(|| resolved.implementation_docstring(env).map(Docstring::new))
 }
 
 impl GotoTarget<'_> {

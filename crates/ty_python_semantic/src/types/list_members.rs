@@ -689,6 +689,9 @@ impl<'db> PartialOrd for Member<'db> {
 
 /// List all members of a given type: anything that would be valid when accessed
 /// as an attribute on an object of the given type.
-pub(crate) fn all_members<'db>(env: &SemanticEnvironment<'db>, ty: Type<'db>) -> FxHashSet<Member<'db>> {
+pub(crate) fn all_members<'db>(
+    env: &SemanticEnvironment<'db>,
+    ty: Type<'db>,
+) -> FxHashSet<Member<'db>> {
     AllMembers::of(env, ty).members
 }

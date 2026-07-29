@@ -2460,7 +2460,7 @@ fn legacy_generic_class_context<'db>(
             if bound.is_typevartuple(db) {
                 validated_typevars.insert(bound);
                 return Err(LegacyGenericContextError::TypeVarTupleMustBeUnpacked(Some(
-                    GenericContext::from_typevar_instances(db, validated_typevars),
+                    GenericContext::from_typevar_instances(env, validated_typevars),
                 )));
             }
             if !validated_typevars.insert(bound) {

@@ -2143,11 +2143,11 @@ pub(crate) mod implicit_globals {
     }
 
     #[salsa::tracked(returns(copy), heap_size=ruff_memory_usage::heap_size)]
-    fn module_type_body_scope_inner<'db>(
-        db: &'db dyn Db,
+    fn module_type_body_scope_inner(
+        db: &dyn Db,
         program: Program,
         _: (), // TODO: Remove once this is a query over `Program`.
-    ) -> Option<ScopeId<'db>> {
+    ) -> Option<ScopeId<'_>> {
         let env = SemanticEnvironment::from_program(db, program);
         let module_scope = core_module_scope(&env, KnownModule::Types)?;
         try_vendored_class_scope(&env, module_scope, "ModuleType").or_else(|| {

@@ -1310,7 +1310,7 @@ pub(crate) fn report_mismatched_type_name<'db>(
             let env = context.semantic_environment();
             diagnostic.set_primary_annotation_message(format_args!(
                 "Expected \"{expected_name}\", got variable of type `{}`",
-                actual_name_ty.display(&env)
+                actual_name_ty.display(env)
             ));
         }
     }

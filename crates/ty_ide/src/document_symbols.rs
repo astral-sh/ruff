@@ -405,7 +405,7 @@ def function():
 <CURSOR>",
         );
 
-        let symbols = document_symbols(&test.db, test.cursor.file)
+        let symbols = document_symbols(&test.db, test.python_file(test.cursor.file))
             .iter()
             .map(|(_, symbol)| (symbol.name.into_owned(), symbol.kind))
             .collect::<Vec<_>>();
@@ -442,7 +442,7 @@ lambda_value = lambda: (lambda_local := 1)
 <CURSOR>",
         );
 
-        let names = document_symbols(&test.db, test.cursor.file)
+        let names = document_symbols(&test.db, test.python_file(test.cursor.file))
             .iter()
             .map(|(_, symbol)| symbol.name.into_owned())
             .collect::<Vec<_>>();
@@ -464,7 +464,7 @@ class Example((class_base := Base)):
 <CURSOR>",
         );
 
-        let symbols = document_symbols(&test.db, test.cursor.file)
+        let symbols = document_symbols(&test.db, test.python_file(test.cursor.file))
             .iter()
             .map(|(_, symbol)| (symbol.name.into_owned(), symbol.kind))
             .collect::<Vec<_>>();

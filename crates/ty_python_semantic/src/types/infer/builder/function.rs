@@ -510,7 +510,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 function_type
             };
             let implementation_callables = inferred_ty
-                .try_upcast_to_callable(&self.semantic_environment())
+                .try_upcast_to_callable(self.semantic_environment())
                 .map_or_else(Box::default, |callables| {
                     callables.iter().copied().collect()
                 });

@@ -29,7 +29,8 @@ pub fn hover<'db>(
         }
     }
 
-    let keyword_argument = keyword_argument_hover_contents(db, &model, &goto_target);
+    let env = model.semantic_environment();
+    let keyword_argument = keyword_argument_hover_contents(&env, &model, &goto_target);
 
     let typed_dict_key = match &goto_target {
         GotoTarget::Expression(ast::ExprRef::Subscript(subscript))
@@ -45,7 +46,7 @@ pub fn hover<'db>(
         None
     } else if let GotoTarget::Call { call, .. } = goto_target {
         resolved_call_signature(&model, call)
-            .and_then(|details| docstring_for_call_definition(db, details.definition?))
+            .and_then(|details| docstring_for_call_definition(&env, details.definition?))
             .or_else(|| {
                 // Fall back to the goto-definition targets. This is what
                 // surfaces the class docstring for a constructor call like
@@ -84,7 +85,6 @@ pub fn hover<'db>(
             contents.push(HoverContent::Docstring(Docstring::new(docstring)));
         }
     } else if let Some(ty) = goto_target.inferred_type(&model) {
-        let env = model.semantic_environment();
         tracing::debug!("Inferred type of covering node is {}", ty.display(&env));
         let qualifiers = goto_target.type_qualifiers(&model);
         let inferred_type_hover_content = match ty {
@@ -149,7 +149,7 @@ pub fn hover<'db>(
 }
 
 fn keyword_argument_hover_contents<'db>(
-    db: &'db dyn Db,
+    env: &SemanticEnvironment<'db>,
     model: &SemanticModel<'db>,
     goto_target: &GotoTarget<'_>,
 ) -> Option<Vec<HoverContent<'db>>> {
@@ -193,7 +193,7 @@ fn keyword_argument_hover_contents<'db>(
     ))];
     if let Some(documentation) = signature
         .definition
-        .and_then(|definition| docstring_for_call_definition(db, definition))
+        .and_then(|definition| docstring_for_call_definition(env, definition))
         .and_then(|docstring| documentation_for_parameter(&docstring, &parameter.name))
     {
         contents.push(HoverContent::DocstringFragment(documentation));

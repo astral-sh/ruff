@@ -127,7 +127,7 @@ pub(crate) fn check_static_class_definitions<'db>(
         //
         // A field carrying both qualifiers is reported once per qualifier, since each qualifier
         // independently violates the restriction on `NamedTuple` fields.
-        for (field_name, qualifiers, declaration) in class.own_annotated_qualifiers(db) {
+        for (field_name, qualifiers, declaration) in class.own_annotated_qualifiers(env) {
             let invalid_qualifiers = [TypeQualifier::ClassVar, TypeQualifier::Final]
                 .into_iter()
                 .filter(|qualifier| qualifiers.contains(TypeQualifiers::from(*qualifier)));

@@ -3906,7 +3906,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     }
                 }
 
-                if typevar.default_type(&self.semantic_environment()).is_some() {
+                if typevar.default_type(self.semantic_environment()).is_some() {
                     if let Some(typevar_tuple) = typevar_tuple {
                         valid_type_params = false;
                         if let Some(builder) = self
@@ -3957,7 +3957,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         if valid_type_params {
             let mut value_typevars = FxOrderSet::default();
             value_ty.find_legacy_typevars(
-                &self.semantic_environment(),
+                self.semantic_environment(),
                 Some(definition),
                 &mut value_typevars,
             );

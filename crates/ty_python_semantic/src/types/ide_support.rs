@@ -2130,10 +2130,10 @@ mod resolve_definition {
             }
         }
 
-        pub fn implementation_docstring(&self, db: &'db dyn Db) -> Option<String> {
+        pub fn implementation_docstring(&self, env: &SemanticEnvironment<'db>) -> Option<String> {
             match self {
                 ResolvedDefinition::Definition(definition) => {
-                    implementation_docstring(db, *definition)
+                    implementation_docstring(env, *definition)
                 }
                 ResolvedDefinition::Module(_) | ResolvedDefinition::FileWithRange(_) => None,
             }
@@ -2149,10 +2149,10 @@ mod resolve_definition {
     // current definition. This correctly handles version-conditional branches and
     // avoids picking up unrelated reassignments of the same name.
     fn implementation_docstring<'db>(
-        db: &'db dyn Db,
+        env: &SemanticEnvironment<'db>,
         definition: Definition<'db>,
     ) -> Option<String> {
-        let env = SemanticEnvironment::from_file(db, definition.python_file(db));
+        let db = env.db();
         let DefinitionKind::Function(_) = definition.kind(db) else {
             return None;
         };
@@ -2162,7 +2162,7 @@ mod resolve_definition {
         let symbol_id = place_table(db, scope).symbol_id(&name)?;
         let use_def = use_def_map(db, scope);
 
-        let current_overload = binding_type(&env, definition)
+        let current_overload = binding_type(env, definition)
             .as_function_literal()?
             .literal(db)
             .last_definition;
@@ -2171,8 +2171,8 @@ mod resolve_definition {
         let implementation = use_def
             .end_of_scope_symbol_bindings(symbol_id)
             .filter_map(|binding| {
-                let ty = binding_type(&env, binding.binding.definition()?).as_function_literal()?;
-                ty.iter_overloads_and_implementation(&env)
+                let ty = binding_type(env, binding.binding.definition()?).as_function_literal()?;
+                ty.iter_overloads_and_implementation(env)
                     .any(|overload| overload == current_overload)
                     .then_some(ty)
             })
@@ -2837,9 +2837,9 @@ fn direct_subtypes<'db>(
             continue;
         }
 
-        let file_ctx = SemanticEnvironment::from_file(db, python_file);
-        for class_ty in reachable_class_literals_in_file(&file_ctx, python_file) {
-            let bases = class_ty.explicit_bases(&file_ctx);
+        let file_env = SemanticEnvironment::from_file(db, python_file);
+        for class_ty in reachable_class_literals_in_file(&file_env, python_file) {
+            let bases = class_ty.explicit_bases(&file_env);
             let is_subtype = if target_is_object
                 && bases.is_empty()
                 && !class_ty.is_known(db, KnownClass::Object)
@@ -2847,7 +2847,7 @@ fn direct_subtypes<'db>(
                 true
             } else {
                 bases.iter().any(|base| {
-                    extract_class_literal(&file_ctx, *base)
+                    extract_class_literal(&file_env, *base)
                         .is_some_and(|base_literal| base_literal == target_class)
                 })
             };

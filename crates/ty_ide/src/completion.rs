@@ -99,7 +99,7 @@ pub fn completion<'db>(
                         ModuleDependencyKind::Current
                     };
                     completions.add(
-                        CompletionBuilder::from_semantic_completion(db, &env, semantic_completion)
+                        CompletionBuilder::from_semantic_completion(&env, semantic_completion)
                             .module_dependency_kind(module_dependency_kind),
                     );
                 }
@@ -253,9 +253,7 @@ impl<'db> Completions<'db> {
         env: &SemanticEnvironment<'db>,
         completion: SemanticCompletion<'db>,
     ) -> bool {
-        self.add(CompletionBuilder::from_semantic_completion(
-            self.db, env, completion,
-        ))
+        self.add(CompletionBuilder::from_semantic_completion(env, completion))
     }
 
     /// Attempts to add the given completion to this collection.
@@ -442,12 +440,11 @@ impl<'db> CompletionBuilder<'db> {
     }
 
     fn from_semantic_completion(
-        db: &'db dyn Db,
         env: &SemanticEnvironment<'db>,
         semantic: SemanticCompletion<'db>,
     ) -> CompletionBuilder<'db> {
         let definition = semantic.ty.and_then(|ty| Definitions::from_ty(env, ty));
-        let documentation = definition.and_then(|def| def.docstring(db));
+        let documentation = definition.and_then(|def| def.docstring(env.db()));
         Completion::builder(semantic.name)
             .ty(semantic.ty)
             .builtin(semantic.builtin)
@@ -3065,7 +3062,7 @@ fn add_import_completions_impl<'db>(
     let env = SemanticEnvironment::from_file(db, completions.python_file);
     for semantic in semantic_completions {
         let module_dependency_kind = module_dependency_kind(&semantic);
-        let mut builder = CompletionBuilder::from_semantic_completion(db, &env, semantic);
+        let mut builder = CompletionBuilder::from_semantic_completion(&env, semantic);
         if let Some(module_dependency_kind) = module_dependency_kind {
             builder = builder.module_dependency_kind(module_dependency_kind);
         }

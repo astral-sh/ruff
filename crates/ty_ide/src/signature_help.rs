@@ -16,12 +16,12 @@ use ruff_python_ast::find_node::covering_node;
 use ruff_python_ast::token::TokenKind;
 use ruff_python_ast::{self as ast, AnyNodeRef};
 use ruff_text_size::{Ranged, TextSize};
-use ty_python_semantic::SemanticModel;
 use ty_python_semantic::types::Type;
 use ty_python_semantic::types::ide_support::{
     CallSignatureDetails, CallSignatureParameter, call_signature_details,
     find_active_signature_from_details,
 };
+use ty_python_semantic::{SemanticEnvironment, SemanticModel};
 
 // TODO: We may want to add special-case handling for calls to constructors
 // so the class docstring is used in place of (or inaddition to) any docstring
@@ -94,6 +94,8 @@ pub fn signature_help<'db>(
         return None;
     }
 
+    let env = model.semantic_environment();
+
     // Find the active signature - the first signature where all arguments map to parameters.
     let active_signature_index = find_active_signature_from_details(&signature_details);
 
@@ -101,7 +103,7 @@ pub fn signature_help<'db>(
     let signatures: Vec<SignatureDetails> = signature_details
         .into_iter()
         .map(|details| {
-            create_signature_details_from_call_signature_details(db, details, current_arg_index)
+            create_signature_details_from_call_signature_details(&env, details, current_arg_index)
         })
         .collect();
 
@@ -186,13 +188,13 @@ fn get_argument_index(call_expr: &ast::ExprCall, offset: TextSize) -> usize {
 
 /// Create signature details from `CallSignatureDetails`.
 fn create_signature_details_from_call_signature_details<'db>(
-    db: &dyn crate::Db,
+    env: &SemanticEnvironment<'db>,
     details: CallSignatureDetails<'db>,
     current_arg_index: usize,
 ) -> SignatureDetails<'db> {
     let documentation = details
         .definition
-        .and_then(|def| docstring_for_call_definition(db, def));
+        .and_then(|def| docstring_for_call_definition(env, def));
 
     // Translate the argument index to parameter index using the mapping.
     let active_parameter =
