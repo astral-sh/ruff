@@ -30,14 +30,13 @@ impl get_size2::GetSize for Program<'_> {}
 
 #[salsa::tracked]
 impl<'db> Program<'db> {
+    /// Creates a program from settings whose search roots have already been registered.
     pub fn from_settings(db: &'db dyn Db, settings: ProgramSettings) -> Self {
         let ProgramSettings {
             python_version,
             python_platform,
             search_paths,
         } = settings;
-
-        search_paths.try_register_static_roots(db);
 
         Program::new(db, python_version, python_platform, search_paths)
     }

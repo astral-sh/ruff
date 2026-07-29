@@ -57,9 +57,9 @@ impl Db {
     }
 
     pub(crate) fn update_program(&mut self, settings: ProgramSettings) {
-        settings.search_paths.try_register_static_roots(self);
         let db_settings = self.settings();
         if db_settings.program(self) != &settings {
+            settings.search_paths.try_register_static_roots(self);
             db_settings.set_program(self).to(settings);
         }
     }

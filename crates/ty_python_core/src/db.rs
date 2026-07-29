@@ -160,7 +160,7 @@ pub(crate) mod tests {
             db.write_files(self.files)
                 .context("Failed to write test files")?;
 
-            db.program_settings = ProgramSettings {
+            let program_settings = ProgramSettings {
                 python_version: PythonVersionWithSource {
                     version: self.python_version,
                     source: PythonVersionSource::default(),
@@ -170,6 +170,8 @@ pub(crate) mod tests {
                     .to_search_paths(db.system(), db.vendored(), &FallibleStrategy)
                     .context("Invalid search path settings")?,
             };
+            program_settings.search_paths.try_register_static_roots(&db);
+            db.program_settings = program_settings;
 
             Ok(db)
         }
