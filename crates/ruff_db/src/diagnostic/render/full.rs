@@ -122,10 +122,8 @@ impl<'a> Diff<'a> {
         let source_code = self.diagnostic_source.as_source_code();
         let source_text = source_code.text();
 
-        // Partition the source code into end offsets for each cell. If `self.notebook_index` is
-        // `None`, indicating a regular script file, all the lines will be in one "cell" under the
-        // `None` key.
         let cells = if let Some(notebook_index) = &self.notebook_index {
+            // Partition the source code into end offsets for each cell.
             let mut last_cell_index = OneIndexed::MIN;
             let mut cells: Vec<(Option<OneIndexed>, TextSize)> = Vec::new();
             for cell in notebook_index.iter() {
@@ -138,6 +136,7 @@ impl<'a> Diff<'a> {
             cells.push((Some(last_cell_index), source_text.text_len()));
             cells
         } else {
+            // a regular script file, all the lines will be in one "cell" under the `None` key
             vec![(None, source_text.text_len())]
         };
 
