@@ -1131,7 +1131,7 @@ There are various ways to make a field immutable. A model can be globally frozen
 parameter:
 
 ```py
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, PrivateAttr
 
 class PersonFrozenName1(BaseModel, frozen=True):
     name: str
@@ -1181,8 +1181,6 @@ derived.value = 2  # error: [invalid-assignment]
 Private attributes on models with `frozen=True` can be mutated:
 
 ```py
-from pydantic import BaseModel, ConfigDict, PrivateAttr
-
 class FrozenPerson(BaseModel):
     model_config = ConfigDict(frozen=True)
 
