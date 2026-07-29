@@ -123,7 +123,7 @@ fn nested_workspace_root_is_not_excluded_by_an_ancestor() -> Result<()> {
 
 #[test]
 fn nested_workspace_root_is_not_excluded_by_an_ancestor_in_a_multi_root_workspace() -> Result<()> {
-    const ISSUE_SOURCE: &str = r#"print("That's a pretty long long long long long long long long long long long long long long long long long long long long long long line")
+    const ISSUE_SOURCE: &str = r#"print("This line is long enough to wrap.")
 "#;
 
     let mut server = TestServerBuilder::new()?
@@ -132,7 +132,7 @@ fn nested_workspace_root_is_not_excluded_by_an_ancestor_in_a_multi_root_workspac
         .with_file(
             ".ruff.toml",
             r#"target-version = "py312"
-line-length = 120
+line-length = 40
 
 extend-exclude = [
     "sub",
@@ -142,7 +142,7 @@ extend-exclude = [
         .with_file(
             "sub/.ruff.toml",
             r#"target-version = "py312"
-line-length = 120
+line-length = 40
 
 extend-exclude = [
     "foo",
@@ -159,7 +159,7 @@ extend-exclude = [
             .context("parent workspace should be formatted")?,
         @r#"
     print(
-        "That's a pretty long long long long long long long long long long long long long long long long long long long long long long line"
+        "This line is long enough to wrap."
     )
     "#
     );
@@ -168,7 +168,7 @@ extend-exclude = [
             .context("nested workspace should be formatted")?,
         @r#"
     print(
-        "That's a pretty long long long long long long long long long long long long long long long long long long long long long long line"
+        "This line is long enough to wrap."
     )
     "#
     );
@@ -228,6 +228,21 @@ enum WorkspaceExclusion {
     ExtendExclude,
 }
 
+/// Creates a test server for the following temporary workspace:
+///
+/// ```text
+/// <temp_dir>/
+/// ├── .ruff.toml              # exclude or extend-exclude = ["sub"]
+/// ├── test.py
+/// ├── sub/
+/// │   ├── .ruff.toml          # extend-exclude = ["foo"]
+/// │   │                       # format.quote-style = "single"
+/// │   ├── test.py
+/// │   └── foo/
+/// │       └── test.py
+/// └── unrelated/
+///     └── test.py
+/// ```
 fn nested_workspace_server(
     workspaces: &[&str],
     exclusion: WorkspaceExclusion,
