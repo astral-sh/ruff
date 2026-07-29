@@ -149,6 +149,47 @@ fn replace_with_bytes_literal(locator: &Locator, call: &ast::ExprCall, tokens: &
     ))
 }
 
+fn report_unnecessary_default_argument(checker: &Checker, call: &ast::ExprCall, encoding_arg: EncodingArg<'_>) {
+    match encoding_arg {
+        EncodingArg::Keyword(kwarg) => {
+            let mut diagnostic = checker.report_diagnostic(
+                UnnecessaryEncodeUTF8 {
+                    reason: Reason::DefaultArgument,
+                },
+                call.range(),
+            );
+            diagnostic.try_set_fix(|| {
+                remove_argument(
+                    kwarg,
+                    &call.arguments,
+                    Parentheses::Preserve,
+                    checker.locator().contents(),
+                    checker.tokens(),
+                )
+                .map(Fix::safe_edit)
+            });
+        }
+        EncodingArg::Positional(arg) => {
+            let mut diagnostic = checker.report_diagnostic(
+                UnnecessaryEncodeUTF8 {
+                    reason: Reason::DefaultArgument,
+                },
+                call.range(),
+            );
+            diagnostic.try_set_fix(|| {
+                remove_argument(
+                    arg,
+                    &call.arguments,
+                    Parentheses::Preserve,
+                    checker.locator().contents(),
+                    checker.tokens(),
+                )
+                .map(Fix::safe_edit)
+            });
+        }
+        EncodingArg::Empty => {}
+    }
+}
 /// UP012
 pub(crate) fn unnecessary_encode_utf8(checker: &Checker, call: &ast::ExprCall) {
     let Some(variable) = match_encoded_variable(&call.func) else {
