@@ -152,24 +152,14 @@ impl<'db> Type<'db> {
             Type::SubclassOf(subclass_of_ty) => match subclass_of_ty.subclass_of() {
                 SubclassOfInner::Class(class) => Some(class.into_callable(db)),
                 SubclassOfInner::Protocol(protocol) => protocol.class_origin(db).map(|origin| {
-                    let callables = (*origin).into_callable(db);
-                    if protocol.materialization_kind(db).is_none() {
-                        return callables;
+                    if protocol.materialization_kind(db).is_some() {
+                        // The origin supplies the constructor, but the actual receiver retains
+                        // `Top[P]` or `Bottom[P]`. Infer with both so instance-returning overloads
+                        // are materialized without replacing explicit non-instance returns.
+                        (*origin).into_callable_with_receiver(db, self)
+                    } else {
+                        (*origin).into_callable(db)
                     }
-
-                    let constructed_type = Type::ProtocolInstance(protocol);
-                    callables.map(|callable| {
-                        let signatures = callable
-                            .signatures(db)
-                            .into_iter()
-                            .map(|signature| signature.clone().with_return_type(constructed_type));
-                        CallableType::new(
-                            db,
-                            CallableSignature::from_overloads(signatures),
-                            callable.kind(db),
-                            callable.provenance(db),
-                        )
-                    })
                 }),
                 SubclassOfInner::TypeVar(tvar) => match tvar.typevar(db).bound_or_constraints(db) {
                     Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {

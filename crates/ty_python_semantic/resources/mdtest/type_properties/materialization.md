@@ -1057,6 +1057,77 @@ def annotated_constructors(top: type[Top[MutableAny]], bottom: type[Bottom[Mutab
     reveal_type(invoke(bottom))  # revealed: Bottom[MutableAny]
 ```
 
+A protocol's constructor can explicitly return a value that is not an instance of the protocol.
+Materializing the protocol must preserve that return type, including when its class object is
+converted to a callable:
+
+```py
+class IntConstructor(Protocol):
+    value: Any
+
+    def __new__(cls) -> int:
+        return 1
+
+def non_instance_constructors(
+    plain: type[IntConstructor],
+    top: type[Top[IntConstructor]],
+    bottom: type[Bottom[IntConstructor]],
+) -> None:
+    reveal_type(invoke(plain))  # revealed: int
+    reveal_type(invoke(top))  # revealed: int
+    reveal_type(invoke(bottom))  # revealed: int
+```
+
+A custom protocol metaclass can likewise construct a value that is not a protocol instance. Its
+`__call__` return type is preserved when the protocol is materialized.
+
+```py
+class IntConstructorMetaclass(type(Protocol)):
+    def __call__(cls) -> int:
+        return 1
+
+class MetaclassConstructor(Protocol, metaclass=IntConstructorMetaclass):
+    value: Any
+
+def metaclass_constructors(
+    plain: type[MetaclassConstructor],
+    top: type[Top[MetaclassConstructor]],
+    bottom: type[Bottom[MetaclassConstructor]],
+) -> None:
+    reveal_type(invoke(plain))  # revealed: int
+    reveal_type(invoke(top))  # revealed: int
+    reveal_type(invoke(bottom))  # revealed: int
+```
+
+Overloaded constructors preserve each return type separately: an instance-returning overload uses
+the materialized protocol, while an overload returning a different type retains that type.
+
+```py
+from typing import Self, overload
+
+class MixedConstructor(Protocol):
+    value: Any
+
+    @overload
+    def __new__(cls) -> Self: ...
+    @overload
+    def __new__(cls, value: int) -> int: ...
+    def __new__(cls, value: int | None = None) -> Self | int:
+        raise NotImplementedError
+
+def invoke_with_int[T](factory: Callable[[int], T]) -> T:
+    return factory(1)
+
+def mixed_constructors(
+    top: type[Top[MixedConstructor]],
+    bottom: type[Bottom[MixedConstructor]],
+) -> None:
+    reveal_type(invoke(top))  # revealed: Top[MixedConstructor]
+    reveal_type(invoke(bottom))  # revealed: Bottom[MixedConstructor]
+    reveal_type(invoke_with_int(top))  # revealed: int
+    reveal_type(invoke_with_int(bottom))  # revealed: int
+```
+
 Materialization preserves sound class-member access: an ordinary instance attribute is not available
 on `type[Top[MutableAny]]` or `type[Bottom[MutableAny]]`.
 
@@ -1411,14 +1482,15 @@ def fully_static_property(
     reveal_type(bottom)  # revealed: FullyStaticProperty
 ```
 
-### Assigning to properties
+### Assignment narrowing of materialized properties
 
-A property setter may transform the assigned value. Assigning a literal therefore must not narrow
-subsequent reads to that literal:
+A materialized protocol exposes a property's return type, not the underlying descriptor, when
+reading that property. Assignment narrowing must still recover the descriptor: its setter can
+transform the assigned value, so the next read must not narrow to the assigned literal.
 
 ```py
 from typing import Any, Protocol
-from ty_extensions import Top
+from ty_extensions import Bottom, Top
 
 class TransformingProperty(Protocol):
     marker: Any
@@ -1428,9 +1500,14 @@ class TransformingProperty(Protocol):
     @value.setter
     def value(self, value: int) -> None: ...
 
-def property_assignment_narrowing(top: Top[TransformingProperty]) -> None:
+def materialized_property_assignment_narrowing(
+    top: Top[TransformingProperty],
+    bottom: Bottom[TransformingProperty],
+) -> None:
     top.value = 1
     reveal_type(top.value)  # revealed: int
+    bottom.value = 2
+    reveal_type(bottom.value)  # revealed: int
 ```
 
 ### Generic inference through inherited and structural protocols
