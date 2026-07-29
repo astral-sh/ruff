@@ -119,6 +119,7 @@ use crate::types::{
 };
 use crate::{Db, FxIndexMap, FxIndexSet, FxOrderSet, ProgramEnvironment};
 
+mod solutions;
 mod support;
 
 /// An extension trait for building constraint sets from [`Option`] values.
@@ -5335,6 +5336,18 @@ impl ConstraintAssignment {
             ConstraintAssignment::Negative(constraint) => constraint,
             ConstraintAssignment::Unconstrained(constraint) => constraint,
         }
+    }
+
+    fn as_constrained(self) -> Option<ConstraintId> {
+        match self {
+            ConstraintAssignment::Positive(constraint)
+            | ConstraintAssignment::Negative(constraint) => Some(constraint),
+            ConstraintAssignment::Unconstrained(_) => None,
+        }
+    }
+
+    fn is_positive(self) -> bool {
+        matches!(self, ConstraintAssignment::Positive(_))
     }
 
     fn negated(self) -> Self {
