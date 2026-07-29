@@ -1655,9 +1655,9 @@ impl<'db> ConstraintBounds<'db> {
 /// constraints) we solve to `Unknown`. An upper bound of `object` is treated as an explicit
 /// request for "any type" as a solution, so we solve it to `object`.
 ///
-/// As an optimization, we will remove redundant clauses as we build up an `UpperBound`. This
-/// reduces the amount of work `IntersectionBuilder` needs to do when producing the solution for
-/// this upper bound.
+/// Redundant clauses are retained while accumulating the bound, avoiding repeated relation checks
+/// for every newly discovered clause. Consumers that require one effective bound can recover it
+/// with [`UpperBound::as_single_bound`] without eagerly expanding large intersections of unions.
 #[derive(Clone, Debug, Default, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) struct UpperBound<'db> {
     clauses: FxOrderSet<Type<'db>>,
@@ -1671,8 +1671,7 @@ impl<'db> UpperBound<'db> {
     /// Creates an upper bound from one explicit clause.
     ///
     /// This preserves an explicit `object` clause so callers can distinguish `T <= object` from a
-    /// missing upper bound. Use [`UpperBound::add_clause`] when accumulating clauses that should
-    /// be canonicalized by redundancy pruning.
+    /// missing upper bound. Use [`UpperBound::add_clause`] when accumulating multiple clauses.
     pub(crate) fn from_clause(clause: Type<'db>) -> Self {
         let clauses = FxOrderSet::from_iter([clause]);
         Self { clauses }
@@ -1686,11 +1685,35 @@ impl<'db> UpperBound<'db> {
         !self.is_empty()
     }
 
-    pub(crate) fn as_single_bound(&self) -> Option<Type<'db>> {
-        if self.clauses.len() != 1 {
-            return None;
+    /// Returns the effective upper bound if its clauses simplify to one type.
+    ///
+    /// First look for a clause that makes every other clause redundant. In addition to avoiding
+    /// union distribution, this preserves constrained type variables: expanding
+    /// `S & (int | str)` into `(S & int) | (S & str)` would otherwise lose `S` as the single
+    /// effective bound. If no existing clause suffices, simplify the intersection within the
+    /// normal expansion budget and reject any remaining nontrivial intersection.
+    ///
+    /// A missing bound remains distinct from an explicit `object`.
+    pub(crate) fn as_single_bound(&self, db: &'db dyn Db) -> Option<Type<'db>> {
+        let mut clauses = self.clauses.iter().copied();
+        let first = clauses.next()?;
+        let candidate = clauses.fold(first, |candidate, clause| {
+            if candidate.is_redundant_with(db, clause) {
+                candidate
+            } else {
+                clause
+            }
+        });
+        if self
+            .clauses
+            .iter()
+            .all(|clause| candidate.is_redundant_with(db, *clause))
+        {
+            return Some(candidate);
         }
-        self.clauses.first().copied()
+
+        let bound = IntersectionType::bounded_from_elements(db, self.clauses.iter().copied())?;
+        (!bound.is_nontrivial_intersection(db)).then_some(bound)
     }
 
     fn is_never(&self) -> bool {
@@ -3981,7 +4004,7 @@ impl<'db> PathBounds<'db> {
                 };
 
                 if let (Some(ty @ Type::TypeVar(_)), _) | (_, Some(ty @ Type::TypeVar(_))) =
-                    (path_bound.lower, path_bound.upper.as_single_bound())
+                    (path_bound.lower, path_bound.upper.as_single_bound(db))
                 {
                     // This path relates two TypeVars, such as passing `S` to a parameter typed as
                     // `T: (int, str)`. The compatibility check above has verified that at least
@@ -7603,7 +7626,7 @@ mod tests {
 
     use crate::db::tests::setup_db;
     use crate::types::generics::ApplySpecialization;
-    use crate::types::{BoundTypeVarInstance, KnownClass, TypeVarVariance};
+    use crate::types::{BoundTypeVarInstance, KnownClass, SubclassOfType, TypeVarVariance};
     use ruff_python_ast::name::Name;
 
     fn create_typevar<'db>(db: &'db dyn Db, name: &'static str) -> BoundTypeVarInstance<'db> {
@@ -7704,6 +7727,154 @@ mod tests {
 
         upper.add_clause(int);
         assert_eq!(upper.clauses, FxOrderSet::from_iter([Type::Never]));
+    }
+
+    #[test]
+    fn upper_bound_recovers_redundant_single_bounds() {
+        let db = setup_db();
+        let int = known_instance(&db, KnownClass::Int);
+        let bool = known_instance(&db, KnownClass::Bool);
+        let str = known_instance(&db, KnownClass::Str);
+        let bytes = known_instance(&db, KnownClass::Bytes);
+        let int_or_str = UnionType::from_two_elements(&db, int, str);
+        let int_or_bytes = UnionType::from_two_elements(&db, int, bytes);
+        let u = create_typevar(&db, "U").map_bound_or_constraints(&db, |_| {
+            Some(TypeVarBoundOrConstraints::UpperBound(int_or_str))
+        });
+        let u = Type::TypeVar(u);
+
+        for (clauses, expected) in [
+            ([Type::object(), int], int),
+            ([int, Type::object()], int),
+            ([int, bool], bool),
+            ([bool, int], bool),
+            ([int_or_str, u], u),
+            ([u, int_or_str], u),
+            ([int_or_str, int_or_bytes], int),
+            ([int_or_bytes, int_or_str], int),
+        ] {
+            let mut upper = UpperBound::none();
+            for clause in clauses {
+                upper.add_clause(clause);
+            }
+
+            assert_eq!(upper.clauses.len(), 2);
+            assert_eq!(upper.as_single_bound(&db), Some(expected));
+        }
+    }
+
+    #[test]
+    fn upper_bound_distinguishes_missing_bound_from_explicit_object() {
+        let db = setup_db();
+
+        assert_eq!(UpperBound::none().as_single_bound(&db), None);
+        assert_eq!(
+            UpperBound::from_clause(Type::object()).as_single_bound(&db),
+            Some(Type::object())
+        );
+    }
+
+    #[test]
+    fn upper_bound_does_not_treat_nontrivial_intersection_as_single_bound() {
+        let db = setup_db();
+        let int = known_instance(&db, KnownClass::Int);
+        let u = Type::TypeVar(create_typevar(&db, "U"));
+        let mut upper = UpperBound::from_clause(u);
+        upper.add_clause(int);
+
+        assert!(upper.materialize_exact(&db).is_nontrivial_intersection(&db));
+        assert_eq!(upper.as_single_bound(&db), None);
+    }
+
+    #[test]
+    fn trivial_disjointness_does_not_claim_bounded_typevar_class_is_disjoint() {
+        let db = setup_db();
+        let builder = ConstraintSetBuilder::new();
+        let bool = known_instance(&db, KnownClass::Bool);
+        let u = create_typevar(&db, "U")
+            .map_bound_or_constraints(&db, |_| Some(TypeVarBoundOrConstraints::UpperBound(bool)));
+        let type_of_u = SubclassOfType::from(&db, u);
+        let bool_class = KnownClass::Bool.to_class_literal(&db);
+
+        for (left, right) in [(type_of_u, bool_class), (bool_class, type_of_u)] {
+            let trivial = left.when_trivially_disjoint_from(&db, right, &builder, TypeVarSet::None);
+            let full = left.when_disjoint_from(&db, right, &builder, TypeVarSet::None);
+
+            assert!(trivial.is_trivially_never_satisfied());
+            assert!(!full.is_always_satisfied(&db));
+        }
+    }
+
+    #[test]
+    fn trivial_disjointness_implies_full_disjointness() {
+        let db = setup_db();
+        let builder = ConstraintSetBuilder::new();
+        let bool = known_instance(&db, KnownClass::Bool);
+        let u = create_typevar(&db, "U")
+            .map_bound_or_constraints(&db, |_| Some(TypeVarBoundOrConstraints::UpperBound(bool)));
+        let types = [
+            Type::Never,
+            Type::object(),
+            bool,
+            known_instance(&db, KnownClass::Int),
+            known_instance(&db, KnownClass::Str),
+            Type::int_literal(0),
+            Type::int_literal(1),
+            Type::bool_literal(true),
+            Type::bool_literal(false),
+            Type::string_literal(&db, "value"),
+            KnownClass::Bool.to_class_literal(&db),
+            KnownClass::Int.to_class_literal(&db),
+            SubclassOfType::from(&db, u),
+        ];
+        let mut positive_results = 0;
+
+        for left in types {
+            for right in types {
+                let trivial =
+                    left.when_trivially_disjoint_from(&db, right, &builder, TypeVarSet::None);
+                if trivial.is_trivially_always_satisfied() {
+                    positive_results += 1;
+                    assert!(
+                        left.when_disjoint_from(&db, right, &builder, TypeVarSet::None)
+                            .is_always_satisfied(&db),
+                        "cheap disjointness incorrectly accepts `{}` and `{}`",
+                        left.display(&db),
+                        right.display(&db)
+                    );
+                }
+            }
+        }
+
+        assert!(positive_results > 0);
+    }
+
+    #[test]
+    fn overlapping_lower_bounds_do_not_skip_nonempty_sequent_map() {
+        let db = setup_db();
+        let builder = ConstraintSetBuilder::new();
+        let t = create_typevar(&db, "T");
+        let bool = known_instance(&db, KnownClass::Bool);
+        let u = create_typevar(&db, "U")
+            .map_bound_or_constraints(&db, |_| Some(TypeVarBoundOrConstraints::UpperBound(bool)));
+        let type_of_u = SubclassOfType::from(&db, u);
+        let bool_class = KnownClass::Bool.to_class_literal(&db);
+        let left = ConstraintId::new_with_bounds(&db, &builder, t, Some(type_of_u), None);
+        let right = ConstraintId::new_with_bounds(&db, &builder, t, Some(bool_class), None);
+
+        for (left, right) in [(left, right), (right, left)] {
+            let sequents = SequentMap::for_constraint_pair(&db, &builder, left, right);
+
+            assert!(
+                sequents
+                    .sequents
+                    .iter()
+                    .any(|sequent| matches!(sequent, Sequent::SingleImplication { .. }))
+            );
+            assert!(!SequentMap::pair_cannot_produce_sequents(
+                &db, &builder, left, right
+            ));
+        }
     }
 
     #[test]

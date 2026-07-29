@@ -2769,11 +2769,10 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             | (
                 other @ (Type::Callable(_) | Type::ProtocolInstance(_)),
                 Type::SubclassOf(subclass_of),
-            ) if self.perform_expensive_checks
-                && let Some(type_var) = subclass_of
-                    .subclass_of()
-                    .with_transposed_type_var(db)
-                    .into_type_var() =>
+            ) if let Some(type_var) = subclass_of
+                .subclass_of()
+                .with_transposed_type_var(db)
+                .into_type_var() =>
             {
                 nontrivial_check(self, || {
                     self.check_type_pair(db, Type::TypeVar(type_var), other)
@@ -2782,8 +2781,7 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
 
             // `type[T]` is disjoint from a class object `A` if every instance of `T` is disjoint from an instance of `A`.
             (Type::SubclassOf(subclass_of), other) | (other, Type::SubclassOf(subclass_of))
-                if self.perform_expensive_checks
-                    && let Some(type_var) = subclass_of.into_type_var()
+                if let Some(type_var) = subclass_of.into_type_var()
                     && let Some(instance) = other.to_instance_approximation(db) =>
             {
                 nontrivial_check(self, || {
