@@ -5208,7 +5208,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                         let declared_type =
                             self.signature.parameters()[matched_parameter.index].annotated_type();
                         let argument_type = argument_types.get_for_declared_type(declared_type);
-                        let paramspec_prefix = |candidate: Type<'db>| {
+                        let paramspec_prefix_len = |candidate: Type<'db>| {
                             candidate
                                 .try_upcast_to_callable(self.db)?
                                 .iter()
@@ -5229,10 +5229,10 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                                 argument_type
                                     .is_assignable_to(self.db, specialized_candidate)
                                     .then_some(*candidate)
-                                    .and_then(paramspec_prefix)
+                                    .and_then(paramspec_prefix_len)
                             })
                         } else {
-                            paramspec_prefix(declared_type)
+                            paramspec_prefix_len(declared_type)
                         }?;
                         let (function, is_bound_method) = match argument_type {
                             Type::FunctionLiteral(function) => (function, false),
@@ -7504,6 +7504,9 @@ pub(crate) struct ForwardedParameterSource<'db> {
 
 impl<'db> ForwardedParameterSource<'db> {
     /// Recovers an overload's original index after specialization filters earlier declarations.
+    ///
+    /// `overload_index` initially refers to the specialized overload list. This method finds the
+    /// corresponding position in the original function, which can differ after filtering.
     fn source_overload_index(self, db: &'db dyn Db, signature: &Signature<'db>) -> Option<usize> {
         let parameter_definition = signature
             .parameters()

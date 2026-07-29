@@ -167,27 +167,28 @@ foo.method(fn1, "a", 2, c="c", unknown=1)
 
 ## Forwarded keyword arguments
 
-A keyword argument passed to `asyncio.to_thread` should identify the matching parameter on the
-callback, not the `func` parameter on `to_thread`.
+A forwarded keyword argument should identify the matching callback parameter, not the parameter that
+accepts the callback.
 
 ```py
-import asyncio
+from typing import Callable
 
+def wrapper[**P](callback: Callable[P, None], *args: P.args, **kwargs: P.kwargs) -> None: ...
 def callback(*, value: int) -> None: ...
-async def run() -> None:
-    await asyncio.to_thread(callback, value="incorrect")  # snapshot: invalid-argument-type
+
+wrapper(callback, value="incorrect")  # snapshot: invalid-argument-type
 ```
 
 ```snapshot
-error[invalid-argument-type]: Argument to function `to_thread` is incorrect
- --> src/mdtest_snippet.py:5:39
+error[invalid-argument-type]: Argument to function `wrapper` is incorrect
+ --> src/mdtest_snippet.py:6:19
   |
-5 |     await asyncio.to_thread(callback, value="incorrect")  # snapshot: invalid-argument-type
-  |                                       ^^^^^^^^^^^^^^^^^ Expected `int`, found `Literal["incorrect"]`
+6 | wrapper(callback, value="incorrect")  # snapshot: invalid-argument-type
+  |                   ^^^^^^^^^^^^^^^^^ Expected `int`, found `Literal["incorrect"]`
 info: Function defined here
- --> src/mdtest_snippet.py:3:5
+ --> src/mdtest_snippet.py:4:5
   |
-3 | def callback(*, value: int) -> None: ...
+4 | def callback(*, value: int) -> None: ...
   |     ^^^^^^^^    ---------- Parameter declared here
 ```
 
@@ -197,52 +198,55 @@ A bound method still includes `self` in its source signature. The diagnostic sho
 parameter and identify the argument that actually failed.
 
 ```py
-import asyncio
+from typing import Callable
+
+def wrapper[**P](callback: Callable[P, None], *args: P.args, **kwargs: P.kwargs) -> None: ...
 
 class Handler:
     def callback(self, *, value: int) -> None: ...
 
-async def run(handler: Handler) -> None:
-    await asyncio.to_thread(handler.callback, value="incorrect")  # snapshot: invalid-argument-type
+def run(handler: Handler) -> None:
+    wrapper(handler.callback, value="incorrect")  # snapshot: invalid-argument-type
 ```
 
 ```snapshot
-error[invalid-argument-type]: Argument to function `to_thread` is incorrect
- --> src/mdtest_snippet.py:7:47
+error[invalid-argument-type]: Argument to function `wrapper` is incorrect
+ --> src/mdtest_snippet.py:9:31
   |
-7 |     await asyncio.to_thread(handler.callback, value="incorrect")  # snapshot: invalid-argument-type
-  |                                               ^^^^^^^^^^^^^^^^^ Expected `int`, found `Literal["incorrect"]`
+9 |     wrapper(handler.callback, value="incorrect")  # snapshot: invalid-argument-type
+  |                               ^^^^^^^^^^^^^^^^^ Expected `int`, found `Literal["incorrect"]`
 info: Method defined here
- --> src/mdtest_snippet.py:4:9
+ --> src/mdtest_snippet.py:6:9
   |
-4 |     def callback(self, *, value: int) -> None: ...
+6 |     def callback(self, *, value: int) -> None: ...
   |         ^^^^^^^^          ---------- Parameter declared here
 ```
 
 ## Callbacks without a source definition
 
 A `Callable` annotation describes the accepted arguments but does not identify the function that
-declared them. In that case, point to the forwarding function's `*args` parameter.
+declared them. In that case, point to the forwarding function's `*args` parameter. The expanded
+keyword parameters below cover the corresponding `**kwargs` fallback.
 
 ```py
-import asyncio
 from typing import Callable
 
-async def run(callback: Callable[[int], None]) -> None:
-    await asyncio.to_thread(callback, "incorrect")  # snapshot: invalid-argument-type
+def wrapper[**P](callback: Callable[P, None], *args: P.args, **kwargs: P.kwargs) -> None: ...
+def run(callback: Callable[[int], None]) -> None:
+    wrapper(callback, "incorrect")  # snapshot: invalid-argument-type
 ```
 
 ```snapshot
-error[invalid-argument-type]: Argument to function `to_thread` is incorrect
- --> src/mdtest_snippet.py:5:39
+error[invalid-argument-type]: Argument to function `wrapper` is incorrect
+ --> src/mdtest_snippet.py:5:23
   |
-5 |     await asyncio.to_thread(callback, "incorrect")  # snapshot: invalid-argument-type
-  |                                       ^^^^^^^^^^^ Expected `int`, found `Literal["incorrect"]`
+5 |     wrapper(callback, "incorrect")  # snapshot: invalid-argument-type
+  |                       ^^^^^^^^^^^ Expected `int`, found `Literal["incorrect"]`
 info: Function defined here
-  --> stdlib/asyncio/threads.pyi:11:11
-   |
-11 | async def to_thread(func: Callable[_P, _R], /, *args: _P.args, **kwargs: _P.kwargs) -> _R:
-   |           ^^^^^^^^^                            -------------- Parameter declared here
+ --> src/mdtest_snippet.py:3:5
+  |
+3 | def wrapper[**P](callback: Callable[P, None], *args: P.args, **kwargs: P.kwargs) -> None: ...
+  |     ^^^^^^^                                   ------------- Parameter declared here
 ```
 
 ## Parameters consumed by Concatenate
@@ -280,24 +284,24 @@ When a callback has multiple overloads, the diagnostic should identify the param
 that accepted the other arguments.
 
 ```py
-import asyncio
-from typing import overload
+from typing import Callable, overload
 
+def wrapper[**P](callback: Callable[P, None], *args: P.args, **kwargs: P.kwargs) -> None: ...
 @overload
 def callback(value: int) -> None: ...
 @overload
 def callback(value: str, *, flag: str) -> None: ...
 def callback(value: int | str, *, flag: str | None = None) -> None: ...
-async def run() -> None:
-    await asyncio.to_thread(callback, "value", flag=1)  # snapshot: invalid-argument-type
+
+wrapper(callback, "value", flag=1)  # snapshot: invalid-argument-type
 ```
 
 ```snapshot
-error[invalid-argument-type]: Argument to function `to_thread` is incorrect
-  --> src/mdtest_snippet.py:10:48
+error[invalid-argument-type]: Argument to function `wrapper` is incorrect
+  --> src/mdtest_snippet.py:10:28
    |
-10 |     await asyncio.to_thread(callback, "value", flag=1)  # snapshot: invalid-argument-type
-   |                                                ^^^^^^ Expected `str`, found `Literal[1]`
+10 | wrapper(callback, "value", flag=1)  # snapshot: invalid-argument-type
+   |                            ^^^^^^ Expected `str`, found `Literal[1]`
 info: Function defined here
  --> src/mdtest_snippet.py:7:5
   |
@@ -344,8 +348,9 @@ A generic method can have separate overloads for different receiver types. A met
 `Receiver[int]` should point to the overload declared for `Receiver[int]`.
 
 ```py
-import asyncio
-from typing import overload
+from typing import Callable, overload
+
+def wrapper[**P](callback: Callable[P, None], *args: P.args, **kwargs: P.kwargs) -> None: ...
 
 class Receiver[T]:
     value: T
@@ -356,20 +361,20 @@ class Receiver[T]:
     def method(self: "Receiver[int]", value: int) -> None: ...
     def method(self, value: str | int) -> None: ...
 
-async def run(receiver: Receiver[int]) -> None:
-    await asyncio.to_thread(receiver.method, "incorrect")  # snapshot: invalid-argument-type
+def run(receiver: Receiver[int]) -> None:
+    wrapper(receiver.method, "incorrect")  # snapshot: invalid-argument-type
 ```
 
 ```snapshot
-error[invalid-argument-type]: Argument to function `to_thread` is incorrect
-  --> src/mdtest_snippet.py:14:46
+error[invalid-argument-type]: Argument to function `wrapper` is incorrect
+  --> src/mdtest_snippet.py:15:30
    |
-14 |     await asyncio.to_thread(receiver.method, "incorrect")  # snapshot: invalid-argument-type
-   |                                              ^^^^^^^^^^^ Expected `int`, found `Literal["incorrect"]`
+15 |     wrapper(receiver.method, "incorrect")  # snapshot: invalid-argument-type
+   |                              ^^^^^^^^^^^ Expected `int`, found `Literal["incorrect"]`
 info: Method defined here
-  --> src/mdtest_snippet.py:10:9
+  --> src/mdtest_snippet.py:11:9
    |
-10 |     def method(self: "Receiver[int]", value: int) -> None: ...
+11 |     def method(self: "Receiver[int]", value: int) -> None: ...
    |         ^^^^^^                        ---------- Parameter declared here
 ```
 
@@ -565,27 +570,28 @@ callback declares only `**options`. Without a reliable link to that declaration,
 forwarding function's `**kwargs` parameter.
 
 ```py
-import asyncio
-from typing import TypedDict, Unpack
+from typing import Callable, TypedDict, Unpack
+
+def wrapper[**P](callback: Callable[P, None], *args: P.args, **kwargs: P.kwargs) -> None: ...
 
 class Config(TypedDict):
     alpha: int
     beta: int
 
 def callback(**options: Unpack[Config]) -> None: ...
-async def run() -> None:
-    await asyncio.to_thread(callback, alpha=1, beta="incorrect")  # snapshot: invalid-argument-type
+
+wrapper(callback, alpha=1, beta="incorrect")  # snapshot: invalid-argument-type
 ```
 
 ```snapshot
-error[invalid-argument-type]: Argument to function `to_thread` is incorrect
-  --> src/mdtest_snippet.py:10:48
+error[invalid-argument-type]: Argument to function `wrapper` is incorrect
+  --> src/mdtest_snippet.py:11:28
    |
-10 |     await asyncio.to_thread(callback, alpha=1, beta="incorrect")  # snapshot: invalid-argument-type
-   |                                                ^^^^^^^^^^^^^^^^ Expected `int`, found `Literal["incorrect"]`
+11 | wrapper(callback, alpha=1, beta="incorrect")  # snapshot: invalid-argument-type
+   |                            ^^^^^^^^^^^^^^^^ Expected `int`, found `Literal["incorrect"]`
 info: Function defined here
-  --> stdlib/asyncio/threads.pyi:11:11
-   |
-11 | async def to_thread(func: Callable[_P, _R], /, *args: _P.args, **kwargs: _P.kwargs) -> _R:
-   |           ^^^^^^^^^                                            ------------------- Parameter declared here
+ --> src/mdtest_snippet.py:3:5
+  |
+3 | def wrapper[**P](callback: Callable[P, None], *args: P.args, **kwargs: P.kwargs) -> None: ...
+  |     ^^^^^^^                                                  ------------------ Parameter declared here
 ```
