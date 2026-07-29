@@ -1501,13 +1501,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         } else if let AnyNodeRef::ExprSubscript(
             subscript @ ast::ExprSubscript {
-                value, slice, env, ..
+                value, slice, ctx, ..
             },
         ) = node
         {
             let value_ty = self.infer_expression(value, TypeContext::default());
             let slice_ty = self.infer_expression(slice, TypeContext::default());
-            Some(self.infer_subscript_expression_types(subscript, value_ty, slice_ty, *env))
+            Some(self.infer_subscript_expression_types(subscript, value_ty, slice_ty, *ctx))
         } else {
             None
         }
@@ -3152,7 +3152,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             ast::Expr::Attribute(
                 attr_expr @ ast::ExprAttribute {
                     value: object,
-                    env: ExprContext::Store,
+                    ctx: ExprContext::Store,
                     attr,
                     ..
                 },
@@ -6617,7 +6617,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             range: _,
             node_index: _,
             elts,
-            env: _,
+            ctx: _,
             parenthesized: _,
         } = tuple;
 
@@ -6734,7 +6734,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             range: _,
             node_index: _,
             elts,
-            env: _,
+            ctx: _,
         } = list;
 
         let elts = elts.iter().map(|elt| [Some(elt)]).collect_vec();
@@ -9131,7 +9131,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             range: _,
             node_index: _,
             value,
-            env: _,
+            ctx: _,
         } = starred;
 
         let db = self.db();
@@ -9455,7 +9455,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             range: _,
             node_index: _,
             id: symbol_name,
-            env: _,
+            ctx: _,
         } = name_node;
         let expr = PlaceExpr::from_expr_name(name_node);
 
@@ -10063,7 +10063,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     fn infer_name_expression(&mut self, name: &ast::ExprName) -> Type<'db> {
-        match name.env {
+        match name.ctx {
             ExprContext::Load => self.infer_name_load(name),
             ExprContext::Store => Type::Never,
             ExprContext::Del => {
@@ -10428,10 +10428,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             attr,
             range: _,
             node_index: _,
-            env,
+            ctx,
         } = attribute;
 
-        match env {
+        match ctx {
             ExprContext::Load => self.infer_attribute_load(attribute),
             ExprContext::Store => {
                 self.infer_expression(value, TypeContext::default());

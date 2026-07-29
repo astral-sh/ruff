@@ -588,7 +588,7 @@ impl<'db> TypeVisitor<'db> for AmbiguousNameCollector<'db> {
             // rather than the protocol members, if it is a class-based protocol.
             // (For the purposes of displaying the type, we'll use the class name.)
             Type::ProtocolInstance(protocol) if let Some(class) = protocol.class_origin(db) => {
-                return self.visit_type(db, Type::from(class));
+                return self.visit_type(env, Type::from(class));
             }
             // no need to recurse into TypeVar bounds/constraints
             Type::TypeVar(_) => return,
@@ -996,7 +996,7 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'_, 'db> {
                         .fmt_detailed(f),
                 },
                 Protocol::Materialized(materialized) => {
-                    let materialization_kind = protocol.display_materialization_kind(self.db);
+                    let materialization_kind = protocol.display_materialization_kind(self.env);
                     if let Some(kind) = materialization_kind {
                         let (name, form) = match kind {
                             MaterializationKind::Top => ("Top", SpecialFormType::Top),
@@ -1006,12 +1006,12 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'_, 'db> {
                         f.write_char('[')?;
                     }
 
-                    match *materialized.origin(self.db) {
+                    match *materialized.origin(self.env.db()) {
                         ClassType::NonGeneric(class) => class
-                            .display_with(self.db, self.settings.clone())
+                            .display_with(self.env.db(), self.settings.clone())
                             .fmt_detailed(f),
                         ClassType::Generic(alias) => alias
-                            .display_with(self.db, self.settings.clone())
+                            .display_with(self.env, self.settings.clone())
                             .fmt_detailed(f),
                     }?;
 

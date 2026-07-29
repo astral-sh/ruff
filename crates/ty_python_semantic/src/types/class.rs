@@ -2213,7 +2213,7 @@ impl<'db> ClassType<'db> {
 
         let lookup_type = Type::from(self);
         let instance_type = receiver
-            .to_instance_approximation(db)
+            .to_instance_approximation(env)
             .unwrap_or_else(Type::unknown);
 
         let metaclass_dunder_call_function_symbol = lookup_type
@@ -2243,16 +2243,16 @@ impl<'db> ClassType<'db> {
             let is_actual_enum = enum_metadata(env, self.class_literal(db)).is_some();
             if !is_actual_enum {
                 let callable = if receiver == lookup_type {
-                    metaclass_dunder_call_function.into_callable_type(db)
+                    metaclass_dunder_call_function.into_callable_type(env)
                 } else {
                     metaclass_dunder_call_function
-                        .into_callable_type_with_receiver(db, receiver, receiver)
+                        .into_callable_type_with_receiver(env, receiver, receiver)
                 };
                 return CallableTypes::one(callable);
             }
         }
 
-        let dunder_new_function_symbol = lookup_type.lookup_dunder_new(db);
+        let dunder_new_function_symbol = lookup_type.lookup_dunder_new(env);
 
         let dunder_new_signature = dunder_new_function_symbol
             .and_then(|place_and_quals| place_and_quals.ignore_possibly_undefined())
@@ -2264,7 +2264,7 @@ impl<'db> ClassType<'db> {
 
         let dunder_new_function = if let Some(dunder_new_signature) = dunder_new_signature {
             let bound_signature = dunder_new_signature.bind_self_with_receiver(
-                db,
+                env,
                 Some(receiver),
                 Some(instance_type),
             );
@@ -2274,7 +2274,7 @@ impl<'db> ClassType<'db> {
             let returns_non_subclass = bound_signature
                 .overloads
                 .iter()
-                .any(|signature| !signature.return_ty.is_assignable_to(db, instance_type));
+                .any(|signature| !signature.return_ty.is_assignable_to(env, instance_type));
 
             let dunder_new_bound_method = CallableType::new(
                 db,
@@ -2339,7 +2339,7 @@ impl<'db> ClassType<'db> {
                     .with_definition(signature.definition())
                     .with_source_overload_index(signature.source_overload_index())
                     .bind_self_with_receiver(
-                        db,
+                        env,
                         Some(instance_type),
                         Some(instance_type),
                     )
@@ -2395,7 +2395,7 @@ impl<'db> ClassType<'db> {
                     CallableTypes::one(
                         new_function
                             .into_bound_method_type(db, instance_type)
-                            .into_callable_type(db),
+                            .into_callable_type(env),
                     )
                 } else {
                     // Fallback if no `object.__new__` is found.

@@ -1136,14 +1136,14 @@ struct GeneratorTypes<'db> {
 
 impl<'db> GeneratorTypes<'db> {
     /// Apply a generator's materialization with the variance of each operation.
-    fn materialize(self, db: &'db dyn Db, kind: MaterializationKind) -> Self {
+    fn materialize(self, env: &SemanticEnvironment<'db>, kind: MaterializationKind) -> Self {
         let visitor = ApplyTypeMappingVisitor::default();
         Self {
-            yield_ty: self.yield_ty.map(|ty| ty.materialize(db, kind, &visitor)),
+            yield_ty: self.yield_ty.map(|ty| ty.materialize(env, kind, &visitor)),
             send_ty: self
                 .send_ty
-                .map(|ty| ty.materialize(db, kind.flip(), &visitor)),
-            return_ty: self.return_ty.map(|ty| ty.materialize(db, kind, &visitor)),
+                .map(|ty| ty.materialize(env, kind.flip(), &visitor)),
+            return_ty: self.return_ty.map(|ty| ty.materialize(env, kind, &visitor)),
         }
     }
 }
@@ -1523,10 +1523,10 @@ impl<'db> Type<'db> {
     fn nominal_class(self, env: &SemanticEnvironment<'db>) -> Option<ClassType<'db>> {
         let db = env.db();
         match self {
-            Type::NominalInstance(instance) => Some(instance.class(db)),
+            Type::NominalInstance(instance) => Some(instance.class(env)),
             Type::ProtocolInstance(instance) => instance.class_origin(db).map(|class| *class),
-            Type::TypeAlias(alias) => alias.value_type(db).nominal_class(db),
-            Type::NewTypeInstance(newtype) => newtype.concrete_base_type(db).nominal_class(db),
+            Type::TypeAlias(alias) => alias.value_type(env).nominal_class(env),
+            Type::NewTypeInstance(newtype) => newtype.concrete_base_type(env).nominal_class(env),
             Type::TypeVar(typevar) => {
                 let TypeVarBoundOrConstraints::UpperBound(bound) =
                     typevar.typevar(db).bound_or_constraints(env)?
@@ -2791,11 +2791,11 @@ impl<'db> Type<'db> {
         if let Type::ProtocolInstance(protocol) = ty
             && let Some(origin) = protocol.materialized_origin(db)
         {
-            let interface = protocol.interface(db);
+            let interface = protocol.interface(env);
             return if interface.includes_member(db, name) {
-                interface.instance_member(db, name)
+                interface.instance_member(env, name)
             } else {
-                Type::instance(db, *origin).class_member_with_policy(db, name, policy)
+                Type::instance(env, *origin).class_member_with_policy(env, name, policy)
             };
         }
 
@@ -2808,7 +2808,7 @@ impl<'db> Type<'db> {
             }),
             // TODO: Remove this once synthesized protocols have a precise meta-type.
             Type::ProtocolInstance(protocol) if protocol.class_origin(db).is_none() => {
-                ty.instance_member(db, name)
+                ty.instance_member(env, name)
             }
 
             Type::LiteralValue(literal)
@@ -2915,7 +2915,7 @@ impl<'db> Type<'db> {
         let own_class = match self {
             Type::SubclassOf(subclass_of) => match subclass_of.subclass_of() {
                 SubclassOfInner::Protocol(protocol) => {
-                    protocol.class_origin(db).map(|origin| *origin)
+                    protocol.class_origin(env.db()).map(|origin| *origin)
                 }
                 subclass_of => subclass_of.into_class(env),
             },
@@ -4241,7 +4241,7 @@ impl<'db> Type<'db> {
                 Type::ProtocolInstance(protocol)
                     if protocol.class_origin(db).is_none()
                         && policy.mro_no_object_fallback()
-                        && !protocol.interface(db).includes_member(db, name_str) =>
+                        && !protocol.interface(env).includes_member(db, name_str) =>
                 {
                     Place::Undefined.into()
                 }
@@ -4883,14 +4883,14 @@ impl<'db> Type<'db> {
                 SubclassOfInner::Dynamic(dynamic_type) => {
                     Binding::single(self, Signature::dynamic(Type::Dynamic(dynamic_type))).into()
                 }
-                SubclassOfInner::Class(class) => self.constructor_bindings(db, class),
+                SubclassOfInner::Class(class) => self.constructor_bindings(env, class),
                 SubclassOfInner::Protocol(protocol) => protocol.class_origin(db).map_or_else(
                     || Binding::single(self, Signature::dynamic(Type::unknown())).into(),
                     |origin| {
-                        let bindings = self.constructor_bindings(db, *origin);
+                        let bindings = self.constructor_bindings(env, *origin);
                         if protocol.materialization_kind(db).is_some() {
                             bindings.with_constructed_instance_type(
-                                db,
+                                env,
                                 Type::ProtocolInstance(protocol),
                             )
                         } else {
@@ -5991,11 +5991,11 @@ impl<'db> Type<'db> {
             }
             Type::ProtocolInstance(protocol) => protocol
                 .class_origin(db)
-                .and_then(|class| class.iter_mro(db).find_map(from_class_base))
+                .and_then(|class| class.iter_mro(env).find_map(from_class_base))
                 .map(|types| {
                     protocol
                         .materialization_kind(db)
-                        .map_or(types, |kind| types.materialize(db, kind))
+                        .map_or(types, |kind| types.materialize(env, kind))
                 }),
             Type::Union(union) => {
                 let mut yield_builder = Some(UnionBuilder::new(env));
@@ -6729,7 +6729,7 @@ impl<'db> Type<'db> {
             }),
 
             Type::ProtocolInstance(instance) => Type::ProtocolInstance(
-                instance.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+                instance.apply_type_mapping_impl(env, type_mapping, tcx, visitor),
             ),
 
             Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderGet(function)) => {

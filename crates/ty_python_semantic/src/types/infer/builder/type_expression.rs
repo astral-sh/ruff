@@ -1343,7 +1343,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                                     {
                                         builder.into_diagnostic(format_args!(
                                             "Cannot subscript non-generic type `{}`",
-                                            value_ty.display(self.db())
+                                            value_ty.display(self.semantic_environment())
                                         ));
                                     }
                                     Type::unknown()
@@ -1791,7 +1791,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         {
                             builder.into_diagnostic(format_args!(
                                 "Cannot subscript non-generic type `{}`",
-                                value_ty.display(self.db())
+                                value_ty.display(self.semantic_environment())
                             ));
                         }
                         Type::unknown()

@@ -204,9 +204,14 @@ impl<'db> TypeVisitor<'db> for DefinitionReferenceVisitor<'db> {
         }
     }
 
-    fn visit_protocol_instance_type(&self, db: &'db dyn Db, protocol: ProtocolInstanceType<'db>) {
+    fn visit_protocol_instance_type(
+        &self,
+        env: &SemanticEnvironment<'db>,
+        protocol: ProtocolInstanceType<'db>,
+    ) {
+        let db = env.db();
         if let Some(class) = protocol.class_origin(db) {
-            class.walk_recursive_member_types(db, self);
+            class.walk_recursive_member_types(env, self);
         }
     }
 
@@ -245,7 +250,8 @@ impl<'db> ProtocolInstanceType<'db> {
         Some(origin.definition(db))
     }
 
-    fn is_recursive(self, db: &'db dyn Db) -> bool {
+    fn is_recursive(self, env: &SemanticEnvironment<'db>) -> bool {
+        let db = env.db();
         let Some(class) = self.class_origin(db) else {
             return false;
         };

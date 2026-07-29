@@ -1243,9 +1243,9 @@ impl<'db> Signature<'db> {
         let specialization = builder.build_with(generic_context, |typevar, bounds| {
             if let Some(bounds) = bounds
                 && let Some(lower) = bounds.lower
-                && let Some(upper) = bounds.upper.as_single_bound(db)
-                && lower.is_equivalent_to(db, upper)
-                && let Ok(Some(solution)) = PathBounds::default_solve(db, &constraints, bounds)
+                && let Some(upper) = bounds.upper.as_single_bound(env)
+                && lower.is_equivalent_to(env, upper)
+                && let Ok(Some(solution)) = PathBounds::default_solve(env, &constraints, bounds)
             {
                 return Some(solution);
             }

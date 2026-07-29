@@ -197,7 +197,7 @@ fn merge_truthiness_guarded_pair<'db>(
 /// unhashable. Keeping the non-final type allows downstream checks to consider it independently.
 fn should_preserve_hashable_union(env: &SemanticEnvironment<'_>, left: Type, right: Type) -> bool {
     let is_hashable =
-        |ty| matches!(ty, Type::ProtocolInstance(protocol) if protocol.is_hashable(env));
+        |ty| matches!(ty, Type::ProtocolInstance(protocol) if protocol.is_hashable(env.db()));
     let is_non_final_nominal_instance =
         |ty| matches!(ty, Type::NominalInstance(instance) if !instance.class(env).is_final(env));
 

@@ -5266,6 +5266,8 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         paramspec: BoundTypeVarInstance<'db>,
         overload_index: usize,
     ) -> Option<ForwardedParameterSource<'db>> {
+        let env = self.env;
+        let db = env.db();
         self.enumerate_argument_types()
             .find_map(|(argument_index, _, argument, argument_types)| {
                 if matches!(argument, Argument::Synthetic) {
@@ -5280,39 +5282,38 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                         let argument_type = argument_types.get_for_declared_type(declared_type);
                         let paramspec_prefix_len = |candidate: Type<'db>| {
                             candidate
-                                .try_upcast_to_callable(self.db)?
+                                .try_upcast_to_callable(env)?
                                 .iter()
                                 .find_map(|callable| {
-                                    callable.signatures(self.db).iter().find_map(|signature| {
+                                    callable.signatures(db).iter().find_map(|signature| {
                                         let (prefix, declared_paramspec) =
                                             signature.parameters().as_paramspec_with_prefix()?;
                                         (declared_paramspec == paramspec).then_some(prefix.len())
                                     })
                                 })
                         };
-                        let prefix_len = if let Type::Union(union) =
-                            declared_type.resolve_type_alias(self.db)
-                        {
-                            union.elements(self.db).iter().find_map(|candidate| {
-                                let specialized_candidate = candidate
-                                    .apply_optional_specialization(self.db, self.specialization());
-                                argument_type
-                                    .is_assignable_to(self.db, specialized_candidate)
-                                    .then_some(*candidate)
-                                    .and_then(paramspec_prefix_len)
-                            })
-                        } else {
-                            paramspec_prefix_len(declared_type)
-                        }?;
+                        let prefix_len =
+                            if let Type::Union(union) = declared_type.resolve_type_alias(env) {
+                                union.elements(db).iter().find_map(|candidate| {
+                                    let specialized_candidate = candidate
+                                        .apply_optional_specialization(env, self.specialization());
+                                    argument_type
+                                        .is_assignable_to(env, specialized_candidate)
+                                        .then_some(*candidate)
+                                        .and_then(paramspec_prefix_len)
+                                })
+                            } else {
+                                paramspec_prefix_len(declared_type)
+                            }?;
                         let (source_type, partial_signature) = match argument_type {
                             Type::KnownInstance(
                                 KnownInstanceType::FunctoolsPartial(partial)
                                 | KnownInstanceType::FunctoolsPartialCall(partial),
                             ) => {
                                 let signatures =
-                                    &partial.partial(self.db).signatures(self.db).overloads;
+                                    &partial.partial(db).signatures(db).overloads;
                                 (
-                                    partial.wrapped(self.db).inner(self.db),
+                                    partial.wrapped(db).inner(db),
                                     signatures
                                         .iter()
                                         .find(|signature| {
@@ -5324,11 +5325,11 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                             }
                             _ => (argument_type, None),
                         };
-                        let argument_bindings = source_type.bindings(self.db);
+                        let argument_bindings = source_type.bindings(env);
                         let callable = argument_bindings.single_item()?.callable();
                         let (function, is_bound_method) = match callable.signature_type {
                             Type::FunctionLiteral(function) => (function, false),
-                            Type::BoundMethod(method) => (method.function(self.db), true),
+                            Type::BoundMethod(method) => (method.function(db), true),
                             _ => return None,
                         };
                         let source_binding = callable
@@ -6121,7 +6122,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                     {
                         if let Some(parameter_source) = parameter_source
                             && parameter_source
-                                .source_parameter_index(self.db, parameter)
+                                .source_parameter_index(self.env, parameter)
                                 .is_some()
                         {
                             *error_parameter_source = Some(parameter_source);
@@ -7653,14 +7654,14 @@ impl<'db> ForwardedParameterSource<'db> {
     /// ```
     fn source_parameter_index(
         self,
-        db: &'db dyn Db,
+        env: &SemanticEnvironment<'db>,
         parameter: &ParameterContext,
     ) -> Option<usize> {
         let parameter_index = parameter
             .source_parameter_index
             .unwrap_or(parameter.signature_parameter_index + self.parameter_index_offset);
         self.function
-            .signature(db)
+            .signature(env)
             .overloads
             .get(self.overload_index)?
             .parameters()
@@ -7672,11 +7673,16 @@ impl<'db> ForwardedParameterSource<'db> {
     }
 
     /// Locates the matched source overload after restoring omitted receiver and prefix parameters.
-    fn parameter_span(self, db: &'db dyn Db, parameter: &ParameterContext) -> (Span, Span) {
+    fn parameter_span(
+        self,
+        env: &SemanticEnvironment<'db>,
+        parameter: &ParameterContext,
+    ) -> (Span, Span) {
+        let db = env.db();
         let parameter_index = self
-            .source_parameter_index(db, parameter)
+            .source_parameter_index(env, parameter)
             .unwrap_or(parameter.signature_parameter_index + self.parameter_index_offset);
-        let (overloads, implementation) = self.function.overloads_and_implementation(db);
+        let (overloads, implementation) = self.function.overloads_and_implementation(env);
         overloads
             .get(self.overload_index)
             .copied()
@@ -8036,7 +8042,7 @@ impl<'db> BindingError<'db> {
 
                 if let Some(parameter_source) = parameter_source {
                     let (name_span, parameter_span) =
-                        parameter_source.parameter_span(context.db(), parameter);
+                        parameter_source.parameter_span(env, parameter);
                     let callable_kind = if parameter_source.is_bound_method {
                         "Method"
                     } else {
@@ -8068,7 +8074,7 @@ impl<'db> BindingError<'db> {
                                 matches!(argument, ArgOrKeyword::Arg(_))
                             });
                             overload_literal
-                                .signature(context.db())
+                                .signature(env)
                                 .parameters()
                                 .iter()
                                 .position(|candidate| {

@@ -657,7 +657,7 @@ impl<'db> BoundSuperType<'db> {
                     match typevar.bound_or_constraints(env) {
                         Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
                             let class = match bound {
-                                Type::NominalInstance(instance) => Some(instance.class(db)),
+                                Type::NominalInstance(instance) => Some(instance.class(env)),
                                 Type::ProtocolInstance(protocol) => {
                                     protocol.class_origin(db).map(|class| *class)
                                 }
@@ -776,7 +776,7 @@ impl<'db> BoundSuperType<'db> {
                 match typevar.bound_or_constraints(env) {
                     Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
                         let class = match bound {
-                            Type::NominalInstance(instance) => Some(instance.class(db)),
+                            Type::NominalInstance(instance) => Some(instance.class(env)),
                             Type::ProtocolInstance(protocol) => {
                                 protocol.class_origin(db).map(|class| *class)
                             }

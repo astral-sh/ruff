@@ -157,7 +157,7 @@ impl<'db> Type<'db> {
 
             // TODO: This is unsound so in future we can consider an opt-in option to disable it.
             Type::SubclassOf(subclass_of_ty) => match subclass_of_ty.subclass_of() {
-                SubclassOfInner::Class(class) => Some(class.into_callable(db)),
+                SubclassOfInner::Class(class) => Some(class.into_callable(env)),
                 SubclassOfInner::Protocol(protocol) => protocol.class_origin(db).map(|origin| {
                     if protocol.materialization_kind(db).is_some() {
                         // The origin supplies the constructor, but the actual receiver retains
@@ -165,55 +165,59 @@ impl<'db> Type<'db> {
                         // are materialized without replacing explicit non-instance returns.
                         (*origin).into_callable_with_receiver(db, self)
                     } else {
-                        (*origin).into_callable(db)
+                        (*origin).into_callable(env)
                     }
                 }),
-                SubclassOfInner::TypeVar(tvar) => match tvar.typevar(db).bound_or_constraints(db) {
-                    Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
-                        let upcast_callables = bound
-                            .to_meta_type(db)
-                            .try_upcast_to_callable_with_policy_and_context(db, policy, context)?;
-                        Some(upcast_callables.map(|callable| {
-                            let signatures = callable
-                                .signatures(db)
-                                .into_iter()
-                                .map(|sig| sig.clone().with_return_type(Type::TypeVar(tvar)));
-                            CallableType::new(
-                                db,
-                                CallableSignature::from_overloads(signatures),
-                                callable.kind(db),
-                                callable.provenance(db),
-                            )
-                        }))
-                    }
-                    Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
-                        let mut callables = SmallVec::new();
-                        for constraint in constraints.elements(db) {
-                            let element_upcast = constraint
+                SubclassOfInner::TypeVar(tvar) => {
+                    match tvar.typevar(db).bound_or_constraints(env) {
+                        Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
+                            let upcast_callables = bound
                                 .to_meta_type(env)
                                 .try_upcast_to_callable_with_policy_and_context(
                                     env, policy, context,
                                 )?;
-                            for callable in element_upcast.into_inner() {
+                            Some(upcast_callables.map(|callable| {
                                 let signatures = callable
                                     .signatures(db)
                                     .into_iter()
                                     .map(|sig| sig.clone().with_return_type(Type::TypeVar(tvar)));
-                                callables.push(CallableType::new(
+                                CallableType::new(
                                     db,
                                     CallableSignature::from_overloads(signatures),
                                     callable.kind(db),
                                     callable.provenance(db),
-                                ));
-                            }
+                                )
+                            }))
                         }
-                        Some(CallableTypes::new(callables))
+                        Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
+                            let mut callables = SmallVec::new();
+                            for constraint in constraints.elements(db) {
+                                let element_upcast = constraint
+                                    .to_meta_type(env)
+                                    .try_upcast_to_callable_with_policy_and_context(
+                                        env, policy, context,
+                                    )?;
+                                for callable in element_upcast.into_inner() {
+                                    let signatures =
+                                        callable.signatures(db).into_iter().map(|sig| {
+                                            sig.clone().with_return_type(Type::TypeVar(tvar))
+                                        });
+                                    callables.push(CallableType::new(
+                                        db,
+                                        CallableSignature::from_overloads(signatures),
+                                        callable.kind(db),
+                                        callable.provenance(db),
+                                    ));
+                                }
+                            }
+                            Some(CallableTypes::new(callables))
+                        }
+                        None => Some(CallableTypes::one(CallableType::single(
+                            db,
+                            Signature::new(Parameters::gradual_form(), Type::TypeVar(tvar)),
+                        ))),
                     }
-                    None => Some(CallableTypes::one(CallableType::single(
-                        db,
-                        Signature::new(Parameters::gradual_form(), Type::TypeVar(tvar)),
-                    ))),
-                },
+                }
                 SubclassOfInner::Dynamic(_) => Some(CallableTypes::one(CallableType::single(
                     db,
                     Signature::new(Parameters::unknown(), Type::from(subclass_of_ty)),

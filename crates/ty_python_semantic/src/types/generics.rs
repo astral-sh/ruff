@@ -2987,8 +2987,8 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         // fallback erases; restrict mixed unions to the protocol used by dictionary constructors.
         if !other_types.is_empty()
             && !matches!(formal, Type::ProtocolInstance(protocol)
-            if protocol.class_origin(self.db).is_some_and(|class| {
-                class.is_known(self.db, KnownClass::SupportsKeysAndGetItem)
+            if protocol.class_origin(db).is_some_and(|class| {
+                class.is_known(db, KnownClass::SupportsKeysAndGetItem)
             }))
         {
             return None;
@@ -3567,25 +3567,26 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
 
             (formal, Type::ProtocolInstance(actual_protocol)) => {
                 if let Type::ProtocolInstance(formal_protocol) = formal
-                    && let Some(actual_origin) = actual_protocol.materialized_origin(self.db)
-                    && let Some(formal_origin) = formal_protocol.class_origin(self.db)
+                    && let Some(actual_origin) = actual_protocol.materialized_origin(self.env.db())
+                    && let Some(formal_origin) = formal_protocol.class_origin(self.env.db())
                 {
                     let nominally_inherited = actual_origin
-                        .iter_mro(self.db)
+                        .iter_mro(self.env)
                         .filter_map(ClassBase::into_class)
                         .any(|base| {
-                            base.class_literal(self.db) == formal_origin.class_literal(self.db)
+                            base.class_literal(self.env.db())
+                                == formal_origin.class_literal(self.env.db())
                         });
                     let when = if nominally_inherited
                         || formal_protocol
-                            .interface(self.db)
-                            .has_only_finite_members(self.db)
+                            .interface(self.env)
+                            .has_only_finite_members(self.env)
                     {
-                        Some(actual.when_constraint_set_assignable_to_owned(self.db, formal))
+                        Some(actual.when_constraint_set_assignable_to_owned(self.env, formal))
                     } else {
                         actual_protocol
                             .when_non_recursive_members_assignable_to_owned(
-                                self.db,
+                                self.env,
                                 formal_protocol,
                             )
                             .map(Cow::Borrowed)
@@ -3596,7 +3597,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                     // interface when doing so is cycle-safe; otherwise use its nonrecursive
                     // requirements and leave full recursive compatibility to argument checking.
                     if let Some(when) = when {
-                        let when = self.constraints.load(self.db, &when);
+                        let when = self.constraints.load(self.env, &when);
                         self.infer_from_constraint_set(when)?;
                         return Ok(());
                     }
@@ -3607,7 +3608,8 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 // To handle classes that implicitly implement a generic protocol, we
                 // will need to check the types of the protocol members to be able to
                 // infer the specialization of the protocol that the class implements.
-                if let Some(actual_nominal) = actual_protocol.nominal_origin_instance(self.db) {
+                if let Some(actual_nominal) = actual_protocol.nominal_origin_instance(self.env.db())
+                {
                     return self.infer_map_impl(
                         formal,
                         Type::NominalInstance(actual_nominal),
