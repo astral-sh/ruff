@@ -460,7 +460,7 @@ impl ClassInfoConstraintFunction {
         env: &ProgramEnvironment<'db>,
         classinfo: Type<'db>,
         is_positive: bool,
-        use_narrowing_bounds: bool,
+        use_generic_filtering: bool,
     ) -> Option<Type<'db>> {
         let constraint_from_class_literal = |class: ClassLiteral<'db>| match self {
             ClassInfoConstraintFunction::IsInstance => {
@@ -553,7 +553,7 @@ impl ClassInfoConstraintFunction {
                             db,
                             constraints.as_type(db),
                             is_positive,
-                            use_narrowing_bounds,
+                            use_generic_filtering,
                         ),
                 }
             }
@@ -604,7 +604,7 @@ impl ClassInfoConstraintFunction {
                     env,
                     alias.aliased_class().to_class_literal(db, env),
                     is_positive,
-                    use_narrowing_bounds,
+                    use_generic_filtering,
                 ),
                 SpecialFormType::Tuple => self.generate_constraint(
                     db,
@@ -617,13 +617,13 @@ impl ClassInfoConstraintFunction {
                     env,
                     KnownClass::Type.to_class_literal(db, env),
                     is_positive,
-                    use_narrowing_bounds,
+                    use_generic_filtering,
                 ),
                 SpecialFormType::Type => self.generate_constraint(
                     db,
                     KnownClass::Type.to_class_literal(db),
                     is_positive,
-                    use_narrowing_bounds,
+                    use_generic_filtering,
                 ),
 
                 // We don't have a good meta-type for `Callable`s right now,
@@ -669,20 +669,48 @@ impl ClassInfoConstraintFunction {
     }
 }
 
+#[derive(Hash, PartialEq, Debug, Eq, Clone, Copy, get_size2::GetSize, salsa::SalsaValue)]
+enum NarrowingConjunct<'db> {
+    Intersection(Type<'db>),
+    GenericFiltering(Type<'db>),
+}
+
+impl<'db> NarrowingConjunct<'db> {
+    const fn ty(self) -> Type<'db> {
+        match self {
+            Self::Intersection(ty) | Self::GenericFiltering(ty) => ty,
+        }
+    }
+}
+
 #[derive(Hash, PartialEq, Debug, Eq, Clone, get_size2::GetSize, salsa::SalsaValue)]
 struct Conjunctions<'db> {
-    conjuncts: SmallVec<[Type<'db>; 2]>,
+    conjuncts: SmallVec<[NarrowingConjunct<'db>; 2]>,
 }
 
 impl<'db> Conjunctions<'db> {
     fn singleton(ty: Type<'db>) -> Self {
         Self {
-            conjuncts: smallvec![ty],
+            conjuncts: smallvec![NarrowingConjunct::Intersection(ty)],
+        }
+    }
+
+    fn generic_filtering(ty: Type<'db>) -> Self {
+        Self {
+            conjuncts: smallvec![NarrowingConjunct::GenericFiltering(ty)],
         }
     }
 
     fn and_with(mut self, other: Self) -> Self {
-        if self.conjuncts.iter().any(Type::is_never) || other.conjuncts.iter().any(Type::is_never) {
+        if self
+            .conjuncts
+            .iter()
+            .any(|conjunct| conjunct.ty().is_never())
+            || other
+                .conjuncts
+                .iter()
+                .any(|conjunct| conjunct.ty().is_never())
+        {
             return Self::singleton(Type::Never);
         }
 
@@ -696,7 +724,7 @@ impl<'db> Conjunctions<'db> {
 
     fn evaluate_constraint_type(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Type<'db> {
         if self.conjuncts.len() == 1 {
-            return self.conjuncts[0];
+            return self.conjuncts[0].ty();
         }
 
         // Collapse shared union arms before distributing the next constraint over them.
@@ -706,6 +734,161 @@ impl<'db> Conjunctions<'db> {
                 IntersectionType::from_two_elements(db, env, accumulated, conjunct)
             })
     }
+}
+
+/// Preserve known generic arguments when narrowing a specialized base to one of its subclasses.
+///
+/// For example, filtering `Sequence[int]` with `list[Unknown]` first infers `list[int]` from
+/// the target class's specialized `Sequence` base. Unrelated union arms and intersection elements
+/// are still intersected with the original unknown-specialized target.
+fn filter_generic_narrowing_constraint<'db>(
+    db: &'db dyn Db,
+    subject: Type<'db>,
+    target: Type<'db>,
+) -> Type<'db> {
+    match (subject, target) {
+        (Type::Union(union), target) => union.map(db, |element| {
+            filter_generic_narrowing_constraint(db, *element, target)
+        }),
+        (subject, Type::Union(union)) => union.map(db, |element| {
+            filter_generic_narrowing_constraint(db, subject, *element)
+        }),
+        (Type::Intersection(intersection), target) => {
+            let specialized_target = intersection
+                .positive(db)
+                .iter()
+                .find_map(|element| specialize_narrowing_target(db, *element, target))
+                .unwrap_or(target);
+            IntersectionType::from_two_elements(db, subject, specialized_target)
+        }
+        (subject, target) => {
+            let specialized_target =
+                specialize_narrowing_target(db, subject, target).unwrap_or(target);
+            IntersectionType::from_two_elements(db, subject, specialized_target)
+        }
+    }
+}
+
+fn specialize_narrowing_target<'db>(
+    db: &'db dyn Db,
+    subject: Type<'db>,
+    target: Type<'db>,
+) -> Option<Type<'db>> {
+    if let Type::TypeVar(typevar) = subject {
+        let bound = match typevar.typevar(db).bound_or_constraints(db)? {
+            TypeVarBoundOrConstraints::UpperBound(bound) => bound,
+            TypeVarBoundOrConstraints::Constraints(constraints) => constraints.as_type(db),
+        };
+
+        return match bound {
+            Type::Union(union) => {
+                let mut candidates = UnionBuilder::new(db);
+                let mut found_specialization = false;
+                for element in union.elements(db) {
+                    if let Some(specialized) = specialize_narrowing_target(db, *element, target) {
+                        candidates = candidates.add(specialized);
+                        found_specialization = true;
+                    }
+                }
+                found_specialization.then(|| candidates.build())
+            }
+            Type::Intersection(intersection) => intersection
+                .positive(db)
+                .iter()
+                .find_map(|element| specialize_narrowing_target(db, *element, target)),
+            bound if bound != subject => specialize_narrowing_target(db, bound, target),
+            _ => None,
+        };
+    }
+
+    let (target_class, subject_class, is_subclass) = match target {
+        Type::SubclassOf(target) => {
+            let SubclassOfInner::Class(target_class) = target.subclass_of() else {
+                return None;
+            };
+            let Type::SubclassOf(subject) = subject else {
+                return None;
+            };
+            let SubclassOfInner::Class(subject_class) = subject.subclass_of() else {
+                return None;
+            };
+            (target_class, subject_class, true)
+        }
+        _ => (target.nominal_class(db)?, subject.nominal_class(db)?, false),
+    };
+
+    // An unspecialized class cannot contribute type arguments to the narrowing target.
+    subject_class.static_class_literal(db)?.1?;
+
+    let target_class = if target_class.class_literal(db) == subject_class.class_literal(db) {
+        subject_class
+    } else {
+        specialize_generic_class_for_subject(db, target_class.class_literal(db), subject_class)?
+    };
+
+    Some(if is_subclass {
+        SubclassOfType::from(db, target_class)
+    } else {
+        Type::instance(db, target_class)
+    })
+}
+
+fn specialize_generic_class_for_subject<'db>(
+    db: &'db dyn Db,
+    target_class: ClassLiteral<'db>,
+    subject_class: ClassType<'db>,
+) -> Option<ClassType<'db>> {
+    let generic_context = target_class.generic_context(db)?;
+    let target_base = target_class
+        .identity_specialization(db)
+        .iter_mro(db)
+        .filter_map(ClassBase::into_class)
+        .find(|base| base.class_literal(db) == subject_class.class_literal(db))?;
+
+    let constraints = ConstraintSetBuilder::new();
+    let solutions = Type::instance(db, target_base)
+        .assignable_solutions_with_inferable(
+            db,
+            Type::instance(db, subject_class),
+            generic_context.inferable_typevars(db),
+        )
+        .solve(db, &constraints);
+    let Solutions::Constrained(solutions) = solutions else {
+        return None;
+    };
+    let [solution] = solutions.as_slice() else {
+        return None;
+    };
+
+    let typevars = generic_context.variables(db);
+    let unknown_specialization = generic_context.unknown_specialization(db);
+    let types = typevars
+        .clone()
+        .zip(unknown_specialization.types(db))
+        .map(|(typevar, unknown)| {
+            solution
+                .iter()
+                .find(|binding| binding.bound_typevar == typevar)
+                .map_or(*unknown, |binding| binding.solution)
+        })
+        .collect::<Vec<_>>();
+    if types.iter().any(|ty| {
+        typevars
+            .clone()
+            .any(|typevar| ty.references_typevar(db, typevar.typevar(db).identity(db)))
+    }) {
+        return None;
+    }
+
+    let specialization = if target_class.is_known(db, KnownClass::Tuple)
+        && let [element] = types.as_slice()
+    {
+        generic_context.specialize_tuple(db, *element, TupleType::homogeneous(db, *element))
+    } else {
+        generic_context.specialize(db, types)
+    };
+
+    Some(target_class.apply_specialization(db, |_| specialization))
 }
 
 /// Represents narrowing constraints in Disjunctive Normal Form (DNF).
@@ -749,6 +932,15 @@ impl<'db> NarrowingConstraint<'db> {
     pub(crate) fn intersection(constraint: Type<'db>) -> Self {
         Self {
             intersection_disjuncts: smallvec_inline![Conjunctions::singleton(constraint)],
+            replacement_disjuncts: smallvec![],
+        }
+    }
+
+    /// Create an intersection constraint that preserves generic arguments already known about
+    /// the subject when narrowing it to a subclass.
+    fn generic_filtering(constraint: Type<'db>) -> Self {
+        Self {
+            intersection_disjuncts: smallvec_inline![Conjunctions::generic_filtering(constraint)],
             replacement_disjuncts: smallvec![],
         }
     }
@@ -3901,7 +4093,7 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
 
                 let class_info_ty = inference.expression_type(second_arg);
 
-                let use_narrowing_bounds = is_positive
+                let use_generic_filtering = is_positive
                     && !self
                         .db
                         .analysis_settings(self.scope().file(self.db))

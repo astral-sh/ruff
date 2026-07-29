@@ -1004,7 +1004,6 @@ impl<'db> GenericContext<'db> {
                 })
                 .collect::<Box<[_]>>(),
             None,
-            false,
             (known_class == Some(KnownClass::Tuple))
                 .then(|| TupleType::homogeneous(db, &env, Type::unknown())),
         )
@@ -1054,7 +1053,7 @@ impl<'db> GenericContext<'db> {
         let types = types.into();
 
         assert_eq!(self.len(db), types.len());
-        Specialization::new(db, self, types, None, false, None)
+        Specialization::new(db, self, types, None, None)
     }
 
     /// Creates a specialization of this generic context. Panics if the length of `types` does not
@@ -1113,7 +1112,7 @@ impl<'db> GenericContext<'db> {
             }
 
             if !any_changed {
-                return Specialization::new(db, self, types, None, false, None);
+                return Specialization::new(db, self, types, None, None);
             }
         }
     }
@@ -1125,14 +1124,7 @@ impl<'db> GenericContext<'db> {
         element_type: Type<'db>,
         tuple: TupleType<'db>,
     ) -> Specialization<'db> {
-        Specialization::new(
-            db,
-            self,
-            [element_type].as_slice(),
-            None,
-            false,
-            Some(tuple),
-        )
+        Specialization::new(db, self, [element_type].as_slice(), None, Some(tuple))
     }
 
     fn fill_in_defaults<I>(self, db: &'db dyn Db, types: I) -> Box<[Type<'db>]>
@@ -1204,14 +1196,7 @@ impl<'db> GenericContext<'db> {
         I: IntoIterator<Item = Option<Type<'db>>>,
         I::IntoIter: ExactSizeIterator,
     {
-        Specialization::new(
-            db,
-            self,
-            self.fill_in_defaults(db, types),
-            None,
-            false,
-            None,
-        )
+        Specialization::new(db, self, self.fill_in_defaults(db, types), None, None)
     }
 }
 
@@ -1234,10 +1219,6 @@ pub struct Specialization<'db> {
     /// dynamic types in invariant positions or positions with constrained type variables.
     #[returns(copy)]
     pub(crate) materialization_kind: Option<MaterializationKind>,
-
-    /// Whether the materialization was introduced while building a narrowing constraint.
-    #[returns(copy)]
-    pub(crate) narrowing_materialization: bool,
 
     /// For specializations of `tuple`, we also store more detailed information about the tuple's
     /// elements, above what the class's (single) typevar can represent.
@@ -1270,7 +1251,6 @@ impl<'db> Specialization<'db> {
     pub(super) fn merge_cycle_recovery(self, db: &'db dyn Db, previous: Self) -> Option<Self> {
         if self.generic_context(db) != previous.generic_context(db)
             || self.materialization_kind(db) != previous.materialization_kind(db)
-            || self.narrowing_materialization(db) != previous.narrowing_materialization(db)
             || self.tuple_inner(db) != previous.tuple_inner(db)
         {
             return None;
@@ -1296,7 +1276,6 @@ impl<'db> Specialization<'db> {
             self.generic_context(db),
             types,
             self.materialization_kind(db),
-            self.narrowing_materialization(db),
             self.tuple_inner(db),
         ))
     }
@@ -1352,7 +1331,6 @@ impl<'db> Specialization<'db> {
             generic_context,
             restricted_types?,
             self.materialization_kind(db),
-            self.narrowing_materialization(db),
             None,
         ))
     }
@@ -1390,7 +1368,6 @@ impl<'db> Specialization<'db> {
             self.generic_context(db),
             [tuple.tuple(db).homogeneous_element_type(db, &env)].as_slice(),
             self.materialization_kind(db),
-            self.narrowing_materialization(db),
             None,
         )
     }
@@ -1431,12 +1408,6 @@ impl<'db> Specialization<'db> {
         );
         match other.materialization_kind(db) {
             None => new_specialization,
-            Some(materialization_kind) if other.narrowing_materialization(db) => new_specialization
-                .materialize_for_narrowing_impl(
-                    db,
-                    materialization_kind,
-                    &ApplyTypeMappingVisitor::default(),
-                ),
             Some(materialization_kind) => new_specialization.materialize_impl(
                 db,
                 materialization_kind,
@@ -1455,7 +1426,6 @@ impl<'db> Specialization<'db> {
             self.generic_context(db),
             self.types(db),
             materialization_kind,
-            self.narrowing_materialization(db),
             self.tuple_inner(db),
         )
     }
@@ -1479,12 +1449,8 @@ impl<'db> Specialization<'db> {
         if let TypeMapping::Materialize(materialization_kind) = type_mapping {
             return self.materialize_impl(db, *materialization_kind, visitor);
         }
-        if let TypeMapping::MaterializeForNarrowing(materialization_kind) = type_mapping {
-            return self.materialize_for_narrowing_impl(db, *materialization_kind, visitor);
-        }
 
         let mut new_materialization_kind = self.materialization_kind(db);
-        let narrowing_materialization = self.narrowing_materialization(db);
         let types = self.map_types(db, |i, typevar, ty| {
             let tcx = TypeContext::new(tcx.get(i).copied());
             match (typevar.variance(db), type_mapping) {
@@ -1537,8 +1503,7 @@ impl<'db> Specialization<'db> {
         // Keep this check in sync with every field that can be transformed above.
         let specialization_unchanged = matches!(&types, Cow::Borrowed(_))
             && tuple_inner == original_tuple_inner
-            && new_materialization_kind == self.materialization_kind(db)
-            && narrowing_materialization == self.narrowing_materialization(db);
+            && new_materialization_kind == self.materialization_kind(db);
         if specialization_unchanged {
             self
         } else {
@@ -1547,7 +1512,6 @@ impl<'db> Specialization<'db> {
                 self.generic_context(db),
                 types,
                 new_materialization_kind,
-                narrowing_materialization,
                 tuple_inner,
             )
         }
@@ -1591,7 +1555,7 @@ impl<'db> Specialization<'db> {
             .collect();
         // TODO: Combine the tuple specs too
         // TODO(jelle): specialization type?
-        Specialization::new(db, self.generic_context(db), types, None, false, None)
+        Specialization::new(db, self.generic_context(db), types, None, None)
     }
 
     pub(super) fn recursive_type_normalized_impl(
@@ -1625,7 +1589,6 @@ impl<'db> Specialization<'db> {
             context,
             types,
             self.materialization_kind(db),
-            self.narrowing_materialization(db),
             tuple_inner,
         ))
     }
@@ -1636,43 +1599,12 @@ impl<'db> Specialization<'db> {
         materialization_kind: MaterializationKind,
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Self {
-        self.materialize_inner(db, materialization_kind, false, visitor)
-    }
-
-    fn materialize_for_narrowing_impl(
-        self,
-        db: &'db dyn Db,
-        materialization_kind: MaterializationKind,
-        visitor: &ApplyTypeMappingVisitor<'db>,
-    ) -> Self {
-        self.materialize_inner(db, materialization_kind, true, visitor)
-    }
-
-    fn materialize_inner(
-        self,
-        db: &'db dyn Db,
-        materialization_kind: MaterializationKind,
-        for_narrowing: bool,
-        visitor: &ApplyTypeMappingVisitor<'db>,
-    ) -> Self {
         // The top and bottom materializations are fully static types already, so materializing them
         // further does nothing.
         if self.materialization_kind(db).is_some() {
             return self;
         }
         let mut has_unsimplified_dynamic_typevar = false;
-        let materialize = |ty: Type<'db>, materialization_kind| {
-            if for_narrowing {
-                ty.apply_type_mapping_impl(
-                    db,
-                    &TypeMapping::MaterializeForNarrowing(materialization_kind),
-                    TypeContext::default(),
-                    visitor,
-                )
-            } else {
-                ty.materialize(db, materialization_kind, visitor)
-            }
-        };
         let types = self.map_types(db, |_, bound_typevar, vartype| {
             let variance = specialization_variance(db, bound_typevar);
             let top_materialization = vartype.materialize(db, MaterializationKind::Top, visitor);
@@ -1683,7 +1615,7 @@ impl<'db> Specialization<'db> {
                 TypeVarVariance::Bivariant => {
                     // With bivariance, all specializations are subtypes of each other,
                     // so any materialization is acceptable.
-                    materialize(vartype, MaterializationKind::Top)
+                    top_materialization
                 }
                 TypeVarVariance::Covariant | TypeVarVariance::Contravariant
                     if has_dynamic_type && bound_typevar.typevar(db).is_constrained(db) =>
@@ -1697,7 +1629,8 @@ impl<'db> Specialization<'db> {
                     } else {
                         materialization_kind.flip()
                     };
-                    let materialized = materialize(vartype, effective_materialization_kind);
+                    let materialized =
+                        vartype.materialize(db, effective_materialization_kind, visitor);
 
                     if has_dynamic_type
                         && effective_materialization_kind == MaterializationKind::Top
@@ -1724,11 +1657,7 @@ impl<'db> Specialization<'db> {
             // Tuples are immutable, so tuple element types are always in covariant position.
             tuple.apply_type_mapping_impl(
                 db,
-                &if for_narrowing {
-                    TypeMapping::MaterializeForNarrowing(materialization_kind)
-                } else {
-                    TypeMapping::Materialize(materialization_kind)
-                },
+                &TypeMapping::Materialize(materialization_kind),
                 TypeContext::default(),
                 visitor,
             )
@@ -1747,7 +1676,6 @@ impl<'db> Specialization<'db> {
                 self.generic_context(db),
                 types,
                 new_materialization_kind,
-                for_narrowing && has_unsimplified_dynamic_typevar,
                 tuple_inner,
             )
         }
@@ -3125,23 +3053,19 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
 
         #[derive(Clone, Copy)]
         struct DictNarrowingContext<'db> {
-            top_materializations: [Type<'db>; 3],
+            specializations: [Type<'db>; 2],
             is_constructor_protocol: bool,
         }
 
         fn normalize_dict_constructor_intersection<'db>(
             db: &'db dyn Db,
             intersection: IntersectionType<'db>,
-            dict_top_materializations: [Type<'db>; 3],
+            dict_specializations: [Type<'db>; 2],
         ) -> Type<'db> {
-            let [dict, dict_top, narrowing_dict_top] = dict_top_materializations;
+            let [dict, dict_top] = dict_specializations;
             intersection.map_positive(db, |element| {
                 let resolved = element.resolve_type_alias(db);
-                if resolved == dict || resolved == narrowing_dict_top {
-                    dict_top
-                } else {
-                    *element
-                }
+                if resolved == dict { dict_top } else { *element }
             })
         }
 
@@ -3199,14 +3123,14 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                         }) =>
                 {
                     // `isinstance(value, dict)` narrows a `TypedDict` to an intersection with
-                    // `dict[Unknown, Unknown]` or its ordinary or tagged top materialization.
+                    // `dict[Unknown, Unknown]` or its top materialization.
                     // Other conjuncts may contribute gradual constraints that the shared mapping
                     // would erase.
                     let ty = if dict_narrowing.is_constructor_protocol {
                         normalize_dict_constructor_intersection(
                             db,
                             intersection,
-                            dict_narrowing.top_materializations,
+                            dict_narrowing.specializations,
                         )
                     } else {
                         ty
@@ -3229,14 +3153,14 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                         }) =>
                 {
                     // `isinstance(value, dict)` can also narrow a mapping to an intersection with
-                    // `dict[Unknown, Unknown]` or its ordinary or tagged top materialization.
+                    // `dict[Unknown, Unknown]` or its top materialization.
                     // Retain the full intersection so its original key and value constraints are
                     // preserved.
                     let ty = if dict_narrowing.is_constructor_protocol {
                         normalize_dict_constructor_intersection(
                             db,
                             intersection,
-                            dict_narrowing.top_materializations,
+                            dict_narrowing.specializations,
                         )
                     } else {
                         ty
@@ -3257,11 +3181,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
 
         let dict = KnownClass::Dict.to_instance_unknown(self.db);
         let dict_narrowing = DictNarrowingContext {
-            top_materializations: [
-                dict,
-                dict.top_materialization(self.db),
-                dict.top_materialization_for_narrowing(self.db),
-            ],
+            specializations: [dict, dict.top_materialization(self.db)],
             is_constructor_protocol: matches!(formal, Type::ProtocolInstance(protocol)
             if protocol.class_origin(self.db).is_some_and(|class| {
                 class.is_known(self.db, KnownClass::SupportsKeysAndGetItem)

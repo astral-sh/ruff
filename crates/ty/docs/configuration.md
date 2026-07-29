@@ -276,11 +276,11 @@ When enabled, ty narrows to the top materialization of the class. For example,
 representing the (infinite) union of all possible `list` specializations. Iterating
 over the list would yield values of type `object`.
 
-When disabled, ty instead preserves the provenance of the narrowing with tagged
-`object*` and `Never*` bounds. The same check still narrows a value of type `object`
-to `Top[list[Unknown]]`, but iterating over the list yields values of type `object*`.
-Both tagged bounds behave like `Unknown` for assignability, so items of any type can
-be appended to the list.
+When disabled, ty preserves compatible type arguments from the original type where
+possible. For example, `isinstance(value, list)` narrows a value of type
+`Sequence[int]` to `list[int]`. If no specialization is available, the same check
+narrows a value of type `object` to `list[Unknown]`; items of any type can then be
+appended to the list.
 
 Defaults to `false`.
 
@@ -918,11 +918,11 @@ When enabled, ty narrows to the top materialization of the class. For example,
 representing the (infinite) union of all possible `list` specializations. Iterating
 over the list would yield values of type `object`.
 
-When disabled, ty instead preserves the provenance of the narrowing with tagged
-`object*` and `Never*` bounds. The same check still narrows a value of type `object`
-to `Top[list[Unknown]]`, but iterating over the list yields values of type `object*`.
-Both tagged bounds behave like `Unknown` for assignability, so items of any type can
-be appended to the list.
+When disabled, ty preserves compatible type arguments from the original type where
+possible. For example, `isinstance(value, list)` narrows a value of type
+`Sequence[int]` to `list[int]`. If no specialization is available, the same check
+narrows a value of type `object` to `list[Unknown]`; items of any type can then be
+appended to the list.
 
 Defaults to `false`.
 

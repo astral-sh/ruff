@@ -1302,14 +1302,6 @@ impl<'db> Type<'db> {
         }
     }
 
-    fn narrowing_bound_fallback(self) -> Option<Type<'db>> {
-        let materialization_kind = self.as_nominal_instance()?.narrowing_bound_kind()?;
-        Some(match materialization_kind {
-            MaterializationKind::Top => Type::object(),
-            MaterializationKind::Bottom => Type::Never,
-        })
-    }
-
     /// Negating a divergent marker preserves the marker and flips its materialization, if any.
     fn negated_divergent(self) -> Option<Type<'db>> {
         let Type::Divergent(divergent) = self else {
@@ -1343,15 +1335,14 @@ impl<'db> Type<'db> {
     }
 
     pub(crate) const fn is_never(&self) -> bool {
-        match self {
+        matches!(
+            self,
             Type::Never
-            | Type::Divergent(DivergentType {
-                materialization: Some(MaterializationKind::Bottom),
-                ..
-            }) => true,
-            Type::NominalInstance(instance) => instance.is_narrowing_never(),
-            _ => false,
-        }
+                | Type::Divergent(DivergentType {
+                    materialization: Some(MaterializationKind::Bottom),
+                    ..
+                })
+        )
     }
 
     /// Returns `true` if this type contains a `Self` type variable.
@@ -1684,15 +1675,6 @@ impl<'db> Type<'db> {
     #[must_use]
     fn top_materialization(&self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Type<'db> {
         (*self).cached_materialization(db, env.program(db), MaterializationKind::Top)
-    }
-
-    #[must_use]
-    pub(crate) fn top_materialization_for_narrowing(&self, db: &'db dyn Db) -> Type<'db> {
-        self.apply_type_mapping(
-            db,
-            &TypeMapping::MaterializeForNarrowing(MaterializationKind::Top),
-            TypeContext::default(),
-        )
     }
 
     /// Returns the bottom materialization (or lower bound materialization) of this type, which is
@@ -7090,8 +7072,8 @@ impl<'db> Type<'db> {
             Type::TypeVar(bound_typevar) => bound_typevar.apply_type_mapping_impl(db, type_mapping, visitor),
             Type::KnownInstance(known_instance) => known_instance.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
 
-            Type::FunctionLiteral(function) => {
-                visitor.visit(db, self, type_mapping, || match type_mapping {
+            Type::FunctionLiteral(function) => visitor.visit(db, self, type_mapping, || {
+                match type_mapping {
                     // Promote the types within the signature before promoting the signature to its
                     // callable form.
                     TypeMapping::Promote(PromotionMode::On, PromotionKind::Regular) => {
@@ -7107,8 +7089,8 @@ impl<'db> Type<'db> {
                         tcx,
                         visitor,
                     )),
-                })
-            },
+                }
+            }),
 
             Type::BoundMethod(method) => Type::BoundMethod(BoundMethodType::new(
                 db,
@@ -7318,7 +7300,6 @@ impl<'db> Type<'db> {
                 TypeMapping::BindSelf { .. } |
                 TypeMapping::ReplaceSelf { .. } |
                 TypeMapping::Materialize(_) |
-                TypeMapping::MaterializeForNarrowing(_) |
                 TypeMapping::ReplaceParameterDefaults |
                 TypeMapping::EagerExpansion |
                 TypeMapping::RescopeReturnCallables(_) |
@@ -7344,9 +7325,6 @@ impl<'db> Type<'db> {
                 TypeMapping::Materialize(materialization_kind) => match materialization_kind {
                     MaterializationKind::Top => Type::object(),
                     MaterializationKind::Bottom => Type::Never,
-                },
-                TypeMapping::MaterializeForNarrowing(materialization_kind) => {
-                    Type::narrowing_bound(*materialization_kind)
                 }
             }
             // `Divergent` is an internal cycle marker rather than a gradual type like `Any` or
@@ -8510,8 +8488,6 @@ pub enum TypeMapping<'a, 'db> {
     ReplaceSelf { new_upper_bound: Type<'db> },
     /// Create the top or bottom materialization of a type.
     Materialize(MaterializationKind),
-    /// Materialize a narrowing constraint, using tagged `object`/`Never` bounds for gradual types.
-    MaterializeForNarrowing(MaterializationKind),
     /// Replace default types in parameters of callables with `Unknown`. This is used to avoid infinite
     /// recursion when the type of the default value of a parameter depends on the callable itself.
     ReplaceParameterDefaults,
@@ -8566,7 +8542,6 @@ impl<'db> TypeMapping<'_, 'db> {
             TypeMapping::Promote(..)
             | TypeMapping::BindLegacyTypevars(_)
             | TypeMapping::Materialize(_)
-            | TypeMapping::MaterializeForNarrowing(_)
             | TypeMapping::ReplaceParameterDefaults
             | TypeMapping::EagerExpansion
             | TypeMapping::RescopeReturnCallables(_) => context,
@@ -8600,9 +8575,6 @@ impl<'db> TypeMapping<'_, 'db> {
         match self {
             TypeMapping::Materialize(materialization_kind) => {
                 TypeMapping::Materialize(materialization_kind.flip())
-            }
-            TypeMapping::MaterializeForNarrowing(materialization_kind) => {
-                TypeMapping::MaterializeForNarrowing(materialization_kind.flip())
             }
             TypeMapping::ApplySpecializationWithMaterialization {
                 specialization,

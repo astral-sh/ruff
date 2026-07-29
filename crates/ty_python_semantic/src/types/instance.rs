@@ -44,22 +44,14 @@ impl<'db> Type<'db> {
         Type::NominalInstance(NominalInstanceType(NominalInstanceInner::Object))
     }
 
-    pub(crate) const fn narrowing_bound(materialization_kind: MaterializationKind) -> Self {
-        Type::NominalInstance(NominalInstanceType(NominalInstanceInner::NarrowingBound(
-            materialization_kind,
-        )))
-    }
-
     pub(crate) const fn is_object(&self) -> bool {
         matches!(
             self,
-            Type::NominalInstance(NominalInstanceType(
-                NominalInstanceInner::Object
-                    | NominalInstanceInner::NarrowingBound(MaterializationKind::Top)
-            )) | Type::Divergent(DivergentType {
-                materialization: Some(MaterializationKind::Top),
-                ..
-            })
+            Type::NominalInstance(NominalInstanceType(NominalInstanceInner::Object))
+                | Type::Divergent(DivergentType {
+                    materialization: Some(MaterializationKind::Top),
+                    ..
+                })
         )
     }
 
@@ -301,9 +293,7 @@ impl<'db> NominalInstanceType<'db> {
             NominalInstanceInner::ExactTuple(_) => Some(KnownClass::Tuple),
             NominalInstanceInner::NonTuple(class) => class.class(db).known(db),
             NominalInstanceInner::SysVersionInfo => Some(KnownClass::VersionInfo),
-            NominalInstanceInner::Object | NominalInstanceInner::NarrowingBound(_) => {
-                Some(KnownClass::Object)
-            }
+            NominalInstanceInner::Object => Some(KnownClass::Object),
         }
     }
 
@@ -330,7 +320,7 @@ impl<'db> NominalInstanceType<'db> {
             NominalInstanceInner::SysVersionInfo => {
                 Some(Cow::Owned(TupleSpec::version_info_spec(db, env)))
             }
-            NominalInstanceInner::Object | NominalInstanceInner::NarrowingBound(_) => None,
+            NominalInstanceInner::Object => None,
             NominalInstanceInner::NonTuple(class) => {
                 let class = class.class(db);
                 // Avoid an expensive MRO traversal for common stdlib classes.
@@ -362,35 +352,13 @@ impl<'db> NominalInstanceType<'db> {
 
     /// Return `true` if this type represents instances of the class `builtins.object`.
     pub(super) const fn is_object(self) -> bool {
-        matches!(
-            self.0,
-            NominalInstanceInner::Object
-                | NominalInstanceInner::NarrowingBound(MaterializationKind::Top)
-        )
-    }
-
-    pub(crate) const fn narrowing_bound_kind(self) -> Option<MaterializationKind> {
-        match self.0 {
-            NominalInstanceInner::NarrowingBound(materialization_kind) => {
-                Some(materialization_kind)
-            }
-            _ => None,
-        }
-    }
-
-    pub(crate) const fn is_narrowing_never(self) -> bool {
-        matches!(
-            self.0,
-            NominalInstanceInner::NarrowingBound(MaterializationKind::Bottom)
-        )
+        matches!(self.0, NominalInstanceInner::Object)
     }
 
     pub(super) fn is_definition_generic(self, db: &'db dyn Db) -> bool {
         match self.0 {
             NominalInstanceInner::ExactTuple(_) => true,
-            NominalInstanceInner::SysVersionInfo
-            | NominalInstanceInner::Object
-            | NominalInstanceInner::NarrowingBound(_) => false,
+            NominalInstanceInner::SysVersionInfo | NominalInstanceInner::Object => false,
             NominalInstanceInner::NonTuple(class) => class.class(db).is_generic(),
         }
     }
@@ -410,8 +378,7 @@ impl<'db> NominalInstanceType<'db> {
             NominalInstanceInner::ExactTuple(tuple) => Some(Cow::Borrowed(tuple.tuple(db))),
             NominalInstanceInner::NonTuple(_)
             | NominalInstanceInner::SysVersionInfo
-            | NominalInstanceInner::Object
-            | NominalInstanceInner::NarrowingBound(_) => None,
+            | NominalInstanceInner::Object => None,
         }
     }
 
@@ -425,8 +392,7 @@ impl<'db> NominalInstanceType<'db> {
             NominalInstanceInner::NonTuple(class) => class.class(db),
             NominalInstanceInner::ExactTuple(_)
             | NominalInstanceInner::SysVersionInfo
-            | NominalInstanceInner::Object
-            | NominalInstanceInner::NarrowingBound(_) => return None,
+            | NominalInstanceInner::Object => return None,
         };
         let (class_literal, specialization) = class.static_class_literal(db)?;
         let specialization = specialization?;
@@ -474,9 +440,6 @@ impl<'db> NominalInstanceType<'db> {
                 Some(Self(NominalInstanceInner::SysVersionInfo))
             }
             NominalInstanceInner::Object => Some(Self(NominalInstanceInner::Object)),
-            NominalInstanceInner::NarrowingBound(materialization_kind) => Some(Self(
-                NominalInstanceInner::NarrowingBound(materialization_kind),
-            )),
             NominalInstanceInner::NonTuple(class) => {
                 let transformed = class
                     .class(db)
@@ -495,9 +458,7 @@ impl<'db> NominalInstanceType<'db> {
             // should not be relied on for type narrowing, so we do not treat it as one.
             // See:
             // https://docs.python.org/3/reference/expressions.html#parenthesized-forms
-            NominalInstanceInner::ExactTuple(_)
-            | NominalInstanceInner::Object
-            | NominalInstanceInner::NarrowingBound(_) => false,
+            NominalInstanceInner::ExactTuple(_) | NominalInstanceInner::Object => false,
             NominalInstanceInner::SysVersionInfo => true,
             NominalInstanceInner::NonTuple(class) => class
                 .class(db)
@@ -524,7 +485,6 @@ impl<'db> NominalInstanceType<'db> {
             }
             NominalInstanceInner::SysVersionInfo => Type::NominalInstance(self),
             NominalInstanceInner::Object => Type::object(),
-            NominalInstanceInner::NarrowingBound(_) => Type::NominalInstance(self),
             NominalInstanceInner::NonTuple(class) => {
                 let transformed =
                     class
@@ -549,9 +509,7 @@ impl<'db> NominalInstanceType<'db> {
             NominalInstanceInner::ExactTuple(tuple) => {
                 tuple.find_legacy_typevars_impl(db, env, binding_context, typevars, visitor);
             }
-            NominalInstanceInner::SysVersionInfo
-            | NominalInstanceInner::Object
-            | NominalInstanceInner::NarrowingBound(_) => {}
+            NominalInstanceInner::SysVersionInfo | NominalInstanceInner::Object => {}
             NominalInstanceInner::NonTuple(class) => {
                 class.class(db).find_legacy_typevars_impl(
                     db,
@@ -1053,8 +1011,6 @@ enum NominalInstanceInner<'db> {
     /// prevalent and foundational, and it's useful to be able to instantiate this without having
     /// to load the definition of `object` from the typeshed.
     Object,
-    /// A tagged `object` or `Never` that preserves generic-narrowing provenance.
-    NarrowingBound(MaterializationKind),
     /// A tuple type, e.g. `tuple[int, str]`.
     ///
     /// Note that the type `tuple[int, str]` includes subtypes of `tuple[int, str]`,
