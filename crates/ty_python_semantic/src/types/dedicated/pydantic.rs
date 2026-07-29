@@ -507,10 +507,11 @@ pub(in crate::types) fn is_model(
 }
 
 /// Return whether `ty` is an instance of a Pydantic model.
-pub(in crate::types) fn is_model_instance(db: &dyn Db, ty: Type<'_>) -> bool {
-    ty.nominal_class(db)
+pub(in crate::types) fn is_model_instance(env: &SemanticEnvironment<'_>, ty: Type<'_>) -> bool {
+    let db = env.db();
+    ty.nominal_class(env)
         .and_then(|class| class.static_class_literal(db))
-        .is_some_and(|(class, _)| is_model(db, class))
+        .is_some_and(|(class, _)| is_model(env, class))
 }
 
 /// Return whether a field specifier's `default` argument provides a default value.

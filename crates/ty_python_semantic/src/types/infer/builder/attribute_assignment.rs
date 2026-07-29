@@ -405,7 +405,7 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
         let is_private_pydantic_attribute =
             matches!(member, InstanceAttributeWriteMember::Explicit { .. })
                 && pydantic::is_private_attribute(self.attribute)
-                && pydantic::is_model_instance(db, object_ty);
+                && pydantic::is_model_instance(env, object_ty);
 
         if setattr_returns_never && !is_private_pydantic_attribute {
             if emit_diagnostics {
