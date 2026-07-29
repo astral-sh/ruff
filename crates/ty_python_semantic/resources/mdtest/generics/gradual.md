@@ -29,8 +29,8 @@ reveal_type(takes_callable(accepts_any))  # revealed: Any
 
 ## Bounded gradual constraints
 
-When a gradual type is assigned to an inferable type variable `T` in covariant position, the
-lower-bound of the gradual type contributes a lower-bound constraint on `T`.
+When a gradual type is assigned to an inferable type variable `T` in covariant position, the lower
+bound of the gradual type contributes a lower-bound constraint on `T`.
 
 ```py
 from typing import Any
@@ -52,8 +52,8 @@ def _(
     reveal_type(takes_bare(bounded))  # revealed: bool | Any
 ```
 
-Conversely, when a gradual type is assigned to an inferable type variable `T` in covariant position,
-the upper-bound of the gradual type contributes an upper-bound constraint on `T`.
+Conversely, when an inferable type variable `T` is assigned to a gradual type in contravariant
+position, the upper bound of the gradual type contributes an upper-bound constraint on `T`.
 
 ```py
 from typing import Any, Callable, final
@@ -72,7 +72,7 @@ def _():
     reveal_type(takes_callable(accepts_bounded))  # revealed: Any & int
 ```
 
-## Nested gradual constraints
+## Complex gradual constraints
 
 When checking an assignment of `Any` to `tuple[T]`, we assume that the gradual type materializes to
 some tuple type. Under that assumption, we have the constraint `tuple[Any] <: tuple[T]`, allowing us
@@ -339,10 +339,10 @@ def _():
 
 ## Bounded nested gradual constraints
 
-We respect the upper and lower when choosing a materialization of the gradual type. For example, an
-assignment of `bool | (int & Any)` to `tuple[T]` will form the constraints
-`tuple[bool | (int & Any)] <: tuple[T]`, allowinhg the upper or lower bounds to be preserved based
-on variance.
+We respect the upper and lower bounds when choosing a materialization of the gradual type. For
+example, an assignment of `bool | (int & Any)` to `tuple[T]` will form the constraints
+`tuple[bool | (int & Any)] <: tuple[T]`, allowing the upper or lower bounds to be preserved based on
+variance.
 
 ```py
 from collections.abc import Iterable

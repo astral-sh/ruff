@@ -1177,9 +1177,9 @@ def quantifier_order[S, T]() -> None:
 
 ## Gradual constraints
 
-Constraint-set assignability preserves gradual types. While constraints on the materializations
-gradual types themselves are flattened to sentinel value, they may contribute to constraints to
-other inferable type variables.
+Constraint-set assignability preserves gradual types. Constraints on their materializations are
+represented by the `gradual` terminal, while constraints against inferable type variables are
+preserved.
 
 ```py
 from typing import Any
@@ -1212,10 +1212,12 @@ static_assert(is_assignable_to(Any, int))
 
 def _[T]() -> None:
     other = ConstraintSet.range(int, T, object)
-    static_assert((gradual | other) == other)
-    static_assert((other | gradual) == other)
-    static_assert((gradual & other) == other)
-    static_assert((other & gradual) == other)
+    static_assert((gradual | other) != other)
+    static_assert((other | gradual) != other)
+    static_assert((gradual & other) != other)
+    static_assert((other & gradual) != other)
+    static_assert((gradual & (other | ~other)) == gradual)
+    static_assert((gradual | (other & ~other)) == gradual)
 ```
 
 Constraint-set implication uses subtyping instead of assignability, and so does not make assumptions
