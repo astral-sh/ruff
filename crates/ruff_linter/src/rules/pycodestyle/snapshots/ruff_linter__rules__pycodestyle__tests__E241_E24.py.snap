@@ -60,7 +60,6 @@ E241 [*] Multiple spaces after comma
 12 |                ef,  +h,
 13 |                c,   -d]
    |                  ^^^
-   |
 help: Replace with single space
    |
 12 |                ef,  +h,

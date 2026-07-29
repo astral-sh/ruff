@@ -156,6 +156,54 @@ p = partial(f, 1)
 reveal_type(p)  # revealed: partial[(**kwargs: str) -> bool]
 ```
 
+### Specialized generic variadics remain non-gradual
+
+Specializing variadic parameter types to `Any` does not make them gradual when constructing a
+`partial`:
+
+```py
+from functools import partial
+from typing import Any, Callable, Generic, TypeVar
+from ty_extensions import static_assert
+from ty_extensions._internal import TypeOf, is_subtype_of
+
+T = TypeVar("T")
+
+class C(Generic[T]):
+    def method(self, *args: T, **kwargs: T) -> None: ...
+
+callback = partial(C[Any]().method)
+reveal_type(callback)  # revealed: partial[(*args: Any, **kwargs: Any) -> None]
+# Unlike a gradual callable, this standard variadic callable is a subtype of a no-argument callable.
+static_assert(is_subtype_of(TypeOf[callback], Callable[[], None]))
+```
+
+### Expanded ParamSpec variadics preserve non-gradual parameters
+
+When a `partial` expands specialized `P.args` and `P.kwargs`, it preserves the kind of the
+parameters inferred for `P`:
+
+```py
+from functools import partial
+from typing import Any, Callable, Generic, ParamSpec, TypeVar
+from ty_extensions import static_assert
+from ty_extensions._internal import TypeOf, is_subtype_of
+
+P = ParamSpec("P")
+T = TypeVar("T")
+
+class C(Generic[T]):
+    def method(self, *args: T, **kwargs: T) -> None: ...
+
+def invoke(callback: Callable[P, None], *args: P.args, **kwargs: P.kwargs) -> None:
+    callback(*args, **kwargs)
+
+callback = partial(invoke, C[Any]().method)
+reveal_type(callback)  # revealed: partial[(*args: Any, **kwargs: Any) -> None]
+# Unlike a gradual callable, this standard variadic callable is a subtype of a no-argument callable.
+static_assert(is_subtype_of(TypeOf[callback], Callable[[], None]))
+```
+
 ### Defaults preserved
 
 ```py
@@ -1208,7 +1256,7 @@ reveal_type(p)  # revealed: partial[(a: int, b: str) -> bool]
 
 ### Generic function with multiple type variables
 
-TODO: preserve uninferred type variables in the resulting partial signature.
+Unresolved type variables remain generic in the resulting partial signature.
 
 ```py
 from functools import partial
@@ -1221,7 +1269,7 @@ def combine(a: T, b: U) -> tuple[T, U]:
     return (a, b)
 
 p = partial(combine, 1)
-reveal_type(p)  # revealed: partial[(b: Unknown) -> tuple[Literal[1], Unknown]]
+reveal_type(p)  # revealed: partial[[U](b: U) -> tuple[Literal[1], U]]
 ```
 
 ### Callable object (class with `__call__`)
@@ -1291,7 +1339,8 @@ reveal_type(p(1, b="world", c=3.14))  # revealed: bool
 
 ### Overriding keyword-bound generic args at call time
 
-TODO: preserve the override branch when a keyword-bound generic is rebound at call time.
+TODO: preserve the override branch when a keyword-bound generic is rebound at call time. Currently,
+bound keyword arguments specialize the stored partial signature.
 
 ```py
 from functools import partial
@@ -1305,9 +1354,7 @@ def pair(a: T, b: T) -> tuple[T, T]:
 p = partial(pair, b=1)
 reveal_type(p)  # revealed: partial[(a: int, *, b: int = 1) -> tuple[int, int]]
 p("x")  # error: [invalid-argument-type]
-# error: [invalid-argument-type]
-# error: [invalid-argument-type]
-p("x", b="y")
+p(1, b="y")  # error: [invalid-argument-type]
 ```
 
 ## Assignability and partial object behavior
@@ -1552,6 +1599,31 @@ def handle(
     return Response()
 
 handler: Handler = partial(handle, context=Context())
+```
+
+A `partial` result is also assignable to a protocol that models `__call__` as a callable attribute.
+
+```py
+from functools import partial
+from typing import Any, Callable, Protocol, TypeVar
+
+T = TypeVar("T")
+
+class PartialLike(Protocol[T]):
+    __call__: Callable[..., T]
+
+    @property
+    def func(self) -> Callable[..., T]: ...
+    @property
+    def args(self) -> tuple[Any, ...]: ...
+    @property
+    def keywords(self) -> dict[str, Any]: ...
+
+def f(x: int) -> int:
+    return x
+
+partial_like: PartialLike[int] = partial(f)
+partial_like_bad: PartialLike[str] = partial(f)  # error: [invalid-assignment]
 ```
 
 ### Accessing `__call__` directly

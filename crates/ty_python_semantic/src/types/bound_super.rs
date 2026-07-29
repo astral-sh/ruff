@@ -128,7 +128,7 @@ impl<'db> BoundSuperError<'db> {
                         _ => {
                             let mut diagnostic =
                                 builder.into_diagnostic("Argument is not a valid class");
-                            diagnostic.set_primary_message(format_args!(
+                            diagnostic.set_primary_annotation_message(format_args!(
                                 "Argument has type `{}`",
                                 pivot_class.display(context.db())
                             ));
@@ -222,7 +222,7 @@ impl<'db> BoundSuperError<'db> {
     }
 }
 
-#[derive(Debug, Copy, Clone, Hash, PartialEq, Eq, get_size2::GetSize, salsa::Update)]
+#[derive(Debug, Copy, Clone, Hash, PartialEq, Eq, get_size2::GetSize)]
 enum DescriptorReceiverKind {
     /// Bind descriptors as if `super()` were owned by a class object, i.e. via
     /// `__get__(None, owner)`.
@@ -232,7 +232,7 @@ enum DescriptorReceiverKind {
     Instance,
 }
 
-#[derive(Debug, Clone, Hash, PartialEq, Eq, get_size2::GetSize, salsa::Update)]
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
 pub struct ResolvedSuperOwner<'db> {
     /// The resolved second `super()` argument, used when binding descriptors after
     /// attribute lookup. If `receiver` is [`DescriptorReceiverKind::Instance`], this
@@ -286,7 +286,7 @@ impl<'db> ResolvedSuperOwner<'db> {
     }
 }
 
-#[derive(Debug, Clone, Hash, PartialEq, Eq, get_size2::GetSize, salsa::Update)]
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
 pub enum SuperOwnerKind<'db> {
     Dynamic(DynamicType<'db>),
     Divergent(DivergentType),
@@ -304,7 +304,7 @@ impl<'db> SuperOwnerKind<'db> {
             SuperOwnerKind::Dynamic(dynamic) => {
                 Some(SuperOwnerKind::Dynamic(dynamic.recursive_type_normalized()))
             }
-            SuperOwnerKind::Divergent(_) => Some(self.clone()),
+            SuperOwnerKind::Divergent(_) => Some(*self),
             SuperOwnerKind::Resolved(resolved_owner) => Some(SuperOwnerKind::Resolved(
                 resolved_owner.recursive_type_normalized_impl(db, div, nested)?,
             )),
@@ -345,7 +345,9 @@ impl<'db> SuperOwnerKind<'db> {
 /// Represent a bound super object like `super(PivotClass, owner)`
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct BoundSuperType<'db> {
+    #[returns(copy)]
     pub pivot_class: ClassBase<'db>,
+    #[returns(copy)]
     pub owner: SuperOwnerKind<'db>,
 }
 
@@ -624,6 +626,9 @@ impl<'db> BoundSuperType<'db> {
                         None,
                     )?)
                 }
+                // `type[Protocol]` is structural: an inhabitant need not inherit from the protocol
+                // class, so its MRO cannot be recovered from the protocol's nominal origin.
+                SubclassOfInner::Protocol(_) => SuperOwnerKind::Dynamic(DynamicType::Unknown),
                 SubclassOfInner::Dynamic(dynamic) => SuperOwnerKind::Dynamic(dynamic),
                 SubclassOfInner::TypeVar(bound_typevar) => {
                     let typevar = bound_typevar.typevar(db);
@@ -631,9 +636,9 @@ impl<'db> BoundSuperType<'db> {
                         Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
                             let class = match bound {
                                 Type::NominalInstance(instance) => Some(instance.class(db)),
-                                Type::ProtocolInstance(protocol) => protocol
-                                    .to_nominal_instance()
-                                    .map(|instance| instance.class(db)),
+                                Type::ProtocolInstance(protocol) => {
+                                    protocol.class_origin(db).map(|class| *class)
+                                }
                                 _ => None,
                             };
                             if let Some(class) = class {
@@ -688,13 +693,13 @@ impl<'db> BoundSuperType<'db> {
             }
 
             Type::ProtocolInstance(protocol) => {
-                if let Some(nominal_instance) = protocol.to_nominal_instance() {
+                if let Some(class) = protocol.class_origin(db) {
                     SuperOwnerKind::Resolved(Self::resolve_instance_super_owner(
                         db,
                         pivot_class,
                         pivot_class_type,
                         owner_type,
-                        nominal_instance.class(db),
+                        *class,
                         None,
                     )?)
                 } else {
@@ -721,7 +726,7 @@ impl<'db> BoundSuperType<'db> {
                 for positive in intersection.positive(db) {
                     if let Ok(good_element) = delegate_to(*positive) {
                         one_good_element_found = true;
-                        builder = builder.add_positive(good_element);
+                        builder.add_positive_in_place(good_element);
                     }
                 }
                 if !one_good_element_found {
@@ -733,7 +738,7 @@ impl<'db> BoundSuperType<'db> {
                 }
                 for negative in intersection.negative(db) {
                     if let Ok(good_element) = delegate_to(*negative) {
-                        builder = builder.add_negative(good_element);
+                        builder.add_negative_in_place(good_element);
                     }
                 }
                 return Ok(builder.build());
@@ -750,9 +755,9 @@ impl<'db> BoundSuperType<'db> {
                     Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
                         let class = match bound {
                             Type::NominalInstance(instance) => Some(instance.class(db)),
-                            Type::ProtocolInstance(protocol) => protocol
-                                .to_nominal_instance()
-                                .map(|instance| instance.class(db)),
+                            Type::ProtocolInstance(protocol) => {
+                                protocol.class_origin(db).map(|class| *class)
+                            }
                             _ => None,
                         };
                         if let Some(class) = class {
@@ -934,7 +939,7 @@ impl<'db> BoundSuperType<'db> {
         {
             let item_parameter = Parameter::positional_only(Some(Name::new_static("item")))
                 .with_annotated_type(Type::unknown());
-            let parameters = Parameters::new(db, [item_parameter]);
+            let parameters = Parameters::standard([item_parameter]);
             let return_type = self.owner(db).owner_type();
             let class_getitem = Type::single_callable(db, Signature::new(parameters, return_type));
             return Place::bound(class_getitem).into();
@@ -1004,7 +1009,7 @@ impl<'c, 'db> EquivalenceChecker<'_, 'c, 'db> {
             }
             (ClassBase::TypedDict(_), _) => self.never(),
         };
-        if class_equivalence.is_never_satisfied(db) {
+        if class_equivalence.is_trivially_never_satisfied() {
             return self.never();
         }
         let owner_equivalence = match (left.owner(db), right.owner(db)) {

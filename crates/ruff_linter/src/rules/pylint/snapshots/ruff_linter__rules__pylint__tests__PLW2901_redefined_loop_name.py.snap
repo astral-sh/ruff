@@ -274,4 +274,3 @@ PLW2901 `for` loop variable `a.i` overwritten by assignment target
 179 | for a. i in []:
 180 |     a.i = 2  # error
     |     ^^^
-    |

@@ -107,6 +107,30 @@ pub struct Options {
     )]
     pub output_format: Option<OutputFormat>,
 
+    /// Whether to prefer rule codes over human-readable rule names in diagnostic output, even
+    /// when preview mode is enabled.
+    ///
+    /// Diagnostics without rule codes, such as syntax errors and formatting diagnostics, will
+    /// continue to use the human-readable name, but those corresponding to lint rules will use the
+    /// rule's code. For example, the concise diagnostic for an unused import will use the code
+    /// `F401` instead of the name `unused-import`:
+    ///
+    /// ```console
+    /// $ ruff check --preview --config 'output-prefer-rule-codes = true' --output-format=concise example.py
+    /// example.py:1:8: F401 [*] `math` imported but unused
+    /// $ ruff check --preview --config 'output-prefer-rule-codes = false' --output-format=concise example.py
+    /// example.py:1:8: unused-import: [*] `math` imported but unused
+    /// ```
+    #[option(
+        default = "false",
+        value_type = "bool",
+        example = r#"
+            # Display rule codes instead of human-readable rule names.
+            output-prefer-rule-codes = true
+        "#
+    )]
+    pub output_prefer_rule_codes: Option<bool>,
+
     /// Enable fix behavior by-default when running `ruff` (overridden
     /// by the `--fix` and `--no-fix` command-line flags).
     /// Only includes automatic fixes unless `--unsafe-fixes` is provided.
@@ -257,15 +281,16 @@ pub struct Options {
     /// A list of file patterns to include when linting.
     ///
     /// Inclusion are based on globs, and should be single-path patterns, like
-    /// `*.pyw`, to include any file with the `.pyw` extension. `pyproject.toml` is
-    /// included here not for configuration but because we lint whether e.g. the
-    /// `[project]` matches the schema.
+    /// `*.pyw`, to include any file with the `.pyw` extension.
+    /// `pyproject.toml`, `ruff.toml`, and `.ruff.toml` are included here not for
+    /// configuration but because we lint whether e.g. the `[project]` matches
+    /// the schema in `pyproject.toml` or that rule names are used as selectors.
     ///
     /// Notebook files (`.ipynb` extension) are included by default on Ruff 0.6.0+.
     ///
     /// For more information on the glob syntax, refer to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).
     #[option(
-        default = r#"["*.py", "*.pyi", "*.pyw", "*.ipynb", "*.md", "**/pyproject.toml"]"#,
+        default = r#"["*.py", "*.pyi", "*.pyw", "*.ipynb", "*.md", "**/pyproject.toml", "**/ruff.toml", "**/.ruff.toml"]"#,
         value_type = "list[str]",
         example = r#"
             include = ["*.py"]
@@ -723,7 +748,7 @@ pub struct LintCommonOptions {
     ///
     /// ```toml
     /// [tool.ruff.lint]
-    /// # Adds flake8-bugbear on top of the default rules (E4, E7, E9, F).
+    /// # Adds flake8-bugbear on top of the default rules.
     /// extend-select = ["B"]
     /// ```
     ///
@@ -733,7 +758,7 @@ pub struct LintCommonOptions {
         default = "[]",
         value_type = "list[RuleSelector]",
         example = r#"
-            # On top of the default `select` (`E4`, E7`, `E9`, and `F`), enable flake8-bugbear (`B`) and flake8-quotes (`Q`).
+            # On top of the default `select`, enable flake8-bugbear (`B`) and flake8-quotes (`Q`).
             extend-select = ["B", "Q"]
         "#
     )]
@@ -881,11 +906,11 @@ pub struct LintCommonOptions {
     /// specific prefixes. `ignore` takes precedence over `select` if the
     /// same prefix appears in both.
     #[option(
-        default = r#"["E4", "E7", "E9", "F"]"#,
+        default = r#"See https://docs.astral.sh/ruff/default-rules/ or run `ruff check --show-settings --isolated`"#,
         value_type = "list[RuleSelector]",
         example = r#"
-            # On top of the defaults (`E4`, E7`, `E9`, and `F`), enable flake8-bugbear (`B`) and flake8-quotes (`Q`).
-            select = ["E4", "E7", "E9", "F", "B", "Q"]
+            # On top of the defaults, enable flake8-bugbear (`B`) and flake8-quotes (`Q`).
+            extend-select = ["B", "Q"]
         "#
     )]
     pub select: Option<Vec<UnresolvedRuleSelector>>,
@@ -1622,7 +1647,8 @@ pub struct Flake8ImportConventionsOptions {
     pub aliases: Option<FxHashMap<ModuleName, Alias>>,
 
     /// A mapping from module to conventional import alias. These aliases will
-    /// be added to the [`aliases`](#lint_flake8-import-conventions_aliases) mapping.
+    /// be added to the [`aliases`](#lint_flake8-import-conventions_aliases) mapping
+    /// and will override any existing `aliases` if the two settings overlap.
     #[option(
         default = r#"{}"#,
         value_type = "dict[str, str]",

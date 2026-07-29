@@ -8,7 +8,7 @@ use ruff_python_ast::{self as ast, AnyNodeRef};
 
 use crate::Db;
 use crate::types::infer::{ExpressionInference, FrozenMap};
-use crate::types::tuple::{ResizeTupleError, Tuple, TupleLength, TupleSpec, TupleUnpacker};
+use crate::types::tuple::{ResizeTupleError, TupleLength, TupleSpec, TupleUnpacker};
 use crate::types::{Type, TypeCheckDiagnostics, TypeContext, infer_expression_types};
 use ty_python_core::ExpressionNodeKey;
 use ty_python_core::scope::ScopeId;
@@ -222,7 +222,7 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
 
                     if let Err(err) = unpacker.unpack_tuple(tuple.as_ref()) {
                         unpacker
-                            .unpack_tuple(&Tuple::homogeneous(Type::unknown()))
+                            .unpack_tuple(&TupleSpec::homogeneous(Type::unknown()))
                             .expect("adding a homogeneous tuple should always succeed");
                         if let Some(builder) = self.context.report_lint(&INVALID_ASSIGNMENT, target)
                         {
@@ -230,7 +230,7 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
                                 ResizeTupleError::TooManyValues => {
                                     let mut diag =
                                         builder.into_diagnostic("Too many values to unpack");
-                                    diag.set_primary_message(format_args!(
+                                    diag.set_primary_annotation_message(format_args!(
                                         "Expected {}",
                                         target_len.display_minimum(),
                                     ));
@@ -241,7 +241,7 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
                                 ResizeTupleError::TooFewValues => {
                                     let mut diag =
                                         builder.into_diagnostic("Not enough values to unpack");
-                                    diag.set_primary_message(format_args!(
+                                    diag.set_primary_annotation_message(format_args!(
                                         "Expected {}",
                                         target_len.display_minimum(),
                                     ));
@@ -278,7 +278,7 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
     }
 }
 
-#[derive(Debug, Default, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
+#[derive(Debug, Default, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) struct UnpackResult<'db> {
     targets: FrozenMap<ExpressionNodeKey, Type<'db>>,
     diagnostics: TypeCheckDiagnostics,

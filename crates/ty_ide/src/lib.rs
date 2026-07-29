@@ -14,6 +14,7 @@ mod folding_range;
 mod goto;
 mod goto_declaration;
 mod goto_definition;
+mod goto_implementation;
 mod goto_type_definition;
 mod hints;
 mod hover;
@@ -44,6 +45,7 @@ pub use document_symbols::document_symbols;
 pub use find_references::find_references;
 pub use folding_range::{FoldingRange, FoldingRangeKind, folding_ranges};
 pub use goto::{goto_declaration, goto_definition, goto_type_definition};
+pub use goto_implementation::goto_implementation;
 pub use hints::{Hint, HintKind, hints};
 pub use hover::hover;
 pub use inlay_hints::{
@@ -69,10 +71,12 @@ use ruff_db::{
     vendored::VendoredPath,
 };
 use ruff_text_size::{Ranged, TextRange};
-use rustc_hash::FxHashSet;
+use rustc_hash::{FxBuildHasher, FxHashSet};
 use std::ops::{Deref, DerefMut};
 use ty_project::Db;
 use ty_python_semantic::types::{Type, TypeDefinition};
+
+type FxIndexMap<K, V> = indexmap::IndexMap<K, V, FxBuildHasher>;
 
 /// Information associated with a text range.
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
@@ -410,7 +414,7 @@ mod tests {
     use ruff_python_trivia::textwrap::dedent;
     use ruff_text_size::TextSize;
     use ty_module_resolver::SearchPathSettings;
-    use ty_project::ProjectMetadata;
+    use ty_project::{Db as _, ProjectMetadata};
     use ty_python_core::platform::PythonPlatform;
     use ty_python_core::program::{FallibleStrategy, Program, ProgramSettings};
     use ty_python_semantic::PythonVersionWithSource;
@@ -512,10 +516,8 @@ mod tests {
 
     impl CursorTestBuilder {
         pub(super) fn build(&self) -> CursorTest {
-            let mut db = ty_project::TestDb::new(ProjectMetadata::new(
-                "test".into(),
-                SystemPathBuf::from("/"),
-            ));
+            let mut db =
+                ty_project::TestDb::new(ProjectMetadata::new("test", SystemPathBuf::from("/")));
 
             db.init_program_with_python_version(
                 self.python_version.unwrap_or_else(PythonVersion::latest_ty),
@@ -554,6 +556,11 @@ mod tests {
                         cursor.is_none(),
                         "found more than one source that contains `<CURSOR>`"
                     );
+
+                    // The cursor file is open in the editor; expected types for
+                    // string-literal completions are only collected for open files.
+                    db.project().open_file(&mut db, file);
+
                     let source = source_text(&db, file);
                     let parsed = parsed_module(&db, file).load(&db);
                     let stylist =
@@ -640,7 +647,7 @@ mod tests {
             let site_packages_path = SystemPathBuf::from("/site-packages");
 
             let mut db =
-                ty_project::TestDb::new(ProjectMetadata::new("test".into(), project_root.clone()));
+                ty_project::TestDb::new(ProjectMetadata::new("test", project_root.clone()));
 
             // Write site-packages files first (before init)
             for Source {
@@ -701,6 +708,11 @@ mod tests {
                         cursor.is_none(),
                         "found more than one source that contains `<CURSOR>`"
                     );
+
+                    // The cursor file is open in the editor; expected types for
+                    // string-literal completions are only collected for open files.
+                    db.project().open_file(&mut db, file);
+
                     let source = source_text(&db, file);
                     let parsed = parsed_module(&db, file).load(&db);
                     let stylist =

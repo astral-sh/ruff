@@ -240,13 +240,9 @@ impl<'a> StringLiteralDisplay<'a> {
             ast::Expr::Dict(dict) => {
                 let mut narrowed_keys = Vec::with_capacity(dict.len());
                 for key in dict.iter_keys() {
-                    if let Some(key) = key {
-                        // This is somewhat unfortunate,
-                        // *but* using a dict for __slots__ is very rare
-                        narrowed_keys.push(key.to_owned());
-                    } else {
-                        return None;
-                    }
+                    // This is somewhat unfortunate,
+                    // *but* using a dict for __slots__ is very rare
+                    narrowed_keys.push(key?.to_owned());
                 }
                 // If `None` was present in the keys, it indicates a "** splat", .e.g
                 // `__slots__ = {"foo": "bar", **other_dict}`

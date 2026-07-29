@@ -49,7 +49,7 @@ struct CallArgument<'a, 'db> {
 ///
 /// Note that a single argument may produce multiple distinct inferred types when inferred
 /// with type context across multiple bindings.
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub(crate) struct CallArgumentTypes<'db> {
     fallback_type: Option<Type<'db>>,
     types: FxHashMap<Type<'db>, Type<'db>>,
@@ -195,6 +195,12 @@ impl<'a, 'db> CallArguments<'a, 'db> {
         self.items.len()
     }
 
+    pub(crate) fn is_variadic(&self, index: usize) -> bool {
+        self.items.get(index).is_some_and(|argument| {
+            matches!(argument.argument, Argument::Variadic | Argument::Keywords)
+        })
+    }
+
     pub(crate) fn argument_types(&self, index: usize) -> Option<&CallArgumentTypes<'db>> {
         self.items.get(index).map(|item| &item.types)
     }
@@ -212,8 +218,23 @@ impl<'a, 'db> CallArguments<'a, 'db> {
             .insert(tcx, ty);
     }
 
+    pub(crate) fn clear_types(&mut self, index: usize) {
+        self.items
+            .get_mut(index)
+            .expect("argument index should be valid")
+            .types = CallArgumentTypes::default();
+    }
+
     pub(crate) fn iter_types(&self) -> impl Iterator<Item = &CallArgumentTypes<'db>> + '_ {
         self.items.iter().map(|item| &item.types)
+    }
+
+    /// Returns `true` if the inferred types are equal for the given set of argument indices.
+    pub(crate) fn inferred_types_equal_at(&self, other: &Self, argument_indices: &[usize]) -> bool {
+        argument_indices.iter().all(|&index| {
+            self.items.get(index).map(|item| &item.types)
+                == other.items.get(index).map(|item| &item.types)
+        })
     }
 
     /// Prepend an optional extra synthetic argument (for a `self` or `cls` parameter) to the front
@@ -279,9 +300,7 @@ impl<'a, 'db> CallArguments<'a, 'db> {
             match argument {
                 Argument::Variadic => {
                     if !matches!(
-                        argument_ty
-                            .as_nominal_instance()
-                            .and_then(|nominal| nominal.tuple_spec(db)),
+                        argument_ty.tuple_instance_spec(db),
                         Some(spec) if spec.as_fixed_length().is_some()
                     ) {
                         return None;
@@ -520,14 +539,18 @@ pub(crate) fn is_expandable_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
         Type::Intersection(intersection) => intersection.finite_alternatives(db).is_some(),
         Type::NominalInstance(instance) => {
             let class = instance.class(db);
-            class.is_known(db, KnownClass::Bool)
-                || instance.tuple_spec(db).is_some_and(|spec| match &*spec {
-                    Tuple::Fixed(fixed_length_tuple) => fixed_length_tuple
-                        .iter_all_elements()
-                        .any(|element| is_expandable_type(db, element)),
-                    Tuple::Variable(_) => false,
-                })
-                || enum_metadata(db, class.class_literal(db)).is_some()
+            if class.is_known(db, KnownClass::Bool) {
+                return true;
+            }
+            if let Some(tuple_spec) = instance.tuple_spec(db)
+                && let Tuple::Fixed(fixed_length_tuple) = &*tuple_spec
+                && fixed_length_tuple
+                    .iter_all_elements()
+                    .any(|element| is_expandable_type(db, element))
+            {
+                return true;
+            }
+            enum_metadata(db, class.class_literal(db)).is_some()
         }
         Type::Union(_) => true,
         Type::TypeAlias(alias) => is_expandable_type(db, alias.value_type(db)),

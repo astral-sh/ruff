@@ -23,6 +23,7 @@ ruff_python_ast = { workspace = true }
 ruff_python_codegen = { workspace = true }
 ruff_python_importer = { workspace = true }
 ruff_python_literal = { workspace = true }
+ruff_python_stdlib = { workspace = true }
 ruff_python_trivia = { workspace = true }
 ruff_source_file = { workspace = true }
 ruff_text_size = { workspace = true }
@@ -36,7 +37,6 @@ compact_str = { workspace = true }
 get-size2 = { workspace = true }
 indexmap = { workspace = true }
 itertools = { workspace = true }
-memchr = { workspace = true }
 rayon = { workspace = true }
 regex = { workspace = true }
 rustc-hash = { workspace = true }

@@ -4,6 +4,7 @@ use std::fmt::Write;
 use std::path::Path;
 
 use ruff_python_ast::SourceType;
+use ruff_workspace::Settings;
 use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
 
@@ -16,21 +17,20 @@ use crate::{
 use ruff_db::diagnostic::{Annotation, Diagnostic, Span, SubDiagnostic};
 use ruff_diagnostics::{Applicability, Edit, Fix};
 use ruff_linter::{
-    Locator,
+    Locator, SuppressionKind,
     directives::{Flags, extract_directives},
-    generate_noqa_edits,
-    linter::check_path,
+    generate_suppression_edits,
+    linter::{check_path, parse_unchecked_source},
     package::PackageRoot,
     packaging::detect_package_root,
     preview::is_human_readable_names_enabled,
-    settings::{LinterSettings, flags},
+    settings::flags,
     source_kind::SourceKind,
     suppression::Suppressions,
 };
 use ruff_notebook::Notebook;
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
-use ruff_python_parser::ParseOptions;
 use ruff_source_file::LineIndex;
 use ruff_text_size::{Ranged, TextRange};
 
@@ -44,7 +44,7 @@ pub(crate) struct AssociatedDiagnosticData {
     pub(crate) edits: Vec<lsp_types::TextEdit>,
     /// The identifier displayed for the diagnostic.
     pub(crate) code: String,
-    /// Possible edit to add a `noqa` comment which will disable this diagnostic.
+    /// Possible edit to add a suppression comment which will disable this diagnostic.
     pub(crate) noqa_edit: Option<lsp_types::TextEdit>,
 }
 
@@ -61,7 +61,7 @@ pub(crate) struct DiagnosticFix {
     /// Edits to fix the diagnostic. If this is empty, a fix
     /// does not exist.
     pub(crate) edits: Vec<lsp_types::TextEdit>,
-    /// Possible edit to add a `noqa` comment which will disable this diagnostic.
+    /// Possible edit to add a suppression comment which will disable this diagnostic.
     pub(crate) noqa_edit: Option<lsp_types::TextEdit>,
 }
 
@@ -109,13 +109,8 @@ pub(crate) fn check(
 
     let target_version = settings.linter.resolve_target_version(&document_path);
 
-    let parse_options =
-        ParseOptions::from(source_type).with_target_version(target_version.parser_version());
-
     // Parse once.
-    let parsed = ruff_python_parser::parse_unchecked(source_kind.source_code(), parse_options)
-        .try_into_module()
-        .expect("PySourceType always parses to a ModModule");
+    let parsed = parse_unchecked_source(&source_kind, source_type, target_version.parser_version());
 
     // Map row and column locations to byte slices (lazily).
     let locator = Locator::new(source_kind.source_code());
@@ -154,7 +149,7 @@ pub(crate) fn check(
         &suppressions,
     );
 
-    let noqa_edits = generate_noqa_edits(
+    let suppression_edits = generate_suppression_edits(
         &document_path,
         &diagnostics,
         &locator,
@@ -163,6 +158,14 @@ pub(crate) fn check(
         &directives.noqa_line_for,
         stylist.line_ending(),
         &suppressions,
+        if is_human_readable_names_enabled(settings.linter.preview)
+            && !settings.output_prefer_rule_codes
+        {
+            SuppressionKind::Ignore
+        } else {
+            SuppressionKind::Noqa
+        },
+        settings.linter.preview,
     );
     let context = LspDiagnosticContext {
         source_kind: &source_kind,
@@ -172,7 +175,7 @@ pub(crate) fn check(
         document_uri: &document_uri,
         notebook,
         supports_related_information,
-        settings: &settings.linter,
+        settings,
     };
 
     let mut diagnostics_map = DiagnosticsMap::default();
@@ -192,7 +195,7 @@ pub(crate) fn check(
     let lsp_diagnostics =
         diagnostics
             .into_iter()
-            .zip(noqa_edits)
+            .zip(suppression_edits)
             .filter_map(|(message, noqa_edit)| {
                 if message.is_invalid_syntax() && !show_syntax_errors {
                     None
@@ -258,7 +261,7 @@ struct LspDiagnosticContext<'a> {
     document_uri: &'a lsp_types::Uri,
     notebook: Option<&'a NotebookDocument>,
     supports_related_information: bool,
-    settings: &'a LinterSettings,
+    settings: &'a Settings,
 }
 
 /// Generates an LSP diagnostic with an associated cell index for the diagnostic to go in.
@@ -276,7 +279,9 @@ fn to_lsp_diagnostic(
 
     let (severity, code) = if let Some(code) = diagnostic.secondary_code() {
         let severity = severity(code);
-        let code = if is_human_readable_names_enabled(context.settings.preview) {
+        let code = if is_human_readable_names_enabled(context.settings.linter.preview)
+            && !context.settings.output_prefer_rule_codes
+        {
             name.to_string()
         } else {
             code.to_string()
@@ -376,9 +381,9 @@ fn to_lsp_diagnostic(
             .primary_annotation()
             .and_then(Annotation::get_message)
         {
-            format!("{}: {annotation_message}", diagnostic.primary_message())
+            format!("{}: {annotation_message}", diagnostic.headline_message())
         } else {
-            diagnostic.primary_message().to_string()
+            diagnostic.headline_message().to_string()
         }
     } else {
         diagnostic.concise_message().to_string()
@@ -565,7 +570,7 @@ mod tests {
         };
         let index = LineIndex::from_source_text(source);
         let uri = lsp_types::Uri::parse("file:///test.py").expect("URI to be valid");
-        let settings = LinterSettings::default();
+        let settings = Settings::default();
         let context = LspDiagnosticContext {
             source_kind: &source_kind,
             index: &index,

@@ -70,4 +70,3 @@ Module(
   |
 1 | a; if b: pass; b
   |    ^^ Syntax Error: Compound statements are not allowed on the same line as simple statements
-  |

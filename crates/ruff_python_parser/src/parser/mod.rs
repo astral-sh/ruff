@@ -6,16 +6,19 @@ use bitflags::bitflags;
 use ruff_python_ast::name::Name;
 use ruff_python_ast::token::TokenKind;
 use ruff_python_ast::{
-    AtomicNodeIndex, Int, IpyEscapeKind, Mod, ModExpression, ModModule, StringFlags,
+    Alias, AtomicNodeIndex, ElifElseClause, Expr, Int, IpyEscapeKind, Keyword, Mod, ModExpression,
+    ModModule, ParameterWithDefault, Stmt, StringFlags,
 };
 use ruff_python_trivia::is_python_whitespace;
 use ruff_text_size::{Ranged, TextRange, TextSize};
+use rustc_hash::FxHashSet;
 use thin_vec::ThinVec;
 use unicode_normalization::UnicodeNormalization;
 
 use crate::error::UnsupportedSyntaxError;
 use crate::parser::expression::ExpressionContext;
 use crate::parser::progress::{ParserProgress, TokenId};
+use crate::parser::scratch_buffer::ScratchBuffer;
 use crate::string::InterpolatedStringKind;
 use crate::token_set::TokenSet;
 use crate::token_source::{TokenSource, TokenSourceCheckpoint};
@@ -30,9 +33,32 @@ mod options;
 mod pattern;
 mod progress;
 mod recovery;
+mod scratch_buffer;
 mod statement;
 #[cfg(test)]
 mod tests;
+
+#[derive(Debug, Default)]
+struct NameInterner {
+    names: FxHashSet<Name>,
+}
+
+impl NameInterner {
+    /// Returns an inline name directly, or a shared clone of a heap-allocated name.
+    fn intern(&mut self, text: &str) -> Name {
+        if let Some(name) = Name::new_inline(text) {
+            return name;
+        }
+
+        if let Some(name) = self.names.get(text) {
+            return name.clone();
+        }
+
+        let name = Name::new_heap(text);
+        self.names.insert(name.clone());
+        name
+    }
+}
 
 #[derive(Debug)]
 pub(crate) struct Parser<'src> {
@@ -40,6 +66,12 @@ pub(crate) struct Parser<'src> {
 
     /// Token source for the parser that skips over any non-trivia token.
     tokens: TokenSource<'src>,
+
+    /// Deduplicates the backing allocations for repeated names that do not fit inline.
+    name_interner: NameInterner,
+
+    /// Reusable storage for names that need to be constructed by the parser.
+    name_buffer: String,
 
     /// Stores all the syntax errors found during the parsing.
     errors: Vec<ParseError>,
@@ -68,6 +100,24 @@ pub(crate) struct Parser<'src> {
 
     /// Maximum lexer nesting depth before postfix calls and subscripts should stop recursing.
     max_nesting_depth: u32,
+
+    /// Reusable, nesting-safe scratch storage for expression lists.
+    expr_scratch: ScratchBuffer<Expr>,
+
+    /// Reusable, nesting-safe scratch storage for call keywords.
+    keyword_scratch: ScratchBuffer<Keyword>,
+
+    /// Reusable, nesting-safe scratch storage for function and lambda parameters.
+    parameter_scratch: ScratchBuffer<ParameterWithDefault>,
+
+    /// Reusable, nesting-safe scratch storage for statement lists.
+    stmt_scratch: ScratchBuffer<Stmt>,
+
+    /// Reusable scratch storage for import aliases.
+    alias_scratch: ScratchBuffer<Alias>,
+
+    /// Reusable, nesting-safe scratch storage for `elif` and `else` clauses.
+    elif_else_scratch: ScratchBuffer<ElifElseClause>,
 }
 
 impl<'src> Parser<'src> {
@@ -92,12 +142,20 @@ impl<'src> Parser<'src> {
             errors: Vec::new(),
             unsupported_syntax_errors: Vec::new(),
             tokens,
+            name_interner: NameInterner::default(),
+            name_buffer: String::new(),
             recovery_context: RecoveryContext::empty(),
             prev_token_end: TextSize::new(0),
             start_offset,
             current_token_id: TokenId::default(),
             depth_remaining,
             max_nesting_depth,
+            expr_scratch: ScratchBuffer::with_capacity(16),
+            keyword_scratch: ScratchBuffer::new(),
+            parameter_scratch: ScratchBuffer::new(),
+            stmt_scratch: ScratchBuffer::with_capacity(32),
+            alias_scratch: ScratchBuffer::new(),
+            elif_else_scratch: ScratchBuffer::new(),
         }
     }
 
@@ -207,7 +265,6 @@ impl<'src> Parser<'src> {
             TokenKind::EndOfFile,
             "Parser should be at the end of the file."
         );
-
         // TODO consider re-integrating lexical error handling into the parser?
         let parse_errors = self.errors;
         let (tokens, lex_errors) = self.tokens.finish();
@@ -395,11 +452,25 @@ impl<'src> Parser<'src> {
     fn bump_name(&mut self) -> Name {
         let text = self.current_token_text();
         let name = if !self.tokens.current_flags().is_non_ascii_name() {
-            Name::new(text)
+            self.intern_name(text)
         } else {
-            normalize_name(text)
+            self.intern_normalized_name(text)
         };
         self.bump(TokenKind::Name);
+        name
+    }
+
+    fn intern_name(&mut self, text: &str) -> Name {
+        self.name_interner.intern(text)
+    }
+
+    fn intern_normalized_name(&mut self, text: &str) -> Name {
+        let snapshot = self.name_buffer.len();
+        self.name_buffer.extend(text.nfkc());
+
+        let name = self.name_interner.intern(&self.name_buffer[snapshot..]);
+
+        self.name_buffer.truncate(snapshot);
         name
     }
 
@@ -665,6 +736,7 @@ impl<'src> Parser<'src> {
         mut parse_element: impl FnMut(&mut Parser<'src>),
     ) {
         let mut progress = ParserProgress::default();
+        let mut unexpected_indents = 0;
 
         let saved_context = self.recovery_context;
         self.recovery_context = self
@@ -674,7 +746,12 @@ impl<'src> Parser<'src> {
         loop {
             progress.assert_progressing(self);
 
-            if recovery_context_kind.is_list_element(self) {
+            if 0 < unexpected_indents && self.at(TokenKind::Dedent) {
+                // Ignore this `Dedent` like we ignored the `Indent`, avoiding extra errors from
+                // being imbalanced
+                unexpected_indents -= 1;
+                self.bump(TokenKind::Dedent);
+            } else if recovery_context_kind.is_list_element(self) {
                 parse_element(self);
             } else if recovery_context_kind.is_regular_list_terminator(self) {
                 break;
@@ -692,6 +769,14 @@ impl<'src> Parser<'src> {
                     self.current_token_range(),
                 );
 
+                if matches!(
+                    recovery_context_kind,
+                    RecoveryContextKind::ModuleStatements | RecoveryContextKind::BlockStatements
+                ) && self.at(TokenKind::Indent)
+                {
+                    // For this invalid `Indent`, ensure the matching `Dedent` gets consumed as well
+                    unexpected_indents += 1;
+                }
                 self.bump_any();
             }
         }
@@ -902,11 +987,6 @@ fn strip_underscores(text: &str) -> Cow<'_, str> {
     } else {
         Cow::Borrowed(text)
     }
-}
-
-#[cold]
-fn normalize_name(text: &str) -> Name {
-    text.nfkc().collect::<Name>()
 }
 
 #[derive(Copy, Clone)]

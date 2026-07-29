@@ -27,6 +27,5 @@ error[invalid-legacy-type-variable]: Unknown keyword argument `invalid_keyword` 
   |
 4 | T = TypeVar("T", invalid_keyword=True)
   |                  ^^^^^^^^^^^^^^^^^^^^
-  |
 
 ```

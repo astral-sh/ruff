@@ -93,7 +93,6 @@ ERA001 [*] Found commented-out code
 20 |     pass
 21 |     # b = c
    |     ^^^^^^^
-   |
 help: Remove commented-out code
    |
 20 |     pass
@@ -250,7 +249,6 @@ ERA001 [*] Found commented-out code
 37 | # except Foo:
 38 | # except Exception as e: print(e)
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 help: Remove commented-out code
    |
 37 | # except Foo:

@@ -309,7 +309,7 @@ Here, both `Foo.foo` and `Bar.bar` use `Self`. When accessing a bound method, we
 occurrences of `Self` with the bound `self` type. In this example, when we access `x.foo`, we only
 want to substitute the occurrences of `Self` in `Foo.foo` — that is, occurrences of `Self@foo`. The
 fact that `x` is an instance of `Foo[Self@bar]` (a completely different `Self` type) should not
-affect that subtitution. If we blindly substitute all occurrences of `Self`, we would get
+affect that substitution. If we blindly substitute all occurrences of `Self`, we would get
 `Foo[Self@bar]` as the return type of the bound method.
 
 ```py
@@ -413,6 +413,7 @@ class GenericShape[T]:
     @classmethod
     def baz[U](cls, u: U) -> "GenericShape[U]":
         reveal_type(cls)  # revealed: type[Self@baz]
+        # error: [invalid-return-type]
         return cls()
 
 class GenericCircle[T](GenericShape[T]): ...
@@ -1091,7 +1092,7 @@ class ExplicitGeneric[T]:
 
 ExplicitGeneric[int]().special()
 
-# TODO: this should be an `invalid-argument-type` error
+# error: [invalid-argument-type] "Argument to bound method `ExplicitGeneric.special` is incorrect: Expected `ExplicitGeneric[int]`, found `ExplicitGeneric[str]`"
 ExplicitGeneric[str]().special()
 ```
 
@@ -1129,7 +1130,7 @@ bound at `C.f`.
 
 ```py
 from typing import Self
-from ty_extensions import generic_context
+from ty_extensions._internal import generic_context
 
 class C[T]():  # fmt:skip
     def f(self: Self):
@@ -1138,7 +1139,7 @@ class C[T]():  # fmt:skip
         # revealed: None
         reveal_type(generic_context(b))
 
-# revealed: ty_extensions.GenericContext[Self@f]
+# revealed: ty_extensions._internal.GenericContext[Self@f]
 reveal_type(generic_context(C.f))
 ```
 
@@ -1147,7 +1148,7 @@ Even if the `Self` annotation appears first in the nested function, it is the me
 
 ```py
 from typing import Self
-from ty_extensions import generic_context
+from ty_extensions._internal import generic_context
 
 class C:
     def f(self: "C"):
@@ -1165,7 +1166,7 @@ reveal_type(generic_context(C.f))
 This makes sure that we don't bind `self` if it's not a positional parameter:
 
 ```py
-from ty_extensions import RegularCallableTypeOf
+from ty_extensions._internal import RegularCallableTypeOf
 
 class C:
     def method(*args, **kwargs) -> None: ...

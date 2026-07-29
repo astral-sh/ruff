@@ -514,6 +514,7 @@ mod tests {
 
     use ruff_cache::CACHE_DIR_NAME;
     use ruff_linter::package::PackageRoot;
+    use ruff_linter::registry::Rule;
     use ruff_linter::settings::LinterSettings;
     use ruff_linter::settings::flags;
     use ruff_linter::settings::types::UnsafeFixes;
@@ -537,7 +538,7 @@ mod tests {
             cache_dir,
             linter: LinterSettings {
                 unresolved_target_version: PythonVersion::latest().into(),
-                ..Default::default()
+                ..LinterSettings::for_rule(Rule::UnusedVariable)
             },
             ..Settings::default()
         };
@@ -1031,6 +1032,7 @@ mod tests {
 
             let settings = Settings {
                 cache_dir,
+                linter: LinterSettings::for_rule(Rule::UndefinedExport),
                 ..Settings::default()
             };
 

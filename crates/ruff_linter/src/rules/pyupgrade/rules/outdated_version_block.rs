@@ -294,11 +294,11 @@ fn fix_always_false_branch(
                 range,
                 ..
             }) => {
-                debug_assert!(
+                debug_assert_eq!(
                     checker
                         .locator()
-                        .slice(TextRange::at(range.start(), "elif".text_len()))
-                        == "elif"
+                        .slice(TextRange::at(range.start(), "elif".text_len())),
+                    "elif"
                 );
                 let end_location = range.start() + ("elif".text_len() - "if".text_len());
                 Some(Fix::unsafe_edit(Edit::deletion(

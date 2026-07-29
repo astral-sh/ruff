@@ -230,7 +230,7 @@ fn run_test(
 
             Some(TestFile {
                 file,
-                code_blocks: embedded.python_code_blocks.clone(),
+                code_blocks: embedded.code_blocks.clone(),
             })
         })
         .collect();

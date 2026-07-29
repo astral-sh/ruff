@@ -77,9 +77,9 @@ pub enum SpecialFormType {
     Never,
     /// The symbol `ty_extensions.Unknown`
     Unknown,
-    /// The symbol `ty_extensions.Divergent`
+    /// The symbol `ty_extensions._internal.Divergent`
     Divergent,
-    /// The symbol `ty_extensions.Todo`
+    /// The symbol `ty_extensions._internal.Todo`
     Todo,
     /// The symbol `ty_extensions.AlwaysTruthy`
     AlwaysTruthy,
@@ -89,11 +89,11 @@ pub enum SpecialFormType {
     Not,
     /// The symbol `ty_extensions.Intersection`
     Intersection,
-    /// The symbol `ty_extensions.TypeOf`
+    /// The symbol `ty_extensions._internal.TypeOf`
     TypeOf,
-    /// The symbol `ty_extensions.CallableTypeOf`
+    /// The symbol `ty_extensions._internal.CallableTypeOf`
     CallableTypeOf,
-    /// The symbol `ty_extensions.RegularCallableTypeOf`
+    /// The symbol `ty_extensions._internal.RegularCallableTypeOf`
     RegularCallableTypeOf,
     /// The symbol `ty_extensions.Top`
     Top,
@@ -232,6 +232,18 @@ impl SpecialFormType {
     /// returns `Type::NominalInstance(NominalInstanceType { class: <typing._SpecialForm> })`.
     pub(super) fn instance_fallback(self, db: &dyn Db) -> Type<'_> {
         self.class().to_instance(db)
+    }
+
+    /// Return `true` if this special form is guaranteed to be a singleton at runtime.
+    ///
+    /// Nearly all `SpecialForm` types are singletons, but if a symbol could validly
+    /// originate from either `typing` or `typing_extensions` then this is not guaranteed.
+    /// E.g. `typing.TypeGuard` is equivalent to `typing_extensions.TypeGuard`, so both are treated
+    /// as inhabiting the type `SpecialFormType::TypeGuard` in our model, but they are actually
+    /// distinct symbols at different memory addresses at runtime.
+    pub(super) const fn is_guaranteed_singleton(self) -> bool {
+        !(self.check_module(KnownModule::Typing)
+            && self.check_module(KnownModule::TypingExtensions))
     }
 
     /// Return the type denoted by this retained special-form value when it is valid without
@@ -517,7 +529,7 @@ impl SpecialFormType {
     ///
     /// Most variants can only exist in one module, which is the same as `self.class().canonical_module(db)`.
     /// Some variants could validly be defined in either `typing` or `typing_extensions`, however.
-    pub(super) fn check_module(self, module: KnownModule) -> bool {
+    pub(super) const fn check_module(self, module: KnownModule) -> bool {
         match self {
             Self::TypeQualifier(qualifier) => qualifier.check_module(module),
             Self::LegacyStdlibAlias(_)
@@ -548,17 +560,18 @@ impl SpecialFormType {
             }
 
             Self::Unknown
-            | Self::Divergent
-            | Self::Todo
             | Self::AlwaysTruthy
             | Self::AlwaysFalsy
             | Self::Not
             | Self::Top
             | Self::Bottom
-            | Self::Intersection
+            | Self::Intersection => module.is_ty_extensions(),
+
+            Self::Divergent
+            | Self::Todo
             | Self::TypeOf
             | Self::CallableTypeOf
-            | Self::RegularCallableTypeOf => module.is_ty_extensions(),
+            | Self::RegularCallableTypeOf => module.is_ty_extensions_internal(),
 
             Self::CollectionsAbcCallable => matches!(
                 module,
@@ -774,17 +787,18 @@ impl SpecialFormType {
             SpecialFormType::CollectionsAbcCallable => &[KnownModule::CollectionsAbc],
 
             SpecialFormType::Unknown
-            | SpecialFormType::Divergent
-            | SpecialFormType::Todo
             | SpecialFormType::AlwaysTruthy
             | SpecialFormType::AlwaysFalsy
             | SpecialFormType::Not
             | SpecialFormType::Intersection
-            | SpecialFormType::TypeOf
-            | SpecialFormType::CallableTypeOf
-            | SpecialFormType::RegularCallableTypeOf
             | SpecialFormType::Top
             | SpecialFormType::Bottom => &[KnownModule::TyExtensions],
+
+            SpecialFormType::Divergent
+            | SpecialFormType::Todo
+            | SpecialFormType::TypeOf
+            | SpecialFormType::CallableTypeOf
+            | SpecialFormType::RegularCallableTypeOf => &[KnownModule::TyExtensionsInternal],
         }
     }
 

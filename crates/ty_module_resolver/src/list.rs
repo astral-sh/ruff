@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::collections::btree_map::{BTreeMap, Entry};
 
 use ruff_db::files::directory_listing;
@@ -27,7 +28,7 @@ pub fn all_modules(db: &dyn Db) -> Vec<Module<'_>> {
 #[salsa::tracked(returns(deref))]
 pub fn list_modules(db: &dyn Db) -> Box<[Module<'_>]> {
     let mut modules: BTreeMap<&ModuleName, ListedModule<'_>> = BTreeMap::new();
-    for search_path in search_paths(db, ModuleResolveMode::StubsAllowed) {
+    for search_path in search_paths(db, ModuleResolveMode::Typing) {
         for &new in list_modules_in(db, SearchPathIngredient::new(db, search_path.clone())) {
             match modules.entry(new.module(db).name(db)) {
                 Entry::Vacant(entry) => {
@@ -74,9 +75,10 @@ fn list_modules_in<'db>(
     db: &'db dyn Db,
     search_path: SearchPathIngredient<'db>,
 ) -> Vec<ListedModule<'db>> {
-    tracing::debug!("Listing modules in search path '{}'", search_path.path(db));
-    let mut lister = Lister::new(db, search_path.path(db));
-    match search_path.path(db).as_path() {
+    let path = search_path.path(db);
+    tracing::debug!("Listing modules in search path '{}'", path);
+    let mut lister = Lister::new(db, path);
+    match path.as_path() {
         SystemOrVendoredPathRef::System(system_search_path) => {
             let Ok(listing) = directory_listing(db, system_search_path) else {
                 return vec![];
@@ -98,7 +100,9 @@ fn list_modules_in<'db>(
 /// A module paired with whether it came from a stub package.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 struct ListedModule<'db> {
+    #[returns(copy)]
     module: Module<'db>,
+    #[returns(copy)]
     is_stub_package: bool,
 }
 
@@ -175,7 +179,7 @@ impl<'db> Lister<'db> {
                         &module_path,
                         Module::file_module(
                             self.db,
-                            module_name,
+                            Cow::Owned(module_name),
                             ModuleKind::Package,
                             self.search_path.clone(),
                             file,
@@ -219,7 +223,7 @@ impl<'db> Lister<'db> {
                 if !self.search_path.is_standard_library() {
                     self.add_module(
                         &module_path,
-                        Module::namespace_package(self.db, module_name),
+                        Module::namespace_package(self.db, Cow::Owned(module_name)),
                     );
                 }
                 return;
@@ -247,7 +251,7 @@ impl<'db> Lister<'db> {
             &module_path,
             Module::file_module(
                 self.db,
-                module_name,
+                Cow::Owned(module_name),
                 ModuleKind::Module,
                 self.search_path.clone(),
                 file,
@@ -291,17 +295,12 @@ impl<'db> Lister<'db> {
                 // the same directory, the former takes precedent.
                 // (This case can only occur when both have a search
                 // path.)
-                if existing.kind(self.db) == ModuleKind::Module
-                    && module.kind(self.db) == ModuleKind::Package
-                {
-                    entry.insert(listed);
-                    return;
-                }
                 // Or if we have two file modules and the new one
                 // is a stub, then the stub takes priority.
                 if existing.kind(self.db) == ModuleKind::Module
-                    && module.kind(self.db) == ModuleKind::Module
-                    && path.is_stub_file()
+                    && let module_kind = module.kind(self.db)
+                    && (module_kind == ModuleKind::Package
+                        || module_kind == ModuleKind::Module && path.is_stub_file())
                 {
                     entry.insert(listed);
                     return;
@@ -318,8 +317,7 @@ impl<'db> Lister<'db> {
 
     /// Returns true if the given module name cannot be shadowable.
     fn is_non_shadowable(&self, name: &ModuleName) -> bool {
-        ModuleResolveMode::StubsAllowed
-            .is_non_shadowable(self.python_version().minor, name.as_str())
+        ModuleResolveMode::Typing.is_non_shadowable(self.python_version().minor, name.as_str())
     }
 
     /// Returns the Python version we want to perform module resolution
@@ -335,7 +333,7 @@ impl<'db> Lister<'db> {
             python_version: self.python_version(),
             // We don't currently support listing modules
             // in a "no stubs allowed" mode.
-            mode: ModuleResolveMode::StubsAllowed,
+            mode: ModuleResolveMode::Typing,
         }
     }
 }
@@ -1438,7 +1436,7 @@ not_a_directory
         assert_function_query_was_not_run(
             &db,
             dynamic_resolution_paths,
-            ModuleResolveModeIngredient::new(&db, ModuleResolveMode::StubsAllowed),
+            ModuleResolveModeIngredient::new(&db, ModuleResolveMode::Typing),
             &events,
         );
     }

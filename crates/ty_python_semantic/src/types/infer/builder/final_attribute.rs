@@ -7,7 +7,10 @@ use crate::place::place_from_declarations;
 use crate::types::infer::nearest_enclosing_function;
 use crate::{
     TypeQualifiers,
-    types::{Type, diagnostic::INVALID_ASSIGNMENT, infer::TypeInferenceBuilder},
+    types::{
+        Type, attribute_write::assignment_attribute_members, diagnostic::INVALID_ASSIGNMENT,
+        infer::TypeInferenceBuilder,
+    },
 };
 use ty_python_core::definition::{Definition, DefinitionKind};
 use ty_python_core::place::{PlaceExpr, ScopedPlaceId};
@@ -210,7 +213,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 "Cannot assign to final attribute `{attribute}` on type `{}`",
                 object_ty.display(db)
             ));
-            diagnostic.set_primary_message(if is_dataclass_like {
+            diagnostic.set_primary_annotation_message(if is_dataclass_like {
                 "`Final` attributes can only be assigned in the class body, `__init__`, or `__post_init__` on dataclass-like classes"
             } else {
                 "`Final` attributes can only be assigned in the class body or `__init__`"
@@ -235,10 +238,12 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         // that happens to have the right type.
         let is_self_parameter = self.is_instance_attribute_assignment(target);
 
-        let class_instance_ty = Type::instance(db, class_ty).top_materialization(db);
-        let object_instance_ty = object_ty.bind_self_typevars(db, class_instance_ty);
-        let is_current_class_instance =
-            is_self_parameter && object_instance_ty.is_subtype_of(db, class_instance_ty);
+        // Final ownership is nominal: checking structural protocol requirements can
+        // incorrectly reject the declaring class's own receiver.
+        let is_current_class_instance = is_self_parameter
+            && object_ty.nominal_class(db).is_some_and(|object_class| {
+                object_class.is_subtype_of_class_literal(db, class_ty.class_literal(db))
+            });
         if !is_current_class_instance {
             report_not_in_init();
             return true;
@@ -259,7 +264,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 {
                     let mut diagnostic =
                         diag_builder.into_diagnostic("Invalid assignment to final attribute");
-                    diagnostic.set_primary_message(format_args!(
+                    diagnostic.set_primary_annotation_message(format_args!(
                         "`{attribute}` already has a value in the class body"
                     ));
                     if let Some(final_declaration) = final_declaration {
@@ -298,7 +303,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     "Cannot delete final attribute `{attribute}` on type `{}`",
                     object_ty.display(db)
                 ));
-                diagnostic.set_primary_message("`Final` attributes cannot be deleted");
+                diagnostic.set_primary_annotation_message("`Final` attributes cannot be deleted");
                 if let Some(final_declaration) = final_declaration {
                     self.annotate_final_declaration(&mut diagnostic, final_declaration);
                 }
@@ -314,25 +319,19 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         object_ty: Type<'db>,
         attribute: &str,
     ) {
-        let Some((meta_attr, fallback_attr)) =
-            self.assignment_attribute_members(object_ty, attribute)
-        else {
+        let Some(members) = assignment_attribute_members(self.db(), object_ty, attribute) else {
             return;
         };
 
-        if !self.invalid_assignment_to_final_attribute(
-            object_ty,
-            target,
-            attribute,
-            meta_attr.qualifiers,
-        ) && let Some(fallback_attr) = fallback_attr
-        {
-            self.invalid_assignment_to_final_attribute(
+        for member in members.effective_members() {
+            if self.invalid_assignment_to_final_attribute(
                 object_ty,
                 target,
                 attribute,
-                fallback_attr.qualifiers,
-            );
+                member.qualifiers,
+            ) {
+                break;
+            }
         }
     }
 
@@ -343,24 +342,16 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         attribute: &str,
         emit_diagnostics: bool,
     ) -> bool {
-        let Some((meta_attr, fallback_attr)) =
-            self.assignment_attribute_members(object_ty, attribute)
-        else {
+        let Some(members) = assignment_attribute_members(self.db(), object_ty, attribute) else {
             return false;
         };
 
-        self.invalid_deletion_of_final_attribute(
-            object_ty,
-            target,
-            attribute,
-            meta_attr.qualifiers,
-            emit_diagnostics,
-        ) || fallback_attr.is_some_and(|fallback_attr| {
+        members.effective_members().any(|member| {
             self.invalid_deletion_of_final_attribute(
                 object_ty,
                 target,
                 attribute,
-                fallback_attr.qualifiers,
+                member.qualifiers,
                 emit_diagnostics,
             )
         })

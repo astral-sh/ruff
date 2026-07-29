@@ -4,7 +4,7 @@ use std::{borrow::Cow, path::Path, sync::Arc};
 use ruff_diagnostics::{Applicability, Fix};
 use ruff_source_file::{LineColumn, SourceCode, SourceFile};
 
-use ruff_annotate_snippets::Level as AnnotateLevel;
+use annotate_snippets::Level as AnnotateLevel;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 #[cfg(feature = "serde")]
 use serde::Serialize;
@@ -155,8 +155,8 @@ impl Diagnostic {
     ///
     /// An "info" diagnostic is useful when contextualizing or otherwise
     /// helpful information can be added to help end users understand the
-    /// main diagnostic message better. For example, if a the main diagnostic
-    /// message is about a function call being invalid, a useful "info"
+    /// headline message better. For example, if the headline message is about
+    /// a function call being invalid, a useful "info"
     /// sub-diagnostic could show the function definition (or only the relevant
     /// parts of it).
     ///
@@ -167,6 +167,13 @@ impl Diagnostic {
     /// message, then they can also pass a `DiagnosticMessage` directly.
     pub fn info<'a>(&mut self, message: impl IntoDiagnosticMessage + 'a) {
         self.sub(SubDiagnostic::new(SubDiagnosticSeverity::Info, message));
+    }
+
+    /// Adds an "info" sub-diagnostic before any existing sub-diagnostics.
+    pub fn prepend_info<'a>(&mut self, message: impl IntoDiagnosticMessage + 'a) {
+        Arc::make_mut(&mut self.inner)
+            .subs
+            .insert(0, SubDiagnostic::new(SubDiagnosticSeverity::Info, message));
     }
 
     /// Adds a "help" sub-diagnostic with the given message.
@@ -203,18 +210,22 @@ impl Diagnostic {
         self.inner.id
     }
 
-    /// Returns the primary message for this diagnostic.
+    /// Returns the headline message for this diagnostic.
     ///
     /// A diagnostic always has a message, but it may be empty.
-    pub fn primary_message(&self) -> &str {
+    pub fn headline_message(&self) -> &str {
         self.inner.message.as_str()
     }
 
-    /// Introspects this diagnostic and returns what kind of "primary" message
-    /// it contains for concise formatting.
+    /// Sets the headline message for this diagnostic.
+    pub fn set_headline_message(&mut self, message: impl IntoDiagnosticMessage) {
+        Arc::make_mut(&mut self.inner).message = message.into_diagnostic_message();
+    }
+
+    /// Introspects this diagnostic and returns its message for concise formatting.
     ///
     /// When we concisely format diagnostics, we likely want to not only
-    /// include the primary diagnostic message but also the message attached
+    /// include the headline message but also the message attached
     /// to the primary annotation. In particular, the primary annotation often
     /// contains *essential* information or context for understanding the
     /// diagnostic.
@@ -242,10 +253,16 @@ impl Diagnostic {
     /// Set a custom message for the concise formatting of this diagnostic.
     ///
     /// This overrides the default behavior of generating a concise message
-    /// from the main diagnostic message and the primary annotation.
+    /// from the headline message and the primary annotation.
     pub fn set_concise_message(&mut self, message: impl IntoDiagnosticMessage) {
         Arc::make_mut(&mut self.inner).custom_concise_message =
             Some(message.into_diagnostic_message());
+    }
+
+    /// Remove the custom concise message, restoring the default behavior of generating a concise
+    /// message from the headline message and the primary annotation.
+    pub fn clear_concise_message(&mut self) {
+        Arc::make_mut(&mut self.inner).custom_concise_message = None;
     }
 
     /// Returns the severity of this diagnostic.
@@ -702,18 +719,17 @@ impl SubDiagnostic {
         self.primary_annotation().map(Annotation::get_span)
     }
 
-    /// Returns the primary message for this sub-diagnostic.
+    /// Returns the headline message for this sub-diagnostic.
     ///
     /// A sub-diagnostic always has a message, but it may be empty.
-    pub fn primary_message(&self) -> &str {
+    pub fn headline_message(&self) -> &str {
         self.inner.message.as_str()
     }
 
-    /// Introspects this diagnostic and returns what kind of "primary" message
-    /// it contains for concise formatting.
+    /// Introspects this sub-diagnostic and returns its message for concise formatting.
     ///
     /// When we concisely format diagnostics, we likely want to not only
-    /// include the primary diagnostic message but also the message attached
+    /// include the headline message but also the message attached
     /// to the primary annotation. In particular, the primary annotation often
     /// contains *essential* information or context for understanding the
     /// diagnostic.
@@ -722,7 +738,7 @@ impl SubDiagnostic {
     /// cases, just converting it to a string (or printing it) will do what
     /// you want.
     pub fn concise_message(&self) -> ConciseMessage<'_> {
-        let main = self.primary_message();
+        let main = self.headline_message();
         let annotation = self
             .primary_annotation()
             .and_then(|ann| ann.get_message())
@@ -1322,11 +1338,11 @@ pub enum Severity {
 }
 
 impl Severity {
-    fn to_annotate(self) -> AnnotateLevel {
+    fn to_annotate(self) -> AnnotateLevel<'static> {
         match self {
-            Severity::Info => AnnotateLevel::Info,
-            Severity::Warning => AnnotateLevel::Warning,
-            Severity::Error => AnnotateLevel::Error,
+            Severity::Info => AnnotateLevel::INFO,
+            Severity::Warning => AnnotateLevel::WARNING,
+            Severity::Error => AnnotateLevel::ERROR,
             // NOTE: Should we really collapse this to "error"?
             //
             // After collapsing this, the snapshot tests seem to reveal that we
@@ -1334,7 +1350,7 @@ impl Severity {
             // And maybe *rendering* this as just an `error` is fine. If we
             // really do need different rendering, then I think we can add a
             // `Level::Fatal`. ---AG
-            Severity::Fatal => AnnotateLevel::Error,
+            Severity::Fatal => AnnotateLevel::ERROR,
         }
     }
 
@@ -1358,13 +1374,13 @@ pub enum SubDiagnosticSeverity {
 }
 
 impl SubDiagnosticSeverity {
-    fn to_annotate(self) -> AnnotateLevel {
+    fn to_annotate(self) -> AnnotateLevel<'static> {
         match self {
-            SubDiagnosticSeverity::Help => AnnotateLevel::Help,
-            SubDiagnosticSeverity::Info => AnnotateLevel::Info,
-            SubDiagnosticSeverity::Warning => AnnotateLevel::Warning,
-            SubDiagnosticSeverity::Error => AnnotateLevel::Error,
-            SubDiagnosticSeverity::Fatal => AnnotateLevel::Error,
+            SubDiagnosticSeverity::Help => AnnotateLevel::HELP,
+            SubDiagnosticSeverity::Info => AnnotateLevel::INFO,
+            SubDiagnosticSeverity::Warning => AnnotateLevel::WARNING,
+            SubDiagnosticSeverity::Error => AnnotateLevel::ERROR,
+            SubDiagnosticSeverity::Fatal => AnnotateLevel::ERROR,
         }
     }
 }
@@ -1431,6 +1447,8 @@ pub struct DisplayDiagnosticConfig {
     merge_window: usize,
     /// Whether to use preview formatting for Ruff diagnostics.
     preview: bool,
+    /// Whether to prefer rule codes over human-readable rule names in Ruff diagnostic output.
+    prefer_rule_codes: bool,
     /// Whether to hide the real `Severity` of diagnostics.
     ///
     /// This is intended for temporary use by Ruff, which only has a single `error` severity at the
@@ -1438,10 +1456,6 @@ pub struct DisplayDiagnosticConfig {
     hide_severity: bool,
     /// Whether to show the availability of a fix in a diagnostic.
     show_fix_status: bool,
-    /// Whether to show the diff for an available fix after the main diagnostic.
-    ///
-    /// This currently only applies to `DiagnosticFormat::Full`.
-    show_fix_diff: bool,
     /// The lowest applicability that should be shown when reporting diagnostics.
     fix_applicability: Applicability,
 
@@ -1459,9 +1473,9 @@ impl DisplayDiagnosticConfig {
             context: 2,
             merge_window: 2,
             preview: false,
+            prefer_rule_codes: false,
             hide_severity: false,
             show_fix_status: false,
-            show_fix_diff: false,
             fix_applicability: Applicability::Safe,
             cancellation_token: None,
         }
@@ -1524,6 +1538,19 @@ impl DisplayDiagnosticConfig {
         self.preview
     }
 
+    /// Whether to prefer rule codes over human-readable rule names, even in preview mode.
+    pub fn prefer_rule_codes(self, yes: bool) -> DisplayDiagnosticConfig {
+        DisplayDiagnosticConfig {
+            prefer_rule_codes: yes,
+            ..self
+        }
+    }
+
+    /// Whether rule codes are explicitly preferred over human-readable rule names.
+    pub fn is_prefer_rule_codes_enabled(&self) -> bool {
+        self.prefer_rule_codes
+    }
+
     /// Whether to hide a diagnostic's severity or not.
     pub fn hide_severity(self, yes: bool) -> DisplayDiagnosticConfig {
         DisplayDiagnosticConfig {
@@ -1536,14 +1563,6 @@ impl DisplayDiagnosticConfig {
     pub fn with_show_fix_status(self, yes: bool) -> DisplayDiagnosticConfig {
         DisplayDiagnosticConfig {
             show_fix_status: yes,
-            ..self
-        }
-    }
-
-    /// Whether to show a diff for an available fix after the main diagnostic.
-    pub fn show_fix_diff(self, yes: bool) -> DisplayDiagnosticConfig {
-        DisplayDiagnosticConfig {
-            show_fix_diff: yes,
             ..self
         }
     }
@@ -1646,10 +1665,10 @@ pub enum DiagnosticFormat {
 
 /// A representation of the kinds of messages inside a diagnostic.
 pub enum ConciseMessage<'a> {
-    /// A diagnostic contains a non-empty main message and an empty
+    /// A diagnostic contains a non-empty headline message and an empty
     /// primary annotation message.
     MainDiagnostic(&'a str),
-    /// A diagnostic contains a non-empty main message and a non-empty
+    /// A diagnostic contains a non-empty headline message and a non-empty
     /// primary annotation message.
     Both { main: &'a str, annotation: &'a str },
     /// A custom concise message has been provided.

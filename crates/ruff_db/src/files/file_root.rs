@@ -18,6 +18,7 @@ pub struct FileRoot {
     pub path: Box<SystemPath>,
 
     /// The kind of the root at the time of its creation.
+    #[returns(copy)]
     pub kind_at_time_of_creation: FileRootKind,
 }
 

@@ -48,7 +48,7 @@ use crate::{FixAvailability, Violation};
 /// ]
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "0.14.14")]
+#[violation_metadata(stable_since = "0.16.0")]
 pub(crate) struct DuplicateEntryInDunderAll;
 
 impl Violation for DuplicateEntryInDunderAll {
@@ -163,7 +163,7 @@ fn duplicate_entry_in_dunder_all(checker: &Checker, target: &ast::Expr, value: &
                 previous_expr,
             );
 
-            diagnostic.set_primary_message(format_args!("`{name}` duplicated here"));
+            diagnostic.set_primary_annotation_message(format_args!("`{name}` duplicated here"));
 
             diagnostic.try_set_fix(|| {
                 edits::remove_member(elts, index, source).map(|edit| {

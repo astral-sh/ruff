@@ -17,7 +17,7 @@ use crate::{Db, DisplaySettings};
 /// Note that a non-specialized generic class _cannot_ be a class base. When we see a
 /// non-specialized generic class in any type expression (including the list of base classes), we
 /// automatically construct the default specialization for that class.
-#[derive(Debug, Copy, Clone, Hash, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
+#[derive(Debug, Copy, Clone, Hash, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
 pub enum ClassBase<'db> {
     /// The `Any` special form used directly as a base class.
     ///
@@ -70,12 +70,7 @@ impl<'db> ClassBase<'db> {
                 | DynamicType::AmbiguousOverload,
             ) => "Unknown",
             ClassBase::Dynamic(DynamicType::UnspecializedTypeVar) => "UnspecializedTypeVar",
-            ClassBase::Dynamic(
-                DynamicType::Todo(_)
-                | DynamicType::TodoUnpack
-                | DynamicType::TodoStarredExpression
-                | DynamicType::TodoTypeVarTuple,
-            ) => "@Todo",
+            ClassBase::Dynamic(DynamicType::Todo(_)) => "@Todo",
             ClassBase::Divergent(_) => "Divergent",
             ClassBase::Protocol => "Protocol",
             ClassBase::Generic => "Generic",
@@ -233,6 +228,7 @@ impl<'db> ClassBase<'db> {
                 | KnownInstanceType::Deprecated(_)
                 | KnownInstanceType::Field(_)
                 | KnownInstanceType::ConstraintSet(_)
+                | KnownInstanceType::ConstraintSetSolution(_)
                 | KnownInstanceType::Callable(_)
                 | KnownInstanceType::GenericContext(_)
                 | KnownInstanceType::Specialization(_)
@@ -246,7 +242,8 @@ impl<'db> ClassBase<'db> {
                 // wrappers are just identity callables at runtime, so this sort of inheritance
                 // doesn't work and isn't allowed.
                 | KnownInstanceType::NewType(_)
-                | KnownInstanceType::FunctoolsPartial(_) => None,
+                | KnownInstanceType::FunctoolsPartial(_)
+                | KnownInstanceType::FunctoolsPartialCall(_) => None,
                 KnownInstanceType::TypeGenericAlias(_) => {
                     Self::try_from_type(db, KnownClass::Type.to_class_literal(db), subclass)
                 }

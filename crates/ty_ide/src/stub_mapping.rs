@@ -32,12 +32,17 @@ impl<'db> StubMapper<'db> {
         &self,
         def: ResolvedDefinition<'db>,
     ) -> impl Iterator<Item = ResolvedDefinition<'db>> {
-        if let Some(definitions) =
-            map_stub_definition(self.db, &def, self.cached_vendored_root.as_deref())
-        {
+        if let Some(definitions) = self.map_definition_to_source(&def) {
             return Either::Left(definitions.into_iter());
         }
         Either::Right(std::iter::once(def))
+    }
+
+    pub(crate) fn map_definition_to_source(
+        &self,
+        def: &ResolvedDefinition<'db>,
+    ) -> Option<Vec<ResolvedDefinition<'db>>> {
+        map_stub_definition(self.db, def, self.cached_vendored_root.as_deref())
     }
 
     /// Map multiple `ResolvedDefinitions`, applying stub-to-source mapping to each.

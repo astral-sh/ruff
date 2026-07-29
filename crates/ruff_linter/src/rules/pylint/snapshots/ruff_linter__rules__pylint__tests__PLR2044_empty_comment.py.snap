@@ -57,7 +57,6 @@ PLR2044 [*] Line with empty comment
 17 | def foo():  # this comment is OK, the one below is not
 18 |     pass  #
    |           ^
-   |
 help: Delete the empty comment
    |
 17 | def foo():  # this comment is OK, the one below is not
@@ -104,7 +103,6 @@ PLR2044 [*] Line with empty comment
 57 | α = 1
 58 | α#
    |  ^
-   |
 help: Delete the empty comment
    |
 57 | α = 1

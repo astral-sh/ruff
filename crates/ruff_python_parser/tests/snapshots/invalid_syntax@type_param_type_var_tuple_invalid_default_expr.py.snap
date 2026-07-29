@@ -362,7 +362,6 @@ Module(
 4 | type X[*Ts = yield from x] = int
 5 | type X[*Ts = x := int] = int
   |                ^^ Syntax Error: Expected `,`, found `:=`
-  |
 
 
 ## Semantic Syntax Errors
@@ -391,4 +390,3 @@ Module(
 4 | type X[*Ts = yield from x] = int
 5 | type X[*Ts = x := int] = int
   |                   ^^^ Syntax Error: non default type parameter `int` follows default type parameter
-  |

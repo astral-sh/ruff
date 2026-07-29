@@ -72,10 +72,12 @@ pub struct DynamicClassLiteral<'db> {
     /// Whether the namespace is dynamic (not a literal dict, or contains
     /// non-string-literal keys). When true, attribute lookups on this class
     /// and its instances return `Unknown` instead of failing.
+    #[returns(copy)]
     pub has_dynamic_namespace: bool,
 
     /// Dataclass parameters if this class has been wrapped with `@dataclass` decorator
     /// or passed to `dataclass()` as a function.
+    #[returns(copy)]
     pub dataclass_params: Option<DataclassParams<'db>>,
 }
 
@@ -84,7 +86,7 @@ pub struct DynamicClassLiteral<'db> {
 /// This enum provides stable identity for `DynamicClassLiteral`:
 /// - For assigned calls, the `Definition` uniquely identifies the class.
 /// - For dangling calls, a relative offset provides stable identity.
-#[derive(Clone, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue)]
 pub enum DynamicClassAnchor<'db> {
     /// The call is assigned to a variable.
     ///
@@ -395,10 +397,9 @@ impl<'db> DynamicClassLiteral<'db> {
         policy: MemberLookupPolicy,
     ) -> PlaceAndQualifiers<'db> {
         // Check if this dynamic class is dataclass-like (via dataclass_transform inheritance).
-        if matches!(
-            CodeGeneratorKind::from_class(db, self.into()),
-            Some(CodeGeneratorKind::DataclassLike(_))
-        ) {
+        if CodeGeneratorKind::from_class(db, self.into())
+            .is_some_and(CodeGeneratorKind::is_dataclass_like)
+        {
             if name == "__dataclass_fields__" {
                 // Make this class look like a subclass of the `DataClassInstance` protocol.
                 return Place::declared(KnownClass::Dict.to_specialized_instance(

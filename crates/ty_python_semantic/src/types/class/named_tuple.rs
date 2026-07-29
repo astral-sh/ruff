@@ -57,7 +57,7 @@ pub(super) fn synthesize_namedtuple_class_member<'db>(
 
             let signature = Signature::new_generic(
                 Some(generic_context),
-                Parameters::new(db, parameters),
+                Parameters::standard(parameters),
                 self_ty,
             );
             Some(Type::function_like_callable(db, signature))
@@ -102,7 +102,7 @@ pub(super) fn synthesize_namedtuple_class_member<'db>(
                     .with_definition(field.definition)
             }));
 
-            let signature = Signature::new(Parameters::new(db, parameters), self_ty);
+            let signature = Signature::new(Parameters::standard(parameters), self_ty);
             Some(Type::function_like_callable(db, signature))
         }
         "__init__" => {
@@ -121,7 +121,7 @@ pub(super) fn synthesize_namedtuple_class_member<'db>(
     }
 }
 
-#[derive(Debug, salsa::Update, get_size2::GetSize, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, get_size2::GetSize, Clone, PartialEq, Eq, Hash, salsa::SalsaValue)]
 pub struct NamedTupleField<'db> {
     pub(crate) name: Name,
     pub(crate) ty: Type<'db>,
@@ -438,6 +438,7 @@ impl<'db> DynamicNamedTupleLiteral<'db> {
 
     fn spec(self, db: &'db dyn Db) -> NamedTupleSpec<'db> {
         #[salsa::tracked(
+            returns(copy),
             cycle_initial=|db, _, _| NamedTupleSpec::unknown(db),
             heap_size=ruff_memory_usage::heap_size
         )]
@@ -481,7 +482,7 @@ impl<'db> DynamicNamedTupleLiteral<'db> {
 /// This enum provides stable identity for `DynamicNamedTupleLiteral` instances:
 /// - For assigned calls, the `Definition` uniquely identifies the class.
 /// - For dangling calls, a relative offset provides stable identity.
-#[derive(Clone, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue)]
 pub enum DynamicNamedTupleAnchor<'db> {
     /// We're dealing with a `collections.namedtuple()` call
     /// that's assigned to a variable.
@@ -566,6 +567,7 @@ pub struct NamedTupleSpec<'db> {
     #[returns(deref)]
     pub(crate) fields: Box<[NamedTupleField<'db>]>,
 
+    #[returns(copy)]
     pub(crate) has_known_fields: bool,
 }
 
@@ -622,10 +624,7 @@ impl get_size2::GetSize for NamedTupleSpec<'_> {}
 /// Create a property type for a namedtuple field.
 fn create_field_property<'db>(db: &'db dyn Db, field_ty: Type<'db>) -> Type<'db> {
     let property_getter_signature = Signature::new(
-        Parameters::new(
-            db,
-            [Parameter::positional_only(Some(Name::new_static("self")))],
-        ),
+        Parameters::standard([Parameter::positional_only(Some(Name::new_static("self")))]),
         field_ty,
     );
     let property_getter = Type::single_callable(db, property_getter_signature);

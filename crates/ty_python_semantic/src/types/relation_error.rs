@@ -136,8 +136,17 @@ pub(crate) enum ErrorContext<'db> {
         member_name: Name,
         ty: Type<'db>,
     },
+    ProtocolSpecialMethodNotDefinedOnMetaType,
     ProtocolMemberIncompatible {
         member_name: Name,
+    },
+    ProtocolMemberReadTypeIncompatible {
+        source: Type<'db>,
+        target: Type<'db>,
+    },
+    ProtocolMemberNotWritable,
+    ProtocolMemberWriteTypeIncompatible {
+        target: Type<'db>,
     },
 }
 
@@ -347,9 +356,23 @@ impl<'db> ErrorContext<'db> {
                 "protocol member `{member_name}` is not defined on type `{}`",
                 ty.display(db),
             ),
+            Self::ProtocolSpecialMethodNotDefinedOnMetaType => {
+                "special methods must be defined on the meta-type when matching a protocol"
+                    .to_string()
+            }
             Self::ProtocolMemberIncompatible { member_name } => {
                 format!("protocol member `{member_name}` is incompatible")
             }
+            Self::ProtocolMemberReadTypeIncompatible { source, target } => format!(
+                "read type `{source}` is not assignable to `{target}`",
+                source = source.display(db),
+                target = target.display(db),
+            ),
+            Self::ProtocolMemberNotWritable => "the member is not writable".to_string(),
+            Self::ProtocolMemberWriteTypeIncompatible { target } => format!(
+                "the member does not accept writes of type `{}`",
+                target.display(db),
+            ),
         })
     }
 }
@@ -478,11 +501,10 @@ impl<'db> ErrorContextTree<'db> {
     }
 
     /// Push a new error context node, making the existing tree a child of the new context.
-    pub(crate) fn push(&self, get_context: impl FnOnce() -> ErrorContext<'db>) {
+    pub(crate) fn push(&self, context: ErrorContext<'db>) {
         if !self.is_enabled() {
             return;
         }
-        let context = get_context();
         let root = self.root.take();
         let children = if root.is_empty() { vec![] } else { vec![root] };
         *self.root.borrow_mut() = ErrorContextNode { context, children };

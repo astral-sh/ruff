@@ -20,7 +20,7 @@ use crate::rules::flake8_datetimez::helpers::{self, DatetimeModuleAntipattern};
 /// always use timezone-aware objects.
 ///
 /// `datetime.datetime.fromtimestamp(ts)` or
-/// `datetime.datetime.fromtimestampe(ts, tz=None)` returns a naive datetime
+/// `datetime.datetime.fromtimestamp(ts, tz=None)` returns a naive datetime
 /// object. Instead, use `datetime.datetime.fromtimestamp(ts, tz=<timezone>)`
 /// to create a timezone-aware object.
 ///

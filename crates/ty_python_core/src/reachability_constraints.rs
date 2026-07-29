@@ -29,7 +29,7 @@ use crate::rank::{RankBitBox, RankBitBoxVec};
 ///
 /// reachability constraints are normalized, so equivalent constraints are guaranteed to have equal
 /// IDs.
-#[derive(Clone, Copy, Eq, Hash, PartialEq, salsa::Update, get_size2::GetSize)]
+#[derive(Clone, Copy, Eq, Hash, PartialEq, get_size2::GetSize)]
 pub struct ScopedReachabilityConstraintId(u32);
 
 impl std::fmt::Debug for ScopedReachabilityConstraintId {
@@ -137,7 +137,7 @@ const SMALLEST_TERMINAL: ScopedReachabilityConstraintId = ALWAYS_FALSE;
 const MAX_INTERIOR_NODES: usize = 512 * 1024;
 
 /// A collection of reachability constraints for a given scope.
-#[derive(Debug, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
+#[derive(Debug, PartialEq, Eq, get_size2::GetSize)]
 pub struct ReachabilityConstraints {
     /// The interior TDD nodes that were marked as used when being built.
     used_interiors: Box<[InteriorNode]>,

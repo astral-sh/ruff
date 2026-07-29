@@ -88,6 +88,9 @@ impl<'a> Printer<'a> {
     }
 
     /// Prints a single element and push the following elements to queue
+    // LLVM considers this function too large to inline on its own, but it is called for every
+    // element visited by the printing loop.
+    #[inline(always)]
     fn print_element(
         &mut self,
         stack: &mut PrintCallStack,
@@ -438,6 +441,10 @@ impl<'a> Printer<'a> {
         Ok(print_mode)
     }
 
+    // LLVM considers this function too large to inline on its own, but it is called for every
+    // text element visited by the printing loop.
+    #[expect(clippy::inline_always)]
+    #[inline(always)]
     fn print_text(&mut self, text: Text) {
         if !self.state.pending_indent.is_empty() {
             let indent = std::mem::take(&mut self.state.pending_indent);

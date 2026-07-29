@@ -1,4 +1,4 @@
-from _curses import window
+from _curses import window as _window
 from typing import Final, final
 
 __version__: Final[str]
@@ -30,7 +30,7 @@ class panel:
     def move(self, y: int, x: int, /) -> None:
         """Move the panel to the screen coordinates (y, x)."""
 
-    def replace(self, win: window, /) -> None:
+    def replace(self, win: _window, /) -> None:
         """Change the window associated with the panel to the window win."""
 
     def set_userptr(self, obj: object, /) -> None:
@@ -48,13 +48,13 @@ class panel:
     def userptr(self) -> object:
         """Return the user pointer for the panel."""
 
-    def window(self) -> window:
+    def window(self) -> _window:
         """Return the window object associated with the panel."""
 
 def bottom_panel() -> panel:
     """Return the bottom panel in the panel stack."""
 
-def new_panel(win: window, /) -> panel:
+def new_panel(win: _window, /) -> panel:
     """Return a panel object, associating it with the given window win.
 
     The new panel is placed on top of the panel stack.

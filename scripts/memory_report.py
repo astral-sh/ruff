@@ -224,9 +224,7 @@ def render_summary(projects: list[ProjectComparison]) -> str:
             )
 
             for name, old_bytes, new_bytes in item_diffs[:MAX_CHANGED_ITEMS]:
-                outcome = format_outcome(
-                    old_bytes=proj.old.total_bytes, new_bytes=proj.new.total_bytes
-                )
+                outcome = format_outcome(old_bytes=old_bytes, new_bytes=new_bytes)
 
                 lines.append(
                     f"| `{name}` | {format_bytes(old_bytes)} | "

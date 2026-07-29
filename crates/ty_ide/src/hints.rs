@@ -41,7 +41,7 @@ impl HintKind {
 }
 
 pub fn hints(db: &dyn Db, file: File) -> Vec<Hint> {
-    if !db.project().should_check_file(db, file) {
+    if !db.should_check_file(file) {
         return Vec::new();
     }
 

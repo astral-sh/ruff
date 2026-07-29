@@ -74,15 +74,7 @@ impl<I: Idx, T> FromIterator<T> for FrozenIndexVec<I, T> {
 #[expect(unsafe_code)]
 unsafe impl<I: Idx, T> Send for FrozenIndexVec<I, T> where T: Send {}
 
+// SAFETY: `FrozenIndexVec` owns its elements; `I` is only a marker.
 #[expect(unsafe_code)]
 #[cfg(feature = "salsa")]
-unsafe impl<I, T> salsa::Update for FrozenIndexVec<I, T>
-where
-    T: salsa::Update,
-{
-    #[expect(unsafe_code)]
-    unsafe fn maybe_update(old_pointer: *mut Self, new_value: Self) -> bool {
-        let old_box: &mut FrozenIndexVec<I, T> = unsafe { &mut *old_pointer };
-        unsafe { salsa::Update::maybe_update(&raw mut old_box.raw, new_value.raw) }
-    }
-}
+unsafe impl<I, T: salsa::SalsaValue> salsa::SalsaValue for FrozenIndexVec<I, T> {}

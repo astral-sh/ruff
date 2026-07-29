@@ -46,6 +46,27 @@ while 1:
     y = (y, *y)
 ```
 
+## Generic `NamedTuple` with recursive fields
+
+This is a regression test for <https://github.com/astral-sh/ty/issues/3872>. Computing the
+`NamedTuple` fields while building the class's MRO must not try to determine whether the same class
+is a `TypedDict`.
+
+```toml
+[environment]
+python-version = "3.14"
+```
+
+```py
+from typing import NamedTuple
+
+class Node[KT, VT](NamedTuple):
+    children: tuple[Node[KT, VT], ...] | tuple[Leaf[VT], ...]
+
+class Leaf[VT](NamedTuple):
+    values: tuple[VT, ...]
+```
+
 ## Literal reduction during cycle recovery
 
 This is a regression test for <https://github.com/astral-sh/ty/issues/3851>. Constructing a union
@@ -165,7 +186,7 @@ falling back to `Unknown` for the type of the default value, which does not have
 impact except for the displayed type. We could also consider inferring `Divergent` when we encounter
 too many layers of nesting (instead of just one), but that would require a type traversal which
 could have performance implications. So for now, we mainly make sure not to panic or stack overflow
-for these seeminly rare cases.
+for these seemingly rare cases.
 
 ### Functions
 
@@ -245,6 +266,33 @@ class Cyclic:
 reveal_type(Cyclic("").data)
 ```
 
+## Cycle normalization preserves non-gradual variadic parameters
+
+Normalizing a recursive implicit-attribute type does not reinterpret specialized variadic parameters
+as gradual:
+
+```py
+from typing import Any, Callable, Generic, TypeVar
+from ty_extensions import static_assert
+from ty_extensions._internal import TypeOf, is_subtype_of
+
+T = TypeVar("T")
+flag: bool
+
+class C(Generic[T]):
+    def method(self, *args: T, **kwargs: T) -> None: ...
+
+c = C[Any]()
+
+class Recursive:
+    def __init__(self, other: "Recursive"):
+        self.callback = c.method if flag else other.callback
+
+def check(value: Recursive):
+    reveal_type(value.callback)  # revealed: bound method C[Any].method(*args: Any, **kwargs: Any) -> None
+    static_assert(is_subtype_of(TypeOf[value.callback], Callable[[], None]))
+```
+
 ## Decorated methods with implicit class attributes
 
 This is a regression test for <https://github.com/astral-sh/ty/issues/3471>.
@@ -295,7 +343,7 @@ from typing import NamedTuple, NewType
 X = NamedTuple("X", [("x", "X")]), None  # error: [invalid-type-form]
 
 list(X)
-min(X)
+min(X)  # error: [invalid-argument-type]
 T = f()
 
 X = NewType("X", C)
@@ -315,7 +363,7 @@ from typing import NamedTuple, NewType
 
 X = NewType("X", C)
 Y = NamedTuple("Y", [("a", "Y")]), X  # error: [invalid-type-form]
-min(Y)
+min(Y)  # error: [invalid-argument-type]
 T = f()
 ```
 
@@ -359,7 +407,7 @@ reveal_type(Derived.decorate)
 `derived.py`:
 
 ```py
-from ty_extensions import reveal_mro
+from ty_extensions._internal import reveal_mro
 import bases
 
 class Derived(bases.GenericBase["Foo", "Bar"]): ...
@@ -385,7 +433,7 @@ reveal_mro(Bar)
 
 ```py
 from typing import Generic, TypeVar, Type
-from ty_extensions import reveal_mro
+from ty_extensions._internal import reveal_mro
 
 T = TypeVar("T")
 B1 = TypeVar("B1", bound="Foo")

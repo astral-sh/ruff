@@ -17,7 +17,7 @@ const LINEAR_SEARCH_THRESHOLD: usize = 16;
 pub struct ScopedSymbolId;
 
 /// A symbol in a given scope.
-#[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize, salsa::Update)]
+#[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize)]
 pub struct Symbol {
     name: Name,
     flags: SymbolFlags,
@@ -273,7 +273,7 @@ impl SymbolTableBuilder {
     }
 
     /// Add a new symbol to this scope or update the flags if a symbol with the same name already exists.
-    pub(super) fn add(&mut self, mut symbol: Symbol) -> (ScopedSymbolId, bool) {
+    pub(super) fn add(&mut self, symbol: Symbol) -> (ScopedSymbolId, bool) {
         let entry = self.reverse.entry(&self.table.symbols, &symbol);
 
         match entry {
@@ -287,7 +287,6 @@ impl SymbolTableBuilder {
                 (id, false)
             }
             Entry::Vacant(entry) => {
-                symbol.name.shrink_to_fit();
                 let id = self.table.symbols.push(symbol);
                 entry.insert(id);
                 (id, true)

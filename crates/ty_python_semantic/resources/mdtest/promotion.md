@@ -61,6 +61,15 @@ reveal_type(promote(x5))  # revealed: list[int | float]
 x6 = 3.14j
 reveal_type(x6)  # revealed: complex
 reveal_type(promote(x6))  # revealed: list[int | float | complex]
+
+def _(source: Literal["foo", "bar"]):
+    x7 = f"hello"
+    reveal_type(x7)  # revealed: Literal["hello"]
+    reveal_type(promote(x7))  # revealed: list[str]
+
+    x8 = f"hello:{source}"
+    reveal_type(x8)  # revealed: LiteralString
+    reveal_type(promote(x8))  # revealed: list[str]
 ```
 
 Function types are also promoted to their `Callable` form:
@@ -378,6 +387,19 @@ def _(c: Consumer[Intersection[A, Not[AlwaysFalsy]]], p: Producer[Intersection[A
     reveal_type(p)  # revealed: Producer[A & ~AlwaysFalsy]
     reveal_type([c])  # revealed: list[Consumer[A & ~AlwaysFalsy]]
     reveal_type([p])  # revealed: list[Producer[A]]
+```
+
+A callable can use the same type in both a contravariant parameter and a covariant return. When the
+callable is promoted as a list element, these positions must be transformed independently: the
+parameter keeps the narrowed type, while the return type is promoted.
+
+```py
+type NarrowA = Intersection[A, Not[AlwaysFalsy]]
+
+def transform(value: NarrowA) -> NarrowA:
+    return value
+
+reveal_type([transform])  # revealed: list[(value: NarrowA) -> A]
 ```
 
 ## Literal annotations are respected

@@ -592,7 +592,7 @@ impl<'db> Imports<'db> {
         &self,
         db: &'db dyn Db,
         importing_file: File,
-        name: &Name,
+        name: &ModuleName,
     ) -> Option<&'db FlatSymbols> {
         let module_name = match self.module_names.get(name.as_str())? {
             ImportModuleKind::Definitive(name) | ImportModuleKind::Possible(name) => {
@@ -973,7 +973,10 @@ impl<'db> SymbolVisitor<'db> {
                 if attr != "__all__" {
                     return false;
                 }
-                let possible_module_name = Name::new(rest.join("."));
+                let Some(possible_module_name) = ModuleName::from_components(rest.iter().copied())
+                else {
+                    return false;
+                };
                 let Some(symbols) =
                     self.imports
                         .get_module_symbols(self.db, self.file, &possible_module_name)
@@ -2970,7 +2973,7 @@ class C: ...
 
     impl PublicTestBuilder {
         pub(super) fn build(&self) -> PublicTest {
-            let metadata = ProjectMetadata::new("test".into(), SystemPathBuf::from("/"));
+            let metadata = ProjectMetadata::new("test", SystemPathBuf::from("/"));
             let mut db = TestDb::new(metadata);
 
             db.init_program_with_python_version(self.python_version.unwrap_or_default())

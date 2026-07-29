@@ -42,7 +42,7 @@ fn get_symbol<'db>(
 fn assert_diagnostic_messages(diagnostics: &[Diagnostic], expected: &[&str]) {
     let messages: Vec<&str> = diagnostics
         .iter()
-        .map(Diagnostic::primary_message)
+        .map(Diagnostic::headline_message)
         .collect();
     assert_eq!(&messages, expected);
 }
@@ -70,6 +70,47 @@ fn assert_revealed_type(db: &TestDb, filename: &str, expected: &str) {
             .and_then(|annotation| annotation.get_message()),
         Some(expected.as_str())
     );
+}
+
+#[test]
+fn expected_types_are_collected_only_for_open_files() -> anyhow::Result<()> {
+    let has_expected_type = |open_file: bool| -> anyhow::Result<bool> {
+        let mut db = setup_db();
+        db.write_dedented(
+            "src/a.py",
+            r#"
+            from typing_extensions import Literal
+
+            value: Literal["apple", "banana"] = "app"
+            "#,
+        )?;
+
+        let file = system_path_to_file(&db, "src/a.py").expect("file to exist");
+        if open_file {
+            db.open_file(file);
+        }
+
+        let module = parsed_module(&db, file).load(&db);
+        let assignment = module.syntax().body[1]
+            .as_ann_assign_stmt()
+            .expect("annotated assignment");
+        let string_expr = assignment
+            .value
+            .as_deref()
+            .expect("annotated assignment to have a value")
+            .as_string_literal_expr()
+            .expect("string literal value");
+        let scope = global_scope(&db, file);
+
+        Ok(infer_complete_scope_types(&db, scope)
+            .try_expected_type(ruff_python_ast::ExprRef::from(string_expr))
+            .is_some())
+    };
+
+    assert!(!has_expected_type(false)?);
+    assert!(has_expected_type(true)?);
+
+    Ok(())
 }
 
 #[test]
@@ -292,19 +333,34 @@ fn pep695_type_params() {
     check_typevar("Y", "TypeVar", None, None, None);
 }
 
+#[test]
+fn simple_assignment_does_not_enter_salsa_cycle() {
+    let mut db = setup_db();
+    db.write_dedented("src/a.py", "x = 1; y = x + 1").unwrap();
+
+    assert_file_diagnostics(&db, "src/a.py", &[]);
+
+    let events = db.take_salsa_events();
+    let cycles = salsa::attach(&db, || {
+        events
+            .iter()
+            .filter_map(|event| {
+                if let salsa::EventKind::WillIterateCycle { database_key, .. } = event.kind {
+                    Some(format!("{database_key:?}"))
+                } else {
+                    None
+                }
+            })
+            .collect::<Vec<_>>()
+    });
+    assert_eq!(cycles, Vec::<String>::new());
+}
+
 /// Test that a symbol known to be unbound in a scope does not still trigger cycle-causing
 /// reachability-constraint checks in that scope.
 #[test]
 fn unbound_symbol_no_reachability_constraint_check() {
     let mut db = setup_db();
-
-    // First, type-check a random other file so that we cache a result for the `module_type_symbols`
-    // query (which often encounters cycles due to `types.pyi` importing `typing_extensions` and
-    // `typing_extensions.pyi` importing `types`). Clear the events afterwards so that unrelated
-    // cycles from that query don't interfere with our test.
-    db.write_dedented("src/wherever.py", "print(x)").unwrap();
-    assert_file_diagnostics(&db, "src/wherever.py", &["Name `x` used when not defined"]);
-    db.clear_salsa_events();
 
     // If the bug we are testing for is not fixed, what happens is that when inferring the
     // `flag: bool = True` definitions, we look up `bool` as a deferred name (thus from end of

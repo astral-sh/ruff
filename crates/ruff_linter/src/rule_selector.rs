@@ -15,6 +15,10 @@ use crate::rule_redirects::get_redirect;
 use crate::settings::types::PreviewMode;
 use crate::warn_user_once_by_message;
 
+/// A potential rule selector that has not yet been validated and tracks its source.
+///
+/// If you add a new field that uses this type, be sure to update `rule-codes-in-selectors`
+/// (`RUF201`) to validate the additional selector field.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
 #[serde(transparent)]
 pub struct UnresolvedRuleSelector(RangedValue<String>);
@@ -102,6 +106,7 @@ impl std::fmt::Display for RuleResolutionError {
             ValueSource::File(path) => format_args!("`{}`", path.as_path()),
             ValueSource::Cli => format_args!("the CLI"),
             ValueSource::Editor => format_args!("the editor configuration"),
+            ValueSource::UvWorkspace => format_args!("uv workspace metadata"),
         };
         match kind {
             RuleResolutionErrorKind::Removed => {

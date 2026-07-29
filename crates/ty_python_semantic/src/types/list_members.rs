@@ -249,21 +249,30 @@ impl<'db> AllMembers<'db> {
                 SubclassOfInner::Dynamic(_) => {
                     self.extend_with_type(db, KnownClass::Type.to_instance(db));
                 }
+                SubclassOfInner::Protocol(protocol) => {
+                    if let Some((class_literal, _)) = protocol
+                        .class_origin(db)
+                        .and_then(|origin| origin.static_class_literal(db))
+                    {
+                        self.extend_with_class_members(db, ty, ClassLiteral::Static(class_literal));
+                        self.extend_with_synthetic_members(
+                            db,
+                            ty,
+                            ClassLiteral::Static(class_literal),
+                        );
+                    }
+                    // A structural implementation can use any metaclass, so only members of
+                    // `type` itself are guaranteed in addition to the protocol interface.
+                    self.extend_with_type(db, KnownClass::Type.to_instance(db));
+                }
                 _ => {
-                    if let Some(class_type) = subclass_of_type.subclass_of().into_class(db) {
-                        if let Some((class_literal, _)) = class_type.static_class_literal(db) {
-                            self.extend_with_class_members(
-                                db,
-                                ty,
-                                ClassLiteral::Static(class_literal),
-                            );
-                            self.extend_with_synthetic_members(
-                                db,
-                                ty,
-                                ClassLiteral::Static(class_literal),
-                            );
-                            self.extend_with_metaclass_members(db, ty, class_literal.metaclass(db));
-                        }
+                    if let Some(class_type) = subclass_of_type.subclass_of().into_class(db)
+                        && let Some((class_literal, _)) = class_type.static_class_literal(db)
+                    {
+                        let static_class = ClassLiteral::Static(class_literal);
+                        self.extend_with_class_members(db, ty, static_class);
+                        self.extend_with_synthetic_members(db, ty, static_class);
+                        self.extend_with_metaclass_members(db, ty, class_literal.metaclass(db));
                     }
                 }
             },
@@ -348,7 +357,7 @@ impl<'db> AllMembers<'db> {
 
             Type::ModuleLiteral(literal) => {
                 // Looking up `__file__` on `types.ModuleType` will not give as precise a type
-                // as we infer in type inference, but it's confuisng if autocomplete etc.
+                // as we infer in type inference, but it's confusing if autocomplete etc.
                 // shows a different type in the tooltip to the one inferred by the type checker.
                 let dunder_file_type = if literal.module(db).file(db).is_some() {
                     KnownClass::Str.to_instance(db)
@@ -393,6 +402,7 @@ impl<'db> AllMembers<'db> {
                                     Some(
                                         KnownClass::TypeVar
                                             | KnownClass::TypeVarTuple
+                                            | KnownClass::ExtensionsTypeVarTuple
                                             | KnownClass::ParamSpec
                                             | KnownClass::UnionType
                                     )
@@ -571,8 +581,14 @@ impl<'db> AllMembers<'db> {
                 }
             }
             Some(CodeGeneratorKind::TypedDict) => {}
-            Some(CodeGeneratorKind::DataclassLike(_)) => {
-                for attr in SYNTHETIC_DATACLASS_ATTRIBUTES {
+            Some(kind @ (CodeGeneratorKind::DataclassLike(_) | CodeGeneratorKind::Pydantic(_))) => {
+                let synthetic_attributes: &[&str] = if kind.is_pydantic() {
+                    &["__replace__"]
+                } else {
+                    SYNTHETIC_DATACLASS_ATTRIBUTES
+                };
+
+                for attr in synthetic_attributes {
                     if let Place::Defined(DefinedPlace {
                         ty: synthetic_member,
                         ..

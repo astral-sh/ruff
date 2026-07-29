@@ -1624,6 +1624,11 @@ impl StringLiteralFlags {
         self
     }
 
+    /// Returns `true` if the parser deemed the string literal invalid.
+    pub const fn is_invalid(self) -> bool {
+        self.0.contains(StringLiteralFlagsInner::INVALID)
+    }
+
     pub const fn prefix(self) -> StringLiteralPrefix {
         if self.0.contains(StringLiteralFlagsInner::U_PREFIX) {
             debug_assert!(
@@ -2045,6 +2050,11 @@ impl BytesLiteralFlags {
         self
     }
 
+    /// Returns `true` if the parser deemed the bytes literal invalid.
+    pub const fn is_invalid(self) -> bool {
+        self.0.contains(BytesLiteralFlagsInner::INVALID)
+    }
+
     pub const fn prefix(self) -> ByteStringPrefix {
         if self.0.contains(BytesLiteralFlagsInner::R_PREFIX_LOWER) {
             debug_assert!(!self.0.contains(BytesLiteralFlagsInner::R_PREFIX_UPPER));
@@ -2134,6 +2144,16 @@ impl BytesLiteral {
             node_index: AtomicNodeIndex::NONE,
             flags: BytesLiteralFlags::empty().with_invalid(),
         }
+    }
+
+    /// The range of the byte literal's contents.
+    ///
+    /// This excludes any prefixes, opening quotes or closing quotes.
+    pub fn content_range(&self) -> TextRange {
+        TextRange::new(
+            self.start() + self.flags.opener_len(),
+            self.end() - self.flags.closer_len(),
+        )
     }
 }
 
@@ -3896,16 +3916,16 @@ mod tests {
     #[test]
     #[cfg(target_pointer_width = "64")]
     fn size() {
-        assert_eq!(std::mem::size_of::<Stmt>(), 96);
-        assert_eq!(std::mem::size_of::<StmtFunctionDef>(), 96);
-        assert_eq!(std::mem::size_of::<StmtClassDef>(), 88);
+        assert_eq!(std::mem::size_of::<Stmt>(), 88);
+        assert_eq!(std::mem::size_of::<StmtFunctionDef>(), 88);
+        assert_eq!(std::mem::size_of::<StmtClassDef>(), 80);
         assert_eq!(std::mem::size_of::<StmtTry>(), 64);
         assert_eq!(std::mem::size_of::<Mod>(), 32);
-        assert_eq!(std::mem::size_of::<Pattern>(), 80);
+        assert_eq!(std::mem::size_of::<Pattern>(), 72);
         assert_eq!(std::mem::size_of::<Parameters>(), 56);
         assert_eq!(std::mem::size_of::<Arguments>(), 40);
         assert_eq!(std::mem::size_of::<Expr>(), 72);
-        assert_eq!(std::mem::size_of::<ExprAttribute>(), 64);
+        assert_eq!(std::mem::size_of::<ExprAttribute>(), 56);
         assert_eq!(std::mem::size_of::<ExprAwait>(), 24);
         assert_eq!(std::mem::size_of::<ExprBinOp>(), 32);
         assert_eq!(std::mem::size_of::<ExprBoolOp>(), 40);
@@ -3923,7 +3943,7 @@ mod tests {
         assert_eq!(std::mem::size_of::<ExprLambda>(), 32);
         assert_eq!(std::mem::size_of::<ExprList>(), 40);
         assert_eq!(std::mem::size_of::<ExprListComp>(), 48);
-        assert_eq!(std::mem::size_of::<ExprName>(), 40);
+        assert_eq!(std::mem::size_of::<ExprName>(), 32);
         assert_eq!(std::mem::size_of::<ExprNamed>(), 32);
         assert_eq!(std::mem::size_of::<ExprNoneLiteral>(), 12);
         assert_eq!(std::mem::size_of::<ExprNumberLiteral>(), 40);

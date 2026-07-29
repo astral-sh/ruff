@@ -32,7 +32,7 @@ use ruff_text_size::Ranged;
 /// This means that changes to expressions in other scopes don't invalidate the expression's id, giving
 /// us some form of scope-stable identity for expressions. Only queries accessing the node field
 /// run on every AST change. All other queries only run when the expression's identity changes.
-#[derive(Clone, salsa::Update)]
+#[derive(Clone)]
 pub struct AstNodeRef<T> {
     /// The index of the node in the AST.
     index: NodeIndex,
@@ -48,9 +48,6 @@ pub struct AstNodeRef<T> {
     #[cfg(debug_assertions)]
     file: File,
 
-    // Always consider the node changed because its identity also depends on the module address,
-    // which is omitted in release builds. Customizing this field avoids requiring `T: Update`.
-    #[update(unsafe(with(|_, _| true)))]
     _node: PhantomData<T>,
 }
 
@@ -113,18 +110,17 @@ where
     for<'ast> &'ast T: TryFrom<AnyRootNodeRef<'ast>>,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        #[cfg(debug_assertions)]
-        {
-            f.debug_struct("AstNodeRef")
-                .field("kind", &self.kind)
-                .field("range", &self.range)
-                .finish()
-        }
-
-        #[cfg(not(debug_assertions))]
-        {
-            // Unfortunately we have no access to the AST here.
-            f.debug_tuple("AstNodeRef").finish_non_exhaustive()
+        cfg_select! {
+            debug_assertions => {
+                f.debug_struct("AstNodeRef")
+                    .field("kind", &self.kind)
+                    .field("range", &self.range)
+                    .finish()
+            },
+            _ => {
+                // Unfortunately we have no access to the AST here.
+                f.debug_tuple("AstNodeRef").finish_non_exhaustive()
+            },
         }
     }
 }

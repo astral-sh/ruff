@@ -72,6 +72,19 @@ fn nfkc_normalizes_names() {
 }
 
 #[test]
+fn nfkc_normalizes_dotted_names() {
+    let suite = parse_module("import 𝒞.𝒟").unwrap().into_suite();
+    let [Stmt::Import(import)] = suite.as_slice() else {
+        panic!("expected a single import statement, got {suite:?}");
+    };
+    let [alias] = import.names.as_slice() else {
+        panic!("expected a single import alias, got {:?}", import.names);
+    };
+
+    assert_eq!(alias.name.id.as_str(), "C.D");
+}
+
+#[test]
 fn number_values() {
     let cases = [
         ("1E400", Number::Float(f64::INFINITY)),

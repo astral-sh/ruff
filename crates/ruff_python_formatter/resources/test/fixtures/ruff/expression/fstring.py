@@ -364,7 +364,7 @@ aaaaaaaaaaaaaaaaaa = f"testeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee{
 # Similar to the previous example but we start with the parenthesized layout. This should
 # remove the parentheses and format the f-string on a single line. This shows that the
 # final layout for the formatter is same for this and the previous case. The only
-# difference is that in the previous case the expression is already mulitline which means
+# difference is that in the previous case the expression is already multiline which means
 # the formatter can break it further at the curly braces.
 aaaaaaaaaaaaaaaaaa = (
     f"testeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee{expression}moreeeeeeeeeeeeeeeee"  # comment loooooooong

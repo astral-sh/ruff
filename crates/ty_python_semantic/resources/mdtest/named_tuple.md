@@ -9,7 +9,8 @@ name, and not just by its numeric position within the tuple:
 
 ```py
 from typing import NamedTuple, Sequence
-from ty_extensions import static_assert, is_subtype_of, is_assignable_to, reveal_mro
+from ty_extensions import static_assert
+from ty_extensions._internal import is_subtype_of, is_assignable_to, reveal_mro
 
 class Person(NamedTuple):
     id: int
@@ -139,7 +140,7 @@ The assigned variable name should match the `typename` argument:
 
 ```py
 from typing import NamedTuple
-from ty_extensions import is_subtype_of
+from ty_extensions._internal import is_subtype_of
 
 # error: [mismatched-type-name]
 Mismatch = NamedTuple("WrongName", [("x", int)])
@@ -261,7 +262,7 @@ reveal_type(n.next)  # revealed: Unknown | None
 Dangling calls cannot contain other dangling calls; that's an invalid type form:
 
 ```py
-from ty_extensions import reveal_mro
+from ty_extensions._internal import reveal_mro
 
 # error: [invalid-type-form]
 class A(NamedTuple("B", [("x", NamedTuple("C", [("x", "A | None")]))])):
@@ -302,7 +303,8 @@ from the inferred tuple type. We instead emit a diagnostic:
 
 ```py
 from typing import NamedTuple
-from ty_extensions import static_assert, is_subtype_of, reveal_mro
+from ty_extensions import static_assert
+from ty_extensions._internal import is_subtype_of, reveal_mro
 
 fields = (("host", str), ("port", int))
 # error: [invalid-named-tuple] "Invalid argument to parameter `fields` of `NamedTuple()`: `fields` must be a literal list or tuple"
@@ -375,7 +377,7 @@ python-version = "3.11"
 
 ```py
 from typing import NamedTuple
-from ty_extensions import reveal_mro
+from ty_extensions._internal import reveal_mro
 
 # Variadic tuple - we can't determine the exact fields statically.
 def get_fields() -> tuple[tuple[str, type[int]], *tuple[tuple[str, type[str]], ...]]:
@@ -396,7 +398,7 @@ Similarly for `collections.namedtuple`:
 
 ```py
 import collections
-from ty_extensions import reveal_mro
+from ty_extensions._internal import reveal_mro
 
 def get_field_names() -> tuple[str, *tuple[str, ...]]:
     return ("x", "y")
@@ -418,7 +420,7 @@ properly inherited:
 
 ```py
 from typing import NamedTuple
-from ty_extensions import reveal_mro
+from ty_extensions._internal import reveal_mro
 
 class Url(NamedTuple("Url", [("host", str), ("path", str)])):
     pass
@@ -523,7 +525,7 @@ accepted because the constructor uses a gradual signature:
 
 ```py
 import collections
-from ty_extensions import reveal_mro
+from ty_extensions._internal import reveal_mro
 
 CheckerConfig = ["duration", "video_fps", "audio_sample_rate"]
 GroundTruth = collections.namedtuple("GroundTruth", " ".join(CheckerConfig))
@@ -548,7 +550,7 @@ The `collections.namedtuple` function accepts `str | Iterable[str]` for `field_n
 
 ```py
 import collections
-from ty_extensions import reveal_mro
+from ty_extensions._internal import reveal_mro
 
 # String field names (space-separated)
 Point1 = collections.namedtuple("Point1", "x y")
@@ -622,7 +624,7 @@ well as `rename`, `defaults`, and `module`:
 
 ```py
 import collections
-from ty_extensions import reveal_mro
+from ty_extensions._internal import reveal_mro
 
 # Both `typename` and `field_names` can be passed as keyword arguments
 NT1 = collections.namedtuple(typename="NT1", field_names="x y")
@@ -675,7 +677,7 @@ The `rename`, `defaults`, and `module` keyword arguments:
 
 ```py
 import collections
-from ty_extensions import reveal_mro
+from ty_extensions._internal import reveal_mro
 
 # `rename=True` replaces invalid identifiers with positional names
 Point = collections.namedtuple("Point", ["x", "class", "_y", "z", "z"], rename=True)
@@ -1467,7 +1469,8 @@ all NamedTuple implementations automatically compatible:
 
 ```py
 from typing import NamedTuple, Protocol, Iterable, Any
-from ty_extensions import static_assert, is_assignable_to
+from ty_extensions import static_assert
+from ty_extensions._internal import is_assignable_to
 
 class Point(NamedTuple):
     x: int

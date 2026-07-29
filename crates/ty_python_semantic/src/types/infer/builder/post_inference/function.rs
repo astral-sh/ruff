@@ -162,7 +162,7 @@ fn check_legacy_positional_only_convention<'db>(
                 "Invalid use of the legacy convention \
                     for positional-only parameters",
             );
-            diagnostic.set_primary_message(
+            diagnostic.set_primary_annotation_message(
                 "Parameter name begins with `__` but will not be treated as positional-only",
             );
             diagnostic.info(
@@ -208,7 +208,10 @@ fn check_legacy_typevar_defaults<'db>(
         // by `check_default_for_outer_scope_typevars` in the type parameter scope.
         if !matches!(
             typevar.kind(db),
-            TypeVarKind::LegacyTypeVar | TypeVarKind::Pep613Alias | TypeVarKind::LegacyParamSpec
+            TypeVarKind::LegacyTypeVar
+                | TypeVarKind::Pep613Alias
+                | TypeVarKind::LegacyParamSpec
+                | TypeVarKind::LegacyTypeVarTuple
         ) {
             continue;
         }
@@ -250,7 +253,7 @@ fn check_legacy_typevar_defaults<'db>(
         ));
 
         if is_later_in_list {
-            diagnostic.set_primary_message(format_args!(
+            diagnostic.set_primary_annotation_message(format_args!(
                 "Default of `{typevar_name}` references later type parameter `{}`",
                 bad_typevar.name(db),
             ));
@@ -260,7 +263,7 @@ fn check_legacy_typevar_defaults<'db>(
                 bad_typevar.name(db)
             ));
         } else {
-            diagnostic.set_primary_message(format_args!(
+            diagnostic.set_primary_annotation_message(format_args!(
                 "Default of `{typevar_name}` references out-of-scope type variable `{}`",
                 bad_typevar.name(db),
             ));
@@ -333,7 +336,10 @@ fn check_legacy_typevar_ordering<'db>(
         // Only check legacy TypeVars; PEP 695 ordering is validated by the parser.
         if !matches!(
             typevar.kind(db),
-            TypeVarKind::LegacyTypeVar | TypeVarKind::Pep613Alias | TypeVarKind::LegacyParamSpec
+            TypeVarKind::LegacyTypeVar
+                | TypeVarKind::Pep613Alias
+                | TypeVarKind::LegacyParamSpec
+                | TypeVarKind::LegacyTypeVarTuple
         ) {
             continue;
         }
@@ -386,14 +392,14 @@ fn check_legacy_typevar_ordering<'db>(
     ));
 
     if let [single_typevar] = &*state.invalid_later_tvars {
-        diagnostic.set_primary_message(format_args!(
+        diagnostic.set_primary_annotation_message(format_args!(
             "Type variable `{}` does not have a default",
             single_typevar.name(db),
         ));
     } else {
         let later_typevars =
             format_enumeration(state.invalid_later_tvars.iter().map(|tv| tv.name(db)));
-        diagnostic.set_primary_message(format_args!(
+        diagnostic.set_primary_annotation_message(format_args!(
             "Type variables {later_typevars} do not have defaults",
         ));
     }

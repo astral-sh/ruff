@@ -46,7 +46,7 @@ use crate::scope::FileScopeId;
 ///
 /// `ALWAYS_TRUE` means that no narrowing applies. `ALWAYS_FALSE` means that the path is
 /// impossible.
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, salsa::Update, get_size2::GetSize)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize)]
 pub struct ScopedNarrowingConstraint(u32);
 
 impl ScopedNarrowingConstraint {
@@ -90,7 +90,7 @@ pub struct InteriorNode {
     pub if_false: ScopedNarrowingConstraint,
 }
 
-#[derive(Debug, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
+#[derive(Debug, PartialEq, Eq, get_size2::GetSize)]
 pub struct NarrowingConstraints {
     used_interiors: Box<[InteriorNode]>,
     used_indices: Option<RankBitBox>,

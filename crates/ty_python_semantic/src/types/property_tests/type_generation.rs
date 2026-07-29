@@ -93,7 +93,7 @@ impl CallableParams {
     pub(crate) fn into_parameters(self, db: &TestDb) -> Parameters<'_> {
         match self {
             CallableParams::GradualForm => Parameters::gradual_form(),
-            CallableParams::List(params) => Parameters::new(
+            CallableParams::List(params) => Parameters::from_annotation(
                 db,
                 params.into_iter().map(|param| {
                     let parameter = match param.kind {
@@ -133,7 +133,7 @@ enum ParamKind {
     KeywordVariadic,
 }
 
-#[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
+#[salsa::tracked(returns(copy), heap_size=ruff_memory_usage::heap_size)]
 fn create_bound_method<'db>(
     db: &'db dyn Db,
     function: Type<'db>,
@@ -142,7 +142,7 @@ fn create_bound_method<'db>(
     Type::BoundMethod(BoundMethodType::new(
         db,
         function.expect_function_literal(),
-        builtins_class.to_instance(db).unwrap(),
+        builtins_class.to_instance_approximation(db).unwrap(),
     ))
 }
 
@@ -182,12 +182,12 @@ impl Ty {
             Ty::BuiltinInstance(s) => builtins_symbol(db, s)
                 .place
                 .expect_type()
-                .to_instance(db)
+                .to_instance_approximation(db)
                 .unwrap(),
             Ty::AbcInstance(s) => known_module_symbol(db, KnownModule::Abc, s)
                 .place
                 .expect_type()
-                .to_instance(db)
+                .to_instance_approximation(db)
                 .unwrap(),
             Ty::AbcClassLiteral(s) => known_module_symbol(db, KnownModule::Abc, s)
                 .place
@@ -197,7 +197,7 @@ impl Ty {
                 .expect_type(),
             Ty::UnittestMockInstance => Ty::UnittestMockLiteral
                 .into_type(db)
-                .to_instance(db)
+                .to_instance_approximation(db)
                 .unwrap(),
             Ty::TypingLiteral => Type::SpecialForm(SpecialFormType::Literal),
             Ty::BuiltinClassLiteral(s) => builtins_symbol(db, s).place.expect_type(),
@@ -208,10 +208,10 @@ impl Ty {
             Ty::Intersection { pos, neg } => {
                 let mut builder = IntersectionBuilder::new(db);
                 for p in pos {
-                    builder = builder.add_positive(p.into_type(db));
+                    builder.add_positive_in_place(p.into_type(db));
                 }
                 for n in neg {
-                    builder = builder.add_negative(n.into_type(db));
+                    builder.add_negative_in_place(n.into_type(db));
                 }
                 builder.build()
             }
@@ -505,11 +505,7 @@ fn arbitrary_parameter_list(g: &mut Gen, size: u32, fully_static: bool) -> Vec<P
 }
 
 fn arbitrary_optional_type(g: &mut Gen, size: u32, fully_static: bool) -> Option<Ty> {
-    match u32::arbitrary(g) % 2 {
-        0 => None,
-        1 => Some(arbitrary_type(g, size, fully_static)),
-        _ => unreachable!(),
-    }
+    bool::arbitrary(g).then(|| arbitrary_type(g, size, fully_static))
 }
 
 fn arbitrary_name(g: &mut Gen) -> Name {
@@ -517,11 +513,7 @@ fn arbitrary_name(g: &mut Gen) -> Name {
 }
 
 fn arbitrary_optional_name(g: &mut Gen) -> Option<Name> {
-    match u32::arbitrary(g) % 2 {
-        0 => None,
-        1 => Some(arbitrary_name(g)),
-        _ => unreachable!(),
-    }
+    bool::arbitrary(g).then(|| arbitrary_name(g))
 }
 
 impl Arbitrary for Ty {

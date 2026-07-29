@@ -38,9 +38,9 @@ mod testing;
 /// Returns an iterator over all search paths pointing to a system path
 pub fn system_module_search_paths(db: &dyn Db) -> SystemModuleSearchPathsIter<'_> {
     SystemModuleSearchPathsIter {
-        // Always run in `StubsAllowed` mode because we want to include as much as possible
+        // Always run in `Typing` mode because we want to include as much as possible
         // and we don't care about the "real" stdlib
-        inner: search_paths(db, ModuleResolveMode::StubsAllowed),
+        inner: search_paths(db, ModuleResolveMode::Typing),
     }
 }
 
