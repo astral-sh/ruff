@@ -91,6 +91,10 @@ pub(crate) fn invalid_envvar_default(checker: &Checker, call: &ast::ExprCall) {
         ) {
             return;
         }
+        if is_integer_default_wrapped_in_int(checker, call, expr) {
+            return;
+        }
+
         checker.report_diagnostic(InvalidEnvvarDefault, expr.range());
     }
 }
