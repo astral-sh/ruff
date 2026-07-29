@@ -605,7 +605,8 @@ impl<'db> TypeVarInstance<'db> {
                     | DynamicType::UnknownGeneric(_)
                     | DynamicType::UnspecializedTypeVar
                     | DynamicType::InvalidConcatenateUnknown
-                    | DynamicType::AmbiguousOverload => Parameters::unknown(),
+                    | DynamicType::AmbiguousOverload
+                    | DynamicType::NarrowingBound(_) => Parameters::unknown(),
                 },
                 Type::Divergent(_) => Parameters::unknown(),
                 Type::TypeVar(typevar) if typevar.is_paramspec(db) => {

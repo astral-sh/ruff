@@ -755,8 +755,9 @@ strict-generic-narrowing = false
 
 In `relaxed` mode, narrowing to a generic class using `isinstance()` intersects with its top
 materialization, using specially tagged `object*`/`Never*` bounds for gradual type arguments. These
-bounds behave like `object`/`Never` while the intersection is simplified, retain their narrowing
-provenance afterwards, and behave like `Unknown` for assignability. For example, in the case below,
+bounds behave like `object`/`Never` while unions and intersections are simplified. Everywhere else,
+including attribute access, calls, subscripting, iteration, operators, and type relations, they
+behave like `Unknown` while retaining their narrowing provenance. For example, in the case below,
 `object & Covariant[object*]` simplifies to `Covariant[object*]`:
 
 ```py
@@ -836,12 +837,13 @@ def _(x: object):
         x.push("foo")
 ```
 
-Both tagged bounds remain gradual only for assignability. In particular, `object*` is assignable to
-and from `int`, but it is not a subtype of `int`:
+Both tagged bounds behave like `Unknown` for type relations outside union and intersection
+simplification. In particular, `object*` is assignable to and from `int`, but it is not a subtype of
+`int`, `int` is not a subtype of it, and it is not disjoint from `int`:
 
 ```py
 from ty_extensions import static_assert
-from ty_extensions._internal import TypeOf, is_assignable_to, is_subtype_of
+from ty_extensions._internal import TypeOf, is_assignable_to, is_disjoint_from, is_subtype_of
 
 def tagged_bounds_are_gradual(value: object) -> None:
     if isinstance(value, Covariant):
@@ -851,6 +853,46 @@ def tagged_bounds_are_gradual(value: object) -> None:
         static_assert(is_assignable_to(TypeOf[item], int))
         static_assert(is_assignable_to(int, TypeOf[item]))
         static_assert(not is_subtype_of(TypeOf[item], int))
+        static_assert(not is_subtype_of(int, TypeOf[item]))
+        static_assert(not is_subtype_of(TypeOf[item], TypeOf[item]))
+        static_assert(not is_disjoint_from(TypeOf[item], int))
+```
+
+Tagged bounds also support all operations supported by `Unknown`. Results retain the tag so that
+subsequent operations remain gradual as well:
+
+```py
+def tagged_bounds_support_unknown_operations(value: object, assigned: int) -> None:
+    if isinstance(value, Covariant):
+        item = value.get()
+        reveal_type(item)  # revealed: object*
+
+        reveal_type(item.missing)  # revealed: object*
+        reveal_type(item.missing(1, keyword="value"))  # revealed: object*
+        reveal_type(item())  # revealed: object*
+        reveal_type(item[0])  # revealed: object*
+        reveal_type(item["key"].nested())  # revealed: object*
+
+        reveal_type(item + 1)  # revealed: object*
+        reveal_type(1 + item)  # revealed: object*
+        reveal_type(-item)  # revealed: object*
+
+        for element in item:
+            reveal_type(element)  # revealed: object*
+            reveal_type(element.missing)  # revealed: object*
+
+        assigned = item
+
+async def tagged_bounds_are_awaitable(value: object) -> None:
+    if isinstance(value, Covariant):
+        item = value.get()
+        reveal_type(await item)  # revealed: object*
+
+def accepts_integer_bound[T: int](value: T) -> None: ...
+def tagged_bounds_satisfy_generic_bounds(value: object) -> None:
+    if isinstance(value, Covariant):
+        item = value.get()
+        accepts_integer_bound(item)
 ```
 
 The behavior of `issubclass()` is similar.
@@ -1014,8 +1056,9 @@ def _(xs: list[str] | set[str]) -> str:
 
 With `analysis.strict-generic-narrowing` disabled, the positive branch is simplified using tagged
 `object*`/`Never*` bounds, which retain their narrowing provenance afterwards and behave like
-`Unknown` for assignability. The negative branch still excludes the ordinary top materialization
-because a negative `isinstance` result excludes every specialization of the class:
+`Unknown` for all operations other than union and intersection simplification. The negative branch
+still excludes the ordinary top materialization because a negative `isinstance` result excludes
+every specialization of the class:
 
 ```toml
 [analysis]
@@ -1062,7 +1105,7 @@ def _(xs: OpenItem | Sequence[OpenItem]):
     if isinstance(xs, Sequence):
         reveal_type(xs)  # revealed: (OpenItem & Sequence[object*]) | Sequence[OpenItem]
         for x in xs:
-            reveal_type(x)  # revealed: object
+            reveal_type(x)  # revealed: object*
     else:
         reveal_type(xs)  # revealed: OpenItem & ~Sequence[object]
 ```
@@ -1078,6 +1121,8 @@ def _(xs: object):
         reveal_type(xs.append)  # revealed: bound method Top[list[Unknown]].append(object: Never*, /) -> None
         for x in xs:
             reveal_type(x)  # revealed: object*
+            reveal_type(x.missing)  # revealed: object*
+            reveal_type(x[0])  # revealed: object*
 
         xs.append(1)
         xs.append("foo")
@@ -1124,7 +1169,7 @@ def _(xs: OpenItem | list[OpenItem]):
     if isinstance(xs, list):
         reveal_type(xs)  # revealed: (OpenItem & Top[list[Unknown]]) | list[OpenItem]
         for x in xs:
-            reveal_type(x)  # revealed: object
+            reveal_type(x)  # revealed: object*
     else:
         reveal_type(xs)  # revealed: OpenItem & ~Top[list[Unknown]]
 ```

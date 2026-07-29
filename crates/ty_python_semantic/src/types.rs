@@ -1179,8 +1179,20 @@ impl<'db> Type<'db> {
         }
     }
 
-    fn narrowing_bound_fallback(self) -> Option<Type<'db>> {
-        let materialization_kind = self.as_nominal_instance()?.narrowing_bound_kind()?;
+    pub(crate) const fn narrowing_bound_kind(self) -> Option<MaterializationKind> {
+        match self {
+            Type::Dynamic(DynamicType::NarrowingBound(materialization_kind)) => {
+                Some(materialization_kind)
+            }
+            _ => None,
+        }
+    }
+
+    /// Return the tagged bound's top or bottom meaning during set-theoretic simplification.
+    ///
+    /// Outside union and intersection simplification, tagged bounds behave like `Unknown`.
+    pub(crate) fn narrowing_bound_fallback(self) -> Option<Type<'db>> {
+        let materialization_kind = self.narrowing_bound_kind()?;
         Some(match materialization_kind {
             MaterializationKind::Top => Type::object(),
             MaterializationKind::Bottom => Type::Never,
@@ -1215,20 +1227,20 @@ impl<'db> Type<'db> {
                 DynamicType::Unknown
                     | DynamicType::UnknownGeneric(_)
                     | DynamicType::AmbiguousOverload
+                    | DynamicType::NarrowingBound(_)
             )
         )
     }
 
     pub(crate) const fn is_never(&self) -> bool {
-        match self {
+        matches!(
+            self,
             Type::Never
-            | Type::Divergent(DivergentType {
-                materialization: Some(MaterializationKind::Bottom),
-                ..
-            }) => true,
-            Type::NominalInstance(instance) => instance.is_narrowing_never(),
-            _ => false,
-        }
+                | Type::Divergent(DivergentType {
+                    materialization: Some(MaterializationKind::Bottom),
+                    ..
+                })
+        )
     }
 
     /// Returns `true` if this type contains a `Self` type variable.
@@ -1356,7 +1368,8 @@ impl<'db> Type<'db> {
             | DynamicType::InvalidConcatenateUnknown
             | DynamicType::UnknownGeneric(_)
             | DynamicType::UnspecializedTypeVar
-            | DynamicType::AmbiguousOverload => false,
+            | DynamicType::AmbiguousOverload
+            | DynamicType::NarrowingBound(_) => false,
             DynamicType::Todo(_) => true,
         })
     }
@@ -1934,10 +1947,7 @@ impl<'db> Type<'db> {
 
     #[must_use]
     pub(crate) fn negate(&self, db: &'db dyn Db) -> Type<'db> {
-        if let Some(materialization_kind) = self
-            .as_nominal_instance()
-            .and_then(NominalInstanceType::narrowing_bound_kind)
-        {
+        if let Some(materialization_kind) = self.narrowing_bound_kind() {
             return Type::narrowing_bound(materialization_kind.flip());
         }
 
@@ -2109,7 +2119,8 @@ impl<'db> Type<'db> {
                 | DynamicType::UnspecializedTypeVar
                 | DynamicType::Todo(_)
                 | DynamicType::InvalidConcatenateUnknown
-                | DynamicType::AmbiguousOverload => false,
+                | DynamicType::AmbiguousOverload
+                | DynamicType::NarrowingBound(_) => false,
             },
         }
     }
@@ -6808,6 +6819,7 @@ impl<'db> Type<'db> {
                 TypeMapping::Promote(PromotionMode::On, PromotionKind::Regular) => self.promote_impl(db),
             }
 
+            Type::Dynamic(DynamicType::NarrowingBound(_)) => self,
             Type::Dynamic(_) => match type_mapping {
                 TypeMapping::ApplySpecialization(_) |
                 TypeMapping::ApplySpecializationWithMaterialization { .. } |
@@ -7356,7 +7368,8 @@ impl<'db> Type<'db> {
             Self::Dynamic(
                 DynamicType::Unknown
                 | DynamicType::UnknownGeneric(_)
-                | DynamicType::AmbiguousOverload,
+                | DynamicType::AmbiguousOverload
+                | DynamicType::NarrowingBound(_),
             ) => Type::SpecialForm(SpecialFormType::Unknown).definition(db),
             Self::Divergent(_) => Type::SpecialForm(SpecialFormType::Divergent).definition(db),
             Self::Dynamic(DynamicType::Todo(_)) => {
@@ -8053,6 +8066,11 @@ pub enum DynamicType<'db> {
     Any,
     /// An unannotated value, or a dynamic type resulting from an error
     Unknown,
+    /// A gradual `isinstance` bound that is top or bottom only while simplifying type sets.
+    ///
+    /// All other type operations treat this exactly like `Unknown`, while retaining its display
+    /// provenance as `object*` or `Never*`.
+    NarrowingBound(MaterializationKind),
     /// Similar to `Unknown`, this represents a dynamic type that has been explicitly specialized
     /// with legacy typevars, e.g. `UnknownClass[T]`, where `T` is a legacy typevar. We keep track
     /// of the type variables in the generic context in case this type is later specialized again.
@@ -8105,6 +8123,8 @@ impl std::fmt::Display for DynamicType<'_> {
             | DynamicType::UnknownGeneric(_)
             | DynamicType::InvalidConcatenateUnknown
             | DynamicType::AmbiguousOverload => f.write_str("Unknown"),
+            DynamicType::NarrowingBound(MaterializationKind::Top) => f.write_str("object*"),
+            DynamicType::NarrowingBound(MaterializationKind::Bottom) => f.write_str("Never*"),
             DynamicType::UnspecializedTypeVar => f.write_str("UnspecializedTypeVar"),
             // `DynamicType::Todo`'s display should be explicit that is not a valid display of
             // any other type

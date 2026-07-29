@@ -2396,11 +2396,7 @@ impl KnownFunction {
                     .peekable();
                 let revealed_type = if let Some(first) = argument_types.next() {
                     // A singleton tagged bound must not be canonicalized to ordinary `object`.
-                    if argument_types.peek().is_none()
-                        && first
-                            .as_nominal_instance()
-                            .is_some_and(|instance| instance.narrowing_bound_kind().is_some())
-                    {
+                    if argument_types.peek().is_none() && first.narrowing_bound_kind().is_some() {
                         first
                     } else {
                         argument_types

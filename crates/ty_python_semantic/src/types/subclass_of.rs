@@ -515,8 +515,10 @@ impl<'db> SubclassOfInner<'db> {
                 ),
             },
             Type::TypeVar(bound_typevar) => SubclassOfInner::TypeVar(bound_typevar),
-            Type::Dynamic(DynamicType::Any) => SubclassOfInner::Dynamic(DynamicType::Any),
-            Type::Dynamic(DynamicType::Unknown) => SubclassOfInner::Dynamic(DynamicType::Unknown),
+            Type::Dynamic(
+                dynamic
+                @ (DynamicType::Any | DynamicType::Unknown | DynamicType::NarrowingBound(_)),
+            ) => SubclassOfInner::Dynamic(dynamic),
             _ => return None,
         })
     }

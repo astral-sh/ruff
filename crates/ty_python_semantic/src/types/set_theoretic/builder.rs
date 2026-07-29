@@ -40,13 +40,42 @@ use super::RecursivelyDefined;
 use crate::types::enums::EnumComplement;
 use crate::types::set_theoretic::expand_intersection_typevars_and_newtypes;
 use crate::types::{
-    BytesLiteralType, ClassLiteral, EnumLiteralType, IntersectionType, KnownClass,
-    KnownInstanceType, LiteralValueType, LiteralValueTypeKind, NegativeIntersectionElements,
-    StringLiteralType, SubclassOfType, Type, TypeVarBoundOrConstraints, TypeVarVariance, UnionType,
+    BytesLiteralType, ClassLiteral, DynamicType, EnumLiteralType, IntersectionType, KnownClass,
+    KnownInstanceType, LiteralValueType, LiteralValueTypeKind, MaterializationKind,
+    NegativeIntersectionElements, StringLiteralType, SubclassOfType, Type,
+    TypeVarBoundOrConstraints, TypeVarVariance, UnionType,
 };
 use crate::{Db, FxOrderMap, FxOrderSet};
 use rustc_hash::FxHashSet;
 use smallvec::SmallVec;
+
+/// Tagged narrowing bounds retain their top/bottom meaning only while simplifying type sets.
+/// Everywhere else they are ordinary gradual types.
+fn materialize_narrowing_bound_for_set_simplification(ty: Type<'_>) -> Type<'_> {
+    ty.narrowing_bound_fallback().unwrap_or(ty)
+}
+
+fn is_bottom_for_set_simplification(ty: &Type<'_>) -> bool {
+    ty.is_never() || ty.narrowing_bound_kind() == Some(MaterializationKind::Bottom)
+}
+
+fn is_top_for_set_simplification(ty: Type<'_>) -> bool {
+    ty.is_object() || ty.narrowing_bound_kind() == Some(MaterializationKind::Top)
+}
+
+fn is_subtype_for_set_simplification(db: &dyn Db, left: Type<'_>, right: Type<'_>) -> bool {
+    materialize_narrowing_bound_for_set_simplification(left).is_subtype_of(
+        db,
+        materialize_narrowing_bound_for_set_simplification(right),
+    )
+}
+
+fn are_disjoint_for_set_simplification(db: &dyn Db, left: Type<'_>, right: Type<'_>) -> bool {
+    materialize_narrowing_bound_for_set_simplification(left).is_disjoint_from(
+        db,
+        materialize_narrowing_bound_for_set_simplification(right),
+    )
+}
 
 /// Extract `(core, guard)` from truthiness-guarded intersections.
 ///
@@ -138,6 +167,7 @@ fn is_invariant_dynamic_generalization_of<'db>(
             continue;
         }
         if general_type.is_non_divergent_dynamic()
+            && general_type.narrowing_bound_kind().is_none()
             && typevar.variance(db) == TypeVarVariance::Invariant
         {
             has_dynamic_replacement = true;
@@ -707,8 +737,14 @@ impl<'db> UnionBuilder<'db> {
                     }
                 }
             }
-            // Adding `Never` to a union is a no-op.
             Type::Never => {}
+            Type::Dynamic(DynamicType::NarrowingBound(MaterializationKind::Bottom)) => {
+                // A tagged bottom is redundant once another element exists, but must retain its
+                // gradual provenance when it is the only element.
+                if self.elements.is_empty() {
+                    self.elements.push(UnionElement::Type(ty));
+                }
+            }
             Type::TypeAlias(alias) if self.unpack_aliases => {
                 if seen_aliases.contains(&ty) {
                     // Union contains itself recursively via a type alias. This is an error, just
@@ -756,7 +792,11 @@ impl<'db> UnionBuilder<'db> {
                                         to_remove = Some(index);
                                         continue;
                                     }
-                                    if ty_negated().is_subtype_of(self.db, *existing) {
+                                    if is_subtype_for_set_simplification(
+                                        self.db,
+                                        ty_negated(),
+                                        *existing,
+                                    ) {
                                         // The type that includes both this new element, and its negation
                                         // (or a supertype of its negation), must be simply `object`.
                                         self.collapse_to_object();
@@ -809,7 +849,11 @@ impl<'db> UnionBuilder<'db> {
                                         to_remove = Some(index);
                                         continue;
                                     }
-                                    if ty_negated().is_subtype_of(self.db, *existing) {
+                                    if is_subtype_for_set_simplification(
+                                        self.db,
+                                        ty_negated(),
+                                        *existing,
+                                    ) {
                                         // The type that includes both this new element, and its negation
                                         // (or a supertype of its negation), must be simply `object`.
                                         self.collapse_to_object();
@@ -864,7 +908,11 @@ impl<'db> UnionBuilder<'db> {
                                         to_remove = Some(index);
                                         continue;
                                     }
-                                    if ty_negated().is_subtype_of(self.db, *existing) {
+                                    if is_subtype_for_set_simplification(
+                                        self.db,
+                                        ty_negated(),
+                                        *existing,
+                                    ) {
                                         // The type that includes both this new element, and its negation
                                         // (or a supertype of its negation), must be simply `object`.
                                         self.collapse_to_object();
@@ -940,7 +988,11 @@ impl<'db> UnionBuilder<'db> {
                                         to_remove = Some(index);
                                         continue;
                                     }
-                                    if ty_negated().is_subtype_of(self.db, *existing) {
+                                    if is_subtype_for_set_simplification(
+                                        self.db,
+                                        ty_negated(),
+                                        *existing,
+                                    ) {
                                         // The type that includes both this new element, and its negation
                                         // (or a supertype of its negation), must be simply `object`.
                                         self.collapse_to_object();
@@ -983,8 +1035,20 @@ impl<'db> UnionBuilder<'db> {
                     _ => self.push_type(ty, seen_aliases),
                 }
             }
-            // Adding `object` to a union results in `object`.
-            ty if ty.is_object() && !cycle_recovery => self.collapse_to_object(),
+            // Adding a top type subsumes every existing union element. Preserve narrowing
+            // provenance unless an ordinary `object` was already present.
+            ty if is_top_for_set_simplification(ty) && !cycle_recovery => {
+                if ty.narrowing_bound_kind().is_some()
+                    && !self.elements.iter().any(|element| {
+                        matches!(element, UnionElement::Type(existing) if existing.is_object())
+                    })
+                {
+                    self.elements.clear();
+                    self.elements.push(UnionElement::Type(ty));
+                } else {
+                    self.collapse_to_object();
+                }
+            }
             _ => self.push_type(ty, seen_aliases),
         }
     }
@@ -1385,7 +1449,7 @@ struct InnerIntersectionBuilder<'db> {
 
 impl<'db> InnerIntersectionBuilder<'db> {
     fn contains_never(&self) -> bool {
-        self.positive.iter().any(Type::is_never)
+        self.positive.iter().any(is_bottom_for_set_simplification)
     }
 
     /// Return `true` when an intersection excludes every member of an enum class.
@@ -1451,12 +1515,12 @@ impl<'db> InnerIntersectionBuilder<'db> {
     /// Adds a positive type to this intersection.
     fn add_positive(&mut self, db: &'db dyn Db, mut new_positive: Type<'db>) {
         // `Never & T` -> `Never`
-        if self.positive.iter().any(Type::is_never) {
+        if self.positive.iter().any(is_bottom_for_set_simplification) {
             return;
         }
 
         // `T & Never` -> `Never`
-        if new_positive.is_never() {
+        if is_bottom_for_set_simplification(&new_positive) {
             *self = Self::default();
             self.positive.insert(new_positive);
             return;
@@ -1549,9 +1613,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
             _ => {
                 let positive_as_instance = new_positive.as_nominal_instance();
 
-                if let Some(instance) = positive_as_instance
-                    && instance.is_object()
-                {
+                if is_top_for_set_simplification(new_positive) {
                     // `object & T` -> `T`; it is always redundant to add `object` to an intersection
                     return;
                 }
@@ -1639,7 +1701,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
                         to_remove.push(index);
                     }
                     // A & B = Never    if A and B are disjoint
-                    if new_positive.is_disjoint_from(db, *existing_positive) {
+                    if are_disjoint_for_set_simplification(db, new_positive, *existing_positive) {
                         *self = Self::default();
                         self.positive.insert(Type::Never);
                         return;
@@ -1652,13 +1714,13 @@ impl<'db> InnerIntersectionBuilder<'db> {
                 let mut to_remove = SmallVec::<[usize; 1]>::new();
                 for (index, existing_negative) in self.negative.iter().enumerate() {
                     // S & ~T = Never    if S <: T
-                    if new_positive.is_subtype_of(db, *existing_negative) {
+                    if is_subtype_for_set_simplification(db, new_positive, *existing_negative) {
                         *self = Self::default();
                         self.positive.insert(Type::Never);
                         return;
                     }
                     // A & ~B = A    if A and B are disjoint
-                    if existing_negative.is_disjoint_from(db, new_positive) {
+                    if are_disjoint_for_set_simplification(db, *existing_negative, new_positive) {
                         to_remove.push(index);
                     }
                 }
@@ -1674,7 +1736,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
     /// Adds a negative type to this intersection.
     fn add_negative(&mut self, db: &'db dyn Db, new_negative: Type<'db>) {
         // `Never & ~T` -> `Never`.
-        if self.positive.iter().any(Type::is_never) {
+        if self.positive.iter().any(is_bottom_for_set_simplification) {
             return;
         }
 
@@ -1707,10 +1769,11 @@ impl<'db> InnerIntersectionBuilder<'db> {
                     self.add_positive(db, *neg);
                 }
             }
-            Type::Never => {
+            Type::Never
+            | Type::Dynamic(DynamicType::NarrowingBound(MaterializationKind::Bottom)) => {
                 // Adding ~Never to an intersection is a no-op.
             }
-            Type::NominalInstance(instance) if instance.is_object() => {
+            ty if is_top_for_set_simplification(ty) => {
                 // Adding ~object to an intersection results in Never.
                 *self = Self::default();
                 self.positive.insert(Type::Never);
@@ -1767,7 +1830,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
                         to_remove.push(index);
                     }
                     // same rule, reverse order
-                    if new_negative.is_subtype_of(db, *existing_negative) {
+                    if is_subtype_for_set_simplification(db, new_negative, *existing_negative) {
                         return;
                     }
                 }
@@ -1798,13 +1861,13 @@ impl<'db> InnerIntersectionBuilder<'db> {
                     }
 
                     // S & ~T = Never    if S <: T
-                    if existing_positive.is_subtype_of(db, new_negative) {
+                    if is_subtype_for_set_simplification(db, *existing_positive, new_negative) {
                         *self = Self::default();
                         self.positive.insert(Type::Never);
                         return;
                     }
                     // A & ~B = A    if A and B are disjoint
-                    if existing_positive.is_disjoint_from(db, new_negative) {
+                    if are_disjoint_for_set_simplification(db, *existing_positive, new_negative) {
                         return;
                     }
                 }
@@ -1847,7 +1910,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
                 let matching_constraints = constraints
                     .iter()
                     .enumerate()
-                    .filter(|(_, c)| c.is_subtype_of(db, *negative));
+                    .filter(|(_, c)| is_subtype_for_set_simplification(db, **c, *negative));
                 for (constraint_index, _) in matching_constraints {
                     remaining_constraints[constraint_index] = None;
                 }
@@ -1931,7 +1994,7 @@ mod tests {
     use crate::place::{global_symbol, known_module_symbol};
     use crate::types::enums::enum_member_literals;
     use crate::types::type_alias::TypeAliasType;
-    use crate::types::{KnownClass, KnownInstanceType, Truthiness};
+    use crate::types::{KnownClass, KnownInstanceType, MaterializationKind, Truthiness};
 
     use ruff_db::system::DbWithWritableSystem as _;
     use ty_module_resolver::KnownModule;
@@ -1951,6 +2014,61 @@ mod tests {
         let t0 = Type::int_literal(0);
         let union = UnionType::from_elements(&db, [t0]);
         assert_eq!(union, t0);
+    }
+
+    #[test]
+    fn build_union_preserves_single_narrowing_bounds() {
+        let db = setup_db();
+
+        for materialization_kind in [MaterializationKind::Top, MaterializationKind::Bottom] {
+            let bound = Type::narrowing_bound(materialization_kind);
+            assert_eq!(UnionBuilder::new(&db).add(bound).build(), bound);
+        }
+    }
+
+    #[test]
+    fn build_union_simplifies_narrowing_bounds() {
+        let db = setup_db();
+        let bound = Type::narrowing_bound(MaterializationKind::Top);
+        let bottom = Type::narrowing_bound(MaterializationKind::Bottom);
+        let int = KnownClass::Int.to_instance(&db);
+
+        assert_eq!(UnionBuilder::new(&db).add(bound).add(int).build(), bound);
+        assert_eq!(UnionBuilder::new(&db).add(int).add(bound).build(), bound);
+        assert_eq!(UnionBuilder::new(&db).add(bottom).add(int).build(), int);
+        assert_eq!(UnionBuilder::new(&db).add(int).add(bottom).build(), int);
+    }
+
+    #[test]
+    fn narrowing_bounds_are_gradual_outside_set_simplification() {
+        let db = setup_db();
+        let int = KnownClass::Int.to_instance(&db);
+
+        for materialization_kind in [MaterializationKind::Top, MaterializationKind::Bottom] {
+            let bound = Type::narrowing_bound(materialization_kind);
+
+            assert!(!bound.is_never());
+            assert!(bound.is_assignable_to(&db, int));
+            assert!(int.is_assignable_to(&db, bound));
+            assert!(!bound.is_subtype_of(&db, int));
+            assert!(!int.is_subtype_of(&db, bound));
+            assert!(!bound.is_disjoint_from(&db, int));
+            assert_eq!(bound.member(&db, "missing").place.expect_type(), bound);
+        }
+    }
+
+    #[test]
+    fn build_intersection_preserves_narrowing_bottom_under_negation() {
+        let db = setup_db();
+        let bottom = Type::narrowing_bound(MaterializationKind::Bottom);
+        let int = KnownClass::Int.to_instance(&db);
+
+        let intersection = IntersectionBuilder::new(&db)
+            .add_positive(bottom)
+            .add_negative(int)
+            .build();
+
+        assert_eq!(intersection, bottom);
     }
 
     #[test]

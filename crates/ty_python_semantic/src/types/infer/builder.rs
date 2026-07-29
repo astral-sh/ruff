@@ -1700,7 +1700,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         // "declared types is `Unknown` (e.g. due to a bad annotation, missing
                         // import, etc.)". Ideally we would still prefer `Unknown` declared type,
                         // but use inferred type if there is no declared type.
-                        && !matches!(declared_type, Type::Dynamic(DynamicType::Unknown))
+                        && !matches!(
+                            declared_type,
+                            Type::Dynamic(DynamicType::Unknown | DynamicType::NarrowingBound(_))
+                        )
                         && declared_type.is_assignable_to(self.db(), inferred_ty)
                     {
                         (declared_ty, declared_type)
@@ -3679,7 +3682,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
             // `Unknown` is likely to be the result of an unresolved import or a typo, which will
             // already get a diagnostic, so don't pile on an extra diagnostic here.
-            Type::Dynamic(DynamicType::Unknown) => return,
+            Type::Dynamic(DynamicType::Unknown | DynamicType::NarrowingBound(_)) => return,
             _ => {}
         }
         if let Some(builder) = self
@@ -4474,7 +4477,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     && !matches!(name_expr.id.as_str(), "_ignore_" | "_value_" | "_name_")
                     // Not bare Final (bare Final is allowed on enum members)
                     && !(declared.qualifiers.contains(TypeQualifiers::FINAL)
-                        && matches!(declared.inner_type(), Type::Dynamic(DynamicType::Unknown)))
+                        && matches!(
+                            declared.inner_type(),
+                            Type::Dynamic(DynamicType::Unknown | DynamicType::NarrowingBound(_))
+                        ))
                     // Value type would be an enum member at runtime (exclude callables,
                     // which are never members)
                     && !inferred_ty.is_subtype_of(
@@ -8119,7 +8125,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // return type as type context.
         let return_tcx = if let Some(signature) = callable_tcx {
             match signature.return_ty {
-                Type::Dynamic(DynamicType::Unknown) => TypeContext::new(None),
+                Type::Dynamic(DynamicType::Unknown | DynamicType::NarrowingBound(_)) => {
+                    TypeContext::new(None)
+                }
                 _ => TypeContext::new(Some(signature.return_ty)),
             }
         } else {

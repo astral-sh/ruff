@@ -1496,6 +1496,7 @@ impl<'db> Specialization<'db> {
                     let vartype = if for_narrowing
                         && materialization_kind == MaterializationKind::Top
                         && vartype.is_unknown()
+                        && vartype.narrowing_bound_kind().is_none()
                         && let Some(TypeVarBoundOrConstraints::UpperBound(bound)) =
                             bound_typevar.typevar(db).bound_or_constraints(db)
                     {
