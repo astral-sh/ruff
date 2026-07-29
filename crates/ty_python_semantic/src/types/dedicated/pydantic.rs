@@ -27,6 +27,11 @@ use crate::types::{
 };
 use crate::{Db, SemanticModel};
 
+/// Pydantic treats underscore-prefixed annotations as private instance attributes.
+pub(in crate::types) fn is_private_attribute(name: &str) -> bool {
+    name.starts_with('_')
+}
+
 /// Metadata that controls Pydantic-specific model synthesis.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub(crate) struct ModelMetadata<'db> {
@@ -487,6 +492,13 @@ pub(in crate::types) fn is_model(db: &dyn Db, class: StaticClassLiteral<'_>) -> 
         .iter_mro(db, None)
         .filter_map(ClassBase::into_class)
         .any(|base| base.is_known(db, KnownClass::PydanticBaseModel))
+}
+
+/// Return whether `ty` is an instance of a Pydantic model.
+pub(in crate::types) fn is_model_instance(db: &dyn Db, ty: Type<'_>) -> bool {
+    ty.nominal_class(db)
+        .and_then(|class| class.static_class_literal(db))
+        .is_some_and(|(class, _)| is_model(db, class))
 }
 
 /// Return whether a field specifier's `default` argument provides a default value.

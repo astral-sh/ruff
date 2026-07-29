@@ -1190,10 +1190,9 @@ class FrozenPerson(BaseModel):
 
 person = FrozenPerson()
 
-# TODO: These should not error
-person._implicit_private = 2  # error: [invalid-assignment]
-person._private_with_default = 2  # error: [invalid-assignment]
-person._explicit_private = 2  # error: [invalid-assignment]
+person._implicit_private = 2
+person._private_with_default = 2
+person._explicit_private = 2
 ```
 
 ## Validation of default values
