@@ -5185,6 +5185,8 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
     /// the forwarding function's actual variadic parameter instead of an unrelated parameter.
     /// Callable objects and constructors use their existing bindings to preserve the active
     /// constructor stage and any consumed receiver.
+    /// A `functools.partial` also requires accounting for arguments that were supplied before the
+    /// remaining signature was forwarded.
     ///
     /// ```python
     /// from typing import Callable
@@ -5236,19 +5238,49 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                         } else {
                             paramspec_prefix_len(declared_type)
                         }?;
-                        let argument_bindings = argument_type.bindings(self.db);
+                        let (source_type, partial_signature) = match argument_type {
+                            Type::KnownInstance(
+                                KnownInstanceType::FunctoolsPartial(partial)
+                                | KnownInstanceType::FunctoolsPartialCall(partial),
+                            ) => (
+                                partial.wrapped(self.db).inner(self.db),
+                                partial
+                                    .partial(self.db)
+                                    .signatures(self.db)
+                                    .overloads
+                                    .get(overload_index),
+                            ),
+                            _ => (argument_type, None),
+                        };
+                        let argument_bindings = source_type.bindings(self.db);
                         let callable = argument_bindings.single_item()?.callable();
                         let (function, is_bound_method) = match callable.signature_type {
                             Type::FunctionLiteral(function) => (function, false),
                             Type::BoundMethod(method) => (method.function(self.db), true),
                             _ => return None,
                         };
-                        let source_parameter_index_offset = callable
+                        let source_binding = callable
                             .overloads()
                             .get(overload_index)
-                            .or_else(|| callable.overloads().first())
+                            .or_else(|| callable.overloads().first());
+                        let source_parameter_index_offset = source_binding
                             .map_or(0, |binding| binding.source_parameter_index_offset)
                             + usize::from(callable.bound_type.is_some());
+                        let source_parameter_index_offset =
+                            partial_signature
+                                .zip(source_binding)
+                                .and_then(|(partial_signature, source_binding)| {
+                                    let definition = partial_signature
+                                        .parameters()
+                                        .iter()
+                                        .find_map(Parameter::definition)?;
+                                    source_binding.signature.parameters().iter().position(
+                                        |parameter| parameter.definition() == Some(definition),
+                                    )
+                                })
+                                .map_or(source_parameter_index_offset, |index| {
+                                    index.max(source_parameter_index_offset)
+                                });
 
                         Some(ForwardedParameterSource {
                             function,

@@ -780,3 +780,59 @@ info: Function defined here
 9 |     def __new__(cls, value: int, flag: int) -> Self: ...
   |         ^^^^^^^                  --------- Parameter declared here
 ```
+
+## Functions wrapped by functools.partial
+
+`functools.partial` supplies the first argument before the callback is passed to `to_thread`. An
+invalid forwarded argument should point to the next parameter on the original function.
+
+```py
+import asyncio
+from functools import partial
+
+def callback(prefix: int, value: int) -> None: ...
+async def run() -> None:
+    await asyncio.to_thread(partial(callback, 1), "incorrect")  # snapshot: invalid-argument-type
+```
+
+```snapshot
+error[invalid-argument-type]: Argument to function `to_thread` is incorrect
+ --> src/mdtest_snippet.py:6:51
+  |
+6 |     await asyncio.to_thread(partial(callback, 1), "incorrect")  # snapshot: invalid-argument-type
+  |                                                   ^^^^^^^^^^^ Expected `int`, found `Literal["incorrect"]`
+info: Function defined here
+ --> src/mdtest_snippet.py:4:5
+  |
+4 | def callback(prefix: int, value: int) -> None: ...
+  |     ^^^^^^^^              ---------- Parameter declared here
+```
+
+## Bound methods wrapped by functools.partial
+
+When `functools.partial` wraps a bound method, both `self` and the argument supplied by `partial`
+come before the forwarded argument.
+
+```py
+import asyncio
+from functools import partial
+
+class Handler:
+    def callback(self, prefix: int, value: int) -> None: ...
+
+async def run(handler: Handler) -> None:
+    await asyncio.to_thread(partial(handler.callback, 1), "incorrect")  # snapshot: invalid-argument-type
+```
+
+```snapshot
+error[invalid-argument-type]: Argument to function `to_thread` is incorrect
+ --> src/mdtest_snippet.py:8:59
+  |
+8 |     await asyncio.to_thread(partial(handler.callback, 1), "incorrect")  # snapshot: invalid-argument-type
+  |                                                           ^^^^^^^^^^^ Expected `int`, found `Literal["incorrect"]`
+info: Method defined here
+ --> src/mdtest_snippet.py:5:9
+  |
+5 |     def callback(self, prefix: int, value: int) -> None: ...
+  |         ^^^^^^^^                    ---------- Parameter declared here
+```
