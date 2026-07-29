@@ -41,24 +41,25 @@ impl Support {
 
     /// Returns an iterator of all of the typevars in this support.
     pub(super) fn iter(&self) -> impl Iterator<Item = TypeVarId> + '_ {
-        self.chunks
-            .iter()
-            .copied()
-            .enumerate()
-            .flat_map(|(chunk_index, mut chunk)| {
-                let mut bit_index = chunk_index * CHUNK_SIZE;
-                std::iter::from_fn(move || {
-                    while chunk != 0 {
-                        let lowest_bit = chunk & 1;
-                        chunk >>= 1;
-                        bit_index += 1;
-                        if lowest_bit != 0 {
-                            return Some(TypeVarId::from_usize(bit_index - 1));
-                        }
-                    }
-                    None
+        // Iterate through all of the chunks
+        let mut next_chunk_start = 0;
+        self.chunks.iter().copied().flat_map(move |mut chunk| {
+            // Figure out the starting index of this chunk
+            let chunk_start = next_chunk_start;
+            next_chunk_start += CHUNK_SIZE;
+
+            // Iterate through the set bits in this chunk
+            std::iter::from_fn(move || {
+                // `lowest_one` finds the lowest set bit, if there is one
+                chunk.lowest_one().map(|index| {
+                    let index = index as usize;
+                    // Clear out the bit we just found.
+                    chunk ^= 1 << index;
+                    // And then return it, converted into a TypeVarId
+                    TypeVarId::from_usize(chunk_start + index)
                 })
             })
+        })
     }
 }
 
