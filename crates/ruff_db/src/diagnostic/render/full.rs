@@ -3,7 +3,9 @@ use std::num::NonZeroUsize;
 
 use similar::{ChangeTag, DiffOp, TextDiff};
 
-use annotate_snippets::Renderer as AnnotateRenderer;
+use annotate_snippets::{
+    Group as AnnotateGroup, Level as AnnotateLevel, Renderer as AnnotateRenderer,
+};
 use ruff_diagnostics::{Applicability, Fix};
 use ruff_notebook::NotebookIndex;
 use ruff_source_file::OneIndexed;
@@ -69,7 +71,9 @@ impl<'a> FullRenderer<'a> {
                     Diff::from_diagnostic(diag, &stylesheet, self.resolver, self.config)
             {
                 write!(f, "{diff}")?;
-                write_applicability_note(diff.fix, &stylesheet, f)?;
+                if let Some(applicability) = to_applicability_annotate(diff.fix) {
+                    writeln!(f, "{}", renderer.render(&[applicability]))?;
+                }
             }
 
             writeln!(f)?;
@@ -350,31 +354,23 @@ fn show_nonprinting(s: &str) -> Cow<'_, str> {
     }
 }
 
-fn write_applicability_note(
-    fix: &Fix,
-    stylesheet: &DiagnosticStylesheet,
-    f: &mut std::fmt::Formatter<'_>,
-) -> std::fmt::Result {
-    let (style, message) = match fix.applicability() {
-        Applicability::Safe => return Ok(()),
+fn to_applicability_annotate(fix: &Fix) -> Option<AnnotateGroup<'static>> {
+    let (level, message) = match fix.applicability() {
+        Applicability::Safe => return None,
         Applicability::Unsafe => (
-            stylesheet.warning,
+            AnnotateLevel::WARNING,
             "This is an unsafe fix and may change runtime behavior",
         ),
         Applicability::DisplayOnly => (
             // Note that this is still only used in tests. There's no `--display-only-fixes`
             // analog to `--unsafe-fixes` for users to activate this or see the styling.
-            stylesheet.error,
+            AnnotateLevel::ERROR,
             "This is a display-only fix and is likely to be incorrect",
         ),
     };
+    let level = level.with_name("note");
 
-    writeln!(
-        f,
-        "{note}: {message}",
-        note = fmt_styled("note", style),
-        message = fmt_styled(message, stylesheet.emphasis),
-    )
+    Some(AnnotateGroup::with_title(level.primary_title(message)))
 }
 
 #[cfg(test)]
