@@ -238,10 +238,12 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         // that happens to have the right type.
         let is_self_parameter = self.is_instance_attribute_assignment(target);
 
-        let class_instance_ty = Type::instance(db, class_ty).top_materialization(db);
-        let object_instance_ty = object_ty.bind_self_typevars(db, class_instance_ty);
-        let is_current_class_instance =
-            is_self_parameter && object_instance_ty.is_subtype_of(db, class_instance_ty);
+        // Final ownership is nominal: checking structural protocol requirements can
+        // incorrectly reject the declaring class's own receiver.
+        let is_current_class_instance = is_self_parameter
+            && object_ty.nominal_class(db).is_some_and(|object_class| {
+                object_class.is_subtype_of_class_literal(db, class_ty.class_literal(db))
+            });
         if !is_current_class_instance {
             report_not_in_init();
             return true;

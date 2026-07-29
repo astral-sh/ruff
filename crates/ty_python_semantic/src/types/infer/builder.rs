@@ -12061,10 +12061,9 @@ impl<'db, 'ast> AddBinding<'db, 'ast> {
                 builder.infer_maybe_standalone_expression(value, TypeContext::default())
             });
             // If the member is a data descriptor, the RHS value may differ from the value actually assigned.
-            if value_ty
-                .class_member(db, &attr.id)
-                .place
-                .ignore_possibly_undefined()
+            if assignment_attribute_members(db, value_ty, &attr.id)
+                .and_then(AssignmentAttributeMembers::type_member)
+                .and_then(|member| member.place.ignore_possibly_undefined())
                 .is_some_and(|ty| ty.may_be_data_descriptor(db))
             {
                 builder.discard_dict_key_assignments_for(self.binding);

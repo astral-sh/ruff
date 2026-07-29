@@ -951,7 +951,7 @@ impl<'db> IntersectionType<'db> {
         if !self.iter_positive(db).any(|positive| {
             matches!(
                 positive,
-                Type::ProtocolInstance(protocol) if protocol.class_origin().is_some()
+                Type::ProtocolInstance(protocol) if protocol.class_origin(db).is_some()
             )
         }) {
             return None;

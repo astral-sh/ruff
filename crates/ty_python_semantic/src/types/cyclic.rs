@@ -138,7 +138,7 @@ impl<'db> DefinitionReferenceVisitor<'db> {
         }
 
         let class = match ty {
-            Type::ProtocolInstance(protocol) => *protocol.class_origin()?,
+            Type::ProtocolInstance(protocol) => *protocol.class_origin(db)?,
             Type::TypedDict(typed_dict) => typed_dict.defining_class()?,
             _ => return None,
         };
@@ -198,7 +198,7 @@ impl<'db> TypeVisitor<'db> for DefinitionReferenceVisitor<'db> {
     }
 
     fn visit_protocol_instance_type(&self, db: &'db dyn Db, protocol: ProtocolInstanceType<'db>) {
-        if let Some(class) = protocol.class_origin() {
+        if let Some(class) = protocol.class_origin(db) {
             class.walk_recursive_member_types(db, self);
         }
     }
@@ -229,12 +229,12 @@ impl<'db> TypeAliasType<'db> {
 
 impl<'db> ProtocolInstanceType<'db> {
     fn definition(self, db: &'db dyn Db) -> Option<Definition<'db>> {
-        let (origin, _) = self.class_origin()?.static_class_literal(db)?;
+        let (origin, _) = self.class_origin(db)?.static_class_literal(db)?;
         Some(origin.definition(db))
     }
 
     fn is_recursive(self, db: &'db dyn Db) -> bool {
-        let Some(class) = self.class_origin() else {
+        let Some(class) = self.class_origin(db) else {
             return false;
         };
         let Some((origin, _)) = class.static_class_literal(db) else {

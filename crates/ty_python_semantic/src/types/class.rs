@@ -2051,12 +2051,25 @@ impl<'db> ClassType<'db> {
 
     /// Return a callable type (or union of callable types) that represents the callable
     /// constructor signature of this class.
+    pub(super) fn into_callable(self, db: &'db dyn Db) -> CallableTypes<'db> {
+        self.into_callable_with_receiver(db, Type::from(self))
+    }
+
+    /// Infer this class's constructor using the actual class-object receiver.
+    ///
+    /// A materialized protocol uses its class origin for constructor lookup, but `Self` must be
+    /// bound to the materialized receiver. Keeping lookup and receiver separate preserves both
+    /// instance-returning constructors and constructors that explicitly return another type.
     #[salsa::tracked(
         returns(clone),
-        cycle_initial=|db, _, _| CallableTypes::one(CallableType::bottom(db)),
+        cycle_initial=|db, _, _, _| CallableTypes::one(CallableType::bottom(db)),
         heap_size=ruff_memory_usage::heap_size
     )]
-    pub(super) fn into_callable(self, db: &'db dyn Db) -> CallableTypes<'db> {
+    pub(super) fn into_callable_with_receiver(
+        self,
+        db: &'db dyn Db,
+        receiver: Type<'db>,
+    ) -> CallableTypes<'db> {
         // TODO: This mimics a lot of the logic in Type::try_call_from_constructor. Can we
         // consolidate the two? Can we invoke a class by upcasting the class into a Callable, and
         // then relying on the call binding machinery to Just Work™?
@@ -2066,8 +2079,12 @@ impl<'db> ClassType<'db> {
             .static_class_literal(db)
             .and_then(|(class_literal, _)| class_literal.generic_context(db));
 
-        let self_ty = Type::from(self);
-        let metaclass_dunder_call_function_symbol = self_ty
+        let lookup_type = Type::from(self);
+        let instance_type = receiver
+            .to_instance_approximation(db)
+            .unwrap_or_else(Type::unknown);
+
+        let metaclass_dunder_call_function_symbol = lookup_type
             .member_lookup_with_policy(
                 db,
                 "__call__",
@@ -2093,11 +2110,17 @@ impl<'db> ClassType<'db> {
             // for dynamic Enum creation.
             let is_actual_enum = enum_metadata(db, self.class_literal(db)).is_some();
             if !is_actual_enum {
-                return CallableTypes::one(metaclass_dunder_call_function.into_callable_type(db));
+                let callable = if receiver == lookup_type {
+                    metaclass_dunder_call_function.into_callable_type(db)
+                } else {
+                    metaclass_dunder_call_function
+                        .into_callable_type_with_receiver(db, receiver, receiver)
+                };
+                return CallableTypes::one(callable);
             }
         }
 
-        let dunder_new_function_symbol = self_ty.lookup_dunder_new(db);
+        let dunder_new_function_symbol = lookup_type.lookup_dunder_new(db);
 
         let dunder_new_signature = dunder_new_function_symbol
             .and_then(|place_and_quals| place_and_quals.ignore_possibly_undefined())
@@ -2108,21 +2131,22 @@ impl<'db> ClassType<'db> {
             });
 
         let dunder_new_function = if let Some(dunder_new_signature) = dunder_new_signature {
+            let bound_signature = dunder_new_signature.bind_self_with_receiver(
+                db,
+                Some(receiver),
+                Some(instance_type),
+            );
+
             // Step 3: If the return type of the `__new__` evaluates to a type that is not a subclass of this class,
             // then we should ignore the `__init__` and just return the `__new__` method.
-            let returns_non_subclass = dunder_new_signature.overloads.iter().any(|signature| {
-                !signature.return_ty.is_assignable_to(
-                    db,
-                    self_ty
-                        .to_instance_approximation(db)
-                        .expect("ClassType should be instantiable"),
-                )
-            });
+            let returns_non_subclass = bound_signature
+                .overloads
+                .iter()
+                .any(|signature| !signature.return_ty.is_assignable_to(db, instance_type));
 
-            let instance_ty = Type::instance(db, self);
             let dunder_new_bound_method = CallableType::new(
                 db,
-                dunder_new_signature.bind_self_with_receiver(db, Some(self_ty), Some(instance_ty)),
+                bound_signature,
                 CallableTypeKind::Regular,
                 CallableFunctionProvenance::None,
             );
@@ -2135,7 +2159,7 @@ impl<'db> ClassType<'db> {
             None
         };
 
-        let dunder_init_function_symbol = self_ty
+        let dunder_init_function_symbol = lookup_type
             .member_lookup_with_policy(
                 db,
                 "__init__",
@@ -2143,10 +2167,6 @@ impl<'db> ClassType<'db> {
                     | MemberLookupPolicy::META_CLASS_NO_TYPE_FALLBACK,
             )
             .place;
-
-        let correct_return_type = self_ty
-            .to_instance_approximation(db)
-            .unwrap_or_else(Type::unknown);
 
         // If the class defines an `__init__` method, then we synthesize a callable type with the
         // same parameters as the `__init__` method after it is bound, and with the return type of
@@ -2173,8 +2193,7 @@ impl<'db> ClassType<'db> {
                             ty.as_typevar()
                                 .is_none_or(|bound_typevar| !bound_typevar.typevar(db).is_self(db))
                         });
-                    let return_type = self_annotation.unwrap_or(correct_return_type);
-                    let instance_ty = Type::instance(db, self);
+                    let return_type = self_annotation.unwrap_or(instance_type);
                     let generic_context = GenericContext::merge_optional(
                         db,
                         class_generic_context,
@@ -2188,8 +2207,8 @@ impl<'db> ClassType<'db> {
                     .with_definition(signature.definition())
                     .bind_self_with_receiver(
                         db,
-                        Some(instance_ty),
-                        Some(instance_ty),
+                        Some(instance_type),
+                        Some(instance_type),
                     )
                 };
 
@@ -2223,7 +2242,7 @@ impl<'db> ClassType<'db> {
             (None, None) => {
                 // If no `__new__` or `__init__` method is found, then we fall back to looking for
                 // an `object.__new__` method.
-                let new_function_symbol = self_ty
+                let new_function_symbol = lookup_type
                     .member_lookup_with_policy(
                         db,
                         "__new__",
@@ -2242,7 +2261,7 @@ impl<'db> ClassType<'db> {
                     }
                     CallableTypes::one(
                         new_function
-                            .into_bound_method_type(db, correct_return_type)
+                            .into_bound_method_type(db, instance_type)
                             .into_callable_type(db),
                     )
                 } else {
@@ -2252,7 +2271,7 @@ impl<'db> ClassType<'db> {
                         Signature::new_generic(
                             class_generic_context,
                             Parameters::empty(),
-                            correct_return_type,
+                            instance_type,
                         ),
                     ))
                 }

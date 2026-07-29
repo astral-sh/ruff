@@ -842,6 +842,32 @@ def bar(x: Foo, value: int):
     x.value = value
 ```
 
+### Protocol members initialized in `__init__`
+
+A protocol may initialize its own `Final` member in `__init__`, even if another method specializes
+the protocol's `self` type. That specialization must not make the initializer appear to belong to a
+different class. Assignments to another instance or outside the initializer remain invalid.
+
+```py
+from __future__ import annotations
+
+from typing import Final, Protocol, TypeVar
+
+T = TypeVar("T", covariant=True)
+
+class Owned(Protocol[T]):
+    owner: Final[T]
+
+    def __init__(self, owner: T, other: Owned[T] | None = None) -> None:
+        self.owner = owner
+        if other is not None:
+            other.owner = owner  # error: [invalid-assignment]
+
+    def progress(self: Owned[int]) -> None: ...
+    def replace(self, owner: T) -> None:
+        self.owner = owner  # error: [invalid-assignment]
+```
+
 ### Explicit `Final` redeclaration
 
 Explicit `Final` redeclaration in the same scope is accepted (shadowing).

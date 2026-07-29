@@ -151,9 +151,16 @@ impl<'db> Type<'db> {
             // TODO: This is unsound so in future we can consider an opt-in option to disable it.
             Type::SubclassOf(subclass_of_ty) => match subclass_of_ty.subclass_of() {
                 SubclassOfInner::Class(class) => Some(class.into_callable(db)),
-                SubclassOfInner::Protocol(protocol) => protocol
-                    .class_origin()
-                    .map(|origin| (*origin).into_callable(db)),
+                SubclassOfInner::Protocol(protocol) => protocol.class_origin(db).map(|origin| {
+                    if protocol.materialization_kind(db).is_some() {
+                        // The origin supplies the constructor, but the actual receiver retains
+                        // `Top[P]` or `Bottom[P]`. Infer with both so instance-returning overloads
+                        // are materialized without replacing explicit non-instance returns.
+                        (*origin).into_callable_with_receiver(db, self)
+                    } else {
+                        (*origin).into_callable(db)
+                    }
+                }),
                 SubclassOfInner::TypeVar(tvar) => match tvar.typevar(db).bound_or_constraints(db) {
                     Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
                         let upcast_callables = bound

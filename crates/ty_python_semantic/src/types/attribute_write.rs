@@ -68,10 +68,11 @@ pub(super) enum ProtocolMemberWriteRequirement<'db> {
     AssignableTo(Type<'db>),
     /// Invoke every possible descriptor setter with the assigned value.
     ///
-    /// `domain` is the precisely derived write type when that domain fits in [`Type`]. It is used
-    /// for contextual inference and protocol compatibility, while descriptor calls remain the
-    /// authority for real assignments. `None` preserves a known write capability whose generic or
-    /// set-theoretic domain cannot be represented precisely.
+    /// `domain` is the precisely derived write type when that domain fits in [`Type`]. A
+    /// representable domain constrains contextual inference, assignment, and protocol
+    /// compatibility. Calling the original descriptor still validates the complete setter
+    /// contract. `None` preserves a known write capability whose generic or set-theoretic domain
+    /// cannot be represented precisely.
     Descriptor {
         descriptor_ty: Type<'db>,
         receiver_ty: Type<'db>,
@@ -645,6 +646,10 @@ pub(super) fn assignment_attribute_members<'db>(
             Type::KnownInstance(KnownInstanceType::FunctoolsPartial(_))
         ) {
         object_ty.member(db, attribute)
+    } else if let Type::ProtocolInstance(protocol) = object_ty
+        && let Some(origin) = protocol.materialized_origin_property(db, attribute)
+    {
+        Type::instance(db, *origin).class_member(db, attribute)
     } else {
         object_ty.class_member(db, attribute)
     };
