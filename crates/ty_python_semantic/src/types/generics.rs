@@ -384,6 +384,10 @@ impl<'db> GenericContext<'db> {
     /// also includes `A@C`. This is needed because at each call site, we need to infer the
     /// specialized class instance type whose method is being invoked.
     pub(crate) fn inferable_typevars(self, db: &'db dyn Db) -> TypeVarSet<'db> {
+        if self.variables_inner(db).is_empty() {
+            return TypeVarSet::None;
+        }
+
         #[derive(Default)]
         struct CollectTypeVars<'db> {
             typevars: RefCell<FxOrderMap<BoundTypeVarIdentity<'db>, BoundTypeVarInstance<'db>>>,
