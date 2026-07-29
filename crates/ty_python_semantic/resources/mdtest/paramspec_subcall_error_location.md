@@ -780,3 +780,62 @@ info: Function defined here
 9 |     def __new__(cls, value: int, flag: int) -> Self: ...
   |         ^^^^^^^                  --------- Parameter declared here
 ```
+
+## Functions wrapped by functools.partial
+
+`functools.partial` supplies the first argument before the callback is passed to the forwarding
+function. An invalid forwarded argument should point to the next parameter on the original function.
+
+```py
+from functools import partial
+from typing import Callable
+
+def wrapper[**P](callback: Callable[P, None], *args: P.args, **kwargs: P.kwargs) -> None: ...
+def callback(prefix: int, value: int) -> None: ...
+
+wrapper(partial(callback, 1), "incorrect")  # snapshot: invalid-argument-type
+```
+
+```snapshot
+error[invalid-argument-type]: Argument to function `wrapper` is incorrect
+ --> src/mdtest_snippet.py:7:31
+  |
+7 | wrapper(partial(callback, 1), "incorrect")  # snapshot: invalid-argument-type
+  |                               ^^^^^^^^^^^ Expected `int`, found `Literal["incorrect"]`
+info: Function defined here
+ --> src/mdtest_snippet.py:5:5
+  |
+5 | def callback(prefix: int, value: int) -> None: ...
+  |     ^^^^^^^^              ---------- Parameter declared here
+```
+
+## Bound methods wrapped by functools.partial
+
+When `functools.partial` wraps a bound method, both `self` and the argument supplied by `partial`
+come before the forwarded argument.
+
+```py
+from functools import partial
+from typing import Callable
+
+def wrapper[**P](callback: Callable[P, None], *args: P.args, **kwargs: P.kwargs) -> None: ...
+
+class Handler:
+    def callback(self, prefix: int, value: int) -> None: ...
+
+def run(handler: Handler) -> None:
+    wrapper(partial(handler.callback, 1), "incorrect")  # snapshot: invalid-argument-type
+```
+
+```snapshot
+error[invalid-argument-type]: Argument to function `wrapper` is incorrect
+  --> src/mdtest_snippet.py:10:43
+   |
+10 |     wrapper(partial(handler.callback, 1), "incorrect")  # snapshot: invalid-argument-type
+   |                                           ^^^^^^^^^^^ Expected `int`, found `Literal["incorrect"]`
+info: Method defined here
+ --> src/mdtest_snippet.py:7:9
+  |
+7 |     def callback(self, prefix: int, value: int) -> None: ...
+  |         ^^^^^^^^                    ---------- Parameter declared here
+```
