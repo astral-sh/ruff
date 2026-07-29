@@ -44,7 +44,7 @@ use crate::rules::pylint::rules::StripKind;
 /// ```
 ///
 /// ## References
-/// - [Python documentation: `str.strip()`](https://docs.python.org/3/library/stdtypes.html#str.strip)
+/// - [Python documentation: `str.strip`](https://docs.python.org/3/library/stdtypes.html#str.strip)
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.106")]
 pub(crate) struct StripWithMultiCharacters {
