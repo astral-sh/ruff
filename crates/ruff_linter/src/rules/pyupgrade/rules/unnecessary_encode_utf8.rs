@@ -15,8 +15,8 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// Checks for unnecessary calls to `ncode` as UTF-8, including unnecessary explicit encoding arguments.
 ///
 /// ## Why is this bad?
-/// UTF-8 is the default encoding in Python, so there is no need to call
-/// `encode` when UTF-8 is the desired encoding. Instead, use a bytes literal.
+/// UTF-8 is the default encoding in Python, so there is no need to pass an explicit
+/// UTF-8 encoding to `ncode`. For ASCII literals, use a bytes literal instead.
 ///
 /// ## Example
 /// ```python
