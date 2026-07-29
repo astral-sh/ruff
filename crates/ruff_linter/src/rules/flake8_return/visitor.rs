@@ -52,8 +52,6 @@ pub(super) struct ReturnVisitor<'semantic, 'data> {
     sibling: Option<&'data Stmt>,
     /// The parent nodes of the current node.
     parents: Vec<&'data Stmt>,
-    /// Ranges of the `finally` suites that would run after a `return` reached here.
-    enclosing_finally: Vec<TextRange>,
 }
 
 impl<'semantic, 'data> ReturnVisitor<'semantic, 'data> {
@@ -63,8 +61,21 @@ impl<'semantic, 'data> ReturnVisitor<'semantic, 'data> {
             stack: Stack::default(),
             sibling: None,
             parents: Vec::new(),
-            enclosing_finally: Vec::new(),
         }
+    }
+
+    /// Return the enclosing `finally` suites that run after this `return`.
+    fn enclosing_finally(&self, stmt_return: &ast::StmtReturn) -> Vec<TextRange> {
+        self.parents
+            .iter()
+            .filter_map(|parent| parent.as_try_stmt())
+            .filter_map(|stmt_try| {
+                let first = stmt_try.finalbody.first()?;
+                let last = stmt_try.finalbody.last()?;
+                Some(TextRange::new(first.start(), last.end()))
+            })
+            .filter(|finally_range| !finally_range.contains_range(stmt_return.range()))
+            .collect()
     }
 }
 
@@ -137,11 +148,12 @@ impl<'a> Visitor<'a> for ReturnVisitor<'_, 'a> {
                         //     return x
                         // ```
                         Stmt::Assign(stmt_assign) => {
+                            let enclosing_finally = self.enclosing_finally(stmt_return);
                             self.stack.assignment_return.push((
                                 stmt_assign,
                                 stmt_return,
                                 stmt,
-                                self.enclosing_finally.clone(),
+                                enclosing_finally,
                             ));
                         }
                         // Example:
@@ -156,11 +168,12 @@ impl<'a> Visitor<'a> for ReturnVisitor<'_, 'a> {
                                 with.body.last().and_then(Stmt::as_assign_stmt)
                             {
                                 if !has_conditional_body(with, self.semantic) {
+                                    let enclosing_finally = self.enclosing_finally(stmt_return);
                                     self.stack.assignment_return.push((
                                         stmt_assign,
                                         stmt_return,
                                         stmt,
-                                        self.enclosing_finally.clone(),
+                                        enclosing_finally,
                                     ));
                                 }
                             }
@@ -179,34 +192,6 @@ impl<'a> Visitor<'a> for ReturnVisitor<'_, 'a> {
                 if let Some(first) = elif_else_clauses.first() {
                     self.stack.elifs_elses.push((body, first));
                 }
-            }
-            Stmt::Try(stmt_try) => {
-                self.sibling = Some(stmt);
-                self.parents.push(stmt);
-
-                // The `finally` runs after a `return` in the `body`, `handlers`, or `orelse`, so
-                // track its range while visiting those. Not the `finalbody` itself: its own
-                // statements can't re-read a `return`.
-                let finally_range = stmt_try
-                    .finalbody
-                    .first()
-                    .zip(stmt_try.finalbody.last())
-                    .map(|(first, last)| TextRange::new(first.start(), last.end()));
-                if let Some(finally_range) = finally_range {
-                    self.enclosing_finally.push(finally_range);
-                }
-                self.visit_body(&stmt_try.body);
-                for handler in &stmt_try.handlers {
-                    visitor::walk_except_handler(self, handler);
-                }
-                self.visit_body(&stmt_try.orelse);
-                if finally_range.is_some() {
-                    self.enclosing_finally.pop();
-                }
-                self.visit_body(&stmt_try.finalbody);
-
-                self.parents.pop();
-                return;
             }
             _ => {}
         }
