@@ -11,6 +11,7 @@
 //! arguments must match _at least one_ overload.
 
 use std::fmt;
+use std::num::NonZeroU32;
 use std::slice::Iter;
 use std::sync::Arc;
 
@@ -2761,11 +2762,14 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         .with_transformed_parameters(source_params.cloned());
                     let lower = Type::Callable(CallableType::new(
                         db,
-                        CallableSignature::single(Signature::new_generic(
-                            source.generic_context,
-                            source_params,
-                            Type::unknown(),
-                        )),
+                        CallableSignature::single(
+                            Signature::new_generic(
+                                source.generic_context,
+                                source_params,
+                                Type::unknown(),
+                            )
+                            .with_definition(source.definition),
+                        ),
                         CallableTypeKind::ParamSpecValue,
                         CallableFunctionProvenance::None,
                     ));
@@ -3846,14 +3850,16 @@ impl<'db> Parameters<'db> {
                 Parameter::keyword_only(name.clone())
                     .with_annotated_type(field.declared_ty)
                     .with_optional_default_type((!field.is_required()).then_some(Type::unknown()))
-                    .with_definition(field.first_declaration()),
+                    .with_definition(field.first_declaration())
+                    .with_source_parameter_index(parameter.source_parameter_index()),
             );
         }
 
         if let Some(extra_items) = unpacked_typed_dict.openness(db).effective_extra_items() {
             value.push(
                 Parameter::keyword_variadic(kwargs_name)
-                    .with_annotated_type(extra_items.declared_ty),
+                    .with_annotated_type(extra_items.declared_ty)
+                    .with_source_parameter_index(parameter.source_parameter_index()),
             );
         }
     }
@@ -4349,7 +4355,9 @@ impl<'db> Parameters<'db> {
                 .chain(positional_or_keyword)
                 .chain(variadic)
                 .chain(keyword_only)
-                .chain(keywords),
+                .chain(keywords)
+                .enumerate()
+                .map(|(index, parameter)| parameter.with_source_parameter_index(Some(index))),
         )
     }
 
@@ -4458,6 +4466,15 @@ impl<'db> Parameters<'db> {
     }
 
     /// Expands an unpacked `*args` annotation into its logical callable parameters.
+    ///
+    /// Preserve the original `*args` definition and source position on every expanded parameter
+    /// so diagnostics can identify its declaration after specialization or overload filtering.
+    ///
+    /// ```python
+    /// from typing import Unpack
+    ///
+    /// def callback(*args: Unpack[tuple[int, str]]) -> None: ...
+    /// ```
     fn expand_starred_variadic_annotations(&self, db: &'db dyn Db) -> Self {
         if !self
             .data
@@ -4476,37 +4493,36 @@ impl<'db> Parameters<'db> {
                 && let Some(tuple) = parameter.annotated_type().exact_tuple_instance_spec(db)
             {
                 expanded = true;
+                let positional_parameter = |ty| {
+                    Parameter::positional_only(None)
+                        .with_annotated_type(ty)
+                        .with_definition(parameter.definition())
+                        .with_source_parameter_index(parameter.source_parameter_index())
+                };
                 match tuple.as_ref() {
                     Tuple::Fixed(tuple) => {
-                        parameters.extend(
-                            tuple
-                                .iter_all_elements()
-                                .map(|ty| Parameter::positional_only(None).with_annotated_type(ty)),
-                        );
+                        parameters.extend(tuple.iter_all_elements().map(positional_parameter));
                     }
                     Tuple::Variable(variable) => {
-                        parameters.extend(
-                            variable
-                                .iter_prefix_elements()
-                                .map(|ty| Parameter::positional_only(None).with_annotated_type(ty)),
-                        );
+                        parameters
+                            .extend(variable.iter_prefix_elements().map(positional_parameter));
                         let name = parameter
                             .name()
                             .cloned()
                             .unwrap_or_else(|| Name::new_static("args"));
-                        parameters.push(Parameter::variadic(name).with_annotated_type(
-                            match variable.variable() {
-                                VariableSegment::Homogeneous(element) => element,
-                                VariableSegment::TypeVarTuple(typevartuple) => {
-                                    Type::TypeVar(typevartuple)
-                                }
-                            },
-                        ));
-                        parameters.extend(
-                            variable
-                                .iter_suffix_elements()
-                                .map(|ty| Parameter::positional_only(None).with_annotated_type(ty)),
+                        parameters.push(
+                            Parameter::variadic(name)
+                                .with_annotated_type(match variable.variable() {
+                                    VariableSegment::Homogeneous(element) => element,
+                                    VariableSegment::TypeVarTuple(typevartuple) => {
+                                        Type::TypeVar(typevartuple)
+                                    }
+                                })
+                                .with_definition(parameter.definition())
+                                .with_source_parameter_index(parameter.source_parameter_index()),
                         );
+                        parameters
+                            .extend(variable.iter_suffix_elements().map(positional_parameter));
                     }
                 }
             } else {
@@ -4664,6 +4680,13 @@ pub(crate) struct Parameter<'db> {
     /// Syntax-level annotation kind for cases where the annotation has special parameter semantics.
     annotation_kind: ParameterAnnotationKind,
 
+    /// Position of the source parameter that owns this logical parameter.
+    ///
+    /// Expanded tuple and `TypedDict` parameters retain the position of their original `*args` or
+    /// `**kwargs` declaration. Store positions one-based so `None` does not increase the size of
+    /// this struct.
+    source_parameter_index: Option<NonZeroU32>,
+
     kind: ParameterKind<'db>,
 }
 
@@ -4691,6 +4714,7 @@ impl<'db> Parameter<'db> {
             definition: None,
             inferred_annotation: true,
             annotation_kind: ParameterAnnotationKind::Normal,
+            source_parameter_index: None,
             kind: ParameterKind::PositionalOnly {
                 name,
                 default_type: None,
@@ -4704,6 +4728,7 @@ impl<'db> Parameter<'db> {
             definition: None,
             inferred_annotation: true,
             annotation_kind: ParameterAnnotationKind::Normal,
+            source_parameter_index: None,
             kind: ParameterKind::PositionalOrKeyword {
                 name,
                 default_type: None,
@@ -4717,6 +4742,7 @@ impl<'db> Parameter<'db> {
             definition: None,
             inferred_annotation: true,
             annotation_kind: ParameterAnnotationKind::Normal,
+            source_parameter_index: None,
             kind: ParameterKind::Variadic { name },
         }
     }
@@ -4727,6 +4753,7 @@ impl<'db> Parameter<'db> {
             definition: None,
             inferred_annotation: true,
             annotation_kind: ParameterAnnotationKind::Normal,
+            source_parameter_index: None,
             kind: ParameterKind::KeywordOnly {
                 name,
                 default_type: None,
@@ -4740,6 +4767,7 @@ impl<'db> Parameter<'db> {
             definition: None,
             inferred_annotation: true,
             annotation_kind: ParameterAnnotationKind::Normal,
+            source_parameter_index: None,
             kind: ParameterKind::KeywordVariadic { name },
         }
     }
@@ -4783,6 +4811,24 @@ impl<'db> Parameter<'db> {
         self
     }
 
+    /// Records the source position without replacing a synthesized parameter's IDE definition.
+    ///
+    /// A `TypedDict` field can then keep its declaration for navigation while diagnostics refer
+    /// to the enclosing `**kwargs` parameter.
+    fn with_source_parameter_index(mut self, index: Option<usize>) -> Self {
+        self.source_parameter_index = index
+            .and_then(|index| u32::try_from(index).ok())
+            .and_then(|index| index.checked_add(1))
+            .and_then(NonZeroU32::new);
+        self
+    }
+
+    /// Returns the original source parameter's position before variadic expansion.
+    pub(crate) fn source_parameter_index(&self) -> Option<usize> {
+        self.source_parameter_index
+            .map(|index| index.get() as usize - 1)
+    }
+
     fn apply_type_mapping_impl<'a>(
         &self,
         db: &'db dyn Db,
@@ -4803,6 +4849,7 @@ impl<'db> Parameter<'db> {
                 .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
             inferred_annotation: self.inferred_annotation,
             annotation_kind: self.annotation_kind,
+            source_parameter_index: self.source_parameter_index,
         }
     }
 
@@ -4818,6 +4865,7 @@ impl<'db> Parameter<'db> {
             definition: self.definition,
             inferred_annotation: self.inferred_annotation,
             annotation_kind: self.annotation_kind,
+            source_parameter_index: self.source_parameter_index,
             kind,
         }
     }
@@ -4833,6 +4881,7 @@ impl<'db> Parameter<'db> {
             definition,
             annotation_kind,
             inferred_annotation,
+            source_parameter_index,
             kind,
         } = self;
 
@@ -4893,6 +4942,7 @@ impl<'db> Parameter<'db> {
             definition: *definition,
             inferred_annotation: *inferred_annotation,
             annotation_kind: *annotation_kind,
+            source_parameter_index: *source_parameter_index,
             kind,
         })
     }
@@ -4938,6 +4988,7 @@ impl<'db> Parameter<'db> {
             definition,
             inferred_annotation,
             annotation_kind,
+            source_parameter_index: None,
             kind,
         }
     }
@@ -5249,6 +5300,7 @@ mod tests {
                 definition: _,
                 annotation_kind,
                 inferred_annotation,
+                source_parameter_index: _,
                 kind,
             } = parameter;
 

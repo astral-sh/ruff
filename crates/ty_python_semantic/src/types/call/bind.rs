@@ -5259,10 +5259,17 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                             Type::BoundMethod(method) => (method.function(self.db), true),
                             _ => return None,
                         };
-                        let source_binding = callable
-                            .overloads()
-                            .get(overload_index)
+                        let source_binding = partial_signature
+                            .and_then(Signature::definition)
+                            .and_then(|definition| {
+                                callable.overloads().iter().find(|binding| {
+                                    binding.signature.definition() == Some(definition)
+                                })
+                            })
+                            .or_else(|| callable.overloads().get(overload_index))
                             .or_else(|| callable.overloads().first());
+                        let overload_index =
+                            source_binding.map_or(overload_index, Binding::source_overload_index);
                         let source_parameter_index_offset = source_binding
                             .map_or(0, |binding| binding.source_parameter_index_offset)
                             + usize::from(callable.bound_type.is_some());
@@ -6043,7 +6050,9 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                         && error_parameter_source.is_none()
                     {
                         if let Some(parameter_source) = parameter_source
-                            && parameter_source.contains_parameter(self.db, parameter.index)
+                            && parameter_source
+                                .source_parameter_index(self.db, parameter)
+                                .is_some()
                         {
                             *error_parameter_source = Some(parameter_source);
                         } else if let Some(parameter_index) = argument_index
@@ -6051,7 +6060,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                             .and_then(|(index, _)| argument_matches[*index].parameters.first())
                             .map(|parameter| parameter.index)
                         {
-                            parameter.index = parameter_index;
+                            parameter.signature_parameter_index = parameter_index;
                         }
                     }
 
@@ -7484,7 +7493,12 @@ impl std::fmt::Display for CallableDescription<'_> {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct ParameterContext {
     name: Option<ParameterDisplayName<Name>>,
-    index: usize,
+
+    /// Position in the current, possibly specialized or expanded signature.
+    signature_parameter_index: usize,
+
+    /// Position of the original source declaration, before any parameter expansion.
+    source_parameter_index: Option<usize>,
 
     /// Was the argument for this parameter passed positionally, and matched to a non-variadic
     /// positional parameter? (If so, we will provide the index in the diagnostic, not just the
@@ -7493,12 +7507,13 @@ pub(crate) struct ParameterContext {
 }
 
 impl ParameterContext {
-    fn new(parameter: &Parameter, index: usize, positional: bool) -> Self {
+    fn new(parameter: &Parameter, signature_parameter_index: usize, positional: bool) -> Self {
         Self {
             name: parameter
                 .display_name()
                 .map(ParameterDisplayName::into_owned),
-            index,
+            signature_parameter_index,
+            source_parameter_index: parameter.source_parameter_index(),
             positional,
         }
     }
@@ -7508,12 +7523,12 @@ impl std::fmt::Display for ParameterContext {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if let Some(name) = &self.name {
             if self.positional {
-                write!(f, "{} (`{name}`)", self.index + 1)
+                write!(f, "{} (`{name}`)", self.signature_parameter_index + 1)
             } else {
                 write!(f, "`{name}`")
             }
         } else {
-            write!(f, "{}", self.index + 1)
+            write!(f, "{}", self.signature_parameter_index + 1)
         }
     }
 }
@@ -7547,52 +7562,91 @@ pub(crate) struct ForwardedParameterSource<'db> {
 impl<'db> ForwardedParameterSource<'db> {
     /// Recovers an overload's original index after specialization filters earlier declarations.
     ///
-    /// `overload_index` initially refers to the specialized overload list. This method finds the
-    /// corresponding position in the original function, which can differ after filtering.
+    /// `overload_index` initially refers to the specialized overload list. Match the overload by
+    /// its function definition when possible, since its position in the original function can
+    /// differ after filtering. In this example, both overloads refer to the same `Config` fields,
+    /// but their function definitions are distinct:
+    ///
+    /// ```python
+    /// @overload
+    /// def callback(prefix: str, **options: Unpack[Config]) -> None: ...
+    /// @overload
+    /// def callback(prefix: int, **options: Unpack[Config]) -> None: ...
+    /// ```
     fn source_overload_index(self, db: &'db dyn Db, signature: &Signature<'db>) -> Option<usize> {
+        let source_signatures = &self.function.signature(db).overloads;
+
+        if let Some(definition) = signature.definition() {
+            return source_signatures
+                .iter()
+                .position(|source_signature| source_signature.definition() == Some(definition));
+        }
+
         let parameter_definition = signature
             .parameters()
             .iter()
             .find_map(Parameter::definition)?;
 
+        let contains_parameter = |source_signature: &Signature<'db>| {
+            source_signature
+                .parameters()
+                .iter()
+                .any(|parameter| parameter.definition() == Some(parameter_definition))
+        };
+
+        if source_signatures
+            .get(self.overload_index)
+            .is_some_and(contains_parameter)
+        {
+            Some(self.overload_index)
+        } else {
+            source_signatures.iter().position(contains_parameter)
+        }
+    }
+
+    /// Locates the source parameter that accepted a forwarded argument.
+    ///
+    /// An unpacked variadic annotation can expand one source declaration into several callable
+    /// parameters. Map each expanded parameter back to its shared `*args` or `**kwargs`
+    /// declaration instead of interpreting its position as a source parameter index. Looking up
+    /// the original position through the cached signature also avoids making the caller depend on
+    /// the callback's entire AST.
+    ///
+    /// ```python
+    /// from typing import Unpack
+    ///
+    /// def callback(*args: Unpack[tuple[int, str]]) -> None: ...
+    /// ```
+    fn source_parameter_index(
+        self,
+        db: &'db dyn Db,
+        parameter: &ParameterContext,
+    ) -> Option<usize> {
+        let parameter_index = parameter
+            .source_parameter_index
+            .unwrap_or(parameter.signature_parameter_index + self.parameter_index_offset);
         self.function
             .signature(db)
             .overloads
+            .get(self.overload_index)?
+            .parameters()
             .iter()
-            .position(|source_signature| {
-                source_signature
-                    .parameters()
-                    .iter()
-                    .any(|parameter| parameter.definition() == Some(parameter_definition))
+            .any(|source_parameter| {
+                source_parameter.source_parameter_index() == Some(parameter_index)
             })
-    }
-
-    /// Returns whether the forwarded parameter maps to a specific source parameter.
-    ///
-    /// Out-of-range indices otherwise resolve to the entire signature, which would produce a
-    /// misleading diagnostic annotation.
-    fn contains_parameter(self, db: &'db dyn Db, parameter_index: usize) -> bool {
-        let parameter_index = parameter_index + self.parameter_index_offset;
-        let (overloads, implementation) = self.function.overloads_and_implementation(db);
-        let Some(overload) = overloads
-            .get(self.overload_index)
-            .copied()
-            .or(implementation)
-        else {
-            return false;
-        };
-
-        let (_, parameter_span) = overload.parameter_span(db, Some(parameter_index));
-        let (_, all_parameters_span) = overload.parameter_span(db, None);
-        parameter_span != all_parameters_span
+            .then_some(parameter_index)
     }
 
     /// Locates the matched source overload after restoring omitted receiver and prefix parameters.
-    fn parameter_span(self, db: &'db dyn Db, parameter_index: usize) -> (Span, Span) {
-        let parameter_index = parameter_index + self.parameter_index_offset;
-        let (overloads, _) = self.function.overloads_and_implementation(db);
+    fn parameter_span(self, db: &'db dyn Db, parameter: &ParameterContext) -> (Span, Span) {
+        let parameter_index = self
+            .source_parameter_index(db, parameter)
+            .unwrap_or(parameter.signature_parameter_index + self.parameter_index_offset);
+        let (overloads, implementation) = self.function.overloads_and_implementation(db);
         overloads
             .get(self.overload_index)
+            .copied()
+            .or(implementation)
             .map(|overload| overload.parameter_span(db, Some(parameter_index)))
             .unwrap_or_else(|| self.function.parameter_span(db, Some(parameter_index)))
     }
@@ -7951,7 +8005,7 @@ impl<'db> BindingError<'db> {
 
                 if let Some(parameter_source) = parameter_source {
                     let (name_span, parameter_span) =
-                        parameter_source.parameter_span(context.db(), parameter.index);
+                        parameter_source.parameter_span(context.db(), parameter);
                     let callable_kind = if parameter_source.is_bound_method {
                         "Method"
                     } else {
@@ -7993,9 +8047,9 @@ impl<'db> BindingError<'db> {
                                         candidate.is_keyword_variadic()
                                     }
                                 })
-                                .unwrap_or(parameter.index)
+                                .unwrap_or(parameter.signature_parameter_index)
                         } else {
-                            parameter.index
+                            parameter.signature_parameter_index
                         };
                         let (name_span, parameter_span) = overload_literal.parameter_span(
                             context.db(),
@@ -8034,7 +8088,7 @@ impl<'db> BindingError<'db> {
                 } else if parameter_source.is_none()
                     && let Some((name_span, parameter_span)) = callable_ty.parameter_span(
                         context.db(),
-                        Some(parameter.index + source_parameter_index_offset),
+                        Some(parameter.signature_parameter_index + source_parameter_index_offset),
                     )
                 {
                     let mut sub = SubDiagnostic::new(
@@ -8135,8 +8189,10 @@ impl<'db> BindingError<'db> {
                     } else {
                         let span = callable_ty.parameter_span(
                             context.db(),
-                            (parameters.0.len() == 1)
-                                .then(|| parameters.0[0].index + source_parameter_index_offset),
+                            (parameters.0.len() == 1).then(|| {
+                                parameters.0[0].signature_parameter_index
+                                    + source_parameter_index_offset
+                            }),
                         );
                         if let Some((_, parameter_span)) = span {
                             let mut sub = SubDiagnostic::new(
