@@ -595,3 +595,184 @@ info: Function defined here
 3 | def wrapper[**P](callback: Callable[P, None], *args: P.args, **kwargs: P.kwargs) -> None: ...
   |     ^^^^^^^                                                  ------------------ Parameter declared here
 ```
+
+## Callback protocols
+
+Unlike a plain `Callable` annotation, a callback protocol includes a declaration for `__call__`. The
+diagnostic should point to the parameter on that method.
+
+```py
+import asyncio
+from typing import Protocol
+
+class Callback(Protocol):
+    def __call__(self, *, value: int) -> None: ...
+
+async def run(callback: Callback) -> None:
+    await asyncio.to_thread(callback, value="incorrect")  # snapshot: invalid-argument-type
+```
+
+```snapshot
+error[invalid-argument-type]: Argument to function `to_thread` is incorrect
+ --> src/mdtest_snippet.py:8:39
+  |
+8 |     await asyncio.to_thread(callback, value="incorrect")  # snapshot: invalid-argument-type
+  |                                       ^^^^^^^^^^^^^^^^^ Expected `int`, found `Literal["incorrect"]`
+info: Method defined here
+ --> src/mdtest_snippet.py:5:9
+  |
+5 |     def __call__(self, *, value: int) -> None: ...
+  |         ^^^^^^^^          ---------- Parameter declared here
+```
+
+## Callable objects
+
+A callable object declares its accepted arguments on `__call__`. Point to that method when the
+object is passed to a forwarding function.
+
+```py
+import asyncio
+
+class Callback:
+    def __call__(self, *, value: int) -> None: ...
+
+async def run() -> None:
+    await asyncio.to_thread(Callback(), value="incorrect")  # snapshot: invalid-argument-type
+```
+
+```snapshot
+error[invalid-argument-type]: Argument to function `to_thread` is incorrect
+ --> src/mdtest_snippet.py:7:41
+  |
+7 |     await asyncio.to_thread(Callback(), value="incorrect")  # snapshot: invalid-argument-type
+  |                                         ^^^^^^^^^^^^^^^^^ Expected `int`, found `Literal["incorrect"]`
+info: Method defined here
+ --> src/mdtest_snippet.py:4:9
+  |
+4 |     def __call__(self, *, value: int) -> None: ...
+  |         ^^^^^^^^          ---------- Parameter declared here
+```
+
+## Constructors defined by __init__
+
+Passing a class to `asyncio.to_thread` forwards arguments to its constructor. A class that declares
+`__init__` should identify the matching constructor parameter.
+
+```py
+import asyncio
+
+class Factory:
+    def __init__(self, value: int) -> None: ...
+
+async def run() -> None:
+    await asyncio.to_thread(Factory, "incorrect")  # snapshot: invalid-argument-type
+```
+
+```snapshot
+error[invalid-argument-type]: Argument to function `to_thread` is incorrect
+ --> src/mdtest_snippet.py:7:38
+  |
+7 |     await asyncio.to_thread(Factory, "incorrect")  # snapshot: invalid-argument-type
+  |                                      ^^^^^^^^^^^ Expected `int`, found `Literal["incorrect"]`
+info: Method defined here
+ --> src/mdtest_snippet.py:4:9
+  |
+4 |     def __init__(self, value: int) -> None: ...
+  |         ^^^^^^^^       ---------- Parameter declared here
+```
+
+## Constructors defined by a metaclass
+
+A custom metaclass can determine the accepted constructor arguments through its own `__call__`. That
+declaration takes precedence over the class's `__init__` method.
+
+```py
+import asyncio
+
+class Meta(type):
+    def __call__(cls, value: int) -> object:
+        return object()
+
+class Factory(metaclass=Meta):
+    def __init__(self, value: str) -> None: ...
+
+async def run() -> None:
+    await asyncio.to_thread(Factory, "incorrect")  # snapshot: invalid-argument-type
+```
+
+```snapshot
+error[invalid-argument-type]: Argument to function `to_thread` is incorrect
+  --> src/mdtest_snippet.py:11:38
+   |
+11 |     await asyncio.to_thread(Factory, "incorrect")  # snapshot: invalid-argument-type
+   |                                      ^^^^^^^^^^^ Expected `int`, found `Literal["incorrect"]`
+info: Method defined here
+ --> src/mdtest_snippet.py:4:9
+  |
+4 |     def __call__(cls, value: int) -> object:
+  |         ^^^^^^^^      ---------- Parameter declared here
+```
+
+## Constructors defined by __new__
+
+A constructor defined by `__new__` consumes `cls` before checking the forwarded arguments. The
+diagnostic should point to `value`, not `cls`.
+
+```py
+import asyncio
+from typing import Self
+
+class Factory:
+    def __new__(cls, value: int) -> Self:
+        return super().__new__(cls)
+
+async def run() -> None:
+    await asyncio.to_thread(Factory, "incorrect")  # snapshot: invalid-argument-type
+```
+
+```snapshot
+error[invalid-argument-type]: Argument to function `to_thread` is incorrect
+ --> src/mdtest_snippet.py:9:38
+  |
+9 |     await asyncio.to_thread(Factory, "incorrect")  # snapshot: invalid-argument-type
+  |                                      ^^^^^^^^^^^ Expected `int`, found `Literal["incorrect"]`
+info: Function defined here
+ --> src/mdtest_snippet.py:5:9
+  |
+5 |     def __new__(cls, value: int) -> Self:
+  |         ^^^^^^^      ---------- Parameter declared here
+```
+
+## Overloaded constructors defined by __new__
+
+When `__new__` is overloaded, the diagnostic must both select the matching overload and account for
+its `cls` parameter.
+
+```py
+import asyncio
+from typing import Self, overload
+
+class Factory:
+    @overload
+    def __new__(cls, value: str) -> Self: ...
+    @overload
+    def __new__(cls, value: int, flag: int) -> Self: ...
+    def __new__(cls, value: str | int, flag: int | None = None) -> Self:
+        return super().__new__(cls)
+
+async def run() -> None:
+    await asyncio.to_thread(Factory, 1, "incorrect")  # snapshot: invalid-argument-type
+```
+
+```snapshot
+error[invalid-argument-type]: Argument to function `to_thread` is incorrect
+  --> src/mdtest_snippet.py:13:41
+   |
+13 |     await asyncio.to_thread(Factory, 1, "incorrect")  # snapshot: invalid-argument-type
+   |                                         ^^^^^^^^^^^ Expected `int`, found `Literal["incorrect"]`
+info: Function defined here
+ --> src/mdtest_snippet.py:8:9
+  |
+8 |     def __new__(cls, value: int, flag: int) -> Self: ...
+  |         ^^^^^^^                  --------- Parameter declared here
+```
