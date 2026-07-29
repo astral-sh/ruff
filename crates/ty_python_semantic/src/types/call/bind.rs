@@ -7510,12 +7510,12 @@ pub(crate) struct ParameterContext {
 }
 
 impl ParameterContext {
-    fn new(parameter: &Parameter, signature_parameter_index: usize, positional: bool) -> Self {
+    fn new(parameter: &Parameter, index: usize, positional: bool) -> Self {
         Self {
             name: parameter
                 .display_name()
                 .map(ParameterDisplayName::into_owned),
-            signature_parameter_index,
+            signature_parameter_index: index,
             source_parameter_index: parameter.source_parameter_index(),
             positional,
         }
