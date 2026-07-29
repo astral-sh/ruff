@@ -4826,7 +4826,6 @@ version = "0.0.6"
 dependencies = [
  "anyhow",
  "bitflags 2.13.1",
- "bitvec",
  "camino",
  "char_str",
  "compact_str",

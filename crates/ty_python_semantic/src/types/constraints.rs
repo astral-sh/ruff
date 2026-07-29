@@ -1291,7 +1291,7 @@ impl<'db> ConstraintSetStorage<'db> {
                     let mut storage = self.storage.borrow_mut();
                     let typevar = storage.intern_typevar(db, bound_typevar);
                     let mut support = self.support.borrow_mut();
-                    support.set(typevar);
+                    support.insert(typevar);
                 }
                 walk_type_with_recursion_guard(db, ty, self, &self.recursion_guard);
             }
@@ -1313,7 +1313,7 @@ impl<'db> ConstraintSetStorage<'db> {
         bounds: ConstraintBounds<'db>,
     ) -> Support {
         let mut support = Support::default();
-        support.set(self.intern_typevar(db, typevar));
+        support.insert(self.intern_typevar(db, typevar));
         if let Some(lower) = bounds.lower {
             self.intern_mentioned_typevars_in_type(db, lower, &mut support);
         }
@@ -4431,7 +4431,10 @@ impl InteriorNode {
             // quantified typevars.
             &mut |storage: &ConstraintSetStorage<'_>, constraint| {
                 let support = storage.constraint_support(constraint);
-                support.contains_any(storage, |typevar| typevar.is_inferable(db, bound_typevars))
+                support.iter().any(|typevar| {
+                    let typevar = storage.typevar_data(typevar);
+                    typevar.is_inferable(db, bound_typevars)
+                })
             },
         )
     }

@@ -29,7 +29,6 @@ ty_python_core = { workspace = true }
 ty_static = { workspace = true }
 
 bitflags = { workspace = true }
-bitvec = { workspace = true }
 char_str = { workspace = true }
 compact_str = { workspace = true }
 drop_bomb = { workspace = true }

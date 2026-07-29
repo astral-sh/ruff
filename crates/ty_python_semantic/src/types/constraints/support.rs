@@ -8,11 +8,10 @@
 
 use std::ops::BitOrAssign;
 
-use crate::types::constraints::{ConstraintSetStorage, TypeVarId};
-use crate::types::typevar::BoundTypeVarIdentity;
+use crate::types::constraints::TypeVarId;
 
-use bitvec::prelude::BitVec;
 use ruff_index::newtype_index;
+use smallvec::SmallVec;
 
 #[newtype_index]
 #[derive(get_size2::GetSize)]
@@ -20,42 +19,57 @@ pub(super) struct SupportId;
 
 #[derive(Clone, Debug, Default, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 pub(super) struct Support {
-    #[get_size(size_fn = support_bit_box_size)]
-    bits: BitVec,
+    chunks: SmallVec<[usize; 2]>,
 }
 
-fn support_bit_box_size(bits: &BitVec) -> usize {
-    std::mem::size_of_val(bits.as_raw_slice())
-}
+const CHUNK_SIZE: usize = usize::BITS as usize;
 
 impl Support {
-    pub(super) fn set(&mut self, typevar: TypeVarId) {
+    /// Adds a typevar to this support.
+    pub(super) fn insert(&mut self, typevar: TypeVarId) {
         let index = typevar.index();
-        if self.bits.len() < index + 1 {
-            self.bits.resize(index + 1, false);
+        let chunks_needed = (index + 1).div_ceil(CHUNK_SIZE);
+        if self.chunks.len() < chunks_needed {
+            self.chunks.resize(chunks_needed, 0);
         }
-        self.bits.set(index, true);
+
+        let chunk_index = index / CHUNK_SIZE;
+        let bit_index_within_chunk = index % CHUNK_SIZE;
+        let bit_mask_within_chunk = 1 << bit_index_within_chunk;
+        self.chunks[chunk_index] |= bit_mask_within_chunk;
     }
 
-    pub(super) fn contains_any<'db>(
-        &self,
-        storage: &ConstraintSetStorage<'db>,
-        mut predicate: impl FnMut(BoundTypeVarIdentity<'db>) -> bool,
-    ) -> bool {
-        self.bits.iter_ones().any(|index| {
-            let typevar = TypeVarId::from_usize(index);
-            let typevar = storage.typevar_data(typevar);
-            predicate(typevar)
-        })
+    /// Returns an iterator of all of the typevars in this support.
+    pub(super) fn iter(&self) -> impl Iterator<Item = TypeVarId> + '_ {
+        self.chunks
+            .iter()
+            .copied()
+            .enumerate()
+            .flat_map(|(chunk_index, mut chunk)| {
+                let mut bit_index = chunk_index * CHUNK_SIZE;
+                std::iter::from_fn(move || {
+                    while chunk != 0 {
+                        let lowest_bit = chunk & 1;
+                        chunk >>= 1;
+                        bit_index += 1;
+                        if lowest_bit != 0 {
+                            return Some(TypeVarId::from_usize(bit_index - 1));
+                        }
+                    }
+                    None
+                })
+            })
     }
 }
 
 impl BitOrAssign<&Self> for Support {
     fn bitor_assign(&mut self, rhs: &Self) {
-        if self.bits.len() < rhs.bits.len() {
-            self.bits.resize(rhs.bits.len(), false);
+        if self.chunks.len() < rhs.chunks.len() {
+            self.chunks.resize(rhs.chunks.len(), 0);
         }
-        self.bits |= rhs.bits.as_bitslice();
+        for (lhs, rhs) in std::iter::zip(&mut self.chunks, &rhs.chunks) {
+            *lhs |= *rhs;
+        }
     }
 }
 
