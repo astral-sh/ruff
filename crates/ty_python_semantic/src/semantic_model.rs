@@ -19,8 +19,8 @@ use crate::reachability::type_narrowed_by_previous_patterns;
 use crate::types::ide_support::{ImportAliasResolution, definition_for_name};
 use crate::types::list_members::{Member, all_members, all_reachable_members};
 use crate::types::{
-    CycleDetector, EnumLiteralType, LiteralValueTypeKind, SpecialFormType, Type, TypeQualifiers,
-    binding_type, expand_type, infer_complete_scope_types, inferred_declaration,
+    CycleDetector, EnumLiteralType, KnownClass, LiteralValueTypeKind, SpecialFormType, Type,
+    TypeQualifiers, binding_type, expand_type, infer_complete_scope_types, inferred_declaration,
     pattern_binding_fallthrough_type,
 };
 use ty_python_core::definition::{Definition, DefinitionKind};
@@ -628,7 +628,15 @@ impl<'db> SemanticModel<'db> {
 
             let expanded = match ty {
                 Type::TypeAlias(alias) => vec![alias.value_type(db)],
-                _ => expand_type(db, ty).unwrap_or_default(),
+                Type::EnumComplement(_) | Type::Intersection(_) | Type::Union(_) => {
+                    expand_type(db, ty).unwrap_or_default()
+                }
+                Type::NominalInstance(instance)
+                    if instance.class_literal(db).is_known(db, KnownClass::Bool) =>
+                {
+                    expand_type(db, ty).unwrap_or_default()
+                }
+                _ => Vec::new(),
             };
 
             expanded

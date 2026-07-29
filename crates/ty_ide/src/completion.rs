@@ -9306,6 +9306,23 @@ def handle(status: bool | None):
     }
 
     #[test]
+    fn match_pattern_does_not_expand_recursive_fixed_tuple_aliases() {
+        let source = "\
+type Recursive = bool | tuple[Recursive]
+
+def handle(status: Recursive):
+    match status:
+        case <CURSOR>:
+            pass
+";
+
+        let builder = completion_test_builder(source);
+        let test = builder.build();
+        test.contains("True");
+        test.contains("False");
+    }
+
+    #[test]
     fn match_pattern_ranks_literal_above_exact_scope_match() {
         let source = "\
 def handle(status: bool | None):
