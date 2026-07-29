@@ -3095,7 +3095,11 @@ fn protocol_bind_self<'db>(
 }
 
 /// Cache receiver and `Self` binding only for protocol-member compatibility checks.
-#[salsa::tracked(returns(copy), heap_size=ruff_memory_usage::heap_size)]
+#[salsa::tracked(
+    returns(copy),
+    cycle_initial=|db, _, _, _, _| CallableType::bottom(db),
+    heap_size=ruff_memory_usage::heap_size
+)]
 fn protocol_apply_self_with_receiver<'db>(
     db: &'db dyn Db,
     callable: CallableType<'db>,
