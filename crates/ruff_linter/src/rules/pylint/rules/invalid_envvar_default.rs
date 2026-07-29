@@ -43,6 +43,26 @@ impl Violation for InvalidEnvvarDefault {
     }
 }
 
+fn is_integer_default_wrapped_in_int(checker: &Checker, call: &ast::ExprCall, default: &ast::Expr) -> bool {
+    if !matches!(
+        default,
+        ast::Expr::NumberLiteral(ast::ExprNumberLiteral {
+            value: ast::Number::Int(_),
+            ..
+        })
+    ) {
+        return false;
+    }
+
+    let Some(ast::Expr::Call(parent)) = checker.semantic().current_expression_parent() else {
+        return false;
+    };
+
+    checker.semantic().match_builtin_expr(&parent.func, "int")
+        && parent.arguments.args.len() == 1
+        && parent.arguments.keywords.is_empty()
+        && parent.arguments.args[0].range() == call.range()
+}
 /// PLW1508
 pub(crate) fn invalid_envvar_default(checker: &Checker, call: &ast::ExprCall) {
     if !checker.semantic().seen_module(Modules::OS) {
