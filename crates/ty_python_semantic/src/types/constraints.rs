@@ -935,8 +935,8 @@ struct ConstraintSetStorage<'db> {
     negate_cache: FxHashMap<NodeId, NodeId>,
     or_cache: FxHashMap<(NodeId, NodeId), NodeId>,
     and_cache: FxHashMap<(NodeId, NodeId), NodeId>,
-    /// Abstraction also constructs sequents while traversing the TDD, so its cache key must retain
-    /// the sidecar source order for the same reason.
+    /// Existential abstraction derives new constraints in source order and returns their
+    /// source-order sidecar, so distinct orderings of the same BDD must not share a cache entry.
     exists_cache: FxHashMap<ExistsCacheKey<'db>, (NodeId, Option<SourceOrderId>)>,
     restrict_one_cache: FxHashMap<(NodeId, ConstraintAssignment), (NodeId, bool)>,
     simplify_cache: FxHashMap<NodeId, NodeId>,
@@ -1446,6 +1446,8 @@ impl<'db> ConstraintSetBuilder<'db> {
         id
     }
 
+    /// Repeating a source-order tree cannot change the first occurrence of any constraint, so
+    /// combining identical trees must reuse their existing sidecar.
     fn ordered_source_order(
         &self,
         left: Option<SourceOrderId>,
@@ -1454,6 +1456,7 @@ impl<'db> ConstraintSetBuilder<'db> {
         match (left, right) {
             (None, None) => None,
             (None, other) | (other, None) => other,
+            (Some(left), Some(right)) if left == right => Some(left),
             (Some(left), Some(right)) => {
                 Some(self.intern_source_order(SourceOrder::Ordered(left, right)))
             }
@@ -8838,6 +8841,32 @@ mod tests {
         assert!(tdd.iff(&db, &builder, negated).is_never_satisfied(&db));
     }
 
+    #[test]
+    fn constraint_set_source_order_combination_is_idempotent() {
+        let db = setup_db();
+        let t = create_typevar(&db, "T");
+        let u = create_typevar(&db, "U");
+        let builder = ConstraintSetBuilder::new();
+        let t_int = create_constraint(&db, &builder, t, KnownClass::Int);
+        let u_str = create_constraint(&db, &builder, u, KnownClass::Str);
+        let combined = t_int.and(&db, &builder, || u_str);
+
+        for original in [t_int, combined] {
+            let original_source_order_count = builder.storage.borrow().source_orders.len();
+            let intersection = original.and(&db, &builder, || original);
+            let union = original.or(&db, &builder, || original);
+
+            assert_eq!(intersection.node, original.node);
+            assert_eq!(intersection.source_order, original.source_order);
+            assert_eq!(union.node, original.node);
+            assert_eq!(union.source_order, original.source_order);
+            assert_eq!(
+                builder.storage.borrow().source_orders.len(),
+                original_source_order_count
+            );
+        }
+    }
+
     fn create_compacted_owned_set(db: &dyn Db) -> OwnedConstraintSet<'_> {
         let t = create_typevar(db, "T");
         let u = create_typevar(db, "U");
@@ -8885,16 +8914,19 @@ mod tests {
             ConstraintSetBuilder::new().into_owned(|builder| {
                 let t_int = create_constraint(&db, builder, t, KnownClass::Int);
                 let u_str = create_constraint(&db, builder, u, KnownClass::Str);
+                let combined = t_int.and(&db, builder, || u_str);
 
                 if include_redundant_combination {
-                    // The redundant combination leaves the BDD unchanged but still creates an
-                    // intermediate source-order tree. It must not affect the final owned set.
-                    let redundant = t_int.and(&db, builder, || t_int);
-                    assert_eq!(redundant.node, t_int.node);
-                    assert_ne!(redundant.source_order, t_int.source_order);
+                    // Repeating one constraint leaves the BDD and first-occurrence source order
+                    // unchanged, but creates a distinct, reachable source-order tree. Both trees
+                    // must compact to the same owned set.
+                    let redundant = combined.and(&db, builder, || t_int);
+                    assert_eq!(redundant.node, combined.node);
+                    assert_ne!(redundant.source_order, combined.source_order);
+                    redundant
+                } else {
+                    combined
                 }
-
-                t_int.and(&db, builder, || u_str)
             })
         };
 
