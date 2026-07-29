@@ -25,6 +25,7 @@ use ruff_linter::{
     packaging::detect_package_root,
     preview::is_human_readable_names_enabled,
     settings::flags,
+    source_kind::SourceKind,
     suppression::Suppressions,
 };
 use ruff_notebook::{Notebook, NotebookIndex};
@@ -93,79 +94,12 @@ pub(crate) fn check(
         return DiagnosticsMap::default();
     }
 
-    let file_path = query.file_path();
-    let package = if let Some(file_path) = &file_path {
-        detect_package_root(
-            file_path
-                .parent()
-                .expect("a path to a document should have a parent path"),
-            &settings.linter.namespace_packages,
-        )
-        .map(PackageRoot::root)
-    } else {
-        None
-    };
-
-    let target_version = settings.linter.resolve_target_version(&document_path);
-
-    // Parse once.
-    let parsed = parse_unchecked_source(&source_kind, source_type, target_version.parser_version());
-
     // Map row and column locations to byte slices (lazily).
     let locator = Locator::new(source_kind.source_code());
-
-    // Detect the current code style (lazily).
-    let stylist = Stylist::from_tokens(parsed.tokens(), locator.contents());
-
-    // Extra indices from the code.
-    let indexer = Indexer::from_tokens(parsed.tokens(), locator.contents());
-
-    // Extract the `# noqa` and `# isort: skip` directives from the source.
-    let directives = extract_directives(parsed.tokens(), Flags::all(), &locator, &indexer);
-
-    // Parse range suppression comments
-    let suppressions = Suppressions::from_tokens(
-        locator.contents(),
-        parsed.tokens(),
-        &indexer,
-        &settings.linter,
-    );
-
-    // Generate checks.
-    let diagnostics = check_path(
-        &document_path,
-        package,
-        &locator,
-        &stylist,
-        &indexer,
-        &directives,
-        &settings.linter,
-        flags::Noqa::Enabled,
-        &source_kind,
-        source_type,
-        &parsed,
-        target_version,
-        &suppressions,
-    );
-
-    let suppression_edits = generate_suppression_edits(
-        &document_path,
-        &diagnostics,
-        &locator,
-        indexer.comment_ranges(),
-        &settings.linter.external,
-        &directives.noqa_line_for,
-        stylist.line_ending(),
-        &suppressions,
-        if is_human_readable_names_enabled(settings.linter.preview)
-            && !settings.output_prefer_rule_codes
-        {
-            SuppressionKind::Ignore
-        } else {
-            SuppressionKind::Noqa
-        },
-        settings.linter.preview,
-    );
+    let CheckResult {
+        diagnostics,
+        suppression_edits,
+    } = check_python(query, source_type, &source_kind, &locator);
     let context = LspDiagnosticContext {
         source: source_kind.source_code(),
         index: locator.to_index(),
@@ -225,6 +159,91 @@ pub(crate) fn check(
     diagnostics_map
 }
 
+fn check_python(
+    query: &DocumentQuery,
+    source_type: ruff_python_ast::PySourceType,
+    source_kind: &SourceKind,
+    locator: &Locator<'_>,
+) -> CheckResult {
+    let settings = query.settings();
+    let document_path = query.virtual_file_path();
+
+    let file_path = query.file_path();
+    let package = if let Some(file_path) = &file_path {
+        detect_package_root(
+            file_path
+                .parent()
+                .expect("a path to a document should have a parent path"),
+            &settings.linter.namespace_packages,
+        )
+        .map(PackageRoot::root)
+    } else {
+        None
+    };
+
+    let target_version = settings.linter.resolve_target_version(&document_path);
+
+    // Parse once.
+    let parsed = parse_unchecked_source(source_kind, source_type, target_version.parser_version());
+
+    // Detect the current code style (lazily).
+    let stylist = Stylist::from_tokens(parsed.tokens(), locator.contents());
+
+    // Extra indices from the code.
+    let indexer = Indexer::from_tokens(parsed.tokens(), locator.contents());
+
+    // Extract the `# noqa` and `# isort: skip` directives from the source.
+    let directives = extract_directives(parsed.tokens(), Flags::all(), locator, &indexer);
+
+    // Parse range suppression comments
+    let suppressions = Suppressions::from_tokens(
+        locator.contents(),
+        parsed.tokens(),
+        &indexer,
+        &settings.linter,
+    );
+
+    // Generate checks.
+    let diagnostics = check_path(
+        &document_path,
+        package,
+        locator,
+        &stylist,
+        &indexer,
+        &directives,
+        &settings.linter,
+        flags::Noqa::Enabled,
+        source_kind,
+        source_type,
+        &parsed,
+        target_version,
+        &suppressions,
+    );
+
+    let suppression_edits = generate_suppression_edits(
+        &document_path,
+        &diagnostics,
+        locator,
+        indexer.comment_ranges(),
+        &settings.linter.external,
+        &directives.noqa_line_for,
+        stylist.line_ending(),
+        &suppressions,
+        if is_human_readable_names_enabled(settings.linter.preview)
+            && !settings.output_prefer_rule_codes
+        {
+            SuppressionKind::Ignore
+        } else {
+            SuppressionKind::Noqa
+        },
+        settings.linter.preview,
+    );
+    CheckResult {
+        diagnostics,
+        suppression_edits,
+    }
+}
+
 /// Converts LSP diagnostics to a list of `DiagnosticFix`es by deserializing associated data on each diagnostic.
 pub(crate) fn fixes_for_diagnostics(
     diagnostics: Vec<lsp_types::Diagnostic>,
@@ -251,6 +270,11 @@ pub(crate) fn fixes_for_diagnostics(
         })
         .filter_map(crate::Result::transpose)
         .collect()
+}
+
+struct CheckResult {
+    diagnostics: Vec<Diagnostic>,
+    suppression_edits: Vec<Option<Edit>>,
 }
 
 struct LspDiagnosticContext<'a> {
