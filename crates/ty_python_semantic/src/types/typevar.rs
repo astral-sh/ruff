@@ -241,13 +241,12 @@ impl<'db> TypeVarInstance<'db> {
     /// Returns the static upper bound used when materializing a gradual type argument.
     ///
     /// Constraints are unioned only when materializing an exposed member, where their union is a
-    /// valid conservative upper bound. A bound can also refer to a specialization of the class
-    /// that owns this type variable. Keeping bound materialization in a tracked query lets Salsa
-    /// recover from that recursive dependency instead of repeatedly expanding the same invalid
-    /// specialization.
+    /// valid conservative upper bound. A bound may recursively refer to its own generic class,
+    /// either directly or through other bounds. Such a bound has no finite static top
+    /// materialization, so recover from its cycle without applying an upper bound.
     #[salsa::tracked(
         returns(copy),
-        cycle_initial=|_, _, _| None,
+        cycle_result=|_, _, _| None,
         heap_size=ruff_memory_usage::heap_size
     )]
     pub(super) fn top_materialized_upper_bound(self, db: &'db dyn Db) -> Option<Type<'db>> {

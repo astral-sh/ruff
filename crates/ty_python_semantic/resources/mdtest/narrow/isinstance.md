@@ -841,6 +841,51 @@ def excludes_bounded_generic_subclass(
     return cls
 ```
 
+## Narrowing recursively bounded generics
+
+An `isinstance()` check must not recurse indefinitely when a generic bound refers to its own class.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Any
+
+class Recursive[T: "Recursive[Any]"]: ...
+
+def narrow(value: object) -> None:
+    if isinstance(value, Recursive):
+        reveal_type(value)  # revealed: Recursive[object]
+```
+
+A self-referential bound must also be safe when its recursion is hidden behind a type alias.
+
+```py
+class AliasedRecursive[T: "RecursiveAlias"]: ...
+
+type RecursiveAlias = AliasedRecursive[Any]
+
+def narrow_alias(value: object) -> None:
+    if isinstance(value, AliasedRecursive):
+        reveal_type(value)  # revealed: AliasedRecursive[object]
+```
+
+The same cycle recovery must handle bounds shared by mutually recursive generic classes.
+
+```py
+class Left[T: "Right[Any]"]: ...
+class Right[U: Left[Any]]: ...
+
+def narrow_mutual(value: object) -> None:
+    if isinstance(value, Left):
+        reveal_type(value)  # revealed: Left[object]
+
+    if isinstance(value, Right):
+        reveal_type(value)  # revealed: Right[object]
+```
+
 ## Narrowing generic defaults in Python 3.13
 
 When a type parameter has a bare `Any` default, narrowing still materializes the substituted
