@@ -6594,24 +6594,33 @@ impl<'db> Type<'db> {
             return self;
         }
 
-        self.apply_specialization_inner(env.db(), env.program(), specialization)
+        let db = env.db();
+        debug_assert_eq!(
+            env.program(),
+            specialization.generic_context(db).program(db)
+        );
+        self.apply_specialization_inner(db, specialization)
     }
 
     #[salsa::tracked(
         returns(copy),
-        cycle_initial=|_, id, _, _, _| Type::divergent(id),
-        cycle_fn=|db, cycle, previous: &Type<'db>, value: Type<'db>, _, program, _| {
-            value.cycle_normalized_impl(&SemanticEnvironment::from_program(db, program), *previous, cycle)
+        cycle_initial=|_, id, _, _| Type::divergent(id),
+        cycle_fn=|db, cycle, previous: &Type<'db>, value: Type<'db>, _, specialization: Specialization<'db>| {
+            let env = SemanticEnvironment::from_program(
+                db,
+                specialization.generic_context(db).program(db),
+            );
+            value.cycle_normalized_impl(&env, *previous, cycle)
         },
         heap_size=ruff_memory_usage::heap_size
     )]
     fn apply_specialization_inner(
         self,
         db: &'db dyn Db,
-        program: Program,
         specialization: Specialization<'db>,
     ) -> Type<'db> {
-        let env = &SemanticEnvironment::from_program(db, program);
+        let env =
+            &SemanticEnvironment::from_program(db, specialization.generic_context(db).program(db));
         let type_mapping = match specialization.materialization_kind(db) {
             None => TypeMapping::ApplySpecialization(ApplySpecialization::Specialization(
                 specialization,
