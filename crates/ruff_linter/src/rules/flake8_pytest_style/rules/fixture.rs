@@ -518,6 +518,11 @@ impl Violation for PytestFixtureFinalizerCallback {
 ///     return resource
 /// ```
 ///
+/// ## Fix safety
+///
+/// This rule's fix is always marked unsafe because removing the `yield` can change the behavior of
+/// code that relies on implicit cleanup, such as when a value is garbage-collected.
+///
 /// ## References
 /// - [`pytest` documentation: Teardown/Cleanup](https://docs.pytest.org/en/latest/how-to/fixtures.html#teardown-cleanup-aka-fixture-finalization)
 #[derive(ViolationMetadata)]
