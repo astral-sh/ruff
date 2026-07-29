@@ -50,14 +50,17 @@ impl Support {
 
             // Iterate through the set bits in this chunk
             std::iter::from_fn(move || {
-                // `lowest_one` finds the lowest set bit, if there is one
-                chunk.lowest_one().map(|index| {
-                    let index = index as usize;
-                    // Clear out the bit we just found.
-                    chunk ^= 1 << index;
-                    // And then return it, converted into a TypeVarId
-                    TypeVarId::from_usize(chunk_start + index)
-                })
+                // Find the lowest set bit, if there is one
+                let index = chunk.trailing_zeros() as usize;
+                if index == CHUNK_SIZE {
+                    return None;
+                }
+
+                // Clear out the bit we just found.
+                chunk ^= 1 << index;
+
+                // And then return it, converted into a TypeVarId
+                Some(TypeVarId::from_usize(chunk_start + index))
             })
         })
     }
