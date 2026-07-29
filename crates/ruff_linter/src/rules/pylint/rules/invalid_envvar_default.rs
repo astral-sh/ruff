@@ -63,6 +63,7 @@ fn is_integer_default_wrapped_in_int(checker: &Checker, call: &ast::ExprCall, de
         && parent.arguments.keywords.is_empty()
         && parent.arguments.args[0].range() == call.range()
 }
+
 /// PLW1508
 pub(crate) fn invalid_envvar_default(checker: &Checker, call: &ast::ExprCall) {
     if !checker.semantic().seen_module(Modules::OS) {
