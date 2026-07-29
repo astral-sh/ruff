@@ -2444,9 +2444,8 @@ impl<'db> StaticClassLiteral<'db> {
                     },
                     CodeGeneratorKind::Pydantic(_) => FieldKind::Pydantic {
                         default_ty,
-                        // Pydantic treats underscore-prefixed annotations as private attributes,
-                        // which are instance attributes but never constructor parameters.
-                        init: init && !symbol.name().starts_with('_'),
+                        // Private attributes are instance attributes but never constructor parameters.
+                        init: init && !pydantic::is_private_attribute(symbol.name()),
                         alias,
                         strict,
                     },

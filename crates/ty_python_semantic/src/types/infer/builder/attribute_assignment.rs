@@ -10,6 +10,7 @@ use crate::types::attribute_write::{
 };
 use crate::types::call::{Bindings, CallArguments, CallDiagnosticOverride, CallError};
 use crate::types::class::FrozenDataclassDispatch;
+use crate::types::dedicated::pydantic;
 use crate::types::diagnostic::{
     INVALID_ASSIGNMENT, INVALID_ATTRIBUTE_ACCESS, UNRESOLVED_ATTRIBUTE, report_bad_dunder_set_call,
     report_invalid_attribute_assignment, report_possibly_missing_attribute,
@@ -393,7 +394,16 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
             Ok(bindings) => bindings.return_type(db).is_never(),
             Err(error) => error.return_type(db).is_some_and(|ty| ty.is_never()),
         };
-        if setattr_returns_never {
+
+        // We could also model this more precisely by synthesizing a `__setattr__`overload set
+        // that only disallows mutation on non-private fields, but for now, we just suppress the
+        // diagnostic here. This is much easier and faster.
+        let is_private_pydantic_attribute =
+            matches!(member, InstanceAttributeWriteMember::Explicit { .. })
+                && pydantic::is_private_attribute(self.attribute)
+                && pydantic::is_model_instance(db, object_ty);
+
+        if setattr_returns_never && !is_private_pydantic_attribute {
             if emit_diagnostics {
                 let is_setattr_synthesized = !matches!(
                     frozen_dataclass_dispatch,
