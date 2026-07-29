@@ -295,6 +295,21 @@ impl<'a> Diff<'a> {
             self.write_gutter(f, digit_with)?;
         }
 
+        self.write_applicability_note(f)?;
+
+        Ok(())
+    }
+
+    fn write_gutter(&self, f: &mut std::fmt::Formatter, width: NonZeroUsize) -> std::fmt::Result {
+        writeln!(
+            f,
+            "{line} {separator}",
+            line = fmt_styled(Line { index: None, width }, self.stylesheet.line_no),
+            separator = fmt_styled("|", self.stylesheet.line_no),
+        )
+    }
+
+    fn write_applicability_note(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self.fix.applicability() {
             Applicability::Safe => {}
             Applicability::Unsafe => {
@@ -324,15 +339,6 @@ impl<'a> Diff<'a> {
         }
 
         Ok(())
-    }
-
-    fn write_gutter(&self, f: &mut std::fmt::Formatter, width: NonZeroUsize) -> std::fmt::Result {
-        writeln!(
-            f,
-            "{line} {separator}",
-            line = fmt_styled(Line { index: None, width }, self.stylesheet.line_no),
-            separator = fmt_styled("|", self.stylesheet.line_no),
-        )
     }
 }
 
