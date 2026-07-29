@@ -258,6 +258,7 @@ struct OwnedConstraintSetInner<'db> {
     constraint_indices: RankBitBox,
     typevars: IndexVec<TypeVarId, BoundTypeVarIdentity<'db>>,
     nodes: Box<[InteriorNodeData]>,
+    node_supports: Box<[SupportId]>,
     node_indices: RankBitBox,
     supports: Box<[Support]>,
     support_indices: RankBitBox,
@@ -978,6 +979,7 @@ struct ConstraintSetStorage<'db> {
 
     supports: IndexVec<SupportId, Support>,
     constraint_supports: IndexVec<ConstraintId, SupportId>,
+    node_supports: IndexVec<NodeId, SupportId>,
 
     /// Encodes an ordering on the constraints in a constraint set, which is based on the order
     /// that the constraints (or more accurately, the Python expressions they're derived from)
@@ -1137,9 +1139,13 @@ impl<'db> ConstraintSetBuilder<'db> {
                 continue;
             }
             let interior = storage.interior_node_data(node);
+            let node_support = storage
+                .node_support_id(node)
+                .expect("node should be non-terminal");
             let constraint_support = storage.constraint_support_id(interior.constraint);
             used_nodes.set(node.index(), true);
             used_constraints.set(interior.constraint.index(), true);
+            used_supports.set(node_support.index(), true);
             used_supports.set(constraint_support.index(), true);
             stack.push(interior.if_true);
             stack.push(interior.if_uncertain);
@@ -1170,6 +1176,12 @@ impl<'db> ConstraintSetBuilder<'db> {
             .into_iter()
             .zip(&used_nodes)
             .filter_map(|(node, used)| used.then_some(node))
+            .collect();
+        let node_supports = storage
+            .node_supports
+            .into_iter()
+            .zip(&used_nodes)
+            .filter_map(|(support, used)| used.then_some(support))
             .collect();
         let node_indices = RankBitBox::from_bits(used_nodes);
 
@@ -1206,6 +1218,7 @@ impl<'db> ConstraintSetBuilder<'db> {
                 constraint_indices,
                 typevars: storage.typevars,
                 nodes,
+                node_supports,
                 node_indices,
                 supports,
                 support_indices,
@@ -1323,7 +1336,7 @@ impl<'db> ConstraintSetStorage<'db> {
         if let Some(id) = self.constraint_cache.get(&data) {
             return *id;
         }
-        let support_id = self.supports.push(support);
+        let support_id = self.intern_support(support);
         let id = self.constraints.push(data);
         self.constraint_supports.push(support_id);
         let id = self.adjusted_constraint_id(id);
@@ -1336,7 +1349,16 @@ impl<'db> ConstraintSetStorage<'db> {
         if let Some(id) = self.node_cache.get(&data) {
             return *id;
         }
+
+        let mut support = Support::default();
+        support |= self.constraint_support(data.constraint);
+        support |= self.node_support(data.if_true);
+        support |= self.node_support(data.if_uncertain);
+        support |= self.node_support(data.if_false);
+        let support = self.intern_support(support);
+
         let id = self.nodes.push(data);
+        self.node_supports.push(support);
         let id = self.adjusted_node_id(id);
         self.node_cache.insert(data, id);
         id
@@ -1518,6 +1540,11 @@ impl<'db> ConstraintSetStorage<'db> {
         result
     }
 
+    fn intern_support(&mut self, data: Support) -> SupportId {
+        let id = self.supports.push(data);
+        self.adjusted_support_id(id)
+    }
+
     fn support_data(&self, support: SupportId) -> &Support {
         if let Some(compacted) = &self.compacted {
             let index = support.index();
@@ -1546,6 +1573,27 @@ impl<'db> ConstraintSetStorage<'db> {
 
     fn constraint_support(&self, constraint: ConstraintId) -> &Support {
         self.support_data(self.constraint_support_id(constraint))
+    }
+
+    fn node_support_id(&self, node: NodeId) -> Option<SupportId> {
+        if node.is_terminal() {
+            return None;
+        }
+        if let Some(compacted) = &self.compacted {
+            let index = node.index();
+            let split = compacted.node_indices.len();
+            if index < split {
+                let compacted_index = compacted.retained_node_index(node);
+                return Some(compacted.node_supports[compacted_index]);
+            }
+            return Some(self.node_supports[NodeId::from_usize(index - split)]);
+        }
+        Some(self.node_supports[node])
+    }
+
+    fn node_support(&self, node: NodeId) -> Option<&Support> {
+        self.node_support_id(node)
+            .map(|support| self.support_data(support))
     }
 
     /// Loads an [`OwnedConstraintSet`] into this storage.

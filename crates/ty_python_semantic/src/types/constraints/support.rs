@@ -45,3 +45,11 @@ impl BitOrAssign<&Self> for Support {
         self.bits |= rhs.bits.as_bitslice();
     }
 }
+
+impl BitOrAssign<Option<&Self>> for Support {
+    fn bitor_assign(&mut self, rhs: Option<&Self>) {
+        if let Some(rhs) = rhs {
+            *self |= rhs;
+        }
+    }
+}
