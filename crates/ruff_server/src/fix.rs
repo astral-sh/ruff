@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 
-use ruff_python_ast::SourceType;
+use ruff_python_ast::{SourceType, TomlSourceType};
 use rustc_hash::FxHashMap;
 
 use crate::{
@@ -14,6 +14,7 @@ use ruff_linter::{
     linter::FixerResult,
     packaging::detect_package_root,
     settings::{LinterSettings, flags},
+    toml::lint_fix_toml,
 };
 use ruff_notebook::SourceValue;
 use ruff_source_file::LineIndex;
@@ -30,11 +31,6 @@ pub(crate) fn fix_all(
     let settings = query.settings();
     let document_path = query.virtual_file_path();
 
-    let SourceType::Python(source_type) = query.source_type_for_lint() else {
-        return Ok(Fixes::default());
-    };
-    let source_kind = query.make_python_source_kind(source_type);
-
     // If the document is excluded, return an empty list of fixes.
     if is_document_excluded_for_linting(
         &document_path,
@@ -44,6 +40,15 @@ pub(crate) fn fix_all(
     ) {
         return Ok(Fixes::default());
     }
+
+    let source_type = match query.source_type_for_lint() {
+        SourceType::Python(source_type) => source_type,
+        SourceType::Toml(source_type @ (TomlSourceType::Pyproject | TomlSourceType::Ruff)) => {
+            return fix_toml(query, linter_settings, source_type, encoding);
+        }
+        SourceType::Toml(_) | SourceType::Markdown => return Ok(Fixes::default()),
+    };
+    let source_kind = query.make_python_source_kind(source_type);
 
     let file_path = query.file_path();
     let package = if let Some(file_path) = &file_path {
@@ -139,6 +144,34 @@ pub(crate) fn fix_all(
             encoding,
         ))
     }
+}
+
+fn fix_toml(
+    query: &DocumentQuery,
+    linter_settings: &LinterSettings,
+    source_type: TomlSourceType,
+    encoding: PositionEncoding,
+) -> crate::Result<Fixes> {
+    let document = query.as_single_document()?;
+    let transformed = lint_fix_toml(
+        &query.virtual_file_path(),
+        document.contents(),
+        linter_settings,
+        source_type,
+        query.settings().unsafe_fixes,
+    )
+    .transformed;
+
+    if let Cow::Borrowed(_) = transformed {
+        return Ok(Fixes::default());
+    }
+
+    Ok(text_document_fixes(
+        query,
+        document.contents(),
+        transformed.as_ref(),
+        encoding,
+    ))
 }
 
 fn text_document_fixes(
