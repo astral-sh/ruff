@@ -6,6 +6,7 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::preview::is_b005_precise_diagnostic_enabled;
 use crate::rules::pylint::rules::StripKind;
 
 /// ## What it does
@@ -43,19 +44,31 @@ use crate::rules::pylint::rules::StripKind;
 /// "text.txt".removesuffix(".txt")  # "text"
 /// ```
 ///
+/// ## Preview
+/// In [preview], the diagnostic message reflects the actual method name
+/// (`.strip()`, `.lstrip()`, or `.rstrip()`), and the diagnostic range covers
+/// the method call rather than the entire expression.
+///
 /// ## References
 /// - [Python documentation: `str.strip`](https://docs.python.org/3/library/stdtypes.html#str.strip)
+///
+/// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.106")]
 pub(crate) struct StripWithMultiCharacters {
-    strip: StripKind,
+    /// The method name is only reflected in the message in preview mode.
+    strip: Option<StripKind>,
 }
 
 impl Violation for StripWithMultiCharacters {
     #[derive_message_formats]
     fn message(&self) -> String {
         let Self { strip } = self;
-        format!("Using `.{strip}()` with multi-character strings is misleading")
+        if let Some(strip) = strip {
+            format!("Using `.{strip}()` with multi-character strings is misleading")
+        } else {
+            "Using `.strip()` with multi-character strings is misleading".to_string()
+        }
     }
 }
 
@@ -78,9 +91,11 @@ pub(crate) fn strip_with_multi_characters(
     };
 
     if value.chars().count() > 1 && !value.chars().all_unique() {
-        checker.report_diagnostic(
-            StripWithMultiCharacters { strip },
-            TextRange::new(attr.start(), expr.end()),
-        );
+        let (strip, range) = if is_b005_precise_diagnostic_enabled(checker.settings()) {
+            (Some(strip), TextRange::new(attr.start(), expr.end()))
+        } else {
+            (None, expr.range())
+        };
+        checker.report_diagnostic(StripWithMultiCharacters { strip }, range);
     }
 }
