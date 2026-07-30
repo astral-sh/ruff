@@ -112,8 +112,8 @@ def nested_transitive[T, U, V]() -> None:
 
 ## Negated alternatives do not infer positive evidence
 
-In `¬((T ≤ int) ∨ (T ≤ str)) | (bytes ≤ U)`, the lhs of the union imposes no positive restriction
-on either typevar. That unconstrained alternative makes the entire constraint set unconstrained, so
+In `¬((T ≤ int) ∨ (T ≤ str)) | (bytes ≤ U)`, the lhs of the union imposes no positive restriction on
+either typevar. That unconstrained alternative makes the entire constraint set unconstrained, so
 neither typevar has an inferred solution.
 
 ```py
@@ -229,11 +229,41 @@ def chain_uts[U, T, S]() -> None:
     reveal_type(constraints.solutions_for(U, inferable=tuple[S, T, U]))
 ```
 
+## Non-inferable constraint source order and typevar orientation
+
+A non-inferable constraint can appear before or after inferable constraints, and a bare relationship
+can be encoded with either variable as its subject. None of those representation choices should
+change which type variables are returned.
+
+```py
+from ty_extensions._internal import ConstraintSet
+
+def noninferable_constraint_first[I, J, N]() -> None:
+    constraints = ConstraintSet.range(int, N, int) & ConstraintSet.range(str, I, str) & ConstraintSet.range(bytes, J, bytes)
+    # revealed: tuple[Solution[I=str, J=bytes]]
+    reveal_type(constraints.solutions(inferable=tuple[I, J]))
+
+def noninferable_constraint_last[I, J, N]() -> None:
+    constraints = ConstraintSet.range(str, I, str) & ConstraintSet.range(bytes, J, bytes) & ConstraintSet.range(int, N, int)
+    # revealed: tuple[Solution[I=str, J=bytes]]
+    reveal_type(constraints.solutions(inferable=tuple[I, J]))
+
+def inferable_subject[I, N]() -> None:
+    constraints = ConstraintSet.range(N, I, N)
+    # revealed: tuple[Solution[I=N@inferable_subject]]
+    reveal_type(constraints.solutions(inferable=tuple[I]))
+
+def noninferable_subject[N, I]() -> None:
+    constraints = ConstraintSet.range(I, N, I)
+    # revealed: tuple[Solution[I=N@noninferable_subject]]
+    reveal_type(constraints.solutions(inferable=tuple[I]))
+```
+
 ## Abstraction and non-inferable typevars
 
 Non-inferable typevars must not appear in reported solution bindings, and irrelevant positive
-decisions must not leak onto independent alternatives. Universal abstraction of an alternative
-must likewise leave only the unrelated branch.
+decisions must not leak onto independent alternatives. Universal abstraction of an alternative must
+likewise leave only the unrelated branch.
 
 ```py
 from typing import Never
