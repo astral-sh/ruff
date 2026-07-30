@@ -1,16 +1,45 @@
 use ruff_python_ast::{self as ast, name::Name};
 use ruff_text_size::Ranged;
 
+use crate::Db;
 use crate::diagnostic::format_enumeration;
 use crate::types::{
     context::InferContext,
     diagnostic::{INVALID_TYPE_FORM, INVALID_TYPE_VARIABLE_DEFAULT},
+    generics::GenericContext,
+    typevar::TypeVarInstance,
 };
 
 #[derive(Clone, Copy)]
 pub(crate) enum TypeParameterOwner<'a> {
     GenericClass(&'a Name),
     TypeAlias(&'a Name),
+}
+
+/// Return the first default and all later checked parameters that lack a default.
+pub(crate) fn invalid_typevar_default_order<'db>(
+    db: &'db dyn Db,
+    generic_context: GenericContext<'db>,
+    should_check: impl Fn(TypeVarInstance<'db>) -> bool,
+) -> Option<(TypeVarInstance<'db>, Vec<TypeVarInstance<'db>>)> {
+    let mut first_default = None;
+    let mut missing_defaults = Vec::new();
+
+    for typevar in generic_context
+        .variables(db)
+        .map(|bound_typevar| bound_typevar.typevar(db))
+        .filter(|typevar| should_check(*typevar))
+    {
+        if typevar.default_type(db).is_some() {
+            first_default.get_or_insert(typevar);
+        } else if first_default.is_some() {
+            missing_defaults.push(typevar);
+        }
+    }
+
+    first_default
+        .filter(|_| !missing_defaults.is_empty())
+        .map(|first_default| (first_default, missing_defaults))
 }
 
 /// Check that a PEP 695 class or type alias parameter list contains at most one `TypeVarTuple`.

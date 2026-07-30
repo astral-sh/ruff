@@ -48,7 +48,6 @@ use crate::{
         mro::StaticMroErrorKind,
         overrides,
         tuple::Tuple,
-        typevar::TypeVarInstance,
         variance::VarianceInferable,
         visitor::find_over_type,
     },
@@ -789,41 +788,20 @@ pub(crate) fn check_static_class_definitions<'db>(
     if context.is_lint_enabled(&INVALID_GENERIC_CLASS) {
         if !class.has_pep_695_type_params(db)
             && let Some(generic_context) = class.legacy_generic_context(db)
+            && let Some((typevar_with_default, invalid_later_tvars)) =
+                super::type_param_validation::invalid_typevar_default_order(
+                    db,
+                    generic_context,
+                    |_| true,
+                )
         {
-            struct State<'db> {
-                typevar_with_default: TypeVarInstance<'db>,
-                invalid_later_tvars: Vec<TypeVarInstance<'db>>,
-            }
-
-            let mut state: Option<State<'db>> = None;
-
-            for bound_typevar in generic_context.variables(db) {
-                let typevar = bound_typevar.typevar(db);
-                let has_default = typevar.default_type(db).is_some();
-
-                if let Some(state) = state.as_mut() {
-                    if !has_default {
-                        state.invalid_later_tvars.push(typevar);
-                    }
-                } else if has_default {
-                    state = Some(State {
-                        typevar_with_default: typevar,
-                        invalid_later_tvars: vec![],
-                    });
-                }
-            }
-
-            if let Some(state) = state
-                && !state.invalid_later_tvars.is_empty()
-            {
-                report_invalid_type_param_order(
-                    context,
-                    class,
-                    class_node,
-                    state.typevar_with_default,
-                    &state.invalid_later_tvars,
-                );
-            }
+            report_invalid_type_param_order(
+                context,
+                class,
+                class_node,
+                typevar_with_default,
+                &invalid_later_tvars,
+            );
         }
 
         // Check that type variable defaults only reference type variables

@@ -317,63 +317,35 @@ fn check_legacy_typevar_ordering<'db>(
     signature: &Signature<'db>,
     file_expression_type: &impl Fn(&ast::Expr) -> Type<'db>,
 ) {
-    struct State<'db> {
-        typevar_with_default: TypeVarInstance<'db>,
-        invalid_later_tvars: Vec<TypeVarInstance<'db>>,
-    }
-
     let db = context.db();
 
     let Some(generic_context) = signature.generic_context else {
         return;
     };
 
-    let mut state: Option<State<'db>> = None;
-
-    for bound_typevar in generic_context.variables(db) {
-        let typevar = bound_typevar.typevar(db);
-
-        // Only check legacy TypeVars; PEP 695 ordering is validated by the parser.
-        if !matches!(
-            typevar.kind(db),
-            TypeVarKind::LegacyTypeVar
-                | TypeVarKind::Pep613Alias
-                | TypeVarKind::LegacyParamSpec
-                | TypeVarKind::LegacyTypeVarTuple
-        ) {
-            continue;
-        }
-
-        let has_default = typevar.default_type(db).is_some();
-
-        if let Some(state) = state.as_mut() {
-            if !has_default {
-                state.invalid_later_tvars.push(typevar);
-            }
-        } else if has_default {
-            state = Some(State {
-                typevar_with_default: typevar,
-                invalid_later_tvars: vec![],
-            });
-        }
-    }
-
-    let Some(state) = state else {
+    // Only check legacy TypeVars; PEP 695 ordering is validated by the parser.
+    let Some((typevar_with_default, invalid_later_tvars)) =
+        super::type_param_validation::invalid_typevar_default_order(
+            db,
+            generic_context,
+            |typevar| {
+                matches!(
+                    typevar.kind(db),
+                    TypeVarKind::LegacyTypeVar
+                        | TypeVarKind::Pep613Alias
+                        | TypeVarKind::LegacyParamSpec
+                        | TypeVarKind::LegacyTypeVarTuple
+                )
+            },
+        )
+    else {
         return;
     };
 
-    if state.invalid_later_tvars.is_empty() {
-        return;
-    }
-
     let node = last_definition.node(db, context.file(), context.module());
 
-    let primary_range = find_typevar_annotation_range(
-        context,
-        node,
-        state.invalid_later_tvars[0],
-        file_expression_type,
-    );
+    let primary_range =
+        find_typevar_annotation_range(context, node, invalid_later_tvars[0], file_expression_type);
 
     let Some(builder) = context.report_lint(&INVALID_TYPE_VARIABLE_DEFAULT, primary_range) else {
         return;
@@ -383,39 +355,34 @@ fn check_legacy_typevar_ordering<'db>(
         "Type parameters without defaults cannot follow type parameters with defaults",
     );
 
-    let typevar_with_default_name = state.typevar_with_default.name(db);
+    let typevar_with_default_name = typevar_with_default.name(db);
 
     diagnostic.set_concise_message(format_args!(
         "Type parameter `{}` without a default cannot follow \
             earlier parameter `{typevar_with_default_name}` with a default",
-        state.invalid_later_tvars[0].name(db),
+        invalid_later_tvars[0].name(db),
     ));
 
-    if let [single_typevar] = &*state.invalid_later_tvars {
+    if let [single_typevar] = &*invalid_later_tvars {
         diagnostic.set_primary_annotation_message(format_args!(
             "Type variable `{}` does not have a default",
             single_typevar.name(db),
         ));
     } else {
-        let later_typevars =
-            format_enumeration(state.invalid_later_tvars.iter().map(|tv| tv.name(db)));
+        let later_typevars = format_enumeration(invalid_later_tvars.iter().map(|tv| tv.name(db)));
         diagnostic.set_primary_annotation_message(format_args!(
             "Type variables {later_typevars} do not have defaults",
         ));
     }
 
-    let secondary_range = find_typevar_annotation_range(
-        context,
-        node,
-        state.typevar_with_default,
-        file_expression_type,
-    );
+    let secondary_range =
+        find_typevar_annotation_range(context, node, typevar_with_default, file_expression_type);
 
     diagnostic.annotate(context.secondary(secondary_range).message(format_args!(
         "Earlier TypeVar `{typevar_with_default_name}` has a default"
     )));
 
-    for tvar in [state.typevar_with_default, state.invalid_later_tvars[0]] {
+    for tvar in [typevar_with_default, invalid_later_tvars[0]] {
         let Some(definition) = tvar.definition(db) else {
             continue;
         };
