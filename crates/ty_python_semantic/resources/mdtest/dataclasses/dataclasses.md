@@ -2023,6 +2023,54 @@ class InvalidDefaultOverride(RequiredBase):  # error: [dataclass-field-order]
     first: int = 1
 ```
 
+### Class variables overriding inherited fields
+
+Redeclaring an inherited instance field as a class variable removes it from the generated
+constructor and positional ordering checks. The override itself remains invalid.
+
+```py
+from dataclasses import dataclass, field
+from typing import ClassVar
+
+@dataclass
+class DefaultedFieldBase:
+    x: int = 1
+
+@dataclass
+class ClassVariableOverride(DefaultedFieldBase):
+    x: ClassVar[int] = 1  # error: [invalid-attribute-override]
+    y: int
+
+reveal_type(ClassVariableOverride.__init__)  # revealed: (self: ClassVariableOverride, y: int) -> None
+
+@dataclass
+class InheritedClassVariableOverride(ClassVariableOverride):
+    z: int
+
+reveal_type(InheritedClassVariableOverride.__init__)  # revealed: (self: InheritedClassVariableOverride, y: int, z: int) -> None
+```
+
+An annotation-only class variable also masks the inherited instance field.
+
+```py
+@dataclass
+class AnnotationOnlyClassVariableOverride(DefaultedFieldBase):
+    x: ClassVar[int]  # error: [invalid-attribute-override]
+    y: int
+
+reveal_type(AnnotationOnlyClassVariableOverride.__init__)  # revealed: (self: AnnotationOnlyClassVariableOverride, y: int) -> None
+```
+
+Restoring an instance field in a later subclass preserves the field's original inherited position.
+
+```py
+@dataclass
+class RestoredInstanceField(ClassVariableOverride):
+    x: int = field()  # error: [invalid-attribute-override]
+
+reveal_type(RestoredInstanceField.__init__)  # revealed: (self: RestoredInstanceField, x: int, y: int) -> None
+```
+
 ### Overwriting attributes from base class
 
 The following example comes from the
