@@ -113,21 +113,7 @@ impl<'a> Diff<'a> {
         })
     }
 
-    fn write_gutter(&self, f: &mut std::fmt::Formatter, width: NonZeroUsize) -> std::fmt::Result {
-        writeln!(
-            f,
-            "{line} {separator}",
-            line = fmt_styled(Line { index: None, width }, self.stylesheet.line_no),
-            separator = fmt_styled("|", self.stylesheet.line_no),
-        )
-    }
-}
-
-/// Limit diffs to a narrow range around each fix rather than diffing the whole file.
-const DIFF_CONTEXT_WINDOW: usize = 3;
-
-impl std::fmt::Display for Diff<'_> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn write(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         let source_code = self.diagnostic_source.as_source_code();
         let source_text = source_code.text();
 
@@ -338,6 +324,24 @@ impl std::fmt::Display for Diff<'_> {
         }
 
         Ok(())
+    }
+
+    fn write_gutter(&self, f: &mut std::fmt::Formatter, width: NonZeroUsize) -> std::fmt::Result {
+        writeln!(
+            f,
+            "{line} {separator}",
+            line = fmt_styled(Line { index: None, width }, self.stylesheet.line_no),
+            separator = fmt_styled("|", self.stylesheet.line_no),
+        )
+    }
+}
+
+/// Limit diffs to a narrow range around each fix rather than diffing the whole file.
+const DIFF_CONTEXT_WINDOW: usize = 3;
+
+impl std::fmt::Display for Diff<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.write(f)
     }
 }
 
