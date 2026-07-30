@@ -706,7 +706,7 @@ impl<'db> SemanticModel<'db> {
         &self,
         match_stmt: &ast::StmtMatch,
         current_case: &ast::MatchCase,
-        current_or_pattern_index: Option<usize>,
+        current_or_pattern_arm_path: &[usize],
     ) -> MatchCaseCompletions<'db> {
         struct MatchCaseCandidates;
         type MatchCaseCandidatesVisitor<'db> =
@@ -792,29 +792,39 @@ impl<'db> SemanticModel<'db> {
         };
 
         // Narrow the subject by all preceding unguarded match patterns.
-        let remaining_ty =
+        let mut remaining_ty =
             type_narrowed_by_previous_patterns(self.db, predicate, PatternSubjectExpansion::Raw);
+        let mut current_pattern = predicate.kind(self.db);
 
-        let remaining_ty = match (
-            current_or_pattern_index,
-            or_patterns(predicate.kind(self.db)),
-        ) {
-            (Some(index), Some(patterns)) => {
-                let Some(previous_patterns) = patterns.get(..index) else {
-                    return MatchCaseCompletions::default();
-                };
+        // Follow the OR arm path from the outermost OR pattern to the cursor. For `A | (B | C)`
+        // with the cursor on `C`, `[1, 1]` first rules out `A` and then rules out `B`.
+        for &index in current_or_pattern_arm_path {
+            let Some(patterns) = or_patterns(current_pattern) else {
+                return MatchCaseCompletions::default();
+            };
 
-                previous_patterns
-                    .iter()
-                    .fold(remaining_ty, |remaining_ty, pattern| {
-                        pattern_binding_fallthrough_type(self.db, &env, pattern, remaining_ty)
-                    })
-            }
-            _ => remaining_ty,
-        };
+            // Every arm before the selected one has already failed to match. In the example above,
+            // `previous_patterns` is `[A]` on the first iteration and `[B]` on the second.
+            let Some(previous_patterns) = patterns.get(..index) else {
+                return MatchCaseCompletions::default();
+            };
+
+            // Keep only the values that fall through all of those previous arms.
+            remaining_ty = previous_patterns
+                .iter()
+                .fold(remaining_ty, |remaining_ty, pattern| {
+                    pattern_binding_fallthrough_type(self.db, &env, pattern, remaining_ty)
+                });
+
+            let Some(pattern) = patterns.get(index) else {
+                return MatchCaseCompletions::default();
+            };
+            current_pattern = pattern;
+        }
 
         let visitor = MatchCaseCandidatesVisitor::default();
         let mut seen = FxHashSet::default();
+
         let known = visitor
             .visit(self.db, subject_ty, || {
                 collect(self.db, &env, subject_ty, &visitor)
@@ -822,6 +832,7 @@ impl<'db> SemanticModel<'db> {
             .into_iter()
             .filter(|candidate| seen.insert(candidate.clone()))
             .collect::<Vec<_>>();
+
         let remaining = known
             .iter()
             .filter(|candidate| !candidate.ty.is_disjoint_from(self.db, &env, remaining_ty))
