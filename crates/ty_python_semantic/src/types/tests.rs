@@ -5,7 +5,26 @@ use crate::types::type_alias::PEP695TypeAliasType;
 use ruff_db::system::DbWithWritableSystem as _;
 use ruff_python_ast as ast;
 use ruff_python_ast::PythonVersion;
+use ruff_python_ast::name::Name;
 use test_case::test_case;
+
+#[test]
+fn string_literal_shares_heap_backed_name() {
+    let db = setup_db();
+    let name = Name::new("a_named_tuple_field_longer_than_the_inline_capacity");
+    let name_pointer = name.as_str().as_ptr();
+
+    let literal = Type::string_literal_from_name(&db, name.clone());
+    let literal = literal
+        .as_string_literal()
+        .expect("the constructed type should be a string literal");
+
+    assert_eq!(literal.value(&db).as_ptr(), name_pointer);
+    assert_eq!(
+        Type::string_literal(&db, &name).as_string_literal(),
+        Some(literal)
+    );
+}
 
 /// Explicitly test for Python version <3.13 and >=3.13, to ensure that
 /// the fallback to `typing_extensions` is working correctly.

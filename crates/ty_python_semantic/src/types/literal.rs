@@ -1,5 +1,7 @@
+use std::hash::{Hash, Hasher};
+
 use bitflags::bitflags;
-use compact_str::CompactString;
+use char_str::CharStr;
 use ruff_python_ast::name::Name;
 
 use crate::Db;
@@ -344,16 +346,48 @@ impl std::cmp::PartialOrd for IntLiteralType {
     }
 }
 
+struct StringLiteralLookup<'a>(&'a str);
+
+impl Hash for StringLiteralLookup<'_> {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.0.hash(state);
+    }
+}
+
+impl salsa::Lookup<CharStr> for StringLiteralLookup<'_> {
+    fn into_owned(self) -> CharStr {
+        CharStr::from(self.0)
+    }
+}
+
+impl salsa::HashEqLike<StringLiteralLookup<'_>> for CharStr {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        Hash::hash(self, state);
+    }
+
+    fn eq(&self, data: &StringLiteralLookup<'_>) -> bool {
+        self.as_str() == data.0
+    }
+}
+
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct StringLiteralType<'db> {
     #[returns(deref)]
-    pub(crate) value: CompactString,
+    pub(crate) value: CharStr,
 }
 
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for StringLiteralType<'_> {}
 
 impl<'db> StringLiteralType<'db> {
+    pub(super) fn from_str(db: &'db dyn Db, value: &str) -> Self {
+        Self::new(db, StringLiteralLookup(value))
+    }
+
+    pub(super) fn from_name(db: &'db dyn Db, name: Name) -> Self {
+        Self::new(db, CharStr::from(name))
+    }
+
     /// The length of the string, as would be returned by Python's `len()`.
     pub(crate) fn python_len(self, db: &'db dyn Db) -> usize {
         self.value(db).chars().count()
