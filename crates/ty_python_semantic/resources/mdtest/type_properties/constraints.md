@@ -1178,8 +1178,9 @@ def quantifier_order[S, T]() -> None:
 ## Gradual constraints
 
 Constraint-set assignability preserves gradual types. Constraints on their materializations are
-represented by the `gradual` terminal, while constraints against inferable type variables are
-preserved.
+represented by hidden type variables, while constraints against inferable type variables are
+preserved. The hidden variables participate in the decision diagram but are existentially quantified
+when the constraint set is converted to a Boolean result.
 
 ```py
 from typing import Any
@@ -1195,7 +1196,7 @@ gradual = is_constraint_set_assignable_to(Any, int)
 # revealed: ConstraintSet[bool]
 reveal_type(gradual)
 
-# revealed: ConstraintSet[gradual]
+# revealed: ConstraintSet[(gradual@0 ≤ int)]
 reveal_type(gradual.with_detailed_display())
 
 static_assert(gradual == gradual)
@@ -1206,7 +1207,6 @@ static_assert((gradual | ConstraintSet.never()) == gradual)
 static_assert((ConstraintSet.never() | gradual) == gradual)
 static_assert((gradual & ConstraintSet.always()) == gradual)
 static_assert((ConstraintSet.always() & gradual) == gradual)
-static_assert(~gradual == gradual)
 static_assert(gradual)
 static_assert(is_assignable_to(Any, int))
 
@@ -1218,6 +1218,26 @@ def _[T]() -> None:
     static_assert((other & gradual) != other)
     static_assert((gradual & (other | ~other)) == gradual)
     static_assert((gradual | (other & ~other)) == gradual)
+```
+
+Distributing one gradual occurrence reuses its hidden variable. Separate occurrences use distinct
+variables, so the constraint set cannot derive transitive facts by assuming that they materialize to
+the same type.
+
+```py
+from typing import Any
+from ty_extensions._internal import is_constraint_set_assignable_to
+
+distributed = is_constraint_set_assignable_to(Any, int | str)
+
+# revealed: ConstraintSet[((gradual@0 ≤ int) ∧ ¬(gradual@0 ≤ str)) ∨ (gradual@0 ≤ Never) ∨ (gradual@0 ≤ str)]
+reveal_type(distributed.with_detailed_display())
+
+first = is_constraint_set_assignable_to(Any, int)
+second = is_constraint_set_assignable_to(Any, str)
+
+# revealed: ConstraintSet[((gradual@0 ≤ int) ∧ (gradual@1 ≤ str))]
+reveal_type((first & second).with_detailed_display())
 ```
 
 Constraint-set implication uses subtyping instead of assignability, and so does not make assumptions
