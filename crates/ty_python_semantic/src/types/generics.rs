@@ -1558,28 +1558,57 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             return self.check_tuple_type_pair(db, source_tuple, target_tuple);
         }
 
-        // A gradual specialization is a subtype of a fully static specialization when all of its
-        // valid materializations are subtypes. Materialize the entire source so declared bounds
-        // and constraints restrict gradual type arguments before comparing each argument. Besides
-        // establishing `C[Any] <: Top[C[Any]]`, this ensures an `isinstance(x, C)` check excludes
-        // every specialization of `C` from its false branch. Pure redundancy instead checks
-        // equivalence and must preserve the specialization's full range of materializations.
+        // A gradual specialization is a subtype of a fully static specialization when all its
+        // valid materializations are subtypes. Materializing the source applies declared bounds
+        // and constraints before comparing arguments. This establishes `C[Any] <: Top[C[Any]]`
+        // and lets negative `isinstance` narrowing exclude every specialization of `C`.
+        //
+        // This transformation is sound for directional subtyping and non-pure redundancy.
+        // Assignability and pure redundancy must retain the source's gradual semantics.
         if matches!(
             self.relation,
             TypeRelation::Subtyping
                 | TypeRelation::SubtypingAssuming
                 | TypeRelation::Redundancy { pure: false }
-        ) && source.materialization_kind(db).is_none()
-            && source.types(db).iter().any(|ty| ty.has_dynamic(db))
+        )
+            // Explicitly materialized sources are already static and cannot advance further.
+            && source.materialization_kind(db).is_none()
+            // Performance only: `source_top != source` below already handles unchanged
+            // arguments. Without expanding aliases, treat them as potentially gradual.
+            && source.types(db).iter().any(|ty| {
+                any_over_type(db, *ty, false, |ty| {
+                    ty.is_dynamic() || matches!(ty, Type::TypeAlias(_))
+                })
+            })
+            // Avoid the `self.always()` type-variable shortcut in
+            // `check_subtyping_in_invariant_position`: it would incorrectly conclude
+            // that `Top[Inv[Any]] <: Inv[T]` for an unresolved `T`.
+            // TODO: remove this once that shortcut is removed.
             && target
                 .types(db)
                 .iter()
                 .all(|ty| !ty.has_typevar_or_typevar_instance(db))
-            && (target.materialization_kind(db).is_some()
-                || target.types(db).iter().all(|ty| !ty.has_dynamic(db)))
+            // Only non-pure redundancy needs a target already equal to its top.
+            // Materializing the source otherwise loses the bottom needed to
+            // simplify `Covariant[Any] | Covariant[Any | str]`. Comparing both
+            // top and bottom is a possible alternative, but it gets more complex
+            // due to the need to preserve Divergent markers. Also the fact that we currently
+            // simplify tuples containing `Never` to `Never` means that for
+            // `class C[T: tuple[int, int]]`, `C[tuple[Any, int]]` and `C[tuple[int, Any]]`
+            // have the same top and bottom but expose `Any` in different tuple positions.
+            // TODO: Try resolving the above issues so we can compare top/bottom subtyping here.
+            && (!matches!(self.relation, TypeRelation::Redundancy { pure: false })
+                || target
+                    == target.materialize_impl(
+                        db,
+                        MaterializationKind::Top,
+                        self.materialization_visitor,
+                    ))
         {
             let source_top =
                 source.materialize_impl(db, MaterializationKind::Top, self.materialization_visitor);
+            // Dynamic arguments can still be unchanged by top materialization; retrying
+            // the same pair would recurse indefinitely.
             if source_top != source {
                 return self.check_specialization_pair(db, source_top, target);
             }
@@ -1662,8 +1691,9 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
     ///
     /// A constrained type variable can only take one of its declared alternatives. For example,
     /// replacing `Any` with `int | str` for `class C[T: (int, str)]` would create the invalid
-    /// specialization `C[int | str]`. Preserve the enclosing materialization instead, and combine
-    /// only the constraints reachable within the argument's materialization range.
+    /// specialization `C[int | str]`. The caller preserves the enclosing `Top[C[Any]]`; this
+    /// helper combines the reachable constraints into `int | str` only for the relation check,
+    /// without constructing `C[int | str]`.
     fn materialize_constrained_type_argument(
         &self,
         db: &'db dyn Db,

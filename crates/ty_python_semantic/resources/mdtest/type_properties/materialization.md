@@ -706,6 +706,29 @@ static_assert(is_subtype_of(BoundedCovariant[Any], Top[BoundedCovariant[Any]]))
 static_assert(is_subtype_of(BoundedCovariant[Any], BoundedCovariant[int]))
 ```
 
+A type alias can conceal a gradual argument; the same subtype relationships still apply.
+
+```py
+type AliasedAny = Any
+
+static_assert(is_subtype_of(BoundedCovariant[AliasedAny], Top[BoundedCovariant[AliasedAny]]))
+static_assert(is_subtype_of(BoundedCovariant[AliasedAny], BoundedCovariant[int]))
+```
+
+An alias for a static upper bound remains static. It absorbs a bounded gradual specialization in
+either union order.
+
+```py
+type AliasedInt = int
+
+def aliased_static_bound(
+    gradual_first: BoundedCovariant[Any] | BoundedCovariant[AliasedInt],
+    gradual_last: BoundedCovariant[AliasedInt] | BoundedCovariant[Any],
+) -> None:
+    reveal_type(gradual_first)  # revealed: BoundedCovariant[AliasedInt]
+    reveal_type(gradual_last)  # revealed: BoundedCovariant[AliasedInt]
+```
+
 Contravariance reverses which bound is used by top and bottom materialization.
 
 ```py
@@ -763,8 +786,8 @@ static_assert(is_equivalent_to(Top[LegacyBoundedContravariant[Any]], LegacyBound
 static_assert(is_equivalent_to(Bottom[LegacyBoundedContravariant[Any]], LegacyBoundedContravariant[int]))
 ```
 
-A legacy invariant type parameter also materializes a readable attribute to its upper or lower
-bound.
+Reading an attribute of a top-materialized legacy invariant generic yields the type parameter's
+upper bound; reading the same attribute from its bottom materialization yields the lower bound.
 
 ```py
 BoundedT = TypeVar("BoundedT", bound=int)
@@ -875,6 +898,17 @@ def constrained_invariant(
     reveal_type(bottom.get)  # revealed: bound method Bottom[ConstrainedInvariant[Any]].get() -> Never
     reveal_type(bottom.put)  # revealed: bound method Bottom[ConstrainedInvariant[Any]].put(value: int | str) -> None
     reveal_type(bottom.value)  # revealed: Never
+```
+
+Direct attribute writes are currently checked against the readable union rather than the safe
+`Never` parameter used for setters.
+
+```py
+def constrained_invariant_writes(top: Top[ConstrainedInvariant[Any]]) -> None:
+    # TODO: Reject these writes; neither value is safe for every specialization.
+    top.value = 1
+    top.value = "value"
+    top.value = 1.5  # error: [invalid-assignment]
 ```
 
 Legacy constrained type variables preserve the same covariant and contravariant subtype

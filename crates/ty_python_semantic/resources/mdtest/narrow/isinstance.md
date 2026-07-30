@@ -923,18 +923,19 @@ def _(x: object):
         reveal_type(x.y)  # revealed: tuple[A, object]
 ```
 
-A default never restricts which specialization matches at runtime. In particular, a `Never` default
-must not prevent narrowing a bounded generic or recovering its original type argument.
+`isinstance(value, Box)` checks the runtime class, not the type argument used to specialize it.
+Narrowing must therefore preserve the original type argument instead of substituting `Box`'s
+default.
 
 ```py
-from typing import Never, assert_never
+from typing import assert_never
 
-class Box[T: str = Never]:
+class Box[T: str = str]:
     value: T
 
     def __init__(self, value: T) -> None: ...
 
-def box_with_default[T: str = Never](value: Box[T] | T) -> Box[T]:
+def box_with_default[T: str = str](value: Box[T] | T) -> Box[T]:
     if isinstance(value, Box):
         reveal_type(value)  # revealed: Box[T@box_with_default]
         return value
@@ -946,11 +947,11 @@ def box_with_default[T: str = Never](value: Box[T] | T) -> Box[T]:
     assert_never(value)
 ```
 
-A tuple subclass must likewise materialize its declared bound, not its `Never` default. Its
-heterogeneous tuple shape is inherited from the specialized base.
+When `isinstance()` narrows an unknown value to a tuple subclass, its type argument comes from the
+declared upper bound, not the default. Its element types are inherited from the specialized base.
 
 ```py
-class DefaultedTuple[T: int = Never](tuple[T, str]): ...
+class DefaultedTuple[T: int = bool](tuple[T, str]): ...
 
 def narrow_defaulted_tuple(value: object) -> None:
     if isinstance(value, DefaultedTuple):

@@ -84,18 +84,18 @@ static_assert(not is_equivalent_to(type, type[Any]))
 static_assert(not is_equivalent_to(type[object], type[Any]))
 ```
 
-## Bounded gradual specializations
+## Equivalent bounded gradual specializations
 
-A bounded generic's gradual type arguments must remain equivalent without being replaced by their
-static upper bounds.
+A bounded generic specialized with a gradual type alias is equivalent to the same generic
+specialized with the expanded alias.
 
 ```toml
 [environment]
 python-version = "3.13"
 ```
 
-A covariant bounded type parameter treats a gradual tuple alias the same as the aliased tuple. The
-alias must not be replaced with the type parameter's static upper bound.
+For a covariant bounded type parameter, this applies to aliases containing either `Any` or
+`Unknown`.
 
 ```py
 from typing import Any
@@ -112,7 +112,6 @@ class BoundedCovariant[T: tuple[int, ...]]:
 
 static_assert(is_equivalent_to(BoundedCovariant[AnyTuple], BoundedCovariant[tuple[Any, ...]]))
 static_assert(is_equivalent_to(BoundedCovariant[UnknownTuple], BoundedCovariant[AnyTuple]))
-static_assert(not is_equivalent_to(BoundedCovariant[AnyTuple], BoundedCovariant[tuple[int, ...]]))
 ```
 
 The same gradual tuple alias remains equivalent when the bounded type parameter is invariant.
@@ -122,10 +121,11 @@ class BoundedInvariant[T: tuple[int, ...]]:
     value: T
 
 static_assert(is_equivalent_to(BoundedInvariant[AnyTuple], BoundedInvariant[tuple[Any, ...]]))
-static_assert(not is_equivalent_to(BoundedInvariant[AnyTuple], BoundedInvariant[tuple[int, ...]]))
 ```
 
-A nested bounded generic remains equivalent whether its gradual default is implicit or explicit.
+`Outer[int, Inner]` is equivalent to `Outer[int, Inner[Any]]` because `Inner` defaults to `Any`.
+`Outer[int]` is equivalent to the same explicit specialization because `Outer` defaults to
+`Inner[Any]`.
 
 ```py
 class Inner[T: int = Any]:
@@ -138,6 +138,40 @@ class Outer[T: int, U: Inner[Any] = Inner[Any]]:
 
 static_assert(is_equivalent_to(Outer[int, Inner[Any]], Outer[int, Inner]))
 static_assert(is_equivalent_to(Outer[int, Inner[Any]], Outer[int]))
+```
+
+## Bounded gradual specializations are distinct from upper bounds
+
+A generic specialized with a gradual type argument is not equivalent to the same generic specialized
+with the type parameter's upper bound.
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+For a covariant type parameter:
+
+```py
+from typing import Any
+
+from ty_extensions import static_assert
+from ty_extensions._internal import is_equivalent_to
+
+class BoundedCovariant[T: tuple[int, ...]]:
+    def get(self) -> T:
+        raise NotImplementedError
+
+static_assert(not is_equivalent_to(BoundedCovariant[tuple[Any, ...]], BoundedCovariant[tuple[int, ...]]))
+```
+
+The same distinction applies to an invariant type parameter.
+
+```py
+class BoundedInvariant[T: tuple[int, ...]]:
+    value: T
+
+static_assert(not is_equivalent_to(BoundedInvariant[tuple[Any, ...]], BoundedInvariant[tuple[int, ...]]))
 ```
 
 ## Unions and intersections

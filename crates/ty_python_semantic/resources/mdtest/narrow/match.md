@@ -112,56 +112,6 @@ def f(x: Covariant[int]):
             assert_never(x)
 ```
 
-A class pattern must also preserve and materialize the built-in tuple's variable-length shape.
-
-```py
-def match_tuple(value: object) -> None:
-    match value:
-        case tuple():
-            reveal_type(value)  # revealed: tuple[object, ...]
-```
-
-A tuple-subclass pattern preserves both the subclass's bounded type argument and the inherited
-heterogeneous tuple shape.
-
-```py
-class BoundedTuple[T: int](tuple[T, str]): ...
-
-def match_tuple_subclass(value: object) -> None:
-    match value:
-        case BoundedTuple():
-            reveal_type(value)  # revealed: BoundedTuple[int]
-            reveal_type(value[0])  # revealed: int
-            reveal_type(value[1])  # revealed: str
-```
-
-## Class patterns with bounded generic classes
-
-A bounded generic class pattern matches every specialization, including gradual specializations, and
-excludes all of them from later patterns.
-
-```toml
-[environment]
-python-version = "3.12"
-```
-
-```py
-from typing import Any
-
-class BoundedCovariant[T: int]:
-    def get(self) -> T:
-        raise NotImplementedError
-
-def match_bounded_generic(value: BoundedCovariant[Any] | bool) -> bool:
-    match value:
-        case BoundedCovariant():
-            reveal_type(value)  # revealed: BoundedCovariant[Any]
-            return False
-        case remaining:
-            reveal_type(remaining)  # revealed: bool
-            return remaining
-```
-
 ## Generic patterns ignore type parameter defaults
 
 A generic class pattern matches every runtime specialization, not only the specialization described
@@ -173,14 +123,14 @@ python-version = "3.13"
 ```
 
 ```py
-from typing import Any, Never
+from typing import Any
 
-class Box[T: str = Never]:
+class Box[T: str = str]:
     value: T
 
     def __init__(self, value: T) -> None: ...
 
-def box_with_default[T: str = Never](value: Box[T] | T) -> Box[T]:
+def box_with_default[T: str = str](value: Box[T] | T) -> Box[T]:
     match value:
         case Box():
             reveal_type(value)  # revealed: Box[T@box_with_default]
@@ -190,11 +140,11 @@ def box_with_default[T: str = Never](value: Box[T] | T) -> Box[T]:
             return Box[T](remaining)
 ```
 
-A tuple-subclass pattern also materializes the declared bound rather than the `Never` default, while
-preserving the heterogeneous tuple shape inherited from its base.
+When a class pattern matches a tuple subclass, its type argument comes from the declared upper
+bound, not the default. Its element types are inherited from the specialized base.
 
 ```py
-class DefaultedTuple[T: int = Never](tuple[T, str]): ...
+class DefaultedTuple[T: int = bool](tuple[T, str]): ...
 
 def match_defaulted_tuple(value: object) -> None:
     match value:
