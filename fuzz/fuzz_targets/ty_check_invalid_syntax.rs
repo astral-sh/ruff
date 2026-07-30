@@ -17,13 +17,13 @@ use ruff_db::vendored::VendoredFileSystem;
 use ruff_python_parser::{Mode, ParseOptions, parse_unchecked};
 use ty_module_resolver::{Db as ModuleResolverDb, SearchPathSettings};
 use ty_python_core::platform::PythonPlatform;
-use ty_python_core::program::{FallibleStrategy, Program, ProgramSettings};
+use ty_python_core::program::{FallibleStrategy, ProgramSettings};
 use ty_python_core::{Db as _, ProgramFile};
 use ty_python_semantic::lint::LintRegistry;
 use ty_python_semantic::types::check_types;
 use ty_python_semantic::{
-    AnalysisSettings, Db as SemanticDb, PythonVersionWithSource, default_lint_registry,
-    lint::RuleSelection,
+    AnalysisSettings, Db as SemanticDb, PythonVersionWithSource, SemanticTestDb,
+    default_lint_registry, lint::RuleSelection,
 };
 
 /// Database that can be used for testing.
@@ -38,11 +38,13 @@ struct TestDb {
     vendored: VendoredFileSystem,
     rule_selection: Arc<RuleSelection>,
     analysis_settings: Arc<AnalysisSettings>,
-    program: Option<Program>,
+    program_settings: ProgramSettings,
 }
 
 impl TestDb {
     fn new() -> Self {
+        let vendored = ty_vendored::file_system().clone();
+        let program_settings = ProgramSettings::empty(&vendored);
         let mut db = Self {
             storage: salsa::Storage::new(Some(Box::new({
                 move |event| {
@@ -50,11 +52,11 @@ impl TestDb {
                 }
             }))),
             system: TestSystem::default(),
-            vendored: ty_vendored::file_system().clone(),
+            vendored,
             files: Files::default(),
             rule_selection: RuleSelection::from_registry(default_lint_registry()).into(),
             analysis_settings: AnalysisSettings::default().into(),
-            program: None,
+            program_settings,
         };
 
         let src_root = SystemPathBuf::from("/src");
@@ -62,22 +64,17 @@ impl TestDb {
             .create_directory_all(&src_root)
             .unwrap();
 
-        db.program = Some(Program::from_settings(
-            &db,
-            ProgramSettings {
-                python_version: PythonVersionWithSource::default(),
-                python_platform: PythonPlatform::default(),
-                search_paths: SearchPathSettings::new(vec![src_root])
-                    .to_search_paths(db.system(), db.vendored(), &FallibleStrategy)
-                    .expect("Valid search path settings"),
-            },
-        ));
+        let program_settings = ProgramSettings {
+            python_version: PythonVersionWithSource::default(),
+            python_platform: PythonPlatform::default(),
+            search_paths: SearchPathSettings::new(vec![src_root])
+                .to_search_paths(db.system(), db.vendored(), &FallibleStrategy)
+                .expect("Valid search path settings"),
+        };
+        program_settings.search_paths.try_register_static_roots(&db);
+        db.program_settings = program_settings;
 
         db
-    }
-
-    fn program(&self) -> Program {
-        self.program.expect("the program should be initialized")
     }
 }
 
@@ -152,6 +149,13 @@ impl SemanticDb for TestDb {
 
     fn dyn_clone(&self) -> Box<dyn ty_python_semantic::Db> {
         Box::new(self.clone())
+    }
+}
+
+#[salsa::db]
+impl SemanticTestDb for TestDb {
+    fn program_settings(&self) -> &ProgramSettings {
+        &self.program_settings
     }
 }
 
