@@ -23,7 +23,20 @@ use crate::{
 use ty_python_core::definition::Definition;
 
 impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
-    /// Bind an imported value while retaining qualifiers that must survive re-exports.
+    /// Binds an imported value without declaring its type, except for inherited `Final` metadata.
+    ///
+    /// An import does not itself constrain later assignments. Imported `Final` values still need a
+    /// declaration so their qualifier survives re-exports and prevents later reassignment:
+    ///
+    /// ```python
+    /// # values.py
+    /// from typing import Final
+    /// VALUE: Final[int] = 1
+    ///
+    /// # consumer.py
+    /// from values import VALUE
+    /// VALUE = 2  # invalid-assignment
+    /// ```
     fn add_imported_binding(
         &mut self,
         alias: &'ast ast::Alias,
@@ -265,25 +278,22 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             for definition in self.index.definitions(alias) {
                 if let Some(star_import) = definition.kind(db).as_star_import() {
                     let use_def = self.index.use_def_map(self.scope().file_scope_id(db));
-                    let is_unreachable = use_def
+                    if let Some(binding) = use_def
                         .reachable_symbol_bindings(star_import.symbol_id())
                         .find(|binding| {
                             binding
                                 .binding
                                 .is_defined_and(|candidate| candidate == *definition)
                         })
-                        .is_some_and(|binding| {
-                            evaluate_reachability_with_cache(
-                                db,
-                                Some(self.reachability_cache()),
-                                use_def.reachability_constraints(),
-                                use_def.predicates(),
-                                binding.reachability_constraint,
-                            )
-                            .is_always_false()
-                        });
-
-                    if is_unreachable {
+                        && evaluate_reachability_with_cache(
+                            db,
+                            Some(self.reachability_cache()),
+                            use_def.reachability_constraints(),
+                            use_def.predicates(),
+                            binding.reachability_constraint,
+                        )
+                        .is_always_false()
+                    {
                         continue;
                     }
                 }

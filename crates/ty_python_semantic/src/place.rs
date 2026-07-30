@@ -1326,20 +1326,18 @@ pub(crate) fn place_by_id<'db>(
             // We generally trust undeclared places in stubs and expose the raw type.
             let in_stub_file = scope.file(db).is_stub(db);
 
-            if is_considered_non_modifiable
+            if !(is_considered_non_modifiable
                 || is_module_global
                 || scope_has_private_visibility
-                || in_stub_file
+                || in_stub_file)
             {
-                inferred.with_qualifiers(imported_qualifiers)
-            } else {
                 // Public inferred types should expose a promoted view rather than their raw
                 // inferred literal form. The adjustment is applied lazily when converting to
                 // `LookupResult` via `into_lookup_result`.
-                inferred
-                    .with_public_type_policy(PublicTypePolicy::Promote)
-                    .with_qualifiers(imported_qualifiers)
+                inferred = inferred.with_public_type_policy(PublicTypePolicy::Promote);
             }
+
+            inferred.with_qualifiers(imported_qualifiers)
         }
     }
 

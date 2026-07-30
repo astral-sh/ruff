@@ -1439,8 +1439,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         )
         .into_place_and_conflicting_declarations();
 
-        let mut inherited_imported_final = None;
-
         let may_inherit_imported_final = if let Some((owner_scope, owner_symbol)) = forwarded_owner
         {
             self.index
@@ -1451,7 +1449,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             place.as_symbol().is_some_and(Symbol::has_imported_binding)
         };
 
-        if place_and_quals.place.is_undefined()
+        let inherited_imported_final = if place_and_quals.place.is_undefined()
             && !binding.kind(db).is_import()
             && may_inherit_imported_final
         {
@@ -1463,15 +1461,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 use_def.bindings_at_definition(binding)
             };
 
-            inherited_imported_final = previous_bindings
+            previous_bindings
                 .filter_map(|previous| previous.binding.definition())
                 .filter_map(|previous| inferred_declaration(db, previous).declared())
-                .find(|imported| imported.qualifiers().contains(TypeQualifiers::FINAL));
+                .find(|imported| imported.qualifiers().contains(TypeQualifiers::FINAL))
+        } else {
+            None
+        };
 
-            if let Some(imported_final) = inherited_imported_final {
-                place_and_quals = Place::bound(imported_final.inner_type())
-                    .with_qualifiers(imported_final.qualifiers());
-            }
+        if let Some(imported_final) = inherited_imported_final {
+            place_and_quals = Place::bound(imported_final.inner_type())
+                .with_qualifiers(imported_final.qualifiers());
         }
 
         if let Some(conflicting) = conflicting {

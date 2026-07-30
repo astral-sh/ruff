@@ -44,6 +44,7 @@ bitflags! {
         /// true if the symbol is assigned more than once, or if it is assigned even though it is already in use
         const IS_REASSIGNED         = 1 << 5;
         const IS_PARAMETER          = 1 << 6;
+        /// At least one binding originated from a direct or wildcard import.
         const HAS_IMPORTED_BINDING  = 1 << 7;
     }
 }
@@ -127,7 +128,15 @@ impl Symbol {
         self.flags.contains(SymbolFlags::IS_PARAMETER)
     }
 
-    /// Returns whether any binding of this symbol originates from an import.
+    /// Returns whether this symbol has ever been bound by an import in its scope.
+    ///
+    /// The flag remains set after reassignment so type inference can preserve imported `Final`
+    /// qualifiers without examining the binding history of symbols that were never imported.
+    ///
+    /// ```python
+    /// from values import value
+    /// value = 1
+    /// ```
     pub fn has_imported_binding(&self) -> bool {
         self.flags.contains(SymbolFlags::HAS_IMPORTED_BINDING)
     }
