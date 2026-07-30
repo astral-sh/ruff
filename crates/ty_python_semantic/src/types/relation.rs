@@ -18,8 +18,8 @@ use crate::types::tuple::TupleType;
 use crate::types::{
     ApplyTypeMappingVisitor, CallableType, ClassBase, ClassLiteral, ClassType, CycleDetector,
     IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType, LiteralValueTypeKind,
-    MemberLookupPolicy, PropertyInstanceType, ProtocolInstanceType, SubclassOfInner,
-    SubclassOfType, TypeVarBoundOrConstraints, UnionType, UpcastPolicy,
+    MaterializationKind, MemberLookupPolicy, PropertyInstanceType, ProtocolInstanceType,
+    SubclassOfInner, SubclassOfType, TypeVarBoundOrConstraints, UnionType, UpcastPolicy,
 };
 use crate::{
     Db,
@@ -2723,6 +2723,21 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
 
         match (left, right) {
             (Type::Never, _) | (_, Type::Never) => self.always(),
+
+            (Type::NominalInstance(instance), _) | (_, Type::NominalInstance(instance))
+                if instance
+                    .class(db)
+                    .into_generic_alias()
+                    .is_some_and(|alias| {
+                        alias.specialization(db).materialization_kind(db)
+                            == Some(MaterializationKind::Bottom)
+                    }) =>
+            {
+                // A bottom materialization with an invariant gradual argument is the
+                // intersection of incompatible specializations. It is uninhabited even though we
+                // preserve its `Bottom[...]` representation instead of normalizing it to `Never`.
+                self.always()
+            }
 
             (Type::Dynamic(_), _) | (_, Type::Dynamic(_)) => self.never(),
             (Type::Divergent(_), _) | (_, Type::Divergent(_)) => self.never(),

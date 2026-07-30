@@ -827,12 +827,50 @@ def no_return_annotation(*args, **kwargs): ...
 static_assert(is_assignable_to(~type & ~RegularCallableTypeOf[no_return_annotation], ~type))
 ```
 
+## Assignability to negated invariant generic types
+
+A gradual invariant specialization can be assignable to the negation of another specialization when
+some materialization of its type argument is incompatible with the negated specialization.
+
+```pyi
+from typing import Any, Generic, TypeVar
+from ty_extensions import Bottom, static_assert
+from ty_extensions._internal import is_assignable_to
+
+T = TypeVar("T")
+T_co = TypeVar("T_co", covariant=True)
+
+class Invariant(Generic[T]):
+    value: T
+
+class Covariant(Generic[T_co]):
+    def get(self) -> T_co: ...
+
+static_assert(is_assignable_to(list[Any], ~list[int]))
+static_assert(is_assignable_to(list[Any], ~list[object]))
+static_assert(is_assignable_to(list[int], ~list[Any]))
+static_assert(is_assignable_to(list[Any], ~list[Any]))
+static_assert(is_assignable_to(list[list[Any]], ~list[list[int]]))
+static_assert(is_assignable_to(list[int | Any], ~list[int]))
+static_assert(is_assignable_to(Bottom[list[Any]], ~list[int]))
+static_assert(is_assignable_to(Bottom[list[Any]], ~list[Any]))
+static_assert(is_assignable_to(Invariant[Any], ~Invariant[int]))
+static_assert(is_assignable_to(Invariant[int], ~Invariant[Any]))
+
+static_assert(not is_assignable_to(list[int], ~list[int]))
+static_assert(not is_assignable_to(list[Any], ~object))
+static_assert(not is_assignable_to(Bottom[list[Any]], ~object))
+static_assert(not is_assignable_to(Covariant[Any], ~Covariant[int]))
+```
+
 ## Intersections with non-fully-static negated elements
 
 A type can be _assignable_ to an intersection containing negated elements only if the _bottom_
 materialization of that type is disjoint from the _bottom_ materialization of all negated elements
-in the intersection. This differs from subtyping, which should do the disjointness check against the
-_top_ materialization of the negated elements.
+in the intersection. This includes bottom materializations of invariant gradual generics: they are
+uninhabited even though their `Bottom[...]` representation remains distinct from `Never`. This
+differs from subtyping, which should do the disjointness check against the _top_ materialization of
+the negated elements.
 
 ```pyi
 from typing_extensions import Any, Never, Sequence
@@ -887,14 +925,13 @@ static_assert(not is_assignable_to(tuple[Any, ...], ~tuple[Any, ...]))
 # and `Never` *is* disjoint from itself
 static_assert(is_assignable_to(tuple[Any], ~tuple[Any]))
 
-# The same principle applies for non-fully-static `list` specializations.
-# TODO: this should pass (`Bottom[list[Any]]` should simplify to `Never`)
-static_assert(is_assignable_to(list[Any], ~list[Any]))  # error: [static-assert-error]
+# The same principle applies for non-fully-static `list` specializations: their invariant type
+# arguments can materialize to incompatible types even though `Bottom[list[Any]]` is not `Never`.
+static_assert(is_assignable_to(list[Any], ~list[Any]))
 
-# `Bottom[list[Any]]` is `Never`, which is disjoint from `Bottom[Sequence[Any]]`
-# (which is `Sequence[Never]`).
-# TODO: this should pass (`Bottom[list[Any]]` should simplify to `Never`)
-static_assert(is_assignable_to(list[Any], ~Sequence[Any]))  # error: [static-assert-error]
+# `list[Any]` can materialize to specializations that are disjoint from
+# `Bottom[Sequence[Any]]` (which is `Sequence[Never]`).
+static_assert(is_assignable_to(list[Any], ~Sequence[Any]))
 ```
 
 ## General properties
