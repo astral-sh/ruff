@@ -125,12 +125,12 @@ impl<'a> Diff<'a> {
         let cells = self.cells();
 
         let mut last_end = TextSize::ZERO;
-        for (cell, offset) in cells {
+        for (cell_index, offset) in cells {
             let range = TextRange::new(last_end, offset);
             last_end = offset;
 
             // For non-notebooks, construct and diff only the source surrounding the edits.
-            let (range, line_offset) = if cell.is_none()
+            let (range, line_offset) = if cell_index.is_none()
                 && let Some(first) = self.fix.edits().first()
                 && let Some(last) = self.fix.edits().last()
             {
@@ -209,10 +209,10 @@ impl<'a> Diff<'a> {
 
             let digit_with = OneIndexed::new(largest_new).unwrap_or_default().digits();
 
-            if let Some(cell) = cell {
+            if let Some(cell_index) = cell_index {
                 // Room for 1 digit, 1 space, 1 `|`, and 1 more following space. This centers the
                 // three colons on the pipe.
-                writeln!(f, "{:>1$} cell {cell}", ":::", digit_with.get() + 3)?;
+                writeln!(f, "{:>1$} cell {cell_index}", ":::", digit_with.get() + 3)?;
             }
 
             self.write_gutter(f, digit_with)?;
