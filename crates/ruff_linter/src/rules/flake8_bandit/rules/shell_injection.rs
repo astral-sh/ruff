@@ -86,7 +86,7 @@ pub(crate) struct SubprocessWithoutShellEqualsTrue;
 impl Violation for SubprocessWithoutShellEqualsTrue {
     #[derive_message_formats]
     fn message(&self) -> String {
-        "`subprocess` call: check for execution of untrusted input".to_string()
+        "`subprocess` call without `shell=True`: check for execution of untrusted input".to_string()
     }
 }
 
