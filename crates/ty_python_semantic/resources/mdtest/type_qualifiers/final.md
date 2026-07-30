@@ -177,6 +177,49 @@ FINAL_E = 2  # error: [invalid-assignment] "Reassignment of `Final` symbol `FINA
 FINAL_F = 2  # error: [invalid-assignment] "Reassignment of `Final` symbol `FINAL_F` is not allowed"
 ```
 
+### Imported `Final` qualifiers survive re-exports
+
+An import does not declare the imported type, but a `Final` qualifier still prevents reassignment
+after direct or wildcard re-exports.
+
+`source.py`:
+
+```py
+from typing import Final
+
+VALUE: Final[int] = 1
+```
+
+`forwarded.py`:
+
+```py
+from source import VALUE as VALUE
+```
+
+`wildcard.py`:
+
+```py
+from source import *
+```
+
+`main.py`:
+
+```py
+from forwarded import VALUE as forwarded_value
+from wildcard import VALUE as wildcard_value
+from source import VALUE as imported_twice
+
+from source import VALUE as imported_twice
+
+forwarded_value = 2  # error: [invalid-assignment] "Reassignment of `Final` symbol `forwarded_value` is not allowed"
+forwarded_value = 3  # error: [invalid-assignment] "Reassignment of `Final` symbol `forwarded_value` is not allowed"
+wildcard_value = 2  # error: [invalid-assignment] "Reassignment of `Final` symbol `wildcard_value` is not allowed"
+
+def overwrite_wildcard() -> None:
+    global wildcard_value
+    wildcard_value = 3  # error: [invalid-assignment] "Reassignment of `Final` symbol `wildcard_value` is not allowed"
+```
+
 ### Reassignment after conditional assignment
 
 If a `Final` symbol is conditionally assigned, a subsequent unconditional assignment is still a

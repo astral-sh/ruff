@@ -3193,7 +3193,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 // * And we're in the global scope
                 //
                 // We introduce a local definition `x = <module 'thispackage.x'>` that occurs
-                // before the `z = ...` declaration the import introduces. This models the fact
+                // before the `z = ...` binding the import introduces. This models the fact
                 // that the *first* time that you import 'thispackage.x' the python runtime creates
                 // `x` as a variable in the global scope of `thispackage`.
                 //

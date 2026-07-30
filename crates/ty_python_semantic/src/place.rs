@@ -1263,9 +1263,14 @@ pub(crate) fn place_by_id<'db>(
         } => {
             let bindings = all_considered_bindings();
             let boundness_analysis = bindings.boundness_analysis();
-            let mut inferred =
-                place_from_bindings_impl(db, &env, bindings, requires_explicit_reexport, None)
-                    .place;
+            let inferred_binding =
+                place_from_bindings_impl(db, &env, bindings, requires_explicit_reexport, None);
+            let imported_qualifiers = inferred_binding
+                .first_definition
+                .and_then(|definition| inferred_declaration(db, definition).declared())
+                .map(|imported| imported.qualifiers())
+                .unwrap_or_default();
+            let mut inferred = inferred_binding.place;
 
             if boundness_analysis == BoundnessAnalysis::AssumeBound {
                 if let Place::Defined(defined) = inferred {
@@ -1312,14 +1317,14 @@ pub(crate) fn place_by_id<'db>(
                 || scope_has_private_visibility
                 || in_stub_file
             {
-                inferred.into()
+                inferred.with_qualifiers(imported_qualifiers)
             } else {
                 // Public inferred types should expose a promoted view rather than their raw
                 // inferred literal form. The adjustment is applied lazily when converting to
                 // `LookupResult` via `into_lookup_result`.
                 inferred
                     .with_public_type_policy(PublicTypePolicy::Promote)
-                    .into()
+                    .with_qualifiers(imported_qualifiers)
             }
         }
     }
