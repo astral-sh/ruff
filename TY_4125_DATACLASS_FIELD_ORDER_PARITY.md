@@ -173,6 +173,12 @@ declaration provenance. It must not compare the required field name alone.
     this; Pyright currently does not.
 - An inherited field replaced by `ClassVar` should not cause an additional field-order diagnostic.
     Pyright reports only the incompatible override; mypy also reports ordering and call errors.
+- A `ClassVar` declared by an undecorated intermediate class does not remove an inherited dataclass
+    field. Both mypy and Pyright still report the subclass ordering violation.
+- An unconditional `InitVar` overriding an inherited `ClassVar` remains a constructor parameter.
+    Pyright may report the incompatible override, but both checkers retain the parameter.
+- User-declared fields named `__dataclass_fields__` or `__dataclass_params__` remain constructor
+    parameters rather than being mistaken for synthesized class variables.
 
 ## Comparison matrix
 

@@ -2046,7 +2046,7 @@ Redeclaring an inherited instance field as a class variable removes it from the 
 constructor and positional ordering checks. The override itself remains invalid.
 
 ```py
-from dataclasses import dataclass, field
+from dataclasses import InitVar, dataclass, field
 from typing import ClassVar
 
 @dataclass
@@ -2065,6 +2065,18 @@ class InheritedClassVariableOverride(ClassVariableOverride):
     z: int
 
 reveal_type(InheritedClassVariableOverride.__init__)  # revealed: (self: InheritedClassVariableOverride, y: int, z: int) -> None
+```
+
+A class variable declared by an undecorated intermediate class does not remove the inherited
+dataclass field.
+
+```py
+class OrdinaryClassVariableOverride(DefaultedFieldBase):
+    x: ClassVar[int] = 1  # error: [invalid-attribute-override]
+
+@dataclass
+class DataclassAfterOrdinaryOverride(OrdinaryClassVariableOverride):
+    y: int  # error: [dataclass-field-order]
 ```
 
 An annotation-only class variable also masks the inherited instance field.
@@ -2086,6 +2098,42 @@ class RestoredInstanceField(ClassVariableOverride):
     x: int = field()  # error: [invalid-attribute-override]
 
 reveal_type(RestoredInstanceField.__init__)  # revealed: (self: RestoredInstanceField, x: int, y: int) -> None
+```
+
+An initialization-only field overrides an inherited class variable and remains a constructor
+parameter.
+
+```py
+@dataclass
+class ClassVariableBase:
+    value: ClassVar[int]
+
+@dataclass
+class InitializationVariableOverride(ClassVariableBase):
+    value: InitVar[int]
+
+reveal_type(InitializationVariableOverride.__init__)  # revealed: (self: InitializationVariableOverride, value: int) -> None
+InitializationVariableOverride(1)
+```
+
+### Fields named after generated dataclass attributes
+
+Fields named after generated dataclass attributes are still ordinary constructor parameters.
+
+```py
+from dataclasses import dataclass
+
+@dataclass
+class DataclassFieldsConstructorField:
+    __dataclass_fields__: int
+
+DataclassFieldsConstructorField(1)
+
+@dataclass
+class DataclassParamsConstructorField:
+    __dataclass_params__: int
+
+DataclassParamsConstructorField(1)
 ```
 
 ### Overwriting attributes from base class

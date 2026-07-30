@@ -18,7 +18,7 @@ use crate::{
         SpecialFormType, StaticClassLiteral, Type, TypeVarVariance, TypedDictModule, binding_type,
         call::Argument,
         class::{
-            AbstractMethod, CodeGeneratorKind, FieldKind, MetaclassErrorKind,
+            AbstractMethod, CodeGeneratorKind, Field, FieldKind, MetaclassErrorKind,
             expanded_class_base_entries,
         },
         context::InferContext,
@@ -919,15 +919,12 @@ pub(crate) fn check_static_class_definitions<'db>(
         let class_init = class.has_dataclass_param(db, field_policy, DataclassFlags::INIT);
         let own_fields = class.own_fields(db, specialization, field_policy);
 
-        let mut kw_only_sentinel_fields = vec![];
+        let kw_only_sentinel_fields: Vec<_> = own_fields
+            .iter()
+            .filter_map(|(name, field)| field.is_kw_only_sentinel(db).then_some(name))
+            .collect();
         let mut field_order_violations = vec![];
         let mut previous_default_field = None;
-
-        for (name, field) in own_fields {
-            if field.is_kw_only_sentinel(db) {
-                kw_only_sentinel_fields.push(name);
-            }
-        }
 
         for (name, field) in class.fields(db, specialization, field_policy) {
             // Extract dataclass field properties
@@ -947,14 +944,9 @@ pub(crate) fn check_static_class_definitions<'db>(
             }
 
             if default_ty.is_some() {
-                previous_default_field = Some((name, field.first_declaration));
-            } else if let Some((default_name, default_declaration)) = previous_default_field {
-                field_order_violations.push((
-                    default_name,
-                    default_declaration,
-                    name,
-                    field.first_declaration,
-                ));
+                previous_default_field = Some((name, field));
+            } else if let Some((default_name, default_field)) = previous_default_field {
+                field_order_violations.push((default_name, default_field, name, field));
             }
         }
 
@@ -976,65 +968,22 @@ pub(crate) fn check_static_class_definitions<'db>(
         }
 
         if !field_order_violations.is_empty() {
-            let mut inherited_field_order_violations = FxHashSet::default();
-            for ancestor in class.iter_mro(db, specialization).skip(1) {
-                let Some(ancestor) = ancestor.into_class() else {
-                    continue;
-                };
-                let Some((ancestor, ancestor_specialization)) = ancestor.static_class_literal(db)
-                else {
-                    continue;
-                };
-                let Some(ancestor_policy @ CodeGeneratorKind::DataclassLike(_)) =
-                    CodeGeneratorKind::from_class(db, ancestor.into())
-                else {
-                    continue;
-                };
-                if !ancestor.has_dataclass_param(db, ancestor_policy, DataclassFlags::INIT) {
-                    continue;
-                }
-
-                let mut ancestor_previous_default = None;
-                for (name, field) in ancestor.fields(db, ancestor_specialization, ancestor_policy) {
-                    let FieldKind::Dataclass {
-                        default_ty,
-                        init,
-                        kw_only,
-                        ..
-                    } = &field.kind
-                    else {
-                        continue;
-                    };
-                    if !init || *kw_only == Some(true) {
-                        continue;
-                    }
-
-                    if default_ty.is_some() {
-                        ancestor_previous_default = Some((name, field.first_declaration));
-                    } else if let Some((default_name, default_declaration)) =
-                        ancestor_previous_default
-                    {
-                        inherited_field_order_violations.insert((
-                            default_name,
-                            default_declaration,
-                            name,
-                            field.first_declaration,
-                        ));
-                    }
-                }
-            }
-
             let body_scope = class.body_scope(db).file_scope_id(db);
             let use_def_map = index.use_def_map(body_scope);
             let place_table = index.place_table(body_scope);
 
-            for (default_name, default_declaration, name, declaration) in field_order_violations {
-                if inherited_field_order_violations.contains(&(
-                    default_name,
-                    default_declaration,
-                    name,
-                    declaration,
-                )) {
+            for (default_name, default_field, name, field) in field_order_violations {
+                if !own_fields.contains_key(default_name)
+                    && !own_fields.contains_key(name)
+                    && has_inherited_dataclass_field_order_violation(
+                        db,
+                        class,
+                        default_name,
+                        default_field,
+                        name,
+                        field,
+                    )
+                {
                     continue;
                 }
 
@@ -1091,6 +1040,64 @@ pub(crate) fn check_static_class_definitions<'db>(
     }
 
     class.validate_members(context);
+}
+
+/// Returns whether the same default-before-required field pair already violates an ancestor's
+/// generated constructor ordering.
+///
+/// ```python
+/// from dataclasses import dataclass
+///
+/// @dataclass
+/// class Base:
+///     optional: int = 1
+///     required: int
+///
+/// @dataclass
+/// class Child(Base):
+///     pass
+/// ```
+///
+/// `Child` inherits the existing error and should not report it again. Comparing declaration
+/// provenance preserves diagnostics when a subclass redeclares either field.
+fn has_inherited_dataclass_field_order_violation<'db>(
+    db: &'db dyn Db,
+    class: StaticClassLiteral<'db>,
+    default_name: &Name,
+    default_field: &Field<'db>,
+    required_name: &Name,
+    required_field: &Field<'db>,
+) -> bool {
+    class
+        .iter_mro(db, None)
+        .skip(1)
+        .filter_map(ClassBase::into_class)
+        .filter_map(|ancestor| ancestor.static_class_literal(db))
+        .any(|(ancestor, specialization)| {
+            let Some(field_policy @ CodeGeneratorKind::DataclassLike(_)) =
+                CodeGeneratorKind::from_class(db, ancestor.into())
+            else {
+                return false;
+            };
+            if !ancestor.has_dataclass_param(db, field_policy, DataclassFlags::INIT) {
+                return false;
+            }
+
+            let fields = ancestor.fields(db, specialization, field_policy);
+            let Some((default_index, _, inherited_default_field)) = fields.get_full(default_name)
+            else {
+                return false;
+            };
+            let Some((required_index, _, inherited_required_field)) =
+                fields.get_full(required_name)
+            else {
+                return false;
+            };
+
+            default_index < required_index
+                && inherited_default_field.first_declaration == default_field.first_declaration
+                && inherited_required_field.first_declaration == required_field.first_declaration
+        })
 }
 
 /// Check compatibility between class namespace values and attributes populated by its metaclass.

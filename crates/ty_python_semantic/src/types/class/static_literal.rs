@@ -2178,6 +2178,7 @@ impl<'db> StaticClassLiteral<'db> {
             "Collecting `fields` for NamedTuples should short-circuit in `fields()`"
         );
 
+        let mut class_variables = FxIndexSet::default();
         let mut map: FxIndexMap<_, _> = self
             .iter_mro(db, specialization)
             .rev()
@@ -2202,12 +2203,36 @@ impl<'db> StaticClassLiteral<'db> {
                 None
             })
             .flat_map(|source| match source {
-                FieldSource::Static(class, specialization) => Either::Left(
-                    class
-                        .own_fields(db, specialization, field_policy)
-                        .iter()
-                        .map(|(name, field)| (name.clone(), field.clone())),
-                ),
+                FieldSource::Static(class, specialization) => {
+                    let own_fields = class.own_fields(db, specialization, field_policy);
+
+                    if field_policy.is_dataclass_like() {
+                        let body_scope = class.body_scope(db);
+                        let table = place_table(db, body_scope);
+                        let use_def = use_def_map(db, body_scope);
+
+                        for (symbol_id, declarations) in
+                            use_def.all_end_of_scope_symbol_declarations()
+                        {
+                            let name = table.symbol(symbol_id).name();
+
+                            if own_fields.contains_key(name) {
+                                class_variables.swap_remove(name);
+                            } else if place_from_declarations(db, declarations)
+                                .ignore_conflicting_declarations()
+                                .is_class_var()
+                            {
+                                class_variables.insert(name.clone());
+                            }
+                        }
+                    }
+
+                    Either::Left(
+                        own_fields
+                            .iter()
+                            .map(|(name, field)| (name.clone(), field.clone())),
+                    )
+                }
                 FieldSource::DynamicTypedDict(typeddict) => {
                     Either::Right(typeddict.items(db).iter().map(|(name, td_field)| {
                         (
@@ -2231,41 +2256,8 @@ impl<'db> StaticClassLiteral<'db> {
             .collect();
 
         if field_policy.is_dataclass_like() {
-            let mut class_variables = FxIndexSet::default();
-
-            for superclass in self.iter_mro(db, specialization).rev() {
-                let Some(superclass) = superclass.into_class() else {
-                    continue;
-                };
-                let Some((superclass, superclass_specialization)) =
-                    superclass.static_class_literal(db)
-                else {
-                    continue;
-                };
-                if !field_policy.matches(db, superclass.into()) {
-                    continue;
-                }
-
-                let body_scope = superclass.body_scope(db);
-                let table = place_table(db, body_scope);
-                let use_def = use_def_map(db, body_scope);
-                let own_fields = superclass.own_fields(db, superclass_specialization, field_policy);
-
-                for (symbol_id, declarations) in use_def.all_end_of_scope_symbol_declarations() {
-                    let name = table.symbol(symbol_id).name();
-                    let declaration =
-                        place_from_declarations(db, declarations).ignore_conflicting_declarations();
-
-                    if declaration.is_class_var() {
-                        class_variables.insert(name.clone());
-                    } else if own_fields.contains_key(name) {
-                        class_variables.shift_remove(name);
-                    }
-                }
-            }
-
-            // `own_fields` excludes class variables, but their declarations still mask inherited
-            // fields. Apply the masks after collection so restoring a field retains its position.
+            // `own_fields` excludes class variables, but their declarations can still mask
+            // inherited fields. Delay removal so restoring a field preserves its original slot.
             map.retain(|name, _| !class_variables.contains(name));
         }
 
