@@ -1957,6 +1957,23 @@ class GrandchildOfIgnoredAncestor(ChildOfIgnoredAncestor):
     pass
 ```
 
+Redeclaring fields can introduce a new violation even when the same required field had an ignored
+violation in an ancestor.
+
+```py
+@dataclass
+class IgnoredViolationsBase:
+    first: int = 1
+    second: int  # ty: ignore[dataclass-field-order]
+    third: int  # ty: ignore[dataclass-field-order]
+
+@dataclass
+class NewlyInvalidOverride(IgnoredViolationsBase):
+    first: int = field()
+    second: int = 1
+    third: int = field()  # error: [dataclass-field-order]
+```
+
 Combining independently valid bases can introduce a new ordering violation even when the child
 declares no fields.
 

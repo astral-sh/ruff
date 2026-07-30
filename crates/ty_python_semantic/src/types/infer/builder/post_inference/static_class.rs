@@ -920,8 +920,8 @@ pub(crate) fn check_static_class_definitions<'db>(
         let own_fields = class.own_fields(db, specialization, field_policy);
 
         let mut kw_only_sentinel_fields = vec![];
-        let mut required_after_default_field_names = vec![];
-        let mut has_seen_default_field = false;
+        let mut field_order_violations = vec![];
+        let mut previous_default_field = None;
 
         for (name, field) in own_fields {
             if field.is_kw_only_sentinel(db) {
@@ -947,9 +947,14 @@ pub(crate) fn check_static_class_definitions<'db>(
             }
 
             if default_ty.is_some() {
-                has_seen_default_field = true;
-            } else if has_seen_default_field {
-                required_after_default_field_names.push(name);
+                previous_default_field = Some((name, field.first_declaration));
+            } else if let Some((default_name, default_declaration)) = previous_default_field {
+                field_order_violations.push((
+                    default_name,
+                    default_declaration,
+                    name,
+                    field.first_declaration,
+                ));
             }
         }
 
@@ -970,7 +975,7 @@ pub(crate) fn check_static_class_definitions<'db>(
             }
         }
 
-        if !required_after_default_field_names.is_empty() {
+        if !field_order_violations.is_empty() {
             let mut inherited_field_order_violations = FxHashSet::default();
             for ancestor in class.iter_mro(db, specialization).skip(1) {
                 let Some(ancestor) = ancestor.into_class() else {
@@ -989,7 +994,7 @@ pub(crate) fn check_static_class_definitions<'db>(
                     continue;
                 }
 
-                let mut ancestor_has_seen_default = false;
+                let mut ancestor_previous_default = None;
                 for (name, field) in ancestor.fields(db, ancestor_specialization, ancestor_policy) {
                     let FieldKind::Dataclass {
                         default_ty,
@@ -1005,9 +1010,16 @@ pub(crate) fn check_static_class_definitions<'db>(
                     }
 
                     if default_ty.is_some() {
-                        ancestor_has_seen_default = true;
-                    } else if ancestor_has_seen_default {
-                        inherited_field_order_violations.insert(name);
+                        ancestor_previous_default = Some((name, field.first_declaration));
+                    } else if let Some((default_name, default_declaration)) =
+                        ancestor_previous_default
+                    {
+                        inherited_field_order_violations.insert((
+                            default_name,
+                            default_declaration,
+                            name,
+                            field.first_declaration,
+                        ));
                     }
                 }
             }
@@ -1016,8 +1028,13 @@ pub(crate) fn check_static_class_definitions<'db>(
             let use_def_map = index.use_def_map(body_scope);
             let place_table = index.place_table(body_scope);
 
-            for name in required_after_default_field_names {
-                if inherited_field_order_violations.contains(name) {
+            for (default_name, default_declaration, name, declaration) in field_order_violations {
+                if inherited_field_order_violations.contains(&(
+                    default_name,
+                    default_declaration,
+                    name,
+                    declaration,
+                )) {
                     continue;
                 }
 
