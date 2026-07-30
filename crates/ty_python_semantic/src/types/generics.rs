@@ -3370,8 +3370,18 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             // A bounded argument exposes the specialization needed by a generic nominal parameter.
             // For example, `Self@handle <: Stream[T@Stream, U@Stream]` lets a function expecting
             // `Stream[T@helper, U@helper]` infer the enclosing class's type variables.
+            // Constrained type variables must not be inferred this way: independently merging
+            // their alternatives can produce a union that is not an allowed specialization.
             (formal @ Type::NominalInstance(_), Type::TypeVar(actual_typevar))
                 if !actual_typevar.is_inferable(self.db, self.inferable)
+                    && !any_over_type(self.db, formal, false, |ty| {
+                        matches!(
+                            ty,
+                            Type::TypeVar(typevar)
+                                if typevar.is_inferable(self.db, self.inferable)
+                                    && typevar.typevar(self.db).constraints(self.db).is_some()
+                        )
+                    })
                     && let Some(upper_bound) =
                         actual_typevar.typevar(self.db).upper_bound(self.db) =>
             {

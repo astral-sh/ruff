@@ -215,6 +215,32 @@ def bounded[S: Stream[int, bytes]](stream: S) -> None:
     reveal_type(helper(stream))  # revealed: tuple[int, bytes]
 ```
 
+A constrained function parameter cannot select different alternatives from a bounded receiver and
+another argument. The matching case remains valid.
+
+```py
+class Box[T]:
+    def get(self) -> T:
+        raise NotImplementedError
+
+def add_same[T: (int, str)](box: Box[T], value: T) -> T:
+    return box.get() + value
+
+def reject[S: Box[int]](box: S, value: str) -> None:
+    add_same(box, value)  # error: [invalid-argument-type]
+
+def accept[S: Box[int]](box: S, value: int) -> None:
+    add_same(box, value)
+```
+
+The same restriction applies when the receiver is an implicit `self` argument.
+
+```py
+class IntBox(Box[int]):
+    def reject(self, value: str) -> None:
+        add_same(self, value)  # error: [invalid-argument-type]
+```
+
 ## Bounded receivers passed to generic protocols
 
 Passing an implicit `Self` receiver to a generic protocol must not produce an invalid return type.

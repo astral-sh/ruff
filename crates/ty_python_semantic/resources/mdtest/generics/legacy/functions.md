@@ -193,6 +193,29 @@ def bounded(stream: S) -> None:
     reveal_type(helper(stream))  # revealed: tuple[int, bytes]
 ```
 
+A constrained function parameter cannot combine incompatible alternatives inferred from a bounded
+receiver and another argument.
+
+```py
+BoxT = TypeVar("BoxT", covariant=True)
+ConstrainedT = TypeVar("ConstrainedT", int, str)
+
+class Box(Generic[BoxT]):
+    def get(self) -> BoxT:
+        raise NotImplementedError
+
+BoundedBoxT = TypeVar("BoundedBoxT", bound=Box[int])
+
+def add_same(box: Box[ConstrainedT], value: ConstrainedT) -> ConstrainedT:
+    return box.get() + value
+
+def reject(box: BoundedBoxT, value: str) -> None:
+    add_same(box, value)  # error: [invalid-argument-type]
+
+def accept(box: BoundedBoxT, value: int) -> None:
+    add_same(box, value)
+```
+
 ## Inferring tuple parameter types
 
 ```toml
