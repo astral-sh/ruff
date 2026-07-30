@@ -1,8 +1,11 @@
 import logging
 import subprocess
 import sys
+from collections.abc import Sequence
 from pathlib import Path
 from typing import Final, Literal, NamedTuple
+
+logger = logging.getLogger(__name__)
 
 
 class Project(NamedTuple):
@@ -26,10 +29,10 @@ class Project(NamedTuple):
     skip: str | None = None
     """The project is skipped from benchmarking if not `None`."""
 
-    include: list[str] = []
+    include: Sequence[str] = ()
     """The directories and files to check. If empty, checks the current directory"""
 
-    exclude: list[str] = []
+    exclude: Sequence[str] = ()
     """The directories and files to exclude from checks."""
 
     edit: IncrementalEdit | None = None
@@ -39,7 +42,7 @@ class Project(NamedTuple):
         if (checkout_dir / ".git").exists():
             return
 
-        logging.debug(f"Cloning {self.repository} to {checkout_dir}")
+        logger.debug(f"Cloning {self.repository} to {checkout_dir}")
 
         try:
             # git doesn't support cloning a specific revision.
@@ -94,7 +97,7 @@ class Project(NamedTuple):
         except subprocess.CalledProcessError as e:
             raise RuntimeError(f"Failed to clone {self.name}:\n\n{e.stderr}") from e
 
-        logging.info(f"Cloned {self.name} to {checkout_dir}.")
+        logger.info(f"Cloned {self.name} to {checkout_dir}.")
 
 
 class IncrementalEdit(NamedTuple):
