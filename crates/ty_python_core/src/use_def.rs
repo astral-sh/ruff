@@ -861,6 +861,13 @@ impl<'db> UseDefMap<'db> {
             .expect("extra use-def data should have been retained")
     }
 
+    fn place_states(&self, place: ScopedPlaceId) -> &RetainedPlaceStates<InternedPlaceStateId> {
+        match place {
+            ScopedPlaceId::Symbol(symbol) => &self.symbol_states[symbol],
+            ScopedPlaceId::Member(member) => &self.extra().member_states[member],
+        }
+    }
+
     pub fn loop_header(&self, id: LoopHeaderId) -> &LoopHeader {
         &self.extra().loop_headers[id]
     }
@@ -980,60 +987,43 @@ impl<'db> UseDefMap<'db> {
         &self,
         place: ScopedPlaceId,
     ) -> BindingWithConstraintsIterator<'_, 'db> {
-        match place {
-            ScopedPlaceId::Symbol(symbol) => self.end_of_scope_symbol_bindings(symbol),
-            ScopedPlaceId::Member(member) => self.end_of_scope_member_bindings(member),
-        }
+        let state = self.place_states(place).end_of_scope;
+        self.bindings_iterator(
+            &self.interned_bindings[state.bindings_id()],
+            BoundnessAnalysis::BasedOnUnboundVisibility,
+        )
     }
 
     pub fn end_of_scope_symbol_bindings(
         &self,
         symbol: ScopedSymbolId,
     ) -> BindingWithConstraintsIterator<'_, 'db> {
-        let place_state_id = self.symbol_states[symbol].end_of_scope;
-        self.bindings_iterator(
-            &self.interned_bindings[place_state_id.bindings_id()],
-            BoundnessAnalysis::BasedOnUnboundVisibility,
-        )
-    }
-
-    pub(crate) fn end_of_scope_member_bindings(
-        &self,
-        member: ScopedMemberId,
-    ) -> BindingWithConstraintsIterator<'_, 'db> {
-        let place_state_id = self.extra().member_states[member].end_of_scope;
-        self.bindings_iterator(
-            &self.interned_bindings[place_state_id.bindings_id()],
-            BoundnessAnalysis::BasedOnUnboundVisibility,
-        )
+        self.end_of_scope_bindings(symbol.into())
     }
 
     pub fn reachable_bindings(
         &self,
         place: ScopedPlaceId,
     ) -> BindingWithConstraintsIterator<'_, 'db> {
-        match place {
-            ScopedPlaceId::Symbol(symbol) => self.reachable_symbol_bindings(symbol),
-            ScopedPlaceId::Member(member) => self.reachable_member_bindings(member),
-        }
+        let state = self.place_states(place).reachable;
+        self.bindings_iterator(
+            &self.interned_bindings[state.bindings_id()],
+            BoundnessAnalysis::AssumeBound,
+        )
     }
 
     pub fn reachable_symbol_bindings(
         &self,
         symbol: ScopedSymbolId,
     ) -> BindingWithConstraintsIterator<'_, 'db> {
-        let place_state_id = self.symbol_states[symbol].reachable;
-        let bindings = &self.interned_bindings[place_state_id.bindings_id()];
-        self.bindings_iterator(bindings, BoundnessAnalysis::AssumeBound)
+        self.reachable_bindings(symbol.into())
     }
 
     pub fn reachable_member_bindings(
         &self,
         member: ScopedMemberId,
     ) -> BindingWithConstraintsIterator<'_, 'db> {
-        let place_state_id = self.extra().member_states[member].reachable;
-        let bindings = &self.interned_bindings[place_state_id.bindings_id()];
-        self.bindings_iterator(bindings, BoundnessAnalysis::AssumeBound)
+        self.reachable_bindings(member.into())
     }
 
     pub(crate) fn enclosing_snapshot(
@@ -1098,53 +1088,40 @@ impl<'db> UseDefMap<'db> {
         &'map self,
         place: ScopedPlaceId,
     ) -> DeclarationsIterator<'map, 'db> {
-        match place {
-            ScopedPlaceId::Symbol(symbol) => self.end_of_scope_symbol_declarations(symbol),
-            ScopedPlaceId::Member(member) => self.end_of_scope_member_declarations(member),
-        }
+        let state = self.place_states(place).end_of_scope;
+        self.declarations_iterator(
+            &self.interned_declarations[state.declarations_id()],
+            BoundnessAnalysis::BasedOnUnboundVisibility,
+        )
     }
 
     pub fn end_of_scope_symbol_declarations<'map>(
         &'map self,
         symbol: ScopedSymbolId,
     ) -> DeclarationsIterator<'map, 'db> {
-        let place_state_id = self.symbol_states[symbol].end_of_scope;
-        let declarations = &self.interned_declarations[place_state_id.declarations_id()];
-        self.declarations_iterator(declarations, BoundnessAnalysis::BasedOnUnboundVisibility)
-    }
-
-    pub(crate) fn end_of_scope_member_declarations<'map>(
-        &'map self,
-        member: ScopedMemberId,
-    ) -> DeclarationsIterator<'map, 'db> {
-        let place_state_id = self.extra().member_states[member].end_of_scope;
-        let declarations = &self.interned_declarations[place_state_id.declarations_id()];
-        self.declarations_iterator(declarations, BoundnessAnalysis::BasedOnUnboundVisibility)
+        self.end_of_scope_declarations(symbol.into())
     }
 
     pub fn reachable_symbol_declarations(
         &self,
         symbol: ScopedSymbolId,
     ) -> DeclarationsIterator<'_, 'db> {
-        let place_state_id = self.symbol_states[symbol].reachable;
-        let declarations = &self.interned_declarations[place_state_id.declarations_id()];
-        self.declarations_iterator(declarations, BoundnessAnalysis::AssumeBound)
+        self.reachable_declarations(symbol.into())
     }
 
     pub fn reachable_member_declarations(
         &self,
         member: ScopedMemberId,
     ) -> DeclarationsIterator<'_, 'db> {
-        let place_state_id = self.extra().member_states[member].reachable;
-        let declarations = &self.interned_declarations[place_state_id.declarations_id()];
-        self.declarations_iterator(declarations, BoundnessAnalysis::AssumeBound)
+        self.reachable_declarations(member.into())
     }
 
     pub fn reachable_declarations(&self, place: ScopedPlaceId) -> DeclarationsIterator<'_, 'db> {
-        match place {
-            ScopedPlaceId::Symbol(symbol) => self.reachable_symbol_declarations(symbol),
-            ScopedPlaceId::Member(member) => self.reachable_member_declarations(member),
-        }
+        let state = self.place_states(place).reachable;
+        self.declarations_iterator(
+            &self.interned_declarations[state.declarations_id()],
+            BoundnessAnalysis::AssumeBound,
+        )
     }
 
     pub fn all_end_of_scope_symbol_declarations<'map>(
