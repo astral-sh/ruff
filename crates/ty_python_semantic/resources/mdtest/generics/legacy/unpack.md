@@ -161,6 +161,91 @@ overloaded_empty = invoke_pack(
 reveal_type(overloaded_empty)  # revealed: tuple[()]
 ```
 
+## Ecosystem generic forwarding callbacks
+
+A legacy `Unpack` forwarding callback must be specialized for the arguments already matched by the
+outer variadic parameter.
+
+```py
+from collections.abc import Awaitable, Callable
+from typing import TypeVar, TypeVarTuple, Unpack
+
+Ts = TypeVarTuple("Ts")
+Us = TypeVarTuple("Us")
+R = TypeVar("R")
+
+def schedule(callback: Callable[[Unpack[Ts]], object], *args: Unpack[Ts]) -> None: ...
+def run_sync(callback: Callable[[Unpack[Us]], R], *args: Unpack[Us]) -> Awaitable[R]:
+    raise NotImplementedError
+
+def target(value: int) -> int:
+    return value
+
+schedule(run_sync, target, 1)
+```
+
+## Ecosystem platform-unknown forwarding callbacks
+
+A value defined only on another platform is unreachable on the current platform. Forwarding it must
+not erase the matched argument count or produce a legacy `Unpack` callback error.
+
+```py
+import os
+from collections.abc import Awaitable, Callable
+from typing import TypeVar, TypeVarTuple, Unpack
+from ty_extensions import Unknown
+
+Ts = TypeVarTuple("Ts")
+Us = TypeVarTuple("Us")
+R = TypeVar("R")
+
+if os.name == "nt":
+    def make_platform_handle() -> int:
+        return 1
+
+class Nursery:
+    def start_soon(
+        self,
+        callback: Callable[[Unpack[Ts]], Awaitable[object]],
+        *args: Unpack[Ts],
+        name: object = None,
+    ) -> None: ...
+
+async def run_sync(
+    callback: Callable[[Unpack[Us]], R],
+    *args: Unpack[Us],
+    name: str | None = None,
+) -> R:
+    raise NotImplementedError
+
+async def signal(value: int) -> None: ...
+async def signal_pair(first: int, second: int) -> None: ...
+def synchronous(value: int) -> int:
+    return value
+
+def synchronous_pair(first: int, second: int) -> int:
+    return first + second
+
+def reveal_platform_handle() -> None:
+    reveal_type(make_platform_handle())  # revealed: Never
+
+def check(nursery: Nursery) -> None:
+    handle = make_platform_handle()
+    nursery.start_soon(signal, handle)
+    nursery.start_soon(run_sync, synchronous, handle)
+    nursery.start_soon(signal_pair, handle, handle)
+    nursery.start_soon(run_sync, synchronous_pair, handle, handle)
+    nursery.start_soon(signal, "invalid")  # error: [invalid-argument-type]
+
+def check_ordinary_unknown(nursery: Nursery, value: Unknown) -> None:
+    nursery.start_soon(signal, value)
+    nursery.start_soon(signal_pair, value, value)
+    nursery.start_soon(signal, value, value)  # error: [invalid-argument-type]
+
+def check_open_unknown(nursery: Nursery, values: tuple[Unknown, ...]) -> None:
+    nursery.start_soon(signal_pair, *values)  # error: [invalid-argument-type]
+```
+
 ## Type aliases
 
 A legacy alias can use `Unpack[Ts]` and accept either individual types or an unpacked tuple type.
@@ -220,6 +305,16 @@ accept(True, "phase", "status", b"ok")
 accept(True, b"ok")
 # error: [invalid-argument-type] "Argument to function `accept` is incorrect: Expected `tuple[bool, *tuple[str, ...], bytes]`"
 accept(True, 1, b"bad")
+
+def concrete(
+    *args: Unpack[tuple[str, Unpack[tuple[str, ...]], dict[str, str]]],
+) -> None: ...
+def check_open_splat(values: list[str], bad: list[int], env: dict[str, str]) -> None:
+    concrete(*values, env)
+    concrete(
+        *bad,  # error: [invalid-argument-type]
+        env,
+    )
 ```
 
 ## Defaults

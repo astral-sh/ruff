@@ -1012,6 +1012,184 @@ def accepts_int(value: int, /) -> None: ...
 reveal_type(infer_from_callback(accepts_int))  # revealed: tuple[int]
 ```
 
+### Ecosystem generic forwarding callbacks
+
+A generic forwarding callback must be specialized for the positional arguments already matched to
+the outer type-variable tuple. The same rule applies to a callback parameterized by `ParamSpec`.
+
+```py
+from collections.abc import Awaitable, Callable
+
+def schedule[*Ts](callback: Callable[[*Ts], object], *args: *Ts) -> None: ...
+def run_sync[*Us, R](callback: Callable[[*Us], R], *args: *Us) -> Awaitable[R]:
+    raise NotImplementedError
+
+def run_paramspec[**P, R](callback: Callable[P, R], *args: P.args, **kwargs: P.kwargs) -> Awaitable[R]:
+    raise NotImplementedError
+
+def target(value: int) -> int:
+    return value
+
+schedule(run_sync, target, 1)
+schedule(run_paramspec, target, 1)
+```
+
+### Ecosystem platform-unknown forwarding callbacks
+
+A value defined only on another platform is unreachable on the current platform. Forwarding it must
+not erase the matched argument count or produce a callback error.
+
+```py
+import os
+from collections.abc import Awaitable, Callable
+from ty_extensions import Unknown
+
+if os.name == "nt":
+    def make_platform_handle() -> int:
+        return 1
+
+class Nursery:
+    def start_soon[*Ts](
+        self,
+        callback: Callable[[*Ts], Awaitable[object]],
+        *args: *Ts,
+        name: object = None,
+    ) -> None: ...
+
+async def run_sync[*Ts, R](
+    callback: Callable[[*Ts], R],
+    *args: *Ts,
+    name: str | None = None,
+) -> R:
+    raise NotImplementedError
+
+async def signal(value: int) -> None: ...
+async def signal_pair(first: int, second: int) -> None: ...
+def synchronous(value: int) -> int:
+    return value
+
+def synchronous_pair(first: int, second: int) -> int:
+    return first + second
+
+def reveal_platform_handle() -> None:
+    reveal_type(make_platform_handle())  # revealed: Never
+
+def check(nursery: Nursery) -> None:
+    handle = make_platform_handle()
+    nursery.start_soon(signal, handle)
+    nursery.start_soon(run_sync, synchronous, handle)
+    nursery.start_soon(signal_pair, handle, handle)
+    nursery.start_soon(run_sync, synchronous_pair, handle, handle)
+    nursery.start_soon(signal, "invalid")  # error: [invalid-argument-type]
+
+def check_ordinary_unknown(nursery: Nursery, value: Unknown) -> None:
+    nursery.start_soon(signal, value)
+    nursery.start_soon(signal_pair, value, value)
+    nursery.start_soon(signal, value, value)  # error: [invalid-argument-type]
+
+def check_open_unknown(nursery: Nursery, values: tuple[Unknown, ...]) -> None:
+    nursery.start_soon(signal_pair, *values)  # error: [invalid-argument-type]
+```
+
+### Ecosystem nullable constrained overloads
+
+The same constrained type variable must select the same overload for every nullable argument. An
+independent union is not correlated and must still be rejected.
+
+```py
+from collections.abc import Callable
+from typing import overload
+
+def invoke[*Ts, R](callback: Callable[[*Ts], R], *args: *Ts) -> R:
+    raise NotImplementedError
+
+@overload
+def correlated(value: str | None, other: str | None) -> str: ...
+@overload
+def correlated(value: bytes | None, other: bytes | None) -> bytes: ...
+def correlated(value: str | bytes | None, other: str | bytes | None) -> str | bytes:
+    return value or other or ""
+
+def call[T: (str, bytes)](value: T | None, other: T | None) -> str | bytes:
+    reveal_type(invoke(correlated, value, other))  # revealed: str | bytes
+    return invoke(correlated, value, other)
+
+def uncorrelated(value: str | bytes | None) -> str | bytes:
+    return invoke(
+        correlated,
+        "first",
+        value,  # error: [invalid-argument-type]
+    )
+```
+
+### Ecosystem overloaded callback pipeline
+
+Each generic callback in an overloaded pipeline must receive the concrete tuple produced by the
+preceding callback.
+
+```py
+from collections.abc import Callable
+from typing import Any, overload
+
+@overload
+def chain[*P, *Q, R](args: tuple[*P], first: Callable[[*P], tuple[*Q]], second: Callable[[*Q], R], /) -> R: ...
+@overload
+def chain[*P, *Q, *X, R](
+    args: tuple[*P],
+    first: Callable[[*P], tuple[*Q]],
+    second: Callable[[*Q], tuple[*X]],
+    third: Callable[[*X], R],
+    /,
+) -> R: ...
+def chain(args: Any, /, *callbacks: Callable[..., Any]) -> Any: ...
+def pair[A, B](first: A, second: B) -> tuple[A, B]:
+    return first, second
+
+def reverse[A, B](first: A, second: B) -> tuple[B, A]:
+    return second, first
+
+def extend[A, B](first: A, second: B) -> tuple[A, B, int]:
+    return first, second, 1
+
+def reject_downstream(first: int, second: str) -> None: ...
+
+reveal_type(chain((1, ""), pair, reverse))  # revealed: tuple[str, int]
+reveal_type(chain((1, ""), pair, reverse, extend))  # revealed: tuple[str, int, int]
+chain(
+    (1, ""),
+    pair,
+    reverse,
+    reject_downstream,  # error: [invalid-argument-type]
+)
+```
+
+### Ecosystem zero-argument constructor callback
+
+A zero-argument class constructor is a valid callback for an inferred empty type-variable tuple.
+
+```py
+from collections.abc import Callable
+
+def invoke[*Ts, R](callback: Callable[[*Ts], R], *args: *Ts) -> R:
+    raise NotImplementedError
+
+reveal_type(invoke(bool))  # revealed: Literal[False]
+
+class NoArguments:
+    def __init__(self) -> None: ...
+
+reveal_type(invoke(NoArguments))  # revealed: NoArguments
+
+class RequiresArgument:
+    def __init__(self, value: int) -> None: ...
+
+# error: [invalid-argument-type]
+invoke(RequiresArgument)
+
+# error: [invalid-argument-type]
+invoke(1)
+```
+
 ### Callable inference with fixed positional parameters
 
 Fixed positional parameters surrounding an unpacked `TypeVarTuple` are excluded from the inferred

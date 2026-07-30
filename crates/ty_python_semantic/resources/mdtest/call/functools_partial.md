@@ -539,6 +539,89 @@ reveal_type(p)  # revealed: partial[(path: str, *, start: str | None = ".") -> s
 reveal_type(list(map(p, paths)))  # revealed: list[str]
 ```
 
+### Unbound `TypeVarTuple` callable bound with `partial`
+
+Binding fixed wrapper parameters must not specialize an untouched variadic tuple to the empty tuple.
+The returned partial must remain callable with the same arguments as its callbacks.
+
+```py
+from collections.abc import Callable
+from functools import partial
+from typing_extensions import TypeVarTuple, Unpack
+
+Ts = TypeVarTuple("Ts")
+
+def wrapper(
+    callback: Callable[[Unpack[Ts]], None],
+    formatter: Callable[[Unpack[Ts]], str],
+    *args: Unpack[Ts],
+) -> None: ...
+def decorate(
+    callback: Callable[[Unpack[Ts]], None],
+    formatter: Callable[[Unpack[Ts]], str],
+) -> Callable[[Unpack[Ts]], None]:
+    return partial(wrapper, callback, formatter)
+
+def accept(value: int) -> None: ...
+def format_value(value: int) -> str:
+    return str(value)
+
+bound = decorate(accept, format_value)
+reveal_type(bound)  # revealed: (int, /) -> None
+bound(1)
+# error: [invalid-argument-type]
+bound("wrong")
+```
+
+### Bound `TypeVarTuple` callable with `partial`
+
+Binding the arguments of a TypeVarTuple-backed callback leaves a zero-argument partial, not a
+partial that still requires the already-bound arguments.
+
+```py
+from collections.abc import Awaitable, Callable
+from functools import partial
+from typing import TypeVar
+from typing_extensions import TypeVarTuple, Unpack
+
+Ts = TypeVarTuple("Ts")
+Us = TypeVarTuple("Us")
+R = TypeVar("R")
+
+def from_thread(
+    callback: Callable[[Unpack[Ts]], Awaitable[R]],
+    *args: Unpack[Ts],
+    token: object | None = None,
+) -> R:
+    raise NotImplementedError
+
+async def sleep(seconds: float) -> None: ...
+async def sleep_pair(seconds: float, label: str) -> None: ...
+async def run_sync(callback: Callable[[Unpack[Us]], R], *args: Unpack[Us]) -> R:
+    raise NotImplementedError
+
+async def check(token: object | None) -> None:
+    bound = partial(from_thread, sleep, 0, token=token)
+    reveal_type(bound)  # revealed: partial[(*, token: object = ...) -> None]
+    bound()
+    await run_sync(bound)
+    bound(1)  # error: [too-many-positional-arguments]
+
+def check_fixed(values: tuple[int], token: object | None) -> None:
+    bound = partial(from_thread, sleep, *values, token=token)
+    reveal_type(bound)  # revealed: partial[(*, token: object = ...) -> None]
+    bound()
+
+def check_multiple(token: object | None) -> None:
+    bound = partial(from_thread, sleep_pair, 0, "value", token=token)
+    reveal_type(bound)  # revealed: partial[(*, token: object = ...) -> None]
+    bound()
+
+def check_open(values: tuple[int, ...], token: object | None) -> None:
+    bound = partial(from_thread, sleep, *values, token=token)
+    reveal_type(bound)  # revealed: partial[Unknown]
+```
+
 ### ParamSpec callable bound with `partial`
 
 ```py

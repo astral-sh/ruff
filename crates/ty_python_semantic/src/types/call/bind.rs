@@ -57,7 +57,7 @@ use crate::types::signatures::{
     CallableSignature, Parameter, ParameterDisplayName, ParameterKind, Parameters, ParametersKind,
     PartialApplication, PartialSignatureApplication,
 };
-use crate::types::tuple::{TupleLength, TupleSpec, TupleSpecBuilder, TupleType, VariableSegment};
+use crate::types::tuple::{TupleLength, TupleSpec, TupleSpecBuilder, TupleType};
 use crate::types::typed_dict::{TypedDictOpenness, extract_unpacked_typed_dict_from_value_type};
 use crate::types::typevar::{BoundTypeVarIdentity, TypeVarNonceGenerator, TypeVarSet};
 use crate::types::visitor::{
@@ -281,7 +281,13 @@ impl<'db> CallableItem<'db> {
     ) {
         match self {
             CallableItem::Regular(binding) => {
-                binding.check_types(db, constraints, argument_types, call_expression_tcx);
+                binding.check_types_with_mode(
+                    db,
+                    constraints,
+                    argument_types,
+                    call_expression_tcx,
+                    mode,
+                );
             }
             CallableItem::Constructor(binding) => {
                 binding.check_types(db, constraints, argument_types, call_expression_tcx, mode);
@@ -576,6 +582,9 @@ pub(crate) enum CheckTypesMode {
     /// type context across call arguments, and so all callable bindings should
     /// remain candidates until the final round is finalized.
     Provisional,
+
+    /// Check a partial application without closing an untouched variadic tuple.
+    PartialApplication,
 }
 
 impl CheckTypesMode {
@@ -3443,6 +3452,23 @@ impl<'db> CallableBinding<'db> {
         call_arguments: &CallArguments<'_, 'db>,
         call_expression_tcx: TypeContext<'db>,
     ) {
+        self.check_types_with_mode(
+            db,
+            constraints,
+            call_arguments,
+            call_expression_tcx,
+            CheckTypesMode::Finalize,
+        );
+    }
+
+    fn check_types_with_mode(
+        &mut self,
+        db: &'db dyn Db,
+        constraints: &ConstraintSetBuilder<'db>,
+        call_arguments: &CallArguments<'_, 'db>,
+        call_expression_tcx: TypeContext<'db>,
+        mode: CheckTypesMode,
+    ) {
         // If this callable is a bound method, prepend the self instance onto the arguments list
         // before checking.
         let call_arguments = call_arguments.with_self(self.bound_type);
@@ -3482,6 +3508,7 @@ impl<'db> CallableBinding<'db> {
                                 constraints,
                                 call_arguments.as_ref(),
                                 call_expression_tcx,
+                                mode,
                             );
                         }
                         return;
@@ -3495,6 +3522,7 @@ impl<'db> CallableBinding<'db> {
                             constraints,
                             call_arguments.as_ref(),
                             call_expression_tcx,
+                            mode,
                         );
                         return;
                     }
@@ -3510,6 +3538,7 @@ impl<'db> CallableBinding<'db> {
                 constraints,
                 call_arguments.as_ref(),
                 call_expression_tcx,
+                mode,
             );
         }
 
@@ -3679,7 +3708,13 @@ impl<'db> CallableBinding<'db> {
                 );
 
                 for (_, overload) in self.matching_overloads_mut() {
-                    overload.check_types(db, constraints, expanded_arguments, call_expression_tcx);
+                    overload.check_types(
+                        db,
+                        constraints,
+                        expanded_arguments,
+                        call_expression_tcx,
+                        mode,
+                    );
                 }
 
                 tracing::trace!(
@@ -5060,6 +5095,7 @@ struct ArgumentTypeChecker<'a, 'db> {
     parameter_tys: &'a mut [Option<Type<'db>>],
     parameter_ty_builders: Vec<Option<UnionBuilder<'db>>>,
     call_expression_tcx: TypeContext<'db>,
+    check_types_mode: CheckTypesMode,
     return_ty: Type<'db>,
     errors: &'a mut Vec<BindingError<'db>>,
 
@@ -5104,6 +5140,8 @@ struct ForwardedCallableSubCall<'db> {
     argument_indices: SmallVec<[Option<usize>; 2]>,
     /// Whether the forwarded tuple is definitely empty.
     forwarded_arguments_are_empty: bool,
+    /// Whether the forwarded tuple contains a value that can never exist.
+    forwarded_arguments_are_unreachable: bool,
 }
 
 /// Whether whole-tuple inference handled the starred positional variadic parameter.
@@ -5180,6 +5218,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         argument_matches: &'a [MatchedArgument<'db>],
         parameter_tys: &'a mut [Option<Type<'db>>],
         call_expression_tcx: TypeContext<'db>,
+        check_types_mode: CheckTypesMode,
         return_ty: Type<'db>,
         errors: &'a mut Vec<BindingError<'db>>,
     ) -> Self {
@@ -5193,6 +5232,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             parameter_tys,
             parameter_ty_builders: Vec::new(),
             call_expression_tcx,
+            check_types_mode,
             return_ty,
             errors,
             inferable_typevars: TypeVarSet::None,
@@ -5271,8 +5311,8 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
     ///     tail(1, flag, *rest)  # collected `*args`: tuple[bool, str, bytes]
     /// ```
     ///
-    /// If the annotation has fixed values around a `TypeVarTuple`, resizes an open provided
-    /// tuple to include those values without dropping fixed values already present:
+    /// If a variable-length tuple annotation has fixed values, resizes an open provided tuple
+    /// to include those values without dropping fixed values already present:
     ///
     /// For example, add a missing prefix and suffix:
     ///
@@ -5340,10 +5380,13 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         }
 
         let mut provided_tuple = provided_tuple.build();
+        // An open `Never` segment is empty; resizing it would hide missing fixed arguments.
         if let (TupleSpec::Variable(declared), TupleSpec::Variable(provided)) =
             (declared_tuple.as_ref(), &provided_tuple)
-            && declared.variable().typevartuple().is_some()
-            && matches!(provided.variable(), VariableSegment::Homogeneous(_))
+            && provided
+                .variable()
+                .homogeneous_type()
+                .is_some_and(|element| !element.resolve_type_alias(self.db).is_never())
         {
             // Keep fixed values that are already present on either side of the open segment.
             let target_length = TupleLength::Variable(
@@ -5391,6 +5434,12 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                 if variable.variable().typevartuple().is_some()
         );
         if !contains_typevartuple {
+            return inference;
+        }
+
+        if self.check_types_mode == CheckTypesMode::PartialApplication
+            && arguments.contributing_argument_indices.is_empty()
+        {
             return inference;
         }
 
@@ -5732,6 +5781,34 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                     });
                     builder.infer(sub_call.expected_return_ty, provided_return_ty)
                 } else {
+                    // Later callbacks need solved packs without closing the remaining ones.
+                    let declared_type = if declared_type.try_upcast_to_callable(self.db).is_some()
+                        && any_over_type(self.db, declared_type, false, |ty| {
+                            matches!(
+                                ty,
+                                Type::TypeVar(typevar)
+                                    if typevar.is_typevartuple(self.db)
+                                        && typevar.is_inferable(self.db, self.inferable_typevars)
+                            )
+                        })
+                        && self.signature.parameters().variadic().is_none()
+                        && let Some(generic_context) = self.signature.generic_context
+                    {
+                        let specialization =
+                            builder.build_with(generic_context, |typevar, bounds| {
+                                if let Some(bounds) = bounds
+                                    && typevar.is_typevartuple(self.db)
+                                    && let Some(lower) = bounds.lower
+                                {
+                                    Some(lower.promote(self.db))
+                                } else {
+                                    bounds.is_none().then_some(Type::TypeVar(typevar))
+                                }
+                            });
+                        declared_type.apply_specialization(self.db, specialization)
+                    } else {
+                        declared_type
+                    };
                     builder.infer(declared_type, argument_type)
                 };
 
@@ -5966,6 +6043,11 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         let (variadic_index, variadic_parameter) = self.signature.parameters().variadic()?;
         let arguments =
             self.collect_starred_parameter_arguments(variadic_index, variadic_parameter)?;
+        if self.check_types_mode == CheckTypesMode::PartialApplication
+            && arguments.contributing_argument_indices.is_empty()
+        {
+            return None;
+        }
         let TupleSpec::Variable(variable) = arguments.declared_tuple.as_ref() else {
             return None;
         };
@@ -6052,6 +6134,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             forwarded_arguments_are_empty: provided_tuple
                 .exact_tuple_instance_spec(self.db)
                 .is_some_and(|tuple| tuple.len() == TupleLength::Fixed(0)),
+            forwarded_arguments_are_unreachable: provided_tuple.is_never(),
         })
     }
 
@@ -6070,26 +6153,49 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             for error in &overload.errors {
                 let BindingError::InvalidArgumentType {
                     expected_ty,
-                    provided_ty: Type::TypeVar(typevar),
+                    provided_ty,
                     ..
                 } = error
                 else {
                     overload_constraints = ConstraintSet::from_bool(constraints, false);
                     break;
                 };
-                if typevar.is_inferable(self.db, self.inferable_typevars)
-                    || typevar.typevar(self.db).constraints(self.db).is_none()
-                {
+
+                // Keep one shared constrained choice; every other union member must already fit.
+                let provided_elements = match provided_ty {
+                    Type::Union(union) => union.elements(self.db),
+                    _ => std::slice::from_ref(provided_ty),
+                };
+                let mut constrained_typevar = None;
+                let fixed_elements_are_assignable = provided_elements.iter().all(|&provided_ty| {
+                    if let Type::TypeVar(typevar) = provided_ty
+                        && !typevar.is_inferable(self.db, self.inferable_typevars)
+                        && typevar.typevar(self.db).constraints(self.db).is_some()
+                    {
+                        constrained_typevar.replace(typevar).is_none()
+                    } else {
+                        provided_ty
+                            .when_assignable_to(
+                                self.db,
+                                *expected_ty,
+                                constraints,
+                                self.inferable_typevars,
+                            )
+                            .is_always_satisfied(self.db)
+                    }
+                });
+                let Some(typevar) = constrained_typevar.filter(|_| fixed_elements_are_assignable)
+                else {
                     overload_constraints = ConstraintSet::from_bool(constraints, false);
                     break;
-                }
+                };
 
-                constrained_typevars.insert(*typevar);
+                constrained_typevars.insert(typevar);
                 overload_constraints = overload_constraints.and(self.db, constraints, || {
                     ConstraintSet::constrain_typevar_upper_bound(
                         self.db,
                         constraints,
-                        *typevar,
+                        typevar,
                         *expected_ty,
                     )
                 });
@@ -6126,10 +6232,16 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         else {
             return false;
         };
+        if sub_call.forwarded_arguments_are_unreachable {
+            return true;
+        }
         let Some(callable_binding) = sub_call.bindings.single_element() else {
             return false;
         };
-        if callable_binding.overloads().len() <= 1 {
+        if callable_binding.overloads().len() <= 1
+            && !(sub_call.forwarded_arguments_are_empty
+                && argument_type.as_class_literal().is_some())
+        {
             return false;
         }
         let Some(provided_return_ty) = sub_call.provided_return_ty else {
@@ -7236,6 +7348,7 @@ impl<'db> Binding<'db> {
         constraints: &ConstraintSetBuilder<'db>,
         arguments: &CallArguments<'_, 'db>,
         call_expression_tcx: TypeContext<'db>,
+        mode: CheckTypesMode,
     ) {
         let parameters = self.signature.parameters();
 
@@ -7264,6 +7377,7 @@ impl<'db> Binding<'db> {
             &self.argument_matches,
             &mut self.parameter_tys,
             call_expression_tcx,
+            mode,
             self.return_ty,
             &mut self.errors,
         );
@@ -7338,21 +7452,19 @@ impl<'db> Binding<'db> {
         let failed_synthesis_return_type =
             KnownClass::FunctoolsPartial.to_specialized_instance(db, &[Type::unknown()]);
 
-        let (bound_call_arguments, partial_bindings, can_synthesize_signature) =
+        let (bound_call_arguments, mut partial_bindings, can_synthesize_signature) =
             Bindings::functools_partial_matched_bindings(db, func_ty, call_arguments)?;
 
         // Reuse call-binding machinery to resolve which wrapped overloads are compatible with
         // bound arguments and to surface binding diagnostics.
-        let partial_bindings = match partial_bindings.check_types(
+        let _ = partial_bindings.check_types_impl(
             db,
             &ConstraintSetBuilder::new(),
             &bound_call_arguments,
             TypeContext::default(),
             &[],
-        ) {
-            Ok(bindings) => bindings,
-            Err(CallError(_, bindings)) => *bindings,
-        };
+            CheckTypesMode::PartialApplication,
+        );
         let new_return_type =
             partial_bindings.functools_partial_type(db, func_ty, self, &bound_call_arguments);
 
@@ -7387,7 +7499,11 @@ impl<'db> Binding<'db> {
     }
 
     /// Collects the parameter-level effects of a `functools.partial(...)` application.
-    fn partial_application(&self, arguments: &CallArguments<'_, 'db>) -> PartialApplication<'db> {
+    fn partial_application(
+        &self,
+        db: &'db dyn Db,
+        arguments: &CallArguments<'_, 'db>,
+    ) -> PartialApplication<'db> {
         let parameters = self.signature.parameters().as_slice();
         let mut partial_application = PartialApplication::new(parameters.len());
 
@@ -7436,6 +7552,36 @@ impl<'db> Binding<'db> {
             }
         }
 
+        if let Some((parameter_index, parameter)) = self.signature.parameters().variadic()
+            && parameter.has_starred_annotation()
+            && let Some(specialization) = self.specialization(db)
+            && let Some(tuple) = parameter
+                .annotated_type()
+                .apply_specialization(db, specialization)
+                .exact_tuple_instance_spec(db)
+            && let TupleLength::Fixed(expected_count) = tuple.len()
+            && let Some(provided_count) =
+                self.argument_matches
+                    .iter()
+                    .try_fold(0usize, |count, argument| {
+                        if let Some(variadic_parameter) = &argument.variadic_parameter
+                            && variadic_parameter.index == parameter_index
+                        {
+                            count.checked_add(variadic_parameter.tuple.len().maximum()?)
+                        } else {
+                            count.checked_add(
+                                argument
+                                    .iter()
+                                    .filter(|matched| matched.index == parameter_index)
+                                    .count(),
+                            )
+                        }
+                    })
+            && provided_count == expected_count
+        {
+            partial_application.bind_positionally(parameter_index);
+        }
+
         partial_application
     }
 
@@ -7447,7 +7593,7 @@ impl<'db> Binding<'db> {
     ) -> PartialSignatureApplication<'db> {
         PartialSignatureApplication::new(
             self.signature.clone(),
-            self.partial_application(arguments),
+            self.partial_application(db, arguments),
             self.inference,
             self.unspecialized_return_type(db),
         )

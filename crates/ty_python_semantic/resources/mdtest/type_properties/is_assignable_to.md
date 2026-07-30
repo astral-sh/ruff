@@ -1398,7 +1398,7 @@ specializations. That means that a generic callable is assignable to any particu
 the generic callable.)
 
 ```py
-from typing import Callable, Self
+from typing import Awaitable, Callable, Self
 from ty_extensions import static_assert
 from ty_extensions._internal import RegularCallableTypeOf, TypeOf, is_assignable_to
 
@@ -1490,6 +1490,79 @@ static_assert(
         Callable[[SelfCarrier[int], str], tuple[int, str]],
     )
 )
+
+def forward_variadic[*Ts, R](callback: Callable[[*Ts], R], *args: *Ts) -> Awaitable[R]:
+    raise NotImplementedError
+
+def forward_paramspec[**P, R](callback: Callable[P, R], *args: P.args, **kwargs: P.kwargs) -> Awaitable[R]:
+    raise NotImplementedError
+
+static_assert(
+    is_assignable_to(
+        TypeOf[forward_variadic],
+        Callable[[Callable[[int], int], int], Awaitable[int]],
+    )
+)
+static_assert(
+    not is_assignable_to(
+        TypeOf[forward_variadic],
+        Callable[[Callable[[int], str], int], Awaitable[int]],
+    )
+)
+static_assert(
+    is_assignable_to(
+        TypeOf[forward_paramspec],
+        Callable[[Callable[[int], int], int], Awaitable[int]],
+    )
+)
+static_assert(
+    not is_assignable_to(
+        TypeOf[forward_paramspec],
+        Callable[[Callable[[int], str], int], Awaitable[int]],
+    )
+)
+
+def capture[*Ts](*args: *Ts) -> tuple[*Ts]:
+    raise NotImplementedError
+
+def capture_kwargs[*Ts](*args: *Ts, **kwargs: object) -> tuple[*Ts]:
+    raise NotImplementedError
+
+def optional(value: int = 0, /) -> tuple[int]:
+    return (value,)
+
+def named(value: int) -> tuple[int]:
+    return (value,)
+
+def homogeneous(*values: int) -> tuple[int, ...]:
+    return values
+
+def concrete(header: bool, /, *rest: *tuple[int, *tuple[str, ...], bytes]) -> tuple[bool, int, *tuple[str, ...], bytes]:
+    return (header, *rest)
+
+def symbolic[*Us](*args: *Us) -> tuple[*Us]:
+    return args
+
+static_assert(is_assignable_to(TypeOf[capture], Callable[[], tuple[()]]))
+static_assert(is_assignable_to(TypeOf[capture], Callable[[int, str], tuple[int, str]]))
+static_assert(is_assignable_to(TypeOf[capture], RegularCallableTypeOf[homogeneous]))
+static_assert(is_assignable_to(TypeOf[capture], RegularCallableTypeOf[concrete]))
+static_assert(is_assignable_to(TypeOf[capture], RegularCallableTypeOf[symbolic]))
+
+static_assert(not is_assignable_to(TypeOf[capture], RegularCallableTypeOf[optional]))
+static_assert(not is_assignable_to(TypeOf[capture_kwargs], RegularCallableTypeOf[named]))
+
+def preserve_outer_paramspec[**P]() -> None:
+    def local[R](*args: P.args, **kwargs: P.kwargs) -> R:
+        raise NotImplementedError
+
+    static_assert(is_assignable_to(TypeOf[local], Callable[[], int]))
+
+def preserve_outer_typevartuple[*Us]() -> None:
+    def local[R](*args: *Us) -> R:
+        raise NotImplementedError
+
+    static_assert(not is_assignable_to(TypeOf[local], Callable[[], int]))
 ```
 
 The reverse is not true — if someone expects a generic function that can be called with any
