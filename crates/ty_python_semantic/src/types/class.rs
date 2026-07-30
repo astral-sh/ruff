@@ -53,10 +53,12 @@ use crate::{
 };
 use ruff_db::diagnostic::Span;
 use ruff_db::files::File;
+use ruff_db::parsed::parsed_module;
 use ruff_python_ast::name::Name;
-use ruff_python_ast::{self as ast};
-use ruff_text_size::TextRange;
+use ruff_python_ast::{self as ast, NodeIndex};
+use ruff_text_size::{Ranged, TextRange};
 use ty_python_core::definition::Definition;
+use ty_python_core::scope::ScopeId;
 use ty_python_core::{place_table, use_def_map};
 
 mod dynamic_literal;
@@ -65,6 +67,44 @@ mod known;
 mod named_tuple;
 mod static_literal;
 mod typed_dict;
+
+enum DynamicClassHeaderAnchor<'db> {
+    Definition(Definition<'db>),
+    ScopeOffset(u32),
+}
+
+/// Returns the source range of a call that creates a dynamic class.
+///
+/// ```python
+/// Color = Enum("Color", "RED GREEN")
+/// #       ^^^^^^^^^^^^^^^^^^^^^^^^^^
+/// ```
+fn dynamic_class_header_range<'db>(
+    db: &'db dyn Db,
+    scope: ScopeId<'db>,
+    anchor: DynamicClassHeaderAnchor<'db>,
+) -> TextRange {
+    let module = parsed_module(db, scope.file(db)).load(db);
+    match anchor {
+        DynamicClassHeaderAnchor::Definition(definition) => definition
+            .kind(db)
+            .value(&module)
+            .expect("dynamic class definitions should only be used for assignments")
+            .range(),
+        DynamicClassHeaderAnchor::ScopeOffset(offset) => {
+            let scope_anchor = scope.node(db).node_index().unwrap_or(NodeIndex::from(0));
+            let anchor_u32 = scope_anchor
+                .as_u32()
+                .expect("anchor should not be NodeIndex::NONE");
+            let absolute_index = NodeIndex::from(anchor_u32 + offset);
+            let node: &ast::ExprCall = module
+                .get_by_index(absolute_index)
+                .try_into()
+                .expect("scope offset should point to ExprCall");
+            node.range()
+        }
+    }
+}
 
 bitflags::bitflags! {
     /// Properties that affect the representation of instances of a class.
