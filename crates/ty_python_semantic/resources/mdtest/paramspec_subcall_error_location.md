@@ -531,11 +531,11 @@ info: Function defined here
   |     ^^^^^^^^ ---------- Parameter declared here
 ```
 
-## Overloads without parameter definitions
+## Overloads with expanded positional parameters
 
-Expanding `Unpack[tuple[int]]` can remove the information linking an overload's parameter back to
-its declaration. Until that link is restored, point to the forwarding function's `*args` rather than
-an unrelated overload.
+Expanding `Unpack[tuple[int]]` must preserve the link to the callback's `*values` declaration. The
+diagnostic can then identify the matching overload instead of falling back to the forwarding
+function's `*args` parameter.
 
 ```py
 from typing import Callable, Concatenate, Unpack, overload
@@ -557,17 +557,17 @@ error[invalid-argument-type]: Argument to function `wrapper` is incorrect
 10 | wrapper(callback, "incorrect")  # snapshot: invalid-argument-type
    |                   ^^^^^^^^^^^ Expected `int`, found `Literal["incorrect"]`
 info: Function defined here
- --> src/mdtest_snippet.py:3:5
+ --> src/mdtest_snippet.py:7:5
   |
-3 | def wrapper[**P](callback: Callable[Concatenate[int, P], None], *args: P.args, **kwargs: P.kwargs) -> None: ...
-  |     ^^^^^^^                                                     ------------- Parameter declared here
+7 | def callback(prefix: int, *values: Unpack[tuple[int]]) -> None: ...
+  |     ^^^^^^^^              --------------------------- Parameter declared here
 ```
 
 ## Expanded keyword parameters
 
 `Unpack[Config]` creates separate keyword parameters for `alpha` and `beta`, even though the
-callback declares only `**options`. Without a reliable link to that declaration, point to the
-forwarding function's `**kwargs` parameter.
+callback declares only `**options`. An error for `beta` should point to that `**options`
+declaration.
 
 ```py
 from typing import Callable, TypedDict, Unpack
@@ -590,10 +590,95 @@ error[invalid-argument-type]: Argument to function `wrapper` is incorrect
 11 | wrapper(callback, alpha=1, beta="incorrect")  # snapshot: invalid-argument-type
    |                            ^^^^^^^^^^^^^^^^ Expected `int`, found `Literal["incorrect"]`
 info: Function defined here
- --> src/mdtest_snippet.py:3:5
+ --> src/mdtest_snippet.py:9:5
   |
-3 | def wrapper[**P](callback: Callable[P, None], *args: P.args, **kwargs: P.kwargs) -> None: ...
-  |     ^^^^^^^                                                  ------------------ Parameter declared here
+9 | def callback(**options: Unpack[Config]) -> None: ...
+  |     ^^^^^^^^ ------------------------- Parameter declared here
+```
+
+## Overloads with expanded keyword parameters
+
+Both callback overloads unpack the same `TypedDict`, so their expanded parameters refer to the same
+field declarations. The diagnostic should still identify the overload selected by its `int` prefix.
+
+```py
+from typing import Callable, Concatenate, TypedDict, Unpack, overload
+
+class Config(TypedDict):
+    value: int
+
+def wrapper[**P](callback: Callable[Concatenate[int, P], None], *args: P.args, **kwargs: P.kwargs) -> None: ...
+@overload
+def callback(prefix: str, **options: Unpack[Config]) -> None: ...
+@overload
+def callback(prefix: int, **options: Unpack[Config]) -> None: ...
+def callback(prefix: str | int, **options: Unpack[Config]) -> None: ...
+
+wrapper(callback, value="incorrect")  # snapshot: invalid-argument-type
+```
+
+```snapshot
+error[invalid-argument-type]: Argument to function `wrapper` is incorrect
+  --> src/mdtest_snippet.py:13:19
+   |
+13 | wrapper(callback, value="incorrect")  # snapshot: invalid-argument-type
+   |                   ^^^^^^^^^^^^^^^^^ Expected `int`, found `Literal["incorrect"]`
+info: Function defined here
+  --> src/mdtest_snippet.py:10:5
+   |
+10 | def callback(prefix: int, **options: Unpack[Config]) -> None: ...
+   |     ^^^^^^^^              ------------------------- Parameter declared here
+```
+
+The same overload identity must survive `functools.partial`, which removes the bound prefix before
+forwarding the remaining arguments.
+
+```py
+from functools import partial
+
+def forward[**P](callback: Callable[P, None], *args: P.args, **kwargs: P.kwargs) -> None: ...
+
+forward(partial(callback, 1), value="incorrect")  # snapshot: invalid-argument-type
+```
+
+```snapshot
+error[invalid-argument-type]: Argument to function `forward` is incorrect
+  --> src/mdtest_snippet.py:18:31
+   |
+18 | forward(partial(callback, 1), value="incorrect")  # snapshot: invalid-argument-type
+   |                               ^^^^^^^^^^^^^^^^^ Expected `int`, found `Literal["incorrect"]`
+info: Function defined here
+  --> src/mdtest_snippet.py:10:5
+   |
+10 | def callback(prefix: int, **options: Unpack[Config]) -> None: ...
+   |     ^^^^^^^^              ------------------------- Parameter declared here
+```
+
+## Expanded positional parameters
+
+`Unpack[tuple[int, str]]` creates two positional parameters from one `*values` declaration. An error
+in the second argument should point to that declaration.
+
+```py
+from typing import Callable, Unpack
+
+def wrapper[**P](callback: Callable[P, None], *args: P.args, **kwargs: P.kwargs) -> None: ...
+def callback(*values: Unpack[tuple[int, str]]) -> None: ...
+
+wrapper(callback, 1, 2)  # snapshot: invalid-argument-type
+```
+
+```snapshot
+error[invalid-argument-type]: Argument to function `wrapper` is incorrect
+ --> src/mdtest_snippet.py:6:22
+  |
+6 | wrapper(callback, 1, 2)  # snapshot: invalid-argument-type
+  |                      ^ Expected `str`, found `Literal[2]`
+info: Function defined here
+ --> src/mdtest_snippet.py:4:5
+  |
+4 | def callback(*values: Unpack[tuple[int, str]]) -> None: ...
+  |     ^^^^^^^^ -------------------------------- Parameter declared here
 ```
 
 ## Callback protocols
@@ -682,6 +767,43 @@ info: Method defined here
   |
 6 |     def __init__(self, value: int) -> None: ...
   |         ^^^^^^^^       ---------- Parameter declared here
+```
+
+## Overloaded constructors defined by __init__
+
+Synthesized constructor signatures should preserve the overload selected by `Concatenate`, even when
+both overloads unpack the same `TypedDict` fields.
+
+```py
+from typing import Callable, Concatenate, TypedDict, Unpack, overload
+
+class Options(TypedDict):
+    value: int
+
+def wrapper[**P, T](callback: Callable[Concatenate[int, P], T], *args: P.args, **kwargs: P.kwargs) -> T:
+    return callback(1, *args, **kwargs)
+
+class Factory:
+    @overload
+    def __init__(self, prefix: str, **options: Unpack[Options]) -> None: ...
+    @overload
+    def __init__(self, prefix: int, **options: Unpack[Options]) -> None: ...
+    def __init__(self, prefix: str | int, **options: Unpack[Options]) -> None: ...
+
+wrapper(Factory, value="incorrect")  # snapshot: invalid-argument-type
+```
+
+```snapshot
+error[invalid-argument-type]: Argument to function `wrapper` is incorrect
+  --> src/mdtest_snippet.py:16:18
+   |
+16 | wrapper(Factory, value="incorrect")  # snapshot: invalid-argument-type
+   |                  ^^^^^^^^^^^^^^^^^ Expected `int`, found `Literal["incorrect"]`
+info: Method defined here
+  --> src/mdtest_snippet.py:13:9
+   |
+13 |     def __init__(self, prefix: int, **options: Unpack[Options]) -> None: ...
+   |         ^^^^^^^^                    -------------------------- Parameter declared here
 ```
 
 ## Constructors defined by a metaclass

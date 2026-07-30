@@ -2205,6 +2205,7 @@ impl<'db> ClassType<'db> {
                         return_type,
                     )
                     .with_definition(signature.definition())
+                    .with_source_overload_index(signature.source_overload_index())
                     .bind_self_with_receiver(
                         db,
                         Some(instance_type),

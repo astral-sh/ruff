@@ -11,6 +11,7 @@
 //! arguments must match _at least one_ overload.
 
 use std::fmt;
+use std::num::NonZeroU32;
 use std::slice::Iter;
 use std::sync::Arc;
 
@@ -242,7 +243,10 @@ impl<'db> CallableSignature<'db> {
                 overload.inference,
                 overload.unspecialized_return_ty,
             );
-            let dedup_key = signature.clone().with_definition(None);
+            let dedup_key = signature
+                .clone()
+                .with_definition(None)
+                .with_source_overload_index(None);
             if seen_overloads.insert(dedup_key) {
                 new_overloads.push(signature);
             }
@@ -324,6 +328,7 @@ impl<'db> CallableSignature<'db> {
                             type_mapping.update_signature_generic_context(db, context)
                         }),
                         definition: self_signature.definition,
+                        source_overload_index: self_signature.source_overload_index,
                         receiver_constraints: self_signature.map_receiver_constraints(
                             db,
                             type_mapping,
@@ -352,6 +357,7 @@ impl<'db> CallableSignature<'db> {
                                 }),
                             ),
                             definition: signature.definition,
+                            source_overload_index: signature.source_overload_index,
                             receiver_constraints: {
                                 let mapped = self_signature.map_receiver_constraints(
                                     db,
@@ -553,6 +559,12 @@ pub struct Signature<'db> {
     /// This is useful for locating and extracting docstring information for the signature.
     pub(crate) definition: Option<Definition<'db>>,
 
+    /// Position of this overload in the original function definition.
+    ///
+    /// Filtering, receiver binding, and partial application can leave a signature at a different
+    /// position in the active overload list. Preserve its source position for call diagnostics.
+    source_overload_index: Option<NonZeroU32>,
+
     /// The constraint introduced by binding an explicitly annotated receiver, if any.
     receiver_constraints: Option<OwnedConstraintSet<'db>>,
 
@@ -693,6 +705,7 @@ impl<'db> Signature<'db> {
         Self {
             generic_context: None,
             definition: None,
+            source_overload_index: None,
             receiver_constraints: None,
             parameters,
             return_ty,
@@ -707,6 +720,7 @@ impl<'db> Signature<'db> {
         Self {
             generic_context,
             definition: None,
+            source_overload_index: None,
             receiver_constraints: None,
             parameters,
             return_ty,
@@ -718,6 +732,7 @@ impl<'db> Signature<'db> {
         Signature {
             generic_context: None,
             definition: None,
+            source_overload_index: None,
             receiver_constraints: None,
             parameters: Parameters::gradual_form(),
             return_ty: signature_type,
@@ -771,6 +786,7 @@ impl<'db> Signature<'db> {
         Self {
             generic_context,
             definition: Some(definition),
+            source_overload_index: None,
             receiver_constraints: None,
             parameters,
             return_ty,
@@ -844,6 +860,7 @@ impl<'db> Signature<'db> {
         Self {
             generic_context: self.generic_context,
             definition: self.definition,
+            source_overload_index: self.source_overload_index,
             receiver_constraints: self.receiver_constraints.clone(),
             parameters,
             return_ty,
@@ -874,6 +891,7 @@ impl<'db> Signature<'db> {
         Some(Self {
             generic_context: self.generic_context,
             definition: self.definition,
+            source_overload_index: self.source_overload_index,
             receiver_constraints: self.receiver_constraints.clone(),
             parameters,
             return_ty,
@@ -892,6 +910,7 @@ impl<'db> Signature<'db> {
                 .generic_context
                 .map(|context| type_mapping.update_signature_generic_context(db, context)),
             definition: self.definition,
+            source_overload_index: self.source_overload_index,
             receiver_constraints: self.map_receiver_constraints(db, type_mapping, tcx, visitor),
             parameters: self
                 .parameters
@@ -1111,6 +1130,7 @@ impl<'db> Signature<'db> {
                 .generic_context
                 .map(|generic_context| generic_context.remove_self(db, binding_context)),
             definition: self.definition,
+            source_overload_index: self.source_overload_index,
             receiver_constraints,
             parameters,
             return_ty,
@@ -1361,6 +1381,7 @@ impl<'db> Signature<'db> {
         Self {
             generic_context: self.generic_context,
             definition: self.definition,
+            source_overload_index: self.source_overload_index,
             receiver_constraints,
             parameters,
             return_ty,
@@ -1735,6 +1756,21 @@ impl<'db> Signature<'db> {
         Self { definition, ..self }
     }
 
+    /// Records this signature's position in its defining function's overload list.
+    pub(crate) fn with_source_overload_index(mut self, index: Option<usize>) -> Self {
+        self.source_overload_index = index
+            .and_then(|index| u32::try_from(index).ok())
+            .and_then(|index| index.checked_add(1))
+            .and_then(NonZeroU32::new);
+        self
+    }
+
+    /// Returns this signature's position in its defining function's overload list.
+    pub(crate) fn source_overload_index(&self) -> Option<usize> {
+        self.source_overload_index
+            .map(|index| index.get() as usize - 1)
+    }
+
     /// Create a new signature with the given parameters.
     pub(crate) fn with_parameters(self, parameters: Parameters<'db>) -> Self {
         Self { parameters, ..self }
@@ -1927,6 +1963,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                                     signature.parameters().clone(),
                                     Type::unknown(),
                                 )
+                                .with_source_overload_index(signature.source_overload_index())
                             },
                         )),
                         CallableTypeKind::ParamSpecValue,
@@ -1979,6 +2016,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                                         signature.parameters().clone(),
                                         Type::unknown(),
                                     )
+                                    .with_source_overload_index(signature.source_overload_index())
                                 }),
                         ),
                         CallableTypeKind::ParamSpecValue,
@@ -2549,17 +2587,20 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     if let Some(source_param) = source_params.next() {
                         let lower = Type::Callable(CallableType::new(
                             db,
-                            CallableSignature::single(Signature::new_generic(
-                                source.generic_context,
-                                Parameters::concatenate(
-                                    db,
-                                    std::iter::once(source_param.clone())
-                                        .chain(source_params.cloned())
-                                        .collect(),
-                                    ConcatenateTail::ParamSpec(source_bound_typevar),
-                                ),
-                                Type::unknown(),
-                            )),
+                            CallableSignature::single(
+                                Signature::new_generic(
+                                    source.generic_context,
+                                    Parameters::concatenate(
+                                        db,
+                                        std::iter::once(source_param.clone())
+                                            .chain(source_params.cloned())
+                                            .collect(),
+                                        ConcatenateTail::ParamSpec(source_bound_typevar),
+                                    ),
+                                    Type::unknown(),
+                                )
+                                .with_source_overload_index(source.source_overload_index()),
+                            ),
                             CallableTypeKind::ParamSpecValue,
                             CallableFunctionProvenance::None,
                         ));
@@ -2574,17 +2615,20 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     } else if let Some(target_param) = target_params.next() {
                         let upper = Type::Callable(CallableType::new(
                             db,
-                            CallableSignature::single(Signature::new_generic(
-                                target.generic_context,
-                                Parameters::concatenate(
-                                    db,
-                                    std::iter::once(target_param.clone())
-                                        .chain(target_params.cloned())
-                                        .collect(),
-                                    ConcatenateTail::ParamSpec(target_bound_typevar),
-                                ),
-                                Type::unknown(),
-                            )),
+                            CallableSignature::single(
+                                Signature::new_generic(
+                                    target.generic_context,
+                                    Parameters::concatenate(
+                                        db,
+                                        std::iter::once(target_param.clone())
+                                            .chain(target_params.cloned())
+                                            .collect(),
+                                        ConcatenateTail::ParamSpec(target_bound_typevar),
+                                    ),
+                                    Type::unknown(),
+                                )
+                                .with_source_overload_index(target.source_overload_index()),
+                            ),
                             CallableTypeKind::ParamSpecValue,
                             CallableFunctionProvenance::None,
                         ));
@@ -2615,11 +2659,14 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 (None, Some(([], target_bound_typevar))) => {
                     let lower = Type::Callable(CallableType::new(
                         db,
-                        CallableSignature::single(Signature::new_generic(
-                            source.generic_context,
-                            source.parameters.clone(),
-                            Type::unknown(),
-                        )),
+                        CallableSignature::single(
+                            Signature::new_generic(
+                                source.generic_context,
+                                source.parameters.clone(),
+                                Type::unknown(),
+                            )
+                            .with_source_overload_index(source.source_overload_index()),
+                        ),
                         CallableTypeKind::ParamSpecValue,
                         CallableFunctionProvenance::None,
                     ));
@@ -2761,11 +2808,14 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         .with_transformed_parameters(source_params.cloned());
                     let lower = Type::Callable(CallableType::new(
                         db,
-                        CallableSignature::single(Signature::new_generic(
-                            source.generic_context,
-                            source_params,
-                            Type::unknown(),
-                        )),
+                        CallableSignature::single(
+                            Signature::new_generic(
+                                source.generic_context,
+                                source_params,
+                                Type::unknown(),
+                            )
+                            .with_source_overload_index(source.source_overload_index()),
+                        ),
                         CallableTypeKind::ParamSpecValue,
                         CallableFunctionProvenance::None,
                     ));
@@ -2785,11 +2835,14 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 (Some(([], source_bound_typevar)), None) => {
                     let upper = Type::Callable(CallableType::new(
                         db,
-                        CallableSignature::single(Signature::new_generic(
-                            target.generic_context,
-                            target.parameters.clone(),
-                            Type::unknown(),
-                        )),
+                        CallableSignature::single(
+                            Signature::new_generic(
+                                target.generic_context,
+                                target.parameters.clone(),
+                                Type::unknown(),
+                            )
+                            .with_source_overload_index(target.source_overload_index()),
+                        ),
                         CallableTypeKind::ParamSpecValue,
                         CallableFunctionProvenance::None,
                     ));
@@ -2899,11 +2952,14 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         .with_transformed_parameters(target_params.cloned());
                     let upper = Type::Callable(CallableType::new(
                         db,
-                        CallableSignature::single(Signature::new_generic(
-                            target.generic_context,
-                            target_params,
-                            Type::unknown(),
-                        )),
+                        CallableSignature::single(
+                            Signature::new_generic(
+                                target.generic_context,
+                                target_params,
+                                Type::unknown(),
+                            )
+                            .with_source_overload_index(target.source_overload_index()),
+                        ),
                         CallableTypeKind::ParamSpecValue,
                         CallableFunctionProvenance::None,
                     ));
@@ -3846,14 +3902,16 @@ impl<'db> Parameters<'db> {
                 Parameter::keyword_only(name.clone())
                     .with_annotated_type(field.declared_ty)
                     .with_optional_default_type((!field.is_required()).then_some(Type::unknown()))
-                    .with_definition(field.first_declaration()),
+                    .with_definition(field.first_declaration())
+                    .with_source_parameter_index(parameter.source_parameter_index()),
             );
         }
 
         if let Some(extra_items) = unpacked_typed_dict.openness(db).effective_extra_items() {
             value.push(
                 Parameter::keyword_variadic(kwargs_name)
-                    .with_annotated_type(extra_items.declared_ty),
+                    .with_annotated_type(extra_items.declared_ty)
+                    .with_source_parameter_index(parameter.source_parameter_index()),
             );
         }
     }
@@ -4349,7 +4407,9 @@ impl<'db> Parameters<'db> {
                 .chain(positional_or_keyword)
                 .chain(variadic)
                 .chain(keyword_only)
-                .chain(keywords),
+                .chain(keywords)
+                .enumerate()
+                .map(|(index, parameter)| parameter.with_source_parameter_index(Some(index))),
         )
     }
 
@@ -4458,6 +4518,15 @@ impl<'db> Parameters<'db> {
     }
 
     /// Expands an unpacked `*args` annotation into its logical callable parameters.
+    ///
+    /// Preserve the original `*args` definition and source position on every expanded parameter
+    /// so diagnostics can identify its declaration after specialization or overload filtering.
+    ///
+    /// ```python
+    /// from typing import Unpack
+    ///
+    /// def callback(*args: Unpack[tuple[int, str]]) -> None: ...
+    /// ```
     fn expand_starred_variadic_annotations(&self, db: &'db dyn Db) -> Self {
         if !self
             .data
@@ -4476,37 +4545,36 @@ impl<'db> Parameters<'db> {
                 && let Some(tuple) = parameter.annotated_type().exact_tuple_instance_spec(db)
             {
                 expanded = true;
+                let positional_parameter = |ty| {
+                    Parameter::positional_only(None)
+                        .with_annotated_type(ty)
+                        .with_definition(parameter.definition())
+                        .with_source_parameter_index(parameter.source_parameter_index())
+                };
                 match tuple.as_ref() {
                     Tuple::Fixed(tuple) => {
-                        parameters.extend(
-                            tuple
-                                .iter_all_elements()
-                                .map(|ty| Parameter::positional_only(None).with_annotated_type(ty)),
-                        );
+                        parameters.extend(tuple.iter_all_elements().map(positional_parameter));
                     }
                     Tuple::Variable(variable) => {
-                        parameters.extend(
-                            variable
-                                .iter_prefix_elements()
-                                .map(|ty| Parameter::positional_only(None).with_annotated_type(ty)),
-                        );
+                        parameters
+                            .extend(variable.iter_prefix_elements().map(positional_parameter));
                         let name = parameter
                             .name()
                             .cloned()
                             .unwrap_or_else(|| Name::new_static("args"));
-                        parameters.push(Parameter::variadic(name).with_annotated_type(
-                            match variable.variable() {
-                                VariableSegment::Homogeneous(element) => element,
-                                VariableSegment::TypeVarTuple(typevartuple) => {
-                                    Type::TypeVar(typevartuple)
-                                }
-                            },
-                        ));
-                        parameters.extend(
-                            variable
-                                .iter_suffix_elements()
-                                .map(|ty| Parameter::positional_only(None).with_annotated_type(ty)),
+                        parameters.push(
+                            Parameter::variadic(name)
+                                .with_annotated_type(match variable.variable() {
+                                    VariableSegment::Homogeneous(element) => element,
+                                    VariableSegment::TypeVarTuple(typevartuple) => {
+                                        Type::TypeVar(typevartuple)
+                                    }
+                                })
+                                .with_definition(parameter.definition())
+                                .with_source_parameter_index(parameter.source_parameter_index()),
                         );
+                        parameters
+                            .extend(variable.iter_suffix_elements().map(positional_parameter));
                     }
                 }
             } else {
@@ -4664,6 +4732,13 @@ pub(crate) struct Parameter<'db> {
     /// Syntax-level annotation kind for cases where the annotation has special parameter semantics.
     annotation_kind: ParameterAnnotationKind,
 
+    /// Position of the source parameter that owns this logical parameter.
+    ///
+    /// Expanded tuple and `TypedDict` parameters retain the position of their original `*args` or
+    /// `**kwargs` declaration. Store positions one-based so `None` does not increase the size of
+    /// this struct.
+    source_parameter_index: Option<NonZeroU32>,
+
     kind: ParameterKind<'db>,
 }
 
@@ -4691,6 +4766,7 @@ impl<'db> Parameter<'db> {
             definition: None,
             inferred_annotation: true,
             annotation_kind: ParameterAnnotationKind::Normal,
+            source_parameter_index: None,
             kind: ParameterKind::PositionalOnly {
                 name,
                 default_type: None,
@@ -4704,6 +4780,7 @@ impl<'db> Parameter<'db> {
             definition: None,
             inferred_annotation: true,
             annotation_kind: ParameterAnnotationKind::Normal,
+            source_parameter_index: None,
             kind: ParameterKind::PositionalOrKeyword {
                 name,
                 default_type: None,
@@ -4717,6 +4794,7 @@ impl<'db> Parameter<'db> {
             definition: None,
             inferred_annotation: true,
             annotation_kind: ParameterAnnotationKind::Normal,
+            source_parameter_index: None,
             kind: ParameterKind::Variadic { name },
         }
     }
@@ -4727,6 +4805,7 @@ impl<'db> Parameter<'db> {
             definition: None,
             inferred_annotation: true,
             annotation_kind: ParameterAnnotationKind::Normal,
+            source_parameter_index: None,
             kind: ParameterKind::KeywordOnly {
                 name,
                 default_type: None,
@@ -4740,6 +4819,7 @@ impl<'db> Parameter<'db> {
             definition: None,
             inferred_annotation: true,
             annotation_kind: ParameterAnnotationKind::Normal,
+            source_parameter_index: None,
             kind: ParameterKind::KeywordVariadic { name },
         }
     }
@@ -4783,6 +4863,24 @@ impl<'db> Parameter<'db> {
         self
     }
 
+    /// Records the source position without replacing a synthesized parameter's IDE definition.
+    ///
+    /// A `TypedDict` field can then keep its declaration for navigation while diagnostics refer
+    /// to the enclosing `**kwargs` parameter.
+    fn with_source_parameter_index(mut self, index: Option<usize>) -> Self {
+        self.source_parameter_index = index
+            .and_then(|index| u32::try_from(index).ok())
+            .and_then(|index| index.checked_add(1))
+            .and_then(NonZeroU32::new);
+        self
+    }
+
+    /// Returns the original source parameter's position before variadic expansion.
+    pub(crate) fn source_parameter_index(&self) -> Option<usize> {
+        self.source_parameter_index
+            .map(|index| index.get() as usize - 1)
+    }
+
     fn apply_type_mapping_impl<'a>(
         &self,
         db: &'db dyn Db,
@@ -4803,6 +4901,7 @@ impl<'db> Parameter<'db> {
                 .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
             inferred_annotation: self.inferred_annotation,
             annotation_kind: self.annotation_kind,
+            source_parameter_index: self.source_parameter_index,
         }
     }
 
@@ -4818,6 +4917,7 @@ impl<'db> Parameter<'db> {
             definition: self.definition,
             inferred_annotation: self.inferred_annotation,
             annotation_kind: self.annotation_kind,
+            source_parameter_index: self.source_parameter_index,
             kind,
         }
     }
@@ -4833,6 +4933,7 @@ impl<'db> Parameter<'db> {
             definition,
             annotation_kind,
             inferred_annotation,
+            source_parameter_index,
             kind,
         } = self;
 
@@ -4893,6 +4994,7 @@ impl<'db> Parameter<'db> {
             definition: *definition,
             inferred_annotation: *inferred_annotation,
             annotation_kind: *annotation_kind,
+            source_parameter_index: *source_parameter_index,
             kind,
         })
     }
@@ -4938,6 +5040,7 @@ impl<'db> Parameter<'db> {
             definition,
             inferred_annotation,
             annotation_kind,
+            source_parameter_index: None,
             kind,
         }
     }
@@ -5249,6 +5352,7 @@ mod tests {
                 definition: _,
                 annotation_kind,
                 inferred_annotation,
+                source_parameter_index: _,
                 kind,
             } = parameter;
 
