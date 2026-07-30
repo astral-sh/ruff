@@ -1497,6 +1497,8 @@ def forward_variadic[*Ts, R](callback: Callable[[*Ts], R], *args: *Ts) -> Awaita
 def forward_paramspec[**P, R](callback: Callable[P, R], *args: P.args, **kwargs: P.kwargs) -> Awaitable[R]:
     raise NotImplementedError
 
+# TODO: Generic callable forwarding should be assignable after callable relation support.
+# error: [static-assert-error]
 static_assert(
     is_assignable_to(
         TypeOf[forward_variadic],
@@ -1509,6 +1511,8 @@ static_assert(
         Callable[[Callable[[int], str], int], Awaitable[int]],
     )
 )
+# TODO: Generic `ParamSpec` forwarding should be assignable after callable relation support.
+# error: [static-assert-error]
 static_assert(
     is_assignable_to(
         TypeOf[forward_paramspec],
@@ -1543,10 +1547,16 @@ def concrete(header: bool, /, *rest: *tuple[int, *tuple[str, ...], bytes]) -> tu
 def symbolic[*Us](*args: *Us) -> tuple[*Us]:
     return args
 
+# TODO: Generic variadic callable relations should accept these compatible signatures.
+# error: [static-assert-error]
 static_assert(is_assignable_to(TypeOf[capture], Callable[[], tuple[()]]))
+# error: [static-assert-error]
 static_assert(is_assignable_to(TypeOf[capture], Callable[[int, str], tuple[int, str]]))
+# error: [static-assert-error]
 static_assert(is_assignable_to(TypeOf[capture], RegularCallableTypeOf[homogeneous]))
+# error: [static-assert-error]
 static_assert(is_assignable_to(TypeOf[capture], RegularCallableTypeOf[concrete]))
+# error: [static-assert-error]
 static_assert(is_assignable_to(TypeOf[capture], RegularCallableTypeOf[symbolic]))
 
 static_assert(not is_assignable_to(TypeOf[capture], RegularCallableTypeOf[optional]))

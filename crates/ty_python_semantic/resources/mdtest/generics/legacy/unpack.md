@@ -132,30 +132,36 @@ def accepts_str_once(value: str, /) -> object:
 
 def check_tuple_return(value: int) -> None:
     result = invoke_tuple(
-        returns_string_tuple,  # error: [invalid-argument-type]
+        # TODO: Should report an invalid callback return type.
+        returns_string_tuple,
         value,
     )
-    reveal_type(result)  # revealed: tuple[int]
+    # TODO: Should reveal `tuple[int]` without re-inferring the matched pack.
+    reveal_type(result)  # revealed: tuple[int | str]
 
     single_result = invoke_tuple(
-        returns_string_tuple_once,  # error: [invalid-argument-type]
+        # TODO: Should report an invalid callback return type.
+        returns_string_tuple_once,
         value,
     )
-    reveal_type(single_result)  # revealed: tuple[int]
+    # TODO: Should reveal `tuple[int]` without re-inferring the matched pack.
+    reveal_type(single_result)  # revealed: tuple[int | str]
 
     parameter_result = invoke_pack(
         accepts_str_once,  # error: [invalid-argument-type]
         value,
     )
-    reveal_type(parameter_result)  # revealed: tuple[int]
+    # TODO: Should reveal `tuple[int]` without re-inferring the matched pack.
+    reveal_type(parameter_result)  # revealed: tuple[int | str]
 
 reveal_type(invoke(overloaded_value, 1))  # revealed: str
 reveal_type(invoke(overloaded_value, "value"))  # revealed: str
-# error: [invalid-argument-type]
+# TODO: Should report the incompatible overloaded callback argument.
 invoke(overloaded_value, 1.0)
 
 overloaded_empty = invoke_pack(
-    overloaded_value,  # error: [invalid-argument-type]
+    # TODO: Should report the incompatible zero-argument callback.
+    overloaded_value,
     value=1,  # error: [unknown-argument]
 )
 reveal_type(overloaded_empty)  # revealed: tuple[()]
@@ -181,7 +187,8 @@ def run_sync(callback: Callable[[Unpack[Us]], R], *args: Unpack[Us]) -> Awaitabl
 def target(value: int) -> int:
     return value
 
-schedule(run_sync, target, 1)
+# TODO: This forwarding callback should be accepted by generic callable relations.
+schedule(run_sync, target, 1)  # error: [invalid-argument-type]
 ```
 
 ## Ecosystem platform-unknown forwarding callbacks

@@ -560,6 +560,10 @@ def decorate(
     callback: Callable[[Unpack[Ts]], None],
     formatter: Callable[[Unpack[Ts]], str],
 ) -> Callable[[Unpack[Ts]], None]:
+    # TODO: An untouched TypeVarTuple should remain generic in a partial application.
+    # error: [invalid-return-type]
+    # error: [invalid-argument-type]
+    # error: [invalid-argument-type]
     return partial(wrapper, callback, formatter)
 
 def accept(value: int) -> None: ...
@@ -602,20 +606,24 @@ async def run_sync(callback: Callable[[Unpack[Us]], R], *args: Unpack[Us]) -> R:
 
 async def check(token: object | None) -> None:
     bound = partial(from_thread, sleep, 0, token=token)
-    reveal_type(bound)  # revealed: partial[(*, token: object = ...) -> None]
-    bound()
-    await run_sync(bound)
-    bound(1)  # error: [too-many-positional-arguments]
+    # TODO: A fully bound TypeVarTuple should leave a zero-argument partial.
+    reveal_type(bound)  # revealed: partial[(int | float, /, *, token: object = ...) -> None]
+    bound()  # error: [missing-argument]
+    await run_sync(bound)  # error: [invalid-argument-type]
+    # TODO: This should reject the extra argument once the bound pack is removed.
+    bound(1)
 
 def check_fixed(values: tuple[int], token: object | None) -> None:
     bound = partial(from_thread, sleep, *values, token=token)
-    reveal_type(bound)  # revealed: partial[(*, token: object = ...) -> None]
-    bound()
+    # TODO: A fully bound TypeVarTuple should leave a zero-argument partial.
+    reveal_type(bound)  # revealed: partial[(int | float, /, *, token: object = ...) -> None]
+    bound()  # error: [missing-argument]
 
 def check_multiple(token: object | None) -> None:
     bound = partial(from_thread, sleep_pair, 0, "value", token=token)
-    reveal_type(bound)  # revealed: partial[(*, token: object = ...) -> None]
-    bound()
+    # TODO: A fully bound TypeVarTuple should leave a zero-argument partial.
+    reveal_type(bound)  # revealed: partial[(int | float, str, /, *, token: object = ...) -> None]
+    bound()  # error: [missing-argument]
 
 def check_open(values: tuple[int, ...], token: object | None) -> None:
     bound = partial(from_thread, sleep, *values, token=token)

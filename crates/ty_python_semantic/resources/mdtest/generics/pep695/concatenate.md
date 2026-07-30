@@ -817,5 +817,7 @@ type ConsumerType[**P1] = Callable[Concatenate[Callable[P1, None], P1], None]
 
 def consumer[**P2](x: Callable[P2, None], /, *args: P2.args, **kwargs: P2.kwargs) -> None: ...
 def assign[**P3](x: Callable[P3, None], /, *args: P3.args, **kwargs: P3.kwargs) -> None:
+    # TODO: This should be accepted once generic callable assignability is supported.
+    # error: [invalid-assignment]
     wrapped: ConsumerType[P3] = consumer
 ```

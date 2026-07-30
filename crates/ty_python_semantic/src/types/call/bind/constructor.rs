@@ -78,8 +78,8 @@ impl<'db> ConstructorBinding<'db> {
 
     /// Check types for all bindings in this constructor.
     ///
-    /// In provisional mode, preserve all constructor bindings. Otherwise, discard inactive
-    /// downstream constructors after checking.
+    /// If `CheckTypesMode::Finalize` is provided, inactive downstream constructors will be
+    /// discarded. Otherwise, all constructor bindings are preserved after the check.
     pub(super) fn check_types(
         &mut self,
         db: &'db dyn Db,

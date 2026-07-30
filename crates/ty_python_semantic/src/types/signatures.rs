@@ -2147,30 +2147,10 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
 
         // `inner` will create a constraint set that references these newly inferable typevars.
         let mut checker = self.with_inferable_typevars(inferable);
-        // Receiver constraints and callable-local parameter packs must be solved together with
-        // the other parameter and return constraints of the same callable specialization.
-        let has_inferable_parameter_pack = [source, target].into_iter().any(|signature| {
-            signature
-                .parameters
-                .as_paramspec_with_prefix()
-                .is_some_and(|(_, paramspec)| paramspec.is_inferable(db, signature_inferable))
-                || signature
-                    .parameters
-                    .variadic()
-                    .is_some_and(|(_, parameter)| {
-                        parameter.has_starred_annotation()
-                            && matches!(
-                                parameter.annotated_type(),
-                                Type::TypeVar(typevar)
-                                    if typevar.is_typevartuple(db)
-                                        && typevar.is_inferable(db, signature_inferable)
-                            )
-                    })
-        });
-        if source.receiver_constraints.is_some()
-            || target.receiver_constraints.is_some()
-            || has_inferable_parameter_pack
-        {
+        // Every nonterminal receiver constraint constrains at least one typevar. Terminal `always`
+        // sets are discarded when receiver constraints are merged, so presence alone is enough to
+        // require lazy typevar evaluation here.
+        if source.receiver_constraints.is_some() || target.receiver_constraints.is_some() {
             checker.typevar_evaluation = TypeVarEvaluation::Lazy;
         }
         let when = checker.with_signature_recursion_guard(source, target, || {
@@ -2298,52 +2278,6 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             }
         }
 
-        fn packed_parameter_types<'a, 'db: 'a>(
-            db: &'db dyn Db,
-            parameters: impl Iterator<Item = &'a Parameter<'db>> + Clone,
-        ) -> Type<'db> {
-            if let Some((variadic_index, variadic)) = parameters
-                .clone()
-                .find_position(|parameter| parameter.is_variadic())
-            {
-                let segment = match variadic.annotated_type() {
-                    Type::TypeVar(typevartuple) if typevartuple.is_typevartuple(db) => {
-                        VariableSegment::TypeVarTuple(typevartuple)
-                    }
-                    element => VariableSegment::Homogeneous(element),
-                };
-                Type::tuple(TupleType::mixed_with_segment(
-                    db,
-                    parameters
-                        .clone()
-                        .take(variadic_index)
-                        .map(Parameter::annotated_type),
-                    segment,
-                    parameters
-                        .skip(variadic_index + 1)
-                        .map(Parameter::annotated_type),
-                ))
-            } else {
-                Type::heterogeneous_tuple(db, parameters.map(Parameter::annotated_type))
-            }
-        }
-
-        let source_typevartuple = if self.typevar_evaluation == TypeVarEvaluation::Lazy {
-            source.parameters.variadic().and_then(|(index, parameter)| {
-                if parameter.has_starred_annotation()
-                    && let Type::TypeVar(typevartuple) = parameter.annotated_type()
-                    && typevartuple.is_typevartuple(db)
-                    && typevartuple.is_inferable(db, self.inferable)
-                {
-                    Some((index, typevartuple))
-                } else {
-                    None
-                }
-            })
-        } else {
-            None
-        };
-
         let target_typevartuple = if self.typevar_evaluation == TypeVarEvaluation::Lazy {
             target.parameters.variadic().and_then(|(index, parameter)| {
                 if parameter.has_starred_annotation()
@@ -2397,19 +2331,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         // Avoid returning early after checking the return types in case there is a `ParamSpec` type
         // variable in either signature to ensure that the `ParamSpec` binding is still applied even
         // if the return types are incompatible.
-        let return_type_constraints = if self.typevar_evaluation == TypeVarEvaluation::Lazy
-            && let Some(source_tuple) = source.return_ty.exact_tuple_instance_spec(db)
-            && let Tuple::Variable(source_tuple) = source_tuple.as_ref()
-            && source_tuple.prefix_elements().is_empty()
-            && source_tuple.suffix_elements().is_empty()
-            && let Some(typevartuple) = source_tuple.variable().typevartuple()
-            && typevartuple.is_inferable(db, self.inferable)
-            && target.return_ty.exact_tuple_instance_spec(db).is_some()
-        {
-            self.check_type_pair(db, Type::TypeVar(typevartuple), target.return_ty)
-        } else {
-            self.check_type_pair(db, source.return_ty, target.return_ty)
-        };
+        let return_type_constraints = self.check_type_pair(db, source.return_ty, target.return_ty);
         let return_type_checks = !result
             .intersect(db, self.constraints, return_type_constraints)
             .is_never_satisfied(db);
@@ -3256,17 +3178,13 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             };
         }
 
-        // Expand concrete starred annotations opposite an inferable TypeVarTuple so the complete
-        // fixed and variable tuple shape can be captured in either direction.
+        // TODO: Normalize starred variadic annotations for all signature comparisons. Restricting
+        // expansion to target TypeVarTuple inference means equivalent nested unpackings such as
+        // `*tuple[*tuple[str, ...], bytes]` and `*tuple[str, ...], bytes` are not related correctly.
         let source_parameters = if target_typevartuple.is_some() {
             source.parameters.expand_starred_variadic_annotations(db)
         } else {
             source.parameters.clone()
-        };
-        let target_parameters = if source_typevartuple.is_some() {
-            target.parameters.expand_starred_variadic_annotations(db)
-        } else {
-            target.parameters.clone()
         };
         // Align the fixed target prefix and suffix before entering the parameter loop so that the
         // target TypeVarTuple captures only the source parameter entries between them.
@@ -3326,7 +3244,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             current_source: None,
             current_target: None,
             source_iter: source_parameters.iter(),
-            target_iter: target_parameters.iter(),
+            target_iter: target.parameters.iter(),
         };
 
         // Collect all the standard parameters that have only been matched against a variadic
@@ -3360,18 +3278,6 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         && let Type::TypeVar(typevartuple) = source_parameter.annotated_type()
                         && typevartuple.is_typevartuple(db)
                     {
-                        if typevartuple.is_inferable(db, self.inferable) {
-                            if !check_types(
-                                &mut result,
-                                Type::empty_tuple(db),
-                                Type::TypeVar(typevartuple),
-                                source_parameter.name(),
-                                target_index,
-                            ) {
-                                return result;
-                            }
-                            continue;
-                        }
                         return self.never();
                     }
                     match source_parameter.kind() {
@@ -3499,53 +3405,6 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         (
                             ParameterKind::Variadic { .. },
                             ParameterKind::PositionalOnly { .. }
-                            | ParameterKind::PositionalOrKeyword { .. }
-                            | ParameterKind::Variadic { .. },
-                        ) if source_param.has_starred_annotation()
-                            && let Type::TypeVar(typevartuple) = source_param.annotated_type()
-                            && typevartuple.is_typevartuple(db)
-                            && typevartuple.is_inferable(db, self.inferable) =>
-                        {
-                            let target_tail = parameters.target_iter.as_slice();
-                            let captured_target_parameters = || {
-                                std::iter::once(target_param).chain(target_tail).take_while(
-                                    |parameter| {
-                                        parameter.is_positional() || parameter.is_variadic()
-                                    },
-                                )
-                            };
-                            if captured_target_parameters().any(|parameter| {
-                                parameter.default_type().is_some()
-                                    || matches!(
-                                        parameter.kind(),
-                                        ParameterKind::PositionalOrKeyword { .. }
-                                    )
-                            }) {
-                                return self.never();
-                            }
-                            let target_parameter_count = captured_target_parameters().count();
-                            let inferred_tuple =
-                                packed_parameter_types(db, captured_target_parameters());
-
-                            if !check_types(
-                                &mut result,
-                                inferred_tuple,
-                                Type::TypeVar(typevartuple),
-                                target_param.name(),
-                                target_index,
-                            ) {
-                                return result;
-                            }
-
-                            for _ in 1..target_parameter_count {
-                                parameters.next_target();
-                                target_index += 1;
-                            }
-                        }
-
-                        (
-                            ParameterKind::Variadic { .. },
-                            ParameterKind::PositionalOnly { .. }
                             | ParameterKind::PositionalOrKeyword { .. },
                         ) => {
                             if !check_types(
@@ -3616,7 +3475,35 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                                         .take(source_parameter_count)
                                 };
                                 let inferred_tuple =
-                                    packed_parameter_types(db, captured_source_parameters());
+                                    if let Some((source_variadic_index, source_variadic)) =
+                                        captured_source_parameters()
+                                            .find_position(|parameter| parameter.is_variadic())
+                                    {
+                                        let variable = match source_variadic.annotated_type() {
+                                            Type::TypeVar(typevartuple)
+                                                if typevartuple.is_typevartuple(db) =>
+                                            {
+                                                VariableSegment::TypeVarTuple(typevartuple)
+                                            }
+                                            element => VariableSegment::Homogeneous(element),
+                                        };
+                                        Type::tuple(TupleType::mixed_with_segment(
+                                            db,
+                                            captured_source_parameters()
+                                                .take(source_variadic_index)
+                                                .map(Parameter::annotated_type),
+                                            variable,
+                                            captured_source_parameters()
+                                                .skip(source_variadic_index + 1)
+                                                .map(Parameter::annotated_type),
+                                        ))
+                                    } else {
+                                        Type::heterogeneous_tuple(
+                                            db,
+                                            captured_source_parameters()
+                                                .map(Parameter::annotated_type),
+                                        )
+                                    };
 
                                 reuse_current_source = source_parameter_count == 0;
                                 for _ in 1..source_parameter_count {
