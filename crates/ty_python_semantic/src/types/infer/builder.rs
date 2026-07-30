@@ -1451,11 +1451,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let assignment_ty = match (place, declared_ty) {
             (PlaceExprRef::Symbol(_), Some(Type::FunctionLiteral(function))) => {
                 let callable = function.into_callable_type(db);
-                Type::Callable(if function.has_implicit_receiver(db) {
-                    callable
-                } else {
+                let callable = if function.file(db) == self.file()
+                    && self.is_in_type_checking_block(
+                        self.scope(),
+                        function.node(db, self.file(), self.module()),
+                    ) {
+                    // A type-checking-only definition describes a callable signature, but never
+                    // creates a function object whose descriptor behavior must be preserved.
                     callable.into_regular(db)
-                })
+                } else {
+                    callable
+                };
+                Type::Callable(callable)
             }
             _ => declared_ty.unwrap_or(Type::unknown()),
         };

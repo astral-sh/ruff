@@ -1063,7 +1063,35 @@ pub(crate) fn place_by_id<'db>(
                 .with_qualifiers(qualifiers),
             }
         }
-        // Place is declared, trust the declared type
+        // A function declaration identifies its original function object, while a compatible
+        // reassignment can replace that object. Once a different binding is visible, expose the
+        // current binding so imports and other public lookups do not retain its stale identity.
+        PlaceAndQualifiers {
+            place:
+                Place::Defined(
+                    declared @ DefinedPlace {
+                        ty: Type::FunctionLiteral(_),
+                        definedness: Definedness::AlwaysDefined,
+                        provenance: Provenance::SingleDefinition(declaration),
+                        ..
+                    },
+                ),
+            qualifiers,
+        } if place_id.as_symbol().is_some()
+            && all_considered_bindings().any(|binding| {
+                matches!(binding.binding, DefinitionState::Defined(binding) if binding != declaration)
+            }) =>
+        {
+            let bindings = all_considered_bindings();
+            match place_from_bindings_impl(db, bindings, requires_explicit_reexport, None).place {
+                Place::Defined(inferred) => {
+                    Place::Defined(inferred.with_origin(TypeOrigin::Declared))
+                        .with_qualifiers(qualifiers)
+                }
+                Place::Undefined => Place::Defined(declared).with_qualifiers(qualifiers),
+            }
+        }
+        // Place is declared, trust the declared type.
         place_and_quals @ PlaceAndQualifiers {
             place:
                 Place::Defined(DefinedPlace {
