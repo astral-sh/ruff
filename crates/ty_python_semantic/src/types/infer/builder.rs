@@ -11939,13 +11939,7 @@ where
 
         self.0.push(value);
     }
-}
 
-impl<V> VecSet<V>
-where
-    V: Eq,
-    V: std::fmt::Debug,
-{
     #[inline]
     fn extend<T: IntoIterator<Item = V>>(&mut self, iter: T) {
         if cfg!(debug_assertions) {
