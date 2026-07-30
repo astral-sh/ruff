@@ -1568,6 +1568,28 @@ reveal_type(t.key)  # revealed: int
 reveal_type(t.name)  # revealed: str
 ```
 
+Dataclass-transform defaults remain attached to inherited fields even when a subclass is explicitly
+decorated with `@dataclass`.
+
+```py
+@dataclass_transform(kw_only_default=True)
+class KeywordOnlyModelMeta(type):
+    pass
+
+class RequiredModel(metaclass=KeywordOnlyModelMeta):
+    required: int
+
+class OptionalModel(metaclass=KeywordOnlyModelMeta):
+    optional: int = 1
+
+@dataclass(kw_only=True)
+class Child(RequiredModel, OptionalModel):
+    pass
+
+reveal_type(Child.__init__)  # revealed: (self: Child, *, optional: int = 1, required: int) -> None
+Child(required=1)
+```
+
 ## `__dataclass_fields__` and `DataclassInstance` protocol
 
 Classes created via `dataclass_transform` should have `__dataclass_fields__` and

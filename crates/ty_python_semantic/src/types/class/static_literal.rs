@@ -2371,9 +2371,11 @@ impl<'db> StaticClassLiteral<'db> {
             } else {
                 false
             };
-        let dataclass_kw_only_default = field_policy
-            .is_dataclass_like()
-            .then(|| self.has_dataclass_param(db, field_policy, DataclassFlags::KW_ONLY));
+        let dataclass_kw_only_default = field_policy.is_dataclass_like().then(|| {
+            let own_field_policy =
+                CodeGeneratorKind::from_class(db, self.into()).unwrap_or(field_policy);
+            self.has_dataclass_param(db, own_field_policy, DataclassFlags::KW_ONLY)
+        });
         let mut kw_only_sentinel_field_seen = false;
         let mut field_declarations = Vec::new();
 
