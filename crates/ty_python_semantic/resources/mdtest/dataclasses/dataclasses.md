@@ -1922,6 +1922,62 @@ class InvalidDefaultFactoryChild(DefaultFactoryBase):
     y: int
 ```
 
+An ordering violation already present in an ancestor is not reported again on its descendants.
+
+```py
+@dataclass
+class InvalidAncestor:
+    optional: int = 1
+    required: int  # error: [dataclass-field-order]
+
+@dataclass
+class ChildOfInvalidAncestor(InvalidAncestor):
+    pass
+
+@dataclass
+class GrandchildOfInvalidAncestor(ChildOfInvalidAncestor):
+    pass
+```
+
+Suppressing the original diagnostic also suppresses that inherited violation throughout the
+hierarchy.
+
+```py
+@dataclass
+class IgnoredInvalidAncestor:
+    optional: int = 1
+    required: int  # ty: ignore[dataclass-field-order]
+
+@dataclass
+class ChildOfIgnoredAncestor(IgnoredInvalidAncestor):
+    pass
+
+@dataclass
+class GrandchildOfIgnoredAncestor(ChildOfIgnoredAncestor):
+    pass
+```
+
+Combining independently valid bases can introduce a new ordering violation even when the child
+declares no fields.
+
+```py
+@dataclass
+class DefaultOnlyBase:
+    optional: int = 1
+
+@dataclass
+class RequiredOnlyBase:
+    required: int
+
+@dataclass
+class InvalidMergedBases(RequiredOnlyBase, DefaultOnlyBase):  # error: [dataclass-field-order]
+    pass
+
+@dataclass
+class ValidMergedBases(DefaultOnlyBase, RequiredOnlyBase):
+    pass
+```
+
 Inherited fields that are keyword-only or excluded from `__init__` do not affect positional field
 ordering, and a required child field can itself be keyword-only.
 

@@ -971,11 +971,56 @@ pub(crate) fn check_static_class_definitions<'db>(
         }
 
         if !required_after_default_field_names.is_empty() {
+            let mut inherited_field_order_violations = FxHashSet::default();
+            for ancestor in class.iter_mro(db, specialization).skip(1) {
+                let Some(ancestor) = ancestor.into_class() else {
+                    continue;
+                };
+                let Some((ancestor, ancestor_specialization)) = ancestor.static_class_literal(db)
+                else {
+                    continue;
+                };
+                let Some(ancestor_policy @ CodeGeneratorKind::DataclassLike(_)) =
+                    CodeGeneratorKind::from_class(db, ancestor.into())
+                else {
+                    continue;
+                };
+                if !ancestor.has_dataclass_param(db, ancestor_policy, DataclassFlags::INIT) {
+                    continue;
+                }
+
+                let mut ancestor_has_seen_default = false;
+                for (name, field) in ancestor.fields(db, ancestor_specialization, ancestor_policy) {
+                    let FieldKind::Dataclass {
+                        default_ty,
+                        init,
+                        kw_only,
+                        ..
+                    } = &field.kind
+                    else {
+                        continue;
+                    };
+                    if !init || *kw_only == Some(true) {
+                        continue;
+                    }
+
+                    if default_ty.is_some() {
+                        ancestor_has_seen_default = true;
+                    } else if ancestor_has_seen_default {
+                        inherited_field_order_violations.insert(name);
+                    }
+                }
+            }
+
             let body_scope = class.body_scope(db).file_scope_id(db);
             let use_def_map = index.use_def_map(body_scope);
             let place_table = index.place_table(body_scope);
 
             for name in required_after_default_field_names {
+                if inherited_field_order_violations.contains(name) {
+                    continue;
+                }
+
                 let report = |range: TextRange| {
                     let Some(builder) = context.report_lint(&DATACLASS_FIELD_ORDER, range) else {
                         return false;
