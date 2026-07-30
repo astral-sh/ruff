@@ -122,13 +122,9 @@ impl<'a> Diff<'a> {
         let source_code = self.diagnostic_source.as_source_code();
         let source_text = source_code.text();
 
-        let cells = self.cells();
+        let cell_ranges = self.cell_ranges();
 
-        let mut last_end = TextSize::ZERO;
-        for (cell_index, offset) in cells {
-            let range = TextRange::new(last_end, offset);
-            last_end = offset;
-
+        for (cell_index, range) in cell_ranges {
             // For non-notebooks, construct and diff only the source surrounding the edits.
             let (range, line_offset) = if cell_index.is_none()
                 && let Some(first) = self.fix.edits().first()
@@ -286,26 +282,33 @@ impl<'a> Diff<'a> {
         Ok(())
     }
 
-    fn cells(&self) -> Vec<(Option<OneIndexed>, TextSize)> {
+    fn cell_ranges(&self) -> Vec<(Option<OneIndexed>, TextRange)> {
         let source_code = self.diagnostic_source.as_source_code();
         let source_text = source_code.text();
 
+        let mut last_end = TextSize::ZERO;
         let Some(notebook_index) = self.notebook_index.as_ref() else {
             // a regular script file, all the lines will be in one "cell" under the `None` key
-            return vec![(None, source_text.text_len())];
+            let offset = source_text.text_len();
+            let range = TextRange::new(last_end, offset);
+            return vec![(None, range)];
         };
 
         // Partition the source code into end offsets for each cell.
         let mut last_cell_index = OneIndexed::MIN;
-        let mut cells: Vec<(Option<OneIndexed>, TextSize)> = Vec::new();
+        let mut cells: Vec<(Option<OneIndexed>, TextRange)> = Vec::new();
         for cell in notebook_index.iter() {
             if cell.cell_index() != last_cell_index {
                 let offset = source_code.line_start(cell.start_row());
-                cells.push((Some(last_cell_index), offset));
+                let range = TextRange::new(last_end, offset);
+                cells.push((Some(last_cell_index), range));
+                last_end = offset;
                 last_cell_index = cell.cell_index();
             }
         }
-        cells.push((Some(last_cell_index), source_text.text_len()));
+        let offset = source_text.text_len();
+        let range = TextRange::new(last_end, offset);
+        cells.push((Some(last_cell_index), range));
         cells
     }
 
