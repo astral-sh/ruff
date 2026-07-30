@@ -190,7 +190,16 @@ struct InheritedFrozenDataclassFields<'db> {
 
 /// Annotated fields and class-variable declarations collected from one class body.
 ///
-/// Class variables are not constructor parameters, but they can mask inherited dataclass fields.
+/// Class variables are not constructor parameters, but they can mask inherited dataclass fields:
+///
+/// ```python
+/// @dataclass
+/// class Child(Base):
+///     value: ClassVar[int]
+///     required: int
+/// ```
+///
+/// Here, `required` is a constructor field and `value` masks an inherited `Base.value` field.
 #[derive(Debug, Default, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
 struct OwnClassFields<'db> {
     fields: FxIndexMap<Name, Field<'db>>,
@@ -2351,7 +2360,9 @@ impl<'db> StaticClassLiteral<'db> {
             .fields
     }
 
-    /// Collects constructor fields and class-variable masks in one pass over a class body.
+    /// Collects ordered constructor fields and `ClassVar` masks in one pass over a class body.
+    ///
+    /// Keeping both together avoids reinterpreting declarations while merging inherited fields.
     #[salsa::tracked(
         returns(ref),
         cycle_initial=|_, _, _, _, _| OwnClassFields::default(),
