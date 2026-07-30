@@ -173,19 +173,24 @@ pub(super) fn walk_tuple_type<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>
 impl get_size2::GetSize for TupleType<'_> {}
 
 impl<'db> VarianceInferable<'db> for TupleType<'db> {
-    fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarIdentity<'db>) -> TypeVarVariance {
+    fn variance_of(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        typevar: BoundTypeVarIdentity<'db>,
+    ) -> TypeVarVariance {
         // The tuple class parameter unions all element types, which can erase a type variable
         // when another element subsumes it. Inspect the heterogeneous elements directly.
         match self.tuple(db) {
             Tuple::Fixed(tuple) => tuple
                 .iter_all_elements()
-                .map(|element| element.variance_of(db, typevar))
+                .map(|element| element.variance_of(db, env, typevar))
                 .collect(),
             Tuple::Variable(tuple) => tuple
                 .iter_prefix_elements()
                 .chain(std::iter::once(tuple.variable().tuple_class_type()))
                 .chain(tuple.iter_suffix_elements())
-                .map(|element| element.variance_of(db, typevar))
+                .map(|element| element.variance_of(db, env, typevar))
                 .collect(),
         }
     }

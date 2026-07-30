@@ -480,25 +480,39 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
 
     pub(super) fn constrain_gradual_lower_bound(
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         builder: &'c ConstraintSetBuilder<'db>,
         variable: GradualVariableId,
         lower: Type<'db>,
     ) -> Self {
         let mut storage = builder.storage.borrow_mut();
-        let (node, source_order) =
-            GradualConstraint::new_node_with_bounds(db, &mut storage, variable, Some(lower), None);
+        let (node, source_order) = GradualConstraint::new_node_with_bounds(
+            db,
+            env,
+            &mut storage,
+            variable,
+            Some(lower),
+            None,
+        );
         Self::from_node(builder, node, source_order)
     }
 
     pub(super) fn constrain_gradual_upper_bound(
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         builder: &'c ConstraintSetBuilder<'db>,
         variable: GradualVariableId,
         upper: Type<'db>,
     ) -> Self {
         let mut storage = builder.storage.borrow_mut();
-        let (node, source_order) =
-            GradualConstraint::new_node_with_bounds(db, &mut storage, variable, None, Some(upper));
+        let (node, source_order) = GradualConstraint::new_node_with_bounds(
+            db,
+            env,
+            &mut storage,
+            variable,
+            None,
+            Some(upper),
+        );
         Self::from_node(builder, node, source_order)
     }
 
@@ -546,10 +560,14 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
     }
 
     /// Returns whether this constraint set holds under some materialization of its gradual types.
-    pub(crate) fn is_gradually_satisfied(self, db: &'db dyn Db) -> bool {
+    pub(crate) fn is_gradually_satisfied(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> bool {
         let mut storage = self.builder.storage.borrow_mut();
         self.node
-            .is_gradually_satisfied(db, &mut storage, self.source_order)
+            .is_gradually_satisfied(db, env, &mut storage, self.source_order)
     }
 
     /// Returns the constraints under which `lhs` is a subtype of `rhs`, assuming that the
@@ -810,6 +828,7 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
                     constraint_id,
                     GradualConstraint::new_node_with_bounds(
                         db,
+                        visitor.env,
                         &mut storage,
                         gradual.variable,
                         lower,
@@ -899,6 +918,7 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
     pub(super) fn freshen_gradual_variables(
         self,
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         builder: &'c ConstraintSetBuilder<'db>,
     ) -> Self {
         fn rebuild_node(
@@ -964,6 +984,7 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
                     constraint_id,
                     GradualConstraint::new_node_with_bounds(
                         db,
+                        env,
                         storage,
                         variable,
                         constraint.bounds.lower,
@@ -1053,11 +1074,12 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
     pub(crate) fn solutions_unquantified(
         self,
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         builder: &'c ConstraintSetBuilder<'db>,
     ) -> PathBounds<'db> {
         self.verify_builder(builder);
         let mut storage = builder.storage.borrow_mut();
-        PathBounds::compute_unquantified(db, &mut storage, self.node, self.source_order)
+        PathBounds::compute_unquantified(db, env, &mut storage, self.node, self.source_order)
     }
 
     pub(crate) fn solutions_with(
@@ -1970,6 +1992,7 @@ impl<'db> ConstraintSetStorage<'db> {
                 ),
                 ConstraintData::Gradual(old_constraint) => GradualConstraint::new_node_with_bounds(
                     db,
+                    env,
                     self,
                     gradual_variables[old_constraint.variable],
                     old_constraint.bounds.lower,
@@ -2172,11 +2195,11 @@ impl<'db> ConstraintData<'db> {
         }
     }
 
-    fn bound_depth(self, db: &'db dyn Db) -> (u16, u16) {
+    fn bound_depth(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> (u16, u16) {
         let both_bounds = iter::chain(self.bounds().lower, self.bounds().upper);
         both_bounds.fold((0, 0), |(constructor_depth, typevar_depth), bound| {
             let (bound_constructor_depth, bound_typevar_depth) =
-                max_constructor_and_typevar_depth(db, bound);
+                max_constructor_and_typevar_depth(db, env, bound);
             (
                 constructor_depth.max(bound_constructor_depth),
                 typevar_depth.max(bound_typevar_depth),
@@ -2744,6 +2767,7 @@ impl<'db> Constraint<'db> {
 impl<'db> GradualConstraint<'db> {
     fn new_node_with_bounds(
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         storage: &mut ConstraintSetStorage<'db>,
         variable: GradualVariableId,
         lower: Option<Type<'db>>,
@@ -2759,8 +2783,14 @@ impl<'db> GradualConstraint<'db> {
             let mut result = ALWAYS_TRUE;
             let mut source_order = None;
             for lower_element in lower_union.elements(db) {
-                let (element_node, element_source_order) =
-                    Self::new_node_with_bounds(db, storage, variable, Some(*lower_element), upper);
+                let (element_node, element_source_order) = Self::new_node_with_bounds(
+                    db,
+                    env,
+                    storage,
+                    variable,
+                    Some(*lower_element),
+                    upper,
+                );
                 result = result.and(storage, element_node);
                 source_order = storage.ordered_source_order(source_order, element_source_order);
             }
@@ -2772,18 +2802,25 @@ impl<'db> GradualConstraint<'db> {
             let mut result = ALWAYS_TRUE;
             let mut source_order = None;
             for upper_element in upper_intersection.iter_positive(db) {
-                let (element_node, element_source_order) =
-                    Self::new_node_with_bounds(db, storage, variable, lower, Some(upper_element));
+                let (element_node, element_source_order) = Self::new_node_with_bounds(
+                    db,
+                    env,
+                    storage,
+                    variable,
+                    lower,
+                    Some(upper_element),
+                );
                 result = result.and(storage, element_node);
                 source_order = storage.ordered_source_order(source_order, element_source_order);
             }
             for upper_element in upper_intersection.iter_negative(db) {
                 let (element_node, element_source_order) = Self::new_node_with_bounds(
                     db,
+                    env,
                     storage,
                     variable,
                     lower,
-                    Some(upper_element.negate(db)),
+                    Some(upper_element.negate(db, env)),
                 );
                 result = result.and(storage, element_node);
                 source_order = storage.ordered_source_order(source_order, element_source_order);
@@ -2797,13 +2834,13 @@ impl<'db> GradualConstraint<'db> {
         });
 
         if let (Some(lower), Some(upper)) = (lower, upper) {
-            let when = lower.when_constraint_set_assignable_to_owned(db, upper);
-            if when.query(|_builder, when| when.is_never_satisfied(db)) {
+            let when = lower.when_constraint_set_assignable_to_owned(db, env, upper);
+            if when.query(|_builder, when| when.is_never_satisfied(db, env)) {
                 return (ALWAYS_FALSE, None);
             }
         }
 
-        let constraint = storage.intern_constraint(db, data);
+        let constraint = storage.intern_constraint(db, env, data);
         Node::new_constraint(storage, constraint)
     }
 }
@@ -3217,24 +3254,23 @@ impl NodeId {
     fn is_gradually_satisfied<'db>(
         self,
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         storage: &mut ConstraintSetStorage<'db>,
         source_order: Option<SourceOrderId>,
     ) -> bool {
         let Node::Interior(interior) = self.node() else {
             return self == ALWAYS_TRUE;
         };
-        // Abstract whole hidden subjects through path assignments rather than dropping their
-        // decisions independently. This preserves constraints derived from requiring one gradual
-        // occurrence's lower and upper bounds to be consistent.
+        // Abstract hidden gradual subjects before checking the Boolean result.
         let (node, derived_source_order) =
-            interior.abstract_inner(db, storage, source_order, |storage, constraint| {
+            interior.abstract_inner(db, env, storage, source_order, |storage, constraint| {
                 matches!(
                     storage.constraint_data(constraint),
                     ConstraintData::Gradual(_)
                 )
             });
         let source_order = storage.ordered_source_order(source_order, derived_source_order);
-        node.is_always_satisfied(db, storage, source_order)
+        node.is_always_satisfied(db, env, storage, source_order)
     }
 
     /// Returns whether this BDD represent the constant function `false`.
@@ -4377,7 +4413,7 @@ impl<'db> PathBounds<'db> {
             storage,
             &source_orders,
             node,
-            |typevar| typevar.is_inferable(db, inferable),
+            inferable,
         ) {
             return path_bounds;
         }
@@ -4418,7 +4454,7 @@ impl<'db> PathBounds<'db> {
         storage: &mut ConstraintSetStorage<'db>,
         source_orders: &FxIndexSet<ConstraintId>,
         node: NodeId,
-        include: impl Fn(BoundTypeVarInstance<'db>) -> bool,
+        inferable: TypeVarSet<'db>,
     ) -> Option<Self> {
         match node.node() {
             Node::AlwaysTrue => return Some(PathBounds::Unconstrained),
@@ -4440,7 +4476,7 @@ impl<'db> PathBounds<'db> {
 
                     let constraint = storage.constraint_data(interior.constraint);
                     let constraint = constraint.as_typevar()?;
-                    if !include(constraint.typevar) {
+                    if !constraint.typevar.is_inferable(db, inferable) {
                         return None;
                     }
 
@@ -4539,6 +4575,7 @@ impl<'db> PathBounds<'db> {
     pub(crate) fn unique_solution(
         &self,
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         builder: &ConstraintSetBuilder<'db>,
     ) -> Result<FxIndexMap<BoundTypeVarIdentity<'db>, TypeVarSolution<'db>>, UniqueSolutionError>
     {
@@ -4554,7 +4591,7 @@ impl<'db> PathBounds<'db> {
         'paths: for path in paths {
             let mut path_solution = FxIndexMap::default();
             for path_bound in path {
-                let candidate = match Self::default_solve(db, builder, path_bound) {
+                let candidate = match Self::default_solve(db, env, builder, path_bound) {
                     Ok(Some(candidate)) => candidate,
                     Ok(None) => continue,
                     Err(()) => continue 'paths,
@@ -4582,7 +4619,9 @@ impl<'db> PathBounds<'db> {
                         return Err(UniqueSolutionError::Ambiguous);
                     };
                     if existing.solution != candidate.solution
-                        && !existing.solution.is_equivalent_to(db, candidate.solution)
+                        && !existing
+                            .solution
+                            .is_equivalent_to(db, env, candidate.solution)
                     {
                         return Err(UniqueSolutionError::Ambiguous);
                     }
@@ -6526,7 +6565,7 @@ impl SequentMap {
         // structural types such as recursive protocols, where expanding inconsequential type
         // variables can cause unnecessary recursive expansion and lead to less precise results.
         let is_distinct_bound = |original: Type<'db>, derived: Type<'db>| {
-            original != derived && !original.is_equivalent_to(db, derived)
+            original != derived && !original.is_equivalent_to(db, env, derived)
         };
         let (Some(left_constraint_data), Some(right_constraint_data)) = (
             storage.constraint_data(left_constraint).as_typevar(),

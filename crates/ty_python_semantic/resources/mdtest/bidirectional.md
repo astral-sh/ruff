@@ -2116,7 +2116,7 @@ def _(callback: TakesInt) -> None:
 Type context specialized to a gradual type should not be ignored:
 
 ```py
-from ty_extensions import Unknown
+from ty_extensions._internal import Unknown
 
 def merge[K, V](*maps: dict[K, V]) -> tuple[K, V]:
     raise NotImplementedError

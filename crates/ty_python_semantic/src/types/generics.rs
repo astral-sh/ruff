@@ -3325,7 +3325,8 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             return Ok(());
         }
 
-        if formal.materialize_once(self.db).is_some() || actual.materialize_once(self.db).is_some()
+        if formal.materialize_once(self.db, self.env).is_some()
+            || actual.materialize_once(self.db, self.env).is_some()
         {
             if let Type::TypeAlias(alias) = formal {
                 return self.infer_map_impl(alias.value_type(self.db), actual, polarity, seen);
@@ -3335,6 +3336,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             // across them. Disjoint filtering can otherwise remove a valid constraint path.
             let when = actual.has_relation_to_with_variance(
                 self.db,
+                self.env,
                 formal,
                 self.constraints,
                 self.inferable,

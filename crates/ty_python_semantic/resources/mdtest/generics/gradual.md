@@ -106,7 +106,7 @@ The same applies to any target type containing an inferable type variable.
 
 ```py
 from typing import Any, Callable, Iterable, TypeVar, Protocol
-from ty_extensions import Unknown
+from ty_extensions._internal import Unknown
 
 DefaultFloat = TypeVar("DefaultFloat", bound=float, default=float)
 
@@ -226,7 +226,7 @@ def _[S](callback: Any, value: S):
     def inner[T](callback: Callable[[T], S], value: T) -> tuple[T, S]:
         raise NotImplementedError
 
-    reveal_type(inner(callback, value))  # revealed: tuple[S@_ | Any, S@_]
+    reveal_type(inner(callback, value))  # revealed: tuple[Any | S@_, S@_]
 ```
 
 The same applies in the opposite direction when a type containing inferable type variables is
@@ -235,7 +235,7 @@ assigned to a gradual type.
 ```py
 from collections.abc import Iterable
 from typing import Any, Callable, Protocol, TypeVar
-from ty_extensions import Unknown
+from ty_extensions._internal import Unknown
 
 DefaultStr = TypeVar("DefaultStr", bound=str, default=str)
 
@@ -337,7 +337,7 @@ def _():
     reveal_type(takes_producer_callable(accepts_unknown))  # revealed: Unknown
 ```
 
-## Bounded nested gradual constraints
+## Bounded complex gradual constraints
 
 We respect the upper and lower bounds when choosing a materialization of the gradual type. For
 example, an assignment of `bool | (int & Any)` to `tuple[T]` will form the constraints
@@ -347,7 +347,8 @@ variance.
 ```py
 from collections.abc import Iterable
 from typing import Any, Callable
-from ty_extensions import Top, Unknown
+from ty_extensions import Top
+from ty_extensions._internal import Unknown
 
 def takes_iterable[T](value: Iterable[T]) -> T:
     raise NotImplementedError

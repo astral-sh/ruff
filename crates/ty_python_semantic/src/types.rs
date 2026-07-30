@@ -1706,7 +1706,11 @@ impl<'db> Type<'db> {
     ///
     /// Note that only a bare dynamic type or a gradual type within a top-level union or intersection
     /// is considered.
-    fn materialize_once(self, db: &'db dyn Db) -> Option<Materialization<'db>> {
+    fn materialize_once(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> Option<Materialization<'db>> {
         if !matches!(
             self,
             Type::Union(_) | Type::Intersection(_) | Type::Dynamic(_)
@@ -1715,8 +1719,8 @@ impl<'db> Type<'db> {
         }
 
         let (bottom, bottom_dynamic) =
-            self.materialize_once_with(db, MaterializationKind::Bottom)?;
-        let (top, top_dynamic) = self.materialize_once_with(db, MaterializationKind::Top)?;
+            self.materialize_once_with(db, env, MaterializationKind::Bottom)?;
+        let (top, top_dynamic) = self.materialize_once_with(db, env, MaterializationKind::Top)?;
 
         if bottom != top && bottom_dynamic == top_dynamic {
             Some(Materialization {
@@ -1732,6 +1736,7 @@ impl<'db> Type<'db> {
     fn materialize_once_with(
         self,
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         materialization_kind: MaterializationKind,
     ) -> Option<(Type<'db>, DynamicType<'db>)> {
         let materialized_dynamic = Cell::new(None);
@@ -1742,7 +1747,7 @@ impl<'db> Type<'db> {
                 materialized_dynamic: &materialized_dynamic,
             },
             TypeContext::default(),
-            &ApplyTypeMappingVisitor::default(),
+            &ApplyTypeMappingVisitor::new(env),
         );
         Some((materialized, materialized_dynamic.get()?))
     }
@@ -6997,9 +7002,15 @@ impl<'db> Type<'db> {
     }
 
     /// Replaces every type variable with `replacement`.
-    pub(crate) fn specialize_all(self, db: &'db dyn Db, replacement: Type<'db>) -> Type<'db> {
+    pub(crate) fn specialize_all(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        replacement: Type<'db>,
+    ) -> Type<'db> {
         self.apply_type_mapping(
             db,
+            env,
             &TypeMapping::ApplySpecialization(ApplySpecialization::All(replacement)),
             TypeContext::default(),
         )
