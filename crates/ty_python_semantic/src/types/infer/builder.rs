@@ -139,7 +139,7 @@ use ty_python_core::node_key::NodeKey;
 use ty_python_core::place::{PlaceExpr, PlaceExprRef};
 use ty_python_core::predicate::PatternPredicate;
 use ty_python_core::scope::{FileScopeId, NodeWithScopeKind, NodeWithScopeRef, ScopeId, ScopeKind};
-use ty_python_core::symbol::ScopedSymbolId;
+use ty_python_core::symbol::{ScopedSymbolId, Symbol};
 use ty_python_core::{
     ApplicableConstraints, EvaluationMode, ProgramFile, SemanticIndex, Truthiness,
     unpack::UnpackPosition,
@@ -1441,7 +1441,20 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let mut inherited_imported_final = None;
 
-        if place_and_quals.place.is_undefined() && !binding.kind(db).is_import() {
+        let may_inherit_imported_final = if let Some((owner_scope, owner_symbol)) = forwarded_owner
+        {
+            self.index
+                .place_table(owner_scope)
+                .symbol(owner_symbol)
+                .has_imported_binding()
+        } else {
+            place.as_symbol().is_some_and(Symbol::has_imported_binding)
+        };
+
+        if place_and_quals.place.is_undefined()
+            && !binding.kind(db).is_import()
+            && may_inherit_imported_final
+        {
             let previous_bindings = if let Some((owner_scope, owner_symbol)) = forwarded_owner {
                 self.index
                     .use_def_map(owner_scope)

@@ -1593,6 +1593,13 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             self.mark_place_bound(place);
             self.invalidate_narrowing_aliases_for(place);
         }
+        if kind.is_import()
+            && let Some(symbol) = place.as_symbol()
+        {
+            self.current_place_table_mut()
+                .symbol_mut(symbol)
+                .mark_imported();
+        }
         if category.is_declaration() {
             self.mark_place_declared(place);
         }
