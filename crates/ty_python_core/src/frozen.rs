@@ -15,13 +15,6 @@ impl<K, V> FrozenMap<K, V> {
         self.0.iter()
     }
 
-    pub fn iter_mut(
-        &mut self,
-    ) -> impl DoubleEndedIterator<Item = (&K, &mut V)> + ExactSizeIterator + std::iter::FusedIterator
-    {
-        self.into_iter()
-    }
-
     pub fn keys(&self) -> impl DoubleEndedIterator<Item = &K> + ExactSizeIterator {
         self.0.iter().map(|(key, _)| key)
     }
@@ -83,15 +76,6 @@ impl<K: Ord, V> std::ops::Index<&K> for FrozenMap<K, V> {
     #[track_caller]
     fn index(&self, index: &K) -> &Self::Output {
         self.get(index).expect("key not found")
-    }
-}
-
-impl<K, V> IntoIterator for FrozenMap<K, V> {
-    type Item = (K, V);
-    type IntoIter = std::vec::IntoIter<(K, V)>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        self.0.into_vec().into_iter()
     }
 }
 
@@ -263,15 +247,6 @@ impl<K: Ord> FrozenSet<K> {
 
 impl<K> FrozenSet<K> {
     pub fn iter(&self) -> std::slice::Iter<'_, K> {
-        self.0.iter()
-    }
-}
-
-impl<'a, K> IntoIterator for &'a FrozenSet<K> {
-    type Item = &'a K;
-    type IntoIter = std::slice::Iter<'a, K>;
-
-    fn into_iter(self) -> Self::IntoIter {
         self.0.iter()
     }
 }
