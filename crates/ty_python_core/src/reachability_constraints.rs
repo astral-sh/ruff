@@ -193,6 +193,12 @@ pub struct ReachabilityConstraintsBuilder {
     >,
 }
 
+#[derive(Clone, Copy)]
+enum BinaryOperation {
+    And,
+    Or,
+}
+
 impl ReachabilityConstraintsBuilder {
     pub(crate) fn build(self) -> ReachabilityConstraints {
         if self.interior_used.first_zero().is_none() {
@@ -352,68 +358,7 @@ impl ReachabilityConstraintsBuilder {
         a: ScopedReachabilityConstraintId,
         b: ScopedReachabilityConstraintId,
     ) -> ScopedReachabilityConstraintId {
-        match (a, b) {
-            (ALWAYS_TRUE, _) | (_, ALWAYS_TRUE) => return ALWAYS_TRUE,
-            (ALWAYS_FALSE, other) | (other, ALWAYS_FALSE) => return other,
-            (AMBIGUOUS, AMBIGUOUS) => return AMBIGUOUS,
-            _ => {}
-        }
-
-        // OR is commutative, which lets us halve the cache requirements
-        let (a, b) = if b.0 < a.0 { (b, a) } else { (a, b) };
-        if let Some(cached) = self.or_cache.get(&(a, b)) {
-            return *cached;
-        }
-
-        if self.interiors.len() >= MAX_INTERIOR_NODES {
-            return AMBIGUOUS;
-        }
-
-        let (atom, if_true, if_ambiguous, if_false) = match self.cmp_atoms(a, b) {
-            Ordering::Equal => {
-                let a_node = self.interiors[a];
-                let b_node = self.interiors[b];
-                let if_true = self.add_or_constraint(a_node.if_true, b_node.if_true);
-                let if_false = self.add_or_constraint(a_node.if_false, b_node.if_false);
-                let if_ambiguous = if if_true == if_false {
-                    if_true
-                } else {
-                    self.add_or_constraint(a_node.if_ambiguous, b_node.if_ambiguous)
-                };
-                (a_node.atom, if_true, if_ambiguous, if_false)
-            }
-            Ordering::Less => {
-                let a_node = self.interiors[a];
-                let if_true = self.add_or_constraint(a_node.if_true, b);
-                let if_false = self.add_or_constraint(a_node.if_false, b);
-                let if_ambiguous = if if_true == if_false {
-                    if_true
-                } else {
-                    self.add_or_constraint(a_node.if_ambiguous, b)
-                };
-                (a_node.atom, if_true, if_ambiguous, if_false)
-            }
-            Ordering::Greater => {
-                let b_node = self.interiors[b];
-                let if_true = self.add_or_constraint(a, b_node.if_true);
-                let if_false = self.add_or_constraint(a, b_node.if_false);
-                let if_ambiguous = if if_true == if_false {
-                    if_true
-                } else {
-                    self.add_or_constraint(a, b_node.if_ambiguous)
-                };
-                (b_node.atom, if_true, if_ambiguous, if_false)
-            }
-        };
-
-        let result = self.add_interior(InteriorNode {
-            atom,
-            if_true,
-            if_ambiguous,
-            if_false,
-        });
-        self.or_cache.insert((a, b), result);
-        result
+        self.add_binary_constraint(a, b, BinaryOperation::Or)
     }
 
     /// Adds a new reachability constraint that is the ternary AND of two existing ones.
@@ -422,17 +367,38 @@ impl ReachabilityConstraintsBuilder {
         a: ScopedReachabilityConstraintId,
         b: ScopedReachabilityConstraintId,
     ) -> ScopedReachabilityConstraintId {
-        match (a, b) {
-            (ALWAYS_FALSE, _) | (_, ALWAYS_FALSE) => return ALWAYS_FALSE,
-            (ALWAYS_TRUE, other) | (other, ALWAYS_TRUE) => return other,
-            (AMBIGUOUS, AMBIGUOUS) => return AMBIGUOUS,
+        self.add_binary_constraint(a, b, BinaryOperation::And)
+    }
+
+    fn add_binary_constraint(
+        &mut self,
+        a: ScopedReachabilityConstraintId,
+        b: ScopedReachabilityConstraintId,
+        operation: BinaryOperation,
+    ) -> ScopedReachabilityConstraintId {
+        match (operation, a, b) {
+            (BinaryOperation::Or, ALWAYS_TRUE, _) | (BinaryOperation::Or, _, ALWAYS_TRUE) => {
+                return ALWAYS_TRUE;
+            }
+            (BinaryOperation::Or, ALWAYS_FALSE, other)
+            | (BinaryOperation::Or, other, ALWAYS_FALSE) => return other,
+            (BinaryOperation::And, ALWAYS_FALSE, _) | (BinaryOperation::And, _, ALWAYS_FALSE) => {
+                return ALWAYS_FALSE;
+            }
+            (BinaryOperation::And, ALWAYS_TRUE, other)
+            | (BinaryOperation::And, other, ALWAYS_TRUE) => return other,
+            (_, AMBIGUOUS, AMBIGUOUS) => return AMBIGUOUS,
             _ => {}
         }
 
-        // AND is commutative, which lets us halve the cache requirements
+        // Both operations are commutative, which halves their cache requirements.
         let (a, b) = if b.0 < a.0 { (b, a) } else { (a, b) };
-        if let Some(cached) = self.and_cache.get(&(a, b)) {
-            return *cached;
+        let cached = match operation {
+            BinaryOperation::And => self.and_cache.get(&(a, b)),
+            BinaryOperation::Or => self.or_cache.get(&(a, b)),
+        };
+        if let Some(&cached) = cached {
+            return cached;
         }
 
         if self.interiors.len() >= MAX_INTERIOR_NODES {
@@ -443,36 +409,30 @@ impl ReachabilityConstraintsBuilder {
             Ordering::Equal => {
                 let a_node = self.interiors[a];
                 let b_node = self.interiors[b];
-                let if_true = self.add_and_constraint(a_node.if_true, b_node.if_true);
-                let if_false = self.add_and_constraint(a_node.if_false, b_node.if_false);
+                let if_true = self.add_binary_constraint(a_node.if_true, b_node.if_true, operation);
+                let if_false =
+                    self.add_binary_constraint(a_node.if_false, b_node.if_false, operation);
                 let if_ambiguous = if if_true == if_false {
                     if_true
                 } else {
-                    self.add_and_constraint(a_node.if_ambiguous, b_node.if_ambiguous)
+                    self.add_binary_constraint(a_node.if_ambiguous, b_node.if_ambiguous, operation)
                 };
                 (a_node.atom, if_true, if_ambiguous, if_false)
             }
-            Ordering::Less => {
-                let a_node = self.interiors[a];
-                let if_true = self.add_and_constraint(a_node.if_true, b);
-                let if_false = self.add_and_constraint(a_node.if_false, b);
+            ordering @ (Ordering::Less | Ordering::Greater) => {
+                let (node, other) = if ordering == Ordering::Less {
+                    (self.interiors[a], b)
+                } else {
+                    (self.interiors[b], a)
+                };
+                let if_true = self.add_binary_constraint(node.if_true, other, operation);
+                let if_false = self.add_binary_constraint(node.if_false, other, operation);
                 let if_ambiguous = if if_true == if_false {
                     if_true
                 } else {
-                    self.add_and_constraint(a_node.if_ambiguous, b)
+                    self.add_binary_constraint(node.if_ambiguous, other, operation)
                 };
-                (a_node.atom, if_true, if_ambiguous, if_false)
-            }
-            Ordering::Greater => {
-                let b_node = self.interiors[b];
-                let if_true = self.add_and_constraint(a, b_node.if_true);
-                let if_false = self.add_and_constraint(a, b_node.if_false);
-                let if_ambiguous = if if_true == if_false {
-                    if_true
-                } else {
-                    self.add_and_constraint(a, b_node.if_ambiguous)
-                };
-                (b_node.atom, if_true, if_ambiguous, if_false)
+                (node.atom, if_true, if_ambiguous, if_false)
             }
         };
 
@@ -482,7 +442,10 @@ impl ReachabilityConstraintsBuilder {
             if_ambiguous,
             if_false,
         });
-        self.and_cache.insert((a, b), result);
+        match operation {
+            BinaryOperation::And => self.and_cache.insert((a, b), result),
+            BinaryOperation::Or => self.or_cache.insert((a, b), result),
+        };
         result
     }
 }
