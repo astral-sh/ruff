@@ -9,7 +9,7 @@ use crate::types::typevar::TypeVarSet;
 use crate::types::{BoundTypeVarInstance, Type};
 use crate::{Db, FxIndexMap, FxIndexSet, ProgramEnvironment};
 
-struct SolutionWalker<'db> {
+pub(super) struct SolutionWalker<'db> {
     inferable: TypeVarSet<'db>,
     inferable_support: Support,
     source_orders: FxIndexSet<ConstraintId>,
@@ -18,6 +18,22 @@ struct SolutionWalker<'db> {
 }
 
 impl<'db> SolutionWalker<'db> {
+    pub(super) fn new(
+        db: &'db dyn Db,
+        storage: &mut ConstraintSetStorage<'db>,
+        inferable: TypeVarSet<'db>,
+        source_orders: FxIndexSet<ConstraintId>,
+    ) -> Self {
+        let inferable_support = Support::from_typevar_set(db, storage, inferable);
+        Self {
+            inferable,
+            inferable_support,
+            source_orders,
+            explored_nodes: FxHashSet::default(),
+            sorted_paths: Vec::default(),
+        }
+    }
+
     /// Returns an iterator of the positive and negative constraints on the current path
     fn constrained_assignments(
         &self,
@@ -47,7 +63,7 @@ impl<'db> SolutionWalker<'db> {
             })
     }
 
-    fn visit_node(
+    pub(super) fn visit_node(
         &mut self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
