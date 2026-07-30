@@ -133,6 +133,27 @@ impl<'src> Parser<'src> {
         options: ParseOptions,
     ) -> Self {
         let tokens = TokenSource::from_source(source, options.mode, start_offset);
+        Self::new_with_token_source(source, start_offset, options, tokens)
+    }
+
+    /// Creates a parser that bypasses chunked lexing, for a single fallback reparse.
+    #[cfg(target_arch = "aarch64")]
+    fn new_starts_at_with_legacy_lexer(
+        source: &'src str,
+        start_offset: TextSize,
+        options: ParseOptions,
+    ) -> Self {
+        let tokens = TokenSource::from_streaming_source(source, options.mode, start_offset);
+        Self::new_with_token_source(source, start_offset, options, tokens)
+    }
+
+    /// Initializes parser state around an already-selected token source.
+    fn new_with_token_source(
+        source: &'src str,
+        start_offset: TextSize,
+        options: ParseOptions,
+        tokens: TokenSource<'src>,
+    ) -> Self {
         let depth_remaining = options.max_recursion_depth;
         let max_nesting_depth = u32::from(options.max_recursion_depth.saturating_sub(2));
 
@@ -197,6 +218,16 @@ impl<'src> Parser<'src> {
             }
             Mode::Module | Mode::Ipython => Mod::Module(self.parse_module()),
         };
+
+        #[cfg(target_arch = "aarch64")]
+        if self.tokens.should_reparse_with_legacy_lexer() {
+            return Parser::new_starts_at_with_legacy_lexer(
+                self.source,
+                self.start_offset,
+                self.options,
+            )
+            .parse();
+        }
 
         self.finish(syntax)
     }
