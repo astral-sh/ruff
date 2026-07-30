@@ -150,24 +150,26 @@ impl<'a> Diff<'a> {
                 (range, 0)
             };
 
+            let edits = self
+                .fix
+                .edits()
+                .iter()
+                .filter(|edit| range.contains_range(edit.range()))
+                .collect::<Vec<_>>();
+            // No edits were applied, so there's no need to diff.
+            if edits.is_empty() {
+                continue;
+            }
+
             let input = source_code.slice(range);
 
             let mut output = String::with_capacity(input.len());
             let mut last_end = range.start();
 
-            let mut applied = 0;
-            for edit in self.fix.edits() {
-                if range.contains_range(edit.range()) {
-                    output.push_str(source_code.slice(TextRange::new(last_end, edit.start())));
-                    output.push_str(edit.content().unwrap_or_default());
-                    last_end = edit.end();
-                    applied += 1;
-                }
-            }
-
-            // No edits were applied, so there's no need to diff.
-            if applied == 0 {
-                continue;
+            for edit in edits {
+                output.push_str(source_code.slice(TextRange::new(last_end, edit.start())));
+                output.push_str(edit.content().unwrap_or_default());
+                last_end = edit.end();
             }
 
             output.push_str(&source_text[usize::from(last_end)..usize::from(range.end())]);
