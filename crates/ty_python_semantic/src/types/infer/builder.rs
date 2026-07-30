@@ -1448,8 +1448,21 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
         .or_else(|| resolved_place.ignore_possibly_undefined());
 
+        let assignment_ty = match (place, declared_ty) {
+            (PlaceExprRef::Symbol(_), Some(Type::FunctionLiteral(function))) => {
+                let callable = function.into_callable_type(db);
+                Type::Callable(if function.has_implicit_receiver(db) {
+                    callable
+                } else {
+                    callable.into_regular(db)
+                })
+            }
+            _ => declared_ty.unwrap_or(Type::unknown()),
+        };
+
         AddBinding {
             declared_ty,
+            assignment_ty,
             binding,
             node,
             qualifiers,
@@ -4155,8 +4168,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
 
             let node = target.into();
+            let declared_ty = self.fallback_member_declared_type(node);
             let add = AddBinding {
-                declared_ty: self.fallback_member_declared_type(node),
+                declared_ty,
+                assignment_ty: declared_ty.unwrap_or(Type::unknown()),
                 binding: definition,
                 node,
                 qualifiers: TypeQualifiers::empty(),
@@ -11975,7 +11990,10 @@ impl<V> IntoIterator for VecSet<V> {
 
 #[must_use]
 struct AddBinding<'db, 'ast> {
+    /// The declared value type, retained for inference context and diagnostics.
     declared_ty: Option<Type<'db>>,
+    /// The contract a new binding must satisfy; function names use their callable signature.
+    assignment_ty: Type<'db>,
     binding: Definition<'db>,
     node: AnyNodeRef<'ast>,
     qualifiers: TypeQualifiers,
@@ -12053,7 +12071,7 @@ impl<'db, 'ast> AddBinding<'db, 'ast> {
             }
         }
 
-        if !bound_ty.is_assignable_to(db, declared_ty) {
+        if !bound_ty.is_assignable_to(db, self.assignment_ty) {
             builder.discard_dict_key_assignments_for(self.binding);
             report_invalid_assignment(
                 &builder.context,
