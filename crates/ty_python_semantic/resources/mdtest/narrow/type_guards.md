@@ -458,22 +458,30 @@ def _(x: Foo | Bar, is_bar: Callable[[object], TypeIs[Bar]]):
         reveal_type(x)  # revealed: Foo & ~Bar
 ```
 
-If a `TypeIs` function returns a gradual specialization of a generic class, we simply intersect with
-that generic type. This means that something like the following does not work like the user probably
-intended:
+A `TypeIs` function that returns a gradual specialization of a generic class narrows to that generic
+type without replacing its gradual type argument:
 
 ```py
-from typing import final
-
-@final
-class Unrelated: ...
-
 class Covariant[T]:
     def get(self) -> T:
         raise NotImplementedError
 
 def is_instance_of_covariant(arg: object) -> TypeIs[Covariant[Any]]:
     return isinstance(arg, Covariant)
+
+def _(x: object):
+    if is_instance_of_covariant(x):
+        reveal_type(x)  # revealed: Covariant[Any]
+```
+
+However, intersecting with the declared gradual type does not necessarily exclude every other
+specialization in the negative branch:
+
+```py
+from typing import final
+
+@final
+class Unrelated: ...
 
 def needs_instance_of_unrelated(arg: Unrelated):
     pass
@@ -491,12 +499,15 @@ If a user wants to select *all* instances of `Covariant`, they must use `Covaria
 generally, `Top[C[Any]]`, which also works for invariant generic types:
 
 ```py
-from ty_extensions import Top
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from ty_extensions import Top
 
 class Invariant[T]:
     value: T  # make it invariant in `T`
 
-def is_instance_of_invariant(arg: object) -> TypeIs[Top[Invariant[Any]]]:
+def is_instance_of_invariant(arg: object) -> "TypeIs[Top[Invariant[Any]]]":
     return isinstance(arg, Invariant)
 
 def _(x: Unrelated | Invariant[int]):
