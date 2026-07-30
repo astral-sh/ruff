@@ -1631,6 +1631,13 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     ) {
         let kind = definition.kind(self.db);
         let category = kind.category(self.source_type.is_stub(), self.module);
+        if kind.is_import()
+            && let Some(symbol) = place.as_symbol()
+        {
+            self.current_place_table_mut()
+                .symbol_mut(symbol)
+                .mark_imported();
+        }
         match category {
             DefinitionCategory::Declaration => {
                 self.mark_place_declared(place);
@@ -1719,7 +1726,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             self.mark_place_bound(place);
             self.invalidate_narrowing_aliases_for(place);
         }
-
         let definition_id = self.current_use_def_map().next_definition_id();
         record(self.current_use_def_map_mut(), place);
 
