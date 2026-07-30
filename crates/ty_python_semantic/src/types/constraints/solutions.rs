@@ -36,7 +36,6 @@ impl<'db> SolutionWalker<'db> {
 
     /// Returns an iterator of the positive and negative constraints on the current path
     fn constrained_assignments(
-        &self,
         path: &PathAssignments,
     ) -> impl Iterator<Item = ConstraintId> + Clone {
         path.assignments
@@ -47,7 +46,6 @@ impl<'db> SolutionWalker<'db> {
     /// Returns an iterator of the constraints on the current path that mention any typevar in the
     /// given support
     fn constrained_assignments_mentioning(
-        &self,
         storage: &ConstraintSetStorage<'db>,
         path: &PathAssignments,
         support: &Support,
@@ -83,10 +81,9 @@ impl<'db> SolutionWalker<'db> {
         if let Some(node_support) = node_support {
             relevant_typevars |= node_support;
         }
-        relevant_typevars.close_over_constraints(storage, self.constrained_assignments(path));
-        let mut relevant_path: Vec<_> = self
-            .constrained_assignments_mentioning(storage, path, &relevant_typevars)
-            .collect();
+        relevant_typevars.close_over_constraints(storage, &Self::constrained_assignments(path));
+        let mut relevant_path: Vec<_> =
+            Self::constrained_assignments_mentioning(storage, path, &relevant_typevars).collect();
         relevant_path.sort_unstable_by_key(|(assignment, _)| assignment.constraint().ordering());
         let key = (node, relevant_path);
         if !self.explored_nodes.insert(key) {
@@ -97,20 +94,20 @@ impl<'db> SolutionWalker<'db> {
         // (We'll only have a Some(node_support) is the node is non-terminal, and we ruled out
         // ALWAYS_FALSE up above.)
         let Some(node_support) = node_support else {
-            self.found_satisfied_path(storage, path, relevant_typevars);
+            self.found_satisfied_path(storage, path, &relevant_typevars);
             return;
         };
 
         // Next see if anything in this node can affect the solution we've already calculated on
         // the current path.
         let mut visible_typevars = self.inferable_support.clone();
-        visible_typevars.close_over_constraints(storage, self.constrained_assignments(path));
+        visible_typevars.close_over_constraints(storage, &Self::constrained_assignments(path));
         if !visible_typevars.overlaps_with(node_support) {
             // This node cannot affect the solution we've found. Make sure that the node has _at
             // least one_ satisfiable path, without walking them all. As long as it does, we can
             // report the solution we have so far as-is.
-            if self.node_is_satisfiable_on_path(db, env, storage, path, node) {
-                self.found_satisfied_path(storage, path, visible_typevars);
+            if Self::node_is_satisfiable_on_path(db, env, storage, path, node) {
+                self.found_satisfied_path(storage, path, &visible_typevars);
             }
             return;
         }
@@ -156,7 +153,6 @@ impl<'db> SolutionWalker<'db> {
     /// `path` already hold. Avoids walking the entire subtree if possible, by returning early once
     /// we find the first satisfied path.
     fn node_is_satisfiable_on_path(
-        &mut self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         storage: &mut ConstraintSetStorage<'db>,
@@ -180,7 +176,7 @@ impl<'db> SolutionWalker<'db> {
                 if found_conflict {
                     false
                 } else {
-                    self.node_is_satisfiable_on_path(db, env, storage, path, interior.if_true)
+                    Self::node_is_satisfiable_on_path(db, env, storage, path, interior.if_true)
                 }
             },
         );
@@ -197,7 +193,7 @@ impl<'db> SolutionWalker<'db> {
                 if found_conflict {
                     false
                 } else {
-                    self.node_is_satisfiable_on_path(db, env, storage, path, interior.if_uncertain)
+                    Self::node_is_satisfiable_on_path(db, env, storage, path, interior.if_uncertain)
                 }
             },
         );
@@ -214,7 +210,7 @@ impl<'db> SolutionWalker<'db> {
                 if found_conflict {
                     false
                 } else {
-                    self.node_is_satisfiable_on_path(db, env, storage, path, interior.if_false)
+                    Self::node_is_satisfiable_on_path(db, env, storage, path, interior.if_false)
                 }
             },
         )
@@ -224,19 +220,19 @@ impl<'db> SolutionWalker<'db> {
         &mut self,
         storage: &ConstraintSetStorage<'db>,
         path: &PathAssignments,
-        visible_typevars: Support,
+        visible_typevars: &Support,
     ) {
-        let mut path: Vec<_> = self
-            .constrained_assignments_mentioning(storage, path, &visible_typevars)
-            .filter(|(assignment, _)| assignment.is_positive())
-            .map(|(assignment, source_constraint)| {
-                let source_order = self
-                    .source_orders
-                    .get_index_of(&source_constraint)
-                    .expect("every TDD constraint should have a source order");
-                (assignment.constraint(), source_order)
-            })
-            .collect();
+        let mut path: Vec<_> =
+            Self::constrained_assignments_mentioning(storage, path, visible_typevars)
+                .filter(|(assignment, _)| assignment.is_positive())
+                .map(|(assignment, source_constraint)| {
+                    let source_order = self
+                        .source_orders
+                        .get_index_of(&source_constraint)
+                        .expect("every TDD constraint should have a source order");
+                    (assignment.constraint(), source_order)
+                })
+                .collect();
         path.sort_by_key(|(_, source_order)| *source_order);
         self.sorted_paths.push(path);
     }

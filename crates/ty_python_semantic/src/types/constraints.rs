@@ -3230,22 +3230,6 @@ impl NodeId {
         result
     }
 
-    fn remove_noninferable<'db>(
-        self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        storage: &mut ConstraintSetStorage<'db>,
-        inferable: TypeVarSet<'db>,
-        source_order: Option<SourceOrderId>,
-    ) -> (Self, Option<SourceOrderId>) {
-        match self.node() {
-            Node::AlwaysTrue => (ALWAYS_TRUE, None),
-            Node::AlwaysFalse => (ALWAYS_FALSE, None),
-            Node::Interior(interior) => {
-                interior.remove_noninferable(db, env, storage, inferable, source_order)
-            }
-        }
-    }
 
     /// Invokes a closure for each unique BDD node that appears anywhere in a BDD.
     ///
@@ -4348,47 +4332,6 @@ impl InteriorNode {
                     let typevar = storage.typevar_data(typevar);
                     typevar.is_inferable(db, bound_typevars)
                 })
-            },
-        )
-    }
-
-    fn remove_noninferable<'db>(
-        self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        storage: &mut ConstraintSetStorage<'db>,
-        inferable: TypeVarSet<'db>,
-        source_order: Option<SourceOrderId>,
-    ) -> (NodeId, Option<SourceOrderId>) {
-        let is_bare_inferable_typevar = |ty: Type<'_>| {
-            ty.as_typevar()
-                .is_some_and(|bound_typevar| bound_typevar.is_inferable(db, inferable))
-        };
-        self.abstract_inner(
-            db,
-            env,
-            storage,
-            source_order,
-            // We only want to keep constraints on inferable typevars. If the constraint's typevar
-            // is itself inferable, we keep it. We also need to keep some constraints in
-            // non-inferable typevars, if their lower or upper bound is a bare inferable typevar.
-            // This ensure that our quantification logic does not depend on typevar ordering.
-            //
-            // For example, `I ≤ N` (where I is inferable and N is non-inferable) could be encoded
-            // either as `Never ≤ I ≤ N` or `I ≤ N ≤ object`, depending on typevar ordering. If we
-            // only checked the inferability of the constrained typevar, we would keep the first
-            // encoding but remove the second.
-            &mut |storage: &ConstraintSetStorage<'_>, constraint| {
-                let constraint = storage.constraint_data(constraint);
-                !constraint.typevar.is_inferable(db, inferable)
-                    && !constraint
-                        .bounds
-                        .lower
-                        .is_some_and(is_bare_inferable_typevar)
-                    && !constraint
-                        .bounds
-                        .upper
-                        .is_some_and(is_bare_inferable_typevar)
             },
         )
     }
@@ -6623,17 +6566,6 @@ impl PathAssignments {
         self.additional_fuels.truncate(additional_fuels_start);
         self.remaining_overall_fuel = previous_remaining_overall_fuel;
         result
-    }
-
-    fn positive_constraints(&self) -> impl Iterator<Item = (ConstraintId, ConstraintId)> + '_ {
-        self.assignments.iter().filter_map(
-            |(assignment, (source_constraint, _))| match assignment {
-                ConstraintAssignment::Positive(constraint) => {
-                    Some((*constraint, *source_constraint))
-                }
-                ConstraintAssignment::Negative(_) | ConstraintAssignment::Unconstrained(_) => None,
-            },
-        )
     }
 
     fn assignment_holds(&self, assignment: ConstraintAssignment) -> bool {
