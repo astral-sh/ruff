@@ -122,13 +122,13 @@ def negated_alternative[T, U]() -> None:
     # ¬((T ≤ int) ∨ (T ≤ str)) | (bytes ≤ U)
     constraints = ~(ConstraintSet.upper_bound(T, int) | ConstraintSet.upper_bound(T, str)) | ConstraintSet.lower_bound(bytes, U)
 
-    # revealed: tuple[()]
+    # revealed: tuple[Solution[], Solution[]]
     reveal_type(constraints.solutions_for(T, inferable=tuple[T, U]))
 
-    # revealed: tuple[()]
+    # revealed: tuple[Solution[], Solution[U=bytes]]
     reveal_type(constraints.solutions_for(U, inferable=tuple[T, U]))
 
-    # revealed: tuple[()]
+    # revealed: tuple[Solution[], Solution[U=bytes]]
     reveal_type(constraints.solutions(inferable=tuple[T, U]))
 ```
 
