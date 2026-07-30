@@ -214,7 +214,6 @@ from included import *
 
 ExcludedT = TypeVar("ExcludedT")
 
-# error: [invalid-assignment]
 # error: [invalid-legacy-type-variable]
 IncludedT = TypeVar("IncludedT")
 ```

@@ -894,7 +894,7 @@ impl DefinitionCategory {
     /// If so, any assignments reached by this definition are in error if they assign a value of a
     /// type not assignable to the declared type.
     ///
-    /// Annotations establish a declared type. So do function and class definitions, and imports.
+    /// Annotations establish a declared type. So do function and class definitions.
     pub fn is_declaration(self) -> bool {
         matches!(
             self,
@@ -1125,13 +1125,10 @@ impl<'db> DefinitionKind<'db> {
 
     pub fn category(&self, in_stub: bool, module: &ParsedModuleRef) -> DefinitionCategory {
         match self {
-            // functions, classes, and imports always bind, and we consider them declarations
+            // Functions and classes always bind, and we consider them declarations.
             DefinitionKind::Function(_)
             | DefinitionKind::Class(_)
             | DefinitionKind::TypeAlias(_)
-            | DefinitionKind::Import(_)
-            | DefinitionKind::ImportFrom(_)
-            | DefinitionKind::StarImport(_)
             | DefinitionKind::TypeVar(_)
             | DefinitionKind::ParamSpec(_)
             | DefinitionKind::TypeVarTuple(_) => DefinitionCategory::DeclarationAndBinding,
@@ -1158,6 +1155,9 @@ impl<'db> DefinitionKind<'db> {
             | DefinitionKind::Comprehension(_)
             | DefinitionKind::WithItem(_)
             | DefinitionKind::MatchPattern(_)
+            | DefinitionKind::Import(_)
+            | DefinitionKind::ImportFrom(_)
+            | DefinitionKind::StarImport(_)
             | DefinitionKind::ImportFromSubmodule(_)
             | DefinitionKind::ExceptHandler(_)
             | DefinitionKind::LoopHeader(_)
