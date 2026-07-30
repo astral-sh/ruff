@@ -58,10 +58,7 @@ impl TupleLength {
     /// Returns the minimum and maximum length of this tuple. (The maximum length will be `None`
     /// for a tuple with a variable-length portion.)
     pub(crate) fn size_hint(self) -> (usize, Option<usize>) {
-        match self {
-            TupleLength::Fixed(len) => (len, Some(len)),
-            TupleLength::Variable(prefix, suffix) => (prefix + suffix, None),
-        }
+        (self.minimum(), self.maximum())
     }
 
     /// Returns the minimum length of this tuple.
