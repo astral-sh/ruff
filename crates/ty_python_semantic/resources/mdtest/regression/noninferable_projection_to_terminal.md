@@ -70,13 +70,23 @@ from typing import TypeVar
 
 BoundedOuter = TypeVar("BoundedOuter", bound=str)
 BoundedInner = TypeVar("BoundedInner", bound=str)
+IncompatibleBoundedInner = TypeVar("IncompatibleBoundedInner", bound=int)
 ConstrainedOuter = TypeVar("ConstrainedOuter", int, str)
 ConstrainedInner = TypeVar("ConstrainedInner", int, str)
+IncompatibleConstrainedInner = TypeVar("IncompatibleConstrainedInner", bytes, float)
 
 def bounded_identity(value: BoundedInner) -> BoundedInner:
     return value
 
 def constrained_identity(value: ConstrainedInner) -> ConstrainedInner:
+    return value
+
+def incompatible_bounded_identity(value: IncompatibleBoundedInner) -> IncompatibleBoundedInner:
+    return value
+
+def incompatible_constrained_identity(
+    value: IncompatibleConstrainedInner,
+) -> IncompatibleConstrainedInner:
     return value
 
 def preserve_bounded(value: BoundedOuter) -> BoundedOuter:
@@ -89,6 +99,12 @@ def preserve_constrained(value: ConstrainedOuter) -> ConstrainedOuter:
     reveal_type(result)  # revealed: ConstrainedOuter@preserve_constrained
     return result
 
+def reject_incompatible_bounded(value: BoundedOuter) -> None:
+    incompatible_bounded_identity(value)  # error: [invalid-argument-type]
+
+def reject_incompatible_constrained(value: ConstrainedOuter) -> None:
+    incompatible_constrained_identity(value)  # error: [invalid-argument-type]
+
 bounded_identity(1)  # error: [invalid-argument-type]
 constrained_identity(b"invalid")  # error: [invalid-argument-type]
 ```
@@ -96,10 +112,12 @@ constrained_identity(b"invalid")  # error: [invalid-argument-type]
 ## Bounded-union method calls with outer return contexts
 
 When a rigid outer variable is bounded by two receiver types, a method shared by those types should
-retain both the outer variable and the matching receiver bound. The independent receiver diagnostics
-are expected, but the current `Unknown` in the return diagnostic is not. Combining return-context
-and argument constraints in [#26680](https://github.com/astral-sh/ruff/pull/26680) should instead
-produce `Response | (T@Manager & Socket)`.
+retain both the outer variable and the matching receiver bound. The return diagnostic should remain,
+because `Response` is not necessarily compatible with `T`, but it should report
+`Response | (T@Manager & Socket)` instead of `Response | Unknown`. Both receiver argument
+diagnostics are false positives and should disappear once
+[#26680](https://github.com/astral-sh/ruff/pull/26680) combines return-context and argument
+constraints.
 
 ```py
 from __future__ import annotations
@@ -121,7 +139,8 @@ class Manager(Generic[T]):
     response: T
 
     async def __aenter__(self) -> T:
-        # TODO(#26680): Retain `Response | (T@Manager & Socket)`.
+        # TODO(#26680): Keep the return error, but report `Response | (T@Manager & Socket)`.
+        # TODO(#26680): Remove both invalid-argument-type errors.
         # error: [invalid-return-type] "expected `T@Manager`, found `Response | Unknown`"
         # error: [invalid-argument-type]
         # error: [invalid-argument-type]
