@@ -290,23 +290,23 @@ impl<'a> Diff<'a> {
         let source_code = self.diagnostic_source.as_source_code();
         let source_text = source_code.text();
 
-        if let Some(notebook_index) = &self.notebook_index {
-            // Partition the source code into end offsets for each cell.
-            let mut last_cell_index = OneIndexed::MIN;
-            let mut cells: Vec<(Option<OneIndexed>, TextSize)> = Vec::new();
-            for cell in notebook_index.iter() {
-                if cell.cell_index() != last_cell_index {
-                    let offset = source_code.line_start(cell.start_row());
-                    cells.push((Some(last_cell_index), offset));
-                    last_cell_index = cell.cell_index();
-                }
-            }
-            cells.push((Some(last_cell_index), source_text.text_len()));
-            cells
-        } else {
+        let Some(notebook_index) = self.notebook_index.as_ref() else {
             // a regular script file, all the lines will be in one "cell" under the `None` key
-            vec![(None, source_text.text_len())]
+            return vec![(None, source_text.text_len())];
+        };
+
+        // Partition the source code into end offsets for each cell.
+        let mut last_cell_index = OneIndexed::MIN;
+        let mut cells: Vec<(Option<OneIndexed>, TextSize)> = Vec::new();
+        for cell in notebook_index.iter() {
+            if cell.cell_index() != last_cell_index {
+                let offset = source_code.line_start(cell.start_row());
+                cells.push((Some(last_cell_index), offset));
+                last_cell_index = cell.cell_index();
+            }
         }
+        cells.push((Some(last_cell_index), source_text.text_len()));
+        cells
     }
 
     fn write_gutter(&self, f: &mut std::fmt::Formatter, width: NonZeroUsize) -> std::fmt::Result {
