@@ -5231,8 +5231,8 @@ def invoke_bounded_callable[T: FactoryHandler](factory: T) -> T:
     return invoke_callable(factory)
 ```
 
-Receiver-specialized overloads remain available when a bounded receiver is forwarded to a generic
-protocol.
+Bounded receivers remain compatible with generic protocols whose methods use receiver-specialized
+overloads.
 
 ```py
 class OverloadedCallback[T](Protocol):

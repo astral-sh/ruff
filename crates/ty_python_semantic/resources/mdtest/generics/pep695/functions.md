@@ -233,6 +233,26 @@ def accept[S: Box[int]](box: S, value: int) -> None:
     add_same(box, value)
 ```
 
+A constrained legacy type variable cannot evade that restriction by appearing inside a PEP 695 type
+alias.
+
+```py
+from typing import TypeVar
+
+type Identity[U] = U
+
+ConstrainedT = TypeVar("ConstrainedT", int, str)
+
+def add_same_aliased(box: Box[Identity[ConstrainedT]], value: ConstrainedT) -> ConstrainedT:
+    return box.get() + value
+
+def reject_aliased[S: Box[int]](box: S, value: str) -> None:
+    add_same_aliased(box, value)  # error: [invalid-argument-type]
+
+def accept_aliased[S: Box[int]](box: S, value: int) -> None:
+    add_same_aliased(box, value)
+```
+
 The same restriction applies when the receiver is an implicit `self` argument.
 
 ```py

@@ -3372,9 +3372,10 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             // `Stream[T@helper, U@helper]` infer the enclosing class's type variables.
             // Constrained type variables must not be inferred this way: independently merging
             // their alternatives can produce a union that is not an allowed specialization.
+            // Visit lazy type attributes so that constraints hidden inside aliases are included.
             (formal @ Type::NominalInstance(_), Type::TypeVar(actual_typevar))
                 if !actual_typevar.is_inferable(self.db, self.inferable)
-                    && !any_over_type(self.db, formal, false, |ty| {
+                    && !any_over_type(self.db, formal, true, |ty| {
                         matches!(
                             ty,
                             Type::TypeVar(typevar)
