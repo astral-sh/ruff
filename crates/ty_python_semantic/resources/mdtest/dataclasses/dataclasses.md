@@ -138,6 +138,24 @@ class F:
         y: str
 ```
 
+A suppression on one reachable declaration must not suppress the same field's declaration in another
+branch.
+
+```py
+def condition() -> bool:
+    return True
+
+@dataclass
+class PartiallyIgnoredField:
+    optional: int = 1
+
+    if condition():
+        required: int  # ty: ignore[dataclass-field-order]
+    else:
+        # error: [dataclass-field-order]
+        required: int
+```
+
 Fields with `init=False` do not participate in the ordering check since they don't appear in
 `__init__`:
 

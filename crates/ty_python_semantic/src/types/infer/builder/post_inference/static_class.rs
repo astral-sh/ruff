@@ -971,25 +971,38 @@ pub(crate) fn check_static_class_definitions<'db>(
         }
 
         if !required_after_default_field_names.is_empty() {
+            let body_scope = class.body_scope(db).file_scope_id(db);
+            let use_def_map = index.use_def_map(body_scope);
+            let place_table = index.place_table(body_scope);
+
             for name in required_after_default_field_names {
-                let diagnostic_range = own_fields
-                    .get(name)
-                    .and_then(|field| field.first_declaration)
-                    .and_then(|definition| {
-                        let DefinitionKind::AnnotatedAssignment(ann_assign) = definition.kind(db)
-                        else {
-                            return None;
-                        };
-                        Some(ann_assign.target(context.module()).range())
-                    })
-                    .unwrap_or_else(|| class_node.name.range());
-                let Some(builder) = context.report_lint(&DATACLASS_FIELD_ORDER, diagnostic_range)
-                else {
+                let report = |range: TextRange| {
+                    let Some(builder) = context.report_lint(&DATACLASS_FIELD_ORDER, range) else {
+                        return false;
+                    };
+                    builder.into_diagnostic(format_args!(
+                        "Required field `{name}` cannot be defined after fields with default values",
+                    ));
+                    true
+                };
+
+                if !own_fields.contains_key(name) {
+                    report(class_node.name.range());
+                    continue;
+                }
+
+                let Some(symbol_id) = place_table.symbol_id(name.as_str()) else {
                     continue;
                 };
-                builder.into_diagnostic(format_args!(
-                    "Required field `{name}` cannot be defined after fields with default values",
-                ));
+                for decl_with_constraints in use_def_map.end_of_scope_symbol_declarations(symbol_id)
+                {
+                    if let Some(definition) = decl_with_constraints.declaration.definition()
+                        && let DefinitionKind::AnnotatedAssignment(ann_assign) = definition.kind(db)
+                        && report(ann_assign.target(context.module()).range())
+                    {
+                        break;
+                    }
+                }
             }
         }
     }
