@@ -2164,12 +2164,14 @@ fn match_case_completion_context<'db>(
         match node {
             ast::AnyNodeRef::StmtMatch(match_stmt) => {
                 if let Some((current_case, position)) = current_case {
+                    let candidates = model.match_case_completions(
+                        match_stmt,
+                        current_case,
+                        position.or_pattern_arm_path(),
+                    );
+
                     return Some(MatchCaseCompletionContext {
-                        candidates: model.match_case_completions(
-                            match_stmt,
-                            current_case,
-                            position.or_pattern_index(),
-                        ),
+                        candidates,
                         replacement_range: position.replacement_range(),
                     });
                 }
@@ -2177,10 +2179,10 @@ fn match_case_completion_context<'db>(
                 return None;
             }
             ast::AnyNodeRef::MatchCase(case) => {
-                if let Some(current_or_pattern_index) =
+                if let Some(completion_position) =
                     match_case_completion_position(&case.pattern, cursor.range)
                 {
-                    current_case = Some((case, current_or_pattern_index));
+                    current_case = Some((case, completion_position));
                 }
             }
             _ => {}
@@ -2190,23 +2192,30 @@ fn match_case_completion_context<'db>(
     None
 }
 
-#[derive(Copy, Clone)]
 enum MatchCaseCompletionPosition {
     Pattern(TextRange),
-    OrArm { index: usize, range: TextRange },
+    OrArm {
+        /// Zero-based arm indices of the position in a possibly nested OR pattern.
+        ///
+        /// - `case A<CURSOR> | B | C:` maps to `[0]`.
+        /// - `case A | B | C<CURSOR>:` maps to `[2]`.
+        /// - `case A | (B | (C | D<CURSOR>)):` maps to `[1, 1, 1]`.
+        arm_path: Vec<usize>,
+        range: TextRange,
+    },
 }
 
 impl MatchCaseCompletionPosition {
-    fn or_pattern_index(self) -> Option<usize> {
+    fn or_pattern_arm_path(&self) -> &[usize] {
         match self {
-            Self::Pattern(_) => None,
-            Self::OrArm { index, .. } => Some(index),
+            Self::Pattern(_) => &[],
+            Self::OrArm { arm_path, .. } => arm_path,
         }
     }
 
-    fn replacement_range(self) -> TextRange {
+    fn replacement_range(&self) -> TextRange {
         match self {
-            Self::Pattern(range) | Self::OrArm { range, .. } => range,
+            Self::Pattern(range) | Self::OrArm { range, .. } => *range,
         }
     }
 }
@@ -2215,8 +2224,8 @@ impl MatchCaseCompletionPosition {
 ///
 /// A standalone target such as `case C<CURSOR>` returns
 /// [`MatchCaseCompletionPosition::Pattern`]. An alternative such as
-/// `case "ready" | w<CURSOR>` returns [`MatchCaseCompletionPosition::OrArm`] with the active
-/// arm's index. Positions inside structural patterns return `None`.
+/// `case "ready" | w<CURSOR>` returns [`MatchCaseCompletionPosition::OrArm`] with the path to the
+/// active arm. Positions inside structural patterns return `None`.
 ///
 /// Structural subpatterns are not supported.
 fn match_case_completion_position(
@@ -2250,27 +2259,43 @@ fn match_case_completion_position(
             )
     }
 
-    let pattern = unwrap_enclosing_as_patterns_at_cursor(pattern, cursor_range);
+    fn supported_completion_range(
+        pattern: &ast::Pattern,
+        cursor_range: TextRange,
+        or_pattern_arm_path: &mut Vec<usize>,
+    ) -> Option<TextRange> {
+        let pattern = unwrap_enclosing_as_patterns_at_cursor(pattern, cursor_range);
 
-    if let ast::Pattern::MatchOr(or_pattern) = pattern {
-        // The semantic model uses this index to narrow candidates by all preceding alternatives.
-        let index = or_pattern
-            .patterns
-            .iter()
-            .position(|pattern| pattern.range().contains_range(cursor_range))?;
+        if let ast::Pattern::MatchOr(or_pattern) = pattern {
+            let index = or_pattern
+                .patterns
+                .iter()
+                .position(|pattern| pattern.range().contains_range(cursor_range))?;
 
-        let arm = unwrap_enclosing_as_patterns_at_cursor(&or_pattern.patterns[index], cursor_range);
+            // Record the cursor's path from the outermost OR pattern to the innermost one.
+            or_pattern_arm_path.push(index);
 
-        return is_supported_completion_target(arm, cursor_range).then_some(
-            MatchCaseCompletionPosition::OrArm {
-                index,
-                range: arm.range(),
-            },
-        );
+            return supported_completion_range(
+                &or_pattern.patterns[index],
+                cursor_range,
+                or_pattern_arm_path,
+            );
+        }
+
+        is_supported_completion_target(pattern, cursor_range).then_some(pattern.range())
     }
 
-    is_supported_completion_target(pattern, cursor_range)
-        .then_some(MatchCaseCompletionPosition::Pattern(pattern.range()))
+    let mut or_pattern_arm_path = Vec::new();
+    let range = supported_completion_range(pattern, cursor_range, &mut or_pattern_arm_path)?;
+
+    if or_pattern_arm_path.is_empty() {
+        Some(MatchCaseCompletionPosition::Pattern(range))
+    } else {
+        Some(MatchCaseCompletionPosition::OrArm {
+            arm_path: or_pattern_arm_path,
+            range,
+        })
+    }
 }
 
 /// Detect and add completions for unset class arguments.
@@ -9872,6 +9897,52 @@ def handle(status: Color):
 
         test.not_contains("Color.RED");
         test.not_contains("Color.BLUE");
+    }
+
+    #[test]
+    fn nested_match_or_pattern_omits_members_matched_by_previous_alternatives() {
+        let source = "\
+from enum import Enum
+
+class Color(Enum):
+    RED = 1
+    GREEN = 2
+    BLUE = 3
+
+def handle(status: Color):
+    match status:
+        case Color.RED | (Color.GREEN | C<CURSOR>):
+            pass
+    ";
+
+        let builder = completion_test_builder(source);
+        let test = builder.build();
+        test.not_contains("Color.RED");
+        test.not_contains("Color.GREEN");
+        test.contains("Color.BLUE");
+    }
+
+    #[test]
+    fn nested_match_or_pattern_includes_members_matched_by_later_alternative() {
+        let source = "\
+from enum import Enum
+
+class Color(Enum):
+    RED = 1
+    GREEN = 2
+    BLUE = 3
+
+def handle(status: Color):
+    match status:
+        case Color.RED | (C<CURSOR> | Color.GREEN):
+            pass
+    ";
+
+        let builder = completion_test_builder(source);
+        let test = builder.build();
+        test.not_contains("Color.RED");
+        test.contains("Color.GREEN");
+        test.contains("Color.BLUE");
     }
 
     #[test]
