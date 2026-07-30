@@ -1,5 +1,66 @@
 # Changelog
 
+## 0.16.1
+
+Released on 2026-07-30.
+
+### Preview features
+
+- Add an option to opt out of human-readable names ([#27160](https://github.com/astral-sh/ruff/pull/27160))
+- \[`flake8-pytest-style`\] Make fixes safe by default and unsafe only when comments are present (`PT018`) ([#27201](https://github.com/astral-sh/ruff/pull/27201))
+- \[`pyupgrade`\] Skip fix when a defaulted `TypeVar` precedes a non-defaulted one (`UP040`, `UP046`, `UP047`) ([#27133](https://github.com/astral-sh/ruff/pull/27133))
+- \[`ruff`\] Fix false positive with unpacked arguments (`RUF065`) ([#26959](https://github.com/astral-sh/ruff/pull/26959))
+
+### Bug fixes
+
+- Bump `gen-lsp-types` to gracefully handle unknown enumeration values in LSP messages ([#27230](https://github.com/astral-sh/ruff/pull/27230))
+- \[`flake8-bugbear`\] Mark `range` as immutable (`B008`) ([#27247](https://github.com/astral-sh/ruff/pull/27247))
+- \[`flake8-comprehensions`\] NFKC-normalize keyword names in `C408` fix ([#26813](https://github.com/astral-sh/ruff/pull/26813))
+- \[`flake8-return`\] Fix false positive when variable is read in `finally` clause (`RET504`) ([#25441](https://github.com/astral-sh/ruff/pull/25441))
+- \[`pydocstyle`\] Skip section detection inside RST directive bodies (`D214`, `D405`, `D413`) ([#23635](https://github.com/astral-sh/ruff/pull/23635))
+- \[`refurb`\] Parenthesize `yield` arguments in the `FURB192` fix ([#27192](https://github.com/astral-sh/ruff/pull/27192))
+
+### Rule changes
+
+- \[`flake8-pytest-style`\] Mark `PT022` fixes as unsafe ([#26440](https://github.com/astral-sh/ruff/pull/26440))
+- \[`refurb`\] Mark fixes that remove unknown separators as unsafe (`FURB105`) ([#27200](https://github.com/astral-sh/ruff/pull/27200))
+
+### Server
+
+- Fix indexing of excluded nested Ruff workspaces ([#27303](https://github.com/astral-sh/ruff/pull/27303))
+- Lint TOML files in the LSP ([#26862](https://github.com/astral-sh/ruff/pull/26862))
+
+### Documentation
+
+- Cover `pycon` Markdown formatting ([#27153](https://github.com/astral-sh/ruff/pull/27153))
+- \[`flake8-bandit`\] Document `TYPE_CHECKING` exception (`S101`) ([#27004](https://github.com/astral-sh/ruff/pull/27004))
+- \[`flake8-import-conventions`\] Document that `extend-aliases` can override default aliases ([#27191](https://github.com/astral-sh/ruff/pull/27191))
+- \[`pylint`\] Add missing fix safety gotchas for `non-augmented-assignment` (`PLR6104`) ([#27250](https://github.com/astral-sh/ruff/pull/27250))
+
+### Other changes
+
+- Reduce syntax error noise by swallowing dedents like indents ([#27170](https://github.com/astral-sh/ruff/pull/27170))
+- Vendor latest annotate-snippets ([#27033](https://github.com/astral-sh/ruff/pull/27033))
+
+### Contributors
+
+- [@bxff](https://github.com/bxff)
+- [@anishgirianish](https://github.com/anishgirianish)
+- [@Avasam](https://github.com/Avasam)
+- [@epage](https://github.com/epage)
+- [@LHMQ878](https://github.com/LHMQ878)
+- [@MichaReiser](https://github.com/MichaReiser)
+- [@ntBre](https://github.com/ntBre)
+- [@HarshalPatel1972](https://github.com/HarshalPatel1972)
+- [@mjpieters](https://github.com/mjpieters)
+- [@joshuavetos](https://github.com/joshuavetos)
+- [@jesco-absolute](https://github.com/jesco-absolut)
+- [@vidigoat](https://github.com/vidigoat)
+- [@baltasarblanco](https://github.com/baltasarblanco)
+- [@ribru17](https://github.com/ribru17)
+- [@oh-summy](https://github.com/oh-summy)
+- [@Jayashanker-Padishala](https://github.com/Jayashanker-Padishala)
+
 ## 0.16.0
 
 Released on 2026-07-23.
