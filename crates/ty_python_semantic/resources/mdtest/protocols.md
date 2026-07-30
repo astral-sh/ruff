@@ -1374,6 +1374,35 @@ def needs_something_hashable(x: Hashable):
 needs_something_hashable([])
 ```
 
+## Bounded receivers and mutable protocol members
+
+A union-bounded receiver must satisfy a mutable protocol separately for each union alternative.
+Combining differently typed attributes would allow an incompatible value to be written.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Protocol
+
+class Cell[T](Protocol):
+    item: T
+
+class IntCell:
+    item: int
+
+class StrCell:
+    item: str
+
+def accept(cell: Cell[int | str]) -> None:
+    cell.item = ""
+
+def reject[T: IntCell | StrCell](cell: T) -> None:
+    accept(cell)  # error: [invalid-argument-type]
+```
+
 ## Diagnostics for protocols with invalid attribute members
 
 This is a short appendix to the previous section with the `snapshot-diagnostics` directive enabled
@@ -5143,6 +5172,104 @@ def _(source: NoArgs):
     target: Variadic[Any] = source  # error: [invalid-assignment]
 ```
 
+## Bounded callable receivers
+
+An implicit `self` argument and a bounded type variable should satisfy a callback protocol when
+their callable signatures match.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Callable, Protocol, Self, overload
+
+class Callback(Protocol):
+    def __call__(self, value: int) -> str: ...
+
+def accept(callback: Callback) -> None: ...
+
+class Handler:
+    def __call__(self, value: int) -> str:
+        return str(value)
+
+    def forward(self) -> None:
+        accept(self)
+
+def forward[T: Handler](handler: T) -> None:
+    accept(handler)
+```
+
+A generic callback returning `Self` must accept both an implicit receiver and a bounded receiver.
+
+```py
+class Factory[T](Protocol):
+    def __call__(self) -> T: ...
+
+def invoke[T](factory: Factory[T]) -> T:
+    return factory()
+
+class FactoryHandler:
+    def __call__(self) -> Self:
+        return self
+
+    def forward(self) -> Self:
+        return invoke(self)
+
+def invoke_bounded[T: FactoryHandler](factory: T) -> T:
+    return invoke(factory)
+```
+
+A `Callable` annotation must also accept a bounded receiver whose `__call__` method returns `Self`.
+
+```py
+def invoke_callable[T](callback: Callable[[], T]) -> T:
+    return callback()
+
+def invoke_bounded_callable[T: FactoryHandler](factory: T) -> T:
+    return invoke_callable(factory)
+```
+
+Receiver-specialized overloads remain available when a bounded receiver is forwarded to a generic
+protocol.
+
+```py
+class OverloadedCallback[T](Protocol):
+    @overload
+    def __call__(self: "OverloadedCallback[int]", value: int) -> int: ...
+    @overload
+    def __call__(self: "OverloadedCallback[str]", value: str) -> str: ...
+
+class OverloadedMethod[T](Protocol):
+    @overload
+    def method(self: "OverloadedMethod[int]", value: int) -> int: ...
+    @overload
+    def method(self: "OverloadedMethod[str]", value: str) -> str: ...
+
+def accept_overloaded[T](callback: OverloadedCallback[T]) -> None: ...
+def accept_overloaded_method[T](value: OverloadedMethod[T]) -> None: ...
+def forward_overloaded[T: OverloadedCallback[str]](callback: T) -> None:
+    accept_overloaded(callback)
+
+def forward_overloaded_method[T: OverloadedMethod[str]](value: T) -> None:
+    accept_overloaded_method(value)
+```
+
+An incompatible callable signature must still be rejected for both receiver forms.
+
+```py
+class WrongHandler:
+    def __call__(self, value: str) -> str:
+        return value
+
+    def forward(self) -> None:
+        accept(self)  # error: [invalid-argument-type]
+
+def reject[T: WrongHandler](handler: T) -> None:
+    accept(handler)  # error: [invalid-argument-type]
+```
+
 ## Class constructors and static callback protocols
 
 A class object's call signature comes from its constructor. An unrelated `__call__` method on the
@@ -5164,6 +5291,30 @@ class Constructor(Protocol):
     def __call__(value: int) -> Product: ...
 
 constructor: Constructor = Product
+```
+
+A bounded class object uses its metaclass's bound call signature, without exposing the implicit
+class receiver as a regular argument.
+
+```py
+from typing import TypeVar
+
+class Meta(type):
+    def __call__(cls, value: str) -> int:
+        return len(value)
+
+class Factory(metaclass=Meta): ...
+
+class MetaConstructor(Protocol):
+    @staticmethod
+    def __call__(value: str) -> int: ...
+
+def accept_constructor(constructor: MetaConstructor) -> None: ...
+
+ClassType = TypeVar("ClassType", bound=type[Factory])
+
+def forward_constructor(constructor: ClassType) -> None:
+    accept_constructor(constructor)
 ```
 
 ## Generic protocols and union arguments
@@ -5367,6 +5518,54 @@ class TypeVarRecursive(Protocol):
 def _(t: TypeVarRecursive):
     # reveal_type(t.x)  # revealed: T
     reveal_type(t.y)  # revealed: TypeVarRecursive
+```
+
+### Bounded receivers satisfying recursive protocols
+
+A recursive protocol can be implemented by a property returning the bounded receiver itself.
+Checking either an implicit `self` or an explicitly bounded receiver must terminate.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from __future__ import annotations
+
+from typing import Protocol, Self
+
+class Recursive(Protocol):
+    @property
+    def parent(self) -> Recursive: ...
+
+def accept(value: Recursive) -> None: ...
+
+class Node:
+    @property
+    def parent(self) -> Self:
+        return self
+
+    def forward(self) -> None:
+        accept(self)
+
+def forward[T: Node](node: T) -> None:
+    accept(node)
+```
+
+An incompatible property must still be rejected for either receiver.
+
+```py
+class WrongNode:
+    @property
+    def parent(self) -> int:
+        return 0
+
+    def forward(self) -> None:
+        accept(self)  # error: [invalid-argument-type]
+
+def reject[T: WrongNode](node: T) -> None:
+    accept(node)  # error: [invalid-argument-type]
 ```
 
 ### Nested occurrences of self-reference

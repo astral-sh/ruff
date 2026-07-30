@@ -186,6 +186,63 @@ def _(a: A, b: B, x: A | B):
     reveal_type(takes_in_supports_foo(x))  # revealed: A | B
 ```
 
+## Inferring generic class parameters from `self`
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+Class type parameters are inferred from an implicit `self` argument instead of falling back to their
+defaults.
+
+```py
+class Stream[T = None, U = str]:
+    def handle(self) -> None:
+        reveal_type(helper(self))  # revealed: tuple[T@Stream, U@Stream]
+        requires_int(self)  # error: [invalid-argument-type]
+
+def helper[T = None, U = str](stream: Stream[T, U]) -> tuple[T, U]:
+    raise NotImplementedError
+
+def requires_int[U](stream: Stream[int, U]) -> None: ...
+```
+
+A type variable with an explicit generic upper bound carries the same specialization information.
+
+```py
+def bounded[S: Stream[int, bytes]](stream: S) -> None:
+    reveal_type(helper(stream))  # revealed: tuple[int, bytes]
+```
+
+## Bounded receivers passed to generic protocols
+
+Passing an implicit `Self` receiver to a generic protocol must not produce an invalid return type.
+
+```py
+from typing import Protocol, Self
+
+class Clonable[T](Protocol):
+    def clone(self) -> T: ...
+
+class Base:
+    def clone(self) -> Self:
+        return self
+
+    def preserve(self) -> Self:
+        return clone(self)
+
+def clone[T](value: Clonable[T]) -> T:
+    return value.clone()
+```
+
+A type variable bounded by the implementing class must also remain valid as a return type.
+
+```py
+def preserve[S: Base](value: S) -> S:
+    return clone(value)
+```
+
 ## Bound violations inferred through protocols
 
 If matching a protocol argument infers a type that violates a type variable's bound, the call should

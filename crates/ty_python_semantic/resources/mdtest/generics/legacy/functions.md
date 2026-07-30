@@ -162,6 +162,37 @@ def pick(x: object) -> str | bool:
 reveal_type(pick([1]))  # revealed: bool
 ```
 
+## Inferring generic class parameters from `self`
+
+A generic function should infer its type variables from the enclosing class specialization when an
+implicit `self` argument is passed to it, even when those type variables have defaults.
+
+```py
+from typing_extensions import Generic, TypeVar
+
+T = TypeVar("T", default=None)
+U = TypeVar("U", default=str)
+
+class Stream(Generic[T, U]):
+    def handle(self) -> None:
+        reveal_type(helper(self))  # revealed: tuple[T@Stream, U@Stream]
+        requires_int(self)  # error: [invalid-argument-type]
+
+def helper(stream: Stream[T, U]) -> tuple[T, U]:
+    raise NotImplementedError
+
+def requires_int(stream: Stream[int, U]) -> None: ...
+```
+
+The same inference also applies to other type variables bounded by a specialized generic class.
+
+```py
+S = TypeVar("S", bound=Stream[int, bytes])
+
+def bounded(stream: S) -> None:
+    reveal_type(helper(stream))  # revealed: tuple[int, bytes]
+```
+
 ## Inferring tuple parameter types
 
 ```toml
