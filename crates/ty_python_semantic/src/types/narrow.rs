@@ -1,7 +1,6 @@
 use std::borrow::Cow;
 use std::collections::{BTreeMap, btree_map::Entry as BTreeEntry, hash_map::Entry};
 
-use crate::Db;
 use crate::reachability::{narrow_type_by_constraint, type_narrowed_by_previous_patterns};
 use crate::subscript::PyIndex;
 use crate::types::function::KnownFunction;
@@ -17,9 +16,9 @@ use crate::types::{
     Parameter, Parameters, Signature, SpecialFormType, SubclassOfInner, SubclassOfType, Truthiness,
     Type, TypeContext, TypeVarBoundOrConstraints, UnionBuilder, callable_pattern_type,
     class_pattern_positional_sources, definite_match_pattern_type_for_subject,
-    exact_sequence_pattern_type, infer_expression_types, mapping_pattern_type,
-    pattern_binding_fallthrough_type, sequence_pattern_type_builder, singleton_pattern_type,
-    starred_sequence_pattern_type, typed_dict_matches_class_pattern,
+    exact_sequence_pattern_type, infer_expression_types, is_typed_dict_runtime_domain,
+    mapping_pattern_type, pattern_binding_fallthrough_type, sequence_pattern_type_builder,
+    singleton_pattern_type, starred_sequence_pattern_type, typed_dict_matches_class_pattern,
 };
 use crate::{Db, ProgramEnvironment};
 use ty_python_core::expression::Expression;
@@ -462,19 +461,30 @@ impl ClassInfoConstraintFunction {
         is_positive: bool,
         use_generic_filtering: bool,
     ) -> Option<Type<'db>> {
-        let constraint_from_class_literal = |class: ClassLiteral<'db>| match self {
-            ClassInfoConstraintFunction::IsInstance => {
-                Type::instance(db, env, class.top_materialization(db))
-            }
-            ClassInfoConstraintFunction::IsSubclass => {
-                SubclassOfType::from(db, env, class.top_materialization(db))
+        let constraint_from_class_literal = |class: ClassLiteral<'db>| {
+            let specialization = if use_generic_filtering && class.generic_context(db).is_some() {
+                class.unknown_specialization(db)
+            } else {
+                // A negative result excludes every specialization of the class.
+                class.top_materialization(db)
+            };
+
+            match self {
+                ClassInfoConstraintFunction::IsInstance => Type::instance(db, env, specialization),
+                ClassInfoConstraintFunction::IsSubclass => {
+                    SubclassOfType::from(db, env, specialization)
+                }
             }
         };
 
         match classinfo {
-            Type::TypeAlias(alias) => {
-                self.generate_constraint(db, env, alias.value_type(db), is_positive)
-            }
+            Type::TypeAlias(alias) => self.generate_constraint(
+                db,
+                env,
+                alias.value_type(db),
+                is_positive,
+                use_generic_filtering,
+            ),
             Type::ClassLiteral(class_literal) => Some(constraint_from_class_literal(class_literal)),
             Type::SubclassOf(subclass_of_ty) => {
                 // We can't narrow negatively from a `SubclassOf` type. `if !isinstance(x, y)`
@@ -522,7 +532,13 @@ impl ClassInfoConstraintFunction {
                         // target) should be SKIPPED, not abort narrowing on the
                         // whole intersection. Narrowing on the remaining members
                         // is still sound.
-                        if let Some(c) = self.generate_constraint(db, env, *element, is_positive) {
+                        if let Some(c) = self.generate_constraint(
+                            db,
+                            env,
+                            *element,
+                            is_positive,
+                            use_generic_filtering,
+                        ) {
                             builder.add_positive_in_place(c);
                             any_member = true;
                         }
@@ -538,20 +554,18 @@ impl ClassInfoConstraintFunction {
                 }
             }
             Type::Union(union) => union.try_map(db, env, |element| {
-                self.generate_constraint(db, env, *element, is_positive)
+                self.generate_constraint(db, env, *element, is_positive, use_generic_filtering)
             }),
             Type::TypeVar(bound_typevar) => {
                 match bound_typevar.typevar(db).bound_or_constraints(db, env)? {
                     TypeVarBoundOrConstraints::UpperBound(bound) => {
-                        self.generate_constraint(db, env, bound, is_positive)
-                    }
-                    TypeVarBoundOrConstraints::Constraints(constraints) => {
-                        self.generate_constraint(db, env, constraints.as_type(db, env), is_positive)
+                        self.generate_constraint(db, env, bound, is_positive, use_generic_filtering)
                     }
                     TypeVarBoundOrConstraints::Constraints(constraints) => self
                         .generate_constraint(
                             db,
-                            constraints.as_type(db),
+                            env,
+                            constraints.as_type(db, env),
                             is_positive,
                             use_generic_filtering,
                         ),
@@ -566,9 +580,15 @@ impl ClassInfoConstraintFunction {
                 UnionType::try_from_elements(
                     db,
                     env,
-                    tuple
-                        .iter_element_types(db)
-                        .map(|element| self.generate_constraint(db, env, element, is_positive)),
+                    tuple.iter_element_types(db).map(|element| {
+                        self.generate_constraint(
+                            db,
+                            env,
+                            element,
+                            is_positive,
+                            use_generic_filtering,
+                        )
+                    }),
                 )
             }
 
@@ -590,9 +610,16 @@ impl ClassInfoConstraintFunction {
                                     env,
                                     KnownClass::NoneType.to_class_literal(db, env),
                                     is_positive,
+                                    use_generic_filtering,
                                 )
                             } else {
-                                self.generate_constraint(db, env, element, is_positive)
+                                self.generate_constraint(
+                                    db,
+                                    env,
+                                    element,
+                                    is_positive,
+                                    use_generic_filtering,
+                                )
                             }
                         }),
                 )
@@ -611,6 +638,7 @@ impl ClassInfoConstraintFunction {
                     env,
                     KnownClass::Tuple.to_class_literal(db, env),
                     is_positive,
+                    use_generic_filtering,
                 ),
                 SpecialFormType::Type => self.generate_constraint(
                     db,
@@ -619,18 +647,16 @@ impl ClassInfoConstraintFunction {
                     is_positive,
                     use_generic_filtering,
                 ),
-                SpecialFormType::Type => self.generate_constraint(
-                    db,
-                    KnownClass::Type.to_class_literal(db),
-                    is_positive,
-                    use_generic_filtering,
-                ),
-
                 // We don't have a good meta-type for `Callable`s right now,
                 // so only apply `isinstance()` narrowing, not `issubclass()`
                 SpecialFormType::TypingCallable | SpecialFormType::CollectionsAbcCallable => {
                     (self == ClassInfoConstraintFunction::IsInstance).then(|| {
-                        Type::Callable(CallableType::unknown(db)).top_materialization(db, env)
+                        let callable = Type::Callable(CallableType::unknown(db));
+                        if use_generic_filtering {
+                            callable
+                        } else {
+                            callable.top_materialization(db, env)
+                        }
                     })
                 }
 
@@ -730,8 +756,13 @@ impl<'db> Conjunctions<'db> {
         // Collapse shared union arms before distributing the next constraint over them.
         self.conjuncts
             .into_iter()
-            .fold(Type::object(), |accumulated, conjunct| {
-                IntersectionType::from_two_elements(db, env, accumulated, conjunct)
+            .fold(Type::object(), |accumulated, conjunct| match conjunct {
+                NarrowingConjunct::Intersection(ty) => {
+                    IntersectionType::from_two_elements(db, env, accumulated, ty)
+                }
+                NarrowingConjunct::GenericFiltering(ty) => {
+                    filter_generic_narrowing_constraint(db, env, accumulated, ty)
+                }
             })
     }
 }
@@ -743,50 +774,65 @@ impl<'db> Conjunctions<'db> {
 /// are still intersected with the original unknown-specialized target.
 fn filter_generic_narrowing_constraint<'db>(
     db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
     subject: Type<'db>,
     target: Type<'db>,
 ) -> Type<'db> {
     match (subject, target) {
-        (Type::Union(union), target) => union.map(db, |element| {
-            filter_generic_narrowing_constraint(db, *element, target)
+        (Type::Union(union), target) => union.map(db, env, |element| {
+            filter_generic_narrowing_constraint(db, env, *element, target)
         }),
-        (subject, Type::Union(union)) => union.map(db, |element| {
-            filter_generic_narrowing_constraint(db, subject, *element)
+        (subject, Type::Union(union)) => union.map(db, env, |element| {
+            filter_generic_narrowing_constraint(db, env, subject, *element)
         }),
+        (subject, target)
+            if is_typed_dict_runtime_domain(db, env, subject)
+                && target.nominal_class(db, env).is_some_and(|class| {
+                    !class.is_protocol(db)
+                        && typed_dict_matches_class_pattern(db, env, class.class_literal(db))
+                }) =>
+        {
+            // A TypedDict is a dictionary at runtime, but intersecting it with the target would
+            // expose dict's unrestricted mutations and discard its required-key guarantees.
+            subject
+        }
         (Type::Intersection(intersection), target) => {
             let specialized_target = intersection
                 .positive(db)
                 .iter()
-                .find_map(|element| specialize_narrowing_target(db, *element, target))
+                .find_map(|element| specialize_narrowing_target(db, env, *element, target))
                 .unwrap_or(target);
-            IntersectionType::from_two_elements(db, subject, specialized_target)
+            IntersectionType::from_two_elements(db, env, subject, specialized_target)
         }
         (subject, target) => {
             let specialized_target =
-                specialize_narrowing_target(db, subject, target).unwrap_or(target);
-            IntersectionType::from_two_elements(db, subject, specialized_target)
+                specialize_narrowing_target(db, env, subject, target).unwrap_or(target);
+            IntersectionType::from_two_elements(db, env, subject, specialized_target)
         }
     }
 }
 
 fn specialize_narrowing_target<'db>(
     db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
     subject: Type<'db>,
     target: Type<'db>,
 ) -> Option<Type<'db>> {
     if let Type::TypeVar(typevar) = subject {
-        let bound = match typevar.typevar(db).bound_or_constraints(db)? {
+        let bound = match typevar.typevar(db).bound_or_constraints(db, env)? {
             TypeVarBoundOrConstraints::UpperBound(bound) => bound,
-            TypeVarBoundOrConstraints::Constraints(constraints) => constraints.as_type(db),
+            TypeVarBoundOrConstraints::Constraints(constraints) => constraints.as_type(db, env),
         };
 
         return match bound {
             Type::Union(union) => {
-                let mut candidates = UnionBuilder::new(db);
+                let mut candidates = UnionBuilder::new(db, env);
                 let mut found_specialization = false;
                 for element in union.elements(db) {
-                    if let Some(specialized) = specialize_narrowing_target(db, *element, target) {
-                        candidates = candidates.add(specialized);
+                    if let Some(specialized) =
+                        specialize_narrowing_target(db, env, *element, target)
+                    {
+                        candidates.add_in_place(specialized);
                         found_specialization = true;
                     }
                 }
@@ -795,8 +841,8 @@ fn specialize_narrowing_target<'db>(
             Type::Intersection(intersection) => intersection
                 .positive(db)
                 .iter()
-                .find_map(|element| specialize_narrowing_target(db, *element, target)),
-            bound if bound != subject => specialize_narrowing_target(db, bound, target),
+                .find_map(|element| specialize_narrowing_target(db, env, *element, target)),
+            bound if bound != subject => specialize_narrowing_target(db, env, bound, target),
             _ => None,
         };
     }
@@ -814,7 +860,11 @@ fn specialize_narrowing_target<'db>(
             };
             (target_class, subject_class, true)
         }
-        _ => (target.nominal_class(db)?, subject.nominal_class(db)?, false),
+        _ => (
+            target.nominal_class(db, env)?,
+            subject.nominal_class(db, env)?,
+            false,
+        ),
     };
 
     // An unspecialized class cannot contribute type arguments to the narrowing target.
@@ -823,18 +873,24 @@ fn specialize_narrowing_target<'db>(
     let target_class = if target_class.class_literal(db) == subject_class.class_literal(db) {
         subject_class
     } else {
-        specialize_generic_class_for_subject(db, target_class.class_literal(db), subject_class)?
+        specialize_generic_class_for_subject(
+            db,
+            env,
+            target_class.class_literal(db),
+            subject_class,
+        )?
     };
 
     Some(if is_subclass {
-        SubclassOfType::from(db, target_class)
+        SubclassOfType::from(db, env, target_class)
     } else {
-        Type::instance(db, target_class)
+        Type::instance(db, env, target_class)
     })
 }
 
 fn specialize_generic_class_for_subject<'db>(
     db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
     target_class: ClassLiteral<'db>,
     subject_class: ClassType<'db>,
 ) -> Option<ClassType<'db>> {
@@ -846,13 +902,14 @@ fn specialize_generic_class_for_subject<'db>(
         .find(|base| base.class_literal(db) == subject_class.class_literal(db))?;
 
     let constraints = ConstraintSetBuilder::new();
-    let solutions = Type::instance(db, target_base)
+    let solutions = Type::instance(db, env, target_base)
         .assignable_solutions_with_inferable(
             db,
-            Type::instance(db, subject_class),
+            env,
+            Type::instance(db, env, subject_class),
             generic_context.inferable_typevars(db),
         )
-        .solve(db, &constraints);
+        .solve(db, env, &constraints);
     let Solutions::Constrained(solutions) = solutions else {
         return None;
     };
@@ -861,7 +918,7 @@ fn specialize_generic_class_for_subject<'db>(
     };
 
     let typevars = generic_context.variables(db);
-    let unknown_specialization = generic_context.unknown_specialization(db);
+    let unknown_specialization = generic_context.unknown_specialization(db, target_class.known(db));
     let types = typevars
         .clone()
         .zip(unknown_specialization.types(db))
@@ -875,7 +932,7 @@ fn specialize_generic_class_for_subject<'db>(
     if types.iter().any(|ty| {
         typevars
             .clone()
-            .any(|typevar| ty.references_typevar(db, typevar.typevar(db).identity(db)))
+            .any(|typevar| ty.references_typevar(db, env, typevar.typevar(db).identity(db)))
     }) {
         return None;
     }
@@ -883,7 +940,7 @@ fn specialize_generic_class_for_subject<'db>(
     let specialization = if target_class.is_known(db, KnownClass::Tuple)
         && let [element] = types.as_slice()
     {
-        generic_context.specialize_tuple(db, *element, TupleType::homogeneous(db, *element))
+        generic_context.specialize_tuple(db, *element, TupleType::homogeneous(db, env, *element))
     } else {
         generic_context.specialize(db, types)
     };
@@ -4099,15 +4156,25 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
                         .analysis_settings(self.scope().file(self.db))
                         .strict_generic_narrowing;
                 function
-                    .generate_constraint(db, &self.env, class_info_ty, is_positive)
+                    .generate_constraint(
+                        db,
+                        &self.env,
+                        class_info_ty,
+                        is_positive,
+                        use_generic_filtering,
+                    )
                     .map(|constraint| {
                         NarrowingConstraints::from_iter([(
                             place,
-                            NarrowingConstraint::intersection(constraint.negate_if(
-                                db,
-                                &self.env,
-                                !is_positive,
-                            )),
+                            if use_generic_filtering {
+                                NarrowingConstraint::generic_filtering(constraint)
+                            } else {
+                                NarrowingConstraint::intersection(constraint.negate_if(
+                                    db,
+                                    &self.env,
+                                    !is_positive,
+                                ))
+                            },
                         )])
                     })
             }

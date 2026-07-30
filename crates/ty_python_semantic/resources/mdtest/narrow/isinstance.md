@@ -1318,6 +1318,9 @@ An `isinstance()` check must not recurse indefinitely when a generic bound refer
 ```toml
 [environment]
 python-version = "3.12"
+
+[analysis]
+strict-generic-narrowing = true
 ```
 
 ```py
@@ -1394,10 +1397,71 @@ def _(x: object):
 
 `isinstance(value, Box)` checks the runtime class, not the type argument used to specialize it.
 Narrowing must therefore preserve the original type argument instead of substituting `Box`'s
-default.
+default. In relaxed mode, the other union member can also intersect with the unknown specialization.
 
 ```py
 from typing import assert_never
+
+class Box[T: str = str]:
+    value: T
+
+    def __init__(self, value: T) -> None: ...
+
+def box_with_default[T: str = str](value: Box[T] | T) -> Box[T]:
+    if isinstance(value, Box):
+        reveal_type(value)  # revealed: Box[T@box_with_default] | (T@box_with_default & Box[Unknown])
+        return value
+
+    if not isinstance(value, Box):
+        reveal_type(value)  # revealed: T@box_with_default & ~Top[Box[Unknown]]
+        return Box[T](value)
+
+    assert_never(value)
+```
+
+When relaxed `isinstance()` narrowing encounters an unknown value, a tuple subclass's uninferred
+type argument remains `Unknown`, regardless of its bound or default. Its element types are inherited
+from the specialized base.
+
+```py
+class DefaultedTuple[T: int = bool](tuple[T, str]): ...
+
+def narrow_defaulted_tuple(value: object) -> None:
+    if isinstance(value, DefaultedTuple):
+        reveal_type(value)  # revealed: DefaultedTuple[Unknown]
+        reveal_type(value[0])  # revealed: Unknown
+        reveal_type(value[1])  # revealed: str
+```
+
+Negative narrowing also excludes gradual specializations of the defaulted tuple subclass.
+
+```py
+def excludes_defaulted_tuple(value: DefaultedTuple[Any] | bool) -> bool:
+    if isinstance(value, DefaultedTuple):
+        reveal_type(value)  # revealed: DefaultedTuple[Any]
+        reveal_type(value[0])  # revealed: Any
+        reveal_type(value[1])  # revealed: str
+        return False
+
+    reveal_type(value)  # revealed: bool
+    return value
+```
+
+## Narrowing bounded generic defaults in strict mode
+
+In strict mode, narrowing to a tuple subclass materializes its declared upper bound rather than its
+narrower default, while preserving the tuple shape inherited from its specialized base.
+
+```toml
+[environment]
+python-version = "3.13"
+
+[analysis]
+strict-generic-narrowing = true
+```
+
+```py
+from typing import Any, assert_never
 
 class Box[T: str = str]:
     value: T
@@ -1414,12 +1478,7 @@ def box_with_default[T: str = str](value: Box[T] | T) -> Box[T]:
         return Box[T](value)
 
     assert_never(value)
-```
 
-When `isinstance()` narrows an unknown value to a tuple subclass, its type argument comes from the
-declared upper bound, not the default. Its element types are inherited from the specialized base.
-
-```py
 class DefaultedTuple[T: int = bool](tuple[T, str]): ...
 
 def narrow_defaulted_tuple(value: object) -> None:
@@ -1427,11 +1486,7 @@ def narrow_defaulted_tuple(value: object) -> None:
         reveal_type(value)  # revealed: DefaultedTuple[int]
         reveal_type(value[0])  # revealed: int
         reveal_type(value[1])  # revealed: str
-```
 
-Negative narrowing also excludes gradual specializations of the defaulted tuple subclass.
-
-```py
 def excludes_defaulted_tuple(value: DefaultedTuple[Any] | bool) -> bool:
     if isinstance(value, DefaultedTuple):
         reveal_type(value)  # revealed: DefaultedTuple[Any]
@@ -1494,6 +1549,153 @@ def test(a: Any, items: list[T]) -> None:
     v = combined[0]
     if isinstance(v, dict):
         cast(T, v)  # no panic
+```
+
+## Preserving TypedDict interfaces when narrowing mappings
+
+A `TypedDict` is always a dictionary at runtime, but its static interface deliberately disallows
+operations that could remove required keys or introduce undeclared ones. Narrowing to `dict`,
+`Mapping`, or `MutableMapping` must not discard these restrictions.
+
+```toml
+[analysis]
+strict-generic-narrowing = false
+```
+
+```py
+from collections.abc import Mapping, MutableMapping
+from typing import Protocol, TypedDict, runtime_checkable
+from typing_extensions import NotRequired
+
+class Payload(TypedDict):
+    key: int
+    optional: NotRequired[str]
+
+class Unrelated: ...
+class CustomDict(dict[str, int]): ...
+
+@runtime_checkable
+class Clearable(Protocol):
+    def clear(self) -> None: ...
+
+PayloadAlias = Payload
+
+def narrow_typed_dict_to_dict(value: Payload) -> None:
+    if isinstance(value, dict):
+        reveal_type(value)  # revealed: Payload
+        reveal_type(value["key"])  # revealed: int
+        value["key"] = 1
+        value["optional"] = "present"
+        reveal_type(value.pop("optional"))  # revealed: str
+
+        # error: [unresolved-attribute]
+        value.clear()
+        # error: [invalid-argument-type] "Cannot pop required field 'key' from TypedDict `Payload`"
+        value.pop("key")
+        # error: [invalid-key] "Unknown key "unexpected" for TypedDict `Payload`"
+        value["unexpected"] = 1
+        # error: [invalid-argument-type] "Cannot delete required key "key" from TypedDict `Payload`"
+        del value["key"]
+
+def narrow_aliased_typed_dict_to_dict(value: PayloadAlias) -> None:
+    if isinstance(value, dict):
+        reveal_type(value)  # revealed: Payload
+        # error: [unresolved-attribute]
+        value.clear()
+
+def narrow_typed_dict_to_mutable_mapping(value: Payload) -> None:
+    if isinstance(value, MutableMapping):
+        reveal_type(value)  # revealed: Payload
+        reveal_type(value["key"])  # revealed: int
+        value["key"] = 1
+
+        # error: [unresolved-attribute]
+        value.clear()
+        # error: [invalid-argument-type] "Cannot pop required field 'key' from TypedDict `Payload`"
+        value.pop("key")
+        # error: [invalid-key] "Unknown key "unexpected" for TypedDict `Payload`"
+        value["unexpected"] = 1
+        # error: [invalid-argument-type] "Cannot delete required key "key" from TypedDict `Payload`"
+        del value["key"]
+
+def narrow_typed_dict_to_mapping(value: Payload) -> None:
+    if isinstance(value, Mapping):
+        reveal_type(value)  # revealed: Payload
+        reveal_type(value["key"])  # revealed: int
+        value["key"] = 1
+
+        # error: [unresolved-attribute]
+        value.clear()
+        # error: [invalid-argument-type] "Cannot pop required field 'key' from TypedDict `Payload`"
+        value.pop("key")
+        # error: [invalid-key] "Unknown key "unexpected" for TypedDict `Payload`"
+        value["unexpected"] = 1
+        # error: [invalid-argument-type] "Cannot delete required key "key" from TypedDict `Payload`"
+        del value["key"]
+
+def narrow_typed_dict_or_unrelated_to_dict(value: Payload | Unrelated) -> None:
+    if isinstance(value, dict):
+        reveal_type(value)  # revealed: Payload | (Unrelated & dict[Unknown, Unknown])
+
+        # error: [unresolved-attribute]
+        value.clear()
+        # error: [invalid-argument-type]
+        value.pop("key")
+        # error: [invalid-key]
+        value["unexpected"] = 1
+        # error: [invalid-argument-type]
+        del value["key"]
+
+def narrow_typed_dict_or_unrelated_to_mutable_mapping(value: Payload | Unrelated) -> None:
+    if isinstance(value, MutableMapping):
+        reveal_type(value)  # revealed: Payload | (Unrelated & MutableMapping[Unknown, Unknown])
+
+        # error: [unresolved-attribute]
+        value.clear()
+        # error: [invalid-argument-type]
+        value.pop("key")
+        # error: [invalid-key]
+        value["unexpected"] = 1
+        # error: [invalid-argument-type]
+        del value["key"]
+
+def narrow_typed_dict_or_unrelated_to_mapping(value: Payload | Unrelated) -> None:
+    if isinstance(value, Mapping):
+        reveal_type(value)  # revealed: Payload | (Unrelated & Mapping[Unknown, Unknown])
+        reveal_type(value["key"])  # revealed: int | Unknown
+
+        # error: [unresolved-attribute]
+        value.clear()
+        # error: [invalid-key]
+        # error: [invalid-assignment]
+        value["unexpected"] = 1
+        # error: [invalid-argument-type]
+        # error: [not-subscriptable]
+        del value["key"]
+
+def narrow_typed_dict_or_dict(value: Payload | dict[str, int]) -> None:
+    if isinstance(value, dict):
+        reveal_type(value)  # revealed: Payload | dict[str, int]
+        reveal_type(value["key"])  # revealed: int
+        value["key"] = 1
+
+        # error: [unresolved-attribute]
+        value.clear()
+        # error: [invalid-argument-type]
+        value.pop("key")
+        # error: [invalid-key]
+        value["unexpected"] = 1
+        # error: [invalid-argument-type]
+        del value["key"]
+
+def narrow_typed_dict_to_custom_dict(value: Payload) -> None:
+    if isinstance(value, CustomDict):
+        reveal_type(value)  # revealed: Never
+
+def narrow_typed_dict_to_clearable_protocol(value: Payload) -> None:
+    if isinstance(value, Clearable):
+        reveal_type(value)  # revealed: Payload & Clearable
+        value.clear()
 ```
 
 ## Narrowing with named expressions (walrus operator)
