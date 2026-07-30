@@ -18,7 +18,7 @@ Released on 2026-07-30.
 - \[`flake8-comprehensions`\] NFKC-normalize keyword names in `C408` fix ([#26813](https://github.com/astral-sh/ruff/pull/26813))
 - \[`flake8-return`\] Fix false positive when variable is read in `finally` clause (`RET504`) ([#25441](https://github.com/astral-sh/ruff/pull/25441))
 - \[`pydocstyle`\] Skip section detection inside RST directive bodies (`D214`, `D405`, `D413`) ([#23635](https://github.com/astral-sh/ruff/pull/23635))
-- \[`refurb`\] Parenthesize `yield` arguments in the `FURB192` fixer ([#27192](https://github.com/astral-sh/ruff/pull/27192))
+- \[`refurb`\] Parenthesize `yield` arguments in the `FURB192` fix ([#27192](https://github.com/astral-sh/ruff/pull/27192))
 
 ### Rule changes
 
@@ -33,7 +33,6 @@ Released on 2026-07-30.
 ### Documentation
 
 - Cover `pycon` Markdown formatting ([#27153](https://github.com/astral-sh/ruff/pull/27153))
-- Document removed default rules ([#27212](https://github.com/astral-sh/ruff/pull/27212))
 - \[`flake8-bandit`\] Document `TYPE_CHECKING` exception (`S101`) ([#27004](https://github.com/astral-sh/ruff/pull/27004))
 - \[`flake8-import-conventions`\] Document that `extend-aliases` can override default aliases ([#27191](https://github.com/astral-sh/ruff/pull/27191))
 - \[`pylint`\] Add missing fix safety gotchas for `non-augmented-assignment` (`PLR6104`) ([#27250](https://github.com/astral-sh/ruff/pull/27250))
