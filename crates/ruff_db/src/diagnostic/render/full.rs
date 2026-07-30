@@ -295,7 +295,7 @@ impl<'a> Diff<'a> {
             self.write_gutter(f, digit_with)?;
         }
 
-        self.write_applicability_note(f)?;
+        Self::write_applicability_note(self.fix, self.stylesheet, f)?;
 
         Ok(())
     }
@@ -309,17 +309,21 @@ impl<'a> Diff<'a> {
         )
     }
 
-    fn write_applicability_note(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self.fix.applicability() {
+    fn write_applicability_note(
+        fix: &Fix,
+        stylesheet: &DiagnosticStylesheet,
+        f: &mut std::fmt::Formatter<'_>,
+    ) -> std::fmt::Result {
+        match fix.applicability() {
             Applicability::Safe => {}
             Applicability::Unsafe => {
                 writeln!(
                     f,
                     "{note}: {msg}",
-                    note = fmt_styled("note", self.stylesheet.warning),
+                    note = fmt_styled("note", stylesheet.warning),
                     msg = fmt_styled(
                         "This is an unsafe fix and may change runtime behavior",
-                        self.stylesheet.emphasis
+                        stylesheet.emphasis
                     )
                 )?;
             }
@@ -329,10 +333,10 @@ impl<'a> Diff<'a> {
                 writeln!(
                     f,
                     "{note}: {msg}",
-                    note = fmt_styled("note", self.stylesheet.error),
+                    note = fmt_styled("note", stylesheet.error),
                     msg = fmt_styled(
                         "This is a display-only fix and is likely to be incorrect",
-                        self.stylesheet.emphasis
+                        stylesheet.emphasis
                     )
                 )?;
             }
