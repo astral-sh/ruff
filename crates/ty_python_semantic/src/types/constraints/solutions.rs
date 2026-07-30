@@ -256,6 +256,7 @@ impl<'db> SolutionWalker<'db> {
         });
 
         let mut result = Vec::with_capacity(self.sorted_paths.len());
+        let mut any_constrained_solutions = false;
         let mut mappings: FxIndexMap<BoundTypeVarInstance<'db>, ConstraintBoundsBuilder<'db>> =
             FxIndexMap::default();
 
@@ -293,9 +294,8 @@ impl<'db> SolutionWalker<'db> {
                 }
             }
 
-            // If any solution path is empty, the overall solution is "unconstrained".
-            if mappings.is_empty() {
-                return PathBounds::Unconstrained;
+            if !mappings.is_empty() {
+                any_constrained_solutions = true;
             }
 
             let path_bounds = mappings
@@ -303,6 +303,10 @@ impl<'db> SolutionWalker<'db> {
                 .map(|(bound_typevar, bounds)| bounds.finish(db, env, bound_typevar))
                 .collect();
             result.push(path_bounds);
+        }
+
+        if !any_constrained_solutions {
+            return PathBounds::Unconstrained;
         }
 
         PathBounds::Constrained(result.into_boxed_slice())
