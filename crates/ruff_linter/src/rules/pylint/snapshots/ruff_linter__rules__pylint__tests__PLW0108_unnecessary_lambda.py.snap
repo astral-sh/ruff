@@ -168,5 +168,4 @@ PLW0108 Lambda may be unnecessary; consider inlining inner function
 62 | _ = lambda x: (string := str)(x)
 63 | _ = lambda x: ((x := 1) and str)(x)
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 help: Inline function call

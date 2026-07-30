@@ -20,7 +20,6 @@ error[RUF200]: Failed to parse pyproject.toml: invalid type: integer `1`, expect
   |
 2 | name = 1 # snapshot: invalid-pyproject-toml
   |        ^
-  |
 ```
 
 ## Respects per-file ignores

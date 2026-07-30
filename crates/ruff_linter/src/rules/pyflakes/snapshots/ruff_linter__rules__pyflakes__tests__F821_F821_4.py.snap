@@ -8,7 +8,6 @@ F821 Undefined name `Model`
 3 |
 4 | _ = List["Model"]
   |           ^^^^^
-  |
 
 F821 Undefined name `Model`
  --> F821_4.py:9:12
@@ -17,7 +16,6 @@ F821 Undefined name `Model`
 8 |
 9 | _ = IList["Model"]
   |            ^^^^^
-  |
 
 F821 Undefined name `Model`
   --> F821_4.py:14:16
@@ -26,7 +24,6 @@ F821 Undefined name `Model`
 13 |
 14 | _ = ItemsView["Model"]
    |                ^^^^^
-   |
 
 F821 Undefined name `Model`
   --> F821_4.py:19:32
@@ -35,7 +32,6 @@ F821 Undefined name `Model`
 18 |
 19 | _ = collections.abc.ItemsView["Model"]
    |                                ^^^^^
-   |
 
 F821 Undefined name `Model`
   --> F821_4.py:24:20
@@ -44,4 +40,3 @@ F821 Undefined name `Model`
 23 |
 24 | _ = abc.ItemsView["Model"]
    |                    ^^^^^
-   |

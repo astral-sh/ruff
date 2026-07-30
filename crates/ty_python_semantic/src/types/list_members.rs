@@ -251,7 +251,7 @@ impl<'db> AllMembers<'db> {
                 }
                 SubclassOfInner::Protocol(protocol) => {
                     if let Some((class_literal, _)) = protocol
-                        .class_origin()
+                        .class_origin(db)
                         .and_then(|origin| origin.static_class_literal(db))
                     {
                         self.extend_with_class_members(db, ty, ClassLiteral::Static(class_literal));

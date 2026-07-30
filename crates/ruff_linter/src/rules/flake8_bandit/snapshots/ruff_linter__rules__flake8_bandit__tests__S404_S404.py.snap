@@ -26,4 +26,3 @@ S404 `subprocess` module is possibly insecure
 2 | from subprocess import Popen  # S404
 3 | from subprocess import Popen as pop  # S404
   |      ^^^^^^^^^^
-  |

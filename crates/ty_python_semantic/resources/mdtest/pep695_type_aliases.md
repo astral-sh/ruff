@@ -261,7 +261,6 @@ error[unsupported-operator]: Unsupported `|` operation
   |          |       |
   |          |       Has type `<class 'str'>`
   |          Has type `Literal["int"]`
-  |
 info: A type alias scope is lazy but will be executed at runtime if the `__value__` property is accessed
 ```
 

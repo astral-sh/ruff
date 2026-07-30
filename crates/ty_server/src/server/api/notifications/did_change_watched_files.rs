@@ -59,6 +59,8 @@ impl SyncNotificationHandler for DidChangeWatchedFiles {
                     path: system_path,
                     kind: DeletedKind::Any,
                 },
+                // Custom file change types are not supported and should be ignored.
+                FileChangeType::Custom(_) => continue,
             };
 
             changes.push(change_event);

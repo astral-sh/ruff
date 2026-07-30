@@ -27,6 +27,5 @@ error[invalid-legacy-type-variable]: The `default` parameter of `typing.TypeVar`
   |
 4 | T = TypeVar("T", default=int)
   |                  ^^^^^^^^^^^
-  |
 
 ```

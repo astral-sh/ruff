@@ -622,7 +622,6 @@ RUF046 [*] Value being cast to `int` is already an integer
 52 | int(1 and 0)
 53 | int(0 or -1)
    | ^^^^^^^^^^^^
-   |
 help: Remove unnecessary `int` call
    |
 52 | int(1 and 0)
@@ -833,7 +832,6 @@ RUF046 [*] Value being cast to `int` is already an integer
 75 | int(round(unknown))
 76 | int(round(unknown, None))
    | ^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 help: Remove unnecessary `int` call
    |
 75 | int(round(unknown))
@@ -1081,7 +1079,6 @@ RUF046 [*] Value being cast to `int` is already an integer
 207 | | # unsafe fix because of this comment
 208 | | )
     | |_^
-    |
 help: Remove unnecessary `int` call
     |
 202 |

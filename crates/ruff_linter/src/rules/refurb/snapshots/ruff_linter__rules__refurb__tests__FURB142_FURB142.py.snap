@@ -231,7 +231,6 @@ FURB142 [*] Use of `set.add()` in a for loop
 44 | | ):
 45 | |     s.add(f"{x}")
    | |_________________^
-   |
 help: Replace with `.update()`
    |
 40 |
@@ -390,7 +389,6 @@ FURB142 [*] Use of `set.add()` in a for loop
 108 | / for x in ("abc", "def"):
 109 | |     s.add((c for c in x))
     | |_________________________^
-    |
 help: Replace with `.update()`
     |
 107 | # don't add extra parens for already parenthesized generators

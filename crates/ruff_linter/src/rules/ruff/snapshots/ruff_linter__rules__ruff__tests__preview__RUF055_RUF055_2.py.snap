@@ -7,7 +7,6 @@ RUF055 [*] Plain string pattern passed to `re` function
 6 | # this should be replaced with `"abc" not in s`
 7 | re.search("abc", s) is None
   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  |
 help: Replace with `"abc" not in s`
   |
 6 | # this should be replaced with `"abc" not in s`
@@ -22,7 +21,6 @@ RUF055 [*] Plain string pattern passed to `re` function
 10 | # this should be replaced with `"abc" in s`
 11 | re.search("abc", s) is not None
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 help: Replace with `"abc" in s`
    |
 10 | # this should be replaced with `"abc" in s`
@@ -37,7 +35,6 @@ RUF055 [*] Plain string pattern passed to `re` function
 14 | # this should be replaced with `not s.startswith("abc")`
 15 | re.match("abc", s) is None
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 help: Replace with `not s.startswith("abc")`
    |
 14 | # this should be replaced with `not s.startswith("abc")`
@@ -52,7 +49,6 @@ RUF055 [*] Plain string pattern passed to `re` function
 18 | # this should be replaced with `s.startswith("abc")`
 19 | re.match("abc", s) is not None
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 help: Replace with `s.startswith("abc")`
    |
 18 | # this should be replaced with `s.startswith("abc")`
@@ -67,7 +63,6 @@ RUF055 [*] Plain string pattern passed to `re` function
 22 | # this should be replaced with `s != "abc"`
 23 | re.fullmatch("abc", s) is None
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 help: Replace with `s != "abc"`
    |
 22 | # this should be replaced with `s != "abc"`
@@ -82,7 +77,6 @@ RUF055 [*] Plain string pattern passed to `re` function
 26 | # this should be replaced with `s == "abc"`
 27 | re.fullmatch("abc", s) is not None
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 help: Replace with `s == "abc"`
    |
 26 | # this should be replaced with `s == "abc"`

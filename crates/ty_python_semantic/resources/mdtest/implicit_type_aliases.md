@@ -881,7 +881,6 @@ error[not-subscriptable]: Cannot subscript non-generic type alias `ListOfInts2`
   |                     -----------^^^^^
   |                     |
   |                     Alias to `list[int]`, which is already specialized
-  |
 ```
 
 ```py
@@ -899,7 +898,6 @@ error[not-subscriptable]: Cannot subscript non-generic type `<class 'tuple[int, 
   |             ---------^^^^^
   |             |
   |             Type is already specialized
-  |
 ```
 
 ```py
@@ -919,7 +917,6 @@ error[not-subscriptable]: Cannot subscript non-generic type `<class 'A[int]'>`
    |              ---------^^^^^
    |              |
    |              Type is already specialized
-   |
 ```
 
 ### Multiple definitions

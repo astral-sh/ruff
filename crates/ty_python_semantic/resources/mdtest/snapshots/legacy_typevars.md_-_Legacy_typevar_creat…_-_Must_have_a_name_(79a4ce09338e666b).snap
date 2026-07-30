@@ -27,6 +27,5 @@ error[invalid-legacy-type-variable]: The `name` parameter of `TypeVar` is requir
   |
 4 | T = TypeVar()
   |     ^^^^^^^^^
-  |
 
 ```

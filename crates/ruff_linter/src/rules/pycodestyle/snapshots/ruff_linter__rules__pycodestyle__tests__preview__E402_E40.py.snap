@@ -106,5 +106,4 @@ E402 Module level import not at top of file
 67 |
 68 | x = 1; import re as regex, string
    |        ^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 help: Move module level imports to top of file

@@ -68,7 +68,6 @@ INT001 f-string is resolved before function call; consider `_("string %s") % arg
 24 | gettext_fn(f"Hello, {name}!")
 25 | ngettext_fn(f"Hello, {name}!", f"Hello, {name}s!", 2)
    |             ^^^^^^^^^^^^^^^^^
-   |
 
 INT001 f-string is resolved before function call; consider `_("string %s") % arg`
   --> INT001.py:31:14
@@ -130,7 +129,6 @@ INT001 f-string is resolved before function call; consider `_("string %s") % arg
 40 |     print(_(a))
 41 |     print(_(f"{a}"))
    |             ^^^^^^
-   |
 
 INT001 f-string is resolved before function call; consider `_("string %s") % arg`
   --> INT001.py:51:12
@@ -159,4 +157,3 @@ INT001 f-string is resolved before function call; consider `_("string %s") % arg
 52 | builtins.gettext(f"{'value'}")
 53 | builtins.ngettext(f"{'value'}", f"{'values'}", 2)
    |                   ^^^^^^^^^^^^
-   |

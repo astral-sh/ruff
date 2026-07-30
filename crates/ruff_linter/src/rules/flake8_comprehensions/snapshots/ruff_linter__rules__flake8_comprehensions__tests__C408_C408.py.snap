@@ -623,7 +623,6 @@ C408 [*] Unnecessary `dict()` call (rewrite as a literal)
 47 | dict(𝕒=1, b=2)
 48 | dict(a=1, b=2)  # already NFKC-normalized: unchanged
    | ^^^^^^^^^^^^^^
-   |
 help: Rewrite as a literal
    |
 47 | dict(𝕒=1, b=2)

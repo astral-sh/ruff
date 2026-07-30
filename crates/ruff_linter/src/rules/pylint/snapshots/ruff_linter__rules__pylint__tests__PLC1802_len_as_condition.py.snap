@@ -329,7 +329,6 @@ PLC1802 [*] `len(set((w + 1) for w in set()))` used as condition without compari
 129 |     assert len({"1":(v + 1) for v in {}})  # [PLC1802]
 130 |     assert len(set((w + 1) for w in set()))  # [PLC1802]
     |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-    |
 help: Remove `len`
     |
 129 |     assert len({"1":(v + 1) for v in {}})  # [PLC1802]

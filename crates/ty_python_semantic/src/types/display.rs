@@ -33,9 +33,8 @@ use crate::types::visitor::TypeVisitor;
 use crate::types::{
     CallableType, IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType,
     LiteralValueType, LiteralValueTypeKind, MaterializationKind, PropertyInstanceType, Protocol,
-    ProtocolInstanceType, SpecialFormType, StringLiteralType, SubclassOfInner, SubclassOfType,
-    Type, TypeAliasType, TypeGuardLike, TypedDictModule, TypedDictType, UnionType,
-    WrapperDescriptorKind, visitor,
+    SpecialFormType, StringLiteralType, SubclassOfInner, SubclassOfType, Type, TypeAliasType,
+    TypeGuardLike, TypedDictModule, TypedDictType, UnionType, WrapperDescriptorKind, visitor,
 };
 use ty_python_core::definition::Definition;
 use ty_python_core::scope::{FileScopeId, ScopeKind};
@@ -582,10 +581,9 @@ impl<'db> TypeVisitor<'db> for AmbiguousNameCollector<'db> {
             // Visit the class (as if it were a nominal-instance type)
             // rather than the protocol members, if it is a class-based protocol.
             // (For the purposes of displaying the type, we'll use the class name.)
-            Type::ProtocolInstance(ProtocolInstanceType {
-                inner: Protocol::FromClass(class),
-                ..
-            }) => return self.visit_type(db, Type::from(class)),
+            Type::ProtocolInstance(protocol) if let Some(class) = protocol.class_origin(db) => {
+                return self.visit_type(db, Type::from(class));
+            }
             // no need to recurse into TypeVar bounds/constraints
             Type::TypeVar(_) => return,
             _ => {}
@@ -985,6 +983,31 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                         .display_with(self.db, self.settings.clone())
                         .fmt_detailed(f),
                 },
+                Protocol::Materialized(materialized) => {
+                    let materialization_kind = protocol.display_materialization_kind(self.db);
+                    if let Some(kind) = materialization_kind {
+                        let (name, form) = match kind {
+                            MaterializationKind::Top => ("Top", SpecialFormType::Top),
+                            MaterializationKind::Bottom => ("Bottom", SpecialFormType::Bottom),
+                        };
+                        f.with_type(Type::SpecialForm(form)).write_str(name)?;
+                        f.write_char('[')?;
+                    }
+
+                    match *materialized.origin(self.db) {
+                        ClassType::NonGeneric(class) => class
+                            .display_with(self.db, self.settings.clone())
+                            .fmt_detailed(f),
+                        ClassType::Generic(alias) => alias
+                            .display_with(self.db, self.settings.clone())
+                            .fmt_detailed(f),
+                    }?;
+
+                    if materialization_kind.is_some() {
+                        f.write_char(']')?;
+                    }
+                    Ok(())
+                }
                 Protocol::Synthesized(synthetic) => {
                     f.set_invalid_type_annotation();
                     f.write_char('<')?;

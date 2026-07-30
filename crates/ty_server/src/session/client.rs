@@ -194,6 +194,21 @@ impl Client {
         self.show_message(message, lsp_types::MessageType::Error);
     }
 
+    /// Sends a notification of partial result progress to the client, via a `$/progress`
+    /// notification.
+    pub(crate) fn send_partial_result<R>(
+        &self,
+        token: lsp_types::ProgressToken,
+        partial_result: R::PartialResult,
+    ) where
+        R: lsp_types::RequestWithPartialResults,
+    {
+        self.send_notification::<lsp_types::ProgressNotification>(lsp_types::ProgressParams {
+            token,
+            value: serde_json::to_value(partial_result).expect("Partial result to be serializable"),
+        });
+    }
+
     /// Re-queues this request after a salsa cancellation for a retry.
     ///
     /// The main loop will skip the retry if the client cancelled the request in the  meantime.

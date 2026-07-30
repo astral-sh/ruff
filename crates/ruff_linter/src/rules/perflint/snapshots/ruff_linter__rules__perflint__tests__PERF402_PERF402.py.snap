@@ -8,4 +8,3 @@ PERF402 Use `list` or `list.copy` to create a copy of a list
 4 |     for i in items:
 5 |         result.append(i)  # PERF402
   |         ^^^^^^^^^^^^^^^^
-  |

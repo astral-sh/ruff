@@ -4,7 +4,7 @@ use std::{borrow::Cow, path::Path, sync::Arc};
 use ruff_diagnostics::{Applicability, Fix};
 use ruff_source_file::{LineColumn, SourceCode, SourceFile};
 
-use ruff_annotate_snippets::Level as AnnotateLevel;
+use annotate_snippets::Level as AnnotateLevel;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 #[cfg(feature = "serde")]
 use serde::Serialize;
@@ -1338,11 +1338,11 @@ pub enum Severity {
 }
 
 impl Severity {
-    fn to_annotate(self) -> AnnotateLevel {
+    fn to_annotate(self) -> AnnotateLevel<'static> {
         match self {
-            Severity::Info => AnnotateLevel::Info,
-            Severity::Warning => AnnotateLevel::Warning,
-            Severity::Error => AnnotateLevel::Error,
+            Severity::Info => AnnotateLevel::INFO,
+            Severity::Warning => AnnotateLevel::WARNING,
+            Severity::Error => AnnotateLevel::ERROR,
             // NOTE: Should we really collapse this to "error"?
             //
             // After collapsing this, the snapshot tests seem to reveal that we
@@ -1350,7 +1350,7 @@ impl Severity {
             // And maybe *rendering* this as just an `error` is fine. If we
             // really do need different rendering, then I think we can add a
             // `Level::Fatal`. ---AG
-            Severity::Fatal => AnnotateLevel::Error,
+            Severity::Fatal => AnnotateLevel::ERROR,
         }
     }
 
@@ -1374,13 +1374,13 @@ pub enum SubDiagnosticSeverity {
 }
 
 impl SubDiagnosticSeverity {
-    fn to_annotate(self) -> AnnotateLevel {
+    fn to_annotate(self) -> AnnotateLevel<'static> {
         match self {
-            SubDiagnosticSeverity::Help => AnnotateLevel::Help,
-            SubDiagnosticSeverity::Info => AnnotateLevel::Info,
-            SubDiagnosticSeverity::Warning => AnnotateLevel::Warning,
-            SubDiagnosticSeverity::Error => AnnotateLevel::Error,
-            SubDiagnosticSeverity::Fatal => AnnotateLevel::Error,
+            SubDiagnosticSeverity::Help => AnnotateLevel::HELP,
+            SubDiagnosticSeverity::Info => AnnotateLevel::INFO,
+            SubDiagnosticSeverity::Warning => AnnotateLevel::WARNING,
+            SubDiagnosticSeverity::Error => AnnotateLevel::ERROR,
+            SubDiagnosticSeverity::Fatal => AnnotateLevel::ERROR,
         }
     }
 }
@@ -1447,6 +1447,8 @@ pub struct DisplayDiagnosticConfig {
     merge_window: usize,
     /// Whether to use preview formatting for Ruff diagnostics.
     preview: bool,
+    /// Whether to prefer rule codes over human-readable rule names in Ruff diagnostic output.
+    prefer_rule_codes: bool,
     /// Whether to hide the real `Severity` of diagnostics.
     ///
     /// This is intended for temporary use by Ruff, which only has a single `error` severity at the
@@ -1471,6 +1473,7 @@ impl DisplayDiagnosticConfig {
             context: 2,
             merge_window: 2,
             preview: false,
+            prefer_rule_codes: false,
             hide_severity: false,
             show_fix_status: false,
             fix_applicability: Applicability::Safe,
@@ -1533,6 +1536,19 @@ impl DisplayDiagnosticConfig {
 
     pub fn preview_enabled(&self) -> bool {
         self.preview
+    }
+
+    /// Whether to prefer rule codes over human-readable rule names, even in preview mode.
+    pub fn prefer_rule_codes(self, yes: bool) -> DisplayDiagnosticConfig {
+        DisplayDiagnosticConfig {
+            prefer_rule_codes: yes,
+            ..self
+        }
+    }
+
+    /// Whether rule codes are explicitly preferred over human-readable rule names.
+    pub fn is_prefer_rule_codes_enabled(&self) -> bool {
+        self.prefer_rule_codes
     }
 
     /// Whether to hide a diagnostic's severity or not.

@@ -39,7 +39,6 @@ error[unsupported-operator]: Unsupported `<` operation
   |     |                    |
   |     |                    Has type `tuple[str, *tuple[int, ...]]`
   |     Has type `tuple[int, *tuple[str, ...]]`
-  |
 info: Operation fails because operator `<` is not supported between objects of type `int` and `str`
 
 ```

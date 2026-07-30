@@ -162,4 +162,3 @@ A001 Variable `sum` is shadowing a Python builtin
 29 |
 30 | [0 for sum in ()]
    |        ^^^
-   |

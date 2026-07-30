@@ -42,7 +42,6 @@ E714 [*] Test for object identity should be `is not`
 38 | assert [42, not foo] in bar
 39 | assert not (re.search(r"^.:\\Users\\[^\\]*\\Downloads\\.*") is None)
    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 help: Convert to `is not`
    |
 38 | assert [42, not foo] in bar
