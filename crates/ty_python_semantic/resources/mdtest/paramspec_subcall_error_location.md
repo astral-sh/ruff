@@ -769,6 +769,43 @@ info: Method defined here
   |         ^^^^^^^^       ---------- Parameter declared here
 ```
 
+## Overloaded constructors defined by __init__
+
+Synthesized constructor signatures should preserve the overload selected by `Concatenate`, even when
+both overloads unpack the same `TypedDict` fields.
+
+```py
+from typing import Callable, Concatenate, TypedDict, Unpack, overload
+
+class Options(TypedDict):
+    value: int
+
+def wrapper[**P, T](callback: Callable[Concatenate[int, P], T], *args: P.args, **kwargs: P.kwargs) -> T:
+    return callback(1, *args, **kwargs)
+
+class Factory:
+    @overload
+    def __init__(self, prefix: str, **options: Unpack[Options]) -> None: ...
+    @overload
+    def __init__(self, prefix: int, **options: Unpack[Options]) -> None: ...
+    def __init__(self, prefix: str | int, **options: Unpack[Options]) -> None: ...
+
+wrapper(Factory, value="incorrect")  # snapshot: invalid-argument-type
+```
+
+```snapshot
+error[invalid-argument-type]: Argument to function `wrapper` is incorrect
+  --> src/mdtest_snippet.py:16:18
+   |
+16 | wrapper(Factory, value="incorrect")  # snapshot: invalid-argument-type
+   |                  ^^^^^^^^^^^^^^^^^ Expected `int`, found `Literal["incorrect"]`
+info: Method defined here
+  --> src/mdtest_snippet.py:13:9
+   |
+13 |     def __init__(self, prefix: int, **options: Unpack[Options]) -> None: ...
+   |         ^^^^^^^^                    -------------------------- Parameter declared here
+```
+
 ## Constructors defined by a metaclass
 
 A custom metaclass can determine the accepted constructor arguments through its own `__call__`. That
