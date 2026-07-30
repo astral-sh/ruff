@@ -9,6 +9,7 @@ use crate::{
     TypeQualifiers, add_inferred_python_version_hint_to_diagnostic,
     dependency::{DependencyProjectKind, missing_direct_dependency},
     place::{DefinedPlace, Definedness, Place, PlaceAndQualifiers, Provenance, TypeOrigin},
+    reachability::evaluate_reachability_with_cache,
     types::{
         ModuleLiteralType, Type, TypeAndQualifiers,
         diagnostic::{
@@ -319,6 +320,31 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         for alias in names {
             let mut checked_dependency = false;
             for definition in self.index.definitions(alias) {
+                if let Some(star_import) = definition.kind(db).as_star_import() {
+                    let use_def = self.index.use_def_map(self.scope().file_scope_id(db));
+                    let is_unreachable = use_def
+                        .reachable_symbol_bindings(star_import.symbol_id())
+                        .find(|binding| {
+                            binding
+                                .binding
+                                .is_defined_and(|candidate| candidate == *definition)
+                        })
+                        .is_some_and(|binding| {
+                            evaluate_reachability_with_cache(
+                                db,
+                                Some(self.reachability_cache()),
+                                use_def.reachability_constraints(),
+                                use_def.predicates(),
+                                binding.reachability_constraint,
+                            )
+                            .is_always_false()
+                        });
+
+                    if is_unreachable {
+                        continue;
+                    }
+                }
+
                 let inferred = infer_definition_types(self.db(), *definition);
                 // Check non-star imports for deprecations
                 if definition.kind(db).as_star_import().is_none() {
