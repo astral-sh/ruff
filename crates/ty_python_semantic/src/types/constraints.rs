@@ -105,7 +105,8 @@ use ty_python_core::rank::RankBitBox;
 use ty_static::EnvVars;
 
 use crate::types::class::GenericAlias;
-use crate::types::typevar::{BoundTypeVarIdentity, TypeVarSet, walk_bound_type_var_type};
+use crate::types::constraints::support::{Support, SupportId};
+use crate::types::typevar::{BoundTypeVarIdentity, TypeVarSet};
 use crate::types::variance::VarianceInferable;
 use crate::types::visitor::{
     TypeCollector, TypeKind, TypeVisitor, any_over_type, walk_non_atomic_type,
@@ -116,6 +117,8 @@ use crate::types::{
     TypeMapping, TypePair, TypeVarBoundOrConstraints, TypeVarVariance, UnionType,
 };
 use crate::{Db, FxIndexMap, FxIndexSet, FxOrderSet};
+
+mod support;
 
 /// An extension trait for building constraint sets from [`Option`] values.
 pub(crate) trait OptionConstraintsExtension<T> {
@@ -251,10 +254,14 @@ pub struct OwnedConstraintSet<'db> {
 #[derive(Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 struct OwnedConstraintSetInner<'db> {
     constraints: Box<[Constraint<'db>]>,
+    constraint_supports: Box<[SupportId]>,
     constraint_indices: RankBitBox,
     typevars: IndexVec<TypeVarId, BoundTypeVarIdentity<'db>>,
     nodes: Box<[InteriorNodeData]>,
+    node_supports: Box<[SupportId]>,
     node_indices: RankBitBox,
+    supports: Box<[Support]>,
+    support_indices: RankBitBox,
     /// A dense, canonical source-order tree whose IDs are independent of sidecar construction
     /// history.
     source_orders: Box<[SourceOrder]>,
@@ -339,6 +346,16 @@ impl OwnedConstraintSetInner<'_> {
             "should not access constraint set constraint that was marked unused",
         );
         self.constraint_indices.rank(index) as usize
+    }
+
+    fn retained_support_index(&self, id: SupportId) -> usize {
+        let index = id.index();
+        debug_assert_eq!(
+            self.support_indices.get_bit(index),
+            Some(true),
+            "should not access constraint set support that was marked unused",
+        );
+        self.support_indices.rank(index) as usize
     }
 }
 
@@ -960,6 +977,10 @@ struct ConstraintSetStorage<'db> {
     /// The BDD nodes that appear in any of the constraint sets constructed in this builder.
     nodes: IndexVec<NodeId, InteriorNodeData>,
 
+    supports: IndexVec<SupportId, Support>,
+    constraint_supports: IndexVec<ConstraintId, SupportId>,
+    node_supports: IndexVec<NodeId, SupportId>,
+
     /// Encodes an ordering on the constraints in a constraint set, which is based on the order
     /// that the constraints (or more accurately, the Python expressions they're derived from)
     /// appear in the source code. This ensures that any union and intersections types that appear
@@ -1050,6 +1071,13 @@ impl ConstraintSetStorage<'_> {
         id
     }
 
+    fn adjusted_support_id(&self, id: SupportId) -> SupportId {
+        if let Some(compacted) = &self.compacted {
+            return id + compacted.support_indices.len();
+        }
+        id
+    }
+
     fn adjusted_source_order_id(&self, id: SourceOrderId) -> SourceOrderId {
         if let Some(compacted) = &self.compacted {
             return id + compacted.source_orders.len();
@@ -1103,15 +1131,22 @@ impl<'db> ConstraintSetBuilder<'db> {
 
         let mut used_nodes = RankBitBox::bits_with_capacity(storage.nodes.len());
         let mut used_constraints = RankBitBox::bits_with_capacity(storage.constraints.len());
+        let mut used_supports = RankBitBox::bits_with_capacity(storage.supports.len());
 
         let mut stack = vec![node];
         while let Some(node) = stack.pop() {
             if node.is_terminal() || used_nodes[node.index()] {
                 continue;
             }
-            let interior = storage.nodes[node];
+            let interior = storage.interior_node_data(node);
+            let node_support = storage
+                .node_support_id(node)
+                .expect("node should be non-terminal");
+            let constraint_support = storage.constraint_support_id(interior.constraint);
             used_nodes.set(node.index(), true);
             used_constraints.set(interior.constraint.index(), true);
+            used_supports.set(node_support.index(), true);
+            used_supports.set(constraint_support.index(), true);
             stack.push(interior.if_true);
             stack.push(interior.if_uncertain);
             stack.push(interior.if_false);
@@ -1134,12 +1169,19 @@ impl<'db> ConstraintSetBuilder<'db> {
 
         used_nodes.truncate(used_nodes.last_one().map_or(0, |last| last + 1));
         used_constraints.truncate(used_constraints.last_one().map_or(0, |last| last + 1));
+        used_supports.truncate(used_supports.last_one().map_or(0, |last| last + 1));
 
         let nodes = storage
             .nodes
             .into_iter()
             .zip(&used_nodes)
             .filter_map(|(node, used)| used.then_some(node))
+            .collect();
+        let node_supports = storage
+            .node_supports
+            .into_iter()
+            .zip(&used_nodes)
+            .filter_map(|(support, used)| used.then_some(support))
             .collect();
         let node_indices = RankBitBox::from_bits(used_nodes);
 
@@ -1149,7 +1191,21 @@ impl<'db> ConstraintSetBuilder<'db> {
             .zip(&used_constraints)
             .filter_map(|(constraint, used)| used.then_some(constraint))
             .collect();
+        let constraint_supports = storage
+            .constraint_supports
+            .into_iter()
+            .zip(&used_constraints)
+            .filter_map(|(support, used)| used.then_some(support))
+            .collect();
         let constraint_indices = RankBitBox::from_bits(used_constraints);
+
+        let supports = storage
+            .supports
+            .into_iter()
+            .zip(&used_supports)
+            .filter_map(|(support, used)| used.then_some(support))
+            .collect();
+        let support_indices = RankBitBox::from_bits(used_supports);
 
         storage.typevars.shrink_to_fit();
 
@@ -1158,10 +1214,14 @@ impl<'db> ConstraintSetBuilder<'db> {
             source_order: Some(source_order),
             inner: Some(Arc::new(OwnedConstraintSetInner {
                 constraints,
+                constraint_supports,
                 constraint_indices,
                 typevars: storage.typevars,
                 nodes,
+                node_supports,
                 node_indices,
+                supports,
+                support_indices,
                 source_orders: source_orders.raw.into_boxed_slice(),
             })),
         }
@@ -1203,26 +1263,21 @@ impl<'db> ConstraintSetStorage<'db> {
     }
 
     /// Interns all of the typevars mentioned in a type in a stable order.
-    fn intern_mentioned_typevars_in_type(&mut self, db: &'db dyn Db, ty: Type<'db>) {
+    fn intern_mentioned_typevars_in_type(
+        &mut self,
+        db: &'db dyn Db,
+        ty: Type<'db>,
+        support: &mut Support,
+    ) {
         struct InternMentionedTypevars<'a, 'db> {
             storage: RefCell<&'a mut ConstraintSetStorage<'db>>,
+            support: RefCell<&'a mut Support>,
             recursion_guard: TypeCollector<'db>,
         }
 
         impl<'db> TypeVisitor<'db> for InternMentionedTypevars<'_, 'db> {
             fn should_visit_lazy_type_attributes(&self) -> bool {
                 false
-            }
-
-            fn visit_bound_type_var_type(
-                &self,
-                db: &'db dyn Db,
-                bound_typevar: BoundTypeVarInstance<'db>,
-            ) {
-                let mut storage = self.storage.borrow_mut();
-                storage.intern_typevar(db, bound_typevar);
-                drop(storage);
-                walk_bound_type_var_type(db, bound_typevar, self);
             }
 
             fn visit_generic_alias_type(&self, db: &'db dyn Db, alias: GenericAlias<'db>) {
@@ -1232,12 +1287,19 @@ impl<'db> ConstraintSetStorage<'db> {
             }
 
             fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
+                if let Type::TypeVar(bound_typevar) = ty {
+                    let mut storage = self.storage.borrow_mut();
+                    let typevar = storage.intern_typevar(db, bound_typevar);
+                    let mut support = self.support.borrow_mut();
+                    support.insert(typevar);
+                }
                 walk_type_with_recursion_guard(db, ty, self, &self.recursion_guard);
             }
         }
 
         InternMentionedTypevars {
             storage: RefCell::new(self),
+            support: RefCell::new(support),
             recursion_guard: TypeCollector::default(),
         }
         .visit_type(db, ty);
@@ -1249,24 +1311,28 @@ impl<'db> ConstraintSetStorage<'db> {
         db: &'db dyn Db,
         typevar: BoundTypeVarInstance<'db>,
         bounds: ConstraintBounds<'db>,
-    ) {
-        self.intern_typevar(db, typevar);
+    ) -> Support {
+        let mut support = Support::default();
+        support.insert(self.intern_typevar(db, typevar));
         if let Some(lower) = bounds.lower {
-            self.intern_mentioned_typevars_in_type(db, lower);
+            self.intern_mentioned_typevars_in_type(db, lower, &mut support);
         }
         if let Some(upper) = bounds.upper {
-            self.intern_mentioned_typevars_in_type(db, upper);
+            self.intern_mentioned_typevars_in_type(db, upper, &mut support);
         }
+        support
     }
 
     fn intern_constraint(&mut self, db: &'db dyn Db, data: Constraint<'db>) -> ConstraintId {
-        self.intern_constraint_typevars(db, data.typevar, data.bounds);
+        let support = self.intern_constraint_typevars(db, data.typevar, data.bounds);
 
         self.ensure_overlay_identity_caches();
         if let Some(id) = self.constraint_cache.get(&data) {
             return *id;
         }
+        let support_id = self.intern_support(support);
         let id = self.constraints.push(data);
+        self.constraint_supports.push(support_id);
         let id = self.adjusted_constraint_id(id);
         self.constraint_cache.insert(data, id);
         id
@@ -1277,7 +1343,16 @@ impl<'db> ConstraintSetStorage<'db> {
         if let Some(id) = self.node_cache.get(&data) {
             return *id;
         }
+
+        let mut support = Support::default();
+        support |= self.constraint_support(data.constraint);
+        support |= self.node_support(data.if_true);
+        support |= self.node_support(data.if_uncertain);
+        support |= self.node_support(data.if_false);
+        let support = self.intern_support(support);
+
         let id = self.nodes.push(data);
+        self.node_supports.push(support);
         let id = self.adjusted_node_id(id);
         self.node_cache.insert(data, id);
         id
@@ -1457,6 +1532,74 @@ impl<'db> ConstraintSetStorage<'db> {
             walk(self, source_order, &mut result);
         }
         result
+    }
+
+    fn intern_support(&mut self, data: Support) -> SupportId {
+        let id = self.supports.push(data);
+        self.adjusted_support_id(id)
+    }
+
+    fn typevar_data(&self, typevar: TypeVarId) -> BoundTypeVarIdentity<'db> {
+        if let Some(compacted) = &self.compacted {
+            let index = typevar.index();
+            let split = compacted.typevars.len();
+            if index < split {
+                return compacted.typevars[typevar];
+            }
+            return self.typevars[TypeVarId::from_usize(index - split)];
+        }
+        self.typevars[typevar]
+    }
+
+    fn support_data(&self, support: SupportId) -> &Support {
+        if let Some(compacted) = &self.compacted {
+            let index = support.index();
+            let split = compacted.support_indices.len();
+            if index < split {
+                let compacted_index = compacted.retained_support_index(support);
+                return &compacted.supports[compacted_index];
+            }
+            return &self.supports[SupportId::from_usize(index - split)];
+        }
+        &self.supports[support]
+    }
+
+    fn constraint_support_id(&self, constraint: ConstraintId) -> SupportId {
+        if let Some(compacted) = &self.compacted {
+            let index = constraint.index();
+            let split = compacted.constraint_indices.len();
+            if index < split {
+                let compacted_index = compacted.retained_constraint_index(constraint);
+                return compacted.constraint_supports[compacted_index];
+            }
+            return self.constraint_supports[ConstraintId::from_usize(index - split)];
+        }
+        self.constraint_supports[constraint]
+    }
+
+    fn constraint_support(&self, constraint: ConstraintId) -> &Support {
+        self.support_data(self.constraint_support_id(constraint))
+    }
+
+    fn node_support_id(&self, node: NodeId) -> Option<SupportId> {
+        if node.is_terminal() {
+            return None;
+        }
+        if let Some(compacted) = &self.compacted {
+            let index = node.index();
+            let split = compacted.node_indices.len();
+            if index < split {
+                let compacted_index = compacted.retained_node_index(node);
+                return Some(compacted.node_supports[compacted_index]);
+            }
+            return Some(self.node_supports[NodeId::from_usize(index - split)]);
+        }
+        Some(self.node_supports[node])
+    }
+
+    fn node_support(&self, node: NodeId) -> Option<&Support> {
+        self.node_support_id(node)
+            .map(|support| self.support_data(support))
     }
 
     /// Loads an [`OwnedConstraintSet`] into this storage.
@@ -4278,10 +4421,6 @@ impl InteriorNode {
         bound_typevars: TypeVarSet<'db>,
         source_order: Option<SourceOrderId>,
     ) -> (NodeId, Option<SourceOrderId>) {
-        let mentions_typevar = |ty: Type<'_>| match ty {
-            Type::TypeVar(typevar) => typevar.is_inferable(db, bound_typevars),
-            _ => false,
-        };
         self.abstract_inner(
             db,
             storage,
@@ -4291,16 +4430,11 @@ impl InteriorNode {
             // the sequent map can propagate any derived constraints that do not mention the
             // quantified typevars.
             &mut |storage: &ConstraintSetStorage<'_>, constraint| {
-                let constraint = storage.constraint_data(constraint);
-                constraint.typevar.is_inferable(db, bound_typevars)
-                    || constraint
-                        .bounds
-                        .lower
-                        .is_some_and(|lower| any_over_type(db, lower, false, mentions_typevar))
-                    || constraint
-                        .bounds
-                        .upper
-                        .is_some_and(|upper| any_over_type(db, upper, false, mentions_typevar))
+                let support = storage.constraint_support(constraint);
+                support.iter().any(|typevar| {
+                    let typevar = storage.typevar_data(typevar);
+                    typevar.is_inferable(db, bound_typevars)
+                })
             },
         )
     }
