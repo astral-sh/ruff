@@ -137,6 +137,7 @@ use crate::types::{
     TypeVarBoundOrConstraints, TypeVarKind, TypeVarVariance, TypingModule, UnionAccumulator,
     UnionBuilder, UnionType, any_over_type, binding_type,
     extract_fixed_length_iterable_element_types, infer_complete_scope_types, infer_scope_types,
+    inferred_declaration,
     is_discarded_dict_key_assignment, todo_type,
 };
 use crate::{AnalysisSettings, Db, DisplaySettings, FxIndexSet, FxOrderSet, SemanticModel};
@@ -1530,11 +1531,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let place_id = binding.place(self.db());
         let place = place_table.place(place_id);
+        let forwarded_owner = place_id
+            .as_symbol()
+            .and_then(|symbol| self.forwarded_assignment_owner(file_scope_id, symbol));
 
-        let (declarations, is_local) = if let Some(symbol) = place_id.as_symbol()
-            && let Some((owner_scope, owner_symbol)) =
-                self.forwarded_assignment_owner(file_scope_id, symbol)
-        {
+        let (declarations, is_local) = if let Some((owner_scope, owner_symbol)) = forwarded_owner {
             (
                 self.index
                     .use_def_map(owner_scope)
@@ -1553,6 +1554,28 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             self.reachability_cache(),
         )
         .into_place_and_conflicting_declarations();
+
+        let mut inherited_imported_final = None;
+
+        if place_and_quals.place.is_undefined() && !binding.kind(db).is_import() {
+            let previous_bindings = if let Some((owner_scope, owner_symbol)) = forwarded_owner {
+                self.index
+                    .use_def_map(owner_scope)
+                    .end_of_scope_symbol_bindings(owner_symbol)
+            } else {
+                use_def.bindings_at_definition(binding)
+            };
+
+            inherited_imported_final = previous_bindings
+                .filter_map(|previous| previous.binding.definition())
+                .filter_map(|previous| inferred_declaration(db, previous).declared())
+                .find(|imported| imported.qualifiers().contains(TypeQualifiers::FINAL));
+
+            if let Some(imported_final) = inherited_imported_final {
+                place_and_quals = Place::bound(imported_final.inner_type())
+                    .with_qualifiers(imported_final.qualifiers());
+            }
+        }
 
         if let Some(conflicting) = conflicting {
             // TODO point out the conflicting declarations in the diagnostic?
@@ -1606,6 +1629,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             node,
             qualifiers,
             is_local,
+            inherited_imported_final,
         }
     }
 
@@ -1943,18 +1967,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         true
-    }
-
-    fn add_unknown_declaration_with_binding(
-        &mut self,
-        node: AnyNodeRef,
-        definition: Definition<'db>,
-    ) {
-        self.add_declaration_with_binding(
-            node,
-            definition,
-            &DeclaredAndInferredType::are_the_same_type(Type::unknown()),
-        );
     }
 
     fn record_return_type(&mut self, ty: Type<'db>, range: TextRange) {
@@ -4497,6 +4509,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 node,
                 qualifiers: TypeQualifiers::empty(),
                 is_local: true,
+                inherited_imported_final: None,
             };
             let target_ty = if let Some(value) = value {
                 // Infer the value as an ordinary assignment without using the rejected annotation
@@ -12896,6 +12909,7 @@ struct AddBinding<'db, 'ast> {
     node: AnyNodeRef<'ast>,
     qualifiers: TypeQualifiers,
     is_local: bool,
+    inherited_imported_final: Option<TypeAndQualifiers<'db>>,
 }
 
 impl<'db, 'ast> AddBinding<'db, 'ast> {
@@ -12942,7 +12956,9 @@ impl<'db, 'ast> AddBinding<'db, 'ast> {
                         // an import. Ideally, we would show the original definition in the external
                         // module, but that information is currently not threaded through attribute
                         // lookup.
-                        if !previous_definition.kind(db).is_import() {
+                        if !previous_definition.kind(db).is_import()
+                            && self.inherited_imported_final.is_none()
+                        {
                             if let DefinitionKind::AnnotatedAssignment(assignment) =
                                 previous_definition.kind(db)
                             {
@@ -13011,6 +13027,12 @@ impl<'db, 'ast> AddBinding<'db, 'ast> {
         }
 
         builder.bindings.insert(self.binding, bound_ty);
+
+        if let Some(inherited_imported_final) = self.inherited_imported_final {
+            builder
+                .declarations
+                .insert(self.binding, inherited_imported_final);
+        }
 
         inferred_ty
     }
