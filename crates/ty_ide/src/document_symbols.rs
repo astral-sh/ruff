@@ -341,6 +341,160 @@ def function():
         ");
     }
 
+    #[test]
+    fn document_symbols_store_contexts() {
+        let test = cursor_test(
+            "
+[left, *middle, right] = (1, 2, 3)
+augmented = 1
+augmented += (augmented_value := 1)
+
+for loop_target in ():
+    pass
+
+(named_target := 1)
+comprehension = [(comprehension_target := value) for value in ()]
+lambda_value = lambda default=(lambda_default := 1): (lambda_local := default)
+
+class C((base_target := object)):
+    [class_left, class_right] = (1, 2)
+
+@((decorator_target := identity))
+def function(default=(default_target := 1)):
+    [local_left, local_right] = (1, 2)
+    (local_walrus := 1)
+<CURSOR>",
+        );
+
+        assert_snapshot!(test.document_symbols(), @"
+        info[document-symbols]: SymbolInfo
+         --> main.py:2:2
+          |
+        2 | [left, *middle, right] = (1, 2, 3)
+          |  ^^^^
+        info: Variable left
+
+        info[document-symbols]: SymbolInfo
+         --> main.py:2:9
+          |
+        2 | [left, *middle, right] = (1, 2, 3)
+          |         ^^^^^^
+        info: Variable middle
+
+        info[document-symbols]: SymbolInfo
+         --> main.py:2:17
+          |
+        2 | [left, *middle, right] = (1, 2, 3)
+          |                 ^^^^^
+        info: Variable right
+
+        info[document-symbols]: SymbolInfo
+         --> main.py:3:1
+          |
+        3 | augmented = 1
+          | ^^^^^^^^^
+        info: Variable augmented
+
+        info[document-symbols]: SymbolInfo
+         --> main.py:4:15
+          |
+        4 | augmented += (augmented_value := 1)
+          |               ^^^^^^^^^^^^^^^
+        info: Variable augmented_value
+
+        info[document-symbols]: SymbolInfo
+         --> main.py:6:5
+          |
+        6 | for loop_target in ():
+          |     ^^^^^^^^^^^
+        info: Variable loop_target
+
+        info[document-symbols]: SymbolInfo
+         --> main.py:9:2
+          |
+        9 | (named_target := 1)
+          |  ^^^^^^^^^^^^
+        info: Variable named_target
+
+        info[document-symbols]: SymbolInfo
+          --> main.py:10:1
+           |
+        10 | comprehension = [(comprehension_target := value) for value in ()]
+           | ^^^^^^^^^^^^^
+        info: Variable comprehension
+
+        info[document-symbols]: SymbolInfo
+          --> main.py:10:19
+           |
+        10 | comprehension = [(comprehension_target := value) for value in ()]
+           |                   ^^^^^^^^^^^^^^^^^^^^
+        info: Variable comprehension_target
+
+        info[document-symbols]: SymbolInfo
+          --> main.py:11:1
+           |
+        11 | lambda_value = lambda default=(lambda_default := 1): (lambda_local := default)
+           | ^^^^^^^^^^^^
+        info: Variable lambda_value
+
+        info[document-symbols]: SymbolInfo
+          --> main.py:11:32
+           |
+        11 | lambda_value = lambda default=(lambda_default := 1): (lambda_local := default)
+           |                                ^^^^^^^^^^^^^^
+        info: Variable lambda_default
+
+        info[document-symbols]: SymbolInfo
+          --> main.py:13:7
+           |
+        13 | class C((base_target := object)):
+           |       ^
+        info: Class C
+
+        info[document-symbols]: SymbolInfo
+          --> main.py:14:6
+           |
+        14 |     [class_left, class_right] = (1, 2)
+           |      ^^^^^^^^^^
+        info: Field class_left
+
+        info[document-symbols]: SymbolInfo
+          --> main.py:14:18
+           |
+        14 |     [class_left, class_right] = (1, 2)
+           |                  ^^^^^^^^^^^
+        info: Field class_right
+
+        info[document-symbols]: SymbolInfo
+          --> main.py:13:10
+           |
+        13 | class C((base_target := object)):
+           |          ^^^^^^^^^^^
+        info: Variable base_target
+
+        info[document-symbols]: SymbolInfo
+          --> main.py:16:4
+           |
+        16 | @((decorator_target := identity))
+           |    ^^^^^^^^^^^^^^^^
+        info: Variable decorator_target
+
+        info[document-symbols]: SymbolInfo
+          --> main.py:17:5
+           |
+        17 | def function(default=(default_target := 1)):
+           |     ^^^^^^^^
+        info: Function function
+
+        info[document-symbols]: SymbolInfo
+          --> main.py:17:23
+           |
+        17 | def function(default=(default_target := 1)):
+           |                       ^^^^^^^^^^^^^^
+        info: Variable default_target
+        ");
+    }
+
     impl CursorTest {
         fn document_symbols(&self) -> String {
             let symbols = document_symbols(&self.db, self.cursor.file).to_hierarchical();
