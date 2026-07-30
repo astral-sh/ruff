@@ -650,7 +650,7 @@ from typing_extensions import Self, TypeVar
 
 class Client:
     def no_argument(self) -> EmptyBox[Self]:
-        # TODO(#26680): Infer `EmptyBox[Self]`.
+        # TODO(#26680): Infer `EmptyBox[Self]` and remove the return error.
         # error: [invalid-return-type] "expected `EmptyBox[Self@no_argument]`, found `EmptyBox[Client]`"
         return EmptyBox()
 
@@ -662,7 +662,7 @@ class EmptyBox(Generic[T]):
 
 class Holder(Generic[T]):
     def related(self) -> RelatedBox[T]:
-        # TODO(#26680): Infer `RelatedBox[T]`.
+        # TODO(#26680): Infer `RelatedBox[T]` and remove the return error.
         # error: [invalid-return-type] "expected `RelatedBox[T@Holder]`, found `RelatedBox[Client]`"
         return RelatedBox(self)
 
@@ -686,10 +686,10 @@ from typing_extensions import Self, TypeVar
 
 class PartialUser:
     def equipped(self, present: bool) -> Equipped[Self]:
-        # TODO(#26680): Infer `Equipped[Self]`.
+        # TODO(#26680): Infer `Equipped[Self]` and remove the return error.
         # error: [invalid-return-type]
         return Equipped(
-            # TODO(#26680): Accept `Item[Self]`.
+            # TODO(#26680): Accept `Item[Self]` and remove the argument error.
             # error: [invalid-argument-type] "Expected `Item[User] | None`, found `Item[Self@equipped] | None`"
             first=Item(self) if present else None,
         )
@@ -731,7 +731,8 @@ class CallbackInterface(Generic[C]):
         self.callback = callback
 
     def view(self) -> CallbackView[C]:
-        # TODO(#26680): Expect `(int, /) -> C@CallbackInterface`.
+        # TODO(#26680): Remove the return error.
+        # TODO(#26680): Keep the argument error, expecting `(int, /) -> C@CallbackInterface`.
         # error: [invalid-return-type]
         # error: [invalid-argument-type] "Expected `(int, /) -> Unknown`, found `Selector@__init__`"
         return CallbackView(self.callback)
@@ -767,7 +768,8 @@ class SequenceView(Iterable[RT], Generic[RT]):
 
 def build_iter_view(matches: Iterable[CT] | Callable[[], Iterable[CT]]) -> Iterable[CT]:
     if callable(matches):
-        # TODO(#26680): Expect `() -> Iterable[CT@build_iter_view]`.
+        # TODO(#26680): Remove the return error.
+        # TODO(#26680): Keep the argument error, expecting `() -> Iterable[CT@build_iter_view]`.
         # error: [invalid-return-type]
         # error: [invalid-argument-type] "Expected `() -> Iterable[Unknown]`"
         return FactoryView(matches)

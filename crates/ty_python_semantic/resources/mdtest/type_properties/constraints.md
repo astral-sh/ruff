@@ -1059,7 +1059,8 @@ def negative_finite_noninferable[I, N: (int, str)]() -> None:
 ### Negative inferable decisions and correlated outputs
 
 Negative inferable decisions alone provide no positive inference evidence, while a negative-only
-alternative must not discard a different path that does provide useful bindings. Different
+alternative must not discard a different path that does provide useful bindings. This also applies
+when the inferable variable appears inside a non-inferable variable's nested bound. Different
 non-inferable values must not combine inferable bindings from different alternatives.
 
 ```py
@@ -1068,6 +1069,20 @@ from ty_extensions._internal import ConstraintSet
 def negative_inferable[I, N]() -> None:
     constraints = ~ConstraintSet.range(int, I, int)
     reveal_type(constraints.solutions(inferable=tuple[I]))  # revealed: tuple[()]
+
+def positive_nested_inferable[I, N]() -> None:
+    constraints = ConstraintSet.range(list[I], N, list[I]) & ConstraintSet.range(int, I, int)
+    # revealed: tuple[Solution[I=int]]
+    reveal_type(constraints.solutions(inferable=tuple[I]))
+
+def negative_nested_inferable[I, N]() -> None:
+    constraints = ~ConstraintSet.range(list[I], N, list[I])
+    reveal_type(constraints.solutions(inferable=tuple[I]))  # revealed: tuple[()]
+
+def negative_nested_alternative[I, N]() -> None:
+    constraints = ~ConstraintSet.range(list[I], N, list[I]) | ConstraintSet.range(int, I, int)
+    # revealed: tuple[Solution[], Solution[I=int]]
+    reveal_type(constraints.solutions(inferable=tuple[I]))
 
 def correlated_noninferable[I, J, N]() -> None:
     int_path = ConstraintSet.range(int, N, int) & ConstraintSet.range(int, I, int) & ConstraintSet.range(list[int], J, list[int])
