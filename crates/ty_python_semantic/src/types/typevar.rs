@@ -15,9 +15,9 @@ use crate::{
     },
     types::{
         ApplySpecialization, ApplyTypeMappingVisitor, CycleDetector, DynamicType, GenericContext,
-        InstanceProjection, KnownClass, KnownInstanceType, MaterializationKind, Parameter,
-        Parameters, Type, TypeAliasType, TypeContext, TypeMapping, TypeVarVariance, UnionBuilder,
-        UnionType, any_over_type, binding_type, definition_expression_type,
+        InstanceProjection, IntersectionType, KnownClass, KnownInstanceType, MaterializationKind,
+        Parameter, Parameters, Type, TypeAliasType, TypeContext, TypeMapping, TypeVarVariance,
+        UnionBuilder, UnionType, any_over_type, binding_type, definition_expression_type,
         tuple::Tuple,
         variance::VarianceInferable,
         visitor::{self, TypeCollector, TypeVisitor, walk_type_with_recursion_guard},
@@ -236,6 +236,34 @@ impl<'db> TypeVarInstance<'db> {
         } else {
             None
         }
+    }
+
+    /// Returns the static upper bound used when materializing a gradual type argument.
+    ///
+    /// Constraints are unioned only when materializing an exposed member, where their union is a
+    /// valid conservative upper bound. A bound may recursively refer to its own generic class,
+    /// either directly or through other bounds. Such a bound has no finite static top
+    /// materialization, so recover from its cycle without applying an upper bound.
+    #[salsa::tracked(
+        returns(copy),
+        cycle_result=|_, _, _| None,
+        heap_size=ruff_memory_usage::heap_size
+    )]
+    pub(super) fn top_materialized_upper_bound(self, db: &'db dyn Db) -> Option<Type<'db>> {
+        self.bound_or_constraints(db)
+            .map(|bound_or_constraints| bound_or_constraints.as_type(db).top_materialization(db))
+    }
+
+    /// Returns whether this type variable has constraints without evaluating a lazy bound.
+    pub(super) fn is_constrained(self, db: &'db dyn Db) -> bool {
+        matches!(
+            self._bound_or_constraints(db),
+            Some(
+                TypeVarBoundOrConstraintsEvaluation::Eager(TypeVarBoundOrConstraints::Constraints(
+                    _
+                )) | TypeVarBoundOrConstraintsEvaluation::LazyConstraints
+            )
+        )
     }
 
     pub(crate) fn constraints(self, db: &'db dyn Db) -> Option<&'db [Type<'db>]> {
@@ -1164,8 +1192,23 @@ impl<'db> BoundTypeVarInstance<'db> {
                     } else {
                         // Materialization uses a different mapping mode. Reuse of the outer
                         // visitor can incorrectly hit a cache entry from specialization.
-                        let materialization_visitor = ApplyTypeMappingVisitor::default();
-                        mapped.materialize(db, *materialization_kind, &materialization_visitor)
+                        let materialization_visitor = visitor.for_new_materialization_root();
+                        let materialized =
+                            mapped.materialize(db, *materialization_kind, &materialization_visitor);
+
+                        if *materialization_kind == MaterializationKind::Top
+                            && !materialization_visitor.is_equivalent_to_materialization(
+                                db,
+                                mapped,
+                                materialized,
+                            )
+                            && let Some(upper_bound) =
+                                self.typevar(db).top_materialized_upper_bound(db)
+                        {
+                            IntersectionType::from_two_elements(db, materialized, upper_bound)
+                        } else {
+                            materialized
+                        }
                     }
                 })
                 .unwrap_or(Type::TypeVar(self)),

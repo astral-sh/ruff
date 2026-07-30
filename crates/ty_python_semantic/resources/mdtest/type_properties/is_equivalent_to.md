@@ -84,6 +84,96 @@ static_assert(not is_equivalent_to(type, type[Any]))
 static_assert(not is_equivalent_to(type[object], type[Any]))
 ```
 
+## Equivalent bounded gradual specializations
+
+A bounded generic specialized with a gradual type alias is equivalent to the same generic
+specialized with the expanded alias.
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+For a covariant bounded type parameter, this applies to aliases containing either `Any` or
+`Unknown`.
+
+```py
+from typing import Any
+
+from ty_extensions import Unknown, static_assert
+from ty_extensions._internal import is_equivalent_to
+
+type AnyTuple = tuple[Any, ...]
+type UnknownTuple = tuple[Unknown, ...]
+
+class BoundedCovariant[T: tuple[int, ...]]:
+    def get(self) -> T:
+        raise NotImplementedError
+
+static_assert(is_equivalent_to(BoundedCovariant[AnyTuple], BoundedCovariant[tuple[Any, ...]]))
+static_assert(is_equivalent_to(BoundedCovariant[UnknownTuple], BoundedCovariant[AnyTuple]))
+```
+
+The same gradual tuple alias remains equivalent when the bounded type parameter is invariant.
+
+```py
+class BoundedInvariant[T: tuple[int, ...]]:
+    value: T
+
+static_assert(is_equivalent_to(BoundedInvariant[AnyTuple], BoundedInvariant[tuple[Any, ...]]))
+```
+
+`Outer[int, Inner]` is equivalent to `Outer[int, Inner[Any]]` because `Inner` defaults to `Any`.
+`Outer[int]` is equivalent to the same explicit specialization because `Outer` defaults to
+`Inner[Any]`.
+
+```py
+class Inner[T: int = Any]:
+    def get(self) -> T:
+        raise NotImplementedError
+
+class Outer[T: int, U: Inner[Any] = Inner[Any]]:
+    def get(self) -> U:
+        raise NotImplementedError
+
+static_assert(is_equivalent_to(Outer[int, Inner[Any]], Outer[int, Inner]))
+static_assert(is_equivalent_to(Outer[int, Inner[Any]], Outer[int]))
+```
+
+## Bounded gradual specializations are distinct from upper bounds
+
+A generic specialized with a gradual type argument is not equivalent to the same generic specialized
+with the type parameter's upper bound.
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+For a covariant type parameter:
+
+```py
+from typing import Any
+
+from ty_extensions import static_assert
+from ty_extensions._internal import is_equivalent_to
+
+class BoundedCovariant[T: tuple[int, ...]]:
+    def get(self) -> T:
+        raise NotImplementedError
+
+static_assert(not is_equivalent_to(BoundedCovariant[tuple[Any, ...]], BoundedCovariant[tuple[int, ...]]))
+```
+
+The same distinction applies to an invariant type parameter.
+
+```py
+class BoundedInvariant[T: tuple[int, ...]]:
+    value: T
+
+static_assert(not is_equivalent_to(BoundedInvariant[tuple[Any, ...]], BoundedInvariant[tuple[int, ...]]))
+```
+
 ## Unions and intersections
 
 ```pyi

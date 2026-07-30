@@ -383,7 +383,7 @@ pub(crate) struct VisitSpecialization;
 
 /// How a generic type has been specialized.
 ///
-/// This matters only if there is at least one invariant type parameter.
+/// This matters only if there is at least one invariant or constrained type parameter.
 /// For example, we represent `Top[list[Any]]` as a `GenericAlias` with
 /// `MaterializationKind` set to Top, which we denote as `Top[list[Any]]`.
 /// A type `Top[list[T]]` includes all fully static list types `list[U]` where `U` is
@@ -1579,8 +1579,8 @@ impl<'db> Type<'db> {
     /// More concretely, `T'`, the materialization of `T`, is the type `T` with all occurrences of
     /// the dynamic types (`Any`, `Unknown`, `Todo`) replaced as follows:
     ///
-    /// - In covariant position, it's replaced with `object` (TODO: it should be the `TypeVar`'s upper
-    ///   bound, if any)
+    /// - In covariant position, it's replaced with `object`, or the type variable's upper bound
+    ///   when the dynamic type is a bounded generic argument
     /// - In contravariant position, it's replaced with `Never`
     /// - In invariant position, we replace the object with a special form recording that it's the top
     ///   or bottom materialization.
