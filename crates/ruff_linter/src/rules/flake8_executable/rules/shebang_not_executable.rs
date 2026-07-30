@@ -1,7 +1,7 @@
 use std::path::Path;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_text_size::TextRange;
+use ruff_text_size::{TextRange, TextSize};
 
 use crate::Violation;
 use crate::checkers::ast::LintContext;
@@ -51,6 +51,12 @@ impl Violation for ShebangNotExecutable {
 /// EXE001
 #[cfg(target_family = "unix")]
 pub(crate) fn shebang_not_executable(filepath: &Path, range: TextRange, context: &LintContext) {
+    // A shebang only affects a file when it starts at the beginning of the file.
+    // Later `#!` comments are handled by EXE005 when that rule is enabled.
+    if range.start() != TextSize::from(0) {
+        return;
+    }
+
     // WSL supports Windows file systems, which do not have executable bits.
     // Instead, everything is executable. Therefore, we skip this rule on WSL.
 
