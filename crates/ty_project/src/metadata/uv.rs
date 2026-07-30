@@ -5,7 +5,10 @@ use ruff_db::system::{System, SystemPath, SystemPathBuf};
 use ruff_ranged_value::{RangedValue, ValueSource};
 use serde::Deserialize;
 use thiserror::Error;
+use ty_python_semantic::dependency::DependencyMetadata;
 use ty_static::EnvVars;
+
+use crate::dependency_metadata::parse_uv_workspace_metadata;
 
 use super::python_version::SupportedPythonVersion;
 
@@ -14,6 +17,7 @@ pub(super) struct UvWorkspace {
     root: SystemPathBuf,
     environment: Option<SystemPathBuf>,
     python_version: Option<RangedValue<SupportedPythonVersion>>,
+    dependency_metadata: Option<DependencyMetadata>,
 }
 
 impl UvWorkspace {
@@ -46,11 +50,21 @@ impl UvWorkspace {
     }
 
     pub(super) fn from_metadata(
-        metadata: &[u8],
+        source: &[u8],
         system: &dyn System,
     ) -> Result<Self, UvWorkspaceError> {
-        let metadata = serde_json::from_slice::<WorkspaceMetadata>(metadata)
+        let metadata = serde_json::from_slice::<WorkspaceMetadata>(source)
             .map_err(UvWorkspaceError::InvalidMetadata)?;
+
+        let dependency_metadata = match parse_uv_workspace_metadata(source) {
+            Ok(metadata) => Some(metadata),
+            Err(error) => {
+                tracing::debug!(
+                    "Failed to read dependency data from `uv workspace metadata` output: {error:#}"
+                );
+                None
+            }
+        };
 
         let root = existing_directory(metadata.workspace_root, "workspace root", system)?;
 
@@ -70,6 +84,7 @@ impl UvWorkspace {
             root,
             environment,
             python_version,
+            dependency_metadata,
         })
     }
 
@@ -83,6 +98,10 @@ impl UvWorkspace {
 
     pub(super) fn python_version(&self) -> Option<&RangedValue<SupportedPythonVersion>> {
         self.python_version.as_ref()
+    }
+
+    pub(super) fn dependency_metadata(&self) -> Option<&DependencyMetadata> {
+        self.dependency_metadata.as_ref()
     }
 }
 
