@@ -295,7 +295,7 @@ impl<'a> Diff<'a> {
             self.write_gutter(f, digit_with)?;
         }
 
-        Self::write_applicability_note(self.fix, self.stylesheet, f)?;
+        write_applicability_note(self.fix, self.stylesheet, f)?;
 
         Ok(())
     }
@@ -307,42 +307,6 @@ impl<'a> Diff<'a> {
             line = fmt_styled(Line { index: None, width }, self.stylesheet.line_no),
             separator = fmt_styled("|", self.stylesheet.line_no),
         )
-    }
-
-    fn write_applicability_note(
-        fix: &Fix,
-        stylesheet: &DiagnosticStylesheet,
-        f: &mut std::fmt::Formatter<'_>,
-    ) -> std::fmt::Result {
-        match fix.applicability() {
-            Applicability::Safe => {}
-            Applicability::Unsafe => {
-                writeln!(
-                    f,
-                    "{note}: {msg}",
-                    note = fmt_styled("note", stylesheet.warning),
-                    msg = fmt_styled(
-                        "This is an unsafe fix and may change runtime behavior",
-                        stylesheet.emphasis
-                    )
-                )?;
-            }
-            Applicability::DisplayOnly => {
-                // Note that this is still only used in tests. There's no `--display-only-fixes`
-                // analog to `--unsafe-fixes` for users to activate this or see the styling.
-                writeln!(
-                    f,
-                    "{note}: {msg}",
-                    note = fmt_styled("note", stylesheet.error),
-                    msg = fmt_styled(
-                        "This is a display-only fix and is likely to be incorrect",
-                        stylesheet.emphasis
-                    )
-                )?;
-            }
-        }
-
-        Ok(())
     }
 }
 
@@ -385,6 +349,42 @@ fn show_nonprinting(s: &str) -> Cow<'_, str> {
     } else {
         Cow::Borrowed(s)
     }
+}
+
+fn write_applicability_note(
+    fix: &Fix,
+    stylesheet: &DiagnosticStylesheet,
+    f: &mut std::fmt::Formatter<'_>,
+) -> std::fmt::Result {
+    match fix.applicability() {
+        Applicability::Safe => {}
+        Applicability::Unsafe => {
+            writeln!(
+                f,
+                "{note}: {msg}",
+                note = fmt_styled("note", stylesheet.warning),
+                msg = fmt_styled(
+                    "This is an unsafe fix and may change runtime behavior",
+                    stylesheet.emphasis
+                )
+            )?;
+        }
+        Applicability::DisplayOnly => {
+            // Note that this is still only used in tests. There's no `--display-only-fixes`
+            // analog to `--unsafe-fixes` for users to activate this or see the styling.
+            writeln!(
+                f,
+                "{note}: {msg}",
+                note = fmt_styled("note", stylesheet.error),
+                msg = fmt_styled(
+                    "This is a display-only fix and is likely to be incorrect",
+                    stylesheet.emphasis
+                )
+            )?;
+        }
+    }
+
+    Ok(())
 }
 
 #[cfg(test)]
