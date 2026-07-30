@@ -8,93 +8,107 @@ support-aware solution walker. The walker traverses the original TDD using
 inferable variables, and short-circuits subtrees that cannot affect those bindings.
 
 Carl Meyer's review of the original implementation identified several remaining issues. Straightforward
-coverage and documentation fixes are complete. The phases below cover the issues requiring deeper
-investigation, without expanding into already acknowledged future work.
+coverage and documentation fixes are complete. Subsequent investigation traced all three remaining
+review concerns to existing sequent-map, quantification, solution-selection, or ordering
+limitations. They are documented below for handoff, but are outside the scope of this PR.
 
 ## Working agreements
 
 - Perform the phases in order unless this document explicitly identifies an independent phase.
+
 - Before resuming work, inspect the implementation and tests to verify that the status markers are
-  still accurate; do not assume that a previous agent's status is correct.
+    still accurate; do not assume that a previous agent's status is correct.
+
 - Give each phase its own Jujutsu revision. Never edit an existing revision: create a new revision
-  with `jj new -A @` when downstream revisions should incorporate the changes, and describe it with
-  a `[π]` prefix.
+    with `jj new -A @` when downstream revisions should incorporate the changes, and describe it with
+    a `[π]` prefix.
+
 - Documentation and tests are cross-cutting concerns, not separate phases. Update focused mdtests,
-  Rust unit tests, comments, and benchmarks as part of the phase that changes the behavior.
+    Rust unit tests, comments, and benchmarks as part of the phase that changes the behavior.
+
 - The full `ty_python_semantic` suite must pass at the end of every phase. If a later phase must
-  correct behavior that cannot yet be fixed, assert the current incorrect result and add a clear
-  TODO describing the desired result; never comment out or ignore a failing test.
+    correct behavior that cannot yet be fixed, assert the current incorrect result and add a clear
+    TODO describing the desired result; never comment out or ignore a failing test.
+
 - Run tests without updating snapshots:
 
-  ```sh
-  CARGO_PROFILE_DEV_OPT_LEVEL=1 \
-  CARGO_PROFILE_DEV_DEBUG=line-tables-only \
-  INSTA_UPDATE=no \
-  MDTEST_UPDATE_SNAPSHOTS=0 \
-  cargo nextest run -p ty_python_semantic --no-fail-fast --status-level fail
-  ```
+    ```sh
+    CARGO_PROFILE_DEV_OPT_LEVEL=1 \
+    CARGO_PROFILE_DEV_DEBUG=line-tables-only \
+    INSTA_UPDATE=no \
+    MDTEST_UPDATE_SNAPSHOTS=0 \
+    cargo nextest run -p ty_python_semantic --no-fail-fast --status-level fail
+    ```
 
 - Run `/home/dcreager/bin/jpk run --files <every changed path>` at the end of each phase.
+
 - When checking perturbed orderings, use `TY_CONSTRAINT_SET_ORDER=normal`, `reverse`, and XOR masks
-  `1`, `2`, `3`, `4`, `7`, `8`, and `15`. Some unrelated mdtests already fail under perturbed
-  orderings; compare against the pre-phase baseline rather than treating those existing failures as
-  new regressions.
+    `1`, `2`, `3`, `4`, `7`, `8`, and `15`. Some unrelated mdtests already fail under perturbed
+    orderings; compare against the pre-phase baseline rather than treating those existing failures as
+    new regressions.
+
 - Preserve the current architecture: use the custom walker and `PathAssignments::walk_edge`; do not
-  depend on `PathVisitor`, extend `PathFold`, include fuel in memoization keys, introduce
-  `fixed_noninferable_bindings`, or add a separate hidden-variable validation mechanism.
+    depend on `PathVisitor`, extend `PathFold`, include fuel in memoization keys, introduce
+    `fixed_noninferable_bindings`, or add a separate hidden-variable validation mechanism.
+
 - Preserve symbolic references to genuinely unfixed outer variables and preserve meaningful empty
-  alternatives alongside informative alternatives.
+    alternatives alongside informative alternatives.
+
 - Do not use whole-solution deduplication or solution ranking as a workaround. Those are separate
-  future concerns; equivalent hidden branches should instead collapse through sound support-aware
-  traversal and path normalization.
+    future concerns; equivalent hidden branches should instead collapse through sound support-aware
+    traversal and path normalization.
 
 ## Current implementation and relevant files
 
 - `crates/ty_python_semantic/src/types/constraints/solutions.rs`: custom solution walking,
-  support-aware path normalization, hidden-only feasibility search, source-order preservation, and
-  inferable-only bound extraction.
+    support-aware path normalization, hidden-only feasibility search, source-order preservation, and
+    inferable-only bound extraction.
 - `crates/ty_python_semantic/src/types/constraints/support.rs`: support closure over all variables
-  mentioned by positive or negative path assignments.
+    mentioned by positive or negative path assignments.
 - `crates/ty_python_semantic/src/types/constraints.rs`: constraint construction, full nested support
-  collection, sequent generation, `PathAssignments::walk_edge`, and solution selection.
+    collection, sequent generation, `PathAssignments::walk_edge`, and solution selection.
 - `crates/ty_python_semantic/resources/mdtest/type_properties/constraints.md`: direct
-  `ConstraintSet` coverage for inferable and non-inferable variables.
+    `ConstraintSet` coverage for inferable and non-inferable variables.
 - `crates/ty_python_semantic/resources/mdtest/regression/noninferable_projection_to_terminal.md`:
-  rigid outer variables, compatible and incompatible outer/inner domains, and contextual-return
-  regressions.
+    rigid outer variables, compatible and incompatible outer/inner domains, and contextual-return
+    regressions.
 - `crates/ty_python_semantic/resources/mdtest/bidirectional.md`: contextual constructor, callback,
-  and factory regressions blocked on upstream PR #26680.
+    and factory regressions blocked on upstream PR #26680.
 - `crates/ruff_benchmark/benches/ty.rs`: independent hidden-alternatives Criterion benchmark.
 
 ## Scope and explicit non-goals
 
 The following are already documented and are **not** prerequisites for the phases below:
 
+- Repairing incomplete relationship discovery or contradiction propagation in the existing sequent
+    map. This PR consumes the sequent map as it exists; fixes belong in separate solver work.
+- Resolving issues already marked with TODOs in existing mdtests or source comments.
+- Addressing constraint-order dependence holistically; that is being handled in separate work.
 - Representing declared bounds and finite domains directly in the TDD. The existing
-  `incompatible_finite_noninferable`, `incompatible_bounded_noninferable`, and
-  `negative_finite_noninferable` mdtests document why separate hidden-domain validation would be
-  the wrong architectural fix.
+    `incompatible_finite_noninferable`, `incompatible_bounded_noninferable`, and
+    `negative_finite_noninferable` mdtests document why separate hidden-domain validation would be
+    the wrong architectural fix.
 - The `int` versus `object` TypedDict regression, which depends on representing declared constraints
-  in the same TDD domain as other alternatives.
+    in the same TDD domain as other alternatives.
 - Contextual-return inference changes blocked on
-  [#26680](https://github.com/astral-sh/ruff/pull/26680). The mdtests explicitly distinguish
-  diagnostics that should remain, disappear, or change their expected type.
+    [#26680](https://github.com/astral-sh/ruff/pull/26680). The mdtests explicitly distinguish
+    diagnostics that should remain, disappear, or change their expected type.
 - Global deduplication or ranking of fully solved alternatives.
 
 ## Phase 0 — Address straightforward review feedback [COMPLETE]
 
 - Add passing mdtests where a bounded or finitely constrained outer type variable is passed to an
-  inner callable whose bound or finite domain is incompatible.
+    inner callable whose bound or finite domain is incompatible.
 - Add passing coverage for positive and negative constraints whose non-inferable subject contains
-  the inferable variable inside `list[I]`, including a negative nested alternative alongside a
-  positive `I = int` alternative.
+    the inferable variable inside `list[I]`, including a negative nested alternative alongside a
+    positive `I = int` alternative.
 - Clarify the desired fate of every currently expected contextual-return and argument diagnostic.
-  In the bounded-union receiver regression, keep the return diagnostic with a more precise found
-  type and remove both bogus receiver-argument diagnostics once #26680 lands.
+    In the bounded-union receiver regression, keep the return diagnostic with a more precise found
+    type and remove both bogus receiver-argument diagnostics once #26680 lands.
 - Keep the TypedDict, declared-domain, and fixed-hidden-variable TODOs documented rather than
-  attempting an unrelated architectural fix.
+    attempting an unrelated architectural fix.
 
-## Phase 1 — Propagate relational contradictions soundly [NOT STARTED]
+## Phase 1 — Relational contradictions [OUT OF SCOPE: EXISTING SEQUENT LIMITATION]
 
 ### Problem
 
@@ -120,30 +134,41 @@ constraints &= ConstraintSet.range(int, I, int)
 # Expected: no satisfiable solution.
 ```
 
-### Investigation and implementation
+### Diagnosis
 
-1. Minimize both reproductions in the Rust constraint/sequent unit tests and inspect which
-   `PairImplication`, mutual, nested, and negative sequents are generated and applied by
-   `PathAssignments::walk_edge`.
-2. Determine whether the missing information originates in constraint construction, sequent
-   generation, assignment propagation, or hidden-only witness search. Do not assume nested support
-   collection is the problem: `intern_mentioned_typevars_in_type` already visits nested arguments.
-3. Extend the existing sequent machinery so positive fixed assignments and negative relationship
-   decisions produce contradictions consistently for both bare and invariant nested relationships.
-4. Add focused positive and negative direct-constraint mdtests. Keep the intentional rule that a
-   negative inferable decision alone supplies no positive solution evidence.
-5. Verify contradictions are rejected identically across normal, reversed, and XOR-perturbed
-   constraint/type-variable orders.
+These failures are not specific to the custom solution walker. For both reproductions,
 
-### Completion criteria
+```py
+static_assert(contradiction == ConstraintSet.never())
+```
 
-- Both reproductions above are unsatisfiable.
-- Previously valid negative-only and empty-plus-informative alternatives retain their behavior.
-- Full semantic tests pass and perturbed ordering introduces no new baseline failures.
+fails: the existing constraint-set equivalence and satisfiability machinery also does not recognize
+the contradiction. Requesting solutions with **both** variables inferable still produces a
+solution. The walker is therefore consuming the same incomplete relationship information that the
+rest of the solver already consumes.
 
-## Phase 2 — Specialize fixed hidden relationships without symbolic leakage [NOT STARTED]
+For the bare case, the sequent map derives separate subtype facts but does not establish the exact
+`I = N` fact needed to conflict with `¬(I = N)`. `SequentMap::add_sequents_for_pair` and
+`PathAssignments::check_pair_implication` currently propagate positive consequences; they do not
+supply the missing equality/negative relationship reasoning.
 
-**Dependency:** Phase 1, so contradictory relational assignments are already handled soundly.
+For the nested case, both constraints have the same subject `N`. Consequently,
+`SequentMap::add_sequents_for_pair` routes them through `add_concrete_sequents`, rather than
+`add_nested_typevar_sequents`, which is only reached when the subjects differ. Intersecting the
+invariant bounds produces a union lower bound and returns `IntersectionResult::CannotSimplify`, so
+no `I = int` relationship is derived.
+
+Detailed constraint display can also misleadingly omit the negative nested condition. Display uses
+`simplify_for_display`, whose existing historical TODO explicitly acknowledges duplicated and
+imperfect relationship logic; direct equivalence checks confirm that the underlying constraint set
+has not actually become equivalent to the displayed simplified expression.
+
+**Decision:** out of scope. Correcting either case requires extending the existing sequent map or
+related constraint simplification, rather than fixing the walker.
+
+## Phase 2 — Fixed hidden relationships [OUT OF SCOPE: EXISTING TODOs]
+
+**Dependency for future work:** relational and invariant sequent improvements.
 
 ### Problem
 
@@ -167,33 +192,40 @@ constraints &= ConstraintSet.range(list[I], N, list[I])
 # Expected: Solution[I=int]
 ```
 
-### Investigation and implementation
+### Diagnosis
 
-1. Trace how `SequentMap` derives exact bare and invariant nested relationships and how
-   `SolutionWalker::found_satisfied_path` and `finish` turn those assignments into visible bounds.
-2. Determine whether the correct fix belongs in existing relation/sequent derivation, constraint
-   canonicalization, visible-bound accumulation, or a combination. Favor the existing sequent
-   machinery over a second substitution or fixed-binding subsystem.
-3. Ensure genuinely unfixed outer variables remain symbolic. Distinguish exact hidden assignments
-   from one-sided bounds, gradual evidence, and unrelated hidden choices without tracking a separate
-   map of fixed non-inferable bindings.
-4. Update the existing `fixed_noninferable`, `fixed_nested_noninferable`, and invariant-class TODO
-   expectations only when the implementation genuinely establishes their correct specialization.
-5. Add the hidden-subject `N = list[int] ∧ N = list[I]` regression and its bare and source-order
-   variants.
+The bare and nested forms have different underlying causes:
 
-### Completion criteria
+1. For `N = int ∧ I = N`, existentially projecting `N` correctly produces `I = int`:
 
-- Exact hidden relationships yield concrete visible solutions where logically forced.
-- Unfixed outer variables remain symbolic, and inferable-only top-level bindings are preserved.
-- Existing gradual, one-sided, rigid-outer, and nested regression tests retain their intended
-  results.
-- Full semantic tests pass and perturbed ordering introduces no new baseline failures.
+    ```py
+    projected = constraints.exists(tuple[N])
+    static_assert(projected == ConstraintSet.range(int, I, int))  # Passes.
+    ```
 
-## Phase 3 — Make overlapping hidden alternatives order-independent [NOT STARTED]
+    Nevertheless, the existing solution machinery also retains the relational source constraint
+    alongside the derived concrete constraint, producing `I = int | N`. The same symbolic
+    contamination appears when **both** variables are inferable, so this is not solely a hidden
+    projection problem. Existing TODOs already document it in `fixed_noninferable`,
+    `fixed_nested_noninferable`, `invariant_declared_upper`, `invariant_explicit_upper`, and the
+    `derived_solution` / transitive-chain ordering regressions.
 
-**Dependency:** Phase 2, because shared concrete types can create legitimate intermediate
-relationships between inferable and non-inferable variables.
+1. For `N = list[int] ∧ N = list[I]`, existentially projecting `N` incorrectly produces `always`,
+    rather than `I = int`; even `constraints.satisfies(I = int)` fails. This demonstrates that the
+    missing relationship originates before solution extraction, in the existing invariant
+    sequent/quantification machinery. `type_properties/quantification.md` already documents related
+    invariant inverse-image and witness-sensitive failures under existing TODOs.
+
+`SolutionWalker::finish` only reverses a relationship when a bound is a bare `Type::TypeVar`.
+Teaching it to invert arbitrary invariant generic structures would duplicate missing sequent
+reasoning and introduce exactly the parallel fixed-binding machinery this PR avoids.
+
+**Decision:** out of scope. The bare failures directly hit existing TODOs; the nested failures
+require fixing invariant relationship derivation and existential quantification elsewhere.
+
+## Phase 3 — Overlapping hidden alternatives [OUT OF SCOPE: EXISTING ORDERING WORK]
+
+**Dependency for future work:** fixed-hidden relationship precision and holistic ordering fixes.
 
 ### Problem
 
@@ -211,27 +243,46 @@ Solution[I=int | N2]
 The correct result is one `Solution[I=int]`, regardless of source order, internal constraint order,
 or type-variable orientation.
 
-### Investigation and implementation
+### Diagnosis
 
-1. Trace which shared-concrete-value sequents relate `I` to each hidden `N`, and identify why the
-   current support closure, relevant-assignment memoization, or witness shortcut retains different
-   visible paths for equivalent hidden assignments.
-2. After Phase 2 eliminates fixed hidden symbolic leakage, determine whether the remaining branches
-   already collapse. If not, strengthen support-aware path normalization or visibility checks while
-   preserving source constraints in memoization keys and never adding fuel to those keys.
-3. Add direct-constraint mdtests for both disjoint and overlapping alternatives, inferable-first and
-   inferable-last source orders, and reversed subject orientation.
-4. Extend the existing Criterion benchmark with overlapping `{int, str}` alternatives as a second
-   family, keeping the disjoint `{str, bytes}` family. Scale both through 4, 8, 12, 16, and 20
-   hidden alternatives and verify the benchmark under normal and perturbed orderings.
-5. Compare perturbed-order mdtest failures against the pre-phase baseline. The new overlapping
-   coverage itself must remain stable across `normal`, `reverse`, `1`, `2`, `3`, `4`, `7`, `8`, and
-   `15`.
+A shared concrete type causes the existing sequent map to derive a relationship even when the
+original constraints are otherwise independent:
 
-### Completion criteria
+```py
+constraints = ConstraintSet.range(int, I, int) & ConstraintSet.range(int, N, int)
+reveal_type(constraints.solutions(inferable=tuple[I]))
+# Current: tuple[Solution[I=int | N]]
+```
 
-- Both disjoint and overlapping alternatives produce exactly one `Solution[I=int]`.
-- Hidden variables do not leak into visible solution types and equivalent hidden branches do not
-  produce duplicate solution paths.
-- The benchmark remains practical at 20 alternatives without enumerating 1,048,576 paths.
-- Full semantic tests, focused benchmark test mode, ordering checks, and prek pass.
+`SolutionWalker::visit_node` closes visible support over every derived relationship. Once a sequent
+relates `I` and `N`, the hidden variable genuinely enters that closure; the walker cannot discard it
+without solving the existing fixed-hidden-variable TODO from Phase 2.
+
+With four `{int, str}` alternatives and `TY_CONSTRAINT_SET_ORDER=2`, this produces three
+contaminated or duplicate visible solutions. Asking for **all** variables to be inferable and then
+filtering with `solutions_for(I, inferable=tuple[I, N0, N1, N2, N3])` independently produces 16
+paths even under normal ordering. Conversely, the existing existential-projection API correctly
+reduces those alternatives to `I = int`, confirming that the issue is relationship-sensitive path
+selection rather than a new failure to represent the underlying alternatives.
+
+Measured with the debug `ty` executable:
+
+| Hidden alternatives | Normal ordering      | XOR mask 2              |
+| ------------------- | -------------------- | ----------------------- |
+| 4                   | 0.07 s; one solution | 0.05 s; three solutions |
+| 8                   | 0.56 s; one solution | 0.51 s; three solutions |
+| 12                  | 0.55 s; one solution | 3.35 s; four solutions  |
+| 16                  | 0.59 s; one solution | 4.49 s; one solution    |
+| 20                  | 0.66 s; one solution | 4.65 s; one solution    |
+
+This is order-sensitive and can be slower, but the current implementation did not enumerate
+1,048,576 returned paths at 20 alternatives. The existing disjoint `{str, bytes}` benchmark
+appropriately isolates the walker optimization without conflating it with already known relational
+and ordering defects.
+
+Existing TODOs in `regression/constraint_set_ordering.md` already cover symbolic contamination,
+type-variable orientation, transitive-chain ordering, and high-fanout sequent behavior.
+
+**Decision:** out of scope. Fixing this example requires the existing fixed-hidden and
+constraint-ordering work; adding whole-solution deduplication or special-casing shared concrete
+values in this PR would mask the underlying defects.
