@@ -188,6 +188,15 @@ struct InheritedFrozenDataclassFields<'db> {
     last_frozen_base: StaticClassLiteral<'db>,
 }
 
+/// Annotated fields and class-variable declarations collected from one class body.
+///
+/// Class variables are not constructor parameters, but they can mask inherited dataclass fields.
+#[derive(Debug, Default, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
+struct OwnClassFields<'db> {
+    fields: FxIndexMap<Name, Field<'db>>,
+    class_variables: Box<[Name]>,
+}
+
 #[salsa::tracked]
 impl<'db> StaticClassLiteral<'db> {
     /// Return `true` if this class represents `known_class`
@@ -2204,31 +2213,18 @@ impl<'db> StaticClassLiteral<'db> {
             })
             .flat_map(|source| match source {
                 FieldSource::Static(class, specialization) => {
-                    let own_fields = class.own_fields(db, specialization, field_policy);
+                    let own_fields = class.own_fields_inner(db, specialization, field_policy);
 
                     if field_policy.is_dataclass_like() {
-                        let body_scope = class.body_scope(db);
-                        let table = place_table(db, body_scope);
-                        let use_def = use_def_map(db, body_scope);
-
-                        for (symbol_id, declarations) in
-                            use_def.all_end_of_scope_symbol_declarations()
-                        {
-                            let name = table.symbol(symbol_id).name();
-
-                            if own_fields.contains_key(name) {
-                                class_variables.swap_remove(name);
-                            } else if place_from_declarations(db, declarations)
-                                .ignore_conflicting_declarations()
-                                .is_class_var()
-                            {
-                                class_variables.insert(name.clone());
-                            }
+                        class_variables.extend(own_fields.class_variables.iter().cloned());
+                        for name in own_fields.fields.keys() {
+                            class_variables.swap_remove(name);
                         }
                     }
 
                     Either::Left(
                         own_fields
+                            .fields
                             .iter()
                             .map(|(name, field)| (name.clone(), field.clone())),
                     )
@@ -2344,17 +2340,29 @@ impl<'db> StaticClassLiteral<'db> {
     /// including properties inherited from class-level dataclass parameters (like `kw_only=True`)
     /// and dataclass-transform parameters (like `kw_only_default=True`). They do not represent
     /// only what is explicitly specified in each field definition.
-    #[salsa::tracked(
-        returns(ref),
-        cycle_initial=|_, _, _, _, _| FxIndexMap::default(),
-        heap_size=get_size2::GetSize::get_heap_size
-    )]
     pub(crate) fn own_fields(
         self,
         db: &'db dyn Db,
         specialization: Option<Specialization<'db>>,
         field_policy: CodeGeneratorKind<'db>,
-    ) -> FxIndexMap<Name, Field<'db>> {
+    ) -> &'db FxIndexMap<Name, Field<'db>> {
+        &self
+            .own_fields_inner(db, specialization, field_policy)
+            .fields
+    }
+
+    /// Collects constructor fields and class-variable masks in one pass over a class body.
+    #[salsa::tracked(
+        returns(ref),
+        cycle_initial=|_, _, _, _, _| OwnClassFields::default(),
+        heap_size=get_size2::GetSize::get_heap_size
+    )]
+    fn own_fields_inner(
+        self,
+        db: &'db dyn Db,
+        specialization: Option<Specialization<'db>>,
+        field_policy: CodeGeneratorKind<'db>,
+    ) -> OwnClassFields<'db> {
         let class_body_scope = self.body_scope(db);
         let table = place_table(db, class_body_scope);
 
@@ -2422,11 +2430,15 @@ impl<'db> StaticClassLiteral<'db> {
             .sort_unstable_by_key(|(first_declaration_order, _, _)| *first_declaration_order);
 
         let mut attributes = FxIndexMap::default();
+        let mut class_variables = Vec::new();
         for (_, symbol_id, result) in field_declarations {
             let symbol = table.symbol(symbol_id);
             let first_declaration = result.first_declaration;
             let attr = result.ignore_conflicting_declarations();
             if attr.is_class_var() {
+                if field_policy.is_dataclass_like() {
+                    class_variables.push(symbol.name().clone());
+                }
                 continue;
             }
 
@@ -2539,7 +2551,10 @@ impl<'db> StaticClassLiteral<'db> {
 
         attributes.shrink_to_fit();
 
-        attributes
+        OwnClassFields {
+            fields: attributes,
+            class_variables: class_variables.into_boxed_slice(),
+        }
     }
 
     /// Look up an instance attribute (available in `__dict__`) of the given name.
