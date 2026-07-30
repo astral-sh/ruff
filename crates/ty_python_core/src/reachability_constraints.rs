@@ -8,7 +8,7 @@ use ruff_index::{Idx, IndexVec};
 use rustc_hash::FxHashMap;
 
 use crate::predicate::ScopedPredicateId;
-use crate::rank::{RankBitBox, RankBitBoxVec};
+use crate::rank::{RankBitBox, RankBitBoxVec, compact_used_nodes};
 
 /// A ternary formula that defines under what conditions a binding is visible. (A ternary formula
 /// is just like a boolean formula, but with `Ambiguous` as a third potential result. See the
@@ -154,16 +154,11 @@ impl ReachabilityConstraints {
     pub fn get_interior_node(&self, id: ScopedReachabilityConstraintId) -> InteriorNode {
         debug_assert!(!id.is_terminal());
         let raw_index = id.as_u32() as usize;
-        if let Some(used_indices) = &self.used_indices {
-            debug_assert!(
-                used_indices.get_bit(raw_index).unwrap_or(false),
-                "all used reachability constraints should have been marked as used",
-            );
-            let index = used_indices.rank(raw_index) as usize;
-            self.used_interiors[index]
-        } else {
-            self.used_interiors[raw_index]
-        }
+        let index = self
+            .used_indices
+            .as_ref()
+            .map_or(raw_index, |used| used.compacted_index(raw_index));
+        self.used_interiors[index]
     }
 
     pub fn used_interiors(&self) -> &[InteriorNode] {
@@ -195,21 +190,10 @@ pub struct ReachabilityConstraintsBuilder {
 
 impl ReachabilityConstraintsBuilder {
     pub(crate) fn build(self) -> ReachabilityConstraints {
-        if self.interior_used.first_zero().is_none() {
-            ReachabilityConstraints {
-                used_interiors: self.interiors.raw.into_boxed_slice(),
-                used_indices: None,
-            }
-        } else {
-            let used_interiors = (self.interiors.into_iter())
-                .zip(&self.interior_used)
-                .filter_map(|(interior, used)| used.then_some(interior))
-                .collect();
-            let used_indices = RankBitBox::from_bits(self.interior_used);
-            ReachabilityConstraints {
-                used_interiors,
-                used_indices: Some(used_indices),
-            }
+        let (used_interiors, used_indices) = compact_used_nodes(self.interiors, self.interior_used);
+        ReachabilityConstraints {
+            used_interiors,
+            used_indices,
         }
     }
 

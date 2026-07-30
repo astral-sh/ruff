@@ -2,6 +2,7 @@
 
 use bitvec::prelude::{BitBox, BitVec, Msb0, bitvec};
 use get_size2::GetSize;
+use ruff_index::{Idx, IndexVec};
 
 /// A boxed bit slice that supports a constant-time `rank` operation.
 ///
@@ -45,6 +46,23 @@ type Chunk = u32;
 
 const CHUNK_SIZE: usize = Chunk::BITS as usize;
 
+/// Retain only used arena entries, preserving their original IDs through a rank index.
+pub(crate) fn compact_used_nodes<I: Idx, T>(
+    nodes: IndexVec<I, T>,
+    used: RankBitBoxVec,
+) -> (Box<[T]>, Option<RankBitBox>) {
+    if used.first_zero().is_none() {
+        return (nodes.raw.into_boxed_slice(), None);
+    }
+
+    let nodes = nodes
+        .into_iter()
+        .zip(&used)
+        .filter_map(|(node, used)| used.then_some(node))
+        .collect();
+    (nodes, Some(RankBitBox::from_bits(used)))
+}
+
 impl RankBitBox {
     pub fn bits_with_capacity(cap: usize) -> RankBitBoxVec {
         bitvec![Chunk, Msb0; 0; cap]
@@ -77,6 +95,14 @@ impl RankBitBox {
     #[inline]
     pub fn get_bit(&self, index: usize) -> Option<bool> {
         self.bits.get(index).map(|bit| *bit)
+    }
+
+    pub(crate) fn compacted_index(&self, original_index: usize) -> usize {
+        debug_assert!(
+            self.get_bit(original_index).unwrap_or(false),
+            "all retained constraint nodes should have been marked as used",
+        );
+        self.rank(original_index) as usize
     }
 
     #[inline]

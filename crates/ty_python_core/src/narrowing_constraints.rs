@@ -39,7 +39,7 @@ use rustc_hash::FxHashMap;
 
 use crate::ast_ids::ScopedUseId;
 use crate::predicate::ScopedPredicateId;
-use crate::rank::{RankBitBox, RankBitBoxVec};
+use crate::rank::{RankBitBox, RankBitBoxVec, compact_used_nodes};
 use crate::scope::FileScopeId;
 
 /// The ID of a narrowing formula within one scope.
@@ -115,15 +115,11 @@ impl NarrowingConstraints {
     pub fn get_interior_node(&self, id: ScopedNarrowingConstraint) -> InteriorNode {
         debug_assert!(!id.is_terminal());
         let raw_index = id.0 as usize;
-        if let Some(used_indices) = &self.used_indices {
-            debug_assert!(
-                used_indices.get_bit(raw_index).unwrap_or(false),
-                "all used narrowing constraints should have been marked as used",
-            );
-            self.used_interiors[used_indices.rank(raw_index) as usize]
-        } else {
-            self.used_interiors[raw_index]
-        }
+        let index = self
+            .used_indices
+            .as_ref()
+            .map_or(raw_index, |used| used.compacted_index(raw_index));
+        self.used_interiors[index]
     }
 }
 
@@ -144,23 +140,10 @@ pub struct NarrowingConstraintsBuilder {
 
 impl NarrowingConstraintsBuilder {
     pub(crate) fn build(self) -> NarrowingConstraints {
-        if self.interior_used.first_zero().is_none() {
-            NarrowingConstraints {
-                used_interiors: self.interiors.raw.into_boxed_slice(),
-                used_indices: None,
-            }
-        } else {
-            let used_interiors = self
-                .interiors
-                .into_iter()
-                .zip(&self.interior_used)
-                .filter_map(|(interior, used)| used.then_some(interior))
-                .collect();
-            let used_indices = RankBitBox::from_bits(self.interior_used);
-            NarrowingConstraints {
-                used_interiors,
-                used_indices: Some(used_indices),
-            }
+        let (used_interiors, used_indices) = compact_used_nodes(self.interiors, self.interior_used);
+        NarrowingConstraints {
+            used_interiors,
+            used_indices,
         }
     }
 
