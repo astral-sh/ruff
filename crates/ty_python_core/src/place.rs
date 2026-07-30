@@ -4,7 +4,6 @@ use crate::member::{
     ScopedMemberId,
 };
 use crate::predicate::PatternPredicate;
-use crate::scope::FileScopeId;
 use crate::symbol::{ScopedSymbolId, Symbol, SymbolTable, SymbolTableBuilder};
 use crate::{Db, PossiblyNarrowedPlaces};
 use ruff_db::parsed::ParsedModuleRef;
@@ -449,14 +448,6 @@ impl ScopedPlaceId {
             }
         }
     }
-
-    pub const fn as_member(self) -> Option<ScopedMemberId> {
-        if let ScopedPlaceId::Member(id) = self {
-            Some(id)
-        } else {
-            None
-        }
-    }
 }
 
 impl<T> std::ops::Index<ScopedPlaceId> for Vec<T> {
@@ -479,29 +470,6 @@ impl From<ScopedMemberId> for ScopedPlaceId {
 impl From<ScopedSymbolId> for ScopedPlaceId {
     fn from(value: ScopedSymbolId) -> Self {
         Self::Symbol(value)
-    }
-}
-
-/// ID that uniquely identifies a place in a file.
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
-pub struct FilePlaceId {
-    scope: FileScopeId,
-    scoped_place_id: ScopedPlaceId,
-}
-
-impl FilePlaceId {
-    pub fn scope(self) -> FileScopeId {
-        self.scope
-    }
-
-    pub(crate) fn scoped_place_id(self) -> ScopedPlaceId {
-        self.scoped_place_id
-    }
-}
-
-impl From<FilePlaceId> for ScopedPlaceId {
-    fn from(val: FilePlaceId) -> Self {
-        val.scoped_place_id()
     }
 }
 
