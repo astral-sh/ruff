@@ -829,6 +829,147 @@ x1: dict[Hashable, Callable[..., object]] = {"x": lambda: 1}
 x2: dict[Hashable, Callable[..., object]] = dict(x=lambda: 1)
 ```
 
+## Covariant constructors with outer return contexts
+
+A bounded, defaulted, covariant constructor should use its outer return context instead of falling
+back to its declared default. These false positives are pending
+[#26680](https://github.com/astral-sh/ruff/pull/26680), which will conjoin contextual return
+constraints with argument constraints before solving.
+
+```py
+from __future__ import annotations
+
+from typing import Generic
+from typing_extensions import Self, TypeVar
+
+class Client:
+    def no_argument(self) -> EmptyBox[Self]:
+        # TODO(#26680): Infer `EmptyBox[Self]`.
+        # error: [invalid-return-type] "expected `EmptyBox[Self@no_argument]`, found `EmptyBox[Client]`"
+        return EmptyBox()
+
+T = TypeVar("T", bound=Client, default=Client, covariant=True)
+
+class EmptyBox(Generic[T]):
+    def __init__(self) -> None:
+        pass
+
+class Holder(Generic[T]):
+    def related(self) -> RelatedBox[T]:
+        # TODO(#26680): Infer `RelatedBox[T]`.
+        # error: [invalid-return-type] "expected `RelatedBox[T@Holder]`, found `RelatedBox[Client]`"
+        return RelatedBox(self)
+
+class RelatedBox(Generic[T]):
+    def __init__(self, holder: Holder[T]) -> None:
+        self.holder = holder
+```
+
+## Dataclass constructors with outer return contexts
+
+A covariant dataclass argument referring to outer `Self` should not specialize to its declared
+default. The resulting return and argument false positives are pending
+[#26680](https://github.com/astral-sh/ruff/pull/26680).
+
+```py
+from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import Generic
+from typing_extensions import Self, TypeVar
+
+class PartialUser:
+    def equipped(self, present: bool) -> Equipped[Self]:
+        # TODO(#26680): Infer `Equipped[Self]`.
+        # error: [invalid-return-type]
+        return Equipped(
+            # TODO(#26680): Accept `Item[Self]`.
+            # error: [invalid-argument-type] "Expected `Item[User] | None`, found `Item[Self@equipped] | None`"
+            first=Item(self) if present else None,
+        )
+
+class User(PartialUser):
+    pass
+
+UserT = TypeVar("UserT", bound=PartialUser, default=User, covariant=True)
+
+class Item(Generic[UserT]):
+    def __init__(self, owner: UserT) -> None:
+        self.owner = owner
+
+@dataclass
+class Equipped(Generic[UserT]):
+    first: Item[UserT] | None
+```
+
+## Callback diagnostics retain contextual outer type variables
+
+A constrained outer return type should remain visible in an invalid callback diagnostic. The
+callback itself is still invalid, but replacing its expected result with `Unknown` loses useful
+information. Restoring the outer result is pending
+[#26680](https://github.com/astral-sh/ruff/pull/26680).
+
+```py
+from collections.abc import Callable
+from typing import Generic, TypeVar
+
+C = TypeVar("C", str, bytes, covariant=True)
+Selector = TypeVar("Selector", bound=Callable[[int], C])  # error: [invalid-type-variable-bound]
+
+class CallbackView(Generic[C]):
+    def __init__(self, callback: Callable[[int], C]) -> None:
+        self.callback = callback
+
+class CallbackInterface(Generic[C]):
+    def __init__(self, callback: Selector) -> None:
+        self.callback = callback
+
+    def view(self) -> CallbackView[C]:
+        # TODO(#26680): Expect `(int, /) -> C@CallbackInterface`.
+        # error: [invalid-return-type]
+        # error: [invalid-argument-type] "Expected `(int, /) -> Unknown`, found `Selector@__init__`"
+        return CallbackView(self.callback)
+```
+
+## Callable factories retain contextual outer element types
+
+Narrowing a union to a callable should not replace its outer iterable element type with `Unknown`.
+The factory argument remains invalid, but its expected result should preserve the outer `CT`. Its
+correct diagnostic is pending [#26680](https://github.com/astral-sh/ruff/pull/26680); the separate
+narrowed-sequence constructor must remain valid.
+
+```py
+from collections.abc import Callable, Iterable, Iterator, Sequence
+from typing import Generic, TypeVar
+
+RT = TypeVar("RT")
+CT = TypeVar("CT")
+
+class FactoryView(Iterable[RT], Generic[RT]):
+    def __init__(self, factory: Callable[[], Iterable[RT]]) -> None:
+        self.factory = factory
+
+    def __iter__(self) -> Iterator[RT]:
+        return iter(self.factory())
+
+class SequenceView(Iterable[RT], Generic[RT]):
+    def __init__(self, sequence: Sequence[RT]) -> None:
+        self.sequence = sequence
+
+    def __iter__(self) -> Iterator[RT]:
+        return iter(self.sequence)
+
+def build_iter_view(matches: Iterable[CT] | Callable[[], Iterable[CT]]) -> Iterable[CT]:
+    if callable(matches):
+        # TODO(#26680): Expect `() -> Iterable[CT@build_iter_view]`.
+        # error: [invalid-return-type]
+        # error: [invalid-argument-type] "Expected `() -> Iterable[Unknown]`"
+        return FactoryView(matches)
+    if not isinstance(matches, Sequence):
+        matches = list(matches)
+    return SequenceView(matches)
+```
+
 ## Generic call argument inference
 
 A function's arguments are also inferred using the type context:
