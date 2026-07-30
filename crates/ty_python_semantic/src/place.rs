@@ -1265,8 +1265,14 @@ pub(crate) fn place_by_id<'db>(
             let boundness_analysis = bindings.boundness_analysis();
             let inferred_binding =
                 place_from_bindings_impl(db, &env, bindings, requires_explicit_reexport, None);
-            let imported_qualifiers = inferred_binding
-                .first_definition
+            let imported_qualifiers = place_id
+                .as_symbol()
+                .filter(|symbol| {
+                    place_table(db, scope)
+                        .symbol(*symbol)
+                        .has_imported_binding()
+                })
+                .and(inferred_binding.first_definition)
                 .and_then(|definition| inferred_declaration(db, definition).declared())
                 .map(|imported| imported.qualifiers())
                 .unwrap_or_default();

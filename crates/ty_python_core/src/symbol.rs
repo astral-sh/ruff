@@ -44,6 +44,7 @@ bitflags! {
         /// true if the symbol is assigned more than once, or if it is assigned even though it is already in use
         const IS_REASSIGNED         = 1 << 5;
         const IS_PARAMETER          = 1 << 6;
+        const HAS_IMPORTED_BINDING  = 1 << 7;
     }
 }
 
@@ -126,6 +127,11 @@ impl Symbol {
         self.flags.contains(SymbolFlags::IS_PARAMETER)
     }
 
+    /// Returns whether any binding of this symbol originates from an import.
+    pub fn has_imported_binding(&self) -> bool {
+        self.flags.contains(SymbolFlags::HAS_IMPORTED_BINDING)
+    }
+
     pub(super) fn mark_global(&mut self) {
         self.insert_flags(SymbolFlags::MARKED_GLOBAL);
     }
@@ -152,6 +158,10 @@ impl Symbol {
 
     pub(super) fn mark_parameter(&mut self) {
         self.insert_flags(SymbolFlags::IS_PARAMETER);
+    }
+
+    pub(super) fn mark_imported(&mut self) {
+        self.insert_flags(SymbolFlags::HAS_IMPORTED_BINDING);
     }
 
     fn insert_flags(&mut self, flags: SymbolFlags) {
