@@ -917,17 +917,19 @@ pub(crate) fn check_static_class_definitions<'db>(
     {
         let specialization = None;
         let class_init = class.has_dataclass_param(db, field_policy, DataclassFlags::INIT);
+        let own_fields = class.own_fields(db, specialization, field_policy);
 
         let mut kw_only_sentinel_fields = vec![];
         let mut required_after_default_field_names = vec![];
         let mut has_seen_default_field = false;
 
-        for (name, field) in class.own_fields(db, specialization, field_policy) {
+        for (name, field) in own_fields {
             if field.is_kw_only_sentinel(db) {
                 kw_only_sentinel_fields.push(name);
-                continue;
             }
+        }
 
+        for (name, field) in class.fields(db, specialization, field_policy) {
             // Extract dataclass field properties
             let FieldKind::Dataclass {
                 default_ty,
@@ -969,36 +971,25 @@ pub(crate) fn check_static_class_definitions<'db>(
         }
 
         if !required_after_default_field_names.is_empty() {
-            // Report field ordering violations
-            let body_scope = class.body_scope(db).file_scope_id(db);
-            let use_def_map = index.use_def_map(body_scope);
-            let place_table = index.place_table(body_scope);
-
             for name in required_after_default_field_names {
-                let Some(symbol_id) = place_table.symbol_id(name.as_str()) else {
+                let diagnostic_range = own_fields
+                    .get(name)
+                    .and_then(|field| field.first_declaration)
+                    .and_then(|definition| {
+                        let DefinitionKind::AnnotatedAssignment(ann_assign) = definition.kind(db)
+                        else {
+                            return None;
+                        };
+                        Some(ann_assign.target(context.module()).range())
+                    })
+                    .unwrap_or_else(|| class_node.name.range());
+                let Some(builder) = context.report_lint(&DATACLASS_FIELD_ORDER, diagnostic_range)
+                else {
                     continue;
                 };
-                for decl_with_constraints in use_def_map.end_of_scope_symbol_declarations(symbol_id)
-                {
-                    let Some(definition) = decl_with_constraints.declaration.definition() else {
-                        continue;
-                    };
-                    let DefinitionKind::AnnotatedAssignment(ann_assign) = definition.kind(db)
-                    else {
-                        continue;
-                    };
-                    let Some(builder) = context
-                        .report_lint(&DATACLASS_FIELD_ORDER, ann_assign.target(context.module()))
-                    else {
-                        continue;
-                    };
-                    builder.into_diagnostic(format_args!(
-                        "Required field `{name}` cannot be defined \
-                                after fields with default values",
-                    ));
-
-                    break;
-                }
+                builder.into_diagnostic(format_args!(
+                    "Required field `{name}` cannot be defined after fields with default values",
+                ));
             }
         }
     }

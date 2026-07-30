@@ -1418,6 +1418,10 @@ class InvalidModel:
     x: int = 1
     y: str  # error: [dataclass-field-order]
 
+@create_model
+class InvalidInheritedModel(ValidModel):
+    z: bytes  # error: [dataclass-field-order]
+
 @dataclass_transform(field_specifiers=(field,), kw_only_default=True)
 def create_kwonly_default_model[T](cls: type[T]) -> type[T]:
     ...

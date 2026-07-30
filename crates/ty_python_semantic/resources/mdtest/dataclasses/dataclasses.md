@@ -169,10 +169,8 @@ class GoodWithClassInitFalse:
 
 GoodWithClassInitFalse("value")
 
-# Re-enabling `init` makes the inherited default-before-required ordering invalid at runtime.
-# TODO: error: [dataclass-field-order]
 @dataclass
-class BadWithReenabledInit(GoodWithClassInitFalse):
+class BadWithReenabledInit(GoodWithClassInitFalse):  # error: [dataclass-field-order]
     pass
 ```
 
@@ -1868,6 +1866,87 @@ Derived(1, "a")
 
 # error: [missing-argument]
 Derived(True)
+```
+
+### Required fields after inherited defaults
+
+A required positional field cannot follow a positional field with a default inherited from a
+dataclass base.
+
+```toml
+[environment]
+python-version = "3.10"
+```
+
+```py
+from dataclasses import dataclass, field
+
+@dataclass
+class DefaultedBase:
+    x: int = 1
+
+@dataclass
+class InvalidChild(DefaultedBase):
+    # error: [dataclass-field-order] "Required field `y` cannot be defined after fields with default values"
+    y: int
+```
+
+A default factory also makes an inherited field optional.
+
+```py
+@dataclass
+class DefaultFactoryBase:
+    x: list[int] = field(default_factory=list)
+
+@dataclass
+class InvalidDefaultFactoryChild(DefaultFactoryBase):
+    # error: [dataclass-field-order]
+    y: int
+```
+
+Inherited fields that are keyword-only or excluded from `__init__` do not affect positional field
+ordering, and a required child field can itself be keyword-only.
+
+```py
+@dataclass
+class KeywordOnlyBase:
+    x: int = field(default=1, kw_only=True)
+
+@dataclass
+class ValidKeywordOnlyBaseChild(KeywordOnlyBase):
+    y: int
+
+@dataclass
+class NonInitBase:
+    x: int = field(default=1, init=False)
+
+@dataclass
+class ValidNonInitBaseChild(NonInitBase):
+    y: int
+
+@dataclass
+class ValidKeywordOnlyChild(DefaultedBase):
+    y: int = field(kw_only=True)
+```
+
+Overriding a field preserves its original position in the inherited field order. Removing its
+default permits later required fields, while introducing a default before another inherited required
+field is invalid.
+
+```py
+@dataclass
+class ValidRequiredOverride(DefaultedBase):
+    x: int = field()
+    y: int
+
+@dataclass
+class RequiredBase:
+    first: int
+    second: int
+
+@dataclass
+class InvalidDefaultOverride(RequiredBase):  # error: [dataclass-field-order]
+    first: int = 1
 ```
 
 ### Overwriting attributes from base class
