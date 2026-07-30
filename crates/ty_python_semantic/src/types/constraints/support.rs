@@ -103,10 +103,10 @@ impl Support {
     /// We perform a fixed-point loop, where we find the constraints that mention any of the
     /// typevars in the support, and add any _other_ typevars they mention. (That might add
     /// additional typevars that cause more constraints to become eligible, and so on.)
-    pub(super) fn close_over_constraints<'db>(
+    pub(super) fn close_over_constraints(
         &mut self,
-        storage: &ConstraintSetStorage<'db>,
-        constraints: impl Iterator<Item = ConstraintId> + Clone,
+        storage: &ConstraintSetStorage<'_>,
+        constraints: &(impl Iterator<Item = ConstraintId> + Clone),
     ) {
         loop {
             let mut any_added = false;
