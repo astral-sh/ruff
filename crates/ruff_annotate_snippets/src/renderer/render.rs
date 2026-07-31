@@ -541,7 +541,10 @@ fn format_origin(origin: &Origin<'_>, anonymized_line_numbers: bool) -> String {
         write!(&mut buffer, "{path}").unwrap();
     }
     if let Some(cell_index) = origin.cell_index {
-        write!(&mut buffer, ":cell {cell_index}").unwrap();
+        if !buffer.is_empty() {
+            write!(&mut buffer, ":").unwrap();
+        }
+        write!(&mut buffer, "cell {cell_index}").unwrap();
     }
     if let Some(line) = origin.line {
         if anonymized_line_numbers {
@@ -1528,8 +1531,8 @@ fn emit_suggestion_default(
     let (complete, parts, highlights, replaced_highlights) = spliced_lines;
     let is_multiline = complete.lines().count() > 1;
 
-    if suggestion.path.as_ref() != primary_path
-        && let Some(path) = suggestion.path.as_ref()
+    let secondary_path = suggestion.path.as_ref() != primary_path;
+    if ((secondary_path && suggestion.path.as_ref().is_some()) || suggestion.cell_index.is_some())
         && !matches_previous_suggestion
     {
         let (loc, _) = sm.span_to_locations(parts[0].span.clone());
@@ -1540,9 +1543,12 @@ fn emit_suggestion_default(
         }
         let arrow = renderer.decor_style.file_start(is_first, false);
         buffer.append(row_num - 1, arrow, ElementStyle::LineNumber);
-        let mut origin = Origin::path(path.as_ref()).cell_index(suggestion.cell_index);
-        origin.line = Some(loc.line);
-        origin.char_column = Some(loc.char + 1);
+        let origin = Origin {
+            path: suggestion.path.as_ref().map(|p| Cow::Borrowed(p.as_ref())),
+            cell_index: suggestion.cell_index,
+            line: Some(loc.line),
+            char_column: Some(loc.char + 1),
+        };
         let message = format_origin(&origin, renderer.anonymized_line_numbers);
         buffer.append(row_num - 1, &message, ElementStyle::LineAndColumn);
 
