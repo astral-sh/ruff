@@ -528,26 +528,28 @@ fn render_origin(
         );
     }
 
-    let str = {
-        use core::fmt::Write as _;
-
-        let mut buffer = origin.path.as_ref().to_owned();
-        if let Some(cell_index) = origin.cell_index {
-            write!(&mut buffer, ":cell {cell_index}").unwrap();
-        }
-        if let Some(line) = origin.line {
-            if renderer.anonymized_line_numbers {
-                write!(&mut buffer, ":{ANONYMIZED_LINE_NUM}").unwrap();
-            } else {
-                write!(&mut buffer, ":{line}").unwrap();
-            }
-            if let Some(col) = origin.char_column {
-                write!(&mut buffer, ":{col}").unwrap();
-            }
-        }
-        buffer
-    };
+    let str = format_origin(origin, renderer.anonymized_line_numbers);
     buffer.append(buffer_msg_line_offset, &str, ElementStyle::LineAndColumn);
+}
+
+fn format_origin(origin: &Origin<'_>, anonymized_line_numbers: bool) -> String {
+    use core::fmt::Write as _;
+
+    let mut buffer = origin.path.as_ref().to_owned();
+    if let Some(cell_index) = origin.cell_index {
+        write!(&mut buffer, ":cell {cell_index}").unwrap();
+    }
+    if let Some(line) = origin.line {
+        if anonymized_line_numbers {
+            write!(&mut buffer, ":{ANONYMIZED_LINE_NUM}").unwrap();
+        } else {
+            write!(&mut buffer, ":{line}").unwrap();
+        }
+        if let Some(col) = origin.char_column {
+            write!(&mut buffer, ":{col}").unwrap();
+        }
+    }
+    buffer
 }
 
 #[allow(clippy::too_many_arguments)]
