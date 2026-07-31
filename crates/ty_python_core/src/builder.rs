@@ -3477,7 +3477,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     *node.target,
                     ast::Expr::Attribute(_) | ast::Expr::Subscript(_) | ast::Expr::Name(_)
                 ) {
-                    self.push_assignment(node.into());
+                    self.push_assignment(CurrentAssignment::AnnAssign(node));
                     self.visit_expr(&node.target);
                     self.pop_assignment();
 
@@ -3510,12 +3510,12 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                             }
                         }
 
-                        self.push_assignment(aug_assign.into());
+                        self.push_assignment(CurrentAssignment::AugAssign(aug_assign));
                         self.visit_expr(target);
                         self.pop_assignment();
                     }
                     ast::Expr::Name(_) | ast::Expr::Attribute(_) | ast::Expr::Subscript(_) => {
-                        self.push_assignment(aug_assign.into());
+                        self.push_assignment(CurrentAssignment::AugAssign(aug_assign));
                         self.visit_expr(target);
                         self.pop_assignment();
                     }
@@ -4671,7 +4671,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
 
                 // See https://peps.python.org/pep-0572/#differences-between-assignment-expressions-and-assignment-statements
                 if node.target.is_name_expr() {
-                    self.push_assignment(node.into());
+                    self.push_assignment(CurrentAssignment::Named(node));
                     self.visit_expr(&node.target);
                     self.pop_assignment();
                 } else {
@@ -5186,24 +5186,6 @@ impl CurrentAssignment<'_, '_> {
             | Self::Comprehension { unpack, .. } => unpack.as_mut().map(|(position, _)| position),
             Self::Assign { .. } | Self::AnnAssign(_) | Self::AugAssign(_) | Self::Named(_) => None,
         }
-    }
-}
-
-impl<'ast> From<&'ast ast::StmtAnnAssign> for CurrentAssignment<'ast, '_> {
-    fn from(value: &'ast ast::StmtAnnAssign) -> Self {
-        Self::AnnAssign(value)
-    }
-}
-
-impl<'ast> From<&'ast ast::StmtAugAssign> for CurrentAssignment<'ast, '_> {
-    fn from(value: &'ast ast::StmtAugAssign) -> Self {
-        Self::AugAssign(value)
-    }
-}
-
-impl<'ast> From<&'ast ast::ExprNamed> for CurrentAssignment<'ast, '_> {
-    fn from(value: &'ast ast::ExprNamed) -> Self {
-        Self::Named(value)
     }
 }
 
