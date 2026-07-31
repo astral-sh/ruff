@@ -961,7 +961,9 @@ wrapper_descriptor(f, None, type(f), "one too many")
 
 ### `__get__` is called with correct arguments
 
-This test makes sure that we call `__get__` with the right argument types for various scenarios:
+Python passes the instance and its class to a descriptor on an instance access. On a class access,
+it passes `None` and the class instead. A descriptor on a metaclass receives the class and its
+metaclass.
 
 ```py
 from __future__ import annotations
@@ -988,22 +990,23 @@ class C(metaclass=Meta):
 reveal_type(C.class_object_access)  # revealed: int
 reveal_type(C().instance_access)  # revealed: str
 reveal_type(C.metaclass_access)  # revealed: bytes
+```
 
-# Invalid calls emit a diagnostic. However, we use the return type of `__get__`
-# as the inferred type anyway:
-# the way to specify that the descriptor object itself is returned when the
-# attribute is accessed on the instance or the class is by overloading `__get__`.
-#
-# Using the return type of `__get__` even for `__get__` calls that have invalid
-# arguments passed to them avoids false positives in situations where there are
-# `__get__` calls that we don't sufficiently understand.
+An invalid descriptor access is reported, but we still use the declared return type of `__get__` to
+avoid cascading errors.
+
+```py
 # error: [invalid-attribute-access] "Invalid access to descriptor attribute `class_object_access` on type `C`"
 reveal_type(C().class_object_access)  # revealed: int
+
 # error: [invalid-attribute-access] "Invalid access to descriptor attribute `instance_access` on type `<class 'C'>`"
 reveal_type(C.instance_access)  # revealed: str
 ```
 
-### Descriptors with incorrect `__get__` signature
+### Descriptors with an incorrect `__get__` signature
+
+Python calls `__get__` with the descriptor, an instance or `None`, and the owner class. A method
+that accepts only the descriptor cannot handle that call.
 
 ```py
 class Descriptor:
@@ -1018,9 +1021,6 @@ C().descriptor  # snapshot: invalid-attribute-access
 
 # error: [invalid-attribute-access] "Invalid access to descriptor attribute `descriptor` on type `<class 'C'>`"
 reveal_type(C.descriptor)  # revealed: int
-
-# error: [invalid-attribute-access] "Invalid access to descriptor attribute `descriptor` on type `C`"
-reveal_type(C().descriptor)  # revealed: int
 ```
 
 ```snapshot
@@ -1037,16 +1037,39 @@ info: Function signature here
   |         ^^^^^^^^^^^^^^^^^^^^
 ```
 
-### Union-like descriptor types use their concrete branches
+### Descriptor aliases use each alternative as `self`
 
-Descriptor calls through a type alias or constrained type variable use each concrete descriptor type
-as the synthetic `self` argument. A valid descriptor should not fail merely because its union-like
-wrapper is not assignable to one of its elements.
+When a descriptor value has a union alias, each `__get__` method receives a value of its own
+descriptor class.
 
 ```toml
 [environment]
 python-version = "3.12"
 ```
+
+```py
+class IntDescriptor:
+    def __get__(self, instance: object, owner: type | None = None) -> int:
+        return 1
+
+class StrDescriptor:
+    def __get__(self, instance: object, owner: type | None = None) -> str:
+        return ""
+
+type DescriptorAlias = IntDescriptor | StrDescriptor
+
+def descriptor() -> DescriptorAlias:
+    raise NotImplementedError
+
+class C:
+    value = descriptor()
+
+reveal_type(C().value)  # revealed: int | str
+```
+
+### Constrained descriptor TypeVars use each constraint as `self`
+
+The same rule applies to a descriptor whose type is a constrained TypeVar.
 
 ```py
 from typing import TypeVar
@@ -1059,50 +1082,63 @@ class StrDescriptor:
     def __get__(self, instance: object, owner: type | None = None) -> str:
         return ""
 
-type DescriptorAlias = IntDescriptor | StrDescriptor
-
-def aliased_descriptor() -> DescriptorAlias:
-    raise NotImplementedError
-
-class AliasedOwner:
-    value = aliased_descriptor()
-
-reveal_type(AliasedOwner().value)  # revealed: int | str
-
 T = TypeVar("T", IntDescriptor, StrDescriptor)
 
-def access_constrained_descriptor(descriptor: T) -> None:
-    class ConstrainedOwner:
+def access(descriptor: T) -> None:
+    class C:
         value = descriptor
 
-    reveal_type(ConstrainedOwner().value)  # revealed: int | str
-
-BoundT = TypeVar("BoundT", bound=IntDescriptor | StrDescriptor)
-
-def access_upper_bounded_descriptor(descriptor: BoundT) -> None:
-    class UpperBoundedOwner:
-        value = descriptor
-
-    reveal_type(UpperBoundedOwner().value)  # revealed: int | str
+    reveal_type(C().value)  # revealed: int | str
 ```
 
-Recursive aliases are expanded behind a cycle-aware query. A recursive branch cannot establish a
-definite descriptor failure, and inspecting an ordinary recursive attribute must terminate.
+### Union-bounded descriptor TypeVars use each alternative as `self`
+
+A TypeVar with a union upper bound likewise uses the matching descriptor class for each possible
+`__get__` call.
+
+```py
+from typing import TypeVar
+
+class IntDescriptor:
+    def __get__(self, instance: object, owner: type | None = None) -> int:
+        return 1
+
+class StrDescriptor:
+    def __get__(self, instance: object, owner: type | None = None) -> str:
+        return ""
+
+T = TypeVar("T", bound=IntDescriptor | StrDescriptor)
+
+def access(descriptor: T) -> None:
+    class C:
+        value = descriptor
+
+    reveal_type(C().value)  # revealed: int | str
+```
+
+### Recursive descriptor aliases terminate
+
+Inspecting a recursive attribute must not recurse forever. The recursive alternative also cannot
+prove that the access will invoke an invalid descriptor.
+
+```toml
+[environment]
+python-version = "3.12"
+```
 
 ```py
 type Recursive = int | Recursive
 
-class RecursiveOwner:
+class C:
     value: Recursive = 1
 
-RecursiveOwner().value
+C().value
 ```
 
-### Constrained receiver types preserve branch correlation
+### Constrained receivers use the matching descriptor
 
-When a constrained type variable is the descriptor receiver, each class constraint is paired with
-the descriptor from that same class. The synthetic `instance` argument should therefore use the
-concrete class for each branch instead of the unexpanded type variable.
+For a constrained receiver, each descriptor is called with an instance of the class that defines
+that descriptor.
 
 ```py
 from typing import TypeVar
@@ -1123,39 +1159,14 @@ class StrOwner:
 
 T = TypeVar("T", IntOwner, StrOwner)
 
-def access_constrained_owner(owner: T) -> None:
+def access(owner: T) -> None:
     reveal_type(owner.value)  # revealed: int | str
 ```
 
-When every constraint has a malformed descriptor, merged binding provenance still does not prove
-that a particular runtime binding is present. Ty conservatively suppresses the error-level
-diagnostic.
+### Constrained class objects use the matching owner
 
-```py
-class BrokenIntDescriptor:
-    def __get__(self) -> int:
-        return 1
-
-class BrokenIntOwner:
-    value = BrokenIntDescriptor()
-
-class BrokenStrDescriptor:
-    def __get__(self) -> str:
-        return ""
-
-class BrokenStrOwner:
-    value = BrokenStrDescriptor()
-
-BrokenT = TypeVar("BrokenT", BrokenIntOwner, BrokenStrOwner)
-
-def access_broken_constrained_owner(owner: BrokenT) -> None:
-    owner.value
-```
-
-### Constrained class-object receivers preserve branch correlation
-
-The same correlation applies when the receiver is a class object. Each concrete class constraint is
-passed as the synthetic `owner` argument to the descriptor selected from that class.
+When the constrained receiver is a class object, each descriptor receives the class that defines it
+as the `owner` argument.
 
 ```py
 from typing import TypeVar
@@ -1176,35 +1187,14 @@ class StrOwner:
 
 T = TypeVar("T", IntOwner, StrOwner)
 
-def access_constrained_class(cls: type[T]) -> None:
+def access(cls: type[T]) -> None:
     reveal_type(cls.value)  # revealed: int | str
 ```
 
-The same conservative suppression applies when every concrete class constraint selects a malformed
-descriptor.
+### A valid alternative prevents a descriptor diagnostic
 
-```py
-class BrokenDescriptor:
-    def __get__(self) -> bytes:
-        return b""
-
-class BrokenIntOwner:
-    value = BrokenDescriptor()
-
-class BrokenStrOwner:
-    value = BrokenDescriptor()
-
-BrokenT = TypeVar("BrokenT", BrokenIntOwner, BrokenStrOwner)
-
-def access_broken_constrained_class(cls: type[BrokenT]) -> None:
-    cls.value
-```
-
-### Possible descriptor failures are not reported
-
-An attribute access is invalid only if every possible value invokes a malformed descriptor. A valid
-descriptor or normal value makes the failure merely possible, so ty preserves the inferred return
-types without emitting `invalid-attribute-access`.
+A descriptor diagnostic is emitted only when every possible attribute value fails. A valid
+descriptor or a value that is not a descriptor provides a successful alternative.
 
 ```py
 class BrokenDescriptor:
@@ -1229,32 +1219,33 @@ reveal_type(C().descriptor)  # revealed: bytes | str
 reveal_type(C().value)  # revealed: bytes | int
 ```
 
-If every possible value is a malformed descriptor, the failure is definite and is reported.
+### Malformed descriptor alternatives are reported
+
+If every possible value is a malformed descriptor, every runtime access fails.
 
 ```py
-class BrokenIntDescriptor:
+class IntDescriptor:
     def __get__(self) -> int:
         return 1
 
-class BrokenStrDescriptor:
+class StrDescriptor:
     def __get__(self) -> str:
         return ""
 
-def broken_descriptor() -> BrokenIntDescriptor | BrokenStrDescriptor:
+def descriptor() -> IntDescriptor | StrDescriptor:
     raise NotImplementedError
 
 class C:
-    descriptor = broken_descriptor()
+    value = descriptor()
 
-# error: [invalid-attribute-access] "Invalid access to descriptor attribute `descriptor` on type `C`"
-reveal_type(C().descriptor)  # revealed: int | str
+# error: [invalid-attribute-access] "Invalid access to descriptor attribute `value` on type `C`"
+reveal_type(C().value)  # revealed: int | str
 ```
 
-### Mixed metaclass descriptor kinds make fallback failures possible
+### A metaclass data descriptor can make a class descriptor irrelevant
 
-A metaclass member that can be a data descriptor takes precedence over a class attribute on that
-branch. If the data descriptor is valid, a malformed class descriptor is therefore only possibly
-invoked. This test intentionally does not assert the inferred type for the mixed-precedence lookup.
+The metaclass attribute below can be a valid data descriptor or a plain value. The data descriptor
+takes precedence over the malformed class descriptor, so at least one possible access succeeds.
 
 ```py
 class ValidDataDescriptor:
@@ -1280,14 +1271,13 @@ class C(metaclass=Meta):
 C.value
 ```
 
-### Conditional descriptor kinds make metaclass failures possible
+### A conditional `__set__` makes descriptor access uncertain
 
-A conditionally defined `__set__` method makes the metaclass member a data descriptor on only some
-paths. On the non-data path, the class attribute takes precedence, so the malformed `__get__` call
-is not definite.
+The metaclass attribute is a data descriptor only on the path where `__set__` exists. On the other
+path, the ordinary class attribute takes precedence.
 
 ```py
-def conditional_descriptor_kind(flag: bool) -> None:
+def access(flag: bool) -> None:
     class Descriptor:
         def __get__(self) -> int:
             return 1
@@ -1305,10 +1295,10 @@ def conditional_descriptor_kind(flag: bool) -> None:
     C.value
 ```
 
-### Static-only descriptor slots do not establish data-descriptor precedence
+### An annotated `__set__` does not create a data descriptor
 
-An annotation for `__set__` is a static contract, not a runtime descriptor slot. The metaclass
-member is therefore a non-data descriptor at runtime, and the class attribute takes precedence.
+A method annotation does not add `__set__` to the descriptor class at runtime. The class attribute
+therefore takes precedence over the metaclass attribute.
 
 ```py
 from typing import Callable
@@ -1328,9 +1318,9 @@ class C(metaclass=Meta):
 C.value
 ```
 
-### Type-checking-only descriptor slots do not establish data-descriptor precedence
+### A type-checking-only `__delete__` does not create a data descriptor
 
-A `TYPE_CHECKING` definition likewise does not install a runtime descriptor slot.
+A method defined only under `TYPE_CHECKING` is also absent at runtime.
 
 ```py
 from typing import TYPE_CHECKING
@@ -1352,50 +1342,31 @@ class C(metaclass=Meta):
 C.value
 ```
 
-### TypeVar data-descriptor kinds retain metaclass precedence
+### Constrained data-descriptor TypeVars take precedence over class attributes
 
-When every constraint or upper-bound alternative is a data descriptor, the TypeVar-valued metaclass
-member always takes precedence over a class attribute. A malformed `__get__` call is therefore
-definite on every branch.
+When every constraint is a data descriptor, the metaclass attribute always takes precedence over the
+class attribute. Every possible `__get__` call below is invalid.
 
 ```py
 from typing import TypeVar
 
-class BrokenIntDataDescriptor:
+class IntDescriptor:
     def __get__(self) -> int:
         return 1
 
     def __set__(self, instance: object, value: object) -> None:
         pass
 
-class BrokenStrDataDescriptor:
+class StrDescriptor:
     def __get__(self) -> str:
         return ""
 
     def __set__(self, instance: object, value: object) -> None:
         pass
 
-ConstrainedDataT = TypeVar(
-    "ConstrainedDataT",
-    BrokenIntDataDescriptor,
-    BrokenStrDataDescriptor,
-)
-BoundDataT = TypeVar(
-    "BoundDataT",
-    bound=BrokenIntDataDescriptor | BrokenStrDataDescriptor,
-)
+T = TypeVar("T", IntDescriptor, StrDescriptor)
 
-def constrained_data_descriptor(descriptor: ConstrainedDataT) -> None:
-    class Meta(type):
-        value = descriptor
-
-    class C(metaclass=Meta):
-        value = 1
-
-    # error: [invalid-attribute-access]
-    C.value
-
-def upper_bounded_data_descriptor(descriptor: BoundDataT) -> None:
+def access(descriptor: T) -> None:
     class Meta(type):
         value = descriptor
 
@@ -1406,237 +1377,65 @@ def upper_bounded_data_descriptor(descriptor: BoundDataT) -> None:
     C.value
 ```
 
-### `super` lookups do not report descriptor-call diagnostics
+### Union-bounded data-descriptor TypeVars take precedence over class attributes
 
-Ty preserves ordinary `super` member inference, including possibly-missing diagnostics, but does not
-propagate error-level descriptor-call diagnostics through `super`. This avoids introducing
-diagnostic-only state into the semantic `super` type.
+The same precedence applies when every alternative in a TypeVar's upper bound is a data descriptor.
 
 ```py
-def _(flag: bool):
-    class BrokenDescriptor:
-        def __get__(self) -> int:
-            return 1
-
-    class Base:
-        if flag:
-            value = BrokenDescriptor()
-
-    class Derived(Base):
-        def read(self) -> None:
-            # error: [possibly-missing-attribute] "Attribute `value` may be missing on object of type `<super: <class 'Derived'>, Self@read>`"
-            super().value
-
-    class DefiniteBase:
-        value = BrokenDescriptor()
-
-    class DefiniteDerived(DefiniteBase):
-        def read_definite(self) -> None:
-            super().value
-```
-
-### Descriptor diagnostics for constrained `super` receivers are suppressed
-
-Ordinary `super` inference retains the constrained owner, but descriptor errors are not propagated
-even when every constraint would invoke a malformed descriptor.
-
-```py
-from __future__ import annotations
-
 from typing import TypeVar
 
+class IntDescriptor:
+    def __get__(self) -> int:
+        return 1
+
+    def __set__(self, instance: object, value: object) -> None:
+        pass
+
+class StrDescriptor:
+    def __get__(self) -> str:
+        return ""
+
+    def __set__(self, instance: object, value: object) -> None:
+        pass
+
+T = TypeVar("T", bound=IntDescriptor | StrDescriptor)
+
+def access(descriptor: T) -> None:
+    class Meta(type):
+        value = descriptor
+
+    class C(metaclass=Meta):
+        value = 1
+
+    # error: [invalid-attribute-access]
+    C.value
+```
+
+### Descriptor diagnostics are not reported through `super()`
+
+We do not report an invalid `__get__` call reached through `super()`. Ordinary `super` attribute
+inference is unchanged.
+
+```py
 class Descriptor:
-    def __get__(self, instance: "Good", owner: type | None = None) -> int:
+    def __get__(self) -> int:
         return 1
 
 class Base:
     value = Descriptor()
 
-class Pivot(Base): ...
-class Good(Pivot): ...
-class Bad(Pivot): ...
-class AlsoBad(Pivot): ...
-
-T = TypeVar("T", Good, Bad)
-
-def possibly_valid(owner: T) -> None:
-    super(Pivot, owner).value
-
-BrokenT = TypeVar("BrokenT", Bad, AlsoBad)
-
-def always_invalid(owner: BrokenT) -> None:
-    super(Pivot, owner).value
+class Derived(Base):
+    def access(self) -> None:
+        super().value
 ```
 
-### Literal-constrained `super` descriptor diagnostics are suppressed
+### A valid `__get__` definition prevents a descriptor diagnostic
 
-Literal constraints can use a delegated `super` construction path that widens the owner to its enum
-class. Descriptor errors are suppressed rather than retaining the literal solely for validation.
-
-```py
-from __future__ import annotations
-
-from enum import Enum
-from typing import Literal, TypeVar
-
-class LiteralDescriptor:
-    def __get__(
-        self,
-        instance: Literal[Member.A, Member.B],
-        owner: type | None = None,
-    ) -> int:
-        return 1
-
-class LiteralBase:
-    value = LiteralDescriptor()
-
-class LiteralPivot(LiteralBase): ...
-
-class Member(LiteralPivot, Enum):
-    A = 1
-    B = 2
-    C = 3
-
-LiteralT = TypeVar("LiteralT", Literal[Member.A], Literal[Member.B])
-
-def literal_constraints(owner: LiteralT) -> None:
-    super(LiteralPivot, owner).value
-```
-
-### Constrained `super` equivalence is independent of constraint order
-
-Equivalent ordinary `super` types collapse without retaining descriptor-validation state. Reversing
-the constraints therefore does not duplicate the inferred type.
+A conditionally defined method can have several callable signatures. The descriptor access is valid
+if any possible definition accepts the call.
 
 ```py
-from __future__ import annotations
-
-from enum import Enum
-from typing import Literal, TypeVar
-
-class PartialLiteralDescriptor:
-    def __get__(
-        self,
-        instance: Literal[PartialMember.B],
-        owner: type | None = None,
-    ) -> int:
-        return 1
-
-class PartialLiteralBase:
-    value = PartialLiteralDescriptor()
-
-class PartialLiteralPivot(PartialLiteralBase): ...
-
-class PartialMember(PartialLiteralPivot, Enum):
-    A = 1
-    B = 2
-    C = 3
-
-OrderedLiteralT = TypeVar(
-    "OrderedLiteralT",
-    Literal[PartialMember.A],
-    Literal[PartialMember.B],
-)
-ReversedLiteralT = TypeVar(
-    "ReversedLiteralT",
-    Literal[PartialMember.B],
-    Literal[PartialMember.A],
-)
-
-def ordered_literal_constraints(owner: OrderedLiteralT) -> None:
-    reveal_type(super(PartialLiteralPivot, owner))  # revealed: <super: <class 'PartialLiteralPivot'>, PartialMember>
-    super(PartialLiteralPivot, owner).value
-
-def reversed_literal_constraints(owner: ReversedLiteralT) -> None:
-    reveal_type(super(PartialLiteralPivot, owner))  # revealed: <super: <class 'PartialLiteralPivot'>, PartialMember>
-    super(PartialLiteralPivot, owner).value
-```
-
-### Descriptor suppression is independent of `super` union order
-
-Descriptor diagnostics remain suppressed when a conditional expression combines a concrete `super`
-owner with a constrained owner. Reversing the operands does not change the result.
-
-```py
-from __future__ import annotations
-
-from enum import Enum
-from typing import Literal, TypeVar
-
-class Descriptor:
-    def __get__(
-        self,
-        instance: Literal[Member.B],
-        owner: type | None = None,
-    ) -> int:
-        return 1
-
-class Base:
-    value = Descriptor()
-
-class Pivot(Base): ...
-
-class Member(Pivot, Enum):
-    A = 1
-    B = 2
-
-T = TypeVar("T", Literal[Member.A], Literal[Member.B])
-
-def concrete_first(
-    flag: bool,
-    concrete: Literal[Member.A],
-    constrained: T,
-) -> None:
-    (super(Pivot, concrete) if flag else super(Pivot, constrained)).value
-
-def constrained_first(
-    flag: bool,
-    concrete: Literal[Member.A],
-    constrained: T,
-) -> None:
-    (super(Pivot, constrained) if flag else super(Pivot, concrete)).value
-```
-
-### Union-bounded `super` preserves ordinary owner alternatives
-
-A union-bounded owner retains the concrete alternatives produced by ordinary `super` inference.
-Descriptor-call diagnostics remain suppressed for the resulting `super` union.
-
-```py
-from __future__ import annotations
-
-from typing import TypeVar
-
-class Descriptor:
-    def __get__(
-        self,
-        instance: B,
-        owner: type | None = None,
-    ) -> int:
-        return 1
-
-class Base:
-    value = Descriptor()
-
-class Pivot(Base): ...
-class A(Pivot): ...
-class B(Pivot): ...
-
-T = TypeVar("T", bound=A | B)
-
-def union_upper_bound(owner: T) -> None:
-    reveal_type(super(Pivot, owner))  # revealed: <super: <class 'Pivot'>, A> | <super: <class 'Pivot'>, B>
-    super(Pivot, owner).value
-```
-
-### Possible `__get__` callable failures are not reported
-
-Conditionally defined methods produce a union of callable types. A valid callable alternative makes
-the implicit descriptor call only possibly invalid, even if another alternative has an incompatible
-signature.
-
-```py
-def _(flag: bool):
+def access(flag: bool) -> None:
     class Descriptor:
         if flag:
             def __get__(self, instance: object, owner: type | None = None) -> int:
@@ -1647,37 +1446,36 @@ def _(flag: bool):
                 return ""
 
     class C:
-        descriptor = Descriptor()
+        value = Descriptor()
 
-    reveal_type(C().descriptor)  # revealed: int | str
+    reveal_type(C().value)  # revealed: int | str
 ```
 
-### A successful `__getattr__` fallback makes descriptor failure possible
+### A successful `__getattr__` fallback prevents a descriptor diagnostic
 
-When an invalid descriptor is only possibly defined, the path on which the attribute is absent can
-succeed through `__getattr__`. The descriptor is therefore not definitely selected.
+When the descriptor is only conditionally present, the path where it is absent can succeed through
+`__getattr__`.
 
 ```py
-def _(flag: bool):
+def access(flag: bool) -> None:
     class Descriptor:
         def __get__(self) -> int:
             return 1
 
     class C:
         if flag:
-            descriptor = Descriptor()
+            value = Descriptor()
 
         def __getattr__(self, name: str) -> str:
             return name
 
-    reveal_type(C().descriptor)  # revealed: int | str
+    reveal_type(C().value)  # revealed: int | str
 ```
 
-### Declaration-only attributes do not prove descriptor invocation
+### A declaration without a value does not create a descriptor
 
-A class-variable declaration is a static member contract, but does not insert a descriptor object
-into the runtime class dictionary. A metaclass `__getattr__` can therefore satisfy the runtime
-lookup. An annotated assignment with a value does establish a runtime descriptor binding.
+An attribute annotation does not add a descriptor to the runtime class dictionary. An annotated
+assignment does.
 
 ```py
 from typing import ClassVar
@@ -1693,42 +1491,19 @@ class Meta(type):
 class Declared(metaclass=Meta):
     value: ClassVar[Descriptor]
 
-# The static declaration remains the inferred member contract.
 reveal_type(Declared.value)  # revealed: int
 
-class Bound(metaclass=Meta):
+class Assigned(metaclass=Meta):
     value: ClassVar[Descriptor] = Descriptor()
 
-# error: [invalid-attribute-access] "Invalid access to descriptor attribute `value` on type `<class 'Bound'>`"
-reveal_type(Bound.value)  # revealed: int
+# error: [invalid-attribute-access] "Invalid access to descriptor attribute `value` on type `<class 'Assigned'>`"
+reveal_type(Assigned.value)  # revealed: int
 ```
 
-### Declaration-only class fallbacks conservatively suppress metaclass descriptor errors
+### A receiver union can include an unassigned declaration
 
-A class declaration is not a runtime class-dictionary entry, so Python would continue to a metaclass
-descriptor. Ty preserves the declared member type and conservatively suppresses the descriptor
-diagnostic instead of modeling that static-versus-runtime namespace difference.
-
-```py
-class Descriptor:
-    def __get__(self) -> int:
-        return 1
-
-class Meta(type):
-    value = Descriptor()
-
-class C(metaclass=Meta):
-    value: int
-
-C.value
-```
-
-### Declaration certainty is preserved across receiver unions
-
-Each receiver branch determines whether its selected attribute is present at runtime before
-descriptor errors are combined. A bound malformed descriptor on one class therefore does not make
-the access definitely fail when another class only declares the attribute and can use a runtime
-fallback.
+One class in the union only declares the attribute and can use its metaclass fallback. A malformed
+descriptor on the other class therefore does not make every possible access fail.
 
 ```py
 from typing import ClassVar
@@ -1737,7 +1512,7 @@ class DeclaredDescriptor:
     def __get__(self) -> int:
         return 1
 
-class BoundDescriptor:
+class AssignedDescriptor:
     def __get__(self) -> int:
         return 1
 
@@ -1745,20 +1520,20 @@ class Meta(type):
     def __getattr__(cls, name: str) -> str:
         return name
 
-class A(metaclass=Meta):
+class Declared(metaclass=Meta):
     value: ClassVar[DeclaredDescriptor]
 
-class B:
-    value = BoundDescriptor()
+class Assigned:
+    value = AssignedDescriptor()
 
-def read(cls: type[A] | type[B]) -> None:
+def access(cls: type[Declared] | type[Assigned]) -> None:
     cls.value
 ```
 
-### Stub declarations do not prove descriptor invocation
+### A stub declaration does not say where the value is stored
 
-A stub describes the static member type but does not reveal whether the implementation stores the
-value in the class or instance dictionary. Descriptor invocation is therefore not definite.
+A stub describes the attribute's static type, but it does not say whether the implementation stores
+the value on the class or on each instance.
 
 `stub_descriptor.pyi`:
 
@@ -1777,10 +1552,10 @@ reveal_type(C.value)  # revealed: int
 reveal_type(C().value)  # revealed: int
 ```
 
-### Type-checking-only bindings do not prove descriptor invocation
+### Assignments under `TYPE_CHECKING` do not run
 
-An assignment under `TYPE_CHECKING` is visible to static analysis but does not add a descriptor to
-the runtime class dictionary. A metaclass fallback can satisfy the runtime lookup instead.
+An assignment under `TYPE_CHECKING` is visible during type checking but does not add the descriptor
+at runtime. The metaclass fallback can handle the access instead.
 
 ```py
 from typing import TYPE_CHECKING, ClassVar
@@ -1797,22 +1572,26 @@ class C(metaclass=Meta):
     if TYPE_CHECKING:
         value: ClassVar[Descriptor] = Descriptor()
 
-# The static declaration remains the inferred member contract.
 reveal_type(C.value)  # revealed: int
-
-class Inferred(metaclass=Meta):
-    if TYPE_CHECKING:
-        value = Descriptor()
-
-reveal_type(Inferred.value)  # revealed: int
 ```
 
-Static-only and conditional runtime definitions merge to uncertain provenance. The runtime path
-without the conditional binding can still succeed through the metaclass fallback, so the descriptor
-failure is not definite.
+### A conditional runtime assignment does not prove the attribute exists
+
+Combining a type-checking-only assignment with a conditional runtime assignment still leaves a
+runtime path where the attribute is absent.
 
 ```py
-def conditional_runtime_binding(flag: bool) -> None:
+from typing import TYPE_CHECKING
+
+class Descriptor:
+    def __get__(self) -> int:
+        return 1
+
+class Meta(type):
+    def __getattr__(cls, name: str) -> str:
+        return name
+
+def access(flag: bool) -> None:
     class C(metaclass=Meta):
         if TYPE_CHECKING:
             value = Descriptor()
@@ -1823,11 +1602,10 @@ def conditional_runtime_binding(flag: bool) -> None:
     C.value
 ```
 
-### Annotation-only `__get__` methods do not produce descriptor errors
+### An annotated `__get__` does not replace an inherited method at runtime
 
-A method annotation is a static contract and does not shadow an inherited runtime implementation. Ty
-preserves its existing inferred member type but does not use the annotation as proof that an invalid
-implicit call occurs.
+The annotation below changes the static member type but does not shadow the inherited
+implementation. It therefore cannot prove that the runtime descriptor call fails.
 
 ```py
 from typing import Callable
@@ -1845,99 +1623,86 @@ class C:
 C().value
 ```
 
-### A custom `__getattribute__` intercepts descriptor access
+### An instance `__getattribute__` runs before descriptors
 
-Python calls a custom `__getattribute__` before applying the normal descriptor lookup algorithm. A
-successful override therefore makes invocation of a malformed descriptor non-definite for both
-instance and class-object access.
-
-```py
-class Descriptor:
-    def __get__(self) -> int:
-        return 1
-
-class C:
-    descriptor = Descriptor()
-
-    def __getattribute__(self, name: str) -> str:
-        return name
-
-# The diagnostic certainty check does not replace the ordinary inferred member type.
-reveal_type(C().descriptor)  # revealed: int
-
-class Meta(type):
-    descriptor = Descriptor()
-
-    def __getattribute__(self, name: str) -> str:
-        return name
-
-class D(metaclass=Meta): ...
-
-reveal_type(D.descriptor)  # revealed: int
-
-def conditional_getattribute(flag: bool) -> None:
-    class Conditional:
-        descriptor = Descriptor()
-
-        if flag:
-            def __getattribute__(self, name: str) -> str:
-                return name
-
-    Conditional().descriptor
-```
-
-A custom `__getattribute__` also intercepts normal lookup when calling it fails. The access may
-still be invalid, but Python never invokes the descriptor, so ty should not attribute that failure
-to the descriptor's `__get__` method.
+A custom `__getattribute__` can return without invoking the malformed descriptor. The ordinary
+member type remains unchanged.
 
 ```py
-class Descriptor:
-    def __get__(self) -> int:
-        return 1
-
-class InvalidAccessor:
-    descriptor = Descriptor()
-    __getattribute__ = None
-
-InvalidAccessor().descriptor
-
-class InvalidMeta(type):
-    descriptor = Descriptor()
-
-    # error: [invalid-method-override] "Invalid override of method `__getattribute__`: Definition is incompatible with `object.__getattribute__`"
-    def __getattribute__(self) -> str:
-        return ""
-
-class C(metaclass=InvalidMeta): ...
-
-C.descriptor
-```
-
-### Annotation-only `__getattribute__` declarations suppress descriptor errors
-
-Ty's static member lookup does not distinguish an annotation-only override from a runtime-bound
-override while continuing through the runtime MRO. The annotation therefore conservatively
-suppresses the descriptor diagnostic, even though `object.__getattribute__` may invoke the malformed
-descriptor at runtime.
-
-```py
-from typing import Callable
-
 class Descriptor:
     def __get__(self) -> int:
         return 1
 
 class C:
     value = Descriptor()
-    __getattribute__: Callable[[], int]
+
+    def __getattribute__(self, name: str) -> str:
+        return name
+
+reveal_type(C().value)  # revealed: int
+```
+
+### A metaclass `__getattribute__` runs before descriptors
+
+The same rule applies when reading an attribute from a class object.
+
+```py
+class Descriptor:
+    def __get__(self) -> int:
+        return 1
+
+class Meta(type):
+    value = Descriptor()
+
+    def __getattribute__(self, name: str) -> str:
+        return name
+
+class C(metaclass=Meta): ...
+
+reveal_type(C.value)  # revealed: int
+```
+
+### A conditional `__getattribute__` can bypass descriptors
+
+If the override exists on only some paths, we cannot know that normal descriptor lookup will run.
+
+```py
+def access(flag: bool) -> None:
+    class Descriptor:
+        def __get__(self) -> int:
+            return 1
+
+    class C:
+        value = Descriptor()
+
+        if flag:
+            def __getattribute__(self, name: str) -> str:
+                return name
+
+    C().value
+```
+
+### A failing `__getattribute__` still runs before descriptors
+
+The access below fails, but Python fails while calling `__getattribute__`; it never calls the
+descriptor's `__get__` method.
+
+```py
+class Descriptor:
+    def __get__(self) -> int:
+        return 1
+
+class C:
+    value = Descriptor()
+    __getattribute__ = None
 
 C().value
 ```
 
-### A definitely assigned instance attribute shadows a broken non-data descriptor
+### An assigned instance attribute shadows a non-data descriptor
 
-An instance attribute takes precedence over a non-data descriptor. Once the instance attribute is
-definitely assigned, accessing it does not call the descriptor's invalid `__get__` method.
+An instance attribute takes precedence over a non-data descriptor. After the assignment, reading the
+attribute does not call the descriptor.
 
 ```py
 from typing import Literal
@@ -1947,18 +1712,17 @@ class Descriptor:
         return ""
 
 class C:
-    descriptor = Descriptor()
+    value = Descriptor()
 
-    def replace_descriptor(self) -> None:
-        self.descriptor: int = 1
-        reveal_type(self.descriptor)  # revealed: Literal[1]
+    def replace(self) -> None:
+        self.value: int = 1
+        reveal_type(self.value)  # revealed: Literal[1]
 ```
 
-### A possibly reaching instance assignment makes descriptor failure possible
+### A conditional instance assignment can shadow a descriptor
 
-An instance assignment that reaches a read on only some control-flow paths can still shadow a
-non-data descriptor. The descriptor call is not definite because the assigned path reads the
-instance dictionary instead.
+If the assignment reaches the read on only some paths, the instance dictionary can still provide the
+attribute.
 
 ```py
 class Descriptor:
@@ -1966,58 +1730,18 @@ class Descriptor:
         return ""
 
 class C:
-    descriptor = Descriptor()
+    value = Descriptor()
 
-    def replace_descriptor(self, flag: bool) -> None:
+    def replace(self, flag: bool) -> None:
         if flag:
-            self.descriptor = Descriptor()
-        self.descriptor
+            self.value = Descriptor()
+        self.value
 ```
 
-### Inferred instance attributes are possible shadows
+### An assignment suppresses a later data-descriptor diagnostic
 
-The class-wide instance-member summary does not distinguish an assignment performed by `__init__`
-from one in an unrelated method. Because either could represent a successful instance-dictionary
-lookup, both suppress the definite descriptor diagnostic. The unrelated-method and deletion cases
-document accepted conservative false negatives; modeling their reachability requires object-level
-dataflow.
-
-```py
-class Descriptor:
-    def __get__(self) -> int:
-        return 1
-
-class C:
-    descriptor = Descriptor()
-
-    def __init__(self) -> None:
-        self.descriptor = Descriptor()
-
-C().descriptor
-
-class D:
-    descriptor = Descriptor()
-
-    def assign_descriptor(self) -> None:
-        self.descriptor: int = 1
-
-D().descriptor
-
-class E:
-    descriptor = Descriptor()
-
-    def read_after_delete(self) -> None:
-        self.descriptor = Descriptor()
-        del self.descriptor
-        self.descriptor
-```
-
-### Reaching assignments conservatively suppress descriptor diagnostics
-
-Ty does not use descriptor kind as proof that a malformed `__get__` remains selected after an
-assignment. Even a statically known data descriptor is not diagnosed after a reaching assignment.
-This conservative boundary also covers conditional setters and mixed descriptor kinds without
-requiring a separate descriptor-certainty model.
+We suppress descriptor diagnostics after an assignment. This also applies to a data descriptor, even
+though `__set__` handles the write and the later read still calls `__get__`.
 
 ```py
 class Descriptor:
@@ -2028,39 +1752,35 @@ class Descriptor:
         pass
 
 class C:
-    descriptor = Descriptor()
+    value = Descriptor()
 
-    def assign_descriptor(self) -> None:
-        self.descriptor = 1
-        reveal_type(self.descriptor)  # revealed: str
+def access(c: C) -> None:
+    c.value = 1
+    c.value
 ```
 
-A conditional `__set__` makes the descriptor data-like on only some runtime paths. The reaching
-assignment suppresses the read diagnostic on both paths.
+### A constructor assignment can shadow a non-data descriptor
+
+An assignment in `__init__` can place a value in the instance dictionary before a later read.
 
 ```py
-def conditional_setter(flag: bool) -> None:
-    class Descriptor:
-        def __get__(self) -> str:
-            return ""
+class Descriptor:
+    def __get__(self) -> int:
+        return 1
 
-        if flag:
-            def __set__(self, instance: object, value: int) -> None:
-                pass
+class C:
+    value = Descriptor()
 
-    class C:
-        descriptor = Descriptor()
+    def __init__(self) -> None:
+        self.value = Descriptor()
 
-    c = C()
-    c.descriptor = 1
-    c.descriptor
+C().value
 ```
 
-### Reaching deletions conservatively suppress descriptor diagnostics
+### Deleting a class attribute can expose `__getattr__`
 
-A deletion removes the original descriptor from the class dictionary. A later lookup can therefore
-succeed through a metaclass fallback, so same-place dataflow treats the deletion as the same
-conservative suppression boundary as an assignment.
+After the descriptor is removed from the class dictionary, a later class access can succeed through
+the metaclass fallback.
 
 ```py
 class Descriptor:
@@ -2080,9 +1800,8 @@ C.value
 
 ### Augmented assignment reads before writing
 
-An augmented assignment first reads the descriptor and then writes the operation's result. A data
-descriptor with a malformed `__get__` therefore produces an access diagnostic even when its
-`__set__` method accepts the result. Deletion invokes `__delete__` without invoking `__get__`.
+An augmented assignment reads the descriptor before writing the operation's result. The malformed
+`__get__` call is therefore reported even though `__set__` accepts the result.
 
 ```py
 class Descriptor:
@@ -2091,140 +1810,38 @@ class Descriptor:
 
     def __set__(self, instance: object, value: int) -> None:
         pass
+
+class C:
+    value = Descriptor()
+
+c = C()
+# error: [invalid-attribute-access] "Invalid access to descriptor attribute `value` on type `C`"
+c.value += 1
+```
+
+### Deletion does not read a descriptor
+
+Deleting a descriptor calls `__delete__` without first calling `__get__`.
+
+```py
+class Descriptor:
+    def __get__(self) -> int:
+        return 1
 
     def __delete__(self, instance: object) -> None:
         pass
 
 class C:
-    descriptor = Descriptor()
+    value = Descriptor()
 
 c = C()
-# error: [invalid-attribute-access] "Invalid access to descriptor attribute `descriptor` on type `C`"
-c.descriptor += 1
-del c.descriptor
+del c.value
 ```
 
-### Reaching assignments suppress mixed-descriptor diagnostics
+### A descriptor owner can use another part of an intersection
 
-If an attribute could contain either a data or non-data descriptor, an assignment can shadow the
-non-data branch. Ty suppresses the descriptor diagnostic after the reaching assignment regardless of
-the aggregate descriptor kind.
-
-```py
-from typing import Union
-
-class BrokenNonData:
-    def __get__(self) -> str:
-        return ""
-
-class BrokenData:
-    def __get__(self) -> bytes:
-        return b""
-
-    def __set__(self, instance: object, value: int) -> None:
-        pass
-
-def make_descriptor() -> Union[BrokenNonData, BrokenData]:
-    return BrokenData()
-
-class C:
-    descriptor = make_descriptor()
-
-c = C()
-# error: [invalid-assignment]
-c.descriptor = 1
-c.descriptor
-```
-
-### Class-namespace mutations are not propagated to instance lookup
-
-Ty tracks assignments to syntactic places such as `C.descriptor`, but it does not propagate that
-mutation through semantic class identity to `C().descriptor`, aliases, or subclasses. The static
-class attribute type includes a normal value in these examples, so the malformed descriptor call is
-not definite and no `invalid-attribute-access` diagnostic is emitted.
-
-```py
-class BrokenDescriptor:
-    def __get__(self) -> str:
-        return ""
-
-class C:
-    descriptor: BrokenDescriptor | int = BrokenDescriptor()
-
-class Subclass(C): ...
-
-C.descriptor = 1
-reveal_type(C.descriptor)  # revealed: Literal[1]
-reveal_type(C().descriptor)  # revealed: str | int
-reveal_type(Subclass().descriptor)  # revealed: str | int
-
-Alias = C
-Alias.descriptor = 1
-reveal_type(C().descriptor)  # revealed: str | int
-```
-
-The same limitation means that assigning a malformed descriptor through a class object is not enough
-to make a later instance diagnostic definite.
-
-```py
-class BrokenDescriptor:
-    def __get__(self) -> str:
-        return ""
-
-class C:
-    descriptor: BrokenDescriptor | int = 1
-
-C.descriptor = BrokenDescriptor()
-C.descriptor
-reveal_type(C().descriptor)  # revealed: str | int
-```
-
-The same conservative boundary applies when a metaclass data descriptor intercepts a class-object
-assignment. Ty does not preserve the lookup stage through same-place assignment flow, so it does not
-diagnose the subsequent read even though runtime still invokes the malformed descriptor.
-
-```py
-class Descriptor:
-    def __get__(self) -> str:
-        return ""
-
-    def __set__(self, instance: object, value: int) -> None:
-        pass
-
-class Meta(type):
-    descriptor = Descriptor()
-
-class C(metaclass=Meta): ...
-
-C.descriptor = 1
-C.descriptor
-```
-
-### Intersection receivers are conservatively not diagnosed
-
-An intersection receiver describes one runtime value, but ordinary member lookup delegates to its
-positive elements. Ty cannot yet derive the precise synthetic descriptor `owner` from the full
-intersection. Descriptor diagnostics are therefore suppressed for these receivers, including the
-accepted false negative where the selected descriptor is malformed.
-
-```py
-from ty_extensions import Intersection
-
-class Descriptor:
-    def __get__(self) -> int:
-        return 1
-
-class DefinesDescriptor:
-    descriptor = Descriptor()
-
-class Marker: ...
-
-def access_intersection(obj: Intersection[DefinesDescriptor, Marker]) -> None:
-    obj.descriptor
-```
-
-The suppression also avoids rejecting a valid descriptor whose `owner` accepts another positive
-element of the receiver intersection.
+The receiver below is both `DefinesDescriptor` and `Marker`, so it is valid for `__get__` to require
+an owner that is a subclass of `Marker`.
 
 ```py
 from ty_extensions import Intersection
@@ -2236,40 +1853,16 @@ class Descriptor:
         return 1
 
 class DefinesDescriptor:
-    descriptor = Descriptor()
+    value = Descriptor()
 
-def access_intersection(obj: Intersection[DefinesDescriptor, Marker]) -> None:
-    reveal_type(obj.descriptor)  # revealed: int
+def access(obj: Intersection[DefinesDescriptor, Marker]) -> None:
+    reveal_type(obj.value)  # revealed: int
 ```
 
-### Intersection-valued descriptors are conservatively not diagnosed
+### Descriptor `self` can use another part of an intersection
 
-An attribute intersection represents one runtime value satisfying every positive element. A positive
-element without `__get__` refines the descriptor value rather than providing an alternative. Ty's
-descriptor lookup currently validates each contributing element separately, so it suppresses the
-error-level diagnostic instead of treating an element as the complete synthetic `self` value. The
-malformed descriptor below is an accepted false negative.
-
-```py
-from ty_extensions import Intersection
-
-class Descriptor:
-    def __get__(self) -> int:
-        return 1
-
-class Marker: ...
-
-def make_descriptor() -> Intersection[Descriptor, Marker]:
-    raise NotImplementedError
-
-class C:
-    descriptor = make_descriptor()
-
-C().descriptor
-```
-
-The same boundary avoids rejecting a descriptor method whose `self` annotation is satisfied by a
-different positive element of the full intersection.
+The descriptor value below is both `Descriptor` and `Marker`. Its `__get__` method can therefore
+require `self` to satisfy `Marker`.
 
 ```py
 from ty_extensions import Intersection
@@ -2280,61 +1873,48 @@ class Descriptor:
     def __get__(self: Marker, instance: object, owner: type | None = None) -> str:
         return ""
 
-def make_descriptor() -> Intersection[Descriptor, Marker]:
+def descriptor() -> Intersection[Descriptor, Marker]:
     raise NotImplementedError
 
 class C:
-    descriptor = make_descriptor()
+    value = descriptor()
 
-C().descriptor
+C().value
 ```
 
-### Intersection descriptor precedence retains its existing limitation
+### A class attribute shadows an intersection-valued metaclass attribute
 
-An intersection describes one runtime value, but ty does not yet discover data descriptors in
-intersections. It therefore allows the class attribute to shadow an intersection-valued metaclass
-member. Preserving this existing limitation avoids exposing the element-wise mapped descriptor
-return as an unsound intersection type.
+We do not treat the intersection below as a data descriptor. The class attribute therefore wins, and
+its value does not also satisfy `Marker`.
 
 ```py
 from ty_extensions import Intersection
 
-class BrokenDataDescriptor:
+class DataDescriptor:
     def __get__(self) -> int:
         return 1
 
     def __set__(self, instance: object, value: object) -> None:
         pass
 
-class BrokenNonDataDescriptor:
-    def __get__(self) -> str:
-        return ""
-
 class Marker: ...
 
-def data_descriptor() -> Intersection[BrokenDataDescriptor, Marker]:
-    raise NotImplementedError
-
-def non_data_descriptor() -> Intersection[BrokenNonDataDescriptor, Marker]:
+def descriptor() -> Intersection[DataDescriptor, Marker]:
     raise NotImplementedError
 
 class Meta(type):
-    data = data_descriptor()
-    non_data = non_data_descriptor()
+    value = descriptor()
 
 class C(metaclass=Meta):
-    data = 1
-    non_data = 1
+    value = 1
 
 # error: [invalid-assignment]
-marker: Marker = C.data
-C.non_data
+marker: Marker = C.value
 ```
 
-### A shadowed metaclass descriptor with an incorrect `__get__` signature
+### A class attribute can shadow a metaclass non-data descriptor
 
-A class attribute takes precedence over a non-data descriptor of the same name on the metaclass, so
-the descriptor's invalid `__get__` signature is irrelevant to this access.
+The class attribute takes precedence, so the malformed metaclass descriptor is not invoked.
 
 ```py
 class Descriptor:
@@ -2342,120 +1922,28 @@ class Descriptor:
         return ""
 
 class Meta(type):
-    attribute = Descriptor()
+    value = Descriptor()
 
 class C(metaclass=Meta):
-    attribute = 1
+    value = 1
 
-reveal_type(C.attribute)  # revealed: int
+reveal_type(C.value)  # revealed: int
 ```
 
-### "Descriptors" with non-callable `__get__` attributes
+### `__get__` is not callable
 
-If `__get__` is not callable at all, the interpreter will still attempt to call the method at
-runtime, and this will raise an exception. As such, even for `__get__ = None`, we still "attempt to
-call `__get__`" on the descriptor object (leading us to infer `Unknown`):
+Python still attempts to call a non-callable `__get__` attribute, so the access fails and its type
+is unknown.
 
 ```py
-class BrokenDescriptor:
+class Descriptor:
     __get__: None = None
 
-class Foo:
-    desc: BrokenDescriptor = BrokenDescriptor()
-
-# This raises `TypeError` at runtime due to the implicit call to `__get__`.
-# error: [invalid-attribute-access] "Invalid access to descriptor attribute `desc` on type `Foo`"
-reveal_type(Foo().desc)  # revealed: Unknown
-```
-
-### Raw descriptor wrapper callability is not diagnosed
-
-Implicit descriptor invocation reads the raw `__get__` value from the descriptor class without
-binding it. A `classmethod` object is therefore non-callable at runtime, but ty's member lookup does
-not retain enough raw-slot provenance to distinguish that wrapper from viable dynamic-MRO or
-decorator alternatives. Ty conservatively does not diagnose these cases.
-
-```py
-class Descriptor:
-    @classmethod
-    def __get__(cls: object, instance: object, owner: object) -> int:
-        return 1
-
 class C:
-    value = Descriptor()
+    value: Descriptor = Descriptor()
 
-reveal_type(C().value)  # revealed: int
-```
-
-An earlier dynamic base can supply a valid regular `__get__` even when a later concrete base defines
-a classmethod slot.
-
-```py
-from typing import Any
-
-class DynamicBase:
-    def __get__(self, instance: object, owner: type | None = None) -> int:
-        return 1
-
-class ConcreteBase:
-    @classmethod
-    def __get__(cls: object, instance: object, owner: object) -> int:
-        return 1
-
-AnyBase: Any = DynamicBase
-
-class Descriptor(AnyBase, ConcreteBase): ...
-
-class C:
-    value = Descriptor()
-
-C().value
-```
-
-An outer decorator can likewise replace a classmethod wrapper with a valid plain callable.
-
-```py
-from collections.abc import Callable
-
-def replace_classmethod(value: object) -> Callable[[object, object, object], int]:
-    def get(descriptor: object, instance: object, owner: object) -> int:
-        return 1
-
-    return get
-
-class Descriptor:
-    @replace_classmethod
-    @classmethod
-    def __get__(cls: object, instance: object, owner: object) -> int:
-        return 1
-
-class C:
-    value = Descriptor()
-
-C().value
-```
-
-### Raw staticmethod slots before Python 3.10 are not diagnosed
-
-Raw `staticmethod` objects became callable in Python 3.10. Ty does not model that version-dependent
-runtime behavior for implicit descriptor calls, so the access below is an accepted false negative
-for a Python 3.9 target.
-
-```toml
-[environment]
-python-version = "3.9"
-```
-
-```py
-class Descriptor:
-    @staticmethod
-    def __get__(descriptor: object, instance: object, owner: object) -> int:
-        return 1
-
-class C:
-    value = Descriptor()
-
-reveal_type(C().value)  # revealed: int
+# error: [invalid-attribute-access] "Invalid access to descriptor attribute `value` on type `C`"
+reveal_type(C().value)  # revealed: Unknown
 ```
 
 ### Undeclared descriptor arguments
