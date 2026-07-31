@@ -698,6 +698,8 @@ struct SymbolVisitor<'db> {
     /// This is true even when we're inside a function definition
     /// that is inside a class.
     in_class: bool,
+    /// The statement whose expressions or patterns are currently being visited.
+    current_stmt: Option<&'db ast::Stmt>,
     /// When enabled, the visitor should only try to extract
     /// symbols from a module that we believed form the "exported"
     /// interface for that module. i.e., `__all__` is only respected
@@ -727,6 +729,7 @@ impl<'db> SymbolVisitor<'db> {
             symbol_stack: vec![],
             in_function: false,
             in_class: false,
+            current_stmt: None,
             exports_only: false,
             all_origin: None,
             all_names: FxHashSet::default(),
@@ -820,6 +823,22 @@ impl<'db> SymbolVisitor<'db> {
         }
     }
 
+    fn with_current_stmt(
+        &mut self,
+        stmt: &'db ast::Stmt,
+        visit: impl FnOnce(&mut SymbolVisitor<'db>),
+    ) {
+        let previous_stmt = self.current_stmt.replace(stmt);
+        visit(self);
+        self.current_stmt = previous_stmt;
+    }
+
+    fn walk_stmt(&mut self, stmt: &'db ast::Stmt) {
+        self.with_current_stmt(stmt, |visitor| {
+            source_order::walk_stmt(visitor, stmt);
+        });
+    }
+
     /// Add a new symbol and return its ID.
     fn add_symbol(&mut self, mut symbol: SymbolTree) -> SymbolId {
         if let Some(&parent_id) = self.symbol_stack.last() {
@@ -836,26 +855,44 @@ impl<'db> SymbolVisitor<'db> {
 
     /// Adds a symbol for a name definition.
     fn add_name_symbol(&mut self, stmt: &ast::Stmt, name: &ast::ExprName, kind: SymbolKind) {
-        let symbol = SymbolTree {
+        self.add_named_symbol(stmt, &name.id, name.range(), kind);
+    }
+
+    fn add_named_symbol(
+        &mut self,
+        stmt: &ast::Stmt,
+        name: &Name,
+        name_range: TextRange,
+        kind: SymbolKind,
+    ) {
+        self.add_symbol(SymbolTree {
             parent: None,
-            name: name.id.to_string(),
+            name: name.to_string(),
             kind,
             deprecated: false,
-            name_range: name.range(),
+            name_range,
             full_range: stmt.range(),
             imported_from: None,
-        };
-        self.add_symbol(symbol);
+        });
     }
 
     /// Adds a symbol introduced via an assignment.
     fn add_assignment(&mut self, stmt: &ast::Stmt, name: &ast::ExprName) {
+        self.add_assignment_name(stmt, &name.id, name.range());
+    }
+
+    /// Adds a symbol introduced via an assignment to an identifier.
+    fn add_assignment_identifier(&mut self, stmt: &ast::Stmt, name: &ast::Identifier) {
+        self.add_assignment_name(stmt, &name.id, name.range());
+    }
+
+    fn add_assignment_name(&mut self, stmt: &ast::Stmt, name: &Name, name_range: TextRange) {
         // Include assignments only when we're in global or class scope.
         if self.in_function {
             return;
         }
 
-        let kind = if Self::is_constant_name(name.id.as_str()) {
+        let kind = if Self::is_constant_name(name.as_str()) {
             SymbolKind::Constant
         } else if self
             .iter_symbol_stack()
@@ -865,7 +902,24 @@ impl<'db> SymbolVisitor<'db> {
         } else {
             SymbolKind::Variable
         };
-        self.add_name_symbol(stmt, name, kind);
+        self.add_named_symbol(stmt, name, name_range, kind);
+    }
+
+    /// Adds symbols introduced by an assignment target.
+    fn add_assignment_target(&mut self, stmt: &ast::Stmt, target: &ast::Expr) {
+        match target {
+            ast::Expr::Name(name) => self.add_assignment(stmt, name),
+            ast::Expr::List(ast::ExprList { elts, .. })
+            | ast::Expr::Tuple(ast::ExprTuple { elts, .. }) => {
+                for element in elts {
+                    self.add_assignment_target(stmt, element);
+                }
+            }
+            ast::Expr::Starred(starred) => {
+                self.add_assignment_target(stmt, &starred.value);
+            }
+            _ => {}
+        }
     }
 
     /// Adds a symbol introduced via an import `stmt`.
@@ -1159,11 +1213,6 @@ impl<'db> SymbolVisitor<'db> {
         self.all_origin = Some(origin);
     }
 
-    fn push_symbol(&mut self, symbol: SymbolTree) {
-        let symbol_id = self.add_symbol(symbol);
-        self.symbol_stack.push(symbol_id);
-    }
-
     fn pop_symbol(&mut self) {
         self.symbol_stack.pop().unwrap();
     }
@@ -1262,19 +1311,36 @@ impl<'db> SourceOrderVisitor<'db> for SymbolVisitor<'db> {
                     imported_from: None,
                 };
 
+                self.with_current_stmt(stmt, |visitor| {
+                    for decorator in &func_def.decorator_list {
+                        visitor.visit_decorator(decorator);
+                    }
+                });
+
+                let symbol_id = self.add_symbol(symbol);
+
+                self.with_current_stmt(stmt, |visitor| {
+                    if let Some(type_params) = &func_def.type_params {
+                        visitor.visit_type_params(type_params);
+                    }
+                    visitor.visit_parameters(&func_def.parameters);
+                    if let Some(returns) = &func_def.returns {
+                        visitor.visit_annotation(returns);
+                    }
+                });
+
                 if self.exports_only {
-                    self.add_symbol(symbol);
                     // If global_only, don't walk function bodies
                     return;
                 }
 
-                self.push_symbol(symbol);
+                self.symbol_stack.push(symbol_id);
 
                 // Mark that we're entering a function scope
                 let was_in_function = self.in_function;
                 self.in_function = true;
 
-                source_order::walk_stmt(self, stmt);
+                self.visit_body(&func_def.body);
 
                 // Restore the previous function scope state
                 self.in_function = was_in_function;
@@ -1292,8 +1358,24 @@ impl<'db> SourceOrderVisitor<'db> for SymbolVisitor<'db> {
                     imported_from: None,
                 };
 
+                self.with_current_stmt(stmt, |visitor| {
+                    for decorator in &class_def.decorator_list {
+                        visitor.visit_decorator(decorator);
+                    }
+                });
+
+                let symbol_id = self.add_symbol(symbol);
+
+                self.with_current_stmt(stmt, |visitor| {
+                    if let Some(type_params) = &class_def.type_params {
+                        visitor.visit_type_params(type_params);
+                    }
+                    if let Some(arguments) = &class_def.arguments {
+                        visitor.visit_arguments(arguments);
+                    }
+                });
+
                 if self.exports_only {
-                    self.add_symbol(symbol);
                     // If global_only, don't walk class bodies
                     return;
                 }
@@ -1302,8 +1384,8 @@ impl<'db> SourceOrderVisitor<'db> for SymbolVisitor<'db> {
                 let was_in_class = self.in_class;
                 self.in_class = true;
 
-                self.push_symbol(symbol);
-                source_order::walk_stmt(self, stmt);
+                self.symbol_stack.push(symbol_id);
+                self.visit_body(&class_def.body);
                 self.pop_symbol();
 
                 // Restore the previous class scope state
@@ -1328,6 +1410,8 @@ impl<'db> SourceOrderVisitor<'db> for SymbolVisitor<'db> {
                     };
                     self.add_assignment(stmt, name);
                 }
+
+                self.walk_stmt(stmt);
             }
             ast::Stmt::AnnAssign(ann_assign) => {
                 self.add_all_assignment(
@@ -1335,71 +1419,63 @@ impl<'db> SourceOrderVisitor<'db> for SymbolVisitor<'db> {
                     ann_assign.value.as_deref(),
                 );
 
-                let ast::Expr::Name(name) = &*ann_assign.target else {
-                    return;
-                };
-                self.add_assignment(stmt, name);
+                if let ast::Expr::Name(name) = &*ann_assign.target {
+                    self.add_assignment(stmt, name);
+                }
+
+                self.walk_stmt(stmt);
+            }
+            ast::Stmt::With(with_stmt) => {
+                self.with_current_stmt(stmt, |visitor| {
+                    for item in &with_stmt.items {
+                        visitor.visit_expr(&item.context_expr);
+                        if let Some(target) = item.optional_vars.as_deref() {
+                            visitor.add_assignment_target(stmt, target);
+                            visitor.visit_expr(target);
+                        }
+                    }
+                });
+
+                self.visit_body(&with_stmt.body);
+            }
+            ast::Stmt::For(for_stmt) => {
+                self.add_assignment_target(stmt, &for_stmt.target);
+                self.walk_stmt(stmt);
+            }
+            ast::Stmt::Match(_) => {
+                self.walk_stmt(stmt);
             }
             ast::Stmt::AugAssign(ast::StmtAugAssign {
                 target, op, value, ..
             }) => {
-                // We don't care about `__all__` unless we're
-                // specifically looking for exported symbols.
-                if !self.exports_only {
-                    return;
+                if self.exports_only && self.all_origin.is_some() && is_dunder_all(target) {
+                    // Anything other than `+=` is not valid.
+                    if !matches!(op, ast::Operator::Add) || !self.extend_all(value) {
+                        self.all_invalid = true;
+                    }
                 }
 
-                if self.all_origin.is_none() {
-                    // We can't update `__all__` if it doesn't already
-                    // exist.
-                    return;
-                }
-                if !is_dunder_all(target) {
-                    return;
-                }
-                // Anything other than `+=` is not valid.
-                if !matches!(op, ast::Operator::Add) {
-                    self.all_invalid = true;
-                    return;
-                }
-                if !self.extend_all(value) {
-                    self.all_invalid = true;
-                }
+                self.walk_stmt(stmt);
             }
             ast::Stmt::Expr(expr) => {
-                // We don't care about `__all__` unless we're
-                // specifically looking for exported symbols.
-                if !self.exports_only {
-                    return;
-                }
-
-                if self.all_origin.is_none() {
-                    // We can't update `__all__` if it doesn't already exist.
-                    return;
-                }
-                let Some(ast::ExprCall {
-                    func, arguments, ..
-                }) = expr.value.as_call_expr()
-                else {
-                    return;
-                };
-                let Some(ast::ExprAttribute {
-                    value,
-                    attr,
-                    ctx: ast::ExprContext::Load,
-                    ..
-                }) = func.as_attribute_expr()
-                else {
-                    return;
-                };
-                if !is_dunder_all(value) {
-                    return;
-                }
-                if !self.update_all_by_call_idiom(attr, arguments) {
+                if self.exports_only
+                    && self.all_origin.is_some()
+                    && let Some(ast::ExprCall {
+                        func, arguments, ..
+                    }) = expr.value.as_call_expr()
+                    && let Some(ast::ExprAttribute {
+                        value,
+                        attr,
+                        ctx: ast::ExprContext::Load,
+                        ..
+                    }) = func.as_attribute_expr()
+                    && is_dunder_all(value)
+                    && !self.update_all_by_call_idiom(attr, arguments)
+                {
                     self.all_invalid = true;
                 }
 
-                source_order::walk_stmt(self, stmt);
+                self.walk_stmt(stmt);
             }
             ast::Stmt::Import(import) => {
                 // We ignore any names introduced by imports
@@ -1450,14 +1526,84 @@ impl<'db> SourceOrderVisitor<'db> for SymbolVisitor<'db> {
             // always `True`. This applies to symbols in general but
             // also `__all__`.
             _ => {
-                source_order::walk_stmt(self, stmt);
+                self.walk_stmt(stmt);
             }
         }
     }
 
-    // TODO: We might consider handling walrus expressions
-    // here, since they can be used to introduce new names.
-    fn visit_expr(&mut self, _expr: &ast::Expr) {}
+    fn visit_expr(&mut self, expr: &'db ast::Expr) {
+        // Function-local assignments aren't included in document or exported symbols.
+        if self.in_function {
+            return;
+        }
+
+        match expr {
+            ast::Expr::Named(named) => {
+                if let Some(stmt) = self.current_stmt
+                    && let ast::Expr::Name(name) = &*named.target
+                {
+                    self.add_assignment(stmt, name);
+                }
+                source_order::walk_expr(self, expr);
+            }
+            ast::Expr::Lambda(lambda) => {
+                if let Some(parameters) = &lambda.parameters {
+                    self.visit_parameters(parameters);
+                }
+
+                let was_in_function = self.in_function;
+                self.in_function = true;
+                self.visit_expr(&lambda.body);
+                self.in_function = was_in_function;
+            }
+            _ => source_order::walk_expr(self, expr),
+        }
+    }
+
+    fn visit_pattern(&mut self, pattern: &'db ast::Pattern) {
+        let Some(stmt) = self.current_stmt else {
+            source_order::walk_pattern(self, pattern);
+            return;
+        };
+
+        match pattern {
+            ast::Pattern::MatchStar(ast::PatternMatchStar {
+                name: Some(name), ..
+            }) => {
+                self.add_assignment_identifier(stmt, name);
+                source_order::walk_pattern(self, pattern);
+            }
+            ast::Pattern::MatchAs(ast::PatternMatchAs { name, .. }) => {
+                source_order::walk_pattern(self, pattern);
+                if let Some(name) = name {
+                    self.add_assignment_identifier(stmt, name);
+                }
+            }
+            ast::Pattern::MatchMapping(mapping) => {
+                let rest_before_keys = mapping.rest.as_ref().filter(|rest| {
+                    mapping
+                        .keys
+                        .first()
+                        .is_some_and(|key| rest.start() < key.start())
+                });
+                let rest_after_keys = mapping.rest.as_ref().filter(|rest| {
+                    mapping
+                        .keys
+                        .first()
+                        .is_none_or(|key| rest.start() >= key.start())
+                });
+
+                if let Some(rest) = rest_before_keys {
+                    self.add_assignment_identifier(stmt, rest);
+                }
+                source_order::walk_pattern(self, pattern);
+                if let Some(rest) = rest_after_keys {
+                    self.add_assignment_identifier(stmt, rest);
+                }
+            }
+            _ => source_order::walk_pattern(self, pattern),
+        }
+    }
 }
 
 /// Represents where an `__all__` has been defined.
@@ -1548,6 +1694,167 @@ def quux():
         X :: Variable
         Foo :: Class
         quux :: Function
+        ",
+        );
+    }
+
+    #[test]
+    fn exports_with_statement_targets() {
+        insta::assert_snapshot!(
+            public_test("\
+from contextlib import nullcontext
+
+with nullcontext() as module_target, nullcontext((1, 2)) as (left, right):
+    body_target = 1
+
+class C:
+    with nullcontext() as class_target:
+        body_field = 1
+
+def function():
+    with nullcontext() as local_target:
+        pass
+").exports(),
+            @"
+        module_target :: Variable
+        left :: Variable
+        right :: Variable
+        body_target :: Variable
+        C :: Class
+        function :: Function
+        ",
+        );
+    }
+
+    #[test]
+    fn exports_for_statement_targets() {
+        insta::assert_snapshot!(
+            public_test("\
+for module_target in ():
+    body_target = 1
+else:
+    fallback_target = 2
+
+for [left, *middle, right] in ():
+    pass
+
+class C:
+    for class_target in ():
+        body_field = 1
+
+def function():
+    for local_target in ():
+        pass
+").exports(),
+            @"
+        module_target :: Variable
+        body_target :: Variable
+        fallback_target :: Variable
+        left :: Variable
+        middle :: Variable
+        right :: Variable
+        C :: Class
+        function :: Function
+        ",
+        );
+    }
+
+    #[test]
+    fn exports_match_pattern_bindings() {
+        insta::assert_snapshot!(
+            public_test("\
+match subject:
+    case [first, *middle, last] as sequence:
+        body_target = 1
+    case {\"key\": mapping_value, **remaining}:
+        fallback_target = 2
+    case Point(positional, named=keyword):
+        pass
+    case (0 as alternative) | (1 as alternative):
+        pass
+
+class C:
+    match subject:
+        case class_capture:
+            body_field = 1
+
+def function():
+    match subject:
+        case local_capture:
+            pass
+").exports(),
+            @"
+        first :: Variable
+        middle :: Variable
+        last :: Variable
+        sequence :: Variable
+        body_target :: Variable
+        mapping_value :: Variable
+        remaining :: Variable
+        fallback_target :: Variable
+        positional :: Variable
+        keyword :: Variable
+        alternative :: Variable
+        C :: Class
+        function :: Function
+        ",
+        );
+    }
+
+    #[test]
+    fn exports_named_expression_bindings() {
+        insta::assert_snapshot!(
+            public_test("\
+(y := []).append(42)
+assignment = (assignment_value := (nested_value := 1))
+
+with (context := object()) as manager:
+    body_target = 1
+
+for item in (iterable := ()):
+    pass
+
+if condition := True:
+    pass
+
+match (subject := 1):
+    case pattern if guard := True:
+        pass
+
+comprehension = [(comprehension_value := value) for value in ()]
+
+@((decorator := identity))
+def function(default=(default_value := 1)):
+    (local := 1)
+
+lambda_value = lambda default=(lambda_default := 1): (lambda_local := default)
+
+class C((base := object)):
+    (field := 1)
+").exports(),
+            @"
+        y :: Variable
+        assignment :: Variable
+        assignment_value :: Variable
+        nested_value :: Variable
+        context :: Variable
+        manager :: Variable
+        body_target :: Variable
+        item :: Variable
+        iterable :: Variable
+        condition :: Variable
+        subject :: Variable
+        pattern :: Variable
+        guard :: Variable
+        comprehension :: Variable
+        comprehension_value :: Variable
+        decorator :: Variable
+        function :: Function
+        default_value :: Variable
+        lambda_value :: Variable
+        lambda_default :: Variable
+        C :: Class
+        base :: Variable
         ",
         );
     }
