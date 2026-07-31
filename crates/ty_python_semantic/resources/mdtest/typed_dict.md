@@ -1030,10 +1030,10 @@ def nested_unknown() -> None:
     reveal_type(Outer(inner=inner, marker=["x"]))  # revealed: Outer[Unknown]
 ```
 
-### Arguments with type aliases
+### Type aliases that contain unspecialized `TypedDict`s
 
-This initial implementation does not infer through PEP 695 type aliases. An alias can therefore not
-hide an unspecialized nested `TypedDict`:
+Following a PEP 695 type alias must not allow an unspecialized `Inner` value to be treated as
+`Inner[str]`:
 
 ```toml
 [environment]
@@ -1059,15 +1059,52 @@ def check_unspecialized_alias() -> None:
     reveal_type(Outer(inner=get_inner(), marker="x"))  # revealed: Outer[Unknown]
 ```
 
-As an intentional limitation, even an alias with explicit type arguments keeps the outer constructor
-unspecialized:
+### Aliases to ordinary types
+
+An ordinary type alias in one field does not prevent another field from determining the type
+argument:
+
+```toml
+[environment]
+python-version = "3.12"
+```
 
 ```py
-def get_int_inner() -> InnerAlias[int]:
+from typing import TypedDict
+
+class Outer[T](TypedDict):
+    marker: T
+    payload: object
+
+type Payload = int
+
+def get_payload() -> Payload:
     raise NotImplementedError
 
-def check_specialized_alias() -> None:
-    reveal_type(Outer(inner=get_int_inner(), marker=1))  # revealed: Outer[Unknown]
+reveal_type(Outer(marker=1, payload=get_payload()))  # revealed: Outer[int]
+```
+
+### Recursive aliases
+
+Checking an argument's aliases must terminate even when each recursive step changes the alias's type
+argument. If ty reaches the same alias again with a different argument, it stops and leaves the
+constructor unspecialized:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import TypedDict
+
+type Growing[T] = T | Growing[list[T]]
+
+class Box[T](TypedDict):
+    value: T
+
+def construct(value: Growing[int]) -> None:
+    reveal_type(Box(value=value))  # revealed: Box[Unknown]
 ```
 
 ### Unrelated protocol members

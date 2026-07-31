@@ -25,7 +25,7 @@ use crate::types::typed_dict::{
 };
 use crate::types::{
     ClassType, IntersectionType, KnownClass, Type, TypeAndQualifiers, TypeContext,
-    TypeVarBoundOrConstraints, TypedDictModule, TypedDictType, any_over_type,
+    TypeVarBoundOrConstraints, TypedDictModule, TypedDictType, any_over_type_expanding_aliases,
 };
 use crate::{FxIndexMap, Program, TypeQualifiers};
 use ty_python_core::definition::Definition;
@@ -202,9 +202,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         // without providing the precise context needed by an expression such as a lambda. Prefer
         // a valid expected specialization so ordinary constructor validation checks the expression
         // under that context.
-        if any_over_type(db, return_ty, false, |ty| {
-            ty.is_unknown() || matches!(ty, Type::TypeAlias(_))
-        }) && let Some(contextual_typed_dict) = contextual_typed_dict
+        if any_over_type_expanding_aliases(db, return_ty, |ty| ty.is_unknown())
+            && let Some(contextual_typed_dict) = contextual_typed_dict
         {
             return Some(Type::TypedDict(contextual_typed_dict));
         }
@@ -393,18 +392,15 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         matching.next().is_none().then_some(specialization)
     }
 
-    /// Return `true` if `ty` contains an opaque alias or a matching generic `TypedDict` with a
-    /// gradual type argument. If `class_literal` is `None`, any `TypedDict` class matches.
+    /// Return `true` if `ty`, after expanding aliases, contains a matching generic `TypedDict`
+    /// with an unknown type argument. If `class_literal` is `None`, any `TypedDict` class matches.
     fn type_contains_unknown_generic_typed_dict(
         &self,
         ty: Type<'db>,
         class_literal: Option<ClassLiteral<'db>>,
     ) -> bool {
         let db = self.db();
-        any_over_type(db, ty, false, |ty| {
-            if matches!(ty, Type::TypeAlias(_)) {
-                return true;
-            }
+        any_over_type_expanding_aliases(db, ty, |ty| {
             let Type::TypedDict(typed_dict) = ty else {
                 return false;
             };
@@ -417,9 +413,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 return false;
             }
             alias.specialization(db).types(db).iter().any(|argument| {
-                any_over_type(db, *argument, false, |nested| {
-                    nested.is_unknown() || matches!(nested, Type::TypeAlias(_))
-                })
+                any_over_type_expanding_aliases(db, *argument, |nested| nested.is_unknown())
             })
         })
     }

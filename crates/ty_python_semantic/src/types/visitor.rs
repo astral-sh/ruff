@@ -3,6 +3,7 @@ use std::hash::Hash;
 
 use rustc_hash::{FxBuildHasher, FxHashSet};
 use smallvec::SmallVec;
+use ty_python_core::definition::Definition;
 
 use crate::{
     Db,
@@ -17,6 +18,7 @@ use crate::{
         class::walk_generic_alias,
         cyclic::ActiveRecursionDetector,
         function::{FunctionType, walk_function_type},
+        generics::walk_specialization,
         instance::{walk_nominal_instance_type, walk_protocol_instance_type},
         known_instance::walk_known_instance_type,
         method::{walk_bound_method_type, walk_method_wrapper_type},
@@ -481,11 +483,26 @@ pub(super) fn non_any_dynamic_content<'db>(db: &'db dyn Db, ty: Type<'db>) -> Dy
     visitor.content.get()
 }
 
+/// Controls which attributes that require deferred type inference are traversed.
+///
+/// The alias-only mode follows structural type composition without inspecting protocol members or
+/// type-variable metadata.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum LazyTypeAttributes {
+    /// Do not traverse any deferred attributes.
+    None,
+    /// Expand type aliases while otherwise remaining within the structural type.
+    TypeAliases,
+    /// Traverse all deferred attributes supported by [`TypeVisitor`].
+    All,
+}
+
 /// Implementation for `any_over_type` and `find_over_type`.
 fn any_over_type_impl<'db, F, T>(
     db: &'db dyn Db,
     ty: Type<'db>,
-    should_visit_lazy_type_attributes: bool,
+    lazy_type_attributes: LazyTypeAttributes,
+    recursive_alias_result: T,
     query: F,
 ) -> T
 where
@@ -495,8 +512,10 @@ where
     struct AnyOverTypeVisitor<'db, 'a, U> {
         query: &'a dyn Fn(Type<'db>) -> U,
         recursion_guard: TypeCollector<'db>,
+        active_type_aliases: ActiveRecursionDetector<Definition<'db>>,
         found_matching_type: Cell<U>,
-        should_visit_lazy_type_attributes: bool,
+        lazy_type_attributes: LazyTypeAttributes,
+        recursive_alias_result: U,
     }
 
     impl<'db, U> TypeVisitor<'db> for AnyOverTypeVisitor<'db, '_, U>
@@ -504,7 +523,7 @@ where
         U: Copy + Default + PartialEq,
     {
         fn should_visit_lazy_type_attributes(&self) -> bool {
-            self.should_visit_lazy_type_attributes
+            self.lazy_type_attributes == LazyTypeAttributes::All
         }
 
         fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
@@ -520,13 +539,62 @@ where
             }
             walk_type_with_recursion_guard(db, ty, self, &self.recursion_guard);
         }
+
+        fn visit_bound_type_var_type(
+            &self,
+            db: &'db dyn Db,
+            bound_typevar: BoundTypeVarInstance<'db>,
+        ) {
+            if self.lazy_type_attributes != LazyTypeAttributes::TypeAliases {
+                walk_bound_type_var_type(db, bound_typevar, self);
+            }
+        }
+
+        fn visit_type_var_type(&self, db: &'db dyn Db, typevar: TypeVarInstance<'db>) {
+            if self.lazy_type_attributes != LazyTypeAttributes::TypeAliases {
+                walk_type_var_type(db, typevar, self);
+            }
+        }
+
+        fn visit_protocol_instance_type(
+            &self,
+            db: &'db dyn Db,
+            protocol: ProtocolInstanceType<'db>,
+        ) {
+            if self.lazy_type_attributes != LazyTypeAttributes::TypeAliases {
+                walk_protocol_instance_type(db, protocol, self);
+                return;
+            }
+
+            if let Some((_, Some(specialization))) = protocol
+                .class_origin(db)
+                .and_then(|class| class.static_class_literal(db))
+            {
+                walk_specialization(db, specialization, self);
+            }
+        }
+
+        fn visit_type_alias_type(&self, db: &'db dyn Db, type_alias: TypeAliasType<'db>) {
+            if self.lazy_type_attributes == LazyTypeAttributes::TypeAliases {
+                let definition = type_alias.definition(db);
+                self.active_type_aliases.visit(
+                    &definition,
+                    || self.found_matching_type.set(self.recursive_alias_result),
+                    || self.visit_type(db, type_alias.value_type(db)),
+                );
+            } else {
+                walk_type_alias_type(db, type_alias, self);
+            }
+        }
     }
 
     let visitor = AnyOverTypeVisitor {
         query: &query,
         recursion_guard: TypeCollector::default(),
+        active_type_aliases: ActiveRecursionDetector::default(),
         found_matching_type: Cell::default(),
-        should_visit_lazy_type_attributes,
+        lazy_type_attributes,
+        recursive_alias_result,
     };
     visitor.visit_type(db, ty);
     visitor.found_matching_type.get()
@@ -546,7 +614,29 @@ pub(super) fn any_over_type<'db>(
     should_visit_lazy_type_attributes: bool,
     query: impl Fn(Type<'db>) -> bool,
 ) -> bool {
-    any_over_type_impl(db, ty, should_visit_lazy_type_attributes, query)
+    any_over_type_impl(
+        db,
+        ty,
+        if should_visit_lazy_type_attributes {
+            LazyTypeAttributes::All
+        } else {
+            LazyTypeAttributes::None
+        },
+        false,
+        query,
+    )
+}
+
+/// Return `true` if `ty`, or any structurally contained type, matches `query`.
+///
+/// This expands type alias values but does not inspect protocol members or type-variable metadata.
+/// A recursive alias whose specialization changes on each expansion conservatively matches.
+pub(super) fn any_over_type_expanding_aliases<'db>(
+    db: &'db dyn Db,
+    ty: Type<'db>,
+    query: impl Fn(Type<'db>) -> bool,
+) -> bool {
+    any_over_type_impl(db, ty, LazyTypeAttributes::TypeAliases, true, query)
 }
 
 /// Recurse into a type and calls the passed-in closure on every nested type
@@ -571,7 +661,17 @@ pub(super) fn find_over_type<'db, T>(
 where
     T: Copy + PartialEq,
 {
-    any_over_type_impl(db, ty, should_visit_lazy_type_attributes, query)
+    any_over_type_impl(
+        db,
+        ty,
+        if should_visit_lazy_type_attributes {
+            LazyTypeAttributes::All
+        } else {
+            LazyTypeAttributes::None
+        },
+        None,
+        query,
+    )
 }
 
 #[cfg(test)]
