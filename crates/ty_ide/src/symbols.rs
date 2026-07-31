@@ -700,7 +700,7 @@ struct SymbolVisitor<'db> {
     in_class: bool,
     /// The statement whose expressions are currently being visited.
     current_stmt: Option<&'db ast::Stmt>,
-    /// Whether names in a `Store` context should be ignored.
+    /// Whether store-context names should be excluded from the enclosing scope.
     suppress_store_symbols: bool,
     /// When enabled, the visitor should only try to extract
     /// symbols from a module that we believed form the "exported"
@@ -826,27 +826,10 @@ impl<'db> SymbolVisitor<'db> {
         }
     }
 
-    fn with_current_stmt(
-        &mut self,
-        stmt: &'db ast::Stmt,
-        visit: impl FnOnce(&mut SymbolVisitor<'db>),
-    ) {
-        let previous_stmt = self.current_stmt.replace(stmt);
-        visit(self);
-        self.current_stmt = previous_stmt;
-    }
-
-    fn with_store_symbols_suppressed(&mut self, visit: impl FnOnce(&mut SymbolVisitor<'db>)) {
-        let was_suppressed = self.suppress_store_symbols;
-        self.suppress_store_symbols = true;
-        visit(self);
-        self.suppress_store_symbols = was_suppressed;
-    }
-
-    fn walk_stmt(&mut self, stmt: &'db ast::Stmt) {
-        self.with_current_stmt(stmt, |visitor| {
-            source_order::walk_stmt(visitor, stmt);
-        });
+    fn visit_nonbinding_target(&mut self, target: &'db ast::Expr) {
+        let previous = std::mem::replace(&mut self.suppress_store_symbols, true);
+        self.visit_expr(target);
+        self.suppress_store_symbols = previous;
     }
 
     /// Add a new symbol and return its ID.
@@ -1263,10 +1246,8 @@ impl<'db> SymbolVisitor<'db> {
         // ... otherwise, it's exported!
         true
     }
-}
 
-impl<'db> SourceOrderVisitor<'db> for SymbolVisitor<'db> {
-    fn visit_stmt(&mut self, stmt: &'db ast::Stmt) {
+    fn visit_stmt_impl(&mut self, stmt: &'db ast::Stmt) {
         match stmt {
             ast::Stmt::FunctionDef(func_def) => {
                 let kind = SymbolKind::function_kind(
@@ -1286,23 +1267,19 @@ impl<'db> SourceOrderVisitor<'db> for SymbolVisitor<'db> {
                     imported_from: None,
                 };
 
-                self.with_current_stmt(stmt, |visitor| {
-                    for decorator in &func_def.decorator_list {
-                        visitor.visit_decorator(decorator);
-                    }
-                });
+                for decorator in &func_def.decorator_list {
+                    self.visit_decorator(decorator);
+                }
 
                 let symbol_id = self.add_symbol(symbol);
 
-                self.with_current_stmt(stmt, |visitor| {
-                    if let Some(type_params) = &func_def.type_params {
-                        visitor.visit_type_params(type_params);
-                    }
-                    visitor.visit_parameters(&func_def.parameters);
-                    if let Some(returns) = &func_def.returns {
-                        visitor.visit_annotation(returns);
-                    }
-                });
+                if let Some(type_params) = &func_def.type_params {
+                    self.visit_type_params(type_params);
+                }
+                self.visit_parameters(&func_def.parameters);
+                if let Some(returns) = &func_def.returns {
+                    self.visit_annotation(returns);
+                }
 
                 if self.exports_only {
                     // If global_only, don't walk function bodies
@@ -1333,22 +1310,18 @@ impl<'db> SourceOrderVisitor<'db> for SymbolVisitor<'db> {
                     imported_from: None,
                 };
 
-                self.with_current_stmt(stmt, |visitor| {
-                    for decorator in &class_def.decorator_list {
-                        visitor.visit_decorator(decorator);
-                    }
-                });
+                for decorator in &class_def.decorator_list {
+                    self.visit_decorator(decorator);
+                }
 
                 let symbol_id = self.add_symbol(symbol);
 
-                self.with_current_stmt(stmt, |visitor| {
-                    if let Some(type_params) = &class_def.type_params {
-                        visitor.visit_type_params(type_params);
-                    }
-                    if let Some(arguments) = &class_def.arguments {
-                        visitor.visit_arguments(arguments);
-                    }
-                });
+                if let Some(type_params) = &class_def.type_params {
+                    self.visit_type_params(type_params);
+                }
+                if let Some(arguments) = &class_def.arguments {
+                    self.visit_arguments(arguments);
+                }
 
                 if self.exports_only {
                     // If global_only, don't walk class bodies
@@ -1378,52 +1351,78 @@ impl<'db> SourceOrderVisitor<'db> for SymbolVisitor<'db> {
             }
             ast::Stmt::Assign(assign) => {
                 self.add_all_assignment(&assign.targets, Some(&assign.value));
-                self.walk_stmt(stmt);
+                source_order::walk_stmt(self, stmt);
             }
             ast::Stmt::AnnAssign(ann_assign) => {
                 self.add_all_assignment(
                     std::slice::from_ref(&ann_assign.target),
                     ann_assign.value.as_deref(),
                 );
-                self.walk_stmt(stmt);
+                source_order::walk_stmt(self, stmt);
             }
             ast::Stmt::AugAssign(ast::StmtAugAssign {
                 target, op, value, ..
             }) => {
-                if self.exports_only && self.all_origin.is_some() && is_dunder_all(target) {
-                    // Anything other than `+=` is not valid.
-                    if !matches!(op, ast::Operator::Add) || !self.extend_all(value) {
-                        self.all_invalid = true;
-                    }
+                self.visit_nonbinding_target(target);
+                self.visit_expr(value);
+
+                // We don't care about `__all__` unless we're
+                // specifically looking for exported symbols.
+                if !self.exports_only {
+                    return;
                 }
 
-                self.with_current_stmt(stmt, |visitor| {
-                    visitor.with_store_symbols_suppressed(|visitor| {
-                        visitor.visit_expr(target);
-                    });
-                    visitor.visit_operator(op);
-                    visitor.visit_expr(value);
-                });
-            }
-            ast::Stmt::Expr(expr) => {
-                if self.exports_only
-                    && self.all_origin.is_some()
-                    && let Some(ast::ExprCall {
-                        func, arguments, ..
-                    }) = expr.value.as_call_expr()
-                    && let Some(ast::ExprAttribute {
-                        value,
-                        attr,
-                        ctx: ast::ExprContext::Load,
-                        ..
-                    }) = func.as_attribute_expr()
-                    && is_dunder_all(value)
-                    && !self.update_all_by_call_idiom(attr, arguments)
-                {
+                if self.all_origin.is_none() {
+                    // We can't update `__all__` if it doesn't already
+                    // exist.
+                    return;
+                }
+                if !is_dunder_all(target) {
+                    return;
+                }
+                // Anything other than `+=` is not valid.
+                if !matches!(op, ast::Operator::Add) {
+                    self.all_invalid = true;
+                    return;
+                }
+                if !self.extend_all(value) {
                     self.all_invalid = true;
                 }
+            }
+            ast::Stmt::Expr(expr) => {
+                source_order::walk_stmt(self, stmt);
 
-                self.walk_stmt(stmt);
+                // We don't care about `__all__` unless we're
+                // specifically looking for exported symbols.
+                if !self.exports_only {
+                    return;
+                }
+
+                if self.all_origin.is_none() {
+                    // We can't update `__all__` if it doesn't already exist.
+                    return;
+                }
+                let Some(ast::ExprCall {
+                    func, arguments, ..
+                }) = expr.value.as_call_expr()
+                else {
+                    return;
+                };
+                let Some(ast::ExprAttribute {
+                    value,
+                    attr,
+                    ctx: ast::ExprContext::Load,
+                    ..
+                }) = func.as_attribute_expr()
+                else {
+                    return;
+                };
+                if !is_dunder_all(value) {
+                    return;
+                }
+                if !self.update_all_by_call_idiom(attr, arguments) {
+                    self.all_invalid = true;
+                }
             }
             ast::Stmt::Import(import) => {
                 // We ignore any names introduced by imports
@@ -1473,10 +1472,16 @@ impl<'db> SourceOrderVisitor<'db> for SymbolVisitor<'db> {
             // statements. We just assume that all `if` statements are
             // always `True`. This applies to symbols in general but
             // also `__all__`.
-            _ => {
-                self.walk_stmt(stmt);
-            }
+            _ => source_order::walk_stmt(self, stmt),
         }
+    }
+}
+
+impl<'db> SourceOrderVisitor<'db> for SymbolVisitor<'db> {
+    fn visit_stmt(&mut self, stmt: &'db ast::Stmt) {
+        let previous_stmt = self.current_stmt.replace(stmt);
+        self.visit_stmt_impl(stmt);
+        self.current_stmt = previous_stmt;
     }
 
     fn visit_expr(&mut self, expr: &'db ast::Expr) {
@@ -1492,12 +1497,27 @@ impl<'db> SourceOrderVisitor<'db> for SymbolVisitor<'db> {
             {
                 self.add_assignment(stmt, name);
 
-                if self.exports_only
-                    && !self.in_class
-                    && self.all_origin.is_some()
-                    && name.id == "__all__"
-                    && !is_recognized_all_assignment(stmt, name)
-                {
+                if name.id != "__all__" {
+                    return;
+                }
+
+                // We don't care about `__all__` unless we're
+                // specifically looking for exported symbols.
+                if !self.exports_only {
+                    return;
+                }
+
+                // Class-scoped assignments do not affect the module's exports.
+                if self.in_class {
+                    return;
+                }
+
+                // We can't update `__all__` if it doesn't already exist.
+                if self.all_origin.is_none() {
+                    return;
+                }
+
+                if !is_recognized_all_assignment(stmt, name) {
                     self.all_invalid = true;
                 }
             }
@@ -1516,10 +1536,9 @@ impl<'db> SourceOrderVisitor<'db> for SymbolVisitor<'db> {
     }
 
     fn visit_comprehension(&mut self, comprehension: &'db ast::Comprehension) {
-        self.with_store_symbols_suppressed(|visitor| {
-            visitor.visit_expr(&comprehension.target);
-        });
+        self.visit_nonbinding_target(&comprehension.target);
         self.visit_expr(&comprehension.iter);
+
         for condition in &comprehension.ifs {
             self.visit_expr(condition);
         }
@@ -1543,15 +1562,16 @@ fn is_dunder_all(expr: &ast::Expr) -> bool {
 }
 
 fn is_recognized_all_assignment(stmt: &ast::Stmt, name: &ast::ExprName) -> bool {
-    let target = match stmt {
-        ast::Stmt::Assign(assign) => assign.targets.first(),
-        ast::Stmt::AnnAssign(ann_assign) => Some(&*ann_assign.target),
-        _ => None,
-    };
-
-    target
-        .and_then(ast::Expr::as_name_expr)
-        .is_some_and(|target| std::ptr::eq(target, name))
+    match stmt {
+        ast::Stmt::Assign(assign) => assign
+            .targets
+            .first()
+            .is_some_and(|target| is_dunder_all(target) && target.range() == name.range()),
+        ast::Stmt::AnnAssign(assign) => {
+            is_dunder_all(&assign.target) && assign.target.range() == name.range()
+        }
+        _ => false,
+    }
 }
 
 /// Create and return a string representing a name from the given
@@ -1659,46 +1679,89 @@ def function():
     }
 
     #[test]
-    fn exports_store_contexts() {
-        insta::assert_snapshot!(
-            public_test("\
-[left, *middle, right] = (1, 2, 3)
-augmented = 1
-augmented += (augmented_value := 1)
-
-for loop_target in ():
+    fn exports_store_context_targets() {
+        let test = public_test(
+            "\
+first, *rest, LAST = values
+for loop_left, [loop_right, *loop_rest] in rows:
     pass
+with manager() as [with_left, *with_rest]:
+    pass
+captured = (walrus := 1)
+",
+        );
 
-(named_target := 1)
-comprehension = [(comprehension_target := value) for value in ()]
-lambda_value = lambda default=(lambda_default := 1): (lambda_local := default)
+        assert_eq!(
+            test.exports(),
+            "first :: Variable\n\
+rest :: Variable\n\
+LAST :: Constant\n\
+loop_left :: Variable\n\
+loop_right :: Variable\n\
+loop_rest :: Variable\n\
+with_left :: Variable\n\
+with_rest :: Variable\n\
+captured :: Variable\n\
+walrus :: Variable"
+        );
+    }
 
-class C((base_target := object)):
-    [class_left, class_right] = (1, 2)
+    #[test]
+    fn exports_exclude_comprehension_targets() {
+        let test = public_test(
+            "\
+result = [item for item in values if (leaked := item)]
+generator = (other for other in values)
+lambda_value = lambda: (lambda_local := 1)
+",
+        );
 
-@((decorator_target := identity))
-def function(default=(default_target := 1)):
-    [local_left, local_right] = (1, 2)
-    (local_walrus := 1)
-").exports(),
-            @"
-        left :: Variable
-        middle :: Variable
-        right :: Variable
-        augmented :: Variable
-        augmented_value :: Variable
-        loop_target :: Variable
-        named_target :: Variable
-        comprehension :: Variable
-        comprehension_target :: Variable
-        lambda_value :: Variable
-        lambda_default :: Variable
-        C :: Class
-        base_target :: Variable
-        decorator_target :: Variable
-        function :: Function
-        default_target :: Variable
-        ",
+        assert_eq!(
+            test.exports(),
+            "result :: Variable\n\
+leaked :: Variable\n\
+generator :: Variable\n\
+lambda_value :: Variable"
+        );
+    }
+
+    #[test]
+    fn exports_invalidate_all_rebound_by_with_target() {
+        let test = public_test(
+            "\
+hidden = 1
+visible = 2
+__all__ = ['visible']
+with manager() as __all__:
+    pass
+",
+        );
+
+        assert_eq!(
+            test.exports(),
+            "hidden :: Variable\n\
+visible :: Variable\n\
+__all__ :: Variable"
+        );
+    }
+
+    #[test]
+    fn exports_invalidate_all_rebound_by_named_expression() {
+        let test = public_test(
+            "\
+hidden = 1
+visible = 2
+__all__ = ['visible']
+result = (__all__ := unknown)
+",
+        );
+
+        assert_eq!(
+            test.exports(),
+            "hidden :: Variable\n\
+visible :: Variable\n\
+__all__ :: Variable\n\
+result :: Variable"
         );
     }
 

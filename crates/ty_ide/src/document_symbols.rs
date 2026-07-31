@@ -10,7 +10,7 @@ pub fn document_symbols(db: &dyn Db, file: File) -> &FlatSymbols {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::symbols::{HierarchicalSymbols, SymbolId, SymbolInfo};
+    use crate::symbols::{HierarchicalSymbols, SymbolId, SymbolInfo, SymbolKind};
     use crate::tests::{CursorTest, IntoDiagnostic, cursor_test};
     use insta::assert_snapshot;
     use ruff_db::diagnostic::{
@@ -342,157 +342,103 @@ def function():
     }
 
     #[test]
-    fn document_symbols_store_contexts() {
+    fn document_symbols_store_context_targets() {
         let test = cursor_test(
             "
-[left, *middle, right] = (1, 2, 3)
-augmented = 1
-augmented += (augmented_value := 1)
+first, *rest, LAST = values
 
-for loop_target in ():
-    pass
+for loop_left, [loop_right, *loop_rest] in rows:
+    loop_body = 1
 
-(named_target := 1)
-comprehension = [(comprehension_target := value) for value in ()]
-lambda_value = lambda default=(lambda_default := 1): (lambda_local := default)
+with manager() as [with_left, *with_rest], manager() as WITH_CONSTANT:
+    with_body = 1
 
-class C((base_target := object)):
-    [class_left, class_right] = (1, 2)
+captured = (walrus := 1)
 
-@((decorator_target := identity))
-def function(default=(default_target := 1)):
-    [local_left, local_right] = (1, 2)
-    (local_walrus := 1)
+def function():
+    function_local = 1
+    with manager() as function_target:
+        pass
 <CURSOR>",
         );
 
-        assert_snapshot!(test.document_symbols(), @"
-        info[document-symbols]: SymbolInfo
-         --> main.py:2:2
-          |
-        2 | [left, *middle, right] = (1, 2, 3)
-          |  ^^^^
-        info: Variable left
+        let symbols = document_symbols(&test.db, test.cursor.file)
+            .iter()
+            .map(|(_, symbol)| (symbol.name.into_owned(), symbol.kind))
+            .collect::<Vec<_>>();
 
-        info[document-symbols]: SymbolInfo
-         --> main.py:2:9
-          |
-        2 | [left, *middle, right] = (1, 2, 3)
-          |         ^^^^^^
-        info: Variable middle
+        assert_eq!(
+            symbols,
+            [
+                ("first", SymbolKind::Variable),
+                ("rest", SymbolKind::Variable),
+                ("LAST", SymbolKind::Constant),
+                ("loop_left", SymbolKind::Variable),
+                ("loop_right", SymbolKind::Variable),
+                ("loop_rest", SymbolKind::Variable),
+                ("loop_body", SymbolKind::Variable),
+                ("with_left", SymbolKind::Variable),
+                ("with_rest", SymbolKind::Variable),
+                ("WITH_CONSTANT", SymbolKind::Constant),
+                ("with_body", SymbolKind::Variable),
+                ("captured", SymbolKind::Variable),
+                ("walrus", SymbolKind::Variable),
+                ("function", SymbolKind::Function),
+            ]
+            .map(|(name, kind)| (name.to_owned(), kind))
+        );
+    }
 
-        info[document-symbols]: SymbolInfo
-         --> main.py:2:17
-          |
-        2 | [left, *middle, right] = (1, 2, 3)
-          |                 ^^^^^
-        info: Variable right
+    #[test]
+    fn document_symbols_comprehension_and_lambda_scopes() {
+        let test = cursor_test(
+            "
+result = [item for item in values if (leaked := item)]
+generator = (other for other in values)
+lambda_value = lambda: (lambda_local := 1)
+<CURSOR>",
+        );
 
-        info[document-symbols]: SymbolInfo
-         --> main.py:3:1
-          |
-        3 | augmented = 1
-          | ^^^^^^^^^
-        info: Variable augmented
+        let names = document_symbols(&test.db, test.cursor.file)
+            .iter()
+            .map(|(_, symbol)| symbol.name.into_owned())
+            .collect::<Vec<_>>();
 
-        info[document-symbols]: SymbolInfo
-         --> main.py:4:15
-          |
-        4 | augmented += (augmented_value := 1)
-          |               ^^^^^^^^^^^^^^^
-        info: Variable augmented_value
+        assert_eq!(names, ["result", "leaked", "generator", "lambda_value"]);
+    }
 
-        info[document-symbols]: SymbolInfo
-         --> main.py:6:5
-          |
-        6 | for loop_target in ():
-          |     ^^^^^^^^^^^
-        info: Variable loop_target
+    #[test]
+    fn document_symbols_function_and_class_header_bindings() {
+        let test = cursor_test(
+            "
+@(function_decorator := decorate)
+def function(value=(default_value := 1)):
+    function_local = 1
 
-        info[document-symbols]: SymbolInfo
-         --> main.py:9:2
-          |
-        9 | (named_target := 1)
-          |  ^^^^^^^^^^^^
-        info: Variable named_target
+@(class_decorator := decorate)
+class Example((class_base := Base)):
+    class_field = 1
+<CURSOR>",
+        );
 
-        info[document-symbols]: SymbolInfo
-          --> main.py:10:1
-           |
-        10 | comprehension = [(comprehension_target := value) for value in ()]
-           | ^^^^^^^^^^^^^
-        info: Variable comprehension
+        let symbols = document_symbols(&test.db, test.cursor.file)
+            .iter()
+            .map(|(_, symbol)| (symbol.name.into_owned(), symbol.kind))
+            .collect::<Vec<_>>();
 
-        info[document-symbols]: SymbolInfo
-          --> main.py:10:19
-           |
-        10 | comprehension = [(comprehension_target := value) for value in ()]
-           |                   ^^^^^^^^^^^^^^^^^^^^
-        info: Variable comprehension_target
-
-        info[document-symbols]: SymbolInfo
-          --> main.py:11:1
-           |
-        11 | lambda_value = lambda default=(lambda_default := 1): (lambda_local := default)
-           | ^^^^^^^^^^^^
-        info: Variable lambda_value
-
-        info[document-symbols]: SymbolInfo
-          --> main.py:11:32
-           |
-        11 | lambda_value = lambda default=(lambda_default := 1): (lambda_local := default)
-           |                                ^^^^^^^^^^^^^^
-        info: Variable lambda_default
-
-        info[document-symbols]: SymbolInfo
-          --> main.py:13:7
-           |
-        13 | class C((base_target := object)):
-           |       ^
-        info: Class C
-
-        info[document-symbols]: SymbolInfo
-          --> main.py:14:6
-           |
-        14 |     [class_left, class_right] = (1, 2)
-           |      ^^^^^^^^^^
-        info: Field class_left
-
-        info[document-symbols]: SymbolInfo
-          --> main.py:14:18
-           |
-        14 |     [class_left, class_right] = (1, 2)
-           |                  ^^^^^^^^^^^
-        info: Field class_right
-
-        info[document-symbols]: SymbolInfo
-          --> main.py:13:10
-           |
-        13 | class C((base_target := object)):
-           |          ^^^^^^^^^^^
-        info: Variable base_target
-
-        info[document-symbols]: SymbolInfo
-          --> main.py:16:4
-           |
-        16 | @((decorator_target := identity))
-           |    ^^^^^^^^^^^^^^^^
-        info: Variable decorator_target
-
-        info[document-symbols]: SymbolInfo
-          --> main.py:17:5
-           |
-        17 | def function(default=(default_target := 1)):
-           |     ^^^^^^^^
-        info: Function function
-
-        info[document-symbols]: SymbolInfo
-          --> main.py:17:23
-           |
-        17 | def function(default=(default_target := 1)):
-           |                       ^^^^^^^^^^^^^^
-        info: Variable default_target
-        ");
+        assert_eq!(
+            symbols,
+            [
+                ("function_decorator", SymbolKind::Variable),
+                ("function", SymbolKind::Function),
+                ("default_value", SymbolKind::Variable),
+                ("class_decorator", SymbolKind::Variable),
+                ("Example", SymbolKind::Class),
+                ("class_base", SymbolKind::Variable),
+                ("class_field", SymbolKind::Field),
+            ]
+            .map(|(name, kind)| (name.to_owned(), kind))
+        );
     }
 
     impl CursorTest {
