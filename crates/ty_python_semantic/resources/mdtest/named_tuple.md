@@ -1635,6 +1635,64 @@ Invalid = NamedTuple("Invalid", [("not valid", int), ("ok", str)])
 reveal_type(Invalid)  # revealed: <class 'Invalid'>
 ```
 
+## NamedTuple fields cannot be qualified with `ClassVar` or `Final`
+
+`NamedTuple` builds each field's type by passing its annotation through `typing._type_check`, which
+rejects bare type qualifiers. Qualifying a field with `ClassVar` or `Final` therefore raises
+`TypeError` as soon as the class statement is executed.
+
+```py
+from typing import ClassVar, Final, NamedTuple
+
+class Foo(NamedTuple):
+    # error: [invalid-named-tuple] "Type qualifier `ClassVar` is not allowed on NamedTuple field `a`"
+    a: ClassVar[int]
+    # error: [invalid-named-tuple] "Type qualifier `Final` is not allowed on NamedTuple field `b`"
+    b: Final[str] = "foo"
+```
+
+An unsubscripted qualifier is rejected for the same reason:
+
+```py
+from typing import ClassVar, NamedTuple
+
+class Bare(NamedTuple):
+    # error: [invalid-named-tuple] "Type qualifier `ClassVar` is not allowed on NamedTuple field `x`"
+    x: ClassVar
+```
+
+A class that inherits from a `NamedTuple` class is an ordinary class at runtime, so it may use both
+qualifiers freely:
+
+```py
+from typing import ClassVar, Final, NamedTuple
+
+class Base(NamedTuple):
+    x: int
+
+class Sub(Base):
+    y: ClassVar[int] = 1
+    z: Final[str] = "z"
+```
+
+The full diagnostic points at the offending field:
+
+```py
+from typing import ClassVar, NamedTuple
+
+class Snapshot(NamedTuple):
+    # snapshot
+    a: ClassVar[int]
+```
+
+```snapshot
+error[invalid-named-tuple]: Type qualifier `ClassVar` is not allowed in a NamedTuple field
+  --> src/mdtest_snippet.py:25:5
+   |
+25 |     a: ClassVar[int]
+   |     ^^^^^^^^^^^^^^^^ Class definition will raise `TypeError` at runtime due to this field
+```
+
 ## Prohibited NamedTuple attributes
 
 `NamedTuple` classes have certain synthesized attributes that cannot be overwritten. Attempting to
