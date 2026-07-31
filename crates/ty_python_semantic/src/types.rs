@@ -23,6 +23,7 @@ use smallvec::smallvec_inline;
 use ty_module_resolver::{KnownModule, Module, ModuleName, resolve_module};
 
 pub(crate) use self::callable::UpcastPolicy;
+use self::cyclic::ActiveRecursionDetector;
 pub use self::cyclic::CycleDetector;
 pub(crate) use self::cyclic::TypeTransformer;
 pub(crate) use self::diagnostic::TypeCheckDiagnostics;
@@ -171,6 +172,10 @@ mod definition;
 #[cfg(test)]
 mod property_tests;
 mod subscript;
+
+/// Bounds type-growing `__call__` chains such as `C[T].__call__: C[list[T]]`.
+/// Matches `MAX_TUPLE_EXPANSION` in `type_expansion`.
+const MAX_DUNDER_CALL_EXPANSION: usize = 64;
 
 pub fn check_types(db: &dyn Db, file: File) -> Vec<Diagnostic> {
     let _span = tracing::trace_span!("check_types", ?file).entered();
@@ -4545,8 +4550,16 @@ impl<'db> Type<'db> {
     /// elements. It's usually best to only worry about "callability" relative to a particular
     /// argument list, via [`try_call`][Self::try_call] and [`CallErrorKind::NotCallable`].
     fn bindings(self, db: &'db dyn Db) -> Bindings<'db> {
+        self.bindings_impl(db, &ActiveRecursionDetector::default())
+    }
+
+    fn bindings_impl(
+        self,
+        db: &'db dyn Db,
+        recursion_guard: &ActiveRecursionDetector<Type<'db>>,
+    ) -> Bindings<'db> {
         if let Some(fallback) = self.materialized_divergent_fallback() {
-            return fallback.bindings(db);
+            return fallback.bindings_impl(db, recursion_guard);
         }
 
         match self {
@@ -4558,11 +4571,16 @@ impl<'db> Type<'db> {
             Type::TypeVar(bound_typevar) => {
                 match bound_typevar.typevar(db).bound_or_constraints(db) {
                     None => CallableBinding::not_callable(self).into(),
-                    Some(TypeVarBoundOrConstraints::UpperBound(bound)) => bound.bindings(db),
+                    Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
+                        bound.bindings_impl(db, recursion_guard)
+                    }
                     Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
                         Bindings::from_union(
                             self,
-                            constraints.elements(db).iter().map(|ty| ty.bindings(db)),
+                            constraints
+                                .elements(db)
+                                .iter()
+                                .map(|ty| ty.bindings_impl(db, recursion_guard)),
                         )
                     }
                 }
@@ -4785,17 +4803,18 @@ impl<'db> Type<'db> {
                 SubclassOfInner::TypeVar(tvar) => {
                     let constructor_instance_type = Type::TypeVar(tvar);
                     let bindings = match tvar.typevar(db).bound_or_constraints(db) {
-                        None => KnownClass::Type.to_instance(db).bindings(db),
+                        None => KnownClass::Type
+                            .to_instance(db)
+                            .bindings_impl(db, recursion_guard),
                         Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
-                            bound.to_meta_type(db).bindings(db)
+                            bound.to_meta_type(db).bindings_impl(db, recursion_guard)
                         }
                         Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
                             Bindings::from_union(
                                 self,
-                                constraints
-                                    .elements(db)
-                                    .iter()
-                                    .map(|ty| ty.to_meta_type(db).bindings(db)),
+                                constraints.elements(db).iter().map(|ty| {
+                                    ty.to_meta_type(db).bindings_impl(db, recursion_guard)
+                                }),
                             )
                         }
                     };
@@ -4844,12 +4863,21 @@ impl<'db> Type<'db> {
                         definedness: boundness,
                         ..
                     }) => {
-                        let mut bindings = dunder_callable.bindings(db);
-                        bindings.replace_callable_type(dunder_callable, self);
-                        if boundness == Definedness::PossiblyUndefined {
-                            bindings.set_dunder_call_is_possibly_unbound();
-                        }
-                        bindings
+                        // Stop cyclic or excessively deep `__call__` expansion before it overflows.
+                        recursion_guard.visit_bounded(
+                            &self,
+                            MAX_DUNDER_CALL_EXPANSION,
+                            || CallableBinding::not_callable(self).into(),
+                            || {
+                                let mut bindings =
+                                    dunder_callable.bindings_impl(db, recursion_guard);
+                                bindings.replace_callable_type(dunder_callable, self);
+                                if boundness == Definedness::PossiblyUndefined {
+                                    bindings.set_dunder_call_is_possibly_unbound();
+                                }
+                                bindings
+                            },
+                        )
                     }
                     Place::Undefined => CallableBinding::not_callable(self).into(),
                 }
@@ -4867,17 +4895,19 @@ impl<'db> Type<'db> {
                 union
                     .elements(db)
                     .iter()
-                    .map(|element| element.bindings(db)),
+                    .map(|element| element.bindings_impl(db, recursion_guard)),
             ),
 
             Type::Intersection(intersection) => Bindings::from_intersection(
                 self,
                 intersection
                     .positive_elements_or_object(db)
-                    .map(|element| element.bindings(db)),
+                    .map(|element| element.bindings_impl(db, recursion_guard)),
             ),
 
-            Type::EnumComplement(complement) => complement.to_intersection(db).bindings(db),
+            Type::EnumComplement(complement) => complement
+                .to_intersection(db)
+                .bindings_impl(db, recursion_guard),
 
             Type::DataclassDecorator(_) => {
                 let typevar = BoundTypeVarInstance::synthetic(
@@ -4904,9 +4934,9 @@ impl<'db> Type<'db> {
             Type::SpecialForm(_) => CallableBinding::not_callable(self).into(),
 
             Type::LiteralValue(literal) => match literal.kind() {
-                LiteralValueTypeKind::Enum(enum_literal) => {
-                    enum_literal.enum_class_instance(db).bindings(db)
-                }
+                LiteralValueTypeKind::Enum(enum_literal) => enum_literal
+                    .enum_class_instance(db)
+                    .bindings_impl(db, recursion_guard),
                 _ => CallableBinding::not_callable(self).into(),
             },
 
@@ -4923,13 +4953,13 @@ impl<'db> Type<'db> {
             Type::KnownInstance(
                 KnownInstanceType::FunctoolsPartial(partial)
                 | KnownInstanceType::FunctoolsPartialCall(partial),
-            ) => Type::Callable(partial.partial(db)).bindings(db),
+            ) => Type::Callable(partial.partial(db)).bindings_impl(db, recursion_guard),
 
-            Type::KnownInstance(known_instance) => {
-                known_instance.instance_fallback(db).bindings(db)
-            }
+            Type::KnownInstance(known_instance) => known_instance
+                .instance_fallback(db)
+                .bindings_impl(db, recursion_guard),
 
-            Type::TypeAlias(alias) => alias.value_type(db).bindings(db),
+            Type::TypeAlias(alias) => alias.value_type(db).bindings_impl(db, recursion_guard),
 
             Type::PropertyInstance(_)
             | Type::AlwaysFalsy

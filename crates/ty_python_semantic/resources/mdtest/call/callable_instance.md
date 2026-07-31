@@ -58,6 +58,76 @@ a = NonCallable()
 reveal_type(a())  # revealed: Unknown
 ```
 
+## Recursive non-callable `__call__`
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+A `__call__` chain that never reaches a callable signature is not callable:
+
+```py
+from typing import Callable
+
+class Direct:
+    __call__: "Direct"
+
+Direct()()  # error: [call-non-callable] "Object of type `Direct` is not callable"
+
+class IndirectA:
+    __call__: "IndirectB"
+
+class IndirectB:
+    __call__: IndirectA
+
+IndirectA()()  # error: [call-non-callable] "Object of type `IndirectA` is not callable"
+```
+
+Only the cyclic union variant is non-callable:
+
+```py
+class Mixed:
+    __call__: "Mixed | Callable[[], int]"
+
+result = Mixed()()  # error: [call-non-callable] "Object of type `Mixed` is not callable"
+reveal_type(result)  # revealed: Unknown | int
+```
+
+Callable assignability follows the same chain without a call expression:
+
+```py
+class Cyclic:
+    __call__: "Cyclic"
+
+def takes_callable(f: Callable[[], int]) -> None: ...
+def _(x: Cyclic, y: Cyclic | Callable[[], int]) -> None:
+    takes_callable(x)  # error: [invalid-argument-type]
+    reveal_type(y)  # revealed: Cyclic | (() -> int)
+```
+
+Exact-cycle detection cannot stop a chain whose specialization grows at every step:
+
+```py
+class Growing[T]:
+    __call__: "Growing[list[T]]"
+
+def _(x: Growing[int]) -> None:
+    takes_callable(x)  # error: [invalid-argument-type]
+    x()  # error: [call-non-callable] "Object of type `Growing[int]` is not callable"
+```
+
+Finite specialization chains still resolve:
+
+```py
+class Wrapper[T]:
+    __call__: "T"
+
+def _(x: Wrapper[Wrapper[Callable[[], int]]]) -> None:
+    takes_callable(x)
+    reveal_type(x())  # revealed: int
+```
+
 ## Possibly non-callable `__call__`
 
 ```py

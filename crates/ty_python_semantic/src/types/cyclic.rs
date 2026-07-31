@@ -661,6 +661,21 @@ impl<T: Hash + Eq + Clone> ActiveRecursionDetector<T> {
 
         func()
     }
+
+    /// Calls `on_limit` when `item` is active or `max_depth` items are already active.
+    pub(crate) fn visit_bounded<R>(
+        &self,
+        item: &T,
+        max_depth: usize,
+        on_limit: impl FnOnce() -> R,
+        func: impl FnOnce() -> R,
+    ) -> R {
+        if self.seen.borrow().len() >= max_depth {
+            return on_limit();
+        }
+
+        self.visit(item, on_limit, func)
+    }
 }
 
 struct ActiveRecursionGuard<'a, T: Hash + Eq> {

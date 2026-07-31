@@ -7,9 +7,11 @@ use crate::{
     types::{
         ApplyTypeMappingVisitor, BoundTypeVarInstance, ClassType, FindLegacyTypeVarsVisitor,
         FunctionType, InternedType, KnownBoundMethodType, KnownClass, KnownInstanceType,
-        LiteralValueTypeKind, MemberLookupPolicy, Parameter, Parameters, Signature,
-        SubclassOfInner, Type, TypeContext, TypeMapping, TypeVarBoundOrConstraints, UnionType,
+        LiteralValueTypeKind, MAX_DUNDER_CALL_EXPANSION, MemberLookupPolicy, Parameter, Parameters,
+        Signature, SubclassOfInner, Type, TypeContext, TypeMapping, TypeVarBoundOrConstraints,
+        UnionType,
         constraints::{ConstraintSet, IteratorConstraintsExtension},
+        cyclic::ActiveRecursionDetector,
         known_instance::FunctoolsPartialInstance,
         relation::{TypeRelation, TypeRelationChecker},
         signatures::{CallableSignature, PartialSignatureApplication},
@@ -54,6 +56,7 @@ impl<'db> Type<'db> {
             UpcastPolicy::default(),
             CallableUpcastContext {
                 recursive_definition,
+                active_dunder_calls: &ActiveRecursionDetector::default(),
             },
         )
     }
@@ -66,7 +69,10 @@ impl<'db> Type<'db> {
         self.try_upcast_to_callable_with_policy_and_context(
             db,
             policy,
-            CallableUpcastContext::default(),
+            CallableUpcastContext {
+                recursive_definition: None,
+                active_dunder_calls: &ActiveRecursionDetector::default(),
+            },
         )
     }
 
@@ -74,7 +80,7 @@ impl<'db> Type<'db> {
         self,
         db: &'db dyn Db,
         policy: UpcastPolicy,
-        context: CallableUpcastContext<'db>,
+        context: CallableUpcastContext<'_, 'db>,
     ) -> Option<CallableTypes<'db>> {
         if let Some(fallback) = self.materialized_divergent_fallback() {
             return fallback.try_upcast_to_callable_with_policy_and_context(db, policy, context);
@@ -121,12 +127,21 @@ impl<'db> Type<'db> {
                 if let Place::Defined(place) = call_symbol
                     && place.is_definitely_defined()
                 {
-                    place
-                        .ty
-                        .try_upcast_to_callable_with_policy_and_context(db, policy, context)
-                        // The callable instance itself doesn't inherit the descriptor behavior of
-                        // its `__call__` method.
-                        .map(|callables| callables.map(|callable| callable.into_regular(db)))
+                    context.active_dunder_calls.visit_bounded(
+                        &self,
+                        MAX_DUNDER_CALL_EXPANSION,
+                        || None,
+                        || {
+                            place
+                                .ty
+                                .try_upcast_to_callable_with_policy_and_context(db, policy, context)
+                                // The callable instance itself doesn't inherit the descriptor
+                                // behavior of its `__call__` method.
+                                .map(|callables| {
+                                    callables.map(|callable| callable.into_regular(db))
+                                })
+                        },
+                    )
                 } else {
                     None
                 }
@@ -305,12 +320,14 @@ impl<'db> Type<'db> {
     }
 }
 
-#[derive(Clone, Copy, Debug, Default)]
-struct CallableUpcastContext<'db> {
+#[derive(Clone, Copy, Debug)]
+struct CallableUpcastContext<'a, 'db> {
     recursive_definition: Option<Definition<'db>>,
+    /// Active `__call__` expansions.
+    active_dunder_calls: &'a ActiveRecursionDetector<Type<'db>>,
 }
 
-impl<'db> CallableUpcastContext<'db> {
+impl<'db> CallableUpcastContext<'_, 'db> {
     fn is_recursive_reference(self, db: &'db dyn Db, function: FunctionType<'db>) -> bool {
         self.recursive_definition
             .is_some_and(|definition| function.contains_definition(db, definition))
