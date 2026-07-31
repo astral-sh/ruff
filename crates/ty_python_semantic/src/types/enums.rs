@@ -14,8 +14,8 @@ use crate::{
     reachability::DeclarationsIteratorExtension,
     types::{
         ClassBase, ClassLiteral, DynamicType, EnumLiteralType, IntersectionType, KnownClass,
-        LiteralValueTypeKind, MemberLookupPolicy, MemberLookupResult, NegativeIntersectionElements,
-        StaticClassLiteral, Type, UnionType, binding_type,
+        LiteralValueTypeKind, MemberLookupPolicy, NegativeIntersectionElements, StaticClassLiteral,
+        Type, UnionType, binding_type,
         function::FunctionType,
         set_theoretic::{
             RecursivelyDefined,
@@ -454,13 +454,13 @@ pub(super) fn member_lookup_for_enum_complement<'db>(
     complement: EnumComplement<'db>,
     name: &str,
     policy: MemberLookupPolicy,
-) -> MemberLookupResult<'db> {
-    if let Some(member) = special_member_for_enum_complement(db, complement, name) {
-        member.into()
+) -> PlaceAndQualifiers<'db> {
+    if let Some(member) = special_member_for_enum_complement(db, env, complement, name) {
+        member
     } else {
         complement
-            .remaining_literal_union(db)
-            .member_lookup_with_policy_and_receiver(db, name, policy, None)
+            .remaining_literal_union(db, env)
+            .member_lookup_with_policy(db, env, name, policy)
     }
 }
 

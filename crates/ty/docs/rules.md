@@ -1286,7 +1286,7 @@ class C:
 C().value  # error: [invalid-attribute-access]
 ```
 
-Ty reports a descriptor error only when the invalid call is definite. If the
+We report a descriptor error only when the invalid call is definite. If the
 attribute could instead contain a normal value or a valid descriptor, no
 diagnostic is emitted.
 

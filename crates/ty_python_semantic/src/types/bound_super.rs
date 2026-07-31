@@ -280,7 +280,7 @@ impl<'db> ResolvedSuperOwner<'db> {
         Some(Self {
             owner_type: self
                 .owner_type
-                .recursive_type_normalized_impl(db, div, nested)?,
+                .recursive_type_normalized_impl(db, env, div, nested)?,
             lookup_anchor: self
                 .lookup_anchor
                 .recursive_type_normalized_impl(db, env, div, nested)?,
@@ -521,8 +521,9 @@ impl<'db> BoundSuperType<'db> {
         pivot_class_type: Type<'db>,
         owner_type: Type<'db>,
     ) -> Result<Type<'db>, BoundSuperError<'db>> {
-        let delegate_to =
-            |type_to_delegate_to| BoundSuperType::build(db, pivot_class_type, type_to_delegate_to);
+        let delegate_to = |type_to_delegate_to| {
+            BoundSuperType::build(db, env, pivot_class_type, type_to_delegate_to)
+        };
 
         // Delegate but rewrite errors to preserve TypeVar context.
         let delegate_with_error_mapped =
@@ -590,10 +591,10 @@ impl<'db> BoundSuperType<'db> {
         let build_constrained_union = |constraints: TypeVarConstraints<'db>,
                                        typevar: TypeVarOwnerContext<'db>|
          -> Result<Type<'db>, BoundSuperError<'db>> {
-            let mut builder = UnionBuilder::new(db);
+            let mut builder = UnionBuilder::new(db, env);
             for constraint in constraints.elements(db) {
                 let class = match constraint {
-                    Type::NominalInstance(instance) => Some(instance.class(db)),
+                    Type::NominalInstance(instance) => Some(instance.class(db, env)),
                     _ => constraint.to_class_type(db),
                 };
                 match class {
