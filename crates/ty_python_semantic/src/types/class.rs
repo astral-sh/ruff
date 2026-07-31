@@ -633,13 +633,10 @@ impl<'db> ClassLiteral<'db> {
     /// For static classes, this applies default type arguments.
     /// For dynamic classes, this returns a non-generic class type.
     pub(crate) fn default_specialization(self, db: &'db dyn Db) -> ClassType<'db> {
-        match self {
-            Self::Static(class) => class.default_specialization(db),
-            Self::Dynamic(_)
-            | Self::DynamicNamedTuple(_)
-            | Self::DynamicTypedDict(_)
-            | Self::DynamicEnum(_) => ClassType::NonGeneric(self),
-        }
+        self.as_static().map_or_else(
+            || ClassType::NonGeneric(self),
+            |class| class.default_specialization(db),
+        )
     }
 
     /// Returns the unknown specialization of this class.
@@ -648,24 +645,18 @@ impl<'db> ClassLiteral<'db> {
     /// For a non-specialized generic class, we return a generic alias that maps each of the class's
     /// typevars to `Unknown`.
     pub(crate) fn unknown_specialization(self, db: &'db dyn Db) -> ClassType<'db> {
-        match self {
-            Self::Static(class) => class.unknown_specialization(db),
-            Self::Dynamic(_)
-            | Self::DynamicNamedTuple(_)
-            | Self::DynamicTypedDict(_)
-            | Self::DynamicEnum(_) => ClassType::NonGeneric(self),
-        }
+        self.as_static().map_or_else(
+            || ClassType::NonGeneric(self),
+            |class| class.unknown_specialization(db),
+        )
     }
 
     /// Returns the identity specialization for this class (same as default for non-generic).
     pub(crate) fn identity_specialization(self, db: &'db dyn Db) -> ClassType<'db> {
-        match self {
-            Self::Static(class) => class.identity_specialization(db),
-            Self::Dynamic(_)
-            | Self::DynamicNamedTuple(_)
-            | Self::DynamicTypedDict(_)
-            | Self::DynamicEnum(_) => ClassType::NonGeneric(self),
-        }
+        self.as_static().map_or_else(
+            || ClassType::NonGeneric(self),
+            |class| class.identity_specialization(db),
+        )
     }
 
     /// Returns the generic context if this is a generic class.
