@@ -733,15 +733,7 @@ fn place_is_definitely_runtime_bound<'db>(db: &'db dyn Db, place: Place<'db>) ->
             provenance: Provenance::SingleDefinition(definition),
             ..
         }) => definition_is_runtime_binding(db, definition),
-        Place::Defined(DefinedPlace {
-            origin: TypeOrigin::Inferred,
-            ..
-        }) => true,
-        Place::Defined(DefinedPlace {
-            origin: TypeOrigin::Declared,
-            ..
-        })
-        | Place::Undefined => false,
+        Place::Defined(_) | Place::Undefined => false,
     }
 }
 
@@ -4217,7 +4209,9 @@ impl<'db> Type<'db> {
                 matches!(
                     self.class_member_with_policy(db, name, MemberLookupPolicy::REQUIRE_CONCRETE)
                         .place,
-                    Place::Defined(defined) if defined.is_definitely_defined()
+                    Place::Defined(defined)
+                        if defined.is_definitely_defined()
+                            && place_is_definitely_runtime_bound(db, Place::Defined(defined))
                 )
             }),
         }

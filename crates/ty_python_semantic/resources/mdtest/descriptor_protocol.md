@@ -1127,7 +1127,9 @@ def access_constrained_owner(owner: T) -> None:
     reveal_type(owner.value)  # revealed: int | str
 ```
 
-Correlation does not suppress a failure that is present for every constraint.
+When every constraint has a malformed descriptor, merged binding provenance still does not prove
+that a particular runtime binding is present. Ty conservatively suppresses the error-level
+diagnostic.
 
 ```py
 class BrokenIntDescriptor:
@@ -1147,7 +1149,6 @@ class BrokenStrOwner:
 BrokenT = TypeVar("BrokenT", BrokenIntOwner, BrokenStrOwner)
 
 def access_broken_constrained_owner(owner: BrokenT) -> None:
-    # error: [invalid-attribute-access] "Invalid access to descriptor attribute `value` on type `BrokenT@access_broken_constrained_owner`"
     owner.value
 ```
 
@@ -1179,7 +1180,7 @@ def access_constrained_class(cls: type[T]) -> None:
     reveal_type(cls.value)  # revealed: int | str
 ```
 
-Correlation still reports a failure when every concrete class constraint selects a malformed
+The same conservative suppression applies when every concrete class constraint selects a malformed
 descriptor.
 
 ```py
@@ -1196,7 +1197,6 @@ class BrokenStrOwner:
 BrokenT = TypeVar("BrokenT", BrokenIntOwner, BrokenStrOwner)
 
 def access_broken_constrained_class(cls: type[BrokenT]) -> None:
-    # error: [invalid-attribute-access] "Invalid access to descriptor attribute `value` on type `type[BrokenT@access_broken_constrained_class]`"
     cls.value
 ```
 
@@ -1303,6 +1303,53 @@ def conditional_descriptor_kind(flag: bool) -> None:
         value = 1
 
     C.value
+```
+
+### Static-only descriptor slots do not establish data-descriptor precedence
+
+An annotation for `__set__` is a static contract, not a runtime descriptor slot. The metaclass
+member is therefore a non-data descriptor at runtime, and the class attribute takes precedence.
+
+```py
+from typing import Callable
+
+class Descriptor:
+    def __get__(self) -> str:
+        return ""
+
+    __set__: Callable[[object, object], None]
+
+class Meta(type):
+    value = Descriptor()
+
+class C(metaclass=Meta):
+    value = 1
+
+C.value
+```
+
+### Type-checking-only descriptor slots do not establish data-descriptor precedence
+
+A `TYPE_CHECKING` definition likewise does not install a runtime descriptor slot.
+
+```py
+from typing import TYPE_CHECKING
+
+class Descriptor:
+    def __get__(self) -> str:
+        return ""
+
+    if TYPE_CHECKING:
+        def __delete__(self, instance: object) -> None:
+            pass
+
+class Meta(type):
+    value = Descriptor()
+
+class C(metaclass=Meta):
+    value = 1
+
+C.value
 ```
 
 ### TypeVar data-descriptor kinds retain metaclass precedence
@@ -1740,6 +1787,22 @@ class Inferred(metaclass=Meta):
 reveal_type(Inferred.value)  # revealed: int
 ```
 
+Static-only and conditional runtime definitions merge to uncertain provenance. The runtime path
+without the conditional binding can still succeed through the metaclass fallback, so the descriptor
+failure is not definite.
+
+```py
+def conditional_runtime_binding(flag: bool) -> None:
+    class C(metaclass=Meta):
+        if TYPE_CHECKING:
+            value = Descriptor()
+
+        if flag:
+            value = Descriptor()
+
+    C.value
+```
+
 ### Annotation-only `__get__` methods do not produce descriptor errors
 
 A method annotation is a static contract and does not shadow an inherited runtime implementation. Ty
@@ -1971,6 +2034,28 @@ def conditional_setter(flag: bool) -> None:
     c = C()
     c.descriptor = 1
     c.descriptor
+```
+
+### Reaching deletions conservatively suppress descriptor diagnostics
+
+A deletion removes the original descriptor from the class dictionary. A later lookup can therefore
+succeed through a metaclass fallback, so same-place dataflow treats the deletion as the same
+conservative suppression boundary as an assignment.
+
+```py
+class Descriptor:
+    def __get__(self) -> str:
+        return ""
+
+class Meta(type):
+    def __getattr__(cls, name: str) -> int:
+        return 1
+
+class C(metaclass=Meta):
+    value = Descriptor()
+
+del C.value
+C.value
 ```
 
 ### Augmented assignment reads before writing

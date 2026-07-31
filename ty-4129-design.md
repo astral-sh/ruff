@@ -42,12 +42,14 @@ should not introduce object-identity, alias, or class-namespace mutation analysi
     error-level descriptor diagnostic.
 - Preserve a possible valid metaclass data-descriptor branch as a higher-precedence lookup
     alternative when a mixed descriptor-kind union otherwise falls through to a class attribute.
-- Treat a conditionally defined `__set__` or `__delete__` method as a possible, rather than definite,
-    data-descriptor path when determining diagnostic certainty.
+- Require a definitely runtime-bound `__set__` or `__delete__` method before using data-descriptor
+    precedence to establish a definite failure. Conditional, annotation-only, and
+    type-checking-only methods do not suffice.
 - Preserve descriptor-call failures while expanding narrowed enum complements into their remaining
     literal alternatives.
 - Suppress descriptor-read diagnostics after any possibly or definitely reaching same-place
-    assignment, without using descriptor kind to prove that `__get__` remains selected.
+    assignment or deletion, without using descriptor kind to prove that `__get__` remains
+    selected.
 - Treat an inferred class-wide instance-member summary as a possible instance-dictionary shadow for
     diagnostic certainty, without treating it as proof that an assignment reaches a particular
     receiver.
@@ -121,9 +123,11 @@ data-descriptor element remains a higher-precedence alternative even when the ag
 kind says that the union is not uniformly data-descriptor-like. The diagnostic preserves that
 successful alternative conservatively without changing the inferred member type.
 
-The same rule applies when descriptor kind depends on a conditionally defined `__set__` or
-`__delete__` method. Ty keeps its existing inferred member type, but combines the invalid `__get__`
-call with the lower-precedence fallback before deciding that the failure is definite.
+The same rule applies when descriptor kind depends on a conditionally defined, annotation-only, or
+type-checking-only `__set__` or `__delete__` method. Only a definitely runtime-bound method can
+establish data-descriptor precedence for this diagnostic. Ty keeps its existing inferred member
+type, but combines the invalid `__get__` call with the lower-precedence fallback before deciding
+that the failure is definite.
 
 Descriptor-kind refinements used only for diagnostic certainty are evaluated only after an invalid
 descriptor call is present. Error-free attribute lookup does not invoke those additional queries.
@@ -146,10 +150,11 @@ re-enters the same query contributes no definite descriptor failure, while the r
 branches continue to determine the inferred return type and diagnostic certainty.
 
 Same-place dataflow participates only as a conservative suppression boundary. Any possibly or
-definitely reaching assignment suppresses the descriptor diagnostic, for both instance and class
-objects. Ty does not distinguish a shadowing write from a data-descriptor `__set__` interception for
-this diagnostic. This avoids requiring certainty about mixed descriptor kinds, conditionally
-defined setters, or whether a metaclass descriptor intercepted a class-object assignment.
+definitely reaching assignment or deletion suppresses the descriptor diagnostic, for both instance
+and class objects. Ty does not distinguish a shadowing write from a data-descriptor `__set__`
+interception for this diagnostic. This avoids requiring certainty about mixed descriptor kinds,
+conditionally defined setters, or whether a metaclass descriptor intercepted a class-object
+assignment.
 
 Class-wide summaries of inferred instance attributes do not establish a live instance-dictionary
 entry for a particular receiver, but they do represent a possible successful fallback. That
@@ -177,8 +182,9 @@ read/write correlation, and bidirectional type-context improvements are separate
 - General object-identity or heap dataflow.
 - Tracking mutations across calls or modules.
 - Proving that an instance assignment performed in another method or call reaches a later read.
-- Diagnosing malformed descriptors after any reaching same-place assignment, including definite
-    data descriptors and metaclass data descriptors that intercept class-object assignments.
+- Diagnosing malformed descriptors after any reaching same-place assignment or deletion, including
+    definite data descriptors and metaclass data descriptors that intercept class-object
+    assignments.
 - Introducing a general tri-state descriptor-kind representation or changing inferred member types
     for descriptors with conditionally defined `__set__` or `__delete__` methods.
 - Precisely diagnosing a malformed descriptor assigned dynamically through a class object.
@@ -216,10 +222,10 @@ augmented-assignment items belong to their existing operator and store-validatio
 
 ## Accepted tradeoff
 
-The implementation may miss invalid descriptor accesses after any reaching assignment. This
-includes definite instance data descriptors and metaclass data descriptors whose `__set__` method
-intercepts a class-object assignment. These conservative false negatives are preferable to an
-error-level false positive on valid code.
+The implementation may miss invalid descriptor accesses after any reaching assignment or deletion.
+This includes definite instance data descriptors and metaclass data descriptors whose `__set__`
+method intercepts a class-object assignment. These conservative false negatives are preferable to
+an error-level false positive on valid code.
 
 The implementation may also suppress a diagnostic when every branch of a mixed metaclass
 descriptor-kind union fails through a different precedence path. Correlating each metaclass branch
@@ -239,6 +245,11 @@ do not affect the concrete descriptor in the original issue.
 The implementation may suppress a diagnostic when an otherwise failing TypeVar alternative is
 semantically uninhabited, including `Never` hidden behind an alias. Applying that normalization
 consistently would require a broader change across every TypeVar and `super()` certainty fold.
+
+The implementation may also suppress a diagnostic when every constrained TypeVar branch selects a
+runtime-bound malformed descriptor. Combining the branch results produces multiple binding
+provenance, which is treated as possibly absent rather than adding a separate branch-sensitive
+runtime-provenance representation for this diagnostic.
 
 The implementation suppresses descriptor diagnostics for all `super()` lookups. Preserving those
 diagnostic branches without changing ordinary `BoundSuperType` inference or making diagnostics
