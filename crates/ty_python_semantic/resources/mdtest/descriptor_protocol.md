@@ -1333,7 +1333,10 @@ valid constraint makes the overall failure only possible, while a constrained ow
 branch is invalid still produces a diagnostic.
 
 ```py
-from typing import TypeVar
+from __future__ import annotations
+
+from enum import Enum
+from typing import Literal, TypeVar
 
 class Descriptor:
     def __get__(self, instance: "Good", owner: type | None = None) -> int:
@@ -1357,6 +1360,29 @@ BrokenT = TypeVar("BrokenT", Bad, AlsoBad)
 def always_invalid(owner: BrokenT) -> None:
     # error: [invalid-attribute-access]
     super(Pivot, owner).value
+
+class LiteralDescriptor:
+    def __get__(
+        self,
+        instance: Literal[Member.A, Member.B],
+        owner: type | None = None,
+    ) -> int:
+        return 1
+
+class LiteralBase:
+    value = LiteralDescriptor()
+
+class LiteralPivot(LiteralBase): ...
+
+class Member(LiteralPivot, Enum):
+    A = 1
+    B = 2
+    C = 3
+
+LiteralT = TypeVar("LiteralT", Literal[Member.A], Literal[Member.B])
+
+def literal_constraints(owner: LiteralT) -> None:
+    super(LiteralPivot, owner).value
 ```
 
 ### Possible `__get__` callable failures are not reported

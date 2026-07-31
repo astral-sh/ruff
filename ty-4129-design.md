@@ -105,7 +105,8 @@ concrete class as its `owner`. The ordinary member result keeps the original rec
 
 Constrained `super()` owners retain the original type variable in the inferred `super` type, but
 descriptor-call validation uses the concrete constraint associated with each already-expanded
-`super` branch.
+`super` branch. This includes constraints, such as enum literals, whose ordinary `super`
+construction delegates to a wider fallback type.
 
 Recursive alias expansion runs inside the cycle-aware descriptor-call query. A recursive branch that
 re-enters the same query contributes no definite descriptor failure, while the remaining concrete

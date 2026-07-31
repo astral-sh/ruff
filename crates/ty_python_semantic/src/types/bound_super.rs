@@ -560,8 +560,22 @@ impl<'db> BoundSuperType<'db> {
         pivot_class_type: Type<'db>,
         owner_type: Type<'db>,
     ) -> Result<Type<'db>, BoundSuperError<'db>> {
+        Self::build_with_descriptor_validation_owner(db, pivot_class_type, owner_type, None)
+    }
+
+    fn build_with_descriptor_validation_owner(
+        db: &'db dyn Db,
+        pivot_class_type: Type<'db>,
+        owner_type: Type<'db>,
+        descriptor_validation_owner_type: Option<Type<'db>>,
+    ) -> Result<Type<'db>, BoundSuperError<'db>> {
         let delegate_to = |type_to_delegate_to| {
-            BoundSuperType::build(db, env, pivot_class_type, type_to_delegate_to)
+            BoundSuperType::build_with_descriptor_validation_owner(
+                db,
+                pivot_class_type,
+                type_to_delegate_to,
+                descriptor_validation_owner_type,
+            )
         };
 
         // Delegate but rewrite errors to preserve TypeVar context.
@@ -632,16 +646,16 @@ impl<'db> BoundSuperType<'db> {
          -> Result<Type<'db>, BoundSuperError<'db>> {
             let mut builder = UnionBuilder::new(db, env);
             for constraint in constraints.elements(db) {
+                let constraint_validation_owner_type = match typevar {
+                    TypeVarOwnerContext::Bare(_) => *constraint,
+                    TypeVarOwnerContext::SubclassOf(_) => constraint.to_meta_type(db),
+                };
                 let class = match constraint {
                     Type::NominalInstance(instance) => Some(instance.class(db, env)),
                     _ => constraint.to_class_type(db),
                 };
                 match class {
                     Some(class) => {
-                        let descriptor_validation_owner_type = match typevar {
-                            TypeVarOwnerContext::Bare(_) => *constraint,
-                            TypeVarOwnerContext::SubclassOf(_) => constraint.to_meta_type(db),
-                        };
                         let owner = match typevar {
                             TypeVarOwnerContext::Bare(_) => Self::resolve_instance_super_owner(
                                 db,
@@ -661,7 +675,7 @@ impl<'db> BoundSuperType<'db> {
                                 Some(typevar),
                             )?,
                         }
-                        .with_descriptor_validation_owner_type(descriptor_validation_owner_type);
+                        .with_descriptor_validation_owner_type(constraint_validation_owner_type);
                         builder = builder.add(Self::build_from_owner(
                             db,
                             pivot_class,
@@ -670,8 +684,15 @@ impl<'db> BoundSuperType<'db> {
                     }
                     None => {
                         // Delegate to the constraint to get better error messages
-                        // if the constraint is incompatible with the pivot class.
-                        builder = builder.add(delegate_to(*constraint)?);
+                        // if the constraint is incompatible with the pivot class. Preserve the
+                        // original constraint for descriptor-call validation even if ordinary
+                        // `super` construction widens it to a fallback type.
+                        builder = builder.add(Self::build_with_descriptor_validation_owner(
+                            db,
+                            pivot_class_type,
+                            *constraint,
+                            Some(constraint_validation_owner_type),
+                        )?);
                     }
                 }
             }
@@ -940,6 +961,15 @@ impl<'db> BoundSuperType<'db> {
                     typevar_context: None,
                 });
             }
+        };
+
+        let owner = match (owner, descriptor_validation_owner_type) {
+            (SuperOwnerKind::Resolved(owner), Some(descriptor_validation_owner_type)) => {
+                SuperOwnerKind::Resolved(
+                    owner.with_descriptor_validation_owner_type(descriptor_validation_owner_type),
+                )
+            }
+            (owner, _) => owner,
         };
 
         Ok(Self::build_from_owner(db, pivot_class, owner))
