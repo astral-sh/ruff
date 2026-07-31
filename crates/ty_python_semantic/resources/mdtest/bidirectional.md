@@ -902,6 +902,49 @@ class Equipped(Generic[UserT]):
     first: Item[UserT] | None
 ```
 
+## Generic dictionary factories retain contextual outer key types
+
+A zero-argument dictionary factory must use the expected outer key type instead of introducing a
+spurious `dict[str, T]` alternative. The resulting false positives in generic dataclass fields and
+nested `defaultdict(dict)` calls are pending [#26680](https://github.com/astral-sh/ruff/pull/26680).
+
+```py
+from collections import defaultdict
+from collections.abc import Hashable, Mapping
+from dataclasses import field
+
+class SharedMemory[K, T]:
+    # TODO(#26680): no error
+    # error: [invalid-assignment]
+    value: dict[K, T] = field(default_factory=dict)
+
+def nested_defaultdict[K: Hashable, K2: Hashable, T](
+    data: Mapping[K, Mapping[K2, T]],
+) -> None:
+    # TODO(#26680): no error
+    # error: [invalid-assignment]
+    value: defaultdict[K2, dict[K, T]] = defaultdict(dict)
+```
+
+## Iterable constructors retain contextual outer element types
+
+After narrowing `Iterable[T] | T`, a `list` constructor should retain the outer `T` instead of
+inferring `object`. This false-positive return diagnostic is also pending
+[#26680](https://github.com/astral-sh/ruff/pull/26680).
+
+```py
+from collections.abc import Collection, Iterable, Sized
+from typing import cast
+
+def maybe_iterable_to_list[T](value: Iterable[T] | T) -> Collection[T] | T:
+    if isinstance(value, Iterable) and not isinstance(value, Sized):
+        # TODO(#26680): no error
+        # error: [invalid-return-type] "found `list[object]`"
+        return list(value)
+    value = cast(Collection[T], value)
+    return value
+```
+
 ## Callback diagnostics retain contextual outer type variables
 
 A constrained outer return type should remain visible in an invalid callback diagnostic. The
