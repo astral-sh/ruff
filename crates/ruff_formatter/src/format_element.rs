@@ -191,10 +191,6 @@ impl Deref for Interned {
     }
 }
 
-const LINE_SEPARATOR: char = '\u{2028}';
-const PARAGRAPH_SEPARATOR: char = '\u{2029}';
-pub const LINE_TERMINATORS: [char; 3] = ['\r', LINE_SEPARATOR, PARAGRAPH_SEPARATOR];
-
 /// Replace the line terminators matching the provided list with "\n"
 /// since its the only line break type supported by the printer
 pub fn normalize_newlines<const N: usize>(text: &str, terminators: [char; N]) -> Cow<'_, str> {
@@ -560,9 +556,12 @@ impl TextWidth {
 
 #[cfg(test)]
 mod tests {
+    const LINE_SEPARATOR: char = '\u{2028}';
+    const PARAGRAPH_SEPARATOR: char = '\u{2029}';
+    const LINE_TERMINATORS: [char; 3] = ['\r', LINE_SEPARATOR, PARAGRAPH_SEPARATOR];
 
     use crate::IndentWidth;
-    use crate::format_element::{LINE_TERMINATORS, TextWidth, normalize_newlines};
+    use crate::format_element::{TextWidth, normalize_newlines};
 
     #[test]
     fn text_width() {
