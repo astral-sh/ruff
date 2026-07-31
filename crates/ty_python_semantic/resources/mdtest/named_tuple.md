@@ -1638,7 +1638,7 @@ reveal_type(Invalid)  # revealed: <class 'Invalid'>
 ## NamedTuple fields cannot be qualified with `ClassVar` or `Final`
 
 Type checkers reject `ClassVar` and `Final` qualifiers on `NamedTuple` fields. When annotations are
-evaluated eagerly, passing a bare qualifier to `typing._type_check` also raises `TypeError` while
+evaluated eagerly, passing these qualifiers to `typing._type_check` also raises `TypeError` while
 the class is defined.
 
 ```py
@@ -1649,6 +1649,10 @@ class Foo(NamedTuple):
     a: ClassVar[int]
     # error: [invalid-named-tuple] "Type qualifier `Final` is not allowed on NamedTuple field `b`"
     b: Final[str] = "foo"
+    # error: [invalid-named-tuple] "Type qualifier `ClassVar` is not allowed on NamedTuple field `c`"
+    # error: [invalid-named-tuple] "Type qualifier `Final` is not allowed on NamedTuple field `c`"
+    # error: [redundant-final-classvar] "Combining `ClassVar` and `Final` is redundant"
+    c: ClassVar[Final[int]]
 ```
 
 An unsubscripted qualifier is rejected for the same reason:
@@ -1687,9 +1691,9 @@ class Snapshot(NamedTuple):
 
 ```snapshot
 error[invalid-named-tuple]: Type qualifier `ClassVar` is not allowed in a NamedTuple field
-  --> src/mdtest_snippet.py:25:5
+  --> src/mdtest_snippet.py:29:5
    |
-25 |     a: ClassVar[int]
+29 |     a: ClassVar[int]
    |     ^^^^^^^^^^^^^^^^
 ```
 

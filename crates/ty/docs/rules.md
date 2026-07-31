@@ -2313,7 +2313,7 @@ AttributeError: Cannot overwrite NamedTuple attribute _asdict
 ```
 
 Finally, `NamedTuple` field annotations cannot use the `ClassVar` or `Final` type
-qualifiers. Bare qualifiers also cause a runtime error when annotations are evaluated eagerly:
+qualifiers. These qualifiers also cause a runtime error when annotations are evaluated eagerly:
 
 ```pycon
 >>> from typing import ClassVar, NamedTuple
