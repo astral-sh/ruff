@@ -19,16 +19,11 @@ use ruff_db::diagnostic::Diagnostic;
 use test_case::test_case;
 use ty_python_core::Db as _;
 
-fn get_cargo_workspace_root() -> anyhow::Result<SystemPathBuf> {
-    Ok(SystemPathBuf::from(String::from_utf8(
-        std::process::Command::new("cargo")
-            .args(["locate-project", "--workspace", "--message-format", "plain"])
-            .output()?
-            .stdout,
-    )?)
-    .parent()
-    .unwrap()
-    .to_owned())
+fn get_cargo_workspace_root() -> anyhow::Result<&'static SystemPath> {
+    SystemPath::new(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .and_then(SystemPath::parent)
+        .context("Failed to determine the Cargo workspace root")
 }
 
 /// Test that all snippets in testcorpus can be checked without panic (except for [`KNOWN_FAILURES`])
