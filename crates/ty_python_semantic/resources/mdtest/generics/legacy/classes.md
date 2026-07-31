@@ -126,6 +126,16 @@ error[shadowed-type-variable]: Generic class `InnerClass` uses ParamSpec `P` alr
    |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `P` used in class definition here
 ```
 
+A `TypeVarTuple` must be unpacked when used as an argument to `Generic`. Even though the base is
+invalid, ty still treats the `TypeVarTuple` as a type parameter of the class during error recovery,
+so correctly unpacked uses within the class do not produce cascading errors.
+
+```py
+# error: [invalid-generic-class] "`TypeVarTuple` must be unpacked"
+class BareTypeVarTuple(Generic[Ts]):
+    values: tuple[*Ts]
+```
+
 If you don't specialize a generic base class, we use the default specialization, which maps each
 typevar to its default value or `Any`. Since that base class is fully specialized, it does not make
 the inheriting class generic.
