@@ -181,7 +181,7 @@ pub(crate) fn render(renderer: &Renderer, groups: Report<'_>) -> String {
 
                     PreProcessedElement::Origin(origin) => {
                         let buffer_msg_line_offset = buffer.num_lines();
-                        let is_primary = primary_path == Some(&origin.path) && !seen_primary;
+                        let is_primary = primary_path == origin.path.as_ref() && !seen_primary;
                         seen_primary |= is_primary;
                         render_origin(
                             renderer,
@@ -535,7 +535,10 @@ fn render_origin(
 fn format_origin(origin: &Origin<'_>, anonymized_line_numbers: bool) -> String {
     use core::fmt::Write as _;
 
-    let mut buffer = origin.path.as_ref().to_owned();
+    let mut buffer = String::new();
+    if let Some(path) = &origin.path {
+        write!(&mut buffer, "{path}").unwrap();
+    }
     if let Some(cell_index) = origin.cell_index {
         write!(&mut buffer, ":cell {cell_index}").unwrap();
     }
@@ -2806,7 +2809,7 @@ fn pre_process<'a>(
                 }
                 Element::Origin(origin) => {
                     if primary_path.is_none() {
-                        primary_path = Some(Some(&origin.path));
+                        primary_path = Some(origin.path.as_ref());
                     }
                     elements.push(PreProcessedElement::Origin(origin));
                 }
