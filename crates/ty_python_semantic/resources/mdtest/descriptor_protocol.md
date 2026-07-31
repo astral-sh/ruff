@@ -1004,6 +1004,97 @@ info: Function signature here
   |         ^^^^^^^^^^^^^^^^^^^^
 ```
 
+### Union-like descriptor types use their concrete branches
+
+Descriptor calls through a type alias or constrained type variable use each concrete descriptor type
+as the synthetic `self` argument. A valid descriptor should not fail merely because its union-like
+wrapper is not assignable to one of its elements.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import TypeVar
+
+class IntDescriptor:
+    def __get__(self, instance: object, owner: type | None = None) -> int:
+        return 1
+
+class StrDescriptor:
+    def __get__(self, instance: object, owner: type | None = None) -> str:
+        return ""
+
+type DescriptorAlias = IntDescriptor | StrDescriptor
+
+def aliased_descriptor() -> DescriptorAlias:
+    raise NotImplementedError
+
+class AliasedOwner:
+    value = aliased_descriptor()
+
+reveal_type(AliasedOwner().value)  # revealed: int | str
+
+T = TypeVar("T", IntDescriptor, StrDescriptor)
+
+def access_constrained_descriptor(descriptor: T) -> None:
+    class ConstrainedOwner:
+        value = descriptor
+
+    reveal_type(ConstrainedOwner().value)  # revealed: int | str
+```
+
+### Possible descriptor failures are not reported
+
+An attribute access is invalid only if every possible value invokes a malformed descriptor. A valid
+descriptor or normal value makes the failure merely possible, so ty preserves the inferred return
+types without emitting `invalid-attribute-access`.
+
+```py
+class BrokenDescriptor:
+    def __get__(self) -> bytes:
+        return b""
+
+class ValidDescriptor:
+    def __get__(self, instance: object, owner: type | None = None) -> str:
+        return ""
+
+def descriptor_or_descriptor() -> BrokenDescriptor | ValidDescriptor:
+    raise NotImplementedError
+
+def descriptor_or_value() -> BrokenDescriptor | int:
+    raise NotImplementedError
+
+class C:
+    descriptor = descriptor_or_descriptor()
+    value = descriptor_or_value()
+
+reveal_type(C().descriptor)  # revealed: bytes | str
+reveal_type(C().value)  # revealed: bytes | int
+```
+
+If every possible value is a malformed descriptor, the failure is definite and is reported.
+
+```py
+class BrokenIntDescriptor:
+    def __get__(self) -> int:
+        return 1
+
+class BrokenStrDescriptor:
+    def __get__(self) -> str:
+        return ""
+
+def broken_descriptor() -> BrokenIntDescriptor | BrokenStrDescriptor:
+    raise NotImplementedError
+
+class C:
+    descriptor = broken_descriptor()
+
+# error: [invalid-attribute-access] "Invalid access to descriptor attribute `descriptor` on type `C`"
+reveal_type(C().descriptor)  # revealed: int | str
+```
+
 ### A definitely assigned instance attribute shadows a broken non-data descriptor
 
 An instance attribute takes precedence over a non-data descriptor. Once the instance attribute is
@@ -1046,10 +1137,11 @@ class C:
         reveal_type(self.descriptor)  # revealed: str
 ```
 
-### A data descriptor error takes precedence in a mixed union
+### A data descriptor error in a mixed union is only possible
 
 If an attribute could contain either a data or non-data descriptor, a definite instance assignment
-only shadows the non-data descriptor. We retain the data descriptor's invalid `__get__` call.
+only shadows the non-data descriptor. The malformed data-descriptor call is therefore possible, but
+not definite, so it is not reported.
 
 ```py
 from typing import Union
@@ -1073,127 +1165,50 @@ class C:
 
     def replace_descriptor(self) -> None:
         self.descriptor: int = 1
-        # error: [invalid-attribute-access] "Invalid access to descriptor attribute `descriptor` on type `Self@replace_descriptor`"
         self.descriptor
 ```
 
-### A class-object assignment replaces a descriptor in the class namespace
+### Class-namespace mutations are not propagated to instance lookup
 
-Assigning an attribute through a class object replaces the entry in that class's namespace, even
-when the previous value was a data descriptor. The replaced descriptor is not called on subsequent
-accesses.
+Ty tracks assignments to syntactic places such as `C.descriptor`, but it does not propagate that
+mutation through semantic class identity to `C().descriptor`, aliases, or subclasses. The static
+class attribute type includes a normal value in these examples, so the malformed descriptor call is
+not definite and no `invalid-attribute-access` diagnostic is emitted.
 
 ```py
-from typing import Literal, Union
-
-class Descriptor:
+class BrokenDescriptor:
     def __get__(self) -> str:
         return ""
 
-    def __set__(self, instance: object, value: int) -> None:
-        pass
-
 class C:
-    descriptor: Union[Descriptor, int] = Descriptor()
+    descriptor: BrokenDescriptor | int = BrokenDescriptor()
+
+class Subclass(C): ...
 
 C.descriptor = 1
 reveal_type(C.descriptor)  # revealed: Literal[1]
+reveal_type(C().descriptor)  # revealed: str | int
+reveal_type(Subclass().descriptor)  # revealed: str | int
+
+Alias = C
+Alias.descriptor = 1
+reveal_type(C().descriptor)  # revealed: str | int
 ```
 
-Assignments on every branch also replace the old descriptor, including when the result is read from
-a nested scope.
+The same limitation means that assigning a malformed descriptor through a class object is not enough
+to make a later instance diagnostic definite.
 
 ```py
-def replace_conditionally(flag: bool) -> None:
-    if flag:
-        C.descriptor = 1
-    else:
-        C.descriptor = 2
-
-    def read_from_nested_scope() -> None:
-        reveal_type(C.descriptor)  # revealed: Literal[1, 2]
-```
-
-### A descriptor assigned through a class object is bound on access
-
-The new class attribute participates in the descriptor protocol. An invalid `__get__` method on the
-assigned value is therefore reported.
-
-```py
-from typing import Union
-
-class Descriptor:
-    def __get__(self) -> bytes:
-        return b""
-
-class C:
-    descriptor: Union[Descriptor, int] = 1
-
-C.descriptor = Descriptor()
-
-# error: [invalid-attribute-access] "Invalid access to descriptor attribute `descriptor` on type `<class 'C'>`"
-reveal_type(C.descriptor)  # revealed: bytes | int
-```
-
-When assignments from multiple branches meet, lookup binds every possible stored value. The same
-applies when the result is captured by a nested scope.
-
-```py
-def assign_conditionally(flag: bool) -> None:
-    if flag:
-        C.descriptor = Descriptor()
-    else:
-        C.descriptor = 1
-
-    # error: [invalid-attribute-access] "Invalid access to descriptor attribute `descriptor` on type `<class 'C'>`"
-    reveal_type(C.descriptor)  # revealed: bytes | int
-
-    def read_from_nested_scope() -> None:
-        # error: [invalid-attribute-access] "Invalid access to descriptor attribute `descriptor` on type `<class 'C'>`"
-        reveal_type(C.descriptor)  # revealed: bytes | Literal[1]
-```
-
-Implicit assignment targets, such as a `for` loop target, also preserve the stored value's
-descriptor lookup stage.
-
-```py
-def assign_in_loop(values: list[Descriptor]) -> None:
-    for C.descriptor in values:
-        # error: [invalid-attribute-access] "Invalid access to descriptor attribute `descriptor` on type `<class 'C'>`"
-        reveal_type(C.descriptor)  # revealed: bytes | int
-
-def assign_in_nonempty_loop() -> None:
-    for C.descriptor in (Descriptor(),):
-        pass
-
-    # error: [invalid-attribute-access] "Invalid access to descriptor attribute `descriptor` on type `<class 'C'>`"
-    C.descriptor
-```
-
-### A metaclass data descriptor intercepts class-object assignment
-
-A data descriptor on the metaclass takes precedence over the assigned class attribute. Assigning
-through the class object invokes `__set__`, so the metaclass descriptor still handles subsequent
-accesses.
-
-```py
-class Descriptor:
+class BrokenDescriptor:
     def __get__(self) -> str:
         return ""
 
-    def __set__(self, instance: object, value: int) -> None:
-        pass
+class C:
+    descriptor: BrokenDescriptor | int = 1
 
-class Meta(type):
-    descriptor = Descriptor()
-
-class C(metaclass=Meta):
-    descriptor = 0
-
-C.descriptor = 1
-
-# error: [invalid-attribute-access] "Invalid access to descriptor attribute `descriptor` on type `<class 'C'>`"
-reveal_type(C.descriptor)  # revealed: str
+C.descriptor = BrokenDescriptor()
+C.descriptor
+reveal_type(C().descriptor)  # revealed: str | int
 ```
 
 ### A shadowed metaclass descriptor with an incorrect `__get__` signature

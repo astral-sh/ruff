@@ -1221,8 +1221,11 @@ Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.1-alpha.1">0.
 **What it does**
 
 
-Checks for assignments to class variables from instances
-and assignments to instance-only attributes from their class.
+Checks for invalid attribute reads and writes.
+
+This includes assignments to class variables from instances, assignments to
+instance-only attributes from their class, and reads that definitely invoke a
+descriptor with an invalid `__get__` method.
 
 An "instance-only" variable is one which is only ever assigned to or declared
 when accessed via `self` in an instance method.
@@ -1265,6 +1268,27 @@ C().class_var = 3  # error
 # Cannot assign to instance-only variable from class
 C.instance_only_var = 56  # error
 ```
+
+A descriptor's `__get__` method receives the descriptor, the instance (or
+`None` for class access), and the owner class. An attribute read is invalid if
+the method cannot accept those arguments:
+
+```python
+class Descriptor:
+    def __get__(self) -> int:
+        return 1
+
+
+class C:
+    value = Descriptor()
+
+
+C().value  # error: [invalid-attribute-access]
+```
+
+Ty reports a descriptor error only when the invalid call is definite. If the
+attribute could instead contain a normal value or a valid descriptor, no
+diagnostic is emitted.
 
 ## `invalid-attribute-override`
 

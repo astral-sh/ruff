@@ -15,7 +15,6 @@ class C:
 
 # error: [invalid-attribute-access] "Invalid access to descriptor attribute `a` on type `<class 'C'>`"
 C.a
-# error: [invalid-attribute-access] "Invalid access to descriptor attribute `a` on type `C`"
 reveal_type(C().a)  # revealed: Unknown | D
 
 class D:
