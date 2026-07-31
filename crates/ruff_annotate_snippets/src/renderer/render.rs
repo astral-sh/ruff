@@ -155,8 +155,8 @@ pub(crate) fn render(renderer: &Renderer, groups: Report<'_>) -> String {
                         spliced_lines,
                         display_suggestion,
                     )) => {
-                        let matches_previous_suggestion =
-                            last_suggestion_path == Some(suggestion.path.as_ref());
+                        let matches_previous_suggestion = last_suggestion_path
+                            == Some((Some(suggestion.path.as_ref()), suggestion.cell_index));
                         emit_suggestion_default(
                             renderer,
                             &mut buffer,
@@ -173,7 +173,8 @@ pub(crate) fn render(renderer: &Renderer, groups: Report<'_>) -> String {
                         );
 
                         if matches!(peek, Some(PreProcessedElement::Suggestion(_))) {
-                            last_suggestion_path = Some(suggestion.path.as_ref());
+                            last_suggestion_path =
+                                Some((Some(suggestion.path.as_ref()), suggestion.cell_index));
                         } else {
                             last_suggestion_path = None;
                         }

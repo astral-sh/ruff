@@ -224,6 +224,7 @@ help: remove the entry
 2 - Second oops line
 2 + Second line
   |
+  |
 2 - Second oops line
 2 + Second oops
   |
@@ -243,7 +244,8 @@ help: remove the entry
   ╭╴
 2 - Second oops line
 2 + Second line
-  ├╴
+  │
+  ╭╴
 2 - Second oops line
 2 + Second oops
   ╰╴
@@ -417,6 +419,8 @@ help: remove the entry
 2 - Second oops line
 2 + Second line
   |
+ --> bar.ipynb:cell 3:2:12
+  |
 2 - Second oops line
 2 + Second oops
   |
@@ -437,7 +441,9 @@ help: remove the entry
   │
 2 - Second oops line
 2 + Second line
-  ├╴
+  │
+  ├▸ bar.ipynb:cell 3:2:12
+  │
 2 - Second oops line
 2 + Second oops
   ╰╴
