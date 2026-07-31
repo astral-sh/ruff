@@ -397,14 +397,27 @@ def foo1(c: Callable[P, int]) -> None:
         # error: [invalid-paramspec] "`*args: P.args` must be accompanied by `**kwargs: P.kwargs`"
         **kwargs: int,
     ) -> None: ...
+```
 
-# TODO: error
+`P.args` and `P.kwargs` do not bind `P` themselves. They must refer to a `ParamSpec` bound by
+another parameter annotation or a visible enclosing generic context. A generic outer class does not
+make its `ParamSpec` visible across a nested class boundary.
+
+```py
+# error: [unbound-type-variable] "ParamSpec `P` is not in scope"
 def bar1(*args: P.args, **kwargs: P.kwargs) -> None:
     pass
 
 class Foo1:
-    # TODO: error
+    # error: [unbound-type-variable] "ParamSpec `P` is not in scope"
     def method(self, *args: P.args, **kwargs: P.kwargs) -> None: ...
+
+class Outer(Generic[P]):
+    def method(self, *args: P.args, **kwargs: P.kwargs) -> None: ...
+
+    class Inner:
+        # error: [unbound-type-variable] "ParamSpec `P` is not in scope"
+        def method(self, *args: P.args, **kwargs: P.kwargs) -> None: ...
 ```
 
 And, they need to be used together.

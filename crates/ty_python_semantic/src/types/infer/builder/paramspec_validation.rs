@@ -1,4 +1,12 @@
-use crate::types::{ParamSpecAttrKind, Type, context::InferContext, diagnostic::INVALID_PARAMSPEC};
+use crate::{
+    semantic_index,
+    types::{
+        ParamSpecAttrKind, Type,
+        context::InferContext,
+        diagnostic::{INVALID_PARAMSPEC, UNBOUND_TYPE_VARIABLE},
+        generics::bind_typevar,
+    },
+};
 use ruff_python_ast as ast;
 use ruff_text_size::Ranged;
 
@@ -8,6 +16,7 @@ use ruff_text_size::Ranged;
 /// This enforces several rules from the typing spec:
 /// - `P.args` and `P.kwargs` must always be used together
 /// - When `*args: P.args` is present, `**kwargs: P.kwargs` must also be present (same P)
+/// - `P` must already be in scope
 /// - No keyword-only parameters are allowed between `*args: P.args` and `**kwargs: P.kwargs`
 pub(super) fn validate_paramspec_components<'db>(
     context: &'db InferContext<'db, '_>,
@@ -49,7 +58,7 @@ pub(super) fn validate_paramspec_components<'db>(
 
     match (args_paramspec, kwargs_paramspec) {
         // Both *args: P.args and **kwargs: P.kwargs present
-        (Some((args_tv, _args_annotation)), Some((kwargs_tv, kwargs_annotation))) => {
+        (Some((args_tv, args_annotation)), Some((kwargs_tv, kwargs_annotation))) => {
             // Check they refer to the same ParamSpec
             if !args_tv.is_same_typevar_as(db, kwargs_tv) {
                 let args_name = args_tv.name(db);
@@ -62,6 +71,24 @@ pub(super) fn validate_paramspec_components<'db>(
                     ));
                 }
             } else {
+                let paramspec_is_in_scope = bind_typevar(
+                    db,
+                    semantic_index(db, context.file()),
+                    context.scope().file_scope_id(db),
+                    None,
+                    args_tv.typevar(db),
+                )
+                .is_some();
+                if !paramspec_is_in_scope
+                    && let Some(builder) =
+                        context.report_lint(&UNBOUND_TYPE_VARIABLE, args_annotation)
+                {
+                    builder.into_diagnostic(format_args!(
+                        "ParamSpec `{}` is not in scope",
+                        args_tv.name(db),
+                    ));
+                }
+
                 // Same ParamSpec - check no keyword-only params between them
                 if !parameters.kwonlyargs.is_empty() {
                     let name = args_tv.name(db);
