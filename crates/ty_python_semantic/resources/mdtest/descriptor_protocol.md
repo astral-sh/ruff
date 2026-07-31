@@ -1153,6 +1153,23 @@ def assign_conditionally(flag: bool) -> None:
         reveal_type(C.descriptor)  # revealed: bytes | Literal[1]
 ```
 
+Implicit assignment targets, such as a `for` loop target, also preserve the stored value's
+descriptor lookup stage.
+
+```py
+def assign_in_loop(values: list[Descriptor]) -> None:
+    for C.descriptor in values:
+        # error: [invalid-attribute-access] "Invalid access to descriptor attribute `descriptor` on type `<class 'C'>`"
+        reveal_type(C.descriptor)  # revealed: bytes | int
+
+def assign_in_nonempty_loop() -> None:
+    for C.descriptor in (Descriptor(),):
+        pass
+
+    # error: [invalid-attribute-access] "Invalid access to descriptor attribute `descriptor` on type `<class 'C'>`"
+    C.descriptor
+```
+
 ### A metaclass data descriptor intercepts class-object assignment
 
 A data descriptor on the metaclass takes precedence over the assigned class attribute. Assigning

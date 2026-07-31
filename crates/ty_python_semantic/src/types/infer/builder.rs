@@ -10278,6 +10278,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
             DefinitionKind::AnnotatedAssignment(assignment) => assignment.value(self.module())?,
             DefinitionKind::NamedExpression(named) => &named.node(self.module()).value,
+            DefinitionKind::For(for_statement) => for_statement.target(self.module()),
+            DefinitionKind::Comprehension(comprehension) => comprehension.target(self.module()),
+            DefinitionKind::WithItem(with_item) => with_item.target(self.module()),
             _ => return None,
         };
         Some(definition_expression_type(db, definition, value))
