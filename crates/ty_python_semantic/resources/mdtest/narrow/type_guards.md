@@ -458,23 +458,30 @@ def _(x: Foo | Bar, is_bar: Callable[[object], TypeIs[Bar]]):
         reveal_type(x)  # revealed: Foo & ~Bar
 ```
 
-For generics, we transform the argument passed into `TypeIs[]` from `X` to `Top[X]`. This helps
-especially when using various functions from typeshed that are annotated as returning
-`TypeIs[SomeCovariantGeneric[Any]]` to avoid false positives in other type checkers. For ty's
-purposes, it would usually lead to more intuitive results if `object` was used as the specialization
-for a covariant generic inside the `TypeIs` special form, but this is mitigated by our implicit
-transformation from `TypeIs[SomeCovariantGeneric[Any]]` to `TypeIs[Top[SomeCovariantGeneric[Any]]]`
-(which just simplifies to `TypeIs[SomeCovariantGeneric[object]]`).
+A `TypeIs` function that returns a gradual specialization of a generic class narrows to that generic
+type without replacing its gradual type argument:
 
 ```py
-class Unrelated: ...
-
 class Covariant[T]:
     def get(self) -> T:
         raise NotImplementedError
 
 def is_instance_of_covariant(arg: object) -> TypeIs[Covariant[Any]]:
     return isinstance(arg, Covariant)
+
+def _(x: object):
+    if is_instance_of_covariant(x):
+        reveal_type(x)  # revealed: Covariant[Any]
+```
+
+However, intersecting with the declared gradual type does not necessarily exclude every other
+specialization in the negative branch:
+
+```py
+from typing import final
+
+@final
+class Unrelated: ...
 
 def needs_instance_of_unrelated(arg: Unrelated):
     pass
@@ -483,11 +490,31 @@ def _(x: Unrelated | Covariant[int]):
     if is_instance_of_covariant(x):
         raise RuntimeError("oh no")
 
-    reveal_type(x)  # revealed: Unrelated & ~Covariant[object]
+    reveal_type(x)  # revealed: Unrelated | (Covariant[int] & ~Covariant[Any])
 
-    # We would emit a false-positive diagnostic here if we didn't implicitly transform
-    # `TypeIs[Covariant[Any]]` to `TypeIs[Covariant[object]]`
-    needs_instance_of_unrelated(x)
+    needs_instance_of_unrelated(x)  # error: [invalid-argument-type]
+```
+
+If a user wants to select *all* instances of `Covariant`, they must use `Covariant[object]`, or more
+generally, `Top[C[Any]]`, which also works for invariant generic types:
+
+```py
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from ty_extensions import Top
+
+class Invariant[T]:
+    value: T  # make it invariant in `T`
+
+def is_instance_of_invariant(arg: object) -> "TypeIs[Top[Invariant[Any]]]":
+    return isinstance(arg, Invariant)
+
+def _(x: Unrelated | Invariant[int]):
+    if is_instance_of_invariant(x):
+        reveal_type(x)  # revealed: Invariant[int]
+    else:
+        reveal_type(x)  # revealed: Unrelated
 ```
 
 ## `TypeGuard` special cases
