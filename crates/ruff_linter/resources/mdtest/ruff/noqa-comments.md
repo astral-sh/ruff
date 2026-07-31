@@ -335,7 +335,7 @@ error[RUF105]: `ruff: noqa` comment used instead of `ruff: file-ignore`
 2 | # ruff: noqa
   | ^^^^^^^^^^^^
 help: Use `ruff: file-ignore` instead
-info: Automatic fix is unavailable because unused codes are present. Consider enabling `RUF100` to remove them.
+info: Automatic fix is unavailable because `ruff: file-ignore` requires explicit rule codes.
 ```
 
 ## Inline self-suppression

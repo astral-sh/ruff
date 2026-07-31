@@ -146,10 +146,17 @@ pub(crate) fn noqa_comments(
     //
     // by converting it to a valid `ruff: ignore` comment.
     if has_unused_codes {
-        diagnostic.info(
-            "Automatic fix is unavailable because unused codes are present. \
+        if file_level && matches!(directive, Directive::All(_)) {
+            diagnostic.info(
+                "Automatic fix is unavailable because `ruff: file-ignore` \
+			     requires explicit rule codes.",
+            );
+        } else {
+            diagnostic.info(
+                "Automatic fix is unavailable because unused codes are present. \
 			 Consider enabling `RUF100` to remove them.",
-        );
+            );
+        }
         return;
     }
 
