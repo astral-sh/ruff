@@ -282,7 +282,7 @@ impl<'a> Diff<'a> {
         Ok(())
     }
 
-    fn cell_ranges(&self) -> Vec<(Option<OneIndexed>, TextRange)> {
+    fn cell_ranges(&self) -> Vec<(Option<usize>, TextRange)> {
         let source_code = self.diagnostic_source.as_source_code();
         let source_text = source_code.text();
 
@@ -296,19 +296,19 @@ impl<'a> Diff<'a> {
 
         // Partition the source code into end offsets for each cell.
         let mut last_cell_index = OneIndexed::MIN;
-        let mut cells: Vec<(Option<OneIndexed>, TextRange)> = Vec::new();
+        let mut cells: Vec<(Option<usize>, TextRange)> = Vec::new();
         for cell in notebook_index.iter() {
             if cell.cell_index() != last_cell_index {
                 let offset = source_code.line_start(cell.start_row());
                 let range = TextRange::new(last_end, offset);
-                cells.push((Some(last_cell_index), range));
+                cells.push((Some(last_cell_index.get()), range));
                 last_end = offset;
                 last_cell_index = cell.cell_index();
             }
         }
         let offset = source_text.text_len();
         let range = TextRange::new(last_end, offset);
-        cells.push((Some(last_cell_index), range));
+        cells.push((Some(last_cell_index.get()), range));
         cells
     }
 
