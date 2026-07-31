@@ -83,16 +83,6 @@ struct Loop {
     continue_states: Vec<FlowSnapshot>,
 }
 
-impl Loop {
-    fn push_break(&mut self, state: FlowSnapshot) {
-        self.break_states.push(state);
-    }
-
-    fn push_continue(&mut self, state: FlowSnapshot) {
-        self.continue_states.push(state);
-    }
-}
-
 /// A narrowing alias: a variable whose RHS is a narrowing expression
 /// (e.g., `is_none = x is None`).
 #[derive(Clone, Debug)]
@@ -4203,20 +4193,14 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 self.mark_unreachable();
             }
 
-            ast::Stmt::Continue(_) => {
+            ast::Stmt::Continue(_) | ast::Stmt::Break(_) => {
                 let snapshot = self.flow_snapshot();
                 if let Some(current_loop) = self.current_loop_mut() {
-                    current_loop.push_continue(snapshot);
-                }
-                self.record_terminal_finally_entry();
-                // Everything in the current block after a terminal statement is unreachable.
-                self.mark_unreachable();
-            }
-
-            ast::Stmt::Break(_) => {
-                let snapshot = self.flow_snapshot();
-                if let Some(current_loop) = self.current_loop_mut() {
-                    current_loop.push_break(snapshot);
+                    if stmt.is_continue_stmt() {
+                        current_loop.continue_states.push(snapshot);
+                    } else {
+                        current_loop.break_states.push(snapshot);
+                    }
                 }
                 self.record_terminal_finally_entry();
                 // Everything in the current block after a terminal statement is unreachable.
