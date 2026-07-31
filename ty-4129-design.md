@@ -30,6 +30,8 @@ should not introduce object-identity, alias, or class-namespace mutation analysi
     alternative makes the failure merely possible.
 - Preserve callable union and intersection structure when deciding whether an implicit `__get__`
     call definitely fails.
+- Preserve the runtime provenance of the raw `__get__` slot: a `classmethod` wrapper is not callable
+    even when its underlying function signature accepts the synthesized arguments.
 - Treat a definitely or possibly bound custom `__getattribute__` as an interceptor that makes
     normal descriptor invocation non-definite, even when calling the override itself fails.
 - Treat a successful `__getattr__` fallback as a successful lookup alternative when the normal
@@ -78,6 +80,11 @@ non-definite.
 Callable types retain a union-of-intersections structure. Every union element must fail for the
 descriptor call to be definitely invalid, while a callable intersection element succeeds if any of
 its callable members accepts the arguments.
+
+Descriptor invocation calls the raw `__get__` value stored on the descriptor class. It does not bind
+that value through the descriptor protocol first. A method decorated with `@classmethod` therefore
+supplies a non-callable `classmethod` wrapper in this slot. Ty uses the underlying function signature
+only to preserve a useful recovery return type; diagnostic validation calls the raw wrapper.
 
 Only lookup paths that can supply the requested member participate in certainty aggregation. An
 undefined intersection element is a refinement, not a successful alternative member lookup.
@@ -165,6 +172,8 @@ read/write correlation, and bidirectional type-context improvements are separate
 - Diagnosing or retargeting call failures from an invalid custom `__getattribute__`.
 - Fully modeling the return type and exceptions of custom `__getattribute__` implementations.
 - General preservation of TypeVar correlation outside descriptor-call validation.
+- General changes to explicit classmethod access or synthesized function and classmethod `__get__`
+    wrapper types.
 
 The class-mutation items require flow facts keyed by semantic object or class identity rather than
 ty's existing syntactic places. That should be designed as a separate dataflow feature. The broader

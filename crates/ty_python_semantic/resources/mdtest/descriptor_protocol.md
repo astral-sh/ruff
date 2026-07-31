@@ -1971,6 +1971,25 @@ class Foo:
 reveal_type(Foo().desc)  # revealed: Unknown
 ```
 
+### A classmethod `__get__` slot is not callable
+
+Implicit descriptor invocation reads the raw `__get__` value from the descriptor class without
+binding it. A `classmethod` object is not callable, even when its underlying function annotations
+accept all three synthesized arguments.
+
+```py
+class Descriptor:
+    @classmethod
+    def __get__(cls: object, instance: object, owner: object) -> int:
+        return 1
+
+class C:
+    value = Descriptor()
+
+# error: [invalid-attribute-access]
+reveal_type(C().value)  # revealed: int
+```
+
 ### Undeclared descriptor arguments
 
 If a descriptor attribute is not declared, we union with `Unknown`, just like for regular
