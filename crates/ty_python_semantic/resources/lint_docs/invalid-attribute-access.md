@@ -3,8 +3,8 @@
 Checks for invalid attribute reads and writes.
 
 This includes assignments to class variables from instances, assignments to
-instance-only attributes from their class, and reads that definitely invoke a
-descriptor with an invalid `__get__` method.
+instance-only attributes from their class, and reads of descriptors with an
+invalid `__get__` method.
 
 An "instance-only" variable is one which is only ever assigned to or declared
 when accessed via `self` in an instance method.
@@ -63,6 +63,6 @@ class C:
 C().value  # error: [invalid-attribute-access]
 ```
 
-We report a descriptor error only when the invalid call is definite. If the
-attribute could instead contain a normal value or a valid descriptor, no
-diagnostic is emitted.
+As with other operations on unions, every possible descriptor implementation
+must accept the implicit call. We avoid reporting when member lookup has a
+successful alternative that does not invoke the descriptor.

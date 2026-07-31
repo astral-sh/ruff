@@ -543,9 +543,9 @@ struct DescriptorGetLookup<'db> {
 
 /// An interned description of an invalid implicit `__get__` call.
 ///
-/// Member lookup carries this compact context through unions and fallbacks. The concrete
-/// [`CallError`] is reconstructed only if expression inference determines that every lookup path
-/// invokes the invalid descriptor.
+/// Member lookup carries this compact context through unions and fallbacks. Expression inference
+/// reconstructs the concrete [`CallError`] if the invalid access remains after applying lookup
+/// fallbacks and local assignment information.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 struct DescriptorGetCallContext<'db> {
     #[returns(copy)]
@@ -559,8 +559,7 @@ struct DescriptorGetCallContext<'db> {
 impl get_size2::GetSize for DescriptorGetCallContext<'_> {}
 
 impl<'db> DescriptorGetCallContext<'db> {
-    /// Reconstructs the implicit call and returns its error if the call is still definitely
-    /// invalid.
+    /// Reconstructs the implicit call and returns its error if the call is still invalid.
     fn into_error(self, db: &'db dyn Db) -> Option<DescriptorGetCallError<'db>> {
         let descriptor_type = self.descriptor_type(db);
         let descr_get = descriptor_type.try_lookup_dunder_get(db)?;
@@ -574,9 +573,6 @@ impl<'db> DescriptorGetCallContext<'db> {
                 &CallArguments::positional([descriptor_type, instance, owner]),
             )
             .err()?;
-        if !error.has_definitely_invalid_callee_or_arguments() {
-            return None;
-        }
         Some(DescriptorGetCallError {
             descriptor_type,
             error,
@@ -598,35 +594,7 @@ fn combine_alternative_descriptor_get_errors<'db>(
     }
 }
 
-/// Aggregates errors from alternative descriptor values.
-///
-/// The access is definitely invalid only when every alternative fails. `selected` retains one
-/// representative failure for the diagnostic.
-struct DescriptorGetErrorAccumulator<'db> {
-    selected: Option<DescriptorGetCallContext<'db>>,
-    all_branches_fail: bool,
-}
-
-impl<'db> DescriptorGetErrorAccumulator<'db> {
-    fn new() -> Self {
-        Self {
-            selected: None,
-            all_branches_fail: true,
-        }
-    }
-
-    fn add(&mut self, error: Option<DescriptorGetCallContext<'db>>) {
-        self.all_branches_fail &= error.is_some();
-        self.selected = self.selected.or(error);
-    }
-
-    fn finish(self) -> Option<DescriptorGetCallContext<'db>> {
-        self.all_branches_fail.then_some(self.selected).flatten()
-    }
-}
-
-/// The result of applying the descriptor protocol to a value, including a deferred definite
-/// failure.
+/// The result of applying the descriptor protocol to a value, including a deferred call failure.
 #[derive(Clone, Debug, Copy, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
 struct DescriptorGetResult<'db> {
     return_type: Type<'db>,
@@ -640,7 +608,7 @@ struct DescriptorGetCallError<'db> {
     error: CallError<'db>,
 }
 
-/// A member lookup result together with a deferred, definitely invalid descriptor call.
+/// A member lookup result together with a deferred invalid descriptor call.
 ///
 /// Keeping the failure attached to the member lets unions, `__getattr__`, and lower-precedence
 /// lookup stages suppress it when any runtime path can avoid the descriptor.
@@ -711,25 +679,6 @@ impl<'db> MemberLookupResult<'db> {
             },
         }
     }
-}
-
-/// Returns whether a single source definition installs a runtime value.
-///
-/// This deliberately rejects stubs and type-checking-only definitions. The caller separately
-/// requires single-definition provenance; other cases do not provide enough information for an
-/// error-level descriptor diagnostic.
-#[salsa::tracked(returns(copy))]
-fn definition_is_runtime_binding<'db>(db: &'db dyn Db, definition: Definition<'db>) -> bool {
-    let file = definition.file(db);
-    if file.is_stub(db) {
-        return false;
-    }
-
-    let module = parsed_module(db, file).load(db);
-    let kind = definition.kind(db);
-    kind.category(false, &module).is_binding()
-        && !semantic_index(db, file)
-            .is_in_type_checking_block(definition.file_scope(db), kind.full_range(&module))
 }
 
 impl<'db> From<PlaceAndQualifiers<'db>> for MemberLookupResult<'db> {
@@ -3720,7 +3669,7 @@ impl<'db> Type<'db> {
         })
     }
 
-    /// Applies `__get__` and retains a definite call failure for expression inference.
+    /// Applies `__get__` and retains an invalid call for expression inference.
     ///
     /// For example, accessing `C().value` below implicitly supplies the descriptor value, the
     /// `C` instance, and `C`, so the declared method is missing two parameters:
@@ -3748,7 +3697,7 @@ impl<'db> Type<'db> {
             owner: Type<'db>,
         ) -> Option<DescriptorGetResult<'db>> {
             let mut return_types = UnionBuilder::new(db);
-            let mut errors = DescriptorGetErrorAccumulator::new();
+            let mut error = None;
             let mut any_descriptor = false;
             let mut all_data_descriptors = true;
 
@@ -3759,11 +3708,10 @@ impl<'db> Type<'db> {
                     any_descriptor = true;
                     all_data_descriptors &= result.kind.is_data();
                     return_types = return_types.add(result.return_type);
-                    errors.add(result.error);
+                    error = error.or(result.error);
                 } else {
                     all_data_descriptors = false;
                     return_types = return_types.add(*alternative);
-                    errors.add(None);
                 }
             }
 
@@ -3776,7 +3724,7 @@ impl<'db> Type<'db> {
                 DescriptorGetResult {
                     return_type: return_types.build(),
                     kind,
-                    error: errors.finish(),
+                    error,
                 }
             })
         }
@@ -3882,9 +3830,8 @@ impl<'db> Type<'db> {
                         UnionType::from_two_elements(db, error.return_type(db), ty)
                     };
                     let error = (!matches!(ty, Type::TypeVar(_))
-                        && descr_get.definedness == Definedness::AlwaysDefined
-                        && error.has_definitely_invalid_callee_or_arguments())
-                    .then(|| DescriptorGetCallContext::new(db, ty, instance, owner));
+                        && descr_get.definedness == Definedness::AlwaysDefined)
+                        .then(|| DescriptorGetCallContext::new(db, ty, instance, owner));
                     (return_type, error)
                 }
             };
@@ -3990,13 +3937,6 @@ impl<'db> Type<'db> {
             );
         }
 
-        let has_runtime_binding = matches!(
-            attribute.place,
-            Place::Defined(DefinedPlace {
-                provenance: Provenance::SingleDefinition(definition),
-                ..
-            }) if definition_is_runtime_binding(db, definition)
-        );
         let (member, kind, error) = match attribute {
             // A directly dynamic attribute could be a data descriptor even though we cannot see
             // its methods. Preserve that uncertainty, along with the existing bottom and cycle
@@ -4022,20 +3962,18 @@ impl<'db> Type<'db> {
                 qualifiers,
             } => {
                 let mut all_data_descriptors = true;
-                let mut errors = DescriptorGetErrorAccumulator::new();
-
+                let mut error = None;
                 let place = union
                     .map_with_boundness(db, env, |elem| {
                         let ty = match elem.try_call_dunder_get_with_error(db, env, instance, owner)
                         {
                             Some(result) => {
                                 all_data_descriptors &= result.kind.is_data();
-                                errors.add(result.error);
+                                error = error.or(result.error);
                                 result.return_type
                             }
                             None => {
                                 all_data_descriptors = false;
-                                errors.add(None);
                                 *elem
                             }
                         };
@@ -4056,7 +3994,7 @@ impl<'db> Type<'db> {
                     AttributeKind::NormalOrNonDataDescriptor
                 };
 
-                (place, kind, errors.finish())
+                (place, kind, error)
             }
 
             attribute @ PlaceAndQualifiers {
@@ -4133,7 +4071,7 @@ impl<'db> Type<'db> {
             _ => (attribute, AttributeKind::NormalOrNonDataDescriptor, None),
         };
 
-        (member, kind, error.filter(|_| has_runtime_binding))
+        (member, kind, error)
     }
 
     /// Returns whether this type is a data descriptor, i.e. defines `__set__` or `__delete__`.
@@ -4593,18 +4531,14 @@ impl<'db> Type<'db> {
 
             match this {
                 Type::Union(union) => {
-                    let mut errors = DescriptorGetErrorAccumulator::new();
+                    let mut error = None;
                     let member = union.map_with_boundness_and_qualifiers(db, |elem| {
                         let result = elem
                             .member_lookup_with_policy_and_receiver(db, name_str, policy, receiver);
-                        if matches!(receiver, Some(Type::TypeVar(_))) {
-                            errors.add(None);
-                        } else {
-                            errors.add(result.descriptor_get_error);
-                        }
+                        error = error.or(result.descriptor_get_error);
                         result.member
                     });
-                    MemberLookupResult::new(member, errors.finish())
+                    MemberLookupResult::new(member, error)
                 }
 
                 Type::Intersection(intersection) => {

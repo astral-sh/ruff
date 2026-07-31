@@ -10307,47 +10307,24 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         let mut assigned_type = None;
-        let mut has_reaching_mutation = false;
         if let Some(place_expr) = PlaceExpr::try_from_expr(attribute) {
             let (resolved, keys) = self.infer_place_load(
                 PlaceExprRef::from(&place_expr),
                 ast::ExprRef::Attribute(attribute),
             );
             if let Place::Defined(DefinedPlace {
-                ty, definedness, ..
+                ty,
+                definedness: Definedness::AlwaysDefined,
+                ..
             }) = resolved.place
             {
-                has_reaching_mutation = true;
-                if definedness == Definedness::AlwaysDefined {
-                    assigned_type = Some(ty);
-                }
-            } else if let Some((file_scope_id, use_id)) =
-                keys.iter().find_map(|(file_scope_id, key)| match key {
-                    ConstraintKey::UseId(use_id) => Some((*file_scope_id, *use_id)),
-                    ConstraintKey::NarrowingConstraint(_) | ConstraintKey::NestedScope(_) => None,
-                })
-            {
-                let use_def = self.index.use_def_map(file_scope_id);
-                let bindings = use_def.bindings_at_use(use_id);
-                let reachability_constraints = bindings.reachability_constraints();
-                let predicates = bindings.predicates();
-                has_reaching_mutation = bindings.into_iter().any(|binding| {
-                    matches!(binding.binding, DefinitionState::Deleted)
-                        && !evaluate_reachability_with_cache(
-                            db,
-                            Some(self.reachability_cache()),
-                            reachability_constraints,
-                            predicates,
-                            binding.reachability_constraint,
-                        )
-                        .is_always_false()
-                });
+                assigned_type = Some(ty);
             }
             constraint_keys.extend(keys);
         }
         let fallback = value_type.member_with_diagnostics(db, &attr.id);
         if report_descriptor_get_error
-            && !has_reaching_mutation
+            && assigned_type.is_none()
             && let Some(context) = fallback.descriptor_get_error
             && let Some(failure) = context.into_error(db)
         {

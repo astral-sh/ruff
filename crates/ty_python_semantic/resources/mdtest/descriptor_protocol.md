@@ -1023,10 +1023,10 @@ class C:
 C().value
 ```
 
-### A valid alternative prevents a descriptor diagnostic
+### Every descriptor alternative must accept the call
 
-A descriptor diagnostic is emitted only when every possible attribute value fails. A valid
-descriptor or a value that is not a descriptor provides a successful alternative.
+As with other operations on a union, an attribute access is invalid if any possible descriptor
+cannot accept the implicit call.
 
 ```py
 class BrokenDescriptor:
@@ -1037,41 +1037,14 @@ class ValidDescriptor:
     def __get__(self, instance: object, owner: type | None = None) -> str:
         return ""
 
-def descriptor_or_descriptor() -> BrokenDescriptor | ValidDescriptor:
-    raise NotImplementedError
-
-def descriptor_or_value() -> BrokenDescriptor | int:
-    raise NotImplementedError
-
-class C:
-    descriptor = descriptor_or_descriptor()
-    value = descriptor_or_value()
-
-reveal_type(C().descriptor)  # revealed: bytes | str
-reveal_type(C().value)  # revealed: bytes | int
-```
-
-### Malformed descriptor alternatives are reported
-
-If every possible value is a malformed descriptor, every runtime access fails.
-
-```py
-class IntDescriptor:
-    def __get__(self) -> int:
-        return 1
-
-class StrDescriptor:
-    def __get__(self) -> str:
-        return ""
-
-def descriptor() -> IntDescriptor | StrDescriptor:
+def descriptor() -> BrokenDescriptor | ValidDescriptor:
     raise NotImplementedError
 
 class C:
     value = descriptor()
 
 # error: [invalid-attribute-access] "Invalid access to descriptor attribute `value` on type `C`"
-reveal_type(C().value)  # revealed: int | str
+reveal_type(C().value)  # revealed: bytes | str
 ```
 
 ### Descriptor diagnostics are not reported through `super()`
@@ -1092,10 +1065,10 @@ class Derived(Base):
         super().value
 ```
 
-### A valid `__get__` definition prevents a descriptor diagnostic
+### Every `__get__` definition must accept the call
 
-A conditionally defined method can have several callable signatures. The descriptor access is valid
-if any possible definition accepts the call.
+A conditionally defined method can have several callable signatures. The access is invalid if any
+possible definition rejects the call.
 
 ```py
 def access(flag: bool) -> None:
@@ -1111,6 +1084,7 @@ def access(flag: bool) -> None:
     class C:
         value = Descriptor()
 
+    # error: [invalid-attribute-access] "Invalid access to descriptor attribute `value` on type `C`"
     reveal_type(C().value)  # revealed: int | str
 ```
 
@@ -1135,10 +1109,9 @@ def access(flag: bool) -> None:
     reveal_type(C().value)  # revealed: int | str
 ```
 
-### A declaration without a value does not create a descriptor
+### A class-object lookup uses its declared member type
 
-We only report invalid descriptor calls for assigned attributes. A declaration alone is not enough
-to show that descriptor lookup will call `__get__`.
+Class-object member lookup uses the declared attribute type even when the declaration has no value.
 
 ```py
 class Descriptor:
@@ -1148,7 +1121,8 @@ class Descriptor:
 class C:
     value: Descriptor
 
-C().value
+# error: [invalid-attribute-access] "Invalid access to descriptor attribute `value` on type `<class 'C'>`"
+C.value
 ```
 
 ### An instance `__getattribute__` runs before descriptors
@@ -1190,24 +1164,24 @@ class C:
         reveal_type(self.value)  # revealed: Literal[1]
 ```
 
-### An assignment suppresses a later data-descriptor diagnostic
+### A conditional assignment does not hide an invalid descriptor call
 
-We suppress descriptor diagnostics after an assignment. This also applies to a data descriptor, even
-though `__set__` handles the write and the later read still calls `__get__`.
+The assignment shadows the non-data descriptor on one path, but the other path still invokes its
+invalid `__get__` method.
 
 ```py
 class Descriptor:
     def __get__(self) -> str:
         return ""
 
-    def __set__(self, instance: object, value: int) -> None:
-        pass
-
 class C:
     value = Descriptor()
 
-def access(c: C) -> None:
-    c.value = 1
+def access(c: C, flag: bool) -> None:
+    if flag:
+        c.value = Descriptor()
+
+    # error: [invalid-attribute-access] "Invalid access to descriptor attribute `value` on type `C`"
     c.value
 ```
 
