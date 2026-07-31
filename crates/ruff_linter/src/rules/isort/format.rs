@@ -1,8 +1,6 @@
 use ruff_python_codegen::Stylist;
-use ruff_python_trivia::{find_trailing_pragma_offset, is_pragma_comment};
 
 use crate::line_width::{LineLength, LineWidthBuilder};
-use crate::preview::is_trailing_pragma_in_line_length_enabled;
 use crate::settings::types::PreviewMode;
 
 use super::types::{AliasData, ImportCommentSet, ImportFromCommentSet, ImportFromData, Importable};
@@ -110,45 +108,6 @@ pub(crate) fn format_import_from(
     format_multi_line(import_from, comments, aliases, is_first, stylist)
 }
 
-/// Add the width of an inline comment (including its two leading spaces) to `line_width`.
-///
-/// Pragma comments (e.g., `# noqa: F401` or `# type: ignore`) are excluded from the width, for
-/// consistency with how `line-too-long` (E501) and the formatter measure line width. Counting them
-/// would cause an import that otherwise fits on one line to be wrapped, moving the pragma to a
-/// position where it no longer applies to the import statement:
-///
-/// ```python
-/// from module import (
-///     member,  # noqa: PLC0415
-/// )
-/// ```
-///
-/// In preview, comments containing a trailing pragma (e.g., `# keep this  # noqa: F401`) only
-/// count the width of the non-pragma prefix, again matching E501 and the formatter.
-fn add_comment_width(
-    line_width: LineWidthBuilder,
-    comment: &str,
-    preview: PreviewMode,
-) -> LineWidthBuilder {
-    if is_trailing_pragma_in_line_length_enabled(preview) {
-        match find_trailing_pragma_offset(comment) {
-            Some(offset) => {
-                let prefix = comment[..offset].trim_end();
-                if prefix.is_empty() {
-                    line_width
-                } else {
-                    line_width.add_width(2).add_str(prefix)
-                }
-            }
-            None => line_width.add_width(2).add_str(comment),
-        }
-    } else if is_pragma_comment(comment) {
-        line_width
-    } else {
-        line_width.add_width(2).add_str(comment)
-    }
-}
-
 /// Format an import-from statement in single-line format.
 ///
 /// This method assumes that the output source code is syntactically valid.
@@ -202,7 +161,7 @@ fn format_single_line(
         output.push(' ');
         output.push(' ');
         output.push_str(comment);
-        line_width = add_comment_width(line_width, comment, preview);
+        line_width = line_width.add_comment(comment, preview);
     }
 
     for (_, comments) in aliases {
@@ -210,21 +169,21 @@ fn format_single_line(
             output.push(' ');
             output.push(' ');
             output.push_str(comment);
-            line_width = add_comment_width(line_width, comment, preview);
+            line_width = line_width.add_comment(comment, preview);
         }
 
         for comment in &comments.inline {
             output.push(' ');
             output.push(' ');
             output.push_str(comment);
-            line_width = add_comment_width(line_width, comment, preview);
+            line_width = line_width.add_comment(comment, preview);
         }
 
         for comment in &comments.trailing {
             output.push(' ');
             output.push(' ');
             output.push_str(comment);
-            line_width = add_comment_width(line_width, comment, preview);
+            line_width = line_width.add_comment(comment, preview);
         }
     }
 
@@ -232,7 +191,7 @@ fn format_single_line(
         output.push(' ');
         output.push(' ');
         output.push_str(comment);
-        line_width = add_comment_width(line_width, comment, preview);
+        line_width = line_width.add_comment(comment, preview);
     }
 
     output.push_str(&stylist.line_ending());
