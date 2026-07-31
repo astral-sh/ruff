@@ -1535,9 +1535,9 @@ fn emit_suggestion_default(
         let arrow = renderer.decor_style.file_start(is_first, false);
         buffer.append(row_num - 1, arrow, ElementStyle::LineNumber);
         let message = if renderer.anonymized_line_numbers {
-            format!("{}:{}:{}", path, loc.line, loc.char + 1)
-        } else {
             format!("{}:{}:{}", path, ANONYMIZED_LINE_NUM, loc.char + 1)
+        } else {
+            format!("{}:{}:{}", path, loc.line, loc.char + 1)
         };
         buffer.append(row_num - 1, &message, ElementStyle::LineAndColumn);
 
