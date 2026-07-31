@@ -96,7 +96,8 @@ impl ProjectDatabase {
         self.files.freeze();
     }
 
-    /// Permanently marks the project as never having open files.
+    /// Permanently marks the project as never having open files, so reads of the open-file state
+    /// record no Salsa dependency. Any later write panics.
     pub fn freeze_open_files(&mut self) {
         let project = self.project();
         project.freeze_open_files(self);

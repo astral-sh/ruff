@@ -88,10 +88,6 @@ impl ChangeEvent {
         matches!(self, ChangeEvent::Rescan)
     }
 
-    pub const fn is_created(&self) -> bool {
-        matches!(self, ChangeEvent::Created { .. })
-    }
-
     pub const fn is_changed(&self) -> bool {
         matches!(self, ChangeEvent::Changed { .. })
     }
