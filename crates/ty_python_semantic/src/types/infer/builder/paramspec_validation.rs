@@ -1,5 +1,5 @@
 use crate::{
-    semantic_index,
+    FxOrderSet, semantic_index,
     types::{
         ParamSpecAttrKind, Type,
         context::InferContext,
@@ -24,6 +24,7 @@ pub(super) fn validate_paramspec_components<'db>(
     infer_type: impl Fn(&ast::Expr) -> Type<'db>,
 ) {
     let db = context.db();
+    let env = context.program_environment();
 
     // Extract ParamSpec info from *args annotation
     let args_paramspec = parameters.vararg.as_deref().and_then(|vararg| {
@@ -71,14 +72,34 @@ pub(super) fn validate_paramspec_components<'db>(
                     ));
                 }
             } else {
-                let paramspec_is_in_scope = bind_typevar(
-                    db,
-                    semantic_index(db, context.file()),
-                    context.scope().file_scope_id(db),
-                    None,
-                    args_tv.typevar(db),
-                )
-                .is_some();
+                let paramspec_is_bound_by_parameter = parameters
+                    .iter()
+                    .filter_map(ast::AnyParameterRef::annotation)
+                    .map(&infer_type)
+                    .filter(|ty| {
+                        !matches!(
+                            ty,
+                            Type::TypeVar(typevar)
+                                if typevar.is_paramspec(db)
+                                    && typevar.paramspec_attr(db).is_some()
+                        )
+                    })
+                    .any(|ty| {
+                        let mut typevars = FxOrderSet::default();
+                        ty.find_legacy_typevars(db, env, None, &mut typevars);
+                        typevars
+                            .iter()
+                            .any(|typevar| typevar.is_same_typevar_as(db, args_tv))
+                    });
+                let index = semantic_index(db, context.file());
+                let paramspec_is_in_scope = paramspec_is_bound_by_parameter
+                    || index
+                        .scope(context.scope().file_scope_id(db))
+                        .parent()
+                        .is_some_and(|parent_scope| {
+                            bind_typevar(db, index, parent_scope, None, args_tv.typevar(db))
+                                .is_some()
+                        });
                 if !paramspec_is_in_scope
                     && let Some(builder) =
                         context.report_lint(&UNBOUND_TYPE_VARIABLE, args_annotation)
