@@ -1,4 +1,5 @@
 use anyhow::Result;
+use insta::assert_json_snapshot;
 use lsp_types::Request as _;
 use lsp_types::{DocumentFormattingRequest, DocumentRangeFormattingRequest, RegistrationRequest};
 
@@ -48,18 +49,24 @@ fn dynamically_registers_formatting_and_range_formatting_for_python_and_markdown
         range_formatting.method,
         DocumentRangeFormattingRequest::METHOD.as_str()
     );
-    assert_eq!(
+    assert_json_snapshot!(
         formatting.register_options,
-        Some(serde_json::json!({
-            "documentSelector": [
-                { "language": "python", "scheme": "file" },
-                { "language": "python", "scheme": "untitled" },
-                { "language": "markdown", "scheme": "file" },
-                { "language": "markdown", "scheme": "untitled" },
-                { "language": "python", "scheme": "vscode-notebook" },
-                { "notebook": "*", "language": "python" }
-            ]
-        }))
+    @r#"
+    {
+      "documentSelector": [
+        {
+          "language": "python"
+        },
+        {
+          "language": "markdown"
+        },
+        {
+          "language": "python",
+          "notebook": "*"
+        }
+      ]
+    }
+    "#
     );
     assert_eq!(
         range_formatting.register_options,

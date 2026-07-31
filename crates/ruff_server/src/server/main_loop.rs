@@ -188,35 +188,25 @@ impl Server {
             }
 
             if supports_formatting || supports_range_formatting {
-                let mut document_selector: types::DocumentSelector = ["python", "markdown"]
-                    .into_iter()
-                    .flat_map(|language| {
-                        ["file", "untitled"].into_iter().map(move |scheme| {
-                            types::TextDocumentFilter::Language(types::TextDocumentFilterLanguage {
-                                language: language.to_string(),
-                                scheme: Some(scheme.to_string()),
-                                pattern: None,
-                            })
-                            .into()
-                        })
-                    })
-                    .collect();
-
-                document_selector.push(
+                let document_selector = vec![
                     types::TextDocumentFilter::Language(types::TextDocumentFilterLanguage {
-                        language: "python".into(),
-                        scheme: Some("vscode-notebook".into()),
+                        language: "python".to_string(),
+                        scheme: None,
                         pattern: None,
                     })
                     .into(),
-                );
-                document_selector.push(
+                    types::TextDocumentFilter::Language(types::TextDocumentFilterLanguage {
+                        language: "markdown".to_string(),
+                        scheme: None,
+                        pattern: None,
+                    })
+                    .into(),
                     types::NotebookCellTextDocumentFilter {
                         notebook: "*".into(),
                         language: Some("python".into()),
                     }
                     .into(),
-                );
+                ];
 
                 let text_document_registration_options = types::TextDocumentRegistrationOptions {
                     document_selector: Some(document_selector),
