@@ -70,6 +70,11 @@ impl RankBitBox {
     }
 
     #[inline]
+    pub fn is_empty(&self) -> bool {
+        self.bits.is_empty()
+    }
+
+    #[inline]
     pub fn get_bit(&self, index: usize) -> Option<bool> {
         self.bits.get(index).map(|bit| *bit)
     }
