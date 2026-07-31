@@ -24,6 +24,16 @@
         }
       ]
     },
+    "extension": {
+      "description": "A mapping of custom file extensions to languages.\n\nThe extension should be specified without a leading dot. Multiple-part extensions, such as\n`py.tmpl`, are supported.\n\nCurrently, the only supported language is `python`.",
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": {
+        "$ref": "#/definitions/ExtensionLanguage"
+      }
+    },
     "overrides": {
       "description": "Override configurations for specific file patterns.\n\nEach override specifies include/exclude patterns and rule configurations\nthat apply to matching files. Multiple overrides can match the same file,\nwith later overrides taking precedence.",
       "anyOf": [
@@ -184,6 +194,13 @@
         }
       },
       "additionalProperties": false
+    },
+    "ExtensionLanguage": {
+      "description": "The language that ty should use for a custom file extension.",
+      "type": "string",
+      "enum": [
+        "python"
+      ]
     },
     "Level": {
       "oneOf": [

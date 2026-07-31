@@ -1,6 +1,36 @@
 <!-- WARNING: This file is auto-generated (cargo dev generate-all). Update the doc comments on the 'Options' struct in 'crates/ty_project/src/metadata/options.rs' if you want to change anything here. -->
 
 # Configuration
+## `extension`
+
+A mapping of custom file extensions to languages.
+
+The extension should be specified without a leading dot. Multiple-part extensions, such as
+`py.tmpl`, are supported.
+
+Currently, the only supported language is `python`.
+
+**Default value**: `{}`
+
+**Type**: `dict[str, "python"]`
+
+**Example usage**:
+
+=== "pyproject.toml"
+
+    ```toml
+    [tool.ty]
+    extension = { "py.tmpl" = "python" }
+    ```
+
+=== "ty.toml"
+
+    ```toml
+    extension = { "py.tmpl" = "python" }
+    ```
+
+---
+
 ## `rules`
 
 Configures the enabled rules and their severity.

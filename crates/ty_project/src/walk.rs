@@ -168,7 +168,9 @@ impl ProjectFilesWalker {
         };
 
         let filter = ProjectFilesFilter::from_project(db, project);
-        let exclude_scripts = project.settings(db).src().exclude_scripts;
+        let src_settings = project.settings(db).src();
+        let exclude_scripts = src_settings.exclude_scripts;
+        let python_extensions = &src_settings.python_extensions;
         let files = std::sync::Mutex::new(Vec::new());
         let diagnostics = std::sync::Mutex::new(Vec::new());
 
@@ -233,8 +235,11 @@ impl ProjectFilesWalker {
                                         // Ignore any non python files to avoid creating too many entries in `Files`.
                                         // Unless the file is explicitly passed on the CLI or a literal match in the `include`, we then always assume it's a file ty can analyze
                                         if entry.depth() > 0
-                                            && !include_result
-                                                .should_index_file(db.system(), entry.path())
+                                            && !include_result.should_index_file(
+                                                db.system(),
+                                                python_extensions,
+                                                entry.path(),
+                                            )
                                         {
                                             return WalkState::Skip;
                                         }

@@ -146,10 +146,11 @@ impl ProjectDatabase {
                     // walk when the path is ignored.
                     if !project.file_set(self).is_lazy() {
                         if self.system().is_file(path) {
-                            if !project
-                                .is_file_included(self, path)
-                                .should_index_file(self.system(), path)
-                            {
+                            if !project.is_file_included(self, path).should_index_file(
+                                self.system(),
+                                &project.settings(self).src().python_extensions,
+                                path,
+                            ) {
                                 continue;
                             }
 

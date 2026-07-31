@@ -7,7 +7,10 @@ use ty_python_semantic::lint::RuleSelection;
 
 use crate::metadata::options::{InnerOverrideOptions, Options, OutputFormat};
 use crate::metadata::script::script_metadata;
-use crate::{Db, glob::IncludeExcludeFilter};
+use crate::{
+    Db,
+    glob::{IncludeExcludeFilter, PythonExtensions},
+};
 
 /// The resolved [`super::Options`] for the project.
 ///
@@ -82,6 +85,7 @@ impl Default for TerminalSettings {
 pub struct SrcSettings {
     pub respect_ignore_files: bool,
     pub exclude_scripts: bool,
+    pub(crate) python_extensions: PythonExtensions,
     pub files: IncludeExcludeFilter,
 }
 impl SrcSettings {
@@ -89,6 +93,7 @@ impl SrcSettings {
         Self {
             respect_ignore_files: true,
             exclude_scripts: false,
+            python_extensions: PythonExtensions::default(),
             files: IncludeExcludeFilter::default(),
         }
     }
