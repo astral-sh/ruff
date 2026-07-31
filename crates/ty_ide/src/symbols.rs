@@ -1363,7 +1363,9 @@ impl<'db> SymbolVisitor<'db> {
             ast::Stmt::AugAssign(ast::StmtAugAssign {
                 target, op, value, ..
             }) => {
-                self.visit_nonbinding_target(target);
+                if !target.is_name_expr() {
+                    self.visit_expr(target);
+                }
                 self.visit_expr(value);
 
                 // We don't care about `__all__` unless we're
@@ -1504,11 +1506,6 @@ impl<'db> SourceOrderVisitor<'db> for SymbolVisitor<'db> {
                 // We don't care about `__all__` unless we're
                 // specifically looking for exported symbols.
                 if !self.exports_only {
-                    return;
-                }
-
-                // Class-scoped assignments do not affect the module's exports.
-                if self.in_class {
                     return;
                 }
 

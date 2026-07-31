@@ -342,6 +342,48 @@ def function():
     }
 
     #[test]
+    fn document_symbols_augmented_assignment_targets() {
+        let test = cursor_test(
+            "
+items = [1]
+items[(index := 0)] += 1
+(obj := factory()).value += 1
+items += (rhs := [1])
+<CURSOR>",
+        );
+
+        assert_snapshot!(test.document_symbols(), @"
+        info[document-symbols]: SymbolInfo
+         --> main.py:2:1
+          |
+        2 | items = [1]
+          | ^^^^^
+        info: Variable items
+
+        info[document-symbols]: SymbolInfo
+         --> main.py:3:8
+          |
+        3 | items[(index := 0)] += 1
+          |        ^^^^^
+        info: Variable index
+
+        info[document-symbols]: SymbolInfo
+         --> main.py:4:2
+          |
+        4 | (obj := factory()).value += 1
+          |  ^^^
+        info: Variable obj
+
+        info[document-symbols]: SymbolInfo
+         --> main.py:5:11
+          |
+        5 | items += (rhs := [1])
+          |           ^^^
+        info: Variable rhs
+        ");
+    }
+
+    #[test]
     fn document_symbols_store_context_targets() {
         let test = cursor_test(
             "
