@@ -737,7 +737,11 @@ impl<'db> GenericContext<'db> {
                 }
             }
 
-            fn visit_callable_type(&self, env: &SemanticEnvironment<'db>, callable: CallableType<'db>) {
+            fn visit_callable_type(
+                &self,
+                env: &SemanticEnvironment<'db>,
+                callable: CallableType<'db>,
+            ) {
                 // Note: We only consider the outermost Callables in the return type.
                 if self.in_return_type && self.in_callable_type.get().is_none() {
                     self.in_callable_type.set(Some(callable));
@@ -1226,7 +1230,10 @@ impl<'db> Specialization<'db> {
     /// access. An unpacked `TypeVarTuple` describes those elements collectively, so project it to
     /// `object` for tuple members and base classes while retaining the symbolic pack in the tuple's
     /// own specialization.
-    pub(crate) fn tuple_runtime_element_specialization(self, env: &SemanticEnvironment<'db>) -> Self {
+    pub(crate) fn tuple_runtime_element_specialization(
+        self,
+        env: &SemanticEnvironment<'db>,
+    ) -> Self {
         let db = env.db();
         let Some(tuple) = self.tuple_inner(db) else {
             return self;
@@ -1516,8 +1523,7 @@ impl<'db> Specialization<'db> {
 
                     if has_dynamic_type
                         && effective_materialization_kind == MaterializationKind::Top
-                        && let Some(upper_bound) =
-                            bound_typevar.typevar(db).top_materialized_upper_bound(db)
+                        && let Some(upper_bound) = bound_typevar.top_materialized_upper_bound(env)
                     {
                         IntersectionType::from_two_elements(env, materialized, upper_bound)
                     } else {
@@ -1647,7 +1653,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             && target
                 .types(db)
                 .iter()
-                .all(|ty| !ty.has_typevar_or_typevar_instance(db))
+                .all(|ty| !ty.has_typevar_or_typevar_instance(env))
             // Only non-pure redundancy needs a target already equal to its top.
             // Materializing the source otherwise loses the bottom needed to
             // simplify `Covariant[Any] | Covariant[Any | str]`. Comparing both
@@ -1665,8 +1671,11 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         self.materialization_visitor,
                     ))
         {
-            let source_top =
-                source.materialize_impl(env, MaterializationKind::Top, self.materialization_visitor);
+            let source_top = source.materialize_impl(
+                env,
+                MaterializationKind::Top,
+                self.materialization_visitor,
+            );
             // Dynamic arguments can still be unchanged by top materialization; retrying
             // the same pair would recurse indefinitely.
             if source_top != source {
@@ -2562,7 +2571,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             // Relationships across binding contexts can intentionally remap one generic context
             // onto another, as with constructor `self` annotations. Synthetic contexts do not
             // identify a single source-level binding, so they are not safe to project either.
-            target_context != BindingContext::Synthetic
+            !matches!(target_context, BindingContext::Synthetic(_))
                 && typevar.is_inferable(self.env.db(), self.inferable)
                 && typevar.binding_context(self.env.db()) == target_context
         })
@@ -3867,13 +3876,19 @@ mod tests {
     fn generic_context_inferable_typevars_retain_instances_from_bounds() {
         let db = setup_db();
         let env = db.semantic_environment();
-        let u =
-            BoundTypeVarInstance::synthetic(&db, Name::new_static("U"), TypeVarVariance::Invariant);
-        let t =
-            BoundTypeVarInstance::synthetic(&db, Name::new_static("T"), TypeVarVariance::Invariant)
-                .map_bound_or_constraints(&env, |_| {
-                    Some(TypeVarBoundOrConstraints::UpperBound(Type::TypeVar(u)))
-                });
+        let u = BoundTypeVarInstance::synthetic(
+            &env,
+            Name::new_static("U"),
+            TypeVarVariance::Invariant,
+        );
+        let t = BoundTypeVarInstance::synthetic(
+            &env,
+            Name::new_static("T"),
+            TypeVarVariance::Invariant,
+        )
+        .map_bound_or_constraints(&env, |_| {
+            Some(TypeVarBoundOrConstraints::UpperBound(Type::TypeVar(u)))
+        });
         let context = GenericContext::from_typevar_instances(&env, [t]);
 
         let inferable = context.inferable_typevars(&env);

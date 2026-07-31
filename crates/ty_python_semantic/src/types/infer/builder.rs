@@ -7527,9 +7527,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return TypeContext::default();
         };
 
-        let db = self.db();
         let yield_typevar = BoundTypeVarInstance::synthetic(
-            db,
+            env,
             Name::new_static("_GeneratorYieldT"),
             TypeVarVariance::Covariant,
         );

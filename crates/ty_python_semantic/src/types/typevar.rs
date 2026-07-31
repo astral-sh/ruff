@@ -25,6 +25,7 @@ use crate::{
     },
 };
 use ty_python_core::{
+    Program,
     definition::{Definition, DefinitionKind},
     semantic_index,
 };
@@ -240,25 +241,6 @@ impl<'db> TypeVarInstance<'db> {
         } else {
             None
         }
-    }
-
-    /// Returns the static upper bound used when materializing a gradual type argument.
-    ///
-    /// Constraints are unioned only when materializing an exposed member, where their union is a
-    /// valid conservative upper bound. A bound may recursively refer to its own generic class,
-    /// either directly or through other bounds. Such a bound has no finite static top
-    /// materialization, so recover from its cycle without applying an upper bound.
-    #[salsa::tracked(
-        returns(copy),
-        cycle_result=|_, _, _| None,
-        heap_size=ruff_memory_usage::heap_size
-    )]
-    pub(super) fn top_materialized_upper_bound(self, db: &'db dyn Db) -> Option<Type<'db>> {
-        let env = SemanticEnvironment::from_version(db, db.python_version());
-        self.bound_or_constraints(&env)
-            .map(|bound_or_constraints| {
-                bound_or_constraints.as_type(&env).top_materialization(&env)
-            })
     }
 
     /// Returns whether this type variable has constraints without evaluating a lazy bound.
@@ -1104,7 +1086,12 @@ impl<'db> BoundTypeVarInstance<'db> {
 
     /// Create a new PEP 695 type variable that can be used in signatures
     /// of synthetic generic functions.
-    pub(crate) fn synthetic(db: &'db dyn Db, name: Name, variance: TypeVarVariance) -> Self {
+    pub(crate) fn synthetic(
+        env: &SemanticEnvironment<'db>,
+        name: Name,
+        variance: TypeVarVariance,
+    ) -> Self {
+        let db = env.db();
         let identity = TypeVarIdentity::new(
             db,
             name,
@@ -1121,7 +1108,7 @@ impl<'db> BoundTypeVarInstance<'db> {
         Self::new(
             db,
             typevar,
-            BindingContext::Synthetic,
+            BindingContext::Synthetic(env.program()),
             None,
             TypeVarNonce::NONE,
         )
@@ -1194,7 +1181,7 @@ impl<'db> BoundTypeVarInstance<'db> {
                         variance => variance,
                     }
                 }),
-                BindingContext::Synthetic => TypeVarVariance::Invariant,
+                BindingContext::Synthetic(_) => TypeVarVariance::Invariant,
             },
         }
     }
@@ -1246,8 +1233,11 @@ impl<'db> BoundTypeVarInstance<'db> {
                         // Materialization uses a different mapping mode. Reuse of the outer
                         // visitor can incorrectly hit a cache entry from specialization.
                         let materialization_visitor = visitor.for_new_materialization_root();
-                        let materialized =
-                            mapped.materialize(env, *materialization_kind, &materialization_visitor);
+                        let materialized = mapped.materialize(
+                            env,
+                            *materialization_kind,
+                            &materialization_visitor,
+                        );
 
                         if *materialization_kind == MaterializationKind::Top
                             && !materialization_visitor.is_equivalent_to_materialization(
@@ -1255,8 +1245,7 @@ impl<'db> BoundTypeVarInstance<'db> {
                                 mapped,
                                 materialized,
                             )
-                            && let Some(upper_bound) =
-                                self.typevar(db).top_materialized_upper_bound(db)
+                            && let Some(upper_bound) = self.top_materialized_upper_bound(env)
                         {
                             IntersectionType::from_two_elements(env, materialized, upper_bound)
                         } else {
@@ -1307,6 +1296,43 @@ impl<'db> BoundTypeVarInstance<'db> {
                 Type::TypeVar(self.materialize_impl(env, *materialization_kind, visitor))
             }
         }
+    }
+
+    /// Returns the static upper bound used when materializing a gradual type argument.
+    ///
+    /// Constraints are unioned only when materializing an exposed member, where their union is a
+    /// valid conservative upper bound. A bound may recursively refer to its own generic class,
+    /// either directly or through other bounds. Such a bound has no finite static top
+    /// materialization, so recover from its cycle without applying an upper bound.
+    pub(super) fn top_materialized_upper_bound(
+        self,
+        env: &SemanticEnvironment<'db>,
+    ) -> Option<Type<'db>> {
+        #[salsa::tracked(
+            returns(copy),
+            cycle_result=|_, _, _| None,
+            heap_size=ruff_memory_usage::heap_size
+        )]
+        fn top_materialized_upper_bound_inner<'db>(
+            db: &'db dyn Db,
+            bound_typevar: BoundTypeVarInstance<'db>,
+        ) -> Option<Type<'db>> {
+            let env = SemanticEnvironment::from_program(
+                db,
+                bound_typevar.binding_context(db).program(db),
+            );
+
+            bound_typevar
+                .typevar(db)
+                .bound_or_constraints(&env)
+                .map(|bound_or_constraints| {
+                    bound_or_constraints.as_type(&env).top_materialization(&env)
+                })
+        }
+
+        let db = env.db();
+        debug_assert_eq!(env.program(), self.binding_context(db).program(db));
+        top_materialized_upper_bound_inner(db, self)
     }
 }
 
@@ -1566,8 +1592,9 @@ pub enum BindingContext<'db> {
     /// The definition of the generic class, function, or type alias that binds this typevar.
     Definition(Definition<'db>),
     /// The typevar is synthesized internally, and is not associated with a particular definition
-    /// in the source, but is still bound and eligible for specialization inference.
-    Synthetic,
+    /// in the source, but is still bound and eligible for specialization inference. Its program
+    /// identifies the environment that cannot otherwise be recovered from a source definition.
+    Synthetic(Program),
 }
 
 impl<'db> From<Definition<'db>> for BindingContext<'db> {
@@ -1580,7 +1607,14 @@ impl<'db> BindingContext<'db> {
     pub(crate) fn definition(self) -> Option<Definition<'db>> {
         match self {
             BindingContext::Definition(definition) => Some(definition),
-            BindingContext::Synthetic => None,
+            BindingContext::Synthetic(_) => None,
+        }
+    }
+
+    pub(crate) fn program(self, db: &'db dyn Db) -> Program {
+        match self {
+            Self::Definition(definition) => definition.program(db),
+            Self::Synthetic(program) => program,
         }
     }
 
@@ -1999,7 +2033,11 @@ impl<'db> TypeVarConstraints<'db> {
     /// Normalize recursive types for cycle recovery when there's no previous value.
     ///
     /// See [`Type::recursive_type_normalized`] for more details.
-    fn recursive_type_normalized(self, env: &SemanticEnvironment<'db>, cycle: &salsa::Cycle) -> Self {
+    fn recursive_type_normalized(
+        self,
+        env: &SemanticEnvironment<'db>,
+        cycle: &salsa::Cycle,
+    ) -> Self {
         let db = env.db();
         self.map(db, |ty| ty.recursive_type_normalized(env, cycle))
     }
@@ -2103,12 +2141,13 @@ mod tests {
     use crate::db::tests::setup_db;
 
     fn bound_typevar<'db>(
-        db: &'db dyn Db,
+        env: &SemanticEnvironment<'db>,
         name: &'static str,
         kind: TypeVarKind,
         bound_or_constraints: Option<TypeVarBoundOrConstraintsEvaluation<'db>>,
         freshness: TypeVarNonce,
     ) -> BoundTypeVarInstance<'db> {
+        let db = env.db();
         let identity = TypeVarIdentity::new(db, Name::new_static(name), None, kind);
         let typevar = TypeVarInstance::new(
             db,
@@ -2117,14 +2156,24 @@ mod tests {
             Some(TypeVarVariance::Invariant),
             None,
         );
-        BoundTypeVarInstance::new(db, typevar, BindingContext::Synthetic, None, freshness)
+        BoundTypeVarInstance::new(
+            db,
+            typevar,
+            BindingContext::Synthetic(env.program()),
+            None,
+            freshness,
+        )
     }
 
     #[test]
     fn typevar_set_empty_set_is_none() {
         let db = setup_db();
-        let typevar =
-            BoundTypeVarInstance::synthetic(&db, Name::new_static("T"), TypeVarVariance::Invariant);
+        let env = db.semantic_environment();
+        let typevar = BoundTypeVarInstance::synthetic(
+            &env,
+            Name::new_static("T"),
+            TypeVarVariance::Invariant,
+        );
         let inferable = TypeVarSet::from_typevars(&db, []);
 
         assert_eq!(inferable, TypeVarSet::None);
@@ -2137,27 +2186,34 @@ mod tests {
     fn typevar_set_keeps_first_instance_for_each_identity() {
         let mut db = setup_db();
         db.clear_salsa_events();
+        let env = db.semantic_environment();
 
         // The synthetic lazy bound has no definition, so it is equivalent to the implicit
         // `object` upper bound represented eagerly below.
         let lazy = bound_typevar(
-            &db,
+            &env,
             "T",
             TypeVarKind::Pep695TypeVar,
             Some(TypeVarBoundOrConstraintsEvaluation::LazyUpperBound),
             TypeVarNonce::NONE,
         );
         let eager = bound_typevar(
-            &db,
+            &env,
             "T",
             TypeVarKind::Pep695TypeVar,
             Some(TypeVarBoundOrConstraints::UpperBound(Type::object()).into()),
             TypeVarNonce::NONE,
         );
-        let u =
-            BoundTypeVarInstance::synthetic(&db, Name::new_static("U"), TypeVarVariance::Invariant);
-        let v =
-            BoundTypeVarInstance::synthetic(&db, Name::new_static("V"), TypeVarVariance::Invariant);
+        let u = BoundTypeVarInstance::synthetic(
+            &env,
+            Name::new_static("U"),
+            TypeVarVariance::Invariant,
+        );
+        let v = BoundTypeVarInstance::synthetic(
+            &env,
+            Name::new_static("V"),
+            TypeVarVariance::Invariant,
+        );
 
         assert_ne!(lazy, eager);
         assert_eq!(lazy.identity(&db), eager.identity(&db));
@@ -2183,21 +2239,21 @@ mod tests {
         let db = setup_db();
         let env = db.semantic_environment();
         let typevar = bound_typevar(
-            &db,
+            &env,
             "T",
             TypeVarKind::Pep695TypeVar,
             None,
             TypeVarNonce::NONE,
         );
         let fresh = bound_typevar(
-            &db,
+            &env,
             "T",
             TypeVarKind::Pep695TypeVar,
             None,
             TypeVarNonce::NONE.increment(),
         );
         let paramspec = bound_typevar(
-            &db,
+            &env,
             "P",
             TypeVarKind::Pep695ParamSpec,
             None,

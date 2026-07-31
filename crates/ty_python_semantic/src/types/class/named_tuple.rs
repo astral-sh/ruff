@@ -37,8 +37,11 @@ pub(super) fn synthesize_namedtuple_class_member<'db>(
     match name {
         "__new__" => {
             // __new__(cls, field1, field2, ...) -> Self
-            let self_typevar =
-                BoundTypeVarInstance::synthetic_self(db, instance_ty, BindingContext::Synthetic);
+            let self_typevar = BoundTypeVarInstance::synthetic_self(
+                db,
+                instance_ty,
+                BindingContext::Synthetic(env.program()),
+            );
             let self_ty = Type::TypeVar(self_typevar);
 
             let variables = inherited_generic_context
@@ -94,7 +97,7 @@ pub(super) fn synthesize_namedtuple_class_member<'db>(
             let self_ty = Type::TypeVar(BoundTypeVarInstance::synthetic_self(
                 db,
                 instance_ty,
-                BindingContext::Synthetic,
+                BindingContext::Synthetic(env.program()),
             ));
 
             let first_parameter = Parameter::positional_or_keyword(Name::new_static("self"))

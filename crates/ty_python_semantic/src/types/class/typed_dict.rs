@@ -4,7 +4,6 @@ use std::borrow::Cow;
 use itertools::Either;
 use ruff_db::diagnostic::Span;
 use ruff_python_ast::name::Name;
-use ruff_python_ast::{self as ast};
 use ruff_python_stdlib::identifiers::is_identifier;
 use ruff_text_size::TextRange;
 use ty_module_resolver::KnownModule;
@@ -388,7 +387,7 @@ fn synthesize_typed_dict_get<'db>(
             );
 
             let t_default = BoundTypeVarInstance::synthetic(
-                db,
+                env,
                 Name::new_static("T"),
                 TypeVarVariance::Covariant,
             );
@@ -446,7 +445,7 @@ fn synthesize_typed_dict_get<'db>(
         )))
         .chain(std::iter::once({
             let t_default = BoundTypeVarInstance::synthetic(
-                db,
+                env,
                 Name::new_static("T"),
                 TypeVarVariance::Covariant,
             );
@@ -567,7 +566,7 @@ fn synthesize_typed_dict_pop<'db>(
         );
 
         let t_default =
-            BoundTypeVarInstance::synthetic(db, Name::new_static("T"), TypeVarVariance::Covariant);
+            BoundTypeVarInstance::synthetic(env, Name::new_static("T"), TypeVarVariance::Covariant);
         let pop_with_default_parameters = [
             Parameter::positional_only(Some(Name::new_static("self")))
                 .with_annotated_type(instance_ty),

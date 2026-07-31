@@ -144,7 +144,10 @@ impl<'db> CodeGeneratorKind<'db> {
     /// This is invariant across generic specializations. Type arguments affect the types of
     /// synthesized members, but not whether the class is dataclass-like, a Pydantic model, a
     /// `NamedTuple`, or a `TypedDict`.
-    pub(crate) fn from_class(env: &SemanticEnvironment<'db>, class: ClassLiteral<'db>) -> Option<Self> {
+    pub(crate) fn from_class(
+        env: &SemanticEnvironment<'db>,
+        class: ClassLiteral<'db>,
+    ) -> Option<Self> {
         match class {
             ClassLiteral::Static(static_class) => Self::from_static_class(env, static_class),
             ClassLiteral::Dynamic(dynamic_class) => Self::from_dynamic_class(env, dynamic_class),
@@ -739,7 +742,10 @@ impl<'db> ClassLiteral<'db> {
     }
 
     /// Returns the generic context if this is a generic class.
-    pub(crate) fn generic_context(self, env: &SemanticEnvironment<'db>) -> Option<GenericContext<'db>> {
+    pub(crate) fn generic_context(
+        self,
+        env: &SemanticEnvironment<'db>,
+    ) -> Option<GenericContext<'db>> {
         self.as_static()
             .and_then(|class| class.generic_context(env))
     }
@@ -1480,7 +1486,11 @@ impl<'db> ClassType<'db> {
     }
 
     /// Return `true` if `other` is present in this class's MRO.
-    pub(super) fn is_subclass_of(self, env: &SemanticEnvironment<'db>, target: ClassType<'db>) -> bool {
+    pub(super) fn is_subclass_of(
+        self,
+        env: &SemanticEnvironment<'db>,
+        target: ClassType<'db>,
+    ) -> bool {
         let constraints = ConstraintSetBuilder::new();
         let relation_visitor = HasRelationToVisitor::default(&constraints);
         let disjointness_visitor = IsDisjointVisitor::default(&constraints);
@@ -2152,7 +2162,11 @@ impl<'db> ClassType<'db> {
 
     /// A helper function for `instance_member` that looks up the `name` attribute only on
     /// this class, not on its superclasses.
-    pub(super) fn own_instance_member(self, env: &SemanticEnvironment<'db>, name: &str) -> Member<'db> {
+    pub(super) fn own_instance_member(
+        self,
+        env: &SemanticEnvironment<'db>,
+        name: &str,
+    ) -> Member<'db> {
         let db = env.db();
         match self {
             Self::NonGeneric(ClassLiteral::Dynamic(dynamic)) => {

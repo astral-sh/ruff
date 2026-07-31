@@ -1592,7 +1592,10 @@ impl<'db> Type<'db> {
     ///
     /// I.e., for the type `tuple[int, str]`, this will return the tuple spec `[int, str]`.
     /// For a subclass of `tuple[int, str]`, it will return the same tuple spec.
-    fn tuple_instance_spec(&self, env: &SemanticEnvironment<'db>) -> Option<Cow<'db, TupleSpec<'db>>> {
+    fn tuple_instance_spec(
+        &self,
+        env: &SemanticEnvironment<'db>,
+    ) -> Option<Cow<'db, TupleSpec<'db>>> {
         self.as_nominal_instance()
             .and_then(|instance| instance.tuple_spec(env))
     }
@@ -3135,7 +3138,11 @@ impl<'db> Type<'db> {
     ///     def __init__(self):
     ///         self.b: str = "a"
     /// ```
-    fn instance_member(&self, env: &SemanticEnvironment<'db>, name: &str) -> PlaceAndQualifiers<'db> {
+    fn instance_member(
+        &self,
+        env: &SemanticEnvironment<'db>,
+        name: &str,
+    ) -> PlaceAndQualifiers<'db> {
         let db = env.db();
         match self {
             Type::Union(union) => {
@@ -4616,7 +4623,10 @@ impl<'db> Type<'db> {
 
     /// Returns the key and value types of this object if it was unpacked using `**`,
     /// or `None` if the object does not support unpacking.
-    fn unpack_keys_and_items(self, env: &SemanticEnvironment<'db>) -> Option<(Type<'db>, Type<'db>)> {
+    fn unpack_keys_and_items(
+        self,
+        env: &SemanticEnvironment<'db>,
+    ) -> Option<(Type<'db>, Type<'db>)> {
         let key_ty = match self
             .member_lookup_with_policy(env, "keys", MemberLookupPolicy::NO_INSTANCE_FALLBACK)
             .place
@@ -4735,7 +4745,7 @@ impl<'db> Type<'db> {
             Type::FunctionLiteral(function_type) => match function_type.known(db) {
                 Some(KnownFunction::AssertType) => {
                     let val_ty = BoundTypeVarInstance::synthetic(
-                        db,
+                        env,
                         Name::new_static("T"),
                         TypeVarVariance::Invariant,
                     );
@@ -4997,7 +5007,7 @@ impl<'db> Type<'db> {
 
             Type::DataclassDecorator(_) => {
                 let typevar = BoundTypeVarInstance::synthetic(
-                    db,
+                    env,
                     Name::new_static("T"),
                     TypeVarVariance::Invariant,
                 );
@@ -5285,7 +5295,7 @@ impl<'db> Type<'db> {
                 //     def __new__(cls, func: Callable[..., _T], /, *args: Any, **kwargs: Any) -> Self: ...
                 // ```
                 let return_ty = BoundTypeVarInstance::synthetic(
-                    db,
+                    env,
                     Name::new_static("_T"),
                     TypeVarVariance::Covariant,
                 );
@@ -5319,7 +5329,7 @@ impl<'db> Type<'db> {
 
             KnownClass::Tuple => {
                 let element_ty = BoundTypeVarInstance::synthetic(
-                    db,
+                    env,
                     Name::new_static("T"),
                     TypeVarVariance::Covariant,
                 );
@@ -7267,7 +7277,7 @@ impl<'db> Type<'db> {
             &TypeMapping::BindLegacyTypevars(
                 binding_context
                     .map(BindingContext::Definition)
-                    .unwrap_or(BindingContext::Synthetic),
+                    .unwrap_or(BindingContext::Synthetic(env.program())),
             ),
             TypeContext::default(),
         )
@@ -8903,7 +8913,11 @@ impl<'db> ModuleLiteralType<'db> {
         Some(Type::module_literal(db, importing_file, submodule))
     }
 
-    fn try_module_getattr(self, env: &SemanticEnvironment<'db>, name: &str) -> PlaceAndQualifiers<'db> {
+    fn try_module_getattr(
+        self,
+        env: &SemanticEnvironment<'db>,
+        name: &str,
+    ) -> PlaceAndQualifiers<'db> {
         let db = env.db();
         // For module literals, we want to try calling the module's own `__getattr__` function
         // if it exists. First, we need to look up the `__getattr__` function in the module's scope.

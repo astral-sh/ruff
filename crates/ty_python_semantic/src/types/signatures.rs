@@ -211,7 +211,10 @@ impl<'db> CallableSignature<'db> {
     }
 
     /// Returns the union of all overload return types, or `Unknown` if there are no overloads.
-    pub(crate) fn overload_return_type_or_unknown(&self, env: &SemanticEnvironment<'db>) -> Type<'db> {
+    pub(crate) fn overload_return_type_or_unknown(
+        &self,
+        env: &SemanticEnvironment<'db>,
+    ) -> Type<'db> {
         match self.overloads.as_slice() {
             [] => Type::unknown(),
             [signature] => signature.return_ty,
@@ -937,7 +940,11 @@ impl<'db> Signature<'db> {
         }
     }
 
-    pub(crate) fn freshen_bound_typevars(&self, env: &SemanticEnvironment<'db>, delta: u32) -> Self {
+    pub(crate) fn freshen_bound_typevars(
+        &self,
+        env: &SemanticEnvironment<'db>,
+        delta: u32,
+    ) -> Self {
         let Some(generic_context) = self.generic_context else {
             return self.clone();
         };
@@ -1103,7 +1110,7 @@ impl<'db> Signature<'db> {
                 Type::TypeVar(BoundTypeVarInstance::synthetic_self(
                     db,
                     Type::object(),
-                    BindingContext::Synthetic,
+                    BindingContext::Synthetic(env.program()),
                 ))
             });
             let annotation = if let Some(typing_self_type) = typing_self_type {
@@ -1359,7 +1366,7 @@ impl<'db> Signature<'db> {
         let receiver_mapping = TypeMapping::BindSelf(SelfBinding::new(
             env,
             receiver_type,
-            Some(BindingContext::Synthetic),
+            Some(BindingContext::Synthetic(env.program())),
         ));
         let self_mapping = TypeMapping::BindSelf(SelfBinding::new(env, self_type, binding_context));
         let receiver_visitor = ApplyTypeMappingVisitor::default();
@@ -1609,7 +1616,11 @@ impl<'db> Signature<'db> {
         }))
     }
 
-    fn needs_self_mapping(&self, env: &SemanticEnvironment<'db>, receiver_is_removed: bool) -> bool {
+    fn needs_self_mapping(
+        &self,
+        env: &SemanticEnvironment<'db>,
+        receiver_is_removed: bool,
+    ) -> bool {
         // TODO: Expand type aliases here so `type Alias = Self` in parameters or returns
         // triggers binding when a method is accessed on a concrete receiver.
         self.return_ty.contains_self(env)
@@ -5640,7 +5651,9 @@ mod tests {
         let sig = func.signature(&db.semantic_environment());
 
         assert_eq!(
-            sig.return_ty.display(&db.semantic_environment()).to_string(),
+            sig.return_ty
+                .display(&db.semantic_environment())
+                .to_string(),
             "bytes"
         );
         assert_params_have_definitions(&sig);
@@ -5708,7 +5721,9 @@ mod tests {
         assert_eq!(name, "a");
         // Parameter resolution not deferred; we should see A not B
         assert_eq!(
-            annotated_type.display(&db.semantic_environment()).to_string(),
+            annotated_type
+                .display(&db.semantic_environment())
+                .to_string(),
             "A"
         );
     }
@@ -5749,7 +5764,9 @@ mod tests {
         assert_eq!(name, "a");
         // Parameter resolution deferred:
         assert_eq!(
-            annotated_type.display(&db.semantic_environment()).to_string(),
+            annotated_type
+                .display(&db.semantic_environment())
+                .to_string(),
             "A | B"
         );
     }
@@ -5795,11 +5812,15 @@ mod tests {
         assert_eq!(a_name, "a");
         assert_eq!(b_name, "b");
         assert_eq!(
-            a_annotated_ty.display(&db.semantic_environment()).to_string(),
+            a_annotated_ty
+                .display(&db.semantic_environment())
+                .to_string(),
             "A"
         );
         assert_eq!(
-            b_annotated_ty.display(&db.semantic_environment()).to_string(),
+            b_annotated_ty
+                .display(&db.semantic_environment())
+                .to_string(),
             "T@f"
         );
     }
@@ -5846,11 +5867,15 @@ mod tests {
         assert_eq!(b_name, "b");
         // Parameter resolution deferred:
         assert_eq!(
-            a_annotated_ty.display(&db.semantic_environment()).to_string(),
+            a_annotated_ty
+                .display(&db.semantic_environment())
+                .to_string(),
             "A | B"
         );
         assert_eq!(
-            b_annotated_ty.display(&db.semantic_environment()).to_string(),
+            b_annotated_ty
+                .display(&db.semantic_environment())
+                .to_string(),
             "T@f"
         );
     }

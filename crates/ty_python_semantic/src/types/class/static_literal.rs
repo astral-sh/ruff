@@ -144,7 +144,11 @@ impl<'db> FrozenDataclassDispatch<'db> {
     /// lookup must resume after the last frozen base. For example, assigning `Child().y` for
     /// `class Child(Frozen, Later)` uses `super(Frozen, child)` when `y` is not a field of `Frozen`;
     /// this preserves a later `__setattr__` or a descriptor for `y`.
-    pub(crate) fn receiver(self, env: &SemanticEnvironment<'db>, object_ty: Type<'db>) -> Type<'db> {
+    pub(crate) fn receiver(
+        self,
+        env: &SemanticEnvironment<'db>,
+        object_ty: Type<'db>,
+    ) -> Type<'db> {
         match self {
             Self::FrozenField => object_ty,
             Self::Delegate(frozen_base) => BoundSuperType::build(
@@ -375,7 +379,10 @@ impl<'db> StaticClassLiteral<'db> {
         None
     }
 
-    pub(crate) fn generic_context(self, env: &SemanticEnvironment<'db>) -> Option<GenericContext<'db>> {
+    pub(crate) fn generic_context(
+        self,
+        env: &SemanticEnvironment<'db>,
+    ) -> Option<GenericContext<'db>> {
         let db = env.db();
         debug_assert_eq!(env.program(), self.program(db));
         self.generic_context_inner(db)
@@ -690,7 +697,10 @@ impl<'db> StaticClassLiteral<'db> {
     }
 
     /// Return `Some()` if this class is known to be a [`DisjointBase`], or `None` if it is not.
-    pub(super) fn as_disjoint_base(self, env: &SemanticEnvironment<'db>) -> Option<DisjointBase<'db>> {
+    pub(super) fn as_disjoint_base(
+        self,
+        env: &SemanticEnvironment<'db>,
+    ) -> Option<DisjointBase<'db>> {
         if self
             .known_function_decorators(env)
             .contains(&KnownFunction::DisjointBase)
@@ -941,7 +951,10 @@ impl<'db> StaticClassLiteral<'db> {
     }
 
     /// Return the module defining the `TypedDict` base of this class.
-    pub(crate) fn typed_dict_module(self, env: &SemanticEnvironment<'db>) -> Option<TypedDictModule> {
+    pub(crate) fn typed_dict_module(
+        self,
+        env: &SemanticEnvironment<'db>,
+    ) -> Option<TypedDictModule> {
         let db = env.db();
         debug_assert_eq!(env.program(), self.program(db));
         self.typed_dict_module_inner(db)
@@ -1344,7 +1357,10 @@ impl<'db> StaticClassLiteral<'db> {
         policy: MemberLookupPolicy,
         mro_iter: impl Iterator<Item = ClassBase<'db>>,
     ) -> PlaceAndQualifiers<'db> {
-        fn into_function_like_callable<'d>(env: &SemanticEnvironment<'d>, ty: Type<'d>) -> Type<'d> {
+        fn into_function_like_callable<'d>(
+            env: &SemanticEnvironment<'d>,
+            ty: Type<'d>,
+        ) -> Type<'d> {
             let db = env.db();
             match ty {
                 Type::Callable(callable_ty)
@@ -1403,7 +1419,10 @@ impl<'db> StaticClassLiteral<'db> {
         specialization: Option<Specialization<'db>>,
         name: &str,
     ) -> Member<'db> {
-        fn into_dunder_paramspec_callable<'d>(env: &SemanticEnvironment<'d>, ty: Type<'d>) -> Type<'d> {
+        fn into_dunder_paramspec_callable<'d>(
+            env: &SemanticEnvironment<'d>,
+            ty: Type<'d>,
+        ) -> Type<'d> {
             let db = env.db();
             match ty {
                 Type::Callable(callable_ty)
@@ -2530,7 +2549,7 @@ impl<'db> StaticClassLiteral<'db> {
             };
         let dataclass_kw_only_default = field_policy.is_dataclass_like().then(|| {
             let own_field_policy =
-                CodeGeneratorKind::from_class(db, self.into()).unwrap_or(field_policy);
+                CodeGeneratorKind::from_class(&env, self.into()).unwrap_or(field_policy);
             self.has_dataclass_param(db, own_field_policy, DataclassFlags::KW_ONLY)
         });
         let mut kw_only_sentinel_field_seen = false;
@@ -3167,7 +3186,11 @@ impl<'db> StaticClassLiteral<'db> {
 
     /// A helper function for `instance_member` that looks up the `name` attribute only on
     /// this class, not on its superclasses.
-    pub(super) fn own_instance_member(self, env: &SemanticEnvironment<'db>, name: &str) -> Member<'db> {
+    pub(super) fn own_instance_member(
+        self,
+        env: &SemanticEnvironment<'db>,
+        name: &str,
+    ) -> Member<'db> {
         let db = env.db();
         // TODO: There are many things that are not yet implemented here:
         // - `typing.Final`
@@ -3419,7 +3442,10 @@ impl<'db> StaticClassLiteral<'db> {
     ///
     /// A class definition like this will fail at runtime,
     /// but we must be resilient to it or we could panic.
-    pub(crate) fn inheritance_cycle(self, env: &SemanticEnvironment<'db>) -> Option<InheritanceCycle> {
+    pub(crate) fn inheritance_cycle(
+        self,
+        env: &SemanticEnvironment<'db>,
+    ) -> Option<InheritanceCycle> {
         let db = env.db();
         if !self.has_explicit_bases(db) {
             return None;

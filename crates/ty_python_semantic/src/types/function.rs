@@ -780,7 +780,10 @@ pub struct FunctionLiteral<'db> {
 }
 
 impl<'db> FunctionLiteral<'db> {
-    pub(super) fn new(env: &SemanticEnvironment<'db>, last_definition: OverloadLiteral<'db>) -> Self {
+    pub(super) fn new(
+        env: &SemanticEnvironment<'db>,
+        last_definition: OverloadLiteral<'db>,
+    ) -> Self {
         let db = env.db();
         Self {
             last_definition,

@@ -112,7 +112,7 @@ fn run_corpus_tests(pattern: &str) -> anyhow::Result<()> {
             let file = system_path_to_file(&db, path).unwrap();
 
             if let Err(err) = std::panic::catch_unwind(|| {
-                pull_types(&db, PythonFile::new(&db, file, db.python_version()))
+                pull_types(&db, PythonFile::new(&db, file, db.python_version()));
             }) {
                 println!("Check failed for {relative_path:?}.");
                 std::panic::resume_unwind(err);

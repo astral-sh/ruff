@@ -1002,7 +1002,7 @@ pub(crate) fn check_static_class_definitions<'db>(
                 if !own_fields.contains_key(default_name)
                     && !own_fields.contains_key(name)
                     && has_inherited_dataclass_field_order_violation(
-                        db,
+                        context.semantic_environment(),
                         class,
                         default_name,
                         default_field,
@@ -1087,21 +1087,22 @@ pub(crate) fn check_static_class_definitions<'db>(
 /// `Child` inherits the existing error and should not report it again. Comparing declaration
 /// provenance preserves diagnostics when a subclass redeclares either field.
 fn has_inherited_dataclass_field_order_violation<'db>(
-    db: &'db dyn Db,
+    env: &SemanticEnvironment<'db>,
     class: StaticClassLiteral<'db>,
     default_name: &Name,
     default_field: &Field<'db>,
     required_name: &Name,
     required_field: &Field<'db>,
 ) -> bool {
+    let db = env.db();
     class
-        .iter_mro(db, None)
+        .iter_mro(env, None)
         .skip(1)
         .filter_map(ClassBase::into_class)
         .filter_map(|ancestor| ancestor.static_class_literal(db))
         .any(|(ancestor, specialization)| {
             let Some(field_policy @ CodeGeneratorKind::DataclassLike(_)) =
-                CodeGeneratorKind::from_class(db, ancestor.into())
+                CodeGeneratorKind::from_class(env, ancestor.into())
             else {
                 return false;
             };
@@ -1109,7 +1110,7 @@ fn has_inherited_dataclass_field_order_violation<'db>(
                 return false;
             }
 
-            let fields = ancestor.fields(db, specialization, field_policy);
+            let fields = ancestor.fields(env, specialization, field_policy);
             let Some((default_index, _, inherited_default_field)) = fields.get_full(default_name)
             else {
                 return false;

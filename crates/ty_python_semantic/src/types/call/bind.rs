@@ -5310,8 +5310,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                                 KnownInstanceType::FunctoolsPartial(partial)
                                 | KnownInstanceType::FunctoolsPartialCall(partial),
                             ) => {
-                                let signatures =
-                                    &partial.partial(db).signatures(db).overloads;
+                                let signatures = &partial.partial(db).signatures(db).overloads;
                                 (
                                     partial.wrapped(db).inner(db),
                                     signatures

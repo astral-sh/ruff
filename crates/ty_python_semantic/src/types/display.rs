@@ -819,7 +819,10 @@ impl<'db> TypeAliasType<'db> {
     }
 
     /// Returns a source-style display of this type alias's declaration.
-    pub fn display_declaration<'env>(self, env: &'env SemanticEnvironment<'db>) -> impl Display + 'env {
+    pub fn display_declaration<'env>(
+        self,
+        env: &'env SemanticEnvironment<'db>,
+    ) -> impl Display + 'env {
         let value_ty = self.raw_value_type(env);
         DisplayTypeAliasDeclaration {
             env,
