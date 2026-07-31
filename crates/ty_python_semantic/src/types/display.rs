@@ -1349,7 +1349,7 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                         .write_str(if boolean { "True" } else { "False" })
                 }
                 LiteralValueTypeKind::String(string) => {
-                    write!(f.with_type(self.ty), "{}", string.display(self.db),)
+                    write!(f.with_type(self.ty), "{}", string.display(self.db))
                 }
                 // We used to return `str` as the type here because that feels generally more useful.
                 // However, the inconsistency between the type shown in the inlay hint and its hover, and the
