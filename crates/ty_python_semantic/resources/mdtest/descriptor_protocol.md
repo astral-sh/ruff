@@ -1004,6 +1004,79 @@ info: Function signature here
   |         ^^^^^^^^^^^^^^^^^^^^
 ```
 
+### A definitely assigned instance attribute shadows a broken non-data descriptor
+
+An instance attribute takes precedence over a non-data descriptor. Once the instance attribute is
+definitely assigned, accessing it does not call the descriptor's invalid `__get__` method.
+
+```py
+from typing import Literal
+
+class Descriptor:
+    def __get__(self) -> str:
+        return ""
+
+class C:
+    descriptor = Descriptor()
+
+    def replace_descriptor(self) -> None:
+        self.descriptor: int = 1
+        reveal_type(self.descriptor)  # revealed: Literal[1]
+```
+
+### A data descriptor still takes precedence over an instance assignment
+
+An assignment to a data descriptor invokes `__set__` instead of replacing the descriptor. Accessing
+the attribute afterwards still calls the invalid `__get__` method.
+
+```py
+class Descriptor:
+    def __get__(self) -> str:
+        return ""
+
+    def __set__(self, instance: object, value: int) -> None:
+        pass
+
+class C:
+    descriptor = Descriptor()
+
+    def assign_descriptor(self) -> None:
+        self.descriptor = 1
+        # error: [invalid-attribute-access] "Invalid access to descriptor attribute `descriptor` on type `Self@assign_descriptor`"
+        reveal_type(self.descriptor)  # revealed: str
+```
+
+### A data descriptor error takes precedence in a mixed union
+
+If an attribute could contain either a data or non-data descriptor, a definite instance assignment
+only shadows the non-data descriptor. We retain the data descriptor's invalid `__get__` call.
+
+```py
+from typing import Union
+
+class BrokenNonData:
+    def __get__(self) -> str:
+        return ""
+
+class BrokenData:
+    def __get__(self) -> bytes:
+        return b""
+
+    def __set__(self, instance: object, value: int) -> None:
+        pass
+
+def make_descriptor() -> Union[BrokenNonData, BrokenData]:
+    return BrokenData()
+
+class C:
+    descriptor = make_descriptor()
+
+    def replace_descriptor(self) -> None:
+        self.descriptor: int = 1
+        # error: [invalid-attribute-access] "Invalid access to descriptor attribute `descriptor` on type `Self@replace_descriptor`"
+        self.descriptor
+```
+
 ### A shadowed metaclass descriptor with an incorrect `__get__` signature
 
 A class attribute takes precedence over a non-data descriptor of the same name on the metaclass, so

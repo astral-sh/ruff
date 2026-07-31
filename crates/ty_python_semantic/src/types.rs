@@ -542,6 +542,8 @@ struct DescriptorGetCallContext<'db> {
     instance: Option<Type<'db>>,
     #[returns(copy)]
     owner: Type<'db>,
+    #[returns(copy)]
+    kind: AttributeKind,
 }
 
 impl get_size2::GetSize for DescriptorGetCallContext<'_> {}
@@ -553,12 +555,7 @@ impl<'db> DescriptorGetCallContext<'db> {
         env: &ProgramEnvironment<'db>,
     ) -> Option<DescriptorGetCallError<'db>> {
         let descriptor_type = self.descriptor_type(db);
-        let Place::Defined(DefinedPlace { ty: descr_get, .. }) = descriptor_type
-            .class_member_with_policy(db, env, "__get__", MemberLookupPolicy::NO_INSTANCE_FALLBACK)
-            .place
-        else {
-            return None;
-        };
+        let (descr_get, _) = descriptor_type.try_lookup_dunder_get(db, env)?;
         let instance = self.instance(db).unwrap_or_else(|| Type::none(db, env));
         let owner = self.owner(db);
         let error = descr_get
@@ -568,10 +565,31 @@ impl<'db> DescriptorGetCallContext<'db> {
                 &CallArguments::positional([descriptor_type, instance, owner]),
             )
             .err()?;
+        if !error.has_invalid_callee_or_arguments() {
+            return None;
+        }
         Some(DescriptorGetCallError {
             descriptor_type,
             error,
         })
+    }
+}
+
+/// Selects one error to report when multiple descriptor branches fail.
+///
+/// A definitely assigned instance attribute can shadow a non-data descriptor but not a data
+/// descriptor, so retain a data-descriptor error whenever one is available.
+fn merge_descriptor_get_errors<'db>(
+    db: &'db dyn Db,
+    first: Option<DescriptorGetCallContext<'db>>,
+    second: Option<DescriptorGetCallContext<'db>>,
+) -> Option<DescriptorGetCallContext<'db>> {
+    match (first, second) {
+        (Some(first), Some(second)) if !first.kind(db).is_data() && second.kind(db).is_data() => {
+            Some(second)
+        }
+        (Some(first), _) => Some(first),
+        (None, second) => second,
     }
 }
 
@@ -623,7 +641,10 @@ impl<'db> MemberLookupResult<'db> {
             fallback_error = fallback.descriptor_get_error;
             fallback.member
         });
-        Self::new(member, self.descriptor_get_error.or(fallback_error))
+        Self::new(
+            member,
+            merge_descriptor_get_errors(db, self.descriptor_get_error, fallback_error),
+        )
     }
 
     fn cycle_normalized(
@@ -637,7 +658,15 @@ impl<'db> MemberLookupResult<'db> {
             member: self
                 .member
                 .cycle_normalized(db, env, previous.member, cycle),
-            descriptor_get_error: self.descriptor_get_error.or(previous.descriptor_get_error),
+            descriptor_get_error: if cycle.iteration() <= crate::TAINTED_CYCLES {
+                self.descriptor_get_error
+            } else {
+                merge_descriptor_get_errors(
+                    db,
+                    self.descriptor_get_error,
+                    previous.descriptor_get_error,
+                )
+            },
         }
     }
 }
@@ -3592,6 +3621,43 @@ impl<'db> Type<'db> {
         }
     }
 
+    fn try_lookup_dunder_get(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> Option<(Type<'db>, Definedness)> {
+        let Place::Defined(DefinedPlace {
+            ty: concrete_descr_get,
+            ..
+        }) = self
+            .class_member_with_policy(db, env, "__get__", MemberLookupPolicy::REQUIRE_CONCRETE)
+            .place
+        else {
+            return None;
+        };
+
+        // A recursive member lookup can yield the internal cycle marker. It does not represent a
+        // concrete descriptor method and must not escape through the access.
+        if concrete_descr_get.is_divergent() {
+            return None;
+        }
+
+        // Descriptor special-method lookup checks the descriptor's type, so instance storage
+        // cannot shadow `__get__`. Dynamic MRO entries still participate in the lookup.
+        let Place::Defined(DefinedPlace {
+            ty: descr_get,
+            definedness,
+            ..
+        }) = self
+            .class_member_with_policy(db, env, "__get__", MemberLookupPolicy::NO_INSTANCE_FALLBACK)
+            .place
+        else {
+            return None;
+        };
+
+        Some((descr_get, definedness))
+    }
+
     fn try_call_dunder_get_with_error(
         self,
         db: &'db dyn Db,
@@ -3664,41 +3730,14 @@ impl<'db> Type<'db> {
                 _ => {}
             }
 
-            let Place::Defined(DefinedPlace {
-                ty: concrete_descr_get,
-                ..
-            }) = ty
-                .class_member_with_policy(db, env, "__get__", MemberLookupPolicy::REQUIRE_CONCRETE)
-                .place
-            else {
-                return None;
-            };
-
-            // A recursive member lookup can yield the internal cycle marker. It does not
-            // represent a concrete descriptor method and must not escape through the access.
-            if concrete_descr_get.is_divergent() {
-                return None;
-            }
-
-            // Descriptor special-method lookup checks the descriptor's type, so instance storage
-            // cannot shadow `__get__`. Dynamic MRO entries still participate in the lookup.
-            let Place::Defined(DefinedPlace {
-                ty: descr_get,
-                definedness: descr_get_boundness,
-                ..
-            }) = ty
-                .class_member_with_policy(
-                    db,
-                    env,
-                    "__get__",
-                    MemberLookupPolicy::NO_INSTANCE_FALLBACK,
-                )
-                .place
-            else {
-                return None;
-            };
+            let (descr_get, descr_get_boundness) = ty.try_lookup_dunder_get(db, env)?;
 
             let instance_ty = instance.unwrap_or_else(|| Type::none(db, env));
+            let kind = if ty.is_data_descriptor(db, env) {
+                AttributeKind::DataDescriptor
+            } else {
+                AttributeKind::NormalOrNonDataDescriptor
+            };
             let (return_type, error) = match descr_get.try_call(
                 db,
                 env,
@@ -3716,15 +3755,9 @@ impl<'db> Type<'db> {
                     let return_type = error.return_type(db, env);
                     let error = error
                         .has_invalid_callee_or_arguments()
-                        .then(|| DescriptorGetCallContext::new(db, ty, instance, owner));
+                        .then(|| DescriptorGetCallContext::new(db, ty, instance, owner, kind));
                     (return_type, error)
                 }
-            };
-
-            let kind = if ty.is_data_descriptor(db, env) {
-                AttributeKind::DataDescriptor
-            } else {
-                AttributeKind::NormalOrNonDataDescriptor
             };
 
             Some(DescriptorGetResult {
@@ -3861,7 +3894,7 @@ impl<'db> Type<'db> {
                         {
                             Some(result) => {
                                 all_data_descriptors &= result.kind.is_data();
-                                error = error.or(result.error);
+                                error = merge_descriptor_get_errors(db, error, result.error);
                                 result.return_type
                             }
                             None => {
@@ -3909,7 +3942,7 @@ impl<'db> Type<'db> {
                             let result =
                                 elem.try_call_dunder_get_with_error(db, env, instance, owner);
                             if let Some(result) = result {
-                                error = error.or(result.error);
+                                error = merge_descriptor_get_errors(db, error, result.error);
                             }
                             Place::Defined(DefinedPlace {
                                 ty: result.map_or(*elem, |result| result.return_type),
@@ -4171,7 +4204,7 @@ impl<'db> Type<'db> {
                     provenance: fallback_provenance.or(meta_attr_provenance),
                 })
                 .with_qualifiers(meta_attr_qualifiers.union(fallback_qualifiers)),
-                meta_attr_error.or(fallback_error),
+                merge_descriptor_get_errors(db, meta_attr_error, fallback_error),
             ),
 
             // `meta_attr` is *not* a data descriptor. This means that the `fallback` type has
@@ -4224,7 +4257,7 @@ impl<'db> Type<'db> {
                     provenance: fallback_provenance.or(meta_attr_provenance),
                 })
                 .with_qualifiers(meta_attr_qualifiers.union(fallback_qualifiers)),
-                meta_attr_error.or(fallback_error),
+                merge_descriptor_get_errors(db, meta_attr_error, fallback_error),
             ),
 
             // If the attribute is not found on the meta-type, we simply return the fallback.
@@ -4429,7 +4462,11 @@ impl<'db> Type<'db> {
                         let result = elem.member_lookup_with_policy_and_receiver(
                             db, env, name_str, policy, receiver,
                         );
-                        descriptor_get_error = descriptor_get_error.or(result.descriptor_get_error);
+                        descriptor_get_error = merge_descriptor_get_errors(
+                            db,
+                            descriptor_get_error,
+                            result.descriptor_get_error,
+                        );
                         result.member
                     });
                     MemberLookupResult::new(member, descriptor_get_error)
@@ -4449,8 +4486,11 @@ impl<'db> Type<'db> {
                                 let result = elem.member_lookup_with_policy_and_receiver(
                                     db, env, name_str, policy, receiver,
                                 );
-                                descriptor_get_error =
-                                    descriptor_get_error.or(result.descriptor_get_error);
+                                descriptor_get_error = merge_descriptor_get_errors(
+                                    db,
+                                    descriptor_get_error,
+                                    result.descriptor_get_error,
+                                );
                                 result.member
                             });
                         MemberLookupResult::new(member, descriptor_get_error)
