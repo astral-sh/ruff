@@ -5081,11 +5081,6 @@ struct ArgumentTypeChecker<'a, 'db> {
     /// TODO: Once specialization inference fully owns generic argument validation, this field can
     /// be removed.
     constraint_set_errors: Vec<bool>,
-
-    /// The starred parameter for which tuple-level inference has already emitted an error.
-    /// This also covers empty packs, which have no argument index to mark in
-    /// `constraint_set_errors`.
-    starred_constraint_error_parameter: Option<usize>,
 }
 
 /// The declared and actual tuple shapes for one starred positional variadic parameter.
@@ -5192,7 +5187,6 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             inferable_typevars: TypeVarSet::None,
             inference: None,
             constraint_set_errors: vec![false; arguments.len()],
-            starred_constraint_error_parameter: None,
         }
     }
 
@@ -5489,14 +5483,14 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         &self,
         builder: &mut SpecializationBuilder<'db, 'c>,
         specialization_errors: &mut Vec<BindingError<'db>>,
+        starred_arguments: Option<&StarredParameterArguments<'db>>,
     ) -> StarredConstraintInference {
         let mut inference = StarredConstraintInference::default();
 
-        let Some((parameter_index, parameter)) = self.signature.parameters().variadic() else {
+        let Some((parameter_index, _)) = self.signature.parameters().variadic() else {
             return inference;
         };
-        let Some(arguments) = self.collect_starred_parameter_arguments(parameter_index, parameter)
-        else {
+        let Some(arguments) = starred_arguments else {
             return inference;
         };
         let contains_typevartuple = matches!(
@@ -5520,13 +5514,17 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             inference.parameter = StarredParameterInference::Failed(parameter_index);
             inference
                 .failed_arguments
-                .extend(arguments.contributing_argument_indices);
+                .extend(arguments.contributing_argument_indices.iter().copied());
         }
 
         inference
     }
 
-    fn infer_specialization(&mut self, constraints: &ConstraintSetBuilder<'db>) {
+    fn infer_specialization(
+        &mut self,
+        constraints: &ConstraintSetBuilder<'db>,
+        starred_arguments: Option<&StarredParameterArguments<'db>>,
+    ) {
         let Some(generic_context) = self.signature.generic_context else {
             return;
         };
@@ -5680,6 +5678,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             &preferred_type_mappings,
             &partially_specialized_declared_type,
             &mut specialization_errors,
+            starred_arguments,
         );
 
         // If we failed to prefer the declared type, attempt inference again, ignoring
@@ -5697,16 +5696,13 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                 &FxHashMap::default(),
                 &FxHashSet::default(),
                 &mut specialization_errors,
+                starred_arguments,
             );
         }
 
         for argument_index in starred_inference.failed_arguments {
             self.constraint_set_errors[argument_index] = true;
         }
-        self.starred_constraint_error_parameter = match starred_inference.parameter {
-            StarredParameterInference::Failed(parameter_index) => Some(parameter_index),
-            StarredParameterInference::NotOwned | StarredParameterInference::Inferred(_) => None,
-        };
         self.errors.extend(specialization_errors);
 
         // Attempt to promote any promotable types assigned to the specialization.
@@ -5803,10 +5799,14 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         preferred_type_mappings: &FxHashMap<BoundTypeVarIdentity<'db>, Type<'db>>,
         partially_specialized_declared_type: &FxHashSet<BoundTypeVarIdentity<'_>>,
         specialization_errors: &mut Vec<BindingError<'db>>,
+        starred_arguments: Option<&StarredParameterArguments<'db>>,
     ) -> (bool, StarredConstraintInference) {
         let parameters = self.signature.parameters();
-        let mut starred_inference =
-            self.infer_starred_typevartuple_constraints(builder, specialization_errors);
+        let mut starred_inference = self.infer_starred_typevartuple_constraints(
+            builder,
+            specialization_errors,
+            starred_arguments,
+        );
         for (argument_index, adjusted_argument_index, _, argument_types) in
             self.enumerate_argument_types()
         {
@@ -5851,19 +5851,23 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         (assignable_to_declared_type, starred_inference)
     }
 
-    fn check_starred_parameter_arguments(&mut self, constraints: &ConstraintSetBuilder<'db>) {
+    // TODO: Once TypeVarTuple uses the constraint solver, infer and validate the complete
+    // argument tuple from a single assignability constraint instead of checking it separately.
+    fn check_starred_parameter_arguments(
+        &mut self,
+        constraints: &ConstraintSetBuilder<'db>,
+        starred_arguments: Option<&StarredParameterArguments<'db>>,
+    ) {
         let Some((parameter_index, parameter)) = self.signature.parameters().variadic() else {
             return;
         };
-        let Some(arguments) = self.collect_starred_parameter_arguments(parameter_index, parameter)
-        else {
+        let Some(arguments) = starred_arguments else {
             return;
         };
-        if self.starred_constraint_error_parameter == Some(parameter_index)
-            || arguments
-                .contributing_argument_indices
-                .iter()
-                .any(|&argument_index| self.constraint_set_errors[argument_index])
+        if arguments
+            .contributing_argument_indices
+            .iter()
+            .any(|&argument_index| self.constraint_set_errors[argument_index])
         {
             return;
         }
@@ -6113,7 +6117,11 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                 })
     }
 
-    fn check_argument_types(&mut self, constraints: &ConstraintSetBuilder<'db>) {
+    fn check_argument_types(
+        &mut self,
+        constraints: &ConstraintSetBuilder<'db>,
+        starred_arguments: Option<&StarredParameterArguments<'db>>,
+    ) {
         let paramspec = self.signature.parameters().as_paramspec_with_prefix();
         let paramspec_component_start = paramspec.and_then(|(prefix, paramspec)| {
             let prefix_len = prefix.len();
@@ -6156,7 +6164,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             }
         });
 
-        self.check_starred_parameter_arguments(constraints);
+        self.check_starred_parameter_arguments(constraints, starred_arguments);
 
         let is_paramspec_component_parameter = |parameter_index: usize| {
             paramspec_component_start.is_some_and(|start| parameter_index >= start)
@@ -7244,10 +7252,19 @@ impl<'db> Binding<'db> {
             &mut self.errors,
         );
 
+        let starred_arguments =
+            checker
+                .signature
+                .parameters()
+                .variadic()
+                .and_then(|(parameter_index, parameter)| {
+                    checker.collect_starred_parameter_arguments(parameter_index, parameter)
+                });
+
         // If this overload is generic, first see if we can infer a specialization of the function
         // from the arguments that were passed in.
-        checker.infer_specialization(constraints);
-        checker.check_argument_types(constraints);
+        checker.infer_specialization(constraints, starred_arguments.as_ref());
+        checker.check_argument_types(constraints, starred_arguments.as_ref());
 
         (self.inferable_typevars, self.inference, self.return_ty) = checker.finish();
     }
