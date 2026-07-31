@@ -1637,9 +1637,9 @@ reveal_type(Invalid)  # revealed: <class 'Invalid'>
 
 ## NamedTuple fields cannot be qualified with `ClassVar` or `Final`
 
-`NamedTuple` builds each field's type by passing its annotation through `typing._type_check`, which
-rejects bare type qualifiers. Qualifying a field with `ClassVar` or `Final` therefore raises
-`TypeError` as soon as the class statement is executed.
+Type checkers reject `ClassVar` and `Final` qualifiers on `NamedTuple` fields. When annotations are
+evaluated eagerly, passing a bare qualifier to `typing._type_check` also raises `TypeError` while
+the class is defined.
 
 ```py
 from typing import ClassVar, Final, NamedTuple
@@ -1690,7 +1690,89 @@ error[invalid-named-tuple]: Type qualifier `ClassVar` is not allowed in a NamedT
   --> src/mdtest_snippet.py:25:5
    |
 25 |     a: ClassVar[int]
-   |     ^^^^^^^^^^^^^^^^ Class definition will raise `TypeError` at runtime due to this field
+   |     ^^^^^^^^^^^^^^^^
+```
+
+## NamedTuple qualifiers and redeclared symbols
+
+A later method declaration does not change the field annotation processed by `NamedTuple`.
+
+```py
+from typing import Final, NamedTuple
+
+class Redeclared(NamedTuple):
+    # error: [invalid-named-tuple] "Type qualifier `Final` is not allowed on NamedTuple field `x`"
+    x: Final[int]
+
+    def x(self) -> int:
+        return 1
+```
+
+## NamedTuple qualifiers in conditional declarations
+
+When only one branch qualifies a field, the diagnostic points to the declaration in that branch.
+
+```py
+from typing import Final, NamedTuple
+
+def condition() -> bool:
+    return True
+
+class Conditional(NamedTuple):
+    if condition():
+        y: int
+    else:
+        # error: [invalid-named-tuple] "Type qualifier `Final` is not allowed on NamedTuple field `y`"
+        y: Final[int]
+```
+
+Statically unreachable qualified declarations are ignored:
+
+```py
+class Unreachable(NamedTuple):
+    if False:
+        hidden: Final[int]
+    visible: int
+```
+
+## NamedTuple qualifiers in deferred annotations
+
+The restriction still applies when annotation evaluation is postponed. The diagnostic does not claim
+that defining the class will fail at runtime, because Python stores a forward reference in this
+case.
+
+```py
+from __future__ import annotations
+
+from typing import Final, NamedTuple
+
+class Deferred(NamedTuple):
+    # snapshot
+    x: Final[int]
+```
+
+```snapshot
+error[invalid-named-tuple]: Type qualifier `Final` is not allowed in a NamedTuple field
+ --> src/mdtest_snippet.py:7:5
+  |
+7 |     x: Final[int]
+  |     ^^^^^^^^^^^^^
+```
+
+## NamedTuple qualifiers in quoted and wrapped annotations
+
+Explicitly quoted and `Annotated` field annotations are rejected for the same static reason:
+
+```py
+from typing import Annotated, Final, NamedTuple
+
+class Quoted(NamedTuple):
+    # error: [invalid-named-tuple] "Type qualifier `Final` is not allowed on NamedTuple field `x`"
+    x: "Final[int]"
+
+class Wrapped(NamedTuple):
+    # error: [invalid-named-tuple] "Type qualifier `Final` is not allowed on NamedTuple field `x`"
+    x: Annotated[Final[int], "metadata"]
 ```
 
 ## Prohibited NamedTuple attributes

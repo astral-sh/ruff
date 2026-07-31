@@ -36,9 +36,7 @@ use crate::{Db, DisplaySettings, FxIndexMap, Program, declare_lint};
 use itertools::Itertools;
 use ruff_db::source::source_text;
 use ruff_db::{
-    diagnostic::{
-        Annotation, Diagnostic, IntoDiagnosticMessage, Span, SubDiagnostic, SubDiagnosticSeverity,
-    },
+    diagnostic::{Annotation, Diagnostic, Span, SubDiagnostic, SubDiagnosticSeverity},
     parsed::parsed_module,
 };
 use ruff_diagnostics::{Edit, Fix, IsolationLevel};
@@ -3305,18 +3303,11 @@ pub(super) fn report_namedtuple_field_without_default_after_field_with_default<'
     }
 }
 
-/// Report a `NamedTuple` class body that will raise `TypeError` when the class statement executes,
-/// because of the way one of its fields is declared.
-///
-/// The diagnostic is anchored to the offending field when we know where it was declared, and to the
-/// class header otherwise; the primary annotation is worded to suit whichever anchor is used.
-fn report_invalid_named_tuple_field<'db>(
+pub(super) fn report_named_tuple_field_with_leading_underscore<'db>(
     context: &InferContext<'db, '_>,
     class: StaticClassLiteral<'db>,
     field_name: &str,
     field_definition: Option<Definition<'db>>,
-    message: impl std::fmt::Display,
-    concise_message: impl IntoDiagnosticMessage,
 ) {
     let db = context.db();
     let module = context.module();
@@ -3328,7 +3319,8 @@ fn report_invalid_named_tuple_field<'db>(
     let Some(builder) = context.report_lint(&INVALID_NAMED_TUPLE, diagnostic_range) else {
         return;
     };
-    let mut diagnostic = builder.into_diagnostic(message);
+    let mut diagnostic =
+        builder.into_diagnostic("NamedTuple field name cannot start with an underscore");
 
     if field_definition.is_some() {
         diagnostic.set_primary_annotation_message(
@@ -3340,53 +3332,31 @@ fn report_invalid_named_tuple_field<'db>(
         ));
     }
 
-    diagnostic.set_concise_message(concise_message);
-}
-
-pub(super) fn report_named_tuple_field_with_leading_underscore<'db>(
-    context: &InferContext<'db, '_>,
-    class: StaticClassLiteral<'db>,
-    field_name: &str,
-    field_definition: Option<Definition<'db>>,
-) {
-    report_invalid_named_tuple_field(
-        context,
-        class,
-        field_name,
-        field_definition,
-        "NamedTuple field name cannot start with an underscore",
-        format_args!("NamedTuple field `{field_name}` cannot start with an underscore"),
-    );
+    diagnostic.set_concise_message(format_args!(
+        "NamedTuple field `{field_name}` cannot start with an underscore"
+    ));
 }
 
 /// Report a `NamedTuple` field annotated with a type qualifier that `NamedTuple` does not accept.
-///
-/// `NamedTuple` builds each field's type by passing the annotation through `typing._type_check`,
-/// which rejects bare qualifiers such as `ClassVar` and `Final`. The class statement therefore
-/// raises `TypeError` as soon as it is executed:
-///
-/// ```python
-/// class Foo(NamedTuple):
-///     x: ClassVar[int]  # TypeError: typing.ClassVar[int] is not valid as type argument
-/// ```
 pub(super) fn report_invalid_named_tuple_field_qualifier<'db>(
     context: &InferContext<'db, '_>,
-    class: StaticClassLiteral<'db>,
     field_name: &str,
     qualifier: TypeQualifier,
-    field_definition: Option<Definition<'db>>,
+    field_definition: Definition<'db>,
 ) {
+    let db = context.db();
+    let module = context.module();
     let qualifier = qualifier.name();
-    report_invalid_named_tuple_field(
-        context,
-        class,
-        field_name,
-        field_definition,
-        format_args!("Type qualifier `{qualifier}` is not allowed in a NamedTuple field"),
-        format_args!(
-            "Type qualifier `{qualifier}` is not allowed on NamedTuple field `{field_name}`"
-        ),
-    );
+    let diagnostic_range = field_definition.kind(db).full_range(module);
+    let Some(builder) = context.report_lint(&INVALID_NAMED_TUPLE, diagnostic_range) else {
+        return;
+    };
+    let mut diagnostic = builder.into_diagnostic(format_args!(
+        "Type qualifier `{qualifier}` is not allowed in a NamedTuple field"
+    ));
+    diagnostic.set_concise_message(format_args!(
+        "Type qualifier `{qualifier}` is not allowed on NamedTuple field `{field_name}`"
+    ));
 }
 
 pub(crate) fn report_missing_typed_dict_key<'db>(

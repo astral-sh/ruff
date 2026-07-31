@@ -122,9 +122,9 @@ pub(crate) fn check_static_class_definitions<'db>(
         // rather than against `own_fields`, since `own_fields` drops `ClassVar` declarations and
         // does not retain the `Final` qualifier for the fields that it does keep.
         //
-        // A field carrying both qualifiers is reported once per qualifier, since removing just one
-        // of them still leaves a class definition that raises `TypeError`.
-        for (field_name, qualifiers, first_declaration) in class.own_annotated_qualifiers(db) {
+        // A field carrying both qualifiers is reported once per qualifier, since each qualifier
+        // independently violates the restriction on `NamedTuple` fields.
+        for (field_name, qualifiers, declaration) in class.own_annotated_qualifiers(db) {
             let invalid_qualifiers = [TypeQualifier::ClassVar, TypeQualifier::Final]
                 .into_iter()
                 .filter(|qualifier| qualifiers.contains(TypeQualifiers::from(*qualifier)));
@@ -132,10 +132,9 @@ pub(crate) fn check_static_class_definitions<'db>(
             for qualifier in invalid_qualifiers {
                 report_invalid_named_tuple_field_qualifier(
                     context,
-                    class,
                     &field_name,
                     qualifier,
-                    first_declaration,
+                    declaration,
                 );
             }
         }

@@ -15,7 +15,9 @@ use crate::{
         DefinedPlace, Definedness, Place, PlaceAndQualifiers, PlaceFromDeclarationsResult,
         Provenance, PublicTypePolicy, TypeOrigin, place_from_bindings, place_from_declarations,
     },
-    reachability::{DeclarationsIteratorExtension, binding_reachability},
+    reachability::{
+        DeclarationsIteratorExtension, ReachabilityConstraintsExtension, binding_reachability,
+    },
     types::{
         ApplyTypeMappingVisitor, BoundTypeVarIdentity, BoundTypeVarInstance, CallArguments,
         CallableType, ClassBase, ClassLiteral, ClassType, DATACLASS_FLAGS, DataclassFlags,
@@ -2399,7 +2401,7 @@ impl<'db> StaticClassLiteral<'db> {
 
         let mut attributes = FxIndexMap::default();
         let mut class_variables = Vec::new();
-        for (symbol_id, result) in self.own_annotated_declarations(db) {
+        for (symbol_id, result) in self.own_field_declarations(db) {
             let symbol = table.symbol(symbol_id);
             let first_declaration = result.first_declaration;
             let attr = result.ignore_conflicting_declarations();
@@ -2525,14 +2527,9 @@ impl<'db> StaticClassLiteral<'db> {
         }
     }
 
-    /// Collect the annotated assignments in this class's body, ordered by the position of each
-    /// symbol's first reachable annotation.
-    ///
-    /// Callers interpret the result differently. [`StaticClassLiteral::own_fields`] discards
-    /// `ClassVar` declarations, because a `ClassVar` is not a dataclass or `NamedTuple` field.
-    /// [`StaticClassLiteral::own_annotated_qualifiers`] deliberately keeps them, because a
-    /// `ClassVar` appearing in a `NamedTuple` body is exactly the thing it needs to report.
-    fn own_annotated_declarations(
+    /// Collect the declarations used to construct this class's fields, ordered by the position of
+    /// each symbol's first reachable annotation.
+    fn own_field_declarations(
         self,
         db: &'db dyn Db,
     ) -> Vec<(ScopedSymbolId, PlaceFromDeclarationsResult<'db>)> {
@@ -2588,26 +2585,54 @@ impl<'db> StaticClassLiteral<'db> {
             .collect()
     }
 
-    /// Return the type qualifiers attached to each annotated assignment in this class's body,
-    /// along with the declaration each one came from, so that callers can point a diagnostic at it.
-    ///
-    /// Unlike [`StaticClassLiteral::own_fields`], this does not drop declarations that the class's
-    /// field policy would reject; it reports what the class body literally says. A `ClassVar`
-    /// annotation is therefore included here even though it is never a field.
+    /// Return the type qualifiers attached to each reachable annotated assignment in this class's
+    /// body, along with the declaration each one came from.
     pub(crate) fn own_annotated_qualifiers(
         self,
         db: &'db dyn Db,
-    ) -> Vec<(Name, TypeQualifiers, Option<Definition<'db>>)> {
-        let table = place_table(db, self.body_scope(db));
+    ) -> Vec<(Name, TypeQualifiers, Definition<'db>)> {
+        let body_scope = self.body_scope(db);
+        let table = place_table(db, body_scope);
+        let use_def = use_def_map(db, body_scope);
+        let mut annotated_qualifiers = Vec::new();
 
-        self.own_annotated_declarations(db)
+        for (symbol_id, _) in use_def.all_end_of_scope_symbol_declarations() {
+            let declarations = use_def.reachable_symbol_declarations(symbol_id);
+            let predicates = declarations.predicates();
+            let reachability_constraints = declarations.reachability_constraints();
+
+            for declaration in declarations {
+                if reachability_constraints
+                    .evaluate(db, predicates, declaration.reachability_constraint)
+                    .is_always_false()
+                {
+                    continue;
+                }
+
+                let DefinitionState::Defined(definition) = declaration.declaration else {
+                    continue;
+                };
+                if !matches!(definition.kind(db), DefinitionKind::AnnotatedAssignment(..)) {
+                    continue;
+                }
+
+                let Some(declared) = inferred_declaration(db, definition).declared() else {
+                    continue;
+                };
+                annotated_qualifiers.push((
+                    declaration.declaration_order,
+                    table.symbol(symbol_id).name().clone(),
+                    declared.qualifiers(),
+                    definition,
+                ));
+            }
+        }
+
+        annotated_qualifiers
+            .sort_unstable_by_key(|(declaration_order, _, _, _)| *declaration_order);
+        annotated_qualifiers
             .into_iter()
-            .map(|(symbol_id, result)| {
-                let name = table.symbol(symbol_id).name().clone();
-                let first_declaration = result.first_declaration;
-                let qualifiers = result.ignore_conflicting_declarations().qualifiers;
-                (name, qualifiers, first_declaration)
-            })
+            .map(|(_, name, qualifiers, definition)| (name, qualifiers, definition))
             .collect()
     }
 
