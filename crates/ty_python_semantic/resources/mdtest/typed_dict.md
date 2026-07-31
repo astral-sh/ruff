@@ -957,8 +957,7 @@ def mapping_overwrite(values: dict[str, str]) -> None:
 
 ### Recursive fields
 
-When the field has the same generic `TypedDict` type as the constructor, ty keeps both calls
-unspecialized instead of reporting an argument error:
+An exact specialization from a recursive field constrains the outer constructor:
 
 ```toml
 [environment]
@@ -972,10 +971,10 @@ class Node[T](TypedDict):
     value: NotRequired[T]
     child: NotRequired["Node[T]"]
 
-reveal_type(Node(child=Node(value=1)))  # revealed: Node[Unknown]
+reveal_type(Node(child=Node(value=1)))  # revealed: Node[int]
 ```
 
-The same rule applies when a union wraps the recursive field:
+Recursive fields wrapped in a union remain diagnostic-free but gradual:
 
 ```py
 class UnionNode[T](TypedDict):
@@ -985,7 +984,7 @@ class UnionNode[T](TypedDict):
 reveal_type(UnionNode(child=UnionNode(value=1)))  # revealed: UnionNode[Unknown]
 ```
 
-It also applies when a PEP 695 type alias wraps the union:
+The same fallback applies when a PEP 695 type alias wraps the union:
 
 ```py
 class AliasNode[T](TypedDict):
@@ -1017,6 +1016,7 @@ class Outer[T](TypedDict):
     inner: Inner[T]
     marker: T
 
+reveal_type(Outer(inner=Inner(value=1), marker=1))  # revealed: Outer[int]
 reveal_type(Outer(inner=Inner(value=1), marker="x"))  # revealed: Outer[Unknown]
 ```
 

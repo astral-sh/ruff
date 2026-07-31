@@ -112,15 +112,6 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             return None;
         }
 
-        // Preserve the existing gradual result when this call is being inferred as a field of
-        // another unspecialized generic TypedDict. Inferring the nested call more precisely would
-        // require propagating its specialization back through the outer field before validation.
-        if call_expression_tcx.annotation.is_some_and(|context| {
-            self.type_contains_unknown_generic_typed_dict(context, Some(class_literal))
-        }) {
-            return None;
-        }
-
         let typed_dict = TypedDictType::new(class_literal.identity_specialization(self.db()));
         let mut fields = FxIndexMap::default();
         let mut keyword_field_names = FxHashSet::default();

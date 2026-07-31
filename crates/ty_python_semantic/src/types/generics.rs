@@ -3481,6 +3481,39 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 );
             }
 
+            (Type::TypedDict(formal), Type::TypedDict(actual)) => {
+                // Nested constructor inference can propagate an exact specialization of the same
+                // generic TypedDict. Inferring between unrelated structural schemas is a separate
+                // problem and remains gradual.
+                let (
+                    Some(ClassType::Generic(formal_alias)),
+                    Some(ClassType::Generic(actual_alias)),
+                ) = (formal.defining_class(), actual.defining_class())
+                else {
+                    return Ok(());
+                };
+                if formal_alias.origin(self.db) != actual_alias.origin(self.db) {
+                    return Ok(());
+                }
+
+                let formal_specialization = formal_alias.specialization(self.db);
+                let actual_specialization = actual_alias.specialization(self.db);
+                let generic_context = formal_specialization.generic_context(self.db);
+                for (typevar, formal_ty, actual_ty) in itertools::izip!(
+                    generic_context.variables(self.db),
+                    formal_specialization.types(self.db),
+                    actual_specialization.types(self.db),
+                ) {
+                    self.infer_map_impl(
+                        *formal_ty,
+                        *actual_ty,
+                        typevar.variance_with_polarity(self.db, polarity),
+                        seen,
+                    )?;
+                }
+                return Ok(());
+            }
+
             (formal, Type::ProtocolInstance(actual_protocol)) => {
                 if let Type::ProtocolInstance(formal_protocol) = formal
                     && let Some(actual_origin) = actual_protocol.materialized_origin(self.db)
