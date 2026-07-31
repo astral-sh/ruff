@@ -46,6 +46,8 @@ should not introduce object-identity, alias, or class-namespace mutation analysi
 - Ignore intersection elements that do not contribute a member when combining descriptor failures.
 - Ignore non-descriptor positive elements of an attribute intersection when combining descriptor
     failures; they refine one runtime value rather than supplying an alternative value.
+- Treat an attribute intersection as a data descriptor when any positive element is definitely a
+    data descriptor, because every inhabitant retains that element's descriptor behavior.
 - Update the `invalid-attribute-access` documentation with a descriptor-read example and
     regenerate references.
 - Add focused tests for descriptor precedence, union-like wrappers, and conservative handling of
@@ -77,7 +79,9 @@ possibly-missing diagnostic remains separate from the descriptor-call diagnostic
 
 Positive elements of an intersection-valued attribute describe one runtime value. Elements without
 `__get__` therefore do not create a successful alternative to a descriptor supplied by another
-element.
+element. The same refinement rule determines descriptor precedence: if any positive element is
+definitely a data descriptor, the intersection is a data descriptor and takes precedence over a
+lower-priority class or instance attribute.
 
 Descriptor precedence can differ across the elements of a union-valued metaclass member. A possible
 data-descriptor element remains a higher-precedence alternative even when the aggregate attribute
@@ -127,6 +131,8 @@ read/write correlation, and bidirectional type-context improvements are separate
     model cannot represent it.
 - Improving the inferred member type or general precedence representation for metaclass attributes
     with mixed data-descriptor and non-data-descriptor alternatives.
+- General resolution of incompatible descriptor method definitions contributed by multiple
+    positive intersection elements.
 - General changes to `super` MRO lookup or possibly-missing attribute inference.
 - General augmented-assignment operator inference, store validation, and bidirectional type-context
     improvements.

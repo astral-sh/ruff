@@ -1652,6 +1652,47 @@ class C:
 C().descriptor
 ```
 
+### Data-descriptor intersections retain metaclass precedence
+
+An intersection describes one runtime value. If any positive element is definitely a data
+descriptor, a class attribute cannot shadow the intersection-valued metaclass member. A non-data
+descriptor intersection remains shadowed as usual.
+
+```py
+from ty_extensions import Intersection
+
+class BrokenDataDescriptor:
+    def __get__(self) -> int:
+        return 1
+
+    def __set__(self, instance: object, value: object) -> None:
+        pass
+
+class BrokenNonDataDescriptor:
+    def __get__(self) -> str:
+        return ""
+
+class Marker: ...
+
+def data_descriptor() -> Intersection[BrokenDataDescriptor, Marker]:
+    raise NotImplementedError
+
+def non_data_descriptor() -> Intersection[BrokenNonDataDescriptor, Marker]:
+    raise NotImplementedError
+
+class Meta(type):
+    data = data_descriptor()
+    non_data = non_data_descriptor()
+
+class C(metaclass=Meta):
+    data = 1
+    non_data = 1
+
+# error: [invalid-attribute-access] "Invalid access to descriptor attribute `data` on type `<class 'C'>`"
+C.data
+C.non_data
+```
+
 ### A shadowed metaclass descriptor with an incorrect `__get__` signature
 
 A class attribute takes precedence over a non-data descriptor of the same name on the metaclass, so

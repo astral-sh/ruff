@@ -4047,6 +4047,11 @@ impl<'db> Type<'db> {
                 qualifiers,
             } => {
                 let mut errors = DescriptorGetErrorAccumulator::new();
+                let kind = if Type::Intersection(intersection).is_data_descriptor(db) {
+                    AttributeKind::DataDescriptor
+                } else {
+                    AttributeKind::NormalOrNonDataDescriptor
+                };
                 let place = if intersection.positive(db).is_empty() {
                     attribute
                 } else {
@@ -4068,9 +4073,8 @@ impl<'db> Type<'db> {
                 };
                 (
                     place,
-                    // TODO: Discover data descriptors in intersections.
-                    AttributeKind::NormalOrNonDataDescriptor,
-                    errors.finish(),
+                    kind,
+                    errors.finish().map(|error| error.with_kind(db, kind)),
                 )
             }
 
