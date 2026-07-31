@@ -216,6 +216,7 @@ fn has_uncertain_interpolation(element: &InterpolatedStringElement) -> bool {
 
 /// Return `true` if the `Expr` contains an expression that appears to include a
 /// side-effect (like a function call).
+/// Return `true` if the body uses `locals()`, `globals()`, `vars()`, `eval()`.
 ///
 /// Accepts a closure that determines whether a given name (e.g., `"list"`) is a Python builtin.
 pub fn contains_effect<F>(expr: &Expr, is_builtin: F) -> bool
@@ -902,18 +903,6 @@ pub fn map_subscript(expr: &Expr) -> &Expr {
     }
 }
 
-/// Given an [`Expr`] that can be starred, return the underlying starred expression.
-pub fn map_starred(expr: &Expr) -> &Expr {
-    if let Expr::Starred(ast::ExprStarred { value, .. }) = expr {
-        // Ex) `*args`
-        value
-    } else {
-        // Ex) `args`
-        expr
-    }
-}
-
-/// Return `true` if the body uses `locals()`, `globals()`, `vars()`, `eval()`.
 ///
 /// Accepts a closure that determines whether a given name (e.g., `"list"`) is a Python builtin.
 pub fn uses_magic_variable_access<F>(body: &[Stmt], is_builtin: F) -> bool
