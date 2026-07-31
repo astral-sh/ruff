@@ -1,3 +1,4 @@
+#[cfg(test)]
 use crate::system::file_time_now;
 
 /// A number representing the revision of a file.
@@ -15,10 +16,6 @@ pub struct FileRevision(u128);
 impl FileRevision {
     pub fn new(value: u128) -> Self {
         Self(value)
-    }
-
-    pub fn now() -> Self {
-        Self::from(file_time_now())
     }
 
     pub(crate) const fn zero() -> Self {

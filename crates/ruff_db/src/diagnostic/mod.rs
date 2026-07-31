@@ -385,13 +385,8 @@ impl Diagnostic {
         Arc::make_mut(&mut self.inner).fix = None;
     }
 
-    /// Returns `true` if the diagnostic contains a [`Fix`].
-    pub fn fixable(&self) -> bool {
-        self.fix().is_some()
-    }
-
-    /// Returns `true` if the diagnostic is [`fixable`](Diagnostic::fixable) and applies at the
-    /// configured applicability level.
+    /// Returns `true` if the diagnostic has a fix that applies at the configured applicability
+    /// level.
     pub fn has_applicable_fix(&self, fix_applicability: Applicability) -> bool {
         self.fix().is_some_and(|fix| fix.applies(fix_applicability))
     }
@@ -419,6 +414,7 @@ impl Diagnostic {
     /// Returns the remapped offset for a suppression comment if it exists.
     ///
     /// Like [`Diagnostic::parent`], this is used for noqa code suppression comments in Ruff.
+    #[cfg(feature = "serde")]
     fn noqa_offset(&self) -> Option<TextSize> {
         self.inner.noqa_offset
     }
@@ -902,19 +898,6 @@ impl Annotation {
     /// Sets the span on this annotation.
     pub fn set_span(&mut self, span: Span) {
         self.span = span;
-    }
-
-    /// Returns the tags associated with this annotation.
-    pub fn get_tags(&self) -> &[DiagnosticTag] {
-        &self.tags
-    }
-
-    /// Attaches this tag to this annotation.
-    ///
-    /// It will not replace any existing tags.
-    pub fn tag(mut self, tag: DiagnosticTag) -> Annotation {
-        self.tags.push(tag);
-        self
     }
 
     /// Attaches an additional tag to this annotation.
@@ -1519,7 +1502,8 @@ impl DisplayDiagnosticConfig {
     ///
     /// Nearby annotations or fix edits are rendered in a single source frame even when their
     /// configured context windows would not otherwise overlap.
-    pub fn merge_window(self, lines: usize) -> DisplayDiagnosticConfig {
+    #[cfg(test)]
+    fn merge_window(self, lines: usize) -> DisplayDiagnosticConfig {
         DisplayDiagnosticConfig {
             merge_window: lines,
             ..self
