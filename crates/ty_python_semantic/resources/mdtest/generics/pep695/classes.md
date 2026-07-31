@@ -365,6 +365,12 @@ class C[T]:
 
         # error: [invalid-assignment] "Object of type `C[T@C]` is not assignable to `C[int]`"
         invalid: C[int] = C(value)
+
+    def from_union(self, value: T | list[T]) -> None:
+        reveal_type(C(value))  # revealed: C[T@C | list[T@C]]
+
+        # error: [invalid-assignment] "Object of type `C[T@C | list[T@C]]` is not assignable to `C[list[T@C]]`"
+        invalid_union: C[list[T]] = C(value)
 ```
 
 A method's own type variable is independent of the class type variable and is preserved in the same
