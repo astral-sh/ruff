@@ -232,6 +232,20 @@ reveal_type(decorator_factory()(identity))
 reveal_type(decorator_factory()(identity)(1))
 ```
 
+A function returned from a factory can use components of the `ParamSpec` from the factory's lexical
+return type. This also works when that function returns another generic callable:
+
+```py
+def nested_callable_factory() -> Callable[P, Callable[[T], T]]:
+    def wrapper(*args: P.args, **kwargs: P.kwargs) -> Callable[[T], T]:
+        def identity(value: T) -> T:
+            return value
+
+        return identity
+
+    return wrapper
+```
+
 If the typevar also appears in a parameter, it is the function that is generic, and the returned
 `Callable` is not:
 
