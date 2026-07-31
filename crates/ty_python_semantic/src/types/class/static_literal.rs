@@ -15,7 +15,9 @@ use crate::{
         DefinedPlace, Definedness, Place, PlaceAndQualifiers, Provenance, PublicTypePolicy,
         TypeOrigin, place_from_bindings, place_from_declarations,
     },
-    reachability::{DeclarationsIteratorExtension, binding_reachability},
+    reachability::{
+        DeclarationsIteratorExtension, ReachabilityConstraintsExtension, binding_reachability,
+    },
     types::{
         ApplyTypeMappingVisitor, BoundTypeVarIdentity, BoundTypeVarInstance, CallArguments,
         CallableType, ClassBase, ClassLiteral, ClassType, DATACLASS_FLAGS, DataclassFlags,
@@ -2566,6 +2568,69 @@ impl<'db> StaticClassLiteral<'db> {
             fields: attributes,
             class_variables: class_variables.into_boxed_slice(),
         }
+    }
+
+    /// Return the type qualifiers attached to each reachable annotated assignment in source order.
+    ///
+    /// This uses the declaration history rather than [`StaticClassLiteral::own_fields`], because a
+    /// later method or nested class can replace the symbol's binding while leaving its entry in
+    /// `__annotations__`:
+    ///
+    /// ```python
+    /// class Example(NamedTuple):
+    ///     value: Final[int]
+    ///     def value(self) -> int: ...
+    /// ```
+    ///
+    /// Each qualifier remains paired with its own definition so diagnostics can point to the
+    /// annotation that introduced it, including when declarations occur in different branches.
+    pub(crate) fn own_annotated_qualifiers(
+        self,
+        db: &'db dyn Db,
+    ) -> Vec<(Name, TypeQualifiers, Definition<'db>)> {
+        let body_scope = self.body_scope(db);
+        let table = place_table(db, body_scope);
+        let use_def = use_def_map(db, body_scope);
+        let mut annotated_qualifiers = Vec::new();
+
+        for (symbol_id, _) in use_def.all_end_of_scope_symbol_declarations() {
+            let declarations = use_def.reachable_symbol_declarations(symbol_id);
+            let predicates = declarations.predicates();
+            let reachability_constraints = declarations.reachability_constraints();
+
+            for declaration in declarations {
+                if reachability_constraints
+                    .evaluate(db, predicates, declaration.reachability_constraint)
+                    .is_always_false()
+                {
+                    continue;
+                }
+
+                let DefinitionState::Defined(definition) = declaration.declaration else {
+                    continue;
+                };
+                if !matches!(definition.kind(db), DefinitionKind::AnnotatedAssignment(..)) {
+                    continue;
+                }
+
+                let Some(declared) = inferred_declaration(db, definition).declared() else {
+                    continue;
+                };
+                annotated_qualifiers.push((
+                    declaration.declaration_order,
+                    table.symbol(symbol_id).name().clone(),
+                    declared.qualifiers(),
+                    definition,
+                ));
+            }
+        }
+
+        annotated_qualifiers
+            .sort_unstable_by_key(|(declaration_order, _, _, _)| *declaration_order);
+        annotated_qualifiers
+            .into_iter()
+            .map(|(_, name, qualifiers, definition)| (name, qualifiers, definition))
+            .collect()
     }
 
     /// Look up an instance attribute (available in `__dict__`) of the given name.

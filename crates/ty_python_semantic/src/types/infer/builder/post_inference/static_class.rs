@@ -33,9 +33,10 @@ use crate::{
             report_bad_frozen_dataclass_inheritance, report_conflicting_metaclass_from_bases,
             report_duplicate_bases, report_inconsistent_generic_bases,
             report_instance_layout_conflict, report_invalid_attribute_assignment,
-            report_invalid_or_unsupported_base, report_invalid_total_ordering,
-            report_invalid_type_param_order, report_invalid_typevar_default_reference,
-            report_missing_type_arguments, report_named_tuple_field_with_leading_underscore,
+            report_invalid_named_tuple_field_qualifier, report_invalid_or_unsupported_base,
+            report_invalid_total_ordering, report_invalid_type_param_order,
+            report_invalid_typevar_default_reference, report_missing_type_arguments,
+            report_named_tuple_field_with_leading_underscore,
             report_namedtuple_field_without_default_after_field_with_default,
             report_shadowed_type_variable,
             report_subclass_of_class_with_non_callable_init_subclass, report_unsupported_base,
@@ -47,6 +48,7 @@ use crate::{
         infer_definition_types,
         mro::StaticMroErrorKind,
         overrides,
+        special_form::TypeQualifier,
         tuple::Tuple,
         typevar::TypeVarInstance,
         variance::VarianceInferable,
@@ -116,6 +118,27 @@ pub(crate) fn check_static_class_definitions<'db>(
     // If it's a `NamedTuple` class, check that no field without a default value
     // appears after a field with a default value.
     if class_kind == Some(CodeGeneratorKind::NamedTuple) {
+        // `ClassVar` and `Final` fields have to be checked against the class body's annotations
+        // rather than against `own_fields`, since `own_fields` drops `ClassVar` declarations and
+        // does not retain the `Final` qualifier for the fields that it does keep.
+        //
+        // A field carrying both qualifiers is reported once per qualifier, since each qualifier
+        // independently violates the restriction on `NamedTuple` fields.
+        for (field_name, qualifiers, declaration) in class.own_annotated_qualifiers(db) {
+            let invalid_qualifiers = [TypeQualifier::ClassVar, TypeQualifier::Final]
+                .into_iter()
+                .filter(|qualifier| qualifiers.contains(TypeQualifiers::from(*qualifier)));
+
+            for qualifier in invalid_qualifiers {
+                report_invalid_named_tuple_field_qualifier(
+                    context,
+                    &field_name,
+                    qualifier,
+                    declaration,
+                );
+            }
+        }
+
         let mut field_with_default_encountered = None;
 
         for (field_name, field) in class.own_fields(db, None, CodeGeneratorKind::NamedTuple) {
