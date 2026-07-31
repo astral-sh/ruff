@@ -19,13 +19,6 @@ impl<'a> Locator<'a> {
         }
     }
 
-    pub fn with_index(contents: &'a str, index: LineIndex) -> Self {
-        Self {
-            contents,
-            index: OnceCell::from(index),
-        }
-    }
-
     #[deprecated(
         note = "This is expensive, avoid using outside of the diagnostic phase. Prefer the other `Locator` methods instead."
     )]
@@ -43,10 +36,6 @@ impl<'a> Locator<'a> {
     pub fn to_index(&self) -> &LineIndex {
         self.index
             .get_or_init(|| LineIndex::from_source_text(self.contents))
-    }
-
-    pub fn line_index(&self) -> Option<&LineIndex> {
-        self.index.get()
     }
 
     pub fn to_source_code(&self) -> SourceCode<'_, '_> {
@@ -126,11 +115,6 @@ impl<'a> Locator<'a> {
     pub(crate) fn text_len(&self) -> TextSize {
         self.contents.text_len()
     }
-
-    /// Return `true` if the source code is empty.
-    pub const fn is_empty(&self) -> bool {
-        self.contents.is_empty()
-    }
 }
 
 // Override the `_str` methods from [`LineRanges`] to extend the lifetime to `'a`.
@@ -154,13 +138,6 @@ impl<'a> Locator<'a> {
     /// See [`LineRanges::lines_str`].
     pub(crate) fn lines_str(&self, range: TextRange) -> &'a str {
         self.contents.lines_str(range)
-    }
-
-    /// Returns the text of all lines that include `range`.
-    ///
-    /// See [`LineRanges::full_lines_str`].
-    pub fn full_lines_str(&self, range: TextRange) -> &'a str {
-        self.contents.full_lines_str(range)
     }
 }
 
