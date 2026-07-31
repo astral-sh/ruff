@@ -30,9 +30,6 @@ should not introduce object-identity, alias, or class-namespace mutation analysi
     alternative makes the failure merely possible.
 - Preserve callable union and intersection structure when deciding whether an implicit `__get__`
     call definitely fails.
-- Preserve the runtime provenance of a directly identifiable raw `__get__` slot: a `classmethod`
-    wrapper is not callable even when its underlying function signature accepts the synthesized
-    arguments.
 - Treat a definitely or possibly bound custom `__getattribute__` as an interceptor that makes
     normal descriptor invocation non-definite, even when calling the override itself fails.
 - Treat a successful `__getattr__` fallback as a successful lookup alternative when the normal
@@ -80,12 +77,11 @@ Callable types retain a union-of-intersections structure. Every union element mu
 descriptor call to be definitely invalid, while a callable intersection element succeeds if any of
 its callable members accepts the arguments.
 
-Descriptor invocation calls the raw `__get__` value stored on the descriptor class. It does not bind
-that value through the descriptor protocol first. A directly identifiable method decorated with
-`@classmethod` therefore supplies a non-callable `classmethod` wrapper in this slot. Ty uses the
-underlying function signature only to preserve a useful recovery return type; diagnostic validation
-calls the raw wrapper. This change does not fold raw-wrapper provenance through unions or aliases,
-or model the target-version-dependent callability of raw `staticmethod` objects.
+Descriptor invocation calls the raw `__get__` value stored on the descriptor class. Ty's semantic
+member lookup does not retain enough raw MRO and decorator provenance to prove whether that value is
+a non-callable wrapper or a viable callable replacement. This change therefore validates the
+callable type exposed by member lookup but does not diagnose runtime non-callability specific to raw
+`classmethod` or `staticmethod` wrappers.
 
 Only lookup paths that can supply the requested member participate in certainty aggregation.
 Conversely, a possibly defined member introduces an absent path that does not invoke the descriptor,
@@ -184,8 +180,9 @@ read/write correlation, and bidirectional type-context improvements are separate
     objects, metaclass descriptor kinds, and `super()` construction.
 - General changes to explicit classmethod access or synthesized function and classmethod `__get__`
     wrapper types.
-- Folding raw `classmethod` slot provenance through unions or aliases.
-- Modeling the Python-version-dependent runtime callability of raw `staticmethod` slots.
+- Diagnosing runtime non-callability of raw descriptor wrapper slots, including classmethods,
+    dynamic-MRO alternatives, decorator replacements, and the Python-version-dependent callability
+    of staticmethods.
 
 The class-mutation items require flow facts keyed by semantic object or class identity rather than
 ty's existing syntactic places. That should be designed as a separate dataflow feature. The broader
@@ -209,10 +206,9 @@ one removed by a later deletion. Distinguishing those cases from constructor-est
 would require the out-of-scope object-identity and interprocedural dataflow described above.
 
 The implementation may also suppress a diagnostic for an intersection receiver or
-intersection-valued descriptor, for a raw `classmethod` slot whose provenance is hidden behind a
-union or alias, or for a raw `staticmethod` slot that is non-callable on Python 3.9 and older. These
-cases require broader intersection or wrapper-provenance modeling and do not affect the concrete
-descriptor in the original issue.
+intersection-valued descriptor, or for a raw `classmethod` or `staticmethod` slot that is
+non-callable at runtime. These cases require broader intersection or wrapper-provenance modeling and
+do not affect the concrete descriptor in the original issue.
 
 The implementation may suppress a diagnostic when an otherwise failing TypeVar alternative is
 semantically uninhabited, including `Never` hidden behind an alias. Applying that normalization

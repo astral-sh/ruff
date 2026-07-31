@@ -538,17 +538,6 @@ impl AttributeKind {
 struct DescriptorGetLookup<'db> {
     callable_type: Type<'db>,
     definedness: Definedness,
-    raw_slot_is_classmethod: bool,
-}
-
-impl<'db> DescriptorGetLookup<'db> {
-    fn runtime_callable_type(self, db: &'db dyn Db) -> Type<'db> {
-        if self.raw_slot_is_classmethod {
-            KnownClass::Classmethod.to_instance(db)
-        } else {
-            self.callable_type
-        }
-    }
 }
 
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
@@ -582,7 +571,7 @@ impl<'db> DescriptorGetCallContext<'db> {
         let instance = self.instance(db).unwrap_or_else(|| Type::none(db));
         let owner = self.owner(db);
         let error = descr_get
-            .runtime_callable_type(db)
+            .callable_type
             .try_call(
                 db,
                 env,
@@ -3704,12 +3693,6 @@ impl<'db> Type<'db> {
             return None;
         }
 
-        let raw_slot_is_classmethod = match concrete_descr_get {
-            Type::FunctionLiteral(function) => function.is_classmethod(db),
-            Type::Callable(callable) => callable.is_classmethod_like(db),
-            _ => false,
-        };
-
         // Descriptor special-method lookup checks the descriptor's type, so instance storage
         // cannot shadow `__get__`. Dynamic MRO entries still participate in the lookup.
         let Place::Defined(DefinedPlace {
@@ -3726,7 +3709,6 @@ impl<'db> Type<'db> {
         Some(DescriptorGetLookup {
             callable_type: descr_get,
             definedness,
-            raw_slot_is_classmethod,
         })
     }
 
@@ -3878,10 +3860,7 @@ impl<'db> Type<'db> {
                     } else {
                         UnionType::from_two_elements(db, env, bindings.return_type(db, env), ty)
                     };
-                    let error = (descr_get.definedness == Definedness::AlwaysDefined
-                        && descr_get.raw_slot_is_classmethod)
-                        .then(|| DescriptorGetCallContext::new(db, ty, instance, owner, kind));
-                    (return_type, error)
+                    (return_type, None)
                 }
                 Err(error) => {
                     let return_type = if descr_get.definedness == Definedness::AlwaysDefined {
@@ -3890,8 +3869,7 @@ impl<'db> Type<'db> {
                         UnionType::from_two_elements(db, error.return_type(db), ty)
                     };
                     let error = (descr_get.definedness == Definedness::AlwaysDefined
-                        && (descr_get.raw_slot_is_classmethod
-                            || error.has_definitely_invalid_callee_or_arguments()))
+                        && error.has_definitely_invalid_callee_or_arguments())
                     .then(|| DescriptorGetCallContext::new(db, ty, instance, owner, kind));
                     (return_type, error)
                 }

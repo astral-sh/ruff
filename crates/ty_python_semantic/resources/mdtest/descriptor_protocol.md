@@ -2013,11 +2013,12 @@ class Foo:
 reveal_type(Foo().desc)  # revealed: Unknown
 ```
 
-### A classmethod `__get__` slot is not callable
+### Raw descriptor wrapper callability is not diagnosed
 
 Implicit descriptor invocation reads the raw `__get__` value from the descriptor class without
-binding it. A `classmethod` object is not callable, even when its underlying function annotations
-accept all three synthesized arguments.
+binding it. A `classmethod` object is therefore non-callable at runtime, but ty's member lookup does
+not retain enough raw-slot provenance to distinguish that wrapper from viable dynamic-MRO or
+decorator alternatives. Ty conservatively does not diagnose these cases.
 
 ```py
 class Descriptor:
@@ -2028,33 +2029,55 @@ class Descriptor:
 class C:
     value = Descriptor()
 
-# error: [invalid-attribute-access]
 reveal_type(C().value)  # revealed: int
 ```
 
-### Composite raw classmethod slots are not diagnosed
-
-Ty detects a directly identifiable raw `classmethod` wrapper. It does not fold that runtime
-provenance through a union or type alias. The conditional definition below is therefore an accepted
-false negative even though both runtime alternatives are non-callable raw wrappers.
+An earlier dynamic base can supply a valid regular `__get__` even when a later concrete base defines
+a classmethod slot.
 
 ```py
-def conditional_descriptor(flag: bool) -> None:
-    class Descriptor:
-        if flag:
-            @classmethod
-            def __get__(cls: object, instance: object, owner: object) -> int:
-                return 1
+from typing import Any
 
-        else:
-            @classmethod
-            def __get__(cls: object, instance: object, owner: object) -> str:
-                return ""
+class DynamicBase:
+    def __get__(self, instance: object, owner: type | None = None) -> int:
+        return 1
 
-    class C:
-        value = Descriptor()
+class ConcreteBase:
+    @classmethod
+    def __get__(cls: object, instance: object, owner: object) -> int:
+        return 1
 
-    reveal_type(C().value)  # revealed: int | str
+AnyBase: Any = DynamicBase
+
+class Descriptor(AnyBase, ConcreteBase): ...
+
+class C:
+    value = Descriptor()
+
+C().value
+```
+
+An outer decorator can likewise replace a classmethod wrapper with a valid plain callable.
+
+```py
+from collections.abc import Callable
+
+def replace_classmethod(value: object) -> Callable[[object, object, object], int]:
+    def get(descriptor: object, instance: object, owner: object) -> int:
+        return 1
+
+    return get
+
+class Descriptor:
+    @replace_classmethod
+    @classmethod
+    def __get__(cls: object, instance: object, owner: object) -> int:
+        return 1
+
+class C:
+    value = Descriptor()
+
+C().value
 ```
 
 ### Raw staticmethod slots before Python 3.10 are not diagnosed
