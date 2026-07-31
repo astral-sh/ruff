@@ -1346,11 +1346,7 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                         .write_str(if boolean { "True" } else { "False" })
                 }
                 LiteralValueTypeKind::String(string) => {
-                    write!(
-                        f.with_type(self.ty),
-                        "{}",
-                        string.display_with(self.db, self.settings.clone()),
-                    )
+                    write!(f.with_type(self.ty), "{}", string.display(self.db))
                 }
                 // We used to return `str` as the type here because that feels generally more useful.
                 // However, the inconsistency between the type shown in the inlay hint and its hover, and the
@@ -3170,22 +3166,15 @@ impl Display for DisplayTypeArray<'_, '_> {
 }
 
 impl<'db> StringLiteralType<'db> {
-    fn display_with(
-        self,
-        db: &'db dyn Db,
-        settings: DisplaySettings<'db>,
-    ) -> DisplayStringLiteralType<'db> {
+    fn display(self, db: &'db dyn Db) -> DisplayStringLiteralType<'db> {
         DisplayStringLiteralType {
             string: self.value(db),
-            settings,
         }
     }
 }
 
 struct DisplayStringLiteralType<'db> {
     string: &'db str,
-    #[expect(dead_code)]
-    settings: DisplaySettings<'db>,
 }
 
 impl Display for DisplayStringLiteralType<'_> {
