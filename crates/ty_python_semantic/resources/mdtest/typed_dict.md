@@ -2950,7 +2950,9 @@ def get_value(value: GetValue[ConstrainedValue]) -> ConstrainedValue:
 
 def takes_str(value: str) -> None: ...
 def _(value: ValueA | ValueB) -> None:
-    # TODO: Infer `int` once declared constraints use the same BDD paths as other alternatives.
+    # TODO: Add declared bounds/constraints directly to the constraint set, rather than handling
+    # them specially in a cleanup pass. (That cleanup pass is not engaging for this example, which
+    # means our "prefer tightest constraint when both work" heuristic is not being applied.)
     # TODO: revealed: int
     reveal_type(get_value(value))  # revealed: object
     takes_str(get_value(value))  # error: [invalid-argument-type]
