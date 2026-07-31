@@ -315,12 +315,13 @@ impl<'db> CallError<'db> {
         self.1.return_type(db, env)
     }
 
-    /// Returns `true` if the call failed because the callee or argument list was invalid.
+    /// Returns `true` if every callable alternative failed because the callee or argument list was
+    /// invalid.
     ///
     /// This excludes errors raised while evaluating synthesized calls, such as invoking a
     /// property's getter. Those errors need diagnostics specific to the synthesized operation.
-    pub(crate) fn has_invalid_callee_or_arguments(&self) -> bool {
-        self.0 != CallErrorKind::BindingError || self.1.has_overload_resolution_error()
+    pub(crate) fn has_definitely_invalid_callee_or_arguments(&self) -> bool {
+        self.1.has_definite_overload_resolution_error()
     }
 
     /// Returns `Some(property)` if the call error was caused by an attempt to set a property

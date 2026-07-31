@@ -9193,9 +9193,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     Type::instance(db, env, collection_literal.identity_specialization(db));
                 let collection_generic_context = collection_literal.generic_context(db);
                 let mut identity_bindings = self
-                    .infer_attribute_load_impl(attribute, identity_instance)
-                    .bindings(db, env)
-                    .match_parameters(db, env, &call_arguments)
+                    .infer_attribute_load_impl(attribute, identity_instance, true)
+                    .bindings(self.db())
+                    .match_parameters(self.db(), &call_arguments)
                     // Perform inference against the type variables on the receiver's generic context.
                     .with_generic_context(self.db(), collection_generic_context);
 
@@ -10258,7 +10258,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     fn infer_attribute_load(&mut self, attribute: &ast::ExprAttribute) -> Type<'db> {
         let value_type =
             self.infer_maybe_standalone_expression(&attribute.value, TypeContext::default());
-        self.infer_attribute_load_impl(attribute, value_type)
+        self.infer_attribute_load_impl(attribute, value_type, true)
     }
 
     /// Infer the type of a [`ast::ExprAttribute`] expression, assuming a load context.
@@ -10266,6 +10266,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         &mut self,
         attribute: &ast::ExprAttribute,
         mut value_type: Type<'db>,
+        report_descriptor_get_error: bool,
     ) -> Type<'db> {
         fn union_elements_missing_attribute<'db>(
             db: &'db dyn Db,
@@ -10303,6 +10304,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         let mut assigned_type = None;
+        let mut has_reaching_assignment = false;
         if let Some(place_expr) = PlaceExpr::try_from_expr(attribute) {
             let (resolved, keys) = self.infer_place_load(
                 PlaceExprRef::from(&place_expr),
@@ -10310,26 +10312,21 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             );
             constraint_keys.extend(keys);
             if let Place::Defined(DefinedPlace {
-                ty,
-                definedness: Definedness::AlwaysDefined,
-                ..
+                ty, definedness, ..
             }) = resolved.place
             {
-                assigned_type = Some(ty);
+                has_reaching_assignment = true;
+                if definedness == Definedness::AlwaysDefined {
+                    assigned_type = Some(ty);
+                }
             }
         }
         let fallback = value_type.member_with_diagnostics(db, &attr.id);
-        if attribute.ctx == ExprContext::Load
+        if report_descriptor_get_error
             && let Some(failure) = fallback
                 .descriptor_get_error
-                .filter(|context| {
-                    assigned_type.is_none()
-                        || (!matches!(
-                            value_type,
-                            Type::ClassLiteral(_) | Type::GenericAlias(_) | Type::SubclassOf(_)
-                        ) && context.kind(db).is_data())
-                })
-                .and_then(|context| context.into_error(db, env))
+                .filter(|_| !has_reaching_assignment)
+                .and_then(|context| context.into_error(db))
         {
             report_bad_dunder_get_call(&self.context, &failure, value_type, attribute);
         }
@@ -10623,7 +10620,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 Type::Never
             }
             ExprContext::Del => {
-                self.infer_attribute_load(attribute);
+                let value_type =
+                    self.infer_maybe_standalone_expression(value, TypeContext::default());
+                self.infer_attribute_load_impl(attribute, value_type, false);
                 self.validate_attribute_deletion(
                     attribute,
                     self.expression_type(value),

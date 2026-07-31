@@ -368,6 +368,14 @@ impl<'db> CallableItem<'db> {
             .map_or(Ok(()), |bindings| bindings.as_result(db))
     }
 
+    fn has_definite_overload_resolution_error(&self) -> bool {
+        self.callable().matching_overloads().next().is_none()
+            || self
+                .as_constructor()
+                .and_then(ConstructorBinding::downstream_constructor)
+                .is_some_and(Bindings::has_definite_overload_resolution_error)
+    }
+
     fn has_own_diagnostics(&self) -> bool {
         self.callable().as_result().is_err()
     }
@@ -522,6 +530,12 @@ impl<'db> BindingsElement<'db> {
             .find(|b| b.error_priority(db) == max_priority)
             .map(|b| b.as_result(db).unwrap_err())
             .unwrap_or(CallErrorKind::NotCallable))
+    }
+
+    fn has_definite_overload_resolution_error(&self) -> bool {
+        self.items
+            .iter()
+            .all(CallableItem::has_definite_overload_resolution_error)
     }
 
     /// Filter bindings in an intersection once at least one binding succeeded.
@@ -900,15 +914,15 @@ impl<'db> Bindings<'db> {
         self.elements.iter().flat_map(BindingsElement::callables)
     }
 
-    /// Returns whether any contributing callable, including a downstream constructor call, has
-    /// no overload compatible with the provided arguments.
-    pub(super) fn has_overload_resolution_error(&self) -> bool {
-        self.iter_flat()
-            .any(|binding| binding.matching_overloads().next().is_none())
-            || self
-                .iter_constructor_items()
-                .filter_map(ConstructorBinding::downstream_constructor)
-                .any(Self::has_overload_resolution_error)
+    /// Returns whether every callable alternative has no overload compatible with the provided
+    /// arguments.
+    ///
+    /// Bindings are a union of intersections. Every union element must fail for the overall call
+    /// to be definitely invalid, while an intersection element succeeds if any item succeeds.
+    pub(super) fn has_definite_overload_resolution_error(&self) -> bool {
+        self.elements
+            .iter()
+            .all(BindingsElement::has_definite_overload_resolution_error)
     }
 
     /// Returns a mutable iterator over all `CallableBinding`s, flattening the two-level structure.
