@@ -157,7 +157,7 @@ error: oops
   |        ^^^^ oops
   |
 help: remove the entry
- --> foo.ipynb:cell 1:2:8
+ --> cell 1:2:8
   |
 2 - Second oops line
 2 + Second line
@@ -178,7 +178,7 @@ error: oops
   │        ━━━━ oops
   ╰╴
 help: remove the entry
-  ╭▸ foo.ipynb:cell 1:2:8
+  ╭▸ cell 1:2:8
   │
 2 - Second oops line
 2 + Second line
@@ -224,12 +224,12 @@ error: oops
   |        ^^^^ oops
   |
 help: remove the entry
- --> foo.ipynb:cell 1:2:8
+ --> cell 1:2:8
   |
 2 - Second oops line
 2 + Second line
   |
- --> foo.ipynb:cell 2:2:12
+ --> cell 2:2:12
   |
 2 - Second oops line
 2 + Second oops
@@ -247,12 +247,12 @@ error: oops
   │        ━━━━ oops
   ╰╴
 help: remove the entry
-  ╭▸ foo.ipynb:cell 1:2:8
+  ╭▸ cell 1:2:8
   │
 2 - Second oops line
 2 + Second line
   │
-  ├▸ foo.ipynb:cell 2:2:12
+  ├▸ cell 2:2:12
   │
 2 - Second oops line
 2 + Second oops
