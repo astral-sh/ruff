@@ -74,10 +74,11 @@ impl<'db> ConstructorBinding<'db> {
     pub(super) fn freshen_generic_contexts_in_place(
         &mut self,
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         nonce_generator: &TypeVarNonceGenerator<'db>,
     ) {
         let instance_type = self.constructed_instance_type();
-        let Some((_, specialization)) = instance_type.class_specialization(db) else {
+        let Some((_, specialization)) = instance_type.class_specialization(db, env) else {
             return;
         };
         let generic_context = specialization.generic_context(db);
@@ -93,13 +94,21 @@ impl<'db> ConstructorBinding<'db> {
             delta,
         };
         let fresh_instance_type =
-            instance_type.apply_type_mapping(db, &type_mapping, TypeContext::default());
-        self.freshen_class_typevars(db, generic_context, delta, fresh_instance_type);
+            instance_type.apply_type_mapping(db, env, &type_mapping, TypeContext::default());
+        // Only freshen a generic context that belongs to the constructed instance itself.
+        // `class_specialization` can also find a context through a class-object type variable's
+        // bound, but freshening that context would detach the constructor parameters from the
+        // receiver.
+        if fresh_instance_type == instance_type {
+            return;
+        }
+        self.freshen_class_typevars(db, env, generic_context, delta, fresh_instance_type);
     }
 
     fn freshen_class_typevars(
         &mut self,
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         generic_context: GenericContext<'db>,
         delta: u32,
         fresh_instance_type: Type<'db>,
@@ -113,7 +122,7 @@ impl<'db> ConstructorBinding<'db> {
         // the inferred specialization to that instance. Only the per-overload context is
         // call-local, so its instance must use the same fresh type variables as the signature.
         let constructor_context = self.context().with_instance_type(fresh_instance_type);
-        let visitor = ApplyTypeMappingVisitor::default();
+        let visitor = ApplyTypeMappingVisitor::new(env);
         self.entry.bound_type = self.entry.bound_type.map(|bound_type| {
             bound_type.apply_type_mapping_impl(db, &type_mapping, TypeContext::default(), &visitor)
         });
@@ -134,6 +143,7 @@ impl<'db> ConstructorBinding<'db> {
             {
                 downstream_binding.freshen_class_typevars(
                     db,
+                    env,
                     generic_context,
                     delta,
                     fresh_instance_type,

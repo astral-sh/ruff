@@ -355,7 +355,7 @@ impl<'db> CallableItem<'db> {
                 binding.freshen_generic_contexts_in_place(db, env, nonce_generator);
             }
             CallableItem::Constructor(binding) => {
-                binding.freshen_generic_contexts_in_place(db, nonce_generator);
+                binding.freshen_generic_contexts_in_place(db, env, nonce_generator);
             }
         }
     }

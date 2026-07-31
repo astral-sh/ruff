@@ -970,7 +970,7 @@ impl<'db> Signature<'db> {
         })
     }
 
-    fn apply_type_mapping_impl<'a>(
+    pub(super) fn apply_type_mapping_impl<'a>(
         &self,
         db: &'db dyn Db,
         type_mapping: &TypeMapping<'a, 'db>,

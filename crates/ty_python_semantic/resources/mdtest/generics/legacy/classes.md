@@ -634,6 +634,34 @@ class C(Generic[T]):
         invalid: C[int] = C(value)
 ```
 
+### Constructing through a classmethod receiver
+
+A constructor call through a classmethod receiver keeps an enclosing `TypeVarTuple` when checking
+the constructor arguments. In particular, freshening the constructor must not replace the
+`TypeVarTuple` in the receiver with `Unknown`.
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+```py
+from __future__ import annotations
+
+from typing import Generic, TypeVarTuple
+
+Ts = TypeVarTuple("Ts")
+
+class Thunk(Generic[*Ts]):
+    def __init__(self, state: Unresolved[*Ts] | None) -> None: ...
+    @classmethod
+    def make(cls, *values: *Ts) -> Thunk[*Ts]:
+        return cls(Unresolved(values))
+
+class Unresolved(Generic[*Ts]):
+    def __init__(self, values: tuple[*Ts]) -> None: ...
+```
+
 ### Many invariant parameters with dynamic bounds
 
 Treating unrelated classes with `Any` in their MRO as transitive pivots caused inference time to
