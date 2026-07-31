@@ -689,13 +689,7 @@ impl<'db> ClassLiteral<'db> {
 
     /// Returns whether this class is `builtins.tuple` exactly
     pub(crate) fn is_tuple(self, db: &'db dyn Db) -> bool {
-        match self {
-            Self::Static(class) => class.is_tuple(db),
-            Self::Dynamic(_)
-            | Self::DynamicNamedTuple(_)
-            | Self::DynamicTypedDict(_)
-            | Self::DynamicEnum(_) => false,
-        }
+        self.as_static().is_some_and(|class| class.is_tuple(db))
     }
 
     /// Return a type representing "the set of all instances of the metaclass of this class".
