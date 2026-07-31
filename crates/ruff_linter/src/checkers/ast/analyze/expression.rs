@@ -863,7 +863,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                 flake8_bandit::rules::weak_cryptographic_key(checker, call);
             }
             if checker.any_rule_enabled(&[
-                Rule::SubprocessWithoutShellEqualsTrue,
+                Rule::SubprocessCallWithUntrustedInput,
                 Rule::SubprocessPopenWithShellEqualsTrue,
                 Rule::CallWithShellEqualsTrue,
                 Rule::StartProcessWithAShell,
