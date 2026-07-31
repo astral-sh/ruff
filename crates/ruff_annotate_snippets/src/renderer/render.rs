@@ -1536,11 +1536,10 @@ fn emit_suggestion_default(
         }
         let arrow = renderer.decor_style.file_start(is_first, false);
         buffer.append(row_num - 1, arrow, ElementStyle::LineNumber);
-        let message = if renderer.anonymized_line_numbers {
-            format!("{}:{}:{}", path, ANONYMIZED_LINE_NUM, loc.char + 1)
-        } else {
-            format!("{}:{}:{}", path, loc.line, loc.char + 1)
-        };
+        let mut origin = Origin::path(path.as_ref()).cell_index(suggestion.cell_index);
+        origin.line = Some(loc.line);
+        origin.char_column = Some(loc.char + 1);
+        let message = format_origin(&origin, renderer.anonymized_line_numbers);
         buffer.append(row_num - 1, &message, ElementStyle::LineAndColumn);
 
         draw_col_separator_no_space(renderer, buffer, row_num, max_line_num_len + 1);
