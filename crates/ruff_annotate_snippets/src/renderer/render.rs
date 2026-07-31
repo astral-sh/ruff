@@ -1544,7 +1544,11 @@ fn emit_suggestion_default(
         let arrow = renderer.decor_style.file_start(is_first, false);
         buffer.append(row_num - 1, arrow, ElementStyle::LineNumber);
         let origin = Origin {
-            path: suggestion.path.as_ref().map(|p| Cow::Borrowed(p.as_ref())),
+            path: suggestion
+                .path
+                .as_ref()
+                .filter(|_| secondary_path)
+                .map(|p| Cow::Borrowed(p.as_ref())),
             cell_index: suggestion.cell_index,
             line: Some(loc.line),
             char_column: Some(loc.char + 1),
