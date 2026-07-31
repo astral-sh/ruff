@@ -50,7 +50,7 @@ reveal_type(collect(1, "a"))  # revealed: tuple[Literal[1], Literal["a"]]
 can describe the arguments forwarded to that callable.
 
 ```py
-from typing import Callable, TypeVar, TypeVarTuple, Unpack
+from typing import Callable, TypeVar, TypeVarTuple, Unpack, overload
 
 R = TypeVar("R")
 Ts = TypeVarTuple("Ts")
@@ -65,8 +65,22 @@ def format_value(value: int, label: str, /) -> str:
     return f"{label}: {value}"
 
 reveal_type(invoke(format_value, 1, "value"))  # revealed: str
-# error: [invalid-argument-type]
+# error: [missing-argument]
 reveal_type(invoke(format_value, 1))  # revealed: str
+
+@overload
+def overloaded(value: int) -> str: ...
+@overload
+def overloaded(value: str) -> str: ...
+def overloaded(value: int | str) -> str:
+    return str(value)
+
+reveal_type(invoke(overloaded, 1))  # revealed: str
+reveal_type(invoke(overloaded, "value"))  # revealed: str
+# error: [invalid-argument-type]
+invoke(overloaded, 1.0)
+# error: [missing-argument]
+invoke(overloaded)
 ```
 
 ## Type aliases

@@ -634,22 +634,22 @@ def positional_variadic(x: int, *args: str) -> tuple[int, *tuple[str, ...]]:
     raise NotImplementedError
 
 reveal_type(invoke(positional_only, 1, "a"))  # revealed: tuple[int, str]
-# error: [invalid-argument-type] "Argument to function `invoke` is incorrect: Expected `() -> tuple[int, str]`, found `def positional_only(x: int, y: str, /) -> tuple[int, str]`"
+# error: [missing-argument]
 reveal_type(invoke(positional_only))  # revealed: tuple[int, str]
-# error: [invalid-argument-type] "Argument to function `invoke` is incorrect: Expected `(Literal[1], /) -> tuple[int, str]`, found `def positional_only(x: int, y: str, /) -> tuple[int, str]`"
+# error: [missing-argument]
 reveal_type(invoke(positional_only, 1))  # revealed: tuple[int, str]
-# error: [invalid-argument-type] "Argument to function `invoke` is incorrect: Expected `(int, Literal[2] | str, /) -> tuple[int, str]`, found `def positional_only(x: int, y: str, /) -> tuple[int, str]`"
+# error: [invalid-argument-type] "Argument to function `invoke` is incorrect: Expected `str`, found `Literal[2]`"
 reveal_type(invoke(positional_only, 1, 2))  # revealed: tuple[int, str]
 
 reveal_type(invoke(standard, 1, "a"))  # revealed: tuple[int, str]
-# error: [invalid-argument-type] "Argument to function `invoke` is incorrect: Expected `() -> tuple[int, str]`, found `def standard(x: int, y: str) -> tuple[int, str]`"
+# error: [missing-argument]
 # error: [unknown-argument] "Argument `x` does not match any known parameter of function `invoke`"
 # error: [unknown-argument] "Argument `y` does not match any known parameter of function `invoke`"
 reveal_type(invoke(standard, x=1, y="a"))  # revealed: tuple[int, str]
 
 reveal_type(invoke(positional_variadic, 1, "a", "b"))  # revealed: tuple[int, *tuple[str, ...]]
 reveal_type(invoke(positional_variadic, 1))  # revealed: tuple[int, *tuple[str, ...]]
-# error: [invalid-argument-type] "Argument to function `invoke` is incorrect: Expected `() -> tuple[int, *tuple[str, ...]]`, found `def positional_variadic(x: int, *args: str) -> tuple[int, *tuple[str, ...]]`"
+# error: [missing-argument]
 reveal_type(invoke(positional_variadic))  # revealed: tuple[int, *tuple[str, ...]]
 
 def accept_forwarded[*Ts](callback: Callable[[*Ts], object], args: tuple[*Ts]) -> None: ...
@@ -665,6 +665,27 @@ def forward_mixed[*Ts](
     *args: *tuple[int, *Ts, str],
 ) -> None:
     accept_mixed_forwarded(callback, args)
+```
+
+### Forwarded arguments use callback parameters
+
+A forwarding call checks each supplied argument against the callback parameter that consumes it. It
+also checks callbacks when the forwarded argument pack is empty.
+
+```py
+from typing import Callable
+
+def forward[*Ts, R](callback: Callable[[*Ts], R], *args: *Ts) -> R:
+    raise NotImplementedError
+
+def receive(value: int, /) -> str:
+    return str(value)
+
+# error: [invalid-argument-type] "Argument to function `forward` is incorrect: Expected `int`, found `float`"
+forward(receive, 1.0)
+
+# error: [missing-argument]
+forward(receive)
 ```
 
 ### Matched positional pack with rejected keywords
@@ -748,42 +769,44 @@ def check(value: int, label: str, fixed: tuple[int, str], empty_tuple: tuple[()]
     reveal_type(single_result)  # revealed: tuple[int | str]
 
     parameter_result = invoke_pack(
-        accepts_str_once,  # error: [invalid-argument-type]
-        value,
+        accepts_str_once,
+        value,  # error: [invalid-argument-type]
     )
     # TODO: Should reveal `tuple[int]` without re-inferring the matched pack.
     reveal_type(parameter_result)  # revealed: tuple[int | str]
 
+    # error: [missing-argument]
     empty = invoke_pack(
-        accepts_int_and_str,  # error: [invalid-argument-type]
+        accepts_int_and_str,
         value=value,  # error: [unknown-argument]
         label=label,  # error: [unknown-argument]
     )
     reveal_type(empty)  # revealed: tuple[()]
 
+    # error: [missing-argument]
     partial = invoke_pack(
-        accepts_int_and_str,  # error: [invalid-argument-type]
+        accepts_int_and_str,
         value,
         label=label,  # error: [unknown-argument]
     )
     reveal_type(partial)  # revealed: tuple[int]
 
+    # error: [missing-argument]
     overloaded_empty = invoke_pack(
-        # TODO: Should report the incompatible zero-argument callback.
         overloaded_value,
         value=value,  # error: [unknown-argument]
     )
     reveal_type(overloaded_empty)  # revealed: tuple[()]
 
+    # error: [missing-argument]
     empty_splat = invoke_pack(
-        # TODO: Should report the incompatible zero-argument callback.
         overloaded_value,
         *empty_tuple,
     )
     reveal_type(empty_splat)  # revealed: tuple[()]
 
+    # error: [missing-argument]
     multiple_empty_splats = invoke_pack(
-        # TODO: Should report the incompatible zero-argument callback.
         overloaded_value,
         *empty_tuple,
         *empty_tuple,
@@ -856,7 +879,7 @@ def accepts_int_or_str(value: int | str) -> str:
 invoke_str(accepts_int_or_str, 1)
 invoke_str(accepts_int_or_str, "value")
 
-# TODO: Should report the incompatible callback argument.
+# error: [invalid-argument-type]
 invoke_str(accepts_int_or_str, 1.0)
 
 def invalid_wrapper[T](value: T) -> str:
@@ -896,7 +919,7 @@ def correlated(left: str | bytes, right: str | bytes) -> str | bytes:
 reveal_type(invoke(correlated, "left", "right"))  # revealed: str | bytes
 # TODO: Should reveal the selected overload return type.
 reveal_type(invoke(correlated, b"left", b"right"))  # revealed: str | bytes
-# TODO: Should report the incompatible correlated overload.
+# error: [invalid-argument-type]
 invoke(correlated, "left", b"right")
 
 def uncovered_constraint[T: (str, bytes)](value: T) -> str | bytes:
@@ -932,8 +955,7 @@ def split_splat(values: tuple[int, str], invalid: tuple[int, int]) -> None:
     reveal_type(invoke_after_header(accepts_string_or_bytes, *values))  # revealed: str
     invoke_after_header(
         accepts_string_or_bytes,
-        # TODO: Should report the incompatible residual splat.
-        *invalid,
+        *invalid,  # error: [invalid-argument-type]
     )
 
 @overload
