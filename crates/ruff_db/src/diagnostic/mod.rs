@@ -312,7 +312,7 @@ impl Diagnostic {
     }
 
     /// Returns a reference to the primary span of this diagnostic.
-    pub fn primary_span_ref(&self) -> Option<&Span> {
+    fn primary_span_ref(&self) -> Option<&Span> {
         self.primary_annotation().map(|ann| &ann.span)
     }
 
@@ -360,7 +360,7 @@ impl Diagnostic {
     }
 
     #[cfg(test)]
-    pub(crate) fn fix_mut(&mut self) -> Option<&mut Fix> {
+    fn fix_mut(&mut self) -> Option<&mut Fix> {
         Arc::make_mut(&mut self.inner).fix.as_mut()
     }
 
@@ -419,7 +419,7 @@ impl Diagnostic {
     /// Returns the remapped offset for a suppression comment if it exists.
     ///
     /// Like [`Diagnostic::parent`], this is used for noqa code suppression comments in Ruff.
-    pub fn noqa_offset(&self) -> Option<TextSize> {
+    fn noqa_offset(&self) -> Option<TextSize> {
         self.inner.noqa_offset
     }
 
@@ -514,7 +514,7 @@ impl Diagnostic {
     /// Returns the [`SourceFile`] which the message belongs to.
     ///
     /// Panics if the diagnostic has no primary span, or if its file is not a `SourceFile`.
-    pub fn expect_ruff_source_file(&self) -> &SourceFile {
+    fn expect_ruff_source_file(&self) -> &SourceFile {
         self.ruff_source_file()
             .expect("Expected a ruff source file")
     }
@@ -1165,7 +1165,7 @@ impl DiagnosticId {
         }
     }
 
-    pub fn is_invalid_syntax(&self) -> bool {
+    fn is_invalid_syntax(&self) -> bool {
         matches!(self, Self::InvalidSyntax)
     }
 }
@@ -1192,7 +1192,7 @@ pub enum UnifiedFile {
 }
 
 impl UnifiedFile {
-    pub fn path<'a>(&'a self, resolver: &'a dyn FileResolver) -> &'a str {
+    fn path<'a>(&'a self, resolver: &'a dyn FileResolver) -> &'a str {
         match self {
             UnifiedFile::Ty(file) => resolver.path(*file),
             UnifiedFile::Ruff(file) => file.name(),
@@ -1200,7 +1200,7 @@ impl UnifiedFile {
     }
 
     /// Return the file's path relative to the current working directory.
-    pub fn relative_path<'a>(&'a self, resolver: &'a dyn FileResolver) -> &'a Path {
+    fn relative_path<'a>(&'a self, resolver: &'a dyn FileResolver) -> &'a Path {
         let cwd = resolver.current_directory();
         let path = Path::new(self.path(resolver));
 
@@ -1293,7 +1293,7 @@ impl Span {
     /// Returns the [`SourceFile`] attached to this [`Span`].
     ///
     /// Panics if the file is a [`UnifiedFile::Ty`] instead of a [`UnifiedFile::Ruff`].
-    pub fn expect_ruff_file(&self) -> &SourceFile {
+    fn expect_ruff_file(&self) -> &SourceFile {
         self.as_ruff_file()
             .expect("Expected a ruff `SourceFile`, found a ty `File`")
     }
@@ -1596,7 +1596,7 @@ impl DisplayDiagnosticConfig {
         self
     }
 
-    pub fn is_canceled(&self) -> bool {
+    fn is_canceled(&self) -> bool {
         self.cancellation_token
             .as_ref()
             .is_some_and(|token| token.is_cancelled())

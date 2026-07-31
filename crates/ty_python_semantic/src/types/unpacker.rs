@@ -305,10 +305,7 @@ impl<'db> UnpackResult<'db> {
         )
     }
 
-    pub(crate) fn try_expression_type(
-        &self,
-        expr: impl Into<ExpressionNodeKey>,
-    ) -> Option<Type<'db>> {
+    fn try_expression_type(&self, expr: impl Into<ExpressionNodeKey>) -> Option<Type<'db>> {
         self.targets
             .get(&expr.into())
             .copied()

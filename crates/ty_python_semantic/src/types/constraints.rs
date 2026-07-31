@@ -885,11 +885,7 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
     }
 
     #[expect(dead_code)] // Keep this around for debugging purposes
-    pub(crate) fn display_graph<'a>(
-        self,
-        db: &'db dyn Db,
-        prefix: &'a dyn Display,
-    ) -> impl Display {
+    fn display_graph<'a>(self, db: &'db dyn Db, prefix: &'a dyn Display) -> impl Display {
         struct DisplayConstraintSet<'a, 'c, 'db> {
             node: NodeId,
             prefix: &'a dyn Display,
@@ -1790,8 +1786,8 @@ enum SourceOrder {
 /// lower and upper bound.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) struct Constraint<'db> {
-    pub(crate) typevar: BoundTypeVarInstance<'db>,
-    pub(crate) bounds: ConstraintBounds<'db>,
+    typevar: BoundTypeVarInstance<'db>,
+    bounds: ConstraintBounds<'db>,
 }
 
 /// The explicit lower and upper bounds inferred for a typevar on one constraint path.
@@ -1822,11 +1818,11 @@ impl<'db> ConstraintBounds<'db> {
         self.upper.is_some()
     }
 
-    pub(crate) fn materialized_lower(self) -> Type<'db> {
+    fn materialized_lower(self) -> Type<'db> {
         self.lower.unwrap_or(Type::Never)
     }
 
-    pub(crate) fn materialized_upper(self) -> Type<'db> {
+    fn materialized_upper(self) -> Type<'db> {
         self.upper.unwrap_or(Type::object())
     }
 }
@@ -1850,7 +1846,7 @@ pub(crate) struct UpperBound<'db> {
 }
 
 impl<'db> UpperBound<'db> {
-    pub(crate) fn none() -> Self {
+    fn none() -> Self {
         Self::default()
     }
 
@@ -1858,16 +1854,16 @@ impl<'db> UpperBound<'db> {
     ///
     /// This preserves an explicit `object` clause so callers can distinguish `T <= object` from a
     /// missing upper bound. Use [`UpperBound::add_clause`] when accumulating multiple clauses.
-    pub(crate) fn from_clause(clause: Type<'db>) -> Self {
+    fn from_clause(clause: Type<'db>) -> Self {
         let clauses = FxOrderSet::from_iter([clause]);
         Self { clauses }
     }
 
-    pub(crate) fn is_empty(&self) -> bool {
+    fn is_empty(&self) -> bool {
         self.clauses.is_empty()
     }
 
-    pub(crate) fn has_explicit_bound(&self) -> bool {
+    fn has_explicit_bound(&self) -> bool {
         !self.is_empty()
     }
 
@@ -1898,7 +1894,7 @@ impl<'db> UpperBound<'db> {
         self.clauses.len() == 1 && self.clauses.contains(&Type::Never)
     }
 
-    pub(crate) fn add_clause(&mut self, clause: Type<'db>) {
+    fn add_clause(&mut self, clause: Type<'db>) {
         if self.is_never() {
             return;
         }
@@ -1912,7 +1908,7 @@ impl<'db> UpperBound<'db> {
         self.clauses.insert(clause);
     }
 
-    pub(crate) fn shrink_to_fit(&mut self) {
+    fn shrink_to_fit(&mut self) {
         self.clauses.shrink_to_fit();
     }
 
@@ -1927,7 +1923,7 @@ impl<'db> UpperBound<'db> {
         self.clauses.iter().copied().any(Type::is_union)
     }
 
-    pub(crate) fn is_satisfied_by(&self, db: &'db dyn Db, ty: Type<'db>) -> bool {
+    fn is_satisfied_by(&self, db: &'db dyn Db, ty: Type<'db>) -> bool {
         self.clauses
             .iter()
             .all(|clause| ty.is_constraint_set_assignable_to(db, *clause))
@@ -3706,7 +3702,7 @@ impl<'db> PathBound<'db> {
         }
     }
 
-    pub(crate) fn variance(&self) -> TypeVarVariance {
+    fn variance(&self) -> TypeVarVariance {
         match (self.lower, self.has_upper()) {
             (None, true) => TypeVarVariance::Covariant,
             (Some(_), false) => TypeVarVariance::Contravariant,
@@ -3715,7 +3711,7 @@ impl<'db> PathBound<'db> {
         }
     }
 
-    pub(crate) fn lower_or_never(&self) -> Type<'db> {
+    fn lower_or_never(&self) -> Type<'db> {
         self.lower.unwrap_or(Type::Never)
     }
 
@@ -7117,9 +7113,7 @@ impl PathAssignments {
         result
     }
 
-    pub(crate) fn positive_constraints(
-        &self,
-    ) -> impl Iterator<Item = (ConstraintId, ConstraintId)> + '_ {
+    fn positive_constraints(&self) -> impl Iterator<Item = (ConstraintId, ConstraintId)> + '_ {
         self.assignments.iter().filter_map(
             |(assignment, (source_constraint, _))| match assignment {
                 ConstraintAssignment::Positive(constraint) => {

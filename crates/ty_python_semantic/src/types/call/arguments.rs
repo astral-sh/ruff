@@ -56,7 +56,7 @@ pub(crate) struct CallArgumentTypes<'db> {
 }
 
 impl<'db> CallArgumentTypes<'db> {
-    pub(crate) fn new(fallback_ty: Option<Type<'db>>) -> Self {
+    fn new(fallback_ty: Option<Type<'db>>) -> Self {
         Self {
             fallback_type: fallback_ty,
             types: FxHashMap::default(),
@@ -89,7 +89,7 @@ impl<'db> CallArgumentTypes<'db> {
     }
 
     /// Insert the type of this argument when inferred with the provided type context.
-    pub(crate) fn insert(&mut self, tcx: impl Into<TypeContext<'db>>, ty: Type<'db>) {
+    fn insert(&mut self, tcx: impl Into<TypeContext<'db>>, ty: Type<'db>) {
         match tcx.into().annotation {
             None => self.fallback_type = Some(ty),
             Some(tcx) => {
@@ -98,7 +98,7 @@ impl<'db> CallArgumentTypes<'db> {
         }
     }
 
-    pub(crate) fn iter(&self) -> impl Iterator<Item = (TypeContext<'db>, Type<'db>)> {
+    fn iter(&self) -> impl Iterator<Item = (TypeContext<'db>, Type<'db>)> {
         self.types
             .iter()
             .map(|(tcx, ty)| (TypeContext::new(Some(*tcx)), *ty))
@@ -261,7 +261,7 @@ impl<'a, 'db> CallArguments<'a, 'db> {
     }
 
     /// Create a new [`CallArguments`] starting from the specified index.
-    pub(crate) fn start_from(&self, index: usize) -> Self {
+    fn start_from(&self, index: usize) -> Self {
         Self {
             items: self.items[index..].to_vec(),
         }

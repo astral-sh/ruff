@@ -176,7 +176,7 @@ impl Project {
     ///
     /// Program-settings diagnostics are accepted separately so callers do not need to know how to
     /// convert and merge them into the stored project settings diagnostics.
-    pub(crate) fn from_metadata(
+    fn from_metadata(
         db: &dyn Db,
         metadata: ProjectMetadata,
         settings: Settings,
@@ -199,7 +199,7 @@ impl Project {
     /// Permanently freezes the most heavily read immutable project inputs.
     ///
     /// This is intentionally not exhaustive.
-    pub(crate) fn freeze(self, db: &mut dyn Db) {
+    fn freeze(self, db: &mut dyn Db) {
         let durability = Durability::NEVER_CHANGE;
         let metadata = Box::new(self.metadata(db).clone());
         let settings = Box::new(self.settings(db).clone());
@@ -234,7 +234,7 @@ impl Project {
         self.metadata(db).root()
     }
 
-    pub fn name(self, db: &dyn Db) -> &str {
+    fn name(self, db: &dyn Db) -> &str {
         self.metadata(db).name()
     }
 
@@ -259,7 +259,7 @@ impl Project {
             .is_file_included(path, GlobFilterCheckMode::Adhoc)
     }
 
-    pub fn is_directory_included(self, db: &dyn Db, path: &SystemPath) -> bool {
+    fn is_directory_included(self, db: &dyn Db, path: &SystemPath) -> bool {
         matches!(
             ProjectFilesFilter::from_project(db, self)
                 .is_directory_included(path, GlobFilterCheckMode::Adhoc),
@@ -325,7 +325,7 @@ impl Project {
     ///
     /// This is used when a change affects [`ty_python_core::program::ProgramSettings`] without
     /// reloading the full project.
-    pub(crate) fn update_settings_diagnostics(
+    fn update_settings_diagnostics(
         self,
         db: &mut dyn Db,
         settings_diagnostics: Vec<OptionDiagnostic>,
@@ -356,7 +356,7 @@ impl Project {
     }
 
     /// Checks the project and its dependencies according to the project's check mode.
-    pub(crate) fn check(self, db: &ProjectDatabase, reporter: &mut dyn ProgressReporter) {
+    fn check(self, db: &ProjectDatabase, reporter: &mut dyn ProgressReporter) {
         let project_span = tracing::debug_span!("Project::check");
         let _span = project_span.enter();
 
@@ -455,7 +455,7 @@ impl Project {
         }
     }
 
-    pub fn verbose(self, db: &dyn Db) -> bool {
+    fn verbose(self, db: &dyn Db) -> bool {
         self.verbose_flag(db)
     }
 
@@ -465,7 +465,7 @@ impl Project {
         }
     }
 
-    pub fn force_exclude(self, db: &dyn Db) -> bool {
+    fn force_exclude(self, db: &dyn Db) -> bool {
         self.force_exclude_flag(db)
     }
 
@@ -487,7 +487,7 @@ impl Project {
     }
 
     /// Returns the open files in the project.
-    pub fn open_files(self, db: &dyn Db) -> &FxHashSet<File> {
+    fn open_files(self, db: &dyn Db) -> &FxHashSet<File> {
         self.open_fileset(db)
     }
 
@@ -501,7 +501,7 @@ impl Project {
 
     /// Permanently marks the project as never having open files, so reads of the
     /// open-file state record no salsa dependency. Any later write panics.
-    pub fn freeze_open_files(self, db: &mut dyn Db) {
+    fn freeze_open_files(self, db: &mut dyn Db) {
         self.set_open_fileset(db)
             .with_durability(Durability::NEVER_CHANGE)
             .to(FxHashSet::default());
@@ -535,7 +535,7 @@ impl Project {
     ///
     /// This is a no-op if the project files are still lazily indexed.
     #[tracing::instrument(level = "debug", skip(self, db, paths))]
-    pub(crate) fn remove_files_under<P, I>(self, db: &mut dyn Db, paths: I)
+    fn remove_files_under<P, I>(self, db: &mut dyn Db, paths: I)
     where
         I: IntoIterator<Item = P>,
         P: AsRef<SystemPath>,
@@ -584,7 +584,7 @@ impl Project {
         }
     }
 
-    pub fn add_file(self, db: &mut dyn Db, file: File) {
+    fn add_file(self, db: &mut dyn Db, file: File) {
         tracing::debug!(
             "Adding file `{}` to project `{}`",
             file.path(db),
@@ -601,7 +601,7 @@ impl Project {
     /// Replaces the diagnostics from indexing the project files with `diagnostics`.
     ///
     /// This is a no-op if the project files haven't been indexed yet.
-    pub fn replace_index_diagnostics(self, db: &mut dyn Db, diagnostics: Vec<Diagnostic>) {
+    fn replace_index_diagnostics(self, db: &mut dyn Db, diagnostics: Vec<Diagnostic>) {
         let Some(mut index) = IndexedFiles::indexed_mut(db, self) else {
             return;
         };
@@ -634,7 +634,7 @@ impl Project {
         }
     }
 
-    pub fn reload_files(self, db: &mut dyn Db) {
+    fn reload_files(self, db: &mut dyn Db) {
         tracing::debug!("Reloading files for project `{}`", self.name(db));
 
         if !self.file_set(db).is_lazy() {
@@ -652,7 +652,7 @@ impl Project {
     }
 }
 
-pub(crate) fn check_file(db: &dyn Db, file: File) -> Vec<Diagnostic> {
+fn check_file(db: &dyn Db, file: File) -> Vec<Diagnostic> {
     if !db.should_check_file(file) {
         return Vec::new();
     }

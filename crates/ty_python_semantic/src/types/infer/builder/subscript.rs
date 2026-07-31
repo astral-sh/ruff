@@ -166,7 +166,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.infer_subscript_load_impl(value_ty, subscript)
     }
 
-    pub(super) fn infer_subscript_load_impl(
+    fn infer_subscript_load_impl(
         &mut self,
         value_ty: Type<'db>,
         subscript: &ast::ExprSubscript,
@@ -563,7 +563,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         result
     }
 
-    pub(super) fn infer_explicit_callable_specialization_impl(
+    fn infer_explicit_callable_specialization_impl(
         &mut self,
         subscript: &ast::ExprSubscript,
         value_ty: Type<'db>,

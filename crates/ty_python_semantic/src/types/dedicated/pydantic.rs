@@ -1246,7 +1246,7 @@ pub(in crate::types) fn model_init_accepts_extra(
 }
 
 /// Return `true` if extra keywords passed to `class` are silently discarded by Pydantic.
-pub(in crate::types) fn model_init_discards_extra(
+fn model_init_discards_extra(
     db: &dyn Db,
     class: StaticClassLiteral<'_>,
     metadata: ModelMetadata<'_>,

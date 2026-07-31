@@ -39,14 +39,14 @@ use ruff_text_size::{Ranged, TextRange};
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub(crate) struct AssociatedDiagnosticData {
     /// The message describing what the fix does, if it exists, or the diagnostic name otherwise.
-    pub(crate) title: String,
+    title: String,
     /// Edits to fix the diagnostic. If this is empty, a fix
     /// does not exist.
-    pub(crate) edits: Vec<lsp_types::TextEdit>,
+    edits: Vec<lsp_types::TextEdit>,
     /// The identifier displayed for the diagnostic.
-    pub(crate) code: String,
+    code: String,
     /// Possible edit to add a suppression comment which will disable this diagnostic.
-    pub(crate) noqa_edit: Option<lsp_types::TextEdit>,
+    noqa_edit: Option<lsp_types::TextEdit>,
 }
 
 /// Describes a fix for `fixed_diagnostic` that may have quick fix

@@ -1229,7 +1229,7 @@ impl<'db> ProtocolInstanceType<'db> {
     }
 
     /// Returns an effective materialized member without applying the nominal class fallback.
-    pub(super) fn materialized_interface_member(
+    fn materialized_interface_member(
         self,
         db: &'db dyn Db,
         name: &str,

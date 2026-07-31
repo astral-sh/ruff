@@ -756,7 +756,7 @@ impl TypeVarNonce {
         )
     }
 
-    pub(crate) fn add(self, delta: u32) -> Self {
+    fn add(self, delta: u32) -> Self {
         Self(
             self.0
                 .checked_add(delta)
@@ -936,7 +936,7 @@ impl<'db> BoundTypeVarInstance<'db> {
         self.identity(db).paramspec_attr
     }
 
-    pub(super) fn freshness(self, db: &'db dyn Db) -> TypeVarNonce {
+    fn freshness(self, db: &'db dyn Db) -> TypeVarNonce {
         self.identity(db).freshness
     }
 
@@ -1535,7 +1535,7 @@ pub struct BoundTypeVarIdentity<'db> {
     /// of a `ParamSpec` i.e., `P.args` or `P.kwargs`.
     pub(super) paramspec_attr: Option<ParamSpecAttrKind>,
     /// The freshness nonce for this bound typevar occurrence; `0` is the source-level occurrence.
-    pub(super) freshness: TypeVarNonce,
+    freshness: TypeVarNonce,
 }
 
 impl<'db> BoundTypeVarIdentity<'db> {
@@ -1653,7 +1653,7 @@ impl<'db> TypeVarSet<'db> {
 
     // Keep this around for debugging purposes
     #[cfg_attr(not(test), expect(dead_code))]
-    pub(crate) fn display(self, db: &'db dyn Db) -> String {
+    fn display(self, db: &'db dyn Db) -> String {
         format!(
             "[{}]",
             self.iter(db)

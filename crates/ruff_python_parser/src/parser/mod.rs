@@ -631,7 +631,7 @@ impl<'src> Parser<'src> {
     /// # Panics
     ///
     /// If the current token is not a soft keyword.
-    pub(crate) fn bump_soft_keyword_as_name(&mut self) {
+    fn bump_soft_keyword_as_name(&mut self) {
         assert!(self.at_soft_keyword());
 
         self.do_bump(TokenKind::Name);

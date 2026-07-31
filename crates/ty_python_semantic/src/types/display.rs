@@ -106,7 +106,7 @@ impl SignatureNameDisplay {
 #[derive(Debug, Clone, Default)]
 pub struct DisplaySettings<'db> {
     /// Whether rendering can be multiline
-    pub multiline: bool,
+    multiline: bool,
     /// Whether callable signatures should include their definition name.
     signature_name_display: SignatureNameDisplay,
     /// Class names that should be displayed fully qualified
@@ -116,17 +116,17 @@ pub struct DisplaySettings<'db> {
     /// (e.g., `A.Alias` instead of just `Alias`)
     qualified_type_aliases: Rc<FxHashMap<&'db str, QualificationLevel>>,
     /// Whether long unions and literals are displayed in full
-    pub preserve_full_unions: bool,
+    preserve_full_unions: bool,
     /// Scopes that are currently active in the display context (e.g. function scopes
     /// whose type parameters are currently being displayed).
     /// Used to suppress redundant `@{scope}` suffixes for type variables.
-    pub active_scopes: Rc<FxHashSet<Definition<'db>>>,
+    active_scopes: Rc<FxHashSet<Definition<'db>>>,
     /// Function types that are currently being displayed.
     /// Used to prevent infinite recursion when displaying self-referential function types.
-    pub visited_function_types: Rc<FxHashSet<FunctionType<'db>>>,
+    visited_function_types: Rc<FxHashSet<FunctionType<'db>>>,
     /// Whether to hide the return type of the outermost signature.
     /// Return types of nested callable types inside parameters are still shown.
-    pub hide_return_type: bool,
+    hide_return_type: bool,
 }
 
 impl<'db> DisplaySettings<'db> {
@@ -147,7 +147,7 @@ impl<'db> DisplaySettings<'db> {
     }
 
     #[must_use]
-    pub fn preserve_long_unions(self) -> Self {
+    pub(crate) fn preserve_long_unions(self) -> Self {
         Self {
             preserve_full_unions: true,
             ..self
@@ -155,7 +155,7 @@ impl<'db> DisplaySettings<'db> {
     }
 
     #[must_use]
-    pub fn disallow_signature_name(&self) -> Self {
+    pub(crate) fn disallow_signature_name(&self) -> Self {
         Self {
             signature_name_display: SignatureNameDisplay::Disallow,
             ..self.clone()
@@ -171,7 +171,7 @@ impl<'db> DisplaySettings<'db> {
     }
 
     #[must_use]
-    pub fn hide_return_type(&self) -> Self {
+    pub(crate) fn hide_return_type(&self) -> Self {
         Self {
             hide_return_type: true,
             ..self.clone()
@@ -206,7 +206,7 @@ impl<'db> DisplaySettings<'db> {
     }
 
     #[must_use]
-    pub fn from_possibly_ambiguous_types<I, T>(db: &'db dyn Db, types: I) -> Self
+    pub(crate) fn from_possibly_ambiguous_types<I, T>(db: &'db dyn Db, types: I) -> Self
     where
         I: IntoIterator<Item = T>,
         T: Into<Type<'db>>,
@@ -1610,7 +1610,7 @@ impl Display for DisplayTuple<'_, '_> {
 impl<'db> OverloadLiteral<'db> {
     // Not currently used, but useful for debugging.
     #[expect(dead_code)]
-    pub(crate) fn display(self, db: &'db dyn Db) -> DisplayOverloadLiteral<'db> {
+    fn display(self, db: &'db dyn Db) -> DisplayOverloadLiteral<'db> {
         Self::display_with(self, db, DisplaySettings::default())
     }
 
@@ -2106,7 +2106,7 @@ impl TupleSpecialization {
 }
 
 impl<'db> CallableType<'db> {
-    pub(crate) fn display<'a>(&'a self, db: &'db dyn Db) -> DisplayCallableType<'a, 'db> {
+    fn display<'a>(&'a self, db: &'db dyn Db) -> DisplayCallableType<'a, 'db> {
         Self::display_with(self, db, DisplaySettings::default())
     }
 
@@ -3193,9 +3193,9 @@ impl Display for DisplayStringLiteralType<'_> {
 }
 
 pub(crate) struct DisplayKnownInstanceRepr<'db> {
-    pub(crate) known_instance: KnownInstanceType<'db>,
-    pub(crate) db: &'db dyn Db,
-    pub(crate) settings: DisplaySettings<'db>,
+    known_instance: KnownInstanceType<'db>,
+    db: &'db dyn Db,
+    settings: DisplaySettings<'db>,
 }
 
 impl<'db> KnownInstanceType<'db> {

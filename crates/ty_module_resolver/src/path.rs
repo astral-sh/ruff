@@ -31,7 +31,7 @@ pub(crate) struct ModulePath {
 
 impl ModulePath {
     #[must_use]
-    pub(crate) fn is_standard_library(&self) -> bool {
+    fn is_standard_library(&self) -> bool {
         matches!(
             &*self.search_path.0,
             SearchPathInner::StandardLibraryCustom(_) | SearchPathInner::StandardLibraryVendored(_)
@@ -705,12 +705,12 @@ impl SearchPath {
     }
 
     #[must_use]
-    pub fn as_system_path(&self) -> Option<&SystemPath> {
+    pub(crate) fn as_system_path(&self) -> Option<&SystemPath> {
         self.as_path().as_system_path()
     }
 
     #[must_use]
-    pub(crate) fn as_vendored_path(&self) -> Option<&VendoredPath> {
+    fn as_vendored_path(&self) -> Option<&VendoredPath> {
         self.as_path().as_vendored_path()
     }
 

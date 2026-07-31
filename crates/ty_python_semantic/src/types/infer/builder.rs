@@ -515,7 +515,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.cycle_recovery
     }
 
-    pub(super) fn recursive_type_expression_definition(&self) -> Option<Definition<'db>> {
+    fn recursive_type_expression_definition(&self) -> Option<Definition<'db>> {
         self.typevar_binding_context.or(match self.region {
             InferenceRegion::Definition(definition) | InferenceRegion::Deferred(definition) => {
                 Some(definition)
@@ -9893,7 +9893,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         (place, constraint_keys)
     }
 
-    pub(super) fn report_unresolved_reference(&self, expr_name_node: &ast::ExprName) {
+    fn report_unresolved_reference(&self, expr_name_node: &ast::ExprName) {
         let Some(builder) = self
             .context
             .report_lint(&UNRESOLVED_REFERENCE, expr_name_node)

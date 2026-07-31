@@ -227,7 +227,7 @@ impl TypeRelation {
         matches!(self, TypeRelation::Subtyping)
     }
 
-    pub(crate) const fn can_safely_assume_reflexivity(self, ty: Type) -> bool {
+    const fn can_safely_assume_reflexivity(self, ty: Type) -> bool {
         match self {
             TypeRelation::Assignability | TypeRelation::Redundancy { .. } => true,
             TypeRelation::Subtyping | TypeRelation::SubtypingAssuming => {
@@ -400,7 +400,11 @@ impl<'db> Type<'db> {
     }
 
     /// Return true if this type is assignable to type `target` using constraint-set typevar rules.
-    pub fn is_constraint_set_assignable_to(self, db: &'db dyn Db, target: Type<'db>) -> bool {
+    pub(crate) fn is_constraint_set_assignable_to(
+        self,
+        db: &'db dyn Db,
+        target: Type<'db>,
+    ) -> bool {
         let constraints = ConstraintSetBuilder::new();
         self.when_constraint_set_assignable_to(db, target, &constraints)
             .is_always_satisfied(db)
@@ -518,7 +522,7 @@ impl<'db> Type<'db> {
         )
     }
 
-    pub(super) fn when_constraint_set_subtype_of<'c>(
+    fn when_constraint_set_subtype_of<'c>(
         self,
         db: &'db dyn Db,
         target: Type<'db>,
@@ -559,7 +563,7 @@ impl<'db> Type<'db> {
         is_redundant_with_impl(db, TypePair::new(db, self, other))
     }
 
-    pub(super) fn has_relation_to<'c>(
+    fn has_relation_to<'c>(
         self,
         db: &'db dyn Db,
         target: Type<'db>,
@@ -653,7 +657,7 @@ impl<'db> Type<'db> {
         )
     }
 
-    pub(crate) fn when_equivalent_to_with_materialization_visitor<'c>(
+    fn when_equivalent_to_with_materialization_visitor<'c>(
         self,
         db: &'db dyn Db,
         other: Type<'db>,
@@ -807,7 +811,7 @@ pub(super) struct TypeRelationChecker<'a, 'c, 'db> {
     pub(super) relation: TypeRelation,
     pub(super) typevar_evaluation: TypeVarEvaluation,
     context_tree: Option<ErrorContextTree<'db>>,
-    pub(super) given: ConstraintSet<'db, 'c>,
+    given: ConstraintSet<'db, 'c>,
     perform_expensive_checks: bool,
 
     // N.B. these fields are private to reduce the risk of
@@ -957,7 +961,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
     }
 
     /// Overwrite the error context tree with a new root context and child nodes.
-    pub(super) fn set_context(
+    fn set_context(
         &self,
         root: ErrorContext<'db>,
         children: impl IntoIterator<Item = ErrorContextTree<'db>>,
@@ -2427,7 +2431,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         })
     }
 
-    pub(super) fn as_equivalence_checker(&self) -> EquivalenceChecker<'_, 'c, 'db> {
+    fn as_equivalence_checker(&self) -> EquivalenceChecker<'_, 'c, 'db> {
         EquivalenceChecker {
             constraints: self.constraints,
             given: self.given,
@@ -2549,7 +2553,7 @@ impl<'c, 'db> EquivalenceChecker<'_, 'c, 'db> {
 
 pub(super) struct DisjointnessChecker<'a, 'c, 'db> {
     pub(super) constraints: &'c ConstraintSetBuilder<'db>,
-    pub(super) inferable: TypeVarSet<'db>,
+    inferable: TypeVarSet<'db>,
     given: ConstraintSet<'db, 'c>,
     perform_expensive_checks: bool,
 
@@ -2605,7 +2609,7 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
         }
     }
 
-    pub(super) fn as_equivalence_checker(&self) -> EquivalenceChecker<'_, 'c, 'db> {
+    fn as_equivalence_checker(&self) -> EquivalenceChecker<'_, 'c, 'db> {
         EquivalenceChecker {
             constraints: self.constraints,
             given: self.given,

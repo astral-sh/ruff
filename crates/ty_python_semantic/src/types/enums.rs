@@ -224,7 +224,7 @@ impl<'db> EnumValueAnnotation<'db> {
 #[derive(Debug, PartialEq, Eq, salsa::SalsaValue)]
 pub(crate) struct EnumMetadata<'db> {
     pub(crate) members: FxIndexMap<Name, Type<'db>>,
-    pub(crate) aliases: FxHashMap<Name, Name>,
+    aliases: FxHashMap<Name, Name>,
 
     /// Whether alias detection was precise for every member declaration.
     pub(super) aliases_are_known: bool,
@@ -516,7 +516,7 @@ impl<'db> EnumMetadata<'db> {
     /// data types normalize the value directly. A literal is preserved when its runtime class
     /// matches an inherited `_value_` annotation; otherwise, the annotation describes the
     /// normalized value.
-    pub(crate) fn value_type(&self, db: &'db dyn Db, member_name: &Name) -> Option<Type<'db>> {
+    fn value_type(&self, db: &'db dyn Db, member_name: &Name) -> Option<Type<'db>> {
         if !self.members.contains_key(member_name) {
             return None;
         }
@@ -798,7 +798,7 @@ impl<'db> EnumComplementType<'db> {
     ///
     /// This handles `.name`, `.value`, `._name_`, and `._value_` by unioning the corresponding
     /// attribute type from each remaining canonical enum member.
-    pub(crate) fn member_type(self, db: &'db dyn Db, member_name: &str) -> Option<Type<'db>> {
+    fn member_type(self, db: &'db dyn Db, member_name: &str) -> Option<Type<'db>> {
         let enum_class_literal = self.enum_class_literal(db);
         let is_enum_subclass = Type::ClassLiteral(self.enum_class(db))
             .is_subtype_of(db, KnownClass::Enum.to_subclass_of(db));

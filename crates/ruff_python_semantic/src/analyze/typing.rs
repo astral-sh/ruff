@@ -861,7 +861,7 @@ impl BuiltinTypeChecker for FloatChecker {
     const EXPR_TYPE: PythonType = PythonType::Number(NumberLike::Float);
 }
 
-pub struct IoBaseChecker;
+struct IoBaseChecker;
 
 impl TypeChecker for IoBaseChecker {
     fn match_annotation(annotation: &Expr, semantic: &SemanticModel) -> bool {
@@ -974,7 +974,7 @@ impl TypeChecker for PathlibPathChecker {
     }
 }
 
-pub struct FastApiRouteChecker;
+struct FastApiRouteChecker;
 
 impl FastApiRouteChecker {
     fn is_fastapi_route_constructor(semantic: &SemanticModel, expr: &Expr) -> bool {
@@ -1003,7 +1003,7 @@ impl TypeChecker for FastApiRouteChecker {
     }
 }
 
-pub struct TypeVarLikeChecker;
+struct TypeVarLikeChecker;
 
 impl TypeVarLikeChecker {
     /// Returns `true` if an [`Expr`] is a `TypeVar`, `TypeVarTuple`, or `ParamSpec` call.
@@ -1146,7 +1146,7 @@ pub fn is_fastapi_route(binding: &Binding, semantic: &SemanticModel) -> bool {
 }
 
 /// Test whether the given binding is for an old-style `TypeVar`, `TypeVarTuple` or a `ParamSpec`.
-pub fn is_type_var_like(binding: &Binding, semantic: &SemanticModel) -> bool {
+pub(crate) fn is_type_var_like(binding: &Binding, semantic: &SemanticModel) -> bool {
     check_type::<TypeVarLikeChecker>(binding, semantic)
 }
 

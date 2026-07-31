@@ -135,7 +135,7 @@ pub struct NavigationTarget {
 
 impl NavigationTarget {
     /// Creates a new `NavigationTarget` where the focus and full range are identical.
-    pub fn new(file: File, range: TextRange) -> Self {
+    fn new(file: File, range: TextRange) -> Self {
         Self {
             file,
             focus_range: range,
@@ -193,7 +193,7 @@ pub struct ReferenceTarget {
 
 impl ReferenceTarget {
     /// Creates a new `ReferenceTarget`.
-    pub fn new(file: File, range: TextRange, kind: ReferenceKind) -> Self {
+    fn new(file: File, range: TextRange, kind: ReferenceKind) -> Self {
         Self {
             file_range: FileRange::new(file, range),
             kind,
@@ -346,7 +346,7 @@ impl HasNavigationTargets for TypeDefinition<'_> {
 }
 
 /// Get the cache-relative path where vendored paths should be written to.
-pub fn relative_cached_vendored_root() -> SystemPathBuf {
+fn relative_cached_vendored_root() -> SystemPathBuf {
     // The vendored files are uniquely identified by the source commit.
     SystemPathBuf::from(format!("vendored/typeshed/{}", ty_vendored::SOURCE_COMMIT))
 }

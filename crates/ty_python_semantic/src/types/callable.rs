@@ -476,10 +476,7 @@ impl<'db> CallableType<'db> {
         )
     }
 
-    pub(crate) fn paramspec_value(
-        db: &'db dyn Db,
-        parameters: Parameters<'db>,
-    ) -> CallableType<'db> {
+    fn paramspec_value(db: &'db dyn Db, parameters: Parameters<'db>) -> CallableType<'db> {
         CallableType::new(
             db,
             CallableSignature::single(Signature::new(parameters, Type::unknown())),
@@ -497,7 +494,7 @@ impl<'db> CallableType<'db> {
         matches!(self.kind(db), CallableTypeKind::FunctionLike)
     }
 
-    pub(crate) fn is_dunder_paramspec(self, db: &'db dyn Db) -> bool {
+    fn is_dunder_paramspec(self, db: &'db dyn Db) -> bool {
         matches!(self.kind(db), CallableTypeKind::DunderParamSpec)
     }
 
@@ -687,7 +684,7 @@ impl<'db> CallableType<'db> {
 pub(crate) struct CallableTypes<'db>(SmallVec<[CallableType<'db>; 1]>);
 
 impl<'db> CallableTypes<'db> {
-    pub(super) fn new(callables: SmallVec<[CallableType<'db>; 1]>) -> Self {
+    fn new(callables: SmallVec<[CallableType<'db>; 1]>) -> Self {
         assert!(!callables.is_empty(), "CallableTypes should not be empty");
         CallableTypes(callables)
     }
@@ -713,7 +710,7 @@ impl<'db> CallableTypes<'db> {
         &self.0
     }
 
-    pub(super) fn into_inner(self) -> SmallVec<[CallableType<'db>; 1]> {
+    fn into_inner(self) -> SmallVec<[CallableType<'db>; 1]> {
         self.0
     }
 

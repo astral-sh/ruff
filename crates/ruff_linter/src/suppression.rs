@@ -184,13 +184,13 @@ pub(crate) enum SuppressionComments {
 }
 
 impl SuppressionComments {
-    pub(crate) fn first(&self) -> &SuppressionComment {
+    fn first(&self) -> &SuppressionComment {
         match self {
             SuppressionComments::Single(comment) => comment,
             SuppressionComments::DisableEnable(comment, _) => comment,
         }
     }
-    pub(crate) fn second(&self) -> Option<&SuppressionComment> {
+    fn second(&self) -> Option<&SuppressionComment> {
         match self {
             SuppressionComments::Single(_) => None,
             SuppressionComments::DisableEnable(_, comment) => Some(comment),
@@ -703,7 +703,7 @@ impl Suppressions {
     }
 }
 
-pub(crate) struct SuppressionsBuilder<'a> {
+struct SuppressionsBuilder<'a> {
     source: &'a str,
     settings: &'a LinterSettings,
 
@@ -714,7 +714,7 @@ pub(crate) struct SuppressionsBuilder<'a> {
 }
 
 impl<'a> SuppressionsBuilder<'a> {
-    pub(crate) fn new(source: &'a str, settings: &'a LinterSettings) -> Self {
+    fn new(source: &'a str, settings: &'a LinterSettings) -> Self {
         Self {
             source,
             settings,
@@ -724,7 +724,7 @@ impl<'a> SuppressionsBuilder<'a> {
         }
     }
 
-    pub(crate) fn load_from_tokens(mut self, tokens: &Tokens, indexer: &Indexer) -> Suppressions {
+    fn load_from_tokens(mut self, tokens: &Tokens, indexer: &Indexer) -> Suppressions {
         let mut indents: Vec<&str> = vec![];
         let mut errors = Vec::new();
 

@@ -116,7 +116,7 @@ impl<'db> SubclassOfType<'db> {
     }
 
     /// Return a [`Type`] instance representing the type `type[object]`.
-    pub(crate) fn subclass_of_object(db: &'db dyn Db) -> Type<'db> {
+    fn subclass_of_object(db: &'db dyn Db) -> Type<'db> {
         // See the documentation of `SubclassOfType::from` for details.
         KnownClass::Type.to_instance(db)
     }
@@ -461,15 +461,15 @@ pub(crate) enum SubclassOfInner<'db> {
 }
 
 impl<'db> SubclassOfInner<'db> {
-    pub(crate) const fn unknown() -> Self {
+    const fn unknown() -> Self {
         Self::Dynamic(DynamicType::Unknown)
     }
 
-    pub(crate) const fn is_dynamic(self) -> bool {
+    const fn is_dynamic(self) -> bool {
         matches!(self, Self::Dynamic(_))
     }
 
-    pub(crate) const fn is_type_var(self) -> bool {
+    const fn is_type_var(self) -> bool {
         matches!(self, Self::TypeVar(_))
     }
 
@@ -505,7 +505,7 @@ impl<'db> SubclassOfInner<'db> {
         }
     }
 
-    pub(crate) fn try_from_instance(db: &'db dyn Db, ty: Type<'db>) -> Option<Self> {
+    fn try_from_instance(db: &'db dyn Db, ty: Type<'db>) -> Option<Self> {
         Some(match ty {
             Type::NominalInstance(instance) => SubclassOfInner::Class(instance.class(db)),
             Type::TypedDict(typed_dict) => match typed_dict {
@@ -562,7 +562,7 @@ impl<'db> SubclassOfInner<'db> {
         Self::TypeVar(bound_typevar)
     }
 
-    pub(super) fn recursive_type_normalized_impl(
+    fn recursive_type_normalized_impl(
         self,
         db: &'db dyn Db,
         div: Type<'db>,

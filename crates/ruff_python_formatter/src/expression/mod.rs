@@ -923,7 +923,7 @@ impl CallChainLayout {
     /// Returns new state decreasing count of remaining calls/subscripts
     /// to traverse, or the state `FirstCallOrSubscript`, as appropriate.
     #[must_use]
-    pub(crate) fn decrement_call_like_count(self) -> Self {
+    fn decrement_call_like_count(self) -> Self {
         match self {
             Self::Fluent(AttributeState::CallLikePreceding(x)) => {
                 if x > 1 {
@@ -945,7 +945,7 @@ impl CallChainLayout {
     /// `FirstCallOrSubscript` -> `BeforeFirstCallOrSubscript`
     /// and otherwise returns unchanged.
     #[must_use]
-    pub(crate) fn transition_after_attribute(self) -> Self {
+    fn transition_after_attribute(self) -> Self {
         match self {
             Self::Fluent(AttributeState::FirstCallLike) => {
                 Self::Fluent(AttributeState::BeforeFirstCallLike)
@@ -954,7 +954,7 @@ impl CallChainLayout {
         }
     }
 
-    pub(crate) fn is_first_call_like(self) -> bool {
+    fn is_first_call_like(self) -> bool {
         matches!(self, Self::Fluent(AttributeState::FirstCallLike))
     }
 
@@ -976,7 +976,7 @@ impl CallChainLayout {
     /// 3. If the root is parenthesized, add 1 to that value.
     /// 4. If the total is at least 2, return `Fluent`. Otherwise
     ///    return `NonFluent`
-    pub(crate) fn from_expression(mut expr: ExprRef, context: &PyFormatContext) -> Self {
+    fn from_expression(mut expr: ExprRef, context: &PyFormatContext) -> Self {
         // TODO(dylan): Once the fluent layout preview style is
         // stabilized, see if it is possible to simplify some of
         // the logic around parenthesized roots. (While supporting
@@ -1118,7 +1118,7 @@ impl CallChainLayout {
 
     /// Determine whether to actually apply fluent layout in attribute, call and subscript
     /// formatting
-    pub(crate) fn apply_in_node<'a>(
+    fn apply_in_node<'a>(
         self,
         item: impl Into<ExprRef<'a>>,
         f: &mut PyFormatter,
@@ -1135,7 +1135,7 @@ impl CallChainLayout {
         }
     }
 
-    pub(crate) fn is_fluent(self) -> bool {
+    fn is_fluent(self) -> bool {
         matches!(self, CallChainLayout::Fluent(_))
     }
 }

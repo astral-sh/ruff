@@ -168,7 +168,7 @@ pub struct SemanticTokens {
 
 impl SemanticTokens {
     /// Create a new `SemanticTokens` instance.
-    pub fn new(tokens: Vec<SemanticToken>) -> Self {
+    fn new(tokens: Vec<SemanticToken>) -> Self {
         Self { tokens }
     }
 }
@@ -4685,8 +4685,8 @@ from pathlib import Missing as Alias
         assert_snapshot!(test.to_snapshot(&tokens), @r#""pathlib" @ 6..13: Namespace"#);
     }
 
-    pub(super) struct SemanticTokenTest {
-        pub(super) db: ty_project::TestDb,
+    struct SemanticTokenTest {
+        db: ty_project::TestDb,
         file: File,
     }
 

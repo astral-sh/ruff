@@ -119,16 +119,16 @@ pub(crate) struct Environment {
     /// stable version supported by ty is used (see `ty check --help` output).
     ///
     /// ty will not infer the Python version from the Python environment at this time.
-    pub(crate) python_version: Option<PythonVersion>,
+    python_version: Option<PythonVersion>,
 
     /// Target platform to assume when resolving types.
-    pub(crate) python_platform: Option<PythonPlatform>,
+    python_platform: Option<PythonPlatform>,
 
     /// Path to a custom typeshed directory.
-    pub(crate) typeshed: Option<SystemPathBuf>,
+    typeshed: Option<SystemPathBuf>,
 
     /// Additional search paths to consider when resolving modules.
-    pub(crate) extra_paths: Option<Vec<SystemPathBuf>>,
+    extra_paths: Option<Vec<SystemPathBuf>>,
 
     /// Path to the Python environment.
     ///
@@ -142,7 +142,7 @@ pub(crate) struct Environment {
     /// ty will search in the resolved environment's `site-packages` directories for type
     /// information and third-party imports.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub python: Option<SystemPathBuf>,
+    python: Option<SystemPathBuf>,
 }
 
 #[derive(Deserialize, Default, Debug, Clone)]
@@ -195,5 +195,5 @@ pub(crate) struct Project {
     /// The site-packages directory will then be copied into the test's filesystem.
     ///
     /// Example: `dependencies = ["pydantic==2.12.2"]`
-    pub(crate) dependencies: Option<Vec<String>>,
+    dependencies: Option<Vec<String>>,
 }

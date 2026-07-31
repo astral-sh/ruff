@@ -193,7 +193,7 @@ impl<'db> AllSymbolInfo<'db> {
     ///
     /// This is only available for symbols that have been imported
     /// into `Self::module()` *and* are determined to be re-exports.
-    pub(crate) fn imported_from(&self) -> Option<&ImportedFrom> {
+    fn imported_from(&self) -> Option<&ImportedFrom> {
         self.symbol
             .as_ref()
             .and_then(|symbol| symbol.imported_from.as_ref())

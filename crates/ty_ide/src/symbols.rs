@@ -31,7 +31,7 @@ pub struct QueryPattern {
 
 impl QueryPattern {
     /// Create a new query pattern from a literal search string given.
-    pub fn fuzzy(literal_query_string: &str) -> QueryPattern {
+    pub(crate) fn fuzzy(literal_query_string: &str) -> QueryPattern {
         let mut pattern = "(?i)".to_string();
         for ch in literal_query_string.chars() {
             pattern.push_str(&regex::escape(ch.encode_utf8(&mut [0; 4])));
@@ -50,7 +50,7 @@ impl QueryPattern {
     }
 
     /// Create a new query
-    pub fn exactly(symbol: &str) -> QueryPattern {
+    pub(crate) fn exactly(symbol: &str) -> QueryPattern {
         QueryPattern {
             re: None,
             original: symbol.to_string(),
@@ -59,7 +59,7 @@ impl QueryPattern {
     }
 
     /// Create a new query pattern that matches all symbols.
-    pub fn matches_all_symbols() -> QueryPattern {
+    pub(crate) fn matches_all_symbols() -> QueryPattern {
         QueryPattern {
             re: None,
             original: String::new(),
@@ -71,7 +71,7 @@ impl QueryPattern {
         self.is_match_symbol_name(&symbol.name)
     }
 
-    pub fn is_match_symbol_name(&self, symbol_name: &str) -> bool {
+    pub(crate) fn is_match_symbol_name(&self, symbol_name: &str) -> bool {
         if let Some(ref re) = self.re {
             re.is_match(symbol_name)
         } else if self.original_is_exact {
@@ -91,7 +91,7 @@ impl QueryPattern {
     /// This will never return `true` incorrectly, but it may return `false`
     /// incorrectly. That is, it's possible that this query will match all
     /// inputs but this still returns `false`.
-    pub fn will_match_everything(&self) -> bool {
+    pub(crate) fn will_match_everything(&self) -> bool {
         self.re.is_none() && self.original.is_empty()
     }
 }
@@ -149,7 +149,10 @@ impl FlatSymbols {
     }
 
     /// Returns a sequence of symbols that matches the given query.
-    pub fn search(&self, query: &QueryPattern) -> impl Iterator<Item = (SymbolId, SymbolInfo<'_>)> {
+    pub(crate) fn search(
+        &self,
+        query: &QueryPattern,
+    ) -> impl Iterator<Item = (SymbolId, SymbolInfo<'_>)> {
         self.iter()
             .filter(|(_, symbol)| query.is_match_symbol(symbol))
     }
@@ -271,7 +274,7 @@ pub struct SymbolInfo<'a> {
 }
 
 impl SymbolInfo<'_> {
-    pub fn to_owned(&self) -> SymbolInfo<'static> {
+    pub(crate) fn to_owned(&self) -> SymbolInfo<'static> {
         SymbolInfo {
             name: Cow::Owned(self.name.to_string()),
             kind: self.kind,
@@ -333,7 +336,7 @@ pub enum SymbolKind {
 }
 
 impl SymbolKind {
-    pub fn function_kind(name: &str, defined_in_class: bool) -> Self {
+    pub(crate) fn function_kind(name: &str, defined_in_class: bool) -> Self {
         if !defined_in_class {
             SymbolKind::Function
         } else if name == "__init__" {
@@ -362,7 +365,7 @@ impl SymbolKind {
     }
 
     /// Maps this to a "completion" kind if a sensible mapping exists.
-    pub fn to_completion_kind(self) -> Option<CompletionKind> {
+    pub(crate) fn to_completion_kind(self) -> Option<CompletionKind> {
         Some(match self {
             SymbolKind::Module => CompletionKind::Module,
             SymbolKind::Class => CompletionKind::Class,
@@ -3182,7 +3185,7 @@ class C: ...
     }
 
     impl PublicTestBuilder {
-        pub(super) fn build(&self) -> PublicTest {
+        fn build(&self) -> PublicTest {
             let metadata = ProjectMetadata::new("test", SystemPathBuf::from("/"));
             let mut db = TestDb::new(metadata);
 
@@ -3216,7 +3219,7 @@ class C: ...
             }
         }
 
-        pub(super) fn source(
+        fn source(
             &mut self,
             path: impl Into<SystemPathBuf>,
             contents: impl AsRef<str>,
@@ -3227,7 +3230,7 @@ class C: ...
             self
         }
 
-        pub(super) fn python_version(&mut self, version: PythonVersion) -> &mut PublicTestBuilder {
+        fn python_version(&mut self, version: PythonVersion) -> &mut PublicTestBuilder {
             self.python_version = Some(version);
             self
         }

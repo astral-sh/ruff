@@ -341,14 +341,14 @@ impl<'db> OverloadLiteral<'db> {
 
     /// Returns true if this overload is decorated with `@staticmethod`, or if it is implicitly a
     /// staticmethod.
-    pub(crate) fn is_staticmethod(self, db: &dyn Db) -> bool {
+    fn is_staticmethod(self, db: &dyn Db) -> bool {
         self.has_known_decorator(db, FunctionDecorators::STATICMETHOD)
             || is_implicit_staticmethod(self.name(db))
     }
 
     /// Returns true if this overload is decorated with `@classmethod`, or if it is implicitly a
     /// classmethod.
-    pub(crate) fn is_classmethod(self, db: &dyn Db) -> bool {
+    fn is_classmethod(self, db: &dyn Db) -> bool {
         self.has_known_decorator(db, FunctionDecorators::CLASSMETHOD)
             || is_implicit_classmethod(self.name(db))
     }
@@ -376,7 +376,7 @@ impl<'db> OverloadLiteral<'db> {
 
     /// Iterate through the decorators on this function, returning the span of the first one
     /// that matches the given predicate.
-    pub(super) fn find_decorator_span(
+    fn find_decorator_span(
         self,
         db: &'db dyn Db,
         predicate: impl Fn(Type<'db>) -> bool,
@@ -966,7 +966,7 @@ impl<'db> FunctionLiteral<'db> {
     /// statements, or if it is a `Protocol` method that only has a docstring,
     /// or if it is a `Protocol` method whose body only consists of a single
     /// `raise NotImplementedError` statement.
-    pub(super) fn as_abstract_method(
+    fn as_abstract_method(
         self,
         db: &'db dyn Db,
         enclosing_class: ClassType<'db>,
@@ -1022,7 +1022,7 @@ impl<'db> FunctionLiteral<'db> {
     ///
     /// Methods defined in stub files are never considered to have trivial bodies,
     /// since stubs use `...` as a placeholder regardless of the runtime implementation.
-    pub(crate) fn has_trivial_body(self, db: &'db dyn Db) -> bool {
+    fn has_trivial_body(self, db: &'db dyn Db) -> bool {
         !self.definition(db).file(db).is_stub(db)
             && matches!(
                 self.body_kind(db),

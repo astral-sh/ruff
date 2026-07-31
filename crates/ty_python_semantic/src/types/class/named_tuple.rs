@@ -201,7 +201,7 @@ impl<'db> DynamicNamedTupleLiteral<'db> {
     }
 
     /// Returns an instance type for this dynamic namedtuple.
-    pub(crate) fn to_instance(self, db: &'db dyn Db) -> Type<'db> {
+    fn to_instance(self, db: &'db dyn Db) -> Type<'db> {
         Type::instance(db, ClassType::NonGeneric(self.into()))
     }
 
