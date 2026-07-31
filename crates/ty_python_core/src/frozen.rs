@@ -86,15 +86,6 @@ impl<K: Ord, V> std::ops::Index<&K> for FrozenMap<K, V> {
     }
 }
 
-impl<K, V> IntoIterator for FrozenMap<K, V> {
-    type Item = (K, V);
-    type IntoIter = std::vec::IntoIter<(K, V)>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        self.0.into_vec().into_iter()
-    }
-}
-
 impl<'a, K, V> IntoIterator for &'a FrozenMap<K, V> {
     type Item = &'a (K, V);
     type IntoIter = std::slice::Iter<'a, (K, V)>;
