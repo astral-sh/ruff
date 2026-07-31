@@ -376,6 +376,57 @@ class UnionC(metaclass=UnionMeta):
 reveal_type(UnionC.attribute)  # revealed: Any | Literal["descriptor"]
 ```
 
+### `TypeForm` metaclass attributes
+
+A `TypeForm` argument describes the instances produced by a type form, not the runtime type form
+value itself. A metaclass attribute typed as `TypeForm[Descriptor]` can therefore be a class whose
+own metaclass makes it a data descriptor, and must continue to take precedence over a class
+attribute with the same name when assigning to the attribute:
+
+```py
+from typing_extensions import TypeForm
+
+class DescriptorMeta(type):
+    def __set__(self, instance: object, value: str) -> None:
+        pass
+
+class Descriptor(metaclass=DescriptorMeta): ...
+
+class Meta(type):
+    attribute: TypeForm[Descriptor] = Descriptor
+
+class C(metaclass=Meta):
+    attribute: int = 1
+
+C.attribute = 1  # error: [invalid-assignment]
+C.attribute = Descriptor  # error: [invalid-assignment]
+```
+
+### Bounded class-object metaclass attributes
+
+An inexact `type[Base]` attribute can hold a subclass whose custom metaclass makes the class object
+a data descriptor. It must therefore continue to take precedence over a class attribute with the
+same name when assigning to the attribute:
+
+```py
+class Base: ...
+
+class DescriptorMeta(type):
+    def __set__(self, instance: object, value: str) -> None:
+        pass
+
+class Descriptor(Base, metaclass=DescriptorMeta): ...
+
+class Meta(type):
+    attribute: type[Base] = Descriptor
+
+class C(metaclass=Meta):
+    attribute: int = 1
+
+C.attribute = 1  # error: [invalid-assignment]
+C.attribute = Descriptor  # error: [invalid-assignment]
+```
+
 ### Class objects with unknown metaclasses
 
 A `type[Any]` value could contain a class whose metaclass implements the descriptor protocol. We
