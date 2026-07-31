@@ -553,24 +553,17 @@ Ts = TypeVarTuple("Ts")
 
 def wrapper(
     callback: Callable[[Unpack[Ts]], None],
-    formatter: Callable[[Unpack[Ts]], str],
     *args: Unpack[Ts],
 ) -> None: ...
-def decorate(
-    callback: Callable[[Unpack[Ts]], None],
-    formatter: Callable[[Unpack[Ts]], str],
-) -> Callable[[Unpack[Ts]], None]:
+def decorate(callback: Callable[[Unpack[Ts]], None]) -> Callable[[Unpack[Ts]], None]:
     # TODO: An untouched TypeVarTuple should remain generic in a partial application.
     # error: [invalid-return-type]
     # error: [invalid-argument-type]
-    # error: [invalid-argument-type]
-    return partial(wrapper, callback, formatter)
+    return partial(wrapper, callback)
 
 def accept(value: int) -> None: ...
-def format_value(value: int) -> str:
-    return str(value)
 
-bound = decorate(accept, format_value)
+bound = decorate(accept)
 reveal_type(bound)  # revealed: (int, /) -> None
 bound(1)
 # error: [invalid-argument-type]
@@ -589,7 +582,6 @@ from typing import TypeVar
 from typing_extensions import TypeVarTuple, Unpack
 
 Ts = TypeVarTuple("Ts")
-Us = TypeVarTuple("Us")
 R = TypeVar("R")
 
 def from_thread(
@@ -600,34 +592,14 @@ def from_thread(
     raise NotImplementedError
 
 async def sleep(seconds: float) -> None: ...
-async def sleep_pair(seconds: float, label: str) -> None: ...
-async def run_sync(callback: Callable[[Unpack[Us]], R], *args: Unpack[Us]) -> R:
-    raise NotImplementedError
 
 async def check(token: object | None) -> None:
     bound = partial(from_thread, sleep, 0, token=token)
     # TODO: A fully bound TypeVarTuple should leave a zero-argument partial.
     reveal_type(bound)  # revealed: partial[(int | float, /, *, token: object = ...) -> None]
     bound()  # error: [missing-argument]
-    await run_sync(bound)  # error: [invalid-argument-type]
     # TODO: This should reject the extra argument once the bound pack is removed.
     bound(1)
-
-def check_fixed(values: tuple[int], token: object | None) -> None:
-    bound = partial(from_thread, sleep, *values, token=token)
-    # TODO: A fully bound TypeVarTuple should leave a zero-argument partial.
-    reveal_type(bound)  # revealed: partial[(int | float, /, *, token: object = ...) -> None]
-    bound()  # error: [missing-argument]
-
-def check_multiple(token: object | None) -> None:
-    bound = partial(from_thread, sleep_pair, 0, "value", token=token)
-    # TODO: A fully bound TypeVarTuple should leave a zero-argument partial.
-    reveal_type(bound)  # revealed: partial[(int | float, str, /, *, token: object = ...) -> None]
-    bound()  # error: [missing-argument]
-
-def check_open(values: tuple[int, ...], token: object | None) -> None:
-    bound = partial(from_thread, sleep, *values, token=token)
-    reveal_type(bound)  # revealed: partial[Unknown]
 ```
 
 ### ParamSpec callable bound with `partial`

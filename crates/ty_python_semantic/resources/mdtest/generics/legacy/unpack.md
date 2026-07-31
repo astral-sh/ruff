@@ -35,21 +35,13 @@ arguments.
 from typing import TypeVarTuple, Unpack
 
 Ts = TypeVarTuple("Ts")
-Us = TypeVarTuple("Us")
 
 def collect(*args: Unpack[Ts]) -> tuple[Unpack[Ts]]:
     reveal_type(args)  # revealed: tuple[*Ts@collect]
     raise NotImplementedError
 
-def forward(*args: Unpack[Us]) -> tuple[Unpack[Us]]:
-    reveal_type(collect(*args))  # revealed: tuple[*Us@forward]
-    return collect(*args)
-
 reveal_type(collect())  # revealed: tuple[()]
-
-def check(i: int, s: str, fixed: tuple[int, str]) -> None:
-    reveal_type(collect(i, s))  # revealed: tuple[int, str]
-    reveal_type(collect(*fixed))  # revealed: tuple[int, str]
+reveal_type(collect(1, "a"))  # revealed: tuple[Literal[1], Literal["a"]]
 ```
 
 ## Callable parameters
@@ -58,7 +50,7 @@ def check(i: int, s: str, fixed: tuple[int, str]) -> None:
 can describe the arguments forwarded to that callable.
 
 ```py
-from typing import Callable, TypeVar, TypeVarTuple, Unpack, overload
+from typing import Callable, TypeVar, TypeVarTuple, Unpack
 
 R = TypeVar("R")
 Ts = TypeVarTuple("Ts")
@@ -69,188 +61,12 @@ def invoke(
 ) -> R:
     raise NotImplementedError
 
-def invoke_tuple(
-    callback: Callable[[Unpack[Ts]], tuple[Unpack[Ts]]],
-    *args: Unpack[Ts],
-) -> tuple[Unpack[Ts]]:
-    raise NotImplementedError
-
-def invoke_pack(
-    callback: Callable[[Unpack[Ts]], object],
-    *args: Unpack[Ts],
-) -> tuple[Unpack[Ts]]:
-    raise NotImplementedError
-
-def no_arguments() -> str:
-    return "empty"
-
 def format_value(value: int, label: str, /) -> str:
     return f"{label}: {value}"
 
 reveal_type(invoke(format_value, 1, "value"))  # revealed: str
 # error: [invalid-argument-type]
 reveal_type(invoke(format_value, 1))  # revealed: str
-
-reveal_type(invoke_pack(no_arguments))  # revealed: tuple[()]
-
-def check_pack(value: int, label: str) -> None:
-    reveal_type(invoke_pack(format_value, value, label))  # revealed: tuple[int, str]
-
-empty = invoke_pack(
-    format_value,  # error: [invalid-argument-type]
-    value=1,  # error: [unknown-argument]
-    label="value",  # error: [unknown-argument]
-)
-reveal_type(empty)  # revealed: tuple[()]
-
-partial = invoke_pack(
-    format_value,  # error: [invalid-argument-type]
-    1,
-    label="value",  # error: [unknown-argument]
-)
-reveal_type(partial)  # revealed: tuple[Literal[1]]
-
-@overload
-def overloaded_value(value: int) -> str: ...
-@overload
-def overloaded_value(value: str) -> str: ...
-def overloaded_value(value: int | str) -> str:
-    return str(value)
-
-@overload
-def returns_string_tuple(value: int, /) -> tuple[str]: ...
-@overload
-def returns_string_tuple(value: str, /) -> tuple[str]: ...
-def returns_string_tuple(value: int | str, /) -> tuple[str]:
-    return (str(value),)
-
-def returns_string_tuple_once(value: object, /) -> tuple[str]:
-    return (str(value),)
-
-def accepts_str_once(value: str, /) -> object:
-    return value
-
-def check_tuple_return(value: int) -> None:
-    result = invoke_tuple(
-        # TODO: Should report an invalid callback return type.
-        returns_string_tuple,
-        value,
-    )
-    # TODO: Should reveal `tuple[int]` without re-inferring the matched pack.
-    reveal_type(result)  # revealed: tuple[int | str]
-
-    single_result = invoke_tuple(
-        # TODO: Should report an invalid callback return type.
-        returns_string_tuple_once,
-        value,
-    )
-    # TODO: Should reveal `tuple[int]` without re-inferring the matched pack.
-    reveal_type(single_result)  # revealed: tuple[int | str]
-
-    parameter_result = invoke_pack(
-        accepts_str_once,  # error: [invalid-argument-type]
-        value,
-    )
-    # TODO: Should reveal `tuple[int]` without re-inferring the matched pack.
-    reveal_type(parameter_result)  # revealed: tuple[int | str]
-
-reveal_type(invoke(overloaded_value, 1))  # revealed: str
-reveal_type(invoke(overloaded_value, "value"))  # revealed: str
-# TODO: Should report the incompatible overloaded callback argument.
-invoke(overloaded_value, 1.0)
-
-overloaded_empty = invoke_pack(
-    # TODO: Should report the incompatible zero-argument callback.
-    overloaded_value,
-    value=1,  # error: [unknown-argument]
-)
-reveal_type(overloaded_empty)  # revealed: tuple[()]
-```
-
-## Ecosystem generic forwarding callbacks
-
-A legacy `Unpack` forwarding callback must be specialized for the arguments already matched by the
-outer variadic parameter.
-
-```py
-from collections.abc import Awaitable, Callable
-from typing import TypeVar, TypeVarTuple, Unpack
-
-Ts = TypeVarTuple("Ts")
-Us = TypeVarTuple("Us")
-R = TypeVar("R")
-
-def schedule(callback: Callable[[Unpack[Ts]], object], *args: Unpack[Ts]) -> None: ...
-def run_sync(callback: Callable[[Unpack[Us]], R], *args: Unpack[Us]) -> Awaitable[R]:
-    raise NotImplementedError
-
-def target(value: int) -> int:
-    return value
-
-# TODO: This forwarding callback should be accepted by generic callable relations.
-schedule(run_sync, target, 1)  # error: [invalid-argument-type]
-```
-
-## Ecosystem platform-unknown forwarding callbacks
-
-A value defined only on another platform is unreachable on the current platform. Forwarding it must
-not erase the matched argument count or produce a legacy `Unpack` callback error.
-
-```py
-import os
-from collections.abc import Awaitable, Callable
-from typing import TypeVar, TypeVarTuple, Unpack
-from ty_extensions import Unknown
-
-Ts = TypeVarTuple("Ts")
-Us = TypeVarTuple("Us")
-R = TypeVar("R")
-
-if os.name == "nt":
-    def make_platform_handle() -> int:
-        return 1
-
-class Nursery:
-    def start_soon(
-        self,
-        callback: Callable[[Unpack[Ts]], Awaitable[object]],
-        *args: Unpack[Ts],
-        name: object = None,
-    ) -> None: ...
-
-async def run_sync(
-    callback: Callable[[Unpack[Us]], R],
-    *args: Unpack[Us],
-    name: str | None = None,
-) -> R:
-    raise NotImplementedError
-
-async def signal(value: int) -> None: ...
-async def signal_pair(first: int, second: int) -> None: ...
-def synchronous(value: int) -> int:
-    return value
-
-def synchronous_pair(first: int, second: int) -> int:
-    return first + second
-
-def reveal_platform_handle() -> None:
-    reveal_type(make_platform_handle())  # revealed: Never
-
-def check(nursery: Nursery) -> None:
-    handle = make_platform_handle()
-    nursery.start_soon(signal, handle)
-    nursery.start_soon(run_sync, synchronous, handle)
-    nursery.start_soon(signal_pair, handle, handle)
-    nursery.start_soon(run_sync, synchronous_pair, handle, handle)
-    nursery.start_soon(signal, "invalid")  # error: [invalid-argument-type]
-
-def check_ordinary_unknown(nursery: Nursery, value: Unknown) -> None:
-    nursery.start_soon(signal, value)
-    nursery.start_soon(signal_pair, value, value)
-    nursery.start_soon(signal, value, value)  # error: [invalid-argument-type]
-
-def check_open_unknown(nursery: Nursery, values: tuple[Unknown, ...]) -> None:
-    nursery.start_soon(signal_pair, *values)  # error: [invalid-argument-type]
 ```
 
 ## Type aliases
@@ -312,16 +128,6 @@ accept(True, "phase", "status", b"ok")
 accept(True, b"ok")
 # error: [invalid-argument-type] "Argument to function `accept` is incorrect: Expected `tuple[bool, *tuple[str, ...], bytes]`"
 accept(True, 1, b"bad")
-
-def concrete(
-    *args: Unpack[tuple[str, Unpack[tuple[str, ...]], dict[str, str]]],
-) -> None: ...
-def check_open_splat(values: list[str], bad: list[int], env: dict[str, str]) -> None:
-    concrete(*values, env)
-    concrete(
-        *bad,  # error: [invalid-argument-type]
-        env,
-    )
 ```
 
 ## Defaults

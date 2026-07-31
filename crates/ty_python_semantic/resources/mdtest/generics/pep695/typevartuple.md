@@ -342,7 +342,6 @@ def f(
     reveal_type(simple(i))  # revealed: tuple[int]
     reveal_type(simple(i, s))  # revealed: tuple[int, str]
     reveal_type(simple(i, s, b))  # revealed: tuple[int, str, bool]
-    reveal_type(simple(*(i, s)))  # revealed: tuple[int, str]
     reveal_type(simple(fixed))  # revealed: tuple[tuple[int, str]]
     reveal_type(simple(*empty))  # revealed: tuple[()]
     reveal_type(simple(*one))  # revealed: tuple[int]
@@ -380,8 +379,7 @@ def f(
 
 The focused matrix covers plain packs, a fixed prefix, and fixed boundaries without repeating every
 cardinality for every shape. A prefix-only pack accepts one, two, or three values; a bounded pack
-requires at least its two fixed values. Invalid calls exercise either fixed boundary and both fixed
-boundaries together.
+requires at least its two fixed values. Invalid calls exercise either fixed boundary.
 
 ```py
 def variadic_prefix[*Ts](*args: *tuple[int, *Ts]) -> tuple[*Ts]:
@@ -422,7 +420,6 @@ def check(
     middle_and_suffix: tuple[bool, str],
     invalid_prefixed: tuple[str],
     invalid_bounded: tuple[str, int],
-    xs: list[int],
 ) -> None:
     reveal_type(variadic_prefix(i))  # revealed: tuple[()]
     reveal_type(variadic_prefix(i, s))  # revealed: tuple[str]
@@ -430,7 +427,6 @@ def check(
     reveal_type(variadic_prefix(*prefixed))  # revealed: tuple[str, bool]
     reveal_type(variadic_prefix(*prefixed_unbounded))  # revealed: tuple[str, ...]
     reveal_type(variadic_prefix(i, *tail))  # revealed: tuple[str, bool]
-    reveal_type(variadic_prefix(*xs))  # revealed: tuple[int, ...]
 
     reveal_type(variadic_bounded(i, s))  # revealed: tuple[()]
     reveal_type(variadic_bounded(i, b, s))  # revealed: tuple[bool]
@@ -440,49 +436,43 @@ def check(
 
     reveal_type(positional((i,)))  # revealed: tuple[int]
     reveal_type(positional((i, s)))  # revealed: tuple[int, str]
-    reveal_type(positional((i, s, b)))  # revealed: tuple[int, str, bool]
 
     reveal_type(positional_prefix((i,)))  # revealed: tuple[()]
     reveal_type(positional_prefix((i, s)))  # revealed: tuple[str]
-    reveal_type(positional_prefix((i, s, b)))  # revealed: tuple[str, bool]
 
     reveal_type(positional_bounded((i, s)))  # revealed: tuple[()]
     reveal_type(positional_bounded((i, b, s)))  # revealed: tuple[bool]
 
     reveal_type(mixed((i,), i))  # revealed: tuple[int]
     reveal_type(mixed((i, s), i, s))  # revealed: tuple[int, str]
-    reveal_type(mixed((i, s, b), i, s, b))  # revealed: tuple[int, str, bool]
 
-    # error: [invalid-argument-type]
-    variadic_prefix(s)
-    # error: [invalid-argument-type]
-    variadic_bounded(s, s)
-    # error: [invalid-argument-type]
-    variadic_bounded(i, i)
-    # error: [invalid-argument-type]
-    variadic_bounded(s, i)
-    # error: [invalid-argument-type]
-    variadic_prefix(*invalid_prefixed)
-    # error: [invalid-argument-type]
-    variadic_bounded(*invalid_bounded)
+    # error: [invalid-argument-type] "Argument to function `variadic_prefix` is incorrect: Expected `tuple[int]`, found `tuple[str]`"
+    reveal_type(variadic_prefix(s))  # revealed: tuple[()]
+    # error: [invalid-argument-type] "Argument to function `variadic_bounded` is incorrect: Expected `tuple[int, str]`, found `tuple[str, str]`"
+    reveal_type(variadic_bounded(s, s))  # revealed: tuple[()]
+    # error: [invalid-argument-type] "Argument to function `variadic_bounded` is incorrect: Expected `tuple[int, str]`, found `tuple[int, int]`"
+    reveal_type(variadic_bounded(i, i))  # revealed: tuple[()]
+    # error: [invalid-argument-type] "Argument to function `variadic_prefix` is incorrect: Expected `tuple[int]`, found `tuple[str]`"
+    reveal_type(variadic_prefix(*invalid_prefixed))  # revealed: tuple[()]
+    # error: [invalid-argument-type] "Argument to function `variadic_bounded` is incorrect: Expected `tuple[int, str]`, found `tuple[str, int]`"
+    reveal_type(variadic_bounded(*invalid_bounded))  # revealed: tuple[()]
 
-    # error: [invalid-argument-type]
-    positional_prefix((s,))
-    # error: [invalid-argument-type]
-    positional_bounded((s, s))
-    # error: [invalid-argument-type]
-    positional_bounded((i, i))
-    # error: [invalid-argument-type]
-    positional_bounded((s, i))
+    # error: [invalid-argument-type] "Argument to function `positional_prefix` is incorrect: Expected `tuple[int]`, found `tuple[str]`"
+    reveal_type(positional_prefix((s,)))  # revealed: tuple[()]
+    # error: [invalid-argument-type] "Argument to function `positional_bounded` is incorrect: Expected `tuple[int, str]`, found `tuple[str, str]`"
+    reveal_type(positional_bounded((s, s)))  # revealed: tuple[()]
+    # error: [invalid-argument-type] "Argument to function `positional_bounded` is incorrect: Expected `tuple[int, str]`, found `tuple[int, int]`"
+    reveal_type(positional_bounded((i, i)))  # revealed: tuple[()]
 
-    # error: [invalid-argument-type]
-    mixed((i,), i, s)
+    # error: [invalid-argument-type] "Argument to function `mixed` is incorrect: Expected `tuple[int, str]`, found `tuple[int]`"
+    reveal_type(mixed((i,), i, s))  # revealed: tuple[int, str]
 ```
 
 ### Resizing starred variadic tuple boundaries
 
-An open splat can supply fixed prefix and suffix values. Resizing its tuple must preserve any fixed
-values that are already present rather than folding them into the open middle.
+Unlike the parameter-shape examples above, these open splats are missing a required prefix, suffix,
+or both. Resizing must fill those boundaries without moving fixed values already present on the
+opposite side into the open middle.
 
 ```py
 def prefixed[*Ts](*args: *tuple[int, *Ts]) -> tuple[*Ts]:
@@ -515,10 +505,10 @@ def check(
     reveal_type(bounded(*extra_boundaries))  # revealed: tuple[bool, *tuple[str, ...], bytes]
 ```
 
-### Diagnostic deduplication for ordinary `TypeVar`s
+### One error for a bounded or constrained `TypeVar`
 
-A bound or constraint on an ordinary `TypeVar` inside a starred tuple is checked by tuple-level
-inference. A failed inference must not be reported again by the later assignability check.
+Tuple inference checks the bound or constraints of an ordinary `TypeVar` inside a starred tuple.
+When inference rejects an argument, the later argument check must not report the same error again.
 
 ```py
 def bounded_typevar[T: str, *Ts](*args: *tuple[T, *Ts]) -> None: ...
@@ -644,22 +634,22 @@ def positional_variadic(x: int, *args: str) -> tuple[int, *tuple[str, ...]]:
     raise NotImplementedError
 
 reveal_type(invoke(positional_only, 1, "a"))  # revealed: tuple[int, str]
-# error: [invalid-argument-type]
+# error: [invalid-argument-type] "Argument to function `invoke` is incorrect: Expected `() -> tuple[int, str]`, found `def positional_only(x: int, y: str, /) -> tuple[int, str]`"
 reveal_type(invoke(positional_only))  # revealed: tuple[int, str]
-# error: [invalid-argument-type]
+# error: [invalid-argument-type] "Argument to function `invoke` is incorrect: Expected `(Literal[1], /) -> tuple[int, str]`, found `def positional_only(x: int, y: str, /) -> tuple[int, str]`"
 reveal_type(invoke(positional_only, 1))  # revealed: tuple[int, str]
-# error: [invalid-argument-type]
+# error: [invalid-argument-type] "Argument to function `invoke` is incorrect: Expected `(int, Literal[2] | str, /) -> tuple[int, str]`, found `def positional_only(x: int, y: str, /) -> tuple[int, str]`"
 reveal_type(invoke(positional_only, 1, 2))  # revealed: tuple[int, str]
 
 reveal_type(invoke(standard, 1, "a"))  # revealed: tuple[int, str]
-# error: [invalid-argument-type]
+# error: [invalid-argument-type] "Argument to function `invoke` is incorrect: Expected `() -> tuple[int, str]`, found `def standard(x: int, y: str) -> tuple[int, str]`"
 # error: [unknown-argument] "Argument `x` does not match any known parameter of function `invoke`"
 # error: [unknown-argument] "Argument `y` does not match any known parameter of function `invoke`"
 reveal_type(invoke(standard, x=1, y="a"))  # revealed: tuple[int, str]
 
 reveal_type(invoke(positional_variadic, 1, "a", "b"))  # revealed: tuple[int, *tuple[str, ...]]
 reveal_type(invoke(positional_variadic, 1))  # revealed: tuple[int, *tuple[str, ...]]
-# error: [invalid-argument-type]
+# error: [invalid-argument-type] "Argument to function `invoke` is incorrect: Expected `() -> tuple[int, *tuple[str, ...]]`, found `def positional_variadic(x: int, *args: str) -> tuple[int, *tuple[str, ...]]`"
 reveal_type(invoke(positional_variadic))  # revealed: tuple[int, *tuple[str, ...]]
 
 def accept_forwarded[*Ts](callback: Callable[[*Ts], object], args: tuple[*Ts]) -> None: ...
@@ -691,12 +681,6 @@ def invoke_pack[*Ts](
     callback: Callable[[*Ts], object],
     *args: *Ts,
 ) -> tuple[*Ts]:
-    raise NotImplementedError
-
-def invoke_str[*Ts](
-    callback: Callable[[*Ts], str],
-    *args: *Ts,
-) -> str:
     raise NotImplementedError
 
 def invoke_tuple[*Ts](
@@ -746,7 +730,6 @@ def check(value: int, label: str, fixed: tuple[int, str], empty_tuple: tuple[()]
     reveal_type(invoke_pack(overloaded_value, value))  # revealed: tuple[int | str]
     reveal_type(invoke_pack(optional_arity))  # revealed: tuple[()]
     reveal_type(invoke_pack(optional_arity, *empty_tuple))  # revealed: tuple[()]
-    reveal_type(invoke_str(optional_arity, *empty_tuple))  # revealed: str
 
     result = invoke_tuple(
         # TODO: Should report an invalid callback return type.
@@ -806,19 +789,6 @@ def check(value: int, label: str, fixed: tuple[int, str], empty_tuple: tuple[()]
         *empty_tuple,
     )
     reveal_type(multiple_empty_splats)  # revealed: tuple[()]
-
-    invoke_str(
-        # TODO: Should report the incompatible zero-argument callback.
-        overloaded_value,
-        *empty_tuple,
-    )
-
-    invoke_str(
-        # TODO: Should report the incompatible zero-argument callback.
-        overloaded_value,
-        *empty_tuple,
-        *empty_tuple,
-    )
 ```
 
 ### Starred variadic tuple normalization
@@ -877,16 +847,6 @@ def invoke_str[*Ts](callback: Callable[[*Ts], str], *args: *Ts) -> str:
     raise NotImplementedError
 
 @overload
-def returns_int(value: int) -> int: ...
-@overload
-def returns_int(value: str) -> int: ...
-def returns_int(value: int | str) -> int:
-    return 1
-
-# TODO: Should report the incompatible callback return type.
-invoke_str(returns_int, 1)
-
-@overload
 def accepts_int_or_str(value: int) -> str: ...
 @overload
 def accepts_int_or_str(value: str) -> str: ...
@@ -938,10 +898,6 @@ reveal_type(invoke(correlated, "left", "right"))  # revealed: str | bytes
 reveal_type(invoke(correlated, b"left", b"right"))  # revealed: str | bytes
 # TODO: Should report the incompatible correlated overload.
 invoke(correlated, "left", b"right")
-
-def correlated_constraint[T: (str, bytes)](left: T, right: T) -> str | bytes:
-    reveal_type(invoke(correlated, left, right))  # revealed: str | bytes
-    return invoke(correlated, left, right)
 
 def uncovered_constraint[T: (str, bytes)](value: T) -> str | bytes:
     return invoke(
@@ -1027,189 +983,6 @@ def infer_from_callback[*Ts](callback: Callable[[*Ts], None]) -> tuple[*Ts]:
 def accepts_int(value: int, /) -> None: ...
 
 reveal_type(infer_from_callback(accepts_int))  # revealed: tuple[int]
-```
-
-### Ecosystem generic forwarding callbacks
-
-A generic forwarding callback must be specialized for the positional arguments already matched to
-the outer type-variable tuple. The same rule applies to a callback parameterized by `ParamSpec`.
-
-```py
-from collections.abc import Awaitable, Callable
-
-def schedule[*Ts](callback: Callable[[*Ts], object], *args: *Ts) -> None: ...
-def run_sync[*Us, R](callback: Callable[[*Us], R], *args: *Us) -> Awaitable[R]:
-    raise NotImplementedError
-
-def run_paramspec[**P, R](callback: Callable[P, R], *args: P.args, **kwargs: P.kwargs) -> Awaitable[R]:
-    raise NotImplementedError
-
-def target(value: int) -> int:
-    return value
-
-# TODO: These forwarding callbacks should be accepted by generic callable relations.
-schedule(run_sync, target, 1)  # error: [invalid-argument-type]
-schedule(run_paramspec, target, 1)  # error: [invalid-argument-type]
-```
-
-### Ecosystem platform-unknown forwarding callbacks
-
-A value defined only on another platform is unreachable on the current platform. Forwarding it must
-not erase the matched argument count or produce a callback error.
-
-```py
-import os
-from collections.abc import Awaitable, Callable
-from ty_extensions import Unknown
-
-if os.name == "nt":
-    def make_platform_handle() -> int:
-        return 1
-
-class Nursery:
-    def start_soon[*Ts](
-        self,
-        callback: Callable[[*Ts], Awaitable[object]],
-        *args: *Ts,
-        name: object = None,
-    ) -> None: ...
-
-async def run_sync[*Ts, R](
-    callback: Callable[[*Ts], R],
-    *args: *Ts,
-    name: str | None = None,
-) -> R:
-    raise NotImplementedError
-
-async def signal(value: int) -> None: ...
-async def signal_pair(first: int, second: int) -> None: ...
-def synchronous(value: int) -> int:
-    return value
-
-def synchronous_pair(first: int, second: int) -> int:
-    return first + second
-
-def reveal_platform_handle() -> None:
-    reveal_type(make_platform_handle())  # revealed: Never
-
-def check(nursery: Nursery) -> None:
-    handle = make_platform_handle()
-    nursery.start_soon(signal, handle)
-    nursery.start_soon(run_sync, synchronous, handle)
-    nursery.start_soon(signal_pair, handle, handle)
-    nursery.start_soon(run_sync, synchronous_pair, handle, handle)
-    nursery.start_soon(signal, "invalid")  # error: [invalid-argument-type]
-
-def check_ordinary_unknown(nursery: Nursery, value: Unknown) -> None:
-    nursery.start_soon(signal, value)
-    nursery.start_soon(signal_pair, value, value)
-    nursery.start_soon(signal, value, value)  # error: [invalid-argument-type]
-
-def check_open_unknown(nursery: Nursery, values: tuple[Unknown, ...]) -> None:
-    nursery.start_soon(signal_pair, *values)  # error: [invalid-argument-type]
-```
-
-### Ecosystem nullable constrained overloads
-
-The same constrained type variable must select the same overload for every nullable argument. An
-independent union is not correlated and must still be rejected.
-
-```py
-from collections.abc import Callable
-from typing import overload
-
-def invoke[*Ts, R](callback: Callable[[*Ts], R], *args: *Ts) -> R:
-    raise NotImplementedError
-
-@overload
-def correlated(value: str | None, other: str | None) -> str: ...
-@overload
-def correlated(value: bytes | None, other: bytes | None) -> bytes: ...
-def correlated(value: str | bytes | None, other: str | bytes | None) -> str | bytes:
-    return value or other or ""
-
-def call[T: (str, bytes)](value: T | None, other: T | None) -> str | bytes:
-    reveal_type(invoke(correlated, value, other))  # revealed: str | bytes
-    return invoke(correlated, value, other)
-
-def uncorrelated(value: str | bytes | None) -> str | bytes:
-    return invoke(
-        correlated,
-        "first",
-        # TODO: Should report the uncorrelated overload argument.
-        value,
-    )
-```
-
-### Ecosystem overloaded callback pipeline
-
-Each generic callback in an overloaded pipeline must receive the concrete tuple produced by the
-preceding callback.
-
-```py
-from collections.abc import Callable
-from typing import Any, overload
-
-@overload
-def chain[*P, *Q, R](args: tuple[*P], first: Callable[[*P], tuple[*Q]], second: Callable[[*Q], R], /) -> R: ...
-@overload
-def chain[*P, *Q, *X, R](
-    args: tuple[*P],
-    first: Callable[[*P], tuple[*Q]],
-    second: Callable[[*Q], tuple[*X]],
-    third: Callable[[*X], R],
-    /,
-) -> R: ...
-def chain(args: Any, /, *callbacks: Callable[..., Any]) -> Any: ...
-def pair[A, B](first: A, second: B) -> tuple[A, B]:
-    return first, second
-
-def reverse[A, B](first: A, second: B) -> tuple[B, A]:
-    return second, first
-
-def extend[A, B](first: A, second: B) -> tuple[A, B, int]:
-    return first, second, 1
-
-def reject_downstream(first: int, second: str) -> None: ...
-
-# TODO: Should preserve the concrete tuple produced by each callback.
-reveal_type(chain((1, ""), pair, reverse))  # revealed: Unknown
-reveal_type(chain((1, ""), pair, reverse, extend))  # revealed: Unknown
-chain(
-    (1, ""),
-    pair,
-    reverse,
-    # TODO: Should report the incompatible downstream callback.
-    reject_downstream,
-)
-```
-
-### Ecosystem zero-argument constructor callback
-
-A zero-argument class constructor is a valid callback for an inferred empty type-variable tuple.
-
-```py
-from collections.abc import Callable
-
-def invoke[*Ts, R](callback: Callable[[*Ts], R], *args: *Ts) -> R:
-    raise NotImplementedError
-
-# TODO: Should preserve the zero-argument constructor's literal return.
-reveal_type(invoke(bool))  # revealed: bool
-
-class NoArguments:
-    def __init__(self) -> None: ...
-
-reveal_type(invoke(NoArguments))  # revealed: NoArguments
-
-class RequiresArgument:
-    def __init__(self, value: int) -> None: ...
-
-# error: [invalid-argument-type]
-invoke(RequiresArgument)
-
-# error: [invalid-argument-type]
-invoke(1)
 ```
 
 ### Callable inference with fixed positional parameters

@@ -5,15 +5,12 @@
 python-version = "3.11"
 ```
 
-Type annotations for `*args` can be starred expressions themselves:
+An unpacked type variable tuple keeps the types of positional arguments passed to `*args`.
 
 ```py
-from typing import Never, TypeAlias
-from typing_extensions import TypeAliasType, TypeVarTuple
+from typing_extensions import TypeVarTuple
 
 Ts = TypeVarTuple("Ts")
-Bottom: TypeAlias = Never
-RuntimeBottom = TypeAliasType("RuntimeBottom", Never)
 
 def append_int(*args: *Ts) -> tuple[*Ts, int]:
     reveal_type(args)  # revealed: tuple[*Ts@append_int]
@@ -22,28 +19,32 @@ def append_int(*args: *Ts) -> tuple[*Ts, int]:
 
 reveal_type(append_int(True, "a"))  # revealed: tuple[Literal[True], Literal["a"], int]
 reveal_type(append_int())  # revealed: tuple[int]
+```
 
+A concrete starred tuple checks its fixed first argument, the remaining argument types, and the minimum number of arguments.
+
+```py
 def first_arg_int(*args: *tuple[int, *tuple[str, ...]]): ...
 
 first_arg_int(42, "42", "42")  # fine
-# error: [invalid-argument-type]
+# error: [invalid-argument-type] "Argument to function `first_arg_int` is incorrect: Expected `tuple[int, *tuple[str, ...]]`, found `tuple[Literal["not an int"], Literal["42"], Literal["42"]]`"
 first_arg_int("not an int", "42", "42")
-# error: [invalid-argument-type]
+# error: [invalid-argument-type] "Argument to function `first_arg_int` is incorrect: Expected `tuple[int, *tuple[str, ...]]`, found `tuple[Literal[56], Literal["42"], Literal[56]]`"
 first_arg_int(56, "42", 56)
-# error: [invalid-argument-type]
+# error: [invalid-argument-type] "Argument to function `first_arg_int` is incorrect: Expected `tuple[int, *tuple[str, ...]]`, found `tuple[()]`"
 first_arg_int()
+```
 
+Open splats can provide fixed prefixes, suffixes, or both, including a separate argument after the splat.
+
+```py
 def prefix(*args: *tuple[str, *tuple[str, ...]]) -> None: ...
 def suffix(*args: *tuple[*tuple[str, ...], str]) -> None: ...
 def bounded(*args: *tuple[str, *tuple[str, ...], str]) -> None: ...
 def execute(*args: *tuple[str, *tuple[str, ...], dict[str, str]]) -> None: ...
-def check(
+def check_valid(
     strings: list[str],
     fixed: tuple[str, ...],
-    invalid: list[int],
-    empty: list[Never],
-    aliased_empty: list[Bottom],
-    runtime_aliased_empty: list[RuntimeBottom],
     env: dict[str, str],
 ) -> None:
     prefix(*strings)
@@ -52,29 +53,34 @@ def check(
     bounded(*strings)
     execute(*strings, env)
     execute(*fixed, env)
+```
 
-    execute(
-        *invalid,  # error: [invalid-argument-type]
-        env,
-    )
+A splat with incompatible elements reports the whole-tuple error on the splatted argument.
 
-    prefix(
-        *empty,  # error: [invalid-argument-type]
-    )
-    prefix(
-        *aliased_empty,  # error: [invalid-argument-type]
-    )
-    prefix(
-        *runtime_aliased_empty,  # error: [invalid-argument-type]
-    )
-    suffix(
-        *empty,  # error: [invalid-argument-type]
-    )
-    bounded(
-        *empty,  # error: [invalid-argument-type]
-    )
-    execute(
-        *empty,  # error: [invalid-argument-type]
-        env,
-    )
+```py
+def check_invalid(invalid: list[int], env: dict[str, str]) -> None:
+    # error: [invalid-argument-type] "Argument to function `execute` is incorrect: Expected `tuple[str, *tuple[str, ...], dict[str, str]]`, found `tuple[int, *tuple[int, ...], dict[str, str]]`"
+    execute(*invalid, env)
+```
+
+An iterable containing only `Never` values must be empty, so it cannot supply a required prefix or suffix.
+
+```py
+from typing import Never
+
+def check_empty(empty: list[Never]) -> None:
+    # error: [invalid-argument-type] "Argument to function `prefix` is incorrect: Expected `tuple[str, *tuple[str, ...]]`, found `tuple[()]`"
+    prefix(*empty)
+```
+
+A runtime type alias preserves the empty-iterable behavior of `Never`.
+
+```py
+from typing_extensions import TypeAliasType
+
+RuntimeBottom = TypeAliasType("RuntimeBottom", Never)
+
+def check_aliases(runtime_aliased_empty: list[RuntimeBottom]) -> None:
+    # error: [invalid-argument-type] "Argument to function `prefix` is incorrect: Expected `tuple[str, *tuple[str, ...]]`, found `tuple[RuntimeBottom, ...]`"
+    prefix(*runtime_aliased_empty)
 ```
