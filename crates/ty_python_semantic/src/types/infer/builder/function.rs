@@ -1,6 +1,7 @@
 use crate::Db;
 use crate::ProgramEnvironment;
 use crate::{
+    FxOrderSet,
     reachability::ReachabilityConstraintsExtension,
     types::{
         KnownClass, KnownInstanceType, ParamSpecAttrKind, SubclassOfInner, SubclassOfType, Type,
@@ -61,17 +62,13 @@ fn parameters_have_annotations(parameters: &ast::Parameters) -> bool {
 struct ExpectedReturnType<'db> {
     /// The externally-visible return type.
     public: Type<'db>,
-    /// The lexical return type, if it differs for a generic PEP 695 function.
-    lexical: Option<Type<'db>>,
+    /// The return type as seen from inside the function body.
+    lexical: Type<'db>,
 }
 
 impl<'db> ExpectedReturnType<'db> {
-    /// Creates the expected return type policy for `function_node`.
-    fn from_function(
-        db: &'db dyn Db,
-        function: FunctionType<'db>,
-        function_node: &ast::StmtFunctionDef,
-    ) -> Self {
+    /// Creates the expected return type policy for `function`.
+    fn from_function(db: &'db dyn Db, function: FunctionType<'db>) -> Self {
         /// Normalizes special return annotations to the type actually returned by expressions.
         fn normalize<'db>(
             db: &'db dyn Db,
@@ -91,18 +88,12 @@ impl<'db> ExpectedReturnType<'db> {
             same_module_uncached_raw_signature(db, function, ReturnCallableTypeVarScope::Public)
                 .return_ty,
         );
-        let lexical = function_node.type_params.is_some().then(|| {
-            normalize(
-                db,
-                &env,
-                same_module_uncached_raw_signature(
-                    db,
-                    function,
-                    ReturnCallableTypeVarScope::Lexical,
-                )
+        let lexical = normalize(
+            db,
+            &env,
+            same_module_uncached_raw_signature(db, function, ReturnCallableTypeVarScope::Lexical)
                 .return_ty,
-            )
-        });
+        );
 
         Self { public, lexical }
     }
@@ -115,10 +106,7 @@ impl<'db> ExpectedReturnType<'db> {
     /// Returns `true` if `ty` is accepted by either the public return type or the lexical return
     /// type.
     fn accepts(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>, ty: Type<'db>) -> bool {
-        ty.is_assignable_to(db, env, self.public)
-            || self
-                .lexical
-                .is_some_and(|lexical| ty.is_assignable_to(db, env, lexical))
+        ty.is_assignable_to(db, env, self.public) || ty.is_assignable_to(db, env, self.lexical)
     }
 }
 
@@ -185,8 +173,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 ReturnCallableTypeVarScope::Public,
             )
             .return_ty;
-            let expected_return =
-                ExpectedReturnType::from_function(db, enclosing_function, function);
+            let expected_return = ExpectedReturnType::from_function(db, enclosing_function);
             let expected_ty = expected_return.public();
 
             let scope_id = self.index.node_scope(NodeWithScopeRef::Function(function));
@@ -699,6 +686,24 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         for param_with_default in parameters.iter_non_variadic_params() {
             self.infer_parameter_with_default(param_with_default);
         }
+
+        let mut paramspec_parameter_bindings = FxOrderSet::default();
+        for annotation in parameters
+            .iter_non_variadic_params()
+            .filter_map(ast::ParameterWithDefault::annotation)
+        {
+            self.expression_type(annotation).find_legacy_typevars(
+                self.db(),
+                None,
+                &mut paramspec_parameter_bindings,
+            );
+        }
+        paramspec_parameter_bindings.retain(|typevar| typevar.is_paramspec(self.db()));
+        let previous_paramspec_parameter_bindings = std::mem::replace(
+            &mut self.paramspec_parameter_bindings,
+            paramspec_parameter_bindings,
+        );
+
         if let Some(vararg) = vararg {
             self.context.inference_flags |= InferenceFlags::IN_VARARG_ANNOTATION;
             self.infer_parameter(vararg);
@@ -713,6 +718,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .inference_flags
                 .remove(InferenceFlags::IN_KWARG_ANNOTATION);
         }
+        self.paramspec_parameter_bindings = previous_paramspec_parameter_bindings;
         self.context
             .inference_flags
             .remove(InferenceFlags::IN_PARAMETER_ANNOTATION);

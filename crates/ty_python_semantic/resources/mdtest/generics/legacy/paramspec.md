@@ -400,9 +400,9 @@ def foo1(c: Callable[P, int]) -> None:
 ```
 
 `P.args` and `P.kwargs` do not bind `P` themselves. They must refer to a `ParamSpec` bound by
-another parameter annotation or a visible enclosing generic context; a return annotation is not
-sufficient. A generic outer class does not make its `ParamSpec` visible across a nested class
-boundary.
+another parameter annotation or a visible enclosing generic context. A return annotation on the same
+function is not sufficient. A generic outer class does not make its `ParamSpec` visible across a
+nested class boundary.
 
 ```py
 # error: [unbound-type-variable] "ParamSpec `P` is not in scope"
@@ -423,6 +423,21 @@ class Outer(Generic[P]):
     class Inner:
         # error: [unbound-type-variable] "ParamSpec `P` is not in scope"
         def method(self, *args: P.args, **kwargs: P.kwargs) -> None: ...
+```
+
+A `ParamSpec` bound by an enclosing function's return annotation is available to components used by
+a nested function in that function's body. A non-variadic parameter on the nested function still
+takes precedence and binds the `ParamSpec` to that function instead.
+
+```py
+def callable_factory() -> Callable[P, int]:
+    def nested(*args: P.args, **kwargs: P.kwargs) -> int:
+        return 1
+
+    def nested_with_parameter(callback: Callable[P, int], *args: P.args, **kwargs: P.kwargs) -> int:
+        return callback(*args, **kwargs)
+
+    return nested
 ```
 
 And, they need to be used together.
