@@ -8564,12 +8564,35 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             _ => None,
         };
 
+        let call_expression_tcx = if let Type::ClassLiteral(class_literal) = callable_type
+            && class_literal.is_typed_dict(self.db())
+            && let Some(contextual_typed_dict) =
+                call_expression_tcx.annotation.and_then(|expected| {
+                    self.contextual_typed_dict_specialization(expected, class_literal)
+                }) {
+            TypeContext::new(Some(Type::TypedDict(contextual_typed_dict)))
+        } else {
+            call_expression_tcx
+        };
+
+        let inferred_typed_dict_constructor_ty = if let Type::ClassLiteral(class_literal) =
+            callable_type
+            && class_literal.is_typed_dict(self.db())
+        {
+            self.infer_generic_typed_dict_constructor(class_literal, arguments, call_expression_tcx)
+        } else {
+            None
+        };
+
         // Prepare `TypedDict` constructor calls before variadic argument setup so field-directed
-        // value inference becomes canonical before `**kwargs` expressions are inferred.
+        // value inference becomes canonical before `**kwargs` expressions are inferred. Candidate
+        // inference is context-free, but preparation and validation use the selected specialization.
         let has_prepared_typed_dict_constructor = class
             .filter(|class| class.is_typed_dict(self.db()))
             .map(|class| {
-                let typed_dict = TypedDictType::new(class);
+                let typed_dict = inferred_typed_dict_constructor_ty
+                    .and_then(Type::as_typed_dict)
+                    .unwrap_or_else(|| TypedDictType::new(class));
                 let form = TypedDictConstructorForm::from_arguments(arguments);
                 self.prepare_typed_dict_constructor(
                     typed_dict,
@@ -9035,7 +9058,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         let db = self.db();
-        let return_ty = bindings.return_type(db);
+        let return_ty =
+            inferred_typed_dict_constructor_ty.unwrap_or_else(|| bindings.return_type(db));
         let return_ty = match collection_initializer_class {
             Some(collection_class @ (KnownClass::List | KnownClass::Set))
                 if return_ty

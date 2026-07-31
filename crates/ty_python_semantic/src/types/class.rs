@@ -107,6 +107,8 @@ fn dynamic_class_header_range<'db>(
     }
 }
 
+pub(in crate::types) use typed_dict::synthesize_typed_dict_constructor_for_inference;
+
 bitflags::bitflags! {
     /// Properties that affect the representation of instances of a class.
     ///

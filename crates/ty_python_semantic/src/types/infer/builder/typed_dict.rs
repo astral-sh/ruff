@@ -1,15 +1,21 @@
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast, AnyNodeRef, HasNodeIndex, NodeIndex, PythonVersion};
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
 use smallvec::SmallVec;
 use strum::IntoEnumIterator;
 
 use super::TypeInferenceBuilder;
-use crate::types::class::{ClassLiteral, DynamicTypedDictAnchor, DynamicTypedDictLiteral};
+use crate::types::call::{Argument, CallArguments};
+use crate::types::class::{
+    ClassLiteral, DynamicTypedDictAnchor, DynamicTypedDictLiteral,
+    synthesize_typed_dict_constructor_for_inference,
+};
+use crate::types::constraints::ConstraintSetBuilder;
 use crate::types::diagnostic::{
     INVALID_ARGUMENT_TYPE, INVALID_TYPE_FORM, MISSING_ARGUMENT, TOO_MANY_POSITIONAL_ARGUMENTS,
     UNKNOWN_ARGUMENT, report_mismatched_type_name,
 };
+use crate::types::generics::{Specialization, enclosing_binding_contexts};
 use crate::types::infer::builder::DeferredExpressionState;
 use crate::types::special_form::TypeQualifier;
 use crate::types::typed_dict::{
@@ -18,10 +24,10 @@ use crate::types::typed_dict::{
     validate_typed_dict_constructor, validate_typed_dict_dict_literal,
 };
 use crate::types::{
-    IntersectionType, KnownClass, Type, TypeAndQualifiers, TypeContext, TypedDictModule,
-    TypedDictType,
+    ClassType, IntersectionType, KnownClass, Type, TypeAndQualifiers, TypeContext,
+    TypeVarBoundOrConstraints, TypedDictModule, TypedDictType, any_over_type,
 };
-use crate::{Program, TypeQualifiers};
+use crate::{FxIndexMap, Program, TypeQualifiers};
 use ty_python_core::definition::Definition;
 
 /// The shape of a `TypedDict` constructor call that affects how we prepare it for inference.
@@ -65,6 +71,368 @@ impl<'expr> TypedDictConstructorForm<'expr> {
 }
 
 impl<'db> TypeInferenceBuilder<'db, '_> {
+    /// Infer the specialization of an unspecialized generic `TypedDict` constructor.
+    ///
+    /// The ordinary constructor bindings intentionally stay gradual because dedicated `TypedDict`
+    /// validation produces better diagnostics. For inference, normalize the prepared constructor
+    /// inputs into exact field-name/value-type pairs and match them against a permissive synthetic
+    /// signature.
+    ///
+    /// ```python
+    /// class Box[T](TypedDict):
+    ///     value: T
+    ///
+    /// reveal_type(Box(value=1))  # Box[int]
+    /// ```
+    pub(super) fn infer_generic_typed_dict_constructor(
+        &self,
+        class_literal: ClassLiteral<'db>,
+        arguments: &ast::Arguments,
+        call_expression_tcx: TypeContext<'db>,
+    ) -> Option<Type<'db>> {
+        debug_assert!(class_literal.is_typed_dict(self.db()));
+        let db = self.db();
+        let generic_context = class_literal.generic_context(self.db())?;
+        let class_binding_context = class_literal.definition(db)?.into();
+
+        // An enclosing function or class can contribute type variables to a local TypedDict, but
+        // those variables are fixed by the enclosing scope rather than inferred by this
+        // constructor call.
+        if generic_context
+            .variables(db)
+            .any(|typevar| typevar.binding_context(db) != class_binding_context)
+        {
+            return None;
+        }
+
+        if generic_context
+            .variables(db)
+            .any(|bound_typevar| bound_typevar.typevar(db).default_type(db).is_some())
+        {
+            return None;
+        }
+
+        // Preserve the existing gradual result when this call is being inferred as a field of
+        // another unspecialized generic TypedDict. Inferring the nested call more precisely would
+        // require propagating its specialization back through the outer field before validation.
+        if call_expression_tcx.annotation.is_some_and(|context| {
+            self.type_contains_unknown_generic_typed_dict(context, Some(class_literal))
+        }) {
+            return None;
+        }
+
+        let typed_dict = TypedDictType::new(class_literal.identity_specialization(self.db()));
+        let mut fields = FxIndexMap::default();
+        let mut keyword_field_names = FxHashSet::default();
+        match &arguments.args[..] {
+            [] => {}
+            [ast::Expr::Dict(dict)] => {
+                self.collect_exact_typed_dict_constructor_fields(dict, &mut fields)?;
+            }
+            _ => return None,
+        }
+
+        for keyword in &arguments.keywords {
+            if let Some(name) = &keyword.arg {
+                if !keyword_field_names.insert(name.id.clone()) {
+                    return None;
+                }
+                fields.insert(
+                    name.id.clone(),
+                    self.infer_exact_typed_dict_constructor_expression(&keyword.value),
+                );
+            } else {
+                let ast::Expr::Dict(dict) = &keyword.value else {
+                    return None;
+                };
+                let mut unpacked_fields = FxIndexMap::default();
+                self.collect_exact_typed_dict_constructor_fields(dict, &mut unpacked_fields)?;
+                if unpacked_fields.keys().any(|name| fields.contains_key(name)) {
+                    return None;
+                }
+                keyword_field_names.extend(unpacked_fields.keys().cloned());
+                fields.extend(unpacked_fields);
+            }
+        }
+
+        if fields
+            .values()
+            .any(|ty| self.type_contains_unknown_generic_typed_dict(*ty, None))
+        {
+            return None;
+        }
+
+        let inference_arguments: CallArguments<'_, 'db> = fields
+            .iter()
+            .filter(|(name, _)| typed_dict.item(self.db(), name.as_str()).is_some())
+            .map(|(name, ty)| (Argument::Keyword(name.as_str()), Some(*ty)))
+            .collect();
+        let inference_bindings =
+            synthesize_typed_dict_constructor_for_inference(db, typed_dict, generic_context)
+                .bindings(db)
+                .with_enclosing_binding_contexts(enclosing_binding_contexts(
+                    self.index,
+                    self.scope().file_scope_id(db),
+                ))
+                .match_parameters(db, &inference_arguments);
+        let inference_bindings = inference_bindings
+            .check_types(
+                db,
+                &ConstraintSetBuilder::new(),
+                &inference_arguments,
+                call_expression_tcx,
+                &[],
+            )
+            .ok()?;
+
+        let inferred_specialization = inference_bindings
+            .single_element()?
+            .matching_overloads()
+            .next()?
+            .1
+            .specialization(db)?;
+        let specialization = Specialization::new(
+            db,
+            generic_context,
+            inferred_specialization.types(db),
+            inferred_specialization.materialization_kind(db),
+            None,
+        );
+        let typed_dict =
+            TypedDictType::new(class_literal.apply_specialization(db, |_| specialization));
+        let return_ty = Type::TypedDict(typed_dict);
+
+        let contextual_typed_dict = call_expression_tcx
+            .annotation
+            .and_then(|expected| self.contextual_typed_dict_specialization(expected, class_literal))
+            .filter(|expected| self.typed_dict_constructor_fields_are_valid(*expected, &fields));
+
+        // Assignability through an unknown type can make a context-free candidate appear valid
+        // without providing the precise context needed by an expression such as a lambda. Prefer
+        // a valid expected specialization so ordinary constructor validation checks the expression
+        // under that context.
+        if any_over_type(db, return_ty, false, |ty| {
+            ty.is_unknown() || matches!(ty, Type::TypeAlias(_))
+        }) && let Some(contextual_typed_dict) = contextual_typed_dict
+        {
+            return Some(Type::TypedDict(contextual_typed_dict));
+        }
+
+        // Generic class constructors promote literal arguments when inferring their
+        // specialization. Do the same for this synthetic constructor callable.
+        let promoted_specialization = Specialization::new(
+            db,
+            specialization.generic_context(db),
+            specialization
+                .generic_context(db)
+                .variables(db)
+                .zip(specialization.types(db))
+                .map(|(bound_typevar, ty)| {
+                    let promoted = ty.promote(db);
+                    match bound_typevar.typevar(db).bound_or_constraints(db) {
+                        Some(TypeVarBoundOrConstraints::UpperBound(bound))
+                            if promoted.is_assignable_to(
+                                db,
+                                bound.apply_specialization(db, specialization),
+                            ) =>
+                        {
+                            promoted
+                        }
+                        Some(_) => *ty,
+                        None => promoted,
+                    }
+                })
+                .collect::<Box<[_]>>(),
+            specialization.materialization_kind(db),
+            None,
+        );
+        let promoted_typed_dict =
+            TypedDictType::new(class_literal.apply_specialization(db, |_| promoted_specialization));
+        let promoted_ty = Type::TypedDict(promoted_typed_dict);
+
+        // Satisfying the type-variable bounds is not sufficient when a variable also occurs
+        // contravariantly or the call has an expected type. Prefer promotion only when every
+        // argument and the call context remain valid.
+        if self.typed_dict_constructor_fields_are_valid(promoted_typed_dict, &fields)
+            && call_expression_tcx
+                .annotation
+                .is_none_or(|expected| promoted_ty.is_assignable_to(db, expected))
+        {
+            return Some(promoted_ty);
+        }
+
+        if call_expression_tcx
+            .annotation
+            .is_none_or(|expected| return_ty.is_assignable_to(db, expected))
+        {
+            return Some(return_ty);
+        }
+
+        // For invariant TypedDicts, an argument-only specialization such as `Box[Dog]` is not
+        // assignable to a wider `Box[Animal]` context. Use that contextual specialization when
+        // the exact constructor fields are valid for it.
+        contextual_typed_dict.map(Type::TypedDict)
+    }
+
+    /// Add fields from a flat dictionary literal if every key is statically known and unique.
+    fn collect_exact_typed_dict_constructor_fields(
+        &self,
+        dict: &ast::ExprDict,
+        fields: &mut FxIndexMap<Name, Type<'db>>,
+    ) -> Option<()> {
+        for item in &dict.items {
+            let key = item.key.as_ref()?;
+            let key = self
+                .infer_exact_typed_dict_constructor_expression(key)
+                .as_string_literal()?;
+            if fields
+                .insert(
+                    Name::new(key.value(self.db())),
+                    self.infer_exact_typed_dict_constructor_expression(&item.value),
+                )
+                .is_some()
+            {
+                return None;
+            }
+        }
+        Some(())
+    }
+
+    /// Infer an exact constructor expression without the unresolved `TypedDict` context used
+    /// during validation.
+    fn infer_exact_typed_dict_constructor_expression(&self, expression: &ast::Expr) -> Type<'db> {
+        self.speculate_without_diagnostics()
+            .infer_expression(expression, TypeContext::default())
+    }
+
+    /// Return whether every known constructor field is assignable to `typed_dict`.
+    ///
+    /// Unknown field names are left to ordinary constructor validation, which owns the diagnostic.
+    fn typed_dict_constructor_fields_are_valid(
+        &self,
+        typed_dict: TypedDictType<'db>,
+        fields: &FxIndexMap<Name, Type<'db>>,
+    ) -> bool {
+        fields.iter().all(|(name, actual)| {
+            typed_dict
+                .item(self.db(), name.as_str())
+                .is_none_or(|field| actual.is_assignable_to(self.db(), field.declared_ty))
+        })
+    }
+
+    /// Return the unique specialization of `class_literal` in an expected alias or union.
+    ///
+    /// Unrelated union arms are ignored, while multiple matching specializations are ambiguous.
+    /// Alias definitions are tracked independently from their type arguments so growing recursive
+    /// aliases terminate conservatively instead of exposing a partially inspected context.
+    ///
+    /// ```python
+    /// target: Box[int] | None = Box(value=1)  # Selects Box[int].
+    /// ```
+    pub(super) fn contextual_typed_dict_specialization(
+        &self,
+        expected: Type<'db>,
+        class_literal: ClassLiteral<'db>,
+    ) -> Option<TypedDictType<'db>> {
+        fn collect_matching_specializations<'db>(
+            db: &'db dyn crate::Db,
+            ty: Type<'db>,
+            class_literal: ClassLiteral<'db>,
+            matching: &mut FxHashSet<TypedDictType<'db>>,
+            visited: &mut FxHashSet<Type<'db>>,
+            active_aliases: &mut FxHashSet<Definition<'db>>,
+        ) -> bool {
+            if !visited.insert(ty) {
+                return true;
+            }
+
+            match ty {
+                Type::TypeAlias(alias) => {
+                    let definition = alias.definition(db);
+                    if !active_aliases.insert(definition) {
+                        return false;
+                    }
+                    let complete = collect_matching_specializations(
+                        db,
+                        alias.value_type(db),
+                        class_literal,
+                        matching,
+                        visited,
+                        active_aliases,
+                    );
+                    active_aliases.remove(&definition);
+                    complete
+                }
+                Type::Union(union) => union.elements(db).iter().all(|element| {
+                    collect_matching_specializations(
+                        db,
+                        *element,
+                        class_literal,
+                        matching,
+                        visited,
+                        active_aliases,
+                    )
+                }),
+                Type::TypedDict(typed_dict)
+                    if typed_dict
+                        .defining_class()
+                        .is_some_and(|class| class.class_literal(db) == class_literal) =>
+                {
+                    matching.insert(typed_dict);
+                    true
+                }
+                _ => true,
+            }
+        }
+
+        let mut matching = FxHashSet::default();
+        if !collect_matching_specializations(
+            self.db(),
+            expected,
+            class_literal,
+            &mut matching,
+            &mut FxHashSet::default(),
+            &mut FxHashSet::default(),
+        ) {
+            return None;
+        }
+
+        let mut matching = matching.into_iter();
+        let specialization = matching.next()?;
+        matching.next().is_none().then_some(specialization)
+    }
+
+    /// Return `true` if `ty` contains an opaque alias or a matching generic `TypedDict` with a
+    /// gradual type argument. If `class_literal` is `None`, any `TypedDict` class matches.
+    fn type_contains_unknown_generic_typed_dict(
+        &self,
+        ty: Type<'db>,
+        class_literal: Option<ClassLiteral<'db>>,
+    ) -> bool {
+        let db = self.db();
+        any_over_type(db, ty, false, |ty| {
+            if matches!(ty, Type::TypeAlias(_)) {
+                return true;
+            }
+            let Type::TypedDict(typed_dict) = ty else {
+                return false;
+            };
+            let Some(ClassType::Generic(alias)) = typed_dict.defining_class() else {
+                return false;
+            };
+            if class_literal.is_some_and(|class_literal| {
+                ClassLiteral::Static(alias.origin(db)) != class_literal
+            }) {
+                return false;
+            }
+            alias.specialization(db).types(db).iter().any(|argument| {
+                any_over_type(db, *argument, false, |nested| {
+                    nested.is_unknown() || matches!(nested, Type::TypeAlias(_))
+                })
+            })
+        })
+    }
+
     /// Infer a `TypedDict(name, fields)` call expression.
     ///
     /// This method *does not* call `infer_expression` on the object being called;

@@ -824,6 +824,480 @@ def _(source: MergeExtraSource):
     MergeTarget({**source, "ccc": 3})
 ```
 
+## Generic `TypedDict` constructor inference from direct arguments
+
+An unspecialized generic `TypedDict` constructor infers its type arguments from the provided field
+values. This works for both PEP 695 and legacy generic syntax:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Generic, TypeVar, TypedDict
+
+class Box[T](TypedDict):
+    value: T
+
+reveal_type(Box(value=1))  # revealed: Box[int]
+
+T = TypeVar("T")
+
+class LegacyBox(TypedDict, Generic[T]):
+    value: T
+
+reveal_type(LegacyBox(value=1))  # revealed: LegacyBox[int]
+```
+
+## Generic `TypedDict` constructor inference from inherited fields
+
+Inference through a field inherited from a generic `TypedDict` base uses the type variables from the
+class being constructed. The inferred specialization and constructor validation therefore use the
+same field type:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Generic, TypeVar, TypedDict
+
+class Base[T](TypedDict):
+    x: T
+
+class Child[T](Base[T]):
+    pass
+
+reveal_type(Child(x=1))  # revealed: Child[int]
+
+T = TypeVar("T")
+
+class LegacyBase(TypedDict, Generic[T]):
+    x: T
+
+class LegacyChild(LegacyBase[T], Generic[T]):
+    pass
+
+reveal_type(LegacyChild(x=1))  # revealed: LegacyChild[int]
+```
+
+## Generic `TypedDict` constructor inference from flat literals
+
+Flat literals provide exact evidence for each field. A direct keyword deterministically replaces a
+value from the positional mapping:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import TypedDict
+
+class Box[T](TypedDict):
+    value: T
+
+class Pair[T, U](TypedDict):
+    left: T
+    right: U
+
+class ListBox[T](TypedDict):
+    value: list[T]
+
+reveal_type(Box({"value": 1}))  # revealed: Box[int]
+reveal_type(Box(**{"value": 1}))  # revealed: Box[int]
+reveal_type(Pair(left=1, right="two"))  # revealed: Pair[int, str]
+reveal_type(Pair({"left": 1}, right="two"))  # revealed: Pair[int, str]
+reveal_type(Pair(**{"left": 1, "right": "two"}))  # revealed: Pair[int, str]
+reveal_type(Box({"value": 1}, value="two"))  # revealed: Box[str]
+reveal_type(ListBox(value=[1]))  # revealed: ListBox[int]
+reveal_type(ListBox({"value": [1]}))  # revealed: ListBox[int]
+reveal_type(ListBox(**{"value": [1]}))  # revealed: ListBox[int]
+```
+
+## Generic `TypedDict` constructor inference with duplicate keyword sources
+
+A direct keyword cannot replace the same key from another keyword source. The constructor remains
+gradual and ordinary constructor validation reports the duplicate:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import TypedDict
+
+class Box[T](TypedDict):
+    value: T
+
+# error: [parameter-already-assigned]
+reveal_type(Box(**{"value": 1}, value="two"))  # revealed: Box[Unknown]
+```
+
+## Generic `TypedDict` constructor inference with ambiguous overwrites
+
+An unpack that can overwrite a field does not use evidence from only one possible value. This
+includes both optional `TypedDict` fields and opaque mappings:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import NotRequired, TypedDict
+
+class Box[T](TypedDict):
+    value: T
+
+class MaybeString(TypedDict):
+    value: NotRequired[str]
+
+def optional_overwrite(maybe: MaybeString) -> None:
+    reveal_type(Box(**{"value": 1, **maybe}))  # revealed: Box[Unknown]
+
+def opaque_overwrite(values: dict[str, str]) -> None:
+    reveal_type(Box(**{"value": 1, **values}))  # revealed: Box[Unknown]
+```
+
+## Generic `TypedDict` constructor inference with recursive fields
+
+Recursive construction remains gradual until constraints can be propagated through an invariant
+nested `TypedDict`. It should not emit a diagnostic:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import NotRequired, TypedDict
+
+class Node[T](TypedDict):
+    value: NotRequired[T]
+    child: NotRequired["Node[T]"]
+
+reveal_type(Node(child=Node(value=1)))  # revealed: Node[Unknown]
+
+class UnionNode[T](TypedDict):
+    value: NotRequired[T]
+    child: NotRequired["UnionNode[T] | None"]
+
+reveal_type(UnionNode(child=UnionNode(value=1)))  # revealed: UnionNode[Unknown]
+
+class AliasNode[T](TypedDict):
+    value: NotRequired[T]
+    child: NotRequired["AliasNodeChild[T]"]
+
+type AliasNodeChild[T] = AliasNode[T] | None
+
+reveal_type(AliasNode(child=AliasNode(value=1)))  # revealed: AliasNode[Unknown]
+```
+
+## Generic `TypedDict` constructor inference from gradual nested evidence
+
+Gradual nested evidence keeps an enclosing constructor gradual, even when another field could
+otherwise constrain the same type variable. Gradual content inside another specialization argument
+has the same effect:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import TypedDict
+
+class Inner[T](TypedDict):
+    value: T
+
+class Outer[T](TypedDict):
+    inner: Inner[T]
+    marker: T
+
+reveal_type(Outer(inner=Inner(value=1), marker="x"))  # revealed: Outer[Unknown]
+
+def unknown(): ...
+def nested_gradual_argument() -> None:
+    inner = Inner(value=[unknown()])
+    reveal_type(inner)  # revealed: Inner[list[Unknown]]
+    reveal_type(Outer(inner=inner, marker=["x"]))  # revealed: Outer[Unknown]
+```
+
+## Generic `TypedDict` constructor inference from aliased evidence
+
+Aliases are opaque evidence in the initial inference model. This prevents aliases from hiding
+gradual nested evidence, but also conservatively keeps known aliases gradual:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import TypedDict
+
+class Inner[T](TypedDict):
+    value: T
+
+class Outer[T](TypedDict):
+    inner: Inner[T]
+    marker: T
+
+type InnerAlias[T] = Inner[T]
+
+def aliased_inner() -> InnerAlias:
+    raise NotImplementedError
+
+def specialized_inner() -> InnerAlias[int]:
+    raise NotImplementedError
+
+def aliased_gradual_argument() -> None:
+    reveal_type(Outer(inner=aliased_inner(), marker="x"))  # revealed: Outer[Unknown]
+    reveal_type(Outer(inner=specialized_inner(), marker=1))  # revealed: Outer[Unknown]
+```
+
+## Generic `TypedDict` constructor inference with growing recursive aliases
+
+Opaque aliases also make recursive constructor evidence terminate without expanding aliases whose
+specialization changes on every step:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import TypedDict
+
+type Growing[T] = T | Growing[list[T]]
+
+class Box[T](TypedDict):
+    value: T
+
+def construct(value: Growing[int]) -> None:
+    reveal_type(Box(value=value))  # revealed: Box[Unknown]
+```
+
+## Generic `TypedDict` constructor inference ignores unrelated protocol members
+
+Gradual `TypedDict` types in a protocol's members are not part of the structural type of a
+constructor argument and do not suppress inference for an unrelated field:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Protocol, TypedDict
+
+class Inner[T](TypedDict):
+    value: T
+
+class HasInner(Protocol):
+    inner: Inner  # error: [missing-type-argument]
+
+class Outer[T](TypedDict):
+    marker: T
+    payload: object
+
+def construct(payload: HasInner) -> None:
+    reveal_type(Outer(marker=1, payload=payload))  # revealed: Outer[int]
+```
+
+## Generic `TypedDict` constructor inference ignores unrelated contextual TypedDicts
+
+An unrelated gradual `TypedDict` in another overload union arm does not suppress exact inference for
+the class being constructed:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import overload, TypedDict
+
+class Box[T](TypedDict):
+    value: T
+
+class Other[T](TypedDict):
+    other: T
+
+@overload
+def select(value: Box[int] | Other) -> int: ...  # error: [missing-type-argument]
+@overload
+def select(value: Box[str]) -> str: ...
+def select(value: object) -> object: ...
+
+reveal_type(select(Box(value=1)))  # revealed: int
+```
+
+## Generic `TypedDict` constructor inference with literal promotion
+
+Literal promotion preserves declared upper bounds. When promotion would violate a bound, inference
+keeps the bound-aware literal specialization. Broad upper bounds permit promotion:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Callable, Literal, TypedDict
+
+class Bound[T: Literal[1]](TypedDict):
+    value: T
+
+reveal_type(Bound(value=1))  # revealed: Bound[Literal[1]]
+
+def accepts_bound(value: Bound[Literal[1]]) -> None: ...
+
+accepts_bound(Bound(value=1))
+
+class IntBound[T: int](TypedDict):
+    value: T
+
+reveal_type(IntBound(value=1))  # revealed: IntBound[int]
+
+def accepts_int_bound(value: IntBound[int]) -> None: ...
+
+accepts_int_bound(IntBound(value=1))
+
+class Both[T](TypedDict):
+    value: T
+    callback: Callable[[T], None]
+
+def accepts_one(value: Literal[1]) -> None: ...
+
+both = Both(value=1, callback=accepts_one)
+reveal_type(both)  # revealed: Both[Literal[1]]
+both["callback"](2)  # error: [invalid-argument-type]
+
+class ContextualBox[T](TypedDict):
+    value: T
+
+target: ContextualBox[Literal[1]] = ContextualBox(value=1)
+```
+
+## Generic `TypedDict` constructor inference with wider context
+
+A wider expected specialization can provide the result when each constructor value is valid for that
+specialization:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import TypedDict
+
+class Animal: ...
+class Dog(Animal): ...
+
+class Box[T](TypedDict):
+    value: T
+
+target: Box[Animal] = Box(value=Dog())
+
+def consume(value: Box[Animal]) -> None: ...
+
+consume(Box(value=Dog()))
+```
+
+## Generic `TypedDict` constructor inference validates contextual fields
+
+After selecting a specialization, constructor fields are inferred and validated under that
+specialization. This gives a lambda parameter the inferred field context before checking its body:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Callable, TypedDict
+
+class Box[T](TypedDict):
+    value: T
+    callback: Callable[[T], int]
+
+box = Box(
+    value=1,
+    callback=lambda x: x.upper(),  # error: [unresolved-attribute]
+)
+reveal_type(box)  # revealed: Box[int]
+```
+
+## Generic `TypedDict` constructor inference prefers precise callable context
+
+A context-free lambda has gradual parameter and return types. When the expected `TypedDict`
+specialization provides a precise callable type, constructor validation uses that context instead of
+accepting the gradual candidate through `Unknown`:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Callable, TypedDict
+
+class Box[T](TypedDict):
+    value: T
+
+target: Box[Callable[[int], int]] = Box(
+    value=lambda x: x.upper(),  # error: [unresolved-attribute]
+)
+```
+
+## Generic `TypedDict` constructor inference from union context
+
+An expected union supplies a precise constructor specialization when exactly one arm is the
+`TypedDict` being constructed. Unrelated arms such as `None` do not prevent the callable field from
+providing context to a lambda:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Callable, TypedDict
+
+class Box[T](TypedDict):
+    value: T
+
+target: Box[Callable[[int], int]] | None = Box(
+    value=lambda x: x.upper(),  # error: [unresolved-attribute]
+)
+```
+
+## Generic `TypedDict` constructor inference with type parameter defaults
+
+The initial inference model does not override a type parameter default. The constructor retains its
+default specialization and validates its arguments against that specialization:
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+from typing import TypedDict
+
+class Defaulted[T = str](TypedDict):
+    value: T
+
+# error: [invalid-argument-type]
+reveal_type(Defaulted(value=1))  # revealed: Defaulted[str]
+```
+
 ## Built-in `dict` constructors
 
 ```py

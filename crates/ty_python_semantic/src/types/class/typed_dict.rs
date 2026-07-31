@@ -194,6 +194,39 @@ fn synthesize_typed_dict_init<'db>(
     ))
 }
 
+/// Synthesize a permissive keyword-only signature for inferring the specialization of a generic
+/// `TypedDict` constructor.
+///
+/// Every declared field is optional because constructor validation and diagnostics are handled
+/// separately. Unlike the IDE-facing `__init__` signature, this signature can also represent field
+/// names that are not valid Python identifiers; those fields can still be provided through a
+/// positional mapping or `**kwargs`.
+pub(in crate::types) fn synthesize_typed_dict_constructor_for_inference<'db>(
+    db: &'db dyn Db,
+    typed_dict: TypedDictType<'db>,
+    generic_context: GenericContext<'db>,
+) -> Type<'db> {
+    let instance_ty = Type::TypedDict(typed_dict);
+    let field_params = typed_dict.items(db).iter().map(|(name, field)| {
+        Parameter::keyword_only(name.clone())
+            .with_annotated_type(field.declared_ty)
+            .with_default_type(field.declared_ty)
+            .with_definition(field.first_declaration())
+    });
+    let signature = Signature::new_generic(
+        Some(generic_context),
+        Parameters::standard(field_params),
+        instance_ty,
+    );
+
+    Type::Callable(CallableType::new(
+        db,
+        CallableSignature::single(signature),
+        CallableTypeKind::FunctionLike,
+        CallableFunctionProvenance::None,
+    ))
+}
+
 /// Synthesize the `__getitem__` method for a `TypedDict`.
 fn synthesize_typed_dict_getitem<'db>(
     db: &'db dyn Db,
