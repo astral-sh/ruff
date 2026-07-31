@@ -114,10 +114,12 @@ use crate::types::{
     IntersectionBuilder, IntersectionType, KnownClass, KnownInstanceType, KnownUnion,
     LiteralValueType, LiteralValueTypeKind, MemberLookupPolicy, ParamSpecAttrKind, Parameter,
     Parameters, ProgramEnvironment, SentinelInstance, Signature, SpecialFormType, SubclassOfType,
-    Type, TypeAliasType, TypeAndQualifiers, TypeContext, TypeQualifiers, TypeVarBoundOrConstraints,
-    TypeVarKind, TypeVarVariance, TypedDictModule, UnionAccumulator, UnionBuilder, UnionType,
-    any_over_type, binding_type, extract_fixed_length_iterable_element_types,
-    infer_complete_scope_types, infer_scope_types, is_discarded_dict_key_assignment, todo_type,
+    Type, TypeAliasType,
+    TypeAndQualifiers, TypeContext, TypeQualifiers, TypeVarBoundOrConstraints, TypeVarKind,
+    TypeVarVariance, TypedDictModule, TypedDictType, UnionAccumulator, UnionBuilder, UnionType,
+    any_over_type, binding_type, definition_expression_type,
+    extract_fixed_length_iterable_element_types, infer_complete_scope_types, infer_scope_types,
+    is_discarded_dict_key_assignment, todo_type,
 };
 use crate::{AnalysisSettings, Db, FxIndexSet, FxOrderSet};
 use ty_python_core::ast_ids::ScopedUseId;
@@ -136,8 +138,8 @@ use ty_python_core::predicate::PatternPredicate;
 use ty_python_core::scope::{FileScopeId, NodeWithScopeKind, NodeWithScopeRef, ScopeId, ScopeKind};
 use ty_python_core::symbol::{ScopedSymbolId, Symbol};
 use ty_python_core::{
-    ApplicableConstraints, EnclosingSnapshotResult, EvaluationMode, ProgramFile, SemanticIndex,
-    Truthiness, unpack::UnpackPosition,
+    ApplicableConstraints, BindingWithConstraintsIterator, EnclosingSnapshotResult, EvaluationMode,
+    ProgramFile, SemanticIndex, Truthiness, unpack::UnpackPosition,
 };
 use ty_python_core::{ExpressionNodeKey, Statement};
 
@@ -10260,6 +10262,144 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.infer_attribute_load_impl(attribute, value_type)
     }
 
+    /// Returns the value stored by an attribute assignment before attribute-read narrowing binds
+    /// descriptors.
+    fn attribute_assignment_value_type(&self, definition: Definition<'db>) -> Option<Type<'db>> {
+        let db = self.db();
+        let value = match definition.kind(db) {
+            DefinitionKind::Assignment(assignment) => {
+                if let Some(unpack) = assignment.unpack() {
+                    return Some(
+                        infer_unpack_types(db, unpack)
+                            .expression_type(assignment.target(self.module())),
+                    );
+                }
+                assignment.value(self.module())
+            }
+            DefinitionKind::AnnotatedAssignment(assignment) => assignment.value(self.module())?,
+            DefinitionKind::NamedExpression(named) => &named.node(self.module()).value,
+            _ => return None,
+        };
+        Some(definition_expression_type(db, definition, value))
+    }
+
+    fn attribute_assignment_value_type_from_bindings(
+        &self,
+        bindings: BindingWithConstraintsIterator<'_, 'db>,
+    ) -> Option<Type<'db>> {
+        let db = self.db();
+        let reachability_constraints = bindings.reachability_constraints();
+        let predicates = bindings.predicates();
+        let mut union = UnionBuilder::new(db);
+
+        for binding in bindings {
+            let static_reachability = evaluate_reachability_with_cache(
+                db,
+                Some(self.reachability_cache()),
+                reachability_constraints,
+                predicates,
+                binding.reachability_constraint,
+            );
+            if static_reachability.is_always_false() {
+                continue;
+            }
+
+            let DefinitionState::Defined(definition) = binding.binding else {
+                continue;
+            };
+            union = union.add(self.attribute_assignment_value_type(definition)?);
+        }
+
+        (!union.is_empty()).then(|| union.build())
+    }
+
+    fn attribute_assignment_value_type_at_use(
+        &self,
+        place: PlaceExprRef<'_>,
+        expression: ast::ExprRef<'_>,
+    ) -> Option<Type<'db>> {
+        // `Provenance` deliberately discards the individual definitions when several bindings
+        // reach a place. Follow the same local, enclosing, and global binding sources as place
+        // lookup so that descriptor binding can start from their stored value types.
+        let db = self.db();
+        let file_scope_id = self.scope().file_scope_id(db);
+        let use_def = self.index.use_def_map(file_scope_id);
+        let bindings = if self.is_deferred() {
+            let place_id = self.index.place_table(file_scope_id).place_id(place)?;
+            use_def.reachable_bindings(place_id)
+        } else {
+            use_def.bindings_at_use(expression.scoped_use_id(db, self.file()))
+        };
+        if bindings
+            .clone()
+            .any(|binding| matches!(binding.binding, DefinitionState::Defined(_)))
+        {
+            return self.attribute_assignment_value_type_from_bindings(bindings);
+        }
+
+        for (enclosing_scope_file_id, _) in self.index.ancestor_scopes(file_scope_id).skip(1) {
+            if enclosing_scope_file_id.is_global() {
+                break;
+            }
+            if !self.is_deferred()
+                && let EnclosingSnapshotResult::FoundBindings(bindings) = self
+                    .index
+                    .enclosing_snapshot(enclosing_scope_file_id, place, file_scope_id)
+                && bindings
+                    .clone()
+                    .any(|binding| matches!(binding.binding, DefinitionState::Defined(_)))
+            {
+                return self.attribute_assignment_value_type_from_bindings(bindings);
+            }
+
+            let enclosing_scope = self.index.scope(enclosing_scope_file_id);
+            let is_immediately_enclosing_scope = self.scope().is_annotation(db)
+                && self
+                    .scope()
+                    .scope(db)
+                    .parent()
+                    .is_some_and(|parent| parent == enclosing_scope_file_id);
+            if !enclosing_scope.kind().is_function_like() && !is_immediately_enclosing_scope {
+                continue;
+            }
+
+            let Some(enclosing_place_id) = self
+                .index
+                .place_table(enclosing_scope_file_id)
+                .place_id(place)
+            else {
+                continue;
+            };
+            let bindings = self
+                .index
+                .use_def_map(enclosing_scope_file_id)
+                .reachable_bindings(enclosing_place_id);
+            if let Some(ty) = self.attribute_assignment_value_type_from_bindings(bindings) {
+                return Some(ty);
+            }
+        }
+
+        if !self.is_deferred()
+            && !file_scope_id.is_global()
+            && let EnclosingSnapshotResult::FoundBindings(bindings) =
+                self.index
+                    .enclosing_snapshot(FileScopeId::global(), place, file_scope_id)
+            && bindings
+                .clone()
+                .any(|binding| matches!(binding.binding, DefinitionState::Defined(_)))
+        {
+            return self.attribute_assignment_value_type_from_bindings(bindings);
+        }
+
+        let global_place_table = self.index.place_table(FileScopeId::global());
+        let global_place_id = global_place_table.place_id(place)?;
+        self.attribute_assignment_value_type_from_bindings(
+            self.index
+                .use_def_map(FileScopeId::global())
+                .reachable_bindings(global_place_id),
+        )
+    }
+
     /// Infer the type of a [`ast::ExprAttribute`] expression, assuming a load context.
     fn infer_attribute_load_impl(
         &mut self,
@@ -10302,6 +10442,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         let mut assigned_type = None;
+        let mut assigned_value_type = None;
         if let Some(place_expr) = PlaceExpr::try_from_expr(attribute) {
             let (resolved, keys) = self.infer_place_load(
                 PlaceExprRef::from(&place_expr),
@@ -10311,13 +10452,38 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             if let Place::Defined(DefinedPlace {
                 ty,
                 definedness: Definedness::AlwaysDefined,
+                provenance,
                 ..
             }) = resolved.place
             {
                 assigned_type = Some(ty);
+                if matches!(
+                    value_type,
+                    Type::ClassLiteral(_) | Type::GenericAlias(_) | Type::SubclassOf(_)
+                ) {
+                    assigned_value_type = Some(
+                        provenance
+                            .definition()
+                            .and_then(|definition| self.attribute_assignment_value_type(definition))
+                            .or_else(|| {
+                                self.attribute_assignment_value_type_at_use(
+                                    PlaceExprRef::from(&place_expr),
+                                    ast::ExprRef::Attribute(attribute),
+                                )
+                            })
+                            .unwrap_or(ty),
+                    );
+                }
             }
         }
-        let fallback = value_type.member_with_diagnostics(db, env, &attr.id);
+        let fallback = if let Some(ty) = assigned_value_type
+            && let Some(member) = value_type.member_with_class_object_assignment(db, &attr.id, ty)
+        {
+            assigned_type = None;
+            member
+        } else {
+            value_type.member_with_diagnostics(db, &attr.id)
+        };
         if attribute.ctx == ExprContext::Load
             && let Some(failure) = fallback
                 .descriptor_get_error

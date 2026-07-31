@@ -683,6 +683,25 @@ impl<'db> From<Place<'db>> for MemberLookupResult<'db> {
     }
 }
 
+fn promote_inferred_attribute_class_literals<'db>(
+    db: &'db dyn Db,
+    result: MemberLookupResult<'db>,
+) -> MemberLookupResult<'db> {
+    let should_promote = matches!(
+        result.member.place,
+        Place::Defined(DefinedPlace {
+            origin: TypeOrigin::Inferred,
+            ..
+        })
+    ) && !result.member.qualifiers.contains(TypeQualifiers::FINAL);
+
+    if should_promote {
+        result.map_type(|ty| ty.promote_class_literals(db))
+    } else {
+        result
+    }
+}
+
 /// This enum is used to control the behavior of the descriptor protocol implementation.
 /// When invoked on a class object, the fallback type (a class attribute) can shadow a
 /// non-data descriptor of the meta-type (the class's metaclass). However, this is not
@@ -4268,6 +4287,95 @@ impl<'db> Type<'db> {
         }
     }
 
+    fn class_object_member_lookup(
+        db: &'db dyn Db,
+        key: MemberLookupKey<'db>,
+        receiver: Type<'db>,
+        class_attr_override: Option<PlaceAndQualifiers<'db>>,
+    ) -> MemberLookupResult<'db> {
+        let this = key.ty(db);
+        let name = key.name(db);
+        let name_str = name.as_str();
+        let policy = key.policy(db);
+
+        if class_attr_override.is_none() {
+            let enum_class = match this {
+                Type::ClassLiteral(literal) => literal.into_enum_class(db),
+                Type::SubclassOf(subclass_of) => subclass_of
+                    .subclass_of()
+                    .into_class(db)
+                    .and_then(|class| class.class_literal(db).into_enum_class(db)),
+                _ => None,
+            };
+            if let Some(enum_class) = enum_class
+                && let Some(resolved_name) = enum_class.resolve_member(db, name)
+            {
+                return Place::bound(Type::enum_literal(EnumLiteralType::new(
+                    db,
+                    enum_class,
+                    resolved_name,
+                )))
+                .into();
+            }
+        }
+
+        let class_attr_plain =
+            class_attr_override.unwrap_or_else(|| this.class_object_member(db, name_str, policy));
+
+        let self_instance = receiver
+            .to_instance_approximation(db)
+            .expect("The receiver for a class-object lookup should always be instantiable");
+        let class_attr_plain =
+            class_attr_plain.map_type(|ty| ty.bind_self_typevars(db, self_instance));
+
+        let (class_attr_fallback, _, class_attr_error) =
+            Type::try_call_dunder_get_on_attribute(db, class_attr_plain, None, receiver);
+
+        let result = Type::invoke_descriptor_protocol(
+            db,
+            key,
+            receiver,
+            MemberLookupResult::new(class_attr_fallback, class_attr_error),
+            InstanceFallbackShadowsNonDataDescriptor::Yes,
+        );
+
+        // A class is an instance of its metaclass. If attribute lookup on the class fails, Python
+        // falls back to `type(cls).__getattr__` and `type(cls).__getattribute__` on the metaclass,
+        // analogous to how instance attribute access falls back to `__getattr__`/`__getattribute__`
+        // on the class. `try_call_dunder` adds `NO_INSTANCE_FALLBACK`, which causes the lookup to
+        // hit the catch-all that only checks the meta-type (the metaclass).
+        let result = MemberLookupResult::new(
+            this.fallback_to_getattr(db, name, result.member, policy),
+            result.descriptor_get_error,
+        );
+        // Unlike a specific class literal, `type[C]` can represent any subclass of `C`, unless a
+        // `TypeVar` upper bound normalizes to a final class.
+        let result = if let Type::SubclassOf(subclass_of) = this
+            && subclass_of.exact_typevar_upper_bound(db).is_none()
+        {
+            promote_inferred_attribute_class_literals(db, result)
+        } else {
+            result
+        };
+
+        // `type[Any]`/`type[Unknown]` are gradual forms with an unknown metaclass (which is at least
+        // `type`). Attributes resolved via `type`'s descriptors are intersected with the dynamic
+        // type to reflect uncertainty about whether the unknown metaclass overrides them.
+        if let Type::SubclassOf(subclass_of) = this
+            && let SubclassOfInner::Dynamic(dynamic) = subclass_of.subclass_of()
+        {
+            result.map_type(|ty| {
+                if ty.is_dynamic() {
+                    ty
+                } else {
+                    IntersectionType::from_two_elements(db, ty, Type::Dynamic(dynamic))
+                }
+            })
+        } else {
+            result
+        }
+    }
+
     /// Access an attribute of this type, potentially invoking the descriptor protocol.
     /// Corresponds to `getattr(<object of type 'self'>, name)`.
     ///
@@ -4297,6 +4405,33 @@ impl<'db> Type<'db> {
             MemberLookupPolicy::default(),
             None,
         )
+    }
+
+    /// Performs class-object member lookup using a definitely assigned class attribute.
+    ///
+    /// The assigned value replaces the previous entry in the class namespace, but a data
+    /// descriptor on the metaclass still takes precedence. If the assigned value is itself a
+    /// descriptor, it is bound as a class attribute before being returned.
+    pub(crate) fn member_with_class_object_assignment(
+        self,
+        db: &'db dyn Db,
+        name: &str,
+        assigned_type: Type<'db>,
+    ) -> Option<MemberLookupResult<'db>> {
+        if !matches!(
+            self,
+            Type::ClassLiteral(_) | Type::GenericAlias(_) | Type::SubclassOf(_)
+        ) {
+            return None;
+        }
+
+        let key = MemberLookupKey::new(db, self, name, MemberLookupPolicy::default());
+        Some(Self::class_object_member_lookup(
+            db,
+            key,
+            self,
+            Some(Place::bound(assigned_type).into()),
+        ))
     }
 
     /// Similar to [`Type::member`], but allows the caller to specify what policy should be used
@@ -4361,26 +4496,6 @@ impl<'db> Type<'db> {
             key: MemberLookupKey<'db>,
             receiver: Option<Type<'db>>,
         ) -> MemberLookupResult<'db> {
-            fn promote_inferred_attribute_class_literals<'db>(
-                db: &'db dyn Db,
-                env: &ProgramEnvironment<'db>,
-                result: MemberLookupResult<'db>,
-            ) -> MemberLookupResult<'db> {
-                let should_promote = matches!(
-                    result.member.place,
-                    Place::Defined(DefinedPlace {
-                        origin: TypeOrigin::Inferred,
-                        ..
-                    })
-                ) && !result.member.qualifiers.contains(TypeQualifiers::FINAL);
-
-                if should_promote {
-                    result.map_type(|ty| ty.promote_class_literals(db, env))
-                } else {
-                    result
-                }
-            }
-
             fn instance_like_member_lookup<'db>(
                 db: &'db dyn Db,
                 env: &ProgramEnvironment<'db>,
@@ -4930,93 +5045,7 @@ impl<'db> Type<'db> {
                     // A class-object lookup can originate from a TypeVar bound such as `type[A]`.
                     // Retain that TypeVar as the receiver so `Self` binds to `T'instance`, not `A`.
                     let receiver = receiver.unwrap_or(this);
-                    let enum_class = match this {
-                        Type::ClassLiteral(literal) => literal.into_enum_class(db),
-                        Type::SubclassOf(subclass_of) => subclass_of
-                            .subclass_of()
-                            .into_class(db, env)
-                            .and_then(|class| class.class_literal(db).into_enum_class(db)),
-                        _ => None,
-                    };
-                    if let Some(enum_class) = enum_class
-                        && let Some(resolved_name) = enum_class.resolve_member(db, name)
-                    {
-                        return Place::bound(Type::enum_literal(EnumLiteralType::new(
-                            db,
-                            enum_class,
-                            resolved_name,
-                        )))
-                        .into();
-                    }
-
-                    let class_attr_plain = this.class_object_member(db, env, name_str, policy);
-
-                    let self_instance = receiver.to_instance_approximation(db, env).expect(
-                        "The receiver for a class-object lookup should always be instantiable",
-                    );
-                    let class_attr_plain = class_attr_plain
-                        .map_type(|ty| ty.bind_self_typevars(db, env, self_instance));
-
-                    let (class_attr_fallback, _, class_attr_error) =
-                        Type::try_call_dunder_get_on_attribute(
-                            db,
-                            env,
-                            class_attr_plain,
-                            None,
-                            receiver,
-                        );
-
-                    let result = Type::invoke_descriptor_protocol(
-                        db,
-                        env,
-                        key,
-                        receiver,
-                        MemberLookupResult::new(class_attr_fallback, class_attr_error),
-                        InstanceFallbackShadowsNonDataDescriptor::Yes,
-                    );
-
-                    // A class is an instance of its metaclass. If attribute lookup on the class
-                    // fails, Python falls back to `type(cls).__getattr__` and
-                    // `type(cls).__getattribute__` on the metaclass, analogous to how instance
-                    // attribute access falls back to `__getattr__`/`__getattribute__` on the
-                    // class. `try_call_dunder` adds `NO_INSTANCE_FALLBACK`, which causes the
-                    // lookup to hit the catch-all that only checks the meta-type (the metaclass).
-                    let result = MemberLookupResult::new(
-                        this.fallback_to_getattr(db, env, name, result.member, policy),
-                        result.descriptor_get_error,
-                    );
-                    // Unlike a specific class literal, `type[C]` can represent any subclass of
-                    // `C`, unless a `TypeVar` upper bound normalizes to a final class.
-                    let result = if let Type::SubclassOf(subclass_of) = this
-                        && subclass_of.exact_typevar_upper_bound(db, env).is_none()
-                    {
-                        promote_inferred_attribute_class_literals(db, env, result)
-                    } else {
-                        result
-                    };
-
-                    // `type[Any]`/`type[Unknown]` are gradual forms with an unknown metaclass
-                    // (which is at least `type`). Attributes resolved via `type`'s descriptors
-                    // are intersected with the dynamic type to reflect uncertainty about
-                    // whether the unknown metaclass overrides them.
-                    if let Type::SubclassOf(subclass_of) = this
-                        && let SubclassOfInner::Dynamic(dynamic) = subclass_of.subclass_of()
-                    {
-                        result.map_type(|ty| {
-                            if ty.is_dynamic() {
-                                ty
-                            } else {
-                                IntersectionType::from_two_elements(
-                                    db,
-                                    env,
-                                    ty,
-                                    Type::Dynamic(dynamic),
-                                )
-                            }
-                        })
-                    } else {
-                        result
-                    }
+                    Type::class_object_member_lookup(db, key, receiver, None)
                 }
 
                 // Unlike other objects, `super` has a unique member lookup behavior.

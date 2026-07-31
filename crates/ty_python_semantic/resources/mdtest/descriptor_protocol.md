@@ -1077,6 +1077,108 @@ class C:
         self.descriptor
 ```
 
+### A class-object assignment replaces a descriptor in the class namespace
+
+Assigning an attribute through a class object replaces the entry in that class's namespace, even
+when the previous value was a data descriptor. The replaced descriptor is not called on subsequent
+accesses.
+
+```py
+from typing import Literal, Union
+
+class Descriptor:
+    def __get__(self) -> str:
+        return ""
+
+    def __set__(self, instance: object, value: int) -> None:
+        pass
+
+class C:
+    descriptor: Union[Descriptor, int] = Descriptor()
+
+C.descriptor = 1
+reveal_type(C.descriptor)  # revealed: Literal[1]
+```
+
+Assignments on every branch also replace the old descriptor, including when the result is read from
+a nested scope.
+
+```py
+def replace_conditionally(flag: bool) -> None:
+    if flag:
+        C.descriptor = 1
+    else:
+        C.descriptor = 2
+
+    def read_from_nested_scope() -> None:
+        reveal_type(C.descriptor)  # revealed: Literal[1, 2]
+```
+
+### A descriptor assigned through a class object is bound on access
+
+The new class attribute participates in the descriptor protocol. An invalid `__get__` method on the
+assigned value is therefore reported.
+
+```py
+from typing import Union
+
+class Descriptor:
+    def __get__(self) -> bytes:
+        return b""
+
+class C:
+    descriptor: Union[Descriptor, int] = 1
+
+C.descriptor = Descriptor()
+
+# error: [invalid-attribute-access] "Invalid access to descriptor attribute `descriptor` on type `<class 'C'>`"
+reveal_type(C.descriptor)  # revealed: bytes | int
+```
+
+When assignments from multiple branches meet, lookup binds every possible stored value. The same
+applies when the result is captured by a nested scope.
+
+```py
+def assign_conditionally(flag: bool) -> None:
+    if flag:
+        C.descriptor = Descriptor()
+    else:
+        C.descriptor = 1
+
+    # error: [invalid-attribute-access] "Invalid access to descriptor attribute `descriptor` on type `<class 'C'>`"
+    reveal_type(C.descriptor)  # revealed: bytes | int
+
+    def read_from_nested_scope() -> None:
+        # error: [invalid-attribute-access] "Invalid access to descriptor attribute `descriptor` on type `<class 'C'>`"
+        reveal_type(C.descriptor)  # revealed: bytes | Literal[1]
+```
+
+### A metaclass data descriptor intercepts class-object assignment
+
+A data descriptor on the metaclass takes precedence over the assigned class attribute. Assigning
+through the class object invokes `__set__`, so the metaclass descriptor still handles subsequent
+accesses.
+
+```py
+class Descriptor:
+    def __get__(self) -> str:
+        return ""
+
+    def __set__(self, instance: object, value: int) -> None:
+        pass
+
+class Meta(type):
+    descriptor = Descriptor()
+
+class C(metaclass=Meta):
+    descriptor = 0
+
+C.descriptor = 1
+
+# error: [invalid-attribute-access] "Invalid access to descriptor attribute `descriptor` on type `<class 'C'>`"
+reveal_type(C.descriptor)  # revealed: str
+```
+
 ### A shadowed metaclass descriptor with an incorrect `__get__` signature
 
 A class attribute takes precedence over a non-data descriptor of the same name on the metaclass, so
