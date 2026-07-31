@@ -1,12 +1,11 @@
 use compact_str::CompactString;
-use ruff_db::files::{File, FilePath};
+use ruff_db::files::File;
 use ruff_db::parsed::{parsed_module, parsed_string_annotation};
-use ruff_db::source::{line_index, source_text};
+use ruff_db::source::source_text;
 use ruff_python_ast::find_node::CoveringNode;
 use ruff_python_ast::{self as ast, ExprStringLiteral, ModExpression};
 use ruff_python_ast::{Expr, ExprRef, name::Name};
 use ruff_python_parser::Parsed;
-use ruff_source_file::LineIndex;
 use ruff_text_size::Ranged;
 use rustc_hash::FxHashMap;
 use ty_module_resolver::{
@@ -61,14 +60,6 @@ impl<'db> SemanticModel<'db> {
 
     pub fn file(&self) -> File {
         self.file
-    }
-
-    pub fn file_path(&self) -> &FilePath {
-        self.file.path(self.db)
-    }
-
-    pub fn line_index(&self) -> LineIndex {
-        line_index(self.db, self.file)
     }
 
     /// Returns a map from symbol name to that symbol's

@@ -4,9 +4,6 @@ use std::borrow::Cow;
 use std::cell::Cell;
 use std::marker::PhantomData;
 
-use ruff_python_ast::name::Name;
-use ty_module_resolver::{ModuleName, file_to_module};
-
 use super::protocol_class::{ProtocolInterface, ProtocolInterfaceView};
 use super::{
     BoundTypeVarIdentity, BoundTypeVarInstance, ClassType, DivergentType, KnownClass,
@@ -207,32 +204,6 @@ impl<'db> NominalInstanceType<'db> {
             NominalInstanceInner::NonTuple(class) => class.inherits_from_explicit_any(),
             _ => false,
         }
-    }
-
-    /// Returns the name of the class this is an instance of.
-    ///
-    /// For example, for an instance of `builtins.str`, this returns `"str"`.
-    ///
-    /// As of 2026-02-16, this method is not used in any crates in the Ruff
-    /// repo, but is exposed as a public API for external users of
-    /// `ty_python_semantic`.
-    pub fn class_name(&self, db: &'db dyn Db) -> &'db Name {
-        self.class(db).name(db)
-    }
-
-    /// Returns the fully qualified module name of the module in which the class
-    /// is defined, if it can be resolved.
-    ///
-    /// For example, for an instance of `pathlib.Path`, this returns
-    /// `Some("pathlib")`. Returns `None` if the class's file cannot be resolved
-    /// to a known module (e.g. for classes defined in scripts or notebooks).
-    ///
-    /// As of 2026-02-16, this method is not used in any crates in the Ruff
-    /// repo, but is exposed as a public API for external users of
-    /// `ty_python_semantic`.
-    pub fn class_module_name(&self, db: &'db dyn Db) -> Option<&'db ModuleName> {
-        let file = self.class(db).class_literal(db).file(db);
-        file_to_module(db, file).map(|module| module.name(db))
     }
 
     pub(super) fn class(&self, db: &'db dyn Db) -> ClassType<'db> {
