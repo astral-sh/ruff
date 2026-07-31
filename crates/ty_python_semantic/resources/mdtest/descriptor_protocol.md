@@ -1359,11 +1359,11 @@ def upper_bounded_data_descriptor(descriptor: BoundDataT) -> None:
     C.value
 ```
 
-### Possibly undefined `super` members do not fail definitely
+### `super` lookups do not report descriptor-call diagnostics
 
-When a malformed descriptor is only possibly defined on a base class, the absent path raises an
-attribute error without invoking `__get__`. The descriptor failure is therefore not definite,
-although the ordinary possibly-missing diagnostic still applies.
+Ty preserves ordinary `super` member inference, including possibly-missing diagnostics, but does not
+propagate error-level descriptor-call diagnostics through `super`. This avoids introducing
+diagnostic-only state into the semantic `super` type.
 
 ```py
 def _(flag: bool):
@@ -1385,15 +1385,13 @@ def _(flag: bool):
 
     class DefiniteDerived(DefiniteBase):
         def read_definite(self) -> None:
-            # error: [invalid-attribute-access] "Invalid access to descriptor attribute `value` on type `<super: <class 'DefiniteDerived'>, Self@read_definite>`"
             super().value
 ```
 
 ### Descriptor diagnostics for constrained `super` receivers are suppressed
 
-Ordinary `super` inference retains the constrained owner, but descriptor validation cannot preserve
-each constraint separately without changing the semantic `super` type. The error-level diagnostic is
-therefore suppressed even when every constraint would invoke a malformed descriptor.
+Ordinary `super` inference retains the constrained owner, but descriptor errors are not propagated
+even when every constraint would invoke a malformed descriptor.
 
 ```py
 from __future__ import annotations
@@ -1458,11 +1456,10 @@ def literal_constraints(owner: LiteralT) -> None:
     super(LiteralPivot, owner).value
 ```
 
-### Descriptor validation does not affect `super` type equivalence
+### Constrained `super` equivalence is independent of constraint order
 
-Equivalent ordinary `super` types collapse even when their TypeVar constraints would require
-different descriptor-validation owners. Reversing the constraints therefore does not duplicate the
-inferred type or change diagnostic behavior.
+Equivalent ordinary `super` types collapse without retaining descriptor-validation state. Reversing
+the constraints therefore does not duplicate the inferred type.
 
 ```py
 from __future__ import annotations
@@ -1508,10 +1505,10 @@ def reversed_literal_constraints(owner: ReversedLiteralT) -> None:
     super(PartialLiteralPivot, owner).value
 ```
 
-### Union-bounded `super` descriptor diagnostics are suppressed
+### Descriptor suppression is independent of `super` union order
 
-A `super` owner with a union-like upper bound can also require per-alternative descriptor
-validation. The diagnostic is suppressed while ordinary `super` inference remains unchanged.
+Descriptor diagnostics remain suppressed when a conditional expression combines a concrete `super`
+owner with a constrained owner. Reversing the operands does not change the result.
 
 ```py
 from __future__ import annotations
@@ -1519,31 +1516,70 @@ from __future__ import annotations
 from enum import Enum
 from typing import Literal, TypeVar
 
-class PartialLiteralDescriptor:
+class Descriptor:
     def __get__(
         self,
-        instance: Literal[PartialMember.B],
+        instance: Literal[Member.B],
         owner: type | None = None,
     ) -> int:
         return 1
 
-class PartialLiteralBase:
-    value = PartialLiteralDescriptor()
+class Base:
+    value = Descriptor()
 
-class PartialLiteralPivot(PartialLiteralBase): ...
+class Pivot(Base): ...
 
-class PartialMember(PartialLiteralPivot, Enum):
+class Member(Pivot, Enum):
     A = 1
     B = 2
-    C = 3
 
-BoundLiteralT = TypeVar(
-    "BoundLiteralT",
-    bound=Literal[PartialMember.A, PartialMember.B],
-)
+T = TypeVar("T", Literal[Member.A], Literal[Member.B])
 
-def union_upper_bound(owner: BoundLiteralT) -> None:
-    super(PartialLiteralPivot, owner).value
+def concrete_first(
+    flag: bool,
+    concrete: Literal[Member.A],
+    constrained: T,
+) -> None:
+    (super(Pivot, concrete) if flag else super(Pivot, constrained)).value
+
+def constrained_first(
+    flag: bool,
+    concrete: Literal[Member.A],
+    constrained: T,
+) -> None:
+    (super(Pivot, constrained) if flag else super(Pivot, concrete)).value
+```
+
+### Union-bounded `super` preserves ordinary owner alternatives
+
+A union-bounded owner retains the concrete alternatives produced by ordinary `super` inference.
+Descriptor-call diagnostics remain suppressed for the resulting `super` union.
+
+```py
+from __future__ import annotations
+
+from typing import TypeVar
+
+class Descriptor:
+    def __get__(
+        self,
+        instance: B,
+        owner: type | None = None,
+    ) -> int:
+        return 1
+
+class Base:
+    value = Descriptor()
+
+class Pivot(Base): ...
+class A(Pivot): ...
+class B(Pivot): ...
+
+T = TypeVar("T", bound=A | B)
+
+def union_upper_bound(owner: T) -> None:
+    reveal_type(super(Pivot, owner))  # revealed: <super: <class 'Pivot'>, A> | <super: <class 'Pivot'>, B>
+    super(Pivot, owner).value
 ```
 
 ### Possible `__get__` callable failures are not reported
@@ -1620,6 +1656,38 @@ class Bound(metaclass=Meta):
 reveal_type(Bound.value)  # revealed: int
 ```
 
+### Declaration certainty is preserved across receiver unions
+
+Each receiver branch determines whether its selected attribute is present at runtime before
+descriptor errors are combined. A bound malformed descriptor on one class therefore does not make
+the access definitely fail when another class only declares the attribute and can use a runtime
+fallback.
+
+```py
+from typing import ClassVar
+
+class DeclaredDescriptor:
+    def __get__(self) -> int:
+        return 1
+
+class BoundDescriptor:
+    def __get__(self) -> int:
+        return 1
+
+class Meta(type):
+    def __getattr__(cls, name: str) -> str:
+        return name
+
+class A(metaclass=Meta):
+    value: ClassVar[DeclaredDescriptor]
+
+class B:
+    value = BoundDescriptor()
+
+def read(cls: type[A] | type[B]) -> None:
+    cls.value
+```
+
 ### Stub declarations do not prove descriptor invocation
 
 A stub describes the static member type but does not reveal whether the implementation stores the
@@ -1664,6 +1732,34 @@ class C(metaclass=Meta):
 
 # The static declaration remains the inferred member contract.
 reveal_type(C.value)  # revealed: int
+
+class Inferred(metaclass=Meta):
+    if TYPE_CHECKING:
+        value = Descriptor()
+
+reveal_type(Inferred.value)  # revealed: int
+```
+
+### Annotation-only `__get__` methods do not produce descriptor errors
+
+A method annotation is a static contract and does not shadow an inherited runtime implementation. Ty
+preserves its existing inferred member type but does not use the annotation as proof that an invalid
+implicit call occurs.
+
+```py
+from typing import Callable
+
+class BaseDescriptor:
+    def __get__(self, instance: object, owner: type | None = None) -> int:
+        return 1
+
+class Descriptor(BaseDescriptor):
+    __get__: Callable[[], int]
+
+class C:
+    value = Descriptor()
+
+C().value
 ```
 
 ### A custom `__getattribute__` intercepts descriptor access
@@ -1732,6 +1828,27 @@ class InvalidMeta(type):
 class C(metaclass=InvalidMeta): ...
 
 C.descriptor
+```
+
+### Annotation-only `__getattribute__` declarations suppress descriptor errors
+
+Ty's static member lookup does not distinguish an annotation-only override from a runtime-bound
+override while continuing through the runtime MRO. The annotation therefore conservatively
+suppresses the descriptor diagnostic, even though `object.__getattribute__` may invoke the malformed
+descriptor at runtime.
+
+```py
+from typing import Callable
+
+class Descriptor:
+    def __get__(self) -> int:
+        return 1
+
+class C:
+    value = Descriptor()
+    __getattribute__: Callable[[], int]
+
+C().value
 ```
 
 ### A definitely assigned instance attribute shadows a broken non-data descriptor

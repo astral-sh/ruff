@@ -538,6 +538,7 @@ impl AttributeKind {
 struct DescriptorGetLookup<'db> {
     callable_type: Type<'db>,
     definedness: Definedness,
+    definitely_runtime_bound: bool,
 }
 
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
@@ -680,25 +681,6 @@ impl<'db> MemberLookupResult<'db> {
         }
     }
 
-    /// Returns `true` if the member that produced a descriptor error is definitely bound at
-    /// runtime.
-    ///
-    /// A declaration such as `value: ClassVar[Descriptor]` is a static contract, but does not add
-    /// a descriptor object to the class dictionary. Preserve the ordinary declared member type,
-    /// but do not report an error for invoking `__get__` unless provenance establishes a binding.
-    pub(crate) fn descriptor_is_definitely_bound(self, db: &'db dyn Db) -> bool {
-        match self.member.place {
-            Place::Defined(DefinedPlace {
-                origin: TypeOrigin::Declared,
-                provenance,
-                ..
-            }) => provenance
-                .definition()
-                .is_some_and(|definition| definition_is_runtime_binding(db, definition)),
-            Place::Defined(_) | Place::Undefined => true,
-        }
-    }
-
     fn or_fall_back_to(self, db: &'db dyn Db, fallback_fn: impl FnOnce() -> Self) -> Self {
         let primary_definedness = match self.member.place {
             Place::Undefined => None,
@@ -742,6 +724,24 @@ impl<'db> MemberLookupResult<'db> {
                 )
             },
         }
+    }
+}
+
+fn place_is_definitely_runtime_bound<'db>(db: &'db dyn Db, place: Place<'db>) -> bool {
+    match place {
+        Place::Defined(DefinedPlace {
+            provenance: Provenance::SingleDefinition(definition),
+            ..
+        }) => definition_is_runtime_binding(db, definition),
+        Place::Defined(DefinedPlace {
+            origin: TypeOrigin::Inferred,
+            ..
+        }) => true,
+        Place::Defined(DefinedPlace {
+            origin: TypeOrigin::Declared,
+            ..
+        })
+        | Place::Undefined => false,
     }
 }
 
@@ -3728,11 +3728,13 @@ impl<'db> Type<'db> {
 
         // Descriptor special-method lookup checks the descriptor's type, so instance storage
         // cannot shadow `__get__`. Dynamic MRO entries still participate in the lookup.
-        let Place::Defined(DefinedPlace {
-            ty: descr_get,
-            definedness,
-            ..
-        }) = self
+        let Place::Defined(
+            defined @ DefinedPlace {
+                ty: descr_get,
+                definedness,
+                ..
+            },
+        ) = self
             .class_member_with_policy(db, env, "__get__", MemberLookupPolicy::NO_INSTANCE_FALLBACK)
             .place
         else {
@@ -3742,6 +3744,10 @@ impl<'db> Type<'db> {
         Some(DescriptorGetLookup {
             callable_type: descr_get,
             definedness,
+            definitely_runtime_bound: place_is_definitely_runtime_bound(
+                db,
+                Place::Defined(defined),
+            ),
         })
     }
 
@@ -3901,7 +3907,8 @@ impl<'db> Type<'db> {
                     } else {
                         UnionType::from_two_elements(db, error.return_type(db), ty)
                     };
-                    let error = (descr_get.definedness == Definedness::AlwaysDefined
+                    let error = (descr_get.definitely_runtime_bound
+                        && descr_get.definedness == Definedness::AlwaysDefined
                         && error.has_definitely_invalid_callee_or_arguments())
                     .then(|| DescriptorGetCallContext::new(db, ty, instance, owner, kind));
                     (return_type, error)
@@ -4009,7 +4016,8 @@ impl<'db> Type<'db> {
             );
         }
 
-        match attribute {
+        let definitely_runtime_bound = place_is_definitely_runtime_bound(db, attribute.place);
+        let (member, kind, error) = match attribute {
             // A directly dynamic attribute could be a data descriptor even though we cannot see
             // its methods. Preserve that uncertainty, along with the existing bottom and cycle
             // behavior, without performing member lookups that cannot add information.
@@ -4146,7 +4154,9 @@ impl<'db> Type<'db> {
             }
 
             _ => (attribute, AttributeKind::NormalOrNonDataDescriptor, None),
-        }
+        };
+
+        (member, kind, error.filter(|_| definitely_runtime_bound))
     }
 
     /// Returns whether this type is a data descriptor, i.e. defines `__set__` or `__delete__`.

@@ -10325,7 +10325,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         if report_descriptor_get_error
             && !has_reaching_assignment
             && let Some(context) = fallback.descriptor_get_error
-            && fallback.descriptor_is_definitely_bound(db)
             && let Some(failure) = context.into_error(db)
         {
             report_bad_dunder_get_call(&self.context, &failure, value_type, attribute);

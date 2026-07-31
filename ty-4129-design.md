@@ -38,12 +38,12 @@ should not introduce object-identity, alias, or class-namespace mutation analysi
     present at runtime, while preserving the ordinary inferred member type.
 - Treat stub definitions and bindings under `TYPE_CHECKING` as static-only evidence that does not
     prove a descriptor is present at runtime.
+- Require runtime-binding provenance before an annotation-selected `__get__` method can produce an
+    error-level descriptor diagnostic.
 - Preserve a possible valid metaclass data-descriptor branch as a higher-precedence lookup
     alternative when a mixed descriptor-kind union otherwise falls through to a class attribute.
 - Treat a conditionally defined `__set__` or `__delete__` method as a possible, rather than definite,
     data-descriptor path when determining diagnostic certainty.
-- Treat the absent branch of a possibly defined `super` member as an alternative that does not
-    invoke the descriptor, while retaining the ordinary possibly-missing diagnostic.
 - Preserve descriptor-call failures while expanding narrowed enum complements into their remaining
     literal alternatives.
 - Suppress descriptor-read diagnostics after any possibly or definitely reaching same-place
@@ -96,10 +96,18 @@ A declaration-only attribute, such as `value: ClassVar[Descriptor]`, does not in
 the runtime class dictionary. It therefore does not establish that descriptor lookup will invoke
 `__get__`, even though ty retains the declaration as the static member contract. For a declared
 member, the diagnostic is reported only when source provenance establishes a runtime binding.
-Unknown or multiple provenance is treated conservatively as a possible absent path; this does not
-change the inferred member type or replace it with the return type of a dynamic `__getattr__`
-fallback. Stub definitions and definitions in a `TYPE_CHECKING` block never establish a runtime
-binding for this diagnostic, even when ty treats them as statically bound.
+Unknown or multiple provenance is treated conservatively as a possible absent path. This certainty
+is determined before union member results and their provenance are merged, so a declaration-only
+branch remains a successful alternative to a bound malformed descriptor. The check does not change
+the inferred member type or replace it with the return type of a dynamic `__getattr__` fallback.
+Stub definitions and definitions in a `TYPE_CHECKING` block never establish a runtime binding for
+this diagnostic, even when ty treats them as statically bound.
+
+The same conservative rule applies to the `__get__` method selected from the descriptor's class. An
+annotation-only method can still participate in ordinary type inference, but an invalid call to
+that static contract does not prove that runtime descriptor invocation fails. Continuing past the
+annotation to an inherited runtime method is part of the broader static-versus-runtime namespace
+model and remains out of scope.
 
 Positive elements of an intersection describe one runtime value rather than alternative values.
 Validating an implicit descriptor call may therefore require the full intersection as the synthetic
@@ -126,12 +134,12 @@ that alternative. For `type[T]`, ty first transposes the alternatives to their c
 each descriptor receives the corresponding concrete class as its `owner`. The ordinary member result
 keeps the original receiver so existing `Self` and TypeVar binding behavior is unchanged.
 
-Constrained or union-bounded `super()` owners can require a different concrete owner for each
-descriptor-validation branch. Retaining those alternatives in `BoundSuperType` changes semantic
-type equivalence and can produce duplicate ordinary `super` union members. This change keeps the
-ordinary `super` type unchanged and suppresses the error-level descriptor diagnostic whenever
-validation would require that correlation. Concrete `super` owners still propagate descriptor-call
-failures.
+This change does not propagate error-level descriptor-call diagnostics through `super()` lookup.
+Doing so would require retaining diagnostic certainty across the alternative owners that ordinary
+`BoundSuperType` construction can normalize or merge. Keeping that state in the semantic type
+changes equivalence and ordinary inference, while discarding it makes diagnostics order-dependent.
+`super()` therefore retains its existing inferred member types and other diagnostics without
+reporting invalid implicit `__get__` calls.
 
 Recursive alias expansion runs inside the cycle-aware descriptor-call query. A recursive branch that
 re-enters the same query contributes no definite descriptor failure, while the remaining concrete
@@ -153,7 +161,9 @@ A custom `__getattribute__` runs before the normal descriptor algorithm. Wheneve
 present, the descriptor call is not definite: a successful override can return first, while an
 invalid override fails before Python reaches the descriptor. This certainty check does not replace
 the ordinary member type with the override's return type when the normal member is already defined,
-and it does not retarget a descriptor diagnostic to the invalid override.
+and it does not retarget a descriptor diagnostic to the invalid override. An annotation-only
+`__getattribute__` can be treated as a possible override because ty's static member lookup does not
+continue through the runtime MRO after rejecting that declaration as a runtime binding.
 
 Augmented assignment has a read phase and a write phase. Diagnosing a malformed descriptor during
 the read phase is in scope. General augmented-assignment operator inference, write validation,
@@ -182,8 +192,7 @@ read/write correlation, and bidirectional type-context improvements are separate
     selected from one positive element with the full intersection as its synthetic `self`.
 - Propagating descriptor-call diagnostics through intersection receivers or intersection-valued
     descriptor attributes.
-- Diagnosing descriptor-call failures for constrained or union-bounded `super()` owners that
-    require per-alternative receiver correlation.
+- Diagnosing descriptor-call failures through `super()` lookup.
 - General changes to `super` MRO lookup or possibly-missing attribute inference.
 - General changes to enum-complement narrowing or inferred member types.
 - General augmented-assignment operator inference, store validation, and bidirectional type-context
@@ -231,9 +240,13 @@ The implementation may suppress a diagnostic when an otherwise failing TypeVar a
 semantically uninhabited, including `Never` hidden behind an alias. Applying that normalization
 consistently would require a broader change across every TypeVar and `super()` certainty fold.
 
-The implementation suppresses descriptor diagnostics for `super()` owners whose TypeVar
-alternatives require different validation receivers. Preserving those diagnostic branches would
-require state separate from ordinary `BoundSuperType` identity and equivalence.
+The implementation suppresses descriptor diagnostics for all `super()` lookups. Preserving those
+diagnostic branches without changing ordinary `BoundSuperType` inference or making diagnostics
+order-dependent requires a separate representation for diagnostic alternatives.
+
+The implementation may suppress a definite descriptor failure when an annotation-only
+`__getattribute__` hides the default or an inherited runtime implementation from static lookup.
+Resolving that case requires a runtime-oriented MRO lookup that skips static-only declarations.
 
 The original issue remains covered because its malformed descriptor is statically known and
 definitely selected.
