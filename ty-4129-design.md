@@ -30,8 +30,9 @@ should not introduce object-identity, alias, or class-namespace mutation analysi
     alternative makes the failure merely possible.
 - Preserve callable union and intersection structure when deciding whether an implicit `__get__`
     call definitely fails.
-- Preserve the runtime provenance of the raw `__get__` slot: a `classmethod` wrapper is not callable
-    even when its underlying function signature accepts the synthesized arguments.
+- Preserve the runtime provenance of a directly identifiable raw `__get__` slot: a `classmethod`
+    wrapper is not callable even when its underlying function signature accepts the synthesized
+    arguments.
 - Treat a definitely or possibly bound custom `__getattribute__` as an interceptor that makes
     normal descriptor invocation non-definite, even when calling the override itself fails.
 - Treat a successful `__getattr__` fallback as a successful lookup alternative when the normal
@@ -51,11 +52,10 @@ should not introduce object-identity, alias, or class-namespace mutation analysi
     receiver.
 - Treat the target of an augmented assignment as an attribute read before its write, while avoiding
     `__get__` diagnostics for deletion targets.
-- Ignore intersection elements that do not contribute a member when combining descriptor failures.
-- Ignore non-descriptor positive elements of an attribute intersection when combining descriptor
-    failures; they refine one runtime value rather than supplying an alternative value.
-- Treat an attribute intersection as a data descriptor when any positive element is definitely a
-    data descriptor, because every inhabitant retains that element's descriptor behavior.
+- Exclude uninhabited alternatives such as `Never` when combining descriptor failures.
+- Preserve existing member types and descriptor precedence for intersections, but suppress the
+    error-level descriptor diagnostic when either the receiver or descriptor value is an
+    intersection, because its full type may be needed as a synthetic `owner` or `self` argument.
 - Treat a TypeVar-valued attribute as a definite data descriptor when its upper bound or every
     constraint is definitely a data descriptor.
 - Update the `invalid-attribute-access` documentation with a descriptor-read example and
@@ -73,30 +73,33 @@ Descriptor lookup should distinguish:
 
 Only definite failures produce `invalid-attribute-access`.
 
-For unions, failure certainty is combined across branches rather than selecting any available
-error. A non-descriptor value or valid descriptor makes the overall descriptor failure
-non-definite.
+For unions, failure certainty is combined across inhabitable branches rather than selecting any
+available error. A non-descriptor value or valid descriptor makes the overall descriptor failure
+non-definite. An uninhabited branch such as `Never` cannot provide a successful runtime path and
+does not weaken an otherwise definite failure.
 
 Callable types retain a union-of-intersections structure. Every union element must fail for the
 descriptor call to be definitely invalid, while a callable intersection element succeeds if any of
 its callable members accepts the arguments.
 
 Descriptor invocation calls the raw `__get__` value stored on the descriptor class. It does not bind
-that value through the descriptor protocol first. A method decorated with `@classmethod` therefore
-supplies a non-callable `classmethod` wrapper in this slot. Ty uses the underlying function signature
-only to preserve a useful recovery return type; diagnostic validation calls the raw wrapper.
+that value through the descriptor protocol first. A directly identifiable method decorated with
+`@classmethod` therefore supplies a non-callable `classmethod` wrapper in this slot. Ty uses the
+underlying function signature only to preserve a useful recovery return type; diagnostic validation
+calls the raw wrapper. This change does not fold raw-wrapper provenance through unions or aliases,
+or model the target-version-dependent callability of raw `staticmethod` objects.
 
-Only lookup paths that can supply the requested member participate in certainty aggregation. An
-undefined intersection element is a refinement, not a successful alternative member lookup.
+Only lookup paths that can supply the requested member participate in certainty aggregation.
 Conversely, a possibly defined member introduces an absent path that does not invoke the descriptor,
 even if that path ultimately raises an attribute error instead of finding a dynamic fallback. A
 possibly-missing diagnostic remains separate from the descriptor-call diagnostic.
 
-Positive elements of an intersection-valued attribute describe one runtime value. Elements without
-`__get__` therefore do not create a successful alternative to a descriptor supplied by another
-element. The same refinement rule determines descriptor precedence: if any positive element is
-definitely a data descriptor, the intersection is a data descriptor and takes precedence over a
-lower-priority class or instance attribute.
+Positive elements of an intersection describe one runtime value rather than alternative values.
+Validating an implicit descriptor call may therefore require the full intersection as the synthetic
+descriptor `self` or deriving an `owner` meta-type from the full receiver. Ty's existing descriptor
+and meta-type APIs decompose these intersections and cannot preserve that correlation. This change
+keeps their existing inferred member types and descriptor precedence but does not propagate an
+error-level descriptor diagnostic through those paths.
 
 Descriptor precedence can differ across the elements of a union-valued metaclass member. A possible
 data-descriptor element remains a higher-precedence alternative even when the aggregate attribute
@@ -165,6 +168,10 @@ read/write correlation, and bidirectional type-context improvements are separate
     with mixed data-descriptor and non-data-descriptor alternatives.
 - General resolution of incompatible descriptor method definitions contributed by multiple
     positive intersection elements.
+- Deriving precise meta-types for intersection receivers or validating a descriptor implementation
+    selected from one positive element with the full intersection as its synthetic `self`.
+- Propagating descriptor-call diagnostics through intersection receivers or intersection-valued
+    descriptor attributes.
 - General changes to `super` MRO lookup or possibly-missing attribute inference.
 - General changes to enum-complement narrowing or inferred member types.
 - General augmented-assignment operator inference, store validation, and bidirectional type-context
@@ -174,6 +181,8 @@ read/write correlation, and bidirectional type-context improvements are separate
 - General preservation of TypeVar correlation outside descriptor-call validation.
 - General changes to explicit classmethod access or synthesized function and classmethod `__get__`
     wrapper types.
+- Folding raw `classmethod` slot provenance through unions or aliases.
+- Modeling the Python-version-dependent runtime callability of raw `staticmethod` slots.
 
 The class-mutation items require flow facts keyed by semantic object or class identity rather than
 ty's existing syntactic places. That should be designed as a separate dataflow feature. The broader
@@ -195,6 +204,12 @@ The implementation may suppress a diagnostic because of an inferred instance att
 assignment does not actually reach the receiver, including an assignment in an unrelated method or
 one removed by a later deletion. Distinguishing those cases from constructor-established attributes
 would require the out-of-scope object-identity and interprocedural dataflow described above.
+
+The implementation may also suppress a diagnostic for an intersection receiver or
+intersection-valued descriptor, for a raw `classmethod` slot whose provenance is hidden behind a
+union or alias, or for a raw `staticmethod` slot that is non-callable on Python 3.9 and older. These
+cases require broader intersection or wrapper-provenance modeling and do not affect the concrete
+descriptor in the original issue.
 
 The original issue remains covered because its malformed descriptor is statically known and
 definitely selected.

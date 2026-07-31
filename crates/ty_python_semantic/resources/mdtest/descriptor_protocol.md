@@ -1097,6 +1097,28 @@ class RecursiveOwner:
 RecursiveOwner().value
 ```
 
+### Uninhabited descriptor alternatives do not weaken failures
+
+An uninhabited TypeVar constraint cannot provide a successful runtime descriptor call. The invalid
+call on every inhabitable constraint is therefore still definite.
+
+```py
+from typing import NoReturn, TypeVar
+
+class Descriptor:
+    def __get__(self) -> int:
+        return 1
+
+T = TypeVar("T", Descriptor, NoReturn)
+
+def access_descriptor(descriptor: T) -> None:
+    class C:
+        value = descriptor
+
+    # error: [invalid-attribute-access]
+    C().value
+```
+
 ### Constrained receiver types preserve branch correlation
 
 When a constrained type variable is the descriptor receiver, each class constraint is paired with
@@ -1846,10 +1868,12 @@ C.descriptor = 1
 C.descriptor
 ```
 
-### Undefined intersection elements do not suppress descriptor failures
+### Intersection receivers are conservatively not diagnosed
 
-An intersection element that does not define the attribute does not contribute an alternative
-member. The member supplied by another element remains definitely selected.
+An intersection receiver describes one runtime value, but ordinary member lookup delegates to its
+positive elements. Ty cannot yet derive the precise synthetic descriptor `owner` from the full
+intersection. Descriptor diagnostics are therefore suppressed for these receivers, including the
+accepted false negative where the selected descriptor is malformed.
 
 ```py
 from ty_extensions import Intersection
@@ -1864,15 +1888,35 @@ class DefinesDescriptor:
 class Marker: ...
 
 def access_intersection(obj: Intersection[DefinesDescriptor, Marker]) -> None:
-    # error: [invalid-attribute-access] "Invalid access to descriptor attribute `descriptor` on type `DefinesDescriptor & Marker`"
     obj.descriptor
 ```
 
-### Non-descriptor attribute intersections are refinements
+The suppression also avoids rejecting a valid descriptor whose `owner` accepts another positive
+element of the receiver intersection.
+
+```py
+from ty_extensions import Intersection
+
+class Marker: ...
+
+class Descriptor:
+    def __get__(self, instance: object, owner: type[Marker]) -> int:
+        return 1
+
+class DefinesDescriptor:
+    descriptor = Descriptor()
+
+def access_intersection(obj: Intersection[DefinesDescriptor, Marker]) -> None:
+    reveal_type(obj.descriptor)  # revealed: int
+```
+
+### Intersection-valued descriptors are conservatively not diagnosed
 
 An attribute intersection represents one runtime value satisfying every positive element. A positive
-element without `__get__` refines the descriptor value; it is not an alternative that can avoid the
-descriptor call.
+element without `__get__` refines the descriptor value rather than providing an alternative. Ty's
+descriptor lookup currently validates each contributing element separately, so it suppresses the
+error-level diagnostic instead of treating an element as the complete synthetic `self` value. The
+malformed descriptor below is an accepted false negative.
 
 ```py
 from ty_extensions import Intersection
@@ -1889,15 +1933,36 @@ def make_descriptor() -> Intersection[Descriptor, Marker]:
 class C:
     descriptor = make_descriptor()
 
-# error: [invalid-attribute-access] "Invalid access to descriptor attribute `descriptor` on type `C`"
 C().descriptor
 ```
 
-### Data-descriptor intersections retain metaclass precedence
+The same boundary avoids rejecting a descriptor method whose `self` annotation is satisfied by a
+different positive element of the full intersection.
+
+```py
+from ty_extensions import Intersection
+
+class Marker: ...
+
+class Descriptor:
+    def __get__(self: Marker, instance: object, owner: type | None = None) -> str:
+        return ""
+
+def make_descriptor() -> Intersection[Descriptor, Marker]:
+    raise NotImplementedError
+
+class C:
+    descriptor = make_descriptor()
+
+C().descriptor
+```
+
+### Intersection descriptor precedence is preserved
 
 An intersection describes one runtime value. If any positive element is definitely a data
 descriptor, a class attribute cannot shadow the intersection-valued metaclass member. A non-data
-descriptor intersection remains shadowed as usual.
+descriptor intersection remains shadowed as usual. Ty preserves that existing precedence behavior,
+but does not emit the descriptor diagnostic that would require intersection-preserving validation.
 
 ```py
 from ty_extensions import Intersection
@@ -1929,7 +1994,6 @@ class C(metaclass=Meta):
     data = 1
     non_data = 1
 
-# error: [invalid-attribute-access] "Invalid access to descriptor attribute `data` on type `<class 'C'>`"
 C.data
 C.non_data
 ```
@@ -1987,6 +2051,54 @@ class C:
     value = Descriptor()
 
 # error: [invalid-attribute-access]
+reveal_type(C().value)  # revealed: int
+```
+
+### Composite raw classmethod slots are not diagnosed
+
+Ty detects a directly identifiable raw `classmethod` wrapper. It does not fold that runtime
+provenance through a union or type alias. The conditional definition below is therefore an accepted
+false negative even though both runtime alternatives are non-callable raw wrappers.
+
+```py
+def conditional_descriptor(flag: bool) -> None:
+    class Descriptor:
+        if flag:
+            @classmethod
+            def __get__(cls: object, instance: object, owner: object) -> int:
+                return 1
+
+        else:
+            @classmethod
+            def __get__(cls: object, instance: object, owner: object) -> str:
+                return ""
+
+    class C:
+        value = Descriptor()
+
+    reveal_type(C().value)  # revealed: int | str
+```
+
+### Raw staticmethod slots before Python 3.10 are not diagnosed
+
+Raw `staticmethod` objects became callable in Python 3.10. Ty does not model that version-dependent
+runtime behavior for implicit descriptor calls, so the access below is an accepted false negative
+for a Python 3.9 target.
+
+```toml
+[environment]
+python-version = "3.9"
+```
+
+```py
+class Descriptor:
+    @staticmethod
+    def __get__(descriptor: object, instance: object, owner: object) -> int:
+        return 1
+
+class C:
+    value = Descriptor()
+
 reveal_type(C().value)  # revealed: int
 ```
 

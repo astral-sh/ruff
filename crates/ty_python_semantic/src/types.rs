@@ -3749,6 +3749,11 @@ impl<'db> Type<'db> {
             let mut all_data_descriptors = true;
 
             for alternative in alternatives {
+                // An uninhabited alternative cannot provide a successful runtime path.
+                if alternative.is_never() {
+                    continue;
+                }
+
                 if let Some(result) =
                     alternative.try_call_dunder_get_with_error(db, instance, owner)
                 {
@@ -4075,7 +4080,6 @@ impl<'db> Type<'db> {
                     }),
                 qualifiers,
             } => {
-                let mut errors = DescriptorGetErrorAccumulator::new();
                 let kind = if Type::Intersection(intersection).is_data_descriptor(db) {
                     AttributeKind::DataDescriptor
                 } else {
@@ -4084,12 +4088,13 @@ impl<'db> Type<'db> {
                 let place = if intersection.positive(db).is_empty() {
                     attribute
                 } else {
+                    // Every positive element describes the same runtime descriptor value. We
+                    // decompose that value to infer its return type, but validating each element
+                    // as the complete synthetic `self` can reject a method whose annotation is
+                    // satisfied by another element of the intersection.
                     intersection
                         .map_with_boundness(db, |elem| {
                             let result = elem.try_call_dunder_get_with_error(db, instance, owner);
-                            if let Some(result) = result {
-                                errors.add(db, result.error);
-                            }
                             Place::Defined(DefinedPlace {
                                 ty: result.map_or(*elem, |result| result.return_type),
                                 origin,
@@ -4100,11 +4105,7 @@ impl<'db> Type<'db> {
                         })
                         .with_qualifiers(qualifiers)
                 };
-                (
-                    place,
-                    kind,
-                    errors.finish().map(|error| error.with_kind(db, kind)),
-                )
+                (place, kind, None)
             }
 
             PlaceAndQualifiers {
@@ -4737,18 +4738,18 @@ impl<'db> Type<'db> {
                     if let Some(complement) = intersection.enum_complement(db) {
                         enums::member_lookup_for_enum_complement(db, complement, name_str, policy)
                     } else {
+                        // Member lookup delegates to the positive elements, but the descriptor's
+                        // synthetic owner is the runtime class satisfying the full intersection.
+                        // Until intersection meta-types preserve that relationship, retaining an
+                        // element-local call error could turn an imprecise owner into a diagnostic.
                         let receiver = Some(receiver.unwrap_or(this));
-                        let mut errors = DescriptorGetErrorAccumulator::new();
                         let member = intersection.map_with_boundness_and_qualifiers(db, |elem| {
-                            let result = elem.member_lookup_with_policy_and_receiver(
+                            elem.member_lookup_with_policy_and_receiver(
                                 db, name_str, policy, receiver,
-                            );
-                            if !result.member.place.is_undefined() {
-                                errors.add(db, result.descriptor_get_error);
-                            }
-                            result.member
+                            )
+                            .member
                         });
-                        MemberLookupResult::new(member, errors.finish())
+                        member.into()
                     }
                 }
 
