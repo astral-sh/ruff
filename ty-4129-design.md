@@ -55,9 +55,10 @@ should not introduce object-identity, alias, or class-namespace mutation analysi
     receiver.
 - Treat the target of an augmented assignment as an attribute read before its write, while avoiding
     `__get__` diagnostics for deletion targets.
-- Preserve existing member types and descriptor precedence for intersections, but suppress the
-    error-level descriptor diagnostic when either the receiver or descriptor value is an
-    intersection, because its full type may be needed as a synthetic `owner` or `self` argument.
+- Preserve existing member types and descriptor precedence for intersections, including the
+    existing limitation that does not classify them as data descriptors. Suppress the error-level
+    descriptor diagnostic when either the receiver or descriptor value is an intersection, because
+    its full type may be needed as a synthetic `owner` or `self` argument.
 - Treat a TypeVar-valued attribute as a definite data descriptor when its upper bound or every
     constraint is definitely a data descriptor.
 - Update the `invalid-attribute-access` documentation with a descriptor-read example and
@@ -114,9 +115,10 @@ model and remains out of scope.
 Positive elements of an intersection describe one runtime value rather than alternative values.
 Validating an implicit descriptor call may therefore require the full intersection as the synthetic
 descriptor `self` or deriving an `owner` meta-type from the full receiver. Ty's existing descriptor
-and meta-type APIs decompose these intersections and cannot preserve that correlation. This change
-keeps their existing inferred member types and descriptor precedence but does not propagate an
-error-level descriptor diagnostic through those paths.
+and meta-type APIs decompose these intersections and cannot preserve that correlation. Ordinary
+lookup also does not classify intersections as data descriptors, so a class attribute can shadow an
+intersection-valued metaclass member. This change preserves those existing types and precedence and
+does not propagate an error-level descriptor diagnostic through those paths.
 
 Descriptor precedence can differ across the elements of a union-valued metaclass member. A possible
 data-descriptor element remains a higher-precedence alternative even when the aggregate attribute
@@ -194,6 +196,8 @@ read/write correlation, and bidirectional type-context improvements are separate
     with mixed data-descriptor and non-data-descriptor alternatives.
 - General resolution of incompatible descriptor method definitions contributed by multiple
     positive intersection elements.
+- Discovering data-descriptor precedence for intersections without first preserving the full
+    intersection through descriptor return-type mapping.
 - Deriving precise meta-types for intersection receivers or validating a descriptor implementation
     selected from one positive element with the full intersection as its synthetic `self`.
 - Propagating descriptor-call diagnostics through intersection receivers or intersection-valued
@@ -208,6 +212,7 @@ read/write correlation, and bidirectional type-context improvements are separate
 - General preservation of TypeVar correlation outside descriptor-call validation.
 - General separation of static declarations from runtime class-namespace entries, including
     incorporating a dynamic fallback's return type into a declaration-only member's inferred type.
+- Diagnosing a metaclass descriptor hidden in static lookup by a declaration-only class fallback.
 - Normalizing semantically uninhabited alternatives across aliases, TypeVar constraints, class
     objects, metaclass descriptor kinds, and `super()` construction.
 - General changes to explicit classmethod access or synthesized function and classmethod `__get__`
@@ -241,6 +246,16 @@ The implementation may also suppress a diagnostic for an intersection receiver o
 intersection-valued descriptor, or for a raw `classmethod` or `staticmethod` slot that is
 non-callable at runtime. These cases require broader intersection or wrapper-provenance modeling and
 do not affect the concrete descriptor in the original issue.
+
+The existing intersection lookup can also allow a class attribute to shadow an
+intersection-valued metaclass data descriptor. Classifying that intersection as a data descriptor
+without preserving the full value through descriptor return-type mapping can expose an unsound
+intersection return type, so improving this precedence remains out of scope.
+
+The implementation may suppress a malformed metaclass descriptor when a declaration-only class
+fallback wins static lookup. Determining that the fallback is absent at runtime while preserving its
+declared member type belongs to the broader static-versus-runtime namespace separation described
+above.
 
 The implementation may suppress a diagnostic when an otherwise failing TypeVar alternative is
 semantically uninhabited, including `Never` hidden behind an alias. Applying that normalization

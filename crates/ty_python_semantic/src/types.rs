@@ -4086,11 +4086,6 @@ impl<'db> Type<'db> {
                     }),
                 qualifiers,
             } => {
-                let kind = if Type::Intersection(intersection).is_data_descriptor(db) {
-                    AttributeKind::DataDescriptor
-                } else {
-                    AttributeKind::NormalOrNonDataDescriptor
-                };
                 let place = if intersection.positive(db).is_empty() {
                     attribute
                 } else {
@@ -4111,7 +4106,13 @@ impl<'db> Type<'db> {
                         })
                         .with_qualifiers(qualifiers)
                 };
-                (place, kind, None)
+                (
+                    place,
+                    // TODO: Discover data descriptors in intersections without decomposing the
+                    // descriptor return type into an unsound intersection.
+                    AttributeKind::NormalOrNonDataDescriptor,
+                    None,
+                )
             }
 
             PlaceAndQualifiers {

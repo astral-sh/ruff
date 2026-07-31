@@ -1703,6 +1703,26 @@ class Bound(metaclass=Meta):
 reveal_type(Bound.value)  # revealed: int
 ```
 
+### Declaration-only class fallbacks conservatively suppress metaclass descriptor errors
+
+A class declaration is not a runtime class-dictionary entry, so Python would continue to a metaclass
+descriptor. Ty preserves the declared member type and conservatively suppresses the descriptor
+diagnostic instead of modeling that static-versus-runtime namespace difference.
+
+```py
+class Descriptor:
+    def __get__(self) -> int:
+        return 1
+
+class Meta(type):
+    value = Descriptor()
+
+class C(metaclass=Meta):
+    value: int
+
+C.value
+```
+
 ### Declaration certainty is preserved across receiver unions
 
 Each receiver branch determines whether its selected attribute is present at runtime before
@@ -2269,12 +2289,12 @@ class C:
 C().descriptor
 ```
 
-### Intersection descriptor precedence is preserved
+### Intersection descriptor precedence retains its existing limitation
 
-An intersection describes one runtime value. If any positive element is definitely a data
-descriptor, a class attribute cannot shadow the intersection-valued metaclass member. A non-data
-descriptor intersection remains shadowed as usual. Ty preserves that existing precedence behavior,
-but does not emit the descriptor diagnostic that would require intersection-preserving validation.
+An intersection describes one runtime value, but ty does not yet discover data descriptors in
+intersections. It therefore allows the class attribute to shadow an intersection-valued metaclass
+member. Preserving this existing limitation avoids exposing the element-wise mapped descriptor
+return as an unsound intersection type.
 
 ```py
 from ty_extensions import Intersection
@@ -2306,7 +2326,8 @@ class C(metaclass=Meta):
     data = 1
     non_data = 1
 
-C.data
+# error: [invalid-assignment]
+marker: Marker = C.data
 C.non_data
 ```
 
