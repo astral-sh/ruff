@@ -1141,17 +1141,21 @@ from ty_extensions._internal import ConstraintSet
 
 def incompatible_finite_noninferable[I, N: (int, str)]() -> None:
     constraints = ConstraintSet.range(bytes, N, bytes)
-    # TODO: Reject this path once declared constraints participate in the BDD domain.
-    reveal_type(constraints.solutions(inferable=tuple[I]))  # revealed: tuple[()]
+    # TODO: Add declared bounds/constraints directly to the constraint set.
+    # TODO: revealed: None
+    # revealed: tuple[()]
+    reveal_type(constraints.solutions(inferable=tuple[I]))
 
 def incompatible_bounded_noninferable[I, N: str]() -> None:
     constraints = ConstraintSet.range(int, N, int)
-    # TODO: Reject this path once declared bounds participate in the BDD domain.
+    # TODO: Add declared bounds/constraints directly to the constraint set.
+    # TODO: revealed: None
     reveal_type(constraints.solutions(inferable=tuple[I]))  # revealed: tuple[()]
 
 def negative_finite_noninferable[I, N: (int, str)]() -> None:
     constraints = ~ConstraintSet.range(int, N, int) & ~ConstraintSet.range(str, N, str)
     # TODO: Complete reasoning about negative non-inferable constraints would reject this path.
+    # TODO: revealed: None
     reveal_type(constraints.solutions(inferable=tuple[I]))  # revealed: tuple[()]
 ```
 
