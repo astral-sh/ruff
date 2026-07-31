@@ -456,19 +456,6 @@ impl<T> Parsed<T> {
         !self.has_no_syntax_errors()
     }
 
-    /// Returns the [`Parsed`] output as a [`Result`], returning [`Ok`] if it has no syntax errors,
-    /// or [`Err`] containing the first [`ParseError`] encountered.
-    ///
-    /// Note that any [`unsupported_syntax_errors`](Parsed::unsupported_syntax_errors) will not
-    /// cause [`Err`] to be returned.
-    pub fn as_result(&self) -> Result<&Parsed<T>, &[ParseError]> {
-        if self.has_valid_syntax() {
-            Ok(self)
-        } else {
-            Err(&self.errors)
-        }
-    }
-
     /// Consumes the [`Parsed`] output and returns a [`Result`] which is [`Ok`] if it has no syntax
     /// errors, or [`Err`] containing the first [`ParseError`] encountered.
     ///
@@ -544,11 +531,6 @@ impl Parsed<ModExpression> {
     /// Returns a mutable reference to the expression contained in this parsed output.
     fn expr_mut(&mut self) -> &mut Expr {
         &mut self.syntax.body
-    }
-
-    /// Consumes the [`Parsed`] output and returns the contained [`Expr`].
-    pub fn into_expr(self) -> Expr {
-        *self.syntax.body
     }
 }
 
