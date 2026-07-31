@@ -3338,6 +3338,10 @@ pub(super) fn report_named_tuple_field_with_leading_underscore<'db>(
 }
 
 /// Report a `NamedTuple` field annotated with a type qualifier that `NamedTuple` does not accept.
+///
+/// The diagnostic is anchored to the annotated assignment that introduced the qualifier. It does
+/// not claim that class creation fails at runtime because deferred and wrapped annotations can
+/// preserve the qualifier without passing it directly to `typing._type_check`.
 pub(super) fn report_invalid_named_tuple_field_qualifier<'db>(
     context: &InferContext<'db, '_>,
     field_name: &str,

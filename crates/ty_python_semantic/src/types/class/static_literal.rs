@@ -12,8 +12,8 @@ use std::cell::RefCell;
 use crate::{
     Db, FxIndexMap, FxIndexSet, Program, TypeQualifiers,
     place::{
-        DefinedPlace, Definedness, Place, PlaceAndQualifiers, PlaceFromDeclarationsResult,
-        Provenance, PublicTypePolicy, TypeOrigin, place_from_bindings, place_from_declarations,
+        DefinedPlace, Definedness, Place, PlaceAndQualifiers, Provenance, PublicTypePolicy,
+        TypeOrigin, place_from_bindings, place_from_declarations,
     },
     reachability::{
         DeclarationsIteratorExtension, ReachabilityConstraintsExtension, binding_reachability,
@@ -65,7 +65,7 @@ use ty_python_core::{
     place_table,
     scope::{Scope, ScopeId},
     semantic_index,
-    symbol::{ScopedSymbolId, Symbol},
+    symbol::Symbol,
     use_def_map,
 };
 
@@ -2398,10 +2398,53 @@ impl<'db> StaticClassLiteral<'db> {
             self.has_dataclass_param(db, own_field_policy, DataclassFlags::KW_ONLY)
         });
         let mut kw_only_sentinel_field_seen = false;
+        let mut field_declarations = Vec::new();
+
+        for (symbol_id, declarations) in use_def.all_end_of_scope_symbol_declarations() {
+            // Here, we exclude all declarations that are not annotated assignments. We need this because
+            // things like function definitions and nested classes would otherwise be considered dataclass
+            // fields. The check is too broad in the sense that it also excludes (weird) constructs where
+            // a symbol would have multiple declarations, one of which is an annotated assignment. If we
+            // want to improve this, we could instead pass a definition-kind filter to the use-def map
+            // query, or to the `symbol_from_declarations` call below. Doing so would potentially require
+            // us to generate a union of `__init__` methods.
+            if declarations.clone().any_reachable(db, |declaration| {
+                declaration.is_defined_and(|declaration| {
+                    !matches!(
+                        declaration.kind(db),
+                        DefinitionKind::AnnotatedAssignment(..)
+                    )
+                })
+            }) {
+                continue;
+            }
+
+            // Field contents come from the declarations live at end of scope, but field order is
+            // anchored to the first reachable annotated declaration in the class body.
+            let Some(first_declaration_order) = use_def
+                .reachable_symbol_declarations(symbol_id)
+                .first_reachable_declaration_order(db, |declaration| {
+                    declaration.is_defined_and(|declaration| {
+                        matches!(
+                            declaration.kind(db),
+                            DefinitionKind::AnnotatedAssignment(..)
+                        )
+                    })
+                })
+            else {
+                continue;
+            };
+
+            let result = place_from_declarations(db, declarations.clone());
+            field_declarations.push((first_declaration_order, symbol_id, result));
+        }
+
+        field_declarations
+            .sort_unstable_by_key(|(first_declaration_order, _, _)| *first_declaration_order);
 
         let mut attributes = FxIndexMap::default();
         let mut class_variables = Vec::new();
-        for (symbol_id, result) in self.own_field_declarations(db) {
+        for (_, symbol_id, result) in field_declarations {
             let symbol = table.symbol(symbol_id);
             let first_declaration = result.first_declaration;
             let attr = result.ignore_conflicting_declarations();
@@ -2527,66 +2570,20 @@ impl<'db> StaticClassLiteral<'db> {
         }
     }
 
-    /// Collect the declarations used to construct this class's fields, ordered by the position of
-    /// each symbol's first reachable annotation.
-    fn own_field_declarations(
-        self,
-        db: &'db dyn Db,
-    ) -> Vec<(ScopedSymbolId, PlaceFromDeclarationsResult<'db>)> {
-        let use_def = use_def_map(db, self.body_scope(db));
-
-        let mut field_declarations = Vec::new();
-
-        for (symbol_id, declarations) in use_def.all_end_of_scope_symbol_declarations() {
-            // Here, we exclude all declarations that are not annotated assignments. We need this because
-            // things like function definitions and nested classes would otherwise be considered dataclass
-            // fields. The check is too broad in the sense that it also excludes (weird) constructs where
-            // a symbol would have multiple declarations, one of which is an annotated assignment. If we
-            // want to improve this, we could instead pass a definition-kind filter to the use-def map
-            // query, or to the `symbol_from_declarations` call below. Doing so would potentially require
-            // us to generate a union of `__init__` methods.
-            if declarations.clone().any_reachable(db, |declaration| {
-                declaration.is_defined_and(|declaration| {
-                    !matches!(
-                        declaration.kind(db),
-                        DefinitionKind::AnnotatedAssignment(..)
-                    )
-                })
-            }) {
-                continue;
-            }
-
-            // Field contents come from the declarations live at end of scope, but field order is
-            // anchored to the first reachable annotated declaration in the class body.
-            let Some(first_declaration_order) = use_def
-                .reachable_symbol_declarations(symbol_id)
-                .first_reachable_declaration_order(db, |declaration| {
-                    declaration.is_defined_and(|declaration| {
-                        matches!(
-                            declaration.kind(db),
-                            DefinitionKind::AnnotatedAssignment(..)
-                        )
-                    })
-                })
-            else {
-                continue;
-            };
-
-            let result = place_from_declarations(db, declarations.clone());
-            field_declarations.push((first_declaration_order, symbol_id, result));
-        }
-
-        field_declarations
-            .sort_unstable_by_key(|(first_declaration_order, _, _)| *first_declaration_order);
-
-        field_declarations
-            .into_iter()
-            .map(|(_, symbol_id, result)| (symbol_id, result))
-            .collect()
-    }
-
-    /// Return the type qualifiers attached to each reachable annotated assignment in this class's
-    /// body, along with the declaration each one came from.
+    /// Return the type qualifiers attached to each reachable annotated assignment in source order.
+    ///
+    /// This uses the declaration history rather than [`StaticClassLiteral::own_fields`], because a
+    /// later method or nested class can replace the symbol's binding while leaving its entry in
+    /// `__annotations__`:
+    ///
+    /// ```python
+    /// class Example(NamedTuple):
+    ///     value: Final[int]
+    ///     def value(self) -> int: ...
+    /// ```
+    ///
+    /// Each qualifier remains paired with its own definition so diagnostics can point to the
+    /// annotation that introduced it, including when declarations occur in different branches.
     pub(crate) fn own_annotated_qualifiers(
         self,
         db: &'db dyn Db,
