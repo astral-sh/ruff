@@ -3,7 +3,6 @@
 use std::fmt::{self, Display};
 
 use compact_str::{CompactString, ToCompactString};
-use itertools::Itertools;
 use ruff_python_ast as ast;
 
 use crate::Db;
@@ -12,7 +11,6 @@ use crate::types::special_form::TypeQualifier;
 
 use super::call::{Bindings, CallArguments, CallDunderError, CallErrorKind};
 use super::class::KnownClass;
-use super::class_base::ClassBase;
 use super::context::InferContext;
 use super::diagnostic::{
     CALL_NON_CALLABLE, INVALID_ARGUMENT_TYPE, INVALID_GENERIC_CLASS, NOT_SUBSCRIPTABLE,
@@ -953,19 +951,15 @@ impl<'db> Type<'db> {
                 }
             }
 
-            // TODO: properly handle old-style generics; get rid of this temporary hack
-            if !value_ty
-                .as_class_literal()
-                .is_some_and(|class| class.iter_mro(db).contains(&ClassBase::Generic))
-            {
-                return Err(SubscriptError::new(
-                    Type::unknown(),
-                    SubscriptErrorKind::NotSubscriptable {
-                        value_ty,
-                        method: DunderMethod::ClassGetItem,
-                    },
-                ));
-            }
+            // Generic class literals return above. Inheriting from a fully specialized generic
+            // base does not make the subclass generic.
+            return Err(SubscriptError::new(
+                Type::unknown(),
+                SubscriptErrorKind::NotSubscriptable {
+                    value_ty,
+                    method: DunderMethod::ClassGetItem,
+                },
+            ));
         } else if expr_context != ast::ExprContext::Store {
             return Err(SubscriptError::new(
                 Type::unknown(),
