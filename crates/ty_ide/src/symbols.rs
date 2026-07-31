@@ -865,27 +865,53 @@ impl<'db> SymbolVisitor<'db> {
     }
 
     /// Adds a symbol for a name definition.
-    fn add_name_symbol(&mut self, stmt: &ast::Stmt, name: &ast::ExprName, kind: SymbolKind) {
+    fn add_named_symbol(
+        &mut self,
+        stmt: &ast::Stmt,
+        name: &Name,
+        name_range: TextRange,
+        kind: SymbolKind,
+    ) {
         let symbol = SymbolTree {
             parent: None,
-            name: name.id.to_string(),
+            name: name.to_string(),
             kind,
             deprecated: false,
-            name_range: name.range(),
+            name_range,
             full_range: stmt.range(),
             imported_from: None,
         };
         self.add_symbol(symbol);
     }
 
+    fn add_name_symbol(&mut self, stmt: &ast::Stmt, name: &ast::ExprName, kind: SymbolKind) {
+        self.add_named_symbol(stmt, &name.id, name.range(), kind);
+    }
+
     /// Adds a symbol introduced via an assignment.
     fn add_assignment(&mut self, stmt: &ast::Stmt, name: &ast::ExprName) {
+        self.add_assignment_name(stmt, &name.id, name.range());
+    }
+
+    fn add_pattern_binding(&mut self, stmt: &ast::Stmt, name: &ast::Identifier) {
+        if self.in_function || name.id == "_" {
+            return;
+        }
+
+        self.add_assignment_name(stmt, &name.id, name.range());
+
+        if self.exports_only && self.all_origin.is_some() && name.id == "__all__" {
+            self.all_invalid = true;
+        }
+    }
+
+    fn add_assignment_name(&mut self, stmt: &ast::Stmt, name: &Name, name_range: TextRange) {
         // Include assignments only when we're in global or class scope.
         if self.in_function {
             return;
         }
 
-        let kind = if Self::is_constant_name(name.id.as_str()) {
+        let kind = if Self::is_constant_name(name.as_str()) {
             SymbolKind::Constant
         } else if self
             .iter_symbol_stack()
@@ -895,7 +921,7 @@ impl<'db> SymbolVisitor<'db> {
         } else {
             SymbolKind::Variable
         };
-        self.add_name_symbol(stmt, name, kind);
+        self.add_named_symbol(stmt, name, name_range, kind);
     }
 
     /// Adds a symbol introduced via an import `stmt`.
@@ -1575,6 +1601,51 @@ impl<'db> SourceOrderVisitor<'db> for SymbolVisitor<'db> {
             self.visit_expr(condition);
         }
     }
+
+    fn visit_pattern(&mut self, pattern: &'db ast::Pattern) {
+        let Some(stmt) = self.current_stmt else {
+            source_order::walk_pattern(self, pattern);
+            return;
+        };
+
+        match pattern {
+            ast::Pattern::MatchStar(ast::PatternMatchStar {
+                name: Some(name), ..
+            }) => {
+                self.add_pattern_binding(stmt, name);
+                source_order::walk_pattern(self, pattern);
+            }
+            ast::Pattern::MatchAs(ast::PatternMatchAs { name, .. }) => {
+                source_order::walk_pattern(self, pattern);
+                if let Some(name) = name {
+                    self.add_pattern_binding(stmt, name);
+                }
+            }
+            ast::Pattern::MatchMapping(mapping) => {
+                let rest_before_keys = mapping.rest.as_ref().filter(|rest| {
+                    mapping
+                        .keys
+                        .first()
+                        .is_some_and(|key| rest.start() < key.start())
+                });
+                let rest_after_keys = mapping.rest.as_ref().filter(|rest| {
+                    mapping
+                        .keys
+                        .first()
+                        .is_none_or(|key| rest.start() >= key.start())
+                });
+
+                if let Some(rest) = rest_before_keys {
+                    self.add_pattern_binding(stmt, rest);
+                }
+                source_order::walk_pattern(self, pattern);
+                if let Some(rest) = rest_after_keys {
+                    self.add_pattern_binding(stmt, rest);
+                }
+            }
+            _ => source_order::walk_pattern(self, pattern),
+        }
+    }
 }
 
 /// Represents where an `__all__` has been defined.
@@ -1736,6 +1807,67 @@ with_left :: Variable\n\
 with_rest :: Variable\n\
 captured :: Variable\n\
 walrus :: Variable"
+        );
+    }
+
+    #[test]
+    fn exports_match_pattern_bindings() {
+        let test = public_test(
+            "\
+match subject:
+    case [first, *middle, last] as sequence:
+        body_target = 1
+    case {\"key\": mapping_value, **remaining}:
+        fallback_target = 2
+    case Point(positional, named=keyword):
+        pass
+    case (0 as alternative) | (1 as alternative):
+        pass
+    case _:
+        wildcard_body = 3
+
+match other:
+    case CONSTANT_CAPTURE:
+        pass
+",
+        );
+
+        assert_eq!(
+            test.exports(),
+            "first :: Variable\n\
+middle :: Variable\n\
+last :: Variable\n\
+sequence :: Variable\n\
+body_target :: Variable\n\
+mapping_value :: Variable\n\
+remaining :: Variable\n\
+fallback_target :: Variable\n\
+positional :: Variable\n\
+keyword :: Variable\n\
+alternative :: Variable\n\
+wildcard_body :: Variable\n\
+CONSTANT_CAPTURE :: Constant"
+        );
+    }
+
+    #[test]
+    fn exports_invalidate_all_rebound_by_match_pattern() {
+        let test = public_test(
+            "\
+hidden = 1
+visible = 2
+__all__ = ['visible']
+match subject:
+    case __all__:
+        pass
+",
+        );
+
+        assert_eq!(
+            test.exports(),
+            "hidden :: Variable\n\
+visible :: Variable\n\
+__all__ :: Variable"
         );
     }
 
