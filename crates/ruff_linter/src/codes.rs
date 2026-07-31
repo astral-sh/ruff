@@ -728,7 +728,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Bandit, "509") => rules::flake8_bandit::rules::SnmpWeakCryptography,
         (Flake8Bandit, "601") => rules::flake8_bandit::rules::ParamikoCall,
         (Flake8Bandit, "602") => rules::flake8_bandit::rules::SubprocessPopenWithShellEqualsTrue,
-        (Flake8Bandit, "603") => rules::flake8_bandit::rules::SubprocessWithoutShellEqualsTrue,
+        (Flake8Bandit, "603") => rules::flake8_bandit::rules::SubprocessCallWithUntrustedInput,
         (Flake8Bandit, "604") => rules::flake8_bandit::rules::CallWithShellEqualsTrue,
         (Flake8Bandit, "605") => rules::flake8_bandit::rules::StartProcessWithAShell,
         (Flake8Bandit, "606") => rules::flake8_bandit::rules::StartProcessWithNoShell,
