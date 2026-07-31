@@ -64,7 +64,7 @@ use crate::types::diagnostic::{
     UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE, UNRESOLVED_GLOBAL, UNRESOLVED_REFERENCE,
     UNSUPPORTED_OPERATOR, UNUSED_AWAITABLE, hint_if_stdlib_attribute_exists_on_other_versions,
     report_attempted_protocol_instantiation, report_bad_dunder_delattr_call,
-    report_bad_dunder_delete_call, report_call_to_abstract_method,
+    report_bad_dunder_delete_call, report_bad_dunder_get_call, report_call_to_abstract_method,
     report_cannot_pop_required_field_on_typed_dict, report_invalid_assignment,
     report_invalid_class_match_pattern, report_invalid_exception_caught,
     report_invalid_exception_cause, report_invalid_exception_raised,
@@ -10317,7 +10317,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 assigned_type = Some(ty);
             }
         }
-        let fallback_place = value_type.member(db, env, &attr.id).map_type(|ty| {
+        let fallback = value_type.member_with_diagnostics(db, env, &attr.id);
+        if attribute.ctx == ExprContext::Load
+            && let Some(failure) = fallback
+                .descriptor_get_error
+                .and_then(|context| context.into_error(db, env))
+        {
+            report_bad_dunder_get_call(&self.context, &failure, value_type, attribute);
+        }
+        let fallback_place = fallback.member.map_type(|ty| {
             self.narrow_expr_with_applicable_constraints(attribute, ty, &constraint_keys)
         });
 

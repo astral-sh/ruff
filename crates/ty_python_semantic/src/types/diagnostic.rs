@@ -2,8 +2,8 @@ use super::call::CallErrorKind;
 use super::context::InferContext;
 use super::mro::DuplicateBaseError;
 use super::{
-    CallArguments, CallDunderError, ClassBase, ClassLiteral, GenericAlias, KnownClass,
-    StaticClassLiteral, add_inferred_python_version_hint_to_diagnostic,
+    CallArguments, CallDunderError, ClassBase, ClassLiteral, DescriptorGetCallError, GenericAlias,
+    KnownClass, StaticClassLiteral, add_inferred_python_version_hint_to_diagnostic,
 };
 use crate::diagnostic::{did_you_mean, format_enumeration};
 use crate::lint::{Level, LintRegistryBuilder, LintStatus};
@@ -1737,6 +1737,33 @@ pub(super) fn report_invalid_attribute_assignment(
 
     let error_context = source_ty.assignability_error_context(db, env, target_ty);
     error_context.attach_to(db, env, &mut diag);
+}
+
+pub(super) fn report_bad_dunder_get_call<'db>(
+    context: &InferContext<'db, '_>,
+    failure: &DescriptorGetCallError<'db>,
+    object_type: Type<'db>,
+    target: &ast::ExprAttribute,
+) {
+    let db = context.db();
+    let env = &context.program_environment();
+    failure.error.report_diagnostics_with_override(
+        context,
+        target.into(),
+        &CallDiagnosticOverride {
+            lint: &INVALID_ATTRIBUTE_ACCESS,
+            message: format!(
+                "Invalid access to descriptor attribute `{}` on type `{}`",
+                target.attr,
+                object_type.display(db, env),
+            ),
+            info: &format!(
+                "This access implicitly calls `__get__` on a descriptor of type `{}`",
+                failure.descriptor_type.display(db, env),
+            ),
+            argument_ranges: &[target.range(), target.value.range(), target.value.range()],
+        },
+    );
 }
 
 pub(super) fn report_bad_dunder_set_call<'db>(

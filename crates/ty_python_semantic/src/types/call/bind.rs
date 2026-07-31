@@ -900,6 +900,17 @@ impl<'db> Bindings<'db> {
         self.elements.iter().flat_map(BindingsElement::callables)
     }
 
+    /// Returns whether any contributing callable, including a downstream constructor call, has
+    /// no overload compatible with the provided arguments.
+    pub(super) fn has_overload_resolution_error(&self) -> bool {
+        self.iter_flat()
+            .any(|binding| binding.matching_overloads().next().is_none())
+            || self
+                .iter_constructor_items()
+                .filter_map(ConstructorBinding::downstream_constructor)
+                .any(Self::has_overload_resolution_error)
+    }
+
     /// Returns a mutable iterator over all `CallableBinding`s, flattening the two-level structure.
     ///
     /// Note: This loses the union/intersection distinction. Use only when you need to

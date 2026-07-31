@@ -534,6 +534,126 @@ impl AttributeKind {
     }
 }
 
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+struct DescriptorGetCallContext<'db> {
+    #[returns(copy)]
+    descriptor_type: Type<'db>,
+    #[returns(copy)]
+    instance: Option<Type<'db>>,
+    #[returns(copy)]
+    owner: Type<'db>,
+}
+
+impl get_size2::GetSize for DescriptorGetCallContext<'_> {}
+
+impl<'db> DescriptorGetCallContext<'db> {
+    fn into_error(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> Option<DescriptorGetCallError<'db>> {
+        let descriptor_type = self.descriptor_type(db);
+        let Place::Defined(DefinedPlace { ty: descr_get, .. }) = descriptor_type
+            .class_member_with_policy(db, env, "__get__", MemberLookupPolicy::NO_INSTANCE_FALLBACK)
+            .place
+        else {
+            return None;
+        };
+        let instance = self.instance(db).unwrap_or_else(|| Type::none(db, env));
+        let owner = self.owner(db);
+        let error = descr_get
+            .try_call(
+                db,
+                env,
+                &CallArguments::positional([descriptor_type, instance, owner]),
+            )
+            .err()?;
+        Some(DescriptorGetCallError {
+            descriptor_type,
+            error,
+        })
+    }
+}
+
+#[derive(Clone, Debug, Copy, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
+struct DescriptorGetResult<'db> {
+    return_type: Type<'db>,
+    kind: AttributeKind,
+    error: Option<DescriptorGetCallContext<'db>>,
+}
+
+pub(crate) struct DescriptorGetCallError<'db> {
+    pub(crate) descriptor_type: Type<'db>,
+    pub(crate) error: CallError<'db>,
+}
+
+#[derive(Clone, Debug, Copy, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
+pub(crate) struct MemberLookupResult<'db> {
+    member: PlaceAndQualifiers<'db>,
+    descriptor_get_error: Option<DescriptorGetCallContext<'db>>,
+}
+
+impl<'db> MemberLookupResult<'db> {
+    fn new(
+        member: PlaceAndQualifiers<'db>,
+        descriptor_get_error: Option<DescriptorGetCallContext<'db>>,
+    ) -> Self {
+        Self {
+            member,
+            descriptor_get_error,
+        }
+    }
+
+    fn map_type(self, f: impl FnOnce(Type<'db>) -> Type<'db>) -> Self {
+        Self {
+            member: self.member.map_type(f),
+            descriptor_get_error: self.descriptor_get_error,
+        }
+    }
+
+    fn or_fall_back_to(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        fallback_fn: impl FnOnce() -> Self,
+    ) -> Self {
+        let mut fallback_error = None;
+        let member = self.member.or_fall_back_to(db, env, || {
+            let fallback = fallback_fn();
+            fallback_error = fallback.descriptor_get_error;
+            fallback.member
+        });
+        Self::new(member, self.descriptor_get_error.or(fallback_error))
+    }
+
+    fn cycle_normalized(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        previous: Self,
+        cycle: &salsa::Cycle,
+    ) -> Self {
+        Self {
+            member: self
+                .member
+                .cycle_normalized(db, env, previous.member, cycle),
+            descriptor_get_error: self.descriptor_get_error.or(previous.descriptor_get_error),
+        }
+    }
+}
+
+impl<'db> From<PlaceAndQualifiers<'db>> for MemberLookupResult<'db> {
+    fn from(member: PlaceAndQualifiers<'db>) -> Self {
+        Self::new(member, None)
+    }
+}
+
+impl<'db> From<Place<'db>> for MemberLookupResult<'db> {
+    fn from(place: Place<'db>) -> Self {
+        Self::new(place.into(), None)
+    }
+}
+
 /// This enum is used to control the behavior of the descriptor protocol implementation.
 /// When invoked on a class object, the fallback type (a class attribute) can shadow a
 /// non-data descriptor of the meta-type (the class's metaclass). However, this is not
@@ -3472,21 +3592,13 @@ impl<'db> Type<'db> {
         }
     }
 
-    /// Look up `__get__` on the meta-type of self, and call it with the arguments `self`, `instance`,
-    /// and `owner`. `__get__` is different than other dunder methods in that it is not looked up using
-    /// the descriptor protocol itself.
-    ///
-    /// In addition to the return type of `__get__`, this method also returns the *kind* of attribute
-    /// that `self` represents: (1) a data descriptor or (2) a non-data descriptor / normal attribute.
-    ///
-    /// If `__get__` is not defined on the meta-type, this method returns `None`.
-    pub(crate) fn try_call_dunder_get(
+    fn try_call_dunder_get_with_error(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         instance: Option<Type<'db>>,
         owner: Type<'db>,
-    ) -> Option<(Type<'db>, AttributeKind)> {
+    ) -> Option<DescriptorGetResult<'db>> {
         #[salsa::tracked(returns(copy), cycle_initial=|_, _, _, _, _, _| None, heap_size=ruff_memory_usage::heap_size)]
         fn try_call_dunder_get_inner<'db>(
             db: &'db dyn Db,
@@ -3494,21 +3606,29 @@ impl<'db> Type<'db> {
             ty: Type<'db>,
             instance: Option<Type<'db>>,
             owner: Type<'db>,
-        ) -> Option<(Type<'db>, AttributeKind)> {
+        ) -> Option<DescriptorGetResult<'db>> {
             let env = &ProgramEnvironment::from_program(program);
             if let Some(fallback) = ty.materialized_divergent_fallback() {
-                return fallback.try_call_dunder_get(db, env, instance, owner);
+                return fallback.try_call_dunder_get_with_error(db, env, instance, owner);
             }
 
             if let Some(dynamic) = ty.dynamic_descriptor_type() {
-                return Some((dynamic, AttributeKind::DataDescriptor));
+                return Some(DescriptorGetResult {
+                    return_type: dynamic,
+                    kind: AttributeKind::DataDescriptor,
+                    error: None,
+                });
             }
 
             match ty {
                 Type::Callable(callable) if callable.is_staticmethod_like(db) => {
                     // For "staticmethod-like" callables, model the behavior of `staticmethod.__get__`.
                     // The underlying function is returned as-is, without binding self.
-                    return Some((ty, AttributeKind::NormalOrNonDataDescriptor));
+                    return Some(DescriptorGetResult {
+                        return_type: ty,
+                        kind: AttributeKind::NormalOrNonDataDescriptor,
+                        error: None,
+                    });
                 }
                 Type::Callable(callable)
                     if let is_function_like = callable.is_function_like(db)
@@ -3517,24 +3637,29 @@ impl<'db> Type<'db> {
                     // For "function-like" or "classmethod-like" callables, model the behavior of
                     // `FunctionType.__get__` or `classmethod.__get__`.
                     //
-                    // It is a shortcut to model this in `try_call_dunder_get`. If we want to be really precise,
-                    // we should instead return a new method-wrapper type variant for the synthesized `__get__`
-                    // method of these synthesized functions. The method-wrapper would then be returned from
-                    // `find_name_in_mro` when called on function-like `Callable`s. This would allow us to
-                    // correctly model the behavior of *explicit* `SomeDataclass.__init__.__get__` calls.
-                    return if instance.is_none() && is_function_like {
-                        Some((ty, AttributeKind::NormalOrNonDataDescriptor))
+                    // It is a shortcut to model this in `try_call_dunder_get_with_error`. If we
+                    // want to be really precise, we should instead return a new method-wrapper
+                    // type variant for the synthesized `__get__` method of these synthesized
+                    // functions. The method-wrapper would then be returned from
+                    // `find_name_in_mro` when called on function-like `Callable`s. This would
+                    // allow us to correctly model the behavior of *explicit*
+                    // `SomeDataclass.__init__.__get__` calls.
+                    let return_type = if instance.is_none() && is_function_like {
+                        ty
                     } else {
                         let self_type = instance.unwrap_or_else(|| {
                             // For classmethod-like callables, bind to the owner class.
                             owner.to_instance_approximation(db, env).unwrap_or(owner)
                         });
 
-                        Some((
-                            Type::Callable(callable.bind_self(db, env, Some(self_type))),
-                            AttributeKind::NormalOrNonDataDescriptor,
-                        ))
+                        Type::Callable(callable.bind_self(db, env, Some(self_type)))
                     };
+
+                    return Some(DescriptorGetResult {
+                        return_type,
+                        kind: AttributeKind::NormalOrNonDataDescriptor,
+                        error: None,
+                    });
                 }
                 _ => {}
             }
@@ -3574,30 +3699,39 @@ impl<'db> Type<'db> {
             };
 
             let instance_ty = instance.unwrap_or_else(|| Type::none(db, env));
-            let return_ty = descr_get
-                .try_call(
-                    db,
-                    env,
-                    &CallArguments::positional([ty, instance_ty, owner]),
-                )
-                .map(|bindings| {
-                    if descr_get_boundness == Definedness::AlwaysDefined {
+            let (return_type, error) = match descr_get.try_call(
+                db,
+                env,
+                &CallArguments::positional([ty, instance_ty, owner]),
+            ) {
+                Ok(bindings) => {
+                    let return_type = if descr_get_boundness == Definedness::AlwaysDefined {
                         bindings.return_type(db, env)
                     } else {
                         UnionType::from_two_elements(db, env, bindings.return_type(db, env), ty)
-                    }
-                })
-                // TODO: an error when calling `__get__` will lead to a `TypeError` or similar at runtime;
-                // we should emit a diagnostic here instead of silently ignoring the error.
-                .unwrap_or_else(|CallError(_, bindings)| bindings.return_type(db, env));
+                    };
+                    (return_type, None)
+                }
+                Err(error) => {
+                    let return_type = error.return_type(db, env);
+                    let error = error
+                        .has_invalid_callee_or_arguments()
+                        .then(|| DescriptorGetCallContext::new(db, ty, instance, owner));
+                    (return_type, error)
+                }
+            };
 
-            let descriptor_kind = if ty.is_data_descriptor(db, env) {
+            let kind = if ty.is_data_descriptor(db, env) {
                 AttributeKind::DataDescriptor
             } else {
                 AttributeKind::NormalOrNonDataDescriptor
             };
 
-            Some((return_ty, descriptor_kind))
+            Some(DescriptorGetResult {
+                return_type,
+                kind,
+                error,
+            })
         }
 
         tracing::trace!(
@@ -3612,7 +3746,7 @@ impl<'db> Type<'db> {
         // Function descriptors have fixed binding behavior, so avoid retaining a tracked query
         // for every function and access context.
         if let Type::FunctionLiteral(function) = self {
-            let descriptor_result = if function.is_classmethod(db) {
+            let return_type = if function.is_classmethod(db) {
                 Type::BoundMethod(BoundMethodType::new(db, function, owner))
             } else if let Some(instance) = instance
                 && !function.is_staticmethod(db)
@@ -3622,10 +3756,33 @@ impl<'db> Type<'db> {
                 self
             };
 
-            return Some((descriptor_result, AttributeKind::NormalOrNonDataDescriptor));
+            return Some(DescriptorGetResult {
+                return_type,
+                kind: AttributeKind::NormalOrNonDataDescriptor,
+                error: None,
+            });
         }
 
         try_call_dunder_get_inner(db, env.program(db), self, instance, owner)
+    }
+
+    /// Look up `__get__` on the meta-type of self, and call it with the arguments `self`, `instance`,
+    /// and `owner`. `__get__` is different than other dunder methods in that it is not looked up using
+    /// the descriptor protocol itself.
+    ///
+    /// In addition to the return type of `__get__`, this method also returns the *kind* of attribute
+    /// that `self` represents: (1) a data descriptor or (2) a non-data descriptor / normal attribute.
+    ///
+    /// If `__get__` is not defined on the meta-type, this method returns `None`.
+    pub(crate) fn try_call_dunder_get(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        instance: Option<Type<'db>>,
+        owner: Type<'db>,
+    ) -> Option<(Type<'db>, AttributeKind)> {
+        self.try_call_dunder_get_with_error(db, env, instance, owner)
+            .map(|result| (result.return_type, result.kind))
     }
 
     /// Look up `__get__` on the meta-type of `attribute`, and call it with `attribute`, `instance`,
@@ -3637,7 +3794,11 @@ impl<'db> Type<'db> {
         attribute: PlaceAndQualifiers<'db>,
         instance: Option<Type<'db>>,
         owner: Type<'db>,
-    ) -> (PlaceAndQualifiers<'db>, AttributeKind) {
+    ) -> (
+        PlaceAndQualifiers<'db>,
+        AttributeKind,
+        Option<DescriptorGetCallContext<'db>>,
+    ) {
         if let PlaceAndQualifiers {
             place:
                 Place::Defined(DefinedPlace {
@@ -3678,7 +3839,7 @@ impl<'db> Type<'db> {
                         ..
                     }),
                 qualifiers: _,
-            } => (attribute, AttributeKind::DataDescriptor),
+            } => (attribute, AttributeKind::DataDescriptor, None),
 
             PlaceAndQualifiers {
                 place:
@@ -3692,13 +3853,16 @@ impl<'db> Type<'db> {
                 qualifiers,
             } => {
                 let mut all_data_descriptors = true;
+                let mut error = None;
 
                 let place = union
                     .map_with_boundness(db, env, |elem| {
-                        let ty = match elem.try_call_dunder_get(db, env, instance, owner) {
-                            Some((ty, kind)) => {
-                                all_data_descriptors &= kind.is_data();
-                                ty
+                        let ty = match elem.try_call_dunder_get_with_error(db, env, instance, owner)
+                        {
+                            Some(result) => {
+                                all_data_descriptors &= result.kind.is_data();
+                                error = error.or(result.error);
+                                result.return_type
                             }
                             None => {
                                 all_data_descriptors = false;
@@ -3722,7 +3886,7 @@ impl<'db> Type<'db> {
                     AttributeKind::NormalOrNonDataDescriptor
                 };
 
-                (place, kind)
+                (place, kind, error)
             }
 
             attribute @ PlaceAndQualifiers {
@@ -3735,16 +3899,20 @@ impl<'db> Type<'db> {
                         provenance: attribute_provenance,
                     }),
                 qualifiers,
-            } => (
-                if intersection.positive(db).is_empty() {
+            } => {
+                let mut error = None;
+                let place = if intersection.positive(db).is_empty() {
                     attribute
                 } else {
                     intersection
                         .map_with_boundness(db, env, |elem| {
+                            let result =
+                                elem.try_call_dunder_get_with_error(db, env, instance, owner);
+                            if let Some(result) = result {
+                                error = error.or(result.error);
+                            }
                             Place::Defined(DefinedPlace {
-                                ty: elem
-                                    .try_call_dunder_get(db, env, instance, owner)
-                                    .map_or(*elem, |(ty, _)| ty),
+                                ty: result.map_or(*elem, |result| result.return_type),
                                 origin,
                                 definedness,
                                 public_type_policy,
@@ -3752,10 +3920,14 @@ impl<'db> Type<'db> {
                             })
                         })
                         .with_qualifiers(qualifiers)
-                },
-                // TODO: Discover data descriptors in intersections.
-                AttributeKind::NormalOrNonDataDescriptor,
-            ),
+                };
+                (
+                    place,
+                    // TODO: Discover data descriptors in intersections.
+                    AttributeKind::NormalOrNonDataDescriptor,
+                    error,
+                )
+            }
 
             PlaceAndQualifiers {
                 place:
@@ -3768,26 +3940,27 @@ impl<'db> Type<'db> {
                     }),
                 qualifiers: _,
             } => {
-                if let Some((return_ty, attribute_kind)) =
-                    attribute_ty.try_call_dunder_get(db, env, instance, owner)
+                if let Some(result) =
+                    attribute_ty.try_call_dunder_get_with_error(db, env, instance, owner)
                 {
                     (
                         Place::Defined(DefinedPlace {
-                            ty: return_ty,
+                            ty: result.return_type,
                             origin,
                             definedness: boundness,
                             public_type_policy,
                             provenance,
                         })
                         .into(),
-                        attribute_kind,
+                        result.kind,
+                        result.error,
                     )
                 } else {
-                    (attribute, AttributeKind::NormalOrNonDataDescriptor)
+                    (attribute, AttributeKind::NormalOrNonDataDescriptor, None)
                 }
             }
 
-            _ => (attribute, AttributeKind::NormalOrNonDataDescriptor),
+            _ => (attribute, AttributeKind::NormalOrNonDataDescriptor, None),
         }
     }
 
@@ -3923,9 +4096,9 @@ impl<'db> Type<'db> {
         env: &ProgramEnvironment<'db>,
         key: MemberLookupKey<'db>,
         receiver: Type<'db>,
-        fallback: PlaceAndQualifiers<'db>,
+        fallback: MemberLookupResult<'db>,
         policy: InstanceFallbackShadowsNonDataDescriptor,
-    ) -> PlaceAndQualifiers<'db> {
+    ) -> MemberLookupResult<'db> {
         let ty = key.ty(db);
         let (
             PlaceAndQualifiers {
@@ -3933,6 +4106,7 @@ impl<'db> Type<'db> {
                 qualifiers: meta_attr_qualifiers,
             },
             meta_attr_kind,
+            meta_attr_error,
         ) = Self::try_call_dunder_get_on_attribute(
             db,
             env,
@@ -3941,17 +4115,19 @@ impl<'db> Type<'db> {
             ty.to_meta_type(db, env),
         );
 
+        let fallback_error = fallback.descriptor_get_error;
         let PlaceAndQualifiers {
             place: fallback,
             qualifiers: fallback_qualifiers,
-        } = fallback;
+        } = fallback.member;
 
         match (meta_attr, meta_attr_kind, fallback) {
             // The fallback type is unbound, so we can just return `meta_attr` unconditionally,
             // no matter if it's data descriptor, a non-data descriptor, or a normal attribute.
-            (meta_attr @ Place::Defined(_), _, Place::Undefined) => {
-                meta_attr.with_qualifiers(meta_attr_qualifiers)
-            }
+            (meta_attr @ Place::Defined(_), _, Place::Undefined) => MemberLookupResult::new(
+                meta_attr.with_qualifiers(meta_attr_qualifiers),
+                meta_attr_error,
+            ),
 
             // `meta_attr` is the return type of a data descriptor and definitely bound, so we
             // return it.
@@ -3962,7 +4138,10 @@ impl<'db> Type<'db> {
                 }),
                 AttributeKind::DataDescriptor,
                 _,
-            ) => meta_attr.with_qualifiers(meta_attr_qualifiers),
+            ) => MemberLookupResult::new(
+                meta_attr.with_qualifiers(meta_attr_qualifiers),
+                meta_attr_error,
+            ),
 
             // `meta_attr` is the return type of a data descriptor, but the attribute on the
             // meta-type is possibly-unbound. This means that we "fall through" to the next
@@ -3983,14 +4162,17 @@ impl<'db> Type<'db> {
                     public_type_policy: fallback_public_type_policy,
                     provenance: fallback_provenance,
                 }),
-            ) => Place::Defined(DefinedPlace {
-                ty: UnionType::from_two_elements(db, env, meta_attr_ty, fallback_ty),
-                origin: meta_origin.merge(fallback_origin),
-                definedness: fallback_boundness,
-                public_type_policy: fallback_public_type_policy,
-                provenance: fallback_provenance.or(meta_attr_provenance),
-            })
-            .with_qualifiers(meta_attr_qualifiers.union(fallback_qualifiers)),
+            ) => MemberLookupResult::new(
+                Place::Defined(DefinedPlace {
+                    ty: UnionType::from_two_elements(db, env, meta_attr_ty, fallback_ty),
+                    origin: meta_origin.merge(fallback_origin),
+                    definedness: fallback_boundness,
+                    public_type_policy: fallback_public_type_policy,
+                    provenance: fallback_provenance.or(meta_attr_provenance),
+                })
+                .with_qualifiers(meta_attr_qualifiers.union(fallback_qualifiers)),
+                meta_attr_error.or(fallback_error),
+            ),
 
             // `meta_attr` is *not* a data descriptor. This means that the `fallback` type has
             // now the highest priority. However, we only return the pure `fallback` type if the
@@ -4008,7 +4190,10 @@ impl<'db> Type<'db> {
                     ..
                 }),
             ) if policy == InstanceFallbackShadowsNonDataDescriptor::Yes => {
-                fallback.with_qualifiers(fallback_qualifiers)
+                MemberLookupResult::new(
+                    fallback.with_qualifiers(fallback_qualifiers),
+                    fallback_error,
+                )
             }
 
             // `meta_attr` is *not* a data descriptor. The `fallback` symbol is either possibly
@@ -4030,17 +4215,23 @@ impl<'db> Type<'db> {
                     public_type_policy: fallback_public_type_policy,
                     provenance: fallback_provenance,
                 }),
-            ) => Place::Defined(DefinedPlace {
-                ty: UnionType::from_two_elements(db, env, meta_attr_ty, fallback_ty),
-                origin: meta_origin.merge(fallback_origin),
-                definedness: meta_attr_boundness.max(fallback_boundness),
-                public_type_policy: fallback_public_type_policy,
-                provenance: fallback_provenance.or(meta_attr_provenance),
-            })
-            .with_qualifiers(meta_attr_qualifiers.union(fallback_qualifiers)),
+            ) => MemberLookupResult::new(
+                Place::Defined(DefinedPlace {
+                    ty: UnionType::from_two_elements(db, env, meta_attr_ty, fallback_ty),
+                    origin: meta_origin.merge(fallback_origin),
+                    definedness: meta_attr_boundness.max(fallback_boundness),
+                    public_type_policy: fallback_public_type_policy,
+                    provenance: fallback_provenance.or(meta_attr_provenance),
+                })
+                .with_qualifiers(meta_attr_qualifiers.union(fallback_qualifiers)),
+                meta_attr_error.or(fallback_error),
+            ),
 
             // If the attribute is not found on the meta-type, we simply return the fallback.
-            (Place::Undefined, _, fallback) => fallback.with_qualifiers(fallback_qualifiers),
+            (Place::Undefined, _, fallback) => MemberLookupResult::new(
+                fallback.with_qualifiers(fallback_qualifiers),
+                fallback_error,
+            ),
         }
     }
 
@@ -4049,16 +4240,30 @@ impl<'db> Type<'db> {
     ///
     /// See also: [`Type::static_member`]
     ///
-    /// TODO: We should return a `Result` here to handle errors that can appear during attribute
-    /// lookup, like a failed `__get__` call on a descriptor.
     #[must_use]
-    fn member(
+    pub(crate) fn member(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         name: &str,
     ) -> PlaceAndQualifiers<'db> {
-        self.member_lookup_with_policy(db, env, name, MemberLookupPolicy::default())
+        self.member_with_diagnostics(db, env, name).member
+    }
+
+    /// Performs member lookup and retains errors raised by an implicit descriptor `__get__` call.
+    pub(crate) fn member_with_diagnostics(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        name: &str,
+    ) -> MemberLookupResult<'db> {
+        self.member_lookup_with_policy_and_receiver(
+            db,
+            env,
+            name,
+            MemberLookupPolicy::default(),
+            None,
+        )
     }
 
     /// Similar to [`Type::member`], but allows the caller to specify what policy should be used
@@ -4071,6 +4276,7 @@ impl<'db> Type<'db> {
         policy: MemberLookupPolicy,
     ) -> PlaceAndQualifiers<'db> {
         self.member_lookup_with_policy_and_receiver(db, env, name, policy, None)
+            .member
     }
 
     /// Perform member lookup while optionally binding descriptors and `Self` to a more precise
@@ -4085,11 +4291,11 @@ impl<'db> Type<'db> {
         name: &str,
         policy: MemberLookupPolicy,
         receiver: Option<Type<'db>>,
-    ) -> PlaceAndQualifiers<'db> {
+    ) -> MemberLookupResult<'db> {
         #[salsa::tracked(
             returns(copy),
-            cycle_initial=|_, id, _| Place::bound(Type::divergent(id)).into(),
-            cycle_fn=|db, cycle, previous: &PlaceAndQualifiers<'db>, member: PlaceAndQualifiers<'db>, key: MemberLookupKey<'db>| {
+            cycle_initial=|_, id, _| MemberLookupResult::new(Place::bound(Type::divergent(id)).into(), None),
+            cycle_fn=|db, cycle, previous: &MemberLookupResult<'db>, member: MemberLookupResult<'db>, key: MemberLookupKey<'db>| {
                 member.cycle_normalized(db, &ProgramEnvironment::from_program(key.program(db)), *previous, cycle)
             },
             heap_size=ruff_memory_usage::heap_size
@@ -4097,14 +4303,14 @@ impl<'db> Type<'db> {
         fn member_lookup_with_policy_inner<'db>(
             db: &'db dyn Db,
             key: MemberLookupKey<'db>,
-        ) -> PlaceAndQualifiers<'db> {
+        ) -> MemberLookupResult<'db> {
             member_lookup_with_policy_impl(db, key, None)
         }
 
         #[salsa::tracked(
             returns(copy),
-            cycle_initial=|_, id, _, _| Place::bound(Type::divergent(id)).into(),
-            cycle_fn=|db, cycle, previous: &PlaceAndQualifiers<'db>, member: PlaceAndQualifiers<'db>, key: MemberLookupKey<'db>, _| {
+            cycle_initial=|_, id, _, _| MemberLookupResult::new(Place::bound(Type::divergent(id)).into(), None),
+            cycle_fn=|db, cycle, previous: &MemberLookupResult<'db>, member: MemberLookupResult<'db>, key: MemberLookupKey<'db>, _| {
                 member.cycle_normalized(db, &ProgramEnvironment::from_program(key.program(db)), *previous, cycle)
             },
             heap_size=ruff_memory_usage::heap_size
@@ -4113,7 +4319,7 @@ impl<'db> Type<'db> {
             db: &'db dyn Db,
             key: MemberLookupKey<'db>,
             receiver: Type<'db>,
-        ) -> PlaceAndQualifiers<'db> {
+        ) -> MemberLookupResult<'db> {
             member_lookup_with_policy_impl(db, key, Some(receiver))
         }
 
@@ -4121,19 +4327,19 @@ impl<'db> Type<'db> {
             db: &'db dyn Db,
             key: MemberLookupKey<'db>,
             receiver: Option<Type<'db>>,
-        ) -> PlaceAndQualifiers<'db> {
+        ) -> MemberLookupResult<'db> {
             fn promote_inferred_attribute_class_literals<'db>(
                 db: &'db dyn Db,
                 env: &ProgramEnvironment<'db>,
-                result: PlaceAndQualifiers<'db>,
-            ) -> PlaceAndQualifiers<'db> {
+                result: MemberLookupResult<'db>,
+            ) -> MemberLookupResult<'db> {
                 let should_promote = matches!(
-                    result.place,
+                    result.member.place,
                     Place::Defined(DefinedPlace {
                         origin: TypeOrigin::Inferred,
                         ..
                     })
-                ) && !result.qualifiers.contains(TypeQualifiers::FINAL);
+                ) && !result.member.qualifiers.contains(TypeQualifiers::FINAL);
 
                 if should_promote {
                     result.map_type(|ty| ty.promote_class_literals(db, env))
@@ -4147,7 +4353,7 @@ impl<'db> Type<'db> {
                 env: &ProgramEnvironment<'db>,
                 key: MemberLookupKey<'db>,
                 receiver: Type<'db>,
-            ) -> PlaceAndQualifiers<'db> {
+            ) -> MemberLookupResult<'db> {
                 let this = key.ty(db);
                 let name = key.name(db);
                 let name_str = name.as_str();
@@ -4179,17 +4385,20 @@ impl<'db> Type<'db> {
                     env,
                     key,
                     receiver,
-                    fallback,
+                    fallback.into(),
                     InstanceFallbackShadowsNonDataDescriptor::No,
                 );
 
-                if result.is_class_var() && this.is_typed_dict() {
+                if result.member.is_class_var() && this.is_typed_dict() {
                     // `ClassVar`s on `TypedDictFallback` cannot be accessed on inhabitants of `SomeTypedDict`.
                     // They can only be accessed on `SomeTypedDict` directly.
                     return Place::Undefined.into();
                 }
 
-                let result = this.fallback_to_getattr(db, env, name, result, key.policy(db));
+                let result = MemberLookupResult::new(
+                    this.fallback_to_getattr(db, env, name, result.member, key.policy(db)),
+                    result.descriptor_get_error,
+                );
                 // An inferred attribute accessed through an instance can resolve to an override
                 // on a subclass, so an exact class object is not a safe public type here.
                 let result = result.map_type(|ty| ty.bind_self_typevars(db, env, receiver));
@@ -4214,27 +4423,43 @@ impl<'db> Type<'db> {
             }
 
             match this {
-                Type::Union(union) => union.map_with_boundness_and_qualifiers(db, env, |elem| {
-                    elem.member_lookup_with_policy_and_receiver(db, env, name_str, policy, receiver)
-                }),
+                Type::Union(union) => {
+                    let mut descriptor_get_error = None;
+                    let member = union.map_with_boundness_and_qualifiers(db, env, |elem| {
+                        let result = elem.member_lookup_with_policy_and_receiver(
+                            db, env, name_str, policy, receiver,
+                        );
+                        descriptor_get_error = descriptor_get_error.or(result.descriptor_get_error);
+                        result.member
+                    });
+                    MemberLookupResult::new(member, descriptor_get_error)
+                }
 
                 Type::Intersection(intersection) => {
                     if let Some(complement) = intersection.enum_complement(db, env) {
                         enums::member_lookup_for_enum_complement(
                             db, env, complement, name_str, policy,
                         )
+                        .into()
                     } else {
                         let receiver = Some(receiver.unwrap_or(this));
-                        intersection.map_with_boundness_and_qualifiers(db, env, |elem| {
-                            elem.member_lookup_with_policy_and_receiver(
-                                db, env, name_str, policy, receiver,
-                            )
-                        })
+                        let mut descriptor_get_error = None;
+                        let member =
+                            intersection.map_with_boundness_and_qualifiers(db, env, |elem| {
+                                let result = elem.member_lookup_with_policy_and_receiver(
+                                    db, env, name_str, policy, receiver,
+                                );
+                                descriptor_get_error =
+                                    descriptor_get_error.or(result.descriptor_get_error);
+                                result.member
+                            });
+                        MemberLookupResult::new(member, descriptor_get_error)
                     }
                 }
 
                 Type::EnumComplement(complement) => {
                     enums::member_lookup_for_enum_complement(db, env, complement, name_str, policy)
+                        .into()
                 }
 
                 Type::Dynamic(..) | Type::Divergent(_) | Type::Never => Place::bound(this).into(),
@@ -4396,21 +4621,19 @@ impl<'db> Type<'db> {
                     "__func__" => {
                         Place::bound(Type::FunctionLiteral(bound_method.function(db))).into()
                     }
-                    _ => {
-                        KnownClass::MethodType
-                            .to_instance(db, env)
-                            .member_lookup_with_policy_and_receiver(
-                                db, env, name_str, policy, receiver,
-                            )
-                            .or_fall_back_to(db, env, || {
-                                // If an attribute is not available on the bound method object,
-                                // it will be looked up on the underlying function object. This
-                                // changes the lookup object, so do not forward the bound-method
-                                // receiver.
-                                Type::FunctionLiteral(bound_method.function(db))
-                                    .member_lookup_with_policy(db, env, name_str, policy)
-                            })
-                    }
+                    _ => KnownClass::MethodType
+                        .to_instance(db, env)
+                        .member_lookup_with_policy_and_receiver(db, env, name_str, policy, receiver)
+                        .or_fall_back_to(db, env, || {
+                            // If an attribute is not available on the bound method object,
+                            // it will be looked up on the underlying function object. This
+                            // changes the lookup object, so do not forward the bound-method
+                            // receiver.
+                            Type::FunctionLiteral(bound_method.function(db))
+                                .member_lookup_with_policy_and_receiver(
+                                    db, env, name_str, policy, None,
+                                )
+                        }),
                 },
                 Type::KnownBoundMethod(method) => method
                     .class()
@@ -4471,7 +4694,7 @@ impl<'db> Type<'db> {
                     Place::bound(Type::int_literal(i64::from(bool_value))).into()
                 }
 
-                Type::ModuleLiteral(module) => module.static_member(db, env, name_str),
+                Type::ModuleLiteral(module) => module.static_member(db, env, name_str).into(),
 
                 // If a protocol does not include a member and the policy disables falling back to
                 // `object`, we return `Place::Undefined` here. This short-circuits attribute lookup
@@ -4499,7 +4722,7 @@ impl<'db> Type<'db> {
                 Type::NewTypeInstance(new_type_instance) if this.as_union_like(db).is_some() => {
                     new_type_instance
                         .concrete_base_type(db)
-                        .member_lookup_with_policy(db, env, name_str, policy)
+                        .member_lookup_with_policy_and_receiver(db, env, name_str, policy, None)
                 }
 
                 Type::TypeAlias(alias) => alias
@@ -4623,7 +4846,7 @@ impl<'db> Type<'db> {
                             db, env, name_str, policy, receiver,
                         );
                     if name_str == "func" {
-                        match nominal_lookup.place {
+                        match nominal_lookup.member.place {
                             Place::Defined(DefinedPlace {
                                 origin,
                                 definedness,
@@ -4694,21 +4917,21 @@ impl<'db> Type<'db> {
                     let class_attr_plain = class_attr_plain
                         .map_type(|ty| ty.bind_self_typevars(db, env, self_instance));
 
-                    let class_attr_fallback = Type::try_call_dunder_get_on_attribute(
-                        db,
-                        env,
-                        class_attr_plain,
-                        None,
-                        receiver,
-                    )
-                    .0;
+                    let (class_attr_fallback, _, class_attr_error) =
+                        Type::try_call_dunder_get_on_attribute(
+                            db,
+                            env,
+                            class_attr_plain,
+                            None,
+                            receiver,
+                        );
 
                     let result = Type::invoke_descriptor_protocol(
                         db,
                         env,
                         key,
                         receiver,
-                        class_attr_fallback,
+                        MemberLookupResult::new(class_attr_fallback, class_attr_error),
                         InstanceFallbackShadowsNonDataDescriptor::Yes,
                     );
 
@@ -4718,7 +4941,10 @@ impl<'db> Type<'db> {
                     // attribute access falls back to `__getattr__`/`__getattribute__` on the
                     // class. `try_call_dunder` adds `NO_INSTANCE_FALLBACK`, which causes the
                     // lookup to hit the catch-all that only checks the meta-type (the metaclass).
-                    let result = this.fallback_to_getattr(db, env, name, result, policy);
+                    let result = MemberLookupResult::new(
+                        this.fallback_to_getattr(db, env, name, result.member, policy),
+                        result.descriptor_get_error,
+                    );
                     // Unlike a specific class literal, `type[C]` can represent any subclass of
                     // `C`, unless a `TypeVar` upper bound normalizes to a final class.
                     let result = if let Type::SubclassOf(subclass_of) = this
@@ -4764,7 +4990,7 @@ impl<'db> Type<'db> {
 
                     bound_super
                         .try_call_dunder_get_on_attribute(db, env, owner_attr)
-                        .unwrap_or(owner_attr)
+                        .unwrap_or_else(|| owner_attr.into())
                 }
             }
         }

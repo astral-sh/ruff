@@ -956,16 +956,17 @@ reveal_type(C.class_object_access)  # revealed: int
 reveal_type(C().instance_access)  # revealed: str
 reveal_type(C.metaclass_access)  # revealed: bytes
 
-# TODO: These should emit a diagnostic
-#
-# However, we use the return-type of `__get__` as the inferred type anyway:
+# Invalid calls emit a diagnostic. However, we use the return type of `__get__`
+# as the inferred type anyway:
 # the way to specify that the descriptor object itself is returned when the
 # attribute is accessed on the instance or the class is by overloading `__get__`.
 #
 # Using the return type of `__get__` even for `__get__` calls that have invalid
 # arguments passed to them avoids false positives in situations where there are
 # `__get__` calls that we don't sufficiently understand.
+# error: [invalid-attribute-access] "Invalid access to descriptor attribute `class_object_access` on type `C`"
 reveal_type(C().class_object_access)  # revealed: int
+# error: [invalid-attribute-access] "Invalid access to descriptor attribute `instance_access` on type `<class 'C'>`"
 reveal_type(C.instance_access)  # revealed: str
 ```
 
@@ -980,11 +981,46 @@ class Descriptor:
 class C:
     descriptor: Descriptor = Descriptor()
 
-# TODO: This should be an error
+C().descriptor  # snapshot: invalid-attribute-access
+
+# error: [invalid-attribute-access] "Invalid access to descriptor attribute `descriptor` on type `<class 'C'>`"
 reveal_type(C.descriptor)  # revealed: int
 
-# TODO: This should be an error
+# error: [invalid-attribute-access] "Invalid access to descriptor attribute `descriptor` on type `C`"
 reveal_type(C().descriptor)  # revealed: int
+```
+
+```snapshot
+error[invalid-attribute-access]: Invalid access to descriptor attribute `descriptor` on type `C`
+ --> src/mdtest_snippet.py:9:1
+  |
+9 | C().descriptor  # snapshot: invalid-attribute-access
+  | ^^^ Too many positional arguments to function `Descriptor.__get__`: expected 1, got 3
+info: This access implicitly calls `__get__` on a descriptor of type `Descriptor`
+info: Function signature here
+ --> src/mdtest_snippet.py:3:9
+  |
+3 |     def __get__(self) -> int:
+  |         ^^^^^^^^^^^^^^^^^^^^
+```
+
+### A shadowed metaclass descriptor with an incorrect `__get__` signature
+
+A class attribute takes precedence over a non-data descriptor of the same name on the metaclass, so
+the descriptor's invalid `__get__` signature is irrelevant to this access.
+
+```py
+class Descriptor:
+    def __get__(self) -> str:
+        return ""
+
+class Meta(type):
+    attribute = Descriptor()
+
+class C(metaclass=Meta):
+    attribute = 1
+
+reveal_type(C.attribute)  # revealed: int
 ```
 
 ### "Descriptors" with non-callable `__get__` attributes
@@ -1000,8 +1036,8 @@ class BrokenDescriptor:
 class Foo:
     desc: BrokenDescriptor = BrokenDescriptor()
 
-# TODO: this raises `TypeError` at runtime due to the implicit call to `__get__`;
-# we should emit a diagnostic
+# This raises `TypeError` at runtime due to the implicit call to `__get__`.
+# error: [invalid-attribute-access] "Invalid access to descriptor attribute `desc` on type `Foo`"
 reveal_type(Foo().desc)  # revealed: Unknown
 ```
 
