@@ -1,5 +1,5 @@
 use crate::{
-    FxOrderSet, semantic_index,
+    FxOrderSet,
     types::{
         ParamSpecAttrKind, Type,
         context::InferContext,
@@ -9,6 +9,7 @@ use crate::{
 };
 use ruff_python_ast as ast;
 use ruff_text_size::Ranged;
+use ty_python_core::SemanticIndex;
 
 /// Validate the usage of `ParamSpec` components (`P.args` and `P.kwargs`) across all
 /// parameters of a function.
@@ -20,6 +21,7 @@ use ruff_text_size::Ranged;
 /// - No keyword-only parameters are allowed between `*args: P.args` and `**kwargs: P.kwargs`
 pub(super) fn validate_paramspec_components<'db>(
     context: &'db InferContext<'db, '_>,
+    index: &SemanticIndex<'db>,
     parameters: &ast::Parameters,
     infer_type: impl Fn(&ast::Expr) -> Type<'db>,
 ) {
@@ -90,7 +92,6 @@ pub(super) fn validate_paramspec_components<'db>(
                             .iter()
                             .any(|typevar| typevar.is_same_typevar_as(db, args_tv))
                     });
-                let index = semantic_index(db, context.file());
                 let paramspec_is_in_scope = paramspec_is_bound_by_parameter
                     || index
                         .scope(context.scope().file_scope_id(db))
