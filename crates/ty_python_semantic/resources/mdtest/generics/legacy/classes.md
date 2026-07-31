@@ -462,6 +462,28 @@ Stop2T = TypeVar("Stop2T", default=int)
 class Bad(Generic[Start2T, Stop2T, StepT]): ...
 ```
 
+## A subclass of a fully specialized generic is not generic
+
+A subclass is generic only if its bases leave at least one type variable unspecialized. Omitting a
+type variable that has a default fully specializes the base, so the subclass cannot be specialized
+again.
+
+```py
+from typing_extensions import Generic, TypeVar
+
+T = TypeVar("T")
+DefaultT = TypeVar("DefaultT", default=str)
+
+class Base(Generic[T, DefaultT]): ...
+class GenericSubclass(Base[int, DefaultT]): ...
+class NonGenericSubclass(Base[int]): ...
+
+reveal_type(GenericSubclass[bytes]())  # revealed: GenericSubclass[bytes]
+
+# error: [not-subscriptable] "Cannot specialize non-generic class `NonGenericSubclass`"
+NonGenericSubclass[bytes]
+```
+
 ## Diagnostics for bad specializations
 
 We show the user where the type variable was defined if a specialization is given that doesn't
