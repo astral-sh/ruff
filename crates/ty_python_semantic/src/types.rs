@@ -3784,15 +3784,12 @@ impl<'db> Type<'db> {
             }
 
             if let Type::TypeVar(typevar) = ty
-                && let Some(TypeVarBoundOrConstraints::Constraints(constraints)) =
-                    typevar.typevar(db).bound_or_constraints(db)
+                && let Some(alternatives) = typevar
+                    .typevar(db)
+                    .bound_or_constraints(db)
+                    .and_then(|bound_or_constraints| bound_or_constraints.union_like_elements(db))
             {
-                return try_call_dunder_get_on_alternatives(
-                    db,
-                    constraints.elements(db),
-                    instance,
-                    owner,
-                );
+                return try_call_dunder_get_on_alternatives(db, alternatives, instance, owner);
             }
 
             match ty {
@@ -4161,7 +4158,17 @@ impl<'db> Type<'db> {
             Type::TypeAlias(alias) => alias
                 .value_type(db)
                 .is_definitely_data_descriptor_for_diagnostic_impl(db, ()),
-            Type::Dynamic(_) | Type::Divergent(_) | Type::Never | Type::TypeVar(_) => false,
+            Type::TypeVar(typevar) => match typevar.typevar(db).bound_or_constraints(db) {
+                Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
+                    bound.is_definitely_data_descriptor_for_diagnostic_impl(db, ())
+                }
+                Some(TypeVarBoundOrConstraints::Constraints(constraints)) => constraints
+                    .elements(db)
+                    .iter()
+                    .all(|ty| ty.is_definitely_data_descriptor_for_diagnostic_impl(db, ())),
+                None => false,
+            },
+            Type::Dynamic(_) | Type::Divergent(_) | Type::Never => false,
             _ => ["__set__", "__delete__"].into_iter().any(|name| {
                 matches!(
                     self.class_member_with_policy(db, name, MemberLookupPolicy::REQUIRE_CONCRETE)
@@ -4576,15 +4583,10 @@ impl<'db> Type<'db> {
                     return result;
                 }
 
-                let alternatives = match typevar.typevar(db).bound_or_constraints(db) {
-                    Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
-                        Some(constraints.elements(db).as_ref())
-                    }
-                    Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
-                        bound.as_union_like(db).map(|union| union.elements(db))
-                    }
-                    None => None,
-                };
+                let alternatives = typevar
+                    .typevar(db)
+                    .bound_or_constraints(db)
+                    .and_then(|bound_or_constraints| bound_or_constraints.union_like_elements(db));
                 let Some(alternatives) = alternatives else {
                     return result;
                 };

@@ -17,12 +17,13 @@ should not introduce object-identity, alias, or class-namespace mutation analysi
 - Expand union-like wrappers before invoking `__get__`:
     - PEP 695 type aliases
     - constrained `TypeVar`s
+    - `TypeVar`s with union-like upper bounds
     - ordinary unions
 - Expand recursive type aliases behind a cycle-aware query so recursion terminates conservatively.
 - Invoke each union branch with its concrete descriptor type as `self`.
-- Preserve the correlation between constrained receiver types and the descriptor selected from that
-    receiver branch when validating the synthetic `instance` or `owner` argument, including for
-    `type[T]` class-object receivers and constrained `super()` owners.
+- Preserve the correlation between TypeVar receiver alternatives and the descriptor selected from
+    that receiver branch when validating the synthetic `instance` or `owner` argument, including for
+    `type[T]` class-object receivers and constrained or union-bounded `super()` owners.
 - Report the diagnostic only when the malformed descriptor is definitely selected and every
     applicable lookup branch fails.
 - Suppress the diagnostic when a normal value, valid descriptor, class mutation, or other lookup
@@ -53,6 +54,8 @@ should not introduce object-identity, alias, or class-namespace mutation analysi
     failures; they refine one runtime value rather than supplying an alternative value.
 - Treat an attribute intersection as a data descriptor when any positive element is definitely a
     data descriptor, because every inhabitant retains that element's descriptor behavior.
+- Treat a TypeVar-valued attribute as a definite data descriptor when its upper bound or every
+    constraint is definitely a data descriptor.
 - Update the `invalid-attribute-access` documentation with a descriptor-read example and
     regenerate references.
 - Add focused tests for descriptor precedence, union-like wrappers, and conservative handling of
@@ -97,16 +100,18 @@ The same rule applies when descriptor kind depends on a conditionally defined `_
 `__delete__` method. Ty keeps its existing inferred member type, but combines the invalid `__get__`
 call with the lower-precedence fallback before deciding that the failure is definite.
 
-Constrained receiver types are expanded only for descriptor-call validation, pairing each concrete
-receiver constraint with the member selected from that constraint. For `type[T]`, ty first
-transposes the constraints to their class-object types so each descriptor receives the corresponding
-concrete class as its `owner`. The ordinary member result keeps the original receiver so existing
-`Self` and TypeVar binding behavior is unchanged.
+Constrained receiver types and receivers with union-like upper bounds are expanded only for
+descriptor-call validation, pairing each concrete receiver alternative with the member selected from
+that alternative. For `type[T]`, ty first transposes the alternatives to their class-object types so
+each descriptor receives the corresponding concrete class as its `owner`. The ordinary member result
+keeps the original receiver so existing `Self` and TypeVar binding behavior is unchanged.
 
-Constrained `super()` owners retain the original type variable in the inferred `super` type, but
-descriptor-call validation uses the concrete constraint associated with each already-expanded
-`super` branch. This includes constraints, such as enum literals, whose ordinary `super`
-construction delegates to a wider fallback type.
+Constrained or union-bounded `super()` owners retain the original type variable in the inferred
+`super` type, but descriptor-call validation uses the concrete alternative associated with each
+already-expanded `super` branch. This includes alternatives, such as enum literals, whose ordinary
+`super` construction delegates to a wider fallback type. The validation owner participates in
+`super` equivalence so union simplification cannot discard distinct validation branches or make a
+diagnostic depend on alternative order.
 
 Recursive alias expansion runs inside the cycle-aware descriptor-call query. A recursive branch that
 re-enters the same query contributes no definite descriptor failure, while the remaining concrete

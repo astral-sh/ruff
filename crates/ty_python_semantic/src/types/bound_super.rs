@@ -17,7 +17,7 @@ use crate::{
         diagnostic::{INVALID_SUPER_ARGUMENT, UNAVAILABLE_IMPLICIT_SUPER_ARGUMENTS},
         relation::EquivalenceChecker,
         signatures::{Parameter, Parameters, Signature},
-        typevar::{TypeVarConstraints, TypeVarInstance},
+        typevar::TypeVarInstance,
         visitor,
     },
 };
@@ -435,6 +435,7 @@ pub(super) fn walk_bound_super_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
         }
         SuperOwnerKind::Resolved(resolved_owner) => {
             visitor.visit_type(db, resolved_owner.owner_type);
+            visitor.visit_type(db, resolved_owner.descriptor_validation_owner_type);
             visitor.visit_type(db, Type::from(resolved_owner.lookup_anchor));
         }
     }
@@ -639,20 +640,20 @@ impl<'db> BoundSuperType<'db> {
             }
         };
 
-        // Helper to build a union of bound-super instances for constrained TypeVars.
-        // Each constraint must be a subclass of the pivot class.
-        let build_constrained_union = |constraints: TypeVarConstraints<'db>,
-                                       typevar: TypeVarOwnerContext<'db>|
+        // Helper to build a union of bound-super instances for constrained TypeVars or TypeVars
+        // with union-like upper bounds. Each alternative must be a subclass of the pivot class.
+        let build_typevar_union = |alternatives: &[Type<'db>],
+                                   typevar: TypeVarOwnerContext<'db>|
          -> Result<Type<'db>, BoundSuperError<'db>> {
-            let mut builder = UnionBuilder::new(db, env);
-            for constraint in constraints.elements(db) {
-                let constraint_validation_owner_type = match typevar {
-                    TypeVarOwnerContext::Bare(_) => *constraint,
-                    TypeVarOwnerContext::SubclassOf(_) => constraint.to_meta_type(db),
+            let mut builder = UnionBuilder::new(db);
+            for alternative in alternatives {
+                let alternative_validation_owner_type = match typevar {
+                    TypeVarOwnerContext::Bare(_) => *alternative,
+                    TypeVarOwnerContext::SubclassOf(_) => alternative.to_meta_type(db),
                 };
-                let class = match constraint {
-                    Type::NominalInstance(instance) => Some(instance.class(db, env)),
-                    _ => constraint.to_class_type(db),
+                let class = match alternative {
+                    Type::NominalInstance(instance) => Some(instance.class(db)),
+                    _ => alternative.to_class_type(db),
                 };
                 match class {
                     Some(class) => {
@@ -675,7 +676,7 @@ impl<'db> BoundSuperType<'db> {
                                 Some(typevar),
                             )?,
                         }
-                        .with_descriptor_validation_owner_type(constraint_validation_owner_type);
+                        .with_descriptor_validation_owner_type(alternative_validation_owner_type);
                         builder = builder.add(Self::build_from_owner(
                             db,
                             pivot_class,
@@ -683,15 +684,15 @@ impl<'db> BoundSuperType<'db> {
                         ));
                     }
                     None => {
-                        // Delegate to the constraint to get better error messages
-                        // if the constraint is incompatible with the pivot class. Preserve the
-                        // original constraint for descriptor-call validation even if ordinary
+                        // Delegate to the alternative to get better error messages
+                        // if it is incompatible with the pivot class. Preserve the original
+                        // alternative for descriptor-call validation even if ordinary
                         // `super` construction widens it to a fallback type.
                         builder = builder.add(Self::build_with_descriptor_validation_owner(
                             db,
                             pivot_class_type,
-                            *constraint,
-                            Some(constraint_validation_owner_type),
+                            *alternative,
+                            Some(alternative_validation_owner_type),
                         )?);
                     }
                 }
@@ -732,6 +733,12 @@ impl<'db> BoundSuperType<'db> {
                     let typevar = bound_typevar.typevar(db);
                     match typevar.bound_or_constraints(db, env) {
                         Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
+                            if let Some(union) = bound.as_union_like(db) {
+                                return build_typevar_union(
+                                    union.elements(db),
+                                    TypeVarOwnerContext::SubclassOf(bound_typevar),
+                                );
+                            }
                             let class = match bound {
                                 Type::NominalInstance(instance) => Some(instance.class(db, env)),
                                 Type::ProtocolInstance(protocol) => {
@@ -759,8 +766,8 @@ impl<'db> BoundSuperType<'db> {
                             }
                         }
                         Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
-                            return build_constrained_union(
-                                constraints,
+                            return build_typevar_union(
+                                constraints.elements(db),
                                 TypeVarOwnerContext::SubclassOf(bound_typevar),
                             );
                         }
@@ -851,6 +858,12 @@ impl<'db> BoundSuperType<'db> {
                 let typevar = bound_typevar.typevar(db);
                 match typevar.bound_or_constraints(db, env) {
                     Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
+                        if let Some(union) = bound.as_union_like(db) {
+                            return build_typevar_union(
+                                union.elements(db),
+                                TypeVarOwnerContext::Bare(bound_typevar),
+                            );
+                        }
                         let class = match bound {
                             Type::NominalInstance(instance) => Some(instance.class(db, env)),
                             Type::ProtocolInstance(protocol) => {
@@ -875,8 +888,8 @@ impl<'db> BoundSuperType<'db> {
                         }
                     }
                     Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
-                        return build_constrained_union(
-                            constraints,
+                        return build_typevar_union(
+                            constraints.elements(db),
                             TypeVarOwnerContext::Bare(bound_typevar),
                         );
                     }
@@ -1153,6 +1166,13 @@ impl<'c, 'db> EquivalenceChecker<'_, 'c, 'db> {
         let owner_equivalence = match (left.owner(db), right.owner(db)) {
             (SuperOwnerKind::Resolved(left), SuperOwnerKind::Resolved(right)) => self
                 .check_type_pair(db, left.owner_type, right.owner_type)
+                .and(db, self.constraints, || {
+                    self.check_type_pair(
+                        db,
+                        left.descriptor_validation_owner_type,
+                        right.descriptor_validation_owner_type,
+                    )
+                })
                 .and(db, self.constraints, || {
                     self.check_type_pair(
                         db,

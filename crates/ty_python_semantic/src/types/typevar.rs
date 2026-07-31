@@ -2075,6 +2075,16 @@ pub(super) fn walk_type_var_bounds<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
 }
 
 impl<'db> TypeVarBoundOrConstraints<'db> {
+    /// Returns the alternatives if these constraints or this upper bound behave like a union.
+    pub(super) fn union_like_elements(self, db: &'db dyn Db) -> Option<&'db [Type<'db>]> {
+        match self {
+            TypeVarBoundOrConstraints::UpperBound(bound) => {
+                bound.as_union_like(db).map(|union| union.elements(db))
+            }
+            TypeVarBoundOrConstraints::Constraints(constraints) => Some(constraints.elements(db)),
+        }
+    }
+
     fn materialize_impl(
         self,
         db: &'db dyn Db,

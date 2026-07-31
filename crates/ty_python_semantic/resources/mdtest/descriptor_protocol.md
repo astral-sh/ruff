@@ -1075,6 +1075,14 @@ def access_constrained_descriptor(descriptor: T) -> None:
         value = descriptor
 
     reveal_type(ConstrainedOwner().value)  # revealed: int | str
+
+BoundT = TypeVar("BoundT", bound=IntDescriptor | StrDescriptor)
+
+def access_upper_bounded_descriptor(descriptor: BoundT) -> None:
+    class UpperBoundedOwner:
+        value = descriptor
+
+    reveal_type(UpperBoundedOwner().value)  # revealed: int | str
 ```
 
 Recursive aliases are expanded behind a cycle-aware query. A recursive branch cannot establish a
@@ -1296,6 +1304,60 @@ def conditional_descriptor_kind(flag: bool) -> None:
     C.value
 ```
 
+### TypeVar data-descriptor kinds retain metaclass precedence
+
+When every constraint or upper-bound alternative is a data descriptor, the TypeVar-valued metaclass
+member always takes precedence over a class attribute. A malformed `__get__` call is therefore
+definite on every branch.
+
+```py
+from typing import TypeVar
+
+class BrokenIntDataDescriptor:
+    def __get__(self) -> int:
+        return 1
+
+    def __set__(self, instance: object, value: object) -> None:
+        pass
+
+class BrokenStrDataDescriptor:
+    def __get__(self) -> str:
+        return ""
+
+    def __set__(self, instance: object, value: object) -> None:
+        pass
+
+ConstrainedDataT = TypeVar(
+    "ConstrainedDataT",
+    BrokenIntDataDescriptor,
+    BrokenStrDataDescriptor,
+)
+BoundDataT = TypeVar(
+    "BoundDataT",
+    bound=BrokenIntDataDescriptor | BrokenStrDataDescriptor,
+)
+
+def constrained_data_descriptor(descriptor: ConstrainedDataT) -> None:
+    class Meta(type):
+        value = descriptor
+
+    class C(metaclass=Meta):
+        value = 1
+
+    # error: [invalid-attribute-access]
+    C.value
+
+def upper_bounded_data_descriptor(descriptor: BoundDataT) -> None:
+    class Meta(type):
+        value = descriptor
+
+    class C(metaclass=Meta):
+        value = 1
+
+    # error: [invalid-attribute-access]
+    C.value
+```
+
 ### Possibly undefined `super` members do not fail definitely
 
 When a malformed descriptor is only possibly defined on a base class, the absent path raises an
@@ -1326,11 +1388,12 @@ def _(flag: bool):
             super().value
 ```
 
-### Constrained `super` receivers preserve branch correlation
+### TypeVar `super` receivers preserve branch correlation
 
-Each constrained `super` branch validates the implicit descriptor call with its concrete owner. A
-valid constraint makes the overall failure only possible, while a constrained owner whose every
-branch is invalid still produces a diagnostic.
+Each constrained or union-bounded `super` branch validates the implicit descriptor call with its
+concrete owner. A valid alternative makes the overall failure only possible, while a constrained
+owner whose every branch is invalid still produces a diagnostic. Equivalent ordinary `super` types
+retain distinct validation branches, so reversing constraint order does not change the result.
 
 ```py
 from __future__ import annotations
@@ -1383,6 +1446,48 @@ LiteralT = TypeVar("LiteralT", Literal[Member.A], Literal[Member.B])
 
 def literal_constraints(owner: LiteralT) -> None:
     super(LiteralPivot, owner).value
+
+class PartialLiteralDescriptor:
+    def __get__(
+        self,
+        instance: Literal[PartialMember.B],
+        owner: type | None = None,
+    ) -> int:
+        return 1
+
+class PartialLiteralBase:
+    value = PartialLiteralDescriptor()
+
+class PartialLiteralPivot(PartialLiteralBase): ...
+
+class PartialMember(PartialLiteralPivot, Enum):
+    A = 1
+    B = 2
+    C = 3
+
+OrderedLiteralT = TypeVar(
+    "OrderedLiteralT",
+    Literal[PartialMember.A],
+    Literal[PartialMember.B],
+)
+ReversedLiteralT = TypeVar(
+    "ReversedLiteralT",
+    Literal[PartialMember.B],
+    Literal[PartialMember.A],
+)
+BoundLiteralT = TypeVar(
+    "BoundLiteralT",
+    bound=Literal[PartialMember.A, PartialMember.B],
+)
+
+def ordered_literal_constraints(owner: OrderedLiteralT) -> None:
+    super(PartialLiteralPivot, owner).value
+
+def reversed_literal_constraints(owner: ReversedLiteralT) -> None:
+    super(PartialLiteralPivot, owner).value
+
+def union_upper_bound(owner: BoundLiteralT) -> None:
+    super(PartialLiteralPivot, owner).value
 ```
 
 ### Possible `__get__` callable failures are not reported
