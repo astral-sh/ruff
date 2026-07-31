@@ -1045,6 +1045,18 @@ def access_constrained_descriptor(descriptor: T) -> None:
     reveal_type(ConstrainedOwner().value)  # revealed: int | str
 ```
 
+Recursive aliases are expanded behind a cycle-aware query. A recursive branch cannot establish a
+definite descriptor failure, and inspecting an ordinary recursive attribute must terminate.
+
+```py
+type Recursive = int | Recursive
+
+class RecursiveOwner:
+    value: Recursive = 1
+
+RecursiveOwner().value
+```
+
 ### Constrained receiver types preserve branch correlation
 
 When a constrained type variable is the descriptor receiver, each class constraint is paired with
@@ -1409,11 +1421,13 @@ class C:
         self.descriptor
 ```
 
-### Unrelated instance assignments do not establish a live shadow
+### Inferred instance attributes are possible shadows
 
-The class-wide instance-member summary records assignments from any method, but it does not prove
-that a particular receiver has that value. A fresh instance still invokes the malformed descriptor.
-Deleting a same-place assignment likewise removes the local shadow.
+The class-wide instance-member summary does not distinguish an assignment performed by `__init__`
+from one in an unrelated method. Because either could represent a successful instance-dictionary
+lookup, both suppress the definite descriptor diagnostic. The unrelated-method and deletion cases
+document accepted conservative false negatives; modeling their reachability requires object-level
+dataflow.
 
 ```py
 class Descriptor:
@@ -1423,19 +1437,25 @@ class Descriptor:
 class C:
     descriptor = Descriptor()
 
-    def assign_descriptor(self) -> None:
-        self.descriptor: int = 1
+    def __init__(self) -> None:
+        self.descriptor = Descriptor()
 
-# error: [invalid-attribute-access] "Invalid access to descriptor attribute `descriptor` on type `C`"
 C().descriptor
 
 class D:
     descriptor = Descriptor()
 
+    def assign_descriptor(self) -> None:
+        self.descriptor: int = 1
+
+D().descriptor
+
+class E:
+    descriptor = Descriptor()
+
     def read_after_delete(self) -> None:
         self.descriptor = Descriptor()
         del self.descriptor
-        # error: [invalid-attribute-access] "Invalid access to descriptor attribute `descriptor` on type `Self@read_after_delete`"
         self.descriptor
 ```
 

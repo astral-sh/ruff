@@ -18,6 +18,7 @@ should not introduce object-identity, alias, or class-namespace mutation analysi
     - PEP 695 type aliases
     - constrained `TypeVar`s
     - ordinary unions
+- Expand recursive type aliases behind a cycle-aware query so recursion terminates conservatively.
 - Invoke each union branch with its concrete descriptor type as `self`.
 - Preserve the correlation between constrained receiver types and the descriptor selected from that
     receiver branch when validating the synthetic `instance` or `owner` argument, including for
@@ -38,9 +39,9 @@ should not introduce object-identity, alias, or class-namespace mutation analysi
     invoke the descriptor, while retaining the ordinary possibly-missing diagnostic.
 - Suppress descriptor-read diagnostics after any possibly or definitely reaching same-place
     assignment, without using descriptor kind to prove that `__get__` remains selected.
-- Do not treat the inferred class-wide instance-member summary from arbitrary method assignments as
-    proof that an assignment reaches a particular receiver. Only a live same-place assignment can
-    establish that shadow, and deletion removes it.
+- Treat an inferred class-wide instance-member summary as a possible instance-dictionary shadow for
+    diagnostic certainty, without treating it as proof that an assignment reaches a particular
+    receiver.
 - Treat the target of an augmented assignment as an attribute read before its write, while avoiding
     `__get__` diagnostics for deletion targets.
 - Ignore intersection elements that do not contribute a member when combining descriptor failures.
@@ -94,15 +95,21 @@ transposes the constraints to their class-object types so each descriptor receiv
 concrete class as its `owner`. The ordinary member result keeps the original receiver so existing
 `Self` and TypeVar binding behavior is unchanged.
 
+Recursive alias expansion runs inside the cycle-aware descriptor-call query. A recursive branch that
+re-enters the same query contributes no definite descriptor failure, while the remaining concrete
+branches continue to determine the inferred return type and diagnostic certainty.
+
 Same-place dataflow participates only as a conservative suppression boundary. Any possibly or
 definitely reaching assignment suppresses the descriptor diagnostic, for both instance and class
 objects. Ty does not distinguish a shadowing write from a data-descriptor `__set__` interception for
 this diagnostic. This avoids requiring certainty about mixed descriptor kinds, conditionally
 defined setters, or whether a metaclass descriptor intercepted a class-object assignment.
 
-Class-wide summaries of assignments in arbitrary methods do not establish a live
-instance-dictionary entry for a particular receiver. Explicit instance-attribute declarations
-remain static contracts and continue to supply an alternative lookup path.
+Class-wide summaries of inferred instance attributes do not establish a live instance-dictionary
+entry for a particular receiver, but they do represent a possible successful fallback. That
+possibility suppresses an error-level descriptor diagnostic. Ty does not distinguish an assignment
+performed by `__init__` from one in an unrelated method, or remove the class-wide summary after a
+same-place deletion.
 
 A custom `__getattribute__` runs before the normal descriptor algorithm. Whenever an override is
 present, the descriptor call is not definite: a successful override can return first, while an
@@ -155,6 +162,11 @@ The implementation may also suppress a diagnostic when every branch of a mixed m
 descriptor-kind union fails through a different precedence path. Correlating each metaclass branch
 with the corresponding class-attribute fallback, and refining the inferred member type accordingly,
 is outside this change.
+
+The implementation may suppress a diagnostic because of an inferred instance attribute whose
+assignment does not actually reach the receiver, including an assignment in an unrelated method or
+one removed by a later deletion. Distinguishing those cases from constructor-established attributes
+would require the out-of-scope object-identity and interprocedural dataflow described above.
 
 The original issue remains covered because its malformed descriptor is statically known and
 definitely selected.

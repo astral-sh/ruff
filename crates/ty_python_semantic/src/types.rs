@@ -3774,6 +3774,27 @@ impl<'db> Type<'db> {
                 });
             }
 
+            if let Some(union) = ty.as_union_like(db) {
+                return try_call_dunder_get_on_alternatives(
+                    db,
+                    union.elements(db),
+                    instance,
+                    owner,
+                );
+            }
+
+            if let Type::TypeVar(typevar) = ty
+                && let Some(TypeVarBoundOrConstraints::Constraints(constraints)) =
+                    typevar.typevar(db).bound_or_constraints(db)
+            {
+                return try_call_dunder_get_on_alternatives(
+                    db,
+                    constraints.elements(db),
+                    instance,
+                    owner,
+                );
+            }
+
             match ty {
                 Type::Callable(callable) if callable.is_staticmethod_like(db) => {
                     // For "staticmethod-like" callables, model the behavior of `staticmethod.__get__`.
@@ -3886,22 +3907,6 @@ impl<'db> Type<'db> {
                 kind: AttributeKind::NormalOrNonDataDescriptor,
                 error: None,
             });
-        }
-
-        if let Some(union) = self.as_union_like(db) {
-            return try_call_dunder_get_on_alternatives(db, union.elements(db), instance, owner);
-        }
-
-        if let Type::TypeVar(typevar) = self
-            && let Some(TypeVarBoundOrConstraints::Constraints(constraints)) =
-                typevar.typevar(db).bound_or_constraints(db)
-        {
-            return try_call_dunder_get_on_alternatives(
-                db,
-                constraints.elements(db),
-                instance,
-                owner,
-            );
         }
 
         try_call_dunder_get_inner(db, self, instance, owner)
@@ -4391,19 +4396,7 @@ impl<'db> Type<'db> {
                     provenance: fallback_provenance.or(meta_attr_provenance),
                 })
                 .with_qualifiers(meta_attr_qualifiers.union(fallback_qualifiers)),
-                if policy == InstanceFallbackShadowsNonDataDescriptor::Yes
-                    || !fallback_qualifiers.contains(TypeQualifiers::IMPLICIT_INSTANCE_ATTRIBUTE)
-                {
-                    combine_alternative_descriptor_get_errors(db, meta_attr_error, fallback_error)
-                } else {
-                    // An inferred instance-member summary includes assignments from arbitrary
-                    // methods, so it cannot prove that a value is present in this receiver's
-                    // instance dictionary. Explicit declarations remain static contracts.
-                    // Same-place flow in the inference builder removes this error when an
-                    // assignment actually reaches the read.
-                    meta_attr_error
-                        .map(|error| error.with_kind(db, AttributeKind::NormalOrNonDataDescriptor))
-                },
+                combine_alternative_descriptor_get_errors(db, meta_attr_error, fallback_error),
             ),
 
             // If the attribute is not found on the meta-type, we simply return the fallback.
