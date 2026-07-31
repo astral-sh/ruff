@@ -10323,10 +10323,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
         let fallback = value_type.member_with_diagnostics(db, &attr.id);
         if report_descriptor_get_error
-            && let Some(failure) = fallback
-                .descriptor_get_error
-                .filter(|_| !has_reaching_assignment)
-                .and_then(|context| context.into_error(db))
+            && !has_reaching_assignment
+            && let Some(context) = fallback.descriptor_get_error
+            && fallback.descriptor_is_definitely_bound(db)
+            && let Some(failure) = context.into_error(db)
         {
             report_bad_dunder_get_call(&self.context, &failure, value_type, attribute);
         }

@@ -680,6 +680,25 @@ impl<'db> MemberLookupResult<'db> {
         }
     }
 
+    /// Returns `true` if the member that produced a descriptor error is definitely bound at
+    /// runtime.
+    ///
+    /// A declaration such as `value: ClassVar[Descriptor]` is a static contract, but does not add
+    /// a descriptor object to the class dictionary. Preserve the ordinary declared member type,
+    /// but do not report an error for invoking `__get__` unless provenance establishes a binding.
+    pub(crate) fn descriptor_is_definitely_bound(self, db: &'db dyn Db) -> bool {
+        match self.member.place {
+            Place::Defined(DefinedPlace {
+                origin: TypeOrigin::Declared,
+                provenance,
+                ..
+            }) => provenance
+                .definition()
+                .is_some_and(|definition| definition_is_binding(db, definition)),
+            Place::Defined(_) | Place::Undefined => true,
+        }
+    }
+
     fn or_fall_back_to(self, db: &'db dyn Db, fallback_fn: impl FnOnce() -> Self) -> Self {
         let primary_definedness = match self.member.place {
             Place::Undefined => None,
@@ -724,6 +743,16 @@ impl<'db> MemberLookupResult<'db> {
             },
         }
     }
+}
+
+#[salsa::tracked(returns(copy))]
+fn definition_is_binding<'db>(db: &'db dyn Db, definition: Definition<'db>) -> bool {
+    let file = definition.file(db);
+    let module = parsed_module(db, file).load(db);
+    definition
+        .kind(db)
+        .category(file.is_stub(db), &module)
+        .is_binding()
 }
 
 impl<'db> From<PlaceAndQualifiers<'db>> for MemberLookupResult<'db> {

@@ -1388,18 +1388,16 @@ def _(flag: bool):
             super().value
 ```
 
-### TypeVar `super` receivers preserve branch correlation
+### Constrained `super` receivers preserve branch correlation
 
-Each constrained or union-bounded `super` branch validates the implicit descriptor call with its
-concrete owner. A valid alternative makes the overall failure only possible, while a constrained
-owner whose every branch is invalid still produces a diagnostic. Equivalent ordinary `super` types
-retain distinct validation branches, so reversing constraint order does not change the result.
+Each constrained `super` branch validates the implicit descriptor call with its concrete owner. A
+valid alternative makes the overall failure only possible, while a constrained owner whose every
+branch is invalid still produces a diagnostic.
 
 ```py
 from __future__ import annotations
 
-from enum import Enum
-from typing import Literal, TypeVar
+from typing import TypeVar
 
 class Descriptor:
     def __get__(self, instance: "Good", owner: type | None = None) -> int:
@@ -1423,6 +1421,18 @@ BrokenT = TypeVar("BrokenT", Bad, AlsoBad)
 def always_invalid(owner: BrokenT) -> None:
     # error: [invalid-attribute-access]
     super(Pivot, owner).value
+```
+
+### Literal-constrained `super` receivers preserve branch correlation
+
+Literal constraints that use the delegated `super` construction path retain their concrete values
+when validating the descriptor call.
+
+```py
+from __future__ import annotations
+
+from enum import Enum
+from typing import Literal, TypeVar
 
 class LiteralDescriptor:
     def __get__(
@@ -1446,6 +1456,18 @@ LiteralT = TypeVar("LiteralT", Literal[Member.A], Literal[Member.B])
 
 def literal_constraints(owner: LiteralT) -> None:
     super(LiteralPivot, owner).value
+```
+
+### `super` descriptor certainty is independent of constraint order
+
+Equivalent ordinary `super` types retain distinct descriptor-validation branches. Reversing the
+constraints therefore does not change whether a valid alternative suppresses the diagnostic.
+
+```py
+from __future__ import annotations
+
+from enum import Enum
+from typing import Literal, TypeVar
 
 class PartialLiteralDescriptor:
     def __get__(
@@ -1475,16 +1497,47 @@ ReversedLiteralT = TypeVar(
     Literal[PartialMember.B],
     Literal[PartialMember.A],
 )
-BoundLiteralT = TypeVar(
-    "BoundLiteralT",
-    bound=Literal[PartialMember.A, PartialMember.B],
-)
 
 def ordered_literal_constraints(owner: OrderedLiteralT) -> None:
     super(PartialLiteralPivot, owner).value
 
 def reversed_literal_constraints(owner: ReversedLiteralT) -> None:
     super(PartialLiteralPivot, owner).value
+```
+
+### Union-bounded `super` receivers preserve branch correlation
+
+A `super` owner with a union-like upper bound validates each concrete alternative separately. A
+valid alternative makes the descriptor failure non-definite.
+
+```py
+from __future__ import annotations
+
+from enum import Enum
+from typing import Literal, TypeVar
+
+class PartialLiteralDescriptor:
+    def __get__(
+        self,
+        instance: Literal[PartialMember.B],
+        owner: type | None = None,
+    ) -> int:
+        return 1
+
+class PartialLiteralBase:
+    value = PartialLiteralDescriptor()
+
+class PartialLiteralPivot(PartialLiteralBase): ...
+
+class PartialMember(PartialLiteralPivot, Enum):
+    A = 1
+    B = 2
+    C = 3
+
+BoundLiteralT = TypeVar(
+    "BoundLiteralT",
+    bound=Literal[PartialMember.A, PartialMember.B],
+)
 
 def union_upper_bound(owner: BoundLiteralT) -> None:
     super(PartialLiteralPivot, owner).value
@@ -1532,6 +1585,36 @@ def _(flag: bool):
             return name
 
     reveal_type(C().descriptor)  # revealed: int | str
+```
+
+### Declaration-only attributes do not prove descriptor invocation
+
+A class-variable declaration is a static member contract, but does not insert a descriptor object
+into the runtime class dictionary. A metaclass `__getattr__` can therefore satisfy the runtime
+lookup. An annotated assignment with a value does establish a runtime descriptor binding.
+
+```py
+from typing import ClassVar
+
+class Descriptor:
+    def __get__(self) -> int:
+        return 1
+
+class Meta(type):
+    def __getattr__(cls, name: str) -> str:
+        return name
+
+class Declared(metaclass=Meta):
+    value: ClassVar[Descriptor]
+
+# The static declaration remains the inferred member contract.
+reveal_type(Declared.value)  # revealed: int
+
+class Bound(metaclass=Meta):
+    value: ClassVar[Descriptor] = Descriptor()
+
+# error: [invalid-attribute-access] "Invalid access to descriptor attribute `value` on type `<class 'Bound'>`"
+reveal_type(Bound.value)  # revealed: int
 ```
 
 ### A custom `__getattribute__` intercepts descriptor access

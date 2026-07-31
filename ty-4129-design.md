@@ -34,6 +34,8 @@ should not introduce object-identity, alias, or class-namespace mutation analysi
     normal descriptor invocation non-definite, even when calling the override itself fails.
 - Treat a successful `__getattr__` fallback as a successful lookup alternative when the normal
     member is possibly undefined.
+- Treat a declaration-only attribute as a static contract rather than proof that a descriptor is
+    present at runtime, while preserving the ordinary inferred member type.
 - Preserve a possible valid metaclass data-descriptor branch as a higher-precedence lookup
     alternative when a mixed descriptor-kind union otherwise falls through to a class attribute.
 - Treat a conditionally defined `__set__` or `__delete__` method as a possible, rather than definite,
@@ -87,6 +89,14 @@ Only lookup paths that can supply the requested member participate in certainty 
 Conversely, a possibly defined member introduces an absent path that does not invoke the descriptor,
 even if that path ultimately raises an attribute error instead of finding a dynamic fallback. A
 possibly-missing diagnostic remains separate from the descriptor-call diagnostic.
+
+A declaration-only attribute, such as `value: ClassVar[Descriptor]`, does not insert a value into
+the runtime class dictionary. It therefore does not establish that descriptor lookup will invoke
+`__get__`, even though ty retains the declaration as the static member contract. For a declared
+member, the diagnostic is reported only when source provenance establishes a runtime binding.
+Unknown or multiple provenance is treated conservatively as a possible absent path; this does not
+change the inferred member type or replace it with the return type of a dynamic `__getattr__`
+fallback.
 
 Positive elements of an intersection describe one runtime value rather than alternative values.
 Validating an implicit descriptor call may therefore require the full intersection as the synthetic
@@ -176,6 +186,8 @@ read/write correlation, and bidirectional type-context improvements are separate
 - Diagnosing or retargeting call failures from an invalid custom `__getattribute__`.
 - Fully modeling the return type and exceptions of custom `__getattribute__` implementations.
 - General preservation of TypeVar correlation outside descriptor-call validation.
+- General separation of static declarations from runtime class-namespace entries, including
+    incorporating a dynamic fallback's return type into a declaration-only member's inferred type.
 - Normalizing semantically uninhabited alternatives across aliases, TypeVar constraints, class
     objects, metaclass descriptor kinds, and `super()` construction.
 - General changes to explicit classmethod access or synthesized function and classmethod `__get__`
