@@ -140,3 +140,10 @@ PLE1307 Format type does not match argument type
 17 |
 18 | # False negatives
    |
+
+PLE1307 Format type does not match argument type
+  --> bad_string_format_type.py:68:1
+   |
+67 | # No errors here, will be reported separately by bad-string-format-character.
+68 | "%b" % b"xx"
+   | ^^^^^^^^^^^^
