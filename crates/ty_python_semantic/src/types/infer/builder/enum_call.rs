@@ -255,9 +255,10 @@ fn apply_generated_type_mixin_member_values<'db>(
         return None;
     };
 
-    let mixin_class = match class.known(db)? {
-        known @ (KnownClass::Str | KnownClass::Bytes | KnownClass::Float) => known,
-        _ => return None,
+    let mixin_class @ (KnownClass::Str | KnownClass::Bytes | KnownClass::Float) =
+        class.known(db)?
+    else {
+        return None;
     };
 
     members
