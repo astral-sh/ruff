@@ -68,11 +68,6 @@ pub enum PyprojectDiscoveryStrategy {
 
 impl PyprojectDiscoveryStrategy {
     #[inline]
-    pub const fn is_fixed(self) -> bool {
-        matches!(self, PyprojectDiscoveryStrategy::Fixed)
-    }
-
-    #[inline]
     const fn is_hierarchical(self) -> bool {
         matches!(self, PyprojectDiscoveryStrategy::Hierarchical)
     }
