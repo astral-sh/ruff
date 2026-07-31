@@ -44,7 +44,7 @@ mod tests {
     #[test_case(Rule::StartProcessWithNoShell, Path::new("S606.py"))]
     #[test_case(Rule::StartProcessWithPartialPath, Path::new("S607.py"))]
     #[test_case(Rule::SubprocessPopenWithShellEqualsTrue, Path::new("S602.py"))]
-    #[test_case(Rule::SubprocessWithoutShellEqualsTrue, Path::new("S603.py"))]
+    #[test_case(Rule::SubprocessCallWithUntrustedInput, Path::new("S603.py"))]
     #[test_case(Rule::SuspiciousPickleUsage, Path::new("S301.py"))]
     #[test_case(Rule::SuspiciousEvalUsage, Path::new("S307.py"))]
     #[test_case(Rule::SuspiciousMarkSafeUsage, Path::new("S308.py"))]
