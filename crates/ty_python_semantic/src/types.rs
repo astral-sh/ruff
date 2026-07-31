@@ -4134,6 +4134,44 @@ impl<'db> Type<'db> {
         self.is_data_descriptor_impl(db, env.program(db), true)
     }
 
+    /// Returns whether this type definitely defines `__set__` or `__delete__`.
+    ///
+    /// This is narrower than [`Type::is_data_descriptor`], which treats a conditionally defined
+    /// method as sufficient for ordinary descriptor lookup. Error-level diagnostics use this
+    /// predicate so a possible non-data path can still fall through to a successful attribute.
+    fn is_definitely_data_descriptor_for_diagnostic(self, db: &'db dyn Db) -> bool {
+        self.is_definitely_data_descriptor_for_diagnostic_impl(db, ())
+    }
+
+    #[salsa::tracked(
+        returns(copy),
+        cycle_initial=|_, _, _, ()| false,
+        heap_size=ruff_memory_usage::heap_size
+    )]
+    fn is_definitely_data_descriptor_for_diagnostic_impl(self, db: &'db dyn Db, (): ()) -> bool {
+        match self {
+            Type::PropertyInstance(_) => true,
+            Type::Union(union) => union
+                .elements(db)
+                .iter()
+                .all(|ty| ty.is_definitely_data_descriptor_for_diagnostic_impl(db, ())),
+            Type::Intersection(intersection) => intersection
+                .iter_positive(db)
+                .any(|ty| ty.is_definitely_data_descriptor_for_diagnostic_impl(db, ())),
+            Type::TypeAlias(alias) => alias
+                .value_type(db)
+                .is_definitely_data_descriptor_for_diagnostic_impl(db, ()),
+            Type::Dynamic(_) | Type::Divergent(_) | Type::Never | Type::TypeVar(_) => false,
+            _ => ["__set__", "__delete__"].into_iter().any(|name| {
+                matches!(
+                    self.class_member_with_policy(db, name, MemberLookupPolicy::REQUIRE_CONCRETE)
+                        .place,
+                    Place::Defined(defined) if defined.is_definitely_defined()
+                )
+            }),
+        }
+    }
+
     /// Returns whether this type is known not to be a data descriptor.
     ///
     /// Descriptor uncertainty only propagates through outer unions, intersections, and aliases;
@@ -4261,6 +4299,10 @@ impl<'db> Type<'db> {
                 .place
                 .ignore_possibly_undefined()
                 .is_some_and(|ty| ty.may_be_data_descriptor(db));
+        let meta_attr_is_definitely_data_descriptor = meta_attr_plain
+            .place
+            .ignore_possibly_undefined()
+            .is_some_and(|ty| ty.is_definitely_data_descriptor_for_diagnostic(db));
         let (
             PlaceAndQualifiers {
                 place: meta_attr,
@@ -4301,7 +4343,11 @@ impl<'db> Type<'db> {
                 _,
             ) => MemberLookupResult::new(
                 meta_attr.with_qualifiers(meta_attr_qualifiers),
-                meta_attr_error,
+                if meta_attr_is_definitely_data_descriptor {
+                    meta_attr_error
+                } else {
+                    combine_alternative_descriptor_get_errors(db, meta_attr_error, fallback_error)
+                },
             ),
 
             // `meta_attr` is the return type of a data descriptor, but the attribute on the
@@ -4659,11 +4705,8 @@ impl<'db> Type<'db> {
                 }
 
                 Type::Intersection(intersection) => {
-                    if let Some(complement) = intersection.enum_complement(db, env) {
-                        enums::member_lookup_for_enum_complement(
-                            db, env, complement, name_str, policy,
-                        )
-                        .into()
+                    if let Some(complement) = intersection.enum_complement(db) {
+                        enums::member_lookup_for_enum_complement(db, complement, name_str, policy)
                     } else {
                         let receiver = Some(receiver.unwrap_or(this));
                         let mut errors = DescriptorGetErrorAccumulator::new();
@@ -4681,8 +4724,7 @@ impl<'db> Type<'db> {
                 }
 
                 Type::EnumComplement(complement) => {
-                    enums::member_lookup_for_enum_complement(db, env, complement, name_str, policy)
-                        .into()
+                    enums::member_lookup_for_enum_complement(db, complement, name_str, policy)
                 }
 
                 Type::Dynamic(..) | Type::Divergent(_) | Type::Never => Place::bound(this).into(),

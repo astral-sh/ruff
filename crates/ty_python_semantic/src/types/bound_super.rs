@@ -251,6 +251,11 @@ pub struct ResolvedSuperOwner<'db> {
     /// call; if `receiver` is [`DescriptorReceiverKind::Class`], it is passed as the
     /// second argument to `__get__` in a `__get__(None, owner)` call.
     owner_type: Type<'db>,
+    /// The concrete owner used only to validate an implicit descriptor call.
+    ///
+    /// Constrained type variables build one `super` branch per constraint while retaining the
+    /// original type variable in `owner_type` for display and ordinary inference.
+    descriptor_validation_owner_type: Type<'db>,
     /// The class whose MRO is searched for attributes after the pivot class.
     lookup_anchor: ClassType<'db>,
     /// The descriptor-binding mode used after attribute lookup.
@@ -265,9 +270,18 @@ impl<'db> ResolvedSuperOwner<'db> {
     ) -> Self {
         Self {
             owner_type,
+            descriptor_validation_owner_type: owner_type,
             lookup_anchor,
             receiver,
         }
+    }
+
+    const fn with_descriptor_validation_owner_type(
+        mut self,
+        descriptor_validation_owner_type: Type<'db>,
+    ) -> Self {
+        self.descriptor_validation_owner_type = descriptor_validation_owner_type;
+        self
     }
 
     fn recursive_type_normalized_impl(
@@ -280,7 +294,10 @@ impl<'db> ResolvedSuperOwner<'db> {
         Some(Self {
             owner_type: self
                 .owner_type
-                .recursive_type_normalized_impl(db, env, div, nested)?,
+                .recursive_type_normalized_impl(db, div, nested)?,
+            descriptor_validation_owner_type: self
+                .descriptor_validation_owner_type
+                .recursive_type_normalized_impl(db, div, nested)?,
             lookup_anchor: self
                 .lookup_anchor
                 .recursive_type_normalized_impl(db, env, div, nested)?,
@@ -298,6 +315,16 @@ impl<'db> ResolvedSuperOwner<'db> {
             DescriptorReceiverKind::Instance => {
                 (Some(self.owner_type), self.owner_type.to_meta_type(db, env))
             }
+        }
+    }
+
+    fn descriptor_validation_binding(&self, db: &'db dyn Db) -> (Option<Type<'db>>, Type<'db>) {
+        match self.receiver {
+            DescriptorReceiverKind::Class => (None, self.descriptor_validation_owner_type),
+            DescriptorReceiverKind::Instance => (
+                Some(self.descriptor_validation_owner_type),
+                self.descriptor_validation_owner_type.to_meta_type(db),
+            ),
         }
     }
 }
@@ -364,6 +391,18 @@ impl<'db> SuperOwnerKind<'db> {
             SuperOwnerKind::Dynamic(_) | SuperOwnerKind::Divergent(_) => None,
             SuperOwnerKind::Resolved(resolved_owner) => {
                 Some(resolved_owner.descriptor_binding(db, env))
+            }
+        }
+    }
+
+    fn descriptor_validation_binding(
+        self,
+        db: &'db dyn Db,
+    ) -> Option<(Option<Type<'db>>, Type<'db>)> {
+        match self {
+            SuperOwnerKind::Dynamic(_) | SuperOwnerKind::Divergent(_) => None,
+            SuperOwnerKind::Resolved(resolved_owner) => {
+                Some(resolved_owner.descriptor_validation_binding(db))
             }
         }
     }
@@ -599,30 +638,35 @@ impl<'db> BoundSuperType<'db> {
                 };
                 match class {
                     Some(class) => {
-                        let owner = match typevar {
-                            TypeVarOwnerContext::Bare(_) => {
-                                SuperOwnerKind::Resolved(Self::resolve_instance_super_owner(
-                                    db,
-                                    pivot_class,
-                                    pivot_class_type,
-                                    owner_type,
-                                    class,
-                                    Some(typevar),
-                                )?)
-                            }
-                            TypeVarOwnerContext::SubclassOf(_) => {
-                                SuperOwnerKind::Resolved(Self::resolve_class_super_owner(
-                                    db,
-                                    pivot_class,
-                                    pivot_class_type,
-                                    owner_type,
-                                    owner_type,
-                                    class,
-                                    Some(typevar),
-                                )?)
-                            }
+                        let descriptor_validation_owner_type = match typevar {
+                            TypeVarOwnerContext::Bare(_) => *constraint,
+                            TypeVarOwnerContext::SubclassOf(_) => constraint.to_meta_type(db),
                         };
-                        builder = builder.add(Self::build_from_owner(db, pivot_class, owner));
+                        let owner = match typevar {
+                            TypeVarOwnerContext::Bare(_) => Self::resolve_instance_super_owner(
+                                db,
+                                pivot_class,
+                                pivot_class_type,
+                                owner_type,
+                                class,
+                                Some(typevar),
+                            )?,
+                            TypeVarOwnerContext::SubclassOf(_) => Self::resolve_class_super_owner(
+                                db,
+                                pivot_class,
+                                pivot_class_type,
+                                owner_type,
+                                owner_type,
+                                class,
+                                Some(typevar),
+                            )?,
+                        }
+                        .with_descriptor_validation_owner_type(descriptor_validation_owner_type);
+                        builder = builder.add(Self::build_from_owner(
+                            db,
+                            pivot_class,
+                            SuperOwnerKind::Resolved(owner),
+                        ));
                     }
                     None => {
                         // Delegate to the constraint to get better error messages
@@ -943,11 +987,23 @@ impl<'db> BoundSuperType<'db> {
     ) -> Option<MemberLookupResult<'db>> {
         let (instance, owner) = self.owner(db).descriptor_binding(db, env)?;
         let (member, _, error) =
-            Type::try_call_dunder_get_on_attribute(db, env, attribute, instance, owner);
-        Some(
-            MemberLookupResult::new(member, error)
-                .or_fall_back_to(db, env, || Place::Undefined.into()),
-        )
+            Type::try_call_dunder_get_on_attribute(db, attribute, instance, owner);
+        let (validation_instance, validation_owner) =
+            self.owner(db).descriptor_validation_binding(db)?;
+        let error = if (validation_instance, validation_owner) == (instance, owner) {
+            error
+        } else {
+            // Keep the member inferred with the original TypeVar owner, but validate the call with
+            // the concrete constraint represented by this `super` branch.
+            Type::try_call_dunder_get_on_attribute(
+                db,
+                attribute,
+                validation_instance,
+                validation_owner,
+            )
+            .2
+        };
+        Some(MemberLookupResult::new(member, error).or_fall_back_to(db, || Place::Undefined.into()))
     }
 
     /// Similar to `Type::find_name_in_mro_with_policy`, but performs lookup starting *after* the

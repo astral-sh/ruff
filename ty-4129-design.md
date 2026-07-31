@@ -22,7 +22,7 @@ should not introduce object-identity, alias, or class-namespace mutation analysi
 - Invoke each union branch with its concrete descriptor type as `self`.
 - Preserve the correlation between constrained receiver types and the descriptor selected from that
     receiver branch when validating the synthetic `instance` or `owner` argument, including for
-    `type[T]` class-object receivers.
+    `type[T]` class-object receivers and constrained `super()` owners.
 - Report the diagnostic only when the malformed descriptor is definitely selected and every
     applicable lookup branch fails.
 - Suppress the diagnostic when a normal value, valid descriptor, class mutation, or other lookup
@@ -35,8 +35,12 @@ should not introduce object-identity, alias, or class-namespace mutation analysi
     member is possibly undefined.
 - Preserve a possible valid metaclass data-descriptor branch as a higher-precedence lookup
     alternative when a mixed descriptor-kind union otherwise falls through to a class attribute.
+- Treat a conditionally defined `__set__` or `__delete__` method as a possible, rather than definite,
+    data-descriptor path when determining diagnostic certainty.
 - Treat the absent branch of a possibly defined `super` member as an alternative that does not
     invoke the descriptor, while retaining the ordinary possibly-missing diagnostic.
+- Preserve descriptor-call failures while expanding narrowed enum complements into their remaining
+    literal alternatives.
 - Suppress descriptor-read diagnostics after any possibly or definitely reaching same-place
     assignment, without using descriptor kind to prove that `__get__` remains selected.
 - Treat an inferred class-wide instance-member summary as a possible instance-dictionary shadow for
@@ -89,11 +93,19 @@ data-descriptor element remains a higher-precedence alternative even when the ag
 kind says that the union is not uniformly data-descriptor-like. The diagnostic preserves that
 successful alternative conservatively without changing the inferred member type.
 
+The same rule applies when descriptor kind depends on a conditionally defined `__set__` or
+`__delete__` method. Ty keeps its existing inferred member type, but combines the invalid `__get__`
+call with the lower-precedence fallback before deciding that the failure is definite.
+
 Constrained receiver types are expanded only for descriptor-call validation, pairing each concrete
 receiver constraint with the member selected from that constraint. For `type[T]`, ty first
 transposes the constraints to their class-object types so each descriptor receives the corresponding
 concrete class as its `owner`. The ordinary member result keeps the original receiver so existing
 `Self` and TypeVar binding behavior is unchanged.
+
+Constrained `super()` owners retain the original type variable in the inferred `super` type, but
+descriptor-call validation uses the concrete constraint associated with each already-expanded
+`super` branch.
 
 Recursive alias expansion runs inside the cycle-aware descriptor-call query. A recursive branch that
 re-enters the same query contributes no definite descriptor failure, while the remaining concrete
@@ -131,8 +143,8 @@ read/write correlation, and bidirectional type-context improvements are separate
 - Proving that an instance assignment performed in another method or call reaches a later read.
 - Diagnosing malformed descriptors after any reaching same-place assignment, including definite
     data descriptors and metaclass data descriptors that intercept class-object assignments.
-- Distinguishing definite data descriptors from descriptors with conditionally defined `__set__` or
-    `__delete__` methods for diagnostic certainty.
+- Introducing a general tri-state descriptor-kind representation or changing inferred member types
+    for descriptors with conditionally defined `__set__` or `__delete__` methods.
 - Precisely diagnosing a malformed descriptor assigned dynamically through a class object.
 - Improving the inferred value type after class-namespace mutation when the existing static class
     model cannot represent it.
@@ -141,6 +153,7 @@ read/write correlation, and bidirectional type-context improvements are separate
 - General resolution of incompatible descriptor method definitions contributed by multiple
     positive intersection elements.
 - General changes to `super` MRO lookup or possibly-missing attribute inference.
+- General changes to enum-complement narrowing or inferred member types.
 - General augmented-assignment operator inference, store validation, and bidirectional type-context
     improvements.
 - Diagnosing or retargeting call failures from an invalid custom `__getattribute__`.

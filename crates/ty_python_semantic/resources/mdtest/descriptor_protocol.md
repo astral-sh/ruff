@@ -128,6 +128,38 @@ def explicit(color: Literal[Color.GREEN, Color.BLUE]):
     del color.marker
 ```
 
+### Enum complements preserve descriptor errors
+
+Attribute lookup expands a narrowed enum complement into its remaining literals. A descriptor
+failure shared by every remaining literal is still definite.
+
+`enum_descriptor.pyi`:
+
+```pyi
+from enum import Enum
+
+class Descriptor:
+    def __get__(self) -> int: ...
+
+class Color(Enum):
+    RED = 1
+    GREEN = 2
+    BLUE = 3
+
+    descriptor: Descriptor
+```
+
+```py
+from enum_descriptor import Color
+
+def narrowed(color: Color) -> None:
+    if color is Color.RED:
+        return
+
+    # error: [invalid-attribute-access]
+    color.descriptor
+```
+
 ### Data and non-data descriptors
 
 Descriptors that define `__set__` or `__delete__` are called *data descriptors*. An example of a
@@ -1239,6 +1271,31 @@ class C(metaclass=Meta):
 C.value
 ```
 
+### Conditional descriptor kinds make metaclass failures possible
+
+A conditionally defined `__set__` method makes the metaclass member a data descriptor on only some
+paths. On the non-data path, the class attribute takes precedence, so the malformed `__get__` call
+is not definite.
+
+```py
+def conditional_descriptor_kind(flag: bool) -> None:
+    class Descriptor:
+        def __get__(self) -> int:
+            return 1
+
+        if flag:
+            def __set__(self, instance: object, value: object) -> None:
+                pass
+
+    class Meta(type):
+        value = Descriptor()
+
+    class C(metaclass=Meta):
+        value = 1
+
+    C.value
+```
+
 ### Possibly undefined `super` members do not fail definitely
 
 When a malformed descriptor is only possibly defined on a base class, the absent path raises an
@@ -1267,6 +1324,39 @@ def _(flag: bool):
         def read_definite(self) -> None:
             # error: [invalid-attribute-access] "Invalid access to descriptor attribute `value` on type `<super: <class 'DefiniteDerived'>, Self@read_definite>`"
             super().value
+```
+
+### Constrained `super` receivers preserve branch correlation
+
+Each constrained `super` branch validates the implicit descriptor call with its concrete owner. A
+valid constraint makes the overall failure only possible, while a constrained owner whose every
+branch is invalid still produces a diagnostic.
+
+```py
+from typing import TypeVar
+
+class Descriptor:
+    def __get__(self, instance: "Good", owner: type | None = None) -> int:
+        return 1
+
+class Base:
+    value = Descriptor()
+
+class Pivot(Base): ...
+class Good(Pivot): ...
+class Bad(Pivot): ...
+class AlsoBad(Pivot): ...
+
+T = TypeVar("T", Good, Bad)
+
+def possibly_valid(owner: T) -> None:
+    super(Pivot, owner).value
+
+BrokenT = TypeVar("BrokenT", Bad, AlsoBad)
+
+def always_invalid(owner: BrokenT) -> None:
+    # error: [invalid-attribute-access]
+    super(Pivot, owner).value
 ```
 
 ### Possible `__get__` callable failures are not reported
