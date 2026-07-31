@@ -30,6 +30,21 @@ def dispatch(value: object) -> None: ...
 def _(value: int | float) -> None: ...
 ```
 
+## Generic single-dispatch functions
+
+The generic function's annotation does not register concrete types, so its numeric union remains
+redundant even when a registered implementation needs the same union.
+
+```py
+import functools
+
+@functools.singledispatch
+def dispatch(value: int | float) -> None: ...  # error: [redundant-numeric-union]
+
+@dispatch.register
+def _(value: int | float) -> None: ...
+```
+
 ## Other parameters of registered functions
 
 Numeric unions remain redundant for parameters that do not determine dispatch registration.
