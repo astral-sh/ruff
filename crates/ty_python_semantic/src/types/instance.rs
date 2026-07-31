@@ -247,7 +247,7 @@ impl<'db> NominalInstanceType<'db> {
     }
 
     /// Returns the class literal for this instance.
-    pub(super) fn class_literal(&self, db: &'db dyn Db) -> ClassLiteral<'db> {
+    pub(crate) fn class_literal(&self, db: &'db dyn Db) -> ClassLiteral<'db> {
         self.class(db).class_literal(db)
     }
 

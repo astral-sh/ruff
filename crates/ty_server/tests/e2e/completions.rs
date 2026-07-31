@@ -537,6 +537,43 @@ x: Literal[\"apple\"] = \"app\"
 }
 
 #[test]
+fn match_case_completion_uses_primary_text_edit() -> Result<()> {
+    let workspace_root = SystemPath::new("src");
+    let foo = SystemPath::new("src/foo.py");
+    let foo_content = "\
+from enum import Enum
+
+class Color(Enum):
+    RED = 1
+    BLUE = 2
+
+def handle(color: Color):
+    match color:
+        case Color.RED | Color.B:
+            pass
+";
+
+    let mut server = TestServerBuilder::new()?
+        .with_initialization_options(ClientOptions::default().with_auto_import(false))
+        .with_workspace(workspace_root, None)?
+        .with_file(foo, foo_content)?
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    server.open_text_document(foo, foo_content, 1);
+
+    let completions = server
+        .completion_request(&server.file_uri(foo), Position::new(8, 32))
+        .into_iter()
+        .filter(|completion| completion.label == "BLUE")
+        .collect::<Vec<_>>();
+
+    insta::assert_json_snapshot!("match_case_completion_uses_primary_text_edit", completions);
+
+    Ok(())
+}
+
+#[test]
 fn typed_dict_literal_key_completion_before_colon() -> Result<()> {
     let workspace_root = SystemPath::new("src");
     let foo = SystemPath::new("src/foo.py");

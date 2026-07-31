@@ -44,9 +44,10 @@ use crate::place::{
 };
 use crate::predicate::{
     CallableAndCallExpr, ClassPatternKeywordPredicateKind, ClassPatternPredicateKind,
-    MappingPatternEntryPredicateKind, MappingPatternPredicateKind, PatternPredicate,
-    PatternPredicateKind, Predicate, PredicateNode, PredicateOrLiteral, ScopedPredicateId,
-    SequencePatternPredicateKind, StarImportPlaceholderPredicate, SubjectElementPatternPredicate,
+    MappingPatternEntryPredicateKind, MappingPatternPredicateKind, MatchCaseNodeKey,
+    PatternPredicate, PatternPredicateKind, Predicate, PredicateNode, PredicateOrLiteral,
+    ScopedPredicateId, SequencePatternPredicateKind, StarImportPlaceholderPredicate,
+    SubjectElementPatternPredicate,
 };
 use crate::program::Program;
 use crate::re_exports::exported_names;
@@ -297,6 +298,9 @@ pub(super) struct SemanticIndexBuilder<'db, 'ast> {
 
     /// Alias metadata for predicate leaf names in the current file.
     alias_predicates: FxHashMap<ExpressionNodeKey, NarrowingAliasPredicate<'db>>,
+
+    /// A collection of pattern predicates in the file collected during indexing.
+    match_case_predicates: Vec<(MatchCaseNodeKey, PatternPredicate<'db>)>,
 }
 
 impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
@@ -326,6 +330,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             scopes_by_node: FxHashMap::default(),
             definitions_by_node: FxHashMap::default(),
             expressions_by_node: FxHashMap::default(),
+            match_case_predicates: Vec::new(),
             unpacks_by_target: FxHashMap::default(),
             condition_flow_snapshots_by_node: FxHashMap::default(),
             statements_by_node: FxHashMap::default(),
@@ -2926,6 +2931,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             generator_functions: FrozenSet::from(self.generator_functions),
             async_comprehensions: FrozenSet::from(self.async_comprehensions),
             narrowing_alias_predicates: FrozenMap::from(self.alias_predicates),
+            match_case_predicates: FrozenMap::from_entries(self.match_case_predicates),
         }
     }
 
@@ -3946,6 +3952,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         case.guard.as_deref(),
                         previous_pattern,
                     );
+                    self.match_case_predicates
+                        .push((case.into(), match_pattern_predicate));
                     self.current_match_case = Some(CurrentMatchCase::new(
                         &case.pattern,
                         match_pattern_predicate,

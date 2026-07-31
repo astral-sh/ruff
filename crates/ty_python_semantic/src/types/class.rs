@@ -841,7 +841,7 @@ impl<'db> ClassLiteral<'db> {
     }
 
     /// Returns the qualified name of this class.
-    pub(super) fn qualified_name(self, db: &'db dyn Db) -> QualifiedClassName<'db> {
+    pub(crate) fn qualified_name(self, db: &'db dyn Db) -> QualifiedClassName<'db> {
         QualifiedClassName::from_class_literal(db, self)
     }
 
@@ -2834,13 +2834,13 @@ pub(super) enum InstanceMemberResult<'db> {
 // have the same components. You'd expect them to compare equal, but they'd compare
 // unequal if `PartialEq`/`Eq` were naively derived.
 #[derive(Clone, Copy)]
-pub(super) struct QualifiedClassName<'db> {
+pub(crate) struct QualifiedClassName<'db> {
     db: &'db dyn Db,
     class: ClassLiteral<'db>,
 }
 
 impl<'db> QualifiedClassName<'db> {
-    pub(super) fn from_class_literal(db: &'db dyn Db, class: ClassLiteral<'db>) -> Self {
+    pub(crate) fn from_class_literal(db: &'db dyn Db, class: ClassLiteral<'db>) -> Self {
         Self { db, class }
     }
 
