@@ -72,8 +72,6 @@ pub struct DiagnosticStylesheet {
     pub(crate) secondary_code: Style,
     pub(crate) insertion: Style,
     pub(crate) deletion: Style,
-    pub(crate) insertion_line_no: Style,
-    pub(crate) deletion_line_no: Style,
     pub(crate) hyperlink: bool,
 }
 
@@ -102,8 +100,6 @@ impl DiagnosticStylesheet {
             secondary_code: AnsiColor::Red.on_default().effects(Effects::BOLD),
             insertion: AnsiColor::Green.on_default(),
             deletion: AnsiColor::Red.on_default(),
-            insertion_line_no: AnsiColor::Green.on_default().effects(Effects::BOLD),
-            deletion_line_no: AnsiColor::Red.on_default().effects(Effects::BOLD),
             hyperlink,
         }
     }
@@ -131,8 +127,6 @@ impl DiagnosticStylesheet {
             secondary_code: Style::new(),
             insertion: Style::new(),
             deletion: Style::new(),
-            insertion_line_no: Style::new(),
-            deletion_line_no: Style::new(),
             hyperlink: false,
         }
     }

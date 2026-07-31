@@ -1,10 +1,6 @@
-use std::borrow::Cow;
-use std::num::NonZeroUsize;
-
-use similar::{ChangeTag, DiffOp, TextDiff};
-
 use annotate_snippets::{
-    Group as AnnotateGroup, Level as AnnotateLevel, Renderer as AnnotateRenderer,
+    Group as AnnotateGroup, Level as AnnotateLevel, Patch as AnnotatePatch,
+    Renderer as AnnotateRenderer, Snippet as AnnotateSnippet,
 };
 use ruff_diagnostics::{Applicability, Fix};
 use ruff_notebook::NotebookIndex;
@@ -12,7 +8,7 @@ use ruff_source_file::OneIndexed;
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use crate::diagnostic::render::{FileResolver, Resolved};
-use crate::diagnostic::stylesheet::{DiagnosticStylesheet, fmt_styled};
+use crate::diagnostic::stylesheet::DiagnosticStylesheet;
 use crate::diagnostic::{Diagnostic, DiagnosticSource, DisplayDiagnosticConfig};
 
 pub(super) struct FullRenderer<'a> {
@@ -52,6 +48,8 @@ impl<'a> FullRenderer<'a> {
             .help(stylesheet.help)
             .line_num(stylesheet.line_no)
             .emphasis(stylesheet.emphasis)
+            .addition(stylesheet.insertion)
+            .removal(stylesheet.deletion)
             .none(stylesheet.none)
             .hyperlink(stylesheet.hyperlink);
 
@@ -62,15 +60,24 @@ impl<'a> FullRenderer<'a> {
 
             let resolved = Resolved::new(self.resolver, diag, self.config);
             let renderable = resolved.to_renderable(self.config);
-            for diag in renderable.diagnostics.iter() {
-                writeln!(f, "{}", renderer.render(&[diag.to_annotate()]))?;
+            let diff = diag
+                .has_applicable_fix(self.config.fix_applicability())
+                .then(|| Diff::from_diagnostic(diag, self.resolver))
+                .flatten();
+
+            for (index, diagnostic) in renderable.diagnostics.iter().enumerate() {
+                let mut group = diagnostic.to_annotate();
+                if index + 1 == renderable.diagnostics.len()
+                    && let Some(diff) = diff.as_ref()
+                {
+                    group = diff.append_to(group);
+                }
+
+                let rendered = renderer.render(&[group]);
+                writeln!(f, "{rendered}")?;
             }
 
-            if diag.has_applicable_fix(self.config.fix_applicability())
-                && let Some(diff) =
-                    Diff::from_diagnostic(diag, &stylesheet, self.resolver, self.config)
-            {
-                write!(f, "{diff}")?;
+            if let Some(diff) = diff {
                 if let Some(applicability) = to_applicability_annotate(diff.fix) {
                     writeln!(f, "{}", renderer.render(&[applicability]))?;
                 }
@@ -83,42 +90,30 @@ impl<'a> FullRenderer<'a> {
     }
 }
 
-const FIX_CONTEXT: usize = 1;
-
-/// Renders a diff that shows the code fixes.
-///
-/// The implementation isn't fully fledged out and only used by tests. Before using in production, try
-/// * Improve layout
-/// * Replace tabs with spaces for a consistent experience across terminals
-/// * Replace zero-width whitespaces
-/// * Print a simpler diff if only a single line has changed
-/// * Compute the diff from the `Edit` because diff calculation is expensive.
+/// Track a diff for showing the code fixes.
 struct Diff<'a> {
     fix: &'a Fix,
     diagnostic_source: DiagnosticSource,
     notebook_index: Option<NotebookIndex>,
-    stylesheet: &'a DiagnosticStylesheet,
-    merge_window: usize,
+    fold: bool,
 }
 
 impl<'a> Diff<'a> {
-    fn from_diagnostic(
-        diagnostic: &'a Diagnostic,
-        stylesheet: &'a DiagnosticStylesheet,
-        resolver: &'a dyn FileResolver,
-        config: &DisplayDiagnosticConfig,
-    ) -> Option<Diff<'a>> {
+    fn from_diagnostic(diagnostic: &'a Diagnostic, resolver: &'a dyn FileResolver) -> Option<Self> {
         let file = &diagnostic.primary_span_ref()?.file;
-        Some(Diff {
+        Some(Self {
             fix: diagnostic.fix()?,
             diagnostic_source: file.diagnostic_source(resolver),
             notebook_index: resolver.notebook_index(file),
-            stylesheet,
-            merge_window: config.merge_window,
+            fold: !diagnostic
+                .inner
+                .annotations
+                .iter()
+                .any(|annotation| annotation.is_primary && annotation.hide_snippet),
         })
     }
 
-    fn write(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+    fn append_to<'s>(&'s self, mut group: AnnotateGroup<'s>) -> AnnotateGroup<'s> {
         let source_code = self.diagnostic_source.as_source_code();
         let source_text = source_code.text();
 
@@ -126,7 +121,7 @@ impl<'a> Diff<'a> {
 
         for (cell_index, range) in cell_ranges {
             // For non-notebooks, construct and diff only the source surrounding the edits.
-            let (range, line_offset) = if cell_index.is_none()
+            let (range, line_num) = if cell_index.is_none()
                 && let Some(first) = self.fix.edits().first()
                 && let Some(last) = self.fix.edits().last()
             {
@@ -144,7 +139,7 @@ impl<'a> Diff<'a> {
                         source_code.line_start(start_line),
                         source_code.line_end(end_line),
                     ),
-                    start_line.to_zero_indexed(),
+                    start_line.get(),
                 )
             } else {
                 (range, 0)
@@ -163,125 +158,21 @@ impl<'a> Diff<'a> {
 
             let input = source_code.slice(range);
 
-            let mut output = String::with_capacity(input.len());
-            let mut last_end = range.start();
-
-            for edit in edits {
-                output.push_str(source_code.slice(TextRange::new(last_end, edit.start())));
-                output.push_str(edit.content().unwrap_or_default());
-                last_end = edit.end();
-            }
-
-            output.push_str(&source_text[usize::from(last_end)..usize::from(range.end())]);
-
-            let diff = TextDiff::from_lines(input, &output);
-
-            let mut grouped_ops: Vec<Vec<DiffOp>> = Vec::new();
-            for group in diff.grouped_ops(FIX_CONTEXT) {
-                if let Some(previous) = grouped_ops.last_mut()
-                    && let Some(DiffOp::Equal { new_index, len, .. }) = previous.last_mut()
-                    && let [
-                        DiffOp::Equal {
-                            new_index: next_new_index,
-                            len: next_len,
-                            ..
-                        },
-                        rest @ ..,
-                    ] = group.as_slice()
-                    && next_new_index.saturating_sub(*new_index + *len) <= self.merge_window
-                {
-                    // Restore the unchanged lines that `grouped_ops` omitted between the groups.
-                    *len = next_new_index + next_len - *new_index;
-                    previous.extend_from_slice(rest);
-                } else {
-                    grouped_ops.push(group);
-                }
-            }
-
-            // Find the new line number with the largest number of digits to align all of the line
-            // number separators.
-            let last_op = grouped_ops.last().and_then(|group| group.last());
-            let largest_new = last_op
-                .map(|op| op.new_range().end + line_offset)
-                .unwrap_or_default();
-
-            let digit_with = OneIndexed::new(largest_new).unwrap_or_default().digits();
-
-            if let Some(cell_index) = cell_index {
-                // Room for 1 digit, 1 space, 1 `|`, and 1 more following space. This centers the
-                // three colons on the pipe.
-                writeln!(f, "{:>1$} cell {cell_index}", ":::", digit_with.get() + 3)?;
-            }
-
-            self.write_gutter(f, digit_with)?;
-
-            for (idx, group) in grouped_ops.iter().enumerate() {
-                if idx > 0 {
-                    writeln!(f, "{:-^1$}", "-", 80)?;
-                }
-                for op in group {
-                    for change in diff.iter_inline_changes(op) {
-                        let (sign, style, line_no_style, index) = match change.tag() {
-                            ChangeTag::Delete => (
-                                "-",
-                                self.stylesheet.deletion,
-                                self.stylesheet.deletion_line_no,
-                                None,
-                            ),
-                            ChangeTag::Insert => (
-                                "+",
-                                self.stylesheet.insertion,
-                                self.stylesheet.insertion_line_no,
-                                change.new_index(),
-                            ),
-                            ChangeTag::Equal => (
-                                "|",
-                                self.stylesheet.none,
-                                self.stylesheet.line_no,
-                                change.new_index(),
-                            ),
-                        };
-
-                        let line = Line {
-                            index: index.map(|i| {
-                                OneIndexed::from_zero_indexed(i).saturating_add(line_offset)
-                            }),
-                            width: digit_with,
-                        };
-
-                        write!(
-                            f,
-                            "{line} {sign}",
-                            line = fmt_styled(line, self.stylesheet.line_no),
-                            sign = fmt_styled(sign, line_no_style),
-                        )?;
-
-                        let mut needs_separator = true;
-                        for (emphasized, value) in change.iter_strings_lossy() {
-                            if needs_separator && !value.trim_end_matches(['\n', '\r']).is_empty() {
-                                f.write_str(" ")?;
-                                needs_separator = false;
-                            }
-
-                            let value = show_nonprinting(&value);
-                            let styled = fmt_styled(value, style);
-                            if emphasized {
-                                write!(f, "{}", fmt_styled(styled, self.stylesheet.emphasis))?;
-                            } else {
-                                write!(f, "{styled}")?;
-                            }
-                        }
-                        if change.missing_newline() {
-                            writeln!(f)?;
-                        }
-                    }
-                }
-            }
-
-            self.write_gutter(f, digit_with)?;
+            let snippet = AnnotateSnippet::source(input)
+                .line_start(line_num)
+                .cell_index(cell_index)
+                .fold(self.fold)
+                .patches(edits.iter().map(|edit| {
+                    let range = edit.range() - range.start();
+                    AnnotatePatch::new(
+                        range.start().to_usize()..range.end().to_usize(),
+                        edit.content().unwrap_or_default(),
+                    )
+                }));
+            group = group.element(snippet);
         }
 
-        Ok(())
+        group
     }
 
     fn cell_ranges(&self) -> Vec<(Option<usize>, TextRange)> {
@@ -313,57 +204,10 @@ impl<'a> Diff<'a> {
         cells.push((Some(last_cell_index.get()), range));
         cells
     }
-
-    fn write_gutter(&self, f: &mut std::fmt::Formatter, width: NonZeroUsize) -> std::fmt::Result {
-        writeln!(
-            f,
-            "{line} {separator}",
-            line = fmt_styled(Line { index: None, width }, self.stylesheet.line_no),
-            separator = fmt_styled("|", self.stylesheet.line_no),
-        )
-    }
 }
 
 /// Limit diffs to a narrow range around each fix rather than diffing the whole file.
 const DIFF_CONTEXT_WINDOW: usize = 3;
-
-impl std::fmt::Display for Diff<'_> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.write(f)
-    }
-}
-
-struct Line {
-    index: Option<OneIndexed>,
-    width: NonZeroUsize,
-}
-
-impl std::fmt::Display for Line {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match self.index {
-            None => {
-                for _ in 0..self.width.get() {
-                    f.write_str(" ")?;
-                }
-                Ok(())
-            }
-            Some(idx) => write!(f, "{:<width$}", idx, width = self.width.get()),
-        }
-    }
-}
-
-fn show_nonprinting(s: &str) -> Cow<'_, str> {
-    if s.find(['\x07', '\x08', '\x1b', '\x7f']).is_some() {
-        Cow::Owned(
-            s.replace('\x07', "␇")
-                .replace('\x08', "␈")
-                .replace('\x1b', "␛")
-                .replace('\x7f', "␡"),
-        )
-    } else {
-        Cow::Borrowed(s)
-    }
-}
 
 fn to_applicability_annotate(fix: &Fix) -> Option<AnnotateGroup<'static>> {
     let (level, message) = match fix.applicability() {
