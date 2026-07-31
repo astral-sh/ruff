@@ -10261,7 +10261,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.infer_attribute_load_impl(attribute, value_type, true)
     }
 
-    /// Infer the type of a [`ast::ExprAttribute`] expression, assuming a load context.
+    /// Infers an attribute load using a previously inferred receiver type.
+    ///
+    /// `report_descriptor_get_error` is false for deletion targets, where this load only provides
+    /// the input to `__delete__` validation and does not represent a runtime `__get__` call.
     fn infer_attribute_load_impl(
         &mut self,
         attribute: &ast::ExprAttribute,

@@ -1739,6 +1739,7 @@ pub(super) fn report_invalid_attribute_assignment(
     error_context.attach_to(db, env, &mut diag);
 }
 
+/// Reports a definitely invalid implicit call to a descriptor's `__get__` method.
 pub(super) fn report_bad_dunder_get_call<'db>(
     context: &InferContext<'db, '_>,
     failure: &DescriptorGetCallError<'db>,

@@ -320,7 +320,7 @@ impl<'db> CallError<'db> {
     ///
     /// This excludes errors raised while evaluating synthesized calls, such as invoking a
     /// property's getter. Those errors need diagnostics specific to the synthesized operation.
-    pub(crate) fn has_definitely_invalid_callee_or_arguments(&self) -> bool {
+    pub(super) fn has_definitely_invalid_callee_or_arguments(&self) -> bool {
         self.1.has_definite_overload_resolution_error()
     }
 

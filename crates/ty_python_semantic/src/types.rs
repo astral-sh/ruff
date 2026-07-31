@@ -534,6 +534,10 @@ impl AttributeKind {
     }
 }
 
+/// The raw `__get__` member selected for a descriptor value.
+///
+/// The lookup keeps both static definedness and runtime-binding certainty because an annotation
+/// can describe `__get__` without installing a method in the runtime class dictionary.
 #[derive(Clone, Debug, Copy)]
 struct DescriptorGetLookup<'db> {
     callable_type: Type<'db>,
@@ -541,6 +545,11 @@ struct DescriptorGetLookup<'db> {
     definitely_runtime_bound: bool,
 }
 
+/// An interned description of an invalid implicit `__get__` call.
+///
+/// Member lookup carries this compact context through unions and fallbacks. The concrete
+/// [`CallError`] is reconstructed only if expression inference determines that every lookup path
+/// invokes the invalid descriptor.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 struct DescriptorGetCallContext<'db> {
     #[returns(copy)]
@@ -566,6 +575,8 @@ impl<'db> DescriptorGetCallContext<'db> {
         )
     }
 
+    /// Reconstructs the implicit call and returns its error if the call is still definitely
+    /// invalid.
     fn into_error(self, db: &'db dyn Db) -> Option<DescriptorGetCallError<'db>> {
         let descriptor_type = self.descriptor_type(db);
         let descr_get = descriptor_type.try_lookup_dunder_get(db)?;
@@ -622,6 +633,10 @@ fn combine_alternative_descriptor_get_errors<'db>(
     }
 }
 
+/// Aggregates errors from alternative descriptor values.
+///
+/// The access is definitely invalid only when every alternative fails. `selected` retains one
+/// representative failure for the diagnostic.
 struct DescriptorGetErrorAccumulator<'db> {
     selected: Option<DescriptorGetCallContext<'db>>,
     all_branches_fail: bool,
@@ -645,6 +660,8 @@ impl<'db> DescriptorGetErrorAccumulator<'db> {
     }
 }
 
+/// The result of applying the descriptor protocol to a value, including a deferred definite
+/// failure.
 #[derive(Clone, Debug, Copy, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
 struct DescriptorGetResult<'db> {
     return_type: Type<'db>,
@@ -652,13 +669,18 @@ struct DescriptorGetResult<'db> {
     error: Option<DescriptorGetCallContext<'db>>,
 }
 
-pub(crate) struct DescriptorGetCallError<'db> {
-    pub(crate) descriptor_type: Type<'db>,
-    pub(crate) error: CallError<'db>,
+/// A failed implicit descriptor call ready to be reported at an attribute expression.
+struct DescriptorGetCallError<'db> {
+    descriptor_type: Type<'db>,
+    error: CallError<'db>,
 }
 
+/// A member lookup result together with a deferred, definitely invalid descriptor call.
+///
+/// Keeping the failure attached to the member lets unions, `__getattr__`, and lower-precedence
+/// lookup stages suppress it when any runtime path can avoid the descriptor.
 #[derive(Clone, Debug, Copy, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
-pub(crate) struct MemberLookupResult<'db> {
+struct MemberLookupResult<'db> {
     member: PlaceAndQualifiers<'db>,
     descriptor_get_error: Option<DescriptorGetCallContext<'db>>,
 }
@@ -727,6 +749,10 @@ impl<'db> MemberLookupResult<'db> {
     }
 }
 
+/// Returns whether a place corresponds to one runtime class-dictionary entry.
+///
+/// Stub definitions, definitions under `TYPE_CHECKING`, and merged provenance are intentionally
+/// not considered definite runtime bindings.
 fn place_is_definitely_runtime_bound<'db>(db: &'db dyn Db, place: Place<'db>) -> bool {
     match place {
         Place::Defined(DefinedPlace {
@@ -3701,6 +3727,8 @@ impl<'db> Type<'db> {
         }
     }
 
+    /// Looks up the raw `__get__` slot on the descriptor's class without applying the descriptor
+    /// protocol to the slot itself.
     fn try_lookup_dunder_get(self, db: &'db dyn Db) -> Option<DescriptorGetLookup<'db>> {
         let Place::Defined(DefinedPlace {
             ty: concrete_descr_get,
@@ -3743,6 +3771,20 @@ impl<'db> Type<'db> {
         })
     }
 
+    /// Applies `__get__` and retains a definite call failure for expression inference.
+    ///
+    /// For example, accessing `C().value` below implicitly supplies the descriptor value, the
+    /// `C` instance, and `C`, so the declared method is missing two parameters:
+    ///
+    /// ```python
+    /// class Descriptor:
+    ///     def __get__(self): ...
+    ///
+    /// class C:
+    ///     value = Descriptor()
+    ///
+    /// C().value
+    /// ```
     fn try_call_dunder_get_with_error(
         self,
         db: &'db dyn Db,
@@ -4522,7 +4564,7 @@ impl<'db> Type<'db> {
     }
 
     /// Performs member lookup and retains errors raised by an implicit descriptor `__get__` call.
-    pub(crate) fn member_with_diagnostics(
+    fn member_with_diagnostics(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
@@ -5302,7 +5344,8 @@ impl<'db> Type<'db> {
 
                     bound_super
                         .try_call_dunder_get_on_attribute(db, env, owner_attr)
-                        .unwrap_or_else(|| owner_attr.into())
+                        .unwrap_or(owner_attr)
+                        .into()
                 }
             }
         }

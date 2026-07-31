@@ -10,8 +10,8 @@ use crate::{
     place::{Place, PlaceAndQualifiers},
     types::{
         BoundTypeVarInstance, ClassBase, ClassType, DivergentType, DynamicType,
-        IntersectionBuilder, KnownClass, MemberLookupPolicy, MemberLookupResult, SpecialFormType,
-        SubclassOfInner, SubclassOfType, Type, TypeVarBoundOrConstraints, UnionBuilder,
+        IntersectionBuilder, KnownClass, MemberLookupPolicy, SpecialFormType, SubclassOfInner,
+        SubclassOfType, Type, TypeVarBoundOrConstraints, UnionBuilder,
         constraints::ConstraintSet,
         context::InferContext,
         diagnostic::{INVALID_SUPER_ARGUMENT, UNAVAILABLE_IMPLICIT_SUPER_ARGUMENTS},
@@ -939,11 +939,9 @@ impl<'db> BoundSuperType<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         attribute: PlaceAndQualifiers<'db>,
-    ) -> Option<MemberLookupResult<'db>> {
+    ) -> Option<PlaceAndQualifiers<'db>> {
         let (instance, owner) = self.owner(db).descriptor_binding(db, env)?;
-        let (member, _, _) =
-            Type::try_call_dunder_get_on_attribute(db, env, attribute, instance, owner);
-        Some(member.into())
+        Some(Type::try_call_dunder_get_on_attribute(db, env, attribute, instance, owner).0)
     }
 
     /// Similar to `Type::find_name_in_mro_with_policy`, but performs lookup starting *after* the
