@@ -18,7 +18,7 @@ use crate::{
         SpecialFormType, StaticClassLiteral, Type, TypeVarVariance, TypedDictModule, binding_type,
         call::Argument,
         class::{
-            AbstractMethod, CodeGeneratorKind, FieldKind, MetaclassErrorKind,
+            AbstractMethod, CodeGeneratorKind, Field, FieldKind, MetaclassErrorKind,
             expanded_class_base_entries,
         },
         context::InferContext,
@@ -917,17 +917,16 @@ pub(crate) fn check_static_class_definitions<'db>(
     {
         let specialization = None;
         let class_init = class.has_dataclass_param(db, field_policy, DataclassFlags::INIT);
+        let own_fields = class.own_fields(db, specialization, field_policy);
 
-        let mut kw_only_sentinel_fields = vec![];
-        let mut required_after_default_field_names = vec![];
-        let mut has_seen_default_field = false;
+        let kw_only_sentinel_fields: Vec<_> = own_fields
+            .iter()
+            .filter_map(|(name, field)| field.is_kw_only_sentinel(db).then_some(name))
+            .collect();
+        let mut field_order_violations = vec![];
+        let mut previous_default_field = None;
 
-        for (name, field) in class.own_fields(db, specialization, field_policy) {
-            if field.is_kw_only_sentinel(db) {
-                kw_only_sentinel_fields.push(name);
-                continue;
-            }
-
+        for (name, field) in class.fields(db, specialization, field_policy) {
             // Extract dataclass field properties
             let FieldKind::Dataclass {
                 default_ty,
@@ -945,9 +944,9 @@ pub(crate) fn check_static_class_definitions<'db>(
             }
 
             if default_ty.is_some() {
-                has_seen_default_field = true;
-            } else if has_seen_default_field {
-                required_after_default_field_names.push(name);
+                previous_default_field = Some((name, field));
+            } else if let Some((default_name, default_field)) = previous_default_field {
+                field_order_violations.push((default_name, default_field, name, field));
             }
         }
 
@@ -968,36 +967,52 @@ pub(crate) fn check_static_class_definitions<'db>(
             }
         }
 
-        if !required_after_default_field_names.is_empty() {
-            // Report field ordering violations
+        if !field_order_violations.is_empty() {
             let body_scope = class.body_scope(db).file_scope_id(db);
             let use_def_map = index.use_def_map(body_scope);
             let place_table = index.place_table(body_scope);
 
-            for name in required_after_default_field_names {
+            for (default_name, default_field, name, field) in field_order_violations {
+                if !own_fields.contains_key(default_name)
+                    && !own_fields.contains_key(name)
+                    && has_inherited_dataclass_field_order_violation(
+                        db,
+                        class,
+                        default_name,
+                        default_field,
+                        name,
+                        field,
+                    )
+                {
+                    continue;
+                }
+
+                let report = |range: TextRange| {
+                    let Some(builder) = context.report_lint(&DATACLASS_FIELD_ORDER, range) else {
+                        return false;
+                    };
+                    builder.into_diagnostic(format_args!(
+                        "Required field `{name}` cannot be defined after fields with default values",
+                    ));
+                    true
+                };
+
+                if !own_fields.contains_key(name) {
+                    report(class_node.name.range());
+                    continue;
+                }
+
                 let Some(symbol_id) = place_table.symbol_id(name.as_str()) else {
                     continue;
                 };
                 for decl_with_constraints in use_def_map.end_of_scope_symbol_declarations(symbol_id)
                 {
-                    let Some(definition) = decl_with_constraints.declaration.definition() else {
-                        continue;
-                    };
-                    let DefinitionKind::AnnotatedAssignment(ann_assign) = definition.kind(db)
-                    else {
-                        continue;
-                    };
-                    let Some(builder) = context
-                        .report_lint(&DATACLASS_FIELD_ORDER, ann_assign.target(context.module()))
-                    else {
-                        continue;
-                    };
-                    builder.into_diagnostic(format_args!(
-                        "Required field `{name}` cannot be defined \
-                                after fields with default values",
-                    ));
-
-                    break;
+                    if let Some(definition) = decl_with_constraints.declaration.definition()
+                        && let DefinitionKind::AnnotatedAssignment(ann_assign) = definition.kind(db)
+                        && report(ann_assign.target(context.module()).range())
+                    {
+                        break;
+                    }
                 }
             }
         }
@@ -1025,6 +1040,64 @@ pub(crate) fn check_static_class_definitions<'db>(
     }
 
     class.validate_members(context);
+}
+
+/// Returns whether the same default-before-required field pair already violates an ancestor's
+/// generated constructor ordering.
+///
+/// ```python
+/// from dataclasses import dataclass
+///
+/// @dataclass
+/// class Base:
+///     optional: int = 1
+///     required: int
+///
+/// @dataclass
+/// class Child(Base):
+///     pass
+/// ```
+///
+/// `Child` inherits the existing error and should not report it again. Comparing declaration
+/// provenance preserves diagnostics when a subclass redeclares either field.
+fn has_inherited_dataclass_field_order_violation<'db>(
+    db: &'db dyn Db,
+    class: StaticClassLiteral<'db>,
+    default_name: &Name,
+    default_field: &Field<'db>,
+    required_name: &Name,
+    required_field: &Field<'db>,
+) -> bool {
+    class
+        .iter_mro(db, None)
+        .skip(1)
+        .filter_map(ClassBase::into_class)
+        .filter_map(|ancestor| ancestor.static_class_literal(db))
+        .any(|(ancestor, specialization)| {
+            let Some(field_policy @ CodeGeneratorKind::DataclassLike(_)) =
+                CodeGeneratorKind::from_class(db, ancestor.into())
+            else {
+                return false;
+            };
+            if !ancestor.has_dataclass_param(db, field_policy, DataclassFlags::INIT) {
+                return false;
+            }
+
+            let fields = ancestor.fields(db, specialization, field_policy);
+            let Some((default_index, _, inherited_default_field)) = fields.get_full(default_name)
+            else {
+                return false;
+            };
+            let Some((required_index, _, inherited_required_field)) =
+                fields.get_full(required_name)
+            else {
+                return false;
+            };
+
+            default_index < required_index
+                && inherited_default_field.first_declaration == default_field.first_declaration
+                && inherited_required_field.first_declaration == required_field.first_declaration
+        })
 }
 
 /// Check compatibility between class namespace values and attributes populated by its metaclass.
