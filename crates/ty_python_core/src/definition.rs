@@ -271,12 +271,6 @@ pub struct Definitions<'db> {
 }
 
 impl<'db> Definitions<'db> {
-    pub fn single(definition: Definition<'db>) -> Self {
-        Self {
-            definitions: smallvec::smallvec_inline![definition],
-        }
-    }
-
     pub(crate) fn push(&mut self, definition: Definition<'db>) {
         self.definitions.push(definition);
     }
