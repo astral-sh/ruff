@@ -56,12 +56,12 @@ impl Violation for SubprocessPopenWithShellEqualsTrue {
 }
 
 /// ## What it does
-/// Check for method calls that initiate a subprocess without a shell.
+/// Check for subprocess calls whose input may be untrusted.
 ///
 /// ## Why is this bad?
-/// Starting a subprocess without a shell can prevent attackers from executing
-/// arbitrary shell commands; however, it is still error-prone. Consider
-/// validating the input.
+/// A subprocess call with untrusted input can allow attackers to influence
+/// the command that is executed. Validate or otherwise constrain the input
+/// before passing it to the subprocess.
 ///
 /// ## Known problems
 /// Prone to false positives as it is difficult to determine whether the
@@ -81,9 +81,9 @@ impl Violation for SubprocessPopenWithShellEqualsTrue {
 /// [#4045]: https://github.com/astral-sh/ruff/issues/4045
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.262")]
-pub(crate) struct SubprocessWithoutShellEqualsTrue;
+pub(crate) struct SubprocessCallWithUntrustedInput;
 
-impl Violation for SubprocessWithoutShellEqualsTrue {
+impl Violation for SubprocessCallWithUntrustedInput {
     #[derive_message_formats]
     fn message(&self) -> String {
         "`subprocess` call: check for execution of untrusted input".to_string()
@@ -342,7 +342,7 @@ pub(crate) fn shell_injection(checker: &Checker, call: &ast::ExprCall) {
                 _ => {
                     if !is_trusted_input(arg, checker.semantic()) {
                         checker.report_diagnostic_if_enabled(
-                            SubprocessWithoutShellEqualsTrue,
+                            SubprocessCallWithUntrustedInput,
                             call.func.range(),
                         );
                     }
