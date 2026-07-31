@@ -68,6 +68,7 @@ mod named_tuple;
 mod static_literal;
 mod typed_dict;
 
+#[derive(Clone, Copy)]
 enum DynamicClassHeaderAnchor<'db> {
     Definition(Definition<'db>),
     ScopeOffset(u32),
