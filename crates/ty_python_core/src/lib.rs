@@ -433,10 +433,6 @@ impl<'db> SemanticIndex<'db> {
         self.place_table(scope).symbol(symbol).is_global()
     }
 
-    pub fn symbol_is_nonlocal_in_scope(&self, symbol: ScopedSymbolId, scope: FileScopeId) -> bool {
-        self.place_table(scope).symbol(symbol).is_nonlocal()
-    }
-
     /// Returns `true` if the given symbol in the given scope resolves to the global scope, either
     /// because:
     ///
