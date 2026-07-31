@@ -307,6 +307,35 @@ If a typevar does not provide a default, we use `Unknown`:
 reveal_type(C())  # revealed: C[Unknown]
 ```
 
+## Calls within the generic class
+
+A call to a generic class from one of its own methods creates an independent generic occurrence. The
+enclosing class's type variable does not constrain the new instance.
+
+```py
+class C[T]:
+    def __init__(self) -> None: ...
+    def method(self) -> None:
+        reveal_type(C())  # revealed: C[Unknown]
+        contextual: C[int] = C()
+```
+
+The same applies when an explicit `__new__` is followed by a downstream `__init__`. Both bound
+receivers refer to the new generic occurrence.
+
+```py
+from typing import Self
+
+class D[T]:
+    def __new__(cls) -> Self:
+        return super().__new__(cls)
+
+    def __init__(self) -> None: ...
+    def method(self) -> None:
+        reveal_type(D())  # revealed: D[Unknown]
+        contextual: D[int] = D()
+```
+
 ## Inferring generic class parameters from constructors
 
 If the type of a constructor parameter is a class typevar, we can use that to infer the type

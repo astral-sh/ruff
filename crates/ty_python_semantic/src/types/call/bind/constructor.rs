@@ -113,12 +113,16 @@ impl<'db> ConstructorBinding<'db> {
         // the inferred specialization to that instance. Only the per-overload context is
         // call-local, so its instance must use the same fresh type variables as the signature.
         let constructor_context = self.context().with_instance_type(fresh_instance_type);
+        let visitor = ApplyTypeMappingVisitor::default();
+        self.entry.bound_type = self.entry.bound_type.map(|bound_type| {
+            bound_type.apply_type_mapping_impl(db, &type_mapping, TypeContext::default(), &visitor)
+        });
         for overload in &mut self.entry.overloads {
             overload.signature = overload.signature.apply_type_mapping_impl(
                 db,
                 &type_mapping,
                 TypeContext::default(),
-                &ApplyTypeMappingVisitor::default(),
+                &visitor,
             );
             overload.set_constructor_context(db, constructor_context);
         }
