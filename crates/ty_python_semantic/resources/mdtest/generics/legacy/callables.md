@@ -236,6 +236,13 @@ A function returned from a factory can use components of the `ParamSpec` from th
 return type. This also works when that function returns another generic callable:
 
 ```py
+def repeated_paramspec_factory() -> Callable[P, Callable[P, int]]:
+    def wrapper(*args: P.args, **kwargs: P.kwargs) -> Callable[P, int]:
+        callback: Callable[P, int]
+        raise NotImplementedError
+
+    return wrapper
+
 def nested_callable_factory() -> Callable[P, Callable[[T], T]]:
     def wrapper(*args: P.args, **kwargs: P.kwargs) -> Callable[[T], T]:
         def identity(value: T) -> T:

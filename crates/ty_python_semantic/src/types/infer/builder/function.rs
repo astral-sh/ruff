@@ -573,10 +573,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .any(|param| param.default.is_some());
 
         let previous_typevar_binding_context = self.typevar_binding_context.replace(definition);
+        let previous_paramspec_bindings = std::mem::take(&mut self.paramspec_bindings);
 
         if !has_type_params {
-            self.infer_return_type_annotation(function.returns.as_deref());
             self.infer_parameters(function.parameters.as_ref());
+            self.infer_return_type_annotation(function.returns.as_deref());
         }
 
         if has_defaults {
@@ -629,6 +630,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             self.deferred_state = previous_deferred_state;
         }
 
+        self.paramspec_bindings = previous_paramspec_bindings;
         self.typevar_binding_context = previous_typevar_binding_context;
     }
 
@@ -654,9 +656,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let binding_context = self.index.expect_single_definition(function);
         let previous_typevar_binding_context =
             self.typevar_binding_context.replace(binding_context);
+        let previous_paramspec_bindings = std::mem::take(&mut self.paramspec_bindings);
         self.infer_return_type_annotation(function.returns.as_deref());
         self.infer_type_parameters(type_params);
         self.infer_parameters(&function.parameters);
+        self.paramspec_bindings = previous_paramspec_bindings;
         self.typevar_binding_context = previous_typevar_binding_context;
     }
 
@@ -670,28 +674,26 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             kwonlyargs: _,
             kwarg,
         } = parameters;
+        let db = self.db();
 
         self.context.inference_flags |= InferenceFlags::IN_PARAMETER_ANNOTATION;
         for param_with_default in parameters.iter_non_variadic_params() {
             self.infer_parameter_with_default(param_with_default);
         }
 
-        let mut paramspec_parameter_bindings = FxOrderSet::default();
+        let mut paramspec_bindings = FxOrderSet::default();
         for annotation in parameters
             .iter_non_variadic_params()
             .filter_map(ast::ParameterWithDefault::annotation)
         {
             self.expression_type(annotation).find_legacy_typevars(
-                self.db(),
+                db,
                 None,
-                &mut paramspec_parameter_bindings,
+                &mut paramspec_bindings,
             );
         }
-        paramspec_parameter_bindings.retain(|typevar| typevar.is_paramspec(self.db()));
-        let previous_paramspec_parameter_bindings = std::mem::replace(
-            &mut self.paramspec_parameter_bindings,
-            paramspec_parameter_bindings,
-        );
+        paramspec_bindings.retain(|typevar| typevar.is_paramspec(db));
+        self.paramspec_bindings = paramspec_bindings;
 
         if let Some(vararg) = vararg {
             self.context.inference_flags |= InferenceFlags::IN_VARARG_ANNOTATION;
@@ -707,7 +709,20 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .inference_flags
                 .remove(InferenceFlags::IN_KWARG_ANNOTATION);
         }
-        self.paramspec_parameter_bindings = previous_paramspec_parameter_bindings;
+        let mut paramspec_component_bindings = FxOrderSet::default();
+        for annotation in [vararg.as_deref(), kwarg.as_deref()]
+            .into_iter()
+            .flatten()
+            .filter_map(|parameter| parameter.annotation.as_deref())
+        {
+            self.expression_type(annotation).find_legacy_typevars(
+                db,
+                None,
+                &mut paramspec_component_bindings,
+            );
+        }
+        paramspec_component_bindings.retain(|typevar| typevar.is_paramspec(db));
+        self.paramspec_bindings = paramspec_component_bindings;
         self.context
             .inference_flags
             .remove(InferenceFlags::IN_PARAMETER_ANNOTATION);

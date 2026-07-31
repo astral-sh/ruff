@@ -180,6 +180,32 @@ fn bind_typevar_impl<'db>(
             }
             continue;
         }
+        // A `ParamSpec` selected for `P.args` or `P.kwargs` remains the binding for ordinary uses
+        // of that `ParamSpec` throughout the function. Only component parameters need this
+        // recovery; ordinary parameter annotations bind through the generic context below.
+        if typevar.is_paramspec(db)
+            && let NodeWithScopeKind::Function(function) = ancestor_scope.node()
+        {
+            let definition = index.expect_single_definition(function);
+            if let Some(function_ty) =
+                infer_definition_types(db, definition).function_type(definition)
+            {
+                let signature = function_ty
+                    .last_definition_raw_signature(db, ReturnCallableTypeVarScope::Lexical);
+                if let Some((_, bound)) = signature.parameters().as_paramspec_with_prefix()
+                    && bound.typevar(db) == typevar
+                    && !(crossed_class_scope
+                        && bound
+                            .binding_context(db)
+                            .definition()
+                            .is_some_and(|definition| {
+                                matches!(definition.kind(db), DefinitionKind::Class(_))
+                            }))
+                {
+                    return Some(bound);
+                }
+            }
+        }
         let generic_context = match return_callable_typevar_scope {
             ReturnCallableTypeVarScope::Lexical => {
                 GenericContext::lexical_of_node(db, ancestor_scope.node(), index)
