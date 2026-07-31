@@ -592,7 +592,6 @@ def from_thread(
     raise NotImplementedError
 
 async def sleep(seconds: float) -> None: ...
-
 async def check(token: object | None) -> None:
     bound = partial(from_thread, sleep, 0, token=token)
     # TODO: A fully bound TypeVarTuple should leave a zero-argument partial.

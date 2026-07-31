@@ -21,7 +21,7 @@ reveal_type(append_int(True, "a"))  # revealed: tuple[Literal[True], Literal["a"
 reveal_type(append_int())  # revealed: tuple[int]
 ```
 
-A concrete starred tuple checks its fixed first argument, the remaining argument types, and the minimum number of arguments.
+A concrete starred tuple checks its fixed first argument, remaining argument types, and arity.
 
 ```py
 def first_arg_int(*args: *tuple[int, *tuple[str, ...]]): ...
@@ -35,7 +35,7 @@ first_arg_int(56, "42", 56)
 first_arg_int()
 ```
 
-Open splats can provide fixed prefixes, suffixes, or both, including a separate argument after the splat.
+Open splats can provide fixed prefixes, suffixes, or both, with arguments after the splat.
 
 ```py
 def prefix(*args: *tuple[str, *tuple[str, ...]]) -> None: ...
@@ -63,7 +63,7 @@ def check_invalid(invalid: list[int], env: dict[str, str]) -> None:
     execute(*invalid, env)
 ```
 
-An iterable containing only `Never` values must be empty, so it cannot supply a required prefix or suffix.
+An iterable of `Never` values must be empty, so it cannot supply a required prefix or suffix.
 
 ```py
 from typing import Never
