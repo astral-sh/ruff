@@ -4504,6 +4504,47 @@ impl<'db> Type<'db> {
                 }
             }
 
+            fn correlate_typevar_descriptor_errors<'db>(
+                db: &'db dyn Db,
+                result: MemberLookupResult<'db>,
+                typevar: BoundTypeVarInstance<'db>,
+                name: &str,
+                policy: MemberLookupPolicy,
+            ) -> MemberLookupResult<'db> {
+                if result.descriptor_get_error.is_none() {
+                    return result;
+                }
+
+                let alternatives = match typevar.typevar(db).bound_or_constraints(db) {
+                    Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
+                        Some(constraints.elements(db).as_ref())
+                    }
+                    Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
+                        bound.as_union_like(db).map(|union| union.elements(db))
+                    }
+                    None => None,
+                };
+                let Some(alternatives) = alternatives else {
+                    return result;
+                };
+
+                let mut errors = DescriptorGetErrorAccumulator::new();
+                for alternative in alternatives {
+                    errors.add(
+                        db,
+                        alternative
+                            .member_lookup_with_policy_and_receiver(
+                                db,
+                                name,
+                                policy,
+                                Some(*alternative),
+                            )
+                            .descriptor_get_error,
+                    );
+                }
+                MemberLookupResult::new(result.member, errors.finish())
+            }
+
             fn instance_like_member_lookup<'db>(
                 db: &'db dyn Db,
                 env: &ProgramEnvironment<'db>,
@@ -4963,38 +5004,7 @@ impl<'db> Type<'db> {
                     }
 
                     let result = instance_like_member_lookup(db, key, receiver);
-                    if result.descriptor_get_error.is_none() {
-                        return result;
-                    }
-
-                    let alternatives = match bound_or_constraints {
-                        Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
-                            Some(constraints.elements(db).as_ref())
-                        }
-                        Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
-                            bound.as_union_like(db).map(|union| union.elements(db))
-                        }
-                        None => None,
-                    };
-                    let Some(alternatives) = alternatives else {
-                        return result;
-                    };
-
-                    let mut errors = DescriptorGetErrorAccumulator::new();
-                    for alternative in alternatives {
-                        errors.add(
-                            db,
-                            alternative
-                                .member_lookup_with_policy_and_receiver(
-                                    db,
-                                    name_str,
-                                    policy,
-                                    Some(*alternative),
-                                )
-                                .descriptor_get_error,
-                        );
-                    }
-                    MemberLookupResult::new(result.member, errors.finish())
+                    correlate_typevar_descriptor_errors(db, result, typevar, name_str, policy)
                 }
 
                 Type::NominalInstance(instance)
@@ -5152,7 +5162,7 @@ impl<'db> Type<'db> {
                     // (which is at least `type`). Attributes resolved via `type`'s descriptors
                     // are intersected with the dynamic type to reflect uncertainty about
                     // whether the unknown metaclass overrides them.
-                    if let Type::SubclassOf(subclass_of) = this
+                    let result = if let Type::SubclassOf(subclass_of) = this
                         && let SubclassOfInner::Dynamic(dynamic) = subclass_of.subclass_of()
                     {
                         result.map_type(|ty| {
@@ -5162,6 +5172,15 @@ impl<'db> Type<'db> {
                                 IntersectionType::from_two_elements(db, ty, Type::Dynamic(dynamic))
                             }
                         })
+                    } else {
+                        result
+                    };
+
+                    if let Type::SubclassOf(subclass_of) = this
+                        && let SubclassOfInner::TypeVar(typevar) =
+                            subclass_of.subclass_of().with_transposed_type_var(db)
+                    {
+                        correlate_typevar_descriptor_errors(db, result, typevar, name_str, policy)
                     } else {
                         result
                     }
@@ -6594,18 +6613,20 @@ impl<'db> Type<'db> {
                     MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
                 ) {
                     Ok(bindings) => (Place::bound(bindings.return_type(db)).into(), true),
-                    Err(CallDunderError::PossiblyUnbound { .. }) => {
-                        (MemberLookupResult::from(Place::Undefined), true)
+                    Err(
+                        CallDunderError::PossiblyUnbound { .. } | CallDunderError::CallError(..),
+                    ) => (MemberLookupResult::from(Place::Undefined), true),
+                    Err(CallDunderError::MethodNotAvailable) => {
+                        (MemberLookupResult::from(Place::Undefined), false)
                     }
-                    // TODO: Handle other call errors here.
-                    Err(_) => (MemberLookupResult::from(Place::Undefined), false),
                 }
             })
         };
 
         // A custom `__getattribute__` runs before normal descriptor lookup. Preserve the normal
-        // member type, but do not report its descriptor failure as definite when the override can
-        // successfully intercept the access.
+        // member type, but do not report its descriptor failure as definite when an override
+        // intercepts the access. This includes an invalid override that fails before Python can
+        // invoke the descriptor.
         let result = if result.descriptor_get_error.is_some() && custom_getattribute().1 {
             MemberLookupResult::new(result.member, None)
         } else {

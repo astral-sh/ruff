@@ -1098,6 +1098,55 @@ def access_broken_constrained_owner(owner: BrokenT) -> None:
     owner.value
 ```
 
+### Constrained class-object receivers preserve branch correlation
+
+The same correlation applies when the receiver is a class object. Each concrete class constraint is
+passed as the synthetic `owner` argument to the descriptor selected from that class.
+
+```py
+from typing import TypeVar
+
+class IntDescriptor:
+    def __get__(self, instance: None, owner: type["IntOwner"]) -> int:
+        return 1
+
+class IntOwner:
+    value = IntDescriptor()
+
+class StrDescriptor:
+    def __get__(self, instance: None, owner: type["StrOwner"]) -> str:
+        return ""
+
+class StrOwner:
+    value = StrDescriptor()
+
+T = TypeVar("T", IntOwner, StrOwner)
+
+def access_constrained_class(cls: type[T]) -> None:
+    reveal_type(cls.value)  # revealed: int | str
+```
+
+Correlation still reports a failure when every concrete class constraint selects a malformed
+descriptor.
+
+```py
+class BrokenDescriptor:
+    def __get__(self) -> bytes:
+        return b""
+
+class BrokenIntOwner:
+    value = BrokenDescriptor()
+
+class BrokenStrOwner:
+    value = BrokenDescriptor()
+
+BrokenT = TypeVar("BrokenT", BrokenIntOwner, BrokenStrOwner)
+
+def access_broken_constrained_class(cls: type[BrokenT]) -> None:
+    # error: [invalid-attribute-access] "Invalid access to descriptor attribute `value` on type `type[BrokenT@access_broken_constrained_class]`"
+    cls.value
+```
+
 ### Possible descriptor failures are not reported
 
 An attribute access is invalid only if every possible value invokes a malformed descriptor. A valid
@@ -1231,6 +1280,33 @@ def conditional_getattribute(flag: bool) -> None:
                 return name
 
     Conditional().descriptor
+```
+
+A custom `__getattribute__` also intercepts normal lookup when calling it fails. The access may
+still be invalid, but Python never invokes the descriptor, so ty should not attribute that failure
+to the descriptor's `__get__` method.
+
+```py
+class Descriptor:
+    def __get__(self) -> int:
+        return 1
+
+class InvalidAccessor:
+    descriptor = Descriptor()
+    __getattribute__ = None
+
+InvalidAccessor().descriptor
+
+class InvalidMeta(type):
+    descriptor = Descriptor()
+
+    # error: [invalid-method-override] "Invalid override of method `__getattribute__`: Definition is incompatible with `object.__getattribute__`"
+    def __getattribute__(self) -> str:
+        return ""
+
+class C(metaclass=InvalidMeta): ...
+
+C.descriptor
 ```
 
 ### A definitely assigned instance attribute shadows a broken non-data descriptor

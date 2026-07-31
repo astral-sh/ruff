@@ -20,15 +20,16 @@ should not introduce object-identity, alias, or class-namespace mutation analysi
     - ordinary unions
 - Invoke each union branch with its concrete descriptor type as `self`.
 - Preserve the correlation between constrained receiver types and the descriptor selected from that
-    receiver branch when validating the synthetic `instance` argument.
+    receiver branch when validating the synthetic `instance` or `owner` argument, including for
+    `type[T]` class-object receivers.
 - Report the diagnostic only when the malformed descriptor is definitely selected and every
     applicable lookup branch fails.
 - Suppress the diagnostic when a normal value, valid descriptor, class mutation, or other lookup
     alternative makes the failure merely possible.
 - Preserve callable union and intersection structure when deciding whether an implicit `__get__`
     call definitely fails.
-- Treat a definitely or possibly bound valid custom `__getattribute__` as an interceptor that makes
-    normal descriptor invocation non-definite, even for an otherwise always-defined member.
+- Treat a definitely or possibly bound custom `__getattribute__` as an interceptor that makes
+    normal descriptor invocation non-definite, even when calling the override itself fails.
 - Treat a successful `__getattr__` fallback as a successful lookup alternative when the normal
     member is possibly undefined.
 - Suppress descriptor-read diagnostics after any possibly or definitely reaching same-place
@@ -74,8 +75,10 @@ Positive elements of an intersection-valued attribute describe one runtime value
 element.
 
 Constrained receiver types are expanded only for descriptor-call validation, pairing each concrete
-receiver constraint with the member selected from that constraint. The ordinary member result keeps
-the original receiver so existing `Self` and TypeVar binding behavior is unchanged.
+receiver constraint with the member selected from that constraint. For `type[T]`, ty first
+transposes the constraints to their class-object types so each descriptor receives the corresponding
+concrete class as its `owner`. The ordinary member result keeps the original receiver so existing
+`Self` and TypeVar binding behavior is unchanged.
 
 Same-place dataflow participates only as a conservative suppression boundary. Any possibly or
 definitely reaching assignment suppresses the descriptor diagnostic, for both instance and class
@@ -87,10 +90,11 @@ Class-wide summaries of assignments in arbitrary methods do not establish a live
 instance-dictionary entry for a particular receiver. Explicit instance-attribute declarations
 remain static contracts and continue to supply an alternative lookup path.
 
-A custom `__getattribute__` runs before the normal descriptor algorithm. When ty can successfully
-call a definitely or possibly bound override, the descriptor call is not definite. This certainty
-check does not replace the ordinary member type with the override's return type when the normal
-member is already defined.
+A custom `__getattribute__` runs before the normal descriptor algorithm. Whenever an override is
+present, the descriptor call is not definite: a successful override can return first, while an
+invalid override fails before Python reaches the descriptor. This certainty check does not replace
+the ordinary member type with the override's return type when the normal member is already defined,
+and it does not retarget a descriptor diagnostic to the invalid override.
 
 Augmented assignment has a read phase and a write phase. Diagnosing a malformed descriptor during
 the read phase is in scope. General augmented-assignment operator inference, write validation,
@@ -113,6 +117,7 @@ read/write correlation, and bidirectional type-context improvements are separate
     model cannot represent it.
 - General augmented-assignment operator inference, store validation, and bidirectional type-context
     improvements.
+- Diagnosing or retargeting call failures from an invalid custom `__getattribute__`.
 - Fully modeling the return type and exceptions of custom `__getattribute__` implementations.
 - General preservation of TypeVar correlation outside descriptor-call validation.
 
