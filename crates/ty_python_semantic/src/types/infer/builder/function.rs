@@ -145,7 +145,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             self.infer_definition(parameter);
         }
 
-        validate_paramspec_components(&self.context, &function.parameters, |expr| {
+        validate_paramspec_components(&self.context, self.index, &function.parameters, |expr| {
             self.file_expression_type(expr)
         });
         self.validate_unpacked_typed_dict_kwargs(&function.parameters);
