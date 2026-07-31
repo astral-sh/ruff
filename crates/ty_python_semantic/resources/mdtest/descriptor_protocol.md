@@ -1097,28 +1097,6 @@ class RecursiveOwner:
 RecursiveOwner().value
 ```
 
-### Uninhabited descriptor alternatives do not weaken failures
-
-An uninhabited TypeVar constraint cannot provide a successful runtime descriptor call. The invalid
-call on every inhabitable constraint is therefore still definite.
-
-```py
-from typing import NoReturn, TypeVar
-
-class Descriptor:
-    def __get__(self) -> int:
-        return 1
-
-T = TypeVar("T", Descriptor, NoReturn)
-
-def access_descriptor(descriptor: T) -> None:
-    class C:
-        value = descriptor
-
-    # error: [invalid-attribute-access]
-    C().value
-```
-
 ### Constrained receiver types preserve branch correlation
 
 When a constrained type variable is the descriptor receiver, each class constraint is paired with

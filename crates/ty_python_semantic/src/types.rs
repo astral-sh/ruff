@@ -3749,11 +3749,6 @@ impl<'db> Type<'db> {
             let mut all_data_descriptors = true;
 
             for alternative in alternatives {
-                // An uninhabited alternative cannot provide a successful runtime path.
-                if alternative.is_never() {
-                    continue;
-                }
-
                 if let Some(result) =
                     alternative.try_call_dunder_get_with_error(db, instance, owner)
                 {
@@ -4328,16 +4323,6 @@ impl<'db> Type<'db> {
     ) -> MemberLookupResult<'db> {
         let ty = key.ty(db);
         let meta_attr_plain = Self::instance_lookup_class_member_with_policy(db, key);
-        let meta_attr_may_be_data_descriptor = policy
-            == InstanceFallbackShadowsNonDataDescriptor::Yes
-            && meta_attr_plain
-                .place
-                .ignore_possibly_undefined()
-                .is_some_and(|ty| ty.may_be_data_descriptor(db));
-        let meta_attr_is_definitely_data_descriptor = meta_attr_plain
-            .place
-            .ignore_possibly_undefined()
-            .is_some_and(|ty| ty.is_definitely_data_descriptor_for_diagnostic(db));
         let (
             PlaceAndQualifiers {
                 place: meta_attr,
@@ -4378,10 +4363,22 @@ impl<'db> Type<'db> {
                 _,
             ) => MemberLookupResult::new(
                 meta_attr.with_qualifiers(meta_attr_qualifiers),
-                if meta_attr_is_definitely_data_descriptor {
-                    meta_attr_error
-                } else {
-                    combine_alternative_descriptor_get_errors(db, meta_attr_error, fallback_error)
+                match meta_attr_error {
+                    Some(error)
+                        if meta_attr_plain
+                            .place
+                            .ignore_possibly_undefined()
+                            .is_some_and(|ty| {
+                                ty.is_definitely_data_descriptor_for_diagnostic(db)
+                            }) =>
+                    {
+                        Some(error)
+                    }
+                    _ => combine_alternative_descriptor_get_errors(
+                        db,
+                        meta_attr_error,
+                        fallback_error,
+                    ),
                 },
             ),
 
@@ -4434,7 +4431,12 @@ impl<'db> Type<'db> {
             ) if policy == InstanceFallbackShadowsNonDataDescriptor::Yes => {
                 MemberLookupResult::new(
                     fallback.with_qualifiers(fallback_qualifiers),
-                    if meta_attr_may_be_data_descriptor {
+                    if fallback_error.is_some()
+                        && meta_attr_plain
+                            .place
+                            .ignore_possibly_undefined()
+                            .is_some_and(|ty| ty.may_be_data_descriptor(db))
+                    {
                         // The aggregate kind only records whether every metaclass branch is a data
                         // descriptor. A possible data-descriptor branch still takes precedence
                         // over the fallback and can make its failure non-definite.

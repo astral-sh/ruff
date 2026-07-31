@@ -52,7 +52,6 @@ should not introduce object-identity, alias, or class-namespace mutation analysi
     receiver.
 - Treat the target of an augmented assignment as an attribute read before its write, while avoiding
     `__get__` diagnostics for deletion targets.
-- Exclude uninhabited alternatives such as `Never` when combining descriptor failures.
 - Preserve existing member types and descriptor precedence for intersections, but suppress the
     error-level descriptor diagnostic when either the receiver or descriptor value is an
     intersection, because its full type may be needed as a synthetic `owner` or `self` argument.
@@ -73,10 +72,9 @@ Descriptor lookup should distinguish:
 
 Only definite failures produce `invalid-attribute-access`.
 
-For unions, failure certainty is combined across inhabitable branches rather than selecting any
-available error. A non-descriptor value or valid descriptor makes the overall descriptor failure
-non-definite. An uninhabited branch such as `Never` cannot provide a successful runtime path and
-does not weaken an otherwise definite failure.
+For unions, failure certainty is combined across branches rather than selecting any available
+error. A non-descriptor value or valid descriptor makes the overall descriptor failure
+non-definite.
 
 Callable types retain a union-of-intersections structure. Every union element must fail for the
 descriptor call to be definitely invalid, while a callable intersection element succeeds if any of
@@ -109,6 +107,9 @@ successful alternative conservatively without changing the inferred member type.
 The same rule applies when descriptor kind depends on a conditionally defined `__set__` or
 `__delete__` method. Ty keeps its existing inferred member type, but combines the invalid `__get__`
 call with the lower-precedence fallback before deciding that the failure is definite.
+
+Descriptor-kind refinements used only for diagnostic certainty are evaluated only after an invalid
+descriptor call is present. Error-free attribute lookup does not invoke those additional queries.
 
 Constrained receiver types and receivers with union-like upper bounds are expanded only for
 descriptor-call validation, pairing each concrete receiver alternative with the member selected from
@@ -179,6 +180,8 @@ read/write correlation, and bidirectional type-context improvements are separate
 - Diagnosing or retargeting call failures from an invalid custom `__getattribute__`.
 - Fully modeling the return type and exceptions of custom `__getattribute__` implementations.
 - General preservation of TypeVar correlation outside descriptor-call validation.
+- Normalizing semantically uninhabited alternatives across aliases, TypeVar constraints, class
+    objects, metaclass descriptor kinds, and `super()` construction.
 - General changes to explicit classmethod access or synthesized function and classmethod `__get__`
     wrapper types.
 - Folding raw `classmethod` slot provenance through unions or aliases.
@@ -210,6 +213,10 @@ intersection-valued descriptor, for a raw `classmethod` slot whose provenance is
 union or alias, or for a raw `staticmethod` slot that is non-callable on Python 3.9 and older. These
 cases require broader intersection or wrapper-provenance modeling and do not affect the concrete
 descriptor in the original issue.
+
+The implementation may suppress a diagnostic when an otherwise failing TypeVar alternative is
+semantically uninhabited, including `Never` hidden behind an alias. Applying that normalization
+consistently would require a broader change across every TypeVar and `super()` certainty fold.
 
 The original issue remains covered because its malformed descriptor is statically known and
 definitely selected.
