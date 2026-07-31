@@ -352,6 +352,31 @@ reveal_type(C(1))  # revealed: C[Literal[1]]
 wrong_innards: C[int] = C("five")
 ```
 
+### Constructing the class from its own type variable
+
+A constructor call inside a generic class can use a value whose type is one of the class's type
+variables. The constructed instance keeps that type variable instead of falling back to `Unknown`,
+so an incompatible type context is rejected.
+
+```py
+class C[T]:
+    def __init__(self, value: T) -> None:
+        reveal_type(C(value))  # revealed: C[T@C]
+
+        # error: [invalid-assignment] "Object of type `C[T@C]` is not assignable to `C[int]`"
+        invalid: C[int] = C(value)
+```
+
+A method's own type variable is independent of the class type variable and is preserved in the same
+way.
+
+```py
+class D[T]:
+    def __init__(self, value: T) -> None: ...
+    def method[S](self, value: S) -> None:
+        reveal_type(D(value))  # revealed: D[S@method]
+```
+
 ### Identical `__new__` and `__init__` signatures
 
 ```py

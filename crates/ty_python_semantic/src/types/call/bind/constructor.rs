@@ -1,11 +1,17 @@
-use super::{Binding, Bindings, CallableBinding, CallableItem, CheckTypesMode};
+use super::{
+    Binding, Bindings, CallableBinding, CallableItem, CheckTypesMode, generic_context_has_paramspec,
+};
 use crate::Db;
 use crate::ProgramEnvironment;
 use crate::types::call::arguments::CallArguments;
 use crate::types::constraints::ConstraintSetBuilder;
-use crate::types::generics::Specialization;
+use crate::types::generics::{GenericContext, Specialization};
 use crate::types::signatures::Parameter;
-use crate::types::{BoundTypeVarInstance, ClassLiteral, DynamicType, Type, TypeContext};
+use crate::types::typevar::TypeVarNonceGenerator;
+use crate::types::{
+    ApplyTypeMappingVisitor, BoundTypeVarInstance, ClassLiteral, DynamicType, Type, TypeContext,
+    TypeMapping,
+};
 
 /// Bindings for a constructor call.
 ///
@@ -63,6 +69,73 @@ impl<'db> ConstructorBinding<'db> {
 
     pub(super) fn set_downstream_constructor(&mut self, bindings: Bindings<'db>) {
         self.downstream_constructor = Some(Box::new(bindings));
+    }
+
+    pub(super) fn freshen_generic_contexts_in_place(
+        &mut self,
+        db: &'db dyn Db,
+        nonce_generator: &TypeVarNonceGenerator<'db>,
+    ) {
+        let instance_type = self.constructed_instance_type();
+        let Some((_, specialization)) = instance_type.class_specialization(db) else {
+            return;
+        };
+        let generic_context = specialization.generic_context(db);
+        if generic_context_has_paramspec(db, generic_context)
+            || !nonce_generator.should_freshen(db, generic_context)
+        {
+            return;
+        }
+
+        let delta = nonce_generator.next().value();
+        let type_mapping = TypeMapping::FreshenBoundTypeVars {
+            generic_context,
+            delta,
+        };
+        let fresh_instance_type =
+            instance_type.apply_type_mapping(db, &type_mapping, TypeContext::default());
+        self.freshen_class_typevars(db, generic_context, delta, fresh_instance_type);
+    }
+
+    fn freshen_class_typevars(
+        &mut self,
+        db: &'db dyn Db,
+        generic_context: GenericContext<'db>,
+        delta: u32,
+        fresh_instance_type: Type<'db>,
+    ) {
+        let type_mapping = TypeMapping::FreshenBoundTypeVars {
+            generic_context,
+            delta,
+        };
+
+        // Keep the source-level instance on `ConstructorBinding`; the final return type applies
+        // the inferred specialization to that instance. Only the per-overload context is
+        // call-local, so its instance must use the same fresh type variables as the signature.
+        let constructor_context = self.context().with_instance_type(fresh_instance_type);
+        for overload in &mut self.entry.overloads {
+            overload.signature = overload.signature.apply_type_mapping_impl(
+                db,
+                &type_mapping,
+                TypeContext::default(),
+                &ApplyTypeMappingVisitor::default(),
+            );
+            overload.set_constructor_context(db, constructor_context);
+        }
+
+        if let Some(downstream) = self.downstream_constructor_mut() {
+            for downstream_binding in downstream
+                .iter_callable_items_mut()
+                .filter_map(CallableItem::as_constructor_mut)
+            {
+                downstream_binding.freshen_class_typevars(
+                    db,
+                    generic_context,
+                    delta,
+                    fresh_instance_type,
+                );
+            }
+        }
     }
 
     /// Match parameters for this constructor method and downstream constructors.
