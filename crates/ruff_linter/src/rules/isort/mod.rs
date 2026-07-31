@@ -20,6 +20,7 @@ use types::{AliasData, ImportBlock, TrailingComma};
 use crate::Locator;
 use crate::line_width::{LineLength, LineWidthBuilder};
 use crate::package::PackageRoot;
+use crate::settings::types::PreviewMode;
 use ruff_python_ast::PythonVersion;
 
 mod annotate;
@@ -77,6 +78,7 @@ pub(crate) fn format_imports(
     source_type: PySourceType,
     target_version: PythonVersion,
     settings: &Settings,
+    preview: PreviewMode,
     tokens: &Tokens,
 ) -> String {
     let trailer = &block.trailer;
@@ -104,6 +106,7 @@ pub(crate) fn format_imports(
             package,
             target_version,
             settings,
+            preview,
         );
 
         if !block_output.is_empty() && !output.is_empty() {
@@ -160,6 +163,7 @@ fn format_import_block(
     package: Option<PackageRoot<'_>>,
     target_version: PythonVersion,
     settings: &Settings,
+    preview: PreviewMode,
 ) -> String {
     #[derive(Debug, Copy, Clone, PartialEq, Eq)]
     enum LineInsertion {
@@ -289,6 +293,7 @@ fn format_import_block(
                         is_first_statement,
                         settings.split_on_trailing_comma
                             && matches!(trailing_comma, TrailingComma::Present),
+                        preview,
                     ));
 
                     if settings.from_first {
@@ -317,7 +322,7 @@ mod tests {
     use crate::registry::Rule;
     use crate::rules::isort::categorize::{ImportSection, KnownModules};
     use crate::settings::LinterSettings;
-    use crate::settings::types::IdentifierPattern;
+    use crate::settings::types::{IdentifierPattern, PreviewMode};
     use crate::test::{test_path, test_resource_path};
 
     use super::categorize::ImportType;
@@ -333,6 +338,7 @@ mod tests {
     #[test_case(Path::new("deduplicate_imports.py"))]
     #[test_case(Path::new("fit_line_length.py"))]
     #[test_case(Path::new("fit_line_length_comment.py"))]
+    #[test_case(Path::new("fit_line_length_mixed_pragma.py"))]
     #[test_case(Path::new("fit_line_length_pragma.py"))]
     #[test_case(Path::new("force_sort_within_sections.py"))]
     #[test_case(Path::new("force_to_top.py"))]
@@ -383,6 +389,22 @@ mod tests {
         let diagnostics = test_path(
             Path::new("isort").join(path).as_path(),
             &LinterSettings {
+                src: vec![test_resource_path("fixtures/isort")],
+                ..LinterSettings::for_rule(Rule::UnsortedImports)
+            },
+        )?;
+        assert_diagnostics!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Path::new("fit_line_length_mixed_pragma.py"))]
+    #[test_case(Path::new("fit_line_length_pragma.py"))]
+    fn preview(path: &Path) -> Result<()> {
+        let snapshot = format!("preview__{}", path.to_string_lossy());
+        let diagnostics = test_path(
+            Path::new("isort").join(path).as_path(),
+            &LinterSettings {
+                preview: PreviewMode::Enabled,
                 src: vec![test_resource_path("fixtures/isort")],
                 ..LinterSettings::for_rule(Rule::UnsortedImports)
             },
