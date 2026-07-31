@@ -423,6 +423,16 @@ class Outer(Generic[P]):
     class Inner:
         # error: [unbound-type-variable] "ParamSpec `P` is not in scope"
         def method(self, *args: P.args, **kwargs: P.kwargs) -> None: ...
+
+    def method_with_nested_class(self, callback: Callable[P, int]) -> None:
+        class Inner:
+            # error: [unbound-type-variable] "ParamSpec `P` is not in scope"
+            def method(self, *args: P.args, **kwargs: P.kwargs) -> None: ...
+
+    def method_with_components(self, *outer_args: P.args, **outer_kwargs: P.kwargs) -> None:
+        class Inner:
+            # error: [unbound-type-variable] "ParamSpec `P` is not in scope"
+            def method(self, *args: P.args, **kwargs: P.kwargs) -> None: ...
 ```
 
 A `ParamSpec` bound by an enclosing function's return annotation is available to components used by
