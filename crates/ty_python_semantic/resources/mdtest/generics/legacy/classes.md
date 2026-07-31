@@ -480,7 +480,7 @@ class NonGenericSubclass(Base[int]): ...
 
 reveal_type(GenericSubclass[bytes]())  # revealed: GenericSubclass[bytes]
 
-# error: [not-subscriptable] "Cannot subscript object of type `<class 'NonGenericSubclass'>` with no `__class_getitem__` method"
+# error: [not-subscriptable] "Cannot specialize non-generic class `NonGenericSubclass`"
 NonGenericSubclass[bytes]
 ```
 

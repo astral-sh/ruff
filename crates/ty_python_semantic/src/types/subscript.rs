@@ -11,6 +11,7 @@ use crate::types::special_form::TypeQualifier;
 
 use super::call::{Bindings, CallArguments, CallDunderError, CallErrorKind};
 use super::class::KnownClass;
+use super::class_base::ClassBase;
 use super::context::InferContext;
 use super::diagnostic::{
     CALL_NON_CALLABLE, INVALID_ARGUMENT_TYPE, INVALID_GENERIC_CLASS, NOT_SUBSCRIPTABLE,
@@ -21,8 +22,8 @@ use super::infer::TypeContext;
 use super::instance::SliceLiteral;
 use super::special_form::SpecialFormType;
 use super::{
-    IntersectionBuilder, IntersectionType, KnownInstanceType, Type, TypeAliasType, TypedDictType,
-    UnionBuilder, UnionType, todo_type,
+    ClassLiteral, IntersectionBuilder, IntersectionType, KnownInstanceType, Type, TypeAliasType,
+    TypedDictType, UnionBuilder, UnionType, todo_type,
 };
 
 /// The kind of subscriptable type that had an out-of-bounds index.
@@ -106,6 +107,8 @@ pub(crate) enum SubscriptErrorKind<'db> {
     SliceStepSizeZero,
     /// A non-generic PEP 695 type alias was subscripted.
     NonGenericTypeAlias { alias: TypeAliasType<'db> },
+    /// A non-generic subclass of a generic class was subscripted.
+    NonGenericClass { class: ClassLiteral<'db> },
     /// `__getitem__` or `__class_getitem__` exists but is possibly unbound.
     DunderPossiblyUnbound {
         method: DunderMethod,
@@ -242,6 +245,14 @@ impl<'db> SubscriptErrorKind<'db> {
                             ),
                         ));
                     }
+                }
+            }
+            Self::NonGenericClass { class } => {
+                if let Some(builder) = context.report_lint(&NOT_SUBSCRIPTABLE, subscript) {
+                    builder.into_diagnostic(format_args!(
+                        "Cannot specialize non-generic class `{}`",
+                        class.name(db)
+                    ));
                 }
             }
             Self::DunderPossiblyUnbound { method, value_ty } => {
@@ -949,10 +960,15 @@ impl<'db> Type<'db> {
                     // expression.
                     return Ok(value_ty);
                 }
+
+                if class.iter_mro(db).any(|base| base == ClassBase::Generic) {
+                    return Err(SubscriptError::new(
+                        Type::unknown(),
+                        SubscriptErrorKind::NonGenericClass { class },
+                    ));
+                }
             }
 
-            // Generic class literals return above. Inheriting from a fully specialized generic
-            // base does not make the subclass generic.
             return Err(SubscriptError::new(
                 Type::unknown(),
                 SubscriptErrorKind::NotSubscriptable {
