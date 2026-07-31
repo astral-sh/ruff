@@ -868,6 +868,23 @@ impl<'db> SymbolVisitor<'db> {
         self.add_name_symbol(stmt, name, kind);
     }
 
+    /// Adds symbols introduced by an assignment target.
+    fn add_assignment_target(&mut self, stmt: &ast::Stmt, target: &ast::Expr) {
+        match target {
+            ast::Expr::Name(name) => self.add_assignment(stmt, name),
+            ast::Expr::List(ast::ExprList { elts, .. })
+            | ast::Expr::Tuple(ast::ExprTuple { elts, .. }) => {
+                for element in elts {
+                    self.add_assignment_target(stmt, element);
+                }
+            }
+            ast::Expr::Starred(starred) => {
+                self.add_assignment_target(stmt, &starred.value);
+            }
+            _ => {}
+        }
+    }
+
     /// Adds a symbol introduced via an import `stmt`.
     fn add_import_alias(&mut self, import: AstImport<'_>, alias: &ast::Alias) -> Option<SymbolId> {
         let name = alias.asname.as_ref().unwrap_or(&alias.name);
@@ -1340,6 +1357,19 @@ impl<'db> SourceOrderVisitor<'db> for SymbolVisitor<'db> {
                 };
                 self.add_assignment(stmt, name);
             }
+            ast::Stmt::With(with_stmt) => {
+                for item in &with_stmt.items {
+                    if let Some(target) = item.optional_vars.as_deref() {
+                        self.add_assignment_target(stmt, target);
+                    }
+                }
+
+                source_order::walk_stmt(self, stmt);
+            }
+            ast::Stmt::For(for_stmt) => {
+                self.add_assignment_target(stmt, &for_stmt.target);
+                source_order::walk_stmt(self, stmt);
+            }
             ast::Stmt::AugAssign(ast::StmtAugAssign {
                 target, op, value, ..
             }) => {
@@ -1548,6 +1578,67 @@ def quux():
         X :: Variable
         Foo :: Class
         quux :: Function
+        ",
+        );
+    }
+
+    #[test]
+    fn exports_with_statement_targets() {
+        insta::assert_snapshot!(
+            public_test("\
+from contextlib import nullcontext
+
+with nullcontext() as module_target, nullcontext((1, 2)) as (left, right):
+    body_target = 1
+
+class C:
+    with nullcontext() as class_target:
+        body_field = 1
+
+def function():
+    with nullcontext() as local_target:
+        pass
+").exports(),
+            @"
+        module_target :: Variable
+        left :: Variable
+        right :: Variable
+        body_target :: Variable
+        C :: Class
+        function :: Function
+        ",
+        );
+    }
+
+    #[test]
+    fn exports_for_statement_targets() {
+        insta::assert_snapshot!(
+            public_test("\
+for module_target in ():
+    body_target = 1
+else:
+    fallback_target = 2
+
+for [left, *middle, right] in ():
+    pass
+
+class C:
+    for class_target in ():
+        body_field = 1
+
+def function():
+    for local_target in ():
+        pass
+").exports(),
+            @"
+        module_target :: Variable
+        body_target :: Variable
+        fallback_target :: Variable
+        left :: Variable
+        middle :: Variable
+        right :: Variable
+        C :: Class
+        function :: Function
         ",
         );
     }
