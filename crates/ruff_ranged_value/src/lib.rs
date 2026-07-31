@@ -43,10 +43,6 @@ impl ValueSource {
             ValueSource::UvWorkspace => None,
         }
     }
-
-    pub const fn is_cli(&self) -> bool {
-        matches!(self, ValueSource::Cli)
-    }
 }
 
 thread_local! {
@@ -169,12 +165,6 @@ impl<T> RangedValue<T> {
 
     pub fn source(&self) -> &ValueSource {
         &self.source
-    }
-
-    #[must_use]
-    pub fn with_source(mut self, source: ValueSource) -> Self {
-        self.source = source;
-        self
     }
 
     #[must_use]
