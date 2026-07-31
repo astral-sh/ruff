@@ -133,20 +133,21 @@ def explicit(color: Literal[Color.GREEN, Color.BLUE]):
 Attribute lookup expands a narrowed enum complement into its remaining literals. A descriptor
 failure shared by every remaining literal is still definite.
 
-`enum_descriptor.pyi`:
+`enum_descriptor.py`:
 
-```pyi
+```py
 from enum import Enum
 
 class Descriptor:
-    def __get__(self) -> int: ...
+    def __get__(self) -> int:
+        return 1
 
 class Color(Enum):
     RED = 1
     GREEN = 2
     BLUE = 3
 
-    descriptor: Descriptor
+    descriptor = Descriptor()
 ```
 
 ```py
@@ -1388,11 +1389,11 @@ def _(flag: bool):
             super().value
 ```
 
-### Constrained `super` receivers preserve branch correlation
+### Descriptor diagnostics for constrained `super` receivers are suppressed
 
-Each constrained `super` branch validates the implicit descriptor call with its concrete owner. A
-valid alternative makes the overall failure only possible, while a constrained owner whose every
-branch is invalid still produces a diagnostic.
+Ordinary `super` inference retains the constrained owner, but descriptor validation cannot preserve
+each constraint separately without changing the semantic `super` type. The error-level diagnostic is
+therefore suppressed even when every constraint would invoke a malformed descriptor.
 
 ```py
 from __future__ import annotations
@@ -1419,14 +1420,13 @@ def possibly_valid(owner: T) -> None:
 BrokenT = TypeVar("BrokenT", Bad, AlsoBad)
 
 def always_invalid(owner: BrokenT) -> None:
-    # error: [invalid-attribute-access]
     super(Pivot, owner).value
 ```
 
-### Literal-constrained `super` receivers preserve branch correlation
+### Literal-constrained `super` descriptor diagnostics are suppressed
 
-Literal constraints that use the delegated `super` construction path retain their concrete values
-when validating the descriptor call.
+Literal constraints can use a delegated `super` construction path that widens the owner to its enum
+class. Descriptor errors are suppressed rather than retaining the literal solely for validation.
 
 ```py
 from __future__ import annotations
@@ -1458,10 +1458,11 @@ def literal_constraints(owner: LiteralT) -> None:
     super(LiteralPivot, owner).value
 ```
 
-### `super` descriptor certainty is independent of constraint order
+### Descriptor validation does not affect `super` type equivalence
 
-Equivalent ordinary `super` types retain distinct descriptor-validation branches. Reversing the
-constraints therefore does not change whether a valid alternative suppresses the diagnostic.
+Equivalent ordinary `super` types collapse even when their TypeVar constraints would require
+different descriptor-validation owners. Reversing the constraints therefore does not duplicate the
+inferred type or change diagnostic behavior.
 
 ```py
 from __future__ import annotations
@@ -1499,16 +1500,18 @@ ReversedLiteralT = TypeVar(
 )
 
 def ordered_literal_constraints(owner: OrderedLiteralT) -> None:
+    reveal_type(super(PartialLiteralPivot, owner))  # revealed: <super: <class 'PartialLiteralPivot'>, PartialMember>
     super(PartialLiteralPivot, owner).value
 
 def reversed_literal_constraints(owner: ReversedLiteralT) -> None:
+    reveal_type(super(PartialLiteralPivot, owner))  # revealed: <super: <class 'PartialLiteralPivot'>, PartialMember>
     super(PartialLiteralPivot, owner).value
 ```
 
-### Union-bounded `super` receivers preserve branch correlation
+### Union-bounded `super` descriptor diagnostics are suppressed
 
-A `super` owner with a union-like upper bound validates each concrete alternative separately. A
-valid alternative makes the descriptor failure non-definite.
+A `super` owner with a union-like upper bound can also require per-alternative descriptor
+validation. The diagnostic is suppressed while ordinary `super` inference remains unchanged.
 
 ```py
 from __future__ import annotations
@@ -1615,6 +1618,52 @@ class Bound(metaclass=Meta):
 
 # error: [invalid-attribute-access] "Invalid access to descriptor attribute `value` on type `<class 'Bound'>`"
 reveal_type(Bound.value)  # revealed: int
+```
+
+### Stub declarations do not prove descriptor invocation
+
+A stub describes the static member type but does not reveal whether the implementation stores the
+value in the class or instance dictionary. Descriptor invocation is therefore not definite.
+
+`stub_descriptor.pyi`:
+
+```pyi
+class Descriptor:
+    def __get__(self) -> int: ...
+
+class C:
+    value: Descriptor
+```
+
+```py
+from stub_descriptor import C
+
+reveal_type(C.value)  # revealed: int
+reveal_type(C().value)  # revealed: int
+```
+
+### Type-checking-only bindings do not prove descriptor invocation
+
+An assignment under `TYPE_CHECKING` is visible to static analysis but does not add a descriptor to
+the runtime class dictionary. A metaclass fallback can satisfy the runtime lookup instead.
+
+```py
+from typing import TYPE_CHECKING, ClassVar
+
+class Descriptor:
+    def __get__(self) -> int:
+        return 1
+
+class Meta(type):
+    def __getattr__(cls, name: str) -> str:
+        return name
+
+class C(metaclass=Meta):
+    if TYPE_CHECKING:
+        value: ClassVar[Descriptor] = Descriptor()
+
+# The static declaration remains the inferred member contract.
+reveal_type(C.value)  # revealed: int
 ```
 
 ### A custom `__getattribute__` intercepts descriptor access

@@ -694,7 +694,7 @@ impl<'db> MemberLookupResult<'db> {
                 ..
             }) => provenance
                 .definition()
-                .is_some_and(|definition| definition_is_binding(db, definition)),
+                .is_some_and(|definition| definition_is_runtime_binding(db, definition)),
             Place::Defined(_) | Place::Undefined => true,
         }
     }
@@ -746,13 +746,17 @@ impl<'db> MemberLookupResult<'db> {
 }
 
 #[salsa::tracked(returns(copy))]
-fn definition_is_binding<'db>(db: &'db dyn Db, definition: Definition<'db>) -> bool {
+fn definition_is_runtime_binding<'db>(db: &'db dyn Db, definition: Definition<'db>) -> bool {
     let file = definition.file(db);
+    if file.is_stub(db) {
+        return false;
+    }
+
     let module = parsed_module(db, file).load(db);
-    definition
-        .kind(db)
-        .category(file.is_stub(db), &module)
-        .is_binding()
+    let kind = definition.kind(db);
+    kind.category(false, &module).is_binding()
+        && !semantic_index(db, file)
+            .is_in_type_checking_block(definition.file_scope(db), kind.full_range(&module))
 }
 
 impl<'db> From<PlaceAndQualifiers<'db>> for MemberLookupResult<'db> {
