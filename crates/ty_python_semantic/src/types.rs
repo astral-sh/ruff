@@ -4245,6 +4245,13 @@ impl<'db> Type<'db> {
         policy: InstanceFallbackShadowsNonDataDescriptor,
     ) -> MemberLookupResult<'db> {
         let ty = key.ty(db);
+        let meta_attr_plain = Self::instance_lookup_class_member_with_policy(db, key);
+        let meta_attr_may_be_data_descriptor = policy
+            == InstanceFallbackShadowsNonDataDescriptor::Yes
+            && meta_attr_plain
+                .place
+                .ignore_possibly_undefined()
+                .is_some_and(|ty| ty.may_be_data_descriptor(db));
         let (
             PlaceAndQualifiers {
                 place: meta_attr,
@@ -4255,7 +4262,7 @@ impl<'db> Type<'db> {
         ) = Self::try_call_dunder_get_on_attribute(
             db,
             env,
-            Self::instance_lookup_class_member_with_policy(db, env, key),
+            meta_attr_plain,
             Some(receiver),
             ty.to_meta_type(db, env),
         );
@@ -4337,7 +4344,18 @@ impl<'db> Type<'db> {
             ) if policy == InstanceFallbackShadowsNonDataDescriptor::Yes => {
                 MemberLookupResult::new(
                     fallback.with_qualifiers(fallback_qualifiers),
-                    fallback_error,
+                    if meta_attr_may_be_data_descriptor {
+                        // The aggregate kind only records whether every metaclass branch is a data
+                        // descriptor. A possible data-descriptor branch still takes precedence
+                        // over the fallback and can make its failure non-definite.
+                        combine_alternative_descriptor_get_errors(
+                            db,
+                            meta_attr_error,
+                            fallback_error,
+                        )
+                    } else {
+                        fallback_error
+                    },
                 )
             }
 

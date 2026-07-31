@@ -32,6 +32,10 @@ should not introduce object-identity, alias, or class-namespace mutation analysi
     normal descriptor invocation non-definite, even when calling the override itself fails.
 - Treat a successful `__getattr__` fallback as a successful lookup alternative when the normal
     member is possibly undefined.
+- Preserve a possible valid metaclass data-descriptor branch as a higher-precedence lookup
+    alternative when a mixed descriptor-kind union otherwise falls through to a class attribute.
+- Treat the absent branch of a possibly defined `super` member as an alternative that does not
+    invoke the descriptor, while retaining the ordinary possibly-missing diagnostic.
 - Suppress descriptor-read diagnostics after any possibly or definitely reaching same-place
     assignment, without using descriptor kind to prove that `__get__` remains selected.
 - Do not treat the inferred class-wide instance-member summary from arbitrary method assignments as
@@ -67,12 +71,18 @@ its callable members accepts the arguments.
 
 Only lookup paths that can supply the requested member participate in certainty aggregation. An
 undefined intersection element is a refinement, not a successful alternative member lookup.
-Conversely, a possibly defined member introduces an absent path; a successful dynamic fallback on
-that path makes descriptor failure non-definite.
+Conversely, a possibly defined member introduces an absent path that does not invoke the descriptor,
+even if that path ultimately raises an attribute error instead of finding a dynamic fallback. A
+possibly-missing diagnostic remains separate from the descriptor-call diagnostic.
 
 Positive elements of an intersection-valued attribute describe one runtime value. Elements without
 `__get__` therefore do not create a successful alternative to a descriptor supplied by another
 element.
+
+Descriptor precedence can differ across the elements of a union-valued metaclass member. A possible
+data-descriptor element remains a higher-precedence alternative even when the aggregate attribute
+kind says that the union is not uniformly data-descriptor-like. The diagnostic preserves that
+successful alternative conservatively without changing the inferred member type.
 
 Constrained receiver types are expanded only for descriptor-call validation, pairing each concrete
 receiver constraint with the member selected from that constraint. For `type[T]`, ty first
@@ -115,6 +125,9 @@ read/write correlation, and bidirectional type-context improvements are separate
 - Precisely diagnosing a malformed descriptor assigned dynamically through a class object.
 - Improving the inferred value type after class-namespace mutation when the existing static class
     model cannot represent it.
+- Improving the inferred member type or general precedence representation for metaclass attributes
+    with mixed data-descriptor and non-data-descriptor alternatives.
+- General changes to `super` MRO lookup or possibly-missing attribute inference.
 - General augmented-assignment operator inference, store validation, and bidirectional type-context
     improvements.
 - Diagnosing or retargeting call failures from an invalid custom `__getattribute__`.
@@ -131,6 +144,11 @@ The implementation may miss invalid descriptor accesses after any reaching assig
 includes definite instance data descriptors and metaclass data descriptors whose `__set__` method
 intercepts a class-object assignment. These conservative false negatives are preferable to an
 error-level false positive on valid code.
+
+The implementation may also suppress a diagnostic when every branch of a mixed metaclass
+descriptor-kind union fails through a different precedence path. Correlating each metaclass branch
+with the corresponding class-attribute fallback, and refining the inferred member type accordingly,
+is outside this change.
 
 The original issue remains covered because its malformed descriptor is statically known and
 definitely selected.

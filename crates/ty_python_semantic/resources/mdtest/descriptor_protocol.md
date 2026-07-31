@@ -1197,6 +1197,66 @@ class C:
 reveal_type(C().descriptor)  # revealed: int | str
 ```
 
+### Mixed metaclass descriptor kinds make fallback failures possible
+
+A metaclass member that can be a data descriptor takes precedence over a class attribute on that
+branch. If the data descriptor is valid, a malformed class descriptor is therefore only possibly
+invoked. This test intentionally does not assert the inferred type for the mixed-precedence lookup.
+
+```py
+class ValidDataDescriptor:
+    def __get__(self, instance: object, owner: type | None = None) -> str:
+        return ""
+
+    def __set__(self, instance: object, value: object) -> None:
+        pass
+
+def descriptor_or_value() -> ValidDataDescriptor | int:
+    raise NotImplementedError
+
+class BrokenDescriptor:
+    def __get__(self) -> bytes:
+        return b""
+
+class Meta(type):
+    value = descriptor_or_value()
+
+class C(metaclass=Meta):
+    value = BrokenDescriptor()
+
+C.value
+```
+
+### Possibly undefined `super` members do not fail definitely
+
+When a malformed descriptor is only possibly defined on a base class, the absent path raises an
+attribute error without invoking `__get__`. The descriptor failure is therefore not definite,
+although the ordinary possibly-missing diagnostic still applies.
+
+```py
+def _(flag: bool):
+    class BrokenDescriptor:
+        def __get__(self) -> int:
+            return 1
+
+    class Base:
+        if flag:
+            value = BrokenDescriptor()
+
+    class Derived(Base):
+        def read(self) -> None:
+            # error: [possibly-missing-attribute] "Attribute `value` may be missing on object of type `<super: <class 'Derived'>, Self@read>`"
+            super().value
+
+    class DefiniteBase:
+        value = BrokenDescriptor()
+
+    class DefiniteDerived(DefiniteBase):
+        def read_definite(self) -> None:
+            # error: [invalid-attribute-access] "Invalid access to descriptor attribute `value` on type `<super: <class 'DefiniteDerived'>, Self@read_definite>`"
+            super().value
+```
+
 ### Possible `__get__` callable failures are not reported
 
 Conditionally defined methods produce a union of callable types. A valid callable alternative makes

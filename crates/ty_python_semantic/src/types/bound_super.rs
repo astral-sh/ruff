@@ -944,7 +944,10 @@ impl<'db> BoundSuperType<'db> {
         let (instance, owner) = self.owner(db).descriptor_binding(db, env)?;
         let (member, _, error) =
             Type::try_call_dunder_get_on_attribute(db, env, attribute, instance, owner);
-        Some(MemberLookupResult::new(member, error))
+        Some(
+            MemberLookupResult::new(member, error)
+                .or_fall_back_to(db, env, || Place::Undefined.into()),
+        )
     }
 
     /// Similar to `Type::find_name_in_mro_with_policy`, but performs lookup starting *after* the
