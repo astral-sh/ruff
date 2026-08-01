@@ -91,7 +91,7 @@ error: oops
   |        ^^^^ oops
   |
 help: remove the entry
- --> cell 1:2:8
+ ::: cell 1:2:8
   |
 2 - Second oops line
 2 + Second line
@@ -111,7 +111,7 @@ error: oops
   │        ━━━━ oops
   ╰╴
 help: remove the entry
-  ╭▸ cell 1:2:8
+  ⸬  cell 1:2:8
   │
 2 - Second oops line
 2 + Second line
@@ -157,7 +157,7 @@ error: oops
   |        ^^^^ oops
   |
 help: remove the entry
- --> cell 1:2:8
+ ::: cell 1:2:8
   |
 2 - Second oops line
 2 + Second line
@@ -178,7 +178,7 @@ error: oops
   │        ━━━━ oops
   ╰╴
 help: remove the entry
-  ╭▸ cell 1:2:8
+  ⸬  cell 1:2:8
   │
 2 - Second oops line
 2 + Second line
@@ -224,12 +224,12 @@ error: oops
   |        ^^^^ oops
   |
 help: remove the entry
- --> cell 1:2:8
+ ::: cell 1:2:8
   |
 2 - Second oops line
 2 + Second line
   |
- --> cell 2:2:12
+ ::: cell 2:2:12
   |
 2 - Second oops line
 2 + Second oops
@@ -247,12 +247,12 @@ error: oops
   │        ━━━━ oops
   ╰╴
 help: remove the entry
-  ╭▸ cell 1:2:8
+  ⸬  cell 1:2:8
   │
 2 - Second oops line
 2 + Second line
   │
-  ├▸ cell 2:2:12
+  ⸬  cell 2:2:12
   │
 2 - Second oops line
 2 + Second oops
@@ -291,7 +291,7 @@ error: oops
   |        ^^^^ oops
   |
 help: remove the entry
- --> cell 2:2:8
+ ::: cell 2:2:8
   |
 2 - Second oops line
 2 + Second line
@@ -311,7 +311,7 @@ error: oops
   │        ━━━━ oops
   ╰╴
 help: remove the entry
-  ╭▸ cell 2:2:8
+  ⸬  cell 2:2:8
   │
 2 - Second oops line
 2 + Second line
@@ -357,7 +357,7 @@ error: oops
   |        ^^^^ oops
   |
 help: remove the entry
- --> bar.ipynb:cell 2:2:8
+ ::: bar.ipynb:cell 2:2:8
   |
 2 - Second oops line
 2 + Second line
@@ -378,7 +378,7 @@ error: oops
   │        ━━━━ oops
   ╰╴
 help: remove the entry
-  ╭▸ bar.ipynb:cell 2:2:8
+  ⸬  bar.ipynb:cell 2:2:8
   │
 2 - Second oops line
 2 + Second line
@@ -424,12 +424,12 @@ error: oops
   |        ^^^^ oops
   |
 help: remove the entry
- --> bar.ipynb:cell 2:2:8
+ ::: bar.ipynb:cell 2:2:8
   |
 2 - Second oops line
 2 + Second line
   |
- --> bar.ipynb:cell 3:2:12
+ ::: bar.ipynb:cell 3:2:12
   |
 2 - Second oops line
 2 + Second oops
@@ -447,12 +447,12 @@ error: oops
   │        ━━━━ oops
   ╰╴
 help: remove the entry
-  ╭▸ bar.ipynb:cell 2:2:8
+  ⸬  bar.ipynb:cell 2:2:8
   │
 2 - Second oops line
 2 + Second line
   │
-  ├▸ bar.ipynb:cell 3:2:12
+  ⸬  bar.ipynb:cell 3:2:12
   │
 2 - Second oops line
 2 + Second oops
