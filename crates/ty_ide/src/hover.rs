@@ -6067,13 +6067,13 @@ def function():
         );
 
         assert_snapshot!(test.hover(), @"
-        int | float
+        float
         ---------------------------------------------
         Convert a string or number to a floating-point number, if possible.
 
         ---------------------------------------------
         ```python
-        int | float
+        float
         ```
         ---
         Convert a string or number to a floating-point number, if possible.

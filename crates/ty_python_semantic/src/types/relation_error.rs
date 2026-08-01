@@ -8,7 +8,7 @@ use ruff_python_ast::name::Name;
 
 use crate::types::context::LintDiagnosticGuard;
 use crate::types::tuple::TupleLength;
-use crate::types::{Type, TypedDictType};
+use crate::types::{DisplaySettings, Type, TypedDictType};
 use crate::{FxOrderSet, ProgramEnvironment};
 
 /// Identifies a parameter, either by name or by position.
@@ -188,17 +188,28 @@ impl<'db> ErrorContext<'db> {
                 element,
                 union,
                 target,
-            } => format!(
-                "element `{}` of union `{}` is not assignable to `{}`",
-                element.display(db, env),
-                union.display(db, env),
-                target.display(db, env),
-            ),
-            Self::NotAssignableToAnyUnionElement { source, union } => format!(
-                "type `{}` is not assignable to any element of the union `{}`",
-                source.display(db, env),
-                union.display(db, env),
-            ),
+            } => {
+                let settings = DisplaySettings::from_possibly_ambiguous_types(
+                    db,
+                    env,
+                    [*element, *union, *target],
+                );
+                format!(
+                    "element `{}` of union `{}` is not assignable to `{}`",
+                    element.display_with(db, env, settings.clone()),
+                    union.display_with(db, env, settings.expand_numeric_tower_unions()),
+                    target.display_with(db, env, settings),
+                )
+            }
+            Self::NotAssignableToAnyUnionElement { source, union } => {
+                let settings =
+                    DisplaySettings::from_possibly_ambiguous_types(db, env, [*source, *union]);
+                format!(
+                    "type `{}` is not assignable to any element of the union `{}`",
+                    source.display_with(db, env, settings.clone()),
+                    union.display_with(db, env, settings.expand_numeric_tower_unions()),
+                )
+            }
             Self::NotAssignableToNOtherUnionElements { n } => format!(
                 "... omitted {n} union element{} without additional context",
                 if *n == 1 { "" } else { "s" }

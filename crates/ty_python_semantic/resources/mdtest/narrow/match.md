@@ -3079,17 +3079,17 @@ class C:
 def _(x: Literal["foo", "bar", 42, b"foo"] | bool | complex):
     match x:
         case "foo":
-            reveal_type(x)  # revealed: Literal["foo"] | float | complex
+            reveal_type(x)  # revealed: Literal["foo"] | float* | complex*
         case 42:
-            reveal_type(x)  # revealed: Literal[42] | float | complex
+            reveal_type(x)  # revealed: Literal[42] | float* | complex*
         case 6.0:
-            reveal_type(x)  # revealed: Literal["bar", b"foo"] | (int & ~Literal[42]) | float | complex
+            reveal_type(x)  # revealed: Literal["bar", b"foo"] | (int & ~Literal[42]) | float* | complex*
         case 1j:
-            reveal_type(x)  # revealed: Literal["bar", b"foo"] | (int & ~Literal[42]) | float | complex
+            reveal_type(x)  # revealed: Literal["bar", b"foo"] | (int & ~Literal[42]) | float* | complex*
         case b"foo":
-            reveal_type(x)  # revealed: Literal[b"foo"] | float | complex
+            reveal_type(x)  # revealed: Literal[b"foo"] | float* | complex*
         case _:
-            reveal_type(x)  # revealed: Literal["bar"] | (int & ~Literal[42]) | float | complex
+            reveal_type(x)  # revealed: Literal["bar"] | (int & ~Literal[42]) | float* | complex*
 ```
 
 The same limitation applies inside a sequence. Matching a literal proves only that the element

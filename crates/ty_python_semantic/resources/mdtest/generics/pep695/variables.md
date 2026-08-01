@@ -124,7 +124,7 @@ When the default is a TypeVar, its upper bound must be assignable to the outer T
 def f[T1: int, S: float = T1](): ...
 
 # `T3` has bound `str`, which is not assignable to `int | float`
-# error: [invalid-type-variable-default] "Default `T3` of TypeVar `U` is not assignable to upper bound `int | float` of `U` because its upper bound `str` is not assignable to `int | float`"
+# error: [invalid-type-variable-default] "Default `T3` of TypeVar `U` is not assignable to upper bound `float` of `U` because its upper bound `str` is not assignable to `float`"
 def g[T3: str, U: float = T3](): ...
 ```
 

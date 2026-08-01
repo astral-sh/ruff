@@ -2965,7 +2965,8 @@ pub(super) fn report_revealed_type<'db>(
                 revealed_type.display_with(
                     db,
                     env,
-                    DisplaySettings::default().preserve_long_unions()
+                    DisplaySettings::from_possibly_ambiguous_types(db, env, [revealed_type])
+                        .preserve_long_unions()
                 )
             )),
         );
