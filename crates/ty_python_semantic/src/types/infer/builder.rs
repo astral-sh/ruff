@@ -83,7 +83,8 @@ use crate::types::function::{
     same_module_uncached_raw_signature,
 };
 use crate::types::generics::{
-    GenericContext, Specialization, SpecializationBuilder, bind_typevar, enclosing_binding_contexts,
+    GenericContext, Specialization, SpecializationBuilder, bind_typevar,
+    enclosing_binding_contexts, resolve_typevar_reference,
 };
 use crate::types::infer::builder::named_tuple::NamedTupleKind;
 use crate::types::infer::builder::paramspec_validation::validate_paramspec_components;
@@ -10018,6 +10019,36 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.infer_attribute_load_impl(attribute, value_type)
     }
 
+    /// Resolves a `ParamSpec` used through `P.args` or `P.kwargs` without introducing a binding.
+    fn resolve_paramspec_component(
+        &self,
+        typevar: TypeVarInstance<'db>,
+    ) -> Option<BoundTypeVarInstance<'db>> {
+        let db = self.db();
+        let parameter_binding = self.typevar_binding_context.and_then(|definition| {
+            let DefinitionKind::Function(function) = definition.kind(db) else {
+                return None;
+            };
+            let function = function.node(self.module());
+            function
+                .parameters
+                .iter_non_variadic_params()
+                .filter_map(ast::ParameterWithDefault::annotation)
+                .filter_map(|annotation| self.try_expression_type(annotation))
+                .find_map(|annotation_ty| {
+                    let mut typevars = FxOrderSet::default();
+                    annotation_ty.find_legacy_typevars(db, None, &mut typevars);
+                    typevars
+                        .into_iter()
+                        .find(|bound| bound.typevar(db).identity(db) == typevar.identity(db))
+                })
+        });
+
+        parameter_binding.or_else(|| {
+            resolve_typevar_reference(db, self.index, self.scope().file_scope_id(db), typevar)
+        })
+    }
+
     /// Infer the type of a [`ast::ExprAttribute`] expression, assuming a load context.
     fn infer_attribute_load_impl(
         &mut self,
@@ -10046,13 +10077,25 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         if let Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) = value_type
             && typevar.is_paramspec(db)
-            && let Some(bound_typevar) = bind_typevar(
-                db,
-                self.index,
-                self.scope().file_scope_id(db),
-                self.typevar_binding_context,
-                typevar,
-            )
+            && let Some(bound_typevar) = if matches!(attr.id.as_str(), "args" | "kwargs") {
+                self.resolve_paramspec_component(typevar).or_else(|| {
+                    bind_typevar(
+                        db,
+                        self.index,
+                        self.scope().file_scope_id(db),
+                        self.typevar_binding_context,
+                        typevar,
+                    )
+                })
+            } else {
+                bind_typevar(
+                    db,
+                    self.index,
+                    self.scope().file_scope_id(db),
+                    self.typevar_binding_context,
+                    typevar,
+                )
+            }
         {
             value_type = Type::TypeVar(bound_typevar);
         }

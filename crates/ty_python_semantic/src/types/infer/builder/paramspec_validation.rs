@@ -4,7 +4,7 @@ use crate::{
         ParamSpecAttrKind, Type,
         context::InferContext,
         diagnostic::{INVALID_PARAMSPEC, UNBOUND_TYPE_VARIABLE},
-        generics::bind_typevar,
+        generics::resolve_typevar_reference,
     },
 };
 use ruff_python_ast as ast;
@@ -97,7 +97,7 @@ pub(super) fn validate_paramspec_components<'db>(
                         .scope(context.scope().file_scope_id(db))
                         .parent()
                         .is_some_and(|parent_scope| {
-                            bind_typevar(db, index, parent_scope, None, args_tv.typevar(db))
+                            resolve_typevar_reference(db, index, parent_scope, args_tv.typevar(db))
                                 .is_some()
                         });
                 if !paramspec_is_in_scope
