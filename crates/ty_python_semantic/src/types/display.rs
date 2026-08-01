@@ -2303,7 +2303,22 @@ impl<'db> Signature<'db> {
         db: &'db dyn Db,
         env: &'a ProgramEnvironment<'db>,
     ) -> DisplaySignature<'a, 'db> {
-        Self::display_with(self, db, env, DisplaySettings::default())
+        Self::display_with(self, db, env, self.display_settings(db, env))
+    }
+
+    pub(crate) fn display_settings(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> DisplaySettings<'db> {
+        DisplaySettings::from_possibly_ambiguous_types(
+            db,
+            env,
+            self.parameters()
+                .iter()
+                .map(Parameter::annotated_type)
+                .chain(std::iter::once(self.return_ty)),
+        )
     }
 
     pub(crate) fn display_with<'a>(

@@ -13,7 +13,7 @@ use crate::types::{
     KnownUnion, PropertyAccessorRole, SubclassOfInner, Type, TypeContext,
     TypeVarBoundOrConstraints, binding_type,
 };
-use crate::{Db, DisplaySettings, HasDefinition, HasType, ProgramEnvironment, SemanticModel};
+use crate::{Db, HasDefinition, HasType, ProgramEnvironment, SemanticModel};
 use itertools::Either;
 use ruff_db::files::FileRange;
 use ruff_db::parsed::parsed_module;
@@ -1775,7 +1775,7 @@ pub fn call_type_simplified_by_overloads(
     let signature = resolve_single_overload(model, callable_type, call_expr)?;
     Some(
         signature
-            .display_with(db, env, DisplaySettings::default().multiline())
+            .display_with(db, env, signature.display_settings(db, env).multiline())
             .to_string(),
     )
 }
@@ -3072,7 +3072,8 @@ pub fn constructor_signature(model: &SemanticModel, call_expr: &ast::ExprCall) -
             .display_with(
                 db,
                 env,
-                DisplaySettings::default()
+                signature
+                    .display_settings(db, env)
                     .multiline()
                     .disallow_signature_name()
                     .hide_return_type(),

@@ -6109,6 +6109,45 @@ def function():
     }
 
     #[test]
+    fn hover_shadowed_numeric_builtin_in_selected_signature() {
+        let test = hover_test(
+            r#"
+            import builtins
+            from typing import overload
+
+            class float: ...
+
+            @overload
+            def choose(value: builtins.float | float) -> None: ...
+            @overload
+            def choose(value: str) -> None: ...
+            def choose(value: object) -> None: ...
+
+            choose<CURSOR>(1.0)
+            "#,
+        );
+
+        assert_snapshot!(test.hover());
+    }
+
+    #[test]
+    fn hover_shadowed_numeric_builtin_in_keyword_parameter() {
+        let test = hover_test(
+            r#"
+            import builtins
+
+            class float: ...
+
+            def choose(*, value: builtins.float | float) -> None: ...
+
+            choose(value<CURSOR>=1.0)
+            "#,
+        );
+
+        assert_snapshot!(test.hover());
+    }
+
+    #[test]
     fn hover_bare_final_annotation() {
         let test = hover_test(
             r#"
