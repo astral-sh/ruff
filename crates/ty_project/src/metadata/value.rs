@@ -7,7 +7,6 @@ use ruff_macros::Combine;
 use ruff_ranged_value::{RangedValue, ValueSource};
 use ruff_text_size::TextRange;
 
-use crate::Db;
 use crate::glob::{
     AbsolutePortableGlobPattern, PortableGlobError, PortableGlobKind, PortableGlobPattern,
 };
@@ -60,16 +59,6 @@ impl RelativePathBuf {
 
     pub(crate) fn range(&self) -> Option<TextRange> {
         self.0.range()
-    }
-
-    /// Returns the owned relative path.
-    pub fn into_path_buf(self) -> SystemPathBuf {
-        self.0.into_inner()
-    }
-
-    /// Resolves the absolute path for `self` based on its origin.
-    pub fn absolute_with_db(&self, db: &dyn Db) -> SystemPathBuf {
-        self.absolute(db.project().root(db), db.system())
     }
 
     /// Resolves the absolute path for `self` based on its origin.
