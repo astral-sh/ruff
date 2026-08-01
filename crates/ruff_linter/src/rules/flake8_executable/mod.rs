@@ -46,4 +46,28 @@ mod tests {
         assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
+
+    /// Regression test for <https://github.com/astral-sh/ruff/issues/27028>.
+    ///
+    /// A `#!` comment later in the file is an ordinary comment, so EXE001 and
+    /// EXE003 should not be reported; only EXE005 should be.
+    #[test]
+    fn comment_not_shebang() -> Result<()> {
+        if super::helpers::is_wsl() {
+            // EXE001 is always ignored on WSL, so skip testing it in a WSL
+            // environment.
+            return Ok(());
+        }
+
+        let diagnostics = test_path(
+            Path::new("flake8_executable/comment_not_shebang.py"),
+            &settings::LinterSettings::for_rules(vec![
+                Rule::ShebangNotExecutable,
+                Rule::ShebangMissingPython,
+                Rule::ShebangNotFirstLine,
+            ]),
+        )?;
+        assert_diagnostics!(Path::new("comment_not_shebang.py"), diagnostics);
+        Ok(())
+    }
 }

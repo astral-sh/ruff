@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use ruff_python_trivia::CommentRanges;
+use ruff_python_trivia::{CommentRanges, is_python_whitespace};
 pub(crate) use shebang_leading_whitespace::*;
 pub(crate) use shebang_missing_executable_file::*;
 pub(crate) use shebang_missing_python::*;
@@ -28,15 +28,26 @@ pub(crate) fn from_tokens(
     for range in comment_ranges {
         let comment = locator.slice(range);
         if let Some(shebang) = ShebangDirective::try_extract(comment) {
-            has_any_shebang = true;
+            // A shebang is only recognized at the beginning of the file,
+            // ignoring whitespace. A `#!` comment later in the file is an
+            // ordinary comment, and should only be reported by EXE005
+            // (`ShebangNotFirstLine`).
+            let is_leading = locator
+                .up_to(range.start())
+                .chars()
+                .all(|c| is_python_whitespace(c) || matches!(c, '\r' | '\n'));
 
-            shebang_missing_python(range, &shebang, context);
+            if is_leading {
+                has_any_shebang = true;
 
-            if context.is_rule_enabled(Rule::ShebangNotExecutable) {
-                shebang_not_executable(path, range, context);
+                shebang_missing_python(range, &shebang, context);
+
+                if context.is_rule_enabled(Rule::ShebangNotExecutable) {
+                    shebang_not_executable(path, range, context);
+                }
+
+                shebang_leading_whitespace(context, range, locator);
             }
-
-            shebang_leading_whitespace(context, range, locator);
 
             shebang_not_first_line(range, locator, context);
         }

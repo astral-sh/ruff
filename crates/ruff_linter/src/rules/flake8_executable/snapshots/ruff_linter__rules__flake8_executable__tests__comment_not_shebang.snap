@@ -1,0 +1,11 @@
+---
+source: crates/ruff_linter/src/rules/flake8_executable/mod.rs
+---
+EXE005 Shebang should be at the beginning of the file
+ --> comment_not_shebang.py:2:5
+  |
+1 | def f():
+2 |     #! regular comment
+  |     ^^^^^^^^^^^^^^^^^^
+3 |     return 1
+  |
