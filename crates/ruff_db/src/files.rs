@@ -4,8 +4,6 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 
 use dashmap::mapref::entry::Entry;
-#[expect(unused_imports)]
-pub(crate) use directory::system_path_to_directory;
 pub use directory::{DirectoryListing, DirectoryListingError, directory_listing};
 pub use file_root::{FileRoot, FileRootKind};
 pub use path::FilePath;
@@ -566,11 +564,6 @@ impl File {
     /// Returns `true` if the file should be analyzed as a type stub.
     pub fn is_stub(self, db: &dyn Db) -> bool {
         self.source_type(db).is_stub()
-    }
-
-    /// Returns `true` if the file is an `__init__.pyi`
-    pub fn is_package_stub(self, db: &dyn Db) -> bool {
-        self.path(db).as_str().ends_with("__init__.pyi")
     }
 
     /// Returns `true` if the file is an `__init__.pyi`

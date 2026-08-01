@@ -333,13 +333,6 @@ pub struct InMemorySystem {
 }
 
 impl InMemorySystem {
-    pub fn new(cwd: SystemPathBuf) -> Self {
-        Self {
-            user_config_directory: Mutex::new(None).into(),
-            memory_fs: MemoryFileSystem::with_current_directory(cwd),
-        }
-    }
-
     pub fn from_memory_fs(memory_fs: MemoryFileSystem) -> Self {
         Self {
             user_config_directory: Mutex::new(None).into(),
