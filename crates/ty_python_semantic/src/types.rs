@@ -560,10 +560,20 @@ impl get_size2::GetSize for DescriptorGetCallContext<'_> {}
 
 impl<'db> DescriptorGetCallContext<'db> {
     /// Reconstructs the implicit call and returns its error if the call is still invalid.
-    fn into_error(self, db: &'db dyn Db) -> Option<DescriptorGetCallError<'db>> {
+    fn into_error(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> Option<DescriptorGetCallError<'db>> {
         let descriptor_type = self.descriptor_type(db);
-        let descr_get = descriptor_type.try_lookup_dunder_get(db)?;
-        let instance = self.instance(db).unwrap_or_else(|| Type::none(db));
+        // `property.__get__` evaluates the property's getter as part of the call. A failure in
+        // that nested call is not evidence that the implicit descriptor call itself is invalid.
+        if descriptor_type.is_property_instance() {
+            return None;
+        }
+
+        let descr_get = descriptor_type.try_lookup_dunder_get(db, env)?;
+        let instance = self.instance(db).unwrap_or_else(|| Type::none(db, env));
         let owner = self.owner(db);
         let error = descr_get
             .callable_type
@@ -636,7 +646,12 @@ impl<'db> MemberLookupResult<'db> {
         }
     }
 
-    fn or_fall_back_to(self, db: &'db dyn Db, fallback_fn: impl FnOnce() -> Self) -> Self {
+    fn or_fall_back_to(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        fallback_fn: impl FnOnce() -> Self,
+    ) -> Self {
         let primary_definedness = match self.member.place {
             Place::Undefined => None,
             Place::Defined(DefinedPlace { definedness, .. }) => Some(definedness),
@@ -3633,7 +3648,11 @@ impl<'db> Type<'db> {
 
     /// Looks up the raw `__get__` slot on the descriptor's class without applying the descriptor
     /// protocol to the slot itself.
-    fn try_lookup_dunder_get(self, db: &'db dyn Db) -> Option<DescriptorGetLookup<'db>> {
+    fn try_lookup_dunder_get(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> Option<DescriptorGetLookup<'db>> {
         let Place::Defined(DefinedPlace {
             ty: concrete_descr_get,
             ..
@@ -3692,18 +3711,19 @@ impl<'db> Type<'db> {
     ) -> Option<DescriptorGetResult<'db>> {
         fn try_call_dunder_get_on_alternatives<'db>(
             db: &'db dyn Db,
+            env: &ProgramEnvironment<'db>,
             alternatives: &[Type<'db>],
             instance: Option<Type<'db>>,
             owner: Type<'db>,
         ) -> Option<DescriptorGetResult<'db>> {
-            let mut return_types = UnionBuilder::new(db);
+            let mut return_types = UnionBuilder::new(db, env);
             let mut error = None;
             let mut any_descriptor = false;
             let mut all_data_descriptors = true;
 
             for alternative in alternatives {
                 if let Some(result) =
-                    alternative.try_call_dunder_get_with_error(db, instance, owner)
+                    alternative.try_call_dunder_get_with_error(db, env, instance, owner)
                 {
                     any_descriptor = true;
                     all_data_descriptors &= result.kind.is_data();
@@ -3729,7 +3749,7 @@ impl<'db> Type<'db> {
             })
         }
 
-        #[salsa::tracked(returns(copy), cycle_initial=|_, _, _, _, _| None, heap_size=ruff_memory_usage::heap_size)]
+        #[salsa::tracked(returns(copy), cycle_initial=|_, _, _, _, _, _| None, heap_size=ruff_memory_usage::heap_size)]
         fn try_call_dunder_get_inner<'db>(
             db: &'db dyn Db,
             program: Program<'db>,
@@ -3753,6 +3773,7 @@ impl<'db> Type<'db> {
             if let Some(union) = ty.as_union_like(db) {
                 return try_call_dunder_get_on_alternatives(
                     db,
+                    env,
                     union.elements(db),
                     instance,
                     owner,
@@ -3803,7 +3824,7 @@ impl<'db> Type<'db> {
                 _ => {}
             }
 
-            let descr_get = ty.try_lookup_dunder_get(db)?;
+            let descr_get = ty.try_lookup_dunder_get(db, env)?;
 
             let instance_ty = instance.unwrap_or_else(|| Type::none(db, env));
             let kind = if ty.is_data_descriptor(db, env) {
@@ -3811,13 +3832,14 @@ impl<'db> Type<'db> {
             } else {
                 AttributeKind::NormalOrNonDataDescriptor
             };
-            let (return_type, error) = match descr_get
-                .callable_type
-                .try_call(db, &CallArguments::positional([ty, instance_ty, owner]))
-            {
+            let (return_type, error) = match descr_get.callable_type.try_call(
+                db,
+                env,
+                &CallArguments::positional([ty, instance_ty, owner]),
+            ) {
                 Ok(bindings) => {
                     let return_type = if descr_get.definedness == Definedness::AlwaysDefined {
-                        bindings.return_type(db)
+                        bindings.return_type(db, env)
                     } else {
                         UnionType::from_two_elements(db, env, bindings.return_type(db, env), ty)
                     };
@@ -3825,9 +3847,9 @@ impl<'db> Type<'db> {
                 }
                 Err(error) => {
                     let return_type = if descr_get.definedness == Definedness::AlwaysDefined {
-                        error.return_type(db)
+                        error.return_type(db, env)
                     } else {
-                        UnionType::from_two_elements(db, error.return_type(db), ty)
+                        UnionType::from_two_elements(db, env, error.return_type(db, env), ty)
                     };
                     let error = (!matches!(ty, Type::TypeVar(_))
                         && descr_get.definedness == Definedness::AlwaysDefined)
@@ -3872,7 +3894,7 @@ impl<'db> Type<'db> {
             });
         }
 
-        try_call_dunder_get_inner(db, self, instance, owner)
+        try_call_dunder_get_inner(db, env.program(db), self, instance, owner)
     }
 
     /// Look up `__get__` on the meta-type of self, and call it with the arguments `self`, `instance`,
@@ -4016,8 +4038,9 @@ impl<'db> Type<'db> {
                     // as the complete synthetic `self` can reject a method whose annotation is
                     // satisfied by another element of the intersection.
                     intersection
-                        .map_with_boundness(db, |elem| {
-                            let result = elem.try_call_dunder_get_with_error(db, instance, owner);
+                        .map_with_boundness(db, env, |elem| {
+                            let result =
+                                elem.try_call_dunder_get_with_error(db, env, instance, owner);
                             Place::Defined(DefinedPlace {
                                 ty: result.map_or(*elem, |result| result.return_type),
                                 origin,
@@ -4210,7 +4233,7 @@ impl<'db> Type<'db> {
         policy: InstanceFallbackShadowsNonDataDescriptor,
     ) -> MemberLookupResult<'db> {
         let ty = key.ty(db);
-        let meta_attr_plain = Self::instance_lookup_class_member_with_policy(db, key);
+        let meta_attr_plain = Self::instance_lookup_class_member_with_policy(db, env, key);
         let (
             PlaceAndQualifiers {
                 place: meta_attr,
@@ -4441,6 +4464,7 @@ impl<'db> Type<'db> {
         ) -> MemberLookupResult<'db> {
             fn promote_inferred_attribute_class_literals<'db>(
                 db: &'db dyn Db,
+                env: &ProgramEnvironment<'db>,
                 result: MemberLookupResult<'db>,
             ) -> MemberLookupResult<'db> {
                 let should_promote = matches!(
@@ -4452,7 +4476,7 @@ impl<'db> Type<'db> {
                 ) && !result.member.qualifiers.contains(TypeQualifiers::FINAL);
 
                 if should_promote {
-                    result.map_type(|ty| ty.promote_class_literals(db))
+                    result.map_type(|ty| ty.promote_class_literals(db, env))
                 } else {
                     result
                 }
@@ -4505,7 +4529,7 @@ impl<'db> Type<'db> {
                     return Place::Undefined.into();
                 }
 
-                let result = this.fallback_to_getattr(db, name, result, key.policy(db));
+                let result = this.fallback_to_getattr(db, env, name, result, key.policy(db));
                 // An inferred attribute accessed through an instance can resolve to an override
                 // on a subclass, so an exact class object is not a safe public type here.
                 let result = result.map_type(|ty| ty.bind_self_typevars(db, env, receiver));
@@ -4532,9 +4556,10 @@ impl<'db> Type<'db> {
             match this {
                 Type::Union(union) => {
                     let mut error = None;
-                    let member = union.map_with_boundness_and_qualifiers(db, |elem| {
-                        let result = elem
-                            .member_lookup_with_policy_and_receiver(db, name_str, policy, receiver);
+                    let member = union.map_with_boundness_and_qualifiers(db, env, |elem| {
+                        let result = elem.member_lookup_with_policy_and_receiver(
+                            db, env, name_str, policy, receiver,
+                        );
                         error = error.or(result.descriptor_get_error);
                         result.member
                     });
@@ -4542,27 +4567,30 @@ impl<'db> Type<'db> {
                 }
 
                 Type::Intersection(intersection) => {
-                    if let Some(complement) = intersection.enum_complement(db) {
-                        enums::member_lookup_for_enum_complement(db, complement, name_str, policy)
-                            .into()
+                    if let Some(complement) = intersection.enum_complement(db, env) {
+                        enums::member_lookup_for_enum_complement(
+                            db, env, complement, name_str, policy,
+                        )
+                        .into()
                     } else {
                         // Member lookup delegates to the positive elements, but the descriptor's
                         // synthetic owner is the runtime class satisfying the full intersection.
                         // Until intersection meta-types preserve that relationship, retaining an
                         // element-local call error could turn an imprecise owner into a diagnostic.
                         let receiver = Some(receiver.unwrap_or(this));
-                        let member = intersection.map_with_boundness_and_qualifiers(db, |elem| {
-                            elem.member_lookup_with_policy_and_receiver(
-                                db, name_str, policy, receiver,
-                            )
-                            .member
-                        });
+                        let member =
+                            intersection.map_with_boundness_and_qualifiers(db, env, |elem| {
+                                elem.member_lookup_with_policy_and_receiver(
+                                    db, env, name_str, policy, receiver,
+                                )
+                                .member
+                            });
                         member.into()
                     }
                 }
 
                 Type::EnumComplement(complement) => {
-                    enums::member_lookup_for_enum_complement(db, complement, name_str, policy)
+                    enums::member_lookup_for_enum_complement(db, env, complement, name_str, policy)
                         .into()
                 }
 
@@ -4883,10 +4911,10 @@ impl<'db> Type<'db> {
                 }
                 Type::TypeVar(typevar) => {
                     let receiver = receiver.unwrap_or(this);
-                    let bound_or_constraints = typevar.typevar(db).bound_or_constraints(db);
+                    let bound_or_constraints = typevar.typevar(db).bound_or_constraints(db, env);
                     if let Some(bound) = bound_or_constraints
-                        .map(|bound_or_constraints| bound_or_constraints.as_type(db))
-                        && bound.to_instance(db).is_some()
+                        .map(|bound_or_constraints| bound_or_constraints.as_type(db, env))
+                        && bound.to_instance(db, env).is_some()
                     {
                         // A TypeVar can be bounded by a class-object type such as `type[A]`, which
                         // requires the full lookup path rather than instance-member lookup.
@@ -4900,7 +4928,7 @@ impl<'db> Type<'db> {
                         return MemberLookupResult::new(result.member, None);
                     }
 
-                    let result = instance_like_member_lookup(db, key, receiver);
+                    let result = instance_like_member_lookup(db, env, key, receiver);
                     MemberLookupResult::new(result.member, None)
                 }
 
@@ -4999,7 +5027,7 @@ impl<'db> Type<'db> {
                         Type::ClassLiteral(literal) => literal.into_enum_class(db),
                         Type::SubclassOf(subclass_of) => subclass_of
                             .subclass_of()
-                            .into_class(db)
+                            .into_class(db, env)
                             .and_then(|class| class.class_literal(db).into_enum_class(db)),
                         _ => None,
                     };
@@ -5014,17 +5042,18 @@ impl<'db> Type<'db> {
                         .into();
                     }
 
-                    let class_attr_plain = this.class_object_member(db, name_str, policy);
+                    let class_attr_plain = this.class_object_member(db, env, name_str, policy);
 
-                    let self_instance = receiver.to_instance_approximation(db).expect(
+                    let self_instance = receiver.to_instance_approximation(db, env).expect(
                         "The receiver for a class-object lookup should always be instantiable",
                     );
-                    let class_attr_plain =
-                        class_attr_plain.map_type(|ty| ty.bind_self_typevars(db, self_instance));
+                    let class_attr_plain = class_attr_plain
+                        .map_type(|ty| ty.bind_self_typevars(db, env, self_instance));
 
                     let (class_attr_fallback, _, class_attr_error) =
                         Type::try_call_dunder_get_on_attribute(
                             db,
+                            env,
                             class_attr_plain,
                             None,
                             receiver,
@@ -5032,6 +5061,7 @@ impl<'db> Type<'db> {
 
                     let result = Type::invoke_descriptor_protocol(
                         db,
+                        env,
                         key,
                         receiver,
                         MemberLookupResult::new(class_attr_fallback, class_attr_error),
@@ -5044,13 +5074,13 @@ impl<'db> Type<'db> {
                     // attribute access falls back to `__getattr__`/`__getattribute__` on the
                     // class. `try_call_dunder` adds `NO_INSTANCE_FALLBACK`, which causes the
                     // lookup to hit the catch-all that only checks the meta-type (the metaclass).
-                    let result = this.fallback_to_getattr(db, name, result, policy);
+                    let result = this.fallback_to_getattr(db, env, name, result, policy);
                     // Unlike a specific class literal, `type[C]` can represent any subclass of
                     // `C`, unless a `TypeVar` upper bound normalizes to a final class.
                     let result = if let Type::SubclassOf(subclass_of) = this
-                        && subclass_of.exact_typevar_upper_bound(db).is_none()
+                        && subclass_of.exact_typevar_upper_bound(db, env).is_none()
                     {
-                        promote_inferred_attribute_class_literals(db, result)
+                        promote_inferred_attribute_class_literals(db, env, result)
                     } else {
                         result
                     };
@@ -5066,7 +5096,12 @@ impl<'db> Type<'db> {
                             if ty.is_dynamic() {
                                 ty
                             } else {
-                                IntersectionType::from_two_elements(db, ty, Type::Dynamic(dynamic))
+                                IntersectionType::from_two_elements(
+                                    db,
+                                    env,
+                                    ty,
+                                    Type::Dynamic(dynamic),
+                                )
                             }
                         })
                     } else {
@@ -5075,7 +5110,7 @@ impl<'db> Type<'db> {
 
                     if let Type::SubclassOf(subclass_of) = this
                         && matches!(
-                            subclass_of.subclass_of().with_transposed_type_var(db),
+                            subclass_of.subclass_of().with_transposed_type_var(db, env),
                             SubclassOfInner::TypeVar(_)
                         )
                     {
@@ -6507,12 +6542,13 @@ impl<'db> Type<'db> {
                 // already model via the normal attribute-lookup path.
                 match self.try_call_dunder_with_policy(
                     db,
+                    env,
                     "__getattribute__",
                     &mut CallArguments::positional([Type::string_literal(db, name)]),
                     TypeContext::default(),
                     MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
                 ) {
-                    Ok(bindings) => (Place::bound(bindings.return_type(db)).into(), true),
+                    Ok(bindings) => (Place::bound(bindings.return_type(db, env)).into(), true),
                     Err(
                         CallDunderError::PossiblyUnbound { .. } | CallDunderError::CallError(..),
                     ) => (MemberLookupResult::from(Place::Undefined), true),
@@ -6534,8 +6570,8 @@ impl<'db> Type<'db> {
         };
 
         result
-            .or_fall_back_to(db, || custom_getattribute().0)
-            .or_fall_back_to(db, custom_getattr_result)
+            .or_fall_back_to(db, env, || custom_getattribute().0)
+            .or_fall_back_to(db, env, custom_getattr_result)
     }
 
     /// Flatten typevars in a union or intersection by resolving them to their upper bounds

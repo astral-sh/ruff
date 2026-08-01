@@ -114,9 +114,8 @@ use crate::types::{
     IntersectionBuilder, IntersectionType, KnownClass, KnownInstanceType, KnownUnion,
     LiteralValueType, LiteralValueTypeKind, MemberLookupPolicy, ParamSpecAttrKind, Parameter,
     Parameters, ProgramEnvironment, SentinelInstance, Signature, SpecialFormType, SubclassOfType,
-    Type, TypeAliasType,
-    TypeAndQualifiers, TypeContext, TypeQualifiers, TypeVarBoundOrConstraints, TypeVarKind,
-    TypeVarVariance, TypedDictModule, TypedDictType, UnionAccumulator, UnionBuilder, UnionType,
+    Type, TypeAliasType, TypeAndQualifiers, TypeContext, TypeQualifiers, TypeVarBoundOrConstraints,
+    TypeVarKind, TypeVarVariance, TypedDictModule, UnionAccumulator, UnionBuilder, UnionType,
     any_over_type, binding_type, extract_fixed_length_iterable_element_types,
     infer_complete_scope_types, infer_scope_types, is_discarded_dict_key_assignment, todo_type,
 };
@@ -9194,8 +9193,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 let collection_generic_context = collection_literal.generic_context(db);
                 let mut identity_bindings = self
                     .infer_attribute_load_impl(attribute, identity_instance, true)
-                    .bindings(self.db())
-                    .match_parameters(self.db(), &call_arguments)
+                    .bindings(db, env)
+                    .match_parameters(db, env, &call_arguments)
                     // Perform inference against the type variables on the receiver's generic context.
                     .with_generic_context(self.db(), collection_generic_context);
 
@@ -10322,11 +10321,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
             constraint_keys.extend(keys);
         }
-        let fallback = value_type.member_with_diagnostics(db, &attr.id);
+        let fallback = value_type.member_with_diagnostics(db, env, &attr.id);
         if report_descriptor_get_error
             && assigned_type.is_none()
             && let Some(context) = fallback.descriptor_get_error
-            && let Some(failure) = context.into_error(db)
+            && let Some(failure) = context.into_error(db, env)
         {
             report_bad_dunder_get_call(&self.context, &failure, value_type, attribute);
         }

@@ -1023,6 +1023,38 @@ class C:
 C().value
 ```
 
+### Errors while evaluating a property getter are not descriptor-call errors
+
+A property is a descriptor, but a failure while checking the getter call does not mean that the
+implicit call to `property.__get__` is invalid. In particular, expanding a generic alias can create
+an intermediate specialization that does not satisfy one of the original type-variable bounds.
+
+```py
+from collections.abc import Callable
+from typing import Generic, TypeVar
+
+AItem = TypeVar("AItem", bound=Callable[[int], str])
+BItem = TypeVar("BItem", bound=Callable[[str], str])
+
+class A(Generic[AItem]):
+    @property
+    def callback(self) -> AItem:
+        raise NotImplementedError
+
+class B(Generic[BItem]):
+    @property
+    def callback(self) -> BItem:
+        raise NotImplementedError
+
+AnyCallback = TypeVar("AnyCallback", bound=Callable[..., str])
+Command = A[AnyCallback] | B[AnyCallback]
+Callback = TypeVar("Callback", bound=Callable[[int], str])
+
+def access(value: Callback | Command[Callback]) -> None:
+    if isinstance(value, A | B):
+        value.callback
+```
+
 ### Every descriptor alternative must accept the call
 
 As with other operations on a union, an attribute access is invalid if any possible descriptor
