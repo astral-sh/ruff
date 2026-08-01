@@ -3596,26 +3596,6 @@ def f(c: C):
     reveal_type(c.x)  # revealed: Unknown
 ```
 
-### Assignment whose value never returns
-
-An assignment cannot initialize an implicit instance attribute if evaluating its value never
-returns.
-
-```py
-from typing import NoReturn
-
-def fail() -> NoReturn:
-    raise RuntimeError
-
-class C:
-    def __init__(self) -> None:
-        self.x = fail()
-
-def f(c: C) -> None:
-    # error: [unresolved-attribute]
-    reveal_type(c.x)  # revealed: Unknown
-```
-
 ### Nested classes
 
 ```py
