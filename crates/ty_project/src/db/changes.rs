@@ -21,6 +21,11 @@ impl ChangeResult {
     pub fn project_changed(&self) -> bool {
         self.project_changed
     }
+
+    /// Returns `true` if the custom stdlib's VERSIONS file has changed.
+    pub fn custom_stdlib_changed(&self) -> bool {
+        self.custom_stdlib_changed
+    }
 }
 
 impl ProjectDatabase {
