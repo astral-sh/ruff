@@ -265,9 +265,6 @@ pub fn walk_stmt<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, stmt: &'a Stmt) {
             visitor.visit_expr(test);
             visitor.visit_body(body);
             for clause in elif_else_clauses {
-                if let Some(test) = &clause.test {
-                    visitor.visit_expr(test);
-                }
                 walk_elif_else_clause(visitor, clause);
             }
         }
