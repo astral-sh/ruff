@@ -192,6 +192,23 @@ fn find_typevar_binding<'db>(
             }
             continue;
         }
+        if typevar.is_paramspec(db)
+            && let NodeWithScopeKind::Function(function) = ancestor_scope.node()
+        {
+            let definition = index.expect_single_definition(function);
+            if let Some(function_ty) =
+                infer_definition_types(db, definition).function_type(definition)
+            {
+                let signature = function_ty
+                    .last_definition_raw_signature(db, ReturnCallableTypeVarScope::Lexical);
+                if let Some(bound) = signature.paramspec_component_binding(db, typevar)
+                    && bound.binding_context(db).definition() != Some(definition)
+                    && is_visible_across_class_boundary(db, bound, crossed_class_scope)
+                {
+                    return Some(bound);
+                }
+            }
+        }
         let generic_context = match return_callable_typevar_scope {
             ReturnCallableTypeVarScope::Lexical => {
                 GenericContext::lexical_of_node(db, ancestor_scope.node(), index)
@@ -602,17 +619,12 @@ impl<'db> GenericContext<'db> {
         for param in parameters {
             let annotated_type = param.annotated_type();
             // `P.args` and `P.kwargs` can only refer to a `ParamSpec` that is already in scope;
-            // they do not bind `P` themselves. Keep a binding that was resolved from an outer
-            // scope so that it remains visible inside this function's body.
-            if let Type::TypeVar(typevar) = annotated_type
-                && typevar.is_paramspec(db)
-                && typevar.paramspec_attr(db).is_some()
-            {
-                let typevar = typevar.without_paramspec_attr(db);
-                if typevar.binding_context(db).definition() != Some(definition) {
-                    variables.insert(typevar);
-                }
-            } else {
+            // they do not bind `P` themselves.
+            if !matches!(
+                annotated_type,
+                Type::TypeVar(typevar)
+                    if typevar.is_paramspec(db) && typevar.paramspec_attr(db).is_some()
+            ) {
                 annotated_type.find_legacy_typevars(db, Some(definition), &mut variables);
             }
             if let Some(ty) = param.default_type() {

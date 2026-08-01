@@ -27,7 +27,7 @@ use crate::{
             original_class_type,
         },
         infer_definition_types, infer_scope_types,
-        signatures::ReturnCallableTypeVarScope,
+        signatures::{Parameter, ReturnCallableTypeVarScope},
         tuple::{TupleSpecBuilder, TupleType},
         typed_dict::extract_unpacked_typed_dict_keys_from_kwargs_annotation,
     },
@@ -40,7 +40,6 @@ use ty_python_core::{
 
 use ruff_python_ast as ast;
 use ruff_text_size::Ranged;
-use rustc_hash::FxHashMap;
 
 fn parameters_have_annotations(parameters: &ast::Parameters) -> bool {
     parameters
@@ -574,13 +573,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .any(|param| param.default.is_some());
 
         let previous_typevar_binding_context = self.typevar_binding_context.replace(definition);
-        let previous_signature_typevar_bindings = self
-            .signature_typevar_bindings
-            .replace(FxHashMap::default());
 
         if !has_type_params {
-            self.infer_parameters(function.parameters.as_ref());
             self.infer_return_type_annotation(function.returns.as_deref());
+            self.infer_parameters(function.parameters.as_ref());
         }
 
         if has_defaults {
@@ -633,7 +629,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             self.deferred_state = previous_deferred_state;
         }
 
-        self.signature_typevar_bindings = previous_signature_typevar_bindings;
         self.typevar_binding_context = previous_typevar_binding_context;
     }
 
@@ -659,13 +654,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let binding_context = self.index.expect_single_definition(function);
         let previous_typevar_binding_context =
             self.typevar_binding_context.replace(binding_context);
-        let previous_signature_typevar_bindings = self
-            .signature_typevar_bindings
-            .replace(FxHashMap::default());
+        self.infer_return_type_annotation(function.returns.as_deref());
         self.infer_type_parameters(type_params);
         self.infer_parameters(&function.parameters);
-        self.infer_return_type_annotation(function.returns.as_deref());
-        self.signature_typevar_bindings = previous_signature_typevar_bindings;
         self.typevar_binding_context = previous_typevar_binding_context;
     }
 
@@ -815,6 +806,20 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
     }
 
+    /// Returns the parameter annotation from the enclosing function's completed signature.
+    ///
+    /// The signature is the source of truth for rewrites that align independently inferred
+    /// annotations to the same type-variable binding.
+    fn function_parameter_annotation_type(&self, definition: Definition<'db>) -> Option<Type<'db>> {
+        let db = self.db();
+        let function = nearest_enclosing_function(db, self.index, self.scope())?;
+        same_module_uncached_raw_signature(db, function, ReturnCallableTypeVarScope::Lexical)
+            .parameters()
+            .iter()
+            .find(|parameter| parameter.definition() == Some(definition))
+            .map(Parameter::annotated_type)
+    }
+
     /// Set initial declared type (if annotated) and inferred type for a function-parameter symbol,
     /// in the function body scope.
     ///
@@ -850,7 +855,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let default_expr = default.as_ref();
         if let Some(annotation) = parameter.annotation.as_ref() {
-            let declared_ty = self.file_expression_type(annotation);
+            let declared_ty = self
+                .function_parameter_annotation_type(definition)
+                .unwrap_or_else(|| self.file_expression_type(annotation));
 
             // P.args and P.kwargs are only valid as annotations on *args and **kwargs,
             // not on regular parameters.

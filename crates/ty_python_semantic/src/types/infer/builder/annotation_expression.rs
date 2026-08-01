@@ -108,7 +108,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         fn infer_name_or_attribute<'db>(
             ty: Type<'db>,
             annotation: &ast::Expr,
-            builder: &mut TypeInferenceBuilder<'db, '_>,
+            builder: &TypeInferenceBuilder<'db, '_>,
             pep_613_policy: PEP613Policy,
         ) -> AnnotationExpressionInference<'db> {
             let special_case = match ty {

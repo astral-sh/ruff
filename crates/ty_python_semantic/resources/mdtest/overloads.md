@@ -972,6 +972,30 @@ def generic_parameter_type(x: int) -> int | str:
     return x
 ```
 
+A method that refers to a type variable from its enclosing class is not itself generic. In
+particular, overload consistency must still account for keyword names that may be included in an
+enclosing `ParamSpec`:
+
+```py
+from typing import Generic, ParamSpec, overload
+
+P = ParamSpec("P")
+
+class Task(Generic[P]):
+    @overload
+    # error: [invalid-overload] "Implementation does not accept all arguments of this overload"
+    def submit(self: "Task[P]", *args: P.args, **kwargs: P.kwargs) -> int: ...
+    @overload
+    def submit(self: "Task[P]", value: int) -> int: ...
+    def submit(
+        self: "Task[P]",
+        *args: object,
+        return_state: bool = False,
+        **kwargs: object,
+    ) -> int:
+        return 1
+```
+
 ### Decorated implementation consistency
 
 Decorators on an overload implementation apply only to the implementation signature. The decorated

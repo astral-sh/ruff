@@ -369,6 +369,7 @@ annotated types of `*args` and `**kwargs` respectively.
 
 ```py
 from typing import Generic, Callable, ParamSpec
+from ty_extensions._internal import generic_context
 
 P = ParamSpec("P")
 
@@ -447,7 +448,8 @@ def callable_factory() -> Callable[P, int]:
     def nested_with_parameter(callback: Callable[P, int], *args: P.args, **kwargs: P.kwargs) -> int:
         return callback(*args, **kwargs)
 
-    nested_with_parameter(lambda value: 1, "argument")
+    # revealed: None
+    reveal_type(generic_context(nested_with_parameter))
     return nested
 
 def repeated_paramspec_factory() -> Callable[P, Callable[P, int]]:
