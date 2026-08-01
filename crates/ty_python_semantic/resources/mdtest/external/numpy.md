@@ -22,6 +22,19 @@ xs = np.array([1.0, 2.0, 3.0], dtype=np.float64)
 reveal_type(xs)  # revealed: ndarray[tuple[Any, ...], dtype[float64]]
 ```
 
+Explicit dtypes remain distinct when checking an array against a parameter annotation. This is a
+regression test for <https://github.com/astral-sh/ty/issues/3199>:
+
+```py
+def takes_float16(values: np.ndarray[tuple[int, ...], np.dtype[np.float16]]) -> None: ...
+
+float32_values = np.array([1, 2, 3], dtype=np.float32)
+float16_values = np.array([1, 2, 3], dtype=np.float16)
+
+takes_float16(float32_values)  # error: [invalid-argument-type]
+takes_float16(float16_values)
+```
+
 An explicit integer dtype is also preserved through `array`, allowing `interp` to select its array
 overload. This is a regression test for <https://github.com/astral-sh/ty/issues/1429>:
 
