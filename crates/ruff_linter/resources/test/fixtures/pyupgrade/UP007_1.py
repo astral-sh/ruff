@@ -162,6 +162,12 @@ IntOrStr = Union[int, str]
 ListOfIntOrStr = list[Union[int, str]]
 
 
+# Regression test for https://github.com/astral-sh/ruff/issues/27238
+# `Union[<call>]` unions the types the call returns.
+def annotated_dynamic_union(x: typing.Annotated[Union[tuple(get_types())], "meta"]):
+    ...
+
+
 # Regression test for https://github.com/astral-sh/ruff/issues/23207
 # Multi-line single-argument Union should be wrapped in parentheses
 from __future__ import annotations

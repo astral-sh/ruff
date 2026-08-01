@@ -337,25 +337,25 @@ help: Convert to `X | Y`
     |
 
 UP007 [*] Use `X | Y` for type annotations
-   --> UP007_1.py:172:31
+   --> UP007_1.py:178:31
     |
-170 |       from typing import Literal, TypeAlias
-171 |
-172 |       LongLiterals: TypeAlias = Union[
+176 |       from typing import Literal, TypeAlias
+177 |
+178 |       LongLiterals: TypeAlias = Union[
     |  _______________________________^
-173 | |         Literal["LongLiteralNumberOne"]
-174 | |         | Literal["LongLiteralNumberTwo"]
-175 | |         | Literal["LongLiteralNumberThree"]
-176 | |     ]
+179 | |         Literal["LongLiteralNumberOne"]
+180 | |         | Literal["LongLiteralNumberTwo"]
+181 | |         | Literal["LongLiteralNumberThree"]
+182 | |     ]
     | |_____^
 help: Convert to `X | Y`
     |
-171 |
+177 |
     -     LongLiterals: TypeAlias = Union[
     -         Literal["LongLiteralNumberOne"]
-172 +     LongLiterals: TypeAlias = (Literal["LongLiteralNumberOne"]
-173 |         | Literal["LongLiteralNumberTwo"]
+178 +     LongLiterals: TypeAlias = (Literal["LongLiteralNumberOne"]
+179 |         | Literal["LongLiteralNumberTwo"]
     -         | Literal["LongLiteralNumberThree"]
     -     ]
-174 +         | Literal["LongLiteralNumberThree"])
+180 +         | Literal["LongLiteralNumberThree"])
     |

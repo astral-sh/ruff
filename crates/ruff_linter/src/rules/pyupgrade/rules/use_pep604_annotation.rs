@@ -280,6 +280,14 @@ pub(crate) fn non_pep604_annotation(
                 return;
             }
 
+            // Likewise, a single call argument is expanded into the union's members at runtime
+            // (e.g., `Union[tuple(types)]`), so the `Union[...]` can't be replaced by its
+            // argument.
+            // <https://github.com/astral-sh/ruff/issues/27238>
+            if slice.is_call_expr() {
+                return;
+            }
+
             let mut diagnostic = checker.report_diagnostic(NonPEP604AnnotationUnion, expr.range());
             if fixable {
                 match slice {
