@@ -70,10 +70,6 @@ impl TextDocument {
         self
     }
 
-    pub fn into_contents(self) -> String {
-        self.contents
-    }
-
     pub(crate) fn uri(&self) -> &Uri {
         &self.uri
     }
