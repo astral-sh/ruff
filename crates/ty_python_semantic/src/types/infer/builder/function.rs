@@ -40,6 +40,7 @@ use ty_python_core::{
 
 use ruff_python_ast as ast;
 use ruff_text_size::Ranged;
+use rustc_hash::FxHashMap;
 
 fn parameters_have_annotations(parameters: &ast::Parameters) -> bool {
     parameters
@@ -573,10 +574,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .any(|param| param.default.is_some());
 
         let previous_typevar_binding_context = self.typevar_binding_context.replace(definition);
+        let previous_signature_typevar_bindings = self
+            .signature_typevar_bindings
+            .replace(FxHashMap::default());
 
         if !has_type_params {
-            self.infer_return_type_annotation(function.returns.as_deref());
             self.infer_parameters(function.parameters.as_ref());
+            self.infer_return_type_annotation(function.returns.as_deref());
         }
 
         if has_defaults {
@@ -629,6 +633,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             self.deferred_state = previous_deferred_state;
         }
 
+        self.signature_typevar_bindings = previous_signature_typevar_bindings;
         self.typevar_binding_context = previous_typevar_binding_context;
     }
 
@@ -654,9 +659,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let binding_context = self.index.expect_single_definition(function);
         let previous_typevar_binding_context =
             self.typevar_binding_context.replace(binding_context);
-        self.infer_return_type_annotation(function.returns.as_deref());
+        let previous_signature_typevar_bindings = self
+            .signature_typevar_bindings
+            .replace(FxHashMap::default());
         self.infer_type_parameters(type_params);
         self.infer_parameters(&function.parameters);
+        self.infer_return_type_annotation(function.returns.as_deref());
+        self.signature_typevar_bindings = previous_signature_typevar_bindings;
         self.typevar_binding_context = previous_typevar_binding_context;
     }
 

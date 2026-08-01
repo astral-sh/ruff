@@ -106,7 +106,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     }
 
     pub(super) fn infer_name_or_attribute_type_expression(
-        &self,
+        &mut self,
         ty: Type<'db>,
         annotation: &ast::Expr,
     ) -> Type<'db> {
@@ -117,16 +117,34 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             return ty;
         }
         report_missing_type_arguments(&self.context, ty, annotation);
-        let result_ty = ty
-            .default_specialize(self.db())
-            .in_type_expression(
-                self.db(),
-                self.scope(),
-                self.typevar_binding_context,
-                self.inference_flags(),
-            )
-            .unwrap_or_else(|error| {
-                error.into_fallback_type(&self.context, annotation, self.inference_flags())
+        let selected_typevar_binding = match ty {
+            Type::KnownInstance(KnownInstanceType::TypeVar(typevar))
+                if (!typevar.is_paramspec(self.db())
+                    || self
+                        .inference_flags()
+                        .contains(InferenceFlags::ALLOW_PARAMSPEC_TYPE_EXPR))
+                    && (!typevar.is_typevartuple(self.db())
+                        || self
+                            .inference_flags()
+                            .contains(InferenceFlags::IN_UNPACK_TYPE_ARGUMENT)) =>
+            {
+                self.bind_typevar_occurrence(typevar)
+            }
+            _ => None,
+        };
+        let result_ty = selected_typevar_binding
+            .map(Type::TypeVar)
+            .unwrap_or_else(|| {
+                ty.default_specialize(self.db())
+                    .in_type_expression(
+                        self.db(),
+                        self.scope(),
+                        self.typevar_binding_context,
+                        self.inference_flags(),
+                    )
+                    .unwrap_or_else(|error| {
+                        error.into_fallback_type(&self.context, annotation, self.inference_flags())
+                    })
             });
         self.check_for_unbound_type_variable(annotation, result_ty)
     }

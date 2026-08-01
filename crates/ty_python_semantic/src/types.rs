@@ -4202,17 +4202,11 @@ impl<'db> Type<'db> {
                     ty.map(Place::bound).unwrap_or_default().into()
                 }
 
-                Type::TypeVar(typevar) if name_str == "args" && typevar.is_paramspec(db) => {
-                    Place::declared(Type::TypeVar(
-                        typevar.with_paramspec_attr(db, ParamSpecAttrKind::Args),
-                    ))
-                    .into()
-                }
-                Type::TypeVar(typevar) if name_str == "kwargs" && typevar.is_paramspec(db) => {
-                    Place::declared(Type::TypeVar(
-                        typevar.with_paramspec_attr(db, ParamSpecAttrKind::Kwargs),
-                    ))
-                    .into()
+                Type::TypeVar(typevar)
+                    if typevar.is_paramspec(db)
+                        && let Some(attr) = ParamSpecAttrKind::from_name(name_str) =>
+                {
+                    Place::declared(Type::TypeVar(typevar.with_paramspec_attr(db, attr))).into()
                 }
                 Type::TypeVar(typevar) => {
                     let receiver = receiver.unwrap_or(this);

@@ -343,6 +343,12 @@ pub(super) struct TypeInferenceBuilder<'db, 'ast> {
     /// Whether we are in a context that binds unbound typevars.
     typevar_binding_context: Option<Definition<'db>>,
 
+    /// Bindings already selected while inferring a legacy function signature.
+    ///
+    /// All occurrences of the same type variable in one signature must use the same binding.
+    /// `ParamSpec` components consult this map but never add a new local binding themselves.
+    signature_typevar_bindings: Option<FxHashMap<TypeVarIdentity<'db>, BoundTypeVarInstance<'db>>>,
+
     /// The deferred state of inferring types of certain expressions within the region.
     ///
     /// This is different from [`InferenceRegion::Deferred`] which works on the entire definition
@@ -482,6 +488,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             bindings: VecMap::default(),
             declarations: VecMap::default(),
             typevar_binding_context: None,
+            signature_typevar_bindings: None,
             deferred: VecSet::default(),
             undecorated_type: None,
             cycle_recovery: None,
@@ -10019,34 +10026,63 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.infer_attribute_load_impl(attribute, value_type)
     }
 
-    /// Resolves a `ParamSpec` used through `P.args` or `P.kwargs` without introducing a binding.
-    fn resolve_paramspec_component(
+    fn signature_typevar_binding(
         &self,
         typevar: TypeVarInstance<'db>,
     ) -> Option<BoundTypeVarInstance<'db>> {
-        let db = self.db();
-        let parameter_binding = self.typevar_binding_context.and_then(|definition| {
-            let DefinitionKind::Function(function) = definition.kind(db) else {
-                return None;
-            };
-            let function = function.node(self.module());
-            function
-                .parameters
-                .iter_non_variadic_params()
-                .filter_map(ast::ParameterWithDefault::annotation)
-                .filter_map(|annotation| self.try_expression_type(annotation))
-                .find_map(|annotation_ty| {
-                    let mut typevars = FxOrderSet::default();
-                    annotation_ty.find_legacy_typevars(db, None, &mut typevars);
-                    typevars
-                        .into_iter()
-                        .find(|bound| bound.typevar(db).identity(db) == typevar.identity(db))
-                })
-        });
+        self.signature_typevar_bindings
+            .as_ref()?
+            .get(&typevar.identity(self.db()))
+            .copied()
+    }
 
-        parameter_binding.or_else(|| {
-            resolve_typevar_reference(db, self.index, self.scope().file_scope_id(db), typevar)
-        })
+    fn record_signature_typevar_binding(
+        &mut self,
+        typevar: TypeVarInstance<'db>,
+        bound: BoundTypeVarInstance<'db>,
+    ) {
+        let identity = typevar.identity(self.db());
+        if let Some(bindings) = self.signature_typevar_bindings.as_mut() {
+            bindings.insert(identity, bound);
+        }
+    }
+
+    fn bind_typevar_occurrence(
+        &mut self,
+        typevar: TypeVarInstance<'db>,
+    ) -> Option<BoundTypeVarInstance<'db>> {
+        if let Some(bound) = self.signature_typevar_binding(typevar) {
+            return Some(bound);
+        }
+
+        let bound = bind_typevar(
+            self.db(),
+            self.index,
+            self.scope().file_scope_id(self.db()),
+            self.typevar_binding_context,
+            typevar,
+        )?;
+        self.record_signature_typevar_binding(typevar, bound);
+        Some(bound)
+    }
+
+    /// Resolves a reference to a type variable without introducing a local binding.
+    fn resolve_typevar_occurrence(
+        &mut self,
+        typevar: TypeVarInstance<'db>,
+    ) -> Option<BoundTypeVarInstance<'db>> {
+        if let Some(bound) = self.signature_typevar_binding(typevar) {
+            return Some(bound);
+        }
+
+        let bound = resolve_typevar_reference(
+            self.db(),
+            self.index,
+            self.scope().file_scope_id(self.db()),
+            typevar,
+        )?;
+        self.record_signature_typevar_binding(typevar, bound);
+        Some(bound)
     }
 
     /// Infer the type of a [`ast::ExprAttribute`] expression, assuming a load context.
@@ -10077,8 +10113,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         if let Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) = value_type
             && typevar.is_paramspec(db)
-            && let Some(bound_typevar) = if matches!(attr.id.as_str(), "args" | "kwargs") {
-                self.resolve_paramspec_component(typevar).or_else(|| {
+            && let Some(bound_typevar) = if ParamSpecAttrKind::from_name(attr.id.as_str()).is_some()
+            {
+                self.resolve_typevar_occurrence(typevar).or_else(|| {
+                    // Keep a bound recovery type for invalid components. This binding is not
+                    // recorded, so it cannot put the ParamSpec in scope for another annotation.
                     bind_typevar(
                         db,
                         self.index,
@@ -10088,13 +10127,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     )
                 })
             } else {
-                bind_typevar(
-                    db,
-                    self.index,
-                    self.scope().file_scope_id(db),
-                    self.typevar_binding_context,
-                    typevar,
-                )
+                self.bind_typevar_occurrence(typevar)
             }
         {
             value_type = Type::TypeVar(bound_typevar);
@@ -10889,6 +10922,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             expression_cache: _,
             reachability_cache: _,
             typevar_binding_context: _,
+            signature_typevar_bindings: _,
             deferred_state: _,
             called_functions,
             index: _,
@@ -10951,6 +10985,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             reachability_cache: _,
             dataclass_field_specifiers: _,
             typevar_binding_context: _,
+            signature_typevar_bindings: _,
             deferred_state: _,
             index: _,
             region: _,
@@ -11055,6 +11090,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             undecorated_type: _,
             discards_dict_key_assignments: _,
             typevar_binding_context: _,
+            signature_typevar_bindings: _,
             deferred_state: _,
             index: _,
             region: _,
@@ -11104,6 +11140,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             reachability_cache: _,
             dataclass_field_specifiers: _,
             typevar_binding_context: _,
+            signature_typevar_bindings: _,
             deferred_state: _,
             index: _,
             region: _,
@@ -11242,6 +11279,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             reachability_cache: _,
             dataclass_field_specifiers: _,
             typevar_binding_context: _,
+            signature_typevar_bindings: _,
             deferred_state: _,
             called_functions: _,
             index: _,
@@ -11294,6 +11332,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             cycle_recovery,
             deferred_state,
             typevar_binding_context,
+            ref signature_typevar_bindings,
             ref expression_cache,
             ref reachability_cache,
             ref return_types_and_ranges,
@@ -11326,6 +11365,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         builder.cycle_recovery = cycle_recovery;
         builder.deferred_state = deferred_state;
         builder.typevar_binding_context = typevar_binding_context;
+        builder
+            .signature_typevar_bindings
+            .clone_from(signature_typevar_bindings);
         builder.context.inference_flags = self.inference_flags();
         builder.expression_cache.clone_from(expression_cache);
         builder.reachability_cache.clone_from(reachability_cache);
@@ -11374,6 +11416,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             expression_cache: _,
             reachability_cache: _,
             typevar_binding_context: _,
+            signature_typevar_bindings,
             deferred_state: _,
             called_functions,
             index: _,
@@ -11403,6 +11446,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.type_expression_flags
             .extend(type_expression_flags.iter());
         self.called_functions.extend(called_functions);
+        if let (Some(current), Some(other)) = (
+            self.signature_typevar_bindings.as_mut(),
+            signature_typevar_bindings,
+        ) {
+            current.extend(other);
+        }
 
         if !matches!(self.region, InferenceRegion::Scope(..)) {
             self.bindings

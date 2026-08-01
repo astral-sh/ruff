@@ -456,6 +456,15 @@ def repeated_paramspec_factory() -> Callable[P, Callable[P, int]]:
         raise NotImplementedError
 
     return nested
+
+def nested_components_factory() -> Callable[P, int]:
+    def outer(*args: P.args, **kwargs: P.kwargs) -> int:
+        def inner(*inner_args: P.args, **inner_kwargs: P.kwargs) -> int:
+            return 1
+
+        return inner(*args, **kwargs)
+
+    return outer
 ```
 
 And, they need to be used together.
