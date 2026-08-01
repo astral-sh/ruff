@@ -151,7 +151,7 @@ fn runtime_required_base_class(
     base_classes: &[String],
     semantic: &SemanticModel,
 ) -> bool {
-    analyze::class::any_qualified_base_class(class_def, semantic, &|qualified_name| {
+    analyze::class::any_qualified_base_class(class_def, semantic, |qualified_name| {
         base_classes
             .iter()
             .any(|base_class| QualifiedName::from_dotted_name(base_class) == qualified_name)
@@ -324,37 +324,29 @@ pub(crate) fn quote_annotation(
     let expr = semantic.expression(node_id).expect("Expression not found");
     if let Some(parent_id) = semantic.parent_expression_id(node_id) {
         match semantic.expression(parent_id) {
-            Some(Expr::Subscript(parent)) => {
-                if expr == parent.value.as_ref() {
-                    // If we're quoting the value of a subscript, we need to quote the entire
-                    // expression. For example, when quoting `DataFrame` in `DataFrame[int]`, we
-                    // should generate `"DataFrame[int]"`.
-                    return quote_annotation(parent_id, semantic, stylist, locator, flags);
-                }
+            Some(Expr::Subscript(parent)) if expr == parent.value.as_ref() => {
+                // If we're quoting the value of a subscript, we need to quote the entire
+                // expression. For example, when quoting `DataFrame` in `DataFrame[int]`, we
+                // should generate `"DataFrame[int]"`.
+                return quote_annotation(parent_id, semantic, stylist, locator, flags);
             }
-            Some(Expr::Attribute(parent)) => {
-                if expr == parent.value.as_ref() {
-                    // If we're quoting the value of an attribute, we need to quote the entire
-                    // expression. For example, when quoting `DataFrame` in `pd.DataFrame`, we
-                    // should generate `"pd.DataFrame"`.
-                    return quote_annotation(parent_id, semantic, stylist, locator, flags);
-                }
+            Some(Expr::Attribute(parent)) if expr == parent.value.as_ref() => {
+                // If we're quoting the value of an attribute, we need to quote the entire
+                // expression. For example, when quoting `DataFrame` in `pd.DataFrame`, we
+                // should generate `"pd.DataFrame"`.
+                return quote_annotation(parent_id, semantic, stylist, locator, flags);
             }
-            Some(Expr::Call(parent)) => {
-                if expr == parent.func.as_ref() {
-                    // If we're quoting the function of a call, we need to quote the entire
-                    // expression. For example, when quoting `DataFrame` in `DataFrame()`, we
-                    // should generate `"DataFrame()"`.
-                    return quote_annotation(parent_id, semantic, stylist, locator, flags);
-                }
+            Some(Expr::Call(parent)) if expr == parent.func.as_ref() => {
+                // If we're quoting the function of a call, we need to quote the entire
+                // expression. For example, when quoting `DataFrame` in `DataFrame()`, we
+                // should generate `"DataFrame()"`.
+                return quote_annotation(parent_id, semantic, stylist, locator, flags);
             }
-            Some(Expr::BinOp(parent)) => {
-                if parent.op.is_bit_or() {
-                    // If we're quoting the left or right side of a binary operation, we need to
-                    // quote the entire expression. For example, when quoting `DataFrame` in
-                    // `DataFrame | Series`, we should generate `"DataFrame | Series"`.
-                    return quote_annotation(parent_id, semantic, stylist, locator, flags);
-                }
+            Some(Expr::BinOp(parent)) if parent.op.is_bit_or() => {
+                // If we're quoting the left or right side of a binary operation, we need to
+                // quote the entire expression. For example, when quoting `DataFrame` in
+                // `DataFrame | Series`, we should generate `"DataFrame | Series"`.
+                return quote_annotation(parent_id, semantic, stylist, locator, flags);
             }
             _ => {}
         }

@@ -73,12 +73,12 @@ import io
 import ssl
 import sys
 import types
-from _typeshed import MaybeNone, ReadableBuffer, SupportsRead, SupportsReadline, WriteableBuffer
+from _typeshed import MaybeNone, ReadableBuffer, StrOrBytesPath, SupportsRead, SupportsReadline, WriteableBuffer
 from collections.abc import Callable, Iterable, Iterator, Mapping
 from email._policybase import _MessageT
 from socket import socket
-from typing import BinaryIO, Final, TypeVar, overload
-from typing_extensions import Self, TypeAlias
+from typing import BinaryIO, Final, TypeAlias, TypeVar, overload
+from typing_extensions import Self, deprecated
 
 __all__ = [
     "HTTPResponse",
@@ -202,8 +202,7 @@ class HTTPMessage(email.message.Message[str, str]):
 
 @overload
 def parse_headers(fp: SupportsReadline[bytes], _class: Callable[[], _MessageT]) -> _MessageT:
-    """Parses only RFC2822 headers from a file pointer."""
-
+    """Parses only RFC 5322 headers from a file pointer."""
 @overload
 def parse_headers(fp: SupportsReadline[bytes]) -> HTTPMessage: ...
 
@@ -240,6 +239,7 @@ class HTTPResponse(io.BufferedIOBase, BinaryIO):  # type: ignore[misc]  # incomp
         """
 
     def readline(self, limit: int = -1) -> bytes: ...  # type: ignore[override]
+
     @overload
     def getheader(self, name: str) -> str | None:
         """Returns the value of the header matching *name*.
@@ -253,9 +253,9 @@ class HTTPResponse(io.BufferedIOBase, BinaryIO):  # type: ignore[misc]  # incomp
         If the headers are unknown, raises http.client.ResponseNotReady.
 
         """
-
     @overload
     def getheader(self, name: str, default: _T) -> str | _T: ...
+
     def getheaders(self) -> list[tuple[str, str]]:
         """Return list of (header, value) tuples."""
 
@@ -267,7 +267,8 @@ class HTTPResponse(io.BufferedIOBase, BinaryIO):  # type: ignore[misc]  # incomp
     def __exit__(
         self, exc_type: type[BaseException] | None, exc_val: BaseException | None, exc_tb: types.TracebackType | None
     ) -> None: ...
-    def info(self) -> email.message.Message:
+    @deprecated("Deprecated since Python 3.9. Use `HTTPResponse.headers` attribute instead.")
+    def info(self) -> HTTPMessage:
         """Returns an instance of the class mimetools.Message containing
         meta-information associated with the URL.
 
@@ -289,6 +290,7 @@ class HTTPResponse(io.BufferedIOBase, BinaryIO):  # type: ignore[misc]  # incomp
 
         """
 
+    @deprecated("Deprecated since Python 3.9. Use `HTTPResponse.url` attribute instead.")
     def geturl(self) -> str:
         """Return the real URL of the page.
 
@@ -300,6 +302,7 @@ class HTTPResponse(io.BufferedIOBase, BinaryIO):  # type: ignore[misc]  # incomp
 
         """
 
+    @deprecated("Deprecated since Python 3.9. Use `HTTPResponse.status` attribute instead.")
     def getcode(self) -> int:
         """Return the HTTP status code that was sent with the response,
         or None if the URL is not an HTTP URL.
@@ -309,6 +312,7 @@ class HTTPResponse(io.BufferedIOBase, BinaryIO):  # type: ignore[misc]  # incomp
     def begin(self) -> None: ...
 
 class HTTPConnection:
+    blocksize: int
     auto_open: int  # undocumented
     debuglevel: int
     default_port: int  # undocumented
@@ -317,14 +321,27 @@ class HTTPConnection:
     host: str
     port: int
     sock: socket | MaybeNone  # can be `None` if `.connect()` was not called
-    def __init__(
-        self,
-        host: str,
-        port: int | None = None,
-        timeout: float | None = ...,
-        source_address: tuple[str, int] | None = None,
-        blocksize: int = 8192,
-    ) -> None: ...
+    if sys.version_info >= (3, 15):
+        def __init__(
+            self,
+            host: str,
+            port: int | None = None,
+            timeout: float | None = ...,
+            source_address: tuple[str, int] | None = None,
+            blocksize: int = 8192,
+            *,
+            max_response_headers: int | None = None,
+        ) -> None: ...
+    else:
+        def __init__(
+            self,
+            host: str,
+            port: int | None = None,
+            timeout: float | None = ...,
+            source_address: tuple[str, int] | None = None,
+            blocksize: int = 8192,
+        ) -> None: ...
+
     def request(
         self,
         method: str,
@@ -340,8 +357,7 @@ class HTTPConnection:
         """Get the response from the server.
 
         If the HTTPConnection is in the correct state, returns an
-        instance of HTTPResponse or of whatever object is returned by
-        the response_class variable.
+        instance of HTTPResponse.
 
         If a request has not been sent or if a previous response has
         not be handled, ResponseNotReady is raised.  If the HTTP
@@ -424,7 +440,19 @@ class HTTPSConnection(HTTPConnection):
 
     # Can be `None` if `.connect()` was not called:
     sock: ssl.SSLSocket | MaybeNone
-    if sys.version_info >= (3, 12):
+    if sys.version_info >= (3, 15):
+        def __init__(
+            self,
+            host: str,
+            port: int | None = None,
+            *,
+            timeout: float | None = ...,
+            source_address: tuple[str, int] | None = None,
+            context: ssl.SSLContext | None = None,
+            blocksize: int = 8192,
+            max_response_headers: int | None = None,
+        ) -> None: ...
+    elif sys.version_info >= (3, 12):
         def __init__(
             self,
             host: str,
@@ -436,12 +464,31 @@ class HTTPSConnection(HTTPConnection):
             blocksize: int = 8192,
         ) -> None: ...
     else:
+        @overload
         def __init__(
             self,
             host: str,
             port: int | None = None,
-            key_file: str | None = None,
-            cert_file: str | None = None,
+            key_file: None = None,
+            cert_file: None = None,
+            timeout: float | None = ...,
+            source_address: tuple[str, int] | None = None,
+            *,
+            context: ssl.SSLContext | None = None,
+            check_hostname: None = None,
+            blocksize: int = 8192,
+        ) -> None: ...
+        @overload
+        @deprecated(
+            "The `key_file`, `cert_file`, `check_hostname` parameters are deprecated since Python 3.6; "
+            "removed in Python 3.12. Use `context` parameter instead."
+        )
+        def __init__(
+            self,
+            host: str,
+            port: int | None = None,
+            key_file: StrOrBytesPath | None = None,
+            cert_file: StrOrBytesPath | None = None,
             timeout: float | None = ...,
             source_address: tuple[str, int] | None = None,
             *,
@@ -449,6 +496,9 @@ class HTTPSConnection(HTTPConnection):
             check_hostname: bool | None = None,
             blocksize: int = 8192,
         ) -> None: ...
+
+        key_file: StrOrBytesPath | None
+        cert_file: StrOrBytesPath | None
 
 class HTTPException(Exception): ...
 

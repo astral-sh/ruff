@@ -45,7 +45,9 @@ exit_code: 1
       "row": 1
     },
     "message": "File would be reformatted",
+    "name": "unformatted",
     "noqa_row": null,
+    "severity": "error",
     "url": null
   }
 ]

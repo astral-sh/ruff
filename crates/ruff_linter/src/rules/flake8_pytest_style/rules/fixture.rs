@@ -6,7 +6,6 @@ use ruff_python_ast::name::UnqualifiedName;
 use ruff_python_ast::visitor;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{self as ast, Expr, Parameters, Stmt};
-use ruff_python_semantic::SemanticModel;
 use ruff_python_semantic::analyze::visibility::is_abstract;
 use ruff_source_file::LineRanges;
 use ruff_text_size::Ranged;
@@ -519,6 +518,11 @@ impl Violation for PytestFixtureFinalizerCallback {
 ///     return resource
 /// ```
 ///
+/// ## Fix safety
+///
+/// This rule's fix is always marked unsafe because removing the `yield` can change the behavior of
+/// code that relies on implicit cleanup, such as when a value is garbage-collected.
+///
 /// ## References
 /// - [`pytest` documentation: Teardown/Cleanup](https://docs.pytest.org/en/latest/how-to/fixtures.html#teardown-cleanup-aka-fixture-finalization)
 #[derive(ViolationMetadata)]
@@ -692,12 +696,10 @@ impl<'a> Visitor<'a> for SkipFunctionsVisitor<'a> {
     }
 }
 
-fn fixture_decorator<'a>(
-    decorators: &'a [Decorator],
-    semantic: &SemanticModel,
-) -> Option<&'a Decorator> {
+fn fixture_decorator<'a>(decorators: &'a [Decorator], checker: &Checker) -> Option<&'a Decorator> {
     decorators.iter().find(|decorator| {
-        is_pytest_fixture(decorator, semantic) || is_pytest_yield_fixture(decorator, semantic)
+        is_pytest_fixture(decorator, checker)
+            || is_pytest_yield_fixture(decorator, checker.semantic())
     })
 }
 
@@ -768,8 +770,8 @@ fn check_fixture_decorator(checker: &Checker, func_name: &str, decorator: &Decor
                                 keyword,
                                 arguments,
                                 edits::Parentheses::Preserve,
-                                checker.locator().contents(),
-                                checker.comment_ranges(),
+                                checker.source(),
+                                checker.tokens(),
                             )
                             .map(Fix::unsafe_edit)
                         });
@@ -843,9 +845,9 @@ fn check_fixture_returns(checker: &Checker, name: &str, body: &[Stmt], returns: 
             ))
         });
         if let Some(return_type_edit) = return_type_edit {
-            diagnostic.set_fix(Fix::safe_edits(yield_edit, [return_type_edit]));
+            diagnostic.set_fix(Fix::unsafe_edits(yield_edit, [return_type_edit]));
         } else {
-            diagnostic.set_fix(Fix::safe_edit(yield_edit));
+            diagnostic.set_fix(Fix::unsafe_edit(yield_edit));
         }
     }
 }
@@ -963,7 +965,7 @@ pub(crate) fn fixture(
     decorators: &[Decorator],
     body: &[Stmt],
 ) {
-    let decorator = fixture_decorator(decorators, checker.semantic());
+    let decorator = fixture_decorator(decorators, checker);
     if let Some(decorator) = decorator {
         if checker.is_rule_enabled(Rule::PytestFixtureIncorrectParenthesesStyle)
             || checker.is_rule_enabled(Rule::PytestFixturePositionalArgs)

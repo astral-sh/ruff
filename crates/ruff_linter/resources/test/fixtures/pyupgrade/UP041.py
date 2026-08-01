@@ -66,3 +66,10 @@ try:
     pass
 except (TimeoutError, KeyError):
     pass
+
+
+raise (
+    asyncio.
+    # text
+       TimeoutError
+)

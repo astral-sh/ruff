@@ -3,6 +3,7 @@ use crate::references::{ReferencesMode, references};
 use crate::{Db, ReferenceTarget};
 use ruff_db::files::File;
 use ruff_text_size::TextSize;
+use ty_python_semantic::SemanticModel;
 
 /// Find all document highlights for a symbol at the given position.
 /// Document highlights are limited to the current file only.
@@ -13,9 +14,10 @@ pub fn document_highlights(
 ) -> Option<Vec<ReferenceTarget>> {
     let parsed = ruff_db::parsed::parsed_module(db, file);
     let module = parsed.load(db);
+    let model = SemanticModel::new(db, file);
 
     // Get the definitions for the symbol at the cursor position
-    let goto_target = find_goto_target(&module, offset)?;
+    let goto_target = find_goto_target(&model, &module, offset)?;
 
     // Use DocumentHighlights mode which limits search to current file only
     references(db, file, &goto_target, ReferencesMode::DocumentHighlights)
@@ -52,6 +54,31 @@ mod tests {
                 },
             ))
         }
+    }
+
+    #[test]
+    fn relative_imported_submodule_highlights() {
+        let test = CursorTest::builder()
+            .source(
+                "mypackage/__init__.py",
+                "from . import module_a\nx = module_a<CURSOR>",
+            )
+            .source("mypackage/module_a.py", "class Test: ...")
+            .build();
+
+        assert_snapshot!(test.document_highlights(), @"
+        info[document_highlights]: Highlight 1 (Other)
+         --> mypackage/__init__.py:1:15
+          |
+        1 | from . import module_a
+          |               ^^^^^^^^
+
+        info[document_highlights]: Highlight 2 (Read)
+         --> mypackage/__init__.py:2:5
+          |
+        2 | x = module_a
+          |     ^^^^^^^^
+        ");
     }
 
     struct HighlightResult {
@@ -92,46 +119,30 @@ def calculate_sum():
 ",
         );
 
-        assert_snapshot!(test.document_highlights(), @r"
+        assert_snapshot!(test.document_highlights(), @"
         info[document_highlights]: Highlight 1 (Write)
          --> main.py:3:5
           |
-        2 | def calculate_sum():
         3 |     value = 10
           |     ^^^^^
-        4 |     doubled = value * 2
-        5 |     result = value + doubled
-          |
 
         info[document_highlights]: Highlight 2 (Read)
          --> main.py:4:15
           |
-        2 | def calculate_sum():
-        3 |     value = 10
         4 |     doubled = value * 2
           |               ^^^^^
-        5 |     result = value + doubled
-        6 |     return value
-          |
 
         info[document_highlights]: Highlight 3 (Read)
          --> main.py:5:14
           |
-        3 |     value = 10
-        4 |     doubled = value * 2
         5 |     result = value + doubled
           |              ^^^^^
-        6 |     return value
-          |
 
         info[document_highlights]: Highlight 4 (Read)
          --> main.py:6:12
           |
-        4 |     doubled = value * 2
-        5 |     result = value + doubled
         6 |     return value
           |            ^^^^^
-          |
         ");
     }
 
@@ -147,45 +158,30 @@ def process_data(<CURSOR>data):
 ",
         );
 
-        assert_snapshot!(test.document_highlights(), @r"
+        assert_snapshot!(test.document_highlights(), @"
         info[document_highlights]: Highlight 1 (Other)
          --> main.py:2:18
           |
         2 | def process_data(data):
           |                  ^^^^
-        3 |     if data:
-        4 |         processed = data.upper()
-          |
 
         info[document_highlights]: Highlight 2 (Read)
          --> main.py:3:8
           |
-        2 | def process_data(data):
         3 |     if data:
           |        ^^^^
-        4 |         processed = data.upper()
-        5 |         return processed
-          |
 
         info[document_highlights]: Highlight 3 (Read)
          --> main.py:4:21
           |
-        2 | def process_data(data):
-        3 |     if data:
         4 |         processed = data.upper()
           |                     ^^^^
-        5 |         return processed
-        6 |     return data
-          |
 
         info[document_highlights]: Highlight 4 (Read)
          --> main.py:6:12
           |
-        4 |         processed = data.upper()
-        5 |         return processed
         6 |     return data
           |            ^^^^
-          |
         ");
     }
 
@@ -201,24 +197,18 @@ calc = Calculator()
 ",
         );
 
-        assert_snapshot!(test.document_highlights(), @r"
+        assert_snapshot!(test.document_highlights(), @"
         info[document_highlights]: Highlight 1 (Other)
          --> main.py:2:7
           |
         2 | class Calculator:
           |       ^^^^^^^^^^
-        3 |     def __init__(self):
-        4 |         self.name = 'Calculator'
-          |
 
         info[document_highlights]: Highlight 2 (Read)
          --> main.py:6:8
           |
-        4 |         self.name = 'Calculator'
-        5 |
         6 | calc = Calculator()
           |        ^^^^^^^^^^
-          |
         ");
     }
 
@@ -228,10 +218,47 @@ calc = Calculator()
             "
 def test():
     # Cursor on a position with no symbol
-    <CURSOR>  
+    <CURSOR>
 ",
         );
 
         assert_snapshot!(test.document_highlights(), @"No highlights found");
+    }
+
+    // TODO: Should only highlight the last use and the last declaration
+    #[test]
+    fn redeclarations() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+                a: str = "test"
+
+                a: int = 10
+
+                print(a<CURSOR>)
+                "#,
+            )
+            .build();
+
+        assert_snapshot!(test.document_highlights(), @r#"
+        info[document_highlights]: Highlight 1 (Write)
+         --> main.py:2:1
+          |
+        2 | a: str = "test"
+          | ^
+
+        info[document_highlights]: Highlight 2 (Write)
+         --> main.py:4:1
+          |
+        4 | a: int = 10
+          | ^
+
+        info[document_highlights]: Highlight 3 (Read)
+         --> main.py:6:7
+          |
+        6 | print(a)
+          |       ^
+        "#);
     }
 }

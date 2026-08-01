@@ -1,12 +1,12 @@
 import pickle
 import sys
-from _pickle import _ReducedType
+from _pickle import _BufferCallback, _ReducedType
 from _typeshed import HasFileno, SupportsWrite, Unused
 from abc import ABCMeta
 from builtins import type as Type  # alias to avoid name clash
 from collections.abc import Callable
 from copyreg import _DispatchTableType
-from multiprocessing import connection
+from multiprocessing import connection, popen_forkserver, popen_spawn_posix, resource_sharer
 from socket import socket
 from typing import Any, Final
 
@@ -21,7 +21,14 @@ class ForkingPickler(pickle.Pickler):
     """Pickler subclass used by multiprocessing."""
 
     dispatch_table: _DispatchTableType
-    def __init__(self, file: SupportsWrite[bytes], protocol: int | None = ...) -> None: ...
+    def __init__(
+        self,
+        file: SupportsWrite[bytes],
+        protocol: int | None = None,
+        fix_imports: bool = True,
+        buffer_callback: _BufferCallback = None,
+        /,
+    ) -> None: ...
     @classmethod
     def register(cls, type: Type, reduce: Callable[[Any], _ReducedType]) -> None:
         """Register a reduce function for a type."""
@@ -31,6 +38,7 @@ class ForkingPickler(pickle.Pickler):
     loads = pickle.loads
 
 register = ForkingPickler.register
+"""Register a reduce function for a type."""
 
 def dump(obj: Any, file: SupportsWrite[bytes], protocol: int | None = None) -> None:
     """Replacement for pickle.dump() using ForkingPickler."""
@@ -73,7 +81,7 @@ else:
     def sendfds(sock: socket, fds: list[int]) -> None:
         """Send an array of fds over an AF_UNIX socket."""
 
-    def DupFd(fd: int) -> Any:  # Return type is really hard to get right
+    def DupFd(fd: int) -> popen_forkserver._DupFd | popen_spawn_posix._DupFd | resource_sharer.DupFd:
         """Return a wrapper for an fd."""
 
 # These aliases are to work around pyright complaints.
@@ -102,6 +110,8 @@ class AbstractReducer(metaclass=ABCMeta):
 
     ForkingPickler = _ForkingPickler
     register = _register
+    """Register a reduce function for a type."""
+
     dump = _dump
     send_handle = _send_handle
     recv_handle = _recv_handle

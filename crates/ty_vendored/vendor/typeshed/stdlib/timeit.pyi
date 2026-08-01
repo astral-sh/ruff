@@ -6,35 +6,6 @@ the Python Cookbook, published by O'Reilly.
 
 Library usage: see the Timer class.
 
-Command line usage:
-    python timeit.py [-n N] [-r N] [-s S] [-p] [-h] [--] [statement]
-
-Options:
-  -n/--number N: how many times to execute 'statement' (default: see below)
-  -r/--repeat N: how many times to repeat the timer (default 5)
-  -s/--setup S: statement to be executed once initially (default 'pass').
-                Execution time of this setup statement is NOT timed.
-  -p/--process: use time.process_time() (default is time.perf_counter())
-  -v/--verbose: print raw timing results; repeat for more digits precision
-  -u/--unit: set the output time unit (nsec, usec, msec, or sec)
-  -h/--help: print this usage message and exit
-  --: separate options from statement, use when statement starts with -
-  statement: statement to be timed (default 'pass')
-
-A multi-line statement may be given by specifying each line as a
-separate argument; indented lines are possible by enclosing an
-argument in quotes and using leading spaces.  Multiple -s options are
-treated similarly.
-
-If -n is not given, a suitable number of loops is calculated by trying
-increasing numbers from the sequence 1, 2, 5, 10, 20, 50, ... until the
-total time is at least 0.2 seconds.
-
-Note: there is a certain baseline overhead associated with executing a
-pass statement.  It differs between versions.  The code here doesn't try
-to hide it, but you should be aware of it.  The baseline overhead can be
-measured by invoking the program without arguments.
-
 Classes:
 
     Timer
@@ -46,9 +17,10 @@ Functions:
     default_timer() -> float
 """
 
+import sys
+import time
 from collections.abc import Callable, Sequence
-from typing import IO, Any
-from typing_extensions import TypeAlias
+from typing import IO, Any, TypeAlias
 
 __all__ = ["Timer", "timeit", "repeat", "default_timer"]
 
@@ -76,7 +48,11 @@ class Timer:
     """
 
     def __init__(
-        self, stmt: _Stmt = "pass", setup: _Stmt = "pass", timer: _Timer = ..., globals: dict[str, Any] | None = None
+        self,
+        stmt: _Stmt = "pass",
+        setup: _Stmt = "pass",
+        timer: _Timer = time.perf_counter,
+        globals: dict[str, Any] | None = None,
     ) -> None:
         """Constructor.  See class doc string."""
 
@@ -96,6 +72,11 @@ class Timer:
 
         The optional file argument directs where the traceback is
         sent; it defaults to sys.stderr.
+
+        The optional colorize keyword argument controls whether the
+        traceback is colorized; it defaults to False for programmatic
+        usage. When used from the command line, this is automatically
+        set based on terminal capabilities.
         """
 
     def timeit(self, number: int = 1000000) -> float:
@@ -130,26 +111,46 @@ class Timer:
         vector and apply common sense rather than statistics.
         """
 
-    def autorange(self, callback: Callable[[int, float], object] | None = None) -> tuple[int, float]:
-        """Return the number of loops and time taken so that total time >= 0.2.
+    if sys.version_info >= (3, 15):
+        def autorange(
+            self, callback: Callable[[int, float], object] | None = None, target_time: float = 0.2
+        ) -> tuple[int, float]:
+            """Return the number of loops and time taken so that
+            total time >= target_time (default is 0.2 seconds).
 
-        Calls the timeit method with increasing numbers from the sequence
-        1, 2, 5, 10, 20, 50, ... until the time taken is at least 0.2
-        second.  Returns (number, time_taken).
+            Calls the timeit method with increasing numbers from the sequence
+            1, 2, 5, 10, 20, 50, ... until the target time is reached.
+            Returns (number, time_taken).
 
-        If *callback* is given and is not None, it will be called after
-        each trial with two arguments: ``callback(number, time_taken)``.
-        """
+            If *callback* is given and is not None, it will be called after
+            each trial with two arguments: ``callback(number, time_taken)``.
+            """
+
+    else:
+        def autorange(self, callback: Callable[[int, float], object] | None = None) -> tuple[int, float]:
+            """Return the number of loops and time taken so that total time >= 0.2.
+
+            Calls the timeit method with increasing numbers from the sequence
+            1, 2, 5, 10, 20, 50, ... until the time taken is at least 0.2
+            second.  Returns (number, time_taken).
+
+            If *callback* is given and is not None, it will be called after
+            each trial with two arguments: ``callback(number, time_taken)``.
+            """
 
 def timeit(
-    stmt: _Stmt = "pass", setup: _Stmt = "pass", timer: _Timer = ..., number: int = 1000000, globals: dict[str, Any] | None = None
+    stmt: _Stmt = "pass",
+    setup: _Stmt = "pass",
+    timer: _Timer = time.perf_counter,
+    number: int = 1000000,
+    globals: dict[str, Any] | None = None,
 ) -> float:
     """Convenience function to create Timer object and call timeit method."""
 
 def repeat(
     stmt: _Stmt = "pass",
     setup: _Stmt = "pass",
-    timer: _Timer = ...,
+    timer: _Timer = time.perf_counter,
     repeat: int = 5,
     number: int = 1000000,
     globals: dict[str, Any] | None = None,

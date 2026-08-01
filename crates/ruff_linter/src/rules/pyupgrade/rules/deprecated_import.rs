@@ -1,10 +1,10 @@
 use itertools::Itertools;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::token::Tokens;
 use ruff_python_ast::whitespace::indentation;
 use ruff_python_ast::{Alias, StmtImportFrom, StmtRef};
 use ruff_python_codegen::Stylist;
-use ruff_python_parser::Tokens;
 use ruff_text_size::Ranged;
 
 use crate::Locator;
@@ -109,6 +109,7 @@ fn is_relevant_module(module: &str) -> bool {
             | "mypy_extensions"
             | "typing_extensions"
             | "typing"
+            | "typing.io"
             | "typing.re"
             | "backports.strenum"
     )
@@ -218,6 +219,14 @@ const TYPING_EXTENSIONS_TO_TYPING_37: &[&str] = &[
     // "NamedTuple",
 ];
 
+// Members of `typing.io` that were moved to `typing`.
+// Note that the `typing.io` namespace has pretty much always been unnecessary.
+const TYPING_IO_TO_TYPING_37: &[&str] = &["BinaryIO", "IO", "TextIO"];
+
+// Members of `typing.re` that were moved to `typing`.
+// Note that the `typing.re` namespace has pretty much always been unnecessary.
+const TYPING_RE_TO_TYPING_37: &[&str] = &["Match", "Pattern"];
+
 // Python 3.8+
 
 // Members of `mypy_extensions` that were moved to `typing`.
@@ -268,7 +277,7 @@ const TYPING_TO_COLLECTIONS_ABC_39: &[&str] = &[
 // Members of `typing` that were moved to `collections`.
 const TYPING_TO_COLLECTIONS_39: &[&str] = &["ChainMap", "Counter", "OrderedDict"];
 
-// Members of `typing` that were moved to `typing.re`.
+// Members of `typing` that were moved to `re`.
 const TYPING_TO_RE_39: &[&str] = &["Match", "Pattern"];
 
 // Members of `typing.re` that were moved to `re`.
@@ -592,9 +601,20 @@ impl<'a> ImportReplacer<'a> {
                     operations.push(operation);
                 }
             }
-            "typing.re" if self.version >= PythonVersion::PY39 => {
-                if let Some(operation) = self.try_replace(TYPING_RE_TO_RE_39, "re") {
+            "typing.io" if self.version >= PythonVersion::PY37 => {
+                if let Some(operation) = self.try_replace(TYPING_IO_TO_TYPING_37, "typing") {
                     operations.push(operation);
+                }
+            }
+            "typing.re" => {
+                if self.version >= PythonVersion::PY39 {
+                    if let Some(operation) = self.try_replace(TYPING_RE_TO_RE_39, "re") {
+                        operations.push(operation);
+                    }
+                } else if self.version >= PythonVersion::PY37 {
+                    if let Some(operation) = self.try_replace(TYPING_RE_TO_TYPING_37, "typing") {
+                        operations.push(operation);
+                    }
                 }
             }
             "backports.strenum" if self.version >= PythonVersion::PY311 => {
@@ -766,11 +786,12 @@ pub(crate) fn deprecated_import(checker: &Checker, import_from_stmt: &StmtImport
     }
 
     for operation in fixer.with_renames() {
-        checker.report_diagnostic(
+        let mut diagnostic = checker.report_diagnostic(
             DeprecatedImport {
                 deprecation: Deprecation::WithRename(operation),
             },
             import_from_stmt.range(),
         );
+        diagnostic.add_primary_tag(ruff_db::diagnostic::DiagnosticTag::Deprecated);
     }
 }

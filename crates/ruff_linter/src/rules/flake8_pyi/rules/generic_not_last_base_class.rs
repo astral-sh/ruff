@@ -141,7 +141,7 @@ pub(crate) fn generic_not_last_base_class(checker: &Checker, class_def: &ast::St
     // where we would naively try to put `Generic[T]` after `*[str]`, which is also after a keyword
     // argument, causing the error.
     if bases
-        .arguments_source_order()
+        .iter_source_order()
         .any(|arg| arg.value().is_starred_expr())
     {
         return;
@@ -160,20 +160,16 @@ fn generate_fix(
 ) -> anyhow::Result<Fix> {
     let locator = checker.locator();
     let source = locator.contents();
+    let tokens = checker.tokens();
 
     let deletion = remove_argument(
         generic_base,
         arguments,
         Parentheses::Preserve,
         source,
-        checker.comment_ranges(),
+        tokens,
     )?;
-    let insertion = add_argument(
-        locator.slice(generic_base),
-        arguments,
-        checker.comment_ranges(),
-        source,
-    );
+    let insertion = add_argument(locator.slice(generic_base), arguments, tokens);
 
     Ok(Fix::unsafe_edits(deletion, [insertion]))
 }

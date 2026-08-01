@@ -4,9 +4,7 @@ use ruff_python_ast::{Expr, ExprCall};
 
 use crate::comments::dangling_comments;
 use crate::expression::CallChainLayout;
-use crate::expression::parentheses::{
-    NeedsParentheses, OptionalParentheses, Parentheses, is_expression_parenthesized,
-};
+use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses, Parentheses};
 use crate::prelude::*;
 
 #[derive(Default)]
@@ -39,15 +37,14 @@ impl FormatNodeRule<ExprCall> for FormatExprCall {
 
         let fmt_func = format_with(|f: &mut PyFormatter| {
             // Format the function expression.
-            if is_expression_parenthesized(
-                func.into(),
-                f.context().comments().ranges(),
-                f.context().source(),
-            ) {
+            if f.context().is_expression_parenthesized(func.into()) {
                 func.format().with_options(Parentheses::Always).fmt(f)
             } else {
                 match func.as_ref() {
-                    Expr::Attribute(expr) => expr.format().with_options(call_chain_layout).fmt(f),
+                    Expr::Attribute(expr) => expr
+                        .format()
+                        .with_options(call_chain_layout.decrement_call_like_count())
+                        .fmt(f),
                     Expr::Call(expr) => expr.format().with_options(call_chain_layout).fmt(f),
                     Expr::Subscript(expr) => expr.format().with_options(call_chain_layout).fmt(f),
                     _ => func.format().with_options(Parentheses::Never).fmt(f),
@@ -67,9 +64,7 @@ impl FormatNodeRule<ExprCall> for FormatExprCall {
         //     queryset.distinct().order_by(field.name).values_list(field_name_flat_long_long=True)
         // )
         // ```
-        if call_chain_layout == CallChainLayout::Fluent
-            && self.call_chain_layout == CallChainLayout::Default
-        {
+        if call_chain_layout.is_fluent() && self.call_chain_layout == CallChainLayout::Default {
             group(&fmt_func).fmt(f)
         } else {
             fmt_func.fmt(f)
@@ -83,20 +78,11 @@ impl NeedsParentheses for ExprCall {
         _parent: AnyNodeRef,
         context: &PyFormatContext,
     ) -> OptionalParentheses {
-        if CallChainLayout::from_expression(
-            self.into(),
-            context.comments().ranges(),
-            context.source(),
-        ) == CallChainLayout::Fluent
-        {
+        if CallChainLayout::from_expression(self.into(), context).is_fluent() {
             OptionalParentheses::Multiline
         } else if context.comments().has_dangling(self) {
             OptionalParentheses::Always
-        } else if is_expression_parenthesized(
-            self.func.as_ref().into(),
-            context.comments().ranges(),
-            context.source(),
-        ) {
+        } else if context.is_expression_parenthesized(self.func.as_ref().into()) {
             OptionalParentheses::Never
         } else {
             self.func.needs_parentheses(self.into(), context)

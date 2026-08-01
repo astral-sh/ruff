@@ -39,6 +39,19 @@ async def main() -> None:
     await PossiblyUnbound()  # error: [invalid-await]
 ```
 
+## Union type where one member lacks `__await__`
+
+```py
+class Awaitable:
+    def __await__(self):
+        yield
+
+class NotAwaitable: ...
+
+async def _(x: Awaitable | NotAwaitable) -> None:
+    await x  # error: [invalid-await]
+```
+
 ## `__await__` definition with extra arguments
 
 Currently, the signature of `__await__` isn't checked for conformity with the `Awaitable` protocol
@@ -56,8 +69,7 @@ async def main() -> None:
 
 ## Non-callable `__await__`
 
-This diagnostic doesn't point to the attribute definition, but complains about it being possibly not
-awaitable.
+This diagnostic points at the binding site of `__await__` when it can be resolved statically.
 
 ```py
 class NonCallableAwait:
@@ -65,6 +77,58 @@ class NonCallableAwait:
 
 async def main() -> None:
     await NonCallableAwait()  # error: [invalid-await]
+```
+
+If `__await__` is inherited from a base class, the diagnostic follows the MRO and points at the base
+class's assignment — including through deeper inheritance chains.
+
+```py
+class BaseWithBadAwait:
+    __await__ = 42
+
+class IntermediateAwait(BaseWithBadAwait): ...
+class DeepInheritedNonCallableAwait(IntermediateAwait): ...
+
+async def main() -> None:
+    await DeepInheritedNonCallableAwait()  # error: [invalid-await]
+```
+
+When multiple union members contribute different binding sites, the diagnostic does not include a
+secondary annotation. ty does not currently preserve which union member caused the call to fail, so
+pointing at any one member's binding site could be misleading.
+
+```py
+class A:
+    __await__ = 42
+
+class B:
+    __await__ = "hello"
+
+x: A | B
+
+async def main() -> None:
+    await x  # error: [invalid-await]
+```
+
+## Non-callable `__await__` on a re-exported class
+
+When `__await__` is defined on a class that is re-exported from another module, the diagnostic
+follows the import to the attribute's binding in the source module.
+
+`other.py`:
+
+```py
+class HasBadAwait:
+    __await__ = 42
+```
+
+`main.py`:
+
+```py
+from other import HasBadAwait
+
+async def main() -> None:
+    await HasBadAwait()  # error: [invalid-await]
 ```
 
 ## `__await__` definition with explicit invalid return type
@@ -92,11 +156,10 @@ from datetime import datetime
 
 class UnawaitableUnion:
     if datetime.today().weekday() == 6:
-
         def __await__(self) -> typing.Generator[typing.Any, None, None]:
             yield
-    else:
 
+    else:
         def __await__(self) -> int:
             return 5
 

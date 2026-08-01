@@ -4,6 +4,8 @@
 use itertools::Either;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Arguments, Decorator, Expr, ExprCall, Operator};
+use ruff_python_semantic::SemanticModel;
+use ruff_python_semantic::analyze::typing::find_binding_value;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::Violation;
@@ -962,7 +964,7 @@ pub(crate) fn suspicious_function_reference(checker: &Checker, func: &Expr) {
     }
 
     match checker.semantic().current_expression_parent() {
-        Some(Expr::Call(parent)) => {
+        Some(Expr::Call(parent))
             // Avoid duplicate diagnostics. For example:
             //
             // ```python
@@ -970,10 +972,9 @@ pub(crate) fn suspicious_function_reference(checker: &Checker, func: &Expr) {
             //   shelve.open(lorem, ipsum)
             // # ^^^^^^ Should not be reported as a reference
             // ```
-            if parent.func.range().contains_range(func.range()) {
+            if parent.func.range().contains_range(func.range()) => {
                 return;
             }
-        }
         Some(Expr::Attribute(_)) => {
             // Avoid duplicate diagnostics. For example:
             //
@@ -1014,6 +1015,20 @@ fn suspicious_function(
     fn has_http_prefix(chars: impl Iterator<Item = char> + Clone) -> bool {
         has_prefix(chars.clone().skip_while(|c| c.is_whitespace()), "http://")
             || has_prefix(chars.skip_while(|c| c.is_whitespace()), "https://")
+    }
+
+    /// Resolves `expr` to its binding and checks if the resolved expression starts with an HTTP or HTTPS prefix.
+    fn expression_starts_with_http_prefix(expr: &Expr, semantic: &SemanticModel) -> bool {
+        let resolved_expression = if let Some(name_expr) = expr.as_name_expr()
+            && let Some(binding_id) = semantic.only_binding(name_expr)
+            && let Some(value) = find_binding_value(semantic.binding(binding_id), semantic)
+        {
+            value
+        } else {
+            expr
+        };
+
+        leading_chars(resolved_expression).is_some_and(has_http_prefix)
     }
 
     /// Return the leading characters for an expression, if it's a string literal, f-string, or
@@ -1139,17 +1154,15 @@ fn suspicious_function(
         // URLOpen (`Request`)
         ["urllib", "request", "Request"] | ["six", "moves", "urllib", "request", "Request"] => {
             if let Some(arguments) = arguments {
-                // If the `url` argument is a string literal or an f-string, allow `http` and `https` schemes.
+                // If the `url` argument is a string literal (including resolved bindings), allow `http` and `https` schemes.
                 if arguments.args.iter().all(|arg| !arg.is_starred_expr())
                     && arguments
                         .keywords
                         .iter()
                         .all(|keyword| keyword.arg.is_some())
                 {
-                    if arguments
-                        .find_argument_value("url", 0)
-                        .and_then(leading_chars)
-                        .is_some_and(has_http_prefix)
+                    if let Some(url_expr) = arguments.find_argument_value("url", 0)
+                        && expression_starts_with_http_prefix(url_expr, checker.semantic())
                     {
                         return;
                     }
@@ -1178,29 +1191,25 @@ fn suspicious_function(
                         // If the `url` argument is a `urllib.request.Request` object, allow `http` and `https` schemes.
                         Some(Expr::Call(ExprCall {
                             func, arguments, ..
-                        })) => {
-                            if checker
-                                .semantic()
-                                .resolve_qualified_name(func.as_ref())
-                                .is_some_and(|name| {
-                                    name.segments() == ["urllib", "request", "Request"]
-                                })
+                        })) if checker
+                            .semantic()
+                            .resolve_qualified_name(func.as_ref())
+                            .is_some_and(|name| {
+                                name.segments() == ["urllib", "request", "Request"]
+                            }) =>
+                        {
+                            if let Some(url_expr) = arguments.find_argument_value("url", 0)
+                                && expression_starts_with_http_prefix(url_expr, checker.semantic())
                             {
-                                if arguments
-                                    .find_argument_value("url", 0)
-                                    .and_then(leading_chars)
-                                    .is_some_and(has_http_prefix)
-                                {
-                                    return;
-                                }
+                                return;
                             }
                         }
 
-                        // If the `url` argument is a string literal, allow `http` and `https` schemes.
-                        Some(expr) => {
-                            if leading_chars(expr).is_some_and(has_http_prefix) {
-                                return;
-                            }
+                        // If the `url` argument is a string literal (including resolved bindings), allow `http` and `https` schemes.
+                        Some(expr)
+                            if expression_starts_with_http_prefix(expr, checker.semantic()) =>
+                        {
+                            return;
                         }
 
                         _ => {}

@@ -1,6 +1,6 @@
 """Internal classes used by compression modules"""
 
-from _typeshed import Incomplete, WriteableBuffer
+from _typeshed import ReadableBuffer, WriteableBuffer
 from collections.abc import Callable
 from io import DEFAULT_BUFFER_SIZE, BufferedIOBase, RawIOBase
 from typing import Any, Protocol, type_check_only
@@ -13,6 +13,17 @@ class _Reader(Protocol):
     def seekable(self) -> bool: ...
     def seek(self, n: int, /) -> Any: ...
 
+@type_check_only
+class _Decompressor(Protocol):
+    def decompress(self, data: ReadableBuffer, /, max_length: int = ...) -> bytes: ...
+    @property
+    def unused_data(self) -> bytes: ...
+    @property
+    def eof(self) -> bool: ...
+    # `zlib._Decompress` does not have next property, but `DecompressReader` calls it:
+    # @property
+    # def needs_input(self) -> bool: ...
+
 class BaseStream(BufferedIOBase):
     """Mode-checking helper functions."""
 
@@ -22,7 +33,7 @@ class DecompressReader(RawIOBase):
     def __init__(
         self,
         fp: _Reader,
-        decomp_factory: Callable[..., Incomplete],  # Consider backporting changes to _compression
+        decomp_factory: Callable[..., _Decompressor],  # Consider backporting changes to _compression
         trailing_error: type[Exception] | tuple[type[Exception], ...] = (),
         **decomp_args: Any,  # These are passed to decomp_factory.
     ) -> None: ...

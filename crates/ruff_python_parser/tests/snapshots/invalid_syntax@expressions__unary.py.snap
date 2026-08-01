@@ -55,4 +55,3 @@ Module(
   |
 1 | not x := 1
   |       ^^ Syntax Error: Expected a statement
-  |

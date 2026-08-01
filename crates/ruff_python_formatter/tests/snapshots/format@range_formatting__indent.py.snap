@@ -89,6 +89,7 @@ docstring-code-line-width  = "dynamic"
 preview                    = Disabled
 target_version             = 3.10
 source_type                = Python
+nested-string-quote-style  = alternating
 ```
 
 ```python
@@ -149,6 +150,7 @@ def test5 ():
 
 
 def test6 ():
+
     print("Format")
     print(3 + 4)
     print("Format to fix indentation" )
@@ -158,21 +160,6 @@ def test7 ():
     print("Format")
     print(3 + 4)
     print("Format to fix indentation" )
-```
-
-
-#### Preview changes
-```diff
---- Stable
-+++ Preview
-@@ -55,6 +55,7 @@
- 
- 
- def test6 ():
-+
-     print("Format")
-     print(3 + 4)
-     print("Format to fix indentation" )
 ```
 
 
@@ -189,6 +176,7 @@ docstring-code-line-width  = "dynamic"
 preview                    = Disabled
 target_version             = 3.10
 source_type                = Python
+nested-string-quote-style  = alternating
 ```
 
 ```python
@@ -249,6 +237,7 @@ def test5 ():
 
 
 def test6 ():
+
 	print("Format")
 	print(3 + 4)
 	print("Format to fix indentation")
@@ -258,21 +247,6 @@ def test7 ():
 	print("Format")
 	print(3 + 4)
 	print("Format to fix indentation")
-```
-
-
-#### Preview changes
-```diff
---- Stable
-+++ Preview
-@@ -55,6 +55,7 @@
- 
- 
- def test6 ():
-+
- 	print("Format")
- 	print(3 + 4)
- 	print("Format to fix indentation")
 ```
 
 
@@ -289,6 +263,7 @@ docstring-code-line-width  = "dynamic"
 preview                    = Disabled
 target_version             = 3.10
 source_type                = Python
+nested-string-quote-style  = alternating
 ```
 
 ```python
@@ -349,6 +324,7 @@ def test5 ():
 
 
 def test6 ():
+
   print("Format")
   print(3 + 4)
   print("Format to fix indentation")
@@ -358,19 +334,4 @@ def test7 ():
   print("Format")
   print(3 + 4)
   print("Format to fix indentation")
-```
-
-
-#### Preview changes
-```diff
---- Stable
-+++ Preview
-@@ -55,6 +55,7 @@
- 
- 
- def test6 ():
-+
-   print("Format")
-   print(3 + 4)
-   print("Format to fix indentation")
 ```

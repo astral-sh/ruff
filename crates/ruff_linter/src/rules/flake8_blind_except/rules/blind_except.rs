@@ -1,5 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::helpers::is_const_true;
+use ruff_python_ast::helpers::Truthiness;
 use ruff_python_ast::statement_visitor::{StatementVisitor, walk_stmt};
 use ruff_python_ast::{self as ast, Expr, Stmt};
 use ruff_python_semantic::SemanticModel;
@@ -8,6 +8,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::rules::flake8_logging::helpers::is_logger_method_name;
 
 /// ## What it does
 /// Checks for `except` clauses that catch all exceptions.  This includes
@@ -47,8 +48,7 @@ use crate::checkers::ast::Checker;
 ///     raise
 /// ```
 ///
-/// Exceptions that are logged via `logging.exception()` or are logged via
-/// `logging.error()` or `logging.critical()` with `exc_info` enabled will
+/// Exceptions that are logged with `exc_info` enabled will
 /// _not_ be flagged, as this is a common pattern for propagating exception
 /// traces:
 /// ```python
@@ -57,6 +57,10 @@ use crate::checkers::ast::Checker;
 /// except BaseException:
 ///     logging.exception("Something went wrong")
 /// ```
+///
+/// ## Options
+///
+/// - `lint.logger-objects`
 ///
 /// ## References
 /// - [Python documentation: The `try` statement](https://docs.python.org/3/reference/compound_stmts.html#the-try-statement)
@@ -180,6 +184,14 @@ impl<'a> StatementVisitor<'a> for ReraiseVisitor<'a> {
     }
 }
 
+/// Returns `true` if the `exc_info` keyword argument is truthy.
+fn is_exc_info_enabled(arguments: &ast::Arguments, semantic: &SemanticModel) -> bool {
+    arguments.find_keyword("exc_info").is_some_and(|keyword| {
+        Truthiness::from_expr(&keyword.value, |id| semantic.has_builtin_binding(id)).into_bool()
+            != Some(false)
+    })
+}
+
 /// A visitor to detect whether the exception was logged.
 struct LogExceptionVisitor<'a> {
     semantic: &'a SemanticModel<'a>,
@@ -215,35 +227,33 @@ impl<'a> StatementVisitor<'a> for LogExceptionVisitor<'a> {
                 }) = value.as_ref()
                 {
                     match func.as_ref() {
-                        Expr::Attribute(ast::ExprAttribute { attr, .. }) => {
+                        Expr::Attribute(ast::ExprAttribute { attr, .. })
                             if logging::is_logger_candidate(
                                 func,
                                 self.semantic,
                                 self.logger_objects,
-                            ) {
-                                if match attr.as_str() {
-                                    "exception" => true,
-                                    "error" | "critical" => arguments
-                                        .find_keyword("exc_info")
-                                        .is_some_and(|keyword| is_const_true(&keyword.value)),
-                                    _ => false,
-                                } {
-                                    self.seen = true;
+                            ) && match attr.as_str() {
+                                "exception" => true,
+                                _ if is_logger_method_name(attr) => {
+                                    is_exc_info_enabled(arguments, self.semantic)
                                 }
-                            }
+                                _ => false,
+                            } =>
+                        {
+                            self.seen = true;
                         }
-                        Expr::Name(ast::ExprName { .. }) => {
+                        Expr::Name(ast::ExprName { .. })
                             if self.semantic.resolve_qualified_name(func).is_some_and(
                                 |qualified_name| match qualified_name.segments() {
                                     ["logging", "exception"] => true,
-                                    ["logging", "error" | "critical"] => arguments
-                                        .find_keyword("exc_info")
-                                        .is_some_and(|keyword| is_const_true(&keyword.value)),
+                                    ["logging", method] if is_logger_method_name(method) => {
+                                        is_exc_info_enabled(arguments, self.semantic)
+                                    }
                                     _ => false,
                                 },
-                            ) {
-                                self.seen = true;
-                            }
+                            ) =>
+                        {
+                            self.seen = true;
                         }
                         _ => {}
                     }

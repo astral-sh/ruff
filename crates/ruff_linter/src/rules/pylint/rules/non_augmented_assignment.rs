@@ -2,7 +2,7 @@ use ast::Expr;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
 use ruff_python_ast::comparable::ComparableExpr;
-use ruff_python_ast::parenthesize::parenthesized_range;
+use ruff_python_ast::token::parenthesized_range;
 use ruff_python_ast::{ExprBinOp, ExprRef, Operator};
 use ruff_text_size::{Ranged, TextRange};
 
@@ -68,6 +68,13 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// foo += [2]
 /// assert (foo, bar) == ([1, 2], [1, 2])
 /// ```
+///
+/// An augmented assignment can also fail where the plain form succeeds. NumPy
+/// writes the result into the target's buffer, so `a *= b` raises where
+/// `a = a * b` would broadcast to a new shape or promote the dtype. The same
+/// applies to `a @= b`, which requires the product to have the target's shape.
+///
+/// The fix replaces the whole statement, so any comments inside it are lost.
 #[derive(ViolationMetadata)]
 #[violation_metadata(preview_since = "v0.3.7")]
 pub(crate) struct NonAugmentedAssignment {
@@ -150,12 +157,10 @@ fn augmented_assignment(
 
     let right_operand_ref = ExprRef::from(right_operand);
     let parent = original_expr.into();
-    let comment_ranges = checker.comment_ranges();
-    let source = checker.source();
+    let tokens = checker.tokens();
 
     let right_operand_range =
-        parenthesized_range(right_operand_ref, parent, comment_ranges, source)
-            .unwrap_or(right_operand.range());
+        parenthesized_range(right_operand_ref, parent, tokens).unwrap_or(right_operand.range());
     let right_operand_expr = locator.slice(right_operand_range);
 
     let target_expr = locator.slice(target);

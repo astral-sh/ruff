@@ -171,7 +171,7 @@ class Bar:
 class Baz(Foo, Bar): ...  # fine
 ```
 
-## Built-ins with implicit layouts
+## Builtins with implicit layouts
 
 <!-- snapshot-diagnostics -->
 
@@ -183,7 +183,7 @@ decorator introduced by this PEP provides a generalised way for type checkers to
 classes.
 
 ```py
-from typing_extensions import disjoint_base
+from typing_extensions import Protocol, TypedDict, disjoint_base
 
 # fmt: off
 
@@ -206,26 +206,33 @@ class E(  # error: [instance-layout-conflict]
     str
 ): ...
 
-class F(int, str, bytes, bytearray): ...  # error: [instance-layout-conflict]
+class F(int, bytes, bytearray): ...  # error: [instance-layout-conflict]
 
 @disjoint_base
 class G: ...
 
 @disjoint_base
 class H: ...
-
+@disjoint_base  # error: [invalid-typed-dict-header] "`@disjoint_base` cannot be used with `TypedDict` class `Movie`"
+class Movie(TypedDict):
+    name: str
+@disjoint_base  # error: [invalid-protocol] "`@disjoint_base` cannot be used with protocol class `SupportsClose`"
+class SupportsClose(Protocol):
+    def close(self) -> None: ...
 class I(  # error: [instance-layout-conflict]
     G,
     H
 ): ...
-
 # fmt: on
 ```
 
 We avoid emitting an `instance-layout-conflict` diagnostic for this class definition, because
-`range` is `@final`, so we'll complain about the `class` statement anyway:
+`range` is `@final`, so we'll complain about the `class` statement anyway. (We also emit
+`invalid-generic-class` here, as `Sequence[str]` and `Sequence[int]` coexist invalidly in this
+class's MRO.)
 
 ```py
+# error: [invalid-generic-class]
 class Foo(range, str): ...  # error: [subclass-of-final-class]
 ```
 
@@ -256,6 +263,18 @@ class BB(AA):
 class CC(BB): ...
 class DD(AA): ...
 class FF(CC, DD): ...  # fine
+```
+
+CPython's layout check operates on runtime classes, so type arguments in a generic disjoint base's
+inheritance hierarchy do not affect whether the disjoint bases can coexist:
+
+```py
+import asyncio
+from typing import Any
+
+class Future(asyncio.Future[Any]): ...
+class Task(asyncio.Task[Any]): ...
+class SubClass(Task, Future): ...  # fine
 ```
 
 ## False negatives

@@ -1,6 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::token::{TokenKind, Tokens};
 use ruff_python_index::Indexer;
-use ruff_python_parser::{TokenKind, Tokens};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::Locator;
@@ -227,8 +227,11 @@ impl Violation for TrailingCommaOnBareTuple {
 /// ```
 ///
 /// ## Formatter compatibility
-/// We recommend against using this rule alongside the [formatter]. The
-/// formatter enforces consistent use of trailing commas, making the rule redundant.
+/// We recommend against using this rule alongside the [formatter]. With the
+/// default `format.skip-magic-trailing-comma = false`, trailing commas can be
+/// intentional: the formatter treats them as a signal to preserve multiline
+/// formatting. When set to `true`, the formatter removes those trailing commas
+/// where possible, making this rule redundant.
 ///
 /// [formatter]:https://docs.astral.sh/ruff/formatter/
 #[derive(ViolationMetadata)]

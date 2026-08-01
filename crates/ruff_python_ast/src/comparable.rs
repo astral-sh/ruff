@@ -517,10 +517,39 @@ pub enum ComparableInterpolatedStringElement<'a> {
     InterpolatedElement(InterpolatedElement<'a>),
 }
 
+/// Comparable wrapper for [`ast::DebugText`].
+///
+/// Compares the full debug text (leading + expression source + trailing) rather than only the
+/// expression source, because whitespace is part of the f-string's runtime output: `f"{x =}"`
+/// produces `"x =<value>"` while `f"{x=}"` produces `"x=<value>"`, making them distinct
+/// `Literal` types.
+#[derive(Debug, PartialEq, Eq, Hash)]
+pub struct ComparableDebugText<'a> {
+    text: Cow<'a, str>,
+}
+
+impl<'a> From<&'a ast::DebugText> for ComparableDebugText<'a> {
+    fn from(debug_text: &'a ast::DebugText) -> Self {
+        // Normalizing newlines is safe because Python normalizes `\r\n` and `\r` to `\n`
+        // at compile time, so they produce identical runtime values.
+        Self {
+            text: normalize_newlines(debug_text.as_str()),
+        }
+    }
+}
+
+fn normalize_newlines(contents: &str) -> Cow<'_, str> {
+    if contents.contains('\r') {
+        Cow::Owned(contents.replace("\r\n", "\n").replace('\r', "\n"))
+    } else {
+        Cow::Borrowed(contents)
+    }
+}
+
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct InterpolatedElement<'a> {
     expression: ComparableExpr<'a>,
-    debug_text: Option<&'a ast::DebugText>,
+    debug_text: Option<ComparableDebugText<'a>>,
     conversion: ast::ConversionFlag,
     format_spec: Option<Vec<ComparableInterpolatedStringElement<'a>>>,
 }
@@ -552,7 +581,7 @@ impl<'a> From<&'a ast::InterpolatedElement> for InterpolatedElement<'a> {
 
         Self {
             expression: (expression).into(),
-            debug_text: debug_text.as_ref(),
+            debug_text: debug_text.as_ref().map(Into::into),
             conversion: *conversion,
             format_spec: format_spec
                 .as_ref()
@@ -884,7 +913,7 @@ pub struct ExprSetComp<'a> {
 
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct ExprDictComp<'a> {
-    key: Box<ComparableExpr<'a>>,
+    key: Option<Box<ComparableExpr<'a>>>,
     value: Box<ComparableExpr<'a>>,
     generators: Vec<ComparableComprehension<'a>>,
 }
@@ -926,7 +955,7 @@ pub struct ExprCall<'a> {
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct ExprInterpolatedElement<'a> {
     value: Box<ComparableExpr<'a>>,
-    debug_text: Option<&'a ast::DebugText>,
+    debug_text: Option<ComparableDebugText<'a>>,
     conversion: ast::ConversionFlag,
     format_spec: Vec<ComparableInterpolatedStringElement<'a>>,
 }
@@ -1157,7 +1186,7 @@ impl<'a> From<&'a ast::Expr> for ComparableExpr<'a> {
                 range: _,
                 node_index: _,
             }) => Self::DictComp(ExprDictComp {
-                key: key.into(),
+                key: key.as_ref().map(Into::into),
                 value: value.into(),
                 generators: generators.iter().map(Into::into).collect(),
             }),
@@ -1532,6 +1561,7 @@ pub struct StmtAssert<'a> {
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct StmtImport<'a> {
     names: Vec<ComparableAlias<'a>>,
+    is_lazy: bool,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
@@ -1539,6 +1569,7 @@ pub struct StmtImportFrom<'a> {
     module: Option<&'a str>,
     names: Vec<ComparableAlias<'a>>,
     level: u32,
+    is_lazy: bool,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
@@ -1778,21 +1809,25 @@ impl<'a> From<&'a ast::Stmt> for ComparableStmt<'a> {
             }),
             ast::Stmt::Import(ast::StmtImport {
                 names,
+                is_lazy,
                 range: _,
                 node_index: _,
             }) => Self::Import(StmtImport {
                 names: names.iter().map(Into::into).collect(),
+                is_lazy: *is_lazy,
             }),
             ast::Stmt::ImportFrom(ast::StmtImportFrom {
                 module,
                 names,
                 level,
+                is_lazy,
                 range: _,
                 node_index: _,
             }) => Self::ImportFrom(StmtImportFrom {
                 module: module.as_deref(),
                 names: names.iter().map(Into::into).collect(),
                 level: *level,
+                is_lazy: *is_lazy,
             }),
             ast::Stmt::Global(ast::StmtGlobal {
                 names,
@@ -1879,62 +1914,191 @@ impl<'a> From<&'a ast::ModExpression> for ComparableModExpression<'a> {
 /// in Python, along with `False`, `0`, and `0.0`.
 ///
 /// See: <https://docs.python.org/3/library/stdtypes.html#mapping-types-dict>
-#[derive(Debug)]
-pub struct HashableExpr<'a>(ComparableExpr<'a>);
+#[derive(Debug, PartialEq, Eq, Hash)]
+pub struct HashableExpr<'a>(HashableExprKind<'a>);
 
-impl Hash for HashableExpr<'_> {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.0.hash(state);
+#[derive(Debug, PartialEq, Eq, Hash)]
+enum HashableExprKind<'a> {
+    Comparable(ComparableExpr<'a>),
+    Number(HashableNumber),
+    NamedExpr {
+        target: ComparableExpr<'a>,
+        value: Box<HashableExprKind<'a>>,
+    },
+    Tuple(Vec<HashableExprKind<'a>>),
+}
+
+#[derive(Debug, PartialEq, Eq, Hash)]
+struct HashableNumber {
+    real: HashableReal,
+    imag: HashableReal,
+}
+
+impl HashableNumber {
+    fn real(real: HashableReal) -> Self {
+        Self {
+            real,
+            imag: HashableReal::Integer(0),
+        }
+    }
+
+    fn complex(real: HashableReal, imag: HashableReal) -> Self {
+        Self { real, imag }
+    }
+
+    fn negate(mut self) -> Self {
+        self.real.negate();
+        self.imag.negate();
+        self
+    }
+
+    fn into_real(self) -> Option<HashableReal> {
+        self.imag.is_zero().then_some(self.real)
     }
 }
 
-impl PartialEq<Self> for HashableExpr<'_> {
-    fn eq(&self, other: &Self) -> bool {
-        self.0 == other.0
+#[derive(Debug, PartialEq, Eq, Hash)]
+enum HashableReal {
+    Integer(i128),
+    Float(u64),
+}
+
+impl HashableReal {
+    fn from_int(value: &ast::Int) -> Option<Self> {
+        value.as_u64().map(i128::from).map(Self::Integer)
+    }
+
+    #[expect(
+        clippy::cast_possible_truncation,
+        clippy::cast_precision_loss,
+        clippy::float_cmp,
+        reason = "the round-trip check guarantees that the float is exactly representable as an integer"
+    )]
+    fn from_float(value: f64) -> Self {
+        if value.is_finite() && value.abs() < U64_EXCLUSIVE_UPPER_BOUND {
+            let integer = value as i128;
+            if integer as f64 == value {
+                return Self::Integer(integer);
+            }
+        }
+        Self::Float(value.to_bits())
+    }
+
+    #[expect(
+        clippy::cast_precision_loss,
+        reason = "Python converts real components to floats before complex arithmetic"
+    )]
+    fn into_float(self) -> Self {
+        match self {
+            Self::Integer(integer) => Self::from_float(integer as f64),
+            Self::Float(_) => self,
+        }
+    }
+
+    fn is_zero(&self) -> bool {
+        matches!(self, Self::Integer(0))
+    }
+
+    fn negate(&mut self) {
+        match self {
+            Self::Integer(integer) => *integer = -*integer,
+            Self::Float(bits) => *bits ^= 1 << 63,
+        }
     }
 }
 
-impl Eq for HashableExpr<'_> {}
+// `2^64`, the exclusive upper bound for values representable as a `u64`.
+const U64_EXCLUSIVE_UPPER_BOUND: f64 = 18_446_744_073_709_551_616.0;
 
 impl<'a> From<&'a Expr> for HashableExpr<'a> {
     fn from(expr: &'a Expr) -> Self {
         /// Returns a version of the given expression that can be hashed and compared according to
         /// Python  semantics.
-        fn as_hashable(expr: &Expr) -> ComparableExpr<'_> {
+        fn as_hashable(expr: &Expr) -> HashableExprKind<'_> {
+            if let Some(constant) = as_hashable_constant(expr) {
+                return constant;
+            }
+
             match expr {
-                Expr::Named(named) => ComparableExpr::NamedExpr(ExprNamed {
-                    target: Box::new(ComparableExpr::from(&named.target)),
+                Expr::Named(named) => HashableExprKind::NamedExpr {
+                    target: ComparableExpr::from(&named.target),
                     value: Box::new(as_hashable(&named.value)),
-                }),
-                Expr::NumberLiteral(number) => as_bool(number)
-                    .map(|value| ComparableExpr::BoolLiteral(ExprBoolLiteral { value }))
-                    .unwrap_or_else(|| ComparableExpr::from(expr)),
-                Expr::Tuple(tuple) => ComparableExpr::Tuple(ExprTuple {
-                    elts: tuple.iter().map(as_hashable).collect(),
-                }),
-                _ => ComparableExpr::from(expr),
+                },
+                _ => HashableExprKind::Comparable(ComparableExpr::from(expr)),
             }
         }
 
-        /// Returns the `bool` value of the given expression, if it has an equivalent hash to
-        /// `True` or `False`.
-        fn as_bool(number: &crate::ExprNumberLiteral) -> Option<bool> {
-            match &number.value {
-                Number::Int(int) => match int.as_u8() {
-                    Some(0) => Some(false),
-                    Some(1) => Some(true),
-                    _ => None,
+        /// Returns a hashable representation if the expression's value is statically known.
+        fn as_hashable_constant(expr: &Expr) -> Option<HashableExprKind<'_>> {
+            if let Some(number) = as_number(expr) {
+                return Some(HashableExprKind::Number(number));
+            }
+
+            let kind = match expr {
+                Expr::Tuple(tuple) => HashableExprKind::Tuple(
+                    tuple
+                        .iter()
+                        .map(as_hashable_constant)
+                        .collect::<Option<_>>()?,
+                ),
+                _ if expr.is_literal_expr() => {
+                    HashableExprKind::Comparable(ComparableExpr::from(expr))
+                }
+                _ => return None,
+            };
+
+            Some(kind)
+        }
+
+        fn as_number(expr: &Expr) -> Option<HashableNumber> {
+            match expr {
+                Expr::BooleanLiteral(boolean) => Some(HashableNumber::real(HashableReal::Integer(
+                    i128::from(u8::from(boolean.value)),
+                ))),
+                Expr::NumberLiteral(number) => match &number.value {
+                    Number::Int(int) => HashableReal::from_int(int).map(HashableNumber::real),
+                    Number::Float(float) => {
+                        Some(HashableNumber::real(HashableReal::from_float(*float)))
+                    }
+                    Number::Complex { real, imag } => Some(HashableNumber::complex(
+                        HashableReal::from_float(*real),
+                        HashableReal::from_float(*imag),
+                    )),
                 },
-                Number::Float(float) => match float {
-                    0.0 => Some(false),
-                    1.0 => Some(true),
-                    _ => None,
+                Expr::UnaryOp(ast::ExprUnaryOp { op, operand, .. }) => match op {
+                    ast::UnaryOp::UAdd => as_number(operand),
+                    ast::UnaryOp::USub => as_number(operand).map(HashableNumber::negate),
+                    ast::UnaryOp::Invert | ast::UnaryOp::Not => None,
                 },
-                Number::Complex { real, imag } => match (real, imag) {
-                    (0.0, 0.0) => Some(false),
-                    (1.0, 0.0) => Some(true),
-                    _ => None,
-                },
+                Expr::BinOp(ast::ExprBinOp {
+                    left,
+                    op: op @ (ast::Operator::Add | ast::Operator::Sub),
+                    right,
+                    ..
+                }) => {
+                    let real = as_number(left)?.into_real()?.into_float();
+                    let Expr::NumberLiteral(ast::ExprNumberLiteral {
+                        value:
+                            Number::Complex {
+                                real: complex_real,
+                                imag,
+                            },
+                        ..
+                    }) = right.as_ref()
+                    else {
+                        return None;
+                    };
+                    let complex_real = HashableReal::from_float(*complex_real);
+                    if !complex_real.is_zero() {
+                        return None;
+                    }
+                    let mut imag = HashableReal::from_float(*imag);
+                    if op.is_sub() {
+                        imag.negate();
+                    }
+                    Some(HashableNumber::complex(real, imag))
+                }
+                _ => None,
             }
         }
 

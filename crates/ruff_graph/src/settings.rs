@@ -6,7 +6,7 @@ use std::collections::BTreeMap;
 use std::fmt;
 use std::path::PathBuf;
 
-#[derive(Debug, Default, Clone, CacheKey)]
+#[derive(Debug, Clone, CacheKey)]
 pub struct AnalyzeSettings {
     pub exclude: FilePatternSet,
     pub preview: PreviewMode,
@@ -14,6 +14,21 @@ pub struct AnalyzeSettings {
     pub string_imports: StringImports,
     pub include_dependencies: BTreeMap<PathBuf, (PathBuf, Vec<String>)>,
     pub extension: ExtensionMapping,
+    pub type_checking_imports: bool,
+}
+
+impl Default for AnalyzeSettings {
+    fn default() -> Self {
+        Self {
+            exclude: FilePatternSet::default(),
+            preview: PreviewMode::default(),
+            target_version: PythonVersion::default(),
+            string_imports: StringImports::default(),
+            include_dependencies: BTreeMap::default(),
+            extension: ExtensionMapping::default(),
+            type_checking_imports: true,
+        }
+    }
 }
 
 impl fmt::Display for AnalyzeSettings {
@@ -29,6 +44,7 @@ impl fmt::Display for AnalyzeSettings {
                 self.string_imports,
                 self.extension | debug,
                 self.include_dependencies | debug,
+                self.type_checking_imports,
             ]
         }
         Ok(())

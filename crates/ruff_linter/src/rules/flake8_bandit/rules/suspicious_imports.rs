@@ -370,6 +370,11 @@ pub(crate) fn suspicious_imports(checker: &Checker, stmt: &Stmt) {
         return;
     }
 
+    // Imports inside `if TYPE_CHECKING:` are not executed at runtime.
+    if checker.semantic().in_type_checking_block() {
+        return;
+    }
+
     match stmt {
         Stmt::Import(ast::StmtImport { names, .. }) => {
             for name in names {

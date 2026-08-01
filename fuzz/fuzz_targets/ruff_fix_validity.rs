@@ -3,7 +3,7 @@
 
 #![no_main]
 
-use libfuzzer_sys::{fuzz_target, Corpus};
+use libfuzzer_sys::{Corpus, fuzz_target};
 use ruff_linter::settings::LinterSettings;
 use std::sync::OnceLock;
 

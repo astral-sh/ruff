@@ -2,8 +2,8 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
 use ruff_python_ast::ExprGenerator;
 use ruff_python_ast::comparable::ComparableExpr;
-use ruff_python_ast::parenthesize::parenthesized_range;
-use ruff_python_parser::TokenKind;
+use ruff_python_ast::token::TokenKind;
+use ruff_python_ast::token::parenthesized_range;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::checkers::ast::Checker;
@@ -147,13 +147,9 @@ pub(crate) fn unnecessary_generator_set(checker: &Checker, call: &ast::ExprCall)
         if *parenthesized {
             // The generator's range will include the innermost parentheses, but it could be
             // surrounded by additional parentheses.
-            let range = parenthesized_range(
-                argument.into(),
-                (&call.arguments).into(),
-                checker.comment_ranges(),
-                checker.locator().contents(),
-            )
-            .unwrap_or(argument.range());
+            let range =
+                parenthesized_range(argument.into(), (&call.arguments).into(), checker.tokens())
+                    .unwrap_or(argument.range());
 
             // The generator always parenthesizes the expression; trim the parentheses.
             let generator = checker.generator().expr(argument);

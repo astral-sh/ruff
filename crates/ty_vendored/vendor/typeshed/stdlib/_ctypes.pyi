@@ -1,14 +1,15 @@
 """Create and manipulate C compatible data types in Python."""
 
 import _typeshed
+import builtins
 import sys
 from _typeshed import ReadableBuffer, StrOrBytesPath, WriteableBuffer
 from abc import abstractmethod
 from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 from ctypes import CDLL, ArgumentError as ArgumentError, c_void_p
 from types import GenericAlias
-from typing import Any, ClassVar, Final, Generic, TypeVar, final, overload, type_check_only
-from typing_extensions import Self, TypeAlias
+from typing import Any, ClassVar, Final, Generic, Literal, SupportsIndex, TypeAlias, TypeVar, final, overload, type_check_only
+from typing_extensions import Self
 
 _T = TypeVar("_T")
 _CT = TypeVar("_CT", bound=_CData)
@@ -41,6 +42,7 @@ if sys.platform == "win32":
 
     def CopyComPointer(src: _PointerLike, dst: _PointerLike | _CArgObject) -> int:
         """CopyComPointer(src, dst) -> HRESULT value"""
+
     FUNCFLAG_HRESULT: Final = 0x2
     FUNCFLAG_STDCALL: Final = 0x0
 
@@ -71,6 +73,7 @@ if sys.platform == "win32":
 else:
     def dlclose(handle: int, /) -> None:
         """dlclose a library"""
+
     # The default for flag is RTLD_GLOBAL|RTLD_LOCAL, which is platform dependent.
     def dlopen(name: StrOrBytesPath, flag: int = ..., /) -> int:
         """dlopen(name, flag={RTLD_GLOBAL|RTLD_LOCAL}) open a shared library"""
@@ -126,6 +129,8 @@ class _SimpleCData(_CData, Generic[_T], metaclass=_PyCSimpleType):
     """XXX to be provided"""
 
     value: _T
+    """current value"""
+
     # The TypeVar can be unsolved here,
     # but we can't use overloads without creating many, many mypy false-positive errors
     def __init__(self, value: _T = ...) -> None: ...  # pyright: ignore[reportInvalidTypeVarUse]
@@ -156,16 +161,19 @@ class _Pointer(_PointerLike, _CData, Generic[_CT], metaclass=_PyCPointerType):
 
     _type_: type[_CT]
     contents: _CT
+    """the object this pointer points to (read-write)"""
+
     @overload
     def __init__(self) -> None: ...
     @overload
     def __init__(self, arg: _CT) -> None: ...
+
     @overload
     def __getitem__(self, key: int, /) -> Any:
         """Return self[key]."""
-
     @overload
-    def __getitem__(self, key: slice, /) -> list[Any]: ...
+    def __getitem__(self, key: slice[SupportsIndex | None], /) -> list[Any]: ...
+
     def __setitem__(self, key: int, value: Any, /) -> None:
         """Set self[key] to value."""
 
@@ -180,9 +188,9 @@ if sys.version_info < (3, 14):
         Pointer types are cached and reused internally,
         so calling this function repeatedly is cheap.
         """
-
     @overload
     def POINTER(type: type[_CT], /) -> type[_Pointer[_CT]]: ...
+
     def pointer(obj: _CT, /) -> _Pointer[_CT]:
         """Create a new pointer instance, pointing to 'obj'.
 
@@ -227,10 +235,17 @@ class CFuncPtr(_PointerLike, _CData, metaclass=_PyCFuncPtrType):
     """Function Pointer"""
 
     restype: type[_CDataType] | Callable[[int], Any] | None
+    """specify the result type"""
+
     argtypes: Sequence[type[_CDataType]]
+    """specify the argument types"""
+
     errcheck: _ECT
+    """a function to check for errors"""
+
     # Abstract attribute that must be defined on subclasses
     _flags_: ClassVar[int]
+
     @overload
     def __new__(cls) -> Self: ...
     @overload
@@ -251,24 +266,65 @@ class CFuncPtr(_PointerLike, _CData, metaclass=_PyCFuncPtrType):
 _GetT = TypeVar("_GetT")
 _SetT = TypeVar("_SetT")
 
-# This class is not exposed. It calls itself _ctypes.CField.
-@final
-@type_check_only
-class _CField(Generic[_CT, _GetT, _SetT]):
-    offset: int
-    size: int
-    if sys.version_info >= (3, 10):
+if sys.version_info >= (3, 14):
+    @final
+    class CField(Generic[_CT, _GetT, _SetT]):
+        """Structure/Union member"""
+
+        offset: int
+        """offset in bytes of this field (same as byte_offset)"""
+
+        size: int
+        """size in bytes of this field. For bitfields, this is a legacy packed value; use byte_size instead"""
+
+        name: str
+        """name of this field"""
+
+        type: builtins.type[_CT]
+        """type of this field"""
+
+        byte_offset: int
+        """offset in bytes of this field. For bitfields: excludes bit_offset."""
+
+        byte_size: int
+        """size of this field in bytes"""
+
+        is_bitfield: bool
+        """true if this is a bitfield"""
+
+        bit_offset: int
+        """additional offset in bits (relative to byte_offset); zero for non-bitfields"""
+
+        bit_size: int
+        """size of this field in bits"""
+
+        is_anonymous: bool
+        """true if this field is anonymous"""
+
+        @overload
+        def __get__(self, instance: None, owner: builtins.type[Any] | None = None, /) -> Self:
+            """Return an attribute of instance, which is of type owner."""
+        @overload
+        def __get__(self, instance: Any, owner: builtins.type[Any] | None = None, /) -> _GetT: ...
+
+        def __set__(self, instance: Any, value: _SetT, /) -> None:
+            """Set an attribute of instance to value."""
+
+    _CField = CField
+
+else:
+    @final
+    @type_check_only
+    class _CField(Generic[_CT, _GetT, _SetT]):
+        offset: int
+        size: int
+
         @overload
         def __get__(self, instance: None, owner: type[Any] | None = None, /) -> Self: ...
         @overload
         def __get__(self, instance: Any, owner: type[Any] | None = None, /) -> _GetT: ...
-    else:
-        @overload
-        def __get__(self, instance: None, owner: type[Any] | None, /) -> Self: ...
-        @overload
-        def __get__(self, instance: Any, owner: type[Any] | None, /) -> _GetT: ...
 
-    def __set__(self, instance: Any, value: _SetT, /) -> None: ...
+        def __set__(self, instance: Any, value: _SetT, /) -> None: ...
 
 # This class is not exposed. It calls itself _ctypes.UnionType.
 @type_check_only
@@ -326,6 +382,10 @@ class Structure(_CData, metaclass=_PyCStructType):
     if sys.version_info >= (3, 13):
         _align_: ClassVar[int]
 
+    if sys.version_info >= (3, 14):
+        # _layout_ can be defined by the user, but is not always present.
+        _layout_: ClassVar[Literal["ms", "gcc-sysv"]]
+
     def __init__(self, *args: Any, **kw: Any) -> None: ...
     def __getattr__(self, name: str) -> Any: ...
     def __setattr__(self, name: str, value: Any) -> None: ...
@@ -358,16 +418,19 @@ class Array(_CData, Generic[_CT], metaclass=_PyCArrayType):
     def _length_(self) -> int: ...
     @_length_.setter
     def _length_(self, value: int) -> None: ...
+
     @property
     @abstractmethod
     def _type_(self) -> type[_CT]: ...
     @_type_.setter
     def _type_(self, value: type[_CT]) -> None: ...
+
     # Note: only available if _CT == c_char
     @property
     def raw(self) -> bytes: ...
     @raw.setter
     def raw(self, value: ReadableBuffer) -> None: ...
+
     value: Any  # Note: bytes if _CT == c_char, str if _CT == c_wchar, unavailable otherwise
     # TODO: These methods cannot be annotated correctly at the moment.
     # All of these "Any"s stand for the array's element type, but it's not possible to use _CT
@@ -382,18 +445,19 @@ class Array(_CData, Generic[_CT], metaclass=_PyCArrayType):
     # This special behavior is not easy to model in a stub, so for now all places where
     # the array element type would belong are annotated with Any instead.
     def __init__(self, *args: Any) -> None: ...
+
     @overload
     def __getitem__(self, key: int, /) -> Any:
         """Return self[key]."""
-
     @overload
-    def __getitem__(self, key: slice, /) -> list[Any]: ...
+    def __getitem__(self, key: slice[SupportsIndex | None], /) -> list[Any]: ...
+
     @overload
     def __setitem__(self, key: int, value: Any, /) -> None:
         """Set self[key] to value."""
-
     @overload
-    def __setitem__(self, key: slice, value: Iterable[Any], /) -> None: ...
+    def __setitem__(self, key: slice[SupportsIndex | None], value: Iterable[Any], /) -> None: ...
+
     def __iter__(self) -> Iterator[Any]: ...
     # Can't inherit from Sized because the metaclass conflict between
     # Sized and _CData prevents using _CDataMeta.
@@ -401,7 +465,7 @@ class Array(_CData, Generic[_CT], metaclass=_PyCArrayType):
         """Return len(self)."""
 
     def __class_getitem__(cls, item: Any, /) -> GenericAlias:
-        """See PEP 585"""
+        """Arrays are generic over the type of their elements"""
 
 def addressof(obj: _CData | _CDataType, /) -> int:
     """Return the address of the C instance internal buffer"""

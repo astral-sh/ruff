@@ -1,4 +1,3 @@
-pub use glob::PatternError;
 pub use memory_fs::MemoryFileSystem;
 
 #[cfg(all(feature = "testing", feature = "os"))]
@@ -9,19 +8,19 @@ pub use os::OsSystem;
 
 use filetime::FileTime;
 use ruff_notebook::{Notebook, NotebookError};
+use ruff_python_ast::PySourceType;
 use std::error::Error;
-use std::fmt::{Debug, Formatter};
-use std::path::{Path, PathBuf};
-use std::{fmt, io};
+use std::fmt;
+use std::fmt::Debug;
+use std::process::Output;
 pub use test::{DbWithTestSystem, DbWithWritableSystem, InMemorySystem, TestSystem};
 use walk_directory::WalkDirectoryBuilder;
-
-use crate::file_revision::FileRevision;
 
 pub use self::path::{
     DeduplicatedNestedPathsIter, SystemPath, SystemPathBuf, SystemVirtualPath,
     SystemVirtualPathBuf, deduplicate_nested_paths,
 };
+use crate::file_revision::FileRevision;
 
 mod memory_fs;
 #[cfg(feature = "os")]
@@ -31,6 +30,7 @@ mod test;
 pub mod walk_directory;
 
 pub type Result<T> = std::io::Result<T>;
+pub type WhichResult = std::result::Result<SystemPathBuf, WhichError>;
 
 /// The system on which Ruff runs.
 ///
@@ -66,6 +66,55 @@ pub trait System: Debug + Sync + Send {
     /// See [dunce::canonicalize] for more information.
     fn canonicalize_path(&self, path: &SystemPath) -> Result<SystemPathBuf>;
 
+    /// Returns `true` if both paths refer to the same file.
+    fn is_same_file(&self, first: &SystemPath, second: &SystemPath) -> Result<bool>;
+
+    /// Returns the source type for `path` if known or `None`.
+    ///
+    /// The default is to always return `None`, assuming the system
+    /// has no additional information and that the caller should
+    /// rely on the file extension instead.
+    ///
+    /// This is primarily used for the LSP integration to respect
+    /// the chosen language (or the fact that it is a notebook) in
+    /// the editor.
+    fn source_type(&self, path: &SystemPath) -> Option<PySourceType> {
+        let _ = path;
+        None
+    }
+
+    /// Returns the source type for `path` if known or `None`.
+    ///
+    /// The default is to always return `None`, assuming the system
+    /// has no additional information and that the caller should
+    /// rely on the file extension instead.
+    ///
+    /// This is primarily used for the LSP integration to respect
+    /// the chosen language (or the fact that it is a notebook) in
+    /// the editor.
+    fn virtual_path_source_type(&self, path: &SystemVirtualPath) -> Option<PySourceType> {
+        let _ = path;
+
+        None
+    }
+
+    /// Find an executable binary's path by name.
+    fn which(&self, binary_name: &str) -> WhichResult;
+
+    /// Runs a command in the given working directory, returning its output.
+    fn run_command(
+        &self,
+        program: &str,
+        args: &[&str],
+        current_directory: &SystemPath,
+    ) -> Result<Output> {
+        let _ = (program, args, current_directory);
+        Err(std::io::Error::new(
+            std::io::ErrorKind::Unsupported,
+            "running commands is not supported by this system",
+        ))
+    }
+
     /// Reads the content of the file at `path` into a [`String`].
     fn read_to_string(&self, path: &SystemPath) -> Result<String>;
 
@@ -89,20 +138,6 @@ pub trait System: Debug + Sync + Send {
     fn path_exists(&self, path: &SystemPath) -> bool {
         self.path_metadata(path).is_ok()
     }
-
-    /// Returns `true` if `path` exists on disk using the exact casing as specified in `path` for the parts after `prefix`.
-    ///
-    /// This is the same as [`Self::path_exists`] on case-sensitive systems.
-    ///
-    /// ## The use of prefix
-    ///
-    /// Prefix is only intended as an optimization for systems that can't efficiently check
-    /// if an entire path exists with the exact casing as specified in `path`. However,
-    /// implementations are allowed to check the casing of the entire path if they can do so efficiently.
-    fn path_exists_case_sensitive(&self, path: &SystemPath, prefix: &SystemPath) -> bool;
-
-    /// Returns the [`CaseSensitivity`] of the system's file system.
-    fn case_sensitivity(&self) -> CaseSensitivity;
 
     /// Returns `true` if `path` exists and is a directory.
     fn is_directory(&self, path: &SystemPath) -> bool {
@@ -163,19 +198,6 @@ pub trait System: Debug + Sync + Send {
     /// yields a single entry for that file.
     fn walk_directory(&self, path: &SystemPath) -> WalkDirectoryBuilder;
 
-    /// Return an iterator that produces all the `Path`s that match the given
-    /// pattern using default match options, which may be absolute or relative to
-    /// the current working directory.
-    ///
-    /// This may return an error if the pattern is invalid.
-    fn glob(
-        &self,
-        pattern: &str,
-    ) -> std::result::Result<
-        Box<dyn Iterator<Item = std::result::Result<SystemPathBuf, GlobError>> + '_>,
-        PatternError,
-    >;
-
     /// Fetches the environment variable `key` from the current process.
     ///
     /// # Errors
@@ -191,7 +213,7 @@ pub trait System: Debug + Sync + Send {
         Err(std::env::VarError::NotPresent)
     }
 
-    /// Returns a handle to a [`WritableSystem`] if this system is writeable.
+    /// Returns a handle to a [`WritableSystem`] if this system is writable.
     fn as_writable(&self) -> Option<&dyn WritableSystem>;
 
     fn as_any(&self) -> &dyn std::any::Any;
@@ -199,39 +221,6 @@ pub trait System: Debug + Sync + Send {
     fn as_any_mut(&mut self) -> &mut dyn std::any::Any;
 
     fn dyn_clone(&self) -> Box<dyn System>;
-}
-
-#[derive(Debug, Default, Copy, Clone, Eq, PartialEq)]
-pub enum CaseSensitivity {
-    /// The case sensitivity of the file system is unknown.
-    ///
-    /// The file system is either case-sensitive or case-insensitive. A caller
-    /// should not assume either case.
-    #[default]
-    Unknown,
-
-    /// The file system is case-sensitive.
-    CaseSensitive,
-
-    /// The file system is case-insensitive.
-    CaseInsensitive,
-}
-
-impl CaseSensitivity {
-    /// Returns `true` if the file system is known to be case-sensitive.
-    pub const fn is_case_sensitive(self) -> bool {
-        matches!(self, Self::CaseSensitive)
-    }
-}
-
-impl fmt::Display for CaseSensitivity {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        match self {
-            CaseSensitivity::Unknown => f.write_str("unknown"),
-            CaseSensitivity::CaseSensitive => f.write_str("case-sensitive"),
-            CaseSensitivity::CaseInsensitive => f.write_str("case-insensitive"),
-        }
-    }
 }
 
 /// System trait for non-readonly systems.
@@ -242,7 +231,12 @@ pub trait WritableSystem: System {
     fn create_new_file(&self, path: &SystemPath) -> Result<()>;
 
     /// Writes the given content to the file at the given path.
-    fn write_file(&self, path: &SystemPath, content: &str) -> Result<()>;
+    fn write_file(&self, path: &SystemPath, content: &str) -> Result<()> {
+        self.write_file_bytes(path, content.as_bytes())
+    }
+
+    /// Writes the given content to the file at the given path.
+    fn write_file_bytes(&self, path: &SystemPath, content: &[u8]) -> Result<()>;
 
     /// Creates a directory at `path` as well as any intermediate directories.
     fn create_directory_all(&self, path: &SystemPath) -> Result<()>;
@@ -282,6 +276,8 @@ pub trait WritableSystem: System {
 
         Ok(Some(cache_path))
     }
+
+    fn dyn_clone(&self) -> Box<dyn WritableSystem>;
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -313,7 +309,7 @@ impl Metadata {
     }
 }
 
-#[derive(Copy, Clone, Eq, PartialEq, Debug, Hash)]
+#[derive(Copy, Clone, Eq, PartialEq, Debug, Hash, get_size2::GetSize)]
 pub enum FileType {
     File,
     Directory,
@@ -358,62 +354,6 @@ impl DirectoryEntry {
     }
 }
 
-/// A glob iteration error.
-///
-/// This is typically returned when a particular path cannot be read
-/// to determine if its contents match the glob pattern. This is possible
-/// if the program lacks the appropriate permissions, for example.
-#[derive(Debug)]
-pub struct GlobError {
-    path: PathBuf,
-    error: GlobErrorKind,
-}
-
-impl GlobError {
-    /// The Path that the error corresponds to.
-    pub fn path(&self) -> &Path {
-        &self.path
-    }
-
-    pub fn kind(&self) -> &GlobErrorKind {
-        &self.error
-    }
-}
-
-impl Error for GlobError {}
-
-impl fmt::Display for GlobError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match &self.error {
-            GlobErrorKind::IOError(error) => {
-                write!(
-                    f,
-                    "attempting to read `{}` resulted in an error: {error}",
-                    self.path.display(),
-                )
-            }
-            GlobErrorKind::NonUtf8Path => {
-                write!(f, "`{}` is not a valid UTF-8 path", self.path.display(),)
-            }
-        }
-    }
-}
-
-impl From<glob::GlobError> for GlobError {
-    fn from(value: glob::GlobError) -> Self {
-        Self {
-            path: value.path().to_path_buf(),
-            error: GlobErrorKind::IOError(value.into_error()),
-        }
-    }
-}
-
-#[derive(Debug)]
-pub enum GlobErrorKind {
-    IOError(io::Error),
-    NonUtf8Path,
-}
-
 #[cfg(not(target_arch = "wasm32"))]
 pub fn file_time_now() -> FileTime {
     FileTime::now()
@@ -436,4 +376,35 @@ pub fn file_time_now() -> FileTime {
 
             FileTime::from_unix_time(-(until_epoch.as_secs() as i64) + sec_offset, nanos)
         })
+}
+
+#[derive(Copy, Clone, Eq, PartialEq, Debug)]
+pub enum WhichError {
+    /// An executable binary with that name was not found
+    CannotFindBinaryPath,
+
+    /// There was nowhere to search and the provided name wasn't an absolute path
+    CannotGetCurrentDirAndPathListEmpty,
+
+    /// Failed to canonicalize the path found
+    CannotCanonicalize,
+
+    /// The executable exists but its path contains non UTF8 characters.
+    NonUtf8Path,
+}
+
+impl Error for WhichError {}
+
+impl fmt::Display for WhichError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            WhichError::CannotFindBinaryPath => write!(f, "cannot find binary path"),
+            WhichError::CannotGetCurrentDirAndPathListEmpty => write!(
+                f,
+                "no path to search and provided name is not an absolute path"
+            ),
+            WhichError::CannotCanonicalize => write!(f, "cannot canonicalize path"),
+            WhichError::NonUtf8Path => write!(f, "non UTF-8 path"),
+        }
+    }
 }

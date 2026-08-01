@@ -11,12 +11,12 @@ use crate::cached_vendored_root;
 /// other language server providers (like hover, completion, and signature help) to find
 /// docstrings for functions that resolve to stubs.
 pub(crate) struct StubMapper<'db> {
-    db: &'db dyn crate::Db,
+    db: &'db dyn ty_python_semantic::Db,
     cached_vendored_root: Option<SystemPathBuf>,
 }
 
 impl<'db> StubMapper<'db> {
-    pub(crate) fn new(db: &'db dyn crate::Db) -> Self {
+    pub(crate) fn new(db: &'db dyn ty_python_semantic::Db) -> Self {
         let cached_vendored_root = cached_vendored_root(db);
         Self {
             db,
@@ -32,12 +32,17 @@ impl<'db> StubMapper<'db> {
         &self,
         def: ResolvedDefinition<'db>,
     ) -> impl Iterator<Item = ResolvedDefinition<'db>> {
-        if let Some(definitions) =
-            map_stub_definition(self.db, &def, self.cached_vendored_root.as_deref())
-        {
+        if let Some(definitions) = self.map_definition_to_source(&def) {
             return Either::Left(definitions.into_iter());
         }
         Either::Right(std::iter::once(def))
+    }
+
+    pub(crate) fn map_definition_to_source(
+        &self,
+        def: &ResolvedDefinition<'db>,
+    ) -> Option<Vec<ResolvedDefinition<'db>>> {
+        map_stub_definition(self.db, def, self.cached_vendored_root.as_deref())
     }
 
     /// Map multiple `ResolvedDefinitions`, applying stub-to-source mapping to each.

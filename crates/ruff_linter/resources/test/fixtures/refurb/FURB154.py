@@ -84,3 +84,11 @@ def fy():
 def fz():
     pass
     global x
+
+
+def func():
+    global x
+    # text
+    global y
+
+    print(x, y)

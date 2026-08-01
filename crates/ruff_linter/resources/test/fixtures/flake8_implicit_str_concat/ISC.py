@@ -208,3 +208,26 @@ _ = t"b {f"c" f"d {t"e" t"f"} g"} h"
 _ = f"b {t"abc" \
     t"def"} g"
 
+
+# Explicit concatenation with either operand being
+# a string literal that wraps across multiple lines (in parentheses)
+# reports diagnostic - no autofix.
+# See https://github.com/astral-sh/ruff/issues/19757
+_ = "abc" + (
+    "def"
+    "ghi"
+)
+
+_ = (
+    "abc"
+    "def"
+) + "ghi"
+
+
+# https://github.com/astral-sh/ruff/issues/26541
+x = (
+    "A"  # Complains about this: +
+    + " broken"
+    + " line"
+    + " string."
+)

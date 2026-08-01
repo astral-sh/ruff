@@ -29,7 +29,7 @@ from collections.abc import (
 )
 from contextlib import AbstractAsyncContextManager as AsyncContextManager, AbstractContextManager as ContextManager
 from re import Match as Match, Pattern as Pattern
-from types import GenericAlias, ModuleType
+from types import GenericAlias, ModuleType, UnionType
 from typing import (  # noqa: Y022,Y037,Y038,Y039,UP035
     IO as IO,
     TYPE_CHECKING as TYPE_CHECKING,
@@ -40,6 +40,7 @@ from typing import (  # noqa: Y022,Y037,Y038,Y039,UP035
     Callable as Callable,
     ChainMap as ChainMap,
     ClassVar as ClassVar,
+    Concatenate as Concatenate,
     Counter as Counter,
     DefaultDict as DefaultDict,
     Deque as Deque,
@@ -50,25 +51,28 @@ from typing import (  # noqa: Y022,Y037,Y038,Y039,UP035
     List as List,
     NoReturn as NoReturn,
     Optional as Optional,
+    ParamSpecArgs as ParamSpecArgs,
+    ParamSpecKwargs as ParamSpecKwargs,
     Set as Set,
     Text as Text,
     TextIO as TextIO,
     Tuple as Tuple,
     Type as Type,
-    TypedDict as TypedDict,
+    TypeAlias as TypeAlias,
+    TypeGuard as TypeGuard,
     TypeVar as _TypeVar,
     Union as Union,
     _Alias,
     _SpecialForm,
     cast as cast,
+    is_typeddict as is_typeddict,
     no_type_check as no_type_check,
-    no_type_check_decorator as no_type_check_decorator,
     overload as overload,
     type_check_only,
 )
 
-if sys.version_info >= (3, 10):
-    from types import UnionType
+if sys.version_info >= (3, 14):
+    from _typeshed import EvaluateFunc
 
 # Please keep order the same as at runtime.
 __all__ = [
@@ -141,6 +145,7 @@ __all__ = [
     "override",
     "Protocol",
     "Sentinel",
+    "sentinel",
     "reveal_type",
     "runtime",
     "runtime_checkable",
@@ -207,12 +212,51 @@ _TC = _TypeVar("_TC", bound=type[object])
 _T_co = _TypeVar("_T_co", covariant=True)  # Any type covariant containers.
 _T_contra = _TypeVar("_T_contra", contravariant=True)
 
+if sys.version_info < (3, 15):
+    def no_type_check_decorator(decorator: _F) -> _F:
+        """Decorator to give another decorator the @no_type_check effect.
+
+        This wraps the decorator with something that wraps the decorated
+        function in @no_type_check.
+        """
+
 # Do not import (and re-export) Protocol or runtime_checkable from
 # typing module because type checkers need to be able to distinguish
 # typing.Protocol and typing_extensions.Protocol so they can properly
 # warn users about potential runtime exceptions when using typing.Protocol
 # on older versions of Python.
 Protocol: _SpecialForm
+"""Base class for protocol classes.
+
+Protocol classes are defined as::
+
+    class Proto(Protocol):
+        def meth(self) -> int:
+            ...
+
+Such classes are primarily used with static type checkers that recognize
+structural subtyping (static duck-typing).
+
+For example::
+
+    class C:
+        def meth(self) -> int:
+            return 0
+
+    def func(x: Proto) -> int:
+        return x.meth()
+
+    func(C())  # Passes static type check
+
+See PEP 544 for details. Protocol classes decorated with
+@typing.runtime_checkable act as simple-minded runtime protocols that check
+only the presence of given attributes, ignoring their type signatures.
+Protocol classes can be generic, they are defined as::
+
+    class GenProto[T](Protocol):
+        def meth(self) -> T:
+            ...
+"""
 
 def runtime_checkable(cls: _TC) -> _TC:
     """Mark a protocol class as a runtime protocol.
@@ -220,7 +264,7 @@ def runtime_checkable(cls: _TC) -> _TC:
     Such protocol can be used with isinstance() and issubclass().
     Raise TypeError if applied to a non-protocol class.
     This allows a simple-minded structural check very similar to
-    one trick ponies in collections.abc such as Iterable.
+    one-trick ponies in collections.abc such as Iterable.
 
     For example::
 
@@ -237,12 +281,29 @@ def runtime_checkable(cls: _TC) -> _TC:
 # This alias for above is kept here for backwards compatibility.
 runtime = runtime_checkable
 Final: _SpecialForm
+"""Special typing construct to indicate final names to type checkers.
 
-def final(f: _F) -> _F:
+A final name cannot be re-assigned or overridden in a subclass.
+
+For example::
+
+    MAX_SIZE: Final = 9000
+    MAX_SIZE += 1  # Error reported by type checker
+
+    class Connection:
+        TIMEOUT: Final[int] = 10
+
+    class FastConnector(Connection):
+        TIMEOUT = 1  # Error reported by type checker
+
+There is no runtime checking of these properties.
+"""
+
+def final(f: _T) -> _T:
     """Decorator to indicate final methods and final classes.
 
     Use this decorator to indicate to type checkers that the decorated
-    method cannot be overridden, and decorated class cannot be subclassed.
+    method cannot be overridden, and the decorated class cannot be subclassed.
 
     For example::
 
@@ -269,7 +330,7 @@ def disjoint_base(cls: _TC) -> _TC:
     """This decorator marks a class as a disjoint base.
 
     Child classes of a disjoint base cannot inherit from other disjoint bases that are
-    not parent classes of the disjoint base.
+    not parent or child classes of the disjoint base.
 
     For example:
 
@@ -283,13 +344,82 @@ def disjoint_base(cls: _TC) -> _TC:
 
     Type checkers can use knowledge of disjoint bases to detect unreachable code
     and determine when two types can overlap.
-
-    See PEP 800.
     """
 
 Literal: _SpecialForm
+"""Special typing form to define literal types (a.k.a. value types).
+
+This form can be used to indicate to type checkers that the corresponding
+variable or function parameter has a value equivalent to the provided
+literal (or one of several literals)::
+
+    def validate_simple(data: Any) -> Literal[True]:  # always returns True
+        ...
+
+    MODE = Literal['r', 'rb', 'w', 'wb']
+    def open_helper(file: str, mode: MODE) -> str:
+        ...
+
+    open_helper('/some/path', 'r')  # Passes type check
+    open_helper('/other/path', 'typo')  # Error in type checker
+
+Literal[...] cannot be subclassed. At runtime, an arbitrary value
+is allowed as type argument to Literal[...], but type checkers may
+impose restrictions.
+"""
 
 def IntVar(name: str) -> Any: ...  # returns a new TypeVar
+
+# Kept as a distinct symbol to `typing.TypedDict` so that type checkers can more easily
+# distinguish between the two on Python 3.14, on which `typing_extensions.TypedDict`
+# exposes `__closed__` and `__extra_items__` but `typing.TypedDict` does not
+TypedDict: _SpecialForm
+"""A simple typed namespace. At runtime it is equivalent to a plain dict.
+
+TypedDict creates a dictionary type such that a type checker will expect all
+instances to have a certain set of keys, where each key is
+associated with a value of a consistent type. This expectation
+is not checked at runtime.
+
+Usage::
+
+    class Point2D(TypedDict):
+        x: int
+        y: int
+        label: str
+
+    a: Point2D = {'x': 1, 'y': 2, 'label': 'good'}  # OK
+    b: Point2D = {'z': 3, 'label': 'bad'}           # Fails type check
+
+    assert Point2D(x=1, y=2, label='first') == dict(x=1, y=2, label='first')
+
+The type info can be accessed via the Point2D.__annotations__ dict, and
+the Point2D.__required_keys__ and Point2D.__optional_keys__ frozensets.
+TypedDict supports an additional equivalent form::
+
+    Point2D = TypedDict('Point2D', {'x': int, 'y': int, 'label': str})
+
+By default, all keys must be present in a TypedDict. It is possible
+to override this by specifying totality::
+
+    class Point2D(TypedDict, total=False):
+        x: int
+        y: int
+
+This means that a Point2D TypedDict can have any of the keys omitted. A type
+checker is only expected to support a literal False or True as the value of
+the total argument. True is the default, and makes all items defined in the
+class body be required.
+
+The Required and NotRequired special forms can also be used to mark
+individual keys as being required or not required::
+
+    class Point2D(TypedDict):
+        x: int  # the "x" key must always be present (Required is the default)
+        y: NotRequired[int]  # the "y" key can be omitted
+
+See PEP 655 for more details on Required and NotRequired.
+"""
 
 # Internal mypy fallback type for all typed dicts (does not exist at runtime)
 # N.B. Keep this mostly in sync with typing._TypedDict/mypy_extensions._TypedDict
@@ -316,23 +446,25 @@ class _TypedDict(Mapping[str, object], metaclass=abc.ABCMeta):
     def keys(self) -> dict_keys[str, object]: ...
     def values(self) -> dict_values[str, object]: ...
     def __delitem__(self, k: Never) -> None: ...
+
     @overload
     def __or__(self, value: Self, /) -> Self:
         """Return self|value."""
-
     @overload
     def __or__(self, value: dict[str, Any], /) -> dict[str, object]: ...
+
     @overload
     def __ror__(self, value: Self, /) -> Self:
         """Return value|self."""
-
     @overload
     def __ror__(self, value: dict[str, Any], /) -> dict[str, object]: ...
+
     # supposedly incompatible definitions of `__ior__` and `__or__`:
     # Since this module defines "Self" it is not recognized by Ruff as typing_extensions.Self
     def __ior__(self, value: Self, /) -> Self: ...  # type: ignore[misc]
 
 OrderedDict = _Alias()
+"""Deprecated alias to collections.OrderedDict."""
 
 if sys.version_info >= (3, 13):
     from typing import get_type_hints as get_type_hints
@@ -387,29 +519,8 @@ def get_args(tp: AnnotationForm) -> tuple[AnnotationForm, ...]:
         >>> assert get_args(Callable[[], T][int]) == ([], int)
     """
 
-if sys.version_info >= (3, 10):
-    @overload
-    def get_origin(tp: UnionType) -> type[UnionType]:
-        """Get the unsubscripted version of a type.
-
-        This supports generic types, Callable, Tuple, Union, Literal, Final, ClassVar,
-        Annotated, and others. Return None for unsupported types.
-
-        Examples::
-
-            >>> P = ParamSpec('P')
-            >>> assert get_origin(Literal[42]) is Literal
-            >>> assert get_origin(int) is None
-            >>> assert get_origin(ClassVar[int]) is ClassVar
-            >>> assert get_origin(Generic) is Generic
-            >>> assert get_origin(Generic[T]) is Generic
-            >>> assert get_origin(Union[T, int]) is Union
-            >>> assert get_origin(List[Tuple[T, T]][int]) is list
-            >>> assert get_origin(P.args) is P
-        """
-
 @overload
-def get_origin(tp: GenericAlias) -> type:
+def get_origin(tp: UnionType) -> type[UnionType]:
     """Get the unsubscripted version of a type.
 
     This supports generic types, Callable, Tuple, Union, Literal, Final, ClassVar,
@@ -427,76 +538,62 @@ def get_origin(tp: GenericAlias) -> type:
         >>> assert get_origin(List[Tuple[T, T]][int]) is list
         >>> assert get_origin(P.args) is P
     """
-
+@overload
+def get_origin(tp: GenericAlias) -> type: ...
 @overload
 def get_origin(tp: ParamSpecArgs | ParamSpecKwargs) -> ParamSpec: ...
 @overload
 def get_origin(tp: AnnotationForm) -> AnnotationForm | None: ...
 
 Annotated: _SpecialForm
+"""Add context-specific metadata to a type.
+
+Example: Annotated[int, runtime_check.Unsigned] indicates to the
+hypothetical runtime_check module that this type is an unsigned int.
+Every other consumer of this type can ignore this metadata and treat
+this type as int.
+
+The first argument to Annotated must be a valid type.
+
+Details:
+
+- It's an error to call `Annotated` with less than two arguments.
+- Access the metadata via the ``__metadata__`` attribute::
+
+    assert Annotated[int, '$'].__metadata__ == ('$',)
+
+- Nested Annotated types are flattened::
+
+    assert Annotated[Annotated[T, Ann1, Ann2], Ann3] == Annotated[T, Ann1, Ann2, Ann3]
+
+- Instantiating an annotated type is equivalent to instantiating the
+underlying type::
+
+    assert Annotated[C, Ann1](5) == C(5)
+
+- Annotated can be used as a generic type alias::
+
+    type Optimized[T] = Annotated[T, runtime.Optimize()]
+    # type checker will treat Optimized[int]
+    # as equivalent to Annotated[int, runtime.Optimize()]
+
+    type OptimizedList[T] = Annotated[list[T], runtime.Optimize()]
+    # type checker will treat OptimizedList[int]
+    # as equivalent to Annotated[list[int], runtime.Optimize()]
+
+- Annotated cannot be used with an unpacked TypeVarTuple::
+
+    type Variadic[*Ts] = Annotated[*Ts, Ann1]  # NOT valid
+
+  This would be equivalent to::
+
+    Annotated[T1, T2, T3, ..., Ann1]
+
+  where T1, T2 etc. are TypeVars, which would be invalid, because
+  only one type should be passed to Annotated.
+"""
+
 _AnnotatedAlias: Any  # undocumented
-
-# New and changed things in 3.10
-if sys.version_info >= (3, 10):
-    from typing import (
-        Concatenate as Concatenate,
-        ParamSpecArgs as ParamSpecArgs,
-        ParamSpecKwargs as ParamSpecKwargs,
-        TypeAlias as TypeAlias,
-        TypeGuard as TypeGuard,
-        is_typeddict as is_typeddict,
-    )
-else:
-    @final
-    class ParamSpecArgs:
-        """The args for a ParamSpec object.
-
-        Given a ParamSpec object P, P.args is an instance of ParamSpecArgs.
-
-        ParamSpecArgs objects have a reference back to their ParamSpec:
-
-        P.args.__origin__ is P
-
-        This type is meant for runtime introspection and has no special meaning to
-        static type checkers.
-        """
-
-        @property
-        def __origin__(self) -> ParamSpec: ...
-        def __init__(self, origin: ParamSpec) -> None: ...
-
-    @final
-    class ParamSpecKwargs:
-        """The kwargs for a ParamSpec object.
-
-        Given a ParamSpec object P, P.kwargs is an instance of ParamSpecKwargs.
-
-        ParamSpecKwargs objects have a reference back to their ParamSpec:
-
-        P.kwargs.__origin__ is P
-
-        This type is meant for runtime introspection and has no special meaning to
-        static type checkers.
-        """
-
-        @property
-        def __origin__(self) -> ParamSpec: ...
-        def __init__(self, origin: ParamSpec) -> None: ...
-
-    Concatenate: _SpecialForm
-    TypeAlias: _SpecialForm
-    TypeGuard: _SpecialForm
-    def is_typeddict(tp: object) -> bool:
-        """Check if an annotation is a TypedDict class
-
-        For example::
-            class Film(TypedDict):
-                title: str
-                year: int
-
-            is_typeddict(Film)  # => True
-            is_typeddict(Union[list, str])  # => False
-        """
 
 # New and changed things in 3.11
 if sys.version_info >= (3, 11):
@@ -518,7 +615,42 @@ if sys.version_info >= (3, 11):
     )
 else:
     Self: _SpecialForm
+    """Used to spell the type of "self" in classes.
+
+    Example::
+
+      from typing import Self
+
+      class ReturnsSelf:
+          def parse(self, data: bytes) -> Self:
+              ...
+              return self
+
+    """
+
     Never: _SpecialForm
+    """The bottom type, a type that has no members.
+
+    This can be used to define a function that should never be
+    called, or a function that never returns::
+
+        from typing_extensions import Never
+
+        def never_call_me(arg: Never) -> None:
+            pass
+
+        def int_or_str(arg: int | str) -> None:
+            never_call_me(arg)  # type checker error
+            match arg:
+                case int():
+                    print("It's an int")
+                case str():
+                    print("It's a str")
+                case _:
+                    never_call_me(arg)  # ok, arg is of type Never
+
+    """
+
     def reveal_type(obj: _T, /) -> _T:
         """Reveal the inferred type of a variable.
 
@@ -576,10 +708,95 @@ else:
 
     def get_overloads(func: Callable[..., object]) -> Sequence[Callable[..., object]]:
         """Return all defined overloads for *func* as a sequence."""
+
     Required: _SpecialForm
+    """A special typing construct to mark a key of a total=False TypedDict
+    as required. For example:
+
+        class Movie(TypedDict, total=False):
+            title: Required[str]
+            year: int
+
+        m = Movie(
+            title='The Matrix',  # typechecker error if key is omitted
+            year=1999,
+        )
+
+    There is no runtime checking that a required key is actually provided
+    when instantiating a related TypedDict.
+    """
+
     NotRequired: _SpecialForm
+    """A special typing construct to mark a key of a TypedDict as
+    potentially missing. For example:
+
+        class Movie(TypedDict):
+            title: str
+            year: NotRequired[int]
+
+        m = Movie(
+            title='The Matrix',  # typechecker error if key is omitted
+            year=1999,
+        )
+    """
+
     LiteralString: _SpecialForm
+    """Represents an arbitrary literal string.
+
+    Example::
+
+      from typing_extensions import LiteralString
+
+      def query(sql: LiteralString) -> ...:
+          ...
+
+      query("SELECT * FROM table")  # ok
+      query(f"SELECT * FROM {input()}")  # not ok
+
+    See PEP 675 for details.
+
+    """
+
     Unpack: _SpecialForm
+    """Type unpack operator.
+
+    The type unpack operator takes the child types from some container type,
+    such as `tuple[int, str]` or a `TypeVarTuple`, and 'pulls them out'. For
+    example:
+
+      # For some generic class `Foo`:
+      Foo[Unpack[tuple[int, str]]]  # Equivalent to Foo[int, str]
+
+      Ts = TypeVarTuple('Ts')
+      # Specifies that `Bar` is generic in an arbitrary number of types.
+      # (Think of `Ts` as a tuple of an arbitrary number of individual
+      #  `TypeVar`s, which the `Unpack` is 'pulling out' directly into the
+      #  `Generic[]`.)
+      class Bar(Generic[Unpack[Ts]]): ...
+      Bar[int]  # Valid
+      Bar[int, str]  # Also valid
+
+    From Python 3.11, this can also be done using the `*` operator:
+
+        Foo[*tuple[int, str]]
+        class Bar(Generic[*Ts]): ...
+
+    The operator can also be used along with a `TypedDict` to annotate
+    `**kwargs` in a function signature. For instance:
+
+      class Movie(TypedDict):
+        name: str
+        year: int
+
+      # This function expects two keyword arguments - *name* of type `str` and
+      # *year* of type `int`.
+      def foo(**kwargs: Unpack[Movie]): ...
+
+    Note that there is only some runtime checking of this operator. Not
+    everything the runtime allows may be accepted by static type checkers.
+
+    For more information, see PEP 646 and PEP 692.
+    """
 
     def dataclass_transform(
         *,
@@ -676,10 +893,12 @@ else:
         _field_defaults: ClassVar[dict[str, Any]]
         _fields: ClassVar[tuple[str, ...]]
         __orig_bases__: ClassVar[tuple[Any, ...]]
+
         @overload
         def __init__(self, typename: str, fields: Iterable[tuple[str, Any]] = ...) -> None: ...
         @overload
         def __init__(self, typename: str, fields: None = None, **kwargs: Any) -> None: ...
+
         @classmethod
         def _make(cls, iterable: Iterable[Any]) -> Self: ...
         def _asdict(self) -> dict[str, Any]: ...
@@ -701,10 +920,10 @@ else:
 
         def __init__(self, name: str, tp: AnnotationForm) -> None: ...
         def __call__(self, obj: _T, /) -> _T: ...
+        def __or__(self, other: Any) -> _SpecialForm: ...
+        def __ror__(self, other: Any) -> _SpecialForm: ...
         __supertype__: type | NewType
-        if sys.version_info >= (3, 10):
-            def __or__(self, other: Any) -> _SpecialForm: ...
-            def __ror__(self, other: Any) -> _SpecialForm: ...
+        __name__: str
 
 if sys.version_info >= (3, 12):
     from collections.abc import Buffer as Buffer
@@ -768,6 +987,7 @@ else:
             assert get_original_bases(Spam) == (TypedDict,)
             assert get_original_bases(int) == (object,)
         """
+
     # mypy and pyright object to this being both ABC and Protocol.
     # At runtime it inherits from ABC and is not a Protocol, but it is on the
     # allowlist for use as a Protocol.
@@ -851,6 +1071,7 @@ else:
         """
 
         __slots__ = ()
+
         @overload
         @abc.abstractmethod
         def __round__(self) -> int: ...
@@ -897,7 +1118,6 @@ if sys.version_info >= (3, 13):
         ReadOnly as ReadOnly,
         TypeIs as TypeIs,
         TypeVar as TypeVar,
-        TypeVarTuple as TypeVarTuple,
         get_protocol_members as get_protocol_members,
         is_protocol as is_protocol,
     )
@@ -927,8 +1147,8 @@ else:
             >>> class P(Protocol):
             ...     def a(self) -> str: ...
             ...     b: int
-            >>> get_protocol_members(P)
-            frozenset({'a', 'b'})
+            >>> get_protocol_members(P) == frozenset({'a', 'b'})
+            True
 
         Raise a TypeError for arguments that are not Protocols.
         """
@@ -1029,12 +1249,12 @@ else:
         ) -> None: ...
         def has_default(self) -> bool: ...
         def __typing_prepare_subst__(self, alias: Any, args: Any) -> tuple[Any, ...]: ...
-        if sys.version_info >= (3, 10):
-            def __or__(self, right: Any) -> _SpecialForm:
-                """Return self|value."""
+        def __or__(self, right: Any) -> _SpecialForm:
+            """Return self|value."""
 
-            def __ror__(self, left: Any) -> _SpecialForm:
-                """Return value|self."""
+        def __ror__(self, left: Any) -> _SpecialForm:
+            """Return value|self."""
+
         if sys.version_info >= (3, 11):
             def __typing_subst__(self, arg: Any) -> Any: ...
 
@@ -1063,19 +1283,76 @@ else:
             covariant: bool = False,
             default: AnnotationForm = ...,
         ) -> None: ...
+        def __or__(self, right: Any) -> _SpecialForm:
+            """Return self|value."""
+
+        def __ror__(self, left: Any) -> _SpecialForm:
+            """Return value|self."""
+
         @property
         def args(self) -> ParamSpecArgs: ...
         @property
         def kwargs(self) -> ParamSpecKwargs: ...
         def has_default(self) -> bool: ...
         def __typing_prepare_subst__(self, alias: Any, args: Any) -> tuple[Any, ...]: ...
-        if sys.version_info >= (3, 10):
-            def __or__(self, right: Any) -> _SpecialForm:
-                """Return self|value."""
 
-            def __ror__(self, left: Any) -> _SpecialForm:
-                """Return value|self."""
+    ReadOnly: _SpecialForm
+    """A special typing construct to mark an item of a TypedDict as read-only.
 
+    For example:
+
+        class Movie(TypedDict):
+            title: ReadOnly[str]
+            year: int
+
+        def mutate_movie(m: Movie) -> None:
+            m["year"] = 1992  # allowed
+            m["title"] = "The Matrix"  # typechecker error
+
+    There is no runtime checking for this property.
+    """
+
+    TypeIs: _SpecialForm
+    """Special typing form used to annotate the return type of a user-defined
+    type narrower function.  ``TypeIs`` only accepts a single type argument.
+    At runtime, functions marked this way should return a boolean.
+
+    ``TypeIs`` aims to benefit *type narrowing* -- a technique used by static
+    type checkers to determine a more precise type of an expression within a
+    program's code flow.  Usually type narrowing is done by analyzing
+    conditional code flow and applying the narrowing to a block of code.  The
+    conditional expression here is sometimes referred to as a "type guard".
+
+    Sometimes it would be convenient to use a user-defined boolean function
+    as a type guard.  Such a function should use ``TypeIs[...]`` as its
+    return type to alert static type checkers to this intention.
+
+    Using  ``-> TypeIs`` tells the static type checker that for a given
+    function:
+
+    1. The return value is a boolean.
+    2. If the return value is ``True``, the type of its argument
+    is the intersection of the type inside ``TypeIs`` and the argument's
+    previously known type.
+
+    For example::
+
+        def is_awaitable(val: object) -> TypeIs[Awaitable[object]]:
+            return hasattr(val, '__await__')
+
+        def f(val: Union[int, Awaitable[int]]) -> int:
+            if is_awaitable(val):
+                assert_type(val, Awaitable[int])
+            else:
+                assert_type(val, int)
+
+    ``TypeIs`` also works with type variables.  For more information, see
+    PEP 742 (Narrowing types with TypeIs).
+    """
+
+if sys.version_info >= (3, 15):
+    from typing import TypeVarTuple as TypeVarTuple
+else:
     @final
     class TypeVarTuple:
         """Type variable tuple."""
@@ -1083,14 +1360,47 @@ else:
         @property
         def __name__(self) -> str: ...
         @property
+        def __bound__(self) -> AnnotationForm | None: ...
+        @property
+        def __covariant__(self) -> bool: ...
+        @property
+        def __contravariant__(self) -> bool: ...
+        @property
+        def __infer_variance__(self) -> bool: ...
+        @property
         def __default__(self) -> AnnotationForm: ...
-        def __init__(self, name: str, *, default: AnnotationForm = ...) -> None: ...
+        if sys.version_info >= (3, 11):
+            def __new__(
+                cls,
+                name: str,
+                *,
+                bound: AnnotationForm | None = None,
+                covariant: bool = False,
+                contravariant: bool = False,
+                infer_variance: bool = False,
+                default: AnnotationForm = ...,
+            ) -> Self: ...
+        else:
+            def __init__(
+                self,
+                name: str,
+                *,
+                bound: AnnotationForm | None = None,
+                covariant: bool = False,
+                contravariant: bool = False,
+                infer_variance: bool = False,
+                default: AnnotationForm = ...,
+            ) -> None: ...
+
         def __iter__(self) -> Any: ...  # Unpack[Self]
         def has_default(self) -> bool: ...
-        def __typing_prepare_subst__(self, alias: Any, args: Any) -> tuple[Any, ...]: ...
+        if sys.version_info >= (3, 11):
+            def __typing_subst__(self, arg: Never, /) -> Never: ...
 
-    ReadOnly: _SpecialForm
-    TypeIs: _SpecialForm
+        def __typing_prepare_subst__(self, alias: Any, args: Any, /) -> tuple[Any, ...]: ...
+        if sys.version_info >= (3, 14):
+            @property
+            def evaluate_default(self) -> EvaluateFunc | None: ...
 
 # TypeAliasType was added in Python 3.12, but had significant changes in 3.14.
 if sys.version_info >= (3, 14):
@@ -1140,24 +1450,12 @@ else:
         def __name__(self) -> str: ...
         # It's writable on types, but not on instances of TypeAliasType.
         @property
-        def __module__(self) -> str | None:  # type: ignore[override]
-            """str(object='') -> str
-            str(bytes_or_buffer[, encoding[, errors]]) -> str
-
-            Create a new string object from the given object. If encoding or
-            errors is specified, then the object must expose a data buffer
-            that will be decoded using the given encoding and error handler.
-            Otherwise, returns the result of object.__str__() (if defined)
-            or repr(object).
-            encoding defaults to 'utf-8'.
-            errors defaults to 'strict'.
-            """
+        def __module__(self) -> str | None: ...  # type: ignore[override]
         # Returns typing._GenericAlias, which isn't stubbed.
         def __getitem__(self, parameters: Incomplete | tuple[Incomplete, ...]) -> AnnotationForm: ...
         def __init_subclass__(cls, *args: Unused, **kwargs: Unused) -> NoReturn: ...
-        if sys.version_info >= (3, 10):
-            def __or__(self, right: Any, /) -> _SpecialForm: ...
-            def __ror__(self, left: Any, /) -> _SpecialForm: ...
+        def __or__(self, right: Any, /) -> _SpecialForm: ...
+        def __ror__(self, left: Any, /) -> _SpecialForm: ...
 
 # PEP 727
 class Doc:
@@ -1191,6 +1489,25 @@ NoExtraItems: _NoExtraItemsType
 
 # PEP 747
 TypeForm: _SpecialForm
+"""A special form representing the value that results from the evaluation
+of a type expression.
+
+This value encodes the information supplied in the type expression, and it
+represents the type described by that type expression.
+
+When used in a type expression, TypeForm describes a set of type form
+objects. It accepts a single type argument, which must be a valid type
+expression. ``TypeForm[T]`` describes the set of all type form objects that
+represent the type T or types that are assignable to T.
+
+Usage::
+
+    def cast[T](typ: TypeForm[T], value: Any) -> T: ...
+
+    reveal_type(cast(int, "x"))  # int
+
+See PEP 747 for more information.
+"""
 
 # PEP 649/749
 if sys.version_info >= (3, 14):
@@ -1250,7 +1567,6 @@ else:
             typing_extensions.get_annotations(obj, format=Format.FORWARDREF)
 
         """
-
     @overload
     def get_annotations(
         obj: Any,  # any object with __annotations__ or __annotate__
@@ -1269,6 +1585,7 @@ else:
         eval_str: bool = False,
         format: Format = Format.VALUE,  # noqa: Y011
     ) -> dict[str, AnnotationForm]: ...
+
     @overload
     def evaluate_forward_ref(
         forward_ref: ForwardRef,
@@ -1302,7 +1619,6 @@ else:
         annotation and is a member of the annotationlib.Format enum.
 
         """
-
     @overload
     def evaluate_forward_ref(
         forward_ref: ForwardRef,
@@ -1325,6 +1641,7 @@ else:
         format: Format | None = None,
         _recursive_guard: Container[str] = ...,
     ) -> AnnotationForm: ...
+
     def type_repr(value: object) -> str:
         """Convert a Python value to a format suitable for use with the STRING format.
 
@@ -1335,19 +1652,27 @@ else:
         """
 
 # PEP 661
-class Sentinel:
-    """Create a unique sentinel object.
+if sys.version_info >= (3, 15):
+    from builtins import sentinel as sentinel
+else:
+    class sentinel:
+        """Create a unique sentinel object.
 
-    *name* should be the name of the variable to which the return value shall be assigned.
+        *name* should be the name of the variable to which the return value
+        shall be assigned.
+        """
 
-    *repr*, if supplied, will be used for the repr of the sentinel object.
-    If not provided, "<name>" will be used.
-    """
+        def __init__(self, name: str, /, *, repr: str | None = None) -> None: ...
+        __name__: str
+        __module__: str
+        if sys.version_info >= (3, 14):
+            # `other`` can be any type form legal for unions.
+            # `x | x` creates a `sentinel` instance if `x` is a sentinel, not a `UnionType` instance
+            def __or__(self, other: Any) -> UnionType | sentinel: ...
+            def __ror__(self, other: Any) -> UnionType | sentinel: ...
+        else:
+            # other can be any type form legal for unions
+            def __or__(self, other: Any) -> _SpecialForm: ...
+            def __ror__(self, other: Any) -> _SpecialForm: ...
 
-    def __init__(self, name: str, repr: str | None = None) -> None: ...
-    if sys.version_info >= (3, 14):
-        def __or__(self, other: Any) -> UnionType: ...  # other can be any type form legal for unions
-        def __ror__(self, other: Any) -> UnionType: ...  # other can be any type form legal for unions
-    elif sys.version_info >= (3, 10):
-        def __or__(self, other: Any) -> _SpecialForm: ...  # other can be any type form legal for unions
-        def __ror__(self, other: Any) -> _SpecialForm: ...  # other can be any type form legal for unions
+Sentinel = sentinel

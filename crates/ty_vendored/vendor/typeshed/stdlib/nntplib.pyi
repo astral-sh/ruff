@@ -33,8 +33,8 @@ import ssl
 from _typeshed import Unused
 from builtins import list as _list  # conflicts with a method named "list"
 from collections.abc import Iterable
-from typing import IO, Any, Final, NamedTuple
-from typing_extensions import Self, TypeAlias
+from typing import IO, Any, Final, NamedTuple, TypeAlias
+from typing_extensions import Self
 
 __all__ = [
     "NNTP",

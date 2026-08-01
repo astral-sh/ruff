@@ -1,6 +1,7 @@
 [package]
 name = "ty_project"
 version = "0.0.0"
+publish = false
 edition.workspace = true
 rust-version.workspace = true
 homepage.workspace = true
@@ -10,6 +11,9 @@ authors.workspace = true
 license.workspace = true
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+#
+[lib]
+doctest = false
 
 [dependencies]
 ruff_cache = { workspace = true }
@@ -19,21 +23,27 @@ ruff_memory_usage = { workspace = true }
 ruff_options_metadata = { workspace = true }
 ruff_python_ast = { workspace = true, features = ["serde"] }
 ruff_python_formatter = { workspace = true, optional = true }
+ruff_ranged_value = { workspace = true, features = ["get-size"] }
 ruff_text_size = { workspace = true }
 ty_combine = { workspace = true }
+ty_module_resolver = { workspace = true }
 ty_python_semantic = { workspace = true, features = ["serde"] }
 ty_static = { workspace = true }
+ty_python_core = { workspace = true }
 ty_vendored = { workspace = true }
 
 anyhow = { workspace = true }
+bitvec = { workspace = true }
 camino = { workspace = true }
 colored = { workspace = true }
+compact_str = { workspace = true, features = ["serde"] }
 crossbeam = { workspace = true }
-get-size2 = { workspace = true }
+get-size2 = { workspace = true, features = ["ordermap", "parking_lot"] }
 globset = { workspace = true }
 notify = { workspace = true }
-pep440_rs = { workspace = true, features = ["version-ranges"] }
 ordermap = { workspace = true, features = ["serde"] }
+parking_lot = { workspace = true }
+pep440_rs = { workspace = true, features = ["version-ranges"] }
 rayon = { workspace = true }
 regex = { workspace = true }
 regex-automata = { workspace = true }
@@ -41,13 +51,17 @@ rustc-hash = { workspace = true }
 salsa = { workspace = true }
 schemars = { workspace = true, optional = true }
 serde = { workspace = true }
-serde_json = { workspace = true, optional = true }
+serde_json = { workspace = true }
+shellexpand = { workspace = true }
+strum = { workspace = true }
+strum_macros = { workspace = true }
 thiserror = { workspace = true }
 toml = { workspace = true }
 tracing = { workspace = true }
 
 [dev-dependencies]
-ruff_db = { workspace = true, features = ["testing"] }
+ruff_db = { workspace = true, features = ["os", "testing"] }
+
 insta = { workspace = true, features = ["redactions", "ron"] }
 
 [features]
@@ -55,12 +69,14 @@ default = ["zstd"]
 deflate = ["ty_vendored/deflate"]
 schemars = [
     "dep:schemars",
-    "dep:serde_json",
     "ruff_db/schemars",
     "ruff_python_ast/schemars",
+    "ruff_ranged_value/schemars",
     "ty_python_semantic/schemars",
+    "ty_python_core/schemars",
 ]
 zstd = ["ty_vendored/zstd"]
+junit = ["ruff_db/junit"]
 format = ["ruff_python_formatter"]
 testing = []
 

@@ -1,5 +1,8 @@
 use std::borrow::Cow;
 
+use lsp_types::{SemanticTokens, SemanticTokensRangeParams, Uri};
+use ty_project::ProjectDatabase;
+
 use crate::document::RangeExt;
 use crate::server::api::semantic_tokens::generate_semantic_tokens;
 use crate::server::api::traits::{
@@ -7,17 +10,15 @@ use crate::server::api::traits::{
 };
 use crate::session::DocumentSnapshot;
 use crate::session::client::Client;
-use lsp_types::{SemanticTokens, SemanticTokensRangeParams, SemanticTokensRangeResult, Url};
-use ty_project::ProjectDatabase;
 
 pub(crate) struct SemanticTokensRangeRequestHandler;
 
 impl RequestHandler for SemanticTokensRangeRequestHandler {
-    type RequestType = lsp_types::request::SemanticTokensRangeRequest;
+    type RequestType = lsp_types::SemanticTokensRangeRequest;
 }
 
 impl BackgroundDocumentRequestHandler for SemanticTokensRangeRequestHandler {
-    fn document_url(params: &SemanticTokensRangeParams) -> Cow<'_, Url> {
+    fn document_uri(params: &SemanticTokensRangeParams) -> Cow<'_, Uri> {
         Cow::Borrowed(&params.text_document.uri)
     }
 
@@ -26,7 +27,7 @@ impl BackgroundDocumentRequestHandler for SemanticTokensRangeRequestHandler {
         snapshot: &DocumentSnapshot,
         _client: &Client,
         params: SemanticTokensRangeParams,
-    ) -> crate::server::Result<Option<SemanticTokensRangeResult>> {
+    ) -> crate::server::Result<Option<SemanticTokens>> {
         if snapshot
             .workspace_settings()
             .is_language_services_disabled()
@@ -34,7 +35,7 @@ impl BackgroundDocumentRequestHandler for SemanticTokensRangeRequestHandler {
             return Ok(None);
         }
 
-        let Some(file) = snapshot.to_file(db) else {
+        let Some(file) = snapshot.to_notebook_or_file(db) else {
             return Ok(None);
         };
 
@@ -42,7 +43,7 @@ impl BackgroundDocumentRequestHandler for SemanticTokensRangeRequestHandler {
         let Some(requested_range) =
             params
                 .range
-                .to_text_range(db, file, snapshot.url(), snapshot.encoding())
+                .to_text_range(db, file, snapshot.uri(), snapshot.encoding())
         else {
             return Ok(None);
         };
@@ -57,10 +58,10 @@ impl BackgroundDocumentRequestHandler for SemanticTokensRangeRequestHandler {
                 .supports_multiline_semantic_tokens(),
         );
 
-        Ok(Some(SemanticTokensRangeResult::Tokens(SemanticTokens {
+        Ok(Some(SemanticTokens {
             result_id: None,
             data: lsp_tokens,
-        })))
+        }))
     }
 }
 

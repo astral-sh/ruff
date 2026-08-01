@@ -26,6 +26,7 @@ Module(
                             asname: None,
                         },
                     ],
+                    is_lazy: false,
                 },
             ),
             Import(
@@ -44,6 +45,7 @@ Module(
                             asname: None,
                         },
                     ],
+                    is_lazy: false,
                 },
             ),
             Expr(
@@ -89,11 +91,9 @@ Module(
 1 | import a..b
 2 | import a...b
   |         ^^^ Syntax Error: Simple statements must be separated by newlines or semicolons
-  |
 
 
   |
 1 | import a..b
 2 | import a...b
   |            ^ Syntax Error: Simple statements must be separated by newlines or semicolons
-  |

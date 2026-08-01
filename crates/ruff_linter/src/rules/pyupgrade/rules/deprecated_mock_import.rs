@@ -45,6 +45,12 @@ pub(crate) enum MockReference {
 /// from unittest import mock
 /// ```
 ///
+/// ## Options
+///
+/// This rule will not trigger if the `mock` import is required by the `isort` configuration.
+///
+/// - `lint.isort.required-imports`
+///
 /// ## References
 /// - [Python documentation: `unittest.mock`](https://docs.python.org/3/library/unittest.mock.html)
 /// - [PyPI: `mock`](https://pypi.org/project/mock/)
@@ -279,14 +285,15 @@ pub(crate) fn deprecated_mock_import(checker: &Checker, stmt: &Stmt) {
     match stmt {
         Stmt::Import(ast::StmtImport {
             names,
+            is_lazy: _,
             range: _,
             node_index: _,
-        }) => {
+        })
             // Find all `mock` imports.
             if names
                 .iter()
                 .any(|name| &name.name == "mock" || &name.name == "mock.mock")
-            {
+            => {
                 // Generate the fix, if needed, which is shared between all `mock` imports.
                 let content = if let Some(indent) = indentation(checker.source(), stmt) {
                     match format_import(stmt, indent, checker.locator(), checker.stylist()) {
@@ -325,7 +332,6 @@ pub(crate) fn deprecated_mock_import(checker: &Checker, stmt: &Stmt) {
                     }
                 }
             }
-        }
         Stmt::ImportFrom(ast::StmtImportFrom {
             module: Some(module),
             level,

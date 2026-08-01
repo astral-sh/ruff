@@ -2,7 +2,9 @@ use std::str::FromStr;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr};
-use ruff_python_literal::cformat::{CFormatPart, CFormatString, CFormatType};
+use ruff_python_literal::cformat::{
+    CConversionFlags, CFormatPart, CFormatSpec, CFormatString, CFormatType,
+};
 use ruff_python_literal::format::FormatConversion;
 use ruff_text_size::Ranged;
 
@@ -135,7 +137,13 @@ pub(crate) fn logging_eager_conversion(checker: &Checker, call: &ast::ExprCall) 
                 None
             }
         })
-        .zip(call.arguments.args.iter().skip(msg_pos + 1))
+        .zip(
+            call.arguments
+                .args
+                .iter()
+                .skip(msg_pos + 1)
+                .take_while(|arg| !arg.is_starred_expr()),
+        )
     {
         // Check if the argument is a call to eagerly format a value
         if let Expr::Call(ast::ExprCall {
@@ -195,7 +203,8 @@ pub(crate) fn logging_eager_conversion(checker: &Checker, call: &ast::ExprCall) 
                 }
                 // %s with oct() - suggest using %#o instead
                 FormatConversion::Str
-                    if checker.semantic().match_builtin_expr(func.as_ref(), "oct") =>
+                    if checker.semantic().match_builtin_expr(func.as_ref(), "oct")
+                        && !has_complex_conversion_specifier(spec) =>
                 {
                     checker.report_diagnostic(
                         LoggingEagerConversion {
@@ -207,7 +216,8 @@ pub(crate) fn logging_eager_conversion(checker: &Checker, call: &ast::ExprCall) 
                 }
                 // %s with hex() - suggest using %#x instead
                 FormatConversion::Str
-                    if checker.semantic().match_builtin_expr(func.as_ref(), "hex") =>
+                    if checker.semantic().match_builtin_expr(func.as_ref(), "hex")
+                        && !has_complex_conversion_specifier(spec) =>
                 {
                     checker.report_diagnostic(
                         LoggingEagerConversion {
@@ -221,4 +231,24 @@ pub(crate) fn logging_eager_conversion(checker: &Checker, call: &ast::ExprCall) 
             }
         }
     }
+}
+
+/// Check if a conversion specifier has complex flags or precision that make `oct()` or `hex()` necessary.
+///
+/// Returns `true` if any of these conditions are met:
+/// - Flag `0` (zero-pad) is used, flag `-` (left-adjust) is not used, and minimum width is specified
+/// - Flag ` ` (blank sign) is used
+/// - Flag `+` (sign char) is used
+/// - Precision is specified
+fn has_complex_conversion_specifier(spec: &CFormatSpec) -> bool {
+    if spec.flags.intersects(CConversionFlags::ZERO_PAD)
+        && !spec.flags.intersects(CConversionFlags::LEFT_ADJUST)
+        && spec.min_field_width.is_some()
+    {
+        return true;
+    }
+
+    spec.flags
+        .intersects(CConversionFlags::BLANK_SIGN | CConversionFlags::SIGN_CHAR)
+        || spec.precision.is_some()
 }

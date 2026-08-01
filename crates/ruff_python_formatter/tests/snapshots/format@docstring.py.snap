@@ -46,7 +46,7 @@ def multiple_negatively_indented_docstring_lines():
     """
 
 
-def overindentend_docstring():
+def overindented_docstring():
     """a
             over-indented
     """
@@ -177,6 +177,7 @@ docstring-code-line-width  = "dynamic"
 preview                    = Disabled
 target_version             = 3.10
 source_type                = Python
+nested-string-quote-style  = alternating
 ```
 
 ```python
@@ -222,7 +223,7 @@ def multiple_negatively_indented_docstring_lines():
     """
 
 
-def overindentend_docstring():
+def overindented_docstring():
     """a
     over-indented
     """
@@ -353,6 +354,7 @@ docstring-code-line-width  = "dynamic"
 preview                    = Disabled
 target_version             = 3.10
 source_type                = Python
+nested-string-quote-style  = alternating
 ```
 
 ```python
@@ -398,7 +400,7 @@ def multiple_negatively_indented_docstring_lines():
   """
 
 
-def overindentend_docstring():
+def overindented_docstring():
   """a
   over-indented
   """
@@ -529,6 +531,7 @@ docstring-code-line-width  = "dynamic"
 preview                    = Disabled
 target_version             = 3.10
 source_type                = Python
+nested-string-quote-style  = alternating
 ```
 
 ```python
@@ -574,7 +577,7 @@ def multiple_negatively_indented_docstring_lines():
 	"""
 
 
-def overindentend_docstring():
+def overindented_docstring():
 	"""a
 	over-indented
 	"""
@@ -705,6 +708,7 @@ docstring-code-line-width  = "dynamic"
 preview                    = Disabled
 target_version             = 3.10
 source_type                = Python
+nested-string-quote-style  = alternating
 ```
 
 ```python
@@ -750,7 +754,7 @@ def multiple_negatively_indented_docstring_lines():
 	"""
 
 
-def overindentend_docstring():
+def overindented_docstring():
 	"""a
 	over-indented
 	"""
@@ -881,6 +885,7 @@ docstring-code-line-width  = "dynamic"
 preview                    = Disabled
 target_version             = 3.10
 source_type                = Python
+nested-string-quote-style  = alternating
 ```
 
 ```python
@@ -926,7 +931,7 @@ def multiple_negatively_indented_docstring_lines():
     """
 
 
-def overindentend_docstring():
+def overindented_docstring():
     """a
     over-indented
     """

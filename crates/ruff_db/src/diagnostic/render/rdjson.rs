@@ -5,17 +5,18 @@ use ruff_diagnostics::{Edit, Fix};
 use ruff_source_file::{LineColumn, SourceCode};
 use ruff_text_size::Ranged;
 
-use crate::diagnostic::Diagnostic;
+use crate::diagnostic::{ConciseMessage, Diagnostic, DisplayDiagnosticConfig};
 
 use super::FileResolver;
 
 pub struct RdjsonRenderer<'a> {
     resolver: &'a dyn FileResolver,
+    config: &'a DisplayDiagnosticConfig,
 }
 
 impl<'a> RdjsonRenderer<'a> {
-    pub(super) fn new(resolver: &'a dyn FileResolver) -> Self {
-        Self { resolver }
+    pub(super) fn new(resolver: &'a dyn FileResolver, config: &'a DisplayDiagnosticConfig) -> Self {
+        Self { resolver, config }
     }
 
     pub(super) fn render(
@@ -26,7 +27,11 @@ impl<'a> RdjsonRenderer<'a> {
         write!(
             f,
             "{:#}",
-            serde_json::json!(RdjsonDiagnostics::new(diagnostics, self.resolver))
+            serde_json::json!(RdjsonDiagnostics::new(
+                diagnostics,
+                self.resolver,
+                self.config
+            ))
         )
     }
 }
@@ -34,6 +39,7 @@ impl<'a> RdjsonRenderer<'a> {
 struct ExpandedDiagnostics<'a> {
     resolver: &'a dyn FileResolver,
     diagnostics: &'a [Diagnostic],
+    config: &'a DisplayDiagnosticConfig,
 }
 
 impl Serialize for ExpandedDiagnostics<'_> {
@@ -44,7 +50,7 @@ impl Serialize for ExpandedDiagnostics<'_> {
         let mut s = serializer.serialize_seq(Some(self.diagnostics.len()))?;
 
         for diagnostic in self.diagnostics {
-            let value = diagnostic_to_rdjson(diagnostic, self.resolver);
+            let value = diagnostic_to_rdjson(diagnostic, self.resolver, self.config);
             s.serialize_element(&value)?;
         }
 
@@ -55,6 +61,7 @@ impl Serialize for ExpandedDiagnostics<'_> {
 fn diagnostic_to_rdjson<'a>(
     diagnostic: &'a Diagnostic,
     resolver: &'a dyn FileResolver,
+    config: &'a DisplayDiagnosticConfig,
 ) -> RdjsonDiagnostic<'a> {
     let span = diagnostic.primary_span_ref();
     let source_file = span.map(|span| {
@@ -76,13 +83,15 @@ fn diagnostic_to_rdjson<'a>(
     let edits = diagnostic.fix().map(Fix::edits).unwrap_or_default();
 
     RdjsonDiagnostic {
-        message: diagnostic.body(),
+        message: diagnostic.concise_message(),
         location,
         code: RdjsonCode {
-            value: diagnostic
-                .secondary_code()
-                .map_or_else(|| diagnostic.name(), |code| code.as_str()),
-            url: diagnostic.to_ruff_url(),
+            value: if config.preview && !config.prefer_rule_codes {
+                diagnostic.id().as_str()
+            } else {
+                diagnostic.secondary_code_or_id()
+            },
+            url: diagnostic.documentation_url(),
         },
         suggestions: rdjson_suggestions(
             edits,
@@ -129,7 +138,11 @@ struct RdjsonDiagnostics<'a> {
 }
 
 impl<'a> RdjsonDiagnostics<'a> {
-    fn new(diagnostics: &'a [Diagnostic], resolver: &'a dyn FileResolver) -> Self {
+    fn new(
+        diagnostics: &'a [Diagnostic],
+        resolver: &'a dyn FileResolver,
+        config: &'a DisplayDiagnosticConfig,
+    ) -> Self {
         Self {
             source: RdjsonSource {
                 name: "ruff",
@@ -139,6 +152,7 @@ impl<'a> RdjsonDiagnostics<'a> {
             diagnostics: ExpandedDiagnostics {
                 diagnostics,
                 resolver,
+                config,
             },
         }
     }
@@ -155,7 +169,7 @@ struct RdjsonDiagnostic<'a> {
     code: RdjsonCode<'a>,
     #[serde(skip_serializing_if = "Option::is_none")]
     location: Option<RdjsonLocation<'a>>,
-    message: &'a str,
+    message: ConciseMessage<'a>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     suggestions: Vec<RdjsonSuggestion<'a>>,
 }
@@ -182,7 +196,7 @@ impl RdjsonRange {
 #[derive(Serialize)]
 struct RdjsonCode<'a> {
     #[serde(skip_serializing_if = "Option::is_none")]
-    url: Option<String>,
+    url: Option<&'a str>,
     value: &'a str,
 }
 
@@ -217,7 +231,10 @@ mod tests {
         env.format(DiagnosticFormat::Rdjson);
         env.preview(false);
 
-        let diag = env.err().build();
+        let diag = env
+            .err()
+            .documentation_url("https://docs.astral.sh/ruff/rules/test-diagnostic")
+            .build();
 
         insta::assert_snapshot!(env.render(&diag));
     }
@@ -228,7 +245,10 @@ mod tests {
         env.format(DiagnosticFormat::Rdjson);
         env.preview(true);
 
-        let diag = env.err().build();
+        let diag = env
+            .err()
+            .documentation_url("https://docs.astral.sh/ruff/rules/test-diagnostic")
+            .build();
 
         insta::assert_snapshot!(env.render(&diag));
     }

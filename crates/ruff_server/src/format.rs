@@ -5,7 +5,8 @@ use std::process::{Command, Stdio};
 use anyhow::Context;
 
 use ruff_formatter::{FormatOptions, PrintedRange};
-use ruff_python_ast::PySourceType;
+use ruff_markdown::{MarkdownResult, format_code_blocks};
+use ruff_python_ast::{PySourceType, SourceType};
 use ruff_python_formatter::{FormatModuleError, PyFormatOptions, format_module_source};
 use ruff_source_file::LineIndex;
 use ruff_text_size::TextRange;
@@ -28,13 +29,28 @@ pub(crate) enum FormatBackend {
     Uv,
 }
 
+#[derive(Debug, PartialEq, Eq)]
+pub(crate) enum FormatResult {
+    Formatted(String),
+    Unchanged,
+}
+
+impl FormatResult {
+    fn into_formatted(self) -> Option<String> {
+        match self {
+            Self::Formatted(formatted) => Some(formatted),
+            Self::Unchanged => None,
+        }
+    }
+}
+
 pub(crate) fn format(
     document: &TextDocument,
-    source_type: PySourceType,
+    source_type: SourceType,
     formatter_settings: &FormatterSettings,
     path: &Path,
     backend: FormatBackend,
-) -> crate::Result<Option<String>> {
+) -> crate::Result<FormatResult> {
     match backend {
         FormatBackend::Uv => format_external(document, source_type, formatter_settings, path),
         FormatBackend::Internal => format_internal(document, source_type, formatter_settings, path),
@@ -44,58 +60,98 @@ pub(crate) fn format(
 /// Format using the built-in Ruff formatter.
 fn format_internal(
     document: &TextDocument,
-    source_type: PySourceType,
+    source_type: SourceType,
     formatter_settings: &FormatterSettings,
     path: &Path,
-) -> crate::Result<Option<String>> {
-    let format_options =
-        formatter_settings.to_format_options(source_type, document.contents(), Some(path));
-    match format_module_source(document.contents(), format_options) {
-        Ok(formatted) => {
-            let formatted = formatted.into_code();
-            if formatted == document.contents() {
-                Ok(None)
-            } else {
-                Ok(Some(formatted))
+) -> crate::Result<FormatResult> {
+    match source_type {
+        SourceType::Python(py_source_type) => {
+            let format_options = formatter_settings.to_format_options(
+                py_source_type,
+                document.contents(),
+                Some(path),
+            );
+            match format_module_source(document.contents(), format_options) {
+                Ok(formatted) => {
+                    let formatted = formatted.into_code();
+                    if formatted == document.contents() {
+                        Ok(FormatResult::Unchanged)
+                    } else {
+                        Ok(FormatResult::Formatted(formatted))
+                    }
+                }
+                // Special case - syntax/parse errors are handled here instead of
+                // being propagated as visible server errors.
+                Err(FormatModuleError::ParseError(error)) => {
+                    tracing::warn!("Unable to format document: {error}");
+                    Ok(FormatResult::Unchanged)
+                }
+                Err(err) => Err(err.into()),
             }
         }
-        // Special case - syntax/parse errors are handled here instead of
-        // being propagated as visible server errors.
-        Err(FormatModuleError::ParseError(error)) => {
-            tracing::warn!("Unable to format document: {error}");
-            Ok(None)
+        SourceType::Markdown => {
+            match format_code_blocks(document.contents(), Some(path), formatter_settings) {
+                MarkdownResult::Formatted(formatted) => Ok(FormatResult::Formatted(formatted)),
+                MarkdownResult::Unchanged => Ok(FormatResult::Unchanged),
+            }
         }
-        Err(err) => Err(err.into()),
+        SourceType::Toml(_) => {
+            tracing::warn!("Formatting TOML files is not supported");
+            Ok(FormatResult::Unchanged)
+        }
     }
 }
 
 /// Format using an external uv command.
 fn format_external(
     document: &TextDocument,
-    source_type: PySourceType,
+    source_type: SourceType,
     formatter_settings: &FormatterSettings,
     path: &Path,
-) -> crate::Result<Option<String>> {
-    let format_options =
-        formatter_settings.to_format_options(source_type, document.contents(), Some(path));
+) -> crate::Result<FormatResult> {
+    let format_options = match source_type {
+        SourceType::Python(py_source_type) => {
+            formatter_settings.to_format_options(py_source_type, document.contents(), Some(path))
+        }
+        SourceType::Markdown => formatter_settings.to_format_options(
+            PySourceType::Python,
+            document.contents(),
+            Some(path),
+        ),
+        SourceType::Toml(_) => {
+            tracing::warn!("Formatting TOML files not supported");
+            return Ok(FormatResult::Unchanged);
+        }
+    };
     let uv_command = UvFormatCommand::from(format_options);
     uv_command.format_document(document.contents(), path)
 }
 
 pub(crate) fn format_range(
     document: &TextDocument,
-    source_type: PySourceType,
+    source_type: SourceType,
     formatter_settings: &FormatterSettings,
     range: TextRange,
     path: &Path,
     backend: FormatBackend,
 ) -> crate::Result<Option<PrintedRange>> {
+    let py_source_type = match source_type {
+        SourceType::Python(py_source_type) => py_source_type,
+        SourceType::Markdown => {
+            tracing::warn!("Range formatting for Markdown files not supported");
+            return Ok(None);
+        }
+        SourceType::Toml(_) => {
+            tracing::warn!("Formatting TOML files not supported");
+            return Ok(None);
+        }
+    };
     match backend {
         FormatBackend::Uv => {
-            format_range_external(document, source_type, formatter_settings, range, path)
+            format_range_external(document, py_source_type, formatter_settings, range, path)
         }
         FormatBackend::Internal => {
-            format_range_internal(document, source_type, formatter_settings, range, path)
+            format_range_internal(document, py_source_type, formatter_settings, range, path)
         }
     }
 }
@@ -142,10 +198,10 @@ fn format_range_external(
     let uv_command = UvFormatCommand::from(format_options);
 
     // Format the range using uv and convert the result to `PrintedRange`
-    match uv_command.format_range(document.contents(), range, path, document.index())? {
-        Some(formatted) => Ok(Some(PrintedRange::new(formatted, range))),
-        None => Ok(None),
-    }
+    Ok(uv_command
+        .format_range(document.contents(), range, path, document.index())?
+        .into_formatted()
+        .map(|formatted| PrintedRange::new(formatted, range)))
 }
 
 /// Builder for uv format commands
@@ -250,7 +306,7 @@ impl UvFormatCommand {
         source: &str,
         path: &Path,
         range_with_index: Option<(TextRange, &LineIndex)>,
-    ) -> crate::Result<Option<String>> {
+    ) -> crate::Result<FormatResult> {
         let mut command =
             self.build_command(path, range_with_index.map(|(r, idx)| (r, idx, source)));
         let mut child = match command.spawn() {
@@ -279,7 +335,7 @@ impl UvFormatCommand {
             // We don't propagate format errors due to invalid syntax
             if stderr.contains("Failed to parse") {
                 tracing::warn!("Unable to format document: {}", stderr);
-                return Ok(None);
+                return Ok(FormatResult::Unchanged);
             }
             // Special-case for when `uv format` is not available
             if stderr.contains("unrecognized subcommand 'format'") {
@@ -294,18 +350,14 @@ impl UvFormatCommand {
             .context("Failed to parse stdout from format subprocess as utf-8")?;
 
         if formatted == source {
-            Ok(None)
+            Ok(FormatResult::Unchanged)
         } else {
-            Ok(Some(formatted))
+            Ok(FormatResult::Formatted(formatted))
         }
     }
 
     /// Format the entire document.
-    pub(crate) fn format_document(
-        &self,
-        source: &str,
-        path: &Path,
-    ) -> crate::Result<Option<String>> {
+    pub(crate) fn format_document(&self, source: &str, path: &Path) -> crate::Result<FormatResult> {
         self.format(source, path, None)
     }
 
@@ -316,7 +368,7 @@ impl UvFormatCommand {
         range: TextRange,
         path: &Path,
         line_index: &LineIndex,
-    ) -> crate::Result<Option<String>> {
+    ) -> crate::Result<FormatResult> {
         self.format(source, path, Some((range, line_index)))
     }
 }
@@ -327,12 +379,18 @@ mod tests {
 
     use insta::assert_snapshot;
     use ruff_linter::settings::types::{CompiledPerFileTargetVersionList, PerFileTargetVersion};
-    use ruff_python_ast::{PySourceType, PythonVersion};
+    use ruff_python_ast::{PySourceType, PythonVersion, SourceType};
     use ruff_text_size::{TextRange, TextSize};
     use ruff_workspace::FormatterSettings;
 
     use crate::TextDocument;
-    use crate::format::{FormatBackend, format, format_range};
+    use crate::format::{FormatBackend, FormatResult, format, format_range};
+
+    fn expect_formatted(result: FormatResult) -> String {
+        result
+            .into_formatted()
+            .expect("Expected formatting changes")
+    }
 
     #[test]
     fn format_per_file_version() {
@@ -349,7 +407,7 @@ with open("a_really_long_foo") as foo, open("a_really_long_bar") as bar, open("a
             .unwrap();
         let result = format(
             &document,
-            PySourceType::Python,
+            SourceType::Python(PySourceType::Python),
             &FormatterSettings {
                 unresolved_target_version: PythonVersion::PY38,
                 per_file_target_version,
@@ -358,8 +416,9 @@ with open("a_really_long_foo") as foo, open("a_really_long_bar") as bar, open("a
             Path::new("test.py"),
             FormatBackend::Internal,
         )
-        .expect("Expected no errors when formatting")
-        .expect("Expected formatting changes");
+        .expect("Expected no errors when formatting");
+
+        let result = expect_formatted(result);
 
         assert_snapshot!(result, @r#"
         with (
@@ -373,7 +432,7 @@ with open("a_really_long_foo") as foo, open("a_really_long_bar") as bar, open("a
         // same as above but without the per_file_target_version override
         let result = format(
             &document,
-            PySourceType::Python,
+            SourceType::Python(PySourceType::Python),
             &FormatterSettings {
                 unresolved_target_version: PythonVersion::PY38,
                 ..Default::default()
@@ -381,8 +440,9 @@ with open("a_really_long_foo") as foo, open("a_really_long_bar") as bar, open("a
             Path::new("test.py"),
             FormatBackend::Internal,
         )
-        .expect("Expected no errors when formatting")
-        .expect("Expected formatting changes");
+        .expect("Expected no errors when formatting");
+
+        let result = expect_formatted(result);
 
         assert_snapshot!(result, @r#"
         with open("a_really_long_foo") as foo, open("a_really_long_bar") as bar, open(
@@ -420,7 +480,7 @@ sys.exit(
             .unwrap();
         let result = format_range(
             &document,
-            PySourceType::Python,
+            SourceType::Python(PySourceType::Python),
             &FormatterSettings {
                 unresolved_target_version: PythonVersion::PY38,
                 per_file_target_version,
@@ -445,7 +505,7 @@ sys.exit(
         // same as above but without the per_file_target_version override
         let result = format_range(
             &document,
-            PySourceType::Python,
+            SourceType::Python(PySourceType::Python),
             &FormatterSettings {
                 unresolved_target_version: PythonVersion::PY38,
                 ..Default::default()
@@ -488,13 +548,14 @@ def world(  ):
 
             let result = format(
                 &document,
-                PySourceType::Python,
+                SourceType::Python(PySourceType::Python),
                 &FormatterSettings::default(),
                 Path::new("test.py"),
                 FormatBackend::Uv,
             )
-            .expect("Expected no errors when formatting with uv")
-            .expect("Expected formatting changes");
+            .expect("Expected no errors when formatting with uv");
+
+            let result = expect_formatted(result);
 
             // uv should format this to a consistent style
             assert_snapshot!(result, @r#"
@@ -529,7 +590,7 @@ def another_function(x,y,z):
 
             let result = format_range(
                 &document,
-                PySourceType::Python,
+                SourceType::Python(PySourceType::Python),
                 &FormatterSettings::default(),
                 range,
                 Path::new("test.py"),
@@ -571,13 +632,14 @@ def hello(very_long_parameter_name_1, very_long_parameter_name_2, very_long_para
 
             let result = format(
                 &document,
-                PySourceType::Python,
+                SourceType::Python(PySourceType::Python),
                 &formatter_settings,
                 Path::new("test.py"),
                 FormatBackend::Uv,
             )
-            .expect("Expected no errors when formatting with uv")
-            .expect("Expected formatting changes");
+            .expect("Expected no errors when formatting with uv");
+
+            let result = expect_formatted(result);
 
             // With line length 60, the function should be wrapped
             assert_snapshot!(result, @r#"
@@ -618,13 +680,14 @@ def hello():
 
             let result = format(
                 &document,
-                PySourceType::Python,
+                SourceType::Python(PySourceType::Python),
                 &formatter_settings,
                 Path::new("test.py"),
                 FormatBackend::Uv,
             )
-            .expect("Expected no errors when formatting with uv")
-            .expect("Expected formatting changes");
+            .expect("Expected no errors when formatting with uv");
+
+            let result = expect_formatted(result);
 
             // Should have formatting changes (spaces to tabs)
             assert_snapshot!(result, @r#"
@@ -647,18 +710,20 @@ def broken(:
                 0,
             );
 
-            // uv should return None for syntax errors (as indicated by the TODO comment)
             let result = format(
                 &document,
-                PySourceType::Python,
+                SourceType::Python(PySourceType::Python),
                 &FormatterSettings::default(),
                 Path::new("test.py"),
                 FormatBackend::Uv,
             )
             .expect("Expected no errors from format function");
 
-            // Should return None since the syntax is invalid
-            assert_eq!(result, None, "Expected None for syntax error");
+            assert_eq!(
+                result,
+                FormatResult::Unchanged,
+                "Expected unchanged for syntax error"
+            );
         }
 
         #[test]
@@ -684,13 +749,14 @@ line'''
 
             let result = format(
                 &document,
-                PySourceType::Python,
+                SourceType::Python(PySourceType::Python),
                 &formatter_settings,
                 Path::new("test.py"),
                 FormatBackend::Uv,
             )
-            .expect("Expected no errors when formatting with uv")
-            .expect("Expected formatting changes");
+            .expect("Expected no errors when formatting with uv");
+
+            let result = expect_formatted(result);
 
             assert_snapshot!(result, @r#"
             x = 'hello'
@@ -726,13 +792,14 @@ bar = [1, 2, 3,]
 
             let result = format(
                 &document,
-                PySourceType::Python,
+                SourceType::Python(PySourceType::Python),
                 &formatter_settings,
                 Path::new("test.py"),
                 FormatBackend::Uv,
             )
-            .expect("Expected no errors when formatting with uv")
-            .expect("Expected formatting changes");
+            .expect("Expected no errors when formatting with uv");
+
+            let result = expect_formatted(result);
 
             assert_snapshot!(result, @r#"
             foo = [1, 2, 3]

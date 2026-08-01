@@ -79,6 +79,8 @@ def _(x: bool, y: int):
 
 #### Comparison Unsupported
 
+<!-- snapshot-diagnostics -->
+
 If two tuples contain types that do not support comparison, the result may be `Unknown`. However,
 `==` and `!=` are exceptions and can still provide definite results.
 
@@ -86,20 +88,21 @@ If two tuples contain types that do not support comparison, the result may be `U
 a = (1, 2)
 b = (1, "hello")
 
-# TODO: should be Literal[False], once we implement (in)equality for mismatched literals
-reveal_type(a == b)  # revealed: bool
+reveal_type(a == b)  # revealed: Literal[False]
 
-# TODO: should be Literal[True], once we implement (in)equality for mismatched literals
-reveal_type(a != b)  # revealed: bool
+reveal_type(a != b)  # revealed: Literal[True]
 
-# error: [unsupported-operator] "Operator `<` is not supported for types `int` and `str`, in comparing `tuple[Literal[1], Literal[2]]` with `tuple[Literal[1], Literal["hello"]]`"
+# error: [unsupported-operator] "Operator `<` is not supported between objects of type `tuple[Literal[1], Literal[2]]` and `tuple[Literal[1], Literal["hello"]]`"
 reveal_type(a < b)  # revealed: Unknown
-# error: [unsupported-operator] "Operator `<=` is not supported for types `int` and `str`, in comparing `tuple[Literal[1], Literal[2]]` with `tuple[Literal[1], Literal["hello"]]`"
+# error: [unsupported-operator] "Operator `<=` is not supported between objects of type `tuple[Literal[1], Literal[2]]` and `tuple[Literal[1], Literal["hello"]]`"
 reveal_type(a <= b)  # revealed: Unknown
-# error: [unsupported-operator] "Operator `>` is not supported for types `int` and `str`, in comparing `tuple[Literal[1], Literal[2]]` with `tuple[Literal[1], Literal["hello"]]`"
+# error: [unsupported-operator] "Operator `>` is not supported between objects of type `tuple[Literal[1], Literal[2]]` and `tuple[Literal[1], Literal["hello"]]`"
 reveal_type(a > b)  # revealed: Unknown
-# error: [unsupported-operator] "Operator `>=` is not supported for types `int` and `str`, in comparing `tuple[Literal[1], Literal[2]]` with `tuple[Literal[1], Literal["hello"]]`"
+# error: [unsupported-operator] "Operator `>=` is not supported between objects of type `tuple[Literal[1], Literal[2]]` and `tuple[Literal[1], Literal["hello"]]`"
 reveal_type(a >= b)  # revealed: Unknown
+# error: [unsupported-operator]
+# error: [unsupported-operator]
+reveal_type((object(),) < (object(),) < (object(),))  # revealed: Unknown
 ```
 
 However, if the lexicographic comparison completes without reaching a point where str and int are
@@ -146,6 +149,7 @@ of the dunder methods.)
 
 ```py
 from __future__ import annotations
+from typing import Literal
 
 class EqReturnType: ...
 class NeReturnType: ...
@@ -155,10 +159,10 @@ class GtReturnType: ...
 class GeReturnType: ...
 
 class A:
-    def __eq__(self, o: object) -> EqReturnType:
+    def __eq__(self, o: object) -> EqReturnType:  # error: [invalid-method-override]
         return EqReturnType()
 
-    def __ne__(self, o: object) -> NeReturnType:
+    def __ne__(self, o: object) -> NeReturnType:  # error: [invalid-method-override]
         return NeReturnType()
 
     def __lt__(self, o: A) -> LtReturnType:
@@ -200,6 +204,18 @@ class B:
         return LtReturnTypeOnB()
 
 reveal_type((A(), B()) < (A(), B()))  # revealed: LtReturnType | LtReturnTypeOnB | Literal[False]
+
+class LaterLtReturnType: ...
+
+class CustomEq:
+    def __eq__(self, other: object) -> Literal[True]:
+        return True
+
+class Later:
+    def __lt__(self, other: Later) -> LaterLtReturnType:
+        return LaterLtReturnType()
+
+reveal_type((CustomEq(), Later()) < (CustomEq(), Later()))  # revealed: LaterLtReturnType | Literal[False]
 ```
 
 #### Special Handling of Eq and NotEq in Lexicographic Comparisons
@@ -257,24 +273,24 @@ comparison can clearly conclude before encountering an error, the error should n
 ```py
 def _(n: int, s: str):
     class A: ...
-    # error: [unsupported-operator] "Operator `<` is not supported for types `A` and `A`"
+    # error: [unsupported-operator] "Operator `<` is not supported between two objects of type `A`"
     A() < A()
-    # error: [unsupported-operator] "Operator `<=` is not supported for types `A` and `A`"
+    # error: [unsupported-operator] "Operator `<=` is not supported between two objects of type `A`"
     A() <= A()
-    # error: [unsupported-operator] "Operator `>` is not supported for types `A` and `A`"
+    # error: [unsupported-operator] "Operator `>` is not supported between two objects of type `A`"
     A() > A()
-    # error: [unsupported-operator] "Operator `>=` is not supported for types `A` and `A`"
+    # error: [unsupported-operator] "Operator `>=` is not supported between two objects of type `A`"
     A() >= A()
 
     a = (0, n, A())
 
-    # error: [unsupported-operator] "Operator `<` is not supported for types `A` and `A`, in comparing `tuple[Literal[0], int, A]` with `tuple[Literal[0], int, A]`"
+    # error: [unsupported-operator] "Operator `<` is not supported between two objects of type `tuple[Literal[0], int, A]`"
     reveal_type(a < a)  # revealed: Unknown
-    # error: [unsupported-operator] "Operator `<=` is not supported for types `A` and `A`, in comparing `tuple[Literal[0], int, A]` with `tuple[Literal[0], int, A]`"
+    # error: [unsupported-operator] "Operator `<=` is not supported between two objects of type `tuple[Literal[0], int, A]`"
     reveal_type(a <= a)  # revealed: Unknown
-    # error: [unsupported-operator] "Operator `>` is not supported for types `A` and `A`, in comparing `tuple[Literal[0], int, A]` with `tuple[Literal[0], int, A]`"
+    # error: [unsupported-operator] "Operator `>` is not supported between two objects of type `tuple[Literal[0], int, A]`"
     reveal_type(a > a)  # revealed: Unknown
-    # error: [unsupported-operator] "Operator `>=` is not supported for types `A` and `A`, in comparing `tuple[Literal[0], int, A]` with `tuple[Literal[0], int, A]`"
+    # error: [unsupported-operator] "Operator `>=` is not supported between two objects of type `tuple[Literal[0], int, A]`"
     reveal_type(a >= a)  # revealed: Unknown
 
     # Comparison between `a` and `b` should only involve the first elements, `Literal[0]` and `Literal[99999]`,
@@ -308,6 +324,96 @@ def _(n: int):
     reveal_type(a not in d)  # revealed: bool
 ```
 
+Membership in a fixed-length tuple compares each element with the needle, regardless of whether the
+needle is itself a tuple:
+
+```py
+from typing import Literal
+
+def scalar_membership(value: int, values: tuple[Literal[1], Literal[2]]):
+    reveal_type(1 in values)  # revealed: Literal[True]
+    reveal_type(3 in values)  # revealed: Literal[False]
+    reveal_type(value in values)  # revealed: bool
+
+    reveal_type(1 not in values)  # revealed: Literal[False]
+    reveal_type(3 not in values)  # revealed: Literal[True]
+    reveal_type(value not in values)  # revealed: bool
+
+def empty_tuple(value: object, values: tuple[()]):
+    reveal_type(value in values)  # revealed: Literal[False]
+    reveal_type(value not in values)  # revealed: Literal[True]
+```
+
+A variable-length tuple might be empty, even if all its possible elements would compare equal to the
+needle:
+
+```py
+from typing import Literal
+
+def variable_length(
+    nested: tuple[tuple[()], ...],
+    values: tuple[Literal[1], ...],
+):
+    reveal_type(() in nested)  # revealed: bool
+    reveal_type(() not in nested)  # revealed: bool
+
+    reveal_type(1 in values)  # revealed: bool
+    reveal_type(1 not in values)  # revealed: bool
+```
+
+Tuple membership checks whether the needle is the same object as an element before comparing the
+objects for equality. A non-reflexive equality method therefore cannot establish that membership is
+always false:
+
+```py
+from typing import Literal
+
+class NeverEqual:
+    def __eq__(self, other: object) -> Literal[False]:
+        return False
+
+class AlwaysEqual:
+    def __eq__(self, other: object) -> Literal[True]:
+        return True
+
+def identity_before_equality(value: NeverEqual):
+    reveal_type(value == value)  # revealed: Literal[False]
+    reveal_type(value in (value,))  # revealed: bool
+    reveal_type(value not in (value,))  # revealed: bool
+
+def custom_equality(value: AlwaysEqual):
+    reveal_type(value in (1,))  # revealed: bool
+    reveal_type(value not in (1,))  # revealed: bool
+    reveal_type((value,) == (1,))  # revealed: Literal[True]
+    reveal_type((value,) != (1,))  # revealed: Literal[False]
+
+def custom_equality_union(value: AlwaysEqual | None):
+    reveal_type(value in (1,))  # revealed: bool
+    reveal_type(value not in (1,))  # revealed: bool
+
+def custom_equality_union_member(value: AlwaysEqual | None, member: AlwaysEqual):
+    reveal_type(value.__eq__(member))  # revealed: bool
+    reveal_type(member.__eq__(value))  # revealed: Literal[True]
+    reveal_type(value in (member,))  # revealed: Literal[True]
+    reveal_type(value not in (member,))  # revealed: Literal[False]
+    reveal_type((value,) == (member,))  # revealed: bool
+    reveal_type((value,) != (member,))  # revealed: bool
+
+class Base:
+    def __eq__(self, other: object) -> bool:
+        return False
+
+class AlwaysEqualChild(Base):
+    def __eq__(self, other: object) -> Literal[True]:
+        return True
+
+def reflected_custom_equality(value: Base, child: AlwaysEqualChild):
+    reveal_type(value == child)  # revealed: bool
+    reveal_type(child == value)  # revealed: Literal[True]
+    reveal_type(value in (child,))  # revealed: Literal[True]
+    reveal_type(value not in (child,))  # revealed: Literal[False]
+```
+
 ### Identity Comparisons
 
 "Identity Comparisons" refers to `is` and `is not`.
@@ -320,10 +426,8 @@ c = (1, 2, 3)
 reveal_type(a is (1, 2))  # revealed: bool
 reveal_type(a is not (1, 2))  # revealed: bool
 
-# TODO should be Literal[False] once we implement comparison of mismatched literal types
-reveal_type(a is b)  # revealed: bool
-# TODO should be Literal[True] once we implement comparison of mismatched literal types
-reveal_type(a is not b)  # revealed: bool
+reveal_type(a is b)  # revealed: Literal[False]
+reveal_type(a is not b)  # revealed: Literal[True]
 
 reveal_type(a is c)  # revealed: Literal[False]
 reveal_type(a is not c)  # revealed: Literal[True]
@@ -333,7 +437,111 @@ reveal_type(a is not c)  # revealed: Literal[True]
 
 For tuples like `tuple[int, ...]`, `tuple[Any, ...]`
 
-// TODO
+### Unsupported Comparisons
+
+<!-- snapshot-diagnostics -->
+
+Comparisons between homogeneous tuples with incompatible element types should emit diagnostics for
+ordering operators (`<`, `<=`, `>`, `>=`), but not for equality operators (`==`, `!=`).
+
+```py
+def f(
+    a: tuple[int, ...],
+    b: tuple[str, ...],
+    c: tuple[str],
+):
+    # Equality comparisons are always valid
+    reveal_type(a == b)  # revealed: bool
+    reveal_type(a != b)  # revealed: bool
+
+    # Ordering comparisons between incompatible types should emit errors
+    # error: [unsupported-operator] "Operator `<` is not supported between objects of type `tuple[int, ...]` and `tuple[str, ...]`"
+    a < b
+    # error: [unsupported-operator] "Operator `<` is not supported between objects of type `tuple[str, ...]` and `tuple[int, ...]`"
+    b < a
+    # error: [unsupported-operator] "Operator `<` is not supported between objects of type `tuple[int, ...]` and `tuple[str]`"
+    a < c
+    # error: [unsupported-operator] "Operator `<` is not supported between objects of type `tuple[str]` and `tuple[int, ...]`"
+    c < a
+```
+
+When comparing fixed-length tuples with variable-length tuples, all element types that could
+potentially be compared must be compatible.
+
+```py
+def _(
+    var_int: tuple[int, ...],
+    var_str: tuple[str, ...],
+    fixed_int_str: tuple[int, str],
+):
+    # Fixed `tuple[int, str]` vs. variable `tuple[int, ...]`:
+    # Position 0: `int` vs. `int` are comparable.
+    # Position 1 (if `var_int` has 2+ elements): `str` vs. `int` are not comparable.
+    # error: [unsupported-operator]
+    fixed_int_str < var_int
+
+    # Variable `tuple[int, ...]` vs. fixed `tuple[int, str]`:
+    # Position 0: `int` vs. `int` are comparable.
+    # Position 1 (if `var_int` has 2+ elements): `int` vs. `str` are not comparable.
+    # error: [unsupported-operator]
+    var_int < fixed_int_str
+
+    # Variable `tuple[str, ...]` vs. fixed `tuple[int, str]`:
+    # Position 0: `str` vs. `int` are not comparable.
+    # error: [unsupported-operator]
+    var_str < fixed_int_str
+```
+
+### Supported Comparisons
+
+Comparisons between homogeneous tuples with compatible element types should work.
+
+```py
+def _(a: tuple[int, ...], b: tuple[int, ...], c: tuple[bool, ...]):
+    # Same element types - always valid
+    reveal_type(a == b)  # revealed: bool
+    reveal_type(a != b)  # revealed: bool
+    reveal_type(a < b)  # revealed: bool
+    reveal_type(a <= b)  # revealed: bool
+    reveal_type(a > b)  # revealed: bool
+    reveal_type(a >= b)  # revealed: bool
+
+    # int and bool are compatible for comparison
+    reveal_type(a < c)  # revealed: bool
+    reveal_type(c < a)  # revealed: bool
+```
+
+### Tuples with Prefixes and Suffixes
+
+<!-- snapshot-diagnostics -->
+
+Variable-length tuples with prefixes and suffixes are also checked.
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+```py
+def _(
+    prefix_int_var_str: tuple[int, *tuple[str, ...]],
+    prefix_str_var_int: tuple[str, *tuple[int, ...]],
+):
+    # Prefix `int` vs. prefix `str` are not comparable.
+    # error: [unsupported-operator]
+    prefix_int_var_str < prefix_str_var_int
+```
+
+Tuples with compatible prefixes/suffixes are allowed.
+
+```py
+def _(
+    prefix_int_var_int: tuple[int, *tuple[int, ...]],
+    prefix_int_var_bool: tuple[int, *tuple[bool, ...]],
+):
+    # Prefix `int` vs. prefix `int`, variable `int` vs. variable `bool` are all comparable.
+    reveal_type(prefix_int_var_int < prefix_int_var_bool)  # revealed: bool
+```
 
 ## Chained comparisons with elements that incorrectly implement `__bool__`
 
@@ -386,11 +594,25 @@ class NotBoolable:
     __bool__: None = None
 
 class A:
+    # error: [invalid-method-override]
     def __eq__(self, other) -> NotBoolable:
         return NotBoolable()
 
 # error: [unsupported-bool-conversion]
-(A(),) == (A(),)
+reveal_type((A(),) == (A(),))  # revealed: bool
+# error: [unsupported-bool-conversion]
+reveal_type((A(), "x") == (A(), "y"))  # revealed: Literal[False]
+# error: [unsupported-bool-conversion]
+reveal_type((A(),) != (A(), 0))  # revealed: Literal[True]
+```
+
+Tuple identity comparisons do not compare elements and therefore do not coerce their equality
+results to `bool`:
+
+```py
+def tuple_identity(left: tuple[A], right: tuple[A]) -> None:
+    reveal_type(left is right)  # revealed: bool
+    reveal_type(left is not right)  # revealed: bool
 ```
 
 ## Recursive NamedTuple

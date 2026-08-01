@@ -1,0 +1,2131 @@
+use crate::{
+    Db, Program,
+    place::{DefinedPlace, Definedness, Place, known_module_symbol},
+    types::{
+        Binding, ClassLiteral, ClassType, GenericContext, KnownInstanceType, StaticClassLiteral,
+        SubclassOfType, Type, binding_type,
+        bound_super::{BoundSuperError, BoundSuperType},
+        class::CodeGeneratorKind,
+        constraints::{ConstraintSet, ConstraintSetBuilder},
+        context::InferContext,
+        diagnostic::SUPER_CALL_IN_NAMED_TUPLE_METHOD,
+        infer::nearest_enclosing_class,
+        known_instance::DeprecatedInstance,
+    },
+};
+use ruff_db::files::File;
+use ruff_python_ast as ast;
+use ruff_python_ast::PythonVersion;
+use rustc_hash::FxHashSet;
+use std::{
+    borrow::Cow,
+    sync::{LazyLock, Mutex},
+};
+use ty_module_resolver::{KnownModule, file_to_module};
+use ty_python_core::{SemanticIndex, Truthiness, scope::NodeWithScopeKind};
+
+/// Non-exhaustive enumeration of known classes (e.g. `builtins.int`, `typing.Any`, ...) to allow
+/// for easier syntax when interacting with very common classes.
+///
+/// Feel free to expand this enum if you ever find yourself using the same class in multiple
+/// places.
+/// Note: good candidates are any classes in `[ty_module_resolver::module::KnownModule]`
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, get_size2::GetSize)]
+#[cfg_attr(test, derive(strum_macros::EnumIter))]
+pub enum KnownClass {
+    // To figure out where an stdlib symbol is defined, you can go into `crates/ty_vendored`
+    // and grep for the symbol name in any `.pyi` file.
+
+    // Builtins
+    Bool,
+    Object,
+    Bytes,
+    Bytearray,
+    Memoryview,
+    Type,
+    Int,
+    Float,
+    Complex,
+    Str,
+    List,
+    Tuple,
+    Range,
+    Set,
+    FrozenSet,
+    Dict,
+    Slice,
+    Property,
+    BaseException,
+    Exception,
+    Warning,
+    BaseExceptionGroup,
+    ExceptionGroup,
+    Staticmethod,
+    Classmethod,
+    Super,
+    NotImplementedError,
+    // enum
+    Enum,
+    EnumProperty,
+    EnumType,
+    Auto,
+    Member,
+    Nonmember,
+    StrEnum,
+    IntEnum,
+    Flag,
+    IntFlag,
+    // abc
+    ABCMeta,
+    // Types
+    GenericAlias,
+    ModuleType,
+    FunctionType,
+    MethodType,
+    MethodWrapperType,
+    WrapperDescriptorType,
+    UnionType,
+    GeneratorType,
+    AsyncGeneratorType,
+    CoroutineType,
+    NotImplementedType,
+    BuiltinFunctionType,
+    // Exposed as `types.EllipsisType` on Python >=3.10;
+    // backported as `builtins.ellipsis` by typeshed on Python <=3.9
+    EllipsisType,
+    // Typeshed
+    NoneType, // Part of `types` for Python >= 3.10
+    SupportsKeysAndGetItem,
+    // Typing
+    Awaitable,
+    Generator,
+    AsyncGenerator,
+    Deprecated,
+    StdlibAlias,
+    SpecialForm,
+    TypeVar,
+    ParamSpec,
+    // typing_extensions.ParamSpec
+    ExtensionsParamSpec, // must be distinct from typing.ParamSpec, backports new features
+    ParamSpecArgs,
+    ParamSpecKwargs,
+    ProtocolMeta,
+    TypeVarTuple,
+    ExtensionsTypeVarTuple, // must be distinct from typing.TypeVarTuple, backports new features
+    TypeAliasType,
+    NoDefaultType,
+    NewType,
+    Hashable,
+    SupportsIndex,
+    Iterable,
+    Iterator,
+    AsyncIterator,
+    Sequence,
+    Mapping,
+    MutableMapping,
+    // typing_extensions
+    ExtensionsTypeVar, // must be distinct from typing.TypeVar, backports new features
+    ExtensionTypedDictFallback,
+    Sentinel,
+    // Collections
+    ChainMap,
+    Counter,
+    DefaultDict,
+    Deque,
+    OrderedDict,
+    // sys
+    VersionInfo,
+    // dataclasses
+    Field,
+    KwOnly,
+    // _typeshed._type_checker_internals
+    NamedTupleFallback,
+    NamedTupleLike,
+    TypedDictFallback,
+    // string.templatelib
+    Template,
+    // pathlib
+    Path,
+    // functools
+    FunctoolsPartial,
+    // ty_extensions
+    ConstraintSet,
+    ConstraintSetSolution,
+    GenericContext,
+    Specialization,
+    TyExtensionsAsyncIterable,
+    TyExtensionsAsyncIterator,
+    TyExtensionsIterable,
+    TyExtensionsIterator,
+    // Pydantic
+    PydanticBaseModel,
+    PydanticBaseSettings,
+    PydanticConfigDict,
+    PydanticRootModel,
+    PydanticStrict,
+}
+
+impl KnownClass {
+    pub(crate) const fn is_bool(self) -> bool {
+        matches!(self, Self::Bool)
+    }
+
+    pub(crate) const fn is_special_form(self) -> bool {
+        matches!(self, Self::SpecialForm)
+    }
+
+    /// Determine whether instances of this class are always truthy, always falsy,
+    /// or have an ambiguous truthiness.
+    ///
+    /// Returns `None` for `KnownClass::Tuple`, since the truthiness of a tuple
+    /// depends on its spec.
+    pub(crate) const fn bool(self) -> Option<Truthiness> {
+        match self {
+            // N.B. It's only generally safe to infer `Truthiness::AlwaysTrue` for a `KnownClass`
+            // variant if the class's `__bool__` method always returns the same thing *and* the
+            // class is `@final`.
+            //
+            // E.g. `ModuleType.__bool__` always returns `True`, but `ModuleType` is not `@final`.
+            // Equally, `range` is `@final`, but its `__bool__` method can return `False`.
+            Self::EllipsisType
+            | Self::NoDefaultType
+            | Self::MethodType
+            | Self::Slice
+            | Self::FunctionType
+            | Self::VersionInfo
+            | Self::TypeAliasType
+            | Self::TypeVar
+            | Self::ExtensionsTypeVar
+            | Self::ParamSpec
+            | Self::ExtensionsParamSpec
+            | Self::ParamSpecArgs
+            | Self::ParamSpecKwargs
+            | Self::TypeVarTuple
+            | Self::ExtensionsTypeVarTuple
+            | Self::Sentinel
+            | Self::Super
+            | Self::WrapperDescriptorType
+            | Self::UnionType
+            | Self::GeneratorType
+            | Self::AsyncGeneratorType
+            | Self::MethodWrapperType
+            | Self::CoroutineType
+            | Self::BuiltinFunctionType
+            | Self::Template
+            | Self::Path => Some(Truthiness::AlwaysTrue),
+
+            Self::NoneType => Some(Truthiness::AlwaysFalse),
+
+            Self::BaseException
+            | Self::Exception
+            | Self::Warning
+            | Self::NotImplementedError
+            | Self::ExceptionGroup
+            | Self::Object
+            | Self::OrderedDict
+            | Self::BaseExceptionGroup
+            | Self::Bool
+            | Self::Str
+            | Self::List
+            | Self::GenericAlias
+            | Self::NewType
+            | Self::StdlibAlias
+            | Self::Hashable
+            | Self::SupportsIndex
+            | Self::Set
+            | Self::Int
+            | Self::Type
+            | Self::Bytes
+            | Self::Bytearray
+            | Self::Memoryview
+            | Self::Range
+            | Self::FrozenSet
+            | Self::Property
+            | Self::SpecialForm
+            | Self::Dict
+            | Self::ModuleType
+            | Self::ChainMap
+            | Self::Complex
+            | Self::Counter
+            | Self::DefaultDict
+            | Self::Deque
+            | Self::Float
+            | Self::Enum
+            | Self::EnumProperty
+            | Self::EnumType
+            | Self::Auto
+            | Self::Member
+            | Self::Nonmember
+            | Self::StrEnum
+            | Self::IntEnum
+            | Self::Flag
+            | Self::IntFlag
+            | Self::ABCMeta
+            | Self::Iterable
+            | Self::TyExtensionsAsyncIterable
+            | Self::TyExtensionsAsyncIterator
+            | Self::TyExtensionsIterable
+            | Self::Iterator
+            | Self::TyExtensionsIterator
+            | Self::AsyncIterator
+            | Self::Sequence
+            | Self::Mapping
+            | Self::MutableMapping
+            | Self::SupportsKeysAndGetItem
+            // Evaluating `NotImplementedType` in a boolean context was deprecated in Python 3.9
+            // and raises a `TypeError` in Python >=3.14
+            // (see https://docs.python.org/3/library/constants.html#NotImplemented)
+            | Self::NotImplementedType
+            | Self::Staticmethod
+            | Self::Classmethod
+            | Self::Awaitable
+            | Self::Generator
+            | Self::AsyncGenerator
+            | Self::Deprecated
+            | Self::Field
+            | Self::KwOnly
+            | Self::NamedTupleFallback
+            | Self::NamedTupleLike
+            | Self::ConstraintSet
+            | Self::ConstraintSetSolution
+            | Self::GenericContext
+            | Self::Specialization
+            | Self::ProtocolMeta
+            | Self::FunctoolsPartial
+            | Self::ExtensionTypedDictFallback
+            | Self::TypedDictFallback
+            | Self::PydanticBaseModel
+            | Self::PydanticBaseSettings
+            | Self::PydanticConfigDict
+            | Self::PydanticRootModel
+            | Self::PydanticStrict => Some(Truthiness::Ambiguous),
+
+            Self::Tuple => None,
+        }
+    }
+
+    /// Return `true` if this class is a subclass of `enum.Enum` *and* has enum members, i.e.
+    /// if it is an "actual" enum, not `enum.Enum` itself or a similar custom enum class.
+    pub(crate) const fn is_enum_subclass_with_members(self) -> bool {
+        match self {
+            KnownClass::Bool
+            | KnownClass::Object
+            | KnownClass::Bytes
+            | KnownClass::Bytearray
+            | KnownClass::Memoryview
+            | KnownClass::Range
+            | KnownClass::Type
+            | KnownClass::Int
+            | KnownClass::Float
+            | KnownClass::Complex
+            | KnownClass::Str
+            | KnownClass::List
+            | KnownClass::Tuple
+            | KnownClass::Set
+            | KnownClass::FrozenSet
+            | KnownClass::Dict
+            | KnownClass::Slice
+            | KnownClass::Property
+            | KnownClass::BaseException
+            | KnownClass::NotImplementedError
+            | KnownClass::Exception
+            | KnownClass::Warning
+            | KnownClass::BaseExceptionGroup
+            | KnownClass::ExceptionGroup
+            | KnownClass::Staticmethod
+            | KnownClass::Classmethod
+            | KnownClass::Awaitable
+            | KnownClass::Generator
+            | KnownClass::AsyncGenerator
+            | KnownClass::Deprecated
+            | KnownClass::Super
+            | KnownClass::Enum
+            | KnownClass::EnumProperty
+            | KnownClass::EnumType
+            | KnownClass::Auto
+            | KnownClass::Member
+            | KnownClass::Nonmember
+            | KnownClass::StrEnum
+            | KnownClass::IntEnum
+            | KnownClass::Flag
+            | KnownClass::IntFlag
+            | KnownClass::ABCMeta
+            | KnownClass::GenericAlias
+            | KnownClass::ModuleType
+            | KnownClass::FunctionType
+            | KnownClass::MethodType
+            | KnownClass::MethodWrapperType
+            | KnownClass::WrapperDescriptorType
+            | KnownClass::UnionType
+            | KnownClass::GeneratorType
+            | KnownClass::AsyncGeneratorType
+            | KnownClass::CoroutineType
+            | KnownClass::NoneType
+            | KnownClass::StdlibAlias
+            | KnownClass::SpecialForm
+            | KnownClass::TypeVar
+            | KnownClass::ExtensionsTypeVar
+            | KnownClass::ParamSpec
+            | KnownClass::ExtensionsParamSpec
+            | KnownClass::ParamSpecArgs
+            | KnownClass::ParamSpecKwargs
+            | KnownClass::TypeVarTuple
+            | KnownClass::ExtensionsTypeVarTuple
+            | KnownClass::Sentinel
+            | KnownClass::TypeAliasType
+            | KnownClass::NoDefaultType
+            | KnownClass::NewType
+            | KnownClass::Hashable
+            | KnownClass::SupportsIndex
+            | KnownClass::Iterable
+            | KnownClass::TyExtensionsAsyncIterable
+            | KnownClass::TyExtensionsAsyncIterator
+            | KnownClass::TyExtensionsIterable
+            | KnownClass::Iterator
+            | KnownClass::TyExtensionsIterator
+            | KnownClass::AsyncIterator
+            | KnownClass::Sequence
+            | KnownClass::Mapping
+            | KnownClass::MutableMapping
+            | KnownClass::SupportsKeysAndGetItem
+            | KnownClass::ChainMap
+            | KnownClass::Counter
+            | KnownClass::DefaultDict
+            | KnownClass::Deque
+            | KnownClass::OrderedDict
+            | KnownClass::VersionInfo
+            | KnownClass::EllipsisType
+            | KnownClass::NotImplementedType
+            | KnownClass::Field
+            | KnownClass::KwOnly
+            | KnownClass::NamedTupleFallback
+            | KnownClass::NamedTupleLike
+            | KnownClass::ConstraintSet
+            | KnownClass::ConstraintSetSolution
+            | KnownClass::GenericContext
+            | KnownClass::Specialization
+            | KnownClass::TypedDictFallback
+            | KnownClass::ExtensionTypedDictFallback
+            | KnownClass::BuiltinFunctionType
+            | KnownClass::ProtocolMeta
+            | KnownClass::Template
+            | KnownClass::Path
+            | KnownClass::FunctoolsPartial
+            | KnownClass::PydanticBaseModel
+            | KnownClass::PydanticBaseSettings
+            | KnownClass::PydanticConfigDict
+            | KnownClass::PydanticRootModel
+            | KnownClass::PydanticStrict => false,
+        }
+    }
+
+    /// Return `true` if this class is a (true) subclass of `typing.TypedDict`.
+    pub(crate) const fn is_typed_dict_subclass(self) -> bool {
+        match self {
+            KnownClass::Bool
+            | KnownClass::Object
+            | KnownClass::Bytes
+            | KnownClass::Bytearray
+            | KnownClass::Memoryview
+            | KnownClass::Range
+            | KnownClass::Type
+            | KnownClass::Int
+            | KnownClass::Float
+            | KnownClass::Complex
+            | KnownClass::Str
+            | KnownClass::List
+            | KnownClass::Tuple
+            | KnownClass::Set
+            | KnownClass::FrozenSet
+            | KnownClass::Dict
+            | KnownClass::Slice
+            | KnownClass::Property
+            | KnownClass::BaseException
+            | KnownClass::Exception
+            | KnownClass::Warning
+            | KnownClass::NotImplementedError
+            | KnownClass::BaseExceptionGroup
+            | KnownClass::ExceptionGroup
+            | KnownClass::Staticmethod
+            | KnownClass::Classmethod
+            | KnownClass::Awaitable
+            | KnownClass::Generator
+            | KnownClass::AsyncGenerator
+            | KnownClass::Deprecated
+            | KnownClass::Super
+            | KnownClass::Enum
+            | KnownClass::EnumProperty
+            | KnownClass::EnumType
+            | KnownClass::Auto
+            | KnownClass::Member
+            | KnownClass::Nonmember
+            | KnownClass::StrEnum
+            | KnownClass::IntEnum
+            | KnownClass::Flag
+            | KnownClass::IntFlag
+            | KnownClass::ABCMeta
+            | KnownClass::GenericAlias
+            | KnownClass::ModuleType
+            | KnownClass::FunctionType
+            | KnownClass::MethodType
+            | KnownClass::MethodWrapperType
+            | KnownClass::WrapperDescriptorType
+            | KnownClass::UnionType
+            | KnownClass::GeneratorType
+            | KnownClass::AsyncGeneratorType
+            | KnownClass::CoroutineType
+            | KnownClass::NoneType
+            | KnownClass::StdlibAlias
+            | KnownClass::SpecialForm
+            | KnownClass::TypeVar
+            | KnownClass::ExtensionsTypeVar
+            | KnownClass::ParamSpec
+            | KnownClass::ExtensionsParamSpec
+            | KnownClass::ParamSpecArgs
+            | KnownClass::ParamSpecKwargs
+            | KnownClass::TypeVarTuple
+            | KnownClass::ExtensionsTypeVarTuple
+            | KnownClass::Sentinel
+            | KnownClass::TypeAliasType
+            | KnownClass::NoDefaultType
+            | KnownClass::NewType
+            | KnownClass::Hashable
+            | KnownClass::SupportsIndex
+            | KnownClass::Iterable
+            | KnownClass::TyExtensionsAsyncIterable
+            | KnownClass::TyExtensionsAsyncIterator
+            | KnownClass::TyExtensionsIterable
+            | KnownClass::Iterator
+            | KnownClass::TyExtensionsIterator
+            | KnownClass::AsyncIterator
+            | KnownClass::Sequence
+            | KnownClass::Mapping
+            | KnownClass::MutableMapping
+            | KnownClass::SupportsKeysAndGetItem
+            | KnownClass::ChainMap
+            | KnownClass::Counter
+            | KnownClass::DefaultDict
+            | KnownClass::Deque
+            | KnownClass::OrderedDict
+            | KnownClass::VersionInfo
+            | KnownClass::EllipsisType
+            | KnownClass::NotImplementedType
+            | KnownClass::Field
+            | KnownClass::KwOnly
+            | KnownClass::NamedTupleFallback
+            | KnownClass::NamedTupleLike
+            | KnownClass::ConstraintSet
+            | KnownClass::ConstraintSetSolution
+            | KnownClass::GenericContext
+            | KnownClass::Specialization
+            | KnownClass::TypedDictFallback
+            | KnownClass::ExtensionTypedDictFallback
+            | KnownClass::BuiltinFunctionType
+            | KnownClass::ProtocolMeta
+            | KnownClass::Template
+            | KnownClass::Path
+            | KnownClass::FunctoolsPartial
+            | KnownClass::PydanticBaseModel
+            | KnownClass::PydanticBaseSettings
+            | KnownClass::PydanticRootModel
+            | KnownClass::PydanticStrict => false,
+
+            KnownClass::PydanticConfigDict => true,
+        }
+    }
+
+    pub(crate) const fn is_tuple_subclass(self) -> bool {
+        match self {
+            KnownClass::Tuple | KnownClass::VersionInfo => true,
+
+            KnownClass::Bool
+            | KnownClass::Object
+            | KnownClass::Bytes
+            | KnownClass::Bytearray
+            | KnownClass::Memoryview
+            | KnownClass::Range
+            | KnownClass::Type
+            | KnownClass::Int
+            | KnownClass::Float
+            | KnownClass::Complex
+            | KnownClass::Str
+            | KnownClass::List
+            | KnownClass::Set
+            | KnownClass::FrozenSet
+            | KnownClass::Dict
+            | KnownClass::Slice
+            | KnownClass::Property
+            | KnownClass::BaseException
+            | KnownClass::Exception
+            | KnownClass::Warning
+            | KnownClass::NotImplementedError
+            | KnownClass::BaseExceptionGroup
+            | KnownClass::ExceptionGroup
+            | KnownClass::Staticmethod
+            | KnownClass::Classmethod
+            | KnownClass::Awaitable
+            | KnownClass::Generator
+            | KnownClass::AsyncGenerator
+            | KnownClass::Deprecated
+            | KnownClass::Super
+            | KnownClass::Enum
+            | KnownClass::EnumProperty
+            | KnownClass::EnumType
+            | KnownClass::Auto
+            | KnownClass::Member
+            | KnownClass::Nonmember
+            | KnownClass::StrEnum
+            | KnownClass::IntEnum
+            | KnownClass::Flag
+            | KnownClass::IntFlag
+            | KnownClass::ABCMeta
+            | KnownClass::GenericAlias
+            | KnownClass::ModuleType
+            | KnownClass::FunctionType
+            | KnownClass::MethodType
+            | KnownClass::MethodWrapperType
+            | KnownClass::WrapperDescriptorType
+            | KnownClass::UnionType
+            | KnownClass::GeneratorType
+            | KnownClass::AsyncGeneratorType
+            | KnownClass::CoroutineType
+            | KnownClass::NoneType
+            | KnownClass::StdlibAlias
+            | KnownClass::SpecialForm
+            | KnownClass::TypeVar
+            | KnownClass::ExtensionsTypeVar
+            | KnownClass::ParamSpec
+            | KnownClass::ExtensionsParamSpec
+            | KnownClass::ParamSpecArgs
+            | KnownClass::ParamSpecKwargs
+            | KnownClass::TypeVarTuple
+            | KnownClass::ExtensionsTypeVarTuple
+            | KnownClass::Sentinel
+            | KnownClass::TypeAliasType
+            | KnownClass::NoDefaultType
+            | KnownClass::NewType
+            | KnownClass::Hashable
+            | KnownClass::SupportsIndex
+            | KnownClass::Iterable
+            | KnownClass::TyExtensionsAsyncIterable
+            | KnownClass::TyExtensionsAsyncIterator
+            | KnownClass::TyExtensionsIterable
+            | KnownClass::Iterator
+            | KnownClass::TyExtensionsIterator
+            | KnownClass::AsyncIterator
+            | KnownClass::Sequence
+            | KnownClass::Mapping
+            | KnownClass::MutableMapping
+            | KnownClass::SupportsKeysAndGetItem
+            | KnownClass::ChainMap
+            | KnownClass::Counter
+            | KnownClass::DefaultDict
+            | KnownClass::Deque
+            | KnownClass::OrderedDict
+            | KnownClass::EllipsisType
+            | KnownClass::NotImplementedType
+            | KnownClass::Field
+            | KnownClass::KwOnly
+            | KnownClass::TypedDictFallback
+            | KnownClass::ExtensionTypedDictFallback
+            | KnownClass::NamedTupleLike
+            | KnownClass::NamedTupleFallback
+            | KnownClass::ConstraintSet
+            | KnownClass::ConstraintSetSolution
+            | KnownClass::GenericContext
+            | KnownClass::Specialization
+            | KnownClass::BuiltinFunctionType
+            | KnownClass::ProtocolMeta
+            | KnownClass::Template
+            | KnownClass::Path
+            | KnownClass::FunctoolsPartial
+            | KnownClass::PydanticBaseModel
+            | KnownClass::PydanticBaseSettings
+            | KnownClass::PydanticConfigDict
+            | KnownClass::PydanticRootModel
+            | KnownClass::PydanticStrict => false,
+        }
+    }
+
+    /// Return `true` if this class is a protocol class.
+    ///
+    /// In an ideal world, perhaps we wouldn't hardcode this knowledge here;
+    /// instead, we'd just look at the bases for these classes, as we do for
+    /// all other classes. However, the special casing here helps us out in
+    /// two important ways:
+    ///
+    /// 1. It helps us avoid Salsa cycles when creating types such as "instance of `str`"
+    ///    and "instance of `sys._version_info`". These types are constructed very early
+    ///    on, but it causes problems if we attempt to infer the types of their bases
+    ///    too soon.
+    /// 2. It's probably more performant.
+    pub(crate) const fn is_protocol(self) -> bool {
+        match self {
+            Self::Hashable
+            | Self::SupportsIndex
+            | Self::SupportsKeysAndGetItem
+            | Self::Iterable
+            | Self::TyExtensionsAsyncIterable
+            | Self::TyExtensionsAsyncIterator
+            | Self::TyExtensionsIterable
+            | Self::Iterator
+            | Self::TyExtensionsIterator
+            | Self::AsyncIterator
+            | Self::Awaitable
+            | Self::NamedTupleLike
+            | Self::AsyncGenerator
+            | Self::Generator => true,
+
+            Self::Bool
+            | Self::Object
+            | Self::Bytes
+            | Self::Bytearray
+            | Self::Memoryview
+            | Self::Range
+            | Self::Tuple
+            | Self::Int
+            | Self::Float
+            | Self::Complex
+            | Self::FrozenSet
+            | Self::Str
+            | Self::Set
+            | Self::Dict
+            | Self::List
+            | Self::Type
+            | Self::Slice
+            | Self::Property
+            | Self::BaseException
+            | Self::BaseExceptionGroup
+            | Self::Exception
+            | Self::Warning
+            | Self::NotImplementedError
+            | Self::ExceptionGroup
+            | Self::Staticmethod
+            | Self::Classmethod
+            | Self::Deprecated
+            | Self::GenericAlias
+            | Self::GeneratorType
+            | Self::AsyncGeneratorType
+            | Self::CoroutineType
+            | Self::ModuleType
+            | Self::FunctionType
+            | Self::MethodType
+            | Self::MethodWrapperType
+            | Self::WrapperDescriptorType
+            | Self::NoneType
+            | Self::SpecialForm
+            | Self::TypeVar
+            | Self::ExtensionsTypeVar
+            | Self::ParamSpec
+            | Self::ExtensionsParamSpec
+            | Self::ParamSpecArgs
+            | Self::ParamSpecKwargs
+            | Self::TypeVarTuple
+            | Self::ExtensionsTypeVarTuple
+            | Self::Sentinel
+            | Self::TypeAliasType
+            | Self::NoDefaultType
+            | Self::NewType
+            | Self::ChainMap
+            | Self::Counter
+            | Self::DefaultDict
+            | Self::Deque
+            | Self::OrderedDict
+            | Self::Enum
+            | Self::EnumProperty
+            | Self::EnumType
+            | Self::Auto
+            | Self::Member
+            | Self::Nonmember
+            | Self::StrEnum
+            | Self::IntEnum
+            | Self::Flag
+            | Self::IntFlag
+            | Self::ABCMeta
+            | Self::Super
+            | Self::StdlibAlias
+            | Self::VersionInfo
+            | Self::EllipsisType
+            | Self::NotImplementedType
+            | Self::UnionType
+            | Self::Field
+            | Self::KwOnly
+            | Self::NamedTupleFallback
+            | Self::ConstraintSet
+            | Self::ConstraintSetSolution
+            | Self::GenericContext
+            | Self::Specialization
+            | Self::TypedDictFallback
+            | Self::ExtensionTypedDictFallback
+            | Self::BuiltinFunctionType
+            | Self::ProtocolMeta
+            | Self::Template
+            | Self::Path
+            | Self::FunctoolsPartial
+            | Self::Mapping
+            | Self::MutableMapping
+            | Self::Sequence
+            | Self::PydanticBaseModel
+            | Self::PydanticBaseSettings
+            | Self::PydanticConfigDict
+            | Self::PydanticRootModel
+            | Self::PydanticStrict => false,
+        }
+    }
+
+    /// Return `true` if this class is a typeshed fallback class which is used to provide attributes and
+    /// methods for another type (e.g. `NamedTupleFallback` for actual `NamedTuple`s). These fallback
+    /// classes need special treatment in some places. For example, implicit usages of `Self` should not
+    /// be eagerly replaced with the fallback class itself. Instead, `Self` should eventually be treated
+    /// as referring to the destination type (e.g. the actual `NamedTuple`).
+    pub(crate) const fn is_fallback_class(self) -> bool {
+        match self {
+            KnownClass::Bool
+            | KnownClass::Object
+            | KnownClass::Bytes
+            | KnownClass::Bytearray
+            | KnownClass::Memoryview
+            | KnownClass::Range
+            | KnownClass::Type
+            | KnownClass::Int
+            | KnownClass::Float
+            | KnownClass::Complex
+            | KnownClass::Str
+            | KnownClass::List
+            | KnownClass::Tuple
+            | KnownClass::Set
+            | KnownClass::FrozenSet
+            | KnownClass::Dict
+            | KnownClass::Slice
+            | KnownClass::Property
+            | KnownClass::BaseException
+            | KnownClass::Exception
+            | KnownClass::Warning
+            | KnownClass::NotImplementedError
+            | KnownClass::BaseExceptionGroup
+            | KnownClass::ExceptionGroup
+            | KnownClass::Staticmethod
+            | KnownClass::Classmethod
+            | KnownClass::Super
+            | KnownClass::Enum
+            | KnownClass::EnumProperty
+            | KnownClass::EnumType
+            | KnownClass::Auto
+            | KnownClass::Member
+            | KnownClass::Nonmember
+            | KnownClass::StrEnum
+            | KnownClass::IntEnum
+            | KnownClass::Flag
+            | KnownClass::IntFlag
+            | KnownClass::ABCMeta
+            | KnownClass::GenericAlias
+            | KnownClass::ModuleType
+            | KnownClass::FunctionType
+            | KnownClass::MethodType
+            | KnownClass::MethodWrapperType
+            | KnownClass::WrapperDescriptorType
+            | KnownClass::UnionType
+            | KnownClass::GeneratorType
+            | KnownClass::AsyncGeneratorType
+            | KnownClass::CoroutineType
+            | KnownClass::NotImplementedType
+            | KnownClass::BuiltinFunctionType
+            | KnownClass::EllipsisType
+            | KnownClass::NoneType
+            | KnownClass::Awaitable
+            | KnownClass::Generator
+            | KnownClass::AsyncGenerator
+            | KnownClass::Deprecated
+            | KnownClass::StdlibAlias
+            | KnownClass::SpecialForm
+            | KnownClass::TypeVar
+            | KnownClass::ExtensionsTypeVar
+            | KnownClass::ParamSpec
+            | KnownClass::ExtensionsParamSpec
+            | KnownClass::ParamSpecArgs
+            | KnownClass::ParamSpecKwargs
+            | KnownClass::ProtocolMeta
+            | KnownClass::TypeVarTuple
+            | KnownClass::ExtensionsTypeVarTuple
+            | KnownClass::Sentinel
+            | KnownClass::TypeAliasType
+            | KnownClass::NoDefaultType
+            | KnownClass::NewType
+            | KnownClass::Hashable
+            | KnownClass::SupportsIndex
+            | KnownClass::Iterable
+            | KnownClass::TyExtensionsAsyncIterable
+            | KnownClass::TyExtensionsAsyncIterator
+            | KnownClass::TyExtensionsIterable
+            | KnownClass::Iterator
+            | KnownClass::TyExtensionsIterator
+            | KnownClass::AsyncIterator
+            | KnownClass::Sequence
+            | KnownClass::Mapping
+            | KnownClass::MutableMapping
+            | KnownClass::SupportsKeysAndGetItem
+            | KnownClass::ChainMap
+            | KnownClass::Counter
+            | KnownClass::DefaultDict
+            | KnownClass::Deque
+            | KnownClass::OrderedDict
+            | KnownClass::VersionInfo
+            | KnownClass::Field
+            | KnownClass::KwOnly
+            | KnownClass::NamedTupleLike
+            | KnownClass::Template
+            | KnownClass::Path
+            | KnownClass::FunctoolsPartial
+            | KnownClass::ConstraintSet
+            | KnownClass::ConstraintSetSolution
+            | KnownClass::GenericContext
+            | KnownClass::Specialization
+            | KnownClass::PydanticBaseModel
+            | KnownClass::PydanticBaseSettings
+            | KnownClass::PydanticConfigDict
+            | KnownClass::PydanticRootModel
+            | KnownClass::PydanticStrict => false,
+            KnownClass::NamedTupleFallback
+            | KnownClass::TypedDictFallback
+            | KnownClass::ExtensionTypedDictFallback => true,
+        }
+    }
+
+    pub(crate) fn name(self, db: &dyn Db) -> &'static str {
+        match self {
+            Self::Bool => "bool",
+            Self::Object => "object",
+            Self::Bytes => "bytes",
+            Self::Bytearray => "bytearray",
+            Self::Memoryview => "memoryview",
+            Self::Tuple => "tuple",
+            Self::Range => "range",
+            Self::Int => "int",
+            Self::Float => "float",
+            Self::Complex => "complex",
+            Self::FrozenSet => "frozenset",
+            Self::Str => "str",
+            Self::Set => "set",
+            Self::Dict => "dict",
+            Self::List => "list",
+            Self::Type => "type",
+            Self::Slice => "slice",
+            Self::Property => "property",
+            Self::BaseException => "BaseException",
+            Self::BaseExceptionGroup => "BaseExceptionGroup",
+            Self::Exception => "Exception",
+            Self::Warning => "Warning",
+            Self::NotImplementedError => "NotImplementedError",
+            Self::ExceptionGroup => "ExceptionGroup",
+            Self::Staticmethod => "staticmethod",
+            Self::Classmethod => "classmethod",
+            Self::Awaitable => "Awaitable",
+            Self::Generator => "Generator",
+            Self::AsyncGenerator => "AsyncGenerator",
+            Self::Deprecated => "deprecated",
+            Self::GenericAlias => "GenericAlias",
+            Self::ModuleType => "ModuleType",
+            Self::FunctionType => "FunctionType",
+            Self::MethodType => "MethodType",
+            Self::UnionType => "UnionType",
+            Self::MethodWrapperType => "MethodWrapperType",
+            Self::WrapperDescriptorType => "WrapperDescriptorType",
+            Self::BuiltinFunctionType => "BuiltinFunctionType",
+            Self::GeneratorType => "GeneratorType",
+            Self::AsyncGeneratorType => "AsyncGeneratorType",
+            Self::CoroutineType => "CoroutineType",
+            Self::NoneType => "NoneType",
+            Self::SupportsKeysAndGetItem => "SupportsKeysAndGetItem",
+            Self::SpecialForm => "_SpecialForm",
+            Self::TypeVar => "TypeVar",
+            Self::ExtensionsTypeVar => "TypeVar",
+            Self::ParamSpec => "ParamSpec",
+            Self::ExtensionsParamSpec => "ParamSpec",
+            Self::ParamSpecArgs => "ParamSpecArgs",
+            Self::ParamSpecKwargs => "ParamSpecKwargs",
+            Self::TypeVarTuple => "TypeVarTuple",
+            Self::ExtensionsTypeVarTuple => "TypeVarTuple",
+            Self::Sentinel => "sentinel",
+            Self::TypeAliasType => "TypeAliasType",
+            Self::NoDefaultType => "_NoDefaultType",
+            Self::NewType => "NewType",
+            Self::Hashable => "Hashable",
+            Self::SupportsIndex => "SupportsIndex",
+            Self::ChainMap => "ChainMap",
+            Self::Counter => "Counter",
+            Self::DefaultDict => "defaultdict",
+            Self::Deque => "deque",
+            Self::OrderedDict => "OrderedDict",
+            Self::Enum => "Enum",
+            Self::EnumProperty => "property",
+            Self::EnumType => {
+                if Program::get(db).python_version(db) >= PythonVersion::PY311 {
+                    "EnumType"
+                } else {
+                    "EnumMeta"
+                }
+            }
+            Self::Auto => "auto",
+            Self::Member => "member",
+            Self::Nonmember => "nonmember",
+            Self::StrEnum => "StrEnum",
+            Self::IntEnum => "IntEnum",
+            Self::Flag => "Flag",
+            Self::IntFlag => "IntFlag",
+            Self::ABCMeta => "ABCMeta",
+            Self::Super => "super",
+            Self::Iterable => "Iterable",
+            Self::TyExtensionsAsyncIterable => "AsyncIterable",
+            Self::TyExtensionsAsyncIterator => "AsyncIterator",
+            Self::TyExtensionsIterable => "Iterable",
+            Self::Iterator => "Iterator",
+            Self::TyExtensionsIterator => "Iterator",
+            Self::AsyncIterator => "AsyncIterator",
+            Self::Sequence => "Sequence",
+            Self::Mapping => "Mapping",
+            Self::MutableMapping => "MutableMapping",
+            // For example, `typing.List` is defined as `List = _Alias()` in typeshed
+            Self::StdlibAlias => "_Alias",
+            // This is the name the type of `sys.version_info` has in typeshed,
+            // which is different to what `type(sys.version_info).__name__` is at runtime.
+            // (At runtime, `type(sys.version_info).__name__ == "version_info"`,
+            // which is impossible to replicate in the stubs since the sole instance of the class
+            // also has that name in the `sys` module.)
+            Self::VersionInfo => "_version_info",
+            Self::EllipsisType => "EllipsisType",
+            Self::NotImplementedType => "NotImplementedType",
+            Self::Field => "Field",
+            Self::KwOnly => "KW_ONLY",
+            Self::NamedTupleFallback => "NamedTupleFallback",
+            Self::NamedTupleLike => "NamedTupleLike",
+            Self::ConstraintSet => "ConstraintSet",
+            Self::ConstraintSetSolution => "ConstraintSetSolution",
+            Self::GenericContext => "GenericContext",
+            Self::Specialization => "Specialization",
+            Self::TypedDictFallback => "TypedDictFallback",
+            Self::ExtensionTypedDictFallback => "_TypedDict",
+            Self::Template => "Template",
+            Self::Path => "Path",
+            Self::FunctoolsPartial => "partial",
+            Self::ProtocolMeta => "_ProtocolMeta",
+            Self::PydanticBaseModel => "BaseModel",
+            Self::PydanticBaseSettings => "BaseSettings",
+            Self::PydanticConfigDict => "ConfigDict",
+            Self::PydanticRootModel => "RootModel",
+            Self::PydanticStrict => "Strict",
+        }
+    }
+
+    pub(crate) fn display(self, db: &dyn Db) -> impl std::fmt::Display + '_ {
+        struct KnownClassDisplay<'db> {
+            db: &'db dyn Db,
+            class: KnownClass,
+        }
+
+        impl std::fmt::Display for KnownClassDisplay<'_> {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                let KnownClassDisplay {
+                    class: known_class,
+                    db,
+                } = *self;
+                write!(
+                    f,
+                    "{module}.{class}",
+                    module = known_class.canonical_module(db),
+                    class = known_class.name(db)
+                )
+            }
+        }
+
+        KnownClassDisplay { db, class: self }
+    }
+
+    /// Look up a [`KnownClass`] in its canonical module and return a [`Type`] representing all
+    /// possible instances of the class. If this class is generic, this will use the default
+    /// specialization.
+    ///
+    /// If the class cannot be found, a debug-level log message will be emitted stating this.
+    #[track_caller]
+    pub fn to_instance(self, db: &dyn Db) -> Type<'_> {
+        debug_assert_ne!(
+            self,
+            KnownClass::Tuple,
+            "Use `Type::heterogeneous_tuple` or `Type::homogeneous_tuple` to create `tuple` instances"
+        );
+
+        #[salsa::tracked(returns(copy), heap_size=ruff_memory_usage::heap_size)]
+        fn known_class_to_instance<'db>(
+            db: &'db dyn Db,
+            class: KnownClassArgument<'db>,
+        ) -> Type<'db> {
+            class
+                .class(db)
+                .to_class_literal(db)
+                .to_class_type(db)
+                .map(|class| Type::instance(db, class))
+                .unwrap_or_else(Type::unknown)
+        }
+
+        known_class_to_instance(db, KnownClassArgument::new(db, self))
+    }
+
+    /// Similar to [`KnownClass::to_instance`], but returns the Unknown-specialization where each type
+    /// parameter is specialized to `Unknown`.
+    #[track_caller]
+    pub(crate) fn to_instance_unknown(self, db: &dyn Db) -> Type<'_> {
+        debug_assert_ne!(
+            self,
+            KnownClass::Tuple,
+            "Use `Type::heterogeneous_tuple` or `Type::homogeneous_tuple` to create `tuple` instances"
+        );
+        self.try_to_class_literal(db)
+            .map(|literal| Type::instance(db, literal.unknown_specialization(db)))
+            .unwrap_or_else(Type::unknown)
+    }
+
+    /// Look up a generic [`KnownClass`] in its canonical module and return a [`Type`] representing a
+    /// specialization of that class.
+    ///
+    /// If the class cannot be found, or if you provide a specialization with the wrong number of
+    /// types, a debug-level log message will be emitted stating this.
+    pub(crate) fn to_specialized_class_type<'t, 'db, T>(
+        self,
+        db: &'db dyn Db,
+        specialization: T,
+    ) -> Option<ClassType<'db>>
+    where
+        T: Into<Cow<'t, [Type<'db>]>>,
+        'db: 't,
+    {
+        fn to_specialized_class_type_impl<'db>(
+            db: &'db dyn Db,
+            class: KnownClass,
+            class_literal: StaticClassLiteral<'db>,
+            specialization: Cow<[Type<'db>]>,
+            generic_context: GenericContext<'db>,
+        ) -> ClassType<'db> {
+            if specialization.len() != generic_context.len(db) {
+                // a cache of the `KnownClass`es that we have already seen mismatched-arity
+                // specializations for (and therefore that we've already logged a warning for)
+                static MESSAGES: LazyLock<Mutex<FxHashSet<KnownClass>>> =
+                    LazyLock::new(Mutex::default);
+                if MESSAGES.lock().unwrap().insert(class) {
+                    tracing::info!(
+                        "Wrong number of types when specializing {}. \
+                 Falling back to default specialization for the symbol instead.",
+                        class.display(db)
+                    );
+                }
+                return class_literal.default_specialization(db);
+            }
+
+            class_literal
+                .apply_specialization(db, |_| generic_context.specialize(db, specialization))
+        }
+
+        let class_literal = self.to_class_literal(db).as_class_literal()?.as_static()?;
+        let generic_context = class_literal.generic_context(db)?;
+        let specialization = specialization.into();
+
+        Some(to_specialized_class_type_impl(
+            db,
+            self,
+            class_literal,
+            specialization,
+            generic_context,
+        ))
+    }
+
+    /// Look up a [`KnownClass`] in its canonical module and return a [`Type`] representing all
+    /// possible instances of the generic class with a specialization.
+    ///
+    /// If the class cannot be found, or if you provide a specialization with the wrong number of
+    /// types, a debug-level log message will be emitted stating this.
+    #[track_caller]
+    pub(crate) fn to_specialized_instance<'t, 'db, T>(
+        self,
+        db: &'db dyn Db,
+        specialization: T,
+    ) -> Type<'db>
+    where
+        T: Into<Cow<'t, [Type<'db>]>>,
+        'db: 't,
+    {
+        debug_assert_ne!(
+            self,
+            KnownClass::Tuple,
+            "Use `Type::heterogeneous_tuple` or `Type::homogeneous_tuple` to create `tuple` instances"
+        );
+        self.to_specialized_class_type(db, specialization)
+            .and_then(|class_type| Type::from(class_type).to_instance_approximation(db))
+            .unwrap_or_else(Type::unknown)
+    }
+
+    /// Look up a [`KnownClass`] in its canonical module.
+    ///
+    /// Lookup errors are logged when the cached query executes.
+    fn lookup_class_literal(
+        self,
+        db: &dyn Db,
+    ) -> Result<Option<StaticClassLiteral<'_>>, KnownClassLookupError<'_>> {
+        #[salsa::tracked(returns(copy), cycle_initial=|_, _, _| Ok(None), heap_size=ruff_memory_usage::heap_size)]
+        fn known_class_to_class_literal<'db>(
+            db: &'db dyn Db,
+            class: KnownClassArgument<'db>,
+        ) -> Result<Option<StaticClassLiteral<'db>>, KnownClassLookupError<'db>> {
+            let class = class.class(db);
+            let module = class.canonical_module(db);
+            let third_party = module.is_third_party();
+            let symbol = known_module_symbol(db, module, class.name(db)).place;
+            let result = match symbol {
+                Place::Defined(DefinedPlace {
+                    ty: Type::ClassLiteral(ClassLiteral::Static(class_literal)),
+                    definedness: Definedness::AlwaysDefined,
+                    ..
+                }) => Ok(Some(class_literal)),
+                Place::Defined(DefinedPlace {
+                    ty: Type::ClassLiteral(ClassLiteral::Static(class_literal)),
+                    definedness: Definedness::PossiblyUndefined,
+                    ..
+                }) => Err(KnownClassLookupError::ClassPossiblyUnbound {
+                    class_literal,
+                    third_party,
+                }),
+                Place::Defined(DefinedPlace { ty: found_type, .. }) => {
+                    Err(KnownClassLookupError::SymbolNotAClass {
+                        found_type,
+                        third_party,
+                    })
+                }
+                Place::Undefined => Err(KnownClassLookupError::ClassNotFound { third_party }),
+            };
+
+            if let Err(lookup_error) = result {
+                if matches!(
+                    lookup_error,
+                    KnownClassLookupError::ClassPossiblyUnbound { .. }
+                ) {
+                    tracing::info!("{}", lookup_error.display(db, class));
+                } else {
+                    tracing::info!(
+                        "{}. Falling back to `Unknown` for the symbol instead.",
+                        lookup_error.display(db, class)
+                    );
+                }
+            }
+
+            result
+        }
+
+        known_class_to_class_literal(db, KnownClassArgument::new(db, self))
+    }
+
+    /// Look up a [`KnownClass`] in its canonical module and return a [`Type`] representing that
+    /// class literal.
+    ///
+    /// If the class cannot be found, a debug-level log message will be emitted stating this.
+    pub(crate) fn try_to_class_literal(self, db: &dyn Db) -> Option<StaticClassLiteral<'_>> {
+        match self.lookup_class_literal(db) {
+            Ok(class_literal) => class_literal,
+            Err(KnownClassLookupError::ClassPossiblyUnbound { class_literal, .. }) => {
+                Some(class_literal)
+            }
+            Err(
+                KnownClassLookupError::ClassNotFound { .. }
+                | KnownClassLookupError::SymbolNotAClass { .. },
+            ) => None,
+        }
+    }
+
+    /// Look up a [`KnownClass`] in its canonical module and return a [`Type`] representing that
+    /// class literal.
+    ///
+    /// If the class cannot be found, a debug-level log message will be emitted stating this.
+    pub(crate) fn to_class_literal(self, db: &dyn Db) -> Type<'_> {
+        self.try_to_class_literal(db)
+            .map(|class| Type::ClassLiteral(ClassLiteral::Static(class)))
+            .unwrap_or_else(Type::unknown)
+    }
+
+    /// Look up a [`KnownClass`] in its canonical module and return a [`Type`] representing that class
+    /// and all possible subclasses of the class.
+    ///
+    /// If the class cannot be found, a debug-level log message will be emitted stating this.
+    pub fn to_subclass_of(self, db: &dyn Db) -> Type<'_> {
+        self.to_class_literal(db)
+            .to_class_type(db)
+            .map(|class| SubclassOfType::from(db, class))
+            .unwrap_or_else(SubclassOfType::subclass_of_unknown)
+    }
+
+    pub(crate) fn to_specialized_subclass_of<'db>(
+        self,
+        db: &'db dyn Db,
+        specialization: &[Type<'db>],
+    ) -> Type<'db> {
+        self.to_specialized_class_type(db, specialization)
+            .map(|class_type| SubclassOfType::from(db, class_type))
+            .unwrap_or_else(SubclassOfType::subclass_of_unknown)
+    }
+
+    /// Return `true` if this symbol can be resolved to a class definition `class` in its canonical
+    /// module, *and* `class` is a subclass of `other`.
+    pub(crate) fn is_subclass_of<'db>(self, db: &'db dyn Db, other: ClassType<'db>) -> bool {
+        self.lookup_class_literal(db)
+            .is_ok_and(|class| class.is_some_and(|class| class.is_subclass_of(db, None, other)))
+    }
+
+    pub(crate) fn when_subclass_of<'db, 'c>(
+        self,
+        db: &'db dyn Db,
+        other: ClassType<'db>,
+        constraints: &'c ConstraintSetBuilder<'db>,
+    ) -> ConstraintSet<'db, 'c> {
+        ConstraintSet::from_bool(constraints, self.is_subclass_of(db, other))
+    }
+
+    /// Return the module in which we should look up the definition for this class
+    pub(super) fn canonical_module(self, db: &dyn Db) -> KnownModule {
+        match self {
+            Self::Bool
+            | Self::Object
+            | Self::Bytes
+            | Self::Bytearray
+            | Self::Memoryview
+            | Self::Range
+            | Self::Type
+            | Self::Int
+            | Self::Float
+            | Self::Complex
+            | Self::Str
+            | Self::List
+            | Self::Tuple
+            | Self::Set
+            | Self::FrozenSet
+            | Self::Dict
+            | Self::BaseException
+            | Self::BaseExceptionGroup
+            | Self::Exception
+            | Self::Warning
+            | Self::NotImplementedError
+            | Self::ExceptionGroup
+            | Self::Staticmethod
+            | Self::Classmethod
+            | Self::Slice
+            | Self::Super
+            | Self::Property => KnownModule::Builtins,
+            Self::VersionInfo => KnownModule::Sys,
+            Self::ABCMeta => KnownModule::Abc,
+            Self::Enum
+            | Self::EnumProperty
+            | Self::EnumType
+            | Self::Auto
+            | Self::Member
+            | Self::Nonmember
+            | Self::StrEnum
+            | Self::IntEnum
+            | Self::Flag
+            | Self::IntFlag => KnownModule::Enum,
+            Self::GenericAlias
+            | Self::ModuleType
+            | Self::FunctionType
+            | Self::MethodType
+            | Self::GeneratorType
+            | Self::AsyncGeneratorType
+            | Self::CoroutineType
+            | Self::MethodWrapperType
+            | Self::UnionType
+            | Self::BuiltinFunctionType
+            | Self::EllipsisType
+            | Self::NotImplementedType
+            | Self::WrapperDescriptorType => KnownModule::Types,
+            Self::NoneType | Self::SupportsKeysAndGetItem => KnownModule::Typeshed,
+            Self::Awaitable
+            | Self::Generator
+            | Self::AsyncGenerator
+            | Self::SpecialForm
+            | Self::TypeVar
+            | Self::StdlibAlias
+            | Self::Iterable
+            | Self::Iterator
+            | Self::AsyncIterator
+            | Self::Sequence
+            | Self::Mapping
+            | Self::MutableMapping
+            | Self::ProtocolMeta
+            | Self::ParamSpec
+            | Self::Hashable
+            | Self::SupportsIndex => KnownModule::Typing,
+            Self::TypeAliasType
+            | Self::ExtensionsTypeVar
+            | Self::ExtensionsTypeVarTuple
+            | Self::ExtensionsParamSpec
+            | Self::ParamSpecArgs
+            | Self::ParamSpecKwargs
+            | Self::Deprecated
+            | Self::ExtensionTypedDictFallback
+            | Self::NewType => KnownModule::TypingExtensions,
+            Self::TypeVarTuple => {
+                if Program::get(db).python_version(db) >= PythonVersion::PY311 {
+                    KnownModule::Typing
+                } else {
+                    KnownModule::TypingExtensions
+                }
+            }
+            Self::Sentinel => {
+                if Program::get(db).python_version(db) >= PythonVersion::PY315 {
+                    KnownModule::Builtins
+                } else {
+                    KnownModule::TypingExtensions
+                }
+            }
+            Self::NoDefaultType => {
+                let python_version = Program::get(db).python_version(db);
+
+                // typing_extensions has a 3.13+ re-export for the `typing.NoDefault`
+                // singleton, but not for `typing._NoDefaultType`. So we need to switch
+                // to `typing._NoDefaultType` for newer versions:
+                if python_version >= PythonVersion::PY313 {
+                    KnownModule::Typing
+                } else {
+                    KnownModule::TypingExtensions
+                }
+            }
+            Self::ChainMap
+            | Self::Counter
+            | Self::DefaultDict
+            | Self::Deque
+            | Self::OrderedDict => KnownModule::Collections,
+            Self::Field | Self::KwOnly => KnownModule::Dataclasses,
+            Self::NamedTupleFallback | Self::TypedDictFallback => KnownModule::TypeCheckerInternals,
+            Self::NamedTupleLike => KnownModule::TyExtensions,
+            Self::ConstraintSet
+            | Self::ConstraintSetSolution
+            | Self::GenericContext
+            | Self::Specialization
+            | Self::TyExtensionsAsyncIterable
+            | Self::TyExtensionsAsyncIterator
+            | Self::TyExtensionsIterable
+            | Self::TyExtensionsIterator => KnownModule::TyExtensionsInternal,
+            Self::Template => KnownModule::Templatelib,
+            Self::Path => KnownModule::Pathlib,
+            Self::FunctoolsPartial => KnownModule::Functools,
+            Self::PydanticBaseModel => KnownModule::PydanticMain,
+            Self::PydanticBaseSettings => KnownModule::PydanticSettingsMain,
+            Self::PydanticConfigDict => KnownModule::PydanticConfig,
+            Self::PydanticRootModel => KnownModule::PydanticRootModel,
+            Self::PydanticStrict => KnownModule::PydanticTypes,
+        }
+    }
+
+    /// Is this class a singleton class?
+    ///
+    /// A singleton class is a class where it is known that only one instance can ever exist at runtime.
+    pub(crate) const fn is_singleton(self) -> bool {
+        match self {
+            Self::NoneType
+            | Self::EllipsisType
+            | Self::NoDefaultType
+            | Self::NotImplementedType => true,
+
+            Self::Bool
+            | Self::Object
+            | Self::Bytes
+            | Self::Bytearray
+            | Self::Memoryview
+            | Self::Range
+            | Self::Tuple
+            | Self::Int
+            | Self::Float
+            | Self::Complex
+            | Self::Str
+            | Self::Set
+            | Self::FrozenSet
+            | Self::Dict
+            | Self::List
+            | Self::VersionInfo
+            | Self::Type
+            | Self::Slice
+            | Self::Property
+            | Self::GenericAlias
+            | Self::ModuleType
+            | Self::FunctionType
+            | Self::MethodType
+            | Self::MethodWrapperType
+            | Self::WrapperDescriptorType
+            | Self::GeneratorType
+            | Self::AsyncGeneratorType
+            | Self::CoroutineType
+            | Self::SpecialForm
+            | Self::ChainMap
+            | Self::Counter
+            | Self::DefaultDict
+            | Self::Deque
+            | Self::OrderedDict
+            | Self::StdlibAlias
+            | Self::Hashable
+            | Self::SupportsIndex
+            | Self::BaseException
+            | Self::BaseExceptionGroup
+            | Self::Exception
+            | Self::Warning
+            | Self::NotImplementedError
+            | Self::ExceptionGroup
+            | Self::Staticmethod
+            | Self::Classmethod
+            | Self::Awaitable
+            | Self::Generator
+            | Self::AsyncGenerator
+            | Self::Deprecated
+            | Self::TypeAliasType
+            | Self::TypeVar
+            | Self::ExtensionsTypeVar
+            | Self::ParamSpec
+            | Self::ExtensionsParamSpec
+            | Self::ParamSpecArgs
+            | Self::ParamSpecKwargs
+            | Self::TypeVarTuple
+            | Self::ExtensionsTypeVarTuple
+            | Self::Sentinel
+            | Self::Enum
+            | Self::EnumProperty
+            | Self::EnumType
+            | Self::Auto
+            | Self::Member
+            | Self::Nonmember
+            | Self::StrEnum
+            | Self::IntEnum
+            | Self::Flag
+            | Self::IntFlag
+            | Self::ABCMeta
+            | Self::Super
+            | Self::UnionType
+            | Self::NewType
+            | Self::Field
+            | Self::KwOnly
+            | Self::Iterable
+            | Self::TyExtensionsAsyncIterable
+            | Self::TyExtensionsAsyncIterator
+            | Self::TyExtensionsIterable
+            | Self::Iterator
+            | Self::TyExtensionsIterator
+            | Self::AsyncIterator
+            | Self::Sequence
+            | Self::Mapping
+            | Self::MutableMapping
+            | Self::SupportsKeysAndGetItem
+            | Self::NamedTupleFallback
+            | Self::NamedTupleLike
+            | Self::ConstraintSet
+            | Self::ConstraintSetSolution
+            | Self::GenericContext
+            | Self::Specialization
+            | Self::TypedDictFallback
+            | Self::ExtensionTypedDictFallback
+            | Self::BuiltinFunctionType
+            | Self::ProtocolMeta
+            | Self::Template
+            | Self::Path
+            | Self::FunctoolsPartial
+            | Self::PydanticBaseModel
+            | Self::PydanticBaseSettings
+            | Self::PydanticConfigDict
+            | Self::PydanticRootModel
+            | Self::PydanticStrict => false,
+        }
+    }
+
+    pub(crate) fn try_from_file_and_name(
+        db: &dyn Db,
+        file: File,
+        class_name: &str,
+    ) -> Option<Self> {
+        // We assert that this match is exhaustive over the right-hand side in the unit test
+        // `known_class_roundtrip_from_str()`
+        let candidates: &[Self] = match class_name {
+            "bool" => &[Self::Bool],
+            "object" => &[Self::Object],
+            "bytes" => &[Self::Bytes],
+            "bytearray" => &[Self::Bytearray],
+            "memoryview" => &[Self::Memoryview],
+            "tuple" => &[Self::Tuple],
+            "range" => &[Self::Range],
+            "type" => &[Self::Type],
+            "int" => &[Self::Int],
+            "float" => &[Self::Float],
+            "complex" => &[Self::Complex],
+            "str" => &[Self::Str],
+            "set" => &[Self::Set],
+            "frozenset" => &[Self::FrozenSet],
+            "dict" => &[Self::Dict],
+            "list" => &[Self::List],
+            "slice" => &[Self::Slice],
+            "property" => &[Self::Property, Self::EnumProperty],
+            "BaseException" => &[Self::BaseException],
+            "BaseExceptionGroup" => &[Self::BaseExceptionGroup],
+            "Exception" => &[Self::Exception],
+            "Warning" => &[Self::Warning],
+            "NotImplementedError" => &[Self::NotImplementedError],
+            "ExceptionGroup" => &[Self::ExceptionGroup],
+            "staticmethod" => &[Self::Staticmethod],
+            "classmethod" => &[Self::Classmethod],
+            "Awaitable" => &[Self::Awaitable],
+            "Generator" => &[Self::Generator],
+            "AsyncGenerator" => &[Self::AsyncGenerator],
+            "deprecated" => &[Self::Deprecated],
+            "GenericAlias" => &[Self::GenericAlias],
+            "NoneType" => &[Self::NoneType],
+            "SupportsKeysAndGetItem" => &[Self::SupportsKeysAndGetItem],
+            "ModuleType" => &[Self::ModuleType],
+            "GeneratorType" => &[Self::GeneratorType],
+            "AsyncGeneratorType" => &[Self::AsyncGeneratorType],
+            "CoroutineType" => &[Self::CoroutineType],
+            "FunctionType" => &[Self::FunctionType],
+            "MethodType" => &[Self::MethodType],
+            "UnionType" => &[Self::UnionType],
+            "MethodWrapperType" => &[Self::MethodWrapperType],
+            "WrapperDescriptorType" => &[Self::WrapperDescriptorType],
+            "BuiltinFunctionType" => &[Self::BuiltinFunctionType],
+            "NewType" => &[Self::NewType],
+            "TypeAliasType" => &[Self::TypeAliasType],
+            "TypeVar" => &[Self::TypeVar, Self::ExtensionsTypeVar],
+            "Iterable" => &[Self::Iterable, Self::TyExtensionsIterable],
+            "Iterator" => &[Self::Iterator, Self::TyExtensionsIterator],
+            "AsyncIterable" => &[Self::TyExtensionsAsyncIterable],
+            "AsyncIterator" => &[Self::AsyncIterator, Self::TyExtensionsAsyncIterator],
+            "Sequence" => &[Self::Sequence],
+            "Mapping" => &[Self::Mapping],
+            "MutableMapping" => &[Self::MutableMapping],
+            "ParamSpec" => &[Self::ParamSpec, Self::ExtensionsParamSpec],
+            "ParamSpecArgs" => &[Self::ParamSpecArgs],
+            "ParamSpecKwargs" => &[Self::ParamSpecKwargs],
+            // On Python 3.10, both candidates resolve to `typing_extensions`. Prefer the
+            // backport-aware variant so that we recognize features such as `default`.
+            "TypeVarTuple" => &[Self::ExtensionsTypeVarTuple, Self::TypeVarTuple],
+            "sentinel" => &[Self::Sentinel],
+            "ChainMap" => &[Self::ChainMap],
+            "Counter" => &[Self::Counter],
+            "defaultdict" => &[Self::DefaultDict],
+            "deque" => &[Self::Deque],
+            "OrderedDict" => &[Self::OrderedDict],
+            "_Alias" => &[Self::StdlibAlias],
+            "_SpecialForm" => &[Self::SpecialForm],
+            "_NoDefaultType" => &[Self::NoDefaultType],
+            "Hashable" => &[Self::Hashable],
+            "SupportsIndex" => &[Self::SupportsIndex],
+            "Enum" => &[Self::Enum],
+            "EnumMeta" => &[Self::EnumType],
+            "EnumType" if Program::get(db).python_version(db) >= PythonVersion::PY311 => {
+                &[Self::EnumType]
+            }
+            "StrEnum" if Program::get(db).python_version(db) >= PythonVersion::PY311 => {
+                &[Self::StrEnum]
+            }
+            "IntEnum" => &[Self::IntEnum],
+            "Flag" => &[Self::Flag],
+            "IntFlag" => &[Self::IntFlag],
+            "auto" => &[Self::Auto],
+            "member" => &[Self::Member],
+            "nonmember" => &[Self::Nonmember],
+            "ABCMeta" => &[Self::ABCMeta],
+            "super" => &[Self::Super],
+            "_version_info" => &[Self::VersionInfo],
+            "EllipsisType" => &[Self::EllipsisType],
+            "NotImplementedType" => &[Self::NotImplementedType],
+            "Field" => &[Self::Field],
+            "KW_ONLY" => &[Self::KwOnly],
+            "NamedTupleFallback" => &[Self::NamedTupleFallback],
+            "NamedTupleLike" => &[Self::NamedTupleLike],
+            "ConstraintSet" => &[Self::ConstraintSet],
+            "ConstraintSetSolution" => &[Self::ConstraintSetSolution],
+            "GenericContext" => &[Self::GenericContext],
+            "Specialization" => &[Self::Specialization],
+            "TypedDictFallback" => &[Self::TypedDictFallback],
+            "Template" => &[Self::Template],
+            "Path" => &[Self::Path],
+            "partial" => &[Self::FunctoolsPartial],
+            "_ProtocolMeta" => &[Self::ProtocolMeta],
+            "_TypedDict" => &[Self::ExtensionTypedDictFallback],
+            "BaseModel" => &[Self::PydanticBaseModel],
+            "BaseSettings" => &[Self::PydanticBaseSettings],
+            "ConfigDict" => &[Self::PydanticConfigDict],
+            "RootModel" => &[Self::PydanticRootModel],
+            "Strict" => &[Self::PydanticStrict],
+            _ => return None,
+        };
+
+        let module = file_to_module(db, file)?.known(db)?;
+
+        candidates
+            .iter()
+            .copied()
+            .find(|&candidate| candidate.check_module(db, module))
+    }
+
+    /// Return `true` if the module of `self` matches `module`
+    fn check_module(self, db: &dyn Db, module: KnownModule) -> bool {
+        match self {
+            Self::Bool
+            | Self::Object
+            | Self::Bytes
+            | Self::Bytearray
+            | Self::Memoryview
+            | Self::Range
+            | Self::Type
+            | Self::Int
+            | Self::Float
+            | Self::Complex
+            | Self::Str
+            | Self::List
+            | Self::Tuple
+            | Self::Set
+            | Self::FrozenSet
+            | Self::Dict
+            | Self::Slice
+            | Self::Property
+            | Self::GenericAlias
+            | Self::ChainMap
+            | Self::Counter
+            | Self::DefaultDict
+            | Self::Deque
+            | Self::OrderedDict
+            | Self::StdlibAlias  // no equivalent class exists in typing_extensions, nor ever will
+            | Self::ModuleType
+            | Self::VersionInfo
+            | Self::BaseException
+            | Self::Exception
+            | Self::Warning
+            | Self::NotImplementedError
+            | Self::ExceptionGroup
+            | Self::EllipsisType
+            | Self::BaseExceptionGroup
+            | Self::Staticmethod
+            | Self::Classmethod
+            | Self::FunctionType
+            | Self::MethodType
+            | Self::MethodWrapperType
+            | Self::Enum
+            | Self::EnumProperty
+            | Self::EnumType
+            | Self::Auto
+            | Self::Member
+            | Self::Nonmember
+            | Self::StrEnum
+            | Self::IntEnum
+            | Self::Flag
+            | Self::IntFlag
+            | Self::ABCMeta
+            | Self::Super
+            | Self::NotImplementedType
+            | Self::UnionType
+            | Self::GeneratorType
+            | Self::AsyncGeneratorType
+            | Self::CoroutineType
+            | Self::WrapperDescriptorType
+            | Self::BuiltinFunctionType
+            | Self::Field
+            | Self::KwOnly
+            | Self::NamedTupleFallback
+            | Self::SupportsKeysAndGetItem
+            | Self::TypedDictFallback
+            | Self::ExtensionTypedDictFallback
+            | Self::TypeVar
+            | Self::ExtensionsTypeVar
+            | Self::ParamSpec
+            | Self::ExtensionsParamSpec
+            | Self::TypeVarTuple
+            | Self::ExtensionsTypeVarTuple
+            | Self::Sentinel
+            | Self::NamedTupleLike
+            | Self::ConstraintSet
+            | Self::ConstraintSetSolution
+            | Self::GenericContext
+            | Self::Specialization
+            | Self::TyExtensionsAsyncIterable
+            | Self::TyExtensionsAsyncIterator
+            | Self::TyExtensionsIterable
+            | Self::TyExtensionsIterator
+            | Self::Awaitable
+            | Self::Generator
+            | Self::AsyncGenerator
+            | Self::Template
+            | Self::Path
+            | Self::FunctoolsPartial
+            | Self::PydanticBaseModel
+            | Self::PydanticBaseSettings
+            | Self::PydanticConfigDict
+            | Self::PydanticRootModel
+            | Self::PydanticStrict => module == self.canonical_module(db),
+            Self::NoneType => matches!(module, KnownModule::Typeshed | KnownModule::Types),
+            Self::SpecialForm
+            | Self::TypeAliasType
+            | Self::NoDefaultType
+            | Self::Hashable
+            | Self::SupportsIndex
+            | Self::ParamSpecArgs
+            | Self::ParamSpecKwargs
+            | Self::Iterable
+            | Self::Iterator
+            | Self::AsyncIterator
+            | Self::Sequence
+            | Self::Mapping
+            | Self::MutableMapping
+            | Self::ProtocolMeta
+            | Self::NewType => matches!(module, KnownModule::Typing | KnownModule::TypingExtensions),
+            Self::Deprecated => matches!(module, KnownModule::Warnings | KnownModule::TypingExtensions),
+        }
+    }
+
+    /// Evaluate a call to this known class, emit any diagnostics that are necessary
+    /// as a result of the call, and return the type that results from the call.
+    pub(crate) fn check_call<'db>(
+        self,
+        context: &InferContext<'db, '_>,
+        index: &SemanticIndex<'db>,
+        overload: &mut Binding<'db>,
+        call_expression: &ast::ExprCall,
+    ) {
+        let db = context.db();
+        let scope = context.scope();
+        let module = context.module();
+
+        match self {
+            KnownClass::Super => {
+                // Handle the case where `super()` is called with no arguments.
+                // In this case, we need to infer the two arguments:
+                //   1. The nearest enclosing class
+                //   2. The first parameter of the current function (typically `self` or `cls`)
+                match overload.parameter_types() {
+                    [] => {
+                        let Some(enclosing_class) = nearest_enclosing_class(db, index, scope)
+                        else {
+                            BoundSuperError::UnavailableImplicitArguments
+                                .report_diagnostic(context, call_expression.into());
+                            overload.set_return_type(Type::unknown());
+                            return;
+                        };
+
+                        // Check if the enclosing class is a `NamedTuple`, which forbids the use of `super()`.
+                        if CodeGeneratorKind::NamedTuple.matches(db, enclosing_class.into()) {
+                            if let Some(builder) = context
+                                .report_lint(&SUPER_CALL_IN_NAMED_TUPLE_METHOD, call_expression)
+                            {
+                                builder.into_diagnostic(format_args!(
+                                    "Cannot use `super()` in a method of NamedTuple class `{}`",
+                                    enclosing_class.name(db)
+                                ));
+                            }
+                            overload.set_return_type(Type::unknown());
+                            return;
+                        }
+
+                        // The type of the first parameter if the given scope is function-like (i.e. function or lambda).
+                        // `None` if the scope is not function-like, or has no parameters.
+                        let first_param = match scope.node(db) {
+                            NodeWithScopeKind::Function(f) => {
+                                f.node(module).parameters.iter().next()
+                            }
+                            NodeWithScopeKind::Lambda(l) => l
+                                .node(module)
+                                .parameters
+                                .as_ref()
+                                .into_iter()
+                                .flatten()
+                                .next(),
+                            _ => None,
+                        };
+
+                        let Some(first_param) = first_param else {
+                            BoundSuperError::UnavailableImplicitArguments
+                                .report_diagnostic(context, call_expression.into());
+                            overload.set_return_type(Type::unknown());
+                            return;
+                        };
+
+                        let definition = index.expect_single_definition(first_param);
+                        let first_param = binding_type(db, definition);
+
+                        let bound_super = BoundSuperType::build(
+                            db,
+                            Type::ClassLiteral(ClassLiteral::Static(enclosing_class)),
+                            first_param,
+                        )
+                        .unwrap_or_else(|err| {
+                            err.report_diagnostic(context, call_expression.into());
+                            Type::unknown()
+                        });
+
+                        overload.set_return_type(bound_super);
+                    }
+                    [Some(pivot_class_type), Some(owner_type)] => {
+                        // Check if the enclosing class is a `NamedTuple`, which forbids the use of `super()`.
+                        if let Some(enclosing_class) = nearest_enclosing_class(db, index, scope) {
+                            if CodeGeneratorKind::NamedTuple.matches(db, enclosing_class.into()) {
+                                if let Some(builder) = context
+                                    .report_lint(&SUPER_CALL_IN_NAMED_TUPLE_METHOD, call_expression)
+                                {
+                                    builder.into_diagnostic(format_args!(
+                                        "Cannot use `super()` in a method of NamedTuple class `{}`",
+                                        enclosing_class.name(db)
+                                    ));
+                                }
+                                overload.set_return_type(Type::unknown());
+                                return;
+                            }
+                        }
+
+                        let bound_super = BoundSuperType::build(db, *pivot_class_type, *owner_type)
+                            .unwrap_or_else(|err| {
+                                err.report_diagnostic(context, call_expression.into());
+                                Type::unknown()
+                            });
+                        overload.set_return_type(bound_super);
+                    }
+                    _ => {}
+                }
+            }
+
+            KnownClass::Deprecated => {
+                // Parsing something of the form:
+                //
+                // @deprecated("message")
+                // @deprecated("message", category = DeprecationWarning, stacklevel = 1)
+                //
+                // "Static type checker behavior is not affected by the category and stacklevel arguments"
+                // so we only need the message and can ignore everything else. The message is mandatory,
+                // must be a LiteralString, and always comes first.
+                //
+                // We aren't guaranteed to know the static value of a LiteralString, so we need to
+                // accept that sometimes we will fail to include the message.
+                //
+                // We don't do any serious validation/diagnostics here, as the signature for this
+                // is included in `Type::bindings`.
+                //
+                // See: <https://typing.python.org/en/latest/spec/directives.html#deprecated>
+                let [Some(message), ..] = overload.parameter_types() else {
+                    // Checking in Type::bindings will complain about this for us
+                    return;
+                };
+
+                overload.set_return_type(Type::KnownInstance(KnownInstanceType::Deprecated(
+                    DeprecatedInstance {
+                        message: message.as_string_literal(),
+                    },
+                )));
+            }
+
+            _ => {}
+        }
+    }
+}
+
+#[salsa::interned(heap_size=ruff_memory_usage::heap_size)]
+struct KnownClassArgument {
+    #[returns(copy)]
+    class: KnownClass,
+}
+
+/// Enumeration of ways in which looking up a [`KnownClass`] in its canonical module could fail.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
+pub(crate) enum KnownClassLookupError<'db> {
+    /// There is no symbol by that name in the expected module.
+    ClassNotFound { third_party: bool },
+    /// There is a symbol by that name in the expected module, but it's not a class.
+    SymbolNotAClass {
+        found_type: Type<'db>,
+        third_party: bool,
+    },
+    /// There is a symbol by that name in the expected module, and it's a class definition, but it's
+    /// possibly unbound.
+    ClassPossiblyUnbound {
+        class_literal: StaticClassLiteral<'db>,
+        third_party: bool,
+    },
+}
+
+impl<'db> KnownClassLookupError<'db> {
+    const fn is_third_party(self) -> bool {
+        match self {
+            Self::ClassNotFound { third_party }
+            | Self::SymbolNotAClass { third_party, .. }
+            | Self::ClassPossiblyUnbound { third_party, .. } => third_party,
+        }
+    }
+
+    fn display(&self, db: &'db dyn Db, class: KnownClass) -> impl std::fmt::Display + 'db {
+        struct ErrorDisplay<'db> {
+            db: &'db dyn Db,
+            class: KnownClass,
+            error: KnownClassLookupError<'db>,
+        }
+
+        impl std::fmt::Display for ErrorDisplay<'_> {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                let ErrorDisplay { db, class, error } = *self;
+
+                let class = class.display(db);
+                let python_version = Program::get(db).python_version(db);
+                let location = if error.is_third_party() {
+                    ""
+                } else {
+                    " in typeshed"
+                };
+
+                match error {
+                    KnownClassLookupError::ClassNotFound { .. } => write!(
+                        f,
+                        "Could not find class `{class}`{location} on Python {python_version}",
+                    ),
+                    KnownClassLookupError::SymbolNotAClass { found_type, .. } => write!(
+                        f,
+                        "Error looking up `{class}`{location}: expected to find a class definition \
+                        on Python {python_version}, but found a symbol of type `{found_type}` instead",
+                        found_type = found_type.display(db),
+                    ),
+                    KnownClassLookupError::ClassPossiblyUnbound { .. } => write!(
+                        f,
+                        "Error looking up `{class}`{location} on Python {python_version}: expected \
+                        to find a fully bound symbol, but found one that is possibly unbound",
+                    ),
+                }
+            }
+        }
+
+        ErrorDisplay {
+            db,
+            class,
+            error: *self,
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::db::tests::setup_db;
+    use crate::{PythonVersionSource, PythonVersionWithSource};
+    use salsa::Setter;
+    use strum::IntoEnumIterator;
+    use ty_module_resolver::resolve_module_confident;
+
+    #[test]
+    fn known_class_roundtrip_from_str() {
+        let mut db = setup_db();
+        Program::get(&db)
+            .set_python_version_with_source(&mut db)
+            .to(PythonVersionWithSource {
+                version: PythonVersion::latest_preview(),
+                source: PythonVersionSource::default(),
+            });
+        for class in KnownClass::iter() {
+            if class.canonical_module(&db).is_third_party() {
+                continue;
+            }
+            let class_name = class.name(&db);
+            let class_module =
+                resolve_module_confident(&db, &class.canonical_module(&db).name()).unwrap();
+
+            assert_eq!(
+                KnownClass::try_from_file_and_name(
+                    &db,
+                    class_module.file(&db).unwrap(),
+                    class_name
+                ),
+                Some(class),
+                "`KnownClass::candidate_from_str` appears to be missing a case for `{class_name}`"
+            );
+        }
+    }
+
+    #[test]
+    fn known_class_doesnt_fallback_to_unknown_unexpectedly_on_latest_version() {
+        let mut db = setup_db();
+
+        Program::get(&db)
+            .set_python_version_with_source(&mut db)
+            .to(PythonVersionWithSource {
+                version: PythonVersion::latest_ty(),
+                source: PythonVersionSource::default(),
+            });
+
+        for class in KnownClass::iter() {
+            if class.canonical_module(&db).is_third_party() {
+                continue;
+            }
+            // Check the class can be looked up successfully
+            class.try_to_class_literal(&db).unwrap();
+
+            // We can't call `KnownClass::Tuple.to_instance()`;
+            // there are assertions to ensure that we always call `Type::homogeneous_tuple()`
+            // or `Type::heterogeneous_tuple()` instead.`
+            if class != KnownClass::Tuple {
+                assert_ne!(
+                    class.to_instance(&db),
+                    Type::unknown(),
+                    "Unexpectedly fell back to `Unknown` for `{class:?}`"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn known_class_doesnt_fallback_to_unknown_unexpectedly_on_low_python_version() {
+        let mut db = setup_db();
+
+        // First, collect the `KnownClass` variants
+        // and sort them according to the version they were added in.
+        // This makes the test far faster as it minimizes the number of times
+        // we need to change the Python version in the loop.
+        let mut classes: Vec<(KnownClass, PythonVersion)> = KnownClass::iter()
+            .filter(|class| !class.canonical_module(&db).is_third_party())
+            .map(|class| {
+                let version_added = match class {
+                    KnownClass::Template => PythonVersion::PY314,
+                    KnownClass::UnionType | KnownClass::KwOnly => PythonVersion::PY310,
+                    KnownClass::BaseExceptionGroup | KnownClass::ExceptionGroup => {
+                        PythonVersion::PY311
+                    }
+                    KnownClass::TypeVarTuple => PythonVersion::PY311,
+                    KnownClass::GenericAlias => PythonVersion::PY39,
+                    KnownClass::EnumProperty
+                    | KnownClass::Member
+                    | KnownClass::Nonmember
+                    | KnownClass::StrEnum => PythonVersion::PY311,
+                    _ => PythonVersion::PY37,
+                };
+                (class, version_added)
+            })
+            .collect();
+
+        classes.sort_unstable_by_key(|(_, version)| *version);
+
+        let program = Program::get(&db);
+        let mut current_version = program.python_version(&db);
+
+        for (class, version_added) in classes {
+            if version_added != current_version {
+                program
+                    .set_python_version_with_source(&mut db)
+                    .to(PythonVersionWithSource {
+                        version: version_added,
+                        source: PythonVersionSource::default(),
+                    });
+                current_version = version_added;
+            }
+
+            // Check the class can be looked up successfully
+            class.try_to_class_literal(&db).unwrap();
+
+            // We can't call `KnownClass::Tuple.to_instance()`;
+            // there are assertions to ensure that we always call `Type::homogeneous_tuple()`
+            // or `Type::heterogeneous_tuple()` instead.`
+            if class != KnownClass::Tuple {
+                assert_ne!(
+                    class.to_instance(&db),
+                    Type::unknown(),
+                    "Unexpectedly fell back to `Unknown` for `{class:?}` on Python {version_added}"
+                );
+            }
+        }
+    }
+}

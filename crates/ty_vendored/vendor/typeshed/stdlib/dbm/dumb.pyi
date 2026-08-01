@@ -9,7 +9,7 @@ XXX TO DO:
 - seems to contain a bug when updating...
 
 - reclaim free space (currently, space once occupied by deleted or expanded
-items is never reused)
+items is not reused except if .reorganize() is called)
 
 - support concurrent access (currently, if two processes take turns making
 updates, they can mess up the index)
@@ -17,15 +17,14 @@ updates, they can mess up the index)
 - support efficient access to large databases (currently, the whole index
 is read when the database is opened, and some updates rewrite the whole index)
 
-- support opening for read-only (flag = 'm')
-
 """
 
 import sys
 from _typeshed import StrOrBytesPath
 from collections.abc import Iterator, MutableMapping
 from types import TracebackType
-from typing_extensions import Self, TypeAlias
+from typing import TypeAlias
+from typing_extensions import Self
 
 __all__ = ["error", "open"]
 
@@ -40,6 +39,9 @@ error = OSError
 class _Database(MutableMapping[_KeyType, bytes]):
     def __init__(self, filebasename: str, mode: str, flag: str = "c") -> None: ...
     def sync(self) -> None: ...
+    if sys.version_info >= (3, 15):
+        def reorganize(self) -> None: ...
+
     def iterkeys(self) -> Iterator[bytes]: ...  # undocumented
     def close(self) -> None: ...
     def __getitem__(self, key: _KeyType) -> bytes: ...

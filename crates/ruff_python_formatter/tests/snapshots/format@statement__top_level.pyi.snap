@@ -1,7 +1,6 @@
 ---
 source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/statement/top_level.pyi
-snapshot_kind: text
 ---
 ## Input
 ```python
@@ -90,7 +89,7 @@ class EllipsisWithComment:
 def function_with_comment():
     ...  # comment
 
-class EllispsisWithMultipleTrailing: # trailing class comment
+class EllipsisWithMultipleTrailing: # trailing class comment
     ... # trailing ellipsis comment
 
 class EllipsisWithLeadingComment:
@@ -154,7 +153,7 @@ class EllipsisWithComment: ...  # comment
 
 def function_with_comment(): ...  # comment
 
-class EllispsisWithMultipleTrailing:  # trailing class comment
+class EllipsisWithMultipleTrailing:  # trailing class comment
     ...  # trailing ellipsis comment
 
 class EllipsisWithLeadingComment:

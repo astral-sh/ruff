@@ -27,14 +27,26 @@
 //! [`await_request`]: TestServer::await_request
 //! [`await_notification`]: TestServer::await_notification
 
+mod call_hierarchy;
+mod code_actions;
 mod commands;
+mod completions;
+mod configuration;
+mod folding_range;
+mod hover;
+mod implementation;
 mod initialize;
 mod inlay_hints;
+mod notebook;
 mod publish_diagnostics;
 mod pull_diagnostics;
+mod rename;
+mod semantic_tokens;
+mod signature_help;
+mod type_hierarchy;
+mod workspace_folders;
 
-use std::collections::hash_map::Entry;
-use std::collections::{HashMap, VecDeque};
+use std::collections::{BTreeMap, HashMap, VecDeque};
 use std::num::NonZeroUsize;
 use std::sync::{Arc, OnceLock};
 use std::thread::JoinHandle;
@@ -45,31 +57,30 @@ use anyhow::{Context, Result, anyhow};
 use crossbeam::channel::RecvTimeoutError;
 use insta::internals::SettingsBindDropGuard;
 use lsp_server::{Connection, Message, RequestId, Response, ResponseError};
-use lsp_types::notification::{
-    DidChangeTextDocument, DidChangeWatchedFiles, DidCloseTextDocument, DidOpenTextDocument, Exit,
-    Initialized, Notification,
-};
-use lsp_types::request::{
-    DocumentDiagnosticRequest, HoverRequest, Initialize, InlayHintRequest, Request, Shutdown,
-    WorkspaceConfiguration, WorkspaceDiagnosticRequest,
-};
 use lsp_types::{
-    ClientCapabilities, ConfigurationParams, DiagnosticClientCapabilities,
-    DidChangeTextDocumentParams, DidChangeWatchedFilesClientCapabilities,
-    DidChangeWatchedFilesParams, DidCloseTextDocumentParams, DidOpenTextDocumentParams,
-    DocumentDiagnosticParams, DocumentDiagnosticReportResult, FileEvent, Hover, HoverParams,
-    InitializeParams, InitializeResult, InitializedParams, InlayHint, InlayHintClientCapabilities,
-    InlayHintParams, NumberOrString, PartialResultParams, Position, PreviousResultId,
-    PublishDiagnosticsClientCapabilities, Range, TextDocumentClientCapabilities,
-    TextDocumentContentChangeEvent, TextDocumentIdentifier, TextDocumentItem,
-    TextDocumentPositionParams, Url, VersionedTextDocumentIdentifier, WorkDoneProgressParams,
-    WorkspaceClientCapabilities, WorkspaceDiagnosticParams, WorkspaceDiagnosticReportResult,
-    WorkspaceFolder,
+    ClientCapabilities, CompletionItem, CompletionParams, CompletionRequest, CompletionResponse,
+    CompletionTriggerKind, ConfigurationParams, ConfigurationRequest, DiagnosticClientCapabilities,
+    DidChangeTextDocumentNotification, DidChangeTextDocumentParams,
+    DidChangeWatchedFilesClientCapabilities, DidChangeWatchedFilesNotification,
+    DidChangeWatchedFilesParams, DidChangeWorkspaceFoldersNotification,
+    DidChangeWorkspaceFoldersParams, DidCloseTextDocumentNotification, DidCloseTextDocumentParams,
+    DidOpenTextDocumentNotification, DidOpenTextDocumentParams, DidSaveTextDocumentNotification,
+    DidSaveTextDocumentParams, DocumentDiagnosticParams, DocumentDiagnosticReport,
+    DocumentDiagnosticRequest, ExitNotification, FileEvent, FoldingRange, FoldingRangeParams,
+    Hover, HoverParams, HoverRequest, InitializeParams, InitializeRequest, InitializeResult,
+    InitializedNotification, InitializedParams, InlayHint, InlayHintClientCapabilities,
+    InlayHintParams, InlayHintRequest, LanguageKind, Notification, PartialResultParams, Position,
+    PrepareRenameRequest, PreviousResultId, PublishDiagnosticsClientCapabilities, Range, Request,
+    SemanticTokens, ShutdownRequest, SignatureHelp, SignatureHelpParams, SignatureHelpRequest,
+    SignatureHelpTriggerKind, TextDocumentClientCapabilities, TextDocumentContentChangeEvent,
+    TextDocumentIdentifier, TextDocumentItem, TextDocumentPositionParams, Uri,
+    VersionedTextDocumentIdentifier, WorkDoneProgressParams, WorkspaceClientCapabilities,
+    WorkspaceDiagnosticParams, WorkspaceDiagnosticReport, WorkspaceDiagnosticRequest,
+    WorkspaceEdit, WorkspaceFolder, WorkspaceFoldersChangeEvent, WorkspaceFoldersInitializeParams,
 };
 use ruff_db::system::{OsSystem, SystemPath, SystemPathBuf, TestSystem};
 use rustc_hash::FxHashMap;
 use tempfile::TempDir;
-
 use ty_server::{ClientOptions, LogLevel, Server, init_logging};
 
 /// Number of times to retry receiving a message before giving up
@@ -87,30 +98,64 @@ fn setup_tracing() {
     });
 }
 
-/// Errors that can occur during testing
+/// Errors when receiving a notification or request from the server.
 #[derive(thiserror::Error, Debug)]
-pub(crate) enum TestServerError {
-    /// The response came back, but was an error response, not a successful one.
-    #[error("Response error: {0:?}")]
-    ResponseError(ResponseError),
+pub(crate) enum ServerMessageError {
+    #[error("waiting for message timed out")]
+    Timeout,
 
-    #[error("Invalid response message for request {0}: {1:?}")]
-    InvalidResponse(RequestId, Box<Response>),
+    #[error("server disconnected")]
+    ServerDisconnected,
 
-    #[error("Got a duplicate response for request ID {0}: {1:?}")]
-    DuplicateResponse(RequestId, Box<Response>),
-
-    #[error("Failed to receive message from server: {0}")]
-    RecvTimeoutError(RecvTimeoutError),
+    #[error("Failed to deserialize message body: {0}")]
+    DeserializationError(#[from] serde_json::Error),
 }
 
-impl TestServerError {
-    fn is_disconnected(&self) -> bool {
-        matches!(
-            self,
-            TestServerError::RecvTimeoutError(RecvTimeoutError::Disconnected)
-        )
+impl From<ReceiveError> for ServerMessageError {
+    fn from(value: ReceiveError) -> Self {
+        match value {
+            ReceiveError::Timeout => Self::Timeout,
+            ReceiveError::ServerDisconnected => Self::ServerDisconnected,
+        }
     }
+}
+
+/// Errors when receiving a response from the server.
+#[derive(thiserror::Error, Debug)]
+pub(crate) enum AwaitResponseError {
+    /// The response came back, but was an error response, not a successful one.
+    #[error("request failed because the server replied with an error: {0:?}")]
+    RequestFailed(ResponseError),
+
+    #[error("received multiple responses for the same request ID: {0:#?}")]
+    MultipleResponses(Box<[Response]>),
+
+    #[error("waiting for response timed out")]
+    Timeout,
+
+    #[error("server disconnected")]
+    ServerDisconnected,
+
+    #[error("failed to deserialize response result: {0}")]
+    DeserializationError(#[from] serde_json::Error),
+}
+
+impl From<ReceiveError> for AwaitResponseError {
+    fn from(err: ReceiveError) -> Self {
+        match err {
+            ReceiveError::Timeout => Self::Timeout,
+            ReceiveError::ServerDisconnected => Self::ServerDisconnected,
+        }
+    }
+}
+
+#[derive(thiserror::Error, Debug)]
+pub(crate) enum ReceiveError {
+    #[error("waiting for message timed out")]
+    Timeout,
+
+    #[error("server disconnected")]
+    ServerDisconnected,
 }
 
 /// A test server for the ty language server that provides helpers for sending requests,
@@ -136,8 +181,12 @@ pub(crate) struct TestServer {
     /// Incrementing counter to automatically generate request IDs
     request_counter: i32,
 
-    /// A mapping of request IDs to responses received from the server
-    responses: FxHashMap<RequestId, Response>,
+    /// A mapping of request IDs to responses received from the server.
+    ///
+    /// Valid responses contain exactly one response but may contain multiple responses
+    /// when the server sends multiple responses for a single request.
+    /// The responses are guaranteed to never be empty.
+    responses: FxHashMap<RequestId, smallvec::SmallVec<[Response; 1]>>,
 
     /// An ordered queue of all the notifications received from the server
     notifications: VecDeque<lsp_server::Notification>,
@@ -149,7 +198,7 @@ pub(crate) struct TestServer {
     initialize_response: Option<InitializeResult>,
 
     /// Workspace configurations for `workspace/configuration` requests
-    workspace_configurations: HashMap<Url, ClientOptions>,
+    workspace_configurations: HashMap<Uri, ClientOptions>,
 
     /// Whether a Shutdown request has been sent by the test
     /// and the exit sequence should be skipped during `Drop`
@@ -163,19 +212,32 @@ impl TestServer {
         test_context: TestContext,
         capabilities: ClientCapabilities,
         initialization_options: Option<ClientOptions>,
-    ) -> Result<Self> {
+        env_vars: Vec<(String, Option<String>)>,
+    ) -> Self {
         setup_tracing();
+
+        tracing::debug!("Starting test client with capabilities {:#?}", capabilities);
 
         let (server_connection, client_connection) = Connection::memory();
 
         // Create OS system with the test directory as cwd
         let os_system = OsSystem::new(test_context.root());
 
+        // Create test system and set environment variable overrides
+        let test_system = Arc::new(TestSystem::new(os_system));
+        for (name, value) in env_vars {
+            match value {
+                Some(value) => {
+                    test_system.set_env_var(name, value);
+                }
+                None => test_system.remove_env_var(name),
+            }
+        }
+
         // Start the server in a separate thread
         let server_thread = std::thread::spawn(move || {
             // TODO: This should probably be configurable to test concurrency issues
             let worker_threads = NonZeroUsize::new(1).unwrap();
-            let test_system = Arc::new(TestSystem::new(os_system));
 
             match Server::new(worker_threads, server_connection, test_system, true) {
                 Ok(server) => {
@@ -196,7 +258,7 @@ impl TestServer {
 
         let workspace_configurations = workspaces
             .into_iter()
-            .filter_map(|(folder, options)| Some((folder.uri, options?)))
+            .map(|(folder, options)| (folder.uri, options.unwrap_or_default()))
             .collect::<HashMap<_, _>>();
 
         Self {
@@ -224,10 +286,12 @@ impl TestServer {
         workspace_folders: Vec<WorkspaceFolder>,
         capabilities: ClientCapabilities,
         initialization_options: Option<ClientOptions>,
-    ) -> Result<Self> {
+    ) -> Self {
         let init_params = InitializeParams {
             capabilities,
-            workspace_folders: Some(workspace_folders),
+            workspace_folders_initialize_params: WorkspaceFoldersInitializeParams {
+                workspace_folders: Some(workspace_folders.into()),
+            },
             initialization_options: initialization_options.map(|options| {
                 serde_json::to_value(options)
                     .context("Failed to serialize initialization options to `ClientOptions`")
@@ -236,11 +300,11 @@ impl TestServer {
             ..Default::default()
         };
 
-        let init_request_id = self.send_request::<Initialize>(init_params);
-        self.initialize_response = Some(self.await_response::<Initialize>(&init_request_id)?);
-        self.send_notification::<Initialized>(InitializedParams {});
+        let init_request_id = self.send_request::<InitializeRequest>(init_params);
+        self.initialize_response = Some(self.await_response::<InitializeRequest>(&init_request_id));
+        self.send_notification::<InitializedNotification>(InitializedParams {});
 
-        Ok(self)
+        self
     }
 
     /// Wait until the server has initialized all workspaces.
@@ -249,28 +313,18 @@ impl TestServer {
     /// server, and handles the request.
     ///
     /// This should only be called if the server is expected to send this request.
-    pub(crate) fn wait_until_workspaces_are_initialized(mut self) -> Result<Self> {
-        let (request_id, params) = self.await_request::<WorkspaceConfiguration>()?;
-        self.handle_workspace_configuration_request(request_id, &params)?;
-        Ok(self)
+    #[track_caller]
+    pub(crate) fn wait_until_workspaces_are_initialized(mut self) -> Self {
+        let (request_id, params) = self.await_request::<ConfigurationRequest>();
+        self.handle_workspace_configuration_request(request_id, &params);
+        self
     }
 
     /// Drain all messages from the server.
     fn drain_messages(&mut self) {
-        loop {
-            // Don't wait too long to drain the messages, as this is called in the `Drop`
-            // implementation which happens everytime the test ends.
-            match self.receive(Some(Duration::from_millis(10))) {
-                Ok(()) => {}
-                Err(TestServerError::RecvTimeoutError(_)) => {
-                    // Only break if we have no more messages to process.
-                    break;
-                }
-                Err(err) => {
-                    tracing::error!("Error while draining messages: {err:?}");
-                }
-            }
-        }
+        // Don't wait too long to drain the messages, as this is called in the `Drop`
+        // implementation which happens everytime the test ends.
+        while let Ok(()) = self.receive(Some(Duration::from_millis(10))) {}
     }
 
     /// Validate that there are no pending messages from the server.
@@ -340,11 +394,12 @@ impl TestServer {
         R: Request,
     {
         // Track if an Exit notification is being sent
-        if R::METHOD == lsp_types::request::Shutdown::METHOD {
+        if R::METHOD == lsp_types::ShutdownRequest::METHOD {
             self.shutdown_requested = true;
         }
 
         let id = self.next_request_id();
+        tracing::debug!("Client sends request `{}` with ID {}", R::METHOD, id);
         let request = lsp_server::Request::new(id.clone(), R::METHOD.to_string(), params);
         self.send(Message::Request(request));
         id
@@ -356,6 +411,7 @@ impl TestServer {
         N: Notification,
     {
         let notification = lsp_server::Notification::new(N::METHOD.to_string(), params);
+        tracing::debug!("Client sends notification `{}`", N::METHOD);
         self.send(Message::Notification(notification));
     }
 
@@ -367,39 +423,69 @@ impl TestServer {
     /// This method will remove the response from the internal data structure, so it can only be
     /// called once per request ID.
     ///
+    /// # Panics
+    ///
+    /// If the server didn't send a response, the response failed with an error code, failed to deserialize,
+    /// or the server responded twice. Use [`Self::try_await_response`] if you want a non-panicking version.
+    ///
     /// [`send_request`]: TestServer::send_request
-    pub(crate) fn await_response<R>(&mut self, id: &RequestId) -> Result<R::Result>
+    #[track_caller]
+    pub(crate) fn await_response<R>(&mut self, id: &RequestId) -> R::Result
+    where
+        R: Request,
+    {
+        self.try_await_response::<R>(id, None)
+            .unwrap_or_else(|err| panic!("Failed to receive response for request {id}: {err}"))
+    }
+
+    #[track_caller]
+    pub(crate) fn send_request_await<R>(&mut self, params: R::Params) -> R::Result
+    where
+        R: Request,
+    {
+        let id = self.send_request::<R>(params);
+        self.try_await_response::<R>(&id, None)
+            .unwrap_or_else(|err| panic!("Failed to receive response for request {id}: {err}"))
+    }
+
+    /// Wait for a server response corresponding to the given request ID.
+    ///
+    /// This should only be called if a request was already sent to the server via [`send_request`]
+    /// which returns the request ID that should be used here.
+    ///
+    /// This method will remove the response from the internal data structure, so it can only be
+    /// called once per request ID.
+    ///
+    /// [`send_request`]: TestServer::send_request
+    pub(crate) fn try_await_response<R>(
+        &mut self,
+        id: &RequestId,
+        timeout: Option<Duration>,
+    ) -> Result<R::Result, AwaitResponseError>
     where
         R: Request,
     {
         loop {
-            if let Some(response) = self.responses.remove(id) {
-                match response {
-                    Response {
-                        error: None,
-                        result: Some(result),
-                        ..
-                    } => {
+            if let Some(mut responses) = self.responses.remove(id) {
+                if responses.len() > 1 {
+                    return Err(AwaitResponseError::MultipleResponses(
+                        responses.into_boxed_slice(),
+                    ));
+                }
+
+                let response = responses.pop().unwrap();
+
+                match response.response_result {
+                    Ok(result) => {
                         return Ok(serde_json::from_value::<R::Result>(result)?);
                     }
-                    Response {
-                        error: Some(err),
-                        result: None,
-                        ..
-                    } => {
-                        return Err(TestServerError::ResponseError(err).into());
-                    }
-                    response => {
-                        return Err(TestServerError::InvalidResponse(
-                            id.clone(),
-                            Box::new(response),
-                        )
-                        .into());
+                    Err(err) => {
+                        return Err(AwaitResponseError::RequestFailed(err));
                     }
                 }
             }
 
-            self.receive_or_panic()?;
+            self.receive(timeout)?;
         }
     }
 
@@ -412,7 +498,35 @@ impl TestServer {
     ///
     /// This method will remove the notification from the internal data structure, so it should
     /// only be called if the notification is expected to be sent by the server.
-    pub(crate) fn await_notification<N: Notification>(&mut self) -> Result<N::Params> {
+    ///
+    /// # Panics
+    ///
+    /// If the server doesn't send the notification within the default timeout or
+    /// the notification failed to deserialize. Use [`Self::try_await_notification`] for
+    /// a panic-free alternative.
+    #[track_caller]
+    pub(crate) fn await_notification<N: Notification>(&mut self) -> N::Params {
+        match self.try_await_notification::<N>(None) {
+            Ok(result) => result,
+            Err(err) => {
+                panic!("Failed to receive notification `{}`: {err}", N::METHOD)
+            }
+        }
+    }
+
+    /// Wait for a notification of the specified type from the server and return its parameters.
+    ///
+    /// The caller should ensure that the server is expected to send this notification type. It
+    /// will keep polling the server for this notification up to 10 times before giving up after
+    /// which it will return an error. It will also return an error if the notification is not
+    /// received within `recv_timeout` duration.
+    ///
+    /// This method will remove the notification from the internal data structure, so it should
+    /// only be called if the notification is expected to be sent by the server.
+    pub(crate) fn try_await_notification<N: Notification>(
+        &mut self,
+        timeout: Option<Duration>,
+    ) -> Result<N::Params, ServerMessageError> {
         for retry_count in 0..RETRY_COUNT {
             if retry_count > 0 {
                 tracing::info!("Retrying to receive `{}` notification", N::METHOD);
@@ -420,17 +534,45 @@ impl TestServer {
             let notification = self
                 .notifications
                 .iter()
-                .position(|notification| N::METHOD == notification.method)
+                .position(|notification| N::METHOD.as_str() == notification.method)
                 .and_then(|index| self.notifications.remove(index));
             if let Some(notification) = notification {
-                return Ok(serde_json::from_value(notification.params)?);
+                let params = serde_json::from_value(notification.params)?;
+                return Ok(params);
             }
-            self.receive_or_panic()?;
+
+            self.receive(timeout)?;
         }
-        Err(anyhow::anyhow!(
-            "Failed to receive `{}` notification after {RETRY_COUNT} retries",
-            N::METHOD
-        ))
+
+        Err(ServerMessageError::Timeout)
+    }
+
+    /// Collects `N` publish diagnostic notifications into a map, indexed by the document URI.
+    ///
+    /// ## Panics
+    /// If there are multiple publish diagnostics notifications for the same document.
+    #[track_caller]
+    pub(crate) fn collect_publish_diagnostic_notifications(
+        &mut self,
+        count: usize,
+    ) -> BTreeMap<Uri, Vec<lsp_types::Diagnostic>> {
+        let mut results = BTreeMap::default();
+
+        for _ in 0..count {
+            let notification =
+                self.await_notification::<lsp_types::PublishDiagnosticsNotification>();
+
+            if let Some(existing) =
+                results.insert(notification.uri.clone(), notification.diagnostics)
+            {
+                panic!(
+                    "Received multiple publish diagnostic notifications for {uri}: ({existing:#?})",
+                    uri = notification.uri
+                );
+            }
+        }
+
+        results
     }
 
     /// Wait for a request of the specified type from the server and return the request ID and
@@ -443,7 +585,35 @@ impl TestServer {
     ///
     /// This method will remove the request from the internal data structure, so it should only be
     /// called if the request is expected to be sent by the server.
-    pub(crate) fn await_request<R: Request>(&mut self) -> Result<(RequestId, R::Params)> {
+    ///
+    /// # Panics
+    ///
+    /// If receiving the request fails.
+    #[track_caller]
+    pub(crate) fn await_request<R: Request>(&mut self) -> (RequestId, R::Params) {
+        match self.try_await_request::<R>(None) {
+            Ok(result) => result,
+            Err(err) => {
+                panic!("Failed to receive server request `{}`: {err}", R::METHOD)
+            }
+        }
+    }
+
+    /// Wait for a request of the specified type from the server and return the request ID and
+    /// parameters.
+    ///
+    /// The caller should ensure that the server is expected to send this request type. It will
+    /// keep polling the server for this request up to 10 times before giving up after which it
+    /// will return an error. It can also return an error if the request is not received within
+    /// `recv_timeout` duration.
+    ///
+    /// This method will remove the request from the internal data structure, so it should only be
+    /// called if the request is expected to be sent by the server.
+    #[track_caller]
+    pub(crate) fn try_await_request<R: Request>(
+        &mut self,
+        timeout: Option<Duration>,
+    ) -> Result<(RequestId, R::Params), ServerMessageError> {
         for retry_count in 0..RETRY_COUNT {
             if retry_count > 0 {
                 tracing::info!("Retrying to receive `{}` request", R::METHOD);
@@ -451,18 +621,16 @@ impl TestServer {
             let request = self
                 .requests
                 .iter()
-                .position(|request| R::METHOD == request.method)
+                .position(|request| R::METHOD.as_str() == request.method)
                 .and_then(|index| self.requests.remove(index));
             if let Some(request) = request {
                 let params = serde_json::from_value(request.params)?;
                 return Ok((request.id, params));
             }
-            self.receive_or_panic()?;
+
+            self.receive(timeout)?;
         }
-        Err(anyhow::anyhow!(
-            "Failed to receive `{}` request after {RETRY_COUNT} retries",
-            R::METHOD
-        ))
+        Err(ServerMessageError::Timeout)
     }
 
     /// Receive a message from the server.
@@ -470,36 +638,24 @@ impl TestServer {
     /// It will wait for `timeout` duration for a message to arrive. If no message is received
     /// within that time, it will return an error.
     ///
-    /// If `timeout` is `None`, it will use a default timeout of 1 second.
-    fn receive(&mut self, timeout: Option<Duration>) -> Result<(), TestServerError> {
-        static DEFAULT_TIMEOUT: Duration = Duration::from_secs(1);
+    /// If `timeout` is `None`, it will use a default timeout of 10 second.
+    fn receive(&mut self, timeout: Option<Duration>) -> Result<(), ReceiveError> {
+        static DEFAULT_TIMEOUT: Duration = Duration::from_secs(10);
 
         let receiver = self.client_connection.as_ref().unwrap().receiver.clone();
         let message = receiver
             .recv_timeout(timeout.unwrap_or(DEFAULT_TIMEOUT))
-            .map_err(TestServerError::RecvTimeoutError)?;
+            .map_err(|err| match err {
+                RecvTimeoutError::Disconnected => ReceiveError::ServerDisconnected,
+                RecvTimeoutError::Timeout => ReceiveError::Timeout,
+            })?;
 
-        self.handle_message(message)?;
+        self.handle_message(message);
 
         for message in receiver.try_iter() {
-            self.handle_message(message)?;
+            self.handle_message(message);
         }
 
-        Ok(())
-    }
-
-    /// This is a convenience method that's same as [`receive`], but panics if the server got
-    /// disconnected. It will pass other errors as is.
-    ///
-    /// [`receive`]: TestServer::receive
-    fn receive_or_panic(&mut self) -> Result<(), TestServerError> {
-        if let Err(err) = self.receive(None) {
-            if err.is_disconnected() {
-                self.panic_on_server_disconnect();
-            } else {
-                return Err(err);
-            }
-        }
         Ok(())
     }
 
@@ -509,32 +665,24 @@ impl TestServer {
     /// - Requests are stored in `self.requests`
     /// - Responses are stored in `self.responses` with the request ID as the key
     /// - Notifications are stored in `self.notifications`
-    fn handle_message(&mut self, message: Message) -> Result<(), TestServerError> {
+    fn handle_message(&mut self, message: Message) {
         match message {
             Message::Request(request) => {
-                tracing::debug!("Received server request {}", &request.method);
+                tracing::debug!("Received server request `{}`", &request.method);
                 self.requests.push_back(request);
             }
             Message::Response(response) => {
                 tracing::debug!("Received server response for request {}", &response.id);
-                match self.responses.entry(response.id.clone()) {
-                    Entry::Occupied(existing) => {
-                        return Err(TestServerError::DuplicateResponse(
-                            response.id,
-                            Box::new(existing.get().clone()),
-                        ));
-                    }
-                    Entry::Vacant(entry) => {
-                        entry.insert(response);
-                    }
-                }
+                self.responses
+                    .entry(response.id.clone())
+                    .or_default()
+                    .push(response);
             }
             Message::Notification(notification) => {
-                tracing::debug!("Received notification {}", &notification.method);
+                tracing::debug!("Received notification `{}`", &notification.method);
                 self.notifications.push_back(notification);
             }
         }
-        Ok(())
     }
 
     #[track_caller]
@@ -554,24 +702,25 @@ impl TestServer {
 
     pub(crate) fn cancel(&mut self, request_id: &RequestId) {
         let id_string = request_id.to_string();
-        self.send_notification::<lsp_types::notification::Cancel>(lsp_types::CancelParams {
+        self.send_notification::<lsp_types::CancelNotification>(lsp_types::CancelParams {
             id: match id_string.parse() {
-                Ok(id) => NumberOrString::Number(id),
-                Err(_) => NumberOrString::String(id_string),
+                Ok(id) => lsp_types::Id::Int(id),
+                Err(_) => lsp_types::Id::String(id_string),
             },
         });
     }
 
     /// Handle workspace configuration requests from the server.
     ///
-    /// Use the [`get_request`] method to wait for the server to send this request.
+    /// Use the [`await_request`] method to wait for the server to send this request.
     ///
-    /// [`get_request`]: TestServer::get_request
+    /// [`await_request`]: TestServer::await_request
+    #[track_caller]
     fn handle_workspace_configuration_request(
         &mut self,
         request_id: RequestId,
         params: &ConfigurationParams,
-    ) -> Result<()> {
+    ) {
         let mut results = Vec::new();
 
         for item in &params.items {
@@ -586,7 +735,12 @@ impl TestServer {
                 // > If the client can't provide a configuration setting for a given scope
                 // > then null needs to be present in the returned array.
                 match item.section.as_deref() {
-                    Some("ty") => serde_json::to_value(options)?,
+                    Some("ty") => match serde_json::to_value(options) {
+                        Ok(value) => value,
+                        Err(err) => {
+                            panic!("Failed to deserialize workspace configuration options: {err}")
+                        }
+                    },
                     Some(section) => {
                         tracing::debug!("Unrecognized section `{section}` for {scope_uri}");
                         serde_json::Value::Null
@@ -607,8 +761,6 @@ impl TestServer {
 
         let response = Response::new_ok(request_id, results);
         self.send(Message::Response(response));
-
-        Ok(())
     }
 
     /// Get the initialization result
@@ -616,27 +768,45 @@ impl TestServer {
         self.initialize_response.as_ref()
     }
 
-    fn file_uri(&self, path: impl AsRef<SystemPath>) -> Url {
-        Url::from_file_path(self.test_context.root().join(path.as_ref()).as_std_path())
-            .expect("Path must be a valid URL")
+    pub(crate) fn file_uri(&self, path: impl AsRef<SystemPath>) -> Uri {
+        Uri::from_file_path(self.file_path(path).as_std_path()).expect("Path must be a valid URI")
+    }
+
+    pub(crate) fn file_path(&self, path: impl AsRef<SystemPath>) -> SystemPathBuf {
+        self.test_context.root().join(path)
+    }
+
+    #[expect(dead_code)]
+    pub(crate) fn write_file(
+        &self,
+        path: impl AsRef<SystemPath>,
+        content: impl AsRef<str>,
+    ) -> Result<()> {
+        let file_path = self.file_path(path);
+        // Ensure parent directories exists
+        if let Some(parent) = file_path.parent() {
+            fs::create_dir_all(parent.as_std_path())?;
+        }
+        fs::write(file_path.as_std_path(), content.as_ref())?;
+        Ok(())
     }
 
     /// Send a `textDocument/didOpen` notification
     pub(crate) fn open_text_document(
         &mut self,
         path: impl AsRef<SystemPath>,
-        content: &impl ToString,
+        content: impl AsRef<str>,
         version: i32,
     ) {
         let params = DidOpenTextDocumentParams {
             text_document: TextDocumentItem {
                 uri: self.file_uri(path),
-                language_id: "python".to_string(),
+                language_id: LanguageKind::Python,
                 version,
-                text: content.to_string(),
+                text: content.as_ref().to_string(),
             },
         };
-        self.send_notification::<DidOpenTextDocument>(params);
+        self.send_notification::<DidOpenTextDocumentNotification>(params);
     }
 
     /// Send a `textDocument/didChange` notification with the given content changes
@@ -648,30 +818,105 @@ impl TestServer {
     ) {
         let params = DidChangeTextDocumentParams {
             text_document: VersionedTextDocumentIdentifier {
-                uri: self.file_uri(path),
+                text_document_identifier: TextDocumentIdentifier {
+                    uri: self.file_uri(path),
+                },
                 version,
             },
             content_changes: changes,
         };
-        self.send_notification::<DidChangeTextDocument>(params);
+        self.send_notification::<DidChangeTextDocumentNotification>(params);
+    }
+
+    /// Send a `textDocument/didSave` notification
+    pub(crate) fn save_text_document(&mut self, path: impl AsRef<SystemPath>) {
+        let params = DidSaveTextDocumentParams {
+            text_document: TextDocumentIdentifier {
+                uri: self.file_uri(path),
+            },
+            text: None,
+        };
+        self.send_notification::<DidSaveTextDocumentNotification>(params);
     }
 
     /// Send a `textDocument/didClose` notification
-    #[expect(dead_code)]
     pub(crate) fn close_text_document(&mut self, path: impl AsRef<SystemPath>) {
         let params = DidCloseTextDocumentParams {
             text_document: TextDocumentIdentifier {
                 uri: self.file_uri(path),
             },
         };
-        self.send_notification::<DidCloseTextDocument>(params);
+        self.send_notification::<DidCloseTextDocumentNotification>(params);
     }
 
     /// Send a `workspace/didChangeWatchedFiles` notification with the given file events
-    #[expect(dead_code)]
     pub(crate) fn did_change_watched_files(&mut self, events: Vec<FileEvent>) {
         let params = DidChangeWatchedFilesParams { changes: events };
-        self.send_notification::<DidChangeWatchedFiles>(params);
+        self.send_notification::<DidChangeWatchedFilesNotification>(params);
+    }
+
+    /// Send a `workspace/didChangeWorkspaceFolders` notification with the given added/removed
+    /// workspace folders. The paths provided should be paths to the root of the workspace folder.
+    pub(crate) fn change_workspace_folders<P: AsRef<SystemPath>>(
+        &mut self,
+        added: impl IntoIterator<Item = P>,
+        removed: impl IntoIterator<Item = P>,
+    ) {
+        let path_to_workspace_folder = |path: &SystemPath| -> WorkspaceFolder {
+            let uri = self.file_uri(path);
+            WorkspaceFolder {
+                uri,
+                name: path.file_name().unwrap_or("").to_string(),
+            }
+        };
+        let params = DidChangeWorkspaceFoldersParams {
+            event: WorkspaceFoldersChangeEvent {
+                added: added
+                    .into_iter()
+                    .map(|path| path_to_workspace_folder(path.as_ref()))
+                    .collect(),
+                removed: removed
+                    .into_iter()
+                    .map(|path| path_to_workspace_folder(path.as_ref()))
+                    .collect(),
+            },
+        };
+        self.send_notification::<DidChangeWorkspaceFoldersNotification>(params);
+    }
+
+    pub(crate) fn rename(
+        &mut self,
+        document: &Uri,
+        position: lsp_types::Position,
+        new_name: &str,
+    ) -> Result<Option<WorkspaceEdit>, ()> {
+        if self
+            .send_request_await::<PrepareRenameRequest>(lsp_types::PrepareRenameParams {
+                text_document_position_params: TextDocumentPositionParams {
+                    text_document: TextDocumentIdentifier {
+                        uri: document.clone(),
+                    },
+                    position,
+                },
+                work_done_progress_params: WorkDoneProgressParams::default(),
+            })
+            .is_none()
+        {
+            return Err(());
+        }
+
+        Ok(
+            self.send_request_await::<lsp_types::RenameRequest>(lsp_types::RenameParams {
+                text_document_position_params: TextDocumentPositionParams {
+                    text_document: TextDocumentIdentifier {
+                        uri: document.clone(),
+                    },
+                    position,
+                },
+                new_name: new_name.to_string(),
+                work_done_progress_params: WorkDoneProgressParams::default(),
+            }),
+        )
     }
 
     /// Send a `textDocument/diagnostic` request for the document at the given path.
@@ -679,7 +924,7 @@ impl TestServer {
         &mut self,
         path: impl AsRef<SystemPath>,
         previous_result_id: Option<String>,
-    ) -> Result<DocumentDiagnosticReportResult> {
+    ) -> DocumentDiagnosticReport {
         let params = DocumentDiagnosticParams {
             text_document: TextDocumentIdentifier {
                 uri: self.file_uri(path),
@@ -696,9 +941,9 @@ impl TestServer {
     /// Send a `workspace/diagnostic` request with optional previous result IDs.
     pub(crate) fn workspace_diagnostic_request(
         &mut self,
-        work_done_token: Option<lsp_types::NumberOrString>,
+        work_done_token: Option<lsp_types::ProgressToken>,
         previous_result_ids: Option<Vec<PreviousResultId>>,
-    ) -> Result<WorkspaceDiagnosticReportResult> {
+    ) -> WorkspaceDiagnosticReport {
         let params = WorkspaceDiagnosticParams {
             identifier: Some("ty".to_string()),
             previous_result_ids: previous_result_ids.unwrap_or_default(),
@@ -715,7 +960,7 @@ impl TestServer {
         &mut self,
         path: impl AsRef<SystemPath>,
         position: Position,
-    ) -> Result<Option<Hover>> {
+    ) -> Option<Hover> {
         let params = HoverParams {
             text_document_position_params: TextDocumentPositionParams {
                 text_document: TextDocumentIdentifier {
@@ -734,7 +979,7 @@ impl TestServer {
         &mut self,
         path: impl AsRef<SystemPath>,
         range: Range,
-    ) -> Result<Option<Vec<InlayHint>>> {
+    ) -> Option<Vec<InlayHint>> {
         let params = InlayHintParams {
             text_document: TextDocumentIdentifier {
                 uri: self.file_uri(path),
@@ -744,6 +989,98 @@ impl TestServer {
         };
         let id = self.send_request::<InlayHintRequest>(params);
         self.await_response::<InlayHintRequest>(&id)
+    }
+
+    /// Sends a `textDocument/completion` request for the document at the given URI and position.
+    pub(crate) fn completion_request(
+        &mut self,
+        uri: &Uri,
+        position: Position,
+    ) -> Vec<CompletionItem> {
+        let completions_id = self.send_request::<CompletionRequest>(CompletionParams {
+            text_document_position_params: TextDocumentPositionParams {
+                text_document: TextDocumentIdentifier { uri: uri.clone() },
+                position,
+            },
+            work_done_progress_params: lsp_types::WorkDoneProgressParams::default(),
+            partial_result_params: lsp_types::PartialResultParams::default(),
+            context: Some(lsp_types::CompletionContext {
+                trigger_kind: CompletionTriggerKind::TriggerForIncompleteCompletions,
+                trigger_character: None,
+            }),
+        });
+        match self.await_response::<lsp_types::CompletionRequest>(&completions_id) {
+            Some(CompletionResponse::CompletionItemList(array)) => array,
+            Some(CompletionResponse::CompletionList(lsp_types::CompletionList {
+                items, ..
+            })) => items,
+            None => vec![],
+        }
+    }
+
+    /// Sends a `textDocument/signatureHelp` request for the document at the given URI and position.
+    pub(crate) fn signature_help_request(
+        &mut self,
+        uri: &Uri,
+        position: Position,
+    ) -> Option<SignatureHelp> {
+        let signature_help_id = self.send_request::<SignatureHelpRequest>(SignatureHelpParams {
+            text_document_position_params: TextDocumentPositionParams {
+                text_document: TextDocumentIdentifier { uri: uri.clone() },
+                position,
+            },
+            work_done_progress_params: lsp_types::WorkDoneProgressParams::default(),
+            context: Some(lsp_types::SignatureHelpContext {
+                trigger_kind: SignatureHelpTriggerKind::Invoked,
+                trigger_character: None,
+                is_retrigger: false,
+                active_signature_help: None,
+            }),
+        });
+        self.await_response::<SignatureHelpRequest>(&signature_help_id)
+    }
+
+    pub(crate) fn semantic_tokens_full_request(&mut self, uri: &Uri) -> Option<SemanticTokens> {
+        self.send_request_await::<lsp_types::SemanticTokensRequest>(
+            lsp_types::SemanticTokensParams {
+                text_document: TextDocumentIdentifier { uri: uri.clone() },
+                work_done_progress_params: lsp_types::WorkDoneProgressParams::default(),
+                partial_result_params: PartialResultParams::default(),
+            },
+        )
+    }
+
+    pub(crate) fn folding_range_request(&mut self, uri: &Uri) -> Option<Vec<FoldingRange>> {
+        self.send_request_await::<lsp_types::FoldingRangeRequest>(FoldingRangeParams {
+            text_document: TextDocumentIdentifier { uri: uri.clone() },
+            work_done_progress_params: WorkDoneProgressParams::default(),
+            partial_result_params: PartialResultParams::default(),
+        })
+    }
+
+    /// Adds a workspace folder configuration to this wrapper's state.
+    ///
+    /// This is meant to roughly model VS Code's "Add Folder to Workspace"
+    /// functionality.
+    ///
+    /// This doesn't actually correspond to any communication with an LSP
+    /// server. To do that, you'll want `change_workspace_folders`.
+    ///
+    /// # Errors
+    ///
+    /// This can return an error when there is a problem converting the
+    /// given workspace folder root path to a URI.
+    pub(crate) fn add_workspace_folder(
+        &mut self,
+        path: &SystemPath,
+        options: Option<ClientOptions>,
+    ) -> Result<()> {
+        let path = self.test_context.root().join(path);
+        let uri = Uri::from_file_path(path.as_std_path())
+            .map_err(|()| anyhow!("Failed to convert workspace path to URI: {path}"))?;
+        self.workspace_configurations
+            .insert(uri, options.unwrap_or_default());
+        Ok(())
     }
 }
 
@@ -770,10 +1107,11 @@ impl Drop for TestServer {
         // The `server_thread` could be `None` if the server exited unexpectedly or panicked or if
         // it dropped the client connection.
         let shutdown_error = if self.server_thread.is_some() && !self.shutdown_requested {
-            let shutdown_id = self.send_request::<Shutdown>(());
-            match self.await_response::<Shutdown>(&shutdown_id) {
+            let shutdown_id = self.send_request::<ShutdownRequest>(());
+            match self.try_await_response::<ShutdownRequest>(&shutdown_id, None) {
                 Ok(()) => {
-                    self.send_notification::<Exit>(());
+                    self.send_notification::<ExitNotification>(());
+
                     None
                 }
                 Err(err) => Some(format!("Failed to get shutdown response: {err:?}")),
@@ -782,9 +1120,29 @@ impl Drop for TestServer {
             None
         };
 
-        if let Some(_client_connection) = self.client_connection.take() {
-            // Drop the client connection before joining the server thread to avoid any hangs
-            // in case the server didn't respond to the shutdown request.
+        // Drop the client connection before joining the server thread to avoid any hangs
+        // in case the server didn't respond to the shutdown request.
+        if let Some(client_connection) = self.client_connection.take() {
+            if !std::thread::panicking() {
+                // Wait for the client sender to drop (confirmation that it processed the exit notification).
+
+                match client_connection
+                    .receiver
+                    .recv_timeout(Duration::from_secs(20))
+                {
+                    Err(RecvTimeoutError::Disconnected) => {
+                        // Good, the server terminated
+                    }
+                    Err(RecvTimeoutError::Timeout) => {
+                        tracing::warn!(
+                            "The server didn't exit within 20ms after receiving the EXIT notification"
+                        );
+                    }
+                    Ok(message) => {
+                        self.handle_message(message);
+                    }
+                }
+            }
         }
 
         if std::thread::panicking() {
@@ -812,6 +1170,7 @@ pub(crate) struct TestServerBuilder {
     workspaces: Vec<(WorkspaceFolder, Option<ClientOptions>)>,
     initialization_options: Option<ClientOptions>,
     client_capabilities: ClientCapabilities,
+    env_vars: Vec<(String, Option<String>)>,
 }
 
 impl TestServerBuilder {
@@ -825,10 +1184,12 @@ impl TestServerBuilder {
         // These are enabled by default for convenience but can be disabled using the builder
         // methods:
         // - Supports pulling workspace configuration
+        // - Support for pull diagnostics
         let client_capabilities = ClientCapabilities {
             text_document: Some(TextDocumentClientCapabilities {
                 publish_diagnostics: Some(PublishDiagnosticsClientCapabilities::default()),
-                ..Default::default()
+                diagnostic: Some(DiagnosticClientCapabilities::default()),
+                ..TextDocumentClientCapabilities::default()
             }),
             workspace: Some(WorkspaceClientCapabilities {
                 configuration: Some(true),
@@ -842,12 +1203,27 @@ impl TestServerBuilder {
             test_context: TestContext::new()?,
             initialization_options: None,
             client_capabilities,
+            env_vars: vec![
+                ("HOME".into(), None),
+                ("PATH".into(), None),
+                ("VIRTUAL_ENV".into(), None),
+            ],
         })
     }
 
     /// Set the initial client options for the test server
     pub(crate) fn with_initialization_options(mut self, options: ClientOptions) -> Self {
         self.initialization_options = Some(options);
+        self
+    }
+
+    /// Set an environment variable for the test server's system.
+    pub(crate) fn with_env_var(
+        mut self,
+        name: impl Into<String>,
+        value: impl Into<String>,
+    ) -> Self {
+        self.env_vars.push((name.into(), Some(value.into())));
         self
     }
 
@@ -863,18 +1239,13 @@ impl TestServerBuilder {
         workspace_root: &SystemPath,
         options: Option<ClientOptions>,
     ) -> Result<Self> {
-        // TODO: Support multiple workspaces in the test server
-        if self.workspaces.len() == 1 {
-            anyhow::bail!("Test server doesn't support multiple workspaces yet");
-        }
-
         let workspace_path = self.test_context.root().join(workspace_root);
         fs::create_dir_all(workspace_path.as_std_path())?;
 
         self.workspaces.push((
             WorkspaceFolder {
-                uri: Url::from_file_path(workspace_path.as_std_path()).map_err(|()| {
-                    anyhow!("Failed to convert workspace path to URL: {workspace_path}")
+                uri: Uri::from_file_path(workspace_path.as_std_path()).map_err(|()| {
+                    anyhow!("Failed to convert workspace path to URI: {workspace_path}")
                 })?,
                 name: workspace_root.file_name().unwrap_or("test").to_string(),
             },
@@ -908,17 +1279,6 @@ impl TestServerBuilder {
         self
     }
 
-    /// Enable or disable dynamic registration of rename capability
-    pub(crate) fn enable_rename_dynamic_registration(mut self, enabled: bool) -> Self {
-        self.client_capabilities
-            .text_document
-            .get_or_insert_default()
-            .rename
-            .get_or_insert_default()
-            .dynamic_registration = Some(enabled);
-        self
-    }
-
     /// Enable or disable workspace configuration capability
     pub(crate) fn enable_workspace_configuration(mut self, enabled: bool) -> Self {
         self.client_capabilities
@@ -941,6 +1301,19 @@ impl TestServerBuilder {
         self
     }
 
+    /// Enable or disable the completion snippet capability.
+    pub(crate) fn enable_completion_snippets(mut self, enabled: bool) -> Self {
+        self.client_capabilities
+            .text_document
+            .get_or_insert_default()
+            .completion
+            .get_or_insert_default()
+            .completion_item
+            .get_or_insert_default()
+            .snippet_support = Some(enabled);
+        self
+    }
+
     /// Enable or disable file watching capability
     #[expect(dead_code)]
     pub(crate) fn enable_did_change_watched_files(mut self, enabled: bool) -> Self {
@@ -955,11 +1328,86 @@ impl TestServerBuilder {
         self
     }
 
+    pub(crate) fn enable_diagnostic_related_information(mut self, enabled: bool) -> Self {
+        self.client_capabilities
+            .text_document
+            .get_or_insert_default()
+            .publish_diagnostics
+            .get_or_insert_default()
+            .diagnostics_capabilities
+            .related_information = Some(enabled);
+        self
+    }
+
+    pub(crate) fn enable_multiline_token_support(mut self, enabled: bool) -> Self {
+        self.client_capabilities
+            .text_document
+            .get_or_insert_default()
+            .semantic_tokens
+            .get_or_insert_default()
+            .multiline_token_support = Some(enabled);
+        self
+    }
+
+    /// Set the hover content format preference for the client
+    pub(crate) fn with_hover_content_format(mut self, formats: Vec<lsp_types::MarkupKind>) -> Self {
+        self.client_capabilities
+            .text_document
+            .get_or_insert_default()
+            .hover
+            .get_or_insert_default()
+            .content_format = Some(formats);
+        self
+    }
+
+    /// Set the completion documentation format preference for the client
+    pub(crate) fn with_completion_documentation_format(
+        mut self,
+        formats: Vec<lsp_types::MarkupKind>,
+    ) -> Self {
+        self.client_capabilities
+            .text_document
+            .get_or_insert_default()
+            .completion
+            .get_or_insert_default()
+            .completion_item
+            .get_or_insert_default()
+            .documentation_format = Some(formats);
+        self
+    }
+
+    /// Advertise support for ty's fully rendered diagnostic output.
+    pub(crate) fn with_full_diagnostic_output(mut self) -> Self {
+        self.client_capabilities.experimental = Some(serde_json::json!({
+            "fullDiagnosticOutput": true,
+        }));
+        self
+    }
+
+    /// Enable or disable location link support for goto implementations
+    pub(crate) fn enable_implementations_link_support(mut self, enabled: bool) -> Self {
+        self.client_capabilities
+            .text_document
+            .get_or_insert_default()
+            .implementation
+            .get_or_insert_default()
+            .link_support = Some(enabled);
+        self
+    }
+
     /// Set custom client capabilities (overrides any previously set capabilities)
     #[expect(dead_code)]
     pub(crate) fn with_client_capabilities(mut self, capabilities: ClientCapabilities) -> Self {
         self.client_capabilities = capabilities;
         self
+    }
+
+    pub(crate) fn file_path(&self, path: impl AsRef<SystemPath>) -> SystemPathBuf {
+        self.test_context.root().join(path)
+    }
+
+    pub(crate) fn file_uri(&self, path: impl AsRef<SystemPath>) -> Uri {
+        Uri::from_file_path(self.file_path(path).as_std_path()).expect("Path must be a valid URI")
     }
 
     /// Write a file to the test directory
@@ -968,7 +1416,7 @@ impl TestServerBuilder {
         path: impl AsRef<SystemPath>,
         content: impl AsRef<str>,
     ) -> Result<Self> {
-        let file_path = self.test_context.root().join(path.as_ref());
+        let file_path = self.file_path(path);
         // Ensure parent directories exists
         if let Some(parent) = file_path.parent() {
             fs::create_dir_all(parent.as_std_path())?;
@@ -992,12 +1440,13 @@ impl TestServerBuilder {
     }
 
     /// Build the test server
-    pub(crate) fn build(self) -> Result<TestServer> {
+    pub(crate) fn build(self) -> TestServer {
         TestServer::new(
             self.workspaces,
             self.test_context,
             self.client_capabilities,
             self.initialization_options,
+            self.env_vars,
         )
     }
 }
@@ -1039,20 +1488,16 @@ impl TestContext {
         })?;
 
         let mut settings = insta::Settings::clone_current();
+        let project_dir_uri = Uri::from_file_path(project_dir.as_std_path())
+            .map_err(|()| anyhow!("Failed to convert root directory to uri"))?;
         settings.add_filter(&tempdir_filter(project_dir.as_str()), "<temp_dir>/");
-        settings.add_filter(
-            &tempdir_filter(
-                Url::from_file_path(project_dir.as_std_path())
-                    .map_err(|()| anyhow!("Failed to convert root directory to url"))?
-                    .path(),
-            ),
-            "<temp_dir>/",
-        );
-        settings.add_filter(r#"\\(\w\w|\s|\.|")"#, "/$1");
+        settings.add_filter(&tempdir_filter(project_dir_uri.path()), "<temp_dir>/");
+        settings.add_filter(r#"\\\\"#, "/");
         settings.add_filter(
             r#"The system cannot find the file specified."#,
             "No such file or directory",
         );
+        settings.add_filter(r"file://.*/stdlib/", "file://<typeshed>/stdlib/");
 
         let settings_scope = settings.bind_to_scope();
 

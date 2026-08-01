@@ -1,5 +1,5 @@
 ---
-source: crates/ruff/tests/lint.rs
+source: crates/ruff/tests/cli/lint.rs
 info:
   program: ruff
   args:
@@ -25,6 +25,10 @@ F401 [*] `os` imported but unused
 3 | match 42:  # invalid-syntax
   |
 help: Remove unused import: `os`
+  |
+  - import os  # F401
+1 | x = y      # F821
+  |
 
 F821 Undefined name `y`
  --> input.py:2:5

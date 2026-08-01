@@ -132,7 +132,6 @@ async def c():
 # Non-errors
 ###
 
-# False-negative: RustPython doesn't parse the `\N{snowman}`.
 "\N{snowman} {}".format(a)
 
 "{".format(a)
@@ -276,3 +275,9 @@ if __name__ == "__main__":
     number = 0
     string = "{}".format(number := number + 1)
     print(string)
+
+# Unicode escape
+"\N{angle}AOB = {angle}°".format(angle=180)
+
+# Raw string with \N{...}
+r"\N{angle}AOB = {angle}°".format(angle=180)

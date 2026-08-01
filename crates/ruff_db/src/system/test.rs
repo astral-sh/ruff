@@ -1,13 +1,14 @@
-use glob::PatternError;
 use ruff_notebook::{Notebook, NotebookError};
+use rustc_hash::FxHashMap;
 use std::panic::RefUnwindSafe;
+use std::process::Output;
 use std::sync::{Arc, Mutex};
 
 use crate::Db;
 use crate::files::File;
 use crate::system::{
-    CaseSensitivity, DirectoryEntry, GlobError, MemoryFileSystem, Metadata, Result, System,
-    SystemPath, SystemPathBuf, SystemVirtualPath,
+    DirectoryEntry, MemoryFileSystem, Metadata, Result, System, SystemPath, SystemPathBuf,
+    SystemVirtualPath, WhichError, WhichResult,
 };
 
 use super::WritableSystem;
@@ -20,16 +21,42 @@ use super::walk_directory::WalkDirectoryBuilder;
 ///
 /// ## Warning
 /// Don't use this system for production code. It's intended for testing only.
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct TestSystem {
     inner: Arc<dyn WritableSystem + RefUnwindSafe + Send + Sync>,
+    /// Environment variable overrides. If a key is present here, it takes precedence
+    /// over the inner system's environment variables.
+    env_overrides: Arc<Mutex<FxHashMap<String, Option<String>>>>,
+}
+
+impl Clone for TestSystem {
+    fn clone(&self) -> Self {
+        Self {
+            inner: self.inner.clone(),
+            env_overrides: self.env_overrides.clone(),
+        }
+    }
 }
 
 impl TestSystem {
     pub fn new(inner: impl WritableSystem + RefUnwindSafe + Send + Sync + 'static) -> Self {
         Self {
             inner: Arc::new(inner),
+            env_overrides: Arc::new(Mutex::new(FxHashMap::default())),
         }
+    }
+
+    /// Sets an environment variable override. This takes precedence over the inner system.
+    pub fn set_env_var(&self, name: impl Into<String>, value: impl Into<String>) {
+        self.env_overrides
+            .lock()
+            .unwrap()
+            .insert(name.into(), Some(value.into()));
+    }
+
+    /// Removes an environment variable override, making it appear as not set.
+    pub fn remove_env_var(&self, name: impl Into<String>) {
+        self.env_overrides.lock().unwrap().insert(name.into(), None);
     }
 
     /// Returns the [`InMemorySystem`].
@@ -75,6 +102,10 @@ impl System for TestSystem {
         self.system().canonicalize_path(path)
     }
 
+    fn is_same_file(&self, first: &SystemPath, second: &SystemPath) -> Result<bool> {
+        self.system().is_same_file(first, second)
+    }
+
     fn read_to_string(&self, path: &SystemPath) -> Result<String> {
         self.system().read_to_string(path)
     }
@@ -106,6 +137,19 @@ impl System for TestSystem {
         self.system().cache_dir()
     }
 
+    fn which(&self, _name: &str) -> WhichResult {
+        Err(WhichError::CannotFindBinaryPath)
+    }
+
+    fn run_command(
+        &self,
+        program: &str,
+        args: &[&str],
+        current_directory: &SystemPath,
+    ) -> Result<Output> {
+        self.system().run_command(program, args, current_directory)
+    }
+
     fn read_directory<'a>(
         &'a self,
         path: &SystemPath,
@@ -115,16 +159,6 @@ impl System for TestSystem {
 
     fn walk_directory(&self, path: &SystemPath) -> WalkDirectoryBuilder {
         self.system().walk_directory(path)
-    }
-
-    fn glob(
-        &self,
-        pattern: &str,
-    ) -> std::result::Result<
-        Box<dyn Iterator<Item = std::result::Result<SystemPathBuf, GlobError>> + '_>,
-        PatternError,
-    > {
-        self.system().glob(pattern)
     }
 
     fn as_writable(&self) -> Option<&dyn WritableSystem> {
@@ -139,12 +173,16 @@ impl System for TestSystem {
         self
     }
 
-    fn path_exists_case_sensitive(&self, path: &SystemPath, prefix: &SystemPath) -> bool {
-        self.system().path_exists_case_sensitive(path, prefix)
-    }
-
-    fn case_sensitivity(&self) -> CaseSensitivity {
-        self.system().case_sensitivity()
+    fn env_var(&self, name: &str) -> std::result::Result<String, std::env::VarError> {
+        // Check overrides first
+        if let Some(override_value) = self.env_overrides.lock().unwrap().get(name) {
+            return match override_value {
+                Some(value) => Ok(value.clone()),
+                None => Err(std::env::VarError::NotPresent),
+            };
+        }
+        // Fall back to inner system
+        self.system().env_var(name)
     }
 
     fn dyn_clone(&self) -> Box<dyn System> {
@@ -154,9 +192,7 @@ impl System for TestSystem {
 
 impl Default for TestSystem {
     fn default() -> Self {
-        Self {
-            inner: Arc::new(InMemorySystem::default()),
-        }
+        Self::new(InMemorySystem::default())
     }
 }
 
@@ -165,12 +201,16 @@ impl WritableSystem for TestSystem {
         self.system().create_new_file(path)
     }
 
-    fn write_file(&self, path: &SystemPath, content: &str) -> Result<()> {
-        self.system().write_file(path, content)
+    fn write_file_bytes(&self, path: &SystemPath, content: &[u8]) -> Result<()> {
+        self.system().write_file_bytes(path, content)
     }
 
     fn create_directory_all(&self, path: &SystemPath) -> Result<()> {
         self.system().create_directory_all(path)
+    }
+
+    fn dyn_clone(&self) -> Box<dyn WritableSystem> {
+        Box::new(self.clone())
     }
 }
 
@@ -243,7 +283,11 @@ pub trait DbWithTestSystem: Db + Sized {
     ///
     /// ## Panics
     /// If the db isn't using the [`InMemorySystem`].
-    fn write_virtual_file(&mut self, path: impl AsRef<SystemVirtualPath>, content: impl ToString) {
+    fn write_virtual_file(
+        &mut self,
+        path: impl AsRef<SystemVirtualPath>,
+        content: impl AsRef<[u8]>,
+    ) {
         let path = path.as_ref();
         self.test_system()
             .memory_file_system()
@@ -282,23 +326,23 @@ where
     }
 }
 
-#[derive(Default, Debug)]
+#[derive(Clone, Default, Debug)]
 pub struct InMemorySystem {
-    user_config_directory: Mutex<Option<SystemPathBuf>>,
+    user_config_directory: Arc<Mutex<Option<SystemPathBuf>>>,
     memory_fs: MemoryFileSystem,
 }
 
 impl InMemorySystem {
     pub fn new(cwd: SystemPathBuf) -> Self {
         Self {
-            user_config_directory: Mutex::new(None),
+            user_config_directory: Mutex::new(None).into(),
             memory_fs: MemoryFileSystem::with_current_directory(cwd),
         }
     }
 
     pub fn from_memory_fs(memory_fs: MemoryFileSystem) -> Self {
         Self {
-            user_config_directory: Mutex::new(None),
+            user_config_directory: Mutex::new(None).into(),
             memory_fs,
         }
     }
@@ -320,6 +364,12 @@ impl System for InMemorySystem {
 
     fn canonicalize_path(&self, path: &SystemPath) -> Result<SystemPathBuf> {
         self.memory_fs.canonicalize(path)
+    }
+
+    fn is_same_file(&self, first: &SystemPath, second: &SystemPath) -> Result<bool> {
+        // The in-memory file system does not support hard links, so canonical paths uniquely
+        // identify files.
+        Ok(self.canonicalize_path(first)? == self.canonicalize_path(second)?)
     }
 
     fn read_to_string(&self, path: &SystemPath) -> Result<String> {
@@ -355,6 +405,10 @@ impl System for InMemorySystem {
         None
     }
 
+    fn which(&self, _name: &str) -> WhichResult {
+        Err(WhichError::CannotFindBinaryPath)
+    }
+
     fn read_directory<'a>(
         &'a self,
         path: &SystemPath,
@@ -364,17 +418,6 @@ impl System for InMemorySystem {
 
     fn walk_directory(&self, path: &SystemPath) -> WalkDirectoryBuilder {
         self.memory_fs.walk_directory(path)
-    }
-
-    fn glob(
-        &self,
-        pattern: &str,
-    ) -> std::result::Result<
-        Box<dyn Iterator<Item = std::result::Result<SystemPathBuf, GlobError>> + '_>,
-        PatternError,
-    > {
-        let iterator = self.memory_fs.glob(pattern)?;
-        Ok(Box::new(iterator))
     }
 
     fn as_writable(&self) -> Option<&dyn WritableSystem> {
@@ -389,21 +432,8 @@ impl System for InMemorySystem {
         self
     }
 
-    #[inline]
-    fn path_exists_case_sensitive(&self, path: &SystemPath, _prefix: &SystemPath) -> bool {
-        // The memory file system is case-sensitive.
-        self.path_exists(path)
-    }
-
-    fn case_sensitivity(&self) -> CaseSensitivity {
-        CaseSensitivity::CaseSensitive
-    }
-
     fn dyn_clone(&self) -> Box<dyn System> {
-        Box::new(Self {
-            user_config_directory: Mutex::new(self.user_config_directory.lock().unwrap().clone()),
-            memory_fs: self.memory_fs.clone(),
-        })
+        Box::new(self.clone())
     }
 }
 
@@ -412,11 +442,15 @@ impl WritableSystem for InMemorySystem {
         self.memory_fs.create_new_file(path)
     }
 
-    fn write_file(&self, path: &SystemPath, content: &str) -> Result<()> {
+    fn write_file_bytes(&self, path: &SystemPath, content: &[u8]) -> Result<()> {
         self.memory_fs.write_file(path, content)
     }
 
     fn create_directory_all(&self, path: &SystemPath) -> Result<()> {
         self.memory_fs.create_directory_all(path)
+    }
+
+    fn dyn_clone(&self) -> Box<dyn WritableSystem> {
+        Box::new(self.clone())
     }
 }

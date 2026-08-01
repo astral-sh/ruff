@@ -6,15 +6,12 @@ F401 [*] `.unused` imported but unused; consider removing, adding to `__all__`, 
   |
 5 | from . import unused, renamed as bees  # F401: add to __all__
   |               ^^^^^^
-  |
 help: Remove unused import
-2 | """
-3 | 
-4 | 
+  |
+4 |
   - from . import unused, renamed as bees  # F401: add to __all__
-5 | 
-6 | 
-7 | __all__ = [];
+5 |
+  |
 note: This is an unsafe fix and may change runtime behavior
 
 F401 [*] `.renamed` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
@@ -22,13 +19,10 @@ F401 [*] `.renamed` imported but unused; consider removing, adding to `__all__`,
   |
 5 | from . import unused, renamed as bees  # F401: add to __all__
   |                                  ^^^^
-  |
 help: Remove unused import
-2 | """
-3 | 
-4 | 
+  |
+4 |
   - from . import unused, renamed as bees  # F401: add to __all__
-5 | 
-6 | 
-7 | __all__ = [];
+5 |
+  |
 note: This is an unsafe fix and may change runtime behavior

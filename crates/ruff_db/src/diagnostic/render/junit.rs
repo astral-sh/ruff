@@ -1,27 +1,28 @@
-use std::{collections::BTreeMap, ops::Deref, path::Path};
+use std::path::Path;
+use std::{collections::BTreeMap, ops::Deref};
 
 use quick_junit::{NonSuccessKind, Report, TestCase, TestCaseStatus, TestSuite, XmlString};
 
 use ruff_source_file::LineColumn;
 
-use crate::diagnostic::{Diagnostic, SecondaryCode, render::FileResolver};
+use crate::diagnostic::{Diagnostic, DisplayDiagnosticConfig, Severity, render::FileResolver};
 
-/// A renderer for diagnostics in the [JUnit] format.
+/// Print diagnostics as a JUnit-style XML report.
 ///
 /// See [`junit.xsd`] for the specification in the JUnit repository and an annotated [version]
 /// linked from the [`quick_junit`] docs.
 ///
-/// [JUnit]: https://junit.org/
 /// [`junit.xsd`]: https://github.com/junit-team/junit-framework/blob/2870b7d8fd5bf7c1efe489d3991d3ed3900e82bb/platform-tests/src/test/resources/jenkins-junit.xsd
 /// [version]: https://llg.cubic.org/docs/junit/
 /// [`quick_junit`]: https://docs.rs/quick-junit/latest/quick_junit/
-pub struct JunitRenderer<'a> {
+pub(super) struct JunitRenderer<'a> {
     resolver: &'a dyn FileResolver,
+    config: &'a DisplayDiagnosticConfig,
 }
 
 impl<'a> JunitRenderer<'a> {
-    pub fn new(resolver: &'a dyn FileResolver) -> Self {
-        Self { resolver }
+    pub(super) fn new(resolver: &'a dyn FileResolver, config: &'a DisplayDiagnosticConfig) -> Self {
+        Self { resolver, config }
     }
 
     pub(super) fn render(
@@ -29,15 +30,16 @@ impl<'a> JunitRenderer<'a> {
         f: &mut std::fmt::Formatter,
         diagnostics: &[Diagnostic],
     ) -> std::fmt::Result {
-        let mut report = Report::new("ruff");
+        let package = format!("org.{}", self.config.program);
+        let mut report = Report::new(self.config.program);
 
         if diagnostics.is_empty() {
-            let mut test_suite = TestSuite::new("ruff");
+            let mut test_suite = TestSuite::new(self.config.program);
             test_suite
                 .extra
-                .insert(XmlString::new("package"), XmlString::new("org.ruff"));
+                .insert(XmlString::new("package"), XmlString::new(&package));
             let mut case = TestCase::new("No errors found", TestCaseStatus::success());
-            case.set_classname("ruff");
+            case.set_classname(self.config.program);
             test_suite.add_test_case(case);
             report.add_test_suite(test_suite);
         } else {
@@ -46,7 +48,7 @@ impl<'a> JunitRenderer<'a> {
                 let mut test_suite = TestSuite::new(filename);
                 test_suite
                     .extra
-                    .insert(XmlString::new("package"), XmlString::new("org.ruff"));
+                    .insert(XmlString::new("package"), XmlString::new(&package));
 
                 let classname = Path::new(filename).with_extension("");
 
@@ -55,25 +57,33 @@ impl<'a> JunitRenderer<'a> {
                         diagnostic,
                         start_location: location,
                     } = diagnostic;
+
+                    let code = if self.config.preview && !self.config.prefer_rule_codes {
+                        diagnostic.id().as_str()
+                    } else {
+                        diagnostic.secondary_code_or_id()
+                    };
+
                     let mut status = TestCaseStatus::non_success(NonSuccessKind::Failure);
-                    status.set_message(diagnostic.body());
+                    status.set_message(diagnostic.concise_message().to_str());
 
                     if let Some(location) = location {
                         status.set_description(format!(
                             "line {row}, col {col}, {body}",
                             row = location.line,
                             col = location.column,
-                            body = diagnostic.body()
+                            body = diagnostic.concise_message()
                         ));
                     } else {
-                        status.set_description(diagnostic.body());
+                        status.set_description(diagnostic.concise_message().to_str());
                     }
 
-                    let code = diagnostic
-                        .secondary_code()
-                        .map_or_else(|| diagnostic.name(), SecondaryCode::as_str);
-                    let mut case = TestCase::new(format!("org.ruff.{code}"), status);
-                    case.set_classname(classname.to_str().unwrap());
+                    let mut case = TestCase::new(
+                        format!("org.{program}.{code}", program = self.config.program),
+                        status,
+                    );
+                    case.set_classname(classname.to_str().unwrap_or(filename));
+                    case.add_property(("severity", severity_name(diagnostic.severity())));
 
                     if let Some(location) = location {
                         case.extra.insert(
@@ -94,6 +104,15 @@ impl<'a> JunitRenderer<'a> {
 
         let adapter = FmtAdapter { fmt: f };
         report.serialize(adapter).map_err(|_| std::fmt::Error)
+    }
+}
+
+const fn severity_name(severity: Severity) -> &'static str {
+    match severity {
+        Severity::Info => "info",
+        Severity::Warning => "warning",
+        Severity::Error => "error",
+        Severity::Fatal => "fatal",
     }
 }
 

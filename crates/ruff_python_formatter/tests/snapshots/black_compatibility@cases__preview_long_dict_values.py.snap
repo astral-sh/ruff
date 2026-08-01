@@ -192,7 +192,7 @@ class Random:
          }
          x = {
              "foobar": (123) + 456,
-@@ -97,24 +94,20 @@
+@@ -97,24 +94,21 @@
  
  
  my_dict = {
@@ -221,13 +221,14 @@ class Random:
 -        .second_call()
 -        .third_call(some_args="some value")
 -    )
-+    "a key in my dict": MyClass.some_attribute.first_call()
++    "a key in my dict": MyClass.some_attribute
++    .first_call()
 +    .second_call()
 +    .third_call(some_args="some value")
  }
  
  {
-@@ -139,17 +132,17 @@
+@@ -139,17 +133,17 @@
  
  class Random:
      def func():
@@ -363,7 +364,8 @@ my_dict = {
     / 100000.0
 }
 my_dict = {
-    "a key in my dict": MyClass.some_attribute.first_call()
+    "a key in my dict": MyClass.some_attribute
+    .first_call()
     .second_call()
     .third_call(some_args="some value")
 }

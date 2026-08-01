@@ -230,7 +230,6 @@ impl<'a> Binding<'a> {
             // Deletions, annotations, `__future__` imports, and builtins are never considered
             // redefinitions.
             BindingKind::Deletion
-            | BindingKind::ConditionalDeletion(_)
             | BindingKind::Annotation
             | BindingKind::FutureImport
             | BindingKind::Builtin => {
@@ -458,6 +457,11 @@ pub struct BindingId;
 pub struct Bindings<'a>(IndexVec<BindingId, Binding<'a>>);
 
 impl<'a> Bindings<'a> {
+    /// Reserves capacity for at least `additional` more bindings.
+    pub(crate) fn reserve_exact(&mut self, additional: usize) {
+        self.0.raw.reserve_exact(additional);
+    }
+
     /// Pushes a new [`Binding`] and returns its [`BindingId`].
     pub fn push(&mut self, binding: Binding<'a>) -> BindingId {
         self.0.push(binding)
@@ -641,13 +645,6 @@ pub enum BindingKind<'a> {
     /// del x
     /// ```
     Deletion,
-
-    /// A binding for a deletion, like `x` in:
-    /// ```python
-    /// if x > 0:
-    ///     del x
-    /// ```
-    ConditionalDeletion(BindingId),
 
     /// A binding to bind an exception to a local variable, like `x` in:
     /// ```python

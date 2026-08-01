@@ -1,26 +1,18 @@
-use rustc_hash::FxHashSet;
-
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::name::Name;
 use ruff_python_ast::statement_visitor::{StatementVisitor, walk_stmt};
 use ruff_python_ast::{self as ast};
+use rustc_hash::FxHashSet;
+use ty_module_resolver::{ModuleName, resolve_module};
 
-use crate::semantic_index::{SemanticIndex, semantic_index};
-use crate::types::{Truthiness, Type, TypeContext, infer_expression_types};
-use crate::{Db, ModuleName, resolve_module};
-
-fn dunder_all_names_cycle_initial(
-    _db: &dyn Db,
-    _id: salsa::Id,
-    _file: File,
-) -> Option<FxHashSet<Name>> {
-    None
-}
+use crate::Db;
+use crate::types::{Type, TypeContext, infer_expression_types};
+use ty_python_core::{SemanticIndex, Truthiness, semantic_index};
 
 /// Returns a set of names in the `__all__` variable for `file`, [`None`] if it is not defined or
 /// if it contains invalid elements.
-#[salsa::tracked(returns(as_ref), cycle_initial=dunder_all_names_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
+#[salsa::tracked(returns(as_ref), cycle_initial=|_, _, _| None, heap_size=ruff_memory_usage::heap_size)]
 pub(crate) fn dunder_all_names(db: &dyn Db, file: File) -> Option<FxHashSet<Name>> {
     let _span = tracing::trace_span!("dunder_all_names", file=?file.path(db)).entered();
 
@@ -166,7 +158,7 @@ impl<'db> DunderAllNamesCollector<'db> {
     ) -> Option<&'db FxHashSet<Name>> {
         let module_name =
             ModuleName::from_import_statement(self.db, self.file, import_from).ok()?;
-        let module = resolve_module(self.db, &module_name)?;
+        let module = resolve_module(self.db, self.file, &module_name)?;
         dunder_all_names(self.db, module.file(self.db)?)
     }
 
@@ -204,13 +196,14 @@ impl<'db> DunderAllNamesCollector<'db> {
     ///
     /// Returns [`None`] if `__all__` is not defined in the current module or if it contains
     /// invalid elements.
-    fn into_names(self) -> Option<FxHashSet<Name>> {
+    fn into_names(mut self) -> Option<FxHashSet<Name>> {
         if self.origin.is_none() {
             None
         } else if self.invalid {
             tracing::debug!("Invalid `__all__` in `{}`", self.file.path(self.db));
             None
         } else {
+            self.names.shrink_to_fit();
             Some(self.names)
         }
     }

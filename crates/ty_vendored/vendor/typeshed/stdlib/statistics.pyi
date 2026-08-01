@@ -106,16 +106,19 @@ A single exception is defined: StatisticsError is a subclass of ValueError.
 
 import sys
 from _typeshed import SupportsRichComparisonT
-from collections.abc import Callable, Hashable, Iterable, Sequence
+from collections.abc import Callable, Hashable, Iterable, Sequence, Sized
 from decimal import Decimal
 from fractions import Fraction
-from typing import Literal, NamedTuple, SupportsFloat, SupportsIndex, TypeVar
-from typing_extensions import Self, TypeAlias
+from typing import Literal, NamedTuple, Protocol, SupportsFloat, SupportsIndex, TypeAlias, TypeVar, type_check_only
+from typing_extensions import Self
 
 __all__ = [
     "StatisticsError",
+    "covariance",
+    "correlation",
     "fmean",
     "geometric_mean",
+    "linear_regression",
     "mean",
     "harmonic_mean",
     "pstdev",
@@ -132,8 +135,6 @@ __all__ = [
     "quantiles",
 ]
 
-if sys.version_info >= (3, 10):
-    __all__ += ["covariance", "correlation", "linear_regression"]
 if sys.version_info >= (3, 13):
     __all__ += ["kde", "kde_random"]
 
@@ -146,6 +147,12 @@ _HashableT = TypeVar("_HashableT", bound=Hashable)
 
 # Used in NormalDist.samples and kde_random
 _Seed: TypeAlias = int | float | str | bytes | bytearray  # noqa: Y041
+
+# Used in linear_regression
+_T_co = TypeVar("_T_co", covariant=True)
+
+@type_check_only
+class _SizedIterable(Iterable[_T_co], Sized, Protocol[_T_co]): ...
 
 class StatisticsError(ValueError): ...
 
@@ -206,54 +213,30 @@ def mean(data: Iterable[_NumberT]) -> _NumberT:
 
     """
 
-if sys.version_info >= (3, 10):
-    def harmonic_mean(data: Iterable[_NumberT], weights: Iterable[_Number] | None = None) -> _NumberT:
-        """Return the harmonic mean of data.
+def harmonic_mean(data: Iterable[_NumberT], weights: Iterable[_Number] | None = None) -> _NumberT:
+    """Return the harmonic mean of data.
 
-        The harmonic mean is the reciprocal of the arithmetic mean of the
-        reciprocals of the data.  It can be used for averaging ratios or
-        rates, for example speeds.
+    The harmonic mean is the reciprocal of the arithmetic mean of the
+    reciprocals of the data.  It can be used for averaging ratios or
+    rates, for example speeds.
 
-        Suppose a car travels 40 km/hr for 5 km and then speeds-up to
-        60 km/hr for another 5 km. What is the average speed?
+    Suppose a car travels 40 km/hr for 5 km and then speeds-up to
+    60 km/hr for another 5 km. What is the average speed?
 
-            >>> harmonic_mean([40, 60])
-            48.0
+        >>> harmonic_mean([40, 60])
+        48.0
 
-        Suppose a car travels 40 km/hr for 5 km, and when traffic clears,
-        speeds-up to 60 km/hr for the remaining 30 km of the journey. What
-        is the average speed?
+    Suppose a car travels 40 km/hr for 5 km, and when traffic clears,
+    speeds-up to 60 km/hr for the remaining 30 km of the journey. What
+    is the average speed?
 
-            >>> harmonic_mean([40, 60], weights=[5, 30])
-            56.0
+        >>> harmonic_mean([40, 60], weights=[5, 30])
+        56.0
 
-        If ``data`` is empty, or any element is less than zero,
-        ``harmonic_mean`` will raise ``StatisticsError``.
+    If ``data`` is empty, or any element is less than zero,
+    ``harmonic_mean`` will raise ``StatisticsError``.
 
-        """
-
-else:
-    def harmonic_mean(data: Iterable[_NumberT]) -> _NumberT:
-        """Return the harmonic mean of data.
-
-        The harmonic mean, sometimes called the subcontrary mean, is the
-        reciprocal of the arithmetic mean of the reciprocals of the data,
-        and is often appropriate when averaging quantities which are rates
-        or ratios, for example speeds. Example:
-
-        Suppose an investor purchases an equal value of shares in each of
-        three companies, with P/E (price/earning) ratios of 2.5, 3 and 10.
-        What is the average P/E ratio for the investor's portfolio?
-
-        >>> harmonic_mean([2.5, 3, 10])  # For an equal investment portfolio.
-        3.6
-
-        Using the arithmetic mean would give an average of about 5.167, which
-        is too high.
-
-        If ``data`` is empty, or any element is less than zero,
-        ``harmonic_mean`` will raise ``StatisticsError``.
-        """
+    """
 
 def median(data: Iterable[_NumberT]) -> _NumberT:
     """Return the median (middle value) of numeric data.
@@ -649,9 +632,11 @@ class NormalDist:
 
     def __neg__(x1) -> NormalDist:
         """Negates mu while keeping sigma the same."""
+
     __radd__ = __add__
     def __rsub__(x1, x2: float | NormalDist) -> NormalDist:
         """Subtract a NormalDist from a constant or another NormalDist."""
+
     __rmul__ = __mul__
     def __hash__(self) -> int:
         """NormalDist objects hash equal if their mu and sigma are both equal."""
@@ -682,7 +667,7 @@ if sys.version_info >= (3, 12):
 
         """
 
-elif sys.version_info >= (3, 10):
+else:
     def correlation(x: Sequence[_Number], y: Sequence[_Number], /) -> float:
         """Pearson's correlation coefficient
 
@@ -701,34 +686,33 @@ elif sys.version_info >= (3, 10):
 
         """
 
-if sys.version_info >= (3, 10):
-    def covariance(x: Sequence[_Number], y: Sequence[_Number], /) -> float:
-        """Covariance
+def covariance(x: Sequence[_Number], y: Sequence[_Number], /) -> float:
+    """Covariance
 
-        Return the sample covariance of two inputs *x* and *y*. Covariance
-        is a measure of the joint variability of two inputs.
+    Return the sample covariance of two inputs *x* and *y*. Covariance
+    is a measure of the joint variability of two inputs.
 
-        >>> x = [1, 2, 3, 4, 5, 6, 7, 8, 9]
-        >>> y = [1, 2, 3, 1, 2, 3, 1, 2, 3]
-        >>> covariance(x, y)
-        0.75
-        >>> z = [9, 8, 7, 6, 5, 4, 3, 2, 1]
-        >>> covariance(x, z)
-        -7.5
-        >>> covariance(z, x)
-        -7.5
+    >>> x = [1, 2, 3, 4, 5, 6, 7, 8, 9]
+    >>> y = [1, 2, 3, 1, 2, 3, 1, 2, 3]
+    >>> covariance(x, y)
+    0.75
+    >>> z = [9, 8, 7, 6, 5, 4, 3, 2, 1]
+    >>> covariance(x, z)
+    -7.5
+    >>> covariance(z, x)
+    -7.5
 
-        """
+    """
 
-    class LinearRegression(NamedTuple):
-        """LinearRegression(slope, intercept)"""
+class LinearRegression(NamedTuple):
+    """LinearRegression(slope, intercept)"""
 
-        slope: float
-        intercept: float
+    slope: float
+    intercept: float
 
 if sys.version_info >= (3, 11):
     def linear_regression(
-        regressor: Sequence[_Number], dependent_variable: Sequence[_Number], /, *, proportional: bool = False
+        regressor: _SizedIterable[_Number], dependent_variable: _SizedIterable[_Number], /, *, proportional: bool = False
     ) -> LinearRegression:
         """Slope and intercept for simple linear regression.
 
@@ -768,8 +752,8 @@ if sys.version_info >= (3, 11):
 
         """
 
-elif sys.version_info >= (3, 10):
-    def linear_regression(regressor: Sequence[_Number], dependent_variable: Sequence[_Number], /) -> LinearRegression:
+else:
+    def linear_regression(regressor: _SizedIterable[_Number], dependent_variable: _SizedIterable[_Number], /) -> LinearRegression:
         """Slope and intercept for simple linear regression.
 
         Return the slope and intercept of simple linear regression

@@ -89,7 +89,7 @@ class Protocol(BaseProtocol):
     """
 
     # Need annotation or mypy will complain about 'Cannot determine type of "__slots__" in base class'
-    __slots__: tuple[()] = ()
+    __slots__: tuple[str, ...] = ()
     def data_received(self, data: bytes) -> None:
         """Called when some data is received.
 
@@ -166,6 +166,7 @@ class DatagramProtocol(BaseProtocol):
         To receive data, wait for data_received() calls.
         When the connection is closed, connection_lost() is called.
         """
+
     # addr can be a tuple[int, int] for some unusual protocols like socket.AF_NETLINK.
     # Use tuple[str | Any, int] to not cause typechecking issues on most usual cases.
     # This could be improved by using tuple[AnyOf[str, int], int] if the AnyOf feature is accepted.
@@ -182,7 +183,7 @@ class DatagramProtocol(BaseProtocol):
 class SubprocessProtocol(BaseProtocol):
     """Interface for protocol for subprocess calls."""
 
-    __slots__: tuple[()] = ()
+    __slots__: tuple[str, ...] = ()
     def pipe_data_received(self, fd: int, data: bytes) -> None:
         """Called when the subprocess writes data into stdout/stderr pipe.
 

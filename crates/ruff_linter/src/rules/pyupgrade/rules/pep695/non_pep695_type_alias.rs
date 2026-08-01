@@ -2,7 +2,7 @@ use itertools::Itertools;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::name::Name;
-use ruff_python_ast::parenthesize::parenthesized_range;
+use ruff_python_ast::token::parenthesized_range;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{Expr, ExprCall, ExprName, Keyword, StmtAnnAssign, StmtAssign, StmtRef};
 use ruff_text_size::{Ranged, TextRange};
@@ -14,6 +14,7 @@ use ruff_python_ast::PythonVersion;
 
 use super::{
     DisplayTypeVars, TypeParamKind, TypeVar, TypeVarReferenceVisitor, expr_name_to_type_var,
+    non_default_follows_default,
 };
 
 /// ## What it does
@@ -77,6 +78,10 @@ use super::{
 /// This rule will not rename private type variables to remove leading underscores, even though the
 /// new type parameters are restricted in scope to their associated aliases. See
 /// [`private-type-parameter`][UP049] for a rule to update these names.
+///
+/// ## Options
+///
+/// - `target-version`
 ///
 /// [PEP 695]: https://peps.python.org/pep-0695/
 /// [PYI018]: https://docs.astral.sh/ruff/rules/unused-private-type-var/
@@ -234,13 +239,6 @@ pub(crate) fn non_pep695_type_alias(checker: &Checker, stmt: &StmtAnnAssign) {
         .unique_by(|tvar| tvar.name)
         .collect::<Vec<_>>();
 
-    // Skip if any TypeVar has defaults and preview mode is not enabled
-    if vars.iter().any(|tv| tv.default.is_some())
-        && !is_type_var_default_enabled(checker.settings())
-    {
-        return;
-    }
-
     create_diagnostic(
         checker,
         stmt.into(),
@@ -260,12 +258,25 @@ fn create_diagnostic(
     type_vars: &[TypeVar],
     type_alias_kind: TypeAliasKind,
 ) {
+    // If any type variables have defaults, skip the rule unless
+    // running with preview mode enabled and targeting Python 3.13+.
+    if (checker.target_version() < PythonVersion::PY313
+        || !is_type_var_default_enabled(checker.settings()))
+        && type_vars.iter().any(|type_var| type_var.default.is_some())
+    {
+        return;
+    }
+
+    if non_default_follows_default(type_vars) {
+        return;
+    }
+
     let source = checker.source();
+    let tokens = checker.tokens();
     let comment_ranges = checker.comment_ranges();
 
     let range_with_parentheses =
-        parenthesized_range(value.into(), stmt.into(), comment_ranges, source)
-            .unwrap_or(value.range());
+        parenthesized_range(value.into(), stmt.into(), tokens).unwrap_or(value.range());
 
     let content = format!(
         "type {name}{type_params} = {value}",

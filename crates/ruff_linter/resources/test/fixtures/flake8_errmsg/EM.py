@@ -110,3 +110,11 @@ def f_typing_cast_excluded_aliased():
     raise my_cast(RuntimeError, "This should not trigger EM101")
 
 
+# Regression test for https://github.com/astral-sh/ruff/issues/24335
+# (Do not shadow existing `msg`)
+def f():
+    msg = "."
+    try:
+        raise RuntimeError("!")
+    except RuntimeError:
+        return msg

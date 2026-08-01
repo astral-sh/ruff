@@ -15,7 +15,6 @@ class _ReadableBinary(Protocol):
 @overload
 def what(file: StrPath | _ReadableBinary, h: None = None) -> str | None:
     """Return the type of image contained in a file or byte stream."""
-
 @overload
 def what(file: Any, h: bytes) -> str | None: ...
 

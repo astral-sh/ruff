@@ -4,8 +4,7 @@ import sys
 from array import array
 from collections import deque
 from collections.abc import Callable
-from typing import Any
-from typing_extensions import TypeAlias
+from typing import Any, TypeAlias
 
 __all__ = ["Repr", "repr", "recursive_repr"]
 

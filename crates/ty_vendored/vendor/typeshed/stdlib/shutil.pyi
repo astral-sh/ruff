@@ -9,8 +9,8 @@ import sys
 from _typeshed import BytesPath, ExcInfo, FileDescriptorOrPath, MaybeNone, StrOrBytesPath, StrPath, SupportsRead, SupportsWrite
 from collections.abc import Callable, Iterable, Sequence
 from tarfile import _TarfileFilter
-from typing import Any, AnyStr, NamedTuple, NoReturn, Protocol, TypeVar, overload, type_check_only
-from typing_extensions import TypeAlias, deprecated
+from typing import Any, AnyStr, NamedTuple, NoReturn, Protocol, TypeAlias, TypeVar, overload, type_check_only
+from typing_extensions import deprecated
 
 __all__ = [
     "copyfileobj",
@@ -117,9 +117,9 @@ def copy(src: StrPath, dst: _StrPathT, *, follow_symlinks: bool = True) -> _StrP
     raised.
 
     """
-
 @overload
 def copy(src: BytesPath, dst: _BytesPathT, *, follow_symlinks: bool = True) -> _BytesPathT | bytes: ...
+
 @overload
 def copy2(src: StrPath, dst: _StrPathT, *, follow_symlinks: bool = True) -> _StrPathT | str:
     """Copy data and metadata. Return the file's destination.
@@ -132,9 +132,9 @@ def copy2(src: StrPath, dst: _StrPathT, *, follow_symlinks: bool = True) -> _Str
     If follow_symlinks is false, symlinks won't be followed. This
     resembles GNU's "cp -P src dst".
     """
-
 @overload
 def copy2(src: BytesPath, dst: _BytesPathT, *, follow_symlinks: bool = True) -> _BytesPathT | bytes: ...
+
 def ignore_patterns(*patterns: StrPath) -> Callable[[Any, list[str]], set[str]]:
     """Function that can be used as copytree() ignore parameter.
 
@@ -244,6 +244,25 @@ class _RmtreeType(Protocol):
         ) -> None: ...
 
 rmtree: _RmtreeType
+"""Recursively delete a directory tree.
+
+If dir_fd is not None, it should be a file descriptor open to a directory;
+path will then be relative to that directory.
+dir_fd may not be implemented on your platform.
+If it is unavailable, using it will raise a NotImplementedError.
+
+If ignore_errors is set, errors are ignored; otherwise, if onexc or
+onerror is set, it is called to handle the error with arguments (func,
+path, exc_info) where func is platform and implementation dependent;
+path is the argument to that function that caused it to fail; and
+the value of exc_info describes the exception. For onexc it is the
+exception instance, and for onerror it is a tuple as returned by
+sys.exc_info().  If ignore_errors is false and both onexc and
+onerror are None, the exception is reraised.
+
+onerror is deprecated and only remains for backwards compatibility.
+If both onerror and onexc are set, onerror is ignored and onexc is used.
+"""
 
 _CopyFn: TypeAlias = Callable[[str, str], object] | Callable[[StrPath, StrPath], object]
 
@@ -262,10 +281,14 @@ def move(src: StrPath, dst: _StrPathT, copy_function: _CopyFn = ...) -> _StrPath
     If dst already exists but is not a directory, it may be overwritten
     depending on os.rename() semantics.
 
-    If the destination is on our current filesystem, then rename() is used.
-    Otherwise, src is copied to the destination and then removed. Symlinks are
-    recreated under the new name if os.rename() fails because of cross
-    filesystem renames.
+    os.rename() is preferably used if the source and destination are on the
+    same filesystem. In case os.rename() fails due to OSError (e.g. the user
+    has write permission to *dst* file but not to its parent directory),
+    this method falls back to using *copy_function* silently.
+    Symlinks are also recreated under the new name if os.rename() fails
+    because of cross filesystem renames.
+
+    It's recommended to use os.rename() if atomic move is strictly required.
 
     The optional `copy_function` argument is a callable that will be used
     to copy the source or it will be delegated to `copytree`.
@@ -316,7 +339,6 @@ if sys.version_info >= (3, 13):
         symbolic link, chown will modify the link itself and not the file being
         referenced by the link.
         """
-
     @overload
     def chown(
         path: FileDescriptorOrPath,
@@ -334,7 +356,6 @@ if sys.version_info >= (3, 13):
     def chown(
         path: FileDescriptorOrPath, user: str | int, group: str | int, *, dir_fd: int | None = None, follow_symlinks: bool = True
     ) -> None: ...
-
 else:
     @overload
     def chown(path: FileDescriptorOrPath, user: str | int, group: None = None) -> None:
@@ -343,7 +364,6 @@ else:
         user and group can be the uid/gid or the user/group names, and in that case,
         they are converted to their respective uid/gid.
         """
-
     @overload
     def chown(path: FileDescriptorOrPath, user: None = None, *, group: str | int) -> None: ...
     @overload
@@ -376,9 +396,9 @@ def which(cmd: StrPath, mode: int = 1, path: StrPath | None = None) -> str | Non
     path.
 
     """
-
 @overload
 def which(cmd: bytes, mode: int = 1, path: StrPath | None = None) -> bytes | None: ...
+
 def make_archive(
     base_name: str,
     format: str,
@@ -425,11 +445,11 @@ def register_archive_format(
     description can be provided to describe the format, and will be returned
     by the get_archive_formats() function.
     """
-
 @overload
 def register_archive_format(
     name: str, function: Callable[[str, str], object], extra_args: None = None, description: str = ""
 ) -> None: ...
+
 def unregister_archive_format(name: str) -> None: ...
 def unpack_archive(
     filename: StrPath, extract_dir: StrPath | None = None, format: str | None = None, *, filter: _TarfileFilter | None = None
@@ -475,11 +495,11 @@ def register_unpack_format(
     description can be provided to describe the format, and will be returned
     by the get_unpack_formats() function.
     """
-
 @overload
 def register_unpack_format(
     name: str, extensions: list[str], function: Callable[[str, str], object], extra_args: None = None, description: str = ""
 ) -> None: ...
+
 def unregister_unpack_format(name: str) -> None:
     """Removes the pack format from the registry."""
 

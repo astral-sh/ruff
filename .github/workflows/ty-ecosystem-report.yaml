@@ -1,3 +1,7 @@
+# This workflow is a cron job that generates a report describing
+# all diagnostics ty emits across the whole ecosystem. The report
+# is uploaded to https://ty-ecosystem-ext.pages.dev/ on a weekly basis.
+
 name: ty ecosystem-report
 
 permissions: {}
@@ -14,52 +18,54 @@ env:
   CARGO_TERM_COLOR: always
   RUSTUP_MAX_RETRIES: 10
   RUST_BACKTRACE: 1
-  CF_API_TOKEN_EXISTS: ${{ secrets.CF_API_TOKEN != '' }}
+  # Line-tables-only debug info: faster builds, backtraces still work.
+  CARGO_PROFILE_PROFILING_DEBUG: line-tables-only
+  ECOSYSTEM_ANALYZER_COMMIT: e2c5b76149b147fae104a7d8fa0997a9eb7f7754
 
 jobs:
   ty-ecosystem-report:
     name: Create ecosystem report
     runs-on: ${{ github.repository == 'astral-sh/ruff' && 'depot-ubuntu-22.04-32' || 'ubuntu-latest' }}
-    timeout-minutes: 20
+    timeout-minutes: 40
     steps:
-      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          path: ruff
-          fetch-depth: 0
           persist-credentials: false
 
       - name: Install the latest version of uv
-        uses: astral-sh/setup-uv@85856786d1ce8acfbcc2f13a5f3fbd6b938f9f41 # v7.1.2
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
         with:
-          enable-cache: true # zizmor: ignore[cache-poisoning] acceptable risk for CloudFlare pages artifact
+          enable-cache: true
+          version: "0.12.0"
 
-      - uses: Swatinem/rust-cache@f13886b937689c021905a6b90929199931d60db1 # v2.8.1
+      - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
         with:
-          workspaces: "ruff"
-          lookup-only: false # zizmor: ignore[cache-poisoning] acceptable risk for CloudFlare pages artifact
+          lookup-only: false
 
       - name: Install Rust toolchain
         run: rustup show
 
+      - name: "Install mold"
+        uses: rui314/setup-mold@9c9c13bf4c3f1adef0cc596abc155580bcb04444 # v1
+
       - name: Create report
         shell: bash
         run: |
-          cd ruff
+          # Faster to do this separately than to use `fetch-depth: 0` with `actions/checkout`
+          git fetch --no-tags --filter=blob:none --unshallow origin
 
-          echo "Enabling configuration overloads (see .github/mypy-primer-ty.toml)"
+          echo "Enabling configuration overloads (see .github/ty-ecosystem.toml)"
           mkdir -p ~/.config/ty
-          cp .github/mypy-primer-ty.toml ~/.config/ty/ty.toml
+          cp .github/ty-ecosystem.toml ~/.config/ty/ty.toml
 
-          cd ..
-
-          uv tool install "git+https://github.com/astral-sh/ecosystem-analyzer@908758da02a73ef3f3308e1dbb2248510029bbe4"
+          uv tool install "git+https://github.com/astral-sh/ecosystem-analyzer@$ECOSYSTEM_ANALYZER_COMMIT"
 
           ecosystem-analyzer \
             --verbose \
-            --repository ruff \
+            --repository . \
+            --flaky-runs 20 \
             analyze \
             --profile=profiling \
-            --projects ruff/crates/ty_python_semantic/resources/primer/good.txt \
             --output ecosystem-diagnostics.json
 
           mkdir dist
@@ -70,11 +76,10 @@ jobs:
             ecosystem-diagnostics.json \
             --output dist/index.html
 
-      - name: "Deploy to Cloudflare Pages"
-        if: ${{ env.CF_API_TOKEN_EXISTS == 'true' }}
-        id: deploy
-        uses: cloudflare/wrangler-action@da0e0dfe58b7a431659754fdf3f186c529afbe65 # v3.14.1
+      # NOTE: astral-sh-bot uses this artifact to publish the ecosystem report.
+      # Make sure to update the bot if you rename the artifact.
+      - name: "Upload ecosystem report"
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          apiToken: ${{ secrets.CF_API_TOKEN }}
-          accountId: ${{ secrets.CF_ACCOUNT_ID }}
-          command: pages deploy dist --project-name=ty-ecosystem --branch main --commit-hash ${GITHUB_SHA}
+          name: full-report
+          path: dist/

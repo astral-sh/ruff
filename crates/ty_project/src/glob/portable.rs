@@ -335,7 +335,7 @@ mod tests {
         // Escapes are not allowed in strict PEP 639 mode
         assert_snapshot!(
             parse_err(r"public domain/Gulliver\\’s Travels.txt"),
-            @r"Invalid character ` ` at position 7. hint: Characters can be escaped with a backslash"
+            @"Invalid character ` ` at position 7. hint: Characters can be escaped with a backslash"
         );
         assert_snapshot!(
             parse_err(r"**/@test"),
@@ -344,11 +344,11 @@ mod tests {
         // Escaping slashes is not allowed.
         assert_snapshot!(
             parse_err(r"licenses\\MIT.txt"),
-            @r"Path separators can't be escaped, invalid character at position 9"
+            @"Path separators can't be escaped, invalid character at position 9"
         );
         assert_snapshot!(
             parse_err(r"licenses\/MIT.txt"),
-            @r"Path separators can't be escaped, invalid character at position 9"
+            @"Path separators can't be escaped, invalid character at position 9"
         );
     }
 

@@ -23,43 +23,29 @@ The action function may be an instance method so it
 has another way to reference private data (besides global variables).
 """
 
-import sys
+import time
 from collections.abc import Callable
-from typing import Any, ClassVar, NamedTuple, type_check_only
-from typing_extensions import TypeAlias
+from typing import Any, NamedTuple, TypeAlias
 
 __all__ = ["scheduler"]
 
 _ActionCallback: TypeAlias = Callable[..., Any]
 
-if sys.version_info >= (3, 10):
-    class Event(NamedTuple):
-        """Event(time, priority, sequence, action, argument, kwargs)"""
+class Event(NamedTuple):
+    """Event(time, priority, sequence, action, argument, kwargs)"""
 
-        time: float
-        priority: Any
-        sequence: int
-        action: _ActionCallback
-        argument: tuple[Any, ...]
-        kwargs: dict[str, Any]
-
-else:
-    @type_check_only
-    class _EventBase(NamedTuple):
-        time: float
-        priority: Any
-        action: _ActionCallback
-        argument: tuple[Any, ...]
-        kwargs: dict[str, Any]
-
-    class Event(_EventBase):
-        __hash__: ClassVar[None]  # type: ignore[assignment]
+    time: float
+    priority: Any
+    sequence: int
+    action: _ActionCallback
+    argument: tuple[Any, ...]
+    kwargs: dict[str, Any]
 
 class scheduler:
     timefunc: Callable[[], float]
     delayfunc: Callable[[float], object]
 
-    def __init__(self, timefunc: Callable[[], float] = ..., delayfunc: Callable[[float], object] = ...) -> None:
+    def __init__(self, timefunc: Callable[[], float] = time.monotonic, delayfunc: Callable[[float], object] = time.sleep) -> None:
         """Initialize a new instance, passing the time and delay
         functions
         """

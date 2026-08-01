@@ -69,8 +69,7 @@ class ModuleSpec:
     `has_location` indicates that a spec's "origin" reflects a location.
     When this is True, `__file__` attribute of the module is set.
 
-    `cached` is the location of the cached bytecode file, if any.  It
-    corresponds to the `__cached__` attribute.
+    `cached` is the location of the cached bytecode file, if any.
 
     `submodule_search_locations` is the sequence of path entries to
     search when importing submodules.  If set, is_package should be
@@ -103,6 +102,7 @@ class ModuleSpec:
     @property
     def parent(self) -> str | None:
         """The name of the module's parent."""
+
     has_location: bool
     def __eq__(self, other: object) -> bool: ...
     __hash__: ClassVar[None]  # type: ignore[assignment]
@@ -152,6 +152,7 @@ class BuiltinImporter(importlib.abc.MetaPathFinder, importlib.abc.InspectLoader)
     @classmethod
     def get_source(cls, fullname: str) -> None:
         """Return None as built-in modules do not have source code."""
+
     # Loader
     if sys.version_info < (3, 12):
         @staticmethod
@@ -165,22 +166,14 @@ class BuiltinImporter(importlib.abc.MetaPathFinder, importlib.abc.InspectLoader)
             The method is deprecated.  The import machinery does the job itself.
 
             """
-    if sys.version_info >= (3, 10):
-        @staticmethod
-        def create_module(spec: ModuleSpec) -> types.ModuleType | None:
-            """Create a built-in module"""
 
-        @staticmethod
-        def exec_module(module: types.ModuleType) -> None:
-            """Exec a built-in module"""
-    else:
-        @classmethod
-        def create_module(cls, spec: ModuleSpec) -> types.ModuleType | None:
-            """Create a built-in module"""
+    @staticmethod
+    def create_module(spec: ModuleSpec) -> types.ModuleType | None:
+        """Create a built-in module"""
 
-        @classmethod
-        def exec_module(cls, module: types.ModuleType) -> None:
-            """Exec a built-in module"""
+    @staticmethod
+    def exec_module(module: types.ModuleType) -> None:
+        """Exec a built-in module"""
 
 class FrozenImporter(importlib.abc.MetaPathFinder, importlib.abc.InspectLoader):
     """Meta path import for frozen modules.
@@ -225,6 +218,7 @@ class FrozenImporter(importlib.abc.MetaPathFinder, importlib.abc.InspectLoader):
     @classmethod
     def get_source(cls, fullname: str) -> None:
         """Return None as frozen modules do not have source code."""
+
     # Loader
     if sys.version_info < (3, 12):
         @staticmethod
@@ -238,14 +232,10 @@ class FrozenImporter(importlib.abc.MetaPathFinder, importlib.abc.InspectLoader):
             The method is deprecated.  The import machinery does the job itself.
 
             """
-    if sys.version_info >= (3, 10):
-        @staticmethod
-        def create_module(spec: ModuleSpec) -> types.ModuleType | None:
-            """Set __file__, if able."""
-    else:
-        @classmethod
-        def create_module(cls, spec: ModuleSpec) -> types.ModuleType | None:
-            """Use default semantics for module creation."""
+
+    @staticmethod
+    def create_module(spec: ModuleSpec) -> types.ModuleType | None:
+        """Set __file__, if able."""
 
     @staticmethod
     def exec_module(module: types.ModuleType) -> None: ...

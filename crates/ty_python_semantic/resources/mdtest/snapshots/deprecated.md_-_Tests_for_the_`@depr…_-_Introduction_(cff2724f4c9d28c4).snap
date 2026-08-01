@@ -1,7 +1,8 @@
 ---
-source: crates/ty_test/src/lib.rs
+source: crates/mdtest/src/lib.rs
 expression: snapshot
 ---
+
 ---
 mdtest name: deprecated.md - Tests for the `@deprecated` decorator - Introduction
 mdtest path: crates/ty_python_semantic/resources/mdtest/deprecated.md
@@ -15,9 +16,9 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/deprecated.md
  1 | from typing_extensions import deprecated
  2 | 
  3 | @deprecated("use OtherClass")
- 4 | def myfunc(): ...
+ 4 | def myfunc(x: int): ...
  5 | 
- 6 | myfunc()  # error: [deprecated] "use OtherClass"
+ 6 | myfunc(1)  # error: [deprecated] "use OtherClass"
  7 | from typing_extensions import deprecated
  8 | 
  9 | @deprecated("use BetterClass")
@@ -42,13 +43,8 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/deprecated.md
 warning[deprecated]: The function `myfunc` is deprecated
  --> src/mdtest_snippet.py:6:1
   |
-4 | def myfunc(): ...
-5 |
-6 | myfunc()  # error: [deprecated] "use OtherClass"
+6 | myfunc(1)  # error: [deprecated] "use OtherClass"
   | ^^^^^^ use OtherClass
-7 | from typing_extensions import deprecated
-  |
-info: rule `deprecated` is enabled by default
 
 ```
 
@@ -56,13 +52,8 @@ info: rule `deprecated` is enabled by default
 warning[deprecated]: The class `MyClass` is deprecated
   --> src/mdtest_snippet.py:12:1
    |
-10 | class MyClass: ...
-11 |
 12 | MyClass()  # error: [deprecated] "use BetterClass"
    | ^^^^^^^ use BetterClass
-13 | from typing_extensions import deprecated
-   |
-info: rule `deprecated` is enabled by default
 
 ```
 
@@ -70,13 +61,8 @@ info: rule `deprecated` is enabled by default
 warning[deprecated]: The function `afunc` is deprecated
   --> src/mdtest_snippet.py:21:9
    |
-19 |     def amethod(self): ...
-20 |
 21 | MyClass.afunc()  # error: [deprecated] "use something else"
    |         ^^^^^ use something else
-22 | MyClass().amethod()  # error: [deprecated] "don't use this!"
-   |
-info: rule `deprecated` is enabled by default
 
 ```
 
@@ -84,10 +70,7 @@ info: rule `deprecated` is enabled by default
 warning[deprecated]: The function `amethod` is deprecated
   --> src/mdtest_snippet.py:22:11
    |
-21 | MyClass.afunc()  # error: [deprecated] "use something else"
 22 | MyClass().amethod()  # error: [deprecated] "don't use this!"
    |           ^^^^^^^ don't use this!
-   |
-info: rule `deprecated` is enabled by default
 
 ```

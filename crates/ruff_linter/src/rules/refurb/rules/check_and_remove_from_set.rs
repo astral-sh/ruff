@@ -193,7 +193,7 @@ fn make_suggestion(set: &ast::ExprName, element: &Expr, generator: Generator) ->
         func: Box::new(attr.into()),
         arguments: ast::Arguments {
             args: Box::from([element.clone()]),
-            keywords: Box::from([]),
+            keywords: std::iter::empty().collect(),
             range: TextRange::default(),
             node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         },

@@ -67,31 +67,31 @@ import logging
 try:
     pass
 except Exception:
-    logging.error("...")
+    logging.error("...")  # BLE001
 
 
 try:
     pass
 except Exception:
-    logging.error("...", exc_info=False)
+    logging.error("...", exc_info=False)  # BLE001
 
 
 try:
     pass
 except Exception:
-    logging.error("...", exc_info=None)
+    logging.error("...", exc_info=None)  # BLE001
 
 
 try:
     pass
 except Exception:
-    logging.exception("...")
+    logging.exception("...")  # ok
 
 
 try:
     pass
 except Exception:
-    logging.error("...", exc_info=True)
+    logging.error("...", exc_info=True)  # ok
 
 
 from logging import critical, error, exception
@@ -99,54 +99,54 @@ from logging import critical, error, exception
 try:
     pass
 except Exception:
-    error("...")
+    error("...")  # BLE001
 
 
 try:
     pass
 except Exception:
-    error("...", exc_info=False)
+    error("...", exc_info=False)  # BLE001
 
 
 try:
     pass
 except Exception:
-    error("...", exc_info=None)
+    error("...", exc_info=None)  # BLE001
 
 
 try:
     pass
 except Exception:
-    critical("...")
+    critical("...")  # BLE001
 
 
 try:
     pass
 except Exception:
-    critical("...", exc_info=False)
+    critical("...", exc_info=False)  # BLE001
 
 
 try:
     pass
 except Exception:
-    critical("...", exc_info=None)
+    critical("...", exc_info=None)  # BLE001
 
 try:
     pass
 except Exception:
-    exception("...")
-
-
-try:
-    pass
-except Exception:
-    error("...", exc_info=True)
+    exception("...")  # ok
 
 
 try:
     pass
 except Exception:
-    critical("...", exc_info=True)
+    error("...", exc_info=True)  # ok
+
+
+try:
+    pass
+except Exception:
+    critical("...", exc_info=True)  # ok
 
 
 try:
@@ -239,7 +239,7 @@ except (OSError, FileNotFoundError) as e:
 try:
     pass
 except (Exception, ValueError):
-    critical("...", exc_info=True)
+    critical("...", exc_info=True)  # ok
 
 try:
     pass
@@ -256,3 +256,38 @@ try:
     pass
 except BaseException as e:
     raise e from None
+
+
+try:
+    pass
+except Exception as e:
+    logging.error("...", exc_info=e)  # ok
+
+
+try:
+    pass
+except Exception as e:
+    logging.debug("...", exc_info=e)  # ok
+
+
+try:
+    pass
+except Exception:
+    logging.info("...", exc_info=True)  # ok 
+
+try:
+    pass
+except Exception as e:
+    logging.warn("...", exc_info=e)  # ok
+
+
+try:
+    pass
+except Exception:
+    logging.warning("...", exc_info=True)  # ok
+
+
+try:
+    pass
+except Exception as e:
+    logging.log(logging.INFO, "...", exc_info=e)  # ok

@@ -4,10 +4,10 @@ use anyhow::Result;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::comparable::ComparableStmt;
-use ruff_python_ast::parenthesize::parenthesized_range;
 use ruff_python_ast::stmt_if::{IfElifBranch, if_elif_branches};
+use ruff_python_ast::token::parenthesized_range;
 use ruff_python_ast::{self as ast, Expr};
-use ruff_python_trivia::{CommentRanges, SimpleTokenKind, SimpleTokenizer};
+use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
 use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange};
 
@@ -99,7 +99,7 @@ pub(crate) fn if_with_same_arms(checker: &Checker, stmt_if: &ast::StmtIf) {
                 &current_branch,
                 following_branch,
                 checker.locator(),
-                checker.comment_ranges(),
+                checker.tokens(),
             )
         });
     }
@@ -111,7 +111,7 @@ fn merge_branches(
     current_branch: &IfElifBranch,
     following_branch: &IfElifBranch,
     locator: &Locator,
-    comment_ranges: &CommentRanges,
+    tokens: &ruff_python_ast::token::Tokens,
 ) -> Result<Fix> {
     // Identify the colon (`:`) at the end of the current branch's test.
     let Some(current_branch_colon) =
@@ -127,12 +127,9 @@ fn merge_branches(
     );
 
     // If the following test isn't parenthesized, consider parenthesizing it.
-    let following_branch_test = if let Some(range) = parenthesized_range(
-        following_branch.test.into(),
-        stmt_if.into(),
-        comment_ranges,
-        locator.contents(),
-    ) {
+    let following_branch_test = if let Some(range) =
+        parenthesized_range(following_branch.test.into(), stmt_if.into(), tokens)
+    {
         Cow::Borrowed(locator.slice(range))
     } else if matches!(
         following_branch.test,
@@ -153,24 +150,19 @@ fn merge_branches(
     //
     // For example, if the current test is `x if x else y`, we should parenthesize it to
     // `(x if x else y) or ...`.
-    let parenthesize_edit = if matches!(
-        current_branch.test,
-        Expr::Lambda(_) | Expr::Named(_) | Expr::If(_)
-    ) && parenthesized_range(
-        current_branch.test.into(),
-        stmt_if.into(),
-        comment_ranges,
-        locator.contents(),
-    )
-    .is_none()
-    {
-        Some(Edit::range_replacement(
-            format!("({})", locator.slice(current_branch.test)),
-            current_branch.test.range(),
-        ))
-    } else {
-        None
-    };
+    let parenthesize_edit =
+        if matches!(
+            current_branch.test,
+            Expr::Lambda(_) | Expr::Named(_) | Expr::If(_)
+        ) && parenthesized_range(current_branch.test.into(), stmt_if.into(), tokens).is_none()
+        {
+            Some(Edit::range_replacement(
+                format!("({})", locator.slice(current_branch.test)),
+                current_branch.test.range(),
+            ))
+        } else {
+            None
+        };
 
     Ok(Fix::safe_edits(
         deletion_edit,

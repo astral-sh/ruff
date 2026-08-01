@@ -1,3 +1,4 @@
+use ruff_diagnostics::Applicability;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, PythonVersion};
 use ruff_python_semantic::SemanticModel;
@@ -37,6 +38,9 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 ///     filename = filename.removesuffix(".txt")
 ///     text = text.removeprefix("pre")
 /// ```
+///
+/// ## Fix safety
+/// This rule's fix is marked as safe, unless the expression contains comments.
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "0.9.0")]
 pub(crate) struct SliceToRemovePrefixOrSuffix {
@@ -89,11 +93,16 @@ pub(crate) fn slice_to_remove_affix_expr(checker: &Checker, if_expr: &ast::ExprI
             let replacement =
                 generate_removeaffix_expr(text, &removal_data.affix_query, checker.locator());
 
-            diagnostic.set_fix(Fix::safe_edit(Edit::replacement(
-                replacement,
-                if_expr.start(),
-                if_expr.end(),
-            )));
+            let applicability = if checker.comment_ranges().intersects(if_expr.range) {
+                Applicability::Unsafe
+            } else {
+                Applicability::Safe
+            };
+
+            diagnostic.set_fix(Fix::applicable_edit(
+                Edit::replacement(replacement, if_expr.start(), if_expr.end()),
+                applicability,
+            ));
         }
     }
 }
@@ -122,11 +131,16 @@ pub(crate) fn slice_to_remove_affix_stmt(checker: &Checker, if_stmt: &ast::StmtI
                 checker.locator(),
             );
 
-            diagnostic.set_fix(Fix::safe_edit(Edit::replacement(
-                replacement,
-                if_stmt.start(),
-                if_stmt.end(),
-            )));
+            let applicability = if checker.comment_ranges().intersects(if_stmt.range) {
+                Applicability::Unsafe
+            } else {
+                Applicability::Safe
+            };
+
+            diagnostic.set_fix(Fix::applicable_edit(
+                Edit::replacement(replacement, if_stmt.start(), if_stmt.end()),
+                applicability,
+            ));
         }
     }
 }
@@ -372,15 +386,16 @@ fn affix_matches_slice_bound(data: &RemoveAffixData, semantic: &SemanticModel) -
                 node_index: _,
                 value: string_val,
             }),
-        ) if operand.is_number_literal_expr() => operand.as_number_literal_expr().is_some_and(
-            |ast::ExprNumberLiteral { value, .. }| {
-                // Only support prefix removal for size at most `u32::MAX`
-                value
-                    .as_int()
-                    .and_then(ast::Int::as_usize)
-                    .is_some_and(|x| x == string_val.chars().count())
-            },
-        ),
+        ) if let ast::Expr::NumberLiteral(ast::ExprNumberLiteral {
+            value: ast::Number::Int(value),
+            ..
+        }) = &**operand =>
+        {
+            // Only support prefix removal for size at most `u32::MAX`
+            value
+                .as_usize()
+                .is_some_and(|x| x == string_val.chars().count())
+        }
         (
             AffixKind::EndsWith,
             ast::Expr::UnaryOp(ast::ExprUnaryOp {

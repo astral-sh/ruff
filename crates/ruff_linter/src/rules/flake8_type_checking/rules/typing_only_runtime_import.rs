@@ -23,10 +23,11 @@ use crate::{Fix, FixAvailability, Violation};
 /// aren't defined in a type-checking block.
 ///
 /// ## Why is this bad?
-/// Unused imports add a performance overhead at runtime, and risk creating
-/// import cycles. If an import is _only_ used in typing-only contexts, it can
-/// instead be imported conditionally under an `if TYPE_CHECKING:` block to
-/// minimize runtime overhead.
+/// Imports that are only used for type annotations add a performance overhead
+/// at runtime. For first-party imports, they can also contribute to import
+/// cycles. If an import is _only_ used in typing-only contexts, it can instead
+/// be imported conditionally under an `if TYPE_CHECKING:` block to minimize
+/// runtime overhead.
 ///
 /// If [`lint.flake8-type-checking.quote-annotations`] is set to `true`,
 /// annotations will be wrapped in quotes if doing so would enable the
@@ -107,8 +108,8 @@ impl Violation for TypingOnlyFirstPartyImport {
 /// aren't defined in a type-checking block.
 ///
 /// ## Why is this bad?
-/// Unused imports add a performance overhead at runtime, and risk creating
-/// import cycles. If an import is _only_ used in typing-only contexts, it can
+/// Imports that are only used for type annotations add a performance overhead
+/// at runtime. If an import is _only_ used in typing-only contexts, it can
 /// instead be imported conditionally under an `if TYPE_CHECKING:` block to
 /// minimize runtime overhead.
 ///
@@ -190,8 +191,8 @@ impl Violation for TypingOnlyThirdPartyImport {
 /// annotations, but aren't defined in a type-checking block.
 ///
 /// ## Why is this bad?
-/// Unused imports add a performance overhead at runtime, and risk creating
-/// import cycles. If an import is _only_ used in typing-only contexts, it can
+/// Imports that are only used for type annotations add a performance overhead
+/// at runtime. If an import is _only_ used in typing-only contexts, it can
 /// instead be imported conditionally under an `if TYPE_CHECKING:` block to
 /// minimize runtime overhead.
 ///
@@ -283,10 +284,9 @@ pub(crate) fn typing_only_runtime_import(
     for binding_id in scope.binding_ids() {
         let binding = checker.semantic().binding(binding_id);
 
-        // If we can't add a `__future__` import and in un-strict mode, don't flag typing-only
-        // imports that are implicitly loaded by way of a valid runtime import.
-        if !checker.settings().future_annotations
-            && !checker.settings().flake8_type_checking.strict
+        // If we're in un-strict mode, don't flag typing-only imports that are
+        // implicitly loaded by way of a valid runtime import.
+        if !checker.settings().flake8_type_checking.strict
             && runtime_imports
                 .iter()
                 .any(|import| is_implicit_import(binding, import))
@@ -374,6 +374,7 @@ pub(crate) fn typing_only_runtime_import(
             range: binding.range(),
             parent_range: binding.parent_range(checker.semantic()),
             needs_future_import,
+            runtime_reference: None,
         };
 
         if checker.rule_is_ignored(rule_for(import_type), import.start())
@@ -395,6 +396,10 @@ pub(crate) fn typing_only_runtime_import(
 
     // Generate a diagnostic for every import, but share a fix across all imports within the same
     // statement (excluding those that are ignored).
+    #[expect(
+        clippy::iter_over_hash_type,
+        reason = "each statement group produces diagnostics and a fix independently"
+    )]
     for ((node_id, import_type), imports) in errors_by_statement {
         let fix = fix_imports(checker, node_id, &imports).ok();
 
@@ -422,6 +427,10 @@ pub(crate) fn typing_only_runtime_import(
 
     // Separately, generate a diagnostic for every _ignored_ import, to ensure that the
     // suppression comments aren't marked as unused.
+    #[expect(
+        clippy::iter_over_hash_type,
+        reason = "each ignored statement group produces diagnostics independently"
+    )]
     for ((_, import_type), imports) in ignores_by_statement {
         for ImportBinding {
             import,

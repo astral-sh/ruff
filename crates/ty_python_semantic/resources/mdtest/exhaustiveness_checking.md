@@ -92,6 +92,97 @@ def exhaustiveness_using_containment_checks():
         assert_never(norm_str)
 ```
 
+## Checks on fixed-length tuples
+
+Finite tuple elements are expanded into their Cartesian product when checking whether a `match`
+statement is exhaustive. The expansion is used only for reachability; it does not affect the
+inferred type of the subject or pattern captures.
+
+```py
+def constructed_bool_tuple(b_1: bool, b_2: bool) -> int:
+    match (b_1, b_2):
+        case (True, True):
+            return 0
+        case (False, _):
+            return 1
+        case (_, False):
+            return 2
+
+def direct_bool_tuple(pair: tuple[bool, bool]) -> int:
+    match pair:
+        case (True, True):
+            return 0
+        case (False, _):
+            return 1
+        case (_, False):
+            return 2
+
+def non_exhaustive_bool_tuple(pair: tuple[bool, bool]) -> int:  # error: [invalid-return-type]
+    match pair:
+        case (True, True):
+            return 0
+        case (False, _):
+            return 1
+
+def guarded_bool_tuple(pair: tuple[bool, bool], flag: bool) -> int:  # error: [invalid-return-type]
+    match pair:
+        case (True, True) if flag:
+            return 0
+        case (False, _):
+            return 1
+        case (_, False):
+            return 2
+```
+
+Although this tuple has 128 possible value combinations, the patterns only constrain the first two
+positions. Tuple-pattern fallthrough only expands positions that can fail, so it can prove the match
+exhaustive without enumerating the remaining elements.
+
+```py
+def tuple_expands_only_constrained_positions(
+    value: tuple[bool, bool, bool, bool, bool, bool, bool],
+) -> int:
+    match value:
+        case (True, True, _, _, _, _, _):
+            return 0
+        case (False, _, _, _, _, _, _):
+            return 1
+        case (_, False, _, _, _, _, _):
+            return 2
+```
+
+Tuple length alone does not prevent exhaustive sequence-pattern checking. The patterns below
+constrain only the first element, and together they cover every possible value of the tuple.
+
+```py
+# fmt: off
+LongBoolTuple = tuple[
+    bool, bool, bool, bool, bool, bool, bool, bool, bool, bool,
+    bool, bool, bool, bool, bool, bool, bool, bool, bool, bool,
+    bool, bool, bool, bool, bool, bool, bool, bool, bool, bool,
+    bool, bool, bool, bool, bool, bool, bool, bool, bool, bool,
+    bool, bool, bool, bool, bool, bool, bool, bool, bool, bool,
+    bool, bool, bool, bool, bool, bool, bool, bool, bool, bool,
+    bool, bool, bool, bool, bool,
+]
+
+def long_tuple_with_one_constrained_position(value: LongBoolTuple) -> int:
+    match value:
+        case (
+            True, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _,
+            _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _,
+            _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _,
+        ):
+            return 0
+        case (
+            False, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _,
+            _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _,
+            _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _,
+        ):
+            return 1
+# fmt: on
+```
+
 ## Checks on enum literals
 
 ```py
@@ -167,6 +258,18 @@ def match_exhaustive_no_assertion(x: Color) -> int:
         case Color.BLUE:
             return 3
 
+def match_exhaustive_through_instance(x: Color) -> int:
+    match x:
+        case x.RED:
+            reveal_type(x)  # revealed: Literal[Color.RED]
+            return 1
+        case x.GREEN:
+            reveal_type(x)  # revealed: Literal[Color.GREEN]
+            return 2
+        case x.BLUE:
+            reveal_type(x)  # revealed: Literal[Color.BLUE]
+            return 3
+
 def match_non_exhaustive(x: Color):
     match x:
         case Color.RED:
@@ -178,6 +281,100 @@ def match_non_exhaustive(x: Color):
 
             # this diagnostic is correct: inferred type of `x` is `Literal[Color.GREEN]`
             assert_never(x)  # error: [type-assertion-failure]
+```
+
+Matching every named member is not exhaustive for enums that can also have unnamed members.
+
+```py
+from enum import Enum, Flag
+
+class Permission(Flag):
+    READ = 1
+
+class MissingValueEnum(Enum):
+    ONLY = 1
+
+    @classmethod
+    def _missing_(cls, value: object) -> "MissingValueEnum":
+        return object.__new__(cls)
+
+def match_flag(value: Permission) -> int:  # error: [invalid-return-type]
+    match value:
+        case Permission.READ:
+            return 1
+
+def match_open_enum(value: MissingValueEnum) -> int:  # error: [invalid-return-type]
+    match value:
+        case MissingValueEnum.ONLY:
+            return 1
+```
+
+## Checks on enum literal subsets
+
+```py
+from enum import Enum
+from typing import Literal, assert_never
+
+class Color(Enum):
+    RED = 1
+    GREEN = 2
+    BLUE = 3
+    ORANGE = 4
+
+def match_exhaustive_literal_or_pattern(v: Literal[Color.RED, Color.GREEN, Color.BLUE]) -> None:
+    match v:
+        case Color.RED | Color.GREEN | Color.BLUE:
+            pass
+        case _:
+            assert_never(v)
+
+def match_exhaustive_literal_or_non_enum_pattern(v: Literal[Color.RED, Color.GREEN, Color.BLUE]) -> None:
+    match v:
+        case Color.RED | Color.GREEN | Color.BLUE | int():
+            pass
+        case _:
+            assert_never(v)
+
+def match_exhaustive_literal_grouped_or_pattern(v: Literal[Color.RED, Color.GREEN, Color.BLUE]) -> None:
+    match v:
+        case (Color.RED | Color.GREEN) | Color.BLUE:
+            pass
+        case _:
+            assert_never(v)
+
+def match_exhaustive_literal_or_as_pattern(v: Literal[Color.RED, Color.GREEN]) -> None:
+    match v:
+        case (Color.RED | Color.GREEN) as selected:
+            pass
+        case _:
+            assert_never(v)
+
+def match_overlapping_or_arm_is_reachable(v: Literal[Color.RED, Color.GREEN, Color.BLUE]) -> None:
+    match v:
+        case Color.RED:
+            pass
+        case Color.RED | Color.GREEN | Color.BLUE:
+            assert_never(v)  # error: [type-assertion-failure]
+
+def match_class_pattern_arm_is_reachable(v: Literal[Color.RED, Color.GREEN, Color.BLUE]) -> None:
+    match v:
+        case Color.RED | Color.GREEN:
+            pass
+        case Color():
+            assert_never(v)  # error: [type-assertion-failure]
+
+def match_mixed_or_arm_is_reachable(v: Literal[Color.RED]) -> None:
+    match v:
+        case Color.BLUE | Color():
+            assert_never(v)  # error: [type-assertion-failure]
+
+def match_non_exhaustive_literal_or_pattern(v: Literal[Color.RED, Color.GREEN, Color.BLUE]) -> None:
+    match v:
+        case Color.RED | Color.GREEN:
+            pass
+        case _:
+            # this diagnostic is correct: inferred type of `v` is `Literal[Color.BLUE]`
+            assert_never(v)  # error: [type-assertion-failure]
 ```
 
 ## `isinstance` checks
@@ -269,7 +466,7 @@ def match_exhaustive_generic[T](obj: GenericClass[T]) -> GenericClass[T]:
             reveal_type(obj)  # revealed: GenericClass[T@match_exhaustive_generic]
             return obj
         case GenericClass(x=x):
-            reveal_type(x)  # revealed: @Todo(`match` pattern definition types)
+            reveal_type(x)  # revealed: T@match_exhaustive_generic
             reveal_type(obj)  # revealed: GenericClass[T@match_exhaustive_generic]
             return obj
 ```
@@ -284,10 +481,17 @@ python-version = "3.12"
 ```py
 from typing import assert_never
 
-class A[T]: ...
+class A[T]:
+    value: T
+
 class ASub[T](A[T]): ...
-class B[T]: ...
-class C[T]: ...
+
+class B[T]:
+    value: T
+
+class C[T]:
+    value: T
+
 class D: ...
 class E: ...
 class F: ...
@@ -464,8 +668,191 @@ def i[T: (int, str)](x: T) -> T:
         case str():
             pass
         case _:
-            reveal_type(x)  # revealed: Never
             assert_never(x)
 
     return x
+
+def eq_narrow_match_constrained[T: (Literal["foo"], Literal["bar"])](x: T) -> T:
+    match x:
+        case "foo":
+            pass
+        case "bar":
+            pass
+        case _:
+            assert_never(x)
+
+    return x
+
+def eq_narrow_if_bounded[T: Literal["foo", "bar"]](x: T) -> T:
+    if x == "foo":
+        pass
+    elif x == "bar":
+        pass
+    else:
+        assert_never(x)
+
+    return x
+
+def eq_narrow_if_constrained[T: (Literal["foo"], Literal["bar"])](x: T) -> T:
+    if x == "foo":
+        pass
+    elif x == "bar":
+        pass
+    else:
+        assert_never(x)
+
+    return x
+```
+
+In these examples, no `invalid-return-type` diagnostics are emitted, despite the fact there are no
+`else` clauses. Note that these examples deliberately also do *not* have any `assert_never` or
+`assert_type` calls, since these call expressions can create their own `IsNonTerminalCall`
+predicates in our reachability infrastructure!
+
+```py
+class A: ...
+class B: ...
+
+def j[T: A | B](x: T) -> bool:
+    if isinstance(x, A):
+        return True
+    elif isinstance(x, B):
+        return False
+
+def k[T: (A, B)](x: T) -> bool:
+    if isinstance(x, A):
+        return True
+    elif isinstance(x, B):
+        return False
+
+def l[T](x: T) -> bool:
+    if isinstance(x, int):
+        return True
+    elif not isinstance(x, int):
+        return False
+
+def m[T: A | B](x: T) -> bool:
+    match x:
+        case A():
+            return True
+        case B():
+            return False
+
+def n[T: (A, B)](x: T) -> bool:
+    match x:
+        case A():
+            return True
+        case B():
+            return False
+
+def o[T: Literal["foo", "bar"]](x: T) -> bool:
+    if x == "foo":
+        return True
+    elif x == "bar":
+        return False
+
+def p[T: Literal["foo", "bar"]](x: T) -> bool:
+    match x:
+        case "foo":
+            return True
+        case "bar":
+            return False
+
+def q[T: (Literal["foo"], Literal["bar"])](x: T) -> bool:
+    if x == "foo":
+        return True
+    elif x == "bar":
+        return False
+
+def r[T: (Literal["foo"], Literal["bar"])](x: T) -> bool:
+    match x:
+        case "foo":
+            return True
+        case "bar":
+            return False
+```
+
+## Exhaustiveness checking for `NewType`s of `float` and `complex`
+
+```py
+from typing_extensions import NewType, assert_never
+
+FloatN = NewType("FloatN", float)
+ComplexN = NewType("ComplexN", complex)
+
+def f(x: FloatN) -> bool:
+    if isinstance(x, int):
+        return True
+    elif isinstance(x, float):
+        return False
+    else:
+        assert_never(x)
+
+def g(x: ComplexN) -> bool:
+    if isinstance(x, int):
+        return True
+    elif isinstance(x, float):
+        return True
+    elif isinstance(x, complex):
+        return False
+    else:
+        assert_never(x)
+
+# the same version of the above tests, but isolated
+# from the fact that `assert_never` creates its own
+# reachability constraint:
+
+# no `invalid-return-type` diagnostic
+def h(x: FloatN) -> bool:
+    if isinstance(x, int):
+        return True
+    elif isinstance(x, float):
+        return False
+
+# no `invalid-return-type` diagnostic
+def i(x: ComplexN) -> bool:
+    if isinstance(x, int):
+        return True
+    elif isinstance(x, float):
+        return True
+    elif isinstance(x, complex):
+        return False
+```
+
+## `isinstance` checks with `Callable`
+
+```toml
+[environment]
+python-version = "3.12"
+
+[rules]
+possibly-unresolved-reference = "error"
+```
+
+The final `Callable` check is exhaustive. These examples deliberately omit an `else` branch and any
+terminal-call assertions so that reachability is determined by the `isinstance` checks alone.
+
+```py
+from collections.abc import Callable
+from typing import Callable as TypingCallable
+
+def assigned(x: Callable[[int], int] | dict[str, int]) -> int:
+    if isinstance(x, dict):
+        result = 1
+    elif isinstance(x, Callable):
+        result = 2
+    return result
+
+def returns(x: Callable[[int], int] | dict[str, int]) -> int:
+    if isinstance(x, dict):
+        return 1
+    elif isinstance(x, TypingCallable):
+        return 2
+
+def match_exhaustive(x: Callable[[int], int] | dict[str, int]) -> int:
+    match x:
+        case dict():
+            return 1
+        case Callable():
+            return 2
 ```

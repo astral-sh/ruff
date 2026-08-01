@@ -17,22 +17,20 @@ I001 [*] Import block is un-sorted or un-formatted
 11 | | import BAR
 12 | | import bar
    | |__________^
-   |
 help: Organize imports
+   |
    - import StringIO
 1  | import glob
-2  | import os
-3  | import shutil
-4  | import tempfile
-5  | import time
+--------------------------------------------------------------------------------
 6  | from subprocess import PIPE, Popen, STDOUT
    - from module import Class, CONSTANT, function, BASIC, Apple
    - import foo
    - import FOO
-7  + 
+7  +
 8  | import BAR
 9  | import bar
 10 + import FOO
 11 + import foo
 12 + import StringIO
 13 + from module import Apple, BASIC, Class, CONSTANT, function
+   |

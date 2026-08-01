@@ -1,11 +1,12 @@
 use ruff_formatter::write;
 use ruff_python_ast::StmtTypeAlias;
 
-use crate::comments::SourceComment;
+use crate::expression::is_invalid_type_expression;
+use crate::expression::parentheses::Parentheses;
+use crate::prelude::*;
 use crate::statement::stmt_assign::{
     AnyAssignmentOperator, AnyBeforeOperator, FormatStatementsLastExpression,
 };
-use crate::{has_skip_comment, prelude::*};
 
 #[derive(Default)]
 pub struct FormatStmtTypeAlias;
@@ -21,6 +22,22 @@ impl FormatNodeRule<StmtTypeAlias> for FormatStmtTypeAlias {
         } = item;
 
         write!(f, [token("type"), space(), name.as_ref().format()])?;
+
+        if is_invalid_type_expression(value) {
+            if let Some(type_params) = type_params {
+                type_params.format().fmt(f)?;
+            }
+
+            return write!(
+                f,
+                [
+                    space(),
+                    token("="),
+                    space(),
+                    value.format().with_options(Parentheses::Preserve)
+                ]
+            );
+        }
 
         if let Some(type_params) = type_params {
             return FormatStatementsLastExpression::RightToLeft {
@@ -41,13 +58,5 @@ impl FormatNodeRule<StmtTypeAlias> for FormatStmtTypeAlias {
                 FormatStatementsLastExpression::left_to_right(value, item)
             ]
         )
-    }
-
-    fn is_suppressed(
-        &self,
-        trailing_comments: &[SourceComment],
-        context: &PyFormatContext,
-    ) -> bool {
-        has_skip_comment(trailing_comments, context.source())
     }
 }

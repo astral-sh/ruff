@@ -5,7 +5,7 @@ use std::cell::OnceCell;
 use std::ops::Deref;
 
 use ruff_python_ast::str::Quote;
-use ruff_python_parser::{Token, TokenKind, Tokens};
+use ruff_python_ast::token::{Token, TokenKind, Tokens};
 use ruff_source_file::{LineEnding, LineRanges, find_newline};
 use ruff_text_size::Ranged;
 

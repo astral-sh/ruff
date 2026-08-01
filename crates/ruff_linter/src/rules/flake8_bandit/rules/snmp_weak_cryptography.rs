@@ -49,7 +49,7 @@ pub(crate) fn snmp_weak_cryptography(checker: &Checker, call: &ast::ExprCall) {
             .is_some_and(|qualified_name| {
                 matches!(
                     qualified_name.segments(),
-                    ["pysnmp", "hlapi", "UsmUserData"]
+                    ["pysnmp", "hlapi", .., "UsmUserData"]
                 )
             })
         {

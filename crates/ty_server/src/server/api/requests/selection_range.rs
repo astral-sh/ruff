@@ -1,7 +1,8 @@
 use std::borrow::Cow;
 
-use lsp_types::request::SelectionRangeRequest;
-use lsp_types::{SelectionRange as LspSelectionRange, SelectionRangeParams, Url};
+use lsp_types::{
+    SelectionRange as LspSelectionRange, SelectionRangeParams, SelectionRangeRequest, Uri,
+};
 use ty_ide::selection_range;
 use ty_project::ProjectDatabase;
 
@@ -19,7 +20,7 @@ impl RequestHandler for SelectionRangeRequestHandler {
 }
 
 impl BackgroundDocumentRequestHandler for SelectionRangeRequestHandler {
-    fn document_url(params: &SelectionRangeParams) -> Cow<'_, Url> {
+    fn document_uri(params: &SelectionRangeParams) -> Cow<'_, Uri> {
         Cow::Borrowed(&params.text_document.uri)
     }
 
@@ -36,14 +37,14 @@ impl BackgroundDocumentRequestHandler for SelectionRangeRequestHandler {
             return Ok(None);
         }
 
-        let Some(file) = snapshot.to_file(db) else {
+        let Some(file) = snapshot.to_notebook_or_file(db) else {
             return Ok(None);
         };
 
         let mut results = Vec::new();
 
         for position in params.positions {
-            let Some(offset) = position.to_text_size(db, file, snapshot.url(), snapshot.encoding())
+            let Some(offset) = position.to_text_size(db, file, snapshot.uri(), snapshot.encoding())
             else {
                 continue;
             };

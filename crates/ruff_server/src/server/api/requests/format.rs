@@ -1,11 +1,12 @@
 use anyhow::Context;
-use lsp_types::{self as types, request as req};
+use lsp_types::{self as types, DocumentFormattingRequest};
 use types::TextEdit;
 
 use ruff_source_file::LineIndex;
 
 use crate::edit::{Replacement, ToRangeExt};
 use crate::fix::Fixes;
+use crate::format::FormatResult;
 use crate::resolve::is_document_excluded_for_formatting;
 use crate::server::Result;
 use crate::server::api::LSPResult;
@@ -15,16 +16,27 @@ use crate::{PositionEncoding, TextDocument};
 pub(crate) struct Format;
 
 impl super::RequestHandler for Format {
-    type RequestType = req::Formatting;
+    type RequestType = DocumentFormattingRequest;
 }
 
 impl super::BackgroundDocumentRequestHandler for Format {
-    super::define_document_url!(params: &types::DocumentFormattingParams);
+    super::define_document_uri!(params: &types::DocumentFormattingParams);
+
     fn run_with_snapshot(
-        snapshot: DocumentSnapshot,
+        snapshot: Self::Snapshot,
         _client: &Client,
         _params: types::DocumentFormattingParams,
     ) -> Result<super::FormatResponse> {
+        let snapshot = match snapshot {
+            Ok(snapshot) => snapshot,
+            Err(uri) => {
+                tracing::warn!(
+                    "Returning no formatting edits because document `{uri}` isn't open."
+                );
+                return Ok(None);
+            }
+        };
+
         format_document(&snapshot)
     }
 }
@@ -40,14 +52,14 @@ pub(super) fn format_full_document(snapshot: &DocumentSnapshot) -> Result<Fixes>
 
     match snapshot.query() {
         DocumentQuery::Notebook { notebook, .. } => {
-            for (url, text_document) in notebook
-                .urls()
-                .map(|url| (url.clone(), notebook.cell_document_by_uri(url).unwrap()))
+            for (uri, text_document) in notebook
+                .uris()
+                .map(|uri| (uri.clone(), notebook.cell_document_by_uri(uri).unwrap()))
             {
                 if let Some(changes) =
                     format_text_document(text_document, query, snapshot.encoding(), true, backend)?
                 {
-                    fixes.insert(url, changes);
+                    fixes.insert(uri, changes);
                 }
             }
         }
@@ -55,7 +67,7 @@ pub(super) fn format_full_document(snapshot: &DocumentSnapshot) -> Result<Fixes>
             if let Some(changes) =
                 format_text_document(document, query, snapshot.encoding(), false, backend)?
             {
-                fixes.insert(snapshot.query().make_key().into_url(), changes);
+                fixes.insert(snapshot.query().make_key().into_uri(), changes);
             }
         }
     }
@@ -94,6 +106,7 @@ fn format_text_document(
 ) -> Result<super::FormatResponse> {
     let settings = query.settings();
     let file_path = query.virtual_file_path();
+    let source_type = query.source_type_for_format();
 
     // If the document is excluded, return early.
     if is_document_excluded_for_formatting(
@@ -108,14 +121,15 @@ fn format_text_document(
     let source = text_document.contents();
     let formatted = crate::format::format(
         text_document,
-        query.source_type(),
+        source_type,
         &settings.formatter,
         &file_path,
         backend,
     )
     .with_failure_code(lsp_server::ErrorCode::InternalError)?;
-    let Some(mut formatted) = formatted else {
-        return Ok(None);
+    let mut formatted = match formatted {
+        FormatResult::Formatted(formatted) => formatted,
+        FormatResult::Unchanged => return Ok(None),
     };
 
     // special case - avoid adding a newline to a notebook cell if it didn't already exist

@@ -1,11 +1,13 @@
 use bitflags::bitflags;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{AnyParameterRef, Expr, ExprBinOp, Operator, Parameters, PythonVersion};
+use ruff_python_ast::{AnyParameterRef, Expr, ExprBinOp, Operator, PythonVersion, StmtFunctionDef};
 use ruff_python_semantic::analyze::typing::traverse_union;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::preview::is_resolve_string_annotation_pyi041_enabled;
+use crate::rules::flake8_type_checking::helpers::is_singledispatch_implementation;
 use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 
 use super::generate_union_fix;
@@ -79,13 +81,24 @@ impl Violation for RedundantNumericUnion {
 }
 
 /// PYI041
-pub(crate) fn redundant_numeric_union(checker: &Checker, parameters: &Parameters) {
-    for annotation in parameters.iter().filter_map(AnyParameterRef::annotation) {
+pub(crate) fn redundant_numeric_union(checker: &Checker, function_def: &StmtFunctionDef) {
+    let skip_dispatch_annotation =
+        is_singledispatch_implementation(function_def, checker.semantic());
+
+    for annotation in function_def
+        .parameters
+        .iter()
+        .filter_map(AnyParameterRef::annotation)
+        .skip(usize::from(skip_dispatch_annotation))
+    {
         check_annotation(checker, annotation);
     }
 }
 
-fn check_annotation<'a>(checker: &Checker, annotation: &'a Expr) {
+fn check_annotation<'a, 'b>(checker: &Checker<'a>, unresolved_annotation: &'b Expr)
+where
+    'a: 'b,
+{
     let mut numeric_flags = NumericFlags::empty();
 
     let mut find_numeric_type = |expr: &Expr, _parent: &Expr| {
@@ -96,8 +109,10 @@ fn check_annotation<'a>(checker: &Checker, annotation: &'a Expr) {
         numeric_flags.seen_builtin_type(builtin_type);
     };
 
+    let annotation = map_maybe_stringized_annotation(checker, unresolved_annotation);
+
     // Traverse the union, and remember which numeric types are found.
-    traverse_union(&mut find_numeric_type, checker.semantic(), annotation);
+    traverse_union(&mut find_numeric_type, checker.semantic(), &annotation);
 
     let Some(redundancy) = Redundancy::from_numeric_flags(numeric_flags) else {
         return;
@@ -107,7 +122,7 @@ fn check_annotation<'a>(checker: &Checker, annotation: &'a Expr) {
     let mut necessary_nodes: Vec<&Expr> = Vec::new();
 
     let mut union_type = UnionKind::TypingUnion;
-    let mut remove_numeric_type = |expr: &'a Expr, parent: &'a Expr| {
+    let mut remove_numeric_type = |expr: &'b Expr, parent: &'b Expr| {
         let Some(builtin_type) = checker.semantic().resolve_builtin_symbol(expr) else {
             // Keep type annotations that are not numeric.
             necessary_nodes.push(expr);
@@ -128,7 +143,7 @@ fn check_annotation<'a>(checker: &Checker, annotation: &'a Expr) {
     };
 
     // Traverse the union a second time to construct a [`Fix`].
-    traverse_union(&mut remove_numeric_type, checker.semantic(), annotation);
+    traverse_union(&mut remove_numeric_type, checker.semantic(), &annotation);
 
     let mut diagnostic =
         checker.report_diagnostic(RedundantNumericUnion { redundancy }, annotation.range());
@@ -142,12 +157,20 @@ fn check_annotation<'a>(checker: &Checker, annotation: &'a Expr) {
         return;
     }
 
+    if annotation.is_complex() {
+        // No fix for concatenated string literals and other complex
+        // annotations. They're rare and too complex to handle.
+        // https://github.com/astral-sh/ruff/issues/19184#issuecomment-3047695205
+        return;
+    }
+
     // Mark [`Fix`] as unsafe when comments are in range.
-    let applicability = if checker.comment_ranges().intersects(annotation.range()) {
-        Applicability::Unsafe
-    } else {
-        Applicability::Safe
-    };
+    let applicability =
+        if annotation.is_string() || checker.comment_ranges().intersects(annotation.range()) {
+            Applicability::Unsafe
+        } else {
+            Applicability::Safe
+        };
 
     // Generate the flattened fix once.
     let fix = if let &[edit_expr] = necessary_nodes.as_slice() {
@@ -161,7 +184,7 @@ fn check_annotation<'a>(checker: &Checker, annotation: &'a Expr) {
             UnionKind::PEP604 => Some(generate_pep604_fix(
                 checker,
                 necessary_nodes,
-                annotation,
+                &annotation,
                 applicability,
             )),
             UnionKind::TypingUnion => {
@@ -173,7 +196,7 @@ fn check_annotation<'a>(checker: &Checker, annotation: &'a Expr) {
                     checker.generator(),
                     &importer,
                     necessary_nodes,
-                    annotation,
+                    &annotation,
                     applicability,
                 )
                 .ok()
@@ -183,6 +206,69 @@ fn check_annotation<'a>(checker: &Checker, annotation: &'a Expr) {
 
     if let Some(fix) = fix {
         diagnostic.set_fix(fix);
+    }
+}
+
+/// Given a type annotation [`Expr`], abstracting over the fact that the annotation expression
+/// might be "stringized".
+///
+/// A stringized annotation is one enclosed in string quotes:
+/// `foo: "typing.Any"` means the same thing to a type checker as `foo: typing.Any`.
+fn map_maybe_stringized_annotation<'a, 'b>(
+    checker: &Checker<'a>,
+    expr: &'b Expr,
+) -> AnnotationKind<'b>
+where
+    'a: 'b,
+{
+    if !is_resolve_string_annotation_pyi041_enabled(checker.settings()) {
+        return AnnotationKind::Simple(expr);
+    }
+
+    if let Expr::StringLiteral(string_annotation) = expr
+        && let Ok(parsed_annotation) = checker.parse_type_annotation(string_annotation)
+    {
+        let expr = parsed_annotation.expression();
+        return match parsed_annotation.kind() {
+            ruff_python_parser::typing::AnnotationKind::Simple => AnnotationKind::String(expr),
+            ruff_python_parser::typing::AnnotationKind::Complex => AnnotationKind::Complex(expr),
+        };
+    }
+    AnnotationKind::Simple(expr)
+}
+
+enum AnnotationKind<'a> {
+    /// A simple non-string annotation like `x: int`.
+    Simple(&'a Expr),
+    /// A simple string annotation like `x: "Union[int, str]"`.
+    String(&'a Expr),
+    /// A complex string annotation with a concatenated string, escaped
+    /// character, or other complication.
+    ///
+    /// See [`ruff_python_parser::typing::AnnotationKind::Complex`] for more
+    /// details.
+    Complex(&'a Expr),
+}
+
+impl<'a> std::ops::Deref for AnnotationKind<'a> {
+    type Target = &'a Expr;
+
+    fn deref(&self) -> &Self::Target {
+        match self {
+            AnnotationKind::Simple(expr)
+            | AnnotationKind::String(expr)
+            | AnnotationKind::Complex(expr) => expr,
+        }
+    }
+}
+
+impl AnnotationKind<'_> {
+    fn is_string(&self) -> bool {
+        matches!(self, Self::String(_))
+    }
+
+    fn is_complex(&self) -> bool {
+        matches!(self, Self::Complex(_))
     }
 }
 

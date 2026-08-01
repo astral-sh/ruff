@@ -1,3 +1,4 @@
+import builtins
 import queue
 import sys
 import threading
@@ -14,8 +15,8 @@ from collections.abc import (
     Set as AbstractSet,
 )
 from types import GenericAlias, TracebackType
-from typing import Any, AnyStr, ClassVar, Generic, SupportsIndex, TypeVar, overload
-from typing_extensions import Self, TypeAlias
+from typing import Any, AnyStr, ClassVar, Generic, SupportsIndex, TypeAlias, TypeVar, overload
+from typing_extensions import Self
 
 from . import pool
 from .connection import Connection, _Address
@@ -26,6 +27,8 @@ from .util import Finalize as _Finalize
 __all__ = ["BaseManager", "SyncManager", "BaseProxy", "Token", "SharedMemoryManager"]
 
 _T = TypeVar("_T")
+_T1 = TypeVar("_T1")
+_T2 = TypeVar("_T2")
 _KT = TypeVar("_KT")
 _VT = TypeVar("_VT")
 _S = TypeVar("_S")
@@ -87,7 +90,8 @@ class ValueProxy(BaseProxy, Generic[_T]):
     def __class_getitem__(cls, item: Any, /) -> GenericAlias:
         """Represent a PEP 585 generic type
 
-        E.g. for t = list[int], t.__origin__ is list and t.__args__ is (int,).
+        For example, for t = list[int], t.__origin__ is list and t.__args__
+        is (int,).
         """
 
 if sys.version_info >= (3, 13):
@@ -99,27 +103,54 @@ if sys.version_info >= (3, 13):
         def __delitem__(self, key: _KT, /) -> None: ...
         def __iter__(self) -> Iterator[_KT]: ...
         def copy(self) -> dict[_KT, _VT]: ...
+
         @overload  # type: ignore[override]
         def get(self, key: _KT, /) -> _VT | None: ...
         @overload
         def get(self, key: _KT, default: _VT, /) -> _VT: ...
         @overload
         def get(self, key: _KT, default: _T, /) -> _VT | _T: ...
+
         @overload
         def pop(self, key: _KT, /) -> _VT: ...
         @overload
         def pop(self, key: _KT, default: _VT, /) -> _VT: ...
         @overload
         def pop(self, key: _KT, default: _T, /) -> _VT | _T: ...
+
         def keys(self) -> list[_KT]: ...  # type: ignore[override]
         def items(self) -> list[tuple[_KT, _VT]]: ...  # type: ignore[override]
         def values(self) -> list[_VT]: ...  # type: ignore[override]
+        if sys.version_info >= (3, 14):
+            # Next methods are copied from builtins.dict
+            @overload
+            def fromkeys(self, iterable: Iterable[_T], value: None = None, /) -> dict[_T, Any | None]: ...
+            @overload
+            def fromkeys(self, iterable: Iterable[_T], value: _S, /) -> dict[_T, _S]: ...
+
+            def __reversed__(self) -> Iterator[_KT]: ...
+
+            @overload
+            def __or__(self, value: dict[_KT, _VT], /) -> dict[_KT, _VT]: ...
+            @overload
+            def __or__(self, value: dict[_T1, _T2], /) -> dict[_KT | _T1, _VT | _T2]: ...
+
+            @overload
+            def __ror__(self, value: dict[_KT, _VT], /) -> dict[_KT, _VT]: ...
+            @overload
+            def __ror__(self, value: dict[_T1, _T2], /) -> dict[_KT | _T1, _VT | _T2]: ...
+
+            @overload  # type: ignore[misc]
+            def __ior__(self, value: SupportsKeysAndGetItem[_KT, _VT], /) -> Self: ...
+            @overload
+            def __ior__(self, value: Iterable[tuple[_KT, _VT]], /) -> Self: ...
 
     class DictProxy(_BaseDictProxy[_KT, _VT]):
         def __class_getitem__(cls, args: Any, /) -> GenericAlias:
             """Represent a PEP 585 generic type
 
-            E.g. for t = list[int], t.__origin__ is list and t.__args__ is (int,).
+            For example, for t = list[int], t.__origin__ is list and t.__args__
+            is (int,).
             """
 
 else:
@@ -131,18 +162,21 @@ else:
         def __delitem__(self, key: _KT, /) -> None: ...
         def __iter__(self) -> Iterator[_KT]: ...
         def copy(self) -> dict[_KT, _VT]: ...
+
         @overload  # type: ignore[override]
         def get(self, key: _KT, /) -> _VT | None: ...
         @overload
         def get(self, key: _KT, default: _VT, /) -> _VT: ...
         @overload
         def get(self, key: _KT, default: _T, /) -> _VT | _T: ...
+
         @overload
         def pop(self, key: _KT, /) -> _VT: ...
         @overload
         def pop(self, key: _KT, default: _VT, /) -> _VT: ...
         @overload
         def pop(self, key: _KT, default: _T, /) -> _VT | _T: ...
+
         def keys(self) -> list[_KT]: ...  # type: ignore[override]
         def items(self) -> list[tuple[_KT, _VT]]: ...  # type: ignore[override]
         def values(self) -> list[_VT]: ...  # type: ignore[override]
@@ -196,15 +230,18 @@ class BaseListProxy(BaseProxy, MutableSequence[_T]):
     __builtins__: ClassVar[dict[str, Any]]
     def __len__(self) -> int: ...
     def __add__(self, x: list[_T], /) -> list[_T]: ...
-    def __delitem__(self, i: SupportsIndex | slice, /) -> None: ...
+    def __delitem__(self, i: SupportsIndex | slice[SupportsIndex | None], /) -> None: ...
+
     @overload
     def __getitem__(self, i: SupportsIndex, /) -> _T: ...
     @overload
-    def __getitem__(self, s: slice, /) -> list[_T]: ...
+    def __getitem__(self, s: slice[SupportsIndex | None], /) -> list[_T]: ...
+
     @overload
     def __setitem__(self, i: SupportsIndex, o: _T, /) -> None: ...
     @overload
-    def __setitem__(self, s: slice, o: Iterable[_T], /) -> None: ...
+    def __setitem__(self, s: slice[SupportsIndex | None], o: Iterable[_T], /) -> None: ...
+
     def __mul__(self, n: SupportsIndex, /) -> list[_T]: ...
     def __rmul__(self, n: SupportsIndex, /) -> list[_T]: ...
     def __imul__(self, value: SupportsIndex, /) -> Self: ...
@@ -216,6 +253,11 @@ class BaseListProxy(BaseProxy, MutableSequence[_T]):
     def count(self, value: _T, /) -> int: ...
     def insert(self, index: SupportsIndex, object: _T, /) -> None: ...
     def remove(self, value: _T, /) -> None: ...
+    if sys.version_info >= (3, 14):
+        # Next methods are copied from builtins.list
+        def clear(self) -> None: ...
+        def copy(self) -> list[_T]: ...
+
     # Use BaseListProxy[SupportsRichComparisonT] for the first overload rather than [SupportsRichComparison]
     # to work around invariance
     @overload
@@ -230,7 +272,8 @@ class ListProxy(BaseListProxy[_T]):
         def __class_getitem__(cls, args: Any, /) -> Any:
             """Represent a PEP 585 generic type
 
-            E.g. for t = list[int], t.__origin__ is list and t.__args__ is (int,).
+            For example, for t = list[int], t.__origin__ is list and t.__args__
+            is (int,).
             """
 
 # Send is (kind, result)
@@ -261,16 +304,10 @@ class Server:
         """
 
     def accepter(self) -> None: ...
-    if sys.version_info >= (3, 10):
-        def handle_request(self, conn: _ServerConnection) -> None:
-            """
-            Handle a new connection
-            """
-    else:
-        def handle_request(self, c: _ServerConnection) -> None:
-            """
-            Handle a new connection
-            """
+    def handle_request(self, conn: _ServerConnection) -> None:
+        """
+        Handle a new connection
+        """
 
     def serve_client(self, conn: _ServerConnection) -> None:
         """
@@ -352,6 +389,7 @@ class BaseManager:
         """
         Spawn a server process for this manager object
         """
+
     shutdown: _Finalize  # only available after start() was called
     def join(self, timeout: float | None = None) -> None:  # undocumented
         """
@@ -412,6 +450,7 @@ class SyncManager(BaseManager):
     def Semaphore(self, value: int = 1) -> threading.Semaphore: ...
     def Array(self, typecode: Any, sequence: Sequence[_T]) -> Sequence[_T]: ...
     def Value(self, typecode: Any, value: _T) -> ValueProxy[_T]: ...
+
     # Overloads are copied from builtins.dict.__init__
     @overload
     def dict(self) -> DictProxy[Any, Any]: ...
@@ -426,13 +465,16 @@ class SyncManager(BaseManager):
     @overload
     def dict(self, iterable: Iterable[tuple[str, _VT]], /, **kwargs: _VT) -> DictProxy[str, _VT]: ...
     @overload
-    def dict(self, iterable: Iterable[list[str]], /) -> DictProxy[str, str]: ...
+    def dict(self, iterable: Iterable[builtins.list[str]], /) -> DictProxy[str, str]: ...
     @overload
-    def dict(self, iterable: Iterable[list[bytes]], /) -> DictProxy[bytes, bytes]: ...
+    def dict(self, iterable: Iterable[builtins.list[bytes]], /) -> DictProxy[bytes, bytes]: ...
+
+    # Overloads are copied from builtins.list.__init__
     @overload
-    def list(self, sequence: Sequence[_T], /) -> ListProxy[_T]: ...
+    def list(self, iterable: Iterable[_T], /) -> ListProxy[_T]: ...
     @overload
     def list(self) -> ListProxy[Any]: ...
+
     if sys.version_info >= (3, 14):
         @overload
         def set(self, iterable: Iterable[_T], /) -> SetProxy[_T]: ...

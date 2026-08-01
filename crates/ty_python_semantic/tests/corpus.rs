@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use anyhow::{Context, anyhow};
 use ruff_db::Db;
 use ruff_db::files::{File, Files, system_path_to_file};
@@ -5,28 +7,26 @@ use ruff_db::system::{DbWithTestSystem, System, SystemPath, SystemPathBuf, TestS
 use ruff_db::vendored::VendoredFileSystem;
 use ruff_python_ast::PythonVersion;
 
+use ty_module_resolver::SearchPathSettings;
+use ty_python_core::platform::PythonPlatform;
+use ty_python_core::program::{FallibleStrategy, Program, ProgramSettings};
 use ty_python_semantic::lint::{LintRegistry, RuleSelection};
 use ty_python_semantic::pull_types::pull_types;
-use ty_python_semantic::{
-    Program, ProgramSettings, PythonPlatform, PythonVersionSource, PythonVersionWithSource,
-    SearchPathSettings, default_lint_registry,
-};
+use ty_python_semantic::{AnalysisSettings, check_file_unwrap, default_lint_registry};
+use ty_site_packages::{PythonVersionSource, PythonVersionWithSource};
 
+use ruff_db::diagnostic::Diagnostic;
 use test_case::test_case;
+use ty_python_core::Db as _;
 
-fn get_cargo_workspace_root() -> anyhow::Result<SystemPathBuf> {
-    Ok(SystemPathBuf::from(String::from_utf8(
-        std::process::Command::new("cargo")
-            .args(["locate-project", "--workspace", "--message-format", "plain"])
-            .output()?
-            .stdout,
-    )?)
-    .parent()
-    .unwrap()
-    .to_owned())
+fn get_cargo_workspace_root() -> anyhow::Result<&'static SystemPath> {
+    SystemPath::new(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .and_then(SystemPath::parent)
+        .context("Failed to determine the Cargo workspace root")
 }
 
-/// Test that all snippets in testcorpus can be checked without panic (except for [`KNOWN_FAILURES`])
+/// Test that all snippets in testcorpus can be checked without panic.
 #[test]
 fn corpus_no_panic() -> anyhow::Result<()> {
     let crate_root = String::from(env!("CARGO_MANIFEST_DIR"));
@@ -79,8 +79,7 @@ fn run_corpus_tests(pattern: &str) -> anyhow::Result<()> {
     let root = SystemPathBuf::from("/src");
 
     let mut db = CorpusDb::new();
-    db.memory_file_system()
-        .create_directory_all(root.as_ref())?;
+    db.memory_file_system().create_directory_all(&root)?;
 
     let workspace_root = get_cargo_workspace_root()?;
     let workspace_root = workspace_root.to_string();
@@ -98,17 +97,6 @@ fn run_corpus_tests(pattern: &str) -> anyhow::Result<()> {
 
         let relative_path = path.strip_prefix(&workspace_root)?;
 
-        let (py_expected_to_fail, pyi_expected_to_fail) = KNOWN_FAILURES
-            .iter()
-            .find_map(|(path, py_fail, pyi_fail)| {
-                if *path == relative_path.as_str().replace('\\', "/") {
-                    Some((*py_fail, *pyi_fail))
-                } else {
-                    None
-                }
-            })
-            .unwrap_or((false, false));
-
         let source = path.as_path();
         let source_filename = source.file_name().unwrap();
 
@@ -123,25 +111,9 @@ fn run_corpus_tests(pattern: &str) -> anyhow::Result<()> {
             // (and some non-expressions that clearly define a single type)
             let file = system_path_to_file(&db, path).unwrap();
 
-            let result = std::panic::catch_unwind(|| pull_types(&db, file));
-
-            let expected_to_fail = if path.extension().map(|e| e == "pyi").unwrap_or(false) {
-                pyi_expected_to_fail
-            } else {
-                py_expected_to_fail
-            };
-            if let Err(err) = result {
-                if !expected_to_fail {
-                    println!(
-                        "Check failed for {relative_path:?}. Consider fixing it or adding it to KNOWN_FAILURES"
-                    );
-                    std::panic::resume_unwind(err);
-                }
-            } else {
-                assert!(
-                    !expected_to_fail,
-                    "Expected to panic, but did not. Consider removing this path from KNOWN_FAILURES"
-                );
+            if let Err(err) = std::panic::catch_unwind(|| pull_types(&db, file)) {
+                println!("Check failed for {relative_path:?}.");
+                std::panic::resume_unwind(err);
             }
 
             db.memory_file_system().remove_file(path).unwrap();
@@ -166,14 +138,6 @@ fn run_corpus_tests(pattern: &str) -> anyhow::Result<()> {
     Ok(())
 }
 
-/// Whether or not the .py/.pyi version of this file is expected to fail
-#[rustfmt::skip]
-const KNOWN_FAILURES: &[(&str, bool, bool)] = &[
-    // Fails with too-many-cycle-iterations due to a self-referential
-    // type alias, see https://github.com/astral-sh/ty/issues/256
-    ("crates/ruff_linter/resources/test/fixtures/pyflakes/F401_34.py", true, true),
-];
-
 #[salsa::db]
 #[derive(Clone)]
 pub struct CorpusDb {
@@ -182,6 +146,7 @@ pub struct CorpusDb {
     rule_selection: RuleSelection,
     system: TestSystem,
     vendored: VendoredFileSystem,
+    analysis_settings: Arc<AnalysisSettings>,
 }
 
 impl CorpusDb {
@@ -193,6 +158,7 @@ impl CorpusDb {
             vendored: ty_vendored::file_system().clone(),
             rule_selection: RuleSelection::from_registry(default_lint_registry()),
             files: Files::default(),
+            analysis_settings: Arc::new(AnalysisSettings::default()),
         };
 
         Program::from_settings(
@@ -204,7 +170,7 @@ impl CorpusDb {
                 },
                 python_platform: PythonPlatform::default(),
                 search_paths: SearchPathSettings::new(vec![])
-                    .to_search_paths(db.system(), db.vendored())
+                    .to_search_paths(db.system(), db.vendored(), &FallibleStrategy)
                     .unwrap(),
             },
         );
@@ -243,9 +209,27 @@ impl ruff_db::Db for CorpusDb {
 }
 
 #[salsa::db]
-impl ty_python_semantic::Db for CorpusDb {
+impl ty_module_resolver::Db for CorpusDb {
+    fn search_paths(&self) -> &ty_module_resolver::SearchPaths {
+        Program::get(self).search_paths(self)
+    }
+}
+
+#[salsa::db]
+impl ty_python_core::Db for CorpusDb {
     fn should_check_file(&self, file: File) -> bool {
         !file.path(self).is_vendored_path()
+    }
+}
+
+#[salsa::db]
+impl ty_python_semantic::Db for CorpusDb {
+    fn check_file(&self, file: File) -> Vec<Diagnostic> {
+        if self.should_check_file(file) {
+            check_file_unwrap(self, file)
+        } else {
+            Vec::new()
+        }
     }
 
     fn rule_selection(&self, _file: File) -> &RuleSelection {
@@ -258,6 +242,18 @@ impl ty_python_semantic::Db for CorpusDb {
 
     fn verbose(&self) -> bool {
         false
+    }
+
+    fn is_open_file(&self, _file: File) -> bool {
+        false
+    }
+
+    fn analysis_settings(&self, _file: File) -> &AnalysisSettings {
+        &self.analysis_settings
+    }
+
+    fn dyn_clone(&self) -> Box<dyn ty_python_semantic::Db> {
+        Box::new(self.clone())
     }
 }
 

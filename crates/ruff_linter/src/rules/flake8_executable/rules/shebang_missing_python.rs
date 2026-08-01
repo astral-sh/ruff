@@ -1,10 +1,29 @@
-use ruff_text_size::TextRange;
+use std::sync::LazyLock;
 
+use regex::Regex;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_text_size::TextRange;
 
 use crate::Violation;
 use crate::checkers::ast::LintContext;
 use crate::comments::shebang::ShebangDirective;
+
+static UV_RUN_REGEX: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(
+        r"(?x)
+        \b
+        (?:
+            # Part A: uv or uv tool (these MUST be followed by run)
+            (?:uv|uv\s+tool) \s+ (?:--?[a-zA-Z][\w-]*(?:[=\s]\S+)?\s+)* run
+            |
+            # Part B: uvx (stands alone, run is optional/redundant)
+            uvx (?: \s+ .* )?
+        )
+        \b
+    ",
+    )
+    .unwrap()
+});
 
 /// ## What it does
 /// Checks for a shebang directive in `.py` files that does not contain `python`,
@@ -48,12 +67,7 @@ pub(crate) fn shebang_missing_python(
     shebang: &ShebangDirective,
     context: &LintContext,
 ) {
-    if shebang.contains("python")
-        || shebang.contains("pytest")
-        || shebang.contains("uv run")
-        || shebang.contains("uvx")
-        || shebang.contains("uv tool run")
-    {
+    if shebang.contains("python") || shebang.contains("pytest") || UV_RUN_REGEX.is_match(shebang) {
         return;
     }
 

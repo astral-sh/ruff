@@ -11,8 +11,9 @@ E265 [*] Block comment should start with `# `
 4 | #:
   |
 help: Format space
-1 | #!/usr/bin/python
+  |
 2 | #
   - #!
 3 + # !
 4 | #:
+  |

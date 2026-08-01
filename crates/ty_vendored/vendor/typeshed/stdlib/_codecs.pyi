@@ -2,8 +2,7 @@ import codecs
 import sys
 from _typeshed import ReadableBuffer
 from collections.abc import Callable
-from typing import Literal, final, overload, type_check_only
-from typing_extensions import TypeAlias
+from typing import Literal, TypeAlias, final, overload, type_check_only
 
 # This type is not exposed; it is defined in unicodeobject.c
 # At runtime it calls itself builtins.EncodingMap
@@ -19,31 +18,32 @@ _SearchFunction: TypeAlias = Callable[[str], codecs.CodecInfo | None]
 def register(search_function: _SearchFunction, /) -> None:
     """Register a codec search function.
 
-    Search functions are expected to take one argument, the encoding name in
-    all lower case letters, and either return None, or a tuple of functions
-    (encoder, decoder, stream_reader, stream_writer) (or a CodecInfo object).
+    Search functions are expected to take one argument, the encoding
+    name in all lower case letters, and either return None, or a tuple
+    of functions (encoder, decoder, stream_reader, stream_writer) (or
+    a CodecInfo object).
     """
 
-if sys.version_info >= (3, 10):
-    def unregister(search_function: _SearchFunction, /) -> None:
-        """Unregister a codec search function and clear the registry's cache.
+def unregister(search_function: _SearchFunction, /) -> None:
+    """Unregister a codec search function and clear the registry's cache.
 
-        If the search function is not registered, do nothing.
-        """
+    If the search function is not registered, do nothing.
+    """
 
 def register_error(errors: str, handler: _Handler, /) -> None:
     """Register the specified error handler under the name errors.
 
     handler must be a callable object, that will be called with an exception
-    instance containing information about the location of the encoding/decoding
-    error and must return a (replacement, new position) tuple.
+    instance containing information about the location of the
+    encoding/decoding error and must return a (replacement, new position)
+    tuple.
     """
 
 def lookup_error(name: str, /) -> _Handler:
     """lookup_error(errors) -> handler
 
-    Return the error handler for the specified error handling name or raise a
-    LookupError, if no handler exists under this name.
+    Return the error handler for the specified error handling name or raise
+    a LookupError, if no handler exists under this name.
     """
 
 # The type ignore on `encode` and `decode` is to avoid issues with overlapping overloads, for more details, see #300
@@ -74,27 +74,26 @@ def encode(obj: ReadableBuffer, encoding: _BytesToBytesEncoding, errors: str = "
     """Encodes obj using the codec registered for encoding.
 
     The default encoding is 'utf-8'.  errors may be given to set a
-    different error handling scheme.  Default is 'strict' meaning that encoding
-    errors raise a ValueError.  Other possible values are 'ignore', 'replace'
-    and 'backslashreplace' as well as any other name registered with
-    codecs.register_error that can handle ValueErrors.
+    different error handling scheme.  Default is 'strict' meaning that
+    encoding errors raise a ValueError.  Other possible values are 'ignore',
+    'replace' and 'backslashreplace' as well as any other name registered
+    with codecs.register_error that can handle ValueErrors.
     """
-
 @overload
 def encode(obj: str, encoding: _StrToStrEncoding, errors: str = "strict") -> str: ...  # type: ignore[overload-overlap]
 @overload
 def encode(obj: str, encoding: str = "utf-8", errors: str = "strict") -> bytes: ...
+
 @overload
 def decode(obj: ReadableBuffer, encoding: _BytesToBytesEncoding, errors: str = "strict") -> bytes:  # type: ignore[overload-overlap]
     """Decodes obj using the codec registered for encoding.
 
     Default encoding is 'utf-8'.  errors may be given to set a
-    different error handling scheme.  Default is 'strict' meaning that encoding
-    errors raise a ValueError.  Other possible values are 'ignore', 'replace'
-    and 'backslashreplace' as well as any other name registered with
-    codecs.register_error that can handle ValueErrors.
+    different error handling scheme.  Default is 'strict' meaning that
+    encoding errors raise a ValueError.  Other possible values are 'ignore',
+    'replace' and 'backslashreplace' as well as any other name registered
+    with codecs.register_error that can handle ValueErrors.
     """
-
 @overload
 def decode(obj: str, encoding: _StrToStrEncoding, errors: str = "strict") -> str: ...
 
@@ -111,6 +110,7 @@ def decode(
 def decode(obj: str, encoding: Literal["hex", "hex_codec"], errors: str = "strict") -> bytes: ...
 @overload
 def decode(obj: ReadableBuffer, encoding: str = "utf-8", errors: str = "strict") -> str: ...
+
 def lookup(encoding: str, /) -> codecs.CodecInfo:
     """Looks up a codec tuple in the Python codec registry and returns a CodecInfo object."""
 
@@ -119,7 +119,9 @@ def ascii_decode(data: ReadableBuffer, errors: str | None = None, /) -> tuple[st
 def ascii_encode(str: str, errors: str | None = None, /) -> tuple[bytes, int]: ...
 def charmap_decode(data: ReadableBuffer, errors: str | None = None, mapping: _CharMap | None = None, /) -> tuple[str, int]: ...
 def charmap_encode(str: str, errors: str | None = None, mapping: _CharMap | None = None, /) -> tuple[bytes, int]: ...
-def escape_decode(data: str | ReadableBuffer, errors: str | None = None, /) -> tuple[str, int]: ...
+
+# Docs say this accepts a bytes-like object, but in practice it also accepts str.
+def escape_decode(data: str | ReadableBuffer, errors: str | None = None, /) -> tuple[bytes, int]: ...
 def escape_encode(data: bytes, errors: str | None = None, /) -> tuple[bytes, int]: ...
 def latin_1_decode(data: ReadableBuffer, errors: str | None = None, /) -> tuple[str, int]: ...
 def latin_1_encode(str: str, errors: str | None = None, /) -> tuple[bytes, int]: ...

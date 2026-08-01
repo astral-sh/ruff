@@ -33,13 +33,13 @@ use crate::checkers::ast::Checker;
 ///     username = await loop.run_in_executor(None, input, "Username:")
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "0.12.12")]
+#[violation_metadata(stable_since = "0.15.0")]
 pub(crate) struct BlockingInputInAsyncFunction;
 
 impl Violation for BlockingInputInAsyncFunction {
     #[derive_message_formats]
     fn message(&self) -> String {
-        "Blocking call to input() in async context".to_string()
+        "Blocking call to `input()` in async context".to_string()
     }
 }
 

@@ -1,46 +1,42 @@
-use super::options::DiagnosticMode;
+use ruff_db::system::SystemPathBuf;
+use ty_ide::{CompletionSettings, InlayHintSettings};
+use ty_project::metadata::Options;
 
-use ty_ide::InlayHintSettings;
-use ty_project::metadata::options::ProjectOptionsOverrides;
+use super::options::DiagnosticMode;
 
 /// Resolved client settings that are shared across all workspaces.
 #[derive(Clone, Default, Debug, PartialEq)]
 pub(crate) struct GlobalSettings {
     pub(super) diagnostic_mode: DiagnosticMode,
     pub(super) experimental: ExperimentalSettings,
-}
-
-impl GlobalSettings {
-    pub(crate) fn is_rename_enabled(&self) -> bool {
-        self.experimental.rename
-    }
-
-    pub(crate) fn is_auto_import_enabled(&self) -> bool {
-        self.experimental.auto_import
-    }
+    pub(super) show_syntax_errors: bool,
 }
 
 impl GlobalSettings {
     pub(crate) fn diagnostic_mode(&self) -> DiagnosticMode {
         self.diagnostic_mode
     }
+
+    pub(crate) fn show_syntax_errors(&self) -> bool {
+        self.show_syntax_errors
+    }
 }
 
 #[derive(Clone, Default, Debug, PartialEq)]
-pub(crate) struct ExperimentalSettings {
-    pub(super) rename: bool,
-    pub(super) auto_import: bool,
-}
+pub(crate) struct ExperimentalSettings;
 
 /// Resolved client settings for a specific workspace.
 ///
 /// These settings are meant to be used directly by the server, and are *not* a 1:1 representation
 /// with how the client sends them.
-#[derive(Clone, Default, Debug)]
+#[derive(Default, Debug)]
 pub(crate) struct WorkspaceSettings {
     pub(super) disable_language_services: bool,
     pub(super) inlay_hints: InlayHintSettings,
-    pub(super) overrides: Option<ProjectOptionsOverrides>,
+    pub(super) completions: CompletionSettings,
+    pub(super) configuration_file: Option<SystemPathBuf>,
+    pub(super) override_options: Option<Box<Options>>,
+    pub(super) fallback_options: Option<Box<Options>>,
 }
 
 impl WorkspaceSettings {
@@ -48,11 +44,23 @@ impl WorkspaceSettings {
         self.disable_language_services
     }
 
-    pub(crate) fn project_options_overrides(&self) -> Option<&ProjectOptionsOverrides> {
-        self.overrides.as_ref()
+    pub(crate) fn configuration_file(&self) -> Option<&SystemPathBuf> {
+        self.configuration_file.as_ref()
+    }
+
+    pub(crate) fn override_options(&self) -> Option<&Options> {
+        self.override_options.as_deref()
+    }
+
+    pub(crate) fn fallback_options(&self) -> Option<&Options> {
+        self.fallback_options.as_deref()
     }
 
     pub(crate) fn inlay_hints(&self) -> &InlayHintSettings {
         &self.inlay_hints
+    }
+
+    pub(crate) fn completions(&self) -> &CompletionSettings {
+        &self.completions
     }
 }

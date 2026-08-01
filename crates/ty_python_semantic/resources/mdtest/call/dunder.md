@@ -53,7 +53,7 @@ class ClassWithNormalDunder:
     def __getitem__(self, key: int) -> str:
         return str(key)
 
-# error: [non-subscriptable]
+# error: [not-subscriptable]
 ClassWithNormalDunder[0]
 ```
 
@@ -85,14 +85,14 @@ class ThisFails:
 
 this_fails = ThisFails()
 
-# error: [non-subscriptable] "Cannot subscript object of type `ThisFails` with no `__getitem__` method"
+# error: [not-subscriptable] "Cannot subscript object of type `ThisFails` with no `__getitem__` method"
 reveal_type(this_fails[0])  # revealed: Unknown
 ```
 
 However, the attached dunder method *can* be called if accessed directly:
 
 ```py
-reveal_type(this_fails.__getitem__(this_fails, 0))  # revealed: Unknown | str
+reveal_type(this_fails.__getitem__(this_fails, 0))  # revealed: str
 ```
 
 The instance-level method is also not called when the class-level method is present:
@@ -110,6 +110,7 @@ def _(flag: bool):
             __getitem__ = external_getitem1
 
         def __init__(self):
+            # error: [invalid-assignment] "Object of type `def external_getitem2(key) -> int` is not assignable to attribute `__getitem__` of type `(instance, key) -> str`"
             self.__getitem__ = external_getitem2
 
     this_fails = ThisFails()
@@ -119,7 +120,7 @@ def _(flag: bool):
     # that the cause of the error was a possibly missing `__getitem__` method
     #
     # error: [possibly-missing-implicit-call] "Method `__getitem__` of type `ThisFails` may be missing"
-    reveal_type(this_fails[0])  # revealed: Unknown | str
+    reveal_type(this_fails[0])  # revealed: str
 ```
 
 ### Dunder methods as class-level annotations with no value
@@ -135,6 +136,36 @@ class C:
 C()()
 
 _: Callable[..., None] = C()
+```
+
+The dunder-name heuristic also does not apply to a callable parameterized by a `ParamSpec`, even
+after the `ParamSpec` is specialized:
+
+```py
+from collections.abc import Callable
+from typing import Generic, ParamSpec, Protocol
+from typing_extensions import Self
+
+P = ParamSpec("P")
+
+class C(Protocol[P]):
+    __call__: Callable[P, int]
+
+def check(value: C[[str]]) -> None:
+    reveal_type(value.__call__)  # revealed: (str, /) -> int
+    reveal_type(value("value"))  # revealed: int
+
+class Base(Generic[P]):
+    __getitem__: Callable[P, Self]
+
+class Child(Base[[int]]):
+    pass
+
+def check_self(value: Child) -> None:
+    reveal_type(value.__getitem__(0))  # revealed: Child
+    reveal_type(value[0])  # revealed: Child
+
+    result: Child = value[0]
 ```
 
 And of course the same is true if we have only an implicit assignment inside a method:
@@ -205,7 +236,7 @@ class C:
         return str(key)
 
     def f(self):
-        # error: [invalid-assignment] "Implicit shadowing of function `__getitem__`"
+        # error: [invalid-assignment]
         self.__getitem__ = None
 
 # This is still fine, and simply calls the `__getitem__` method on the class
@@ -220,6 +251,7 @@ def _(flag: bool):
         if flag:
             def __getitem__(self, key: int) -> str:
                 return str(key)
+
         else:
             def __getitem__(self, key: int) -> bytes:
                 return bytes()
@@ -259,8 +291,8 @@ class NotSubscriptable2:
         self.__getitem__ = external_getitem
 
 def _(union: NotSubscriptable1 | NotSubscriptable2):
-    # error: [non-subscriptable] "Cannot subscript object of type `NotSubscriptable2` with no `__getitem__` method"
-    # error: [non-subscriptable] "Cannot subscript object of type `NotSubscriptable1` with no `__getitem__` method"
+    # error: [not-subscriptable] "Cannot subscript object of type `NotSubscriptable2` with no `__getitem__` method"
+    # error: [not-subscriptable] "Cannot subscript object of type `NotSubscriptable1` with no `__getitem__` method"
     union[0]
 ```
 

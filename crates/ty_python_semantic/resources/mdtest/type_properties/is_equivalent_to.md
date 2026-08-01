@@ -14,7 +14,8 @@ materializations of `B`, and all materializations of `B` are also materializatio
 
 ```py
 from typing_extensions import Literal, LiteralString, Protocol, Never
-from ty_extensions import Unknown, is_equivalent_to, static_assert, TypeOf, AlwaysTruthy, AlwaysFalsy
+from ty_extensions import Unknown, static_assert, AlwaysTruthy, AlwaysFalsy
+from ty_extensions._internal import TypeOf, is_equivalent_to
 from enum import Enum
 
 class Answer(Enum):
@@ -71,7 +72,8 @@ static_assert(is_equivalent_to(type, type[object]))
 ```py
 from typing import Any
 from typing_extensions import Literal, LiteralString, Never
-from ty_extensions import Unknown, is_equivalent_to, static_assert
+from ty_extensions import Unknown, static_assert
+from ty_extensions._internal import is_equivalent_to
 
 static_assert(is_equivalent_to(Any, Any))
 static_assert(is_equivalent_to(Unknown, Unknown))
@@ -82,24 +84,116 @@ static_assert(not is_equivalent_to(type, type[Any]))
 static_assert(not is_equivalent_to(type[object], type[Any]))
 ```
 
-## Unions and intersections
+## Equivalent bounded gradual specializations
+
+A bounded generic specialized with a gradual type alias is equivalent to the same generic
+specialized with the expanded alias.
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+For a covariant bounded type parameter, this applies to aliases containing either `Any` or
+`Unknown`.
 
 ```py
-from typing import Any, Literal
-from ty_extensions import Intersection, Not, Unknown, is_equivalent_to, static_assert
+from typing import Any
+
+from ty_extensions import Unknown, static_assert
+from ty_extensions._internal import is_equivalent_to
+
+type AnyTuple = tuple[Any, ...]
+type UnknownTuple = tuple[Unknown, ...]
+
+class BoundedCovariant[T: tuple[int, ...]]:
+    def get(self) -> T:
+        raise NotImplementedError
+
+static_assert(is_equivalent_to(BoundedCovariant[AnyTuple], BoundedCovariant[tuple[Any, ...]]))
+static_assert(is_equivalent_to(BoundedCovariant[UnknownTuple], BoundedCovariant[AnyTuple]))
+```
+
+The same gradual tuple alias remains equivalent when the bounded type parameter is invariant.
+
+```py
+class BoundedInvariant[T: tuple[int, ...]]:
+    value: T
+
+static_assert(is_equivalent_to(BoundedInvariant[AnyTuple], BoundedInvariant[tuple[Any, ...]]))
+```
+
+`Outer[int, Inner]` is equivalent to `Outer[int, Inner[Any]]` because `Inner` defaults to `Any`.
+`Outer[int]` is equivalent to the same explicit specialization because `Outer` defaults to
+`Inner[Any]`.
+
+```py
+class Inner[T: int = Any]:
+    def get(self) -> T:
+        raise NotImplementedError
+
+class Outer[T: int, U: Inner[Any] = Inner[Any]]:
+    def get(self) -> U:
+        raise NotImplementedError
+
+static_assert(is_equivalent_to(Outer[int, Inner[Any]], Outer[int, Inner]))
+static_assert(is_equivalent_to(Outer[int, Inner[Any]], Outer[int]))
+```
+
+## Bounded gradual specializations are distinct from upper bounds
+
+A generic specialized with a gradual type argument is not equivalent to the same generic specialized
+with the type parameter's upper bound.
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+For a covariant type parameter:
+
+```py
+from typing import Any
+
+from ty_extensions import static_assert
+from ty_extensions._internal import is_equivalent_to
+
+class BoundedCovariant[T: tuple[int, ...]]:
+    def get(self) -> T:
+        raise NotImplementedError
+
+static_assert(not is_equivalent_to(BoundedCovariant[tuple[Any, ...]], BoundedCovariant[tuple[int, ...]]))
+```
+
+The same distinction applies to an invariant type parameter.
+
+```py
+class BoundedInvariant[T: tuple[int, ...]]:
+    value: T
+
+static_assert(not is_equivalent_to(BoundedInvariant[tuple[Any, ...]], BoundedInvariant[tuple[int, ...]]))
+```
+
+## Unions and intersections
+
+```pyi
+from typing import Any, Literal, TypeAlias
+from ty_extensions import Unknown, static_assert
+from ty_extensions._internal import is_equivalent_to
 from enum import Enum
 
 static_assert(is_equivalent_to(str | int, str | int))
 static_assert(is_equivalent_to(str | int | Any, str | int | Unknown))
 static_assert(is_equivalent_to(str | int, int | str))
-static_assert(is_equivalent_to(Intersection[str, int, Not[bytes], Not[None]], Intersection[int, str, Not[None], Not[bytes]]))
-static_assert(is_equivalent_to(Intersection[str | int, Not[type[Any]]], Intersection[int | str, Not[type[Unknown]]]))
+static_assert(is_equivalent_to(str & int & ~bytes & ~None, int & str & ~None & ~bytes))
+static_assert(is_equivalent_to((str | int) & ~type[Any], (int | str) & ~type[Unknown]))
 
 static_assert(not is_equivalent_to(str | int, int | str | bytes))
-static_assert(not is_equivalent_to(str | int | bytes, int | str | dict))
+static_assert(not is_equivalent_to(str | int | bytes, int | str | dict))  # error: [missing-type-argument]
 
 static_assert(is_equivalent_to(Unknown, Unknown | Any))
-static_assert(is_equivalent_to(Unknown, Intersection[Unknown, Any]))
+UnknownAndAny: TypeAlias = Unknown & Any
+static_assert(is_equivalent_to(Unknown, UnknownAndAny))
 
 class P: ...
 class Q: ...
@@ -124,31 +218,32 @@ static_assert(is_equivalent_to(R | P | Q, R | Q | P))  # 15
 
 static_assert(is_equivalent_to(str | None, None | str))
 
-static_assert(is_equivalent_to(Intersection[P, Q], Intersection[Q, P]))
-static_assert(is_equivalent_to(Intersection[Q, Not[P]], Intersection[Not[P], Q]))
-static_assert(is_equivalent_to(Intersection[Q, R, Not[P]], Intersection[Not[P], R, Q]))
-static_assert(is_equivalent_to(Intersection[Q | R, Not[P | S]], Intersection[Not[S | P], R | Q]))
+static_assert(is_equivalent_to(P & Q, Q & P))
+static_assert(is_equivalent_to(Q & ~P, ~P & Q))
+static_assert(is_equivalent_to(Q & R & ~P, ~P & R & Q))
+static_assert(is_equivalent_to((Q | R) & ~(P | S), ~(S | P) & (R | Q)))
 
 class Single(Enum):
     VALUE = 1
 
 static_assert(is_equivalent_to(P | Q | Single, Literal[Single.VALUE] | Q | P))
 
-static_assert(is_equivalent_to(Any, Any | Intersection[Any, str]))
-static_assert(is_equivalent_to(Any, Intersection[str, Any] | Any))
-static_assert(is_equivalent_to(Any, Any | Intersection[Any, Not[None]]))
-static_assert(is_equivalent_to(Any, Intersection[Not[None], Any] | Any))
+static_assert(is_equivalent_to(Any, Any | Any & str))
+static_assert(is_equivalent_to(Any, str & Any | Any))
+static_assert(is_equivalent_to(Any, Any | Any & ~None))
+static_assert(is_equivalent_to(Any, ~None & Any | Any))
 
-static_assert(is_equivalent_to(Any, Unknown | Intersection[Unknown, str]))
-static_assert(is_equivalent_to(Any, Intersection[str, Unknown] | Unknown))
-static_assert(is_equivalent_to(Any, Unknown | Intersection[Unknown, Not[None]]))
-static_assert(is_equivalent_to(Any, Intersection[Not[None], Unknown] | Unknown))
+static_assert(is_equivalent_to(Any, Unknown | Unknown & str))
+static_assert(is_equivalent_to(Any, str & Unknown | Unknown))
+static_assert(is_equivalent_to(Any, Unknown | Unknown & ~None))
+static_assert(is_equivalent_to(Any, ~None & Unknown | Unknown))
 ```
 
 ## Tuples
 
 ```py
-from ty_extensions import Unknown, is_equivalent_to, static_assert
+from ty_extensions import Unknown, static_assert
+from ty_extensions._internal import is_equivalent_to
 from typing import Any
 
 static_assert(is_equivalent_to(tuple[str, Any], tuple[str, Unknown]))
@@ -159,8 +254,9 @@ static_assert(not is_equivalent_to(tuple[str, int], tuple[int, str]))
 
 ## Tuples containing equivalent but differently ordered unions/intersections are equivalent
 
-```py
-from ty_extensions import is_equivalent_to, TypeOf, static_assert, Intersection, Not
+```pyi
+from ty_extensions import static_assert
+from ty_extensions._internal import TypeOf, is_equivalent_to
 from typing import Literal
 
 class P: ...
@@ -170,15 +266,14 @@ class S: ...
 
 static_assert(is_equivalent_to(tuple[P | Q], tuple[Q | P]))
 static_assert(is_equivalent_to(tuple[P | None], tuple[None | P]))
-static_assert(
-    is_equivalent_to(tuple[Intersection[P, Q] | Intersection[R, Not[S]]], tuple[Intersection[Not[S], R] | Intersection[Q, P]])
-)
+static_assert(is_equivalent_to(tuple[P & Q | R & ~S], tuple[~S & R | Q & P]))
 ```
 
 ## Unions containing tuples containing tuples containing unions (etc.)
 
-```py
-from ty_extensions import is_equivalent_to, static_assert, Intersection
+```pyi
+from ty_extensions import static_assert
+from ty_extensions._internal import is_equivalent_to
 
 class P: ...
 class Q: ...
@@ -191,22 +286,23 @@ static_assert(
 )
 static_assert(
     is_equivalent_to(
-        tuple[tuple[tuple[tuple[tuple[Intersection[P, Q]]]]]],
-        tuple[tuple[tuple[tuple[tuple[Intersection[Q, P]]]]]],
+        tuple[tuple[tuple[tuple[tuple[P & Q]]]]],
+        tuple[tuple[tuple[tuple[tuple[Q & P]]]]],
     )
 )
 ```
 
 ## Intersections containing tuples containing unions
 
-```py
-from ty_extensions import is_equivalent_to, static_assert, Intersection
+```pyi
+from ty_extensions import static_assert
+from ty_extensions._internal import is_equivalent_to
 
 class P: ...
 class Q: ...
 class R: ...
 
-static_assert(is_equivalent_to(Intersection[tuple[P | Q], R], Intersection[tuple[Q | P], R]))
+static_assert(is_equivalent_to(tuple[P | Q] & R, tuple[Q | P] & R))
 ```
 
 ## Unions containing generic instances parameterized by unions
@@ -217,7 +313,8 @@ python-version = "3.12"
 ```
 
 ```py
-from ty_extensions import is_equivalent_to, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import is_equivalent_to
 
 class A: ...
 class B: ...
@@ -235,14 +332,19 @@ the parameter in one of the callable has a default value then the corresponding 
 other callable should also have a default value.
 
 ```py
-from ty_extensions import CallableTypeOf, is_equivalent_to, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import RegularCallableTypeOf, is_equivalent_to
 from typing import Callable
 
 def f1(a: int = 1) -> None: ...
 def f2(a: int = 2) -> None: ...
 
-static_assert(is_equivalent_to(CallableTypeOf[f1], CallableTypeOf[f2]))
-static_assert(is_equivalent_to(CallableTypeOf[f1] | bool | CallableTypeOf[f2], CallableTypeOf[f2] | bool | CallableTypeOf[f1]))
+static_assert(is_equivalent_to(RegularCallableTypeOf[f1], RegularCallableTypeOf[f2]))
+static_assert(
+    is_equivalent_to(
+        RegularCallableTypeOf[f1] | bool | RegularCallableTypeOf[f2], RegularCallableTypeOf[f2] | bool | RegularCallableTypeOf[f1]
+    )
+)
 ```
 
 The names of the positional-only, variadic and keyword-variadic parameters does not need to be the
@@ -252,8 +354,12 @@ same.
 def f3(a1: int, /, *args1: int, **kwargs2: int) -> None: ...
 def f4(a2: int, /, *args2: int, **kwargs1: int) -> None: ...
 
-static_assert(is_equivalent_to(CallableTypeOf[f3], CallableTypeOf[f4]))
-static_assert(is_equivalent_to(CallableTypeOf[f3] | bool | CallableTypeOf[f4], CallableTypeOf[f4] | bool | CallableTypeOf[f3]))
+static_assert(is_equivalent_to(RegularCallableTypeOf[f3], RegularCallableTypeOf[f4]))
+static_assert(
+    is_equivalent_to(
+        RegularCallableTypeOf[f3] | bool | RegularCallableTypeOf[f4], RegularCallableTypeOf[f4] | bool | RegularCallableTypeOf[f3]
+    )
+)
 ```
 
 Putting it all together, the following two callables are equivalent:
@@ -262,8 +368,12 @@ Putting it all together, the following two callables are equivalent:
 def f5(a1: int, /, b: float, c: bool = False, *args1: int, d: int = 1, e: str, **kwargs1: float) -> None: ...
 def f6(a2: int, /, b: float, c: bool = True, *args2: int, d: int = 2, e: str, **kwargs2: float) -> None: ...
 
-static_assert(is_equivalent_to(CallableTypeOf[f5], CallableTypeOf[f6]))
-static_assert(is_equivalent_to(CallableTypeOf[f5] | bool | CallableTypeOf[f6], CallableTypeOf[f6] | bool | CallableTypeOf[f5]))
+static_assert(is_equivalent_to(RegularCallableTypeOf[f5], RegularCallableTypeOf[f6]))
+static_assert(
+    is_equivalent_to(
+        RegularCallableTypeOf[f5] | bool | RegularCallableTypeOf[f6], RegularCallableTypeOf[f6] | bool | RegularCallableTypeOf[f5]
+    )
+)
 ```
 
 ### Not equivalent
@@ -271,7 +381,8 @@ static_assert(is_equivalent_to(CallableTypeOf[f5] | bool | CallableTypeOf[f6], C
 There are multiple cases when two callable types are not equivalent which are enumerated below.
 
 ```py
-from ty_extensions import CallableTypeOf, is_equivalent_to, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import RegularCallableTypeOf, is_equivalent_to
 from typing import Callable
 ```
 
@@ -281,7 +392,7 @@ When the number of parameters is different:
 def f1(a: int) -> None: ...
 def f2(a: int, b: int) -> None: ...
 
-static_assert(not is_equivalent_to(CallableTypeOf[f1], CallableTypeOf[f2]))
+static_assert(not is_equivalent_to(RegularCallableTypeOf[f1], RegularCallableTypeOf[f2]))
 ```
 
 When the return types are not equivalent in one or both of the callable types:
@@ -291,9 +402,9 @@ def f3(): ...
 def f4() -> None: ...
 
 static_assert(not is_equivalent_to(Callable[[], int], Callable[[], None]))
-static_assert(is_equivalent_to(CallableTypeOf[f3], CallableTypeOf[f3]))
-static_assert(not is_equivalent_to(CallableTypeOf[f3], CallableTypeOf[f4]))
-static_assert(not is_equivalent_to(CallableTypeOf[f4], CallableTypeOf[f3]))
+static_assert(is_equivalent_to(RegularCallableTypeOf[f3], RegularCallableTypeOf[f3]))
+static_assert(not is_equivalent_to(RegularCallableTypeOf[f3], RegularCallableTypeOf[f4]))
+static_assert(not is_equivalent_to(RegularCallableTypeOf[f4], RegularCallableTypeOf[f3]))
 ```
 
 When the parameter names are different:
@@ -302,13 +413,13 @@ When the parameter names are different:
 def f5(a: int) -> None: ...
 def f6(b: int) -> None: ...
 
-static_assert(not is_equivalent_to(CallableTypeOf[f5], CallableTypeOf[f6]))
+static_assert(not is_equivalent_to(RegularCallableTypeOf[f5], RegularCallableTypeOf[f6]))
 ```
 
 When only one of the callable types has parameter names:
 
 ```py
-static_assert(not is_equivalent_to(CallableTypeOf[f5], Callable[[int], None]))
+static_assert(not is_equivalent_to(RegularCallableTypeOf[f5], Callable[[int], None]))
 ```
 
 When the parameter kinds are different:
@@ -317,7 +428,7 @@ When the parameter kinds are different:
 def f7(a: int, /) -> None: ...
 def f8(a: int) -> None: ...
 
-static_assert(not is_equivalent_to(CallableTypeOf[f7], CallableTypeOf[f8]))
+static_assert(not is_equivalent_to(RegularCallableTypeOf[f7], RegularCallableTypeOf[f8]))
 ```
 
 When the annotated types of the parameters are not equivalent or absent in one or both of the
@@ -328,10 +439,10 @@ def f9(a: int) -> None: ...
 def f10(a: str) -> None: ...
 def f11(a) -> None: ...
 
-static_assert(not is_equivalent_to(CallableTypeOf[f9], CallableTypeOf[f10]))
-static_assert(not is_equivalent_to(CallableTypeOf[f10], CallableTypeOf[f11]))
-static_assert(not is_equivalent_to(CallableTypeOf[f11], CallableTypeOf[f10]))
-static_assert(is_equivalent_to(CallableTypeOf[f11], CallableTypeOf[f11]))
+static_assert(not is_equivalent_to(RegularCallableTypeOf[f9], RegularCallableTypeOf[f10]))
+static_assert(not is_equivalent_to(RegularCallableTypeOf[f10], RegularCallableTypeOf[f11]))
+static_assert(not is_equivalent_to(RegularCallableTypeOf[f11], RegularCallableTypeOf[f10]))
+static_assert(is_equivalent_to(RegularCallableTypeOf[f11], RegularCallableTypeOf[f11]))
 ```
 
 When the default value for a parameter is present only in one of the callable type:
@@ -340,8 +451,8 @@ When the default value for a parameter is present only in one of the callable ty
 def f12(a: int) -> None: ...
 def f13(a: int = 2) -> None: ...
 
-static_assert(not is_equivalent_to(CallableTypeOf[f12], CallableTypeOf[f13]))
-static_assert(not is_equivalent_to(CallableTypeOf[f13], CallableTypeOf[f12]))
+static_assert(not is_equivalent_to(RegularCallableTypeOf[f12], RegularCallableTypeOf[f13]))
+static_assert(not is_equivalent_to(RegularCallableTypeOf[f13], RegularCallableTypeOf[f12]))
 ```
 
 ### Unions containing `Callable`s
@@ -350,12 +461,13 @@ Two unions containing different `Callable` types are equivalent even if the unio
 ordered:
 
 ```py
-from ty_extensions import CallableTypeOf, Unknown, is_equivalent_to, static_assert
+from ty_extensions import Unknown, static_assert
+from ty_extensions._internal import RegularCallableTypeOf, is_equivalent_to
 
 def f(x): ...
 def g(x: Unknown): ...
 
-static_assert(is_equivalent_to(CallableTypeOf[f] | int | str, str | int | CallableTypeOf[g]))
+static_assert(is_equivalent_to(RegularCallableTypeOf[f] | int | str, str | int | RegularCallableTypeOf[g]))
 ```
 
 ### Unions containing `Callable`s containing unions
@@ -364,7 +476,8 @@ Differently ordered unions inside `Callable`s inside unions can still be equival
 
 ```py
 from typing import Callable
-from ty_extensions import is_equivalent_to, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import is_equivalent_to
 
 static_assert(is_equivalent_to(int | Callable[[int | str], None], Callable[[str | int], None] | int))
 ```
@@ -391,13 +504,14 @@ def overloaded(a: Grandparent) -> None: ...
 ```
 
 ```py
-from ty_extensions import CallableTypeOf, is_equivalent_to, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import RegularCallableTypeOf, is_equivalent_to
 from overloaded import Grandparent, Parent, Child, overloaded
 
 def grandparent(a: Grandparent) -> None: ...
 
-static_assert(is_equivalent_to(CallableTypeOf[grandparent], CallableTypeOf[overloaded]))
-static_assert(is_equivalent_to(CallableTypeOf[overloaded], CallableTypeOf[grandparent]))
+static_assert(is_equivalent_to(RegularCallableTypeOf[grandparent], RegularCallableTypeOf[overloaded]))
+static_assert(is_equivalent_to(RegularCallableTypeOf[overloaded], RegularCallableTypeOf[grandparent]))
 ```
 
 #### Both overloads
@@ -415,7 +529,6 @@ class Child(Parent): ...
 def pg(a: Parent) -> None: ...
 @overload
 def pg(a: Grandparent) -> None: ...
-
 @overload
 def cpg(a: Child) -> None: ...
 @overload
@@ -425,11 +538,12 @@ def cpg(a: Grandparent) -> None: ...
 ```
 
 ```py
-from ty_extensions import CallableTypeOf, is_equivalent_to, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import RegularCallableTypeOf, is_equivalent_to
 from overloaded import pg, cpg
 
-static_assert(is_equivalent_to(CallableTypeOf[pg], CallableTypeOf[cpg]))
-static_assert(is_equivalent_to(CallableTypeOf[cpg], CallableTypeOf[pg]))
+static_assert(is_equivalent_to(RegularCallableTypeOf[pg], RegularCallableTypeOf[cpg]))
+static_assert(is_equivalent_to(RegularCallableTypeOf[cpg], RegularCallableTypeOf[pg]))
 ```
 
 ### Function-literal types and bound-method types
@@ -442,7 +556,8 @@ python-version = "3.12"
 ```
 
 ```py
-from ty_extensions import is_equivalent_to, TypeOf, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import TypeOf, is_equivalent_to
 
 def f(): ...
 
@@ -464,7 +579,8 @@ gradual types. The cases with fully static types and using different combination
 are covered above.
 
 ```py
-from ty_extensions import Unknown, CallableTypeOf, TypeOf, is_equivalent_to, static_assert
+from ty_extensions import Unknown, static_assert
+from ty_extensions._internal import CallableTypeOf, RegularCallableTypeOf, TypeOf, is_equivalent_to
 from typing import Any, Callable
 
 static_assert(is_equivalent_to(Callable[..., int], Callable[..., int]))
@@ -486,7 +602,7 @@ def f1():
 def f1_equivalent() -> Any:
     return
 
-static_assert(is_equivalent_to(CallableTypeOf[f1], CallableTypeOf[f1_equivalent]))
+static_assert(is_equivalent_to(RegularCallableTypeOf[f1], RegularCallableTypeOf[f1_equivalent]))
 ```
 
 And, similarly for parameters with no annotations.
@@ -498,7 +614,7 @@ def f2(a, b, /) -> None:
 def f2_equivalent(a: Any, b: Any, /) -> None:
     return
 
-static_assert(is_equivalent_to(CallableTypeOf[f2], CallableTypeOf[f2_equivalent]))
+static_assert(is_equivalent_to(RegularCallableTypeOf[f2], RegularCallableTypeOf[f2_equivalent]))
 ```
 
 A function definition that includes both `*args` and `**kwargs` parameter that are annotated as
@@ -542,16 +658,16 @@ def variadic_kwargs(**kwargs):
     return
 
 def _(
-    signature_variadic_args: CallableTypeOf[variadic_args],
-    signature_variadic_kwargs: CallableTypeOf[variadic_kwargs],
+    signature_variadic_args: RegularCallableTypeOf[variadic_args],
+    signature_variadic_kwargs: RegularCallableTypeOf[variadic_kwargs],
 ) -> None:
     # revealed: (*args) -> Unknown
     reveal_type(signature_variadic_args)
     # revealed: (**kwargs) -> Unknown
     reveal_type(signature_variadic_kwargs)
 
-static_assert(not is_equivalent_to(CallableTypeOf[variadic_args], Callable[..., Any]))
-static_assert(not is_equivalent_to(CallableTypeOf[variadic_kwargs], Callable[..., Any]))
+static_assert(not is_equivalent_to(RegularCallableTypeOf[variadic_args], Callable[..., Any]))
+static_assert(not is_equivalent_to(RegularCallableTypeOf[variadic_kwargs], Callable[..., Any]))
 ```
 
 Parameter names, default values, and it's kind should also be considered when checking for gradual
@@ -561,19 +677,23 @@ equivalence.
 def f1(a): ...
 def f2(b): ...
 
-static_assert(not is_equivalent_to(CallableTypeOf[f1], CallableTypeOf[f2]))
+static_assert(not is_equivalent_to(RegularCallableTypeOf[f1], RegularCallableTypeOf[f2]))
 
 def f3(a=1): ...
 def f4(a=2): ...
 def f5(a): ...
 
-static_assert(is_equivalent_to(CallableTypeOf[f3], CallableTypeOf[f4]))
-static_assert(is_equivalent_to(CallableTypeOf[f3] | bool | CallableTypeOf[f4], CallableTypeOf[f4] | bool | CallableTypeOf[f3]))
-static_assert(not is_equivalent_to(CallableTypeOf[f3], CallableTypeOf[f5]))
+static_assert(is_equivalent_to(RegularCallableTypeOf[f3], RegularCallableTypeOf[f4]))
+static_assert(
+    is_equivalent_to(
+        RegularCallableTypeOf[f3] | bool | RegularCallableTypeOf[f4], RegularCallableTypeOf[f4] | bool | RegularCallableTypeOf[f3]
+    )
+)
+static_assert(not is_equivalent_to(RegularCallableTypeOf[f3], RegularCallableTypeOf[f5]))
 
 def f6(a, /): ...
 
-static_assert(not is_equivalent_to(CallableTypeOf[f1], CallableTypeOf[f6]))
+static_assert(not is_equivalent_to(RegularCallableTypeOf[f1], RegularCallableTypeOf[f6]))
 ```
 
 ## Module-literal types
@@ -592,7 +712,8 @@ import typing
 ```py
 import typing
 from module import typing as other_typing
-from ty_extensions import TypeOf, static_assert, is_equivalent_to
+from ty_extensions import static_assert
+from ty_extensions._internal import TypeOf, is_equivalent_to
 
 static_assert(is_equivalent_to(TypeOf[typing], TypeOf[other_typing]))
 static_assert(is_equivalent_to(TypeOf[typing] | int | str, str | int | TypeOf[other_typing]))
@@ -626,14 +747,35 @@ import imported.abc
 ```py
 import imported
 from module2 import imported as other_imported
-from ty_extensions import TypeOf, static_assert, is_equivalent_to
+from ty_extensions import static_assert
+from ty_extensions._internal import TypeOf, is_equivalent_to
 
-# error: [unresolved-attribute] "Module `imported` has no member `abc`"
+# error: [possibly-missing-submodule]
 reveal_type(imported.abc)  # revealed: Unknown
 
 reveal_type(other_imported.abc)  # revealed: <module 'imported.abc'>
 
 static_assert(not is_equivalent_to(TypeOf[imported], TypeOf[other_imported]))
+```
+
+## Bound-super types
+
+Two bound-super types are equivalent if the pivot class and the instance are equivalent:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from ty_extensions import static_assert
+from ty_extensions._internal import TypeOf, is_equivalent_to
+
+class Foo[T]:
+    x: T
+
+def bar(a: Foo[int | str], b: Foo[str | int]):
+    static_assert(is_equivalent_to(TypeOf[super(Foo, a)], TypeOf[super(Foo, b)]))
 ```
 
 [materializations]: https://typing.python.org/en/latest/spec/glossary.html#term-materialize

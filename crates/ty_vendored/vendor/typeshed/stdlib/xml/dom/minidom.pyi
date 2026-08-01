@@ -20,8 +20,8 @@ from _collections_abc import dict_keys, dict_values
 from _typeshed import Incomplete, ReadableBuffer, SupportsRead, SupportsWrite
 from collections.abc import Iterable, Sequence
 from types import TracebackType
-from typing import Any, ClassVar, Generic, Literal, NoReturn, Protocol, TypeVar, overload, type_check_only
-from typing_extensions import Self, TypeAlias
+from typing import Any, ClassVar, Generic, Literal, NoReturn, Protocol, TypeAlias, TypeVar, overload, type_check_only
+from typing_extensions import Self
 from xml.dom.minicompat import EmptyNodeList, NodeList
 from xml.dom.xmlbuilder import DocumentLS, DOMImplementationLS
 from xml.sax.xmlreader import XMLReader
@@ -116,10 +116,12 @@ class Node(xml.dom.Node):
         """Namespace-local name of this node."""
 
     def __bool__(self) -> Literal[True]: ...
+
     @overload
     def toxml(self, encoding: str, standalone: bool | None = None) -> bytes: ...
     @overload
     def toxml(self, encoding: None = None, standalone: bool | None = None) -> str: ...
+
     @overload
     def toprettyxml(
         self,
@@ -149,6 +151,7 @@ class Node(xml.dom.Node):
         encoding: str,
         standalone: bool | None = None,
     ) -> bytes: ...
+
     def hasChildNodes(self) -> bool: ...
     def insertBefore(  # type: ignore[misc]
         self: _NodesWithChildren,  # pyright: ignore[reportGeneralTypeIssues]
@@ -158,6 +161,7 @@ class Node(xml.dom.Node):
     def appendChild(  # type: ignore[misc]
         self: _NodesWithChildren, node: _ChildNodePlusFragmentVar  # pyright: ignore[reportGeneralTypeIssues]
     ) -> _ChildNodePlusFragmentVar: ...
+
     @overload
     def replaceChild(  # type: ignore[misc]
         self: _NodesWithChildren, newChild: DocumentFragment, oldChild: _ChildNodeVar
@@ -166,6 +170,7 @@ class Node(xml.dom.Node):
     def replaceChild(  # type: ignore[misc]
         self: _NodesWithChildren, newChild: _NodesThatAreChildren, oldChild: _ChildNodeVar
     ) -> _ChildNodeVar | None: ...
+
     def removeChild(self: _NodesWithChildren, oldChild: _ChildNodeVar) -> _ChildNodeVar: ...  # type: ignore[misc]  # pyright: ignore[reportGeneralTypeIssues]
     def normalize(self: _NodesWithChildren) -> None: ...  # type: ignore[misc]  # pyright: ignore[reportGeneralTypeIssues]
     def cloneNode(self, deep: bool) -> Self | None: ...
@@ -198,6 +203,7 @@ class DocumentFragment(Node):
     @property
     def lastChild(self) -> _DocumentFragmentChildren | None:
         """Last child node, or None."""
+
     namespaceURI: None
     prefix: None
     @property
@@ -209,10 +215,12 @@ class DocumentFragment(Node):
         self, newChild: _DFChildrenPlusFragment, refChild: _DocumentFragmentChildren | None
     ) -> _DFChildrenPlusFragment: ...
     def appendChild(self, node: _DFChildrenPlusFragment) -> _DFChildrenPlusFragment: ...  # type: ignore[override]
+
     @overload  # type: ignore[override]
     def replaceChild(self, newChild: DocumentFragment, oldChild: _DFChildrenVar) -> _DFChildrenVar | DocumentFragment: ...
     @overload
     def replaceChild(self, newChild: _DocumentFragmentChildren, oldChild: _DFChildrenVar) -> _DFChildrenVar | None: ...  # type: ignore[override]
+
     def removeChild(self, oldChild: _DFChildrenVar) -> _DFChildrenVar: ...  # type: ignore[override]
 
 _AttrChildrenVar = TypeVar("_AttrChildrenVar", bound=_AttrChildren)
@@ -236,11 +244,13 @@ class Attr(Node):
     @property
     def lastChild(self) -> _AttrChildren | None:
         """Last child node, or None."""
+
     namespaceURI: str | None
     prefix: str | None
     @property
     def localName(self) -> str:
         """Namespace-local name of this attribute."""
+
     name: str
     value: str
     specified: bool
@@ -260,10 +270,12 @@ class Attr(Node):
 
     def insertBefore(self, newChild: _AttrChildrenPlusFragment, refChild: _AttrChildren | None) -> _AttrChildrenPlusFragment: ...  # type: ignore[override]
     def appendChild(self, node: _AttrChildrenPlusFragment) -> _AttrChildrenPlusFragment: ...  # type: ignore[override]
+
     @overload  # type: ignore[override]
     def replaceChild(self, newChild: DocumentFragment, oldChild: _AttrChildrenVar) -> _AttrChildrenVar | DocumentFragment: ...
     @overload
     def replaceChild(self, newChild: _AttrChildren, oldChild: _AttrChildrenVar) -> _AttrChildrenVar | None: ...  # type: ignore[override]
+
     def removeChild(self, oldChild: _AttrChildrenVar) -> _AttrChildrenVar: ...  # type: ignore[override]
 
 # In the DOM, this interface isn't specific to Attr, but our implementation is
@@ -340,6 +352,7 @@ class Element(Node):
     @property
     def attributes(self) -> NamedNodeMap:  # type: ignore[override]
         """NamedNodeMap of attributes on the element."""
+
     parentNode: Document | Element | DocumentFragment | None
     nextSibling: _DocumentChildren | _ElementChildren | _DocumentFragmentChildren | None
     previousSibling: _DocumentChildren | _ElementChildren | _DocumentFragmentChildren | None
@@ -351,11 +364,13 @@ class Element(Node):
     @property
     def lastChild(self) -> _ElementChildren | None:
         """Last child node, or None."""
+
     namespaceURI: str | None
     prefix: str | None
     @property
     def localName(self) -> str:
         """Namespace-local name of this element."""
+
     schemaType: TypeInfo
     tagName: str
 
@@ -415,12 +430,14 @@ class Element(Node):
         self, newChild: _ElementChildrenPlusFragment, refChild: _ElementChildren | None
     ) -> _ElementChildrenPlusFragment: ...
     def appendChild(self, node: _ElementChildrenPlusFragment) -> _ElementChildrenPlusFragment: ...  # type: ignore[override]
+
     @overload  # type: ignore[override]
     def replaceChild(
         self, newChild: DocumentFragment, oldChild: _ElementChildrenVar
     ) -> _ElementChildrenVar | DocumentFragment: ...
     @overload
     def replaceChild(self, newChild: _ElementChildren, oldChild: _ElementChildrenVar) -> _ElementChildrenVar | None: ...  # type: ignore[override]
+
     def removeChild(self, oldChild: _ElementChildrenVar) -> _ElementChildrenVar: ...  # type: ignore[override]
 
 class Childless:
@@ -432,13 +449,9 @@ class Childless:
     attributes: None
     childNodes: EmptyNodeList
     @property
-    def firstChild(self) -> None:
-        """The type of the None singleton."""
-
+    def firstChild(self) -> None: ...
     @property
-    def lastChild(self) -> None:
-        """The type of the None singleton."""
-
+    def lastChild(self) -> None: ...
     def appendChild(self, node: _NodesThatAreChildren | DocumentFragment) -> NoReturn: ...
     def hasChildNodes(self) -> Literal[False]: ...
     def insertBefore(
@@ -460,17 +473,16 @@ class ProcessingInstruction(Childless, Node):
     previousSibling: _DocumentChildren | _ElementChildren | _DocumentFragmentChildren | None
     childNodes: EmptyNodeList
     @property
-    def firstChild(self) -> None:
-        """The type of the None singleton."""
-
+    def firstChild(self) -> None: ...
     @property
-    def lastChild(self) -> None:
-        """The type of the None singleton."""
+    def lastChild(self) -> None: ...
+
     namespaceURI: None
     prefix: None
     @property
     def localName(self) -> None:
         """Namespace-local name of this node."""
+
     target: str
     data: str
 
@@ -489,6 +501,7 @@ class CharacterData(Childless, Node):
     @property
     def localName(self) -> None:
         """Namespace-local name of this node."""
+
     ownerDocument: Document | None
     data: str
 
@@ -516,17 +529,16 @@ class Text(CharacterData):
     previousSibling: _DocumentFragmentChildren | _ElementChildren | _AttrChildren | None
     childNodes: EmptyNodeList
     @property
-    def firstChild(self) -> None:
-        """The type of the None singleton."""
-
+    def firstChild(self) -> None: ...
     @property
-    def lastChild(self) -> None:
-        """The type of the None singleton."""
+    def lastChild(self) -> None: ...
+
     namespaceURI: None
     prefix: None
     @property
     def localName(self) -> None:
         """Namespace-local name of this node."""
+
     data: str
     def splitText(self, offset: int) -> Self: ...
     def writexml(self, writer: SupportsWrite[str], indent: str = "", addindent: str = "", newl: str = "") -> None: ...
@@ -550,12 +562,10 @@ class Comment(CharacterData):
     previousSibling: _DocumentChildren | _ElementChildren | _DocumentFragmentChildren | None
     childNodes: EmptyNodeList
     @property
-    def firstChild(self) -> None:
-        """The type of the None singleton."""
-
+    def firstChild(self) -> None: ...
     @property
-    def lastChild(self) -> None:
-        """The type of the None singleton."""
+    def lastChild(self) -> None: ...
+
     namespaceURI: None
     prefix: None
     @property
@@ -612,17 +622,16 @@ class DocumentType(Identified, Childless, Node):
     previousSibling: _DocumentChildren | None
     childNodes: EmptyNodeList
     @property
-    def firstChild(self) -> None:
-        """The type of the None singleton."""
-
+    def firstChild(self) -> None: ...
     @property
-    def lastChild(self) -> None:
-        """The type of the None singleton."""
+    def lastChild(self) -> None: ...
+
     namespaceURI: None
     prefix: None
     @property
     def localName(self) -> None:
         """Namespace-local name of this node."""
+
     name: str | None
     internalSubset: str | None
     entities: ReadOnlySequentialNamedNodeMap[Entity]
@@ -649,11 +658,13 @@ class Entity(Identified, Node):
     @property
     def lastChild(self) -> _EntityChildren | None:
         """Last child node, or None."""
+
     namespaceURI: None
     prefix: None
     @property
     def localName(self) -> None:
         """Namespace-local name of this node."""
+
     actualEncoding: str | None
     encoding: str | None
     version: str | None
@@ -676,12 +687,10 @@ class Notation(Identified, Childless, Node):
     previousSibling: _DocumentFragmentChildren | None
     childNodes: EmptyNodeList
     @property
-    def firstChild(self) -> None:
-        """The type of the None singleton."""
-
+    def firstChild(self) -> None: ...
     @property
-    def lastChild(self) -> None:
-        """The type of the None singleton."""
+    def lastChild(self) -> None: ...
+
     namespaceURI: None
     prefix: None
     @property
@@ -742,11 +751,13 @@ class Document(Node, DocumentLS):
     @property
     def lastChild(self) -> _DocumentChildren | None:
         """Last child node, or None."""
+
     namespaceURI: None
     prefix: None
     @property
     def localName(self) -> None:
         """Namespace-local name of this node."""
+
     implementation: DOMImplementation
     actualEncoding: str | None
     encoding: str | None
@@ -757,6 +768,7 @@ class Document(Node, DocumentLS):
     documentURI: str | None
     doctype: DocumentType | None
     documentElement: Element | None
+    """Top-level element of this document."""
 
     def __init__(self) -> None: ...
     def appendChild(self, node: _DocumentChildrenVar) -> _DocumentChildrenVar: ...  # type: ignore[override]
@@ -786,15 +798,18 @@ class Document(Node, DocumentLS):
         encoding: str | None = None,
         standalone: bool | None = None,
     ) -> None: ...
+
     @overload
     def renameNode(self, n: Element, namespaceURI: str, name: str) -> Element: ...
     @overload
     def renameNode(self, n: Attr, namespaceURI: str, name: str) -> Attr: ...
     @overload
     def renameNode(self, n: Element | Attr, namespaceURI: str, name: str) -> Element | Attr: ...
+
     def insertBefore(
         self, newChild: _DocumentChildrenPlusFragment, refChild: _DocumentChildren | None  # type: ignore[override]
     ) -> _DocumentChildrenPlusFragment: ...
+
     @overload  # type: ignore[override]
     def replaceChild(
         self, newChild: DocumentFragment, oldChild: _DocumentChildrenVar

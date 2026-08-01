@@ -6,7 +6,9 @@ use ruff_python_semantic::analyze::visibility;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
-use crate::rules::flake8_boolean_trap::helpers::is_allowed_func_def;
+use crate::rules::flake8_boolean_trap::helpers::{
+    add_liskov_substitution_principle_help, is_allowed_func_def,
+};
 
 /// ## What it does
 /// Checks for the use of boolean positional arguments in function definitions,
@@ -24,6 +26,11 @@ use crate::rules::flake8_boolean_trap::helpers::is_allowed_func_def;
 /// `True` and `False` cases, using an `Enum`, or making the argument a
 /// keyword-only argument, to force callers to be explicit when providing
 /// the argument.
+///
+/// This rule exempts methods decorated with [`@typing.override`][override],
+/// since changing the signature of a subclass method that overrides a
+/// superclass method may cause type checkers to complain about a violation of
+/// the Liskov Substitution Principle.
 ///
 /// ## Example
 /// ```python
@@ -89,6 +96,8 @@ use crate::rules::flake8_boolean_trap::helpers::is_allowed_func_def;
 /// ## References
 /// - [Python documentation: Calls](https://docs.python.org/3/reference/expressions.html#calls)
 /// - [_How to Avoid “The Boolean Trap”_ by Adam Johnson](https://adamj.eu/tech/2021/07/10/python-type-hints-how-to-avoid-the-boolean-trap/)
+///
+/// [override]: https://docs.python.org/3/library/typing.html#typing.override
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.127")]
 pub(crate) struct BooleanDefaultValuePositionalArgument;
@@ -132,7 +141,9 @@ pub(crate) fn boolean_default_value_positional_argument(
                 return;
             }
 
-            checker.report_diagnostic(BooleanDefaultValuePositionalArgument, param.identifier());
+            let mut diagnostic = checker
+                .report_diagnostic(BooleanDefaultValuePositionalArgument, param.identifier());
+            add_liskov_substitution_principle_help(&mut diagnostic, name, decorator_list, checker);
         }
     }
 }

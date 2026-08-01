@@ -1,7 +1,7 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::parenthesize::parenthesized_range;
+use ruff_python_ast::token::parenthesized_range;
 use ruff_python_ast::{
-    self as ast, Expr, ExprEllipsisLiteral, ExprLambda, Identifier, Parameter,
+    self as ast, DecoratorList, Expr, ExprEllipsisLiteral, ExprLambda, Identifier, Parameter,
     ParameterWithDefault, Parameters, Stmt,
 };
 use ruff_python_semantic::SemanticModel;
@@ -33,6 +33,15 @@ use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 /// def f(x):
 ///     return 2 * x
 /// ```
+///
+/// ## Fix safety
+/// This fix is marked as unsafe because converting a lambda assignment into a
+/// function definition changes observable properties of the callable.
+///
+/// In particular, a lambda function has the name `"<lambda>"`, while the
+/// generated function uses the name of the assigned variable. Code that relies
+/// on function metadata, such as logging, registration, or introspection, may
+/// therefore behave differently after the fix.
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#programming-recommendations
 #[derive(ViolationMetadata)]
@@ -208,7 +217,7 @@ fn function(
                     },
                     ..parameter.clone()
                 })
-                .collect::<Vec<_>>();
+                .collect::<ast::ParameterWithDefaults>();
             let new_args = parameters
                 .args
                 .iter()
@@ -222,7 +231,7 @@ fn function(
                     },
                     ..parameter.clone()
                 })
-                .collect::<Vec<_>>();
+                .collect::<ast::ParameterWithDefaults>();
             let func = Stmt::FunctionDef(ast::StmtFunctionDef {
                 is_async: false,
                 name: Identifier::new(name.to_string(), TextRange::default()),
@@ -231,8 +240,8 @@ fn function(
                     args: new_args,
                     ..parameters
                 }),
-                body: vec![body],
-                decorator_list: vec![],
+                body: ast::Suite::from([body]),
+                decorator_list: ast::DecoratorList::new(),
                 returns: Some(Box::new(return_type)),
                 type_params: None,
                 range: TextRange::default(),
@@ -247,8 +256,8 @@ fn function(
         is_async: false,
         name: Identifier::new(name.to_string(), TextRange::default()),
         parameters: Box::new(parameters),
-        body: vec![body],
-        decorator_list: vec![],
+        body: ast::Suite::from([body]),
+        decorator_list: DecoratorList::new(),
         returns: None,
         type_params: None,
         range: TextRange::default(),
@@ -265,29 +274,19 @@ fn replace_trailing_ellipsis_with_original_expr(
     stmt: &Stmt,
     checker: &Checker,
 ) -> String {
-    let original_expr_range = parenthesized_range(
-        (&lambda.body).into(),
-        lambda.into(),
-        checker.comment_ranges(),
-        checker.source(),
-    )
-    .unwrap_or(lambda.body.range());
+    let original_expr_range =
+        parenthesized_range((&lambda.body).into(), lambda.into(), checker.tokens())
+            .unwrap_or(lambda.body.range());
 
     // This prevents the autofix of introducing a syntax error if the lambda's body is an
     // expression spanned across multiple lines. To avoid the syntax error we preserve
     // the parenthesis around the body.
-    let original_expr_in_source = if parenthesized_range(
-        lambda.into(),
-        stmt.into(),
-        checker.comment_ranges(),
-        checker.source(),
-    )
-    .is_some()
-    {
-        format!("({})", checker.locator().slice(original_expr_range))
-    } else {
-        checker.locator().slice(original_expr_range).to_string()
-    };
+    let original_expr_in_source =
+        if parenthesized_range(lambda.into(), stmt.into(), checker.tokens()).is_some() {
+            format!("({})", checker.locator().slice(original_expr_range))
+        } else {
+            checker.locator().slice(original_expr_range).to_string()
+        };
 
     let placeholder_ellipsis_start = generated.rfind("...").unwrap();
     let placeholder_ellipsis_end = placeholder_ellipsis_start + "...".len();

@@ -1,7 +1,8 @@
 ---
-source: crates/ty_test/src/lib.rs
+source: crates/mdtest/src/lib.rs
 expression: snapshot
 ---
+
 ---
 mdtest name: invalid_await.md - Invalid await diagnostics - Custom type with missing `__await__`
 mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/invalid_await.md
@@ -25,7 +26,6 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/invalid_awai
 error[invalid-await]: `MissingAwait` is not awaitable
  --> src/mdtest_snippet.py:5:11
   |
-4 | async def main() -> None:
 5 |     await MissingAwait()  # error: [invalid-await]
   |           ^^^^^^^^^^^^^^
   |
@@ -33,9 +33,6 @@ error[invalid-await]: `MissingAwait` is not awaitable
   |
 1 | class MissingAwait:
   |       ------------ type defined here
-2 |     pass
-  |
 info: `__await__` is missing
-info: rule `invalid-await` is enabled by default
 
 ```

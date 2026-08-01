@@ -1,11 +1,10 @@
-#![cfg(any(test, fuzzing))]
+#![cfg(any(test, fuzzing, feature = "testing"))]
 //! Helper functions for the tests of rule implementations.
 
 use std::borrow::Cow;
-use std::fmt;
 use std::path::Path;
 
-#[cfg(not(fuzzing))]
+#[cfg(test)]
 use anyhow::Result;
 use itertools::Itertools;
 use rustc_hash::FxHashMap;
@@ -14,12 +13,12 @@ use ruff_db::diagnostic::{
     Diagnostic, DiagnosticFormat, DisplayDiagnosticConfig, DisplayDiagnostics, Span,
 };
 use ruff_notebook::Notebook;
-#[cfg(not(fuzzing))]
+#[cfg(test)]
 use ruff_notebook::NotebookError;
 use ruff_python_ast::PySourceType;
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
-use ruff_python_parser::{ParseError, ParseOptions};
+use ruff_python_parser::ParseError;
 use ruff_python_trivia::textwrap::dedent;
 use ruff_source_file::SourceFileBuilder;
 
@@ -32,10 +31,12 @@ use crate::packaging::detect_package_root;
 use crate::settings::types::UnsafeFixes;
 use crate::settings::{LinterSettings, flags};
 use crate::source_kind::SourceKind;
+use crate::suppression::Suppressions;
 use crate::{Applicability, FixAvailability};
 use crate::{Locator, directives};
 
 /// Represents the difference between two diagnostic runs.
+#[cfg(any(test, fuzzing))]
 #[derive(Debug)]
 pub(crate) struct DiagnosticsDiff {
     /// Diagnostics that were removed (present in 'before' but not in 'after')
@@ -48,8 +49,9 @@ pub(crate) struct DiagnosticsDiff {
     settings_after: LinterSettings,
 }
 
-impl fmt::Display for DiagnosticsDiff {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+#[cfg(any(test, fuzzing))]
+impl std::fmt::Display for DiagnosticsDiff {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         writeln!(f, "--- Linter settings ---")?;
         let settings_before_str = format!("{}", self.settings_before);
         let settings_after_str = format!("{}", self.settings_after);
@@ -89,6 +91,7 @@ impl fmt::Display for DiagnosticsDiff {
 }
 
 /// Compare two sets of diagnostics and return the differences
+#[cfg(any(test, fuzzing))]
 fn diff_diagnostics(
     before: Vec<Diagnostic>,
     after: Vec<Diagnostic>,
@@ -114,25 +117,43 @@ fn diff_diagnostics(
     }
 }
 
-#[cfg(not(fuzzing))]
+#[cfg(test)]
 pub(crate) fn test_resource_path(path: impl AsRef<Path>) -> std::path::PathBuf {
     Path::new("./resources/test/").join(path)
 }
 
 /// Run [`check_path`] on a Python file in the `resources/test/fixtures` directory.
-#[cfg(not(fuzzing))]
+#[cfg(test)]
 pub(crate) fn test_path(
     path: impl AsRef<Path>,
     settings: &LinterSettings,
 ) -> Result<Vec<Diagnostic>> {
     let path = test_resource_path("fixtures").join(path);
-    let source_type = PySourceType::from(&path);
+    let source_type = ruff_python_ast::SourceType::Python(PySourceType::from(&path));
     let source_kind = SourceKind::from_path(path.as_ref(), source_type)?.expect("valid source");
     Ok(test_contents(&source_kind, &path, settings).0)
 }
 
+/// Run the configuration TOML linter on a file in the `resources/test/fixtures` directory.
+#[cfg(test)]
+pub(crate) fn test_toml_path(
+    path: impl AsRef<Path>,
+    settings: &LinterSettings,
+    source_type: ruff_python_ast::TomlSourceType,
+) -> Result<Vec<Diagnostic>> {
+    let path = test_resource_path("fixtures").join(path);
+    let filename = path.file_name().unwrap_or_else(|| path.as_os_str());
+    let contents = std::fs::read_to_string(&path)?;
+    Ok(crate::toml::lint_toml(
+        Path::new(filename),
+        &contents,
+        settings,
+        source_type,
+    ))
+}
+
 /// Test a file with two different settings and return the differences
-#[cfg(not(fuzzing))]
+#[cfg(test)]
 pub(crate) fn test_path_with_settings_diff(
     path: impl AsRef<Path>,
     settings_before: &LinterSettings,
@@ -155,14 +176,14 @@ pub(crate) fn test_path_with_settings_diff(
     Ok(diff)
 }
 
-#[cfg(not(fuzzing))]
+#[cfg(test)]
 pub(crate) struct TestedNotebook {
     pub(crate) diagnostics: Vec<Diagnostic>,
     pub(crate) source_notebook: Notebook,
     pub(crate) linted_notebook: Notebook,
 }
 
-#[cfg(not(fuzzing))]
+#[cfg(test)]
 pub(crate) fn assert_notebook_path(
     path: impl AsRef<Path>,
     expected: impl AsRef<Path>,
@@ -196,7 +217,15 @@ pub(crate) fn assert_notebook_path(
 pub fn test_snippet(contents: &str, settings: &LinterSettings) -> Vec<Diagnostic> {
     let path = Path::new("<filename>");
     let contents = dedent(contents);
-    test_contents(&SourceKind::Python(contents.into_owned()), path, settings).0
+    test_contents(
+        &SourceKind::Python {
+            code: contents.into_owned(),
+            is_stub: false,
+        },
+        path,
+        settings,
+    )
+    .0
 }
 
 thread_local! {
@@ -213,18 +242,18 @@ pub(crate) fn max_iterations() -> usize {
 
 /// A convenient wrapper around [`check_path`], that additionally
 /// asserts that fixes converge after a fixed number of iterations.
-pub(crate) fn test_contents<'a>(
+pub fn test_contents<'a>(
     source_kind: &'a SourceKind,
     path: &Path,
     settings: &LinterSettings,
 ) -> (Vec<Diagnostic>, Cow<'a, SourceKind>) {
     let source_type = PySourceType::from(path);
     let target_version = settings.resolve_target_version(path);
-    let options =
-        ParseOptions::from(source_type).with_target_version(target_version.parser_version());
-    let parsed = ruff_python_parser::parse_unchecked(source_kind.source_code(), options.clone())
-        .try_into_module()
-        .expect("PySourceType always parses into a module");
+    let parsed = crate::linter::parse_unchecked_source(
+        source_kind,
+        source_type,
+        target_version.parser_version(),
+    );
     let locator = Locator::new(source_kind.source_code());
     let stylist = Stylist::from_tokens(parsed.tokens(), locator.contents());
     let indexer = Indexer::from_tokens(parsed.tokens(), locator.contents());
@@ -234,6 +263,8 @@ pub(crate) fn test_contents<'a>(
         &locator,
         &indexer,
     );
+    let suppressions =
+        Suppressions::from_tokens(locator.contents(), parsed.tokens(), &indexer, settings);
     let messages = check_path(
         path,
         path.parent()
@@ -249,6 +280,7 @@ pub(crate) fn test_contents<'a>(
         source_type,
         &parsed,
         target_version,
+        &suppressions,
     );
 
     let source_has_errors = parsed.has_invalid_syntax();
@@ -285,10 +317,11 @@ pub(crate) fn test_contents<'a>(
 
             transformed = Cow::Owned(transformed.updated(fixed_contents, &source_map));
 
-            let parsed =
-                ruff_python_parser::parse_unchecked(transformed.source_code(), options.clone())
-                    .try_into_module()
-                    .expect("PySourceType always parses into a module");
+            let parsed = crate::linter::parse_unchecked_source(
+                &transformed,
+                source_type,
+                target_version.parser_version(),
+            );
             let locator = Locator::new(transformed.source_code());
             let stylist = Stylist::from_tokens(parsed.tokens(), locator.contents());
             let indexer = Indexer::from_tokens(parsed.tokens(), locator.contents());
@@ -299,6 +332,8 @@ pub(crate) fn test_contents<'a>(
                 &indexer,
             );
 
+            let suppressions =
+                Suppressions::from_tokens(locator.contents(), parsed.tokens(), &indexer, settings);
             let fixed_messages = check_path(
                 path,
                 None,
@@ -312,6 +347,7 @@ pub(crate) fn test_contents<'a>(
                 source_type,
                 &parsed,
                 target_version,
+                &suppressions,
             );
 
             if parsed.has_invalid_syntax() && !source_has_errors {
@@ -446,11 +482,10 @@ pub(crate) fn print_jupyter_messages(
     path: &Path,
     notebook: &Notebook,
 ) -> String {
-    let config = DisplayDiagnosticConfig::default()
+    let config = DisplayDiagnosticConfig::new("ruff")
         .format(DiagnosticFormat::Full)
         .hide_severity(true)
         .with_show_fix_status(true)
-        .show_fix_diff(true)
         .with_fix_applicability(Applicability::DisplayOnly);
 
     DisplayDiagnostics::new(
@@ -465,11 +500,10 @@ pub(crate) fn print_jupyter_messages(
 }
 
 pub(crate) fn print_messages(diagnostics: &[Diagnostic]) -> String {
-    let config = DisplayDiagnosticConfig::default()
+    let config = DisplayDiagnosticConfig::new("ruff")
         .format(DiagnosticFormat::Full)
         .hide_severity(true)
         .with_show_fix_status(true)
-        .show_fix_diff(true)
         .with_fix_applicability(Applicability::DisplayOnly);
 
     DisplayDiagnostics::new(

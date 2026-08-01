@@ -3,39 +3,37 @@
     reason = "Prefer System trait methods over std methods in ty crates"
 )]
 use crate::glob::{GlobFilterCheckMode, IncludeResult};
-use crate::metadata::options::{OptionDiagnostic, ToSettingsError};
+use crate::metadata::options::{OptionDiagnostic, ProgramSettingsDiagnostic};
+use crate::parallel::ParallelIteratorExt;
 use crate::walk::{ProjectFilesFilter, ProjectFilesWalker};
 #[cfg(feature = "testing")]
-pub use db::tests::TestDb;
+pub use db::testing::TestDb;
 pub use db::{ChangeResult, CheckMode, Db, ProjectDatabase, SalsaMemoryDump};
 use files::{Index, Indexed, IndexedFiles};
+
 use metadata::settings::Settings;
 pub use metadata::{ProjectMetadata, ProjectMetadataError};
+use rayon::prelude::*;
 use ruff_db::diagnostic::{
-    Annotation, Diagnostic, DiagnosticId, Severity, Span, SubDiagnostic, SubDiagnosticSeverity,
+    Diagnostic, DiagnosticId, Severity, SubDiagnostic, SubDiagnosticSeverity,
 };
-use ruff_db::files::{File, FileRootKind};
+use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
-use ruff_db::source::{SourceTextError, source_text};
-use ruff_db::system::{SystemPath, SystemPathBuf};
+use ruff_db::system::{SystemPath, SystemPathBuf, deduplicate_nested_paths};
 use rustc_hash::FxHashSet;
-use salsa::Durability;
-use salsa::Setter;
+use salsa::{Database, Durability, Setter};
 use std::backtrace::BacktraceStatus;
-use std::collections::hash_set;
+use std::collections::{BTreeSet, hash_set};
 use std::iter::FusedIterator;
 use std::panic::{AssertUnwindSafe, UnwindSafe};
 use std::sync::Arc;
-use thiserror::Error;
-use tracing::error;
-use ty_python_semantic::add_inferred_python_version_hint_to_diagnostic;
 use ty_python_semantic::lint::RuleSelection;
-use ty_python_semantic::types::check_types;
 
 mod db;
 mod files;
-mod glob;
+pub mod glob;
 pub mod metadata;
+pub mod parallel;
 mod walk;
 pub mod watch;
 
@@ -53,7 +51,7 @@ pub mod watch;
 #[salsa::input(heap_size=ruff_memory_usage::heap_size)]
 #[derive(Debug)]
 pub struct Project {
-    /// The files that are open in the project, [`None`] if there are no open files.
+    /// The files that are open in the project.
     #[returns(ref)]
     #[default]
     open_fileset: FxHashSet<File>,
@@ -112,10 +110,17 @@ pub struct Project {
     /// This changes the behavior of `check` to either check only the open files or all files in
     /// the project including the virtual files that might exists in the editor.
     #[default]
+    #[returns(copy)]
     check_mode: CheckMode,
 
     #[default]
+    #[returns(copy)]
     verbose_flag: bool,
+
+    /// Whether to enforce exclusion rules even to files explicitly passed to ty on the command line.
+    #[default]
+    #[returns(copy)]
+    force_exclude_flag: bool,
 }
 
 /// A progress reporter.
@@ -167,23 +172,62 @@ impl ProgressReporter for CollectReporter {
 
 #[salsa::tracked]
 impl Project {
-    pub fn from_metadata(db: &dyn Db, metadata: ProjectMetadata) -> Result<Self, ToSettingsError> {
-        let (settings, diagnostics) = metadata.options().to_settings(db, metadata.root())?;
+    /// Create a project from resolved metadata and settings.
+    ///
+    /// Program-settings diagnostics are accepted separately so callers do not need to know how to
+    /// convert and merge them into the stored project settings diagnostics.
+    pub(crate) fn from_metadata(
+        db: &dyn Db,
+        metadata: ProjectMetadata,
+        settings: Settings,
+        settings_diagnostics: Vec<OptionDiagnostic>,
+        program_settings_diagnostics: Vec<ProgramSettingsDiagnostic>,
+    ) -> Self {
+        let diagnostics = Self::settings_diagnostics_with_program_diagnostics(
+            db,
+            settings_diagnostics,
+            program_settings_diagnostics,
+        );
 
-        // This adds a file root for the project itself. This enables
-        // tracking of when changes are made to the files in a project
-        // at the directory level. At time of writing (2025-07-17),
-        // this is used for caching completions for submodules.
-        db.files()
-            .try_add_root(db, metadata.root(), FileRootKind::Project);
-
-        let project = Project::builder(Box::new(metadata), Box::new(settings), diagnostics)
+        Project::builder(Box::new(metadata), Box::new(settings), diagnostics)
             .durability(Durability::MEDIUM)
             .open_fileset_durability(Durability::LOW)
             .file_set_durability(Durability::LOW)
-            .new(db);
+            .new(db)
+    }
 
-        Ok(project)
+    /// Permanently freezes the most heavily read immutable project inputs.
+    ///
+    /// This is intentionally not exhaustive.
+    pub(crate) fn freeze(self, db: &mut dyn Db) {
+        let durability = Durability::NEVER_CHANGE;
+        let metadata = Box::new(self.metadata(db).clone());
+        let settings = Box::new(self.settings(db).clone());
+        let included_paths = self.included_paths_list(db).to_vec();
+        let check_mode = self.check_mode(db);
+        let verbose = self.verbose_flag(db);
+        let force_exclude = self.force_exclude_flag(db);
+
+        self.set_metadata(db)
+            .with_durability(durability)
+            .to(metadata);
+        self.set_settings(db)
+            .with_durability(durability)
+            .to(settings);
+        self.set_included_paths_list(db)
+            .with_durability(durability)
+            .to(included_paths);
+        self.set_check_mode(db)
+            .with_durability(durability)
+            .to(check_mode);
+        self.set_verbose_flag(db)
+            .with_durability(durability)
+            .to(verbose);
+        self.set_force_exclude_flag(db)
+            .with_durability(durability)
+            .to(force_exclude);
+
+        IndexedFiles::freeze(db, self);
     }
 
     pub fn root(self, db: &dyn Db) -> &SystemPath {
@@ -204,49 +248,111 @@ impl Project {
         self.settings(db).to_rules()
     }
 
-    /// Returns `true` if `path` is both part of the project and included (see `included_paths_list`).
+    /// Returns whether `path` is part of the project and included (see `included_paths_list`).
     ///
     /// Unlike [Self::files], this method does not respect `.gitignore` files. It only checks
     /// the project's include and exclude settings as well as the paths that were passed to `ty check <paths>`.
     /// This means, that this method is an over-approximation of `Self::files` and may return `true` for paths
     /// that won't be included when checking the project because they're ignored in a `.gitignore` file.
-    pub fn is_file_included(self, db: &dyn Db, path: &SystemPath) -> bool {
+    pub fn is_file_included(self, db: &dyn Db, path: &SystemPath) -> IncludeResult {
         ProjectFilesFilter::from_project(db, self)
             .is_file_included(path, GlobFilterCheckMode::Adhoc)
-            == IncludeResult::Included
     }
 
     pub fn is_directory_included(self, db: &dyn Db, path: &SystemPath) -> bool {
-        ProjectFilesFilter::from_project(db, self)
-            .is_directory_included(path, GlobFilterCheckMode::Adhoc)
-            == IncludeResult::Included
+        matches!(
+            ProjectFilesFilter::from_project(db, self)
+                .is_directory_included(path, GlobFilterCheckMode::Adhoc),
+            IncludeResult::Included { .. }
+        )
     }
 
-    pub fn reload(self, db: &mut dyn Db, metadata: ProjectMetadata) {
+    /// Reload the project after its metadata or settings have changed.
+    ///
+    /// Program-settings diagnostics are converted and merged here to keep reload behavior
+    /// consistent with initial project creation.
+    pub fn reload(
+        self,
+        db: &mut dyn Db,
+        metadata: ProjectMetadata,
+        settings: Option<Settings>,
+        settings_diagnostics: Vec<OptionDiagnostic>,
+        program_settings_diagnostics: Vec<ProgramSettingsDiagnostic>,
+    ) -> ProjectReloadResult {
         tracing::debug!("Reloading project");
-        assert_eq!(self.root(db), metadata.root());
+        let metadata_changed = &metadata != self.metadata(db);
+        let settings_diagnostics = Self::settings_diagnostics_with_program_diagnostics(
+            db,
+            settings_diagnostics,
+            program_settings_diagnostics,
+        );
 
-        if &metadata != self.metadata(db) {
-            match metadata.options().to_settings(db, metadata.root()) {
-                Ok((settings, settings_diagnostics)) => {
-                    if self.settings(db) != &settings {
-                        self.set_settings(db).to(Box::new(settings));
-                    }
+        let root_changed = metadata.root() != self.root(db);
+        let (settings_changed, files_changed) = if let Some(settings) = settings
+            && self.settings(db) != &settings
+        {
+            let files_changed = root_changed || settings.src() != self.settings(db).src();
+            self.set_settings(db).to(Box::new(settings));
+            (true, files_changed)
+        } else {
+            (false, root_changed)
+        };
 
-                    if self.settings_diagnostics(db) != settings_diagnostics {
-                        self.set_settings_diagnostics(db).to(settings_diagnostics);
-                    }
-                }
-                Err(error) => {
-                    self.set_settings_diagnostics(db)
-                        .to(vec![error.into_diagnostic()]);
-                }
-            }
+        if self.settings_diagnostics(db) != settings_diagnostics {
+            self.set_settings_diagnostics(db).to(settings_diagnostics);
+        }
 
+        if files_changed {
+            // The project file set only depends on the project root, explicit check paths,
+            // force-exclude, and `src` settings. Check paths and force-exclude are updated
+            // through their own setters, so a config reload only needs to reindex when the
+            // root or resolved `src` settings changed.
+            self.reload_files(db);
+        }
+
+        if metadata_changed {
             self.set_metadata(db).to(Box::new(metadata));
         }
 
-        self.reload_files(db);
+        if metadata_changed || settings_changed {
+            ProjectReloadResult::Changed { files_changed }
+        } else {
+            ProjectReloadResult::Unchanged
+        }
+    }
+
+    /// Replace stored settings diagnostics after recomputing program settings.
+    ///
+    /// This is used when a change affects [`ty_python_core::program::ProgramSettings`] without
+    /// reloading the full project.
+    pub(crate) fn update_settings_diagnostics(
+        self,
+        db: &mut dyn Db,
+        settings_diagnostics: Vec<OptionDiagnostic>,
+        program_settings_diagnostics: Vec<ProgramSettingsDiagnostic>,
+    ) {
+        let settings_diagnostics = Self::settings_diagnostics_with_program_diagnostics(
+            db,
+            settings_diagnostics,
+            program_settings_diagnostics,
+        );
+
+        if self.settings_diagnostics(db) != settings_diagnostics {
+            self.set_settings_diagnostics(db).to(settings_diagnostics);
+        }
+    }
+
+    fn settings_diagnostics_with_program_diagnostics(
+        db: &dyn Db,
+        mut settings_diagnostics: Vec<OptionDiagnostic>,
+        program_settings_diagnostics: Vec<ProgramSettingsDiagnostic>,
+    ) -> Vec<OptionDiagnostic> {
+        settings_diagnostics.extend(
+            program_settings_diagnostics
+                .into_iter()
+                .map(|diagnostic| diagnostic.into_diagnostic(db)),
+        );
+        settings_diagnostics
     }
 
     /// Checks the project and its dependencies according to the project's check mode.
@@ -269,76 +375,51 @@ impl Project {
         let files = ProjectFiles::new(db, self);
         reporter.set_files(files.len());
 
-        diagnostics.extend(
-            files
-                .diagnostics()
-                .iter()
-                .map(IOErrorDiagnostic::to_diagnostic),
-        );
+        diagnostics.extend_from_slice(files.diagnostics());
 
         reporter.report_diagnostics(db, diagnostics);
 
         let open_files = self.open_files(db);
         let check_start = ruff_db::Instant::now();
 
-        {
-            let db = db.clone();
-            let project_span = &project_span;
+        let files: Vec<_> = (&files).into_iter().collect();
 
-            rayon::scope(move |scope| {
-                for file in &files {
-                    let db = db.clone();
-                    let reporter = &*reporter;
-                    scope.spawn(move |_| {
-                        let check_file_span =
-                            tracing::debug_span!(parent: project_span, "check_file", ?file);
-                        let _entered = check_file_span.entered();
+        files
+            .into_par_iter()
+            .for_each_with_project_db(db, |db, file| {
+                db.unwind_if_revision_cancelled();
 
-                        match check_file_impl(&db, file) {
-                            Ok(diagnostics) => {
-                                reporter.report_checked_file(&db, file, diagnostics);
+                let check_file_span =
+                    tracing::debug_span!(parent: &project_span, "check_file", ?file);
+                let _entered = check_file_span.entered();
 
-                                // This is outside `check_file_impl` to avoid that opening or closing
-                                // a file invalidates the `check_file_impl` query of every file!
-                                if !open_files.contains(&file) {
-                                    // The module has already been parsed by `check_file_impl`.
-                                    // We only retrieve it here so that we can call `clear` on it.
-                                    let parsed = parsed_module(&db, file);
+                match check_file_impl(db, file) {
+                    Ok(diagnostics) => {
+                        reporter.report_checked_file(db, file, diagnostics);
 
-                                    // Drop the AST now that we are done checking this file. It is not currently open,
-                                    // so it is unlikely to be accessed again soon. If any queries need to access the AST
-                                    // from across files, it will be re-parsed.
-                                    parsed.clear();
-                                }
-                            }
-                            Err(io_error) => {
-                                reporter.report_checked_file(
-                                    &db,
-                                    file,
-                                    std::slice::from_ref(io_error),
-                                );
-                            }
+                        // This is outside `check_file_impl` to avoid that opening or closing
+                        // a file invalidates the `check_file_impl` query of every file!
+                        if !open_files.contains(&file) {
+                            // The module has already been parsed by `check_file_impl`.
+                            // We only retrieve it here so that we can call `clear` on it.
+                            let parsed = parsed_module(db, file);
+
+                            // Drop the AST now that we are done checking this file. It is not currently open,
+                            // so it is unlikely to be accessed again soon. If any queries need to access the AST
+                            // from across files, it will be re-parsed.
+                            parsed.clear();
                         }
-                    });
+                    }
+                    Err(io_error) => {
+                        reporter.report_checked_file(db, file, std::slice::from_ref(io_error));
+                    }
                 }
             });
-        };
 
         tracing::debug!(
             "Checking all files took {:.3}s",
             check_start.elapsed().as_secs_f64(),
         );
-    }
-
-    pub(crate) fn check_file(self, db: &dyn Db, file: File) -> Vec<Diagnostic> {
-        if !self.should_check_file(db, file) {
-            return Vec::new();
-        }
-
-        match check_file_impl(db, file) {
-            Ok(diagnostics) => diagnostics.to_vec(),
-            Err(diagnostic) => vec![diagnostic.clone()],
-        }
     }
 
     /// Opens a file in the project.
@@ -356,10 +437,7 @@ impl Project {
 
         let mut open_files = self.take_open_files(db);
         let removed = open_files.remove(&file);
-
-        if removed {
-            self.set_open_files(db, open_files);
-        }
+        self.set_open_files(db, open_files);
 
         removed
     }
@@ -381,6 +459,16 @@ impl Project {
         self.verbose_flag(db)
     }
 
+    pub fn set_force_exclude(self, db: &mut dyn Db, force: bool) {
+        if self.force_exclude_flag(db) != force {
+            self.set_force_exclude_flag(db).to(force);
+        }
+    }
+
+    pub fn force_exclude(self, db: &dyn Db) -> bool {
+        self.force_exclude_flag(db)
+    }
+
     /// Returns the paths that should be checked.
     ///
     /// The default is to check the entire project in which case this method returns
@@ -398,7 +486,7 @@ impl Project {
         }
     }
 
-    /// Returns the open files in the project or `None` if there are no open files.
+    /// Returns the open files in the project.
     pub fn open_files(self, db: &dyn Db) -> &FxHashSet<File> {
         self.open_fileset(db)
     }
@@ -411,6 +499,14 @@ impl Project {
         self.set_open_fileset(db).to(open_files);
     }
 
+    /// Permanently marks the project as never having open files, so reads of the
+    /// open-file state record no salsa dependency. Any later write panics.
+    pub fn freeze_open_files(self, db: &mut dyn Db) {
+        self.set_open_fileset(db)
+            .with_durability(Durability::NEVER_CHANGE)
+            .to(FxHashSet::default());
+    }
+
     /// This takes the open files from the project and returns them.
     fn take_open_files(self, db: &mut dyn Db) -> FxHashSet<File> {
         tracing::debug!("Take open project files");
@@ -418,35 +514,6 @@ impl Project {
         // Salsa will cancel any pending queries and remove its own reference to `open_files`
         // so that the reference counter to `open_files` now drops to 1.
         self.set_open_fileset(db).to(FxHashSet::default())
-    }
-
-    /// Returns `true` if the file should be checked.
-    ///
-    /// This depends on the project's check mode:
-    /// * For [`OpenFiles`], it checks if the file is either explicitly set as an open file using
-    ///   [`open_file`] or a system virtual path
-    /// * For [`AllFiles`], it checks if the file is either a system virtual path or a part of the
-    ///   indexed files in the project
-    ///
-    /// [`open_file`]: Self::open_file
-    /// [`OpenFiles`]: CheckMode::OpenFiles
-    /// [`AllFiles`]: CheckMode::AllFiles
-    pub fn should_check_file(self, db: &dyn Db, file: File) -> bool {
-        let path = file.path(db);
-
-        // Try to return early to avoid adding a dependency on `open_files` or `file_set` which
-        // both have a durability of `LOW`.
-        if path.is_vendored_path() {
-            return false;
-        }
-
-        match self.check_mode(db) {
-            CheckMode::OpenFiles => self.open_files(db).contains(&file),
-            CheckMode::AllFiles => {
-                // Virtual files are always checked.
-                path.is_system_virtual_path() || self.files(db).contains(&file)
-            }
-        }
     }
 
     #[tracing::instrument(level = "debug", skip(self, db))]
@@ -462,6 +529,59 @@ impl Project {
         };
 
         index.remove(file);
+    }
+
+    /// Removes all indexed project files under `paths`.
+    ///
+    /// This is a no-op if the project files are still lazily indexed.
+    #[tracing::instrument(level = "debug", skip(self, db, paths))]
+    pub(crate) fn remove_files_under<P, I>(self, db: &mut dyn Db, paths: I)
+    where
+        I: IntoIterator<Item = P>,
+        P: AsRef<SystemPath>,
+    {
+        let paths = deduplicate_nested_paths(
+            paths
+                .into_iter()
+                .map(|path| SystemPath::absolute(path, db.system().current_directory())),
+        )
+        .collect::<BTreeSet<_>>();
+
+        if paths.is_empty() {
+            return;
+        }
+
+        if self.file_set(db).is_lazy() {
+            return;
+        }
+
+        let files_to_remove = {
+            let files = self.files(db);
+            files
+                .iter()
+                .copied()
+                .filter(|file| {
+                    file.path(db).as_system_path().is_some_and(|file_path| {
+                        paths
+                            .range(..=file_path.to_path_buf())
+                            .next_back()
+                            .is_some_and(|path| file_path.starts_with(path))
+                    })
+                })
+                .collect::<Vec<_>>()
+        };
+
+        if files_to_remove.is_empty() {
+            return;
+        }
+
+        let Some(mut index) = IndexedFiles::indexed_mut(db, self) else {
+            return;
+        };
+
+        for file in files_to_remove {
+            index.remove(file);
+        }
     }
 
     pub fn add_file(self, db: &mut dyn Db, file: File) {
@@ -481,7 +601,7 @@ impl Project {
     /// Replaces the diagnostics from indexing the project files with `diagnostics`.
     ///
     /// This is a no-op if the project files haven't been indexed yet.
-    pub fn replace_index_diagnostics(self, db: &mut dyn Db, diagnostics: Vec<IOErrorDiagnostic>) {
+    pub fn replace_index_diagnostics(self, db: &mut dyn Db, diagnostics: Vec<Diagnostic>) {
         let Some(mut index) = IndexedFiles::indexed_mut(db, self) else {
             return;
         };
@@ -500,7 +620,7 @@ impl Project {
                         .entered();
                 let start = ruff_db::Instant::now();
 
-                let walker = ProjectFilesWalker::new(db);
+                let walker = ProjectFilesWalker::full();
                 let (files, diagnostics) = walker.collect_set(db);
 
                 tracing::info!(
@@ -532,57 +652,101 @@ impl Project {
     }
 }
 
-#[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
-pub(crate) fn check_file_impl(db: &dyn Db, file: File) -> Result<Box<[Diagnostic]>, Diagnostic> {
-    let mut diagnostics: Vec<Diagnostic> = Vec::new();
-
-    // Abort checking if there are IO errors.
-    let source = source_text(db, file);
-
-    if let Some(read_error) = source.read_error() {
-        return Err(IOErrorDiagnostic {
-            file: Some(file),
-            error: read_error.clone().into(),
-        }
-        .to_diagnostic());
+pub(crate) fn check_file(db: &dyn Db, file: File) -> Vec<Diagnostic> {
+    if !db.should_check_file(file) {
+        return Vec::new();
     }
 
-    let parsed = parsed_module(db, file);
+    check_file_impl(db, file)
+        .map(<[Diagnostic]>::to_vec)
+        .unwrap_or_else(|diagnostic| vec![diagnostic.clone()])
+}
 
-    let parsed_ref = parsed.load(db);
-    diagnostics.extend(
-        parsed_ref
-            .errors()
-            .iter()
-            .map(|error| Diagnostic::invalid_syntax(file, &error.error, error)),
-    );
+/// Returns `true` if the file should be checked.
+///
+/// This depends on the project's check mode:
+/// * For [`CheckMode::OpenFiles`], it checks if the file is explicitly in the open file set.
+/// * For [`CheckMode::AllFiles`], it checks if the file is virtual, indexed in the project, or in
+///   the open file set.
+///
+/// This query provides a per-file backdating boundary around the project-wide file sets. Updating
+/// either set still revalidates this query, but unchanged results are backdated before invalidation
+/// reaches semantic-index and type-inference queries.
+#[salsa::tracked(returns(copy))]
+pub(crate) fn should_check_file(db: &dyn Db, file: File) -> bool {
+    let project = db.project();
+    let path = file.path(db);
 
-    diagnostics.extend(parsed_ref.unsupported_syntax_errors().iter().map(|error| {
-        let mut error = Diagnostic::invalid_syntax(file, error, error);
-        add_inferred_python_version_hint_to_diagnostic(db, &mut error, "parsing syntax");
-        error
-    }));
+    // NOTE: The tracing messages below were added because whether a file should be checked or not
+    // can sometimes be at the root of confusing UX like "diagnostics all of a sudden stopped
+    // working." Having a trace message indicating why a particular file isn't being checked can
+    // be quite helpful for narrowing down the issue. The messages are at TRACE because they are
+    // extremely noisy.
 
+    if path.is_vendored_path() {
+        tracing::trace!("Not checking {path} because it is a vendored path");
+        return false;
+    }
+
+    match project.check_mode(db) {
+        CheckMode::OpenFiles => {
+            let should_check = project.open_files(db).contains(&file);
+            if !should_check {
+                tracing::trace!(
+                    "Not checking {path} because check mode is `OpenFiles` \
+                     and it is not in the open file set"
+                );
+            }
+            should_check
+        }
+        CheckMode::AllFiles => {
+            // Virtual files are always checked.
+            //
+            // We also check the open file set. In theory, we shouldn't need to do this since it is
+            // accounted for by the virtual file check (for the case when a file wants to be checked
+            // but isn't saved to disk yet). However, not all clients follow the LSP convention that
+            // URIs for documents not on disk yet use the `untitled://...` scheme. That is, we assume
+            // that a `file://...` scheme corresponds to a saved file on disk, and anything else is
+            // "virtual." For example, neovim uses `file://...` even for an open buffer that does not
+            // correspond to a file saved to disk yet.
+            if path.is_system_virtual_path() {
+                return true;
+            }
+
+            let should_check =
+                project.files(db).contains(&file) || project.open_files(db).contains(&file);
+            if !should_check {
+                tracing::trace!(
+                    "Not checking {path} because check mode is `AllFiles` \
+                     and it is not a virtual path, in the project files \
+                     or in the open file set"
+                );
+            }
+            should_check
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ProjectReloadResult {
+    /// Neither project metadata nor settings changed.
+    Unchanged,
+    /// Project metadata or settings changed.
+    Changed {
+        /// Whether the indexed project files changed.
+        files_changed: bool,
+    },
+}
+
+#[salsa::tracked(returns(as_deref), heap_size=ruff_memory_usage::heap_size)]
+pub(crate) fn check_file_impl(db: &dyn Db, file: File) -> Result<Box<[Diagnostic]>, Diagnostic> {
     {
         let db = AssertUnwindSafe(db);
-        match catch(&**db, file, || check_types(*db, file)) {
-            Ok(Some(type_check_diagnostics)) => {
-                diagnostics.extend(type_check_diagnostics);
-            }
-            Ok(None) => {}
-            Err(diagnostic) => diagnostics.push(diagnostic),
+        match catch(&**db, file, || ty_python_semantic::check_file(*db, file)) {
+            Ok(result) => result,
+            Err(diagnostic) => Ok(Box::new([diagnostic])),
         }
     }
-
-    diagnostics.sort_unstable_by_key(|diagnostic| {
-        diagnostic
-            .primary_span()
-            .and_then(|span| span.range())
-            .unwrap_or_default()
-            .start()
-    });
-
-    Ok(diagnostics.into_boxed_slice())
 }
 
 #[derive(Debug)]
@@ -599,7 +763,7 @@ impl<'a> ProjectFiles<'a> {
         }
     }
 
-    fn diagnostics(&self) -> &[IOErrorDiagnostic] {
+    fn diagnostics(&self) -> &[Diagnostic] {
         match self {
             ProjectFiles::OpenFiles(_) => &[],
             ProjectFiles::Indexed(files) => files.diagnostics(),
@@ -644,75 +808,40 @@ impl Iterator for ProjectFilesIter<'_> {
 
 impl FusedIterator for ProjectFilesIter<'_> {}
 
-#[derive(Debug, Clone, get_size2::GetSize)]
-pub struct IOErrorDiagnostic {
-    file: Option<File>,
-    error: IOErrorKind,
-}
-
-impl IOErrorDiagnostic {
-    fn to_diagnostic(&self) -> Diagnostic {
-        let mut diag = Diagnostic::new(DiagnosticId::Io, Severity::Error, &self.error);
-        if let Some(file) = self.file {
-            diag.annotate(Annotation::primary(Span::from(file)));
-        }
-        diag
-    }
-}
-
-#[derive(Error, Debug, Clone, get_size2::GetSize)]
-enum IOErrorKind {
-    #[error(transparent)]
-    Walk(#[from] walk::WalkError),
-
-    #[error(transparent)]
-    SourceText(#[from] SourceTextError),
-}
-
-fn catch<F, R>(db: &dyn Db, file: File, f: F) -> Result<Option<R>, Diagnostic>
+fn catch<F, R>(db: &dyn Db, file: File, f: F) -> Result<R, Diagnostic>
 where
     F: FnOnce() -> R + UnwindSafe,
 {
-    match ruff_db::panic::catch_unwind(|| {
-        // Ignore salsa errors
-        salsa::Cancelled::catch(f).ok()
-    }) {
+    match ruff_db::panic::catch_unwind(f) {
         Ok(result) => Ok(result),
         Err(error) => {
-            let message = error.to_diagnostic_message(Some(file.path(db)));
-            let mut diagnostic = Diagnostic::new(DiagnosticId::Panic, Severity::Fatal, message);
-            diagnostic.sub(SubDiagnostic::new(
-                SubDiagnosticSeverity::Info,
-                "This indicates a bug in ty.",
-            ));
+            match error.payload.downcast_ref::<salsa::Cancelled>() {
+                None => {
+                    // Add a diagnostic (by not early returning) for
+                    // any non Salsa panic (a bug in ty)
+                }
+                Some(salsa::Cancelled::PropagatedPanic) => {
+                    // Add a diagnostic for propagated Salsa panics. That is, query `A`
+                    // running on thread `a` depends on query `B` running on thread `b`
+                    // and query `B` panics. However, avoid adding such a diagnostic
+                    // if query `B` panicked because of a cancellation by calling
+                    // `unwind_if_revision_cancelled`.
+                    //
+                    // The propagated Salsa panic isn't very actionable for users,
+                    // but it can be useful to know that file A failed to type check
+                    // because file B panicked (both files will have a panic-diagnostic).
+                    db.unwind_if_revision_cancelled();
+                }
 
-            let report_message = "If you could open an issue at https://github.com/astral-sh/ty/issues/new?title=%5Bpanic%5D, we'd be very appreciative!";
-            diagnostic.sub(SubDiagnostic::new(
-                SubDiagnosticSeverity::Info,
-                report_message,
-            ));
-            diagnostic.sub(SubDiagnostic::new(
-                SubDiagnosticSeverity::Info,
-                format!(
-                    "Platform: {os} {arch}",
-                    os = std::env::consts::OS,
-                    arch = std::env::consts::ARCH
-                ),
-            ));
-            if let Some(version) = ruff_db::program_version() {
-                diagnostic.sub(SubDiagnostic::new(
-                    SubDiagnosticSeverity::Info,
-                    format!("Version: {version}"),
-                ));
+                // For any pending write or local cancellation, resume the panic to abort the outer query.
+                Some(_) => {
+                    error.resume_unwind();
+                }
             }
 
-            diagnostic.sub(SubDiagnostic::new(
-                SubDiagnosticSeverity::Info,
-                format!(
-                    "Args: {args:?}",
-                    args = std::env::args().collect::<Vec<_>>()
-                ),
-            ));
+            let message = error.to_diagnostic_message(Some(file.path(db)));
+            let mut diagnostic = Diagnostic::new(DiagnosticId::Panic, Severity::Fatal, message);
+            diagnostic.add_bug_sub_diagnostics("%5Bpanic%5D");
 
             if let Some(backtrace) = error.backtrace {
                 match backtrace.status() {
@@ -741,6 +870,10 @@ where
                 });
             }
 
+            // Report an untracked read because Salsa didn't carry over
+            // the dependencies of any query called by `f` because it panicked.
+            db.report_untracked_read();
+
             Err(diagnostic)
         }
     }
@@ -748,19 +881,19 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::ProjectMetadata;
     use crate::check_file_impl;
-    use crate::db::tests::TestDb;
+    use crate::db::Db as _;
+    use crate::db::testing::TestDb;
+    use crate::{IncludeResult, ProjectMetadata};
     use ruff_db::files::system_path_to_file;
     use ruff_db::source::source_text;
     use ruff_db::system::{DbWithTestSystem, DbWithWritableSystem as _, SystemPath, SystemPathBuf};
     use ruff_db::testing::assert_function_query_was_not_run;
-    use ruff_python_ast::name::Name;
     use ty_python_semantic::types::check_types;
 
     #[test]
     fn check_file_skips_type_checking_when_file_cant_be_read() -> ruff_db::system::Result<()> {
-        let project = ProjectMetadata::new(Name::new_static("test"), SystemPathBuf::from("/"));
+        let project = ProjectMetadata::new("test", SystemPathBuf::from("/"));
         let mut db = TestDb::new(project);
         db.init_program().unwrap();
         let path = SystemPath::new("test.py");
@@ -777,7 +910,7 @@ mod tests {
             check_file_impl(&db, file)
                 .as_ref()
                 .unwrap_err()
-                .primary_message()
+                .headline_message()
                 .to_string(),
             "Failed to read file: No such file or directory".to_string()
         );
@@ -795,11 +928,29 @@ mod tests {
                 .as_ref()
                 .unwrap()
                 .iter()
-                .map(|diagnostic| diagnostic.primary_message().to_string())
+                .map(|diagnostic| diagnostic.headline_message().to_string())
                 .collect::<Vec<_>>(),
             vec![] as Vec<String>
         );
 
         Ok(())
+    }
+
+    #[test]
+    fn explicit_nested_included_file_is_a_literal_match() {
+        let root = SystemPathBuf::from("/project");
+        let explicit_file = root.join("build/keep.txt");
+        let project = ProjectMetadata::new("test", root.clone());
+        let mut db = TestDb::new(project);
+        let project = db.project();
+
+        project.set_included_paths(&mut db, vec![root, explicit_file.clone()]);
+
+        assert_eq!(
+            project.is_file_included(&db, &explicit_file),
+            IncludeResult::Included {
+                literal_match: Some(true)
+            }
+        );
     }
 }

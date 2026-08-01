@@ -1,4 +1,5 @@
 use anyhow::{Result, bail};
+use ruff_diagnostics::Applicability;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::helpers::any_over_expr;
@@ -39,6 +40,9 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 ///
 /// all(starmap(predicate, some_iterable))
 /// ```
+///
+/// ## Fix safety
+/// This rule's fix is marked as safe, unless the expression contains comments.
 ///
 /// ## References
 /// - [Python documentation: `itertools.starmap`](https://docs.python.org/3/library/itertools.html#itertools.starmap)
@@ -108,7 +112,7 @@ pub(crate) fn reimplemented_starmap(checker: &Checker, target: &StarmapCandidate
             }
 
             // If the argument is used outside the function call, we can't replace it.
-            if any_over_expr(func, &|expr| {
+            if any_over_expr(func, |expr| {
                 expr.as_name_expr().is_some_and(|expr| expr.id == name.id)
             }) {
                 return;
@@ -124,7 +128,7 @@ pub(crate) fn reimplemented_starmap(checker: &Checker, target: &StarmapCandidate
             }
 
             // If any of the members are used outside the function call, we can't replace it.
-            if any_over_expr(func, &|expr| {
+            if any_over_expr(func, |expr| {
                 tuple
                     .iter()
                     .any(|elem| ComparableExpr::from(expr) == ComparableExpr::from(elem))
@@ -155,7 +159,18 @@ pub(crate) fn reimplemented_starmap(checker: &Checker, target: &StarmapCandidate
             )?,
             target.range(),
         );
-        Ok(Fix::safe_edits(import_edit, [main_edit]))
+
+        let applicability = if checker.comment_ranges().intersects(target.range()) {
+            Applicability::Unsafe
+        } else {
+            Applicability::Safe
+        };
+
+        Ok(Fix::applicable_edits(
+            import_edit,
+            [main_edit],
+            applicability,
+        ))
     });
 }
 
@@ -305,7 +320,7 @@ fn construct_starmap_call(starmap_binding: Name, iter: &Expr, func: &Expr) -> as
         func: Box::new(starmap.into()),
         arguments: ast::Arguments {
             args: Box::from([func.clone(), iter.clone()]),
-            keywords: Box::from([]),
+            keywords: std::iter::empty().collect(),
             range: TextRange::default(),
             node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         },
@@ -326,7 +341,7 @@ fn wrap_with_call_to(call: ast::ExprCall, func_name: Name) -> ast::ExprCall {
         func: Box::new(name.into()),
         arguments: ast::Arguments {
             args: Box::from([call.into()]),
-            keywords: Box::from([]),
+            keywords: std::iter::empty().collect(),
             range: TextRange::default(),
             node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         },

@@ -46,7 +46,6 @@ _S = TypeVar("_S", bound=WSGIServer)
 @overload
 def make_server(host: str, port: int, app: WSGIApplication, *, handler_class: type[WSGIRequestHandler] = ...) -> WSGIServer:
     """Create a new WSGI server listening on `host` and `port` for `app`"""
-
 @overload
 def make_server(
     host: str, port: int, app: WSGIApplication, server_class: type[_S], handler_class: type[WSGIRequestHandler] = ...

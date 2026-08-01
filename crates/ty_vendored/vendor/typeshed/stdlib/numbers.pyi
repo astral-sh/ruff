@@ -74,8 +74,7 @@ class Number(metaclass=ABCMeta):
 
     __slots__ = ()
     @abstractmethod
-    def __hash__(self) -> int:
-        """The type of the None singleton."""
+    def __hash__(self) -> int: ...
 
 # See comment at the top of the file
 # for why some of these return types are purposefully vague
@@ -171,6 +170,7 @@ class Complex(Number, _ComplexLike):
     @abstractmethod
     def __eq__(self, other: object) -> bool:
         """self == other"""
+
     __hash__: ClassVar[None]  # type: ignore[assignment]
 
 # See comment at the top of the file
@@ -220,10 +220,10 @@ class Real(Complex, _RealLike):
         If ndigits is omitted or None, returns an Integral, otherwise
         returns a Real. Rounds half toward even.
         """
-
     @abstractmethod
     @overload
     def __round__(self, ndigits: int) -> _RealLike: ...
+
     def __divmod__(self, other) -> tuple[_RealLike, _RealLike]:
         """divmod(self, other): The pair (self // other, self % other).
 
@@ -278,6 +278,7 @@ class Real(Complex, _RealLike):
 
     def conjugate(self) -> _RealLike:
         """Conjugate is a no-op for Reals."""
+
     # Not actually overridden at runtime,
     # but we override these in the stub to give them more precise return types:
     @abstractmethod
@@ -291,7 +292,11 @@ class Real(Complex, _RealLike):
 # See comment at the top of the file
 # for why some of these return types are purposefully vague
 class Rational(Real):
-    """.numerator and .denominator should be in lowest terms."""
+    """To Real, Rational adds numerator and denominator properties.
+
+    The numerator and denominator values should be in lowest terms,
+    with a positive denominator.
+    """
 
     __slots__ = ()
     @property
@@ -397,6 +402,7 @@ class Integral(Rational, _IntegralLike):
     @property
     def denominator(self) -> Literal[1]:
         """Integers have a denominator of 1."""
+
     # Not actually overridden at runtime,
     # but we override these in the stub to give them more precise return types:
     @abstractmethod
@@ -419,7 +425,6 @@ class Integral(Rational, _IntegralLike):
         If ndigits is omitted or None, returns an Integral, otherwise
         returns a Real. Rounds half toward even.
         """
-
     @abstractmethod
     @overload
     def __round__(self, ndigits: int) -> _IntegralLike: ...

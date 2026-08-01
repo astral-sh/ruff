@@ -42,3 +42,8 @@ os.system("./bin/ls")
 os.system(["/bin/ls"])
 os.system(["/bin/ls", "/tmp"])
 os.system(r"C:\\bin\ls")
+
+# Regression for https://github.com/astral-sh/ruff/issues/24075
+# Check that "partial path" checks tuples too
+import subprocess
+subprocess.run(("echo", "foo"))

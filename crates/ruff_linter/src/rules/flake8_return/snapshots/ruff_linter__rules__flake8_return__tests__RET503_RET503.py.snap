@@ -12,13 +12,11 @@ RET503 [*] Missing explicit `return` at the end of function able to return non-`
 23 |       # error
    |
 help: Add explicit `return` statement
-20 | def x(y):
-21 |     if not y:
+   |
 22 |         return 1
 23 +     return None
 24 |     # error
-25 | 
-26 | 
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
@@ -30,15 +28,12 @@ RET503 [*] Missing explicit `return` at the end of function able to return non-`
 29 | |     else:
 30 | |         return 2
    | |________________^
-   |
 help: Add explicit `return` statement
-28 |         print()  # error
-29 |     else:
+   |
 30 |         return 2
 31 +     return None
-32 | 
-33 | 
-34 | def x(y):
+32 |
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
@@ -50,15 +45,12 @@ RET503 [*] Missing explicit `return` at the end of function able to return non-`
 36 | |
 37 | |     print()  # error
    | |___________^
-   |
 help: Add explicit `return` statement
-35 |         return 1
-36 | 
+   |
 37 |     print()  # error
 38 +     return None
-39 | 
-40 | 
-41 | # for
+39 |
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
@@ -73,13 +65,11 @@ RET503 [*] Missing explicit `return` at the end of function able to return non-`
 45 |       # error
    |
 help: Add explicit `return` statement
-42 |     for i in range(10):
-43 |         if i > 10:
+   |
 44 |             return i
 45 +     return None
 46 |     # error
-47 | 
-48 | 
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
@@ -92,15 +82,12 @@ RET503 [*] Missing explicit `return` at the end of function able to return non-`
 52 | |     else:
 53 | |         print()  # error
    | |_______________^
-   |
 help: Add explicit `return` statement
-51 |             return i
-52 |     else:
+   |
 53 |         print()  # error
 54 +     return None
-55 | 
-56 | 
-57 | # A nonexistent function
+55 |
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
@@ -112,15 +99,12 @@ RET503 [*] Missing explicit `return` at the end of function able to return non-`
 59 | |         return False
 60 | |     no_such_function()  # error
    | |______________________^
-   |
 help: Add explicit `return` statement
-58 |     if x > 0:
-59 |         return False
+   |
 60 |     no_such_function()  # error
 61 +     return None
-62 | 
-63 | 
-64 | # A function that does return the control
+62 |
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
@@ -132,15 +116,12 @@ RET503 [*] Missing explicit `return` at the end of function able to return non-`
 66 | |         return False
 67 | |     print("", end="")  # error
    | |_____________________^
-   |
 help: Add explicit `return` statement
-65 |     if x > 0:
-66 |         return False
+   |
 67 |     print("", end="")  # error
 68 +     return None
-69 | 
-70 | 
-71 | ###
+69 |
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
@@ -153,15 +134,12 @@ RET503 [*] Missing explicit `return` at the end of function able to return non-`
 85 | |             return 1
 86 | |         y += 1
    | |______________^
-   |
 help: Add explicit `return` statement
-84 |         if y > 0:
-85 |             return 1
+   |
 86 |         y += 1
 87 +     return None
-88 | 
-89 | 
-90 | # exclude empty functions
+88 |
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
@@ -174,15 +152,12 @@ RET503 [*] Missing explicit `return` at the end of function able to return non-`
 116 | |             break
 117 | |         return z
     | |________________^
-    |
 help: Add explicit `return` statement
-115 |         if i > y:
-116 |             break
+    |
 117 |         return z
 118 +     return None
-119 | 
-120 | 
-121 | def bar3(x, y, z):
+119 |
+    |
 note: This is an unsafe fix and may change runtime behavior
 
 RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
@@ -197,15 +172,12 @@ RET503 [*] Missing explicit `return` at the end of function able to return non-`
 126 | |             return z
 127 | |         return None
     | |___________________^
-    |
 help: Add explicit `return` statement
-125 |         else:
-126 |             return z
+    |
 127 |         return None
 128 +     return None
-129 | 
-130 | 
-131 | def bar1(x, y, z):
+129 |
+    |
 note: This is an unsafe fix and may change runtime behavior
 
 RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
@@ -217,15 +189,12 @@ RET503 [*] Missing explicit `return` at the end of function able to return non-`
 133 | |             continue
 134 | |         return z
     | |________________^
-    |
 help: Add explicit `return` statement
-132 |         if i < y:
-133 |             continue
+    |
 134 |         return z
 135 +     return None
-136 | 
-137 | 
-138 | def bar3(x, y, z):
+136 |
+    |
 note: This is an unsafe fix and may change runtime behavior
 
 RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
@@ -240,15 +209,12 @@ RET503 [*] Missing explicit `return` at the end of function able to return non-`
 143 | |             return z
 144 | |         return None
     | |___________________^
-    |
 help: Add explicit `return` statement
-142 |         else:
-143 |             return z
+    |
 144 |         return None
 145 +     return None
-146 | 
-147 | 
-148 | def prompts(self, foo):
+146 |
+    |
 note: This is an unsafe fix and may change runtime behavior
 
 RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
@@ -261,15 +227,12 @@ RET503 [*] Missing explicit `return` at the end of function able to return non-`
 275 | |     for value in values:
 276 | |         print(value)
     | |____________________^
-    |
 help: Add explicit `return` statement
-274 | 
-275 |     for value in values:
+    |
 276 |         print(value)
 277 +     return None
-278 | 
-279 | 
-280 | def while_true():
+278 |
+    |
 note: This is an unsafe fix and may change runtime behavior
 
 RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
@@ -283,15 +246,12 @@ RET503 [*] Missing explicit `return` at the end of function able to return non-`
 291 | |         case 1:
 292 | |             print()  # error
     | |___________________^
-    |
 help: Add explicit `return` statement
-290 |             return 1
-291 |         case 1:
+    |
 292 |             print()  # error
 293 +     return None
-294 | 
-295 | 
-296 | def foo(baz: str) -> str:
+294 |
+    |
 note: This is an unsafe fix and may change runtime behavior
 
 RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
@@ -302,15 +262,12 @@ RET503 [*] Missing explicit `return` at the end of function able to return non-`
 301 | |         if True:
 302 | |             return ""
     | |_____________________^
-    |
 help: Add explicit `return` statement
-300 |     def example():
-301 |         if True:
+    |
 302 |             return ""
 303 +         return None
-304 | 
-305 | 
-306 |     def example():
+304 |
+    |
 note: This is an unsafe fix and may change runtime behavior
 
 RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
@@ -320,15 +277,12 @@ RET503 [*] Missing explicit `return` at the end of function able to return non-`
 306 | |         if True:
 307 | |             return ""
     | |_____________________^
-    |
 help: Add explicit `return` statement
-305 |     def example():
-306 |         if True:
+    |
 307 |             return ""
 308 +         return None
-309 | 
-310 | 
-311 |     def example():
+309 |
+    |
 note: This is an unsafe fix and may change runtime behavior
 
 RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
@@ -338,15 +292,12 @@ RET503 [*] Missing explicit `return` at the end of function able to return non-`
 311 | |         if True:
 312 | |             return ""  # type: ignore
     | |_____________________^
-    |
 help: Add explicit `return` statement
-310 |     def example():
-311 |         if True:
+    |
 312 |             return ""  # type: ignore
 313 +         return None
-314 | 
-315 | 
-316 |     def example():
+314 |
+    |
 note: This is an unsafe fix and may change runtime behavior
 
 RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
@@ -356,15 +307,12 @@ RET503 [*] Missing explicit `return` at the end of function able to return non-`
 316 | |         if True:
 317 | |             return ""  ;
     | |_____________________^
-    |
 help: Add explicit `return` statement
-315 |     def example():
-316 |         if True:
+    |
 317 |             return ""  ;
 318 +         return None
-319 | 
-320 | 
-321 |     def example():
+319 |
+    |
 note: This is an unsafe fix and may change runtime behavior
 
 RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
@@ -377,13 +325,11 @@ RET503 [*] Missing explicit `return` at the end of function able to return non-`
 323 |                   ;  # type: ignore
     |
 help: Add explicit `return` statement
-321 |         if True:
-322 |             return "" \
+    |
 323 |                 ;  # type: ignore
 324 +         return None
-325 | 
-326 | 
-327 | def end_of_file():
+325 |
+    |
 note: This is an unsafe fix and may change runtime behavior
 
 RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
@@ -394,15 +340,12 @@ RET503 [*] Missing explicit `return` at the end of function able to return non-`
 328 | |         return 1
 329 | |     x = 2 \
     | |_________^
-    |
 help: Add explicit `return` statement
-328 |         return 1
-329 |     x = 2 \
-330 | 
+    |
+330 |
 331 +     return None
-332 | 
-333 | 
-334 | # function return type annotation NoReturn
+332 |
+    |
 note: This is an unsafe fix and may change runtime behavior
 
 RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
@@ -415,15 +358,12 @@ RET503 [*] Missing explicit `return` at the end of function able to return non-`
 402 | |         with c:
 403 | |             d
     | |_____________^
-    |
 help: Add explicit `return` statement
-401 |     else:
-402 |         with c:
+    |
 403 |             d
 404 +     return None
-405 | 
-406 | 
-407 | 
+405 |
+    |
 note: This is an unsafe fix and may change runtime behavior
 
 RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
@@ -438,12 +378,11 @@ RET503 [*] Missing explicit `return` at the end of function able to return non-`
 417 | |         return 5
 418 | |     bar()
     | |_________^
-    |
 help: Add explicit `return` statement
-415 |         abort()
-416 |     if x == 5:
+    |
 417 |         return 5
     -     bar()
 418 +     bar()
 419 +     return None
+    |
 note: This is an unsafe fix and may change runtime behavior

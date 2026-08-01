@@ -6,30 +6,29 @@ User-defined type guards are functions of which the return type is either `TypeG
 ## Display
 
 ```py
-from ty_extensions import Intersection, Not, TypeOf
+from ty_extensions import Intersection, Not
+from ty_extensions._internal import TypeOf
 from typing_extensions import TypeGuard, TypeIs
 
 def _(
     a: TypeGuard[str],
     b: TypeIs[str | int],
-    c: TypeGuard[Intersection[complex, Not[int], Not[float]]],
+    c: TypeGuard[bool],
     d: TypeIs[tuple[TypeOf[bytes]]],
-    e: TypeGuard,  # error: [invalid-type-form]
-    f: TypeIs,  # error: [invalid-type-form]
+    e: TypeGuard,  # error: [invalid-type-form] "`typing.TypeGuard` requires exactly one argument when used in a parameter annotation"
+    f: TypeIs,  # error: [invalid-type-form] "`typing.TypeIs` requires exactly one argument when used in a parameter annotation"
 ):
-    # TODO: Should be `TypeGuard[str]`
-    reveal_type(a)  # revealed: @Todo(`TypeGuard[]` special form)
+    reveal_type(a)  # revealed: TypeGuard[str]
     reveal_type(b)  # revealed: TypeIs[str | int]
-    # TODO: Should be `TypeGuard[complex & ~int & ~float]`
-    reveal_type(c)  # revealed: @Todo(`TypeGuard[]` special form)
+    reveal_type(c)  # revealed: TypeGuard[bool]
     reveal_type(d)  # revealed: TypeIs[tuple[<class 'bytes'>]]
     reveal_type(e)  # revealed: Unknown
     reveal_type(f)  # revealed: Unknown
 
-# TODO: error: [invalid-return-type] "Function always implicitly returns `None`, which is not assignable to return type `TypeGuard[str]`"
+# error: [empty-body] "Function always implicitly returns `None`, which is not assignable to return type `TypeGuard[str]`"
 def _(a) -> TypeGuard[str]: ...
 
-# error: [invalid-return-type] "Function always implicitly returns `None`, which is not assignable to return type `TypeIs[str]`"
+# error: [empty-body] "Function always implicitly returns `None`, which is not assignable to return type `TypeIs[str]`"
 def _(a) -> TypeIs[str]: ...
 def f(a) -> TypeGuard[str]:
     return True
@@ -38,8 +37,7 @@ def g(a) -> TypeIs[str]:
     return True
 
 def _(a: object):
-    # TODO: Should be `TypeGuard[str @ a]`
-    reveal_type(f(a))  # revealed: @Todo(`TypeGuard[]` special form)
+    reveal_type(f(a))  # revealed: TypeGuard[str @ a]
     reveal_type(g(a))  # revealed: TypeIs[str @ a]
 ```
 
@@ -49,12 +47,23 @@ A user-defined type guard must accept at least one positional argument (in addit
 for non-static methods).
 
 ```pyi
+from typing import Any, TypeVar
 from typing_extensions import TypeGuard, TypeIs
 
-# TODO: error: [invalid-type-guard-definition]
+T = TypeVar("T")
+
+# Multiple parameters are allowed
+def is_str_list(val: list[object], allow_empty: bool) -> TypeGuard[list[str]]: ...
+def is_set_of(val: set[Any], type: type[T]) -> TypeGuard[set[T]]: ...
+def is_two_element_tuple(val: tuple[object, ...], a: str, b: str) -> TypeIs[tuple[str, str]]: ...
+
+# error: [invalid-type-guard-definition] "`TypeGuard` function must have a parameter to narrow"
 def _() -> TypeGuard[str]: ...
 
-# TODO: error: [invalid-type-guard-definition]
+# error: [invalid-type-guard-definition] "`TypeGuard` function must have a parameter to narrow"
+def _(*args) -> TypeGuard[str]: ...
+
+# error: [invalid-type-guard-definition] "`TypeIs` function must have a parameter to narrow"
 def _(**kwargs) -> TypeIs[str]: ...
 
 class _:
@@ -66,14 +75,17 @@ class _:
     def _(a) -> TypeIs[str]: ...
 
     # errors
-    def _(self) -> TypeGuard[str]: ...  # TODO: error: [invalid-type-guard-definition]
-    def _(self, /, *, a) -> TypeGuard[str]: ...  # TODO: error: [invalid-type-guard-definition]
+    # error: [invalid-type-guard-definition] "`TypeGuard` function must have a parameter to narrow"
+    def _(self) -> TypeGuard[str]: ...
+    # error: [invalid-type-guard-definition] "`TypeGuard` function must have a parameter to narrow"
+    def _(self, /, *, a) -> TypeGuard[str]: ...
     @classmethod
-    def _(cls) -> TypeIs[str]: ...  # TODO: error: [invalid-type-guard-definition]
+    def _(cls) -> TypeIs[str]: ...  # error: [invalid-type-guard-definition] "`TypeIs` function must have a parameter to narrow"
     @classmethod
-    def _() -> TypeIs[str]: ...  # TODO: error: [invalid-type-guard-definition]
+    def _() -> TypeIs[str]: ...  # error: [invalid-type-guard-definition] "`TypeIs` function must have a parameter to narrow"
     @staticmethod
-    def _(*, a) -> TypeGuard[str]: ...  # TODO: error: [invalid-type-guard-definition]
+    # error: [invalid-type-guard-definition] "`TypeGuard` function must have a parameter to narrow"
+    def _(*, a) -> TypeGuard[str]: ...
 ```
 
 For `TypeIs` functions, the narrowed type must be assignable to the declared type of that parameter,
@@ -89,11 +101,114 @@ def _(a: tuple[object]) -> TypeIs[tuple[str]]: ...
 def _(a: str | Any) -> TypeIs[str]: ...
 def _(a) -> TypeIs[str]: ...
 
-# TODO: error: [invalid-type-guard-definition]
+# error: [invalid-type-guard-definition] "Narrowed type `str` is not assignable to the declared parameter type `int`"
 def _(a: int) -> TypeIs[str]: ...
 
-# TODO: error: [invalid-type-guard-definition]
+# error: [invalid-type-guard-definition] "Narrowed type `int` is not assignable to the declared parameter type `bool | str`"
 def _(a: bool | str) -> TypeIs[int]: ...
+```
+
+## Overloaded definitions
+
+Each overload is checked exactly once, and distinct invalid overloads each report their own
+diagnostic.
+
+```pyi
+from typing import overload
+from typing_extensions import Never, TypeIs
+
+@overload
+# error: [invalid-type-guard-definition] "Narrowed type `bool` is not assignable to the declared parameter type `Never`"
+def one_invalid(value: Never) -> TypeIs[bool]: ...
+@overload
+def one_invalid(value: object) -> TypeIs[str]: ...
+
+# Two distinct invalid overloads should each report their own diagnostic.
+@overload
+# error: [invalid-type-guard-definition] "Narrowed type `bool` is not assignable to the declared parameter type `Never`"
+def two_invalid(value: Never) -> TypeIs[bool]: ...
+@overload
+# error: [invalid-type-guard-definition] "Narrowed type `str` is not assignable to the declared parameter type `int`"
+def two_invalid(value: int) -> TypeIs[str]: ...
+```
+
+## Methods
+
+Methods narrow the first positional argument after `self` or `cls`
+
+```py
+from typing import TypeGuard
+
+class C:
+    def f(self, x: object, other: object = object()) -> TypeGuard[str]:
+        return True
+
+    @classmethod
+    def g(cls, x: object, other: object = object()) -> TypeGuard[int]:
+        return True
+
+    def h(
+        self,
+    ) -> TypeGuard[str]:  # error: [invalid-type-guard-definition] "`TypeGuard` function must have a parameter to narrow"
+        return True
+
+    @classmethod
+    def j(cls) -> TypeGuard[int]:  # error: [invalid-type-guard-definition] "`TypeGuard` function must have a parameter to narrow"
+        return True
+
+def _(x: object, other: object):
+    if C().f(x):
+        reveal_type(x)  # revealed: str
+    if C.f(C(), x):
+        reveal_type(x)  # revealed: str
+    if C.g(x):
+        reveal_type(x)  # revealed: int
+    if C().g(x):
+        reveal_type(x)  # revealed: int
+    if C().f(other=other, x=x):
+        reveal_type(x)  # revealed: str
+        reveal_type(other)  # revealed: object
+    if C.f(C(), other=other, x=x):
+        reveal_type(x)  # revealed: str
+        reveal_type(other)  # revealed: object
+    if C.g(other=other, x=x):
+        reveal_type(x)  # revealed: int
+        reveal_type(other)  # revealed: object
+    if C().h():
+        pass
+    if C.j():
+        pass
+```
+
+```py
+from typing_extensions import TypeIs
+
+def is_int(val: object) -> TypeIs[int]:
+    return isinstance(val, int)
+
+class A:
+    def is_int(self, val: object) -> TypeIs[int]:
+        return isinstance(val, int)
+
+    @classmethod
+    def is_int2(cls, val: object) -> TypeIs[int]:
+        return isinstance(val, int)
+
+def _(x: object):
+    if is_int(x):
+        reveal_type(x)  # revealed: int
+
+    if A().is_int(x):
+        reveal_type(x)  # revealed: int
+
+    if A.is_int(A(), x):
+        reveal_type(x)  # revealed: int
+
+    if A().is_int2(x):
+        reveal_type(x)  # revealed: int
+
+    if A.is_int2(x):
+        reveal_type(x)  # revealed: int
 ```
 
 ## Arguments to special forms
@@ -105,15 +220,13 @@ from typing_extensions import TypeGuard, TypeIs
 
 a = 123
 
-# TODO: error: [invalid-type-form]
+# error: [invalid-type-form] "Special form `typing.TypeGuard` expected exactly one type parameter"
 def f(_) -> TypeGuard[int, str]: ...
 
 # error: [invalid-type-form] "Special form `typing.TypeIs` expected exactly one type parameter"
-# error: [invalid-type-form] "Variable of type `Literal[123]` is not allowed in a type expression"
 def g(_) -> TypeIs[a, str]: ...
 
-# TODO: Should be `Unknown`
-reveal_type(f(0))  # revealed: @Todo(`TypeGuard[]` special form)
+reveal_type(f(0))  # revealed: Unknown
 reveal_type(g(0))  # revealed: Unknown
 ```
 
@@ -126,9 +239,10 @@ from typing_extensions import Literal, TypeGuard, TypeIs, assert_never
 
 def _(a: object, flag: bool) -> TypeGuard[str]:
     if flag:
+        # error: [invalid-return-type] "Return type does not match returned value: expected `TypeGuard[str]`, found `Literal[0]`"
         return 0
 
-    # TODO: error: [invalid-return-type] "Return type does not match returned value: expected `TypeIs[str]`, found `Literal["foo"]`"
+    # error: [invalid-return-type] "Return type does not match returned value: expected `TypeGuard[str]`, found `Literal["foo"]`"
     return "foo"
 
 # error: [invalid-return-type] "Function can implicitly return `None`, which is not assignable to return type `TypeIs[str]`"
@@ -145,30 +259,53 @@ def g(a: Literal["foo", "bar"]) -> TypeIs[Literal["foo"]]:
     return False
 ```
 
-## Invalid calls
+## Calls
 
 ```py
-from typing import Any
+from typing import Any, Literal, overload
 from typing_extensions import TypeGuard, TypeIs
 
-def f(a: object) -> TypeGuard[str]:
+def f(a: object, other: object = object()) -> TypeGuard[str]:
     return True
 
-def g(a: object) -> TypeIs[int]:
+def g(a: object, other: object = object()) -> TypeIs[int]:
     return True
 
-def _(d: Any):
-    if f():  # error: [missing-argument]
+def defaulted(a: object = object(), other: object = object()) -> TypeIs[int]:
+    return True
+
+@overload
+def overloaded(a: object, mode: Literal[True]) -> TypeIs[int]: ...
+@overload
+def overloaded(a: object, mode: Literal[False]) -> TypeIs[int]: ...
+def overloaded(a: object, mode: bool) -> TypeIs[int]:
+    return True
+
+def _(d: Any, guarded: object, narrowed: object, other: object, mode: bool):
+    if f():  # error: [missing-argument] "No argument provided for required parameter `a` of function `f`"
         ...
 
     if g(*d):
-        ...
+        pass
 
-    if f("foo"):  # TODO: error: [invalid-type-guard-call]
-        ...
+    if f("foo"): ...
 
-    if g(a=d):  # error: [invalid-type-guard-call]
-        ...
+    if f(other=other, a=guarded):
+        reveal_type(guarded)  # revealed: str
+        reveal_type(other)  # revealed: object
+
+    if g(other=other, a=narrowed):
+        reveal_type(narrowed)  # revealed: int
+        reveal_type(other)  # revealed: object
+
+    if defaulted(other=other):
+        reveal_type(other)  # revealed: object
+
+    if defaulted():
+        pass
+
+    if overloaded(mode=mode, a=narrowed):
+        reveal_type(narrowed)  # revealed: int
 ```
 
 ## Narrowing
@@ -193,8 +330,7 @@ def is_bar(a: object) -> TypeIs[Bar]:
 
 def _(a: Foo | Bar):
     if guard_foo(a):
-        # TODO: Should be `Foo`
-        reveal_type(a)  # revealed: Foo | Bar
+        reveal_type(a)  # revealed: Foo
     else:
         reveal_type(a)  # revealed: Foo | Bar
 
@@ -202,6 +338,26 @@ def _(a: Foo | Bar):
         reveal_type(a)  # revealed: Bar
     else:
         reveal_type(a)  # revealed: Foo & ~Bar
+```
+
+```py
+from typing import TypeGuard, reveal_type
+
+class P:
+    pass
+
+class A:
+    pass
+
+class B:
+    pass
+
+def is_b(val: object) -> TypeGuard[B]:
+    return isinstance(val, B)
+
+def _(x: P):
+    if isinstance(x, A) or is_b(x):
+        reveal_type(x)  # revealed: B | (P & A)
 ```
 
 Attribute and subscript narrowing is supported:
@@ -215,23 +371,17 @@ class C(Generic[T]):
     v: T
 
 def _(a: tuple[Foo, Bar] | tuple[Bar, Foo], c: C[Any]):
-    # TODO: Should be `TypeGuard[Foo @ a[1]]`
-    if reveal_type(guard_foo(a[1])):  # revealed: @Todo(`TypeGuard[]` special form)
-        # TODO: Should be `tuple[Bar, Foo]`
+    if reveal_type(guard_foo(a[1])):  # revealed: TypeGuard[Foo @ a[1]]
         reveal_type(a)  # revealed: tuple[Foo, Bar] | tuple[Bar, Foo]
-        # TODO: Should be `Foo`
-        reveal_type(a[1])  # revealed: Bar | Foo
+        reveal_type(a[1])  # revealed: Foo
 
     if reveal_type(is_bar(a[0])):  # revealed: TypeIs[Bar @ a[0]]
-        # TODO: Should be `tuple[Bar, Bar & Foo]`
         reveal_type(a)  # revealed: tuple[Foo, Bar] | tuple[Bar, Foo]
         reveal_type(a[0])  # revealed: Bar
 
-    # TODO: Should be `TypeGuard[Foo @ c.v]`
-    if reveal_type(guard_foo(c.v)):  # revealed: @Todo(`TypeGuard[]` special form)
+    if reveal_type(guard_foo(c.v)):  # revealed: TypeGuard[Foo @ c.v]
         reveal_type(c)  # revealed: C[Any]
-        # TODO: Should be `Foo`
-        reveal_type(c.v)  # revealed: Any
+        reveal_type(c.v)  # revealed: Foo
 
     if reveal_type(is_bar(c.v)):  # revealed: TypeIs[Bar @ c.v]
         reveal_type(c)  # revealed: C[Any]
@@ -246,22 +396,18 @@ def _(a: Foo | Bar):
     c = is_bar(a)
 
     reveal_type(a)  # revealed: Foo | Bar
-    # TODO: Should be `TypeGuard[Foo @ a]`
-    reveal_type(b)  # revealed: @Todo(`TypeGuard[]` special form)
+    reveal_type(b)  # revealed: TypeGuard[Foo @ a]
     reveal_type(c)  # revealed: TypeIs[Bar @ a]
 
     if b:
-        # TODO should be `Foo`
-        reveal_type(a)  # revealed: Foo | Bar
+        reveal_type(a)  # revealed: Foo
     else:
         reveal_type(a)  # revealed: Foo | Bar
 
     if c:
-        # TODO should be `Bar`
-        reveal_type(a)  # revealed: Foo | Bar
+        reveal_type(a)  # revealed: Bar
     else:
-        # TODO should be `Foo & ~Bar`
-        reveal_type(a)  # revealed: Foo | Bar
+        reveal_type(a)  # revealed: Foo & ~Bar
 ```
 
 Further writes to the narrowed place invalidate the narrowing:
@@ -283,12 +429,12 @@ The `TypeIs` type remains effective across generic boundaries:
 ```py
 from typing_extensions import TypeVar
 
-T = TypeVar("T")
+IdentityT = TypeVar("IdentityT")
 
 def f(v: object) -> TypeIs[Bar]:
     return True
 
-def g(v: T) -> T:
+def g(v: IdentityT) -> IdentityT:
     return v
 
 def _(a: Foo):
@@ -300,23 +446,42 @@ def _(a: Foo):
         reveal_type(a)  # revealed: Foo & Bar
 ```
 
-For generics, we transform the argument passed into `TypeIs[]` from `X` to `Top[X]`. This helps
-especially when using various functions from typeshed that are annotated as returning
-`TypeIs[SomeCovariantGeneric[Any]]` to avoid false positives in other type checkers. For ty's
-purposes, it would usually lead to more intuitive results if `object` was used as the specialization
-for a covariant generic inside the `TypeIs` special form, but this is mitigated by our implicit
-transformation from `TypeIs[SomeCovariantGeneric[Any]]` to `TypeIs[Top[SomeCovariantGeneric[Any]]]`
-(which just simplifies to `TypeIs[SomeCovariantGeneric[object]]`).
+Type guard narrowing also works when the callee has a `Callable` type:
 
 ```py
-class Unrelated: ...
+from typing import Callable
 
+def _(x: Foo | Bar, is_bar: Callable[[object], TypeIs[Bar]]):
+    if is_bar(x):
+        reveal_type(x)  # revealed: Bar
+    else:
+        reveal_type(x)  # revealed: Foo & ~Bar
+```
+
+A `TypeIs` function that returns a gradual specialization of a generic class narrows to that generic
+type without replacing its gradual type argument:
+
+```py
 class Covariant[T]:
     def get(self) -> T:
         raise NotImplementedError
 
 def is_instance_of_covariant(arg: object) -> TypeIs[Covariant[Any]]:
     return isinstance(arg, Covariant)
+
+def _(x: object):
+    if is_instance_of_covariant(x):
+        reveal_type(x)  # revealed: Covariant[Any]
+```
+
+However, intersecting with the declared gradual type does not necessarily exclude every other
+specialization in the negative branch:
+
+```py
+from typing import final
+
+@final
+class Unrelated: ...
 
 def needs_instance_of_unrelated(arg: Unrelated):
     pass
@@ -325,11 +490,31 @@ def _(x: Unrelated | Covariant[int]):
     if is_instance_of_covariant(x):
         raise RuntimeError("oh no")
 
-    reveal_type(x)  # revealed: Unrelated & ~Covariant[object]
+    reveal_type(x)  # revealed: Unrelated | (Covariant[int] & ~Covariant[Any])
 
-    # We would emit a false-positive diagnostic here if we didn't implicitly transform
-    # `TypeIs[Covariant[Any]]` to `TypeIs[Covariant[object]]`
-    needs_instance_of_unrelated(x)
+    needs_instance_of_unrelated(x)  # error: [invalid-argument-type]
+```
+
+If a user wants to select *all* instances of `Covariant`, they must use `Covariant[object]`, or more
+generally, `Top[C[Any]]`, which also works for invariant generic types:
+
+```py
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from ty_extensions import Top
+
+class Invariant[T]:
+    value: T  # make it invariant in `T`
+
+def is_instance_of_invariant(arg: object) -> "TypeIs[Top[Invariant[Any]]]":
+    return isinstance(arg, Invariant)
+
+def _(x: Unrelated | Invariant[int]):
+    if is_instance_of_invariant(x):
+        reveal_type(x)  # revealed: Invariant[int]
+    else:
+        reveal_type(x)  # revealed: Unrelated
 ```
 
 ## `TypeGuard` special cases
@@ -345,25 +530,137 @@ class Baz(Bar): ...
 def guard_foo(a: object) -> TypeGuard[Foo]:
     return True
 
+def guard_bar(a: object) -> TypeGuard[Bar]:
+    return True
+
 def is_bar(a: object) -> TypeIs[Bar]:
     return True
 
 def does_not_narrow_in_negative_case(a: Foo | Bar):
     if not guard_foo(a):
-        # TODO: Should be `Bar`
         reveal_type(a)  # revealed: Foo | Bar
     else:
-        reveal_type(a)  # revealed: Foo | Bar
+        reveal_type(a)  # revealed: Foo
 
 def narrowed_type_must_be_exact(a: object, b: Baz):
     if guard_foo(b):
-        # TODO: Should be `Foo`
-        reveal_type(b)  # revealed: Baz
+        reveal_type(b)  # revealed: Foo
 
     if isinstance(a, Baz) and is_bar(a):
         reveal_type(a)  # revealed: Baz
 
     if isinstance(a, Bar) and guard_foo(a):
-        # TODO: Should be `Foo`
-        reveal_type(a)  # revealed: Bar
+        reveal_type(a)  # revealed: Foo
+        if guard_bar(a):
+            reveal_type(a)  # revealed: Bar
+```
+
+## TypeGuard overrides normal constraints
+
+TypeGuard constraints override any previous narrowing, but additional "regular" constraints can be
+added on to TypeGuard constraints.
+
+```py
+from typing_extensions import TypeGuard, TypeIs
+
+class A: ...
+class B: ...
+class C: ...
+
+def f(x: object) -> TypeGuard[A]:
+    return True
+
+def g(x: object) -> TypeGuard[B]:
+    return True
+
+def h(x: object) -> TypeIs[C]:
+    return True
+
+def _(x: object):
+    if f(x) and g(x) and h(x):
+        reveal_type(x)  # revealed: B & C
+```
+
+## Boolean logic with TypeGuard and TypeIs
+
+TypeGuard constraints need to properly distribute through boolean operations.
+
+```py
+from typing_extensions import TypeGuard, TypeIs
+
+class A: ...
+class B: ...
+class C: ...
+
+def f(x: object) -> TypeIs[A]:
+    return True
+
+def g(x: object) -> TypeGuard[B]:
+    return True
+
+def h(x: object) -> TypeIs[C]:
+    return True
+
+def _(x: object):
+    # g(x) or h(x) should give B | C
+    # Then f(x) and (...) should distribute: (f(x) and g(x)) or (f(x) and h(x))
+    # Which is (Regular(A) & TypeGuard(B)) | (Regular(A) & Regular(C))
+    # TypeGuard clobbers in the first branch, giving: B | (A & C)
+    if f(x) and (g(x) or h(x)):
+        reveal_type(x)  # revealed: B | (A & C)
+```
+
+## Narrowing with named expressions (walrus operator)
+
+When a type guard is used with a named expression, the target of the named expression should be
+narrowed. When a type guard is the value of a named expression, its argument should also be
+narrowed.
+
+```py
+from typing_extensions import TypeGuard, TypeIs
+
+def is_str(x: object) -> TypeIs[str]:
+    return isinstance(x, str)
+
+def guard_str(x: object) -> TypeGuard[str]:
+    return isinstance(x, str)
+
+def get_value() -> int | str:
+    return 1
+
+def f():
+    if is_str(x := get_value()):
+        reveal_type(x)  # revealed: str
+    else:
+        reveal_type(x)  # revealed: int
+
+    if guard_str(y := get_value()):
+        reveal_type(y)  # revealed: str
+    else:
+        reveal_type(y)  # revealed: int | str
+
+    value = get_value()
+    if result := is_str(value):
+        reveal_type(value)  # revealed: str
+        reveal_type(result)  # revealed: TypeIs[str @ value] & ~AlwaysFalsy
+    else:
+        reveal_type(value)  # revealed: int
+        reveal_type(result)  # revealed: TypeIs[str @ value] & ~AlwaysTruthy
+
+    other = get_value()
+    if result := guard_str(other):
+        reveal_type(other)  # revealed: str
+        reveal_type(result)  # revealed: TypeGuard[str @ other] & ~AlwaysFalsy
+    else:
+        reveal_type(other)  # revealed: int | str
+        reveal_type(result)  # revealed: TypeGuard[str @ other] & ~AlwaysTruthy
+
+def guard_list(value: object) -> TypeGuard[list[int]]:
+    return isinstance(value, list)
+
+def overwritten_target(value: object):
+    if value := guard_list(value):
+        reveal_type(value)  # revealed: TypeGuard[list[int] @ value] & ~AlwaysFalsy
+    else:
+        reveal_type(value)  # revealed: TypeGuard[list[int] @ value] & ~AlwaysTruthy
 ```

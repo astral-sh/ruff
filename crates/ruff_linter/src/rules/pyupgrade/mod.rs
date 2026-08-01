@@ -44,8 +44,8 @@ mod tests {
     #[test_case(Rule::NonPEP585Annotation, Path::new("UP006_1.py"))]
     #[test_case(Rule::NonPEP585Annotation, Path::new("UP006_2.py"))]
     #[test_case(Rule::NonPEP585Annotation, Path::new("UP006_3.py"))]
-    #[test_case(Rule::NonPEP604AnnotationUnion, Path::new("UP007.py"))]
-    #[test_case(Rule::NonPEP604AnnotationOptional, Path::new("UP045.py"))]
+    #[test_case(Rule::NonPEP604AnnotationUnion, Path::new("UP007_1.py"))]
+    #[test_case(Rule::NonPEP604AnnotationOptional, Path::new("UP045_1.py"))]
     #[test_case(Rule::NonPEP604Isinstance, Path::new("UP038.py"))]
     #[test_case(Rule::OSErrorAlias, Path::new("UP024_0.py"))]
     #[test_case(Rule::OSErrorAlias, Path::new("UP024_1.py"))]
@@ -100,6 +100,7 @@ mod tests {
     #[test_case(Rule::UnicodeKindPrefix, Path::new("UP025.py"))]
     #[test_case(Rule::UnnecessaryBuiltinImport, Path::new("UP029_0.py"))]
     #[test_case(Rule::UnnecessaryBuiltinImport, Path::new("UP029_2.py"))]
+    #[test_case(Rule::UnnecessaryBuiltinImport, Path::new("UP029_3.py"))]
     #[test_case(Rule::UnnecessaryClassParentheses, Path::new("UP039.py"))]
     #[test_case(Rule::UnnecessaryDefaultTypeArgs, Path::new("UP043.py"))]
     #[test_case(Rule::UnnecessaryEncodeUTF8, Path::new("UP012.py"))]
@@ -127,6 +128,96 @@ mod tests {
         Ok(())
     }
 
+    /// Test that enabling preview switches from `FA100` to the rule when `future-annotations` is on.
+    #[test_case(Rule::NonPEP585Annotation, Path::new("UP006_4.py"))]
+    #[test_case(Rule::NonPEP604AnnotationUnion, Path::new("UP007_2.py"))]
+    #[test_case(Rule::NonPEP604AnnotationOptional, Path::new("UP045_2.py"))]
+    fn preview_with_fa100(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!("preview_with_fa100_{}", path.to_string_lossy());
+        assert_diagnostics_diff!(
+            snapshot,
+            Path::new("pyupgrade").join(path),
+            &settings::LinterSettings {
+                future_annotations: true,
+                preview: PreviewMode::Disabled,
+                unresolved_target_version: PythonVersion::PY38.into(),
+                ..settings::LinterSettings::for_rules(vec![
+                    rule_code,
+                    Rule::FutureRewritableTypeAnnotation
+                ])
+            },
+            &settings::LinterSettings {
+                future_annotations: true,
+                preview: PreviewMode::Enabled,
+                unresolved_target_version: PythonVersion::PY38.into(),
+                ..settings::LinterSettings::for_rules(vec![
+                    rule_code,
+                    Rule::FutureRewritableTypeAnnotation
+                ])
+            },
+        );
+        Ok(())
+    }
+
+    /// Test that `FA100` fires when added alongside the rule in preview on 3.8 with
+    /// `future-annotations` disabled.
+    #[test_case(Rule::NonPEP585Annotation, Path::new("UP006_4.py"))]
+    #[test_case(Rule::NonPEP604AnnotationUnion, Path::new("UP007_2.py"))]
+    #[test_case(Rule::NonPEP604AnnotationOptional, Path::new("UP045_2.py"))]
+    fn preview_with_fa100_no_future_annotations_setting(
+        rule_code: Rule,
+        path: &Path,
+    ) -> Result<()> {
+        let snapshot = format!(
+            "preview_with_fa100_no_future_annotations_{}",
+            path.to_string_lossy()
+        );
+        assert_diagnostics_diff!(
+            snapshot,
+            Path::new("pyupgrade").join(path),
+            &settings::LinterSettings {
+                preview: PreviewMode::Enabled,
+                unresolved_target_version: PythonVersion::PY38.into(),
+                ..settings::LinterSettings::for_rule(rule_code)
+            },
+            &settings::LinterSettings {
+                preview: PreviewMode::Enabled,
+                unresolved_target_version: PythonVersion::PY38.into(),
+                ..settings::LinterSettings::for_rules(vec![
+                    rule_code,
+                    Rule::FutureRewritableTypeAnnotation,
+                ])
+            },
+        );
+        Ok(())
+    }
+
+    /// On 3.10, the `__future__` import is unnecessary from either the `future-annotations` setting
+    /// or from FA100.
+    #[test_case(Rule::NonPEP585Annotation, Path::new("UP006_4.py"))]
+    #[test_case(Rule::NonPEP604AnnotationUnion, Path::new("UP007_2.py"))]
+    #[test_case(Rule::NonPEP604AnnotationOptional, Path::new("UP045_2.py"))]
+    fn preview_with_fa100_and_future_annotations_py310(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!(
+            "{}_preview_with_fa100_and_future_annotations_py310",
+            path.to_string_lossy()
+        );
+        let diagnostics = test_path(
+            Path::new("pyupgrade").join(path).as_path(),
+            &settings::LinterSettings {
+                preview: PreviewMode::Enabled,
+                future_annotations: true,
+                unresolved_target_version: PythonVersion::PY310.into(),
+                ..settings::LinterSettings::for_rules(vec![
+                    rule_code,
+                    Rule::FutureRewritableTypeAnnotation,
+                ])
+            },
+        )?;
+        assert_diagnostics!(snapshot, diagnostics);
+        Ok(())
+    }
+
     #[test_case(Rule::NonPEP695GenericClass, Path::new("UP046_2.py"))]
     #[test_case(Rule::NonPEP695GenericFunction, Path::new("UP047_1.py"))]
     fn rules_not_applied_default_typevar_backported(rule_code: Rule, path: &Path) -> Result<()> {
@@ -143,8 +234,7 @@ mod tests {
         Ok(())
     }
 
-    #[test_case(Rule::SuperCallWithParameters, Path::new("UP008.py"))]
-    #[test_case(Rule::TypingTextStrAlias, Path::new("UP019.py"))]
+    #[test_case(Rule::OSErrorAlias, Path::new("UP024_0.py"))]
     fn rules_preview(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}__preview", path.to_string_lossy());
         let diagnostics = test_path(
@@ -386,29 +476,34 @@ mod tests {
                 ])
             },
         );
-        assert_diagnostics!(diagnostics, @r"
+        assert_diagnostics!(diagnostics, @"
         UP035 [*] Import from `shlex` instead: `quote`
          --> <filename>:1:1
           |
         1 | from pipes import quote, Template
           | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-          |
         help: Import from `shlex`
+          |
           - from pipes import quote, Template
         1 + from pipes import Template
         2 + from shlex import quote
-
-        I002 [*] Missing required import: `from __future__ import generator_stop`
-        --> <filename>:1:1
-        help: Insert required import: `from __future__ import generator_stop`
-        1 + from __future__ import generator_stop
-        2 | from pipes import quote, Template
+          |
 
         I002 [*] Missing required import: `from collections import Sequence`
         --> <filename>:1:1
         help: Insert required import: `from collections import Sequence`
+          |
         1 + from collections import Sequence
         2 | from pipes import quote, Template
+          |
+
+        I002 [*] Missing required import: `from __future__ import generator_stop`
+        --> <filename>:1:1
+        help: Insert required import: `from __future__ import generator_stop`
+          |
+        1 + from __future__ import generator_stop
+        2 | from pipes import quote, Template
+          |
         ");
     }
 
@@ -439,17 +534,29 @@ mod tests {
     }
 
     #[test]
-    fn unnecessary_default_type_args_stubs_py312_preview() -> Result<()> {
-        let snapshot = format!("{}__preview", "UP043.pyi");
+    fn unnecessary_default_type_args_stubs_py312() -> Result<()> {
+        let snapshot = "UP043.pyi";
         let diagnostics = test_path(
             Path::new("pyupgrade/UP043.pyi"),
             &settings::LinterSettings {
-                preview: PreviewMode::Enabled,
                 unresolved_target_version: PythonVersion::PY312.into(),
                 ..settings::LinterSettings::for_rule(Rule::UnnecessaryDefaultTypeArgs)
             },
         )?;
         assert_diagnostics!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn up045_future_annotations_py39() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("pyupgrade/UP045_py39.py"),
+            &settings::LinterSettings {
+                unresolved_target_version: PythonVersion::PY39.into(),
+                ..settings::LinterSettings::for_rule(Rule::NonPEP604AnnotationOptional)
+            },
+        )?;
+        assert_diagnostics!(diagnostics);
         Ok(())
     }
 }

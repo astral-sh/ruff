@@ -5,8 +5,8 @@ use std::iter::FusedIterator;
 use std::slice::Iter;
 
 use ruff_python_ast::statement_visitor::{StatementVisitor, walk_stmt};
+use ruff_python_ast::token::{Token, TokenKind, Tokens};
 use ruff_python_ast::{self as ast, Stmt, Suite};
-use ruff_python_parser::{Token, TokenKind, Tokens};
 use ruff_source_file::UniversalNewlineIterator;
 use ruff_text_size::{Ranged, TextSize};
 

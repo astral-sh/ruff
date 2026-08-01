@@ -2,8 +2,7 @@
 numbers.
 """
 
-from typing import Final, SupportsComplex, SupportsFloat, SupportsIndex
-from typing_extensions import TypeAlias
+from typing import Final, SupportsComplex, SupportsFloat, SupportsIndex, TypeAlias
 
 e: Final[float]
 pi: Final[float]
@@ -13,6 +12,7 @@ nan: Final[float]
 nanj: Final[complex]
 tau: Final[float]
 
+_F: TypeAlias = SupportsFloat | SupportsIndex
 _C: TypeAlias = SupportsFloat | SupportsComplex | SupportsIndex | complex
 
 def acos(z: _C, /) -> complex:
@@ -54,11 +54,12 @@ def isclose(a: _C, b: _C, *, rel_tol: SupportsFloat = 1e-09, abs_tol: SupportsFl
 
     Return True if a is close in value to b, and False otherwise.
 
-    For the values to be considered close, the difference between them must be
-    smaller than at least one of the tolerances.
+    For the values to be considered close, the difference between them must
+    be smaller than at least one of the tolerances.
 
-    -inf, inf and NaN behave similarly to the IEEE 754 Standard. That is, NaN is
-    not close to anything, even itself. inf and -inf are only close to themselves.
+    -inf, inf and NaN behave similarly to the IEEE 754 Standard.  That is,
+    NaN is not close to anything, even itself. inf and -inf are only close
+    to themselves.
     """
 
 def isinf(z: _C, /) -> bool:
@@ -70,7 +71,8 @@ def isnan(z: _C, /) -> bool:
 def log(z: _C, base: _C = ..., /) -> complex:
     """log(z[, base]) -> the logarithm of z to the given base.
 
-    If the base is not specified, returns the natural logarithm (base e) of z.
+    If the base is not specified, returns the natural logarithm (base e)
+    of z.
     """
 
 def log10(z: _C, /) -> complex:
@@ -85,7 +87,7 @@ def polar(z: _C, /) -> tuple[float, float]:
     r is the distance from 0 and phi the phase angle.
     """
 
-def rect(r: float, phi: float, /) -> complex:
+def rect(r: _F, phi: _F, /) -> complex:
     """Convert from polar coordinates to rectangular coordinates."""
 
 def sin(z: _C, /) -> complex:

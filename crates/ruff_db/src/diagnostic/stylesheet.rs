@@ -1,6 +1,8 @@
 use anstyle::{AnsiColor, Effects, Style};
 use std::fmt::Formatter;
 
+use crate::diagnostic::HyperlinkMode;
+
 pub(super) const fn fmt_styled<'a, T>(
     content: T,
     style: anstyle::Style,
@@ -31,6 +33,31 @@ where
     FmtStyled { content, style }
 }
 
+pub(super) fn fmt_with_hyperlink<'a, T>(
+    content: T,
+    url: Option<&'a str>,
+    stylesheet: &DiagnosticStylesheet,
+) -> impl std::fmt::Display + 'a
+where
+    T: std::fmt::Display + 'a,
+{
+    let url = if stylesheet.hyperlink { url } else { None };
+
+    std::fmt::from_fn(move |f| {
+        if let Some(url) = url {
+            write!(f, "\x1B]8;;{url}\x1B\\")?;
+        }
+
+        content.fmt(f)?;
+
+        if url.is_some() {
+            f.write_str("\x1B]8;;\x1B\\")?;
+        }
+
+        Ok(())
+    })
+}
+
 #[derive(Clone, Debug)]
 pub struct DiagnosticStylesheet {
     pub(crate) error: Style,
@@ -47,6 +74,7 @@ pub struct DiagnosticStylesheet {
     pub(crate) deletion: Style,
     pub(crate) insertion_line_no: Style,
     pub(crate) deletion_line_no: Style,
+    pub(crate) hyperlink: bool,
 }
 
 impl Default for DiagnosticStylesheet {
@@ -59,6 +87,8 @@ impl DiagnosticStylesheet {
     /// Default terminal styling
     pub fn styled() -> Self {
         let bright_blue = AnsiColor::BrightBlue.on_default();
+
+        let hyperlink = supports_hyperlinks::supports_hyperlinks();
         Self {
             error: AnsiColor::BrightRed.on_default().effects(Effects::BOLD),
             warning: AnsiColor::Yellow.on_default().effects(Effects::BOLD),
@@ -74,7 +104,17 @@ impl DiagnosticStylesheet {
             deletion: AnsiColor::Red.on_default(),
             insertion_line_no: AnsiColor::Green.on_default().effects(Effects::BOLD),
             deletion_line_no: AnsiColor::Red.on_default().effects(Effects::BOLD),
+            hyperlink,
         }
+    }
+
+    pub(super) fn hyperlinks(mut self, mode: HyperlinkMode) -> Self {
+        match mode {
+            HyperlinkMode::Auto => {}
+            HyperlinkMode::Always => self.hyperlink = true,
+            HyperlinkMode::Never => self.hyperlink = false,
+        }
+        self
     }
 
     pub fn plain() -> Self {
@@ -93,6 +133,7 @@ impl DiagnosticStylesheet {
             deletion: Style::new(),
             insertion_line_no: Style::new(),
             deletion_line_no: Style::new(),
+            hyperlink: false,
         }
     }
 }

@@ -5,17 +5,15 @@ import IStandaloneCodeEditor = editor.IStandaloneCodeEditor;
 import MonacoEditor from "@monaco-editor/react";
 
 export enum SecondaryTool {
-  "Format" = "Format",
-  "AST" = "AST",
-  "Tokens" = "Tokens",
-  "FIR" = "FIR",
-  "Comments" = "Comments",
+  Format = "Format",
+  AST = "AST",
+  Tokens = "Tokens",
+  FIR = "FIR",
+  Comments = "Comments",
 }
 
 export type SecondaryPanelResult =
-  | null
-  | { status: "ok"; content: string }
-  | { status: "error"; error: string };
+  null | { status: "ok"; content: string } | { status: "error"; error: string };
 
 export type SecondaryPanelProps = {
   tool: SecondaryTool;
@@ -32,34 +30,6 @@ export default function SecondaryPanel({
   selectionOffset,
   onSourceByteRangeClicked,
 }: SecondaryPanelProps) {
-  return (
-    <div className="flex flex-col h-full">
-      <div className="grow">
-        <Content
-          tool={tool}
-          result={result}
-          theme={theme}
-          selectionOffset={selectionOffset}
-          onSourceByteRangeClicked={onSourceByteRangeClicked}
-        />
-      </div>
-    </div>
-  );
-}
-
-function Content({
-  tool,
-  result,
-  theme,
-  selectionOffset,
-  onSourceByteRangeClicked,
-}: {
-  tool: SecondaryTool;
-  result: SecondaryPanelResult;
-  theme: Theme;
-  selectionOffset: number | null;
-  onSourceByteRangeClicked(start: number, end: number): void;
-}) {
   const [editor, setEditor] = useState<IStandaloneCodeEditor | null>(null);
   const [prevSelection, setPrevSelection] = useState<number | null>(null);
   const [ranges, setRanges] = useState<

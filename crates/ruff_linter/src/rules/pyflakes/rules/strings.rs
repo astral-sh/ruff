@@ -2,6 +2,7 @@ use std::string::ToString;
 
 use ruff_diagnostics::Applicability;
 use ruff_python_ast::helpers::contains_effect;
+use ruff_python_semantic::analyze::type_inference::{PythonType, ResolvedPythonType};
 use rustc_hash::FxHashSet;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
@@ -757,6 +758,28 @@ pub(crate) fn percent_format_positional_count_mismatch(
                 location,
             );
         }
+    } else if let ResolvedPythonType::Atom(resolved_type) = ResolvedPythonType::from(right) {
+        // If we can infer a concrete non-tuple type for the RHS, it's always
+        // a single positional argument. Variables, attribute accesses, calls,
+        // etc. resolve to `Unknown` and are not flagged because they could be
+        // tuples at runtime.
+        if resolved_type != PythonType::Tuple && summary.num_positional != 1 {
+            checker.report_diagnostic(
+                PercentFormatPositionalCountMismatch {
+                    wanted: summary.num_positional,
+                    got: 1,
+                },
+                location,
+            );
+        }
+    } else if summary.num_positional == 0 {
+        // When the format string has no placeholders, only `()` or `{}` would
+        // succeed at runtime. The chance that this is intentional is very low,
+        // so flag any RHS that isn't an empty tuple or empty dict literal.
+        checker.report_diagnostic(
+            PercentFormatPositionalCountMismatch { wanted: 0, got: 1 },
+            location,
+        );
     }
 }
 

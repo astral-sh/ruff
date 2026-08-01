@@ -6,27 +6,42 @@ use log::{debug, error};
 #[cfg(not(target_family = "wasm"))]
 use rayon::prelude::*;
 
-use ruff_linter::linter::add_noqa_to_path;
+use ruff_linter::SuppressionKind;
+use ruff_linter::linter::add_suppressions_to_path;
 use ruff_linter::source_kind::SourceKind;
 use ruff_linter::warn_user_once;
 use ruff_python_ast::{PySourceType, SourceType};
 use ruff_workspace::resolver::{
-    PyprojectConfig, ResolvedFile, match_exclusion, python_files_in_path,
+    PyprojectConfig, ResolvedFile, match_exclusion, project_files_in_path,
 };
 
 use crate::args::ConfigArguments;
 
-/// Add `noqa` directives to a collection of files.
+/// Add suppression directives to a collection of files.
 pub(crate) fn add_noqa(
     files: &[PathBuf],
     pyproject_config: &PyprojectConfig,
     config_arguments: &ConfigArguments,
+    reason: Option<&str>,
+    suppression_kind: SuppressionKind,
 ) -> Result<usize> {
     // Collect all the files to check.
     let start = Instant::now();
-    let (paths, resolver) = python_files_in_path(files, pyproject_config, config_arguments)?;
+    let (mut paths, resolver) = project_files_in_path(files, pyproject_config, config_arguments)?;
     let duration = start.elapsed();
     debug!("Identified files to lint in: {duration:?}");
+
+    // Filter out paths for file types not supported for linting
+    paths.retain(|path| {
+        if let Ok(ResolvedFile::Root(path) | ResolvedFile::Nested(path)) = path {
+            matches!(
+                SourceType::from(path),
+                SourceType::Python(PySourceType::Python | PySourceType::Stub)
+            )
+        } else {
+            true
+        }
+    });
 
     if paths.is_empty() {
         warn_user_once!("No Python files found under the given path(s)");
@@ -46,12 +61,8 @@ pub(crate) fn add_noqa(
     let modifications: usize = paths
         .par_iter()
         .flatten()
-        .filter_map(|resolved_file| {
-            let SourceType::Python(source_type @ (PySourceType::Python | PySourceType::Stub)) =
-                SourceType::from(resolved_file.path())
-            else {
-                return None;
-            };
+        .map(|resolved_file| -> Result<usize> {
+            let source_type = SourceType::from(resolved_file.path());
             let path = resolved_file.path();
             let package = resolved_file
                 .path()
@@ -66,28 +77,36 @@ pub(crate) fn add_noqa(
                     &settings.linter.exclude,
                 )
             {
-                return None;
+                return Ok(0);
             }
             let source_kind = match SourceKind::from_path(path, source_type) {
                 Ok(Some(source_kind)) => source_kind,
-                Ok(None) => return None,
+                Ok(None) => return Ok(0),
                 Err(e) => {
                     error!("Failed to extract source from {}: {e}", path.display());
-                    return None;
+                    return Ok(0);
                 }
             };
-            match add_noqa_to_path(path, package, &source_kind, source_type, &settings.linter) {
-                Ok(count) => Some(count),
+            match add_suppressions_to_path(
+                path,
+                package,
+                &source_kind,
+                source_type.expect_python(),
+                &settings.linter,
+                reason,
+                suppression_kind,
+            ) {
+                Ok(count) => Ok(count),
                 Err(e) => {
-                    error!("Failed to add noqa to {}: {e}", path.display());
-                    None
+                    error!("Failed to add suppression to {}: {e}", path.display());
+                    Ok(0)
                 }
             }
         })
-        .sum();
+        .sum::<Result<usize>>()?;
 
     let duration = start.elapsed();
-    debug!("Added noqa to files in: {duration:?}");
+    debug!("Added suppressions to files in: {duration:?}");
 
     Ok(modifications)
 }

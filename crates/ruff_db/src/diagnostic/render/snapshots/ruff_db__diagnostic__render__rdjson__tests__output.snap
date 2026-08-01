@@ -93,6 +93,26 @@ expression: env.render_diagnostics(&diagnostics)
         }
       },
       "message": "Undefined name `a`"
+    },
+    {
+      "code": {
+        "url": "https://docs.astral.sh/ruff/rules/undefined-name",
+        "value": "F821"
+      },
+      "location": {
+        "path": "/fib.py",
+        "range": {
+          "end": {
+            "column": 26,
+            "line": 12
+          },
+          "start": {
+            "column": 16,
+            "line": 12
+          }
+        }
+      },
+      "message": "Undefined name `fibonaccii`"
     }
   ],
   "severity": "WARNING",

@@ -38,14 +38,14 @@ Reference Manual pages.
 """
 
 import sys
-from _typeshed import OptExcInfo, SupportsWrite, Unused
+from _typeshed import OptExcInfo, StrPath, SupportsWrite, Unused
 from abc import abstractmethod
 from builtins import list as _list  # "list" conflicts with method name
 from collections.abc import Callable, Container, Mapping, MutableMapping
 from reprlib import Repr
 from types import MethodType, ModuleType, TracebackType
-from typing import IO, Any, AnyStr, Final, NoReturn, Protocol, TypeVar, type_check_only
-from typing_extensions import TypeGuard, deprecated
+from typing import IO, Any, AnyStr, Final, NoReturn, Protocol, TypeGuard, TypeVar, overload, type_check_only
+from typing_extensions import deprecated
 
 __all__ = ["help"]
 
@@ -91,14 +91,9 @@ def visiblename(name: str, all: Container[str] | None = None, obj: object = None
 def classify_class_attrs(object: object) -> list[tuple[str, str, type, str]]:
     """Wrap inspect.classify_class_attrs, with fixup for data descriptors and bound methods."""
 
-if sys.version_info >= (3, 13):
-    @deprecated("Deprecated since Python 3.13.")
-    def ispackage(path: str) -> bool:  # undocumented
-        """Guess whether a path refers to a package directory."""
-
-else:
-    def ispackage(path: str) -> bool:  # undocumented
-        """Guess whether a path refers to a package directory."""
+@deprecated("Deprecated since Python 3.13.")
+def ispackage(path: StrPath) -> bool:  # undocumented
+    """Guess whether a path refers to a package directory."""
 
 def source_synopsis(file: IO[AnyStr]) -> AnyStr | None:
     """Return the one-line summary of a file object, if present"""
@@ -113,7 +108,14 @@ class ErrorDuringImport(Exception):
     exc: type[BaseException] | None
     value: BaseException | None
     tb: TracebackType | None
-    def __init__(self, filename: str, exc_info: OptExcInfo) -> None: ...
+    if sys.version_info >= (3, 12):
+        @overload
+        def __init__(self, filename: str, exc_info: BaseException) -> None: ...
+        @overload
+        @deprecated("A tuple value for `exc_info` parameter is deprecated since Python 3.12. Use an exception instance.")
+        def __init__(self, filename: str, exc_info: OptExcInfo) -> None: ...
+    else:
+        def __init__(self, filename: str, exc_info: OptExcInfo) -> None: ...
 
 def importfile(path: str) -> ModuleType:
     """Import a Python source file or compiled file given its path."""
@@ -130,6 +132,9 @@ def safeimport(path: str, forceload: bool = ..., cache: MutableMapping[str, Modu
 
 class Doc:
     PYTHONDOCS: str
+    if sys.version_info >= (3, 15):
+        STDLIB_DIR: str
+
     def document(self, object: object, name: str | None = None, *args: Any) -> str:
         """Generate documentation for an object."""
 
@@ -160,8 +165,13 @@ class Doc:
     def docdata(self, object: object, name: str | None = None, *args: Any) -> str:
         """Raise an exception for unimplemented types."""
 
-    def getdocloc(self, object: object, basedir: str = ...) -> str | None:
-        """Return the location of module docs or None"""
+    if sys.version_info >= (3, 15):
+        def getdocloc(self, object: object, basedir: str | None = None) -> str | None:
+            """Return the location of module docs or None"""
+
+    else:
+        def getdocloc(self, object: object, basedir: str = ...) -> str | None:
+            """Return the location of module docs or None"""
 
 class HTMLRepr(Repr):
     """Class for safely making an HTML representation of a Python object."""
@@ -183,6 +193,7 @@ class HTMLDoc(Doc):
     escape = _repr_instance.escape
     def page(self, title: str, contents: str) -> str:
         """Format an HTML page."""
+
     if sys.version_info >= (3, 11):
         def heading(self, title: str, extras: str = "") -> str:
             """Format a page heading."""
@@ -201,6 +212,7 @@ class HTMLDoc(Doc):
 
         def multicolumn(self, list: list[_T], format: Callable[[_T], str]) -> str:
             """Format a list of items into a multi-column list."""
+
     else:
         def heading(self, title: str, fgcol: str, bgcol: str, extras: str = "") -> str:
             """Format a page heading."""
@@ -274,6 +286,7 @@ class HTMLDoc(Doc):
 
     def docother(self, object: object, name: str | None = None, mod: Any | None = None, *ignored: Unused) -> str:
         """Produce HTML documentation for a data object."""
+
     if sys.version_info >= (3, 11):
         def docroutine(  # type: ignore[override]
             self,
@@ -297,6 +310,7 @@ class HTMLDoc(Doc):
             self, object: object, name: str | None = None, mod: Any | None = None, cl: Any | None = None, *ignored: Unused
         ) -> str:
             """Produce html documentation for a data descriptor."""
+
     else:
         def docroutine(  # type: ignore[override]
             self,
@@ -315,6 +329,7 @@ class HTMLDoc(Doc):
 
         def docdata(self, object: object, name: str | None = None, mod: Any | None = None, cl: Any | None = None) -> str:  # type: ignore[override]
             """Produce html documentation for a data descriptor."""
+
     if sys.version_info >= (3, 11):
         def parentlink(self, object: type | ModuleType, modname: str) -> str:
             """Make a link for the enclosing class or module."""
@@ -358,6 +373,7 @@ class TextDoc(Doc):
 
     def formatvalue(self, object: object) -> str:
         """Format an argument default value as text."""
+
     if sys.version_info >= (3, 11):
         def docroutine(  # type: ignore[override]
             self,
@@ -393,6 +409,7 @@ class TextDoc(Doc):
             doc: Any | None = None,
         ) -> str:
             """Produce text documentation for a data object."""
+
     else:
         def docroutine(self, object: object, name: str | None = None, mod: str | None = None, cl: Any | None = None) -> str:  # type: ignore[override]
             """Produce text documentation for a function or method object."""
@@ -449,6 +466,7 @@ if sys.version_info >= (3, 13):
 
     def plain_pager(text: str, title: str = "") -> None:
         """Simply print unformatted text.  This is the ultimate fallback."""
+
     # For backwards compatibility.
     getpager = get_pager
     pipepager = pipe_pager
@@ -520,6 +538,7 @@ class Helper:
     def interact(self) -> None: ...
     def getline(self, prompt: str) -> str:
         """Read one line, using input() when appropriate."""
+
     if sys.version_info >= (3, 11):
         def help(self, request: Any, is_cli: bool = False) -> None: ...
     else:

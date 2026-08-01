@@ -13,22 +13,23 @@ I001 [*] Import block is un-sorted or un-formatted
 7 | | # The next import doesn't fit on one line.
 8 | | from h import i  # 012ß9💣2ℝ9012ß9💣2ℝ9012ß9💣2ℝ9012ß9💣2ℝ9012ß9💣2ℝ9012ß9💣2ℝ9012ß9💣2ℝ9
   | |_______________^
-  |
 help: Organize imports
+   |
 1  | import a
-2  + 
+2  +
 3  | # Don't take this comment into account when determining whether the next import can fit on one line.
 4  | from b import c
    - from d import e  # Do take this comment into account when determining whether the next import can fit on one line.
 5  + from d import (
 6  +     e,  # Do take this comment into account when determining whether the next import can fit on one line.
 7  + )
-8  + 
+8  +
 9  | # The next import fits on one line.
 10 | from f import g  # 012ß9💣2ℝ9012ß9💣2ℝ9012ß9💣2ℝ9012ß9💣2ℝ9012ß9💣2ℝ9012ß9💣2ℝ9012ß9💣2ℝ
-11 + 
+11 +
 12 | # The next import doesn't fit on one line.
    - from h import i  # 012ß9💣2ℝ9012ß9💣2ℝ9012ß9💣2ℝ9012ß9💣2ℝ9012ß9💣2ℝ9012ß9💣2ℝ9012ß9💣2ℝ9
 13 + from h import (
 14 +     i,  # 012ß9💣2ℝ9012ß9💣2ℝ9012ß9💣2ℝ9012ß9💣2ℝ9012ß9💣2ℝ9012ß9💣2ℝ9012ß9💣2ℝ9
 15 + )
+   |

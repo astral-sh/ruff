@@ -3,16 +3,20 @@
     reason = "Prefer System trait methods over std methods in ty crates"
 )]
 mod all_symbols;
+mod call_hierarchy;
+mod code_action;
 mod completion;
 mod doc_highlights;
 mod docstring;
 mod document_symbols;
-mod find_node;
+mod find_references;
+mod folding_range;
 mod goto;
 mod goto_declaration;
 mod goto_definition;
-mod goto_references;
+mod goto_implementation;
 mod goto_type_definition;
+mod hints;
 mod hover;
 mod importer;
 mod inlay_hints;
@@ -24,16 +28,29 @@ mod semantic_tokens;
 mod signature_help;
 mod stub_mapping;
 mod symbols;
+mod type_hierarchy;
 mod workspace_symbols;
 
 pub use all_symbols::{AllSymbolInfo, all_symbols};
-pub use completion::{Completion, CompletionKind, CompletionSettings, completion};
+pub use call_hierarchy::incoming_calls::{IncomingCall, incoming_calls};
+pub use call_hierarchy::outgoing_calls::{OutgoingCall, outgoing_calls};
+pub use call_hierarchy::{CallHierarchyItem, prepare_call_hierarchy};
+pub use code_action::{QuickFix, code_actions};
+pub use completion::{
+    Completion, CompletionCapabilities, CompletionInsertTextFormat, CompletionKind,
+    CompletionSettings, completion,
+};
 pub use doc_highlights::document_highlights;
 pub use document_symbols::document_symbols;
+pub use find_references::find_references;
+pub use folding_range::{FoldingRange, FoldingRangeKind, folding_ranges};
 pub use goto::{goto_declaration, goto_definition, goto_type_definition};
-pub use goto_references::goto_references;
+pub use goto_implementation::goto_implementation;
+pub use hints::{Hint, HintKind, hints};
 pub use hover::hover;
-pub use inlay_hints::{InlayHintKind, InlayHintLabel, InlayHintSettings, inlay_hints};
+pub use inlay_hints::{
+    InlayHintKind, InlayHintLabel, InlayHintSettings, InlayHintTextEdit, inlay_hints,
+};
 pub use markup::MarkupKind;
 pub use references::ReferencesMode;
 pub use rename::{can_rename, rename};
@@ -43,18 +60,23 @@ pub use semantic_tokens::{
 };
 pub use signature_help::{ParameterDetails, SignatureDetails, SignatureHelpInfo, signature_help};
 pub use symbols::{FlatSymbols, HierarchicalSymbols, SymbolId, SymbolInfo, SymbolKind};
+pub use type_hierarchy::{
+    TypeHierarchyItem, prepare_type_hierarchy, type_hierarchy_subtypes, type_hierarchy_supertypes,
+};
 pub use workspace_symbols::{WorkspaceSymbolInfo, workspace_symbols};
 
 use ruff_db::{
     files::{File, FileRange},
-    system::SystemPathBuf,
+    system::{SystemPath, SystemPathBuf},
     vendored::VendoredPath,
 };
 use ruff_text_size::{Ranged, TextRange};
-use rustc_hash::FxHashSet;
+use rustc_hash::{FxBuildHasher, FxHashSet};
 use std::ops::{Deref, DerefMut};
 use ty_project::Db;
 use ty_python_semantic::types::{Type, TypeDefinition};
+
+type FxIndexMap<K, V> = indexmap::IndexMap<K, V, FxBuildHasher>;
 
 /// Information associated with a text range.
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
@@ -131,6 +153,20 @@ impl NavigationTarget {
 
     pub fn full_range(&self) -> TextRange {
         self.full_range
+    }
+
+    pub fn full_file_range(&self) -> FileRange {
+        FileRange::new(self.file, self.full_range)
+    }
+}
+
+impl From<FileRange> for NavigationTarget {
+    fn from(value: FileRange) -> Self {
+        Self {
+            file: value.file(),
+            focus_range: value.range(),
+            full_range: value.range(),
+        }
     }
 }
 
@@ -212,6 +248,11 @@ impl NavigationTargets {
     fn is_empty(&self) -> bool {
         self.0.is_empty()
     }
+
+    #[cfg(test)]
+    fn len(&self) -> usize {
+        self.0.len()
+    }
 }
 
 impl IntoIterator for NavigationTargets {
@@ -252,6 +293,13 @@ impl HasNavigationTargets for Type<'_> {
                 .collect(),
 
             Type::Intersection(intersection) => {
+                if let Some(alternatives) = intersection.finite_alternatives(db) {
+                    return alternatives
+                        .iter()
+                        .flat_map(|alternative| alternative.navigation_targets(db))
+                        .collect();
+                }
+
                 // Only consider the positive elements because the negative elements are mainly from narrowing constraints.
                 let mut targets = intersection.iter_positive(db).filter(|ty| !ty.is_unknown());
 
@@ -268,6 +316,12 @@ impl HasNavigationTargets for Type<'_> {
                     None => first.navigation_targets(db),
                 }
             }
+
+            Type::EnumComplement(complement) => complement
+                .remaining_literal_types(db)
+                .iter()
+                .flat_map(|alternative| alternative.navigation_targets(db))
+                .collect(),
 
             ty => ty
                 .definition(db)
@@ -323,21 +377,47 @@ pub fn cached_vendored_root(db: &dyn ty_python_semantic::Db) -> Option<SystemPat
     Some(writable.cache_dir()?.join(relative_root))
 }
 
+/// Maps an absolute system path to a vendored path.
+///
+/// This is useful for normalizing file paths received from the LSP. Namely,
+/// the LSP might include a *system* file path to a vendored typeshed file.
+/// But the ty LSP really wants to represent that as a `VendoredPath` and not
+/// a `SystemPath`. Otherwise we end up with different `File` values in memory
+/// for the same file on disk.
+///
+/// Callers should provide [`cached_vendored_root`]. Whenever the system path
+/// begins with the vendored root, this routine will return a vendored file
+/// path.
+pub fn map_system_to_vendored<'a>(
+    cached_vendored_root: &SystemPath,
+    absolute_path: &'a SystemPath,
+) -> Option<&'a VendoredPath> {
+    let rel_path = absolute_path.strip_prefix(cached_vendored_root).ok()?;
+    Some(VendoredPath::new(rel_path.as_str()))
+}
+
 #[cfg(test)]
 mod tests {
     use camino::Utf8Component;
     use insta::internals::SettingsBindDropGuard;
 
     use ruff_db::Db;
-    use ruff_db::diagnostic::{Diagnostic, DiagnosticFormat, DisplayDiagnosticConfig};
+    use ruff_db::diagnostic::{
+        Annotation, Diagnostic, DiagnosticFormat, DisplayDiagnosticConfig, UnifiedFile,
+    };
     use ruff_db::files::{File, FileRootKind, system_path_to_file};
     use ruff_db::parsed::{ParsedModuleRef, parsed_module};
     use ruff_db::source::{SourceText, source_text};
-    use ruff_db::system::{DbWithWritableSystem, SystemPath, SystemPathBuf};
+    use ruff_db::system::{DbWithTestSystem, DbWithWritableSystem, SystemPath, SystemPathBuf};
+    use ruff_python_ast::PythonVersion;
     use ruff_python_codegen::Stylist;
     use ruff_python_trivia::textwrap::dedent;
     use ruff_text_size::TextSize;
-    use ty_project::ProjectMetadata;
+    use ty_module_resolver::SearchPathSettings;
+    use ty_project::{Db as _, ProjectMetadata};
+    use ty_python_core::platform::PythonPlatform;
+    use ty_python_core::program::{FallibleStrategy, Program, ProgramSettings};
+    use ty_python_semantic::PythonVersionWithSource;
 
     /// A way to create a simple single-file (named `main.py`) cursor test.
     ///
@@ -375,16 +455,40 @@ mod tests {
 
             let mut buf = String::new();
 
-            let config = DisplayDiagnosticConfig::default()
+            let config = DisplayDiagnosticConfig::new("ty")
                 .color(false)
+                .context(0)
                 .format(DiagnosticFormat::Full);
             for diagnostic in diagnostics {
                 let diag = diagnostic.into_diagnostic();
+                let config = config
+                    .clone()
+                    .anonymized_line_numbers(diagnostic_touches_vendored_file(&self.db, &diag));
                 write!(buf, "{}", diag.display(&self.db, &config)).unwrap();
             }
 
             buf
         }
+    }
+
+    pub(super) fn diagnostic_touches_vendored_file(db: &dyn Db, diagnostic: &Diagnostic) -> bool {
+        fn annotation_is_vendored(db: &dyn Db, annotation: &Annotation) -> bool {
+            matches!(
+                annotation.get_span().file(),
+                UnifiedFile::Ty(file) if file.path(db).is_vendored_path()
+            )
+        }
+
+        diagnostic
+            .primary_annotation()
+            .into_iter()
+            .chain(diagnostic.secondary_annotations())
+            .chain(diagnostic.sub_diagnostics().iter().flat_map(|sub| {
+                sub.primary_annotation()
+                    .into_iter()
+                    .chain(sub.secondary_annotations())
+            }))
+            .any(|annotation| annotation_is_vendored(db, annotation))
     }
 
     /// The file and offset into that file where a `<CURSOR>` marker
@@ -405,16 +509,20 @@ mod tests {
         /// A list of source files, corresponding to the
         /// file's path and its contents.
         sources: Vec<Source>,
+        snapshot_filters: Vec<(String, String)>,
+        /// The python version to use.
+        python_version: Option<PythonVersion>,
     }
 
     impl CursorTestBuilder {
         pub(super) fn build(&self) -> CursorTest {
-            let mut db = ty_project::TestDb::new(ProjectMetadata::new(
-                "test".into(),
-                SystemPathBuf::from("/"),
-            ));
+            let mut db =
+                ty_project::TestDb::new(ProjectMetadata::new("test", SystemPathBuf::from("/")));
 
-            db.init_program().unwrap();
+            db.init_program_with_python_version(
+                self.python_version.unwrap_or_else(PythonVersion::latest_ty),
+            )
+            .unwrap();
 
             let mut cursor: Option<Cursor> = None;
             for &Source {
@@ -434,8 +542,7 @@ mod tests {
                 if let Some(top) = top {
                     let top = SystemPath::new(top);
                     if db.system().is_directory(top) {
-                        db.files()
-                            .try_add_root(&db, top, FileRootKind::LibrarySearchPath);
+                        db.files().try_add_root(&db, top, FileRootKind::SearchPath);
                     }
                 }
 
@@ -449,6 +556,11 @@ mod tests {
                         cursor.is_none(),
                         "found more than one source that contains `<CURSOR>`"
                     );
+
+                    // The cursor file is open in the editor; expected types for
+                    // string-literal completions are only collected for open files.
+                    db.project().open_file(&mut db, file);
+
                     let source = source_text(&db, file);
                     let parsed = parsed_module(&db, file).load(&db);
                     let stylist =
@@ -467,6 +579,9 @@ mod tests {
             insta_settings.add_filter(r#"\\(\w\w|\.|")"#, "/$1");
             // Filter out TODO types because they are different between debug and release builds.
             insta_settings.add_filter(r"@Todo\(.+\)", "@Todo");
+            for (pattern, replacement) in &self.snapshot_filters {
+                insta_settings.add_filter(pattern, replacement);
+            }
 
             let insta_settings_guard = insta_settings.bind_to_scope();
 
@@ -482,40 +597,213 @@ mod tests {
             path: impl Into<SystemPathBuf>,
             contents: impl AsRef<str>,
         ) -> &mut CursorTestBuilder {
-            const MARKER: &str = "<CURSOR>";
+            add_source(&mut self.sources, path, contents);
+            self
+        }
 
-            let path = path.into();
-            let contents = dedent(contents.as_ref()).into_owned();
-            let Some(cursor_offset) = contents.find(MARKER) else {
-                self.sources.push(Source {
-                    path,
-                    contents,
-                    cursor_offset: None,
-                });
-                return self;
-            };
+        pub(super) fn snapshot_filter(
+            &mut self,
+            pattern: impl Into<String>,
+            replacement: impl Into<String>,
+        ) -> &mut CursorTestBuilder {
+            self.snapshot_filters
+                .push((pattern.into(), replacement.into()));
+            self
+        }
 
-            if let Some(source) = self.sources.iter().find(|src| src.cursor_offset.is_some()) {
-                panic!(
-                    "cursor tests must contain exactly one file \
-                     with a `<CURSOR>` marker, but found a marker \
-                     in both `{path1}` and `{path2}`",
-                    path1 = source.path,
-                    path2 = path,
-                );
+        pub(super) fn python_version(&mut self, version: PythonVersion) -> &mut CursorTestBuilder {
+            self.python_version = Some(version);
+            self
+        }
+
+        /// Convert to a builder that supports site-packages (third-party dependencies).
+        pub(super) fn with_site_packages(self) -> SitePackagesCursorTestBuilder {
+            SitePackagesCursorTestBuilder {
+                sources: self.sources,
+                site_packages_sources: Vec::new(),
+            }
+        }
+    }
+
+    /// A cursor test builder that supports site-packages (third-party
+    /// dependencies).
+    ///
+    /// Use `CursorTestBuilder::builder().with_site_packages()` to
+    /// create one.
+    ///
+    /// Unlike `CursorTest`, first party source files go in `/src` and
+    /// third party sources go in `/site-packages`.
+    ///
+    /// TODO: Ideally this would be rolled into `CursorTestBuilder`
+    /// so that we don't have two of these somewhat similar helpers.
+    pub(super) struct SitePackagesCursorTestBuilder {
+        sources: Vec<Source>,
+        site_packages_sources: Vec<Source>,
+    }
+
+    impl SitePackagesCursorTestBuilder {
+        pub(super) fn build(&self) -> CursorTest {
+            let project_root = SystemPathBuf::from("/src");
+            let site_packages_path = SystemPathBuf::from("/site-packages");
+
+            let mut db =
+                ty_project::TestDb::new(ProjectMetadata::new("test", project_root.clone()));
+
+            // Write site-packages files first (before init)
+            for Source {
+                path,
+                contents,
+                cursor_offset: _,
+            } in &self.site_packages_sources
+            {
+                let full_path = site_packages_path.join(path);
+                db.write_file(&full_path, contents)
+                    .expect("write to memory file system to be successful");
             }
 
-            let mut without_cursor_marker = contents[..cursor_offset].to_string();
-            without_cursor_marker.push_str(&contents[cursor_offset + MARKER.len()..]);
-            let cursor_offset =
-                TextSize::try_from(cursor_offset).expect("source to be smaller than 4GB");
-            self.sources.push(Source {
+            // Create /src directory for first-party code
+            db.memory_file_system()
+                .create_directory_all(&project_root)
+                .expect("create /src directory");
+
+            // Configure search paths with site-packages
+            let search_paths = SearchPathSettings {
+                src_roots: vec![project_root.clone()],
+                site_packages_paths: vec![site_packages_path.clone()],
+                ..SearchPathSettings::empty()
+            }
+            .to_search_paths(db.system(), db.vendored(), &FallibleStrategy)
+            .expect("valid search paths");
+
+            Program::from_settings(
+                &db,
+                ProgramSettings {
+                    python_version: PythonVersionWithSource::default(),
+                    python_platform: PythonPlatform::default(),
+                    search_paths,
+                },
+            );
+
+            db.files()
+                .try_add_root(&db, &project_root, FileRootKind::Project);
+            db.files()
+                .try_add_root(&db, &site_packages_path, FileRootKind::SearchPath);
+
+            let mut cursor: Option<Cursor> = None;
+            for &Source {
+                ref path,
+                ref contents,
+                cursor_offset,
+            } in &self.sources
+            {
+                let path = project_root.join(path);
+
+                db.write_file(&path, contents)
+                    .expect("write to memory file system to be successful");
+
+                let file = system_path_to_file(&db, &path).expect("newly written file to existing");
+
+                if let Some(offset) = cursor_offset {
+                    assert!(
+                        cursor.is_none(),
+                        "found more than one source that contains `<CURSOR>`"
+                    );
+
+                    // The cursor file is open in the editor; expected types for
+                    // string-literal completions are only collected for open files.
+                    db.project().open_file(&mut db, file);
+
+                    let source = source_text(&db, file);
+                    let parsed = parsed_module(&db, file).load(&db);
+                    let stylist =
+                        Stylist::from_tokens(parsed.tokens(), source.as_str()).into_owned();
+                    cursor = Some(Cursor {
+                        file,
+                        offset,
+                        parsed,
+                        source,
+                        stylist,
+                    });
+                }
+            }
+
+            let mut insta_settings = insta::Settings::clone_current();
+            insta_settings.add_filter(r#"\\(\w\w|\.|")"#, "/$1");
+            insta_settings.add_filter(r"@Todo\(.+\)", "@Todo");
+
+            let insta_settings_guard = insta_settings.bind_to_scope();
+
+            CursorTest {
+                db,
+                cursor: cursor.expect("at least one source to contain `<CURSOR>`"),
+                _insta_settings_guard: insta_settings_guard,
+            }
+        }
+
+        pub(super) fn source(
+            &mut self,
+            path: impl Into<SystemPathBuf>,
+            contents: impl AsRef<str>,
+        ) -> &mut SitePackagesCursorTestBuilder {
+            add_source(&mut self.sources, path, contents);
+            self
+        }
+
+        /// Add a file to site-packages (simulating a third-party dependency).
+        /// The path should be relative to site-packages root (e.g., "numpy/__init__.py").
+        pub(super) fn site_packages(
+            &mut self,
+            path: impl Into<SystemPathBuf>,
+            contents: impl AsRef<str>,
+        ) -> &mut SitePackagesCursorTestBuilder {
+            let path = path.into();
+            let contents = dedent(contents.as_ref()).into_owned();
+            self.site_packages_sources.push(Source {
                 path,
-                contents: without_cursor_marker,
-                cursor_offset: Some(cursor_offset),
+                contents,
+                cursor_offset: None,
             });
             self
         }
+    }
+
+    fn add_source(
+        sources: &mut Vec<Source>,
+        path: impl Into<SystemPathBuf>,
+        contents: impl AsRef<str>,
+    ) {
+        const MARKER: &str = "<CURSOR>";
+
+        let path = path.into();
+        let contents = dedent(contents.as_ref()).into_owned();
+        let Some(cursor_offset) = contents.find(MARKER) else {
+            sources.push(Source {
+                path,
+                contents,
+                cursor_offset: None,
+            });
+            return;
+        };
+
+        if let Some(source) = sources.iter().find(|src| src.cursor_offset.is_some()) {
+            panic!(
+                "cursor tests must contain exactly one file \
+                 with a `<CURSOR>` marker, but found a marker \
+                 in both `{path1}` and `{path2}`",
+                path1 = source.path,
+                path2 = path,
+            );
+        }
+
+        let mut without_cursor_marker = contents[..cursor_offset].to_string();
+        without_cursor_marker.push_str(&contents[cursor_offset + MARKER.len()..]);
+        let cursor_offset =
+            TextSize::try_from(cursor_offset).expect("source to be smaller than 4GB");
+        sources.push(Source {
+            path,
+            contents: without_cursor_marker,
+            cursor_offset: Some(cursor_offset),
+        });
     }
 
     struct Source {

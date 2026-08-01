@@ -2,7 +2,7 @@
 //! are omitted from the AST (e.g., commented lines).
 
 use ruff_python_ast::Stmt;
-use ruff_python_parser::{TokenKind, Tokens};
+use ruff_python_ast::token::{TokenKind, Tokens};
 use ruff_python_trivia::{
     CommentRanges, has_leading_content, has_trailing_content, is_python_whitespace,
 };
@@ -42,39 +42,51 @@ impl Indexer {
         let mut line_start = TextSize::default();
 
         for token in tokens {
-            let trivia = &source[TextRange::new(prev_end, token.start())];
+            let token_start = token.start();
 
-            // Get the trivia between the previous and the current token and detect any newlines.
-            // This is necessary because `RustPython` doesn't emit `[Tok::Newline]` tokens
-            // between any two tokens that form a continuation. That's why we have to extract the
-            // newlines "manually".
-            for (index, text) in trivia.match_indices(['\n', '\r']) {
-                if text == "\r" && trivia.as_bytes().get(index + 1) == Some(&b'\n') {
-                    continue;
-                }
-                continuation_lines.push(line_start);
+            if prev_end != token_start {
+                let trivia = &source[TextRange::new(prev_end, token_start)];
 
-                // SAFETY: Safe because of the len assertion at the top of the function.
-                #[expect(clippy::cast_possible_truncation)]
-                {
-                    line_start = prev_end + TextSize::new((index + 1) as u32);
+                // Get the trivia between the previous and the current token and detect any
+                // newlines. This is necessary because `RustPython` doesn't emit `[Tok::Newline]`
+                // tokens between any two tokens that form a continuation. That's why we have to
+                // extract the newlines "manually".
+                for (index, text) in trivia.match_indices(['\n', '\r']) {
+                    if text == "\r" && trivia.as_bytes().get(index + 1) == Some(&b'\n') {
+                        continue;
+                    }
+                    continuation_lines.push(line_start);
+
+                    // SAFETY: Safe because of the len assertion at the top of the function.
+                    #[expect(clippy::cast_possible_truncation)]
+                    {
+                        line_start = prev_end + TextSize::new((index + 1) as u32);
+                    }
                 }
             }
-
-            interpolated_string_ranges_builder.visit_token(token);
-            multiline_ranges_builder.visit_token(token);
 
             match token.kind() {
                 TokenKind::Newline | TokenKind::NonLogicalNewline => {
                     line_start = token.end();
                 }
-                TokenKind::String => {
-                    // If the previous token was a string, find the start of the line that contains
-                    // the closing delimiter, since the token itself can span multiple lines.
-                    line_start = source.line_start(token.end());
-                }
                 TokenKind::Comment => {
                     comment_ranges.push(token.range());
+                }
+                // String-like tokens, including f/t-string start, middle, and end tokens, can span
+                // multiple lines.
+                TokenKind::FStringStart
+                | TokenKind::FStringEnd
+                | TokenKind::TStringStart
+                | TokenKind::TStringEnd => {
+                    interpolated_string_ranges_builder.visit_token(token);
+                    line_start = source.line_start(token.end());
+                }
+                TokenKind::String | TokenKind::FStringMiddle => {
+                    multiline_ranges_builder.visit_token(token);
+                    line_start = source.line_start(token.end());
+                }
+                TokenKind::TStringMiddle => {
+                    line_start = source.line_start(token.end());
                 }
                 _ => {}
             }
@@ -344,6 +356,24 @@ x = (
                 TextSize::new(24),
                 // row 7
                 TextSize::new(31),
+            ]
+        );
+
+        let contents = r#"
+x = [
+    "a" + \
+f"""
+b
+""" + \
+    "c"
+]
+"#
+        .trim();
+        assert_eq!(
+            new_indexer(contents).continuation_line_starts(),
+            [
+                TextSize::try_from(contents.find(r#"    "a" + \"#).unwrap()).unwrap(),
+                TextSize::try_from(contents.find("\"\"\" + \\").unwrap()).unwrap(),
             ]
         );
     }

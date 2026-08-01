@@ -54,10 +54,10 @@ if sys.version_info >= (3, 12):
             Given a source (filename or zipfile), return an
             appropriate CompleteDirs subclass.
             """
-
         @overload
         @classmethod
         def make(cls, source: StrPath | IO[bytes]) -> Self: ...
+
         if sys.version_info >= (3, 13):
             @classmethod
             def inject(cls, zf: _ZF) -> _ZF:
@@ -194,6 +194,7 @@ if sys.version_info >= (3, 12):
         def suffixes(self) -> list[str]: ...
         @property
         def stem(self) -> str: ...
+
         @overload
         def open(
             self,
@@ -201,8 +202,8 @@ if sys.version_info >= (3, 12):
             encoding: str | None = None,
             errors: str | None = None,
             newline: str | None = None,
-            line_buffering: bool = ...,
-            write_through: bool = ...,
+            line_buffering: bool = False,
+            write_through: bool = False,
             *,
             pwd: bytes | None = None,
         ) -> TextIOWrapper:
@@ -211,20 +212,20 @@ if sys.version_info >= (3, 12):
             of ``pathlib.Path.open()`` by passing arguments through
             to io.TextIOWrapper().
             """
-
         @overload
         def open(self, mode: Literal["rb", "wb"], *, pwd: bytes | None = None) -> IO[bytes]: ...
+
         def iterdir(self) -> Iterator[Self]: ...
         def is_dir(self) -> bool: ...
         def is_file(self) -> bool: ...
         def exists(self) -> bool: ...
         def read_text(
             self,
-            encoding: str | None = ...,
-            errors: str | None = ...,
-            newline: str | None = ...,
-            line_buffering: bool = ...,
-            write_through: bool = ...,
+            encoding: str | None = None,
+            errors: str | None = None,
+            newline: str | None = None,
+            line_buffering: bool = False,
+            write_through: bool = False,
         ) -> str: ...
         def read_bytes(self) -> bytes: ...
         def joinpath(self, *other: StrPath) -> Path: ...

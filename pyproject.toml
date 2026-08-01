@@ -1,15 +1,16 @@
 [build-system]
-requires = ["maturin>=1.9,<2.0"]
+requires = ["maturin>=1.9.3,<2.0"]
 build-backend = "maturin"
 
 [project]
 name = "ruff"
-version = "0.14.4"
+version = "0.16.1"
 description = "An extremely fast Python linter and code formatter, written in Rust."
 authors = [{ name = "Astral Software Inc.", email = "hey@astral.sh" }]
 readme = "README.md"
 requires-python = ">=3.7"
-license = { file = "LICENSE" }
+license = "MIT"
+license-files = ["LICENSE"]
 keywords = [
     "automation",
     "flake8",
@@ -22,7 +23,6 @@ classifiers = [
     "Development Status :: 5 - Production/Stable",
     "Environment :: Console",
     "Intended Audience :: Developers",
-    "License :: OSI Approved :: MIT License",  # for compatibility with tooling such as pip-licenses
     "Operating System :: OS Independent",
     "Programming Language :: Python",
     "Programming Language :: Python :: 3.7",
@@ -32,6 +32,7 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Programming Language :: Python :: 3 :: Only",
     "Programming Language :: Rust",
     "Topic :: Software Development :: Libraries :: Python Modules",
@@ -53,6 +54,18 @@ exclude = [
     "crates/ruff_linter/resources/test/fixtures/**/*",
     "crates/ruff_linter/src/rules/*/snapshots/**/*"
 ]
+
+[dependency-groups]
+dev = [
+    "prek==0.4.10",
+]
+release = [
+    "rooster==0.1.1",
+]
+
+[tool.uv.dependency-groups]
+dev = { requires-python = ">=3.12" }
+release = { requires-python = ">=3.12" }
 
 [tool.ruff]
 target-version = "py38"
@@ -79,6 +92,7 @@ select = [
     "PGH", # pygrep-hooks
     "PYI", # flake8-pyi
     "RUF",
+    "S602", # flake8-bandit: subprocess-popen-with-shell-equals-true
 ]
 
 ignore = [
@@ -92,10 +106,11 @@ ignore = [
 
 [tool.ruff.lint.isort]
 required-imports = ["from __future__ import annotations"]
+combine-as-imports = true
 
 [tool.ruff.per-file-target-version]
 "crates/ty_python_semantic/mdtest.py" = "py310"
-"crates/ty_vendored/ty_extensions/ty_extensions.pyi" = "py312"
+"crates/ty_vendored/ty_extensions/*.pyi" = "py312"
 
 [tool.black]
 force-exclude = '''
@@ -116,10 +131,15 @@ ignore_labels = ["internal", "ci", "testing", "ty"]
 version_files = [
     "README.md",
     "pyproject.toml",
+    # Might become unneeded once Markdown formatting is stabilized.
+    "docs/formatter.md",
     "docs/integrations.md",
     "docs/tutorial.md",
     "crates/ruff/Cargo.toml",
     "crates/ruff_linter/Cargo.toml",
+    # Note that the value being replaced here needs to be kept in sync with the
+    # validation regex in the `violation_metadata` macro.
+    { target = "crates/ruff_linter/src/rules/**/*.rs", replace = "NEXT_RUFF_VERSION" },
     "crates/ruff_wasm/Cargo.toml",
     "scripts/benchmarks/pyproject.toml",
 ]

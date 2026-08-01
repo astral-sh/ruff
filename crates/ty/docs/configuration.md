@@ -5,6 +5,7 @@
 
 Configures the enabled rules and their severity.
 
+The keys are either rule names or `all` to set a default severity for all rules.
 See [the rules documentation](https://ty.dev/rules) for a list of all available rules.
 
 Valid severities are:
@@ -12,19 +13,256 @@ Valid severities are:
 * `ignore`: Disable the rule.
 * `warn`: Enable the rule and create a warning diagnostic.
 * `error`: Enable the rule and create an error diagnostic.
-  ty will exit with a non-zero code if any error diagnostics are emitted.
+
+By default, ty exits with code 1 if it emits any warning or error diagnostics.
+Set `terminal.error-on-warning` to `false` to exit with code 0 if all diagnostics have `warning` severity.
 
 **Default value**: `{...}`
 
-**Type**: `dict[RuleName, "ignore" | "warn" | "error"]`
+**Type**: `dict[RuleName | "all", "ignore" | "warn" | "error"]`
 
-**Example usage** (`pyproject.toml`):
+**Example usage**:
 
-```toml
-[tool.ty.rules]
-possibly-unresolved-reference = "warn"
-division-by-zero = "ignore"
+=== "pyproject.toml"
+
+    ```toml
+    [tool.ty.rules]
+    possibly-unresolved-reference = "warn"
+    division-by-zero = "ignore"
+    ```
+
+=== "ty.toml"
+
+    ```toml
+    [rules]
+    possibly-unresolved-reference = "warn"
+    division-by-zero = "ignore"
+    ```
+
+---
+
+## `analysis`
+
+### `allowed-unresolved-imports`
+
+A list of module glob patterns for which `unresolved-import` diagnostics should be suppressed.
+
+Details on supported glob patterns:
+- `*` matches zero or more characters except `.`. For example, `foo.*` matches `foo.bar` but
+  not `foo.bar.baz`; `foo*` matches `foo` and `foobar` but not `foo.bar` or `barfoo`; and `*foo`
+  matches `foo` and `barfoo` but not `foo.bar` or `foobar`.
+- `**` matches any number of module components (e.g., `foo.**` matches `foo`, `foo.bar`, etc.)
+- Prefix a pattern with `!` to exclude matching modules
+
+When multiple patterns match, later entries take precedence.
+
+Glob patterns can be used in combinations with each other. For example, to suppress errors for
+any module where the first component contains the substring `test`, use `*test*.**`.
+
+**Default value**: `[]`
+
+**Type**: `list[str]`
+
+**Example usage**:
+
+=== "pyproject.toml"
+
+    ```toml
+    [tool.ty.analysis]
+    # Suppress errors for all `test` modules except `test.foo`
+    allowed-unresolved-imports = ["test.**", "!test.foo"]
+    ```
+
+=== "ty.toml"
+
+    ```toml
+    [analysis]
+    # Suppress errors for all `test` modules except `test.foo`
+    allowed-unresolved-imports = ["test.**", "!test.foo"]
+    ```
+
+---
+
+### `replace-imports-with-any`
+
+A list of module glob patterns whose imports should be replaced with `typing.Any`.
+
+Unlike `allowed-unresolved-imports`, this setting replaces the module's type information
+with `typing.Any` even if the module can be resolved. Import diagnostics are
+unconditionally suppressed for matching modules.
+
+- Prefix a pattern with `!` to exclude matching modules
+
+When multiple patterns match, later entries take precedence.
+
+Glob patterns can be used in combinations with each other. For example, to suppress errors for
+any module where the first component contains the substring `test`, use `*test*.**`.
+
+When multiple patterns match, later entries take precedence.
+
+**Default value**: `[]`
+
+**Type**: `list[str]`
+
+**Example usage**:
+
+=== "pyproject.toml"
+
+    ```toml
+    [tool.ty.analysis]
+    # Replace all pandas and numpy imports with Any
+    replace-imports-with-any = ["pandas.**", "numpy.**"]
+    ```
+
+=== "ty.toml"
+
+    ```toml
+    [analysis]
+    # Replace all pandas and numpy imports with Any
+    replace-imports-with-any = ["pandas.**", "numpy.**"]
+    ```
+
+---
+
+### `respect-type-ignore-comments`
+
+Whether ty should respect `type: ignore` comments.
+
+When set to `false`, `type: ignore` comments are treated like any other normal
+comment and can't be used to suppress ty errors (you have to use `ty: ignore` instead).
+
+Setting this option can be useful when using ty alongside other type checkers or when
+you prefer using `ty: ignore` over `type: ignore`.
+
+Defaults to `true`.
+
+**Default value**: `true`
+
+**Type**: `bool`
+
+**Example usage**:
+
+=== "pyproject.toml"
+
+    ```toml
+    [tool.ty.analysis]
+    # Disable support for `type: ignore` comments
+    respect-type-ignore-comments = false
+    ```
+
+=== "ty.toml"
+
+    ```toml
+    [analysis]
+    # Disable support for `type: ignore` comments
+    respect-type-ignore-comments = false
+    ```
+
+---
+
+### `strict-equality-semantics`
+
+Configure ty's behavior regarding type inference and narrowing of equality
+checks. Defaults to `false`.
+
+By default, ty makes various assumptions about equality checks that match the
+intuitions of most Python programmers, but may not be fully sound in all situations.
+Enabling this option makes ty more conservative about these assumptions, making it
+less likely to infer `Literal[True]` or `Literal[False]` as the result of an
+equality check. This has various effects on type checking, including fewer type
+narrowing opportunities and more conservative assumptions regarding control flow.
+
+One way in which ty will by default make unsound assumptions is by narrowing an
+object `x` of type `str` to `Literal["a"]` after an `if x == "a"` check. This is
+unsound because a subclass of `str` with value `"a"` will (by default) compare equal
+to `"a"`, but will not be of type `Literal["a"]`:
+
+```pycon
+>>> # `Literal["a"]` can only be inhabited by instances of exactly `str`, not
+>>> # subclasses, but str subclasses compare equal by default:
+>>> class StringSubclass(str): ...
+...
+>>> StringSubclass("a") == "a"
+True
+>>>
+>>> # This also applies to `StrEnum`s:
+>>> from enum import StrEnum
+>>> class MyEnum(StrEnum):
+...     A = "a"
+...
+>>> MyEnum.A == "a"
+True
 ```
+
+Enabling this option prevents the unsound narrowing of `x` to `Literal["a"]`,
+and instead keeps it as `str`:
+
+```python
+from typing import Literal
+
+def parse(value: str) -> Literal["a"] | None:
+    # with `strict-equality-semantics = true`, no narrowing will occur here,
+    # and an error will be emitted on the `return` statement.
+    if value == "a":
+        return value
+    return None
+```
+
+Another assumption ty makes by default is that subclasses will never override `__eq__` or
+`__ne__`. This allows ty to narrow the following union based on an equality check, despite
+the fact that an instance of a subclass of `Foo` could compare equal to `None`, and it's
+perfectly valid to pass an instance of a subclass into the `x` parameter of this function:
+
+```python
+def narrow(x: Foo | None, other: Foo) -> None:
+    if x == other:
+        # with this option enabled, `x` will still have type `Foo | None` here,
+        # since it is legal to subclass `Foo` and override its `__eq__` method.
+        reveal_type(x)
+```
+
+Many operations in Python implicitly call `__eq__` under the hood; enabling this option
+will also impact those operations. For example, this option will also impact narrowing from
+`in` checks, and narrowing in `match` statements that use value patterns:
+
+```python
+def narrow_in(x: Foo | None, other: list[Foo]) -> None:
+    if x in other:
+        # with this option enabled, `x` will still have type `Foo | None` here,
+        # since the `in` operator implicitly calls `__eq__` on each element of `other`.
+        reveal_type(x)
+
+
+def narrow_match(x: str) -> None:
+    match x:
+        case "a":
+            # with this option enabled, `x` will still have type `str` here,
+            # since this `case` branch will be taken by any object that compares
+            # equal to `"a"`, including subclasses of `str`.
+            reveal_type(x)
+```
+
+**Default value**: `false`
+
+**Type**: `bool`
+
+**Example usage**:
+
+=== "pyproject.toml"
+
+    ```toml
+    [tool.ty.analysis]
+    # Preserve broad builtin types instead of narrowing them to literals
+    strict-equality-semantics = true
+    ```
+
+=== "ty.toml"
+
+    ```toml
+    [analysis]
+    # Preserve broad builtin types instead of narrowing them to literals
+    strict-equality-semantics = true
+    ```
 
 ---
 
@@ -45,12 +283,21 @@ configuration setting.
 
 **Type**: `list[str]`
 
-**Example usage** (`pyproject.toml`):
+**Example usage**:
 
-```toml
-[tool.ty.environment]
-extra-paths = ["./shared/my-search-path"]
-```
+=== "pyproject.toml"
+
+    ```toml
+    [tool.ty.environment]
+    extra-paths = ["./shared/my-search-path"]
+    ```
+
+=== "ty.toml"
+
+    ```toml
+    [environment]
+    extra-paths = ["./shared/my-search-path"]
+    ```
 
 ---
 
@@ -61,27 +308,40 @@ Path to your project's Python environment or interpreter.
 ty uses the `site-packages` directory of your project's Python environment
 to resolve third-party (and, in some cases, first-party) imports in your code.
 
-If you're using a project management tool such as uv, you should not generally need
-to specify this option, as commands such as `uv run` will set the `VIRTUAL_ENV`
-environment variable to point to your project's virtual environment. ty can also infer
-the location of your environment from an activated Conda environment, and will look for
-a `.venv` directory in the project root if none of the above apply.
+This can be a path to:
 
-Passing a path to a Python executable is supported, but passing a path to a dynamic executable
-(such as a shim) is not currently supported.
+- A Python interpreter, e.g. `.venv/bin/python3`
+- A virtual environment directory, e.g. `.venv`
+- A system Python [`sys.prefix`] directory, e.g. `/usr`
 
-This option can be used to point to virtual or system Python environments.
+If you're using a project management tool such as uv, you should not generally need to
+specify this option, as commands such as `uv run` will set the `VIRTUAL_ENV` environment
+variable to point to your project's virtual environment. ty can also infer the location of
+your environment from an activated Conda environment, and will look for a `.venv` directory
+in the project root if none of the above apply. Failing that, ty will look for a `python3`
+or `python` binary available in `PATH`.
+
+[`sys.prefix`]: https://docs.python.org/3/library/sys.html#sys.prefix
 
 **Default value**: `null`
 
 **Type**: `str`
 
-**Example usage** (`pyproject.toml`):
+**Example usage**:
 
-```toml
-[tool.ty.environment]
-python = "./custom-venv-location/.venv"
-```
+=== "pyproject.toml"
+
+    ```toml
+    [tool.ty.environment]
+    python = "./custom-venv-location/.venv"
+    ```
+
+=== "ty.toml"
+
+    ```toml
+    [environment]
+    python = "./custom-venv-location/.venv"
+    ```
 
 ---
 
@@ -103,13 +363,23 @@ If no platform is specified, ty will use the current platform:
 
 **Type**: `"win32" | "darwin" | "android" | "ios" | "linux" | "all" | str`
 
-**Example usage** (`pyproject.toml`):
+**Example usage**:
 
-```toml
-[tool.ty.environment]
-# Tailor type stubs and conditionalized type definitions to windows.
-python-platform = "win32"
-```
+=== "pyproject.toml"
+
+    ```toml
+    [tool.ty.environment]
+    # Tailor type stubs and conditionalized type definitions to windows.
+    python-platform = "win32"
+    ```
+
+=== "ty.toml"
+
+    ```toml
+    [environment]
+    # Tailor type stubs and conditionalized type definitions to windows.
+    python-platform = "win32"
+    ```
 
 ---
 
@@ -117,9 +387,13 @@ python-platform = "win32"
 
 Specifies the version of Python that will be used to analyze the source code.
 The version should be specified as a string in the format `M.m` where `M` is the major version
-and `m` is the minor (e.g. `"3.0"` or `"3.6"`).
+and `m` is the minor (e.g. `"3.7"` or `"3.12"`).
 If a version is provided, ty will generate errors if the source code makes use of language features
 that are not supported in that version.
+
+ty officially supports type checking code that targets Python 3.10 and later. Python 3.7
+through 3.9 can still be selected, but ty may produce false positives or false negatives for
+standard-library APIs because its bundled stubs do not fully describe those versions.
 
 If a version is not specified, ty will try the following techniques in order of preference
 to determine a value:
@@ -135,14 +409,23 @@ to reflect the differing contents of the standard library across Python versions
 
 **Default value**: `"3.14"`
 
-**Type**: `"3.7" | "3.8" | "3.9" | "3.10" | "3.11" | "3.12" | "3.13" | "3.14" | <major>.<minor>`
+**Type**: `"3.7" | "3.8" | "3.9" | "3.10" | "3.11" | "3.12" | "3.13" | "3.14" | "3.15"`
 
-**Example usage** (`pyproject.toml`):
+**Example usage**:
 
-```toml
-[tool.ty.environment]
-python-version = "3.12"
-```
+=== "pyproject.toml"
+
+    ```toml
+    [tool.ty.environment]
+    python-version = "3.12"
+    ```
+
+=== "ty.toml"
+
+    ```toml
+    [environment]
+    python-version = "3.12"
+    ```
 
 ---
 
@@ -152,26 +435,35 @@ The root paths of the project, used for finding first-party modules.
 
 Accepts a list of directory paths searched in priority order (first has highest priority).
 
-If left unspecified, ty will try to detect common project layouts and initialize `root` accordingly:
+If left unspecified, ty will try to detect common project layouts and initialize `root` accordingly.
+The project root (`.`) is always included. Additionally, the following directories are included
+if they exist and are not packages (i.e. they do not contain `__init__.py` or `__init__.pyi` files):
 
-* if a `./src` directory exists, include `.` and `./src` in the first party search path (src layout or flat)
-* if a `./<project-name>/<project-name>` directory exists, include `.` and `./<project-name>` in the first party search path
-* otherwise, default to `.` (flat layout)
-
-Besides, if a `./python` or `./tests` directory exists and is not a package (i.e. it does not contain an `__init__.py` or `__init__.pyi` file),
-it will also be included in the first party search path.
+* `./src`
+* `./<project-name>` (if a `./<project-name>/<project-name>` directory exists)
+* `./python`
 
 **Default value**: `null`
 
 **Type**: `list[str]`
 
-**Example usage** (`pyproject.toml`):
+**Example usage**:
 
-```toml
-[tool.ty.environment]
-# Multiple directories (priority order)
-root = ["./src", "./lib", "./vendor"]
-```
+=== "pyproject.toml"
+
+    ```toml
+    [tool.ty.environment]
+    # Multiple directories (priority order)
+    root = ["./src", "./lib", "./vendor"]
+    ```
+
+=== "ty.toml"
+
+    ```toml
+    [environment]
+    # Multiple directories (priority order)
+    root = ["./src", "./lib", "./vendor"]
+    ```
 
 ---
 
@@ -185,12 +477,21 @@ bundled as a zip file in the binary
 
 **Type**: `str`
 
-**Example usage** (`pyproject.toml`):
+**Example usage**:
 
-```toml
-[tool.ty.environment]
-typeshed = "/path/to/custom/typeshed"
-```
+=== "pyproject.toml"
+
+    ```toml
+    [tool.ty.environment]
+    typeshed = "/path/to/custom/typeshed"
+    ```
+
+=== "ty.toml"
+
+    ```toml
+    [environment]
+    typeshed = "/path/to/custom/typeshed"
+    ```
 
 ---
 
@@ -200,24 +501,22 @@ Configuration override that applies to specific files based on glob patterns.
 
 An override allows you to apply different rule configurations to specific
 files or directories. Multiple overrides can match the same file, with
-later overrides take precedence.
+later overrides take precedence. Override rules take precedence over global
+rules for matching files.
 
-### Precedence
-
-- Later overrides in the array take precedence over earlier ones
-- Override rules take precedence over global rules for matching files
-
-### Examples
+For example, to relax enforcement of rules in test files:
 
 ```toml
-# Relax rules for test files
 [[tool.ty.overrides]]
 include = ["tests/**", "**/test_*.py"]
 
 [tool.ty.overrides.rules]
 possibly-unresolved-reference = "warn"
+```
 
-# Ignore generated files but still check important ones
+Or, to ignore a rule in generated files but retain enforcement in an important file:
+
+```toml
 [[tool.ty.overrides]]
 include = ["generated/**"]
 exclude = ["generated/important.py"]
@@ -240,17 +539,31 @@ If not specified, defaults to `[]` (excludes no files).
 
 **Type**: `list[str]`
 
-**Example usage** (`pyproject.toml`):
+**Example usage**:
 
-```toml
-[[tool.ty.overrides]]
-exclude = [
-    "generated",
-    "*.proto",
-    "tests/fixtures/**",
-    "!tests/fixtures/important.py"  # Include this one file
-]
-```
+=== "pyproject.toml"
+
+    ```toml
+    [[tool.ty.overrides]]
+    exclude = [
+        "generated",
+        "*.proto",
+        "tests/fixtures/**",
+        "!tests/fixtures/important.py"  # Include this one file
+    ]
+    ```
+
+=== "ty.toml"
+
+    ```toml
+    [[overrides]]
+    exclude = [
+        "generated",
+        "*.proto",
+        "tests/fixtures/**",
+        "!tests/fixtures/important.py"  # Include this one file
+    ]
+    ```
 
 ---
 
@@ -268,15 +581,27 @@ If not specified, defaults to `["**"]` (matches all files).
 
 **Type**: `list[str]`
 
-**Example usage** (`pyproject.toml`):
+**Example usage**:
 
-```toml
-[[tool.ty.overrides]]
-include = [
-    "src",
-    "tests",
-]
-```
+=== "pyproject.toml"
+
+    ```toml
+    [[tool.ty.overrides]]
+    include = [
+        "src",
+        "tests",
+    ]
+    ```
+
+=== "ty.toml"
+
+    ```toml
+    [[overrides]]
+    include = [
+        "src",
+        "tests",
+    ]
+    ```
 
 ---
 
@@ -290,17 +615,254 @@ severity levels or disable them entirely.
 
 **Default value**: `{...}`
 
-**Type**: `dict[RuleName, "ignore" | "warn" | "error"]`
+**Type**: `dict[RuleName | "all", "ignore" | "warn" | "error"]`
 
-**Example usage** (`pyproject.toml`):
+**Example usage**:
 
-```toml
-[[tool.ty.overrides]]
-include = ["src"]
+=== "pyproject.toml"
 
-[tool.ty.overrides.rules]
-possibly-unresolved-reference = "ignore"
+    ```toml
+    [[tool.ty.overrides]]
+    include = ["src"]
+
+    [tool.ty.overrides.rules]
+    possibly-unresolved-reference = "ignore"
+    ```
+
+=== "ty.toml"
+
+    ```toml
+    [[overrides]]
+    include = ["src"]
+
+    [overrides.rules]
+    possibly-unresolved-reference = "ignore"
+    ```
+
+---
+
+## `overrides.analysis`
+
+#### `allowed-unresolved-imports`
+
+A list of module glob patterns for which `unresolved-import` diagnostics should be suppressed.
+
+Details on supported glob patterns:
+- `*` matches zero or more characters except `.`. For example, `foo.*` matches `foo.bar` but
+  not `foo.bar.baz`; `foo*` matches `foo` and `foobar` but not `foo.bar` or `barfoo`; and `*foo`
+  matches `foo` and `barfoo` but not `foo.bar` or `foobar`.
+- `**` matches any number of module components (e.g., `foo.**` matches `foo`, `foo.bar`, etc.)
+- Prefix a pattern with `!` to exclude matching modules
+
+When multiple patterns match, later entries take precedence.
+
+Glob patterns can be used in combinations with each other. For example, to suppress errors for
+any module where the first component contains the substring `test`, use `*test*.**`.
+
+**Default value**: `[]`
+
+**Type**: `list[str]`
+
+**Example usage**:
+
+=== "pyproject.toml"
+
+    ```toml
+    [tool.ty.overrides.analysis]
+    # Suppress errors for all `test` modules except `test.foo`
+    allowed-unresolved-imports = ["test.**", "!test.foo"]
+    ```
+
+=== "ty.toml"
+
+    ```toml
+    [overrides.analysis]
+    # Suppress errors for all `test` modules except `test.foo`
+    allowed-unresolved-imports = ["test.**", "!test.foo"]
+    ```
+
+---
+
+#### `replace-imports-with-any`
+
+A list of module glob patterns whose imports should be replaced with `typing.Any`.
+
+Unlike `allowed-unresolved-imports`, this setting replaces the module's type information
+with `typing.Any` even if the module can be resolved. Import diagnostics are
+unconditionally suppressed for matching modules.
+
+- Prefix a pattern with `!` to exclude matching modules
+
+When multiple patterns match, later entries take precedence.
+
+Glob patterns can be used in combinations with each other. For example, to suppress errors for
+any module where the first component contains the substring `test`, use `*test*.**`.
+
+When multiple patterns match, later entries take precedence.
+
+**Default value**: `[]`
+
+**Type**: `list[str]`
+
+**Example usage**:
+
+=== "pyproject.toml"
+
+    ```toml
+    [tool.ty.overrides.analysis]
+    # Replace all pandas and numpy imports with Any
+    replace-imports-with-any = ["pandas.**", "numpy.**"]
+    ```
+
+=== "ty.toml"
+
+    ```toml
+    [overrides.analysis]
+    # Replace all pandas and numpy imports with Any
+    replace-imports-with-any = ["pandas.**", "numpy.**"]
+    ```
+
+---
+
+#### `respect-type-ignore-comments`
+
+Whether ty should respect `type: ignore` comments.
+
+When set to `false`, `type: ignore` comments are treated like any other normal
+comment and can't be used to suppress ty errors (you have to use `ty: ignore` instead).
+
+Setting this option can be useful when using ty alongside other type checkers or when
+you prefer using `ty: ignore` over `type: ignore`.
+
+Defaults to `true`.
+
+**Default value**: `true`
+
+**Type**: `bool`
+
+**Example usage**:
+
+=== "pyproject.toml"
+
+    ```toml
+    [tool.ty.overrides.analysis]
+    # Disable support for `type: ignore` comments
+    respect-type-ignore-comments = false
+    ```
+
+=== "ty.toml"
+
+    ```toml
+    [overrides.analysis]
+    # Disable support for `type: ignore` comments
+    respect-type-ignore-comments = false
+    ```
+
+---
+
+#### `strict-equality-semantics`
+
+Configure ty's behavior regarding type inference and narrowing of equality
+checks. Defaults to `false`.
+
+By default, ty makes various assumptions about equality checks that match the
+intuitions of most Python programmers, but may not be fully sound in all situations.
+Enabling this option makes ty more conservative about these assumptions, making it
+less likely to infer `Literal[True]` or `Literal[False]` as the result of an
+equality check. This has various effects on type checking, including fewer type
+narrowing opportunities and more conservative assumptions regarding control flow.
+
+One way in which ty will by default make unsound assumptions is by narrowing an
+object `x` of type `str` to `Literal["a"]` after an `if x == "a"` check. This is
+unsound because a subclass of `str` with value `"a"` will (by default) compare equal
+to `"a"`, but will not be of type `Literal["a"]`:
+
+```pycon
+>>> # `Literal["a"]` can only be inhabited by instances of exactly `str`, not
+>>> # subclasses, but str subclasses compare equal by default:
+>>> class StringSubclass(str): ...
+...
+>>> StringSubclass("a") == "a"
+True
+>>>
+>>> # This also applies to `StrEnum`s:
+>>> from enum import StrEnum
+>>> class MyEnum(StrEnum):
+...     A = "a"
+...
+>>> MyEnum.A == "a"
+True
 ```
+
+Enabling this option prevents the unsound narrowing of `x` to `Literal["a"]`,
+and instead keeps it as `str`:
+
+```python
+from typing import Literal
+
+def parse(value: str) -> Literal["a"] | None:
+    # with `strict-equality-semantics = true`, no narrowing will occur here,
+    # and an error will be emitted on the `return` statement.
+    if value == "a":
+        return value
+    return None
+```
+
+Another assumption ty makes by default is that subclasses will never override `__eq__` or
+`__ne__`. This allows ty to narrow the following union based on an equality check, despite
+the fact that an instance of a subclass of `Foo` could compare equal to `None`, and it's
+perfectly valid to pass an instance of a subclass into the `x` parameter of this function:
+
+```python
+def narrow(x: Foo | None, other: Foo) -> None:
+    if x == other:
+        # with this option enabled, `x` will still have type `Foo | None` here,
+        # since it is legal to subclass `Foo` and override its `__eq__` method.
+        reveal_type(x)
+```
+
+Many operations in Python implicitly call `__eq__` under the hood; enabling this option
+will also impact those operations. For example, this option will also impact narrowing from
+`in` checks, and narrowing in `match` statements that use value patterns:
+
+```python
+def narrow_in(x: Foo | None, other: list[Foo]) -> None:
+    if x in other:
+        # with this option enabled, `x` will still have type `Foo | None` here,
+        # since the `in` operator implicitly calls `__eq__` on each element of `other`.
+        reveal_type(x)
+
+
+def narrow_match(x: str) -> None:
+    match x:
+        case "a":
+            # with this option enabled, `x` will still have type `str` here,
+            # since this `case` branch will be taken by any object that compares
+            # equal to `"a"`, including subclasses of `str`.
+            reveal_type(x)
+```
+
+**Default value**: `false`
+
+**Type**: `bool`
+
+**Example usage**:
+
+=== "pyproject.toml"
+
+    ```toml
+    [tool.ty.overrides.analysis]
+    # Preserve broad builtin types instead of narrowing them to literals
+    strict-equality-semantics = true
+    ```
+
+=== "ty.toml"
+
+    ```toml
+    [overrides.analysis]
+    # Preserve broad builtin types instead of narrowing them to literals
+    strict-equality-semantics = true
+    ```
 
 ---
 
@@ -358,17 +920,58 @@ to re-include `dist` use `exclude = ["!dist"]`
 
 **Type**: `list[str]`
 
-**Example usage** (`pyproject.toml`):
+**Example usage**:
 
-```toml
-[tool.ty.src]
-exclude = [
-    "generated",
-    "*.proto",
-    "tests/fixtures/**",
-    "!tests/fixtures/important.py"  # Include this one file
-]
-```
+=== "pyproject.toml"
+
+    ```toml
+    [tool.ty.src]
+    exclude = [
+        "generated",
+        "*.proto",
+        "tests/fixtures/**",
+        "!tests/fixtures/important.py"  # Include this one file
+    ]
+    ```
+
+=== "ty.toml"
+
+    ```toml
+    [src]
+    exclude = [
+        "generated",
+        "*.proto",
+        "tests/fixtures/**",
+        "!tests/fixtures/important.py"  # Include this one file
+    ]
+    ```
+
+---
+
+### `exclude-scripts`
+
+Whether to exclude files containing PEP 723 inline script metadata unless they are
+explicitly passed on the command line.
+
+**Default value**: `false`
+
+**Type**: `bool`
+
+**Example usage**:
+
+=== "pyproject.toml"
+
+    ```toml
+    [tool.ty.src]
+    exclude-scripts = true
+    ```
+
+=== "ty.toml"
+
+    ```toml
+    [src]
+    exclude-scripts = true
+    ```
 
 ---
 
@@ -399,15 +1002,27 @@ matches `<project_root>/src` and not `<project_root>/test/src`).
 
 **Type**: `list[str]`
 
-**Example usage** (`pyproject.toml`):
+**Example usage**:
 
-```toml
-[tool.ty.src]
-include = [
-    "src",
-    "tests",
-]
-```
+=== "pyproject.toml"
+
+    ```toml
+    [tool.ty.src]
+    include = [
+        "src",
+        "tests",
+    ]
+    ```
+
+=== "ty.toml"
+
+    ```toml
+    [src]
+    include = [
+        "src",
+        "tests",
+    ]
+    ```
 
 ---
 
@@ -421,41 +1036,58 @@ Enabled by default.
 
 **Type**: `bool`
 
-**Example usage** (`pyproject.toml`):
+**Example usage**:
 
-```toml
-[tool.ty.src]
-respect-ignore-files = false
-```
+=== "pyproject.toml"
+
+    ```toml
+    [tool.ty.src]
+    respect-ignore-files = false
+    ```
+
+=== "ty.toml"
+
+    ```toml
+    [src]
+    respect-ignore-files = false
+    ```
 
 ---
 
 ### `root`
 
-> [!WARN] "Deprecated"
-> This option has been deprecated. Use `environment.root` instead.
+!!! warning "Deprecated"
+    This option has been deprecated. Use `environment.root` instead.
 
 The root of the project, used for finding first-party modules.
 
-If left unspecified, ty will try to detect common project layouts and initialize `src.root` accordingly:
+If left unspecified, ty will try to detect common project layouts and initialize `src.root` accordingly.
+The project root (`.`) is always included. Additionally, the following directories are included
+if they exist and are not packages (i.e. they do not contain `__init__.py` or `__init__.pyi` files):
 
-* if a `./src` directory exists, include `.` and `./src` in the first party search path (src layout or flat)
-* if a `./<project-name>/<project-name>` directory exists, include `.` and `./<project-name>` in the first party search path
-* otherwise, default to `.` (flat layout)
-
-Besides, if a `./tests` directory exists and is not a package (i.e. it does not contain an `__init__.py` file),
-it will also be included in the first party search path.
+* `./src`
+* `./<project-name>` (if a `./<project-name>/<project-name>` directory exists)
+* `./python`
 
 **Default value**: `null`
 
 **Type**: `str`
 
-**Example usage** (`pyproject.toml`):
+**Example usage**:
 
-```toml
-[tool.ty.src]
-root = "./app"
-```
+=== "pyproject.toml"
+
+    ```toml
+    [tool.ty.src]
+    root = "./app"
+    ```
+
+=== "ty.toml"
+
+    ```toml
+    [src]
+    root = "./app"
+    ```
 
 ---
 
@@ -463,21 +1095,31 @@ root = "./app"
 
 ### `error-on-warning`
 
-Use exit code 1 if there are any warning-level diagnostics.
+Use exit code 1, even if all diagnostics only had `warning` severity.
 
-Defaults to `false`.
+Defaults to `true`.
 
-**Default value**: `false`
+**Default value**: `true`
 
 **Type**: `bool`
 
-**Example usage** (`pyproject.toml`):
+**Example usage**:
 
-```toml
-[tool.ty.terminal]
-# Error if ty emits any warning-level diagnostics.
-error-on-warning = true
-```
+=== "pyproject.toml"
+
+    ```toml
+    [tool.ty.terminal]
+    # Exit with code 0 if all diagnostics had `warning` severity.
+    error-on-warning = false
+    ```
+
+=== "ty.toml"
+
+    ```toml
+    [terminal]
+    # Exit with code 0 if all diagnostics had `warning` severity.
+    error-on-warning = false
+    ```
 
 ---
 
@@ -489,14 +1131,23 @@ Defaults to `full`.
 
 **Default value**: `full`
 
-**Type**: `full | concise`
+**Type**: `full | concise | github | gitlab | junit`
 
-**Example usage** (`pyproject.toml`):
+**Example usage**:
 
-```toml
-[tool.ty.terminal]
-output-format = "concise"
-```
+=== "pyproject.toml"
+
+    ```toml
+    [tool.ty.terminal]
+    output-format = "concise"
+    ```
+
+=== "ty.toml"
+
+    ```toml
+    [terminal]
+    output-format = "concise"
+    ```
 
 ---
 

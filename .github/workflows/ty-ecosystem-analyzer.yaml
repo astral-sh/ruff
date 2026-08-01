@@ -4,11 +4,35 @@ permissions: {}
 
 on:
   pull_request:
-    types: [labeled]
+    paths:
+      - "crates/ty*/**"
+      - "!crates/ty_ide/**"
+      - "!crates/ty_server/**"
+      - "!crates/ty_test/**"
+      - "!crates/ty_completion_eval/**"
+      - "!crates/ty_wasm/**"
+      - "crates/ruff_db/**"
+      - "crates/ruff_python_ast/**"
+      - "crates/ruff_python_parser/**"
+      - "crates/ruff_python_stdlib/**"
+      - ".github/workflows/ty-ecosystem-analyzer.yaml"
+      - ".github/ty-ecosystem.toml"
+      - "crates/ty_python_semantic/resources/primer/**"
+      - "Cargo.lock"
+      - "!**.md"
+      - "!**.snap"
+      # It's tempting to skip all Python files in every directory,
+      # but changes to Python files in `ty_vendored` can affect the output of ecosystem analysis,
+      # so we apply a narrow exemption for all files in the corpus directory instead.
+      - "!crates/ty_python_semantic/resources/corpus/**"
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref_name }}-${{ github.event.pull_request.number || github.sha }}
-  cancel-in-progress: true
+  group: ty-ecosystem-analyzer-${{ github.ref_name }}-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+defaults:
+  run:
+    shell: bash
 
 env:
   CARGO_INCREMENTAL: 0
@@ -16,135 +40,233 @@ env:
   CARGO_TERM_COLOR: always
   RUSTUP_MAX_RETRIES: 10
   RUST_BACKTRACE: 1
-  REF_NAME: ${{ github.ref_name }}
-  CF_API_TOKEN_EXISTS: ${{ secrets.CF_API_TOKEN != '' }}
+  # Line-tables-only debug info: faster builds, backtraces still work.
+  CARGO_PROFILE_PROFILING_DEBUG: line-tables-only
+  ECOSYSTEM_ANALYZER_COMMIT: 263b5500881186e8c918193577c23b341e5b7237
 
 jobs:
-  ty-ecosystem-analyzer:
-    name: Compute diagnostic diff
+  build-ty:
+    name: Build ty (${{ matrix.revision }})
+    strategy:
+      matrix:
+        revision: [base, pr]
     runs-on: ${{ github.repository == 'astral-sh/ruff' && 'depot-ubuntu-22.04-32' || 'ubuntu-latest' }}
-    timeout-minutes: 20
-    if: contains(github.event.label.name, 'ecosystem-analyzer')
+    timeout-minutes: 5
     steps:
-      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          path: ruff
-          fetch-depth: 0
           persist-credentials: false
+          ref: ${{ github.sha }}
 
-      - name: Install the latest version of uv
-        uses: astral-sh/setup-uv@85856786d1ce8acfbcc2f13a5f3fbd6b938f9f41 # v7.1.2
+      - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
         with:
-          enable-cache: true # zizmor: ignore[cache-poisoning] acceptable risk for CloudFlare pages artifact
-
-      - uses: Swatinem/rust-cache@f13886b937689c021905a6b90929199931d60db1 # v2.8.1
-        with:
-          workspaces: "ruff"
-          lookup-only: false # zizmor: ignore[cache-poisoning] acceptable risk for CloudFlare pages artifact
+          lookup-only: false
 
       - name: Install Rust toolchain
         run: rustup show
 
-      - name: Compute diagnostic diff
-        shell: bash
+      - name: "Install mold"
+        uses: rui314/setup-mold@9c9c13bf4c3f1adef0cc596abc155580bcb04444 # v1
+
+      - name: Build ty
+        env:
+          REVISION: ${{ matrix.revision }}
         run: |
-          cd ruff
+          if [[ "${REVISION}" == "base" ]]; then
+            # Faster to do this separately than to use `fetch-depth: 0` with `actions/checkout`
+            git fetch --no-tags --filter=blob:none --unshallow origin
 
-          echo "Enabling configuration overloads (see .github/mypy-primer-ty.toml)"
+            MERGE_BASE="$(git merge-base "${GITHUB_SHA}" "origin/${GITHUB_BASE_REF}")"
+            echo "${MERGE_BASE}" > merge-base.txt
+            echo "Merge base: ${MERGE_BASE}"
+            echo "PR commit: ${GITHUB_SHA}"
+
+            git checkout "${MERGE_BASE}"
+          fi
+
+          echo "Building ${REVISION} revision $(git rev-parse HEAD)"
+          cargo build --package ty --profile profiling
+          cp target/profiling/ty "ty-${REVISION}"
+
+          if [[ "${REVISION}" == "pr" ]]; then
+            cp crates/ty_python_semantic/resources/primer/flaky.txt projects_flaky.txt
+            cp .github/ty-ecosystem.toml ty-ecosystem.toml
+          fi
+
+      - name: Upload base ty binary
+        if: matrix.revision == 'base'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ty-build-base
+          compression-level: 1
+          path: |
+            ty-base
+            merge-base.txt
+
+      - name: Upload PR ty binary, flaky project list, and config
+        if: matrix.revision == 'pr'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ty-build-pr
+          compression-level: 1
+          path: |
+            ty-pr
+            projects_flaky.txt
+            ty-ecosystem.toml
+
+  analyze-shards:
+    needs: [build-ty]
+    strategy:
+      matrix:
+        shard: [0, 1, 2, 3]
+    runs-on: ${{ github.repository == 'astral-sh/ruff' && 'depot-ubuntu-22.04-32' || 'ubuntu-latest' }}
+    timeout-minutes: 10
+    env:
+      EXCLUDE_NEWER: ${{ github.event.pull_request.updated_at }}
+    steps:
+      - name: Install the latest version of uv
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          version: "0.12.0"
+          ignore-empty-workdir: true
+          # The default of `enable-cache: auto` leads to warnings from setup-uv in this job,
+          # since its cache-invalidation keys (pyproject.toml, uv.lock, etc.) aren't available
+          # here. But the cache doesn't help us much here anyway, since the uv binary, the
+          # Python binary, and all pre-built wheels are all excluded from setup-uv's cache.
+          # The cache would only save us from building two Git dependencies which are both
+          # small, pure-Python projects.
+          enable-cache: false
+
+      - name: Download ty binaries, flaky project list, and config
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: ty-build-*
+          merge-multiple: true
+
+      - name: Analyze shard ${{ matrix.shard }}
+        env:
+          SHARD: ${{ matrix.shard }}
+        run: |
           mkdir -p ~/.config/ty
-          cp .github/mypy-primer-ty.toml ~/.config/ty/ty.toml
+          cp ty-ecosystem.toml ~/.config/ty/ty.toml
 
-          echo "new commit"
-          git checkout -b new_commit "$GITHUB_SHA"
-          git rev-list --format=%s --max-count=1 new_commit
-          cp crates/ty_python_semantic/resources/primer/good.txt projects_new.txt
+          chmod +x ty-base ty-pr
+          MERGE_BASE="$(< merge-base.txt)"
+          echo "MERGE_BASE: ${MERGE_BASE}"
 
-          echo "old commit (merge base)"
-          MERGE_BASE="$(git merge-base "$GITHUB_SHA" "origin/$GITHUB_BASE_REF")"
-          git checkout -b old_commit "$MERGE_BASE"
-          git rev-list --format=%s --max-count=1 old_commit
-          cp crates/ty_python_semantic/resources/primer/good.txt projects_old.txt
-
-          cd ..
-
-          uv tool install "git+https://github.com/astral-sh/ecosystem-analyzer@908758da02a73ef3f3308e1dbb2248510029bbe4"
-
-          ecosystem-analyzer \
-            --repository ruff \
+          uvx \
+            --from "git+https://github.com/astral-sh/ecosystem-analyzer@${ECOSYSTEM_ANALYZER_COMMIT}" \
+            ecosystem-analyzer \
+            --flaky-runs 10 \
             diff \
-            --profile=profiling \
-            --projects-old ruff/projects_old.txt \
-            --projects-new ruff/projects_new.txt \
-            --old old_commit \
-            --new new_commit \
-            --output-old diagnostics-old.json \
-            --output-new diagnostics-new.json
+            --projects-flaky projects_flaky.txt \
+            --ty-binary-old ty-base \
+            --ty-binary-new ty-pr \
+            --old "${MERGE_BASE}" \
+            --new "${GITHUB_SHA}" \
+            --exclude-newer "${EXCLUDE_NEWER}" \
+            --shard "${SHARD}" \
+            --num-shards 4 \
+            --output-old "diagnostics-base-${SHARD}.json" \
+            --output-new "diagnostics-PR-${SHARD}.json"
+
+      - name: Upload diagnostics
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: diagnostics-shard-${{ matrix.shard }}
+          path: |
+            diagnostics-base-${{ matrix.shard }}.json
+            diagnostics-PR-${{ matrix.shard }}.json
+
+  generate-report:
+    name: Generate diagnostic diff report
+    needs: [analyze-shards]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Install the latest version of uv
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          version: "0.12.0"
+          ignore-empty-workdir: true
+          # The default of `enable-cache: auto` leads to warnings from setup-uv in this job,
+          # since its cache-invalidation keys (pyproject.toml, uv.lock, etc.) aren't available
+          # here. But the cache doesn't help us much here anyway, since the uv binary, the
+          # Python binary, and all pre-built wheels are all excluded from setup-uv's cache.
+          # The cache would only save us from building two Git dependencies which are both
+          # small, pure-Python projects.
+          enable-cache: false
+
+      - name: Download shard diagnostics
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: diagnostics-shard-*
+          merge-multiple: true
+
+      - name: Generate reports
+        id: generate-reports
+        env:
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          # Merge shard diagnostics
+          jq -s '{ outputs: [.[].outputs[]] }' diagnostics-base-*.json > diagnostics-base.json
+          jq -s '{ outputs: [.[].outputs[]] }' diagnostics-PR-*.json   > diagnostics-PR.json
+
+          uv tool install "git+https://github.com/astral-sh/ecosystem-analyzer@$ECOSYSTEM_ANALYZER_COMMIT"
 
           mkdir dist
 
           ecosystem-analyzer \
             generate-diff \
-            diagnostics-old.json \
-            diagnostics-new.json \
+            diagnostics-base.json \
+            diagnostics-PR.json \
             --old-name "main (merge base)" \
             --new-name "$REF_NAME" \
             --output-html dist/diff.html
 
+          set +e
           ecosystem-analyzer \
             generate-diff-statistics \
-            diagnostics-old.json \
-            diagnostics-new.json \
+            diagnostics-base.json \
+            diagnostics-PR.json \
+            --fail-on-new-abnormal-exits \
             --old-name "main (merge base)" \
             --new-name "$REF_NAME" \
             --output diff-statistics.md
+          DIFF_STATISTICS_EXIT_CODE=$?
+          set -e
 
           ecosystem-analyzer \
             generate-timing-diff \
-            diagnostics-old.json \
-            diagnostics-new.json \
+            diagnostics-base.json \
+            diagnostics-PR.json \
             --old-name "main (merge base)" \
             --new-name "$REF_NAME" \
             --output-html dist/timing.html
 
-          echo '## `ecosystem-analyzer` results' > comment.md
-          echo >> comment.md
           cat diff-statistics.md >> comment.md
 
           cat diff-statistics.md >> "$GITHUB_STEP_SUMMARY"
 
-      - name: "Deploy to Cloudflare Pages"
-        if: ${{ env.CF_API_TOKEN_EXISTS == 'true' }}
-        id: deploy
-        uses: cloudflare/wrangler-action@da0e0dfe58b7a431659754fdf3f186c529afbe65 # v3.14.1
-        with:
-          apiToken: ${{ secrets.CF_API_TOKEN }}
-          accountId: ${{ secrets.CF_ACCOUNT_ID }}
-          command: pages deploy dist --project-name=ty-ecosystem --branch ${{ github.head_ref }} --commit-hash ${GITHUB_SHA}
+          echo "diff_statistics_exit_code=$DIFF_STATISTICS_EXIT_CODE" >> "$GITHUB_OUTPUT"
 
-      - name: "Append deployment URL"
-        if: ${{ env.CF_API_TOKEN_EXISTS == 'true' }}
-        env:
-          DEPLOYMENT_URL: ${{ steps.deploy.outputs.pages-deployment-alias-url }}
-        run: |
-          echo >> comment.md
-          echo "**[Full report with detailed diff]($DEPLOYMENT_URL/diff)** ([timing results]($DEPLOYMENT_URL/timing))" >> comment.md
+      # NOTE: astral-bot deploys both HTML files in this artifact and uses the
+      # deployed URLs for the report links in its PR comment.
+      # Make sure to update the bot if you rename the artifact.
+      - name: "Upload full report"
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: full-report
+          path: dist/
 
       # NOTE: astral-sh-bot uses this artifact to post comments on PRs.
       # Make sure to update the bot if you rename the artifact.
       - name: Upload comment
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: comment.md
           path: comment.md
 
-      - name: Upload diagnostics diff
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        with:
-          name: diff.html
-          path: dist/diff.html
-
-      - name: Upload timing diff
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        with:
-          name: timing.html
-          path: dist/timing.html
+      - name: Fail on new abnormal exits
+        if: steps.generate-reports.outputs.diff_statistics_exit_code != '0'
+        run: exit 1

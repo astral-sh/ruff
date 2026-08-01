@@ -7,13 +7,11 @@ use ruff_text_size::{Ranged, TextRange};
 use crate::builders::parenthesize_if_expands;
 use crate::comments::SourceComment;
 use crate::expression::can_omit_optional_parentheses;
-use crate::expression::parentheses::{
-    is_expression_parenthesized, optional_parentheses, parenthesized,
-};
+use crate::expression::parentheses::{optional_parentheses, parenthesized};
 use crate::other::commas;
 use crate::other::with_item::WithItemLayout;
 use crate::prelude::*;
-use crate::statement::clause::{ClauseHeader, clause_body, clause_header};
+use crate::statement::clause::{ClauseHeader, clause};
 use crate::statement::suite::SuiteKind;
 
 #[derive(Default)]
@@ -46,106 +44,103 @@ impl FormatNodeRule<StmtWith> for FormatStmtWith {
 
         write!(
             f,
-            [
-                clause_header(
-                    ClauseHeader::With(with_stmt),
-                    colon_comments,
-                    &format_with(|f| {
-                        write!(
-                            f,
-                            [
-                                with_stmt
-                                    .is_async
-                                    .then_some(format_args![token("async"), space()]),
-                                token("with"),
-                                space()
-                            ]
-                        )?;
+            [clause(
+                ClauseHeader::With(with_stmt),
+                &format_with(|f| {
+                    write!(
+                        f,
+                        [
+                            with_stmt
+                                .is_async
+                                .then_some(format_args![token("async"), space()]),
+                            token("with"),
+                            space()
+                        ]
+                    )?;
 
-                        let layout = WithItemsLayout::from_statement(
-                            with_stmt,
-                            f.context(),
-                            parenthesized_comments,
-                        )?;
+                    let layout = WithItemsLayout::from_statement(
+                        with_stmt,
+                        f.context(),
+                        parenthesized_comments,
+                    )?;
 
-                        match layout {
-                            WithItemsLayout::SingleWithTarget(single) => {
-                                optional_parentheses(&single.format().with_options(
-                                    WithItemLayout::ParenthesizedContextManagers { single: true },
-                                ))
-                                .fmt(f)
-                            }
-
-                            WithItemsLayout::SingleWithoutTarget(single) => single
-                                .format()
-                                .with_options(WithItemLayout::SingleWithoutTarget)
-                                .fmt(f),
-
-                            WithItemsLayout::SingleParenthesizedContextManager(single) => single
-                                .format()
-                                .with_options(WithItemLayout::SingleParenthesizedContextManager)
-                                .fmt(f),
-
-                            WithItemsLayout::ParenthesizeIfExpands => {
-                                parenthesize_if_expands(&format_with(|f| {
-                                    let mut joiner = f.join_comma_separated(
-                                        with_stmt.body.first().unwrap().start(),
-                                    );
-
-                                    for item in &with_stmt.items {
-                                        joiner.entry_with_line_separator(
-                                            item,
-                                            &item.format().with_options(
-                                                WithItemLayout::ParenthesizedContextManagers {
-                                                    single: with_stmt.items.len() == 1,
-                                                },
-                                            ),
-                                            soft_line_break_or_space(),
-                                        );
-                                    }
-                                    joiner.finish()
-                                }))
-                                .fmt(f)
-                            }
-
-                            WithItemsLayout::Python38OrOlder => f
-                                .join_with(format_args![token(","), space()])
-                                .entries(with_stmt.items.iter().map(|item| {
-                                    item.format().with_options(WithItemLayout::Python38OrOlder {
-                                        single: with_stmt.items.len() == 1,
-                                    })
-                                }))
-                                .finish(),
-
-                            WithItemsLayout::Parenthesized => parenthesized(
-                                "(",
-                                &format_with(|f: &mut PyFormatter| {
-                                    let mut joiner = f.join_comma_separated(
-                                        with_stmt.body.first().unwrap().start(),
-                                    );
-
-                                    for item in &with_stmt.items {
-                                        joiner.entry(
-                                            item,
-                                            &item.format().with_options(
-                                                WithItemLayout::ParenthesizedContextManagers {
-                                                    single: with_stmt.items.len() == 1,
-                                                },
-                                            ),
-                                        );
-                                    }
-
-                                    joiner.finish()
-                                }),
-                                ")",
-                            )
-                            .with_dangling_comments(parenthesized_comments)
-                            .fmt(f),
+                    match layout {
+                        WithItemsLayout::SingleWithTarget(single) => {
+                            optional_parentheses(&single.format().with_options(
+                                WithItemLayout::ParenthesizedContextManagers { single: true },
+                            ))
+                            .fmt(f)
                         }
-                    })
-                ),
-                clause_body(&with_stmt.body, SuiteKind::other(true), colon_comments)
-            ]
+
+                        WithItemsLayout::SingleWithoutTarget(single) => single
+                            .format()
+                            .with_options(WithItemLayout::SingleWithoutTarget)
+                            .fmt(f),
+
+                        WithItemsLayout::SingleParenthesizedContextManager(single) => single
+                            .format()
+                            .with_options(WithItemLayout::SingleParenthesizedContextManager)
+                            .fmt(f),
+
+                        WithItemsLayout::ParenthesizeIfExpands => {
+                            parenthesize_if_expands(&format_with(|f| {
+                                let mut joiner =
+                                    f.join_comma_separated(with_stmt.body.first().unwrap().start());
+
+                                for item in &with_stmt.items {
+                                    joiner.entry_with_line_separator(
+                                        item,
+                                        &item.format().with_options(
+                                            WithItemLayout::ParenthesizedContextManagers {
+                                                single: with_stmt.items.len() == 1,
+                                            },
+                                        ),
+                                        soft_line_break_or_space(),
+                                    );
+                                }
+                                joiner.finish()
+                            }))
+                            .fmt(f)
+                        }
+
+                        WithItemsLayout::Python38OrOlder => f
+                            .join_with(format_args![token(","), space()])
+                            .entries(with_stmt.items.iter().map(|item| {
+                                item.format().with_options(WithItemLayout::Python38OrOlder {
+                                    single: with_stmt.items.len() == 1,
+                                })
+                            }))
+                            .finish(),
+
+                        WithItemsLayout::Parenthesized => parenthesized(
+                            "(",
+                            &format_with(|f: &mut PyFormatter| {
+                                let mut joiner =
+                                    f.join_comma_separated(with_stmt.body.first().unwrap().start());
+
+                                for item in &with_stmt.items {
+                                    joiner.entry(
+                                        item,
+                                        &item.format().with_options(
+                                            WithItemLayout::ParenthesizedContextManagers {
+                                                single: with_stmt.items.len() == 1,
+                                            },
+                                        ),
+                                    );
+                                }
+
+                                joiner.finish()
+                            }),
+                            ")",
+                        )
+                        .with_dangling_comments(parenthesized_comments)
+                        .fmt(f),
+                    }
+                }),
+                colon_comments,
+                &with_stmt.body,
+                SuiteKind::other(true),
+            )]
         )
     }
 }
@@ -180,8 +175,10 @@ enum WithItemsLayout<'a> {
     ///     ...
     /// ```
     ///
-    /// In this case, use [`maybe_parenthesize_expression`] to format the context expression
-    /// to get the exact same formatting as when formatting an expression in any other clause header.
+    /// In this case, use
+    /// [`maybe_parenthesize_expression`](crate::expression::maybe_parenthesize_expression) to
+    /// format the context expression to get the exact same formatting as when formatting an
+    /// expression in any other clause header.
     ///
     /// Only used for Python 3.9+
     ///
@@ -293,11 +290,7 @@ impl<'a> WithItemsLayout<'a> {
 
             // Preserve the parentheses around the context expression instead of parenthesizing the entire
             // with items.
-            if is_expression_parenthesized(
-                (&single.context_expr).into(),
-                context.comments().ranges(),
-                context.source(),
-            ) {
+            if context.is_expression_parenthesized((&single.context_expr).into()) {
                 return Ok(Self::SingleParenthesizedContextManager(single));
             }
         }

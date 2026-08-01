@@ -1,6 +1,7 @@
 pub(crate) use convert_named_tuple_functional_to_class::*;
 pub(crate) use convert_typed_dict_functional_to_class::*;
 pub(crate) use datetime_utc_alias::*;
+pub(crate) use deprecated_abc_decorator::*;
 pub(crate) use deprecated_c_element_tree::*;
 pub(crate) use deprecated_import::*;
 pub(crate) use deprecated_mock_import::*;
@@ -45,6 +46,7 @@ pub(crate) use yield_in_for_loop::*;
 mod convert_named_tuple_functional_to_class;
 mod convert_typed_dict_functional_to_class;
 mod datetime_utc_alias;
+mod deprecated_abc_decorator;
 mod deprecated_c_element_tree;
 mod deprecated_import;
 mod deprecated_mock_import;

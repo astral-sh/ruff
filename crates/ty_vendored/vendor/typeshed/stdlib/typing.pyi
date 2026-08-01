@@ -5,7 +5,7 @@ Among other things, the module includes the following:
 * Generic, Protocol, and internal machinery to support generic aliases.
   All subscripted types like X[int], Union[int, str] are generic aliases.
 * Various "special forms" that have unique meanings in type annotations:
-  NoReturn, Never, ClassVar, Self, Concatenate, Unpack, and others.
+  Any, Never, ClassVar, Self, Concatenate, Unpack, and others.
 * Classes whose instances can be type arguments to generic classes and functions:
   TypeVar, ParamSpec, TypeVarTuple.
 * Public helper functions: get_type_hints, overload, cast, final, and others.
@@ -38,17 +38,15 @@ from types import (
     MethodWrapperType,
     ModuleType,
     TracebackType,
+    UnionType,
     WrapperDescriptorType,
 )
-from typing_extensions import Never as _Never, ParamSpec as _ParamSpec, deprecated
+from typing_extensions import Never as _Never, deprecated
 
 if sys.version_info >= (3, 14):
     from _typeshed import EvaluateFunc
 
     from annotationlib import Format
-
-if sys.version_info >= (3, 10):
-    from types import UnionType
 
 __all__ = [
     "AbstractSet",
@@ -61,11 +59,11 @@ __all__ = [
     "AsyncIterator",
     "Awaitable",
     "BinaryIO",
-    "ByteString",
     "Callable",
     "ChainMap",
     "ClassVar",
     "Collection",
+    "Concatenate",
     "Container",
     "ContextManager",
     "Coroutine",
@@ -97,6 +95,9 @@ __all__ = [
     "NoReturn",
     "Optional",
     "OrderedDict",
+    "ParamSpec",
+    "ParamSpecArgs",
+    "ParamSpecKwargs",
     "Pattern",
     "Protocol",
     "Reversible",
@@ -114,6 +115,8 @@ __all__ = [
     "TextIO",
     "Tuple",
     "Type",
+    "TypeAlias",
+    "TypeGuard",
     "TypeVar",
     "TypedDict",
     "Union",
@@ -124,17 +127,20 @@ __all__ = [
     "get_args",
     "get_origin",
     "get_type_hints",
+    "is_typeddict",
     "no_type_check",
-    "no_type_check_decorator",
     "overload",
     "runtime_checkable",
 ]
 
+if sys.version_info < (3, 15):
+    __all__ += ["ByteString", "no_type_check_decorator"]
+
 if sys.version_info >= (3, 14):
     __all__ += ["evaluate_forward_ref"]
 
-if sys.version_info >= (3, 10):
-    __all__ += ["Concatenate", "ParamSpec", "ParamSpecArgs", "ParamSpecKwargs", "TypeAlias", "TypeGuard", "is_typeddict"]
+if sys.version_info >= (3, 15):
+    __all__ += ["NoExtraItems", "TypeForm", "disjoint_base"]
 
 if sys.version_info >= (3, 11):
     __all__ += [
@@ -166,12 +172,12 @@ if sys.version_info >= (3, 13):
 class Any:
     """Special type indicating an unconstrained type.
 
-    - Any is compatible with every type.
-    - Any assumed to have all methods.
-    - All values assumed to be instances of Any.
+    - Any is assignable to every type.
+    - Any assumed to have all methods and attributes.
+    - All values are assignable to Any.
 
     Note that all the above statements are true from the point of view of
-    static type checkers. At runtime, Any should not be used with instance
+    static type checkers. At runtime, Any cannot be used with instance
     checks.
     """
 
@@ -184,7 +190,7 @@ def final(f: _T) -> _T:
     """Decorator to indicate final methods and final classes.
 
     Use this decorator to indicate to type checkers that the decorated
-    method cannot be overridden, and decorated class cannot be subclassed.
+    method cannot be overridden, and the decorated class cannot be subclassed.
 
     For example::
 
@@ -309,12 +315,13 @@ class TypeVar:
             covariant: bool = False,
             contravariant: bool = False,
         ) -> None: ...
-    if sys.version_info >= (3, 10):
-        def __or__(self, right: Any, /) -> _SpecialForm:  # AnnotationForm
-            """Return self|value."""
 
-        def __ror__(self, left: Any, /) -> _SpecialForm:  # AnnotationForm
-            """Return value|self."""
+    def __or__(self, right: Any, /) -> _SpecialForm:  # AnnotationForm
+        """Return self|value."""
+
+    def __ror__(self, left: Any, /) -> _SpecialForm:  # AnnotationForm
+        """Return value|self."""
+
     if sys.version_info >= (3, 11):
         def __typing_subst__(self, arg: Any, /) -> Any: ...
     if sys.version_info >= (3, 13):
@@ -328,40 +335,410 @@ class TypeVar:
         @property
         def evaluate_default(self) -> EvaluateFunc | None: ...
 
-# Used for an undocumented mypy feature. Does not exist at runtime.
-# Obsolete, use _typeshed._type_checker_internals.promote instead.
-_promote = object()
-
 # N.B. Keep this definition in sync with typing_extensions._SpecialForm
 @final
 class _SpecialForm(_Final):
     __slots__ = ("_name", "__doc__", "_getitem")
     def __getitem__(self, parameters: Any) -> object: ...
-    if sys.version_info >= (3, 10):
-        def __or__(self, other: Any) -> _SpecialForm: ...
-        def __ror__(self, other: Any) -> _SpecialForm: ...
+    def __or__(self, other: Any) -> _SpecialForm: ...
+    def __ror__(self, other: Any) -> _SpecialForm: ...
 
 Union: _SpecialForm
+"""Represent a union type
+
+E.g. for int | str
+"""
+
 Protocol: _SpecialForm
+"""Base class for protocol classes.
+
+Protocol classes are defined as::
+
+    class Proto(Protocol):
+        def meth(self) -> int:
+            ...
+
+Such classes are primarily used with static type checkers that recognize
+structural subtyping (static duck-typing).
+
+For example::
+
+    class C:
+        def meth(self) -> int:
+            return 0
+
+    def func(x: Proto) -> int:
+        return x.meth()
+
+    func(C())  # Passes static type check
+
+See PEP 544 for details. Protocol classes decorated with
+@typing.runtime_checkable act as simple-minded runtime protocols that check
+only the presence of given attributes, ignoring their type signatures.
+Protocol classes can be generic, they are defined as::
+
+    class GenProto[T](Protocol):
+        def meth(self) -> T:
+            ...
+"""
+
 Callable: _SpecialForm
+"""Deprecated alias to collections.abc.Callable.
+
+Callable[[int], str] signifies a function that takes a single
+parameter of type int and returns a str.
+
+The subscription syntax must always be used with exactly two
+values: the argument list and the return type.
+The argument list must be a list of types, a ParamSpec,
+Concatenate or ellipsis. The return type must be a single type.
+
+There is no syntax to indicate optional or keyword arguments;
+such function types are rarely used as callback types.
+"""
+
 Type: _SpecialForm
+"""Deprecated alias to builtins.type.
+
+builtins.type or typing.Type can be used to annotate class objects.
+For example, suppose we have the following classes::
+
+    class User: ...  # Abstract base for User classes
+    class BasicUser(User): ...
+    class ProUser(User): ...
+    class TeamUser(User): ...
+
+And a function that takes a class argument that's a subclass of
+User and returns an instance of the corresponding class::
+
+    def new_user[U](user_class: type[U]) -> U:
+        user = user_class()
+        # (Here we could write the user object to a database)
+        return user
+
+    joe = new_user(BasicUser)
+
+At this point the type checker knows that joe has type BasicUser.
+"""
+
 NoReturn: _SpecialForm
+"""Special type indicating functions that never return.
+
+Example::
+
+    from typing import NoReturn
+
+    def stop() -> NoReturn:
+        raise Exception('no way')
+
+NoReturn can also be used as a bottom type, a type that
+has no values. Starting in Python 3.11, the Never type should
+be used for this concept instead. Type checkers should treat the two
+equivalently.
+"""
+
 ClassVar: _SpecialForm
+"""Special type construct to mark class variables.
+
+An annotation wrapped in ClassVar indicates that a given
+attribute is intended to be used as a class variable and
+should not be set on instances of that class.
+
+Usage::
+
+    class Starship:
+        stats: ClassVar[dict[str, int]] = {} # class variable
+        damage: int = 10                     # instance variable
+
+ClassVar accepts only types and cannot be further subscribed.
+
+Note that ClassVar is not a class itself, and cannot
+be used with isinstance() or issubclass().
+"""
 
 Optional: _SpecialForm
+"""Optional[X] is equivalent to X | None."""
+
 Tuple: _SpecialForm
+"""Deprecated alias to builtins.tuple.
+
+Tuple[X, Y] is the cross-product type of X and Y.
+
+Example: Tuple[T1, T2] is a tuple of two elements corresponding
+to type variables T1 and T2.  Tuple[int, float, str] is a tuple
+of an int, a float and a string.
+
+To specify a variable-length tuple of homogeneous type, use Tuple[T, ...].
+"""
+
 Final: _SpecialForm
+"""Special typing construct to indicate final names to type checkers.
+
+A final name cannot be re-assigned or overridden in a subclass.
+
+For example::
+
+    MAX_SIZE: Final = 9000
+    MAX_SIZE += 1  # Error reported by type checker
+
+    class Connection:
+        TIMEOUT: Final[int] = 10
+
+    class FastConnector(Connection):
+        TIMEOUT = 1  # Error reported by type checker
+
+There is no runtime checking of these properties.
+"""
 
 Literal: _SpecialForm
+"""Special typing form to define literal types (a.k.a. value types).
+
+This form can be used to indicate to type checkers that the corresponding
+variable or function parameter has a value equivalent to the provided
+literal (or one of several literals)::
+
+    def validate_simple(data: Any) -> Literal[True]:  # always returns True
+        ...
+
+    MODE = Literal['r', 'rb', 'w', 'wb']
+    def open_helper(file: str, mode: MODE) -> str:
+        ...
+
+    open_helper('/some/path', 'r')  # Passes type check
+    open_helper('/other/path', 'typo')  # Error in type checker
+
+Literal[...] cannot be subclassed. At runtime, an arbitrary value
+is allowed as type argument to Literal[...], but type checkers may
+impose restrictions.
+"""
+
 TypedDict: _SpecialForm
+"""A simple typed namespace. At runtime it is equivalent to a plain dict.
+
+TypedDict creates a dictionary type such that a type checker will expect all
+instances to have a certain set of keys, where each key is
+associated with a value of a consistent type. This expectation
+is not checked at runtime.
+
+Usage::
+
+    >>> class Point2D(TypedDict):
+    ...     x: int
+    ...     y: int
+    ...     label: str
+    ...
+    >>> a: Point2D = {'x': 1, 'y': 2, 'label': 'good'}  # OK
+    >>> b: Point2D = {'z': 3, 'label': 'bad'}           # Fails type check
+    >>> Point2D(x=1, y=2, label='first') == dict(x=1, y=2, label='first')
+    True
+
+The type info can be accessed by calling annotationlib.get_annotations(Point2D), and
+via the Point2D.__required_keys__ and Point2D.__optional_keys__ frozensets.
+TypedDict supports an additional equivalent form::
+
+    Point2D = TypedDict('Point2D', {'x': int, 'y': int, 'label': str})
+
+By default, all keys must be present in a TypedDict. It is possible
+to override this by using the NotRequired and Required special forms::
+
+    class Point2D(TypedDict):
+        x: int               # the "x" key must always be present (Required is the default)
+        y: NotRequired[int]  # the "y" key can be omitted
+
+This means that a Point2D TypedDict can have the "y" key omitted, but the "x" key must be present.
+Items are required by default, so the Required special form is not necessary in this example.
+In addition, the total argument to the TypedDict function can be used to make all items not required::
+
+    class Point2D(TypedDict, total=False):
+        x: int
+        y: int
+
+This means that a Point2D TypedDict can have any of the keys omitted. A type
+checker is only expected to support a literal False or True as the value of
+the total argument. True is the default, and makes all items defined in the
+class body be required. The Required special form can be used to mark individual
+keys as required in a total=False TypedDict.
+
+The ReadOnly special form can be used
+to mark individual keys as immutable for type checkers::
+
+    class DatabaseUser(TypedDict):
+        id: ReadOnly[int]  # the "id" key must not be modified
+        username: str      # the "username" key can be changed
+
+The closed argument controls whether the TypedDict allows additional
+non-required items during inheritance and assignability checks.
+If closed=True, the TypedDict does not allow additional items::
+
+    Point2D = TypedDict('Point2D', {'x': int, 'y': int}, closed=True)
+    class Point3D(Point2D):
+        z: int  # Type checker error
+
+Passing closed=False explicitly requests TypedDict's default open behavior.
+If closed is not provided, the behavior is inherited from the superclass.
+A type checker is only expected to support a literal False or True as the
+value of the closed argument.
+
+The extra_items argument can instead be used to specify the assignable type
+of unknown non-required keys::
+
+    Point2D = TypedDict('Point2D', {'x': int, 'y': int}, extra_items=int)
+    class Point3D(Point2D):
+        z: int      # OK
+        label: str  # Type checker error
+
+The extra_items argument is also inherited through subclassing. It is unset
+by default, and it may not be used with the closed argument at the same
+time.
+
+See PEPs 589, 655, 705, and 728 for more information.
+"""
 
 if sys.version_info >= (3, 11):
     Self: _SpecialForm
+    """Used to spell the type of "self" in classes.
+
+    Example::
+
+        from typing import Self
+
+        class Foo:
+            def return_self(self) -> Self:
+                ...
+                return self
+
+    This is especially useful for:
+        - classmethods that are used as alternative constructors
+        - annotating an `__enter__` method which returns self
+    """
+
     Never: _SpecialForm
+    """The bottom type, a type that has no members.
+
+    This can be used to define a function that should never be
+    called, or a function that never returns::
+
+        from typing import Never
+
+        def never_call_me(arg: Never) -> None:
+            pass
+
+        def int_or_str(arg: int | str) -> None:
+            never_call_me(arg)  # type checker error
+            match arg:
+                case int():
+                    print("It's an int")
+                case str():
+                    print("It's a str")
+                case _:
+                    never_call_me(arg)  # OK, arg is of type Never
+    """
+
     Unpack: _SpecialForm
+    """Type unpack operator.
+
+    The type unpack operator takes the child types from some container type,
+    such as `tuple[int, str]` or a `TypeVarTuple`, and 'pulls them out'.
+
+    For example::
+
+        # For some generic class `Foo`:
+        Foo[Unpack[tuple[int, str]]]  # Equivalent to Foo[int, str]
+
+        Ts = TypeVarTuple('Ts')
+        # Specifies that `Bar` is generic in an arbitrary number of types.
+        # (Think of `Ts` as a tuple of an arbitrary number of individual
+        #  `TypeVar`s, which the `Unpack` is 'pulling out' directly into the
+        #  `Generic[]`.)
+        class Bar(Generic[Unpack[Ts]]): ...
+        Bar[int]  # Valid
+        Bar[int, str]  # Also valid
+
+    From Python 3.11, this can also be done using the `*` operator::
+
+        Foo[*tuple[int, str]]
+        class Bar(Generic[*Ts]): ...
+
+    And from Python 3.12, it can be done using built-in syntax for generics::
+
+        Foo[*tuple[int, str]]
+        class Bar[*Ts]: ...
+
+    The operator can also be used along with a `TypedDict` to annotate
+    `**kwargs` in a function signature::
+
+        class Movie(TypedDict):
+            name: str
+            year: int
+
+        # This function expects two keyword arguments - *name* of type `str` and
+        # *year* of type `int`.
+        def foo(**kwargs: Unpack[Movie]): ...
+
+    Note that there is only some runtime checking of this operator. Not
+    everything the runtime allows is accepted by static type checkers.
+
+    For more information, see PEPs 646 and 692.
+    """
+
     Required: _SpecialForm
+    """Special typing construct to mark a TypedDict key as required.
+
+    This is mainly useful for total=False TypedDicts.
+
+    For example::
+
+        class Movie(TypedDict, total=False):
+            title: Required[str]
+            year: int
+
+        m = Movie(
+            title='The Matrix',  # type checker error if key is omitted
+            year=1999,
+        )
+
+    There is no runtime checking that a required key is actually provided
+    when instantiating a related TypedDict.
+    """
+
     NotRequired: _SpecialForm
+    """Special typing construct to mark a TypedDict key as potentially missing.
+
+    For example::
+
+        class Movie(TypedDict):
+            title: str
+            year: NotRequired[int]
+
+        m = Movie(
+            title='The Matrix',  # type checker error if key is omitted
+            year=1999,
+        )
+    """
+
     LiteralString: _SpecialForm
+    """Represents an arbitrary literal string.
+
+    Example::
+
+        from typing import LiteralString
+
+        def run_query(sql: LiteralString) -> None:
+            ...
+
+        def caller(arbitrary_string: str, literal_string: LiteralString) -> None:
+            run_query("SELECT * FROM students")  # OK
+            run_query(literal_string)  # OK
+            run_query("SELECT * FROM " + literal_string)  # OK
+            run_query(arbitrary_string)  # type checker error
+            run_query(  # type checker error
+                f"SELECT * FROM students WHERE name = {arbitrary_string}"
+            )
+
+    Only string literals and other LiteralStrings are compatible
+    with LiteralString. This provides a tool to help prevent
+    security issues such as SQL injection.
+    """
 
     @final
     class TypeVarTuple:
@@ -406,13 +783,33 @@ if sys.version_info >= (3, 11):
 
         @property
         def __name__(self) -> str: ...
+        if sys.version_info >= (3, 15):
+            @property
+            def __bound__(self) -> Any | None: ...  # AnnotationForm
+            @property
+            def __covariant__(self) -> bool: ...
+            @property
+            def __contravariant__(self) -> bool: ...
+            @property
+            def __infer_variance__(self) -> bool: ...
         if sys.version_info >= (3, 13):
             @property
             def __default__(self) -> Any:  # AnnotationForm
                 """The default value for this TypeVarTuple."""
 
             def has_default(self) -> bool: ...
-        if sys.version_info >= (3, 13):
+        if sys.version_info >= (3, 15):
+            def __new__(
+                cls,
+                name: str,
+                *,
+                bound: Any | None = None,  # AnnotationForm
+                covariant: bool = False,
+                contravariant: bool = False,
+                default: Any = ...,  # AnnotationForm
+                infer_variance: bool = False,
+            ) -> Self: ...
+        elif sys.version_info >= (3, 13):
             def __new__(cls, name: str, *, default: Any = ...) -> Self: ...  # AnnotationForm
         elif sys.version_info >= (3, 12):
             def __new__(cls, name: str) -> Self: ...
@@ -428,249 +825,298 @@ if sys.version_info >= (3, 11):
             @property
             def evaluate_default(self) -> EvaluateFunc | None: ...
 
-if sys.version_info >= (3, 10):
-    @final
-    class ParamSpecArgs:
-        """The args for a ParamSpec object.
+@final
+class ParamSpecArgs:
+    """The args for a ParamSpec object.
 
-        Given a ParamSpec object P, P.args is an instance of ParamSpecArgs.
+    Given a ParamSpec object P, P.args is an instance of ParamSpecArgs.
 
-        ParamSpecArgs objects have a reference back to their ParamSpec::
+    ParamSpecArgs objects have a reference back to their ParamSpec::
 
-            >>> P = ParamSpec("P")
-            >>> P.args.__origin__ is P
-            True
+        >>> P = ParamSpec("P")
+        >>> P.args.__origin__ is P
+        True
 
-        This type is meant for runtime introspection and has no special meaning
-        to static type checkers.
-        """
+    This type is meant for runtime introspection and has no special meaning
+    to static type checkers.
+    """
 
+    @property
+    def __origin__(self) -> ParamSpec: ...
+    if sys.version_info >= (3, 12):
+        def __new__(cls, origin: ParamSpec) -> Self: ...
+    else:
+        def __init__(self, origin: ParamSpec) -> None: ...
+
+    def __eq__(self, other: object, /) -> bool: ...
+    __hash__: ClassVar[None]  # type: ignore[assignment]
+
+@final
+class ParamSpecKwargs:
+    """The kwargs for a ParamSpec object.
+
+    Given a ParamSpec object P, P.kwargs is an instance of ParamSpecKwargs.
+
+    ParamSpecKwargs objects have a reference back to their ParamSpec::
+
+        >>> P = ParamSpec("P")
+        >>> P.kwargs.__origin__ is P
+        True
+
+    This type is meant for runtime introspection and has no special meaning
+    to static type checkers.
+    """
+
+    @property
+    def __origin__(self) -> ParamSpec: ...
+    if sys.version_info >= (3, 12):
+        def __new__(cls, origin: ParamSpec) -> Self: ...
+    else:
+        def __init__(self, origin: ParamSpec) -> None: ...
+
+    def __eq__(self, other: object, /) -> bool: ...
+    __hash__: ClassVar[None]  # type: ignore[assignment]
+
+@final
+class ParamSpec:
+    """Parameter specification variable.
+
+    The preferred way to construct a parameter specification is via the
+    dedicated syntax for generic functions, classes, and type aliases,
+    where the use of '**' creates a parameter specification::
+
+        type IntFunc[**P] = Callable[P, int]
+
+    The following syntax creates a parameter specification that defaults
+    to a callable accepting two positional-only arguments of types int
+    and str:
+
+        type IntFuncDefault[**P = [int, str]] = Callable[P, int]
+
+    For compatibility with Python 3.11 and earlier, ParamSpec objects
+    can also be created as follows::
+
+        P = ParamSpec('P')
+        DefaultP = ParamSpec('DefaultP', default=[int, str])
+
+    Parameter specification variables exist primarily for the benefit of
+    static type checkers.  They are used to forward the parameter types of
+    one callable to another callable, a pattern commonly found in
+    higher-order functions and decorators.  They are only valid when used
+    in ``Concatenate``, or as the first argument to ``Callable``, or as
+    parameters for user-defined Generics. See class Generic for more
+    information on generic types.
+
+    An example for annotating a decorator::
+
+        def add_logging[**P, T](f: Callable[P, T]) -> Callable[P, T]:
+            '''A type-safe decorator to add logging to a function.'''
+            def inner(*args: P.args, **kwargs: P.kwargs) -> T:
+                logging.info(f'{f.__name__} was called')
+                return f(*args, **kwargs)
+            return inner
+
+        @add_logging
+        def add_two(x: float, y: float) -> float:
+            '''Add two numbers together.'''
+            return x + y
+
+    Parameter specification variables can be introspected. e.g.::
+
+        >>> P = ParamSpec("P")
+        >>> P.__name__
+        'P'
+
+    Note that only parameter specification variables defined in the global
+    scope can be pickled.
+    """
+
+    @property
+    def __name__(self) -> str: ...
+    @property
+    def __bound__(self) -> Any | None: ...  # AnnotationForm
+    @property
+    def __covariant__(self) -> bool: ...
+    @property
+    def __contravariant__(self) -> bool: ...
+    if sys.version_info >= (3, 12):
         @property
-        def __origin__(self) -> ParamSpec: ...
-        if sys.version_info >= (3, 12):
-            def __new__(cls, origin: ParamSpec) -> Self: ...
-        else:
-            def __init__(self, origin: ParamSpec) -> None: ...
-
-        def __eq__(self, other: object, /) -> bool: ...
-        __hash__: ClassVar[None]  # type: ignore[assignment]
-
-    @final
-    class ParamSpecKwargs:
-        """The kwargs for a ParamSpec object.
-
-        Given a ParamSpec object P, P.kwargs is an instance of ParamSpecKwargs.
-
-        ParamSpecKwargs objects have a reference back to their ParamSpec::
-
-            >>> P = ParamSpec("P")
-            >>> P.kwargs.__origin__ is P
-            True
-
-        This type is meant for runtime introspection and has no special meaning
-        to static type checkers.
-        """
-
+        def __infer_variance__(self) -> bool: ...
+    if sys.version_info >= (3, 13):
         @property
-        def __origin__(self) -> ParamSpec: ...
-        if sys.version_info >= (3, 12):
-            def __new__(cls, origin: ParamSpec) -> Self: ...
-        else:
-            def __init__(self, origin: ParamSpec) -> None: ...
+        def __default__(self) -> Any:  # AnnotationForm
+            """The default value for this ParamSpec."""
 
-        def __eq__(self, other: object, /) -> bool: ...
-        __hash__: ClassVar[None]  # type: ignore[assignment]
+    if sys.version_info >= (3, 13):
+        def __new__(
+            cls,
+            name: str,
+            *,
+            bound: Any | None = None,  # AnnotationForm
+            contravariant: bool = False,
+            covariant: bool = False,
+            infer_variance: bool = False,
+            default: Any = ...,  # AnnotationForm
+        ) -> Self: ...
+    elif sys.version_info >= (3, 12):
+        def __new__(
+            cls,
+            name: str,
+            *,
+            bound: Any | None = None,  # AnnotationForm
+            contravariant: bool = False,
+            covariant: bool = False,
+            infer_variance: bool = False,
+        ) -> Self: ...
+    elif sys.version_info >= (3, 11):
+        def __new__(
+            cls, name: str, *, bound: Any | None = None, contravariant: bool = False, covariant: bool = False  # AnnotationForm
+        ) -> Self: ...
+    else:
+        def __init__(
+            self, name: str, *, bound: Any | None = None, contravariant: bool = False, covariant: bool = False  # AnnotationForm
+        ) -> None: ...
 
-    @final
-    class ParamSpec:
-        """Parameter specification variable.
+    @property
+    def args(self) -> ParamSpecArgs:
+        """Represents positional arguments."""
 
-        The preferred way to construct a parameter specification is via the
-        dedicated syntax for generic functions, classes, and type aliases,
-        where the use of '**' creates a parameter specification::
+    @property
+    def kwargs(self) -> ParamSpecKwargs:
+        """Represents keyword arguments."""
 
-            type IntFunc[**P] = Callable[P, int]
+    if sys.version_info >= (3, 11):
+        def __typing_subst__(self, arg: Any, /) -> Any: ...
+        def __typing_prepare_subst__(self, alias: Any, args: Any, /) -> tuple[Any, ...]: ...
 
-        The following syntax creates a parameter specification that defaults
-        to a callable accepting two positional-only arguments of types int
-        and str:
+    def __or__(self, right: Any, /) -> _SpecialForm:
+        """Return self|value."""
 
-            type IntFuncDefault[**P = (int, str)] = Callable[P, int]
+    def __ror__(self, left: Any, /) -> _SpecialForm:
+        """Return value|self."""
 
-        For compatibility with Python 3.11 and earlier, ParamSpec objects
-        can also be created as follows::
-
-            P = ParamSpec('P')
-            DefaultP = ParamSpec('DefaultP', default=(int, str))
-
-        Parameter specification variables exist primarily for the benefit of
-        static type checkers.  They are used to forward the parameter types of
-        one callable to another callable, a pattern commonly found in
-        higher-order functions and decorators.  They are only valid when used
-        in ``Concatenate``, or as the first argument to ``Callable``, or as
-        parameters for user-defined Generics. See class Generic for more
-        information on generic types.
-
-        An example for annotating a decorator::
-
-            def add_logging[**P, T](f: Callable[P, T]) -> Callable[P, T]:
-                '''A type-safe decorator to add logging to a function.'''
-                def inner(*args: P.args, **kwargs: P.kwargs) -> T:
-                    logging.info(f'{f.__name__} was called')
-                    return f(*args, **kwargs)
-                return inner
-
-            @add_logging
-            def add_two(x: float, y: float) -> float:
-                '''Add two numbers together.'''
-                return x + y
-
-        Parameter specification variables can be introspected. e.g.::
-
-            >>> P = ParamSpec("P")
-            >>> P.__name__
-            'P'
-
-        Note that only parameter specification variables defined in the global
-        scope can be pickled.
-        """
-
+    if sys.version_info >= (3, 13):
+        def has_default(self) -> bool: ...
+    if sys.version_info >= (3, 14):
         @property
-        def __name__(self) -> str: ...
-        @property
-        def __bound__(self) -> Any | None: ...  # AnnotationForm
-        @property
-        def __covariant__(self) -> bool: ...
-        @property
-        def __contravariant__(self) -> bool: ...
-        if sys.version_info >= (3, 12):
-            @property
-            def __infer_variance__(self) -> bool: ...
-        if sys.version_info >= (3, 13):
-            @property
-            def __default__(self) -> Any:  # AnnotationForm
-                """The default value for this ParamSpec."""
-        if sys.version_info >= (3, 13):
-            def __new__(
-                cls,
-                name: str,
-                *,
-                bound: Any | None = None,  # AnnotationForm
-                contravariant: bool = False,
-                covariant: bool = False,
-                infer_variance: bool = False,
-                default: Any = ...,  # AnnotationForm
-            ) -> Self: ...
-        elif sys.version_info >= (3, 12):
-            def __new__(
-                cls,
-                name: str,
-                *,
-                bound: Any | None = None,  # AnnotationForm
-                contravariant: bool = False,
-                covariant: bool = False,
-                infer_variance: bool = False,
-            ) -> Self: ...
-        elif sys.version_info >= (3, 11):
-            def __new__(
-                cls,
-                name: str,
-                *,
-                bound: Any | None = None,  # AnnotationForm
-                contravariant: bool = False,
-                covariant: bool = False,
-            ) -> Self: ...
-        else:
-            def __init__(
-                self,
-                name: str,
-                *,
-                bound: Any | None = None,  # AnnotationForm
-                contravariant: bool = False,
-                covariant: bool = False,
-            ) -> None: ...
+        def evaluate_default(self) -> EvaluateFunc | None: ...
 
-        @property
-        def args(self) -> ParamSpecArgs:
-            """Represents positional arguments."""
+Concatenate: _SpecialForm
+"""Special form for annotating higher-order functions.
 
-        @property
-        def kwargs(self) -> ParamSpecKwargs:
-            """Represents keyword arguments."""
-        if sys.version_info >= (3, 11):
-            def __typing_subst__(self, arg: Any, /) -> Any: ...
-            def __typing_prepare_subst__(self, alias: Any, args: Any, /) -> tuple[Any, ...]: ...
+``Concatenate`` can be used in conjunction with ``ParamSpec`` and
+``Callable`` to represent a higher-order function which adds, removes or
+transforms the parameters of a callable.
 
-        def __or__(self, right: Any, /) -> _SpecialForm:
-            """Return self|value."""
+For example::
 
-        def __ror__(self, left: Any, /) -> _SpecialForm:
-            """Return value|self."""
-        if sys.version_info >= (3, 13):
-            def has_default(self) -> bool: ...
-        if sys.version_info >= (3, 14):
-            @property
-            def evaluate_default(self) -> EvaluateFunc | None: ...
+    Callable[Concatenate[int, P], int]
 
-    Concatenate: _SpecialForm
-    TypeAlias: _SpecialForm
-    TypeGuard: _SpecialForm
+See PEP 612 for detailed information.
+"""
 
-    class NewType:
-        """NewType creates simple unique types with almost zero runtime overhead.
+TypeAlias: _SpecialForm
+"""Special form for marking type aliases.
 
-        NewType(name, tp) is considered a subtype of tp
-        by static type checkers. At runtime, NewType(name, tp) returns
-        a dummy callable that simply returns its argument.
+TypeAlias can be used to indicate that an assignment should
+be recognized as a proper type alias definition by type
+checkers.
 
-        Usage::
+For example::
 
-            UserId = NewType('UserId', int)
+    Predicate: TypeAlias = Callable[..., bool]
 
-            def name_by_id(user_id: UserId) -> str:
-                ...
+It's invalid when used anywhere except as in the example above.
+"""
 
-            UserId('user')          # Fails type check
+TypeGuard: _SpecialForm
+"""Special typing construct for marking user-defined type predicate functions.
 
-            name_by_id(42)          # Fails type check
-            name_by_id(UserId(42))  # OK
+``TypeGuard`` can be used to annotate the return type of a user-defined
+type predicate function.  ``TypeGuard`` only accepts a single type argument.
+At runtime, functions marked this way should return a boolean.
 
-            num = UserId(5) + 1     # type: int
-        """
+``TypeGuard`` aims to benefit *type narrowing* -- a technique used by static
+type checkers to determine a more precise type of an expression within a
+program's code flow.  Usually type narrowing is done by analyzing
+conditional code flow and applying the narrowing to a block of code.  The
+conditional expression here is sometimes referred to as a "type predicate".
 
-        def __init__(self, name: str, tp: Any) -> None: ...  # AnnotationForm
-        if sys.version_info >= (3, 11):
-            @staticmethod
-            def __call__(x: _T, /) -> _T: ...
-        else:
-            def __call__(self, x: _T) -> _T: ...
+Sometimes it would be convenient to use a user-defined boolean function
+as a type predicate.  Such a function should use ``TypeGuard[...]`` or
+``TypeIs[...]`` as its return type to alert static type checkers to
+this intention. ``TypeGuard`` should be used over ``TypeIs`` when narrowing
+from an incompatible type (e.g., ``list[object]`` to ``list[int]``) or when
+the function does not return ``True`` for all instances of the narrowed type.
 
-        def __or__(self, other: Any) -> _SpecialForm: ...
-        def __ror__(self, other: Any) -> _SpecialForm: ...
-        __supertype__: type | NewType
+Using  ``-> TypeGuard[NarrowedType]`` tells the static type checker that
+for a given function:
 
-else:
-    def NewType(name: str, tp: Any) -> Any:
-        """NewType creates simple unique types with almost zero
-        runtime overhead. NewType(name, tp) is considered a subtype of tp
-        by static type checkers. At runtime, NewType(name, tp) returns
-        a dummy function that simply returns its argument. Usage::
+1. The return value is a boolean.
+2. If the return value is ``True``, the type of its argument
+   is ``NarrowedType``.
 
-            UserId = NewType('UserId', int)
+For example::
 
-            def name_by_id(user_id: UserId) -> str:
-                ...
+     def is_str_list(val: list[object]) -> TypeGuard[list[str]]:
+         '''Determines whether all objects in the list are strings'''
+         return all(isinstance(x, str) for x in val)
 
-            UserId('user')          # Fails type check
+     def func1(val: list[object]):
+         if is_str_list(val):
+             # Type of ``val`` is narrowed to ``list[str]``.
+             print(" ".join(val))
+         else:
+             # Type of ``val`` remains as ``list[object]``.
+             print("Not a list of strings!")
 
-            name_by_id(42)          # Fails type check
-            name_by_id(UserId(42))  # OK
+Strict type narrowing is not enforced -- ``TypeB`` need not be a narrower
+form of ``TypeA`` (it can even be a wider form) and this may lead to
+type-unsafe results.  The main reason is to allow for things like
+narrowing ``list[object]`` to ``list[str]`` even though the latter is not
+a subtype of the former, since ``list`` is invariant.  The responsibility of
+writing type-safe type predicates is left to the user.
 
-            num = UserId(5) + 1     # type: int
-        """
+``TypeGuard`` also works with type variables.  For more information, see
+PEP 647 (User-Defined Type Guards).
+"""
+
+class NewType:
+    """NewType creates simple unique types with almost zero runtime overhead.
+
+    NewType(name, tp) is considered a subtype of tp
+    by static type checkers. At runtime, NewType(name, tp) returns
+    a dummy callable that simply returns its argument.
+
+    Usage::
+
+        UserId = NewType('UserId', int)
+
+        def name_by_id(user_id: UserId) -> str:
+            ...
+
+        UserId('user')          # Fails type check
+
+        name_by_id(42)          # Fails type check
+        name_by_id(UserId(42))  # OK
+
+        num = UserId(5) + 1     # type: int
+    """
+
+    def __init__(self, name: str, tp: Any) -> None: ...  # AnnotationForm
+    if sys.version_info >= (3, 11):
+        @staticmethod
+        def __call__(x: _T, /) -> _T: ...
+    else:
+        def __call__(self, x: _T) -> _T: ...
+
+    def __or__(self, other: Any) -> _SpecialForm: ...
+    def __ror__(self, other: Any) -> _SpecialForm: ...
+    __supertype__: type | NewType
+    __name__: str
 
 _F = TypeVar("_F", bound=Callable[..., Any])
-_P = _ParamSpec("_P")
+_P = ParamSpec("_P")
 _T = TypeVar("_T")
 
 _FT = TypeVar("_FT", bound=Callable[..., Any] | type)
@@ -687,20 +1133,9 @@ _TC = TypeVar("_TC", bound=type[object])
 def overload(func: _F) -> _F:
     """Decorator for overloaded functions/methods.
 
-    In a stub file, place two or more stub definitions for the same
-    function in a row, each decorated with @overload.
-
-    For example::
-
-        @overload
-        def utf8(value: None) -> None: ...
-        @overload
-        def utf8(value: bytes) -> bytes: ...
-        @overload
-        def utf8(value: str) -> bytes: ...
-
-    In a non-stub file (i.e. a regular .py file), do the same but
-    follow it with an implementation.  The implementation should *not*
+    In a non-stub file, place two or more stub definitions for the same
+    function in a row, each decorated with @overload, followed
+    by an implementation.  The implementation should *not*
     be decorated with @overload::
 
         @overload
@@ -711,6 +1146,16 @@ def overload(func: _F) -> _F:
         def utf8(value: str) -> bytes: ...
         def utf8(value):
             ...  # implementation goes here
+
+    In a stub file or in an abstract method (for example, in a Protocol definition),
+    the implementation may be omitted::
+
+        @overload
+        def utf8(value: None) -> None: ...
+        @overload
+        def utf8(value: bytes) -> bytes: ...
+        @overload
+        def utf8(value: str) -> bytes: ...
 
     The overloads for a function can be retrieved at runtime using the
     get_overloads() function.
@@ -726,12 +1171,35 @@ def no_type_check(arg: _F) -> _F:
     This mutates the function(s) or class(es) in place.
     """
 
-def no_type_check_decorator(decorator: Callable[_P, _T]) -> Callable[_P, _T]:
-    """Decorator to give another decorator the @no_type_check effect.
+if sys.version_info < (3, 15):
+    @deprecated("Deprecated since Python 3.13; removed in Python 3.15.")
+    def no_type_check_decorator(decorator: Callable[_P, _T]) -> Callable[_P, _T]:
+        """Decorator to give another decorator the @no_type_check effect.
 
-    This wraps the decorator with something that wraps the decorated
-    function in @no_type_check.
-    """
+        This wraps the decorator with something that wraps the decorated
+        function in @no_type_check.
+        """
+
+if sys.version_info >= (3, 15):
+    def disjoint_base(cls: _TC) -> _TC:
+        """This decorator marks a class as a disjoint base.
+
+        Child classes of a disjoint base cannot inherit from other disjoint bases that are
+        not parent or child classes of the disjoint base.
+
+        For example:
+
+            @disjoint_base
+            class Disjoint1: pass
+
+            @disjoint_base
+            class Disjoint2: pass
+
+            class Disjoint3(Disjoint1, Disjoint2): pass  # Type checker error
+
+        Type checkers can use knowledge of disjoint bases to detect unreachable code
+        and determine when two types can overlap.
+        """
 
 # This itself is only available during type checking
 def type_check_only(func_or_cls: _FT) -> _FT: ...
@@ -744,17 +1212,106 @@ class _Alias:
     def __getitem__(self, typeargs: Any) -> Any: ...
 
 List = _Alias()
+"""Deprecated alias to list."""
+
 Dict = _Alias()
+"""Deprecated alias to dict."""
+
 DefaultDict = _Alias()
+"""Deprecated alias to collections.defaultdict."""
+
 Set = _Alias()
+"""Deprecated alias to set."""
+
 FrozenSet = _Alias()
+"""Deprecated alias to frozenset."""
+
 Counter = _Alias()
+"""Deprecated alias to collections.Counter."""
+
 Deque = _Alias()
+"""Deprecated alias to collections.deque."""
+
 ChainMap = _Alias()
+"""Deprecated alias to collections.ChainMap."""
 
 OrderedDict = _Alias()
+"""Deprecated alias to collections.OrderedDict."""
 
 Annotated: _SpecialForm
+"""Add context-specific metadata to a type.
+
+Example: Annotated[int, runtime_check.Unsigned] indicates to the
+hypothetical runtime_check module that this type is an unsigned int.
+Every other consumer of this type can ignore this metadata and treat
+this type as int.
+
+The first argument to Annotated must be a valid type.
+
+Details:
+
+- It's an error to call `Annotated` with less than two arguments.
+- Access the metadata via the ``__metadata__`` attribute::
+
+    assert Annotated[int, '$'].__metadata__ == ('$',)
+
+- Nested Annotated types are flattened::
+
+    assert Annotated[Annotated[T, Ann1, Ann2], Ann3] == Annotated[T, Ann1, Ann2, Ann3]
+
+- Instantiating an annotated type is equivalent to instantiating the
+underlying type::
+
+    assert Annotated[C, Ann1](5) == C(5)
+
+- Annotated can be used as a generic type alias::
+
+    type Optimized[T] = Annotated[T, runtime.Optimize()]
+    # type checker will treat Optimized[int]
+    # as equivalent to Annotated[int, runtime.Optimize()]
+
+    type OptimizedList[T] = Annotated[list[T], runtime.Optimize()]
+    # type checker will treat OptimizedList[int]
+    # as equivalent to Annotated[list[int], runtime.Optimize()]
+
+- Annotated cannot be used with an unpacked TypeVarTuple::
+
+    type Variadic[*Ts] = Annotated[*Ts, Ann1]  # NOT valid
+
+  This would be equivalent to::
+
+    Annotated[T1, T2, T3, ..., Ann1]
+
+  where T1, T2 etc. are TypeVars, which would be invalid, because
+  only one type should be passed to Annotated.
+"""
+
+if sys.version_info >= (3, 15):
+    @type_check_only
+    class _NoExtraItemsType: ...
+
+    NoExtraItems: _NoExtraItemsType
+
+    TypeForm: _SpecialForm
+    """A special form representing the value that results from the evaluation
+    of a type expression.
+
+    This value encodes the information supplied in the type expression, and it
+    represents the type described by that type expression.
+
+    When used in a type expression, TypeForm describes a set of type form
+    objects. It accepts a single type argument, which must be a valid type
+    expression. ``TypeForm[T]`` describes the set of all type form objects that
+    represent the type T or types that are assignable to T.
+
+    Usage::
+
+        def cast[T](typ: TypeForm[T], value: Any) -> T: ...
+
+        reveal_type(cast(int, "x"))  # int
+
+    See PEP 747 for more information.
+    """
 
 # Predefined type variables.
 AnyStr = TypeVar("AnyStr", str, bytes)  # noqa: Y001
@@ -764,14 +1321,32 @@ class _Generic:
     if sys.version_info < (3, 12):
         __slots__ = ()
 
-    if sys.version_info >= (3, 10):
-        @classmethod
-        def __class_getitem__(cls, args: TypeVar | ParamSpec | tuple[TypeVar | ParamSpec, ...]) -> _Final: ...
-    else:
-        @classmethod
-        def __class_getitem__(cls, args: TypeVar | tuple[TypeVar, ...]) -> _Final: ...
+    @classmethod
+    def __class_getitem__(cls, args: TypeVar | ParamSpec | tuple[TypeVar | ParamSpec, ...]) -> _Final: ...
 
 Generic: type[_Generic]
+"""Abstract base class for generic types.
+
+On Python 3.12 and newer, generic classes implicitly inherit from
+Generic when they declare a parameter list after the class's name::
+
+    class Mapping[KT, VT]:
+        def __getitem__(self, key: KT) -> VT:
+            ...
+        # Etc.
+
+On older versions of Python, however, generic classes have to
+explicitly inherit from Generic.
+
+After a class has been declared to be generic, it can then be used as
+follows::
+
+    def lookup_name[KT, VT](mapping: Mapping[KT, VT], key: KT, default: VT) -> VT:
+        try:
+            return mapping[key]
+        except KeyError:
+            return default
+"""
 
 class _ProtocolMeta(ABCMeta):
     if sys.version_info >= (3, 12):
@@ -785,7 +1360,7 @@ def runtime_checkable(cls: _TC) -> _TC:
     Such protocol can be used with isinstance() and issubclass().
     Raise TypeError if applied to a non-protocol class.
     This allows a simple-minded structural check very similar to
-    one trick ponies in collections.abc such as Iterable.
+    one-trick ponies in collections.abc such as Iterable.
 
     For example::
 
@@ -801,7 +1376,7 @@ def runtime_checkable(cls: _TC) -> _TC:
 
 @runtime_checkable
 class SupportsInt(Protocol, metaclass=ABCMeta):
-    """An ABC with one abstract method __int__."""
+    """A protocol with one abstract method __int__."""
 
     __slots__ = ()
     @abstractmethod
@@ -809,7 +1384,7 @@ class SupportsInt(Protocol, metaclass=ABCMeta):
 
 @runtime_checkable
 class SupportsFloat(Protocol, metaclass=ABCMeta):
-    """An ABC with one abstract method __float__."""
+    """A protocol with one abstract method __float__."""
 
     __slots__ = ()
     @abstractmethod
@@ -817,7 +1392,7 @@ class SupportsFloat(Protocol, metaclass=ABCMeta):
 
 @runtime_checkable
 class SupportsComplex(Protocol, metaclass=ABCMeta):
-    """An ABC with one abstract method __complex__."""
+    """A protocol with one abstract method __complex__."""
 
     __slots__ = ()
     @abstractmethod
@@ -825,7 +1400,7 @@ class SupportsComplex(Protocol, metaclass=ABCMeta):
 
 @runtime_checkable
 class SupportsBytes(Protocol, metaclass=ABCMeta):
-    """An ABC with one abstract method __bytes__."""
+    """A protocol with one abstract method __bytes__."""
 
     __slots__ = ()
     @abstractmethod
@@ -833,7 +1408,7 @@ class SupportsBytes(Protocol, metaclass=ABCMeta):
 
 @runtime_checkable
 class SupportsIndex(Protocol, metaclass=ABCMeta):
-    """An ABC with one abstract method __index__."""
+    """A protocol with one abstract method __index__."""
 
     __slots__ = ()
     @abstractmethod
@@ -841,7 +1416,7 @@ class SupportsIndex(Protocol, metaclass=ABCMeta):
 
 @runtime_checkable
 class SupportsAbs(Protocol[_T_co]):
-    """An ABC with one abstract method __abs__ that is covariant in its return type."""
+    """A protocol with one abstract method __abs__ that is covariant in its return type."""
 
     __slots__ = ()
     @abstractmethod
@@ -849,9 +1424,10 @@ class SupportsAbs(Protocol[_T_co]):
 
 @runtime_checkable
 class SupportsRound(Protocol[_T_co]):
-    """An ABC with one abstract method __round__ that is covariant in its return type."""
+    """A protocol with one abstract method __round__ that is covariant in its return type."""
 
     __slots__ = ()
+
     @overload
     @abstractmethod
     def __round__(self) -> int: ...
@@ -915,13 +1491,14 @@ class Generator(Iterator[_YieldT_co], Protocol[_YieldT_co, _SendT_contra, _Retur
         """Raise an exception in the generator.
         Return next yielded value or raise StopIteration.
         """
-
     @overload
     @abstractmethod
     def throw(self, typ: BaseException, val: None = None, tb: TracebackType | None = None, /) -> _YieldT_co: ...
+
     if sys.version_info >= (3, 13):
         def close(self) -> _ReturnT_co | None:
             """Raise GeneratorExit inside generator."""
+
     else:
         def close(self) -> None:
             """Raise GeneratorExit inside generator."""
@@ -936,11 +1513,11 @@ else:
 
     @runtime_checkable
     class ContextManager(AbstractContextManager[_T_co, bool | None], Protocol[_T_co]):
-        """An abstract base class for context managers."""
+        """A generic version of contextlib.AbstractContextManager."""
 
     @runtime_checkable
     class AsyncContextManager(AbstractAsyncContextManager[_T_co, bool | None], Protocol[_T_co]):
-        """An abstract base class for asynchronous context managers."""
+        """A generic version of contextlib.AbstractAsyncContextManager."""
 
 @runtime_checkable
 class Awaitable(Protocol[_T_co]):
@@ -969,10 +1546,10 @@ class Coroutine(Awaitable[_ReturnT_nd_co], Generic[_YieldT_co, _SendT_nd_contra,
         """Raise an exception in the coroutine.
         Return next yielded value or raise StopIteration.
         """
-
     @overload
     @abstractmethod
     def throw(self, typ: BaseException, val: None = None, tb: TracebackType | None = None, /) -> _YieldT_co: ...
+
     @abstractmethod
     def close(self) -> None:
         """Raise GeneratorExit inside coroutine."""
@@ -1022,23 +1599,26 @@ class AsyncGenerator(AsyncIterator[_YieldT_co], Protocol[_YieldT_co, _SendT_cont
         """Raise an exception in the asynchronous generator.
         Return next yielded value or raise StopAsyncIteration.
         """
-
     @overload
     @abstractmethod
     def athrow(
         self, typ: BaseException, val: None = None, tb: TracebackType | None = None, /
     ) -> Coroutine[Any, Any, _YieldT_co]: ...
+
     def aclose(self) -> Coroutine[Any, Any, None]:
         """Raise GeneratorExit inside coroutine."""
 
-@runtime_checkable
-class Container(Protocol[_T_co]):
-    # This is generic more on vibes than anything else
-    @abstractmethod
-    def __contains__(self, x: object, /) -> bool: ...
+_ContainerT_contra = TypeVar("_ContainerT_contra", contravariant=True, default=Any)
 
 @runtime_checkable
-class Collection(Iterable[_T_co], Container[_T_co], Protocol[_T_co]):
+class Container(Protocol[_ContainerT_contra]):
+    # This is generic more on vibes than anything else
+    @abstractmethod
+    def __contains__(self, x: _ContainerT_contra, /) -> bool: ...
+
+@runtime_checkable
+class Collection(Iterable[_T_co], Container[Any], Protocol[_T_co]):
+    # Note: need to use Container[Any] instead of Container[_T_co] to ensure covariance.
     # Implement Sized (but don't have it as a base class).
     @abstractmethod
     def __len__(self) -> int: ...
@@ -1052,23 +1632,24 @@ class Sequence(Reversible[_T_co], Collection[_T_co]):
 
     @overload
     @abstractmethod
-    def __getitem__(self, index: int) -> _T_co: ...
+    def __getitem__(self, index: int, /) -> _T_co: ...
     @overload
     @abstractmethod
-    def __getitem__(self, index: slice) -> Sequence[_T_co]: ...
+    def __getitem__(self, index: slice[int | None], /) -> Sequence[_T_co]: ...
+
     # Mixin methods
-    def index(self, value: Any, start: int = 0, stop: int = ...) -> int:
-        """S.index(value, [start, [stop]]) -> integer -- return first index of value.
-        Raises ValueError if the value is not present.
+    def index(self, value: Any, start: int = 0, stop: int = ..., /) -> int:
+        """S.index(value, [start, [stop]]) -> integer -- return first index of
+        value.  Raises ValueError if the value is not present.
 
         Supporting start and stop arguments is optional, but
         recommended.
         """
 
-    def count(self, value: Any) -> int:
+    def count(self, value: Any, /) -> int:
         """S.count(value) -> integer -- return number of occurrences of value"""
 
-    def __contains__(self, value: object) -> bool: ...
+    def __contains__(self, value: object, /) -> bool: ...
     def __iter__(self) -> Iterator[_T_co]: ...
     def __reversed__(self) -> Iterator[_T_co]: ...
 
@@ -1080,51 +1661,56 @@ class MutableSequence(Sequence[_T]):
     """
 
     @abstractmethod
-    def insert(self, index: int, value: _T) -> None:
+    def insert(self, index: int, value: _T, /) -> None:
         """S.insert(index, value) -- insert value before index"""
 
     @overload
     @abstractmethod
-    def __getitem__(self, index: int) -> _T: ...
+    def __getitem__(self, index: int, /) -> _T: ...
     @overload
     @abstractmethod
-    def __getitem__(self, index: slice) -> MutableSequence[_T]: ...
+    def __getitem__(self, index: slice[int | None], /) -> MutableSequence[_T]: ...
+
     @overload
     @abstractmethod
-    def __setitem__(self, index: int, value: _T) -> None: ...
+    def __setitem__(self, index: int, value: _T, /) -> None: ...
     @overload
     @abstractmethod
-    def __setitem__(self, index: slice, value: Iterable[_T]) -> None: ...
+    def __setitem__(self, index: slice[int | None], value: Iterable[_T], /) -> None: ...
+
     @overload
     @abstractmethod
-    def __delitem__(self, index: int) -> None: ...
+    def __delitem__(self, index: int, /) -> None: ...
     @overload
     @abstractmethod
-    def __delitem__(self, index: slice) -> None: ...
+    def __delitem__(self, index: slice[int | None], /) -> None: ...
+
     # Mixin methods
-    def append(self, value: _T) -> None:
+    def append(self, value: _T, /) -> None:
         """S.append(value) -- append value to the end of the sequence"""
 
     def clear(self) -> None:
         """S.clear() -> None -- remove all items from S"""
 
-    def extend(self, values: Iterable[_T]) -> None:
-        """S.extend(iterable) -- extend sequence by appending elements from the iterable"""
+    def extend(self, values: Iterable[_T], /) -> None:
+        """S.extend(iterable) -- extend sequence by appending elements from the
+        iterable
+        """
 
     def reverse(self) -> None:
         """S.reverse() -- reverse *IN PLACE*"""
 
-    def pop(self, index: int = -1) -> _T:
-        """S.pop([index]) -> item -- remove and return item at index (default last).
-        Raise IndexError if list is empty or index is out of range.
+    def pop(self, index: int = -1, /) -> _T:
+        """S.pop([index]) -> item -- remove and return item at index (default
+        last).  Raise IndexError if list is empty or index is out of range.
         """
 
-    def remove(self, value: _T) -> None:
+    def remove(self, value: _T, /) -> None:
         """S.remove(value) -- remove first occurrence of value.
         Raise ValueError if the value is not present.
         """
 
-    def __iadd__(self, values: Iterable[_T]) -> typing_extensions.Self: ...
+    def __iadd__(self, values: Iterable[_T], /) -> typing_extensions.Self: ...
 
 class AbstractSet(Collection[_T_co]):
     """A set is a finite, iterable container.
@@ -1138,7 +1724,7 @@ class AbstractSet(Collection[_T_co]):
     """
 
     @abstractmethod
-    def __contains__(self, x: object) -> bool: ...
+    def __contains__(self, x: object, /) -> bool: ...
     def _hash(self) -> int:
         """Compute the hash value of a set.
 
@@ -1154,17 +1740,26 @@ class AbstractSet(Collection[_T_co]):
         freedom for __eq__ or __hash__.  We match the algorithm used
         by the built-in frozenset type.
         """
+
     # Mixin methods
-    def __le__(self, other: AbstractSet[Any]) -> bool: ...
-    def __lt__(self, other: AbstractSet[Any]) -> bool: ...
-    def __gt__(self, other: AbstractSet[Any]) -> bool: ...
-    def __ge__(self, other: AbstractSet[Any]) -> bool: ...
-    def __and__(self, other: AbstractSet[Any]) -> AbstractSet[_T_co]: ...
-    def __or__(self, other: AbstractSet[_T]) -> AbstractSet[_T_co | _T]: ...
-    def __sub__(self, other: AbstractSet[Any]) -> AbstractSet[_T_co]: ...
-    def __xor__(self, other: AbstractSet[_T]) -> AbstractSet[_T_co | _T]: ...
-    def __eq__(self, other: object) -> bool: ...
-    def isdisjoint(self, other: Iterable[Any]) -> bool:
+    @classmethod
+    def _from_iterable(cls, it: Iterable[_S], /) -> AbstractSet[_S]:
+        """Construct an instance of the class from any iterable input.
+
+        Must override this method if the class constructor signature
+        does not accept an iterable for an input.
+        """
+
+    def __le__(self, other: AbstractSet[Any], /) -> bool: ...
+    def __lt__(self, other: AbstractSet[Any], /) -> bool: ...
+    def __gt__(self, other: AbstractSet[Any], /) -> bool: ...
+    def __ge__(self, other: AbstractSet[Any], /) -> bool: ...
+    def __and__(self, other: AbstractSet[Any], /) -> AbstractSet[_T_co]: ...
+    def __or__(self, other: AbstractSet[_T], /) -> AbstractSet[_T_co | _T]: ...
+    def __sub__(self, other: AbstractSet[Any], /) -> AbstractSet[_T_co]: ...
+    def __xor__(self, other: AbstractSet[_T], /) -> AbstractSet[_T_co | _T]: ...
+    def __eq__(self, other: object, /) -> bool: ...
+    def isdisjoint(self, other: Iterable[Any], /) -> bool:
         """Return True if two sets have a null intersection."""
 
 class MutableSet(AbstractSet[_T]):
@@ -1180,12 +1775,13 @@ class MutableSet(AbstractSet[_T]):
     """
 
     @abstractmethod
-    def add(self, value: _T) -> None:
+    def add(self, value: _T, /) -> None:
         """Add an element."""
 
     @abstractmethod
-    def discard(self, value: _T) -> None:
+    def discard(self, value: _T, /) -> None:
         """Remove an element.  Do not raise an exception if absent."""
+
     # Mixin methods
     def clear(self) -> None:
         """This is slow (creates N new iterators!) but effective."""
@@ -1193,13 +1789,13 @@ class MutableSet(AbstractSet[_T]):
     def pop(self) -> _T:
         """Return the popped value.  Raise KeyError if empty."""
 
-    def remove(self, value: _T) -> None:
+    def remove(self, value: _T, /) -> None:
         """Remove an element. If not a member, raise a KeyError."""
 
-    def __ior__(self, it: AbstractSet[_T]) -> typing_extensions.Self: ...  # type: ignore[override,misc]
-    def __iand__(self, it: AbstractSet[Any]) -> typing_extensions.Self: ...
-    def __ixor__(self, it: AbstractSet[_T]) -> typing_extensions.Self: ...  # type: ignore[override,misc]
-    def __isub__(self, it: AbstractSet[Any]) -> typing_extensions.Self: ...
+    def __ior__(self, it: AbstractSet[_T], /) -> typing_extensions.Self: ...  # type: ignore[override,misc]
+    def __iand__(self, it: AbstractSet[Any], /) -> typing_extensions.Self: ...
+    def __ixor__(self, it: AbstractSet[_T], /) -> typing_extensions.Self: ...  # type: ignore[override,misc]
+    def __isub__(self, it: AbstractSet[Any], /) -> typing_extensions.Self: ...
 
 class MappingView(Sized):
     __slots__ = ("_mapping",)
@@ -1208,34 +1804,43 @@ class MappingView(Sized):
 
 class ItemsView(MappingView, AbstractSet[tuple[_KT_co, _VT_co]], Generic[_KT_co, _VT_co]):
     def __init__(self, mapping: SupportsGetItemViewable[_KT_co, _VT_co]) -> None: ...  # undocumented
-    def __and__(self, other: Iterable[Any]) -> set[tuple[_KT_co, _VT_co]]: ...
-    def __rand__(self, other: Iterable[_T]) -> set[_T]: ...
-    def __contains__(self, item: tuple[object, object]) -> bool: ...  # type: ignore[override]
+    @classmethod
+    def _from_iterable(cls, it: Iterable[_S], /) -> set[_S]: ...
+    def __and__(self, other: Iterable[Any], /) -> set[tuple[_KT_co, _VT_co]]: ...
+    def __rand__(self, other: Iterable[_T], /) -> set[_T]: ...
+    def __contains__(self, item: tuple[object, object], /) -> bool: ...  # type: ignore[override]
     def __iter__(self) -> Iterator[tuple[_KT_co, _VT_co]]: ...
-    def __or__(self, other: Iterable[_T]) -> set[tuple[_KT_co, _VT_co] | _T]: ...
-    def __ror__(self, other: Iterable[_T]) -> set[tuple[_KT_co, _VT_co] | _T]: ...
-    def __sub__(self, other: Iterable[Any]) -> set[tuple[_KT_co, _VT_co]]: ...
-    def __rsub__(self, other: Iterable[_T]) -> set[_T]: ...
-    def __xor__(self, other: Iterable[_T]) -> set[tuple[_KT_co, _VT_co] | _T]: ...
-    def __rxor__(self, other: Iterable[_T]) -> set[tuple[_KT_co, _VT_co] | _T]: ...
+    def __or__(self, other: Iterable[_T], /) -> set[tuple[_KT_co, _VT_co] | _T]: ...
+    def __ror__(self, other: Iterable[_T], /) -> set[tuple[_KT_co, _VT_co] | _T]: ...
+    def __sub__(self, other: Iterable[Any], /) -> set[tuple[_KT_co, _VT_co]]: ...
+    def __rsub__(self, other: Iterable[_T], /) -> set[_T]: ...
+    def __xor__(self, other: Iterable[_T], /) -> set[tuple[_KT_co, _VT_co] | _T]: ...
+    def __rxor__(self, other: Iterable[_T], /) -> set[tuple[_KT_co, _VT_co] | _T]: ...
 
 class KeysView(MappingView, AbstractSet[_KT_co]):
     def __init__(self, mapping: Viewable[_KT_co]) -> None: ...  # undocumented
-    def __and__(self, other: Iterable[Any]) -> set[_KT_co]: ...
-    def __rand__(self, other: Iterable[_T]) -> set[_T]: ...
-    def __contains__(self, key: object) -> bool: ...
+    @classmethod
+    def _from_iterable(cls, it: Iterable[_S], /) -> set[_S]: ...
+    def __and__(self, other: Iterable[Any], /) -> set[_KT_co]: ...
+    def __rand__(self, other: Iterable[_T], /) -> set[_T]: ...
+    def __contains__(self, key: object, /) -> bool: ...
     def __iter__(self) -> Iterator[_KT_co]: ...
-    def __or__(self, other: Iterable[_T]) -> set[_KT_co | _T]: ...
-    def __ror__(self, other: Iterable[_T]) -> set[_KT_co | _T]: ...
-    def __sub__(self, other: Iterable[Any]) -> set[_KT_co]: ...
-    def __rsub__(self, other: Iterable[_T]) -> set[_T]: ...
-    def __xor__(self, other: Iterable[_T]) -> set[_KT_co | _T]: ...
-    def __rxor__(self, other: Iterable[_T]) -> set[_KT_co | _T]: ...
+    def __or__(self, other: Iterable[_T], /) -> set[_KT_co | _T]: ...
+    def __ror__(self, other: Iterable[_T], /) -> set[_KT_co | _T]: ...
+    def __sub__(self, other: Iterable[Any], /) -> set[_KT_co]: ...
+    def __rsub__(self, other: Iterable[_T], /) -> set[_T]: ...
+    def __xor__(self, other: Iterable[_T], /) -> set[_KT_co | _T]: ...
+    def __rxor__(self, other: Iterable[_T], /) -> set[_KT_co | _T]: ...
 
 class ValuesView(MappingView, Collection[_VT_co]):
     def __init__(self, mapping: SupportsGetItemViewable[Any, _VT_co]) -> None: ...  # undocumented
-    def __contains__(self, value: object) -> bool: ...
+    def __contains__(self, value: object, /) -> bool: ...
     def __iter__(self) -> Iterator[_VT_co]: ...
+
+# note for Mapping.get and MutableMapping.pop and MutableMapping.setdefault
+# In _collections_abc.py the parameters are positional-or-keyword,
+# but dict and types.MappingProxyType (the vast majority of Mapping types)
+# don't allow keyword arguments.
 
 class Mapping(Collection[_KT], Generic[_KT, _VT_co]):
     """A Mapping is a generic container for associating key/value
@@ -1249,15 +1854,16 @@ class Mapping(Collection[_KT], Generic[_KT, _VT_co]):
     # see discussion in https://github.com/python/typing/pull/273.
     @abstractmethod
     def __getitem__(self, key: _KT, /) -> _VT_co: ...
+
     # Mixin methods
     @overload
-    def get(self, key: _KT, /) -> _VT_co | None:
+    def get(self, key: object, /) -> _VT_co | None:
         """D.get(k[,d]) -> D[k] if k in D, else d.  d defaults to None."""
+    @overload
+    def get(self, key: object, default: _VT_co, /) -> _VT_co: ...  # type: ignore[misc] # pyright: ignore[reportGeneralTypeIssues] # Covariant type as parameter
+    @overload
+    def get(self, key: object, default: _T, /) -> _VT_co | _T: ...
 
-    @overload
-    def get(self, key: _KT, /, default: _VT_co) -> _VT_co: ...  # type: ignore[misc] # pyright: ignore[reportGeneralTypeIssues] # Covariant type as parameter
-    @overload
-    def get(self, key: _KT, /, default: _T) -> _VT_co | _T: ...
     def items(self) -> ItemsView[_KT, _VT_co]:
         """D.items() -> a set-like object providing a view on D's items"""
 
@@ -1288,18 +1894,20 @@ class MutableMapping(Mapping[_KT, _VT]):
 
     @overload
     def pop(self, key: _KT, /) -> _VT:
-        """D.pop(k[,d]) -> v, remove specified key and return the corresponding value.
-        If key is not found, d is returned if given, otherwise KeyError is raised.
+        """D.pop(k[,d]) -> v, remove specified key and return the corresponding
+        value.  If key is not found, d is returned if given, otherwise
+        KeyError is raised.
         """
+    @overload
+    def pop(self, key: _KT, default: _VT, /) -> _VT: ...
+    @overload
+    def pop(self, key: _KT, default: _T, /) -> _VT | _T: ...
 
-    @overload
-    def pop(self, key: _KT, /, default: _VT) -> _VT: ...
-    @overload
-    def pop(self, key: _KT, /, default: _T) -> _VT | _T: ...
     def popitem(self) -> tuple[_KT, _VT]:
         """D.popitem() -> (k, v), remove and return some (key, value) pair
         as a 2-tuple; but raise KeyError if D is empty.
         """
+
     # This overload should be allowed only if the value type is compatible with None.
     #
     # Keep the following methods in line with MutableMapping.setdefault, modulo positional-only differences:
@@ -1309,9 +1917,9 @@ class MutableMapping(Mapping[_KT, _VT]):
     @overload
     def setdefault(self: MutableMapping[_KT, _T | None], key: _KT, default: None = None, /) -> _T | None:
         """D.setdefault(k[,d]) -> D.get(k,d), also set D[k]=d if k not in D"""
-
     @overload
     def setdefault(self, key: _KT, default: _VT, /) -> _VT: ...
+
     # 'update' used to take a Union, but using overloading is better.
     # The second overloaded type here is a bit too general, because
     # Mapping[tuple[_KT, _VT], W] is a subclass of Iterable[tuple[_KT, _VT]],
@@ -1335,11 +1943,13 @@ class MutableMapping(Mapping[_KT, _VT]):
     @overload
     def update(self, m: SupportsKeysAndGetItem[_KT, _VT], /) -> None:
         """D.update([E, ]**F) -> None.  Update D from mapping/iterable E and F.
-        If E present and has a .keys() method, does:     for k in E.keys(): D[k] = E[k]
-        If E present and lacks .keys() method, does:     for (k, v) in E: D[k] = v
-        In either case, this is followed by: for k, v in F.items(): D[k] = v
+        If E present and has a .keys() method, does:
+            for k in E.keys(): D[k] = E[k]
+        If E present and lacks .keys() method, does:
+            for (k, v) in E: D[k] = v
+        In either case, this is followed by:
+            for k, v in F.items(): D[k] = v
         """
-
     @overload
     def update(self: SupportsGetItem[str, _VT], m: SupportsKeysAndGetItem[str, _VT], /, **kwargs: _VT) -> None: ...
     @overload
@@ -1347,7 +1957,7 @@ class MutableMapping(Mapping[_KT, _VT]):
     @overload
     def update(self: SupportsGetItem[str, _VT], m: Iterable[tuple[str, _VT]], /, **kwargs: _VT) -> None: ...
     @overload
-    def update(self: SupportsGetItem[str, _VT], **kwargs: _VT) -> None: ...
+    def update(self: SupportsGetItem[str, _VT], /, **kwargs: _VT) -> None: ...
 
 Text = str
 
@@ -1365,8 +1975,8 @@ class IO(Generic[AnyStr]):
     classes (text vs. binary, read vs. write vs. read/write,
     append-only, unbuffered).  The TextIO and BinaryIO subclasses
     below capture the distinctions between text vs. binary, which is
-    pervasive in the interface; however we currently do not offer a
-    way to track the other distinctions in the type system.
+    pervasive in the interface. For more precise types, define a custom
+    Protocol.
     """
 
     # At runtime these are all abstract properties,
@@ -1407,18 +2017,21 @@ class IO(Generic[AnyStr]):
     def truncate(self, size: int | None = None, /) -> int: ...
     @abstractmethod
     def writable(self) -> bool: ...
+
     @abstractmethod
     @overload
     def write(self: IO[bytes], s: ReadableBuffer, /) -> int: ...
     @abstractmethod
     @overload
     def write(self, s: AnyStr, /) -> int: ...
+
     @abstractmethod
     @overload
     def writelines(self: IO[bytes], lines: Iterable[ReadableBuffer], /) -> None: ...
     @abstractmethod
     @overload
     def writelines(self, lines: Iterable[AnyStr], /) -> None: ...
+
     @abstractmethod
     def __next__(self) -> AnyStr: ...
     @abstractmethod
@@ -1431,14 +2044,14 @@ class IO(Generic[AnyStr]):
     ) -> None: ...
 
 class BinaryIO(IO[bytes]):
-    """Typed version of the return of open() in binary mode."""
+    """Typed approximation of the return of open() in binary mode."""
 
     __slots__ = ()
     @abstractmethod
     def __enter__(self) -> BinaryIO: ...
 
 class TextIO(IO[str]):
-    """Typed version of the return of open() in text mode."""
+    """Typed approximation of the return of open() in text mode."""
 
     # See comment regarding the @properties in the `IO` class
     __slots__ = ()
@@ -1478,12 +2091,12 @@ if sys.version_info >= (3, 14):
         localns: Mapping[str, Any] | None = None,
         include_extras: bool = False,
         *,
-        format: Format | None = None,
+        format: Format | None = None,  # Default: Format.VALUE
     ) -> dict[str, Any]:  # AnnotationForm
         """Return type hints for an object.
 
-        This is often the same as obj.__annotations__, but it handles
-        forward references encoded as string literals and recursively replaces all
+        This is often the same as annotationlib.get_annotations(obj) or obj.__annotations__,
+        but it handles forward references encoded as string literals and recursively replaces all
         'Annotated[T, ...]' with 'T' (unless 'include_extras=True').
 
         The argument may be a module, class, method, or function. The annotations
@@ -1520,8 +2133,8 @@ else:
     ) -> dict[str, Any]:  # AnnotationForm
         """Return type hints for an object.
 
-        This is often the same as obj.__annotations__, but it handles
-        forward references encoded as string literals and recursively replaces all
+        This is often the same as inspect.get_annotations(obj) or obj.__annotations__,
+        but it handles forward references encoded as string literals and recursively replaces all
         'Annotated[T, ...]' with 'T' (unless 'include_extras=True').
 
         The argument may be a module, class, method, or function. The annotations
@@ -1564,32 +2177,8 @@ def get_args(tp: Any) -> tuple[Any, ...]:  # AnnotationForm
         >>> assert get_args(Callable[[], T][int]) == ([], int)
     """
 
-if sys.version_info >= (3, 10):
-    @overload
-    def get_origin(tp: ParamSpecArgs | ParamSpecKwargs) -> ParamSpec:
-        """Get the unsubscripted version of a type.
-
-        This supports generic types, Callable, Tuple, Union, Literal, Final, ClassVar,
-        Annotated, and others. Return None for unsupported types.
-
-        Examples::
-
-            >>> P = ParamSpec('P')
-            >>> assert get_origin(Literal[42]) is Literal
-            >>> assert get_origin(int) is None
-            >>> assert get_origin(ClassVar[int]) is ClassVar
-            >>> assert get_origin(Generic) is Generic
-            >>> assert get_origin(Generic[T]) is Generic
-            >>> assert get_origin(Union[T, int]) is Union
-            >>> assert get_origin(List[Tuple[T, T]][int]) is list
-            >>> assert get_origin(P.args) is P
-        """
-
-    @overload
-    def get_origin(tp: UnionType) -> type[UnionType]: ...
-
 @overload
-def get_origin(tp: GenericAlias) -> type:
+def get_origin(tp: ParamSpecArgs | ParamSpecKwargs) -> ParamSpec:
     """Get the unsubscripted version of a type.
 
     This supports generic types, Callable, Tuple, Union, Literal, Final, ClassVar,
@@ -1607,9 +2196,13 @@ def get_origin(tp: GenericAlias) -> type:
         >>> assert get_origin(List[Tuple[T, T]][int]) is list
         >>> assert get_origin(P.args) is P
     """
-
+@overload
+def get_origin(tp: UnionType) -> type[UnionType]: ...
+@overload
+def get_origin(tp: GenericAlias) -> type: ...
 @overload
 def get_origin(tp: Any) -> Any | None: ...  # AnnotationForm
+
 @overload
 def cast(typ: type[_T], val: Any) -> _T:
     """Cast a value to a type.
@@ -1619,7 +2212,6 @@ def cast(typ: type[_T], val: Any) -> _T:
     runtime we intentionally don't check anything (we want this
     to be as fast as possible).
     """
-
 @overload
 def cast(typ: str, val: Any) -> Any: ...
 @overload
@@ -1691,7 +2283,7 @@ if sys.version_info >= (3, 11):
         field_specifiers: tuple[type[Any] | Callable[..., Any], ...] = (),
         **kwargs: Any,
     ) -> IdentityFunction:
-        """Decorator to mark an object as providing dataclass-like behaviour.
+        """Decorator to mark an object as providing dataclass-like behavior.
 
         The decorator can be applied to a function, class, or metaclass.
 
@@ -1758,7 +2350,7 @@ if sys.version_info >= (3, 11):
 
 # Obsolete, will be changed to a function. Use _typeshed._type_checker_internals.NamedTupleFallback instead.
 class NamedTuple(tuple[Any, ...]):
-    """Typed version of namedtuple.
+    """Typed version of collections.namedtuple.
 
     Usage::
 
@@ -1770,8 +2362,8 @@ class NamedTuple(tuple[Any, ...]):
 
         Employee = collections.namedtuple('Employee', ['name', 'id'])
 
-    The resulting class has an extra __annotations__ attribute, giving a
-    dict that maps field names to types.  (The field names are also in
+    The types for each field name can be retrieved by calling
+    annotationlib.get_annotations(Employee).  (The field names are also in
     the _fields attribute, which is part of the namedtuple API.)
     An alternative equivalent functional syntax is also accepted::
 
@@ -1780,6 +2372,7 @@ class NamedTuple(tuple[Any, ...]):
 
     _field_defaults: ClassVar[dict[str, Any]]
     _fields: ClassVar[tuple[str, ...]]
+    __match_args__: ClassVar[tuple[str, ...]] = ...
     # __orig_bases__ sometimes exists on <3.12, but not consistently
     # So we only add it to the stub on 3.12+.
     if sys.version_info >= (3, 12):
@@ -1788,13 +2381,15 @@ class NamedTuple(tuple[Any, ...]):
     @overload
     def __init__(self, typename: str, fields: Iterable[tuple[str, Any]], /) -> None: ...
     @overload
-    @typing_extensions.deprecated(
-        "Creating a typing.NamedTuple using keyword arguments is deprecated and support will be removed in Python 3.15"
-    )
+    @deprecated("Creating a typing.NamedTuple using keyword arguments is deprecated and support will be removed in Python 3.15")
     def __init__(self, typename: str, fields: None = None, /, **kwargs: Any) -> None: ...
+
+    @final
     @classmethod
     def _make(cls, iterable: Iterable[Any]) -> typing_extensions.Self: ...
+    @final
     def _asdict(self) -> dict[str, Any]: ...
+    @final
     def _replace(self, **kwargs: Any) -> typing_extensions.Self: ...
     if sys.version_info >= (3, 13):
         def __replace__(self, **kwargs: Any) -> typing_extensions.Self: ...
@@ -1814,6 +2409,10 @@ class _TypedDict(Mapping[str, object], metaclass=ABCMeta):
     if sys.version_info >= (3, 13):
         __readonly_keys__: ClassVar[frozenset[str]]
         __mutable_keys__: ClassVar[frozenset[str]]
+    if sys.version_info >= (3, 15):
+        # PEP 728
+        __closed__: ClassVar[bool | None]
+        __extra_items__: ClassVar[Any]  # AnnotationForm
 
     def copy(self) -> typing_extensions.Self: ...
     # Using Never so that only calls using mypy plugin hook that specialize the signature
@@ -1826,18 +2425,19 @@ class _TypedDict(Mapping[str, object], metaclass=ABCMeta):
     def items(self) -> dict_items[str, object]: ...
     def keys(self) -> dict_keys[str, object]: ...
     def values(self) -> dict_values[str, object]: ...
+
     @overload
     def __or__(self, value: typing_extensions.Self, /) -> typing_extensions.Self:
         """Return self|value."""
-
     @overload
     def __or__(self, value: dict[str, Any], /) -> dict[str, object]: ...
+
     @overload
     def __ror__(self, value: typing_extensions.Self, /) -> typing_extensions.Self:
         """Return value|self."""
-
     @overload
     def __ror__(self, value: dict[str, Any], /) -> dict[str, object]: ...
+
     # supposedly incompatible definitions of __or__ and __ior__
     def __ior__(self, value: typing_extensions.Self, /) -> typing_extensions.Self: ...  # type: ignore[misc]
 
@@ -1936,22 +2536,21 @@ else:
             def __or__(self, other: Any) -> _SpecialForm: ...
             def __ror__(self, other: Any) -> _SpecialForm: ...
 
-if sys.version_info >= (3, 10):
-    def is_typeddict(tp: object) -> bool:
-        """Check if an annotation is a TypedDict class.
+def is_typeddict(tp: object) -> bool:
+    """Check if an object is a TypedDict class.
 
-        For example::
+    For example::
 
-            >>> from typing import TypedDict
-            >>> class Film(TypedDict):
-            ...     title: str
-            ...     year: int
-            ...
-            >>> is_typeddict(Film)
-            True
-            >>> is_typeddict(dict)
-            False
-        """
+        >>> from typing import TypedDict
+        >>> class Film(TypedDict):
+        ...     title: str
+        ...     year: int
+        ...
+        >>> is_typeddict(Film)
+        True
+        >>> is_typeddict(dict)
+        False
+    """
 
 def _type_repr(obj: object) -> str:
     """Return the repr() of an object, special-casing types (internal helper).
@@ -2012,7 +2611,9 @@ if sys.version_info >= (3, 12):
         At runtime, Alias is an instance of TypeAliasType. The __name__
         attribute holds the name of the type alias. The value of the type alias
         is stored in the __value__ attribute. It is evaluated lazily, so the
-        value is computed only if the attribute is accessed.
+        value is computed only if the attribute is accessed. The __module__
+        attribute holds the name of the module in which the type alias was
+        defined; it can be assigned to.
 
         Type aliases can also be generic::
 
@@ -2033,6 +2634,9 @@ if sys.version_info >= (3, 12):
         def __parameters__(self) -> tuple[Any, ...]: ...  # AnnotationForm
         @property
         def __name__(self) -> str: ...
+        if sys.version_info >= (3, 15):
+            @property
+            def __qualname__(self) -> str: ...
         # It's writable on types, but not on instances of TypeAliasType.
         @property
         def __module__(self) -> str | None: ...  # type: ignore[override]
@@ -2044,7 +2648,11 @@ if sys.version_info >= (3, 12):
 
         def __ror__(self, left: Any, /) -> _SpecialForm:
             """Return value|self."""
+
         if sys.version_info >= (3, 14):
+            def __iter__(self) -> Any:  # Unpack[Self]
+                """Implement iter(self)."""
+
             @property
             def evaluate_value(self) -> EvaluateFunc: ...
 
@@ -2085,4 +2693,82 @@ if sys.version_info >= (3, 13):
 
     NoDefault: _NoDefaultType
     TypeIs: _SpecialForm
+    """Special typing construct for marking user-defined type predicate functions.
+
+    ``TypeIs`` can be used to annotate the return type of a user-defined
+    type predicate function.  ``TypeIs`` only accepts a single type argument.
+    At runtime, functions marked this way should return a boolean and accept
+    at least one argument.
+
+    ``TypeIs`` aims to benefit *type narrowing* -- a technique used by static
+    type checkers to determine a more precise type of an expression within a
+    program's code flow.  Usually type narrowing is done by analyzing
+    conditional code flow and applying the narrowing to a block of code.  The
+    conditional expression here is sometimes referred to as a "type predicate".
+
+    Sometimes it would be convenient to use a user-defined boolean function
+    as a type predicate.  Such a function should use ``TypeIs[...]`` or
+    ``TypeGuard[...]`` as its return type to alert static type checkers to
+    this intention.  ``TypeIs`` usually has more intuitive behavior than
+    ``TypeGuard``, but it cannot be used when the input and output types
+    are incompatible (e.g., ``list[object]`` to ``list[int]``) or when the
+    function does not return ``True`` for all instances of the narrowed type.
+
+    Using  ``-> TypeIs[NarrowedType]`` tells the static type checker that for
+    a given function:
+
+    1. The return value is a boolean.
+    2. If the return value is ``True``, the type of its argument
+       is the intersection of the argument's original type and
+       ``NarrowedType``.
+    3. If the return value is ``False``, the type of its argument
+       is narrowed to exclude ``NarrowedType``.
+
+    For example::
+
+        from typing import assert_type, final, TypeIs
+
+        class Parent: pass
+        class Child(Parent): pass
+        @final
+        class Unrelated: pass
+
+        def is_parent(val: object) -> TypeIs[Parent]:
+            return isinstance(val, Parent)
+
+        def run(arg: Child | Unrelated):
+            if is_parent(arg):
+                # Type of ``arg`` is narrowed to the intersection
+                # of ``Parent`` and ``Child``, which is equivalent to
+                # ``Child``.
+                assert_type(arg, Child)
+            else:
+                # Type of ``arg`` is narrowed to exclude ``Parent``,
+                # so only ``Unrelated`` is left.
+                assert_type(arg, Unrelated)
+
+    The type inside ``TypeIs`` must be consistent with the type of the
+    function's argument; if it is not, static type checkers will raise
+    an error.  An incorrectly written ``TypeIs`` function can lead to
+    unsound behavior in the type system; it is the user's responsibility
+    to write such functions in a type-safe manner.
+
+    ``TypeIs`` also works with type variables.  For more information, see
+    PEP 742 (Narrowing types with ``TypeIs``).
+    """
+
     ReadOnly: _SpecialForm
+    """A special typing construct to mark an item of a TypedDict as read-only.
+
+    For example::
+
+        class Movie(TypedDict):
+            title: ReadOnly[str]
+            year: int
+
+        def mutate_movie(m: Movie) -> None:
+            m["year"] = 1992  # allowed
+            m["title"] = "The Matrix"  # type checker error
+
+    There is no runtime checking for this property.
+    """

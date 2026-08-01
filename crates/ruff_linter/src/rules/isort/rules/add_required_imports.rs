@@ -61,6 +61,7 @@ fn includes_import(stmt: &Stmt, target: &NameImport) -> bool {
         NameImport::Import(target) => {
             let Stmt::Import(ast::StmtImport {
                 names,
+                is_lazy: _,
                 range: _,
                 node_index: _,
             }) = &stmt
@@ -77,6 +78,7 @@ fn includes_import(stmt: &Stmt, target: &NameImport) -> bool {
                 module,
                 names,
                 level,
+                is_lazy: _,
                 range: _,
                 node_index: _,
             }) = &stmt
@@ -140,7 +142,7 @@ pub(crate) fn add_required_imports(
     source_type: PySourceType,
     context: &LintContext,
 ) {
-    for required_import in &settings.isort.required_imports {
+    for required_import in settings.isort.required_imports.iter().rev() {
         add_required_import(
             required_import,
             parsed,

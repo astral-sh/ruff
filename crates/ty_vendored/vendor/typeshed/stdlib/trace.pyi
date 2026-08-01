@@ -23,8 +23,7 @@ import sys
 import types
 from _typeshed import Incomplete, StrPath, TraceFunction
 from collections.abc import Callable, Iterable, Mapping, Sequence
-from typing import Any, TypeVar
-from typing_extensions import ParamSpec, TypeAlias
+from typing import Any, ParamSpec, TypeAlias, TypeVar
 
 __all__ = ["Trace", "CoverageResults"]
 
@@ -49,6 +48,7 @@ class CoverageResults:
     ) -> None: ...  # undocumented
     def update(self, other: CoverageResults) -> None:
         """Merge in the data from another CoverageResults"""
+
     if sys.version_info >= (3, 13):
         def write_results(
             self,
@@ -70,6 +70,7 @@ class CoverageResults:
                              exist are silently ignored. Otherwise, a missing file
                              will raise a FileNotFoundError.
             """
+
     else:
         def write_results(self, show_missing: bool = True, summary: bool = False, coverdir: StrPath | None = None) -> None:
             """

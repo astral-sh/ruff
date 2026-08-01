@@ -10,7 +10,7 @@ use libcst_native::{
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::Truthiness;
-use ruff_python_ast::parenthesize::parenthesized_range;
+use ruff_python_ast::token::parenthesized_range;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{
     self as ast, AnyNodeRef, Arguments, BoolOp, ExceptHandler, Expr, Keyword, Stmt, UnaryOp,
@@ -28,7 +28,8 @@ use crate::cst::matchers::match_indented_block;
 use crate::cst::matchers::match_module;
 use crate::fix::codemods::CodegenStylist;
 use crate::importer::ImportRequest;
-use crate::{Edit, Fix, FixAvailability, Violation};
+use crate::preview::is_fix_pytest_composite_assertion_enabled;
+use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 
 use super::unittest_assert::UnittestAssert;
 
@@ -60,6 +61,14 @@ use super::unittest_assert::UnittestAssert;
 ///     assert not something
 ///     assert not something_else
 /// ```
+///
+/// ## Fix safety
+///
+/// On stable, the rule's fix is always unsafe and not offered when it would remove comments in the
+/// compound assertion. In [preview], the fix is only unsafe when it would delete such comments and
+/// safe otherwise.
+///
+/// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.208")]
 pub(crate) struct PytestCompositeAssertion;
@@ -104,6 +113,16 @@ impl Violation for PytestCompositeAssertion {
 ///     with pytest.raises(ZeroDivisionError) as exc_info:
 ///         1 / 0
 ///     assert exc_info.value.args
+/// ```
+///
+/// Or, for pytest 8.4.0 and later:
+/// ```python
+/// import pytest
+///
+///
+/// def test_foo():
+///     with pytest.raises(ZeroDivisionError, check=lambda e: e.args):
+///         1 / 0
 /// ```
 ///
 /// ## References
@@ -303,8 +322,7 @@ pub(crate) fn unittest_assertion(
                 parenthesized_range(
                     expr.into(),
                     checker.semantic().current_statement().into(),
-                    checker.comment_ranges(),
-                    checker.locator().contents(),
+                    checker.tokens(),
                 )
                 .unwrap_or(expr.range()),
             )));
@@ -820,16 +838,24 @@ pub(crate) fn composite_condition(checker: &Checker, stmt: &Stmt, test: &Expr, m
     let composite = is_composite_condition(test);
     if matches!(composite, CompositionKind::Simple | CompositionKind::Mixed) {
         let mut diagnostic = checker.report_diagnostic(PytestCompositeAssertion, stmt.range());
+        let preview_fix = is_fix_pytest_composite_assertion_enabled(checker.settings());
         if matches!(composite, CompositionKind::Simple)
             && msg.is_none()
-            && !checker.comment_ranges().intersects(stmt.range())
+            && (preview_fix || !checker.comment_ranges().intersects(stmt.range()))
             && !checker
                 .indexer()
                 .in_multi_statement_line(stmt, checker.source())
         {
             diagnostic.try_set_fix(|| {
-                fix_composite_condition(stmt, checker.locator(), checker.stylist())
-                    .map(Fix::unsafe_edit)
+                fix_composite_condition(stmt, checker.locator(), checker.stylist()).map(|edit| {
+                    let applicability =
+                        if preview_fix && !checker.comment_ranges().intersects(edit.range()) {
+                            Applicability::Safe
+                        } else {
+                            Applicability::Unsafe
+                        };
+                    Fix::applicable_edit(edit, applicability)
+                })
             });
         }
     }

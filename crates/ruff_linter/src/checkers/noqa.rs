@@ -18,11 +18,13 @@ use crate::rules::pygrep_hooks;
 use crate::rules::ruff;
 use crate::rules::ruff::rules::{UnusedCodes, UnusedNOQA};
 use crate::settings::LinterSettings;
+use crate::suppression::Suppressions;
 use crate::{Edit, Fix, Locator};
 
 use super::ast::LintContext;
 
 /// RUF100
+#[expect(clippy::too_many_arguments)]
 pub(crate) fn check_noqa(
     context: &mut LintContext,
     path: &Path,
@@ -31,20 +33,24 @@ pub(crate) fn check_noqa(
     noqa_line_for: &NoqaMapping,
     analyze_directives: bool,
     settings: &LinterSettings,
+    suppressions: &Suppressions,
 ) -> Vec<usize> {
     // Identify any codes that are globally exempted (within the current file).
     let file_noqa_directives =
         FileNoqaDirectives::extract(locator, comment_ranges, &settings.external, path);
 
     // Extract all `noqa` directives.
-    let mut noqa_directives =
-        NoqaDirectives::from_commented_ranges(comment_ranges, &settings.external, path, locator);
+    let mut noqa_directives = NoqaDirectives::from_commented_ranges(comment_ranges, path, locator);
 
-    if file_noqa_directives.is_empty() && noqa_directives.is_empty() {
+    if file_noqa_directives.is_empty() && noqa_directives.is_empty() && suppressions.is_empty() {
         return Vec::new();
     }
 
     let exemption = FileExemption::from(&file_noqa_directives);
+
+    // Generate diagnostics for suppression comments before applying suppressions so that the
+    // diagnostics can themselves be suppressed.
+    suppressions.check_rule_codes(context, locator);
 
     // Indices of diagnostics that were ignored by a `noqa` directive.
     let mut ignored_diagnostics = vec![];
@@ -60,15 +66,23 @@ pub(crate) fn check_noqa(
             continue;
         }
 
+        // Apply file-level suppressions first
         if exemption.contains_secondary_code(code) {
             ignored_diagnostics.push(index);
             continue;
         }
 
+        // Apply ranged suppressions next
+        if suppressions.check_diagnostic(diagnostic) {
+            ignored_diagnostics.push(index);
+            continue;
+        }
+
+        // Apply end-of-line noqa suppressions last
         let noqa_offsets = diagnostic
             .parent()
             .into_iter()
-            .chain(diagnostic.range().map(TextRange::start).into_iter())
+            .chain(diagnostic.range().map(TextRange::start))
             .map(|position| noqa_line_for.resolve(position))
             .unique();
 
@@ -107,12 +121,14 @@ pub(crate) fn check_noqa(
         }
     }
 
-    // Enforce that the noqa directive was actually used (RUF100), unless RUF100 was itself
-    // suppressed.
-    if context.is_rule_enabled(Rule::UnusedNOQA)
+    // Only migrate directives that don't require RUF100 cleanup first.
+    let check_unused_noqa = context.is_rule_enabled(Rule::UnusedNOQA)
         && analyze_directives
-        && !exemption.includes(Rule::UnusedNOQA)
-    {
+        && !exemption.includes(Rule::UnusedNOQA);
+    let check_noqa_comment =
+        context.is_rule_enabled(Rule::NoqaComments) && !exemption.enumerates(Rule::NoqaComments);
+
+    if check_unused_noqa || check_noqa_comment {
         let directives = noqa_directives
             .lines()
             .iter()
@@ -125,31 +141,59 @@ pub(crate) fn check_noqa(
             );
         for (directive, matches, is_file_level) in directives {
             match directive {
-                Directive::All(directive) => {
-                    if matches.is_empty() {
-                        let edit = delete_comment(directive.range(), locator);
-                        let mut diagnostic = context
-                            .report_diagnostic(UnusedNOQA { codes: None }, directive.range());
+                Directive::All(all) => {
+                    if check_unused_noqa && matches.is_empty() {
+                        let edit = delete_comment(all.range(), locator);
+                        let mut diagnostic = context.report_diagnostic(
+                            UnusedNOQA {
+                                codes: None,
+                                kind: ruff::rules::UnusedNOQAKind::Noqa,
+                            },
+                            all.range(),
+                        );
                         diagnostic.add_primary_tag(ruff_db::diagnostic::DiagnosticTag::Unnecessary);
                         diagnostic.set_fix(Fix::safe_edit(edit));
+                    } else if check_noqa_comment {
+                        ruff::rules::noqa_comments(
+                            context,
+                            locator,
+                            is_file_level,
+                            matches.is_empty(),
+                            directive,
+                            matches,
+                            suppressions,
+                        );
                     }
                 }
-                Directive::Codes(directive) => {
+                Directive::Codes(codes) => {
                     let mut disabled_codes = vec![];
                     let mut duplicated_codes = vec![];
-                    let mut unknown_codes = vec![];
                     let mut unmatched_codes = vec![];
                     let mut valid_codes = vec![];
                     let mut seen_codes = FxHashSet::default();
                     let mut self_ignore = false;
-                    for original_code in directive.iter().map(Code::as_str) {
+                    let mut suppress_noqa_comment = false;
+                    for original_code in codes.iter().map(Code::as_str) {
                         let code = get_redirect_target(original_code).unwrap_or(original_code);
-                        if Rule::UnusedNOQA.noqa_code() == code {
-                            self_ignore = true;
-                            break;
-                        }
-
                         if seen_codes.insert(original_code) {
+                            if Rule::UnusedNOQA.noqa_code() == code {
+                                self_ignore = true;
+                                if context.is_rule_enabled(Rule::UnusedNOQA) {
+                                    valid_codes.push(original_code);
+                                } else {
+                                    disabled_codes.push(original_code);
+                                }
+                                continue;
+                            }
+
+                            if context.is_rule_enabled(Rule::NoqaComments)
+                                && Rule::NoqaComments.noqa_code() == code
+                            {
+                                suppress_noqa_comment = true;
+                                valid_codes.push(original_code);
+                                continue;
+                            }
+
                             let is_code_used = if is_file_level {
                                 context.iter().any(|diag| {
                                     diag.secondary_code().is_some_and(|noqa| *noqa == code)
@@ -169,27 +213,21 @@ pub(crate) fn check_noqa(
                                 } else {
                                     disabled_codes.push(original_code);
                                 }
-                            } else {
-                                unknown_codes.push(original_code);
                             }
                         } else {
                             duplicated_codes.push(original_code);
                         }
                     }
 
-                    if self_ignore {
-                        continue;
-                    }
-
-                    if !(disabled_codes.is_empty()
+                    let has_unused_codes = !(disabled_codes.is_empty()
                         && duplicated_codes.is_empty()
-                        && unknown_codes.is_empty()
-                        && unmatched_codes.is_empty())
-                    {
+                        && unmatched_codes.is_empty());
+
+                    if check_unused_noqa && !self_ignore && has_unused_codes {
                         let edit = if valid_codes.is_empty() {
-                            delete_comment(directive.range(), locator)
+                            delete_comment(codes.range(), locator)
                         } else {
-                            let original_text = locator.slice(directive.range());
+                            let original_text = locator.slice(codes.range());
                             let prefix = if is_file_level {
                                 if original_text.contains("flake8") {
                                     "# flake8: noqa: "
@@ -201,39 +239,40 @@ pub(crate) fn check_noqa(
                             };
                             Edit::range_replacement(
                                 format!("{}{}", prefix, valid_codes.join(", ")),
-                                directive.range(),
+                                codes.range(),
                             )
                         };
                         let mut diagnostic = context.report_diagnostic(
                             UnusedNOQA {
                                 codes: Some(UnusedCodes {
-                                    disabled: disabled_codes
-                                        .iter()
-                                        .map(|code| (*code).to_string())
-                                        .collect(),
-                                    duplicated: duplicated_codes
-                                        .iter()
-                                        .map(|code| (*code).to_string())
-                                        .collect(),
-                                    unknown: unknown_codes
-                                        .iter()
-                                        .map(|code| (*code).to_string())
-                                        .collect(),
-                                    unmatched: unmatched_codes
-                                        .iter()
-                                        .map(|code| (*code).to_string())
-                                        .collect(),
+                                    disabled: &disabled_codes,
+                                    duplicated: &duplicated_codes,
+                                    unmatched: &unmatched_codes,
                                 }),
+                                kind: ruff::rules::UnusedNOQAKind::Noqa,
                             },
-                            directive.range(),
+                            codes.range(),
                         );
                         diagnostic.add_primary_tag(ruff_db::diagnostic::DiagnosticTag::Unnecessary);
                         diagnostic.set_fix(Fix::safe_edit(edit));
+                    } else if check_noqa_comment && !suppress_noqa_comment {
+                        ruff::rules::noqa_comments(
+                            context,
+                            locator,
+                            is_file_level,
+                            has_unused_codes,
+                            directive,
+                            matches,
+                            suppressions,
+                        );
                     }
                 }
             }
         }
     }
+
+    // Diagnostics for unused/invalid range suppressions
+    suppressions.check_suppressions(context, locator);
 
     if context.is_rule_enabled(Rule::RedirectedNOQA) && !exemption.includes(Rule::RedirectedNOQA) {
         ruff::rules::redirected_noqa(context, &noqa_directives);
@@ -252,7 +291,13 @@ pub(crate) fn check_noqa(
     if context.is_rule_enabled(Rule::InvalidRuleCode)
         && !exemption.enumerates(Rule::InvalidRuleCode)
     {
-        ruff::rules::invalid_noqa_code(context, &noqa_directives, locator, &settings.external);
+        ruff::rules::invalid_noqa_code(
+            context,
+            &file_noqa_directives,
+            &noqa_directives,
+            locator,
+            &settings.external,
+        );
     }
 
     ignored_diagnostics.sort_unstable();

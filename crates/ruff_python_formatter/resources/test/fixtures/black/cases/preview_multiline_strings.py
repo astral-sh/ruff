@@ -102,7 +102,7 @@ test_vectors = [
     "two\nliner\n",
     """expressed
 as a three line
-mulitline string""",
+multiline string""",
 ]
 
 _wat = re.compile(
@@ -155,24 +155,6 @@ msg = f"""The arguments {bad_arguments} were passed in.
 Please use `--build-option` instead,
 `--global-option` is reserved to flags like `--verbose` or `--quiet`.
 """
-
-this_will_become_one_line = (
-    "a"
-    "b"
-    "c"
-)
-
-this_will_stay_on_three_lines = (
-    "a"  # comment
-    "b"
-    "c"
-)
-
-this_will_also_become_one_line = (  # comment
-    "a"
-    "b"
-    "c"
-)
 
 assert some_var == expected_result, """
 test

@@ -119,7 +119,6 @@ E741 Ambiguous variable name: `l`
 25 |     global l
 26 |     l = 0
    |     ^
-   |
 
 E741 Ambiguous variable name: `l`
   --> E741.py:30:5

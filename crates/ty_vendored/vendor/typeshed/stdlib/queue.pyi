@@ -82,6 +82,7 @@ class Queue(Generic[_T]):
         Only get an item if one is immediately available. Otherwise
         raise the Empty exception.
         """
+
     if sys.version_info >= (3, 13):
         def shutdown(self, immediate: bool = False) -> None:
             """Shut-down the queue, making queue gets and puts raise ShutDown.
@@ -89,9 +90,11 @@ class Queue(Generic[_T]):
             By default, gets will only raise once the queue is empty. Set
             'immediate' to True to make gets raise immediately instead.
 
-            All blocked callers of put() and get() will be unblocked. If
-            'immediate', a task is marked as done for each item remaining in
-            the queue, which may unblock callers of join().
+            All blocked callers of put() and get() will be unblocked.
+
+            If 'immediate', the queue is drained and unfinished tasks
+            is reduced by the number of drained tasks.  If unfinished tasks
+            is reduced to zero, callers of Queue.join are unblocked.
             """
 
     def _get(self) -> _T: ...
@@ -142,9 +145,6 @@ class Queue(Generic[_T]):
         have been processed (meaning that a task_done() call was received
         for every item that had been put() into the queue).
 
-        shutdown(immediate=True) calls task_done() for each remaining item in
-        the queue.
-
         Raises a ValueError if called more times than there were items
         placed in the queue.
         """
@@ -152,7 +152,8 @@ class Queue(Generic[_T]):
     def __class_getitem__(cls, item: Any, /) -> GenericAlias:
         """Represent a PEP 585 generic type
 
-        E.g. for t = list[int], t.__origin__ is list and t.__args__ is (int,).
+        For example, for t = list[int], t.__origin__ is list and t.__args__
+        is (int,).
         """
 
 class PriorityQueue(Queue[SupportsRichComparisonT]):

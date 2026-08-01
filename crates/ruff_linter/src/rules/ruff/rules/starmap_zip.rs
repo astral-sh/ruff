@@ -1,7 +1,7 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::PythonVersion;
-use ruff_python_ast::{Expr, ExprCall, parenthesize::parenthesized_range};
-use ruff_python_parser::TokenKind;
+use ruff_python_ast::token::TokenKind;
+use ruff_python_ast::{Expr, ExprCall, token::parenthesized_range};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
@@ -124,13 +124,8 @@ fn replace_with_map(starmap: &ExprCall, zip: &ExprCall, checker: &Checker) -> Op
 
     let mut remove_zip = vec![];
 
-    let full_zip_range = parenthesized_range(
-        zip.into(),
-        starmap.into(),
-        checker.comment_ranges(),
-        checker.source(),
-    )
-    .unwrap_or(zip.range());
+    let full_zip_range =
+        parenthesized_range(zip.into(), starmap.into(), checker.tokens()).unwrap_or(zip.range());
 
     // Delete any parentheses around the `zip` call to prevent that the argument turns into a tuple.
     remove_zip.push(Edit::range_deletion(TextRange::new(
@@ -138,13 +133,8 @@ fn replace_with_map(starmap: &ExprCall, zip: &ExprCall, checker: &Checker) -> Op
         zip.start(),
     )));
 
-    let full_zip_func_range = parenthesized_range(
-        (&zip.func).into(),
-        zip.into(),
-        checker.comment_ranges(),
-        checker.source(),
-    )
-    .unwrap_or(zip.func.range());
+    let full_zip_func_range = parenthesized_range((&zip.func).into(), zip.into(), checker.tokens())
+        .unwrap_or(zip.func.range());
 
     // Delete the `zip` callee
     remove_zip.push(Edit::range_deletion(full_zip_func_range));

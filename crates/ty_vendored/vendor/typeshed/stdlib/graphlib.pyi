@@ -17,6 +17,7 @@ class TopologicalSorter(Generic[_T]):
     def __init__(self, graph: None = None) -> None: ...
     @overload
     def __init__(self, graph: SupportsItems[_T, Iterable[_T]]) -> None: ...
+
     def add(self, node: _T, *predecessors: _T) -> None:
         """Add a new node and its predecessors to the graph.
 
@@ -89,11 +90,13 @@ class TopologicalSorter(Generic[_T]):
         Using this method does not require to call "prepare" or "done". If any
         cycle is detected, :exc:`CycleError` will be raised.
         """
+
     if sys.version_info >= (3, 11):
         def __class_getitem__(cls, item: Any, /) -> GenericAlias:
             """Represent a PEP 585 generic type
 
-            E.g. for t = list[int], t.__origin__ is list and t.__args__ is (int,).
+            For example, for t = list[int], t.__origin__ is list and t.__args__
+            is (int,).
             """
 
 class CycleError(ValueError):

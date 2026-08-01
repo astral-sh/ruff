@@ -1,8 +1,8 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_notebook::CellOffsets;
 use ruff_python_ast::PySourceType;
+use ruff_python_ast::token::{TokenIterWithContext, TokenKind, Tokens};
 use ruff_python_index::Indexer;
-use ruff_python_parser::{TokenIterWithContext, TokenKind, Tokens};
 use ruff_text_size::{Ranged, TextSize};
 
 use crate::Locator;
@@ -135,17 +135,11 @@ pub(crate) fn compound_statements(
     // Use an iterator to allow passing it around.
     let mut token_iter = tokens.iter_with_context();
 
-    loop {
-        let Some(token) = token_iter.next() else {
-            break;
-        };
-
+    while let Some(token) = token_iter.next() {
         match token.kind() {
-            TokenKind::Ellipsis => {
-                if allow_ellipsis {
-                    allow_ellipsis = false;
-                    continue;
-                }
+            TokenKind::Ellipsis if allow_ellipsis => {
+                allow_ellipsis = false;
+                continue;
             }
             TokenKind::Indent => {
                 indent = indent.saturating_add(1);

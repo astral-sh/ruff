@@ -3,7 +3,7 @@ use crate::{Db, NavigationTargets, RangedValue};
 use ruff_db::files::{File, FileRange};
 use ruff_db::parsed::parsed_module;
 use ruff_text_size::{Ranged, TextSize};
-use ty_python_semantic::ImportAliasResolution;
+use ty_python_semantic::{ImportAliasResolution, SemanticModel};
 
 /// Navigate to the definition of a symbol.
 ///
@@ -17,11 +17,12 @@ pub fn goto_definition(
     offset: TextSize,
 ) -> Option<RangedValue<NavigationTargets>> {
     let module = parsed_module(db, file).load(db);
-    let goto_target = find_goto_target(&module, offset)?;
-
+    let model = SemanticModel::new(db, file);
+    let goto_target = find_goto_target(&model, &module, offset)?;
     let definition_targets = goto_target
-        .get_definition_targets(file, db, ImportAliasResolution::ResolveAliases)?
-        .definition_targets(db)?;
+        .definitions(&model, ImportAliasResolution::ResolveAliases)?
+        .goto_definition(&model, &goto_target)?
+        .into_navigation_targets(model.db());
 
     Some(RangedValue {
         range: FileRange::new(file, goto_target.range()),
@@ -30,16 +31,232 @@ pub fn goto_definition(
 }
 
 #[cfg(test)]
-mod test {
-    use crate::tests::{CursorTest, IntoDiagnostic};
-    use crate::{NavigationTarget, goto_definition};
+pub(super) mod test {
+
+    use crate::tests::{CursorTest, IntoDiagnostic, cursor_test};
+    use crate::{NavigationTargets, RangedValue, goto_definition};
     use insta::assert_snapshot;
     use ruff_db::diagnostic::{
         Annotation, Diagnostic, DiagnosticId, LintName, Severity, Span, SubDiagnostic,
         SubDiagnosticSeverity,
     };
-    use ruff_db::files::FileRange;
     use ruff_text_size::Ranged;
+
+    #[test]
+    fn goto_definition_does_not_mix_global_and_nonlocal_comprehension_walruses() {
+        let test = cursor_test(
+            "
+last = 0
+
+def outer():
+    last = 1
+
+    def write_global():
+        global last
+        [(last := global_item) for global_item in [2]]
+
+    def write_nonlocal():
+        nonlocal last
+        [(last := nonlocal_item) for nonlocal_item in [3]]
+
+    write_global()
+    write_nonlocal()
+    return la<CURSOR>st
+",
+        );
+
+        assert_snapshot!(test.goto_definition(), @"
+        info[goto-definition]: Go to definition
+          --> main.py:17:12
+           |
+        17 |     return last
+           |            ^^^^ Clicking here
+        info: Found 2 definitions
+          --> main.py:5:5
+           |
+         5 |     last = 1
+           |     ----
+           |
+          ::: main.py:13:11
+           |
+        13 |         [(last := nonlocal_item) for nonlocal_item in [3]]
+           |           ----
+        ");
+    }
+
+    #[test]
+    fn goto_definition_comprehension_walrus_in_function() {
+        let test = cursor_test(
+            "
+def f(items):
+    [(last := item) for item in items]
+    return la<CURSOR>st
+",
+        );
+
+        assert_snapshot!(test.goto_definition(), @"
+        info[goto-definition]: Go to definition
+         --> main.py:4:12
+          |
+        4 |     return last
+          |            ^^^^ Clicking here
+        info: Found 1 definition
+         --> main.py:3:7
+          |
+        3 |     [(last := item) for item in items]
+          |       ----
+        ");
+    }
+
+    #[test]
+    fn goto_definition_nested_comprehension_walrus_in_function() {
+        let test = cursor_test(
+            "
+def f(items):
+    [[(last := item) for item in items] for _ in [1]]
+    return la<CURSOR>st
+",
+        );
+
+        assert_snapshot!(test.goto_definition(), @"
+        info[goto-definition]: Go to definition
+         --> main.py:4:12
+          |
+        4 |     return last
+          |            ^^^^ Clicking here
+        info: Found 1 definition
+         --> main.py:3:8
+          |
+        3 |     [[(last := item) for item in items] for _ in [1]]
+          |        ----
+        ");
+    }
+
+    #[test]
+    fn goto_definition_imported_comprehension_walrus() {
+        let test = CursorTest::builder()
+            .source("lib.py", "[(last := item) for item in [1]]\n")
+            .source("main.py", "from lib import last\nprint(la<CURSOR>st)\n")
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @"
+        info[goto-definition]: Go to definition
+         --> main.py:2:7
+          |
+        2 | print(last)
+          |       ^^^^ Clicking here
+        info: Found 1 definition
+         --> lib.py:1:3
+          |
+        1 | [(last := item) for item in [1]]
+          |   ----
+        ");
+    }
+
+    #[test]
+    fn goto_definition_nonlocal_comprehension_walrus() {
+        let test = cursor_test(
+            "
+def outer(items):
+    last = 0
+
+    def inner():
+        nonlocal last
+        [(last := item) for item in items]
+        return la<CURSOR>st
+
+    return inner()
+",
+        );
+
+        assert_snapshot!(test.goto_definition(), @"
+        info[goto-definition]: Go to definition
+         --> main.py:8:16
+          |
+        8 |         return last
+          |                ^^^^ Clicking here
+        info: Found 2 definitions
+         --> main.py:3:5
+          |
+        3 |     last = 0
+          |     ----
+        4 |
+        5 |     def inner():
+        6 |         nonlocal last
+        7 |         [(last := item) for item in items]
+          |           ----
+        ");
+    }
+
+    #[test]
+    fn goto_definition_relative_import() {
+        let test = CursorTest::builder()
+            .source("mypackage/__init__.py", "from . import module_a<CURSOR>")
+            .source("mypackage/module_a.py", "class Test: ...")
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @"
+        info[goto-definition]: Go to definition
+         --> mypackage/__init__.py:1:15
+          |
+        1 | from . import module_a
+          |               ^^^^^^^^ Clicking here
+        info: Found 1 definition
+         --> mypackage/module_a.py:1:1
+          |
+        1 | class Test: ...
+          | -
+        ");
+    }
+
+    #[test]
+    fn goto_definition_relative_import_reference() {
+        let test = CursorTest::builder()
+            .source(
+                "mypackage/__init__.py",
+                "from . import module_a\nx = module_a<CURSOR>",
+            )
+            .source("mypackage/module_a.py", "class Test: ...")
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @"
+        info[goto-definition]: Go to definition
+         --> mypackage/__init__.py:2:5
+          |
+        2 | x = module_a
+          |     ^^^^^^^^ Clicking here
+        info: Found 1 definition
+         --> mypackage/module_a.py:1:1
+          |
+        1 | class Test: ...
+          | -
+        ");
+    }
+
+    #[test]
+    fn goto_definition_relative_star_imported_submodule_reference() {
+        let test = CursorTest::builder()
+            .source(
+                "mypackage/__init__.py",
+                "from .exporter import *\nx = module_a<CURSOR>",
+            )
+            .source("mypackage/exporter.py", "from . import module_a")
+            .source("mypackage/module_a.py", "class Test: ...")
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @"
+        info[goto-definition]: Go to definition
+         --> mypackage/__init__.py:2:5
+          |
+        2 | x = module_a
+          |     ^^^^^^^^ Clicking here
+        info: Found 1 definition
+         --> mypackage/module_a.py:1:1
+          |
+        1 | class Test: ...
+          | -
+        ");
+    }
 
     /// goto-definition on a module should go to the .py not the .pyi
     ///
@@ -69,22 +286,18 @@ def my_function(): ...
             )
             .build();
 
-        assert_snapshot!(test.goto_definition(), @r#"
-        info[goto-definition]: Definition
-         --> mymodule.py:1:1
-          |
-        1 |
-          | ^
-        2 | def my_function():
-        3 |     return "hello"
-          |
-        info: Source
+        assert_snapshot!(test.goto_definition(), @"
+        info[goto-definition]: Go to definition
          --> main.py:2:6
           |
         2 | from mymodule import my_function
-          |      ^^^^^^^^
+          |      ^^^^^^^^ Clicking here
+        info: Found 1 definition
+         --> mymodule.py:1:1
           |
-        "#);
+        1 |
+          | -
+        ");
     }
 
     /// goto-definition on a module ref should go to the .py not the .pyi
@@ -113,23 +326,18 @@ def my_function(): ...
             )
             .build();
 
-        assert_snapshot!(test.goto_definition(), @r#"
-        info[goto-definition]: Definition
+        assert_snapshot!(test.goto_definition(), @"
+        info[goto-definition]: Go to definition
+         --> main.py:3:5
+          |
+        3 | x = mymodule
+          |     ^^^^^^^^ Clicking here
+        info: Found 1 definition
          --> mymodule.py:1:1
           |
         1 |
-          | ^
-        2 | def my_function():
-        3 |     return "hello"
-          |
-        info: Source
-         --> main.py:3:5
-          |
-        2 | import mymodule
-        3 | x = mymodule
-          |     ^^^^^^^^
-          |
-        "#);
+          | -
+        ");
     }
 
     /// goto-definition on a function call should go to the .py not the .pyi
@@ -163,22 +371,53 @@ def other_function(): ...
             )
             .build();
 
-        assert_snapshot!(test.goto_definition(), @r#"
-        info[goto-definition]: Definition
+        assert_snapshot!(test.goto_definition(), @"
+        info[goto-definition]: Go to definition
+         --> main.py:3:7
+          |
+        3 | print(my_function())
+          |       ^^^^^^^^^^^ Clicking here
+        info: Found 1 definition
          --> mymodule.py:2:5
           |
         2 | def my_function():
-          |     ^^^^^^^^^^^
-        3 |     return "hello"
+          |     -----------
+        ");
+    }
+
+    #[test]
+    fn goto_definition_stub_map_reexported_function() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                "
+from a import bar
+bar<CURSOR>()
+",
+            )
+            .source("a/__init__.pyi", "def bar() -> None: ...\n")
+            .source("a/__init__.py", "from .impl import bar as bar\n")
+            .source(
+                "a/impl.py",
+                r#"
+def bar() -> None:
+    pass
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @"
+        info[goto-definition]: Go to definition
+         --> main.py:3:1
           |
-        info: Source
-         --> main.py:3:7
+        3 | bar()
+          | ^^^ Clicking here
+        info: Found 1 definition
+         --> a/impl.py:2:5
           |
-        2 | from mymodule import my_function
-        3 | print(my_function())
-          |       ^^^^^^^^^^^
-          |
-        "#);
+        2 | def bar() -> None:
+          |     ---
+        ");
     }
 
     /// goto-definition on a function definition in a .pyi should go to the .py
@@ -205,23 +444,18 @@ def other_function(): ...
             )
             .build();
 
-        assert_snapshot!(test.goto_definition(), @r#"
-        info[goto-definition]: Definition
-         --> mymodule.py:2:5
-          |
-        2 | def my_function():
-          |     ^^^^^^^^^^^
-        3 |     return "hello"
-          |
-        info: Source
+        assert_snapshot!(test.goto_definition(), @"
+        info[goto-definition]: Go to definition
          --> mymodule.pyi:2:5
           |
         2 | def my_function(): ...
-          |     ^^^^^^^^^^^
-        3 |
-        4 | def other_function(): ...
+          |     ^^^^^^^^^^^ Clicking here
+        info: Found 1 definition
+         --> mymodule.py:2:5
           |
-        "#);
+        2 | def my_function():
+          |     -----------
+        ");
     }
 
     /// goto-definition on a function that's redefined many times in the impl .py
@@ -266,54 +500,24 @@ def other_function(): ...
             .build();
 
         assert_snapshot!(test.goto_definition(), @r#"
-        info[goto-definition]: Definition
+        info[goto-definition]: Go to definition
+         --> main.py:3:7
+          |
+        3 | print(my_function())
+          |       ^^^^^^^^^^^ Clicking here
+        info: Found 3 definitions
          --> mymodule.py:2:5
           |
         2 | def my_function():
-          |     ^^^^^^^^^^^
-        3 |     return "hello"
-          |
-        info: Source
-         --> main.py:3:7
-          |
-        2 | from mymodule import my_function
-        3 | print(my_function())
-          |       ^^^^^^^^^^^
-          |
-
-        info[goto-definition]: Definition
-         --> mymodule.py:5:5
-          |
+          |     -----------
         3 |     return "hello"
         4 |
         5 | def my_function():
-          |     ^^^^^^^^^^^
-        6 |     return "hello again"
-          |
-        info: Source
-         --> main.py:3:7
-          |
-        2 | from mymodule import my_function
-        3 | print(my_function())
-          |       ^^^^^^^^^^^
-          |
-
-        info[goto-definition]: Definition
-         --> mymodule.py:8:5
-          |
+          |     -----------
         6 |     return "hello again"
         7 |
         8 | def my_function():
-          |     ^^^^^^^^^^^
-        9 |     return "we can't keep doing this"
-          |
-        info: Source
-         --> main.py:3:7
-          |
-        2 | from mymodule import my_function
-        3 | print(my_function())
-          |       ^^^^^^^^^^^
-          |
+          |     -----------
         "#);
     }
 
@@ -352,22 +556,17 @@ class MyOtherClass:
             )
             .build();
 
-        assert_snapshot!(test.goto_definition(), @r"
-        info[goto-definition]: Definition
+        assert_snapshot!(test.goto_definition(), @"
+        info[goto-definition]: Go to definition
+         --> main.py:3:5
+          |
+        3 | x = MyClass
+          |     ^^^^^^^ Clicking here
+        info: Found 1 definition
          --> mymodule.py:2:7
           |
         2 | class MyClass:
-          |       ^^^^^^^
-        3 |     def __init__(self, val):
-        4 |         self.val = val
-          |
-        info: Source
-         --> main.py:3:5
-          |
-        2 | from mymodule import MyClass
-        3 | x = MyClass
-          |     ^^^^^^^
-          |
+          |       -------
         ");
     }
 
@@ -399,22 +598,17 @@ class MyOtherClass:
             )
             .build();
 
-        assert_snapshot!(test.goto_definition(), @r"
-        info[goto-definition]: Definition
-         --> mymodule.py:2:7
-          |
-        2 | class MyClass:
-          |       ^^^^^^^
-        3 |     def __init__(self, val):
-        4 |         self.val = val
-          |
-        info: Source
+        assert_snapshot!(test.goto_definition(), @"
+        info[goto-definition]: Go to definition
          --> mymodule.pyi:2:7
           |
         2 | class MyClass:
-          |       ^^^^^^^
-        3 |     def __init__(self, val: bool): ...
+          |       ^^^^^^^ Clicking here
+        info: Found 1 definition
+         --> mymodule.py:2:7
           |
+        2 | class MyClass:
+          |       -------
         ");
     }
 
@@ -453,38 +647,17 @@ class MyOtherClass:
             )
             .build();
 
-        assert_snapshot!(test.goto_definition(), @r"
-        info[goto-definition]: Definition
+        assert_snapshot!(test.goto_definition(), @"
+        info[goto-definition]: Go to definition
+         --> main.py:3:5
+          |
+        3 | x = MyClass(0)
+          |     ^^^^^^^ Clicking here
+        info: Found 1 definition
          --> mymodule.py:2:7
           |
         2 | class MyClass:
-          |       ^^^^^^^
-        3 |     def __init__(self, val):
-        4 |         self.val = val
-          |
-        info: Source
-         --> main.py:3:5
-          |
-        2 | from mymodule import MyClass
-        3 | x = MyClass(0)
-          |     ^^^^^^^
-          |
-
-        info[goto-definition]: Definition
-         --> mymodule.py:3:9
-          |
-        2 | class MyClass:
-        3 |     def __init__(self, val):
-          |         ^^^^^^^^
-        4 |         self.val = val
-          |
-        info: Source
-         --> main.py:3:5
-          |
-        2 | from mymodule import MyClass
-        3 | x = MyClass(0)
-          |     ^^^^^^^
-          |
+          |       -------
         ");
     }
 
@@ -527,24 +700,98 @@ class MyOtherClass:
             )
             .build();
 
-        assert_snapshot!(test.goto_definition(), @r"
-        info[goto-definition]: Definition
-         --> mymodule.py:5:9
-          |
-        3 |     def __init__(self, val):
-        4 |         self.val = val
-        5 |     def action(self):
-          |         ^^^^^^
-        6 |         print(self.val)
-          |
-        info: Source
+        assert_snapshot!(test.goto_definition(), @"
+        info[goto-definition]: Go to definition
          --> main.py:4:3
           |
-        2 | from mymodule import MyClass
-        3 | x = MyClass(0)
         4 | x.action()
-          |   ^^^^^^
+          |   ^^^^^^ Clicking here
+        info: Found 1 definition
+         --> mymodule.py:5:9
           |
+        5 |     def action(self):
+          |         ------
+        ");
+    }
+
+    /// goto-definition on a class attribute should go to the .py not the .pyi
+    #[test]
+    fn goto_definition_stub_map_class_attribute() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                "
+from mymodule import MyClass
+def f(x: MyClass):
+    x.so<CURSOR>und
+",
+            )
+            .source(
+                "mymodule.py",
+                r#"
+class MyClass:
+    sound: str = "generic"
+"#,
+            )
+            .source(
+                "mymodule.pyi",
+                r#"
+class MyClass:
+    sound: str
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @r#"
+        info[goto-definition]: Go to definition
+         --> main.py:4:7
+          |
+        4 |     x.sound
+          |       ^^^^^ Clicking here
+        info: Found 1 definition
+         --> mymodule.py:3:5
+          |
+        3 |     sound: str = "generic"
+          |     -----
+        "#);
+    }
+
+    /// goto-definition on a module-level variable should go to the .py not the .pyi
+    #[test]
+    fn goto_definition_stub_map_module_variable() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                "
+import mymodule
+mymodule.CO<CURSOR>UNT
+",
+            )
+            .source(
+                "mymodule.py",
+                r#"
+COUNT = 0
+"#,
+            )
+            .source(
+                "mymodule.pyi",
+                r#"
+COUNT: int
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @r"
+        info[goto-definition]: Go to definition
+         --> main.py:3:10
+          |
+        3 | mymodule.COUNT
+          |          ^^^^^ Clicking here
+        info: Found 1 definition
+         --> mymodule.py:2:1
+          |
+        2 | COUNT = 0
+          | -----
         ");
     }
 
@@ -586,24 +833,18 @@ class MyOtherClass:
             )
             .build();
 
-        assert_snapshot!(test.goto_definition(), @r#"
-        info[goto-definition]: Definition
-         --> mymodule.py:5:9
-          |
-        3 |     def __init__(self, val):
-        4 |         self.val = val
-        5 |     def action():
-          |         ^^^^^^
-        6 |         print("hi!")
-          |
-        info: Source
+        assert_snapshot!(test.goto_definition(), @"
+        info[goto-definition]: Go to definition
          --> main.py:3:13
           |
-        2 | from mymodule import MyClass
         3 | x = MyClass.action()
-          |             ^^^^^^
+          |             ^^^^^^ Clicking here
+        info: Found 1 definition
+         --> mymodule.py:5:9
           |
-        "#);
+        5 |     def action():
+          |         ------
+        ");
     }
 
     /// goto-definition on a class import should go to the .py not the .pyi
@@ -630,19 +871,17 @@ class MyClass: ...
             )
             .build();
 
-        assert_snapshot!(test.goto_definition(), @r"
-        info[goto-definition]: Definition
-         --> mymodule.py:2:7
-          |
-        2 | class MyClass: ...
-          |       ^^^^^^^
-          |
-        info: Source
+        assert_snapshot!(test.goto_definition(), @"
+        info[goto-definition]: Go to definition
          --> main.py:2:22
           |
         2 | from mymodule import MyClass
-          |                      ^^^^^^^
+          |                      ^^^^^^^ Clicking here
+        info: Found 1 definition
+         --> mymodule.py:2:7
           |
+        2 | class MyClass: ...
+          |       -------
         ");
     }
 
@@ -664,23 +903,17 @@ my_func(my_other_func(ab=5, y=2), 0)
             )
             .build();
 
-        assert_snapshot!(test.goto_definition(), @r"
-        info[goto-definition]: Definition
+        assert_snapshot!(test.goto_definition(), @"
+        info[goto-definition]: Go to definition
+         --> main.py:5:23
+          |
+        5 | my_other_func(my_func(ab=5, y=2), 0)
+          |                       ^^ Clicking here
+        info: Found 1 definition
          --> main.py:2:13
           |
         2 | def my_func(ab, y, z = None): ...
-          |             ^^
-        3 | def my_other_func(ab, y): ...
-          |
-        info: Source
-         --> main.py:5:23
-          |
-        3 | def my_other_func(ab, y): ...
-        4 |
-        5 | my_other_func(my_func(ab=5, y=2), 0)
-          |                       ^^
-        6 | my_func(my_other_func(ab=5, y=2), 0)
-          |
+          |             --
         ");
     }
 
@@ -702,23 +935,17 @@ my_func(my_other_func(a<CURSOR>b=5, y=2), 0)
             )
             .build();
 
-        assert_snapshot!(test.goto_definition(), @r"
-        info[goto-definition]: Definition
-         --> main.py:3:19
-          |
-        2 | def my_func(ab, y, z = None): ...
-        3 | def my_other_func(ab, y): ...
-          |                   ^^
-        4 |
-        5 | my_other_func(my_func(ab=5, y=2), 0)
-          |
-        info: Source
+        assert_snapshot!(test.goto_definition(), @"
+        info[goto-definition]: Go to definition
          --> main.py:6:23
           |
-        5 | my_other_func(my_func(ab=5, y=2), 0)
         6 | my_func(my_other_func(ab=5, y=2), 0)
-          |                       ^^
+          |                       ^^ Clicking here
+        info: Found 1 definition
+         --> main.py:3:19
           |
+        3 | def my_other_func(ab, y): ...
+          |                   --
         ");
     }
 
@@ -740,23 +967,17 @@ my_func(my_other_func(ab=5, y=2), 0)
             )
             .build();
 
-        assert_snapshot!(test.goto_definition(), @r"
-        info[goto-definition]: Definition
+        assert_snapshot!(test.goto_definition(), @"
+        info[goto-definition]: Go to definition
+         --> main.py:5:23
+          |
+        5 | my_other_func(my_func(ab=5, y=2), 0)
+          |                       ^^ Clicking here
+        info: Found 1 definition
          --> main.py:2:13
           |
         2 | def my_func(ab, y): ...
-          |             ^^
-        3 | def my_other_func(ab, y): ...
-          |
-        info: Source
-         --> main.py:5:23
-          |
-        3 | def my_other_func(ab, y): ...
-        4 |
-        5 | my_other_func(my_func(ab=5, y=2), 0)
-          |                       ^^
-        6 | my_func(my_other_func(ab=5, y=2), 0)
-          |
+          |             --
         ");
     }
 
@@ -778,23 +999,17 @@ my_func(my_other_func(a<CURSOR>b=5, y=2), 0)
             )
             .build();
 
-        assert_snapshot!(test.goto_definition(), @r"
-        info[goto-definition]: Definition
-         --> main.py:3:19
-          |
-        2 | def my_func(ab, y): ...
-        3 | def my_other_func(ab, y): ...
-          |                   ^^
-        4 |
-        5 | my_other_func(my_func(ab=5, y=2), 0)
-          |
-        info: Source
+        assert_snapshot!(test.goto_definition(), @"
+        info[goto-definition]: Go to definition
          --> main.py:6:23
           |
-        5 | my_other_func(my_func(ab=5, y=2), 0)
         6 | my_func(my_other_func(ab=5, y=2), 0)
-          |                       ^^
+          |                       ^^ Clicking here
+        info: Found 1 definition
+         --> main.py:3:19
           |
+        3 | def my_other_func(ab, y): ...
+          |                   --
         ");
     }
 
@@ -830,23 +1045,18 @@ def ab(a: str): ...
             )
             .build();
 
-        assert_snapshot!(test.goto_definition(), @r#"
-        info[goto-definition]: Definition
+        assert_snapshot!(test.goto_definition(), @"
+        info[goto-definition]: Go to definition
+         --> main.py:4:1
+          |
+        4 | ab(1)
+          | ^^ Clicking here
+        info: Found 1 definition
          --> mymodule.py:2:5
           |
         2 | def ab(a):
-          |     ^^
-        3 |     """the real implementation!"""
-          |
-        info: Source
-         --> main.py:4:1
-          |
-        2 | from mymodule import ab
-        3 |
-        4 | ab(1)
-          | ^^
-          |
-        "#);
+          |     --
+        ");
     }
 
     #[test]
@@ -882,21 +1092,16 @@ def ab(a: str): ...
             .build();
 
         assert_snapshot!(test.goto_definition(), @r#"
-        info[goto-definition]: Definition
+        info[goto-definition]: Go to definition
+         --> main.py:4:1
+          |
+        4 | ab("hello")
+          | ^^ Clicking here
+        info: Found 1 definition
          --> mymodule.py:2:5
           |
         2 | def ab(a):
-          |     ^^
-        3 |     """the real implementation!"""
-          |
-        info: Source
-         --> main.py:4:1
-          |
-        2 | from mymodule import ab
-        3 |
-        4 | ab("hello")
-          | ^^
-          |
+          |     --
         "#);
     }
 
@@ -932,23 +1137,18 @@ def ab(a: int): ...
             )
             .build();
 
-        assert_snapshot!(test.goto_definition(), @r#"
-        info[goto-definition]: Definition
+        assert_snapshot!(test.goto_definition(), @"
+        info[goto-definition]: Go to definition
+         --> main.py:4:1
+          |
+        4 | ab(1, 2)
+          | ^^ Clicking here
+        info: Found 1 definition
          --> mymodule.py:2:5
           |
         2 | def ab(a, b = None):
-          |     ^^
-        3 |     """the real implementation!"""
-          |
-        info: Source
-         --> main.py:4:1
-          |
-        2 | from mymodule import ab
-        3 |
-        4 | ab(1, 2)
-          | ^^
-          |
-        "#);
+          |     --
+        ");
     }
 
     #[test]
@@ -983,23 +1183,18 @@ def ab(a: int): ...
             )
             .build();
 
-        assert_snapshot!(test.goto_definition(), @r#"
-        info[goto-definition]: Definition
+        assert_snapshot!(test.goto_definition(), @"
+        info[goto-definition]: Go to definition
+         --> main.py:4:1
+          |
+        4 | ab(1)
+          | ^^ Clicking here
+        info: Found 1 definition
          --> mymodule.py:2:5
           |
         2 | def ab(a, b = None):
-          |     ^^
-        3 |     """the real implementation!"""
-          |
-        info: Source
-         --> main.py:4:1
-          |
-        2 | from mymodule import ab
-        3 |
-        4 | ab(1)
-          | ^^
-          |
-        "#);
+          |     --
+        ");
     }
 
     #[test]
@@ -1037,23 +1232,18 @@ def ab(a: int, *, c: int): ...
             )
             .build();
 
-        assert_snapshot!(test.goto_definition(), @r#"
-        info[goto-definition]: Definition
+        assert_snapshot!(test.goto_definition(), @"
+        info[goto-definition]: Go to definition
+         --> main.py:4:1
+          |
+        4 | ab(1, b=2)
+          | ^^ Clicking here
+        info: Found 1 definition
          --> mymodule.py:2:5
           |
         2 | def ab(a, *, b = None, c = None):
-          |     ^^
-        3 |     """the real implementation!"""
-          |
-        info: Source
-         --> main.py:4:1
-          |
-        2 | from mymodule import ab
-        3 |
-        4 | ab(1, b=2)
-          | ^^
-          |
-        "#);
+          |     --
+        ");
     }
 
     #[test]
@@ -1091,23 +1281,18 @@ def ab(a: int, *, c: int): ...
             )
             .build();
 
-        assert_snapshot!(test.goto_definition(), @r#"
-        info[goto-definition]: Definition
+        assert_snapshot!(test.goto_definition(), @"
+        info[goto-definition]: Go to definition
+         --> main.py:4:1
+          |
+        4 | ab(1, c=2)
+          | ^^ Clicking here
+        info: Found 1 definition
          --> mymodule.py:2:5
           |
         2 | def ab(a, *, b = None, c = None):
-          |     ^^
-        3 |     """the real implementation!"""
-          |
-        info: Source
-         --> main.py:4:1
-          |
-        2 | from mymodule import ab
-        3 |
-        4 | ab(1, c=2)
-          | ^^
-          |
-        "#);
+          |     --
+        ");
     }
 
     #[test]
@@ -1129,23 +1314,17 @@ a <CURSOR>+ b
             )
             .build();
 
-        assert_snapshot!(test.goto_definition(), @r"
-        info[goto-definition]: Definition
-         --> main.py:3:9
-          |
-        2 | class Test:
-        3 |     def __add__(self, other):
-          |         ^^^^^^^
-        4 |         return Test()
-          |
-        info: Source
+        assert_snapshot!(test.goto_definition(), @"
+        info[goto-definition]: Go to definition
           --> main.py:10:3
            |
-         8 | b = Test()
-         9 |
         10 | a + b
-           |   ^
-           |
+           |   ^ Clicking here
+        info: Found 1 definition
+         --> main.py:3:9
+          |
+        3 |     def __add__(self, other):
+          |         -------
         ");
     }
 
@@ -1166,23 +1345,17 @@ B() <CURSOR>+ A()
             )
             .build();
 
-        assert_snapshot!(test.goto_definition(), @r"
-        info[goto-definition]: Definition
-         --> main.py:3:9
-          |
-        2 | class A:
-        3 |     def __radd__(self, other) -> A:
-          |         ^^^^^^^^
-        4 |         return self
-          |
-        info: Source
+        assert_snapshot!(test.goto_definition(), @"
+        info[goto-definition]: Go to definition
          --> main.py:8:5
           |
-        6 | class B: ...
-        7 |
         8 | B() + A()
-          |     ^
+          |     ^ Clicking here
+        info: Found 1 definition
+         --> main.py:3:9
           |
+        3 |     def __radd__(self, other) -> A:
+          |         --------
         ");
     }
 
@@ -1205,23 +1378,17 @@ a<CURSOR>+b
             )
             .build();
 
-        assert_snapshot!(test.goto_definition(), @r"
-        info[goto-definition]: Definition
-         --> main.py:3:9
-          |
-        2 | class Test:
-        3 |     def __add__(self, other):
-          |         ^^^^^^^
-        4 |         return Test()
-          |
-        info: Source
+        assert_snapshot!(test.goto_definition(), @"
+        info[goto-definition]: Go to definition
           --> main.py:10:2
            |
-         8 | b = Test()
-         9 |
         10 | a+b
-           |  ^
-           |
+           |  ^ Clicking here
+        info: Found 1 definition
+         --> main.py:3:9
+          |
+        3 |     def __add__(self, other):
+          |         -------
         ");
     }
 
@@ -1244,24 +1411,17 @@ a+<CURSOR>b
             )
             .build();
 
-        assert_snapshot!(test.goto_definition(), @r"
-        info[goto-definition]: Definition
-          --> main.py:8:1
-           |
-         7 | a = Test()
-         8 | b = Test()
-           | ^
-         9 |
-        10 | a+b
-           |
-        info: Source
+        assert_snapshot!(test.goto_definition(), @"
+        info[goto-definition]: Go to definition
           --> main.py:10:3
            |
-         8 | b = Test()
-         9 |
         10 | a+b
-           |   ^
-           |
+           |   ^ Clicking here
+        info: Found 1 definition
+         --> main.py:8:1
+          |
+        8 | b = Test()
+          | -
         ");
     }
 
@@ -1303,24 +1463,17 @@ a = Test()
             )
             .build();
 
-        assert_snapshot!(test.goto_definition(), @r"
-        info[goto-definition]: Definition
-         --> main.py:3:9
-          |
-        2 | class Test:
-        3 |     def __invert__(self) -> 'Test': ...
-          |         ^^^^^^^^^^
-        4 |
-        5 | a = Test()
-          |
-        info: Source
+        assert_snapshot!(test.goto_definition(), @"
+        info[goto-definition]: Go to definition
          --> main.py:7:1
           |
-        5 | a = Test()
-        6 |
         7 | ~a
-          | ^
+          | ^ Clicking here
+        info: Found 1 definition
+         --> main.py:3:9
           |
+        3 |     def __invert__(self) -> 'Test': ...
+          |         ----------
         ");
     }
 
@@ -1341,24 +1494,17 @@ a = Test()
             )
             .build();
 
-        assert_snapshot!(test.goto_definition(), @r"
-        info[goto-definition]: Definition
-         --> main.py:3:9
-          |
-        2 | class Test:
-        3 |     def __invert__(self, extra_arg) -> 'Test': ...
-          |         ^^^^^^^^^^
-        4 |
-        5 | a = Test()
-          |
-        info: Source
+        assert_snapshot!(test.goto_definition(), @"
+        info[goto-definition]: Go to definition
          --> main.py:7:1
           |
-        5 | a = Test()
-        6 |
         7 | ~a
-          | ^
+          | ^ Clicking here
+        info: Found 1 definition
+         --> main.py:3:9
           |
+        3 |     def __invert__(self, extra_arg) -> 'Test': ...
+          |         ----------
         ");
     }
 
@@ -1378,24 +1524,17 @@ a = Test()
             )
             .build();
 
-        assert_snapshot!(test.goto_definition(), @r"
-        info[goto-definition]: Definition
-         --> main.py:3:9
-          |
-        2 | class Test:
-        3 |     def __invert__(self) -> 'Test': ...
-          |         ^^^^^^^^^^
-        4 |
-        5 | a = Test()
-          |
-        info: Source
+        assert_snapshot!(test.goto_definition(), @"
+        info[goto-definition]: Go to definition
          --> main.py:7:1
           |
-        5 | a = Test()
-        6 |
         7 | ~ a
-          | ^
+          | ^ Clicking here
+        info: Found 1 definition
+         --> main.py:3:9
           |
+        3 |     def __invert__(self) -> 'Test': ...
+          |         ----------
         ");
     }
 
@@ -1415,25 +1554,17 @@ a = Test()
             )
             .build();
 
-        assert_snapshot!(test.goto_definition(), @r"
-        info[goto-definition]: Definition
-         --> main.py:5:1
-          |
-        3 |     def __invert__(self) -> 'Test': ...
-        4 |
-        5 | a = Test()
-          | ^
-        6 |
-        7 | -a
-          |
-        info: Source
+        assert_snapshot!(test.goto_definition(), @"
+        info[goto-definition]: Go to definition
          --> main.py:7:2
           |
-        5 | a = Test()
-        6 |
         7 | -a
-          |  ^
+          |  ^ Clicking here
+        info: Found 1 definition
+         --> main.py:5:1
           |
+        5 | a = Test()
+          | -
         ");
     }
 
@@ -1453,24 +1584,17 @@ a = Test()
             )
             .build();
 
-        assert_snapshot!(test.goto_definition(), @r"
-        info[goto-definition]: Definition
-         --> main.py:3:9
-          |
-        2 | class Test:
-        3 |     def __bool__(self) -> bool: ...
-          |         ^^^^^^^^
-        4 |
-        5 | a = Test()
-          |
-        info: Source
+        assert_snapshot!(test.goto_definition(), @"
+        info[goto-definition]: Go to definition
          --> main.py:7:1
           |
-        5 | a = Test()
-        6 |
         7 | not a
-          | ^^^
+          | ^^^ Clicking here
+        info: Found 1 definition
+         --> main.py:3:9
           |
+        3 |     def __bool__(self) -> bool: ...
+          |         --------
         ");
     }
 
@@ -1490,24 +1614,17 @@ a = Test()
             )
             .build();
 
-        assert_snapshot!(test.goto_definition(), @r"
-        info[goto-definition]: Definition
-         --> main.py:3:9
-          |
-        2 | class Test:
-        3 |     def __len__(self) -> 42: ...
-          |         ^^^^^^^
-        4 |
-        5 | a = Test()
-          |
-        info: Source
+        assert_snapshot!(test.goto_definition(), @"
+        info[goto-definition]: Go to definition
          --> main.py:7:1
           |
-        5 | a = Test()
-        6 |
         7 | not a
-          | ^^^
+          | ^^^ Clicking here
+        info: Found 1 definition
+         --> main.py:3:9
           |
+        3 |     def __len__(self) -> 42: ...
+          |         -------
         ");
     }
 
@@ -1531,23 +1648,17 @@ a = Test()
             )
             .build();
 
-        assert_snapshot!(test.goto_definition(), @r"
-        info[goto-definition]: Definition
-         --> main.py:3:9
-          |
-        2 | class Test:
-        3 |     def __bool__(self, extra_arg) -> bool: ...
-          |         ^^^^^^^^
-        4 |     def __len__(self) -> 42: ...
-          |
-        info: Source
+        assert_snapshot!(test.goto_definition(), @"
+        info[goto-definition]: Go to definition
          --> main.py:8:1
           |
-        6 | a = Test()
-        7 |
         8 | not a
-          | ^^^
+          | ^^^ Clicking here
+        info: Found 1 definition
+         --> main.py:3:9
           |
+        3 |     def __bool__(self, extra_arg) -> bool: ...
+          |         --------
         ");
     }
 
@@ -1571,24 +1682,82 @@ a = Test()
             )
             .build();
 
-        assert_snapshot!(test.goto_definition(), @r"
-        info[goto-definition]: Definition
-         --> main.py:3:9
-          |
-        2 | class Test:
-        3 |     def __len__(self, extra_arg) -> 42: ...
-          |         ^^^^^^^
-        4 |
-        5 | a = Test()
-          |
-        info: Source
+        assert_snapshot!(test.goto_definition(), @"
+        info[goto-definition]: Go to definition
          --> main.py:7:1
           |
-        5 | a = Test()
-        6 |
         7 | not a
-          | ^^^
+          | ^^^ Clicking here
+        info: Found 1 definition
+         --> main.py:3:9
           |
+        3 |     def __len__(self, extra_arg) -> 42: ...
+          |         -------
+        ");
+    }
+
+    #[test]
+    fn float_annotation() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                "
+a: float<CURSOR> = 3.14
+",
+            )
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @"
+        info[goto-definition]: Go to definition
+          --> main.py:LL:4
+           |
+        LL | a: float = 3.14
+           |    ^^^^^ Clicking here
+        info: Found 2 definitions
+          --> stdlib/builtins.pyi:LL:7
+           |
+        LL | class int:
+           |       ---
+           |
+          ::: stdlib/builtins.pyi:LL:7
+           |
+        LL | class float:
+           |       -----
+        ");
+    }
+
+    #[test]
+    fn complex_annotation() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                "
+a: complex<CURSOR> = 3.14
+",
+            )
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @"
+        info[goto-definition]: Go to definition
+          --> main.py:LL:4
+           |
+        LL | a: complex = 3.14
+           |    ^^^^^^^ Clicking here
+        info: Found 3 definitions
+          --> stdlib/builtins.pyi:LL:7
+           |
+        LL | class int:
+           |       ---
+           |
+          ::: stdlib/builtins.pyi:LL:7
+           |
+        LL | class float:
+           |       -----
+           |
+          ::: stdlib/builtins.pyi:LL:7
+           |
+        LL | class complex:
+           |       -------
         ");
     }
 
@@ -1609,10 +1778,878 @@ Traceb<CURSOR>ackType
         assert_snapshot!(test.goto_definition(), @"No goto target found");
     }
 
+    /// goto-definition on a class init opening parenthesis should go to constructor
+    #[test]
+    fn goto_definition_class_init_parenthesis_opening() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                "
+class MyClass:
+    def __init__(self, val):
+        self.val = val
+x = MyClass<CURSOR>()
+",
+            )
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @"
+        info[goto-definition]: Go to definition
+         --> main.py:5:5
+          |
+        5 | x = MyClass()
+          |     ^^^^^^^ Clicking here
+        info: Found 1 definition
+         --> main.py:3:9
+          |
+        3 |     def __init__(self, val):
+          |         --------
+        ");
+    }
+
+    /// goto-definition on a class init closing parenthesis should go to constructor
+    #[test]
+    fn goto_definition_class_init_parenthesis_closing() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                "
+class MyClass:
+    def __init__(self, val):
+        self.val = val
+x = MyClass(<CURSOR>)
+",
+            )
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @"
+        info[goto-definition]: Go to definition
+         --> main.py:5:5
+          |
+        5 | x = MyClass()
+          |     ^^^^^^^ Clicking here
+        info: Found 1 definition
+         --> main.py:3:9
+          |
+        3 |     def __init__(self, val):
+          |         --------
+        ");
+    }
+
+    /// goto-definition on a class init closing parenthesis
+    /// when there is an argument is somewhat ambiguous, and
+    /// so doesn't find any defs.
+    #[test]
+    fn goto_definition_class_init_parenthesis_ambiguous_closing() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                "
+class MyClass:
+    def __init__(self, val):
+        self.val = val
+x = MyClass(0<CURSOR>)
+",
+            )
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @"No goto target found");
+    }
+
+    /// goto-definition on a class init closing parenthesis when there
+    /// is an argument with its own definition is somewhat ambiguous,
+    /// and but we currently go to the definition of the argument.
+    #[test]
+    fn goto_definition_class_init_parenthesis_ambiguous_argument_closing() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                "
+foo = 1
+
+class MyClass:
+    def __init__(self, val):
+        self.val = val
+x = MyClass(foo<CURSOR>)
+",
+            )
+            .build();
+
+        assert_snapshot!(
+            test.goto_definition(),
+            @"
+        info[goto-definition]: Go to definition
+         --> main.py:7:13
+          |
+        7 | x = MyClass(foo)
+          |             ^^^ Clicking here
+        info: Found 1 definition
+         --> main.py:2:1
+          |
+        2 | foo = 1
+          | ---
+        ",
+        );
+    }
+
+    /// goto-definition on a class init parenthesis includes `__new__`
+    #[test]
+    fn goto_definition_class_init_parenthesis_includes_new() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                "
+class MyClass:
+    def __init__(self, val):
+        self.val = val
+    def __new__(self, val):
+        self.val = val
+x = MyClass<CURSOR>()
+",
+            )
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @"
+        info[goto-definition]: Go to definition
+         --> main.py:7:5
+          |
+        7 | x = MyClass()
+          |     ^^^^^^^ Clicking here
+        info: Found 2 definitions
+         --> main.py:3:9
+          |
+        3 |     def __init__(self, val):
+          |         --------
+        4 |         self.val = val
+        5 |     def __new__(self, val):
+          |         -------
+        ");
+    }
+
+    /// goto-definition on a dynamic class literal (created via `type()`)
+    #[test]
+    fn goto_definition_dynamic_class_literal() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+DynClass = type("DynClass", (), {})
+
+x = DynCla<CURSOR>ss()
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @r#"
+        info[goto-definition]: Go to definition
+         --> main.py:4:5
+          |
+        4 | x = DynClass()
+          |     ^^^^^^^^ Clicking here
+        info: Found 1 definition
+         --> main.py:2:1
+          |
+        2 | DynClass = type("DynClass", (), {})
+          | --------
+        "#);
+    }
+
+    /// goto-definition on a dynamic class literal (created via `type()`)
+    /// when on the opening parenthesis.
+    ///
+    /// Unlike when the cursor is on the `DynClass` name itself, this
+    /// will report the constructor method as the definition.
+    #[test]
+    fn goto_definition_dynamic_class_literal_parenthesis() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+DynClass = type("DynClass", (), {})
+
+x = DynClass<CURSOR>()
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @"
+        info[goto-definition]: Go to definition
+          --> main.py:LL:5
+           |
+        LL | x = DynClass()
+           |     ^^^^^^^^ Clicking here
+        info: Found 1 definition
+          --> stdlib/builtins.pyi:LL:9
+           |
+        LL |     def __new__(cls) -> Self: ...
+           |         -------
+        ");
+    }
+
+    /// goto-definition on a dangling dynamic class literal (not assigned to a variable)
+    #[test]
+    fn goto_definition_dangling_dynamic_class_literal() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+class Foo(type("Ba<CURSOR>r", (), {})):
+    pass
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @"No goto target found");
+    }
+
+    /// goto-definition on a dynamic namedtuple class literal (created via `collections.namedtuple()`)
+    #[test]
+    fn goto_definition_dynamic_namedtuple_literal() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+from collections import namedtuple
+
+Point = namedtuple("Point", ["x", "y"])
+
+p = Poi<CURSOR>nt(1, 2)
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @r#"
+        info[goto-definition]: Go to definition
+         --> main.py:6:5
+          |
+        6 | p = Point(1, 2)
+          |     ^^^^^ Clicking here
+        info: Found 1 definition
+         --> main.py:4:1
+          |
+        4 | Point = namedtuple("Point", ["x", "y"])
+          | -----
+        "#);
+    }
+
+    /// goto-definition on a dynamic namedtuple class literal via opening parenthesis.
+    ///
+    /// At time of writing (2026-02-04), goto-def doesn't report
+    /// any possible constructor methods for this case. But normally,
+    /// clicking on an opening parenthesis only goes to constructor
+    /// methods. So this tests that even in that case, we still go
+    /// to the actual definition.
+    #[test]
+    fn goto_definition_dynamic_namedtuple_literal_parenthesis() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+from collections import namedtuple
+
+Point = namedtuple("Point", ["x", "y"])
+
+p = Point<CURSOR>(1, 2)
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @r#"
+        info[goto-definition]: Go to definition
+         --> main.py:6:5
+          |
+        6 | p = Point(1, 2)
+          |     ^^^^^ Clicking here
+        info: Found 1 definition
+         --> main.py:4:1
+          |
+        4 | Point = namedtuple("Point", ["x", "y"])
+          | -----
+        "#);
+    }
+
+    // TODO: Should only list `a: int`
+    #[test]
+    fn redeclarations() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+                a: str = "test"
+
+                a: int = 10
+
+                print(a<CURSOR>)
+
+                a: bool = True
+                "#,
+            )
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @r#"
+        info[goto-definition]: Go to definition
+         --> main.py:6:7
+          |
+        6 | print(a)
+          |       ^ Clicking here
+        info: Found 3 definitions
+         --> main.py:2:1
+          |
+        2 | a: str = "test"
+          | -
+        3 |
+        4 | a: int = 10
+          | -
+        5 |
+        6 | print(a)
+        7 |
+        8 | a: bool = True
+          | -
+        "#);
+    }
+
+    #[test]
+    fn goto_definition_attribute_redeclarations() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+                class Test:
+                    a: str
+                    a: str
+
+                test = Test()
+
+                test.a<CURSOR>
+                "#,
+            )
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @"
+        info[goto-definition]: Go to definition
+         --> main.py:8:6
+          |
+        8 | test.a
+          |      ^ Clicking here
+        info: Found 2 definitions
+         --> main.py:3:5
+          |
+        3 |     a: str
+          |     -
+        4 |     a: str
+          |     -
+        ");
+    }
+
+    #[test]
+    fn goto_definition_property_getter_and_setter() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+                class Test:
+                    @property
+                    def a(self) -> str:
+                        return ""
+
+                    @a.setter
+                    def a(self, value: str) -> None:
+                        pass
+
+                test = Test()
+
+                test.a<CURSOR>
+                "#,
+            )
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @"
+        info[goto-definition]: Go to definition
+          --> main.py:13:6
+           |
+        13 | test.a
+           |      ^ Clicking here
+        info: Found 2 definitions
+         --> main.py:4:9
+          |
+        4 |     def a(self) -> str:
+          |         -
+          |
+         ::: main.py:8:9
+          |
+        8 |     def a(self, value: str) -> None:
+          |         -
+        ");
+    }
+
+    /// Goto-definition works when accessing type attributes on class objects.
+    #[test]
+    fn goto_definition_for_type_attributes_on_class_objects() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                "
+                class Foo: ...
+
+                Foo.__dictoff<CURSOR>set__
+                ",
+            )
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @"
+        info[goto-definition]: Go to definition
+          --> main.py:LL:5
+           |
+        LL | Foo.__dictoffset__
+           |     ^^^^^^^^^^^^^^ Clicking here
+        info: Found 1 definition
+          --> stdlib/builtins.pyi:LL:9
+           |
+        LL |     def __dictoffset__(self) -> int: ...
+           |         --------------
+        ");
+    }
+
+    /// Goto-definition performs lookups on the metaclass when attributes are not found.
+    #[test]
+    fn goto_definition_performs_lookups_on_metaclass() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                "
+                class Foo(type):
+                    a: int
+
+                class Bar(metaclass=Foo): ...
+                Bar.<CURSOR>a
+                ",
+            )
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @"
+        info[goto-definition]: Go to definition
+         --> main.py:6:5
+          |
+        6 | Bar.a
+          |     ^ Clicking here
+        info: Found 1 definition
+         --> main.py:3:5
+          |
+        3 |     a: int
+          |     -
+        ");
+    }
+
+    /// Goto-definition does not look up instance members on the metaclass.
+    #[test]
+    fn goto_definition_on_members_of_class_instances() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                "
+                class Foo(type):
+                    a: int
+
+                class Bar(metaclass=Foo): ...
+                Bar().<CURSOR>a
+                ",
+            )
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @"No goto target found");
+    }
+
+    /// Check that we don't fall into infinite recursion when e.g.
+    /// looking up attributes on the metaclass of `type`
+    /// (`type` is its own metaclass)
+    #[test]
+    fn goto_definition_on_builtins_dot_type_itself_unresolved() {
+        let test = CursorTest::builder()
+            .source("main.py", "type.<CURSOR>a")
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @"No goto target found");
+    }
+
+    /// Check that we don't fall into infinite recursion when e.g.
+    /// looking up attributes on the metaclass of `type`
+    /// (`type` is its own metaclass)
+    #[test]
+    fn goto_definition_on_builtins_dot_type_itself_resolved() {
+        let test = CursorTest::builder()
+            .source("main.py", "type.__dict<CURSOR>offset__")
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @"
+        info[goto-definition]: Go to definition
+          --> main.py:LL:6
+           |
+        LL | type.__dictoffset__
+           |      ^^^^^^^^^^^^^^ Clicking here
+        info: Found 1 definition
+          --> stdlib/builtins.pyi:LL:9
+           |
+        LL |     def __dictoffset__(self) -> int: ...
+           |         --------------
+        ");
+    }
+
+    /// Go-to-definition should not point to while-loop header definitions.
+    #[test]
+    fn goto_definition_does_not_point_to_while_loop_header() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                "
+while True:
+    variable = 1
+
+    vari<CURSOR>able
+",
+            )
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @"
+        info[goto-definition]: Go to definition
+         --> main.py:5:5
+          |
+        5 |     variable
+          |     ^^^^^^^^ Clicking here
+        info: Found 1 definition
+         --> main.py:3:5
+          |
+        3 |     variable = 1
+          |     --------
+        ");
+    }
+
+    #[test]
+    fn goto_definition_keyword_argument_typeddict() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                "
+from typing import TypedDict
+
+class TD(TypedDict):
+    f: int
+    g: str
+
+TD(f<CURSOR>=1)
+",
+            )
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @"
+        info[goto-definition]: Go to definition
+         --> main.py:8:4
+          |
+        8 | TD(f=1)
+          |    ^ Clicking here
+        info: Found 1 definition
+         --> main.py:5:5
+          |
+        5 |     f: int
+          |     -
+        ");
+    }
+
+    #[test]
+    fn goto_definition_keyword_argument_typeddict_update() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                "
+from typing import TypedDict
+
+class TD(TypedDict):
+    f: int
+    g: str
+
+td = TD(f=1, g=\"\")
+td.update(f<CURSOR>=2)
+",
+            )
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @"
+        info[goto-definition]: Go to definition
+         --> main.py:9:11
+          |
+        9 | td.update(f=2)
+          |           ^ Clicking here
+        info: Found 1 definition
+         --> main.py:5:5
+          |
+        5 |     f: int
+          |     -
+        ");
+    }
+
+    #[test]
+    fn goto_definition_keyword_argument_unpack_typeddict() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                "
+from typing import TypedDict, Unpack
+
+class TD(TypedDict):
+    f: int
+    g: str
+
+def func(**kwargs: Unpack[TD]): ...
+
+func(f<CURSOR>=1)
+",
+            )
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @"
+        info[goto-definition]: Go to definition
+          --> main.py:10:6
+           |
+        10 | func(f=1)
+           |      ^ Clicking here
+        info: Found 1 definition
+         --> main.py:5:5
+          |
+        5 |     f: int
+          |     -
+        ");
+    }
+
+    #[test]
+    fn goto_definition_keyword_argument_namedtuple() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                "
+from typing import NamedTuple
+
+class NT(NamedTuple):
+    f: int
+    g: str
+
+NT(f<CURSOR>=1)
+",
+            )
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @"
+        info[goto-definition]: Go to definition
+         --> main.py:8:4
+          |
+        8 | NT(f=1)
+          |    ^ Clicking here
+        info: Found 1 definition
+         --> main.py:5:5
+          |
+        5 |     f: int
+          |     -
+        ");
+    }
+
+    #[test]
+    fn goto_definition_keyword_argument_dataclass() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                "
+from dataclasses import dataclass
+
+@dataclass
+class DC:
+    f: int
+    g: str
+
+DC(f<CURSOR>=1)
+",
+            )
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @"
+        info[goto-definition]: Go to definition
+         --> main.py:9:4
+          |
+        9 | DC(f=1)
+          |    ^ Clicking here
+        info: Found 1 definition
+         --> main.py:6:5
+          |
+        6 |     f: int
+          |     -
+        ");
+    }
+
+    #[test]
+    fn goto_definition_keyword_argument_dataclass_custom_init() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                "
+from dataclasses import dataclass
+
+@dataclass
+class DC:
+    f: int
+    g: str
+
+    def __init__(self, f: int) -> None: ...
+
+DC(f<CURSOR>=1)
+",
+            )
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @"
+        info[goto-definition]: Go to definition
+          --> main.py:11:4
+           |
+        11 | DC(f=1)
+           |    ^ Clicking here
+        info: Found 1 definition
+         --> main.py:9:24
+          |
+        9 |     def __init__(self, f: int) -> None: ...
+          |                        -
+        ");
+    }
+
+    #[test]
+    fn goto_definition_keyword_argument_dataclass_transform_alias() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                "
+from typing import dataclass_transform
+
+def Field(alias: str = ...): ...
+
+@dataclass_transform(field_specifiers=(Field,))
+class MyDataclass: ...
+
+class DC(MyDataclass):
+    f: int = Field(alias='g')
+
+DC(g<CURSOR>=1)
+",
+            )
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @"
+        info[goto-definition]: Go to definition
+          --> main.py:12:4
+           |
+        12 | DC(g=1)
+           |    ^ Clicking here
+        info: Found 1 definition
+          --> main.py:10:5
+           |
+        10 |     f: int = Field(alias='g')
+           |     -
+        ");
+    }
+
+    /// Go-to-definition should not point to for-loop header definitions.
+    #[test]
+    fn goto_definition_does_not_point_to_for_loop_header() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                "
+for x in range(10):
+    variable = 1
+
+    vari<CURSOR>able
+",
+            )
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @"
+        info[goto-definition]: Go to definition
+         --> main.py:5:5
+          |
+        5 |     variable
+          |     ^^^^^^^^ Clicking here
+        info: Found 1 definition
+         --> main.py:3:5
+          |
+        3 |     variable = 1
+          |     --------
+        ");
+    }
+
+    /// Go-to-definition on `super()` should not lookup on the super class itself
+    #[test]
+    fn goto_definition_does_not_lookup_on_bound_super() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                "
+class Foo:
+    def __init__(self, x: int) -> None:
+        self.x = x
+
+class Bar(Foo):
+    def __init__(self):
+        super().__init<CURSOR>__(x)
+",
+            )
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @"
+        info[goto-definition]: Go to definition
+         --> main.py:8:17
+          |
+        8 |         super().__init__(x)
+          |                 ^^^^^^^^ Clicking here
+        info: Found 1 definition
+         --> main.py:3:9
+          |
+        3 |     def __init__(self, x: int) -> None:
+          |         --------
+        ");
+    }
+
+    /// Go-to-definition should resolve to the parent class
+    #[test]
+    fn goto_definition_resolves_super_for_generic_class() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                "
+class Base:
+    def __init__(self, x: int) -> None:
+        self.x = x
+
+class GenericFoo[T](Base):
+    def __init__(self, x: int, y: T):
+        super().__init<CURSOR>__(x)
+        self.y = y
+",
+            )
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @"
+        info[goto-definition]: Go to definition
+         --> main.py:8:17
+          |
+        8 |         super().__init__(x)
+          |                 ^^^^^^^^ Clicking here
+        info: Found 1 definition
+         --> main.py:3:9
+          |
+        3 |     def __init__(self, x: int) -> None:
+          |         --------
+        ");
+    }
+
     impl CursorTest {
         fn goto_definition(&self) -> String {
-            let Some(targets) = goto_definition(&self.db, self.cursor.file, self.cursor.offset)
-            else {
+            let Some(targets) = salsa::attach(&self.db, || {
+                goto_definition(&self.db, self.cursor.file, self.cursor.offset)
+            }) else {
                 return "No goto target found".to_string();
             };
 
@@ -1620,47 +2657,90 @@ Traceb<CURSOR>ackType
                 return "No definitions found".to_string();
             }
 
-            let source = targets.range;
-            self.render_diagnostics(
-                targets
-                    .into_iter()
-                    .map(|target| GotoDefinitionDiagnostic::new(source, &target)),
-            )
+            self.render_diagnostics([GotoDiagnostic::new(GotoAction::Definition, targets)])
         }
     }
 
-    struct GotoDefinitionDiagnostic {
-        source: FileRange,
-        target: FileRange,
+    pub(crate) struct GotoDiagnostic {
+        action: GotoAction,
+        targets: RangedValue<NavigationTargets>,
     }
 
-    impl GotoDefinitionDiagnostic {
-        fn new(source: FileRange, target: &NavigationTarget) -> Self {
-            Self {
-                source,
-                target: FileRange::new(target.file(), target.focus_range()),
-            }
+    impl GotoDiagnostic {
+        pub(crate) fn new(action: GotoAction, targets: RangedValue<NavigationTargets>) -> Self {
+            Self { action, targets }
         }
     }
 
-    impl IntoDiagnostic for GotoDefinitionDiagnostic {
+    impl IntoDiagnostic for GotoDiagnostic {
         fn into_diagnostic(self) -> Diagnostic {
-            let mut source = SubDiagnostic::new(SubDiagnosticSeverity::Info, "Source");
-            source.annotate(Annotation::primary(
-                Span::from(self.source.file()).with_range(self.source.range()),
-            ));
-
+            let source = self.targets.range;
             let mut main = Diagnostic::new(
-                DiagnosticId::Lint(LintName::of("goto-definition")),
+                DiagnosticId::Lint(LintName::of(self.action.name())),
                 Severity::Info,
-                "Definition".to_string(),
+                self.action.label().to_string(),
             );
-            main.annotate(Annotation::primary(
-                Span::from(self.target.file()).with_range(self.target.range()),
-            ));
-            main.sub(source);
+
+            main.annotate(
+                Annotation::primary(Span::from(source.file()).with_range(source.range()))
+                    .message("Clicking here"),
+            );
+
+            let mut sub = SubDiagnostic::new(
+                SubDiagnosticSeverity::Info,
+                format_args!(
+                    "Found {} {}{}",
+                    self.targets.len(),
+                    self.action.item_label(),
+                    if self.targets.len() == 1 { "" } else { "s" }
+                ),
+            );
+
+            for target in self.targets {
+                sub.annotate(Annotation::secondary(
+                    Span::from(target.file()).with_range(target.focus_range()),
+                ));
+            }
+
+            main.sub(sub);
 
             main
+        }
+    }
+
+    pub(crate) enum GotoAction {
+        Definition,
+        Declaration,
+        TypeDefinition,
+        Implementation,
+    }
+
+    impl GotoAction {
+        fn name(&self) -> &'static str {
+            match self {
+                GotoAction::Definition => "goto-definition",
+                GotoAction::Declaration => "goto-declaration",
+                GotoAction::TypeDefinition => "goto-type definition",
+                GotoAction::Implementation => "goto-implementation",
+            }
+        }
+
+        fn label(&self) -> &'static str {
+            match self {
+                GotoAction::Definition => "Go to definition",
+                GotoAction::Declaration => "Go to declaration",
+                GotoAction::TypeDefinition => "Go to type definition",
+                GotoAction::Implementation => "Go to implementation",
+            }
+        }
+
+        fn item_label(&self) -> &'static str {
+            match self {
+                GotoAction::Definition => "definition",
+                GotoAction::Declaration => "declaration",
+                GotoAction::TypeDefinition => "type definition",
+                GotoAction::Implementation => "implementation",
+            }
         }
     }
 }

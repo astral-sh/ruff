@@ -10,7 +10,7 @@ impl EnvVars {
     ///
     /// For example:
     ///
-    /// - `TY_LOG=uv=debug` is the equivalent of `-vv` to the command line
+    /// - `TY_LOG=ty=debug` is the equivalent of `-vv` to the command line
     /// - `TY_LOG=trace` will enable all trace-level logging.
     ///
     /// See the [tracing documentation](https://docs.rs/tracing-subscriber/latest/tracing_subscriber/filter/struct.EnvFilter.html#example-syntax)
@@ -27,10 +27,17 @@ impl EnvVars {
     /// Accepted values:
     ///
     /// * `short` - Display short memory report
-    /// * `mypy_primer` - Display `mypy_primer` format and suppress workspace diagnostics
     /// * `full` - Display full memory report
+    /// * `json` - Display machine-readable JSON format and suppress workspace diagnostics
     #[attr_hidden]
     pub const TY_MEMORY_REPORT: &'static str = "TY_MEMORY_REPORT";
+
+    /// Perturbs constraint-set variable ordering to help detect order-dependent inference.
+    ///
+    /// Set to `reverse` to reverse builder-local IDs, or to an integer to select an arbitrary
+    /// permutation of the naturally chosen variable ordering.
+    #[attr_hidden]
+    pub const TY_CONSTRAINT_SET_ORDER: &'static str = "TY_CONSTRAINT_SET_ORDER";
 
     /// Specifies an upper limit for the number of tasks ty is allowed to run in parallel.
     ///
@@ -38,6 +45,34 @@ impl EnvVars {
     /// This isn't the same as a thread limit. ty may spawn additional threads
     /// when necessary, e.g. to watch for file system changes or a dedicated UI thread.
     pub const TY_MAX_PARALLELISM: &'static str = "TY_MAX_PARALLELISM";
+
+    /// Path to a `ty.toml` configuration file to use.
+    ///
+    /// When set, ty will use this file for configuration instead of
+    /// discovering configuration files automatically.
+    ///
+    /// Equivalent to the `--config-file` command-line argument.
+    pub const TY_CONFIG_FILE: &'static str = "TY_CONFIG_FILE";
+
+    /// The format to use for printing diagnostic messages.
+    ///
+    /// When set, ty will use this format for output instead of the default.
+    ///
+    /// Accepts the same values as the `--output-format` command-line argument.
+    pub const TY_OUTPUT_FORMAT: &'static str = "TY_OUTPUT_FORMAT";
+
+    /// Enable uv integration.
+    ///
+    /// When set to `"1"` or `"true"`, ty invokes `uv workspace metadata` to discover the workspace
+    /// root.
+    #[attr_hidden]
+    pub const TY_UV: &'static str = "TY_UV";
+
+    /// The path to the uv executable to use for workspace discovery.
+    ///
+    /// ty uses this path when uv integration is enabled by `TY_UV`.
+    #[attr_hidden]
+    pub const UV: &'static str = "UV";
 
     /// Used to detect an activated virtual environment.
     pub const VIRTUAL_ENV: &'static str = "VIRTUAL_ENV";
@@ -57,18 +92,6 @@ impl EnvVars {
 
     /// Used to determine the root install path of Conda.
     pub const CONDA_ROOT: &'static str = "_CONDA_ROOT";
-
-    /// Filter which tests to run in mdtest.
-    ///
-    /// Only tests whose names contain this filter string will be executed.
-    #[attr_hidden]
-    pub const MDTEST_TEST_FILTER: &'static str = "MDTEST_TEST_FILTER";
-
-    /// Switch mdtest output format to GitHub Actions annotations.
-    ///
-    /// If set (to any value), mdtest will output errors in GitHub Actions format.
-    #[attr_hidden]
-    pub const MDTEST_GITHUB_ANNOTATIONS_FORMAT: &'static str = "MDTEST_GITHUB_ANNOTATIONS_FORMAT";
 
     // Externally defined environment variables
 

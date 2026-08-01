@@ -49,6 +49,10 @@ impl Violation for StaticKeyDictComprehension {
 
 /// B035, RUF011
 pub(crate) fn static_key_dict_comprehension(checker: &Checker, dict_comp: &ast::ExprDictComp) {
+    let Some(key) = dict_comp.key.as_deref() else {
+        return;
+    };
+
     // Collect the bound names in the comprehension's generators.
     let names = {
         let mut visitor = StoredNameFinder::default();
@@ -58,12 +62,12 @@ pub(crate) fn static_key_dict_comprehension(checker: &Checker, dict_comp: &ast::
         visitor.names
     };
 
-    if is_constant(&dict_comp.key, &names) {
+    if is_constant(key, &names) {
         checker.report_diagnostic(
             StaticKeyDictComprehension {
-                key: SourceCodeSnippet::from_str(checker.locator().slice(dict_comp.key.as_ref())),
+                key: SourceCodeSnippet::from_str(checker.locator().slice(key)),
             },
-            dict_comp.key.range(),
+            key.range(),
         );
     }
 }

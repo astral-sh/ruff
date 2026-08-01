@@ -3,6 +3,7 @@ use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::visitor::source_order;
 use ruff_python_ast::{self as ast, AnyNodeRef, Expr, Stmt};
 use ruff_python_semantic::Modules;
+use ruff_python_semantic::SemanticModel;
 use ruff_python_semantic::analyze::function_type::is_stub;
 
 use crate::Violation;
@@ -17,7 +18,11 @@ use crate::rules::fastapi::rules::is_fastapi_route;
 /// ## Why is this bad?
 /// Declaring a function `async` when it's not is usually a mistake, and will artificially limit the
 /// contexts where that function may be called. In some cases, labeling a function `async` is
-/// semantically meaningful (e.g. with the trio library).
+/// semantically meaningful. For example, an async test or callback may need to run in an async
+/// execution context, even if it only uses a `ContextVar`.
+///
+/// If the async context is intentional, add an actual await expression, such as
+/// `await asyncio.sleep(0)`, or disable this rule for the function.
 ///
 /// ## Example
 /// ```python
@@ -154,6 +159,20 @@ where
     }
 }
 
+/// Returns `true` if the function is decorated with `contextlib.asynccontextmanager`.
+fn is_async_context_manager(function_def: &ast::StmtFunctionDef, semantic: &SemanticModel) -> bool {
+    function_def.decorator_list.iter().any(|decorator| {
+        semantic
+            .resolve_qualified_name(&decorator.expression)
+            .is_some_and(|qualified_name| {
+                matches!(
+                    qualified_name.segments(),
+                    ["contextlib", "asynccontextmanager"]
+                )
+            })
+    })
+}
+
 /// RUF029
 pub(crate) fn unused_async(
     checker: &Checker,
@@ -180,6 +199,12 @@ pub(crate) fn unused_async(
     if checker.semantic().seen_module(Modules::FASTAPI)
         && is_fastapi_route(function_def, checker.semantic())
     {
+        return;
+    }
+
+    // Ignore functions decorated with `contextlib.asynccontextmanager`, which are
+    // required to be `async` even if they don't use `await`.
+    if is_async_context_manager(function_def, checker.semantic()) {
         return;
     }
 

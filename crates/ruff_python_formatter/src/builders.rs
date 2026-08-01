@@ -1,4 +1,4 @@
-use ruff_formatter::{Argument, Arguments, write};
+use ruff_formatter::{Argument, Arguments, format_args, write};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::context::{NodeLevel, WithNodeLevel};
@@ -33,20 +33,27 @@ impl<'ast> Format<PyFormatContext<'ast>> for ParenthesizeIfExpands<'_, 'ast> {
         {
             let mut f = WithNodeLevel::new(NodeLevel::ParenthesizedExpression, f);
 
-            write!(
-                f,
-                [group(&format_with(|f| {
-                    if_group_breaks(&token("(")).fmt(f)?;
-
-                    if self.indent {
-                        soft_block_indent(&Arguments::from(&self.inner)).fmt(f)?;
-                    } else {
-                        Arguments::from(&self.inner).fmt(f)?;
-                    }
-
-                    if_group_breaks(&token(")")).fmt(f)
-                }))]
-            )
+            if self.indent {
+                let parens_id = f.group_id("indented_parenthesize_if_expands");
+                group(&format_args![
+                    if_group_breaks(&token("(")),
+                    indent_if_group_breaks(
+                        &format_args![soft_line_break(), &Arguments::from(&self.inner)],
+                        parens_id
+                    ),
+                    soft_line_break(),
+                    if_group_breaks(&token(")"))
+                ])
+                .with_id(Some(parens_id))
+                .fmt(&mut f)
+            } else {
+                group(&format_args![
+                    if_group_breaks(&token("(")),
+                    Arguments::from(&self.inner),
+                    if_group_breaks(&token(")")),
+                ])
+                .fmt(&mut f)
+            }
         }
     }
 }

@@ -144,10 +144,6 @@ are likely visible after the loop body, since loops do not introduce new scopes.
 infinite loops are one exception — if control never leaves the loop body, bindings inside of the
 loop are not visible outside of it.)
 
-TODO: We are not currently modeling the cyclic control flow for loops, pending fixpoint support in
-Salsa. The false positives in this section are because of that, and not our terminal statement
-support. See [ruff#14160](https://github.com/astral-sh/ruff/issues/14160) for more details.
-
 ```py
 def resolved_reference(cond: bool) -> str:
     while True:
@@ -168,8 +164,7 @@ def continue_in_then_branch(cond: bool, i: int):
             x = "loop"
             reveal_type(x)  # revealed: Literal["loop"]
         reveal_type(x)  # revealed: Literal["loop"]
-    # TODO: Should be Literal["before", "loop", "continue"]
-    reveal_type(x)  # revealed: Literal["before", "loop"]
+    reveal_type(x)  # revealed: Literal["before", "continue", "loop"]
 
 def continue_in_else_branch(cond: bool, i: int):
     x = "before"
@@ -182,8 +177,7 @@ def continue_in_else_branch(cond: bool, i: int):
             reveal_type(x)  # revealed: Literal["continue"]
             continue
         reveal_type(x)  # revealed: Literal["loop"]
-    # TODO: Should be Literal["before", "loop", "continue"]
-    reveal_type(x)  # revealed: Literal["before", "loop"]
+    reveal_type(x)  # revealed: Literal["before", "loop", "continue"]
 
 def continue_in_both_branches(cond: bool, i: int):
     x = "before"
@@ -196,8 +190,7 @@ def continue_in_both_branches(cond: bool, i: int):
             x = "continue2"
             reveal_type(x)  # revealed: Literal["continue2"]
             continue
-    # TODO: Should be Literal["before", "continue1", "continue2"]
-    reveal_type(x)  # revealed: Literal["before"]
+    reveal_type(x)  # revealed: Literal["before", "continue1", "continue2"]
 
 def continue_in_nested_then_branch(cond1: bool, cond2: bool, i: int):
     x = "before"
@@ -215,8 +208,7 @@ def continue_in_nested_then_branch(cond1: bool, cond2: bool, i: int):
                 reveal_type(x)  # revealed: Literal["loop2"]
             reveal_type(x)  # revealed: Literal["loop2"]
         reveal_type(x)  # revealed: Literal["loop1", "loop2"]
-    # TODO: Should be Literal["before", "loop1", "loop2", "continue"]
-    reveal_type(x)  # revealed: Literal["before", "loop1", "loop2"]
+    reveal_type(x)  # revealed: Literal["before", "loop1", "continue", "loop2"]
 
 def continue_in_nested_else_branch(cond1: bool, cond2: bool, i: int):
     x = "before"
@@ -234,8 +226,7 @@ def continue_in_nested_else_branch(cond1: bool, cond2: bool, i: int):
                 continue
             reveal_type(x)  # revealed: Literal["loop2"]
         reveal_type(x)  # revealed: Literal["loop1", "loop2"]
-    # TODO: Should be Literal["before", "loop1", "loop2", "continue"]
-    reveal_type(x)  # revealed: Literal["before", "loop1", "loop2"]
+    reveal_type(x)  # revealed: Literal["before", "loop1", "loop2", "continue"]
 
 def continue_in_both_nested_branches(cond1: bool, cond2: bool, i: int):
     x = "before"
@@ -253,8 +244,7 @@ def continue_in_both_nested_branches(cond1: bool, cond2: bool, i: int):
                 reveal_type(x)  # revealed: Literal["continue2"]
                 continue
         reveal_type(x)  # revealed: Literal["loop"]
-    # TODO: Should be Literal["before", "loop", "continue1", "continue2"]
-    reveal_type(x)  # revealed: Literal["before", "loop"]
+    reveal_type(x)  # revealed: Literal["before", "loop", "continue1", "continue2"]
 ```
 
 ## `break`
@@ -555,11 +545,128 @@ def raise_in_both_nested_branches(cond1: bool, cond2: bool):
 
 ## Terminal in `try` with `finally` clause
 
-TODO: we don't yet model that a `break` or `continue` in a `try` block will jump to a `finally`
-clause before it jumps to end/start of the loop.
+We model terminal control flow in a `try`, `except`, or `else` block as jumping to a `finally`
+clause before it terminates the current scope or jumps to its final destination when there are no
+normal paths into the `finally` block.
+
+TODO: we don't yet consider both normal and terminal entry states when checking a `finally` block
+that has a mix of normal and terminal entry paths.
 
 ```py
-def f():
+def finally_runs_after_return():
+    x = "before"
+    try:
+        x = "return"
+        return
+    finally:
+        reveal_type(x)  # revealed: Literal["return"]
+
+def finally_runs_after_try_and_except_are_terminal(cond: bool):
+    x = "before"
+    try:
+        if cond:
+            x = "try-return"
+            return
+        else:
+            x = "try-raise"
+            raise ValueError
+    except ValueError:
+        x = "except-return"
+        return
+    finally:
+        reveal_type(x)  # revealed: Literal["try-return", "try-raise", "except-return"]
+
+def finally_runs_after_except_and_else_are_terminal():
+    x = "before"
+    try:
+        x = "try-normal"
+    except ValueError:
+        x = "except-return"
+        return
+    else:
+        x = "else-return"
+        return
+    finally:
+        reveal_type(x)  # revealed: Literal["except-return", "else-return"]
+
+def finally_runs_after_mixed_except_paths(cond: bool):
+    x = "before"
+    try:
+        raise ValueError
+    except ValueError:
+        if cond:
+            x = "except-return"
+            return
+        x = "except-normal"
+    finally:
+        # TODO: should also include `Literal["except-return"]`
+        reveal_type(x)  # revealed: Literal["except-normal"]
+
+def finally_runs_after_mixed_try_paths(cond: bool):
+    x = "before"
+    try:
+        if cond:
+            x = "try-return"
+            return
+        x = "try-normal"
+    finally:
+        # TODO: should also include `Literal["try-return"]`
+        reveal_type(x)  # revealed: Literal["try-normal"]
+
+def finally_runs_after_mixed_break_paths(cond: bool):
+    x = "before"
+    while True:
+        try:
+            if cond:
+                x = "break"
+                break
+            x = "normal"
+        finally:
+            # TODO: should also include `Literal["break"]`
+            reveal_type(x)  # revealed: Literal["normal"]
+        break
+
+def finally_runs_before_break():
+    x = "before"
+    while True:
+        try:
+            x = "break"
+            break
+        finally:
+            reveal_type(x)  # revealed: Literal["break"]
+
+def finally_runs_before_continue(cond: bool):
+    while cond:
+        x = "before"
+        try:
+            x = "continue"
+            continue
+        finally:
+            reveal_type(x)  # revealed: Literal["continue"]
+
+def nested_finally_runs_after_return():
+    x = "before"
+    try:
+        try:
+            x = "return"
+            return
+        finally:
+            reveal_type(x)  # revealed: Literal["return"]
+    finally:
+        reveal_type(x)  # revealed: Literal["return"]
+
+def nested_outer_finally_sees_inner_finally_assignments():
+    x = "before"
+    try:
+        try:
+            x = "return"
+            return
+        finally:
+            x = "inner-finally"
+    finally:
+        reveal_type(x)  # revealed: Literal["inner-finally"]
+
+def finally_assignment_runs_before_break():
     x = 1
     while True:
         try:
@@ -618,9 +725,7 @@ def g(x: int | None):
     if x is None:
         sys.exit(1)
 
-    # TODO: should be just `int`, not `int | None`
-    # See https://github.com/astral-sh/ty/issues/685
-    reveal_type(x)  # revealed: int | None
+    reveal_type(x)  # revealed: int
 ```
 
 ### Possibly unresolved diagnostics
@@ -767,9 +872,36 @@ def _() -> NoReturn:
     f("")
 ```
 
+### Generic functions
+
+If a generic function's return type depends on a type variable, and the argument passed resolves
+that type variable to `Never`, the call should still be treated as terminal.
+
+```py
+from typing import TypeVar, NoReturn
+
+T = TypeVar("T")
+
+def identity(x: T) -> T:
+    return x
+
+# No "implicitly returns `None`" diagnostic
+def _() -> NoReturn:
+    identity(exit())
+
+def _(flag: bool):
+    if flag:
+        x = "test"
+    else:
+        x = "terminal"
+        identity(exit())
+
+    reveal_type(x)  # revealed: Literal["test"]
+```
+
 ### Other callables
 
-If other types of callables are annotated with `NoReturn`, we should still be ablt to infer correct
+If other types of callables are annotated with `NoReturn`, we should still be able to infer correct
 reachability.
 
 ```py
@@ -791,6 +923,28 @@ def _() -> NoReturn:
 # No "implicitly returns `None`" diagnostic
 def _() -> NoReturn:
     C().die()
+```
+
+### Awaiting async `NoReturn` functions
+
+Awaiting an async function annotated as returning `NoReturn` should be treated as terminal, just
+like calling a synchronous `NoReturn` function.
+
+```py
+from typing import NoReturn
+
+async def stop() -> NoReturn:
+    raise NotImplementedError
+
+async def main(flag: bool):
+    if flag:
+        x = "terminal"
+        await stop()
+    else:
+        x = "test"
+        pass
+
+    reveal_type(x)  # revealed: Literal["test"]
 ```
 
 ## Nested functions

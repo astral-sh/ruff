@@ -7,8 +7,8 @@ if sys.version_info >= (3, 11):
     from contextlib import AbstractContextManager
     from importlib.resources.abc import ResourceReader, Traversable
     from pathlib import Path
-    from typing import Literal, overload
-    from typing_extensions import TypeAlias, deprecated
+    from typing import Literal, TypeAlias, overload
+    from typing_extensions import deprecated
 
     Package: TypeAlias = str | types.ModuleType
 
@@ -35,7 +35,6 @@ if sys.version_info >= (3, 11):
             """
             Get a Traversable resource for an anchor.
             """
-
         @overload
         @deprecated("Deprecated since Python 3.12; will be removed in Python 3.15. Use `anchor` parameter instead.")
         def files(package: Anchor | None = None) -> Traversable: ...
@@ -50,6 +49,7 @@ if sys.version_info >= (3, 11):
         """
         Return the package's loader if it's a ResourceReader.
         """
+
     if sys.version_info >= (3, 12):
         def resolve(cand: Anchor | None) -> types.ModuleType: ...
 

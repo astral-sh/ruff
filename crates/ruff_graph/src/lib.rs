@@ -30,6 +30,7 @@ impl ModuleImports {
         path: &SystemPath,
         package: Option<&SystemPath>,
         string_imports: StringImports,
+        type_checking_imports: bool,
     ) -> Result<Self> {
         // Parse the source code.
         let parsed = parse(source, ParseOptions::from(source_type))?;
@@ -38,13 +39,17 @@ impl ModuleImports {
             package.and_then(|package| to_module_path(package.as_std_path(), path.as_std_path()));
 
         // Collect the imports.
-        let imports =
-            Collector::new(module_path.as_deref(), string_imports).collect(parsed.syntax());
+        let imports = Collector::new(
+            module_path.as_deref(),
+            string_imports,
+            type_checking_imports,
+        )
+        .collect(parsed.syntax());
 
         // Resolve the imports.
         let mut resolved_imports = ModuleImports::default();
         for import in imports {
-            for resolved in Resolver::new(db).resolve(import) {
+            for resolved in Resolver::new(db, path).resolve(import) {
                 if let Some(path) = resolved.as_system_path() {
                     resolved_imports.insert(path.to_path_buf());
                 }

@@ -305,3 +305,24 @@ def f():
         result = []
         for NL_INDEX in range(3):
             result.append(NL_INDEX)
+
+def f():
+    # comment duplication in if test (https://github.com/astral-sh/ruff/issues/18787)
+    original = list(range(10000))
+    filtered = []
+    for i in original:
+        if (
+            i
+            # comment
+        ):
+            filtered.append(i)
+
+def f():
+    # comment duplication in target (https://github.com/astral-sh/ruff/issues/18787)
+    original = list(range(10000))
+    filtered = []
+    for (
+        i  # comment
+    ) in original:
+        if i > 0:
+            filtered.append(i)

@@ -4,7 +4,7 @@ use ruff_text_size::{Ranged, TextRange};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::{is_const_false, is_const_true};
 use ruff_python_ast::name::Name;
-use ruff_python_ast::parenthesize::parenthesized_range;
+use ruff_python_ast::token::parenthesized_range;
 
 use crate::checkers::ast::Checker;
 use crate::{AlwaysFixableViolation, Edit, Fix, FixAvailability, Violation};
@@ -171,13 +171,8 @@ pub(crate) fn if_expr_with_true_false(
             checker
                 .locator()
                 .slice(
-                    parenthesized_range(
-                        test.into(),
-                        expr.into(),
-                        checker.comment_ranges(),
-                        checker.locator().contents(),
-                    )
-                    .unwrap_or(test.range()),
+                    parenthesized_range(test.into(), expr.into(), checker.tokens())
+                        .unwrap_or(test.range()),
                 )
                 .to_string(),
             expr.range(),
@@ -197,7 +192,7 @@ pub(crate) fn if_expr_with_true_false(
                     ),
                     arguments: Arguments {
                         args: Box::from([test.clone()]),
-                        keywords: Box::from([]),
+                        keywords: std::iter::empty().collect(),
                         range: TextRange::default(),
                         node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                     },

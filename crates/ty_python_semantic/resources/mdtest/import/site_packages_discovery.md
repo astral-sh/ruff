@@ -8,7 +8,7 @@ our purposes, so we try to parse it when possible. However, the key is not read 
 standard library, and is provided under different keys depending on which virtual-environment
 creation tool created the `pyvenv.cfg` file (the stdlib `venv` module calls the key `version`,
 whereas uv and virtualenv both call it `version_info`). We therefore do not return an error when
-discovering a virtual environment's `site-packages` directory if the virtula environment contains a
+discovering a virtual environment's `site-packages` directory if the virtual environment contains a
 `pyvenv.cfg` file which doesn't have this key, or if the associated value of the key doesn't parse
 according to our expectations. The file isn't really *invalid* in this situation.
 
@@ -22,10 +22,10 @@ python = "/.venv"
 `/.venv/pyvenv.cfg`:
 
 ```cfg
-home = /doo/doo/wop/cpython-3.13.2-macos-aarch64-none/bin
+home = /do/re/mi//cpython-3.13.2-macos-aarch64-none/bin
 ```
 
-`/doo/doo/wop/cpython-3.13.2-macos-aarch64-none/bin/python`:
+`/do/re/mi//cpython-3.13.2-macos-aarch64-none/bin/python`:
 
 ```text
 ```
@@ -54,11 +54,11 @@ python = "/.venv"
 `/.venv/pyvenv.cfg`:
 
 ```cfg
-home = /doo/doo/wop/cpython-3.13.2-macos-aarch64-none/bin
+home = /do/re/mi//cpython-3.13.2-macos-aarch64-none/bin
 version = wut
 ```
 
-`/doo/doo/wop/cpython-3.13.2-macos-aarch64-none/bin/python`:
+`/do/re/mi//cpython-3.13.2-macos-aarch64-none/bin/python`:
 
 ```text
 ```
@@ -87,11 +87,11 @@ python = "/.venv"
 `/.venv/pyvenv.cfg`:
 
 ```cfg
-home = /doo/doo/wop/cpython-3.13.2-macos-aarch64-none/bin
+home = /do/re/mi//cpython-3.13.2-macos-aarch64-none/bin
 version_info = no-really-wut
 ```
 
-`/doo/doo/wop/cpython-3.13.2-macos-aarch64-none/bin/python`:
+`/do/re/mi//cpython-3.13.2-macos-aarch64-none/bin/python`:
 
 ```text
 ```
@@ -127,12 +127,13 @@ environment) if we detect that an ephemeral uv environment has been activated.
 ```toml
 [environment]
 python = "/.venv"
+python-version = "3.13"
 ```
 
 `/.venv/pyvenv.cfg`:
 
 ```cfg
-home = /doo/doo/wop/cpython-3.13.2-macos-aarch64-none/bin
+home = /do/re/mi//cpython-3.13.2-macos-aarch64-none/bin
 implementation = CPython
 uv = 0.7.6
 version_info = 3.13.2
@@ -141,7 +142,7 @@ prompt = ruff
 extends-environment = /.other-environment
 ```
 
-`/doo/doo/wop/cpython-3.13.2-macos-aarch64-none/bin/python`:
+`/do/re/mi//cpython-3.13.2-macos-aarch64-none/bin/python`:
 
 ```text
 ```
@@ -177,17 +178,18 @@ includes `=` characters. The following is a regression test for
 ```toml
 [environment]
 python = "/.venv"
+python-version = "3.13"
 ```
 
 `/.venv/pyvenv.cfg`:
 
 ```cfg
-home = /doo/doo/wop/cpython-3.13.2-macos-aarch64-none/bin
+home = /do/re/mi//cpython-3.13.2-macos-aarch64-none/bin
 version_info = 3.13
 command = /.pyenv/versions/3.13.3/bin/python3.13 -m venv --without-pip --prompt="python-default/3.13.3" /somewhere-else/python/virtualenvs/python-default/3.13.3
 ```
 
-`/doo/doo/wop/cpython-3.13.2-macos-aarch64-none/bin/python`:
+`/do/re/mi//cpython-3.13.2-macos-aarch64-none/bin/python`:
 
 ```text
 ```

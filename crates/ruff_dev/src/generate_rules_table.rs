@@ -26,7 +26,7 @@ const SYMBOL_STYLE: &str = "style='width: 1em; display: inline-block;'";
 const SYMBOLS_CONTAINER: &str = "style='display: flex; gap: 0.5rem; justify-content: end;'";
 
 fn generate_table(table_out: &mut String, rules: impl IntoIterator<Item = Rule>, linter: &Linter) {
-    table_out.push_str("| Code | Name | Message |    |");
+    table_out.push_str("| Code { scope='col' } | Name { scope='col' } | Message { scope='col' } | Fix/Status { scope='col' .sr-only } |");
     table_out.push('\n');
     table_out.push_str("| ---- | ---- | ------- | -: |");
     table_out.push('\n');
@@ -34,27 +34,31 @@ fn generate_table(table_out: &mut String, rules: impl IntoIterator<Item = Rule>,
         let status_token = match rule.group() {
             RuleGroup::Removed { since } => {
                 format!(
-                    "<span {SYMBOL_STYLE} title='Rule was removed in {since}'>{REMOVED_SYMBOL}</span>"
+                    "<span aria-hidden='true' {SYMBOL_STYLE} title='Rule was removed in {since}'>{REMOVED_SYMBOL}</span><span class='sr-only'>Rule was removed in {since}</span>"
                 )
             }
             RuleGroup::Deprecated { since } => {
                 format!(
-                    "<span {SYMBOL_STYLE} title='Rule has been deprecated since {since}'>{WARNING_SYMBOL}</span>"
+                    "<span aria-hidden='true' {SYMBOL_STYLE} title='Rule has been deprecated since {since}'>{WARNING_SYMBOL}</span><span class='sr-only'>Rule has been deprecated since {since}</span>"
                 )
             }
             RuleGroup::Preview { since } => {
                 format!(
-                    "<span {SYMBOL_STYLE} title='Rule has been in preview since {since}'>{PREVIEW_SYMBOL}</span>"
+                    "<span aria-hidden='true' {SYMBOL_STYLE} title='Rule has been in preview since {since}'>{PREVIEW_SYMBOL}</span><span class='sr-only'>Rule has been in preview since {since}</span>"
                 )
             }
             RuleGroup::Stable { since } => {
-                format!("<span {SYMBOL_STYLE} title='Rule has been stable since {since}'></span>")
+                format!(
+                    "<span aria-hidden='true' {SYMBOL_STYLE} title='Rule has been stable since {since}'></span><span class='sr-only'>Rule has been stable since {since}</span>"
+                )
             }
         };
 
         let fix_token = match rule.fixable() {
             FixAvailability::Always | FixAvailability::Sometimes => {
-                format!("<span {SYMBOL_STYLE} title='Automatic fix available'>{FIX_SYMBOL}</span>")
+                format!(
+                    "<span aria-hidden='true' {SYMBOL_STYLE} title='Automatic fix available'>{FIX_SYMBOL}</span><span class='sr-only'>Automatic fix available</span>"
+                )
             }
             FixAvailability::None => format!("<span {SYMBOL_STYLE}></span>"),
         };
@@ -171,12 +175,14 @@ pub(crate) fn generate() -> String {
             table_out.push('\n');
         }
 
-        if Options::metadata().has(&format!("lint.{}", linter.name())) {
+        // The linter names for Ruff and NumPy are suffixed with "-specific rules."
+        let linter_name = linter.name().trim_end_matches("-specific rules");
+        // Several linter names are capitalized, but their settings are not.
+        let linter_name_lower = linter_name.to_lowercase();
+        if Options::metadata().has(&format!("lint.{linter_name_lower}")) {
             let _ = write!(
                 table_out,
-                "For related settings, see [{}](settings.md#lint{}).",
-                linter.name(),
-                linter.name(),
+                "For related settings, see [{linter_name}](settings.md#lint{linter_name_lower}).",
             );
             table_out.push('\n');
             table_out.push('\n');

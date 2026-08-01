@@ -23,7 +23,6 @@ else:
     @overload
     def split(s: str | _ShlexInstream, comments: bool = False, posix: bool = True) -> list[str]:
         """Split the string *s* using shell-like syntax."""
-
     @overload
     @deprecated("Passing None for 's' to shlex.split() is deprecated and will raise an error in Python 3.12.")
     def split(s: None, comments: bool = False, posix: bool = True) -> list[str]: ...

@@ -1,12 +1,13 @@
 use std::fmt;
 
-use ruff_python_ast::helpers::map_callable;
+use ruff_python_ast::helpers::{is_const_true, map_callable};
 use ruff_python_ast::{self as ast, Decorator, Expr, ExprCall, Keyword, Stmt, StmtFunctionDef};
 use ruff_python_semantic::analyze::visibility;
 use ruff_python_semantic::{ScopeKind, SemanticModel};
 use ruff_python_trivia::PythonWhitespace;
 
 use crate::checkers::ast::Checker;
+use crate::preview::is_pytest_asyncio_enabled;
 
 pub(super) fn get_mark_decorators<'a>(
     decorators: &'a [Decorator],
@@ -28,10 +29,18 @@ pub(super) fn is_pytest_fail(call: &Expr, semantic: &SemanticModel) -> bool {
         .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["pytest", "fail"]))
 }
 
-pub(super) fn is_pytest_fixture(decorator: &Decorator, semantic: &SemanticModel) -> bool {
-    semantic
+pub(crate) fn is_pytest_fixture(decorator: &Decorator, checker: &Checker) -> bool {
+    checker
+        .semantic()
         .resolve_qualified_name(map_callable(&decorator.expression))
-        .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["pytest", "fixture"]))
+        .is_some_and(|qualified_name| {
+            matches!(qualified_name.segments(), ["pytest", "fixture"])
+                || matches!(
+                    qualified_name.segments(),
+                    ["pytest_asyncio", "fixture"]
+                        if is_pytest_asyncio_enabled(checker.settings())
+                )
+        })
 }
 
 pub(super) fn is_pytest_yield_fixture(decorator: &Decorator, semantic: &SemanticModel) -> bool {
@@ -48,6 +57,33 @@ pub(super) fn is_pytest_parametrize(call: &ExprCall, semantic: &SemanticModel) -
         .is_some_and(|qualified_name| {
             matches!(qualified_name.segments(), ["pytest", "mark", "parametrize"])
         })
+}
+
+/// Returns `true` if the decorator is `@pytest.hookimpl(wrapper=True)` or
+/// `@pytest.hookimpl(hookwrapper=True)`.
+///
+/// These hook wrappers intentionally use `return` in generator functions as part of the
+/// pytest hook wrapper protocol.
+///
+/// See: <https://docs.pytest.org/en/stable/how-to/writing_hook_functions.html#hook-wrappers-executing-around-other-hooks>
+pub(crate) fn is_pytest_hookimpl_wrapper(decorator: &Decorator, semantic: &SemanticModel) -> bool {
+    let Expr::Call(call) = &decorator.expression else {
+        return false;
+    };
+
+    // Check if it's pytest.hookimpl
+    let is_hookimpl = semantic
+        .resolve_qualified_name(&call.func)
+        .is_some_and(|name| matches!(name.segments(), ["pytest", "hookimpl"]));
+
+    if !is_hookimpl {
+        return false;
+    }
+
+    let wrapper = call.arguments.find_argument_value("wrapper", 6);
+    let hookwrapper = call.arguments.find_argument_value("hookwrapper", 1);
+
+    wrapper.or(hookwrapper).is_some_and(is_const_true)
 }
 
 /// Whether the currently checked `func` is likely to be a Pytest test.

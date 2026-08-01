@@ -47,6 +47,7 @@ def foo(
     z: tuple[type[BaseException], ...],
     zz: tuple[type[TypeError | RuntimeError], ...],
     zzz: type[BaseException] | tuple[type[BaseException], ...],
+    v: type[ValueError] | tuple[type[ValueError], ...],
 ):
     try:
         help()
@@ -60,6 +61,41 @@ def foo(
         reveal_type(h)  # revealed: TypeError | RuntimeError
     except zzz as i:
         reveal_type(i)  # revealed: BaseException
+    except v as j:
+        reveal_type(j)  # revealed: ValueError
+```
+
+## Exception-class expressions
+
+Exception-class expressions can produce intersections, gradual refinements, or unions. Positive
+class-object constraints project into the caught instance type; unmappable positive constraints and
+exact-class negatives do not exclude valid subclass instances.
+
+```py
+from typing import Any
+from ty_extensions import Intersection
+
+class FirstError(Exception): ...
+class SecondError(Exception): ...
+
+def catch_intersection(exc: Intersection[type[FirstError], type[SecondError]]) -> None:
+    try:
+        help()
+    except exc as caught:
+        reveal_type(caught)  # revealed: FirstError & SecondError
+
+def catch_proper_subclass(exc: Any) -> None:
+    if exc != ValueError and issubclass(exc, ValueError):
+        reveal_type(exc)  # revealed: Any & type[ValueError] & ~<class 'ValueError'>
+        try:
+            help()
+        except exc as caught:
+            reveal_type(caught)  # revealed: Any & ValueError
+
+try:
+    help()
+except ZeroDivisionError and ValueError as caught:
+    reveal_type(caught)  # revealed: ZeroDivisionError | ValueError
 ```
 
 We do not emit an `invalid-exception-caught` if a class is caught that has `Any` or `Unknown` in its
@@ -71,9 +107,9 @@ from compat import BASE_EXCEPTION_CLASS  # error: [unresolved-import] "Cannot re
 class Error(BASE_EXCEPTION_CLASS): ...
 
 try:
-    ...
+    pass
 except Error as err:
-    ...
+    pass
 ```
 
 ## Exception with no captured type
@@ -93,7 +129,9 @@ python-version = "3.12"
 ```
 
 ```py
-from typing import Callable
+from typing import Callable, TypeVar
+
+E = TypeVar("E", bound=Exception)
 
 def silence[T: type[BaseException]](
     func: Callable[[], None],
@@ -104,29 +142,43 @@ def silence[T: type[BaseException]](
     except exception_type as e:
         reveal_type(e)  # revealed: T'instance@silence
 
-def silence2[T: (
-    type[ValueError],
-    type[TypeError],
-)](func: Callable[[], None], exception_type: T,):
+def silence2[T: (type[ValueError], type[TypeError])](func: Callable[[], None], exception_type: T):
     try:
         func()
     except exception_type as e:
         reveal_type(e)  # revealed: T'instance@silence2
+
+def silence3(func: Callable[[], None], exception_types: type[E] | tuple[type[E], ...]):
+    try:
+        func()
+    except exception_types as e:
+        reveal_type(e)  # revealed: E@silence3
+
+def silence4[T: type[BaseException] | tuple[type[BaseException], ...]](
+    func: Callable[[], None],
+    exception_types: T,
+):
+    try:
+        func()
+    except exception_types as e:
+        # TODO: Should reveal something more like `T'instance@silence4`.
+        reveal_type(e)  # revealed: BaseException
 ```
 
 ## Invalid exception handlers
 
+<!-- snapshot-diagnostics -->
+
 ```py
 try:
     pass
-# error: [invalid-exception-caught] "Cannot catch object of type `Literal[3]` in an exception handler (must be a `BaseException` subclass or a tuple of `BaseException` subclasses)"
+# error: [invalid-exception-caught]
 except 3 as e:
     reveal_type(e)  # revealed: Unknown
 
 try:
     pass
-# error: [invalid-exception-caught] "Cannot catch object of type `Literal["foo"]` in an exception handler (must be a `BaseException` subclass or a tuple of `BaseException` subclasses)"
-# error: [invalid-exception-caught] "Cannot catch object of type `Literal[b"bar"]` in an exception handler (must be a `BaseException` subclass or a tuple of `BaseException` subclasses)"
+# error: [invalid-exception-caught]
 except (ValueError, OSError, "foo", b"bar") as e:
     reveal_type(e)  # revealed: ValueError | OSError | Unknown
 
@@ -160,22 +212,22 @@ except int:
 try:
     raise AttributeError()  # fine
 except:
-    ...
+    pass
 
 try:
     raise FloatingPointError  # fine
 except:
-    ...
+    pass
 
 try:
     raise 1  # error: [invalid-raise]
 except:
-    ...
+    pass
 
 try:
     raise int  # error: [invalid-raise]
 except:
-    ...
+    pass
 
 def _(e: Exception | type[Exception]):
     raise e  # fine
@@ -191,31 +243,31 @@ def _():
     try:
         raise EOFError() from GeneratorExit  # fine
     except:
-        ...
+        pass
 
 def _():
     try:
         raise StopIteration from MemoryError()  # fine
     except:
-        ...
+        pass
 
 def _():
     try:
         raise BufferError() from None  # fine
     except:
-        ...
+        pass
 
 def _():
     try:
         raise ZeroDivisionError from False  # error: [invalid-raise]
     except:
-        ...
+        pass
 
 def _():
     try:
         raise SystemExit from bool()  # error: [invalid-raise]
     except:
-        ...
+        pass
 
 def _():
     try:
@@ -277,4 +329,21 @@ def f(x: type[Exception]):
         pass
     # error: [possibly-unresolved-reference]
     reveal_type(e)  # revealed: None
+```
+
+## Special-cased diagnostics for `NotImplemented`
+
+<!-- snapshot-diagnostics -->
+
+```py
+try:
+    # error: [invalid-raise]
+    # error: [invalid-raise]
+    raise NotImplemented from NotImplemented
+# error: [invalid-exception-caught]
+except NotImplemented:
+    pass
+# error: [invalid-exception-caught]
+except (TypeError, NotImplemented):
+    pass
 ```

@@ -1,5 +1,5 @@
 from abc import abstractmethod
-from typing import overload, cast
+from typing import overload, cast, TypeVar
 from typing_extensions import override
 
 
@@ -256,3 +256,15 @@ class C:
         """Docstring."""
         msg = t"{x}..."
         raise NotImplementedError(msg)
+    
+
+###
+# Unused arguments with `**kwargs`.
+###
+
+def f(
+    default: object = None,  # noqa: ARG001
+    **kwargs: object,
+) -> None:
+    TypeVar(**kwargs)
+

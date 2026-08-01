@@ -6,8 +6,8 @@ import unittest.result
 import unittest.suite
 from _typeshed import SupportsFlush, SupportsWrite
 from collections.abc import Callable, Iterable
-from typing import Any, Generic, Protocol, TypeVar, type_check_only
-from typing_extensions import Never, TypeAlias
+from typing import Any, Generic, Protocol, TypeAlias, TypeVar, type_check_only
+from typing_extensions import Never
 from warnings import _ActionKind
 
 _ResultClassType: TypeAlias = Callable[[_TextTestStream, bool, int], TextTestResult[Any]]
@@ -32,6 +32,8 @@ class _WritelnDecorator:
     # These attributes are prevented by __getattr__
     stream: Never
     __getstate__: Never
+    """Helper for pickle."""
+
     # Methods proxied from the wrapped stream object via __getattr__
     def flush(self) -> object: ...
     def write(self, s: str, /) -> object: ...
@@ -56,6 +58,7 @@ class TextTestResult(unittest.result.TestResult, Generic[_StreamT]):
             """Construct a TextTestResult. Subclasses should accept **kwargs
             to ensure compatibility as the interface changes.
             """
+
     else:
         def __init__(self, stream: _StreamT, descriptions: bool, verbosity: int) -> None: ...
 
@@ -70,6 +73,11 @@ class TextTestRunner:
     """
 
     resultclass: _ResultClassType
+    """A test result class that can print formatted text results to a stream.
+
+    Used by TextTestRunner.
+    """
+
     stream: _WritelnDecorator
     descriptions: bool
     verbosity: int
@@ -98,6 +106,7 @@ class TextTestRunner:
             Subclasses should accept **kwargs to ensure compatibility as the
             interface changes.
             """
+
     else:
         def __init__(
             self,

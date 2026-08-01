@@ -12,7 +12,7 @@ use crate::{checkers::ast::Checker, settings::LinterSettings};
 /// Checks for non-literal strings being passed to [`markupsafe.Markup`][markupsafe-markup].
 ///
 /// ## Why is this bad?
-/// [`markupsafe.Markup`] does not perform any escaping, so passing dynamic
+/// [`markupsafe.Markup`][markupsafe-markup] does not perform any escaping, so passing dynamic
 /// content, like f-strings, variables or interpolated strings will potentially
 /// lead to XSS vulnerabilities.
 ///

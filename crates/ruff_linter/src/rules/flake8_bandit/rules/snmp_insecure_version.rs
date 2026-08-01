@@ -49,7 +49,7 @@ pub(crate) fn snmp_insecure_version(checker: &Checker, call: &ast::ExprCall) {
         .is_some_and(|qualified_name| {
             matches!(
                 qualified_name.segments(),
-                ["pysnmp", "hlapi", "CommunityData"]
+                ["pysnmp", "hlapi", .., "CommunityData"]
             )
         })
     {

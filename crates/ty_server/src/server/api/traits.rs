@@ -38,15 +38,13 @@ use crate::session::{DocumentSnapshot, Session, SessionSnapshot};
 use lsp_server::RequestId;
 use std::borrow::Cow;
 
-use lsp_types::Url;
-use lsp_types::notification::Notification;
-use lsp_types::request::Request;
+use lsp_types::{LspNotificationMethod, LspRequestMethod, Notification, Request, Uri};
 use ty_project::ProjectDatabase;
 
 /// A supertrait for any server request handler.
 pub(super) trait RequestHandler {
     type RequestType: Request;
-    const METHOD: &'static str = <<Self as RequestHandler>::RequestType>::METHOD;
+    const METHOD: LspRequestMethod<'static> = <<Self as RequestHandler>::RequestType>::METHOD;
 }
 
 /// A request handler that needs mutable access to the session.
@@ -86,10 +84,10 @@ pub(super) trait RetriableRequestHandler: RequestHandler {
 ///
 /// This handler is specific to requests that operate on a single document.
 pub(super) trait BackgroundDocumentRequestHandler: RetriableRequestHandler {
-    /// Returns the URL of the document that this request handler operates on.
-    fn document_url(
+    /// Returns the URI of the document that this request handler operates on.
+    fn document_uri(
         params: &<<Self as RequestHandler>::RequestType as Request>::Params,
-    ) -> Cow<'_, Url>;
+    ) -> Cow<'_, Uri>;
 
     /// Processes the request parameters and returns the LSP request result.
     ///
@@ -116,7 +114,10 @@ pub(super) trait BackgroundDocumentRequestHandler: RetriableRequestHandler {
 
         if let Err(err) = &result {
             tracing::error!("An error occurred with request ID {id}: {err}");
-            client.show_error_message("ty encountered a problem. Check the logs for more details.");
+            client.show_error_message(format!(
+                "ty encountered a problem. {}",
+                snapshot.client_name().log_guidance()
+            ));
         }
 
         client.respond(id, result);
@@ -153,7 +154,10 @@ pub(super) trait BackgroundRequestHandler: RetriableRequestHandler {
 
         if let Err(err) = &result {
             tracing::error!("An error occurred with request ID {id}: {err}");
-            client.show_error_message("ty encountered a problem. Check the logs for more details.");
+            client.show_error_message(format!(
+                "ty encountered a problem. {}",
+                snapshot.client_name().log_guidance()
+            ));
         }
 
         client.respond(id, result);
@@ -163,7 +167,8 @@ pub(super) trait BackgroundRequestHandler: RetriableRequestHandler {
 /// A supertrait for any server notification handler.
 pub(super) trait NotificationHandler {
     type NotificationType: Notification;
-    const METHOD: &'static str = <<Self as NotificationHandler>::NotificationType>::METHOD;
+    const METHOD: LspNotificationMethod<'static> =
+        <<Self as NotificationHandler>::NotificationType>::METHOD;
 }
 
 /// A notification handler that needs mutable access to the session.
@@ -181,10 +186,10 @@ pub(super) trait SyncNotificationHandler: NotificationHandler {
 
 /// A notification handler that can be run on a background thread.
 pub(super) trait BackgroundDocumentNotificationHandler: NotificationHandler {
-    /// Returns the URL of the document that this notification handler operates on.
-    fn document_url(
+    /// Returns the URI of the document that this notification handler operates on.
+    fn document_uri(
         params: &<<Self as NotificationHandler>::NotificationType as Notification>::Params,
-    ) -> Cow<'_, Url>;
+    ) -> Cow<'_, Uri>;
 
     fn run_with_snapshot(
         snapshot: DocumentSnapshot,

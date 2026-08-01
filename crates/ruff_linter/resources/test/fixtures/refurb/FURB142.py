@@ -99,3 +99,11 @@ for x in lambda: 0:
 
 for x in (1,) if True else (2,):
     s.add(x)
+
+# https://github.com/astral-sh/ruff/issues/21098
+for x in ("abc", "def"):
+    s.add(c for c in x)
+
+# don't add extra parens for already parenthesized generators
+for x in ("abc", "def"):
+    s.add((c for c in x))

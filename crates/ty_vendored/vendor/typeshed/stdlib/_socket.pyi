@@ -7,8 +7,8 @@ import sys
 from _typeshed import ReadableBuffer, WriteableBuffer
 from collections.abc import Iterable
 from socket import error as error, gaierror as gaierror, herror as herror, timeout as timeout
-from typing import Any, Final, SupportsIndex, overload
-from typing_extensions import CapsuleType, TypeAlias, disjoint_base
+from typing import Any, Final, SupportsIndex, TypeAlias, overload
+from typing_extensions import CapsuleType, disjoint_base
 
 _CMSG: TypeAlias = tuple[int, int, bytes]
 _CMSGArg: TypeAlias = tuple[int, int, ReadableBuffer]
@@ -16,7 +16,11 @@ _CMSGArg: TypeAlias = tuple[int, int, ReadableBuffer]
 # Addresses can be either tuples of varying lengths (AF_INET, AF_INET6,
 # AF_NETLINK, AF_TIPC) or strings/buffers (AF_UNIX).
 # See getsockaddrarg() in socketmodule.c.
-_Address: TypeAlias = tuple[Any, ...] | str | ReadableBuffer
+if sys.version_info >= (3, 14):
+    # A bare int is accepted for Bluetooth HCI device IDs.
+    _Address: TypeAlias = tuple[Any, ...] | str | ReadableBuffer | int
+else:
+    _Address: TypeAlias = tuple[Any, ...] | str | ReadableBuffer
 _RetAddress: TypeAlias = Any
 
 # ===== Constants =====
@@ -200,7 +204,7 @@ if sys.platform != "win32" and sys.platform != "darwin" and sys.platform != "lin
 if sys.platform == "linux":
     # Availability: Linux >= 2.6.20, FreeBSD >= 10.1
     IPPROTO_UDPLITE: Final[int]
-if sys.version_info >= (3, 10) and sys.platform == "linux":
+if sys.platform == "linux":
     IPPROTO_MPTCP: Final[int]
 
 IPPORT_RESERVED: Final[int]
@@ -223,8 +227,7 @@ IP_MULTICAST_TTL: Final[int]
 IP_OPTIONS: Final[int]
 if sys.platform != "linux":
     IP_RECVDSTADDR: Final[int]
-if sys.version_info >= (3, 10):
-    IP_RECVTOS: Final[int]
+IP_RECVTOS: Final[int]
 IP_TOS: Final[int]
 IP_TTL: Final[int]
 if sys.platform != "win32":
@@ -236,6 +239,9 @@ if sys.platform != "win32":
     IP_RETOPTS: Final[int]
 if sys.version_info >= (3, 13) and sys.platform == "linux":
     CAN_RAW_ERR_FILTER: Final[int]
+if sys.version_info >= (3, 15):
+    if sys.platform == "win32" or sys.platform == "linux":
+        IPV6_HDRINCL: Final[int]
 if sys.version_info >= (3, 14):
     IP_RECVTTL: Final[int]
 
@@ -253,8 +259,75 @@ if sys.version_info >= (3, 14):
         TCP_QUICKACK: Final[int]
 
     if sys.platform == "linux":
+        BDADDR_BREDR: Final[int]
+        BDADDR_LE_PUBLIC: Final[int]
+        BDADDR_LE_RANDOM: Final[int]
+        BT_CHANNEL_POLICY: Final[int]
+        BT_CHANNEL_POLICY_BREDR_ONLY: Final[int]
+        BT_CHANNEL_POLICY_BREDR_PREFERRED: Final[int]
+        BT_CODEC: Final[int]
+        BT_DEFER_SETUP: Final[int]
+        BT_FLUSHABLE: Final[int]
+        BT_FLUSHABLE_OFF: Final[int]
+        BT_FLUSHABLE_ON: Final[int]
+        BT_ISO_QOS: Final[int]
+        BT_MODE: Final[int]
+        BT_MODE_BASIC: Final[int]
+        BT_MODE_ERTM: Final[int]
+        BT_MODE_EXT_FLOWCTL: Final[int]
+        BT_MODE_LE_FLOWCTL: Final[int]
+        BT_MODE_STREAMING: Final[int]
+        BT_PHY: Final[int]
+        BT_PHY_BR_1M_1SLOT: Final[int]
+        BT_PHY_BR_1M_3SLOT: Final[int]
+        BT_PHY_BR_1M_5SLOT: Final[int]
+        BT_PHY_EDR_2M_1SLOT: Final[int]
+        BT_PHY_EDR_2M_3SLOT: Final[int]
+        BT_PHY_EDR_2M_5SLOT: Final[int]
+        BT_PHY_EDR_3M_1SLOT: Final[int]
+        BT_PHY_EDR_3M_3SLOT: Final[int]
+        BT_PHY_EDR_3M_5SLOT: Final[int]
+        BT_PHY_LE_1M_RX: Final[int]
+        BT_PHY_LE_1M_TX: Final[int]
+        BT_PHY_LE_2M_RX: Final[int]
+        BT_PHY_LE_2M_TX: Final[int]
+        BT_PHY_LE_CODED_RX: Final[int]
+        BT_PHY_LE_CODED_TX: Final[int]
+        BT_PKT_STATUS: Final[int]
+        BT_POWER: Final[int]
+        BT_POWER_FORCE_ACTIVE_OFF: Final[int]
+        BT_POWER_FORCE_ACTIVE_ON: Final[int]
+        BT_RCVMTU: Final[int]
+        BT_SECURITY: Final[int]
+        BT_SECURITY_FIPS: Final[int]
+        BT_SECURITY_HIGH: Final[int]
+        BT_SECURITY_LOW: Final[int]
+        BT_SECURITY_MEDIUM: Final[int]
+        BT_SECURITY_SDP: Final[int]
+        BT_SNDMTU: Final[int]
+        BT_VOICE: Final[int]
+        BT_VOICE_CVSD_16BIT: Final[int]
+        BT_VOICE_TRANSPARENT: Final[int]
+        BT_VOICE_TRANSPARENT_16BIT: Final[int]
+        HCI_CHANNEL_CONTROL: Final[int]
+        HCI_CHANNEL_LOGGING: Final[int]
+        HCI_CHANNEL_MONITOR: Final[int]
+        HCI_CHANNEL_RAW: Final[int]
+        HCI_CHANNEL_USER: Final[int]
+        HCI_DEV_NONE: Final[int]
         IP_FREEBIND: Final[int]
         IP_RECVORIGDSTADDR: Final[int]
+        L2CAP_LM: Final[int]
+        L2CAP_LM_AUTH: Final[int]
+        L2CAP_LM_ENCRYPT: Final[int]
+        L2CAP_LM_MASTER: Final[int]
+        L2CAP_LM_RELIABLE: Final[int]
+        L2CAP_LM_SECURE: Final[int]
+        L2CAP_LM_TRUSTED: Final[int]
+        SOL_BLUETOOTH: Final[int]
+        SOL_L2CAP: Final[int]
+        SOL_RFCOMM: Final[int]
+        SOL_SCO: Final[int]
         VMADDR_CID_LOCAL: Final[int]
 
 if sys.platform != "win32" and sys.platform != "darwin":
@@ -348,7 +421,7 @@ if sys.platform != "win32":
     TCP_NOTSENT_LOWAT: Final[int]
 if sys.platform != "darwin":
     TCP_KEEPIDLE: Final[int]
-if sys.version_info >= (3, 10) and sys.platform == "darwin":
+if sys.platform == "darwin":
     TCP_KEEPALIVE: Final[int]
 if sys.version_info >= (3, 11) and sys.platform == "darwin":
     TCP_CONNECTION_INFO: Final[int]
@@ -443,6 +516,35 @@ if sys.platform == "linux":
     CAN_RAW_JOIN_FILTERS: Final[int]
     # Availability: Linux >= 2.6.25
     CAN_ISOTP: Final[int]
+    if sys.version_info >= (3, 15):
+        CAN_ISOTP_CHK_PAD_DATA: Final[int]
+        CAN_ISOTP_CHK_PAD_LEN: Final[int]
+        CAN_ISOTP_DEFAULT_EXT_ADDRESS: Final[int]
+        CAN_ISOTP_DEFAULT_FLAGS: Final[int]
+        CAN_ISOTP_DEFAULT_FRAME_TXTIME: Final[int]
+        CAN_ISOTP_DEFAULT_LL_MTU: Final[int]
+        CAN_ISOTP_DEFAULT_LL_TX_DL: Final[int]
+        CAN_ISOTP_DEFAULT_LL_TX_FLAGS: Final[int]
+        CAN_ISOTP_DEFAULT_PAD_CONTENT: Final[int]
+        CAN_ISOTP_DEFAULT_RECV_BS: Final[int]
+        CAN_ISOTP_DEFAULT_RECV_STMIN: Final[int]
+        CAN_ISOTP_DEFAULT_RECV_WFTMAX: Final[int]
+        CAN_ISOTP_EXTEND_ADDR: Final[int]
+        CAN_ISOTP_FORCE_RXSTMIN: Final[int]
+        CAN_ISOTP_FORCE_TXSTMIN: Final[int]
+        CAN_ISOTP_HALF_DUPLEX: Final[int]
+        CAN_ISOTP_LL_OPTS: Final[int]
+        CAN_ISOTP_LISTEN_MODE: Final[int]
+        CAN_ISOTP_OPTS: Final[int]
+        CAN_ISOTP_RECV_FC: Final[int]
+        CAN_ISOTP_RX_EXT_ADDR: Final[int]
+        CAN_ISOTP_RX_PADDING: Final[int]
+        CAN_ISOTP_RX_STMIN: Final[int]
+        CAN_ISOTP_SF_BROADCAST: Final[int]
+        CAN_ISOTP_TX_PADDING: Final[int]
+        CAN_ISOTP_TX_STMIN: Final[int]
+        CAN_ISOTP_WAIT_TX_DONE: Final[int]
+        SOL_CAN_ISOTP: Final[int]
     # Availability: Linux >= 5.4
     CAN_J1939: Final[int]
 
@@ -592,7 +694,7 @@ if sys.platform != "linux":
 
 has_ipv6: bool
 
-if sys.platform != "darwin" and sys.platform != "linux":
+if sys.platform != "darwin":
     BDADDR_ANY: Final = "00:00:00:00:00:00"
     BDADDR_LOCAL: Final = "00:00:00:FF:FF:FF"
 
@@ -665,16 +767,16 @@ if sys.platform == "darwin":
     PF_SYSTEM: Final[int]
     SYSPROTO_CONTROL: Final[int]
 
-if sys.platform != "darwin" and sys.platform != "linux":
+if sys.platform != "darwin":
     AF_BLUETOOTH: Final[int]
 
-if sys.platform != "win32" and sys.platform != "darwin" and sys.platform != "linux":
+if sys.platform != "win32" and sys.platform != "darwin":
     # Linux and some BSD support is explicit in the docs
     # Windows and macOS do not support in practice
     BTPROTO_HCI: Final[int]
     BTPROTO_L2CAP: Final[int]
     BTPROTO_SCO: Final[int]  # not in FreeBSD
-if sys.platform != "darwin" and sys.platform != "linux":
+if sys.platform != "darwin":
     BTPROTO_RFCOMM: Final[int]
 
 if sys.platform == "linux":
@@ -770,7 +872,7 @@ class socket:
     recv(buflen[, flags]) -- receive data
     recv_into(buffer[, nbytes[, flags]]) -- receive data (into a buffer)
     recvfrom(buflen[, flags]) -- receive data and sender's address
-    recvfrom_into(buffer[, nbytes, [, flags])
+    recvfrom_into(buffer[, nbytes, [, flags]])
       -- receive data and sender's address (into a buffer)
     sendall(data[, flags]) -- send all data
     send(data[, flags]) -- send data, may not send all of it
@@ -795,10 +897,12 @@ class socket:
     @property
     def proto(self) -> int:
         """the socket protocol"""
+
     # F811: "Redefinition of unused `timeout`"
     @property
-    def timeout(self) -> float | None:  # noqa: F811
+    def timeout(self) -> float | None:
         """the socket timeout"""
+
     if sys.platform == "win32":
         def __init__(
             self, family: int = ..., type: int = ..., proto: int = ..., fileno: SupportsIndex | bytes | None = None
@@ -872,9 +976,9 @@ class socket:
         If a nonzero buffersize argument is given, the return value is a
         string of that length; otherwise it is an integer.
         """
-
     @overload
     def getsockopt(self, level: int, optname: int, buflen: int, /) -> bytes: ...
+
     def getblocking(self) -> bool:
         """getblocking()
 
@@ -889,6 +993,7 @@ class socket:
         operations. A timeout of None indicates that timeouts on socket
         operations are disabled.
         """
+
     if sys.platform == "win32":
         def ioctl(self, control: int, option: int | tuple[int, int, int] | bool, /) -> None:
             """ioctl(cmd, option) -> long
@@ -922,6 +1027,7 @@ class socket:
 
         Like recv(buffersize, flags) but also return the sender's address info.
         """
+
     if sys.platform != "win32":
         def recvmsg(self, bufsize: int, ancbufsize: int = 0, flags: int = 0, /) -> tuple[bytes, list[_CMSG], int, Any]:
             """recvmsg(bufsize[, ancbufsize[, flags]]) -> (data, ancdata, msg_flags, address)
@@ -1006,20 +1112,20 @@ class socket:
         """
 
     def send(self, data: ReadableBuffer, flags: int = 0, /) -> int:
-        """send(data[, flags]) -> count
+        """Send a data string to the socket.
 
-        Send a data string to the socket.  For the optional flags
-        argument, see the Unix manual.  Return the number of bytes
-        sent; this may be less than len(data) if the network is busy.
+        For the optional flags argument, see the Unix manual.
+        Return the number of bytes sent; this may be less than len(data) if
+        the network is busy.
         """
 
     def sendall(self, data: ReadableBuffer, flags: int = 0, /) -> None:
-        """sendall(data[, flags])
+        """Send a data string to the socket.
 
-        Send a data string to the socket.  For the optional flags
-        argument, see the Unix manual.  This calls send() repeatedly
-        until all data is sent.  If an error occurs, it's impossible
-        to tell how much data has been sent.
+        For the optional flags argument, see the Unix manual.
+        This calls send() repeatedly until all data is sent.
+        If an error occurs, it's impossible to tell how much data has been
+        sent.
         """
 
     @overload
@@ -1029,9 +1135,9 @@ class socket:
         Like send(data, flags) but allows specifying the destination address.
         For IP sockets, the address is a pair (hostaddr, port).
         """
-
     @overload
     def sendto(self, data: ReadableBuffer, flags: int, address: _Address, /) -> int: ...
+
     if sys.platform != "win32":
         def sendmsg(
             self,
@@ -1041,22 +1147,23 @@ class socket:
             address: _Address | None = None,
             /,
         ) -> int:
-            """sendmsg(buffers[, ancdata[, flags[, address]]]) -> count
+            """Send normal and ancillary data to the socket.
 
-            Send normal and ancillary data to the socket, gathering the
-            non-ancillary data from a series of buffers and concatenating it into
-            a single message.  The buffers argument specifies the non-ancillary
+            It gathering the non-ancillary data from a series of buffers
+            and concatenating it into a single message.
+            The buffers argument specifies the non-ancillary
             data as an iterable of bytes-like objects (e.g. bytes objects).
             The ancdata argument specifies the ancillary data (control messages)
             as an iterable of zero or more tuples (cmsg_level, cmsg_type,
-            cmsg_data), where cmsg_level and cmsg_type are integers specifying the
-            protocol level and protocol-specific type respectively, and cmsg_data
-            is a bytes-like object holding the associated data.  The flags
-            argument defaults to 0 and has the same meaning as for send().  If
-            address is supplied and not None, it sets a destination address for
-            the message.  The return value is the number of bytes of non-ancillary
-            data sent.
+            cmsg_data), where cmsg_level and cmsg_type are integers specifying
+            the protocol level and protocol-specific type respectively, and
+            cmsg_data is a bytes-like object holding the associated data.  The
+            flags argument defaults to 0 and has the same meaning as for send().
+            If address is supplied and not None, it sets a destination address
+            for the message.  The return value is the number of bytes of
+            non-ancillary data sent.
             """
+
     if sys.platform == "linux":
         def sendmsg_afalg(
             self, msg: Iterable[ReadableBuffer] = ..., *, op: int, iv: Any = ..., assoclen: int = ..., flags: int = 0
@@ -1094,9 +1201,9 @@ class socket:
         The value argument can either be an integer, a string buffer, or
         None, optlen.
         """
-
     @overload
     def setsockopt(self, level: int, optname: int, value: None, optlen: int, /) -> None: ...
+
     if sys.platform == "win32":
         def share(self, process_id: int, /) -> bytes:
             """share(process_id) -> bytes
@@ -1236,10 +1343,10 @@ def getdefaulttimeout() -> float | None:
     """
 
 # F811: "Redefinition of unused `timeout`"
-def setdefaulttimeout(timeout: float | None, /) -> None:  # noqa: F811
+def setdefaulttimeout(timeout: float | None, /) -> None:
     """setdefaulttimeout(timeout)
 
-    Set the default timeout in seconds (float) for new socket objects.
+    Set the default timeout in seconds (real number) for new socket objects.
     A value of None indicates that new socket objects have no timeout.
     When the socket module is first imported, the default is None.
     """

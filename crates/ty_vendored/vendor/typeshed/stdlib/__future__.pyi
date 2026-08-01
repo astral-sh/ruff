@@ -47,7 +47,7 @@ attribute on _Future instances.  These values must match the appropriate
 No feature line is ever to be deleted from this file.
 """
 
-from typing_extensions import TypeAlias
+from typing import TypeAlias
 
 _VersionInfo: TypeAlias = tuple[int, int, int, str, int]
 
@@ -65,6 +65,7 @@ class _Feature:
         This is a 5-tuple, of the same form as sys.version_info, or, if
         the feature was dropped, or the release date is undetermined, is None.
         """
+
     compiler_flag: int
 
 absolute_import: _Feature

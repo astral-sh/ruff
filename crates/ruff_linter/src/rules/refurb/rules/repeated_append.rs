@@ -176,7 +176,7 @@ fn match_consecutive_appends<'a>(
     let suite = if semantic.at_top_level() {
         // If the statement is at the top level, we should go to the parent module.
         // Module is available in the definitions list.
-        EnclosingSuite::new(semantic.definitions.python_ast()?, stmt)?
+        EnclosingSuite::new(semantic.definitions.python_ast()?, stmt.into())?
     } else {
         // Otherwise, go to the parent, and take its body as a sequence of siblings.
         semantic
@@ -360,7 +360,7 @@ fn make_suggestion(group: &AppendGroup, generator: Generator) -> String {
         func: Box::new(attr.into()),
         arguments: ast::Arguments {
             args: Box::from([tuple.into()]),
-            keywords: Box::from([]),
+            keywords: std::iter::empty().collect(),
             range: TextRange::default(),
             node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         },

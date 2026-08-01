@@ -140,6 +140,18 @@ pub(crate) fn repeated_equality_comparison(checker: &Checker, bool_op: &ast::Exp
                 continue;
             }
 
+            if let Some((&first, rest)) = comparators.split_first() {
+                let first_comparable = ComparableExpr::from(first);
+
+                if rest
+                    .iter()
+                    .all(|&c| ComparableExpr::from(c) == first_comparable)
+                {
+                    // Do not flag if all members are identical
+                    continue;
+                }
+            }
+
             // if we can determine that all the values are hashable, we can use a set
             // TODO: improve with type inference
             let all_hashable = comparators
@@ -252,7 +264,7 @@ fn to_allowed_value<'a>(
 
     // Ignore `sys.version_info` and `sys.platform` comparisons, which are only
     // respected by type checkers when enforced via equality.
-    if any_over_expr(value, &|expr| {
+    if any_over_expr(value, |expr| {
         semantic
             .resolve_qualified_name(expr)
             .is_some_and(|qualified_name| {
@@ -288,8 +300,8 @@ fn merged_membership_test(
         .join(", ");
 
     if all_hashable {
-        return format!("{left} {op} {{{members}}}",);
+        return format!("{left} {op} {{{members}}}");
     }
 
-    format!("{left} {op} ({members})",)
+    format!("{left} {op} ({members})")
 }

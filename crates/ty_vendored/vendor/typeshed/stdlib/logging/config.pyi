@@ -14,8 +14,8 @@ from collections.abc import Callable, Hashable, Iterable, Mapping, Sequence
 from configparser import RawConfigParser
 from re import Pattern
 from threading import Thread
-from typing import IO, Any, Final, Literal, SupportsIndex, TypedDict, overload, type_check_only
-from typing_extensions import Required, TypeAlias, disjoint_base
+from typing import IO, Any, Final, Literal, SupportsIndex, TypeAlias, TypedDict, overload, type_check_only
+from typing_extensions import Required, disjoint_base
 
 from . import Filter, Filterer, Formatter, Handler, Logger, _FilterType, _FormatStyle, _Level
 
@@ -76,36 +76,20 @@ class _DictConfigArgs(TypedDict, total=False):
 def dictConfig(config: _DictConfigArgs | dict[str, Any]) -> None:
     """Configure logging using a dictionary."""
 
-if sys.version_info >= (3, 10):
-    def fileConfig(
-        fname: StrOrBytesPath | IO[str] | RawConfigParser,
-        defaults: Mapping[str, str] | None = None,
-        disable_existing_loggers: bool = True,
-        encoding: str | None = None,
-    ) -> None:
-        """
-        Read the logging configuration from a ConfigParser-format file.
+def fileConfig(
+    fname: StrOrBytesPath | IO[str] | RawConfigParser,
+    defaults: Mapping[str, str] | None = None,
+    disable_existing_loggers: bool = True,
+    encoding: str | None = None,
+) -> None:
+    """
+    Read the logging configuration from a ConfigParser-format file.
 
-        This can be called several times from an application, allowing an end user
-        the ability to select from various pre-canned configurations (if the
-        developer provides a mechanism to present the choices and load the chosen
-        configuration).
-        """
-
-else:
-    def fileConfig(
-        fname: StrOrBytesPath | IO[str] | RawConfigParser,
-        defaults: Mapping[str, str] | None = None,
-        disable_existing_loggers: bool = True,
-    ) -> None:
-        """
-        Read the logging configuration from a ConfigParser-format file.
-
-        This can be called several times from an application, allowing an end user
-        the ability to select from various pre-canned configurations (if the
-        developer provides a mechanism to present the choices and load the chosen
-        configuration).
-        """
+    This can be called several times from an application, allowing an end user
+    the ability to select from various pre-canned configurations (if the
+    developer provides a mechanism to present the choices and load the chosen
+    configuration).
+    """
 
 def valid_ident(s: str) -> Literal[True]: ...  # undocumented
 def listen(port: int = 9030, verify: Callable[[bytes], bytes | None] | None = None) -> Thread:
@@ -152,7 +136,8 @@ class ConvertingList(list[Any], ConvertingMixin):  # undocumented
     @overload
     def __getitem__(self, key: SupportsIndex) -> Any: ...
     @overload
-    def __getitem__(self, key: slice) -> Any: ...
+    def __getitem__(self, key: slice[SupportsIndex | None]) -> Any: ...
+
     def pop(self, idx: SupportsIndex = -1) -> Any: ...
 
 if sys.version_info >= (3, 12):
@@ -162,7 +147,7 @@ if sys.version_info >= (3, 12):
         @overload
         def __getitem__(self, key: SupportsIndex) -> Any: ...
         @overload
-        def __getitem__(self, key: slice) -> Any: ...
+        def __getitem__(self, key: slice[SupportsIndex | None]) -> Any: ...
 
 else:
     @disjoint_base
@@ -172,7 +157,7 @@ else:
         @overload
         def __getitem__(self, key: SupportsIndex) -> Any: ...
         @overload
-        def __getitem__(self, key: slice) -> Any: ...
+        def __getitem__(self, key: slice[SupportsIndex | None]) -> Any: ...
 
 class BaseConfigurator:
     """

@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_logging_format/mod.rs
-assertion_line: 50
 ---
 G004 Logging statement uses f-string
  --> G004_implicit_concat.py:6:10
@@ -31,5 +30,4 @@ G004 Logging statement uses f-string
 7 | log.info("a " f"b {variablename}")
 8 | log.info("prefix " f"middle {variablename}" f" suffix")
   |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  |
 help: Convert to lazy `%` formatting

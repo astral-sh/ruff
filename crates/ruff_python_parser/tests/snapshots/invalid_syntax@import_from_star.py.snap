@@ -57,6 +57,7 @@ Module(
                                     },
                                 ],
                                 level: 0,
+                                is_lazy: false,
                             },
                         ),
                     ],
@@ -99,6 +100,7 @@ Module(
                                     },
                                 ],
                                 level: 0,
+                                is_lazy: false,
                             },
                         ),
                     ],
@@ -151,6 +153,7 @@ Module(
                                     },
                                 ],
                                 level: 2,
+                                is_lazy: false,
                             },
                         ),
                     ],
@@ -213,6 +216,7 @@ Module(
                                     },
                                 ],
                                 level: 0,
+                                is_lazy: false,
                             },
                         ),
                     ],
@@ -229,7 +233,6 @@ Module(
 7 | def f3():
 8 |     from module import *, *
   |                        ^^^^ Syntax Error: Star import must be the only import
-  |
 
 
 ## Semantic Syntax Errors
@@ -268,4 +271,3 @@ Module(
 7 | def f3():
 8 |     from module import *, *
   |     ^^^^^^^^^^^^^^^^^^^^^^^ Syntax Error: `from module import *` only allowed at module level
-  |

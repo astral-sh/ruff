@@ -1,3 +1,4 @@
+use ruff_diagnostics::Applicability;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::{self as ast, CmpOp, Expr};
@@ -19,13 +20,20 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 ///
 /// ## Example
 /// ```python
+/// score1, score2 = 4, 5
+///
 /// highest_score = score1 if score1 > score2 else score2
 /// ```
 ///
 /// Use instead:
 /// ```python
+/// score1, score2 = 4, 5
+///
 /// highest_score = max(score2, score1)
 /// ```
+///
+/// ## Fix safety
+/// This rule's fix is marked as safe, unless the expression contains comments.
 ///
 /// ## References
 /// - [Python documentation: `min`](https://docs.python.org/3.11/library/functions.html#min)
@@ -141,10 +149,16 @@ pub(crate) fn if_expr_min_max(checker: &Checker, if_exp: &ast::ExprIf) {
     );
 
     if checker.semantic().has_builtin_binding(min_max.as_str()) {
-        diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-            replacement,
-            if_exp.range(),
-        )));
+        let applicability = if checker.comment_ranges().intersects(if_exp.range()) {
+            Applicability::Unsafe
+        } else {
+            Applicability::Safe
+        };
+
+        diagnostic.set_fix(Fix::applicable_edit(
+            Edit::range_replacement(replacement, if_exp.range()),
+            applicability,
+        ));
     }
 }
 

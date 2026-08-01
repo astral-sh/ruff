@@ -137,3 +137,51 @@ os.rename("pth1_file", "pth1_file1", None, None, 1, *[1], **{"x": 1}, foo=1)
 os.replace("pth1_file1", "pth1_file", None, None, 1, *[1], **{"x": 1}, foo=1)
 
 os.path.samefile("pth1_file", "pth1_link", 1, *[1], **{"x": 1}, foo=1)
+
+# See: https://github.com/astral-sh/ruff/issues/21794
+import sys
+
+if os.rename("pth1.py", "pth1.py.bak"):
+    print("rename: truthy")
+else:
+    print("rename: falsey")
+
+if os.replace("pth1.py.bak", "pth1.py"):
+    print("replace: truthy")
+else:
+    print("replace: falsey")
+
+try:
+    for _ in os.getcwd():
+        print("getcwd: iterable")
+        break
+except TypeError as e:
+    print("getcwd: not iterable")
+
+try:
+    for _ in os.getcwdb():
+        print("getcwdb: iterable")
+        break
+except TypeError as e:
+    print("getcwdb: not iterable")
+
+try:
+    for _ in os.readlink(sys.executable):
+        print("readlink: iterable")
+        break
+except TypeError as e:
+    print("readlink: not iterable")
+
+
+# https://github.com/astral-sh/ruff/issues/17699
+# Attribute access whose binding can be resolved via `lookup_attribute`.
+# When the resolved attribute is `int`, the diagnostic is suppressed,
+# matching the behavior for `int`-annotated names elsewhere in this file.
+# Note: this only covers class-attribute access via the class itself
+# (e.g., `Cls.attr`); instance access (e.g., `obj.attr`) is not resolved.
+class _AttrHolder:
+    fd: int = 0
+    name: str = ""
+
+os.chmod(_AttrHolder.fd, 0o644)    # Suppressed: resolved as `int`
+os.chmod(_AttrHolder.name, 0o644)  # Diagnostic + fix: resolved as `str`

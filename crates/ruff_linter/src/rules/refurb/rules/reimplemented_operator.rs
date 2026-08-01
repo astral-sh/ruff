@@ -283,7 +283,7 @@ fn itemgetter_op(expr: &ExprSubscript, params: &Parameters, locator: &Locator) -
     }
 
     // The subscripted expression can't contain references to the argument, as in: `lambda x: x[x]`.
-    if any_over_expr(expr.slice.as_ref(), &|expr| is_same_expression(arg, expr)) {
+    if any_over_expr(expr.slice.as_ref(), |expr| is_same_expression(arg, expr)) {
         return None;
     }
 
@@ -311,7 +311,12 @@ fn itemgetter_op_tuple(
             .iter()
             .map(|expr| {
                 expr.as_subscript_expr()
-                    .filter(|expr| is_same_expression(arg, &expr.value))
+                    .filter(|expr| {
+                        is_same_expression(arg, &expr.value)
+                            && !any_over_expr(expr.slice.as_ref(), |expr| {
+                                is_same_expression(arg, expr)
+                            })
+                    })
                     .map(|expr| expr.slice.as_ref())
                     .map(|slice| subscript_slice_to_string(slice, locator).to_string())
             })

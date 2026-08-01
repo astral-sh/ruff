@@ -7,7 +7,7 @@ Reference: <https://typing.python.org/en/latest/spec/overload.html>
 The definition of `typing.overload` in typeshed is an identity function.
 
 ```py
-from typing import overload
+from typing import Callable, overload
 
 def foo(x: int) -> int:
     return x
@@ -20,7 +20,7 @@ reveal_type(bar)  # revealed: def foo(x: int) -> int
 ## Functions
 
 ```py
-from typing import overload
+from typing import Callable, overload
 
 @overload
 def add() -> None: ...
@@ -140,6 +140,371 @@ reveal_type(foo3.takes_self_or_int(foo3))  # revealed: Foo3
 reveal_type(foo3.takes_self_or_int(1))  # revealed: int
 ```
 
+## Explicit receiver annotations
+
+Binding a method filters overloads that explicitly annotate `self` with a type that cannot accept
+the bound receiver. The `Child`-specific overload is therefore unavailable when accessing the method
+through `Base`, but is retained for `Child`.
+
+```py
+from typing import overload
+
+class Base:
+    @overload
+    def narrowed(self: "Base", x: int) -> int: ...
+    @overload
+    def narrowed(self: "Child", x: str) -> str: ...
+    def narrowed(self, x: int | str) -> int | str:
+        return x
+
+class Child(Base): ...
+
+reveal_type(Base().narrowed)  # revealed: bound method Base.narrowed(x: int) -> int
+reveal_type(Child().narrowed)  # revealed: Overload[(x: int) -> int, (x: str) -> str]
+```
+
+## Specialized generic receivers
+
+An explicit receiver annotation can also select overloads based on a generic class specialization.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import overload
+
+class Box[T]:
+    # Use the class type parameter so specializations remain meaningful.
+    x: T
+
+    @overload
+    def specialized(self: "Box[str]", x: str) -> str: ...
+    @overload
+    def specialized(self, x: int) -> int: ...
+    def specialized(self, x: str | int) -> str | int:
+        return x
+
+reveal_type(Box[int]().specialized)  # revealed: bound method Box[int].specialized(x: int) -> int
+reveal_type(Box[str]().specialized)  # revealed: Overload[(x: str) -> str, (x: int) -> int]
+```
+
+## Nominal receiver mismatches
+
+`BaseForAny[Any]` has a dynamic type argument, but it is not necessarily an instance of its subclass
+`ChildForAny`. Binding `g` must still remove the overload restricted to that subclass.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Any, Callable, overload
+
+class BaseForAny[T]:
+    value: T
+
+    @overload
+    def g(self: "ChildForAny") -> bytes: ...
+    @overload
+    def g(self) -> int: ...
+    def g(self) -> bytes | int:
+        return 1
+
+class ChildForAny(BaseForAny[int]): ...
+
+def accepts_bytes_callback(cb: Callable[[], bytes]) -> None: ...
+def takes_base_any(base: BaseForAny[Any]) -> None:
+    reveal_type(base.g)  # revealed: bound method BaseForAny[Any].g() -> int
+    reveal_type(base.g())  # revealed: int
+    accepts_bytes_callback(base.g)  # error: [invalid-argument-type]
+```
+
+## No matching explicit receiver
+
+When none of the explicitly annotated receivers accept the bound object, no overload is exposed.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Callable, overload
+
+class BaseWithNoMatchingReceiver[T]:
+    value: T
+
+    @overload
+    def g(self: "BaseWithNoMatchingReceiver[bytes]") -> bytes: ...
+    @overload
+    def g(self: "BaseWithNoMatchingReceiver[str]") -> str: ...
+    def g(self) -> str | bytes:
+        return ""
+
+def takes_str_callback(cb: Callable[[], str]) -> None: ...
+def no_matching_receiver(y: BaseWithNoMatchingReceiver[int]) -> None:
+    reveal_type(y.g)  # revealed: Overload[]
+    takes_str_callback(y.g)  # error: [invalid-argument-type]
+```
+
+## Union receivers
+
+A receiver specialized with a union is not specifically a `Reader[int]` or a `Reader[str]`, so
+neither restricted overload is exposed.
+
+```py
+from typing import Generic, TypeVar, overload
+
+T_co = TypeVar("T_co", covariant=True)
+
+class Reader(Generic[T_co]):
+    @overload
+    def get(self: "Reader[int]", default: int) -> int: ...
+    @overload
+    def get(self: "Reader[str]", default: str) -> str: ...
+    def get(self, default: object) -> object:
+        return default
+
+def union_receiver(reader: Reader[int | str]):
+    reveal_type(reader.get)  # revealed: Overload[]
+```
+
+## Method type variables inferred from `self`
+
+Binding an overload whose explicit receiver introduces a method type variable should infer that
+variable from the concrete receiver and apply it to the remainder of the signature.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Any, Callable, overload
+
+class ReceiverGeneric[T]:
+    value: T
+
+    @overload
+    def method[S](self: "ReceiverGeneric[S]", value: S) -> S: ...
+    @overload
+    def method(self, value: bytes) -> bytes: ...
+    def method(self, value: object) -> object:
+        return value
+
+reveal_type(ReceiverGeneric[str]().method)  # revealed: Overload[(value: str) -> str, (value: bytes) -> bytes]
+
+def takes_callable(fn: Callable[..., Any]) -> None: ...
+def use_generic_receiver[T](value: ReceiverGeneric[T]) -> None:
+    # revealed: Overload[(value: T@use_generic_receiver) -> T@use_generic_receiver, (value: bytes) -> bytes]
+    reveal_type(value.method)
+    takes_callable(value.method)
+```
+
+## Constrained method type variables inferred from `self`
+
+Matching a receiver against a value-constrained method type variable must reject values outside that
+variable's constraints. A subclass of an allowed value must be promoted to the declared constraint
+rather than appearing as the specialized return type.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Callable, Generic, TypeVar, overload
+
+BoxT = TypeVar("BoxT", covariant=True)
+Constrained = TypeVar("Constrained", str, bytes)
+
+class ConstrainedReceiverBox(Generic[BoxT]):
+    @overload
+    def method(self: "ConstrainedReceiverBox[Constrained]", value: Constrained) -> Constrained: ...
+    @overload
+    def method(self: "ConstrainedReceiverBox[Constrained]", value: Constrained, repeat: int = ...) -> Constrained: ...
+    def method(self, value: str | bytes, repeat: int = 1) -> str | bytes:
+        return value
+
+invalid_receiver = ConstrainedReceiverBox[int]()
+invalid_method = invalid_receiver.method
+reveal_type(invalid_method)  # revealed: Overload[]
+
+# error: [no-matching-overload]
+reveal_type(invalid_method(1))  # revealed: Unknown
+
+# error: [invalid-assignment]
+invalid_callback: Callable[[int], int] = invalid_method
+
+class SubStr(str): ...
+
+subclass_receiver = ConstrainedReceiverBox[SubStr]()
+reveal_type(subclass_receiver.method(SubStr()))  # revealed: str
+promoted_callback: Callable[[SubStr], str] = subclass_receiver.method
+```
+
+## Disjunctive generic receivers
+
+A receiver may satisfy both sides of a union without constraining both sides' type variables on the
+same path. In particular, matching `Left[int]` leaves the `Right` type variable available to
+specialize from the method arguments.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Callable, overload
+
+class Left[T]:
+    left: T
+
+class Right[T]:
+    right: T
+
+class BaseWithDisjunctiveReceiver:
+    @overload
+    def method[S, U](self: "Left[S] | Right[U]", first: S, second: U) -> tuple[S, U]: ...
+    @overload
+    def method(self, first: bytes, second: bytes) -> tuple[bytes, bytes]: ...
+    def method(self, first: object, second: object) -> tuple[object, object]:
+        return first, second
+
+class Both(BaseWithDisjunctiveReceiver, Left[int], Right[str]): ...
+
+receiver = Both()
+receiver.method(1, b"value")
+valid_callback: Callable[[int, bytes], tuple[int, bytes]] = receiver.method
+```
+
+## Receiver type variables alongside variadic type parameters
+
+A method's `ParamSpec` or `TypeVarTuple` must not prevent an ordinary type variable from being
+specialized by its receiver. The variadic parameters remain available for argument inference;
+neither method can be converted into a callback with a return type incompatible with the receiver.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Callable, overload
+
+class VariadicReceiverBox[T]:
+    value: T
+
+    @overload
+    def with_paramspec[**P, S](self: "VariadicReceiverBox[S]", callback: Callable[P, object]) -> S: ...
+    @overload
+    def with_paramspec(self, callback: bytes) -> bytes: ...
+    def with_paramspec(self, callback: object) -> object:
+        return callback
+
+    @overload
+    def with_typevartuple[*Ts, S](self: "VariadicReceiverBox[S]", first: int, *values: *Ts) -> S: ...
+    @overload
+    def with_typevartuple(self, first: bytes) -> bytes: ...
+    def with_typevartuple(self, first: object, *values: object) -> object:
+        return first
+
+def accepts_int(value: int) -> object:
+    return value
+
+receiver = VariadicReceiverBox[str]()
+
+# revealed: Overload[[**P](callback: (**P) -> object) -> str, (callback: bytes) -> bytes]
+reveal_type(receiver.with_paramspec)
+reveal_type(receiver.with_paramspec(accepts_int))  # revealed: str
+
+# error: [invalid-assignment]
+bad_paramspec_callback: Callable[[Callable[[int], object]], int] = receiver.with_paramspec
+
+reveal_type(receiver.with_typevartuple(1, b"value"))  # revealed: str
+typevartuple_callback: Callable[[int, bytes], str] = receiver.with_typevartuple
+
+# error: [invalid-assignment]
+bad_typevartuple_callback: Callable[[int, bytes], int] = receiver.with_typevartuple
+```
+
+## Structural protocol receivers
+
+Checking a generic protocol receiver requires solving all uses of its type variable together. Here
+`get()` would require `int` to be assignable to `T`, while `put()` would require `T` to be
+assignable to `str`, so no `T` can satisfy `ProtocolSelf[T]`.
+
+```py
+from typing import Callable, Protocol, TypeVar, overload
+
+ProtocolSelfT = TypeVar("ProtocolSelfT")
+
+class ProtocolSelf(Protocol[ProtocolSelfT]):
+    def get(self) -> ProtocolSelfT: ...
+    def put(self, x: ProtocolSelfT) -> None: ...
+
+class BaseWithProtocolSelf:
+    @overload
+    def method(self: ProtocolSelf[ProtocolSelfT]) -> ProtocolSelfT: ...
+    @overload
+    def method(self) -> bytes: ...
+    def method(self) -> object:
+        return b""
+
+class ProtocolSelfImplementation(BaseWithProtocolSelf):
+    def get(self) -> int:
+        return 1
+
+    def put(self, x: str) -> None: ...
+
+reveal_type(ProtocolSelfImplementation().method)  # revealed: bound method ProtocolSelfImplementation.method() -> bytes
+
+good_protocol_receiver: Callable[[], bytes] = ProtocolSelfImplementation().method
+bad_protocol_receiver: Callable[[], int] = ProtocolSelfImplementation().method  # error: [invalid-assignment]
+```
+
+## One-sided constraints from protocol receivers
+
+An explicit protocol receiver can constrain a method type variable without determining an exact
+specialization. Keep that type variable generic so that compatible callbacks remain valid while the
+receiver constraint rejects incompatible ones.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Callable, Protocol, overload
+
+class Producer[T](Protocol):
+    def get(self) -> T: ...
+
+class BaseWithProducer:
+    @overload
+    def method[S](self: Producer[S], value: S) -> S: ...
+    @overload
+    def method(self, value: bytes) -> bytes: ...
+    def method(self, value: object) -> object:
+        return value
+
+class ProducerImplementation(BaseWithProducer):
+    def get(self) -> str:
+        return ""
+
+# `Producer` is covariant, so binding records `str <: S` without specializing `S` to `str`.
+reveal_type(ProducerImplementation().method)  # revealed: Overload[[S](value: S) -> S, (value: bytes) -> bytes]
+# `S = object` satisfies the receiver constraint.
+producer_callback: Callable[[object], object] = ProducerImplementation().method
+# `S = int` violates the receiver constraint, and the `bytes` overload is also incompatible.
+bad_producer_callback: Callable[[int], int] = ProducerImplementation().method  # error: [invalid-assignment]
+# The argument adds `Literal[1] <: S`, so the combined lower bound is `str | Literal[1]`.
+reveal_type(ProducerImplementation().method(1))  # revealed: str | Literal[1]
+```
+
 ## Constructor
 
 ```py
@@ -155,11 +520,11 @@ class Foo:
 
 foo = Foo()
 reveal_type(foo)  # revealed: Foo
-reveal_type(foo.x)  # revealed: Unknown | int | None
+reveal_type(foo.x)  # revealed: int | None
 
 foo1 = Foo(1)
 reveal_type(foo1)  # revealed: Foo
-reveal_type(foo1.x)  # revealed: Unknown | int | None
+reveal_type(foo1.x)  # revealed: int | None
 ```
 
 ## Version specific
@@ -176,6 +541,8 @@ python-version = "3.9"
 ```
 
 ```py
+from __future__ import annotations
+
 import sys
 from typing import overload
 
@@ -311,7 +678,7 @@ def func[T](x: T) -> T: ...
 def func[T](x: T | None = None) -> T | None:
     return x
 
-reveal_type(func)  # revealed: Overload[() -> None, (x: T@func) -> T@func]
+reveal_type(func)  # revealed: Overload[() -> None, [T](x: T) -> T]
 reveal_type(func())  # revealed: None
 reveal_type(func(1))  # revealed: Literal[1]
 reveal_type(func(""))  # revealed: Literal[""]
@@ -329,9 +696,8 @@ At least two `@overload`-decorated definitions must be present.
 from typing import overload
 
 @overload
-def func(x: int) -> int: ...
-
 # error: [invalid-overload]
+def func(x: int) -> int: ...
 def func(x: int | str) -> int | str:
     return x
 ```
@@ -357,16 +723,16 @@ non-`@overload`-decorated definition (for the same function/method).
 from typing import overload
 
 @overload
+# error: [invalid-overload] "Overloads for function `func` must be followed by a non-`@overload`-decorated implementation function"
 def func(x: int) -> int: ...
 @overload
-# error: [invalid-overload] "Overloads for function `func` must be followed by a non-`@overload`-decorated implementation function"
 def func(x: str) -> str: ...
 
 class Foo:
     @overload
+    # error: [invalid-overload] "Overloads for function `method` must be followed by a non-`@overload`-decorated implementation function"
     def method(self, x: int) -> int: ...
     @overload
-    # error: [invalid-overload] "Overloads for function `method` must be followed by a non-`@overload`-decorated implementation function"
     def method(self, x: str) -> str: ...
 ```
 
@@ -418,13 +784,25 @@ Using the `@abstractmethod` decorator requires that the class's metaclass is `AB
 from it.
 
 ```py
-class Foo:
+from abc import ABCMeta
+
+class CustomAbstractMetaclass(ABCMeta): ...
+
+class Fine(metaclass=CustomAbstractMetaclass):
     @overload
     @abstractmethod
     def f(self, x: int) -> int: ...
     @overload
     @abstractmethod
+    def f(self, x: str) -> str: ...
+
+class Foo:
+    @overload
+    @abstractmethod
     # error: [invalid-overload]
+    def f(self, x: int) -> int: ...
+    @overload
+    @abstractmethod
     def f(self, x: str) -> str: ...
 ```
 
@@ -434,18 +812,74 @@ And, the `@abstractmethod` decorator must be present on all the `@overload`-ed m
 class PartialFoo1(ABC):
     @overload
     @abstractmethod
+    # error: [invalid-overload]
     def f(self, x: int) -> int: ...
     @overload
-    # error: [invalid-overload]
     def f(self, x: str) -> str: ...
 
 class PartialFoo(ABC):
     @overload
+    # error: [invalid-overload]
     def f(self, x: int) -> int: ...
     @overload
     @abstractmethod
-    # error: [invalid-overload]
     def f(self, x: str) -> str: ...
+```
+
+#### `TYPE_CHECKING` blocks
+
+As in other areas of ty, we treat `TYPE_CHECKING` blocks the same as "inline stub files", so we
+permit overloaded functions to exist without an implementation if all overloads are defined inside
+an `if TYPE_CHECKING` block:
+
+```py
+from typing import overload, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    @overload
+    def a() -> str: ...
+    @overload
+    def a(x: int) -> int: ...
+
+    class F:
+        @overload
+        def method(self) -> None: ...
+        @overload
+        def method(self, x: int) -> int: ...
+
+class G:
+    if TYPE_CHECKING:
+        @overload
+        def method(self) -> None: ...
+        @overload
+        def method(self, x: int) -> int: ...
+
+if TYPE_CHECKING:
+    @overload
+    def b() -> str: ...
+
+if TYPE_CHECKING:
+    @overload
+    def b(x: int) -> int: ...
+
+if TYPE_CHECKING:
+    import sys
+
+    if sys.platform == "win32":
+        pass
+    else:
+        @overload
+        def d() -> bytes: ...
+        @overload
+        def d(x: int) -> int: ...
+
+if TYPE_CHECKING:
+    @overload
+    # not all overloads are in a `TYPE_CHECKING` block, so this is an error
+    def c() -> None: ...  # error: [invalid-overload]
+
+@overload
+def c(x: int) -> int: ...
 ```
 
 ### `@overload`-decorated functions with non-stub bodies
@@ -497,6 +931,368 @@ def foo(x):
     return x
 ```
 
+### Implementation consistency
+
+The implementation must accept every argument accepted by each overload, and each overload return
+type must be assignable to the implementation return type. This check initially only covers
+overloads where all signatures are non-generic.
+
+```py
+from typing import overload
+
+@overload
+def return_type(x: int) -> int: ...
+@overload
+# error: [invalid-overload] "Overload return type is not assignable to implementation return type"
+def return_type(x: str) -> str: ...
+def return_type(x: int | str) -> int:
+    return 1
+
+@overload
+def parameter_type(x: int) -> int: ...
+@overload
+# error: [invalid-overload] "Implementation does not accept all arguments of this overload"
+def parameter_type(x: str) -> str: ...
+def parameter_type(x: int) -> int | str:
+    return 1
+```
+
+Generic overloads are left to the full implementation-consistency check.
+
+```py
+from typing import TypeVar, overload
+
+T = TypeVar("T")
+
+@overload
+def generic_parameter_type(x: T) -> T: ...
+@overload
+def generic_parameter_type(x: str) -> str: ...
+def generic_parameter_type(x: int) -> int | str:
+    return x
+```
+
+### Decorated implementation consistency
+
+Decorators on an overload implementation apply only to the implementation signature. The decorated
+signature is checked against the overloads, while callers continue to see only the overloads.
+
+```py
+from typing import Callable, overload
+
+def widen_return(func: Callable[[int | str], int]) -> Callable[[int | str], int | str]:
+    raise NotImplementedError
+
+@overload
+def widened(x: int, /) -> int: ...
+@overload
+def widened(x: str, /) -> str: ...
+@widen_return
+def widened(x: int | str) -> int:
+    return 1
+
+reveal_type(widened)  # revealed: Overload[(x: int, /) -> int, (x: str, /) -> str]
+reveal_type(widened(1))  # revealed: int
+reveal_type(widened("one"))  # revealed: str
+
+def narrow_parameter(func: Callable[[int | str], int | str]) -> Callable[[int], int | str]:
+    raise NotImplementedError
+
+@overload
+def narrowed(x: int, /) -> int: ...
+@overload
+# error: [invalid-overload] "Implementation does not accept all arguments of this overload"
+def narrowed(x: str, /) -> str: ...
+@narrow_parameter
+def narrowed(x: int | str) -> int | str:
+    return x
+
+reveal_type(narrowed)  # revealed: Overload[(x: int, /) -> int, (x: str, /) -> str]
+reveal_type(narrowed(1))  # revealed: int
+reveal_type(narrowed("one"))  # revealed: str
+```
+
+### Decorated overload consistency
+
+Decorators on individual overloads transform those overload signatures before implementation
+consistency is checked. The transformed signatures remain visible to callers.
+
+```py
+from typing import Callable, overload
+
+def decorate_overload(func: Callable[..., object]) -> Callable[[int], int]:
+    raise NotImplementedError
+
+def decorate_implementation(func: Callable[..., object]) -> Callable[[int | str], int | str]:
+    raise NotImplementedError
+
+@overload
+@decorate_overload
+def decorated() -> None: ...
+@overload
+def decorated(x: str, /) -> str: ...
+@decorate_implementation
+def decorated(y: bytes, z: bytes) -> bytes:
+    raise NotImplementedError
+
+reveal_type(decorated)  # revealed: Overload[(int, /) -> int, (x: str, /) -> str]
+reveal_type(decorated(1))  # revealed: int
+reveal_type(decorated("one"))  # revealed: str
+```
+
+### Decorated overloads with `Concatenate`
+
+Each decorated overload applies its decorator to its own signature, without including any preceding
+overloads in the decorator call.
+
+```py
+from collections.abc import Callable
+from typing import Any, Concatenate, ParamSpec, TypeVar, overload
+
+P = ParamSpec("P")
+A = TypeVar("A")
+R = TypeVar("R")
+
+def curry1(func: Callable[Concatenate[A, P], R]) -> Callable[[A], Callable[P, R]]:
+    raise NotImplementedError
+
+@curry1
+@overload
+def starmap(mapper: Callable[[int, int], int], parser: int) -> int: ...
+@curry1
+@overload
+def starmap(mapper: Callable[[str, str, str], str], parser: str) -> str: ...
+@curry1
+def starmap(mapper: Callable[..., Any], parser: Any) -> Any:
+    raise NotImplementedError
+
+def add(x: int, y: int) -> int:
+    return x + y
+
+# revealed: Overload[((int, int, /) -> int, /) -> ((parser: int) -> int), ((str, str, str, /) -> str, /) -> ((parser: str) -> str)]
+reveal_type(starmap)
+reveal_type(starmap(add))  # revealed: (parser: int) -> int
+```
+
+### Decorated implementation replaced by a function
+
+A decorator can replace an overload implementation with another function. The overload set remains
+visible to callers, the replacement signature is checked for consistency, and an outer `@deprecated`
+decorator still applies to the overload set.
+
+```py
+from collections.abc import Callable
+from typing import Any, TypeVar, overload
+from typing_extensions import deprecated
+
+R = TypeVar("R")
+
+def replacement(x: int, /) -> int:
+    return x
+
+def replace_with(value: R) -> Callable[[Callable[..., Any]], R]:
+    def decorator(_function: Callable[..., Any]) -> R:
+        return value
+    return decorator
+
+@overload
+def replaced(x: int, /) -> int: ...
+@overload
+# error: [invalid-overload] "Overload signature is not consistent with implementation"
+def replaced(x: str, /) -> str: ...
+@deprecated("use replacement directly")
+@replace_with(replacement)
+def replaced(x: int | str) -> int | str:
+    return x
+
+# error: [deprecated] "use replacement directly"
+reveal_type(replaced)  # revealed: Overload[(x: int, /) -> int, (x: str, /) -> str]
+# error: [deprecated] "use replacement directly"
+reveal_type(replaced("one"))  # revealed: str
+```
+
+### Decorated implementation with multiple callable signatures
+
+An overloaded callback protocol can provide one implementation signature for each overload. Every
+callable in a union must support every overload. A decorator that returns a non-callable cannot
+implement any overload.
+
+```py
+from typing import Callable, Protocol, overload
+
+class ValidCallback(Protocol):
+    @overload
+    def __call__(self, x: int, /) -> int: ...
+    @overload
+    def __call__(self, x: str, /) -> str: ...
+
+class NarrowCallback(Protocol):
+    @overload
+    def __call__(self, x: int, /) -> int: ...
+    @overload
+    def __call__(self, x: bytes, /) -> bytes: ...
+
+def valid_callback(func: Callable[[int | str], int | str]) -> ValidCallback:
+    raise NotImplementedError
+
+def narrow_callback(func: Callable[[int | str], int | str]) -> NarrowCallback:
+    raise NotImplementedError
+
+def valid_union(
+    func: Callable[[int | str], int | str],
+) -> Callable[[int | str], int | str] | Callable[[object], object]:
+    raise NotImplementedError
+
+def narrow_union(
+    func: Callable[[int | str], int | str],
+) -> Callable[[int | str], int | str] | Callable[[int], int]:
+    raise NotImplementedError
+
+def noncallable(func: Callable[[int | str], int | str]) -> int:
+    raise NotImplementedError
+
+@overload
+def callback_valid(x: int, /) -> int: ...
+@overload
+def callback_valid(x: str, /) -> str: ...
+@valid_callback
+def callback_valid(x: int | str) -> int | str:
+    return x
+
+@overload
+def callback_narrowed(x: int, /) -> int: ...
+@overload
+# error: [invalid-overload] "Overload signature is not consistent with implementation"
+def callback_narrowed(x: str, /) -> str: ...
+@narrow_callback
+def callback_narrowed(x: int | str) -> int | str:
+    return x
+
+@overload
+def union_valid(x: int, /) -> int: ...
+@overload
+def union_valid(x: str, /) -> str: ...
+@valid_union
+def union_valid(x: int | str) -> int | str:
+    return x
+
+@overload
+def union_narrowed(x: int, /) -> int: ...
+@overload
+# error: [invalid-overload] "Overload signature is not consistent with implementation"
+def union_narrowed(x: str, /) -> str: ...
+@narrow_union
+def union_narrowed(x: int | str) -> int | str:
+    return x
+
+@overload
+def not_callable(x: int, /) -> int: ...
+@overload
+def not_callable(x: str, /) -> str: ...
+@noncallable
+# error: [invalid-overload] "Overload implementation is not callable after applying decorators"
+def not_callable(x: int | str) -> int | str:
+    return x
+
+reveal_type(callback_valid)  # revealed: Overload[(x: int, /) -> int, (x: str, /) -> str]
+reveal_type(callback_narrowed)  # revealed: Overload[(x: int, /) -> int, (x: str, /) -> str]
+reveal_type(union_valid)  # revealed: Overload[(x: int, /) -> int, (x: str, /) -> str]
+reveal_type(union_narrowed)  # revealed: Overload[(x: int, /) -> int, (x: str, /) -> str]
+reveal_type(not_callable)  # revealed: Overload[(x: int, /) -> int, (x: str, /) -> str]
+```
+
+### Implementation consistency parameter mismatch diagnostics
+
+Non-generic implementation checks require parameter names and positional-only forms to line up with
+each overload signature.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from collections.abc import Iterable
+from typing import overload
+
+class ColumnSelector:
+    @overload
+    def _extract(self, row_key: int) -> object: ...
+    @overload
+    # snapshot: invalid-overload
+    def _extract(self, column_key: int) -> object: ...
+    def _extract(self, row_key: int | None = None, column_key: int | None = None) -> object:
+        return object()
+
+class PositionalOnlyWithKwargs:
+    @overload
+    def update(self, params: Iterable[tuple[str, str | Iterable[str]]], /, **kwds: str) -> None: ...
+    @overload
+    # snapshot: invalid-overload
+    def update(self, **kwds: str | Iterable[str]) -> None: ...
+    def update(self, params=(), /, **kwds) -> None:
+        pass
+```
+
+```snapshot
+error[invalid-overload]: Implementation does not accept all arguments of this overload
+  --> src/mdtest_snippet.py:9:9
+   |
+ 9 |     def _extract(self, column_key: int) -> object: ...
+   |         ^^^^^^^^
+10 |     def _extract(self, row_key: int | None = None, column_key: int | None = None) -> object:
+   |         -------- Implementation defined here
+info: Implementation signature `(self, row_key: int | None = None, column_key: int | None = None) -> object` is not assignable to overload signature `(self, column_key: int) -> object`
+info: the parameter named `row_key` does not match `column_key` (and can be used as a keyword parameter)
+
+
+error[invalid-overload]: Implementation does not accept all arguments of this overload
+  --> src/mdtest_snippet.py:18:9
+   |
+18 |     def update(self, **kwds: str | Iterable[str]) -> None: ...
+   |         ^^^^^^
+19 |     def update(self, params=(), /, **kwds) -> None:
+   |         ------ Implementation defined here
+info: Implementation signature `(self, params=..., /, **kwds) -> None` is not assignable to overload signature `(self, **kwds: Iterable[str]) -> None`
+info: parameter `self` is positional-only but must also accept keyword arguments
+```
+
+### Implementation consistency return type diagnostics
+
+Non-generic implementation checks show why an overload return type is not assignable to the
+implementation return type.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import overload
+
+@overload
+# snapshot: invalid-overload
+def return_tuple(x: int) -> tuple[str]: ...
+@overload
+def return_tuple(x: str) -> tuple[int]: ...
+def return_tuple(x: int | str) -> tuple[int]:
+    return (1,)
+```
+
+```snapshot
+error[invalid-overload]: Overload return type is not assignable to implementation return type
+ --> src/mdtest_snippet.py:5:5
+  |
+5 | def return_tuple(x: int) -> tuple[str]: ...
+  |     ^^^^^^^^^^^^
+6 | @overload
+7 | def return_tuple(x: str) -> tuple[int]: ...
+8 | def return_tuple(x: int | str) -> tuple[int]:
+  |     ------------ Implementation defined here
+info: Overload returns `tuple[str]`, which is not assignable to implementation return type `tuple[int]`
+info: the first tuple element is not compatible: `str` is not assignable to `int`
+```
+
 ### Inconsistent decorators
 
 #### `@staticmethod`
@@ -507,7 +1303,7 @@ similarly decorated. The implementation, if present, must also have a consistent
 ```py
 from __future__ import annotations
 
-from typing import overload
+from typing import Callable, overload
 
 class CheckStaticMethod:
     @overload
@@ -559,7 +1355,7 @@ The same rules apply for `@classmethod` as for [`@staticmethod`](#staticmethod).
 ```py
 from __future__ import annotations
 
-from typing import overload
+from typing import Callable, overload
 
 class CheckClassMethod:
     def __init__(self, x: int) -> None:
@@ -613,6 +1409,26 @@ class CheckClassMethod:
         if isinstance(x, int):
             return cls(x)
         return None
+
+class Base:
+    @overload
+    @classmethod
+    def from_value(cls: type[Base], x: int) -> int: ...
+    @overload
+    @classmethod
+    def from_value(cls: type[Child], x: str) -> str: ...
+    @classmethod
+    def from_value(cls, x: int | str) -> int | str:
+        return x
+
+class Child(Base): ...
+
+reveal_type(Base.from_value)  # revealed: bound method <class 'Base'>.from_value(x: int) -> int
+reveal_type(Child.from_value)  # revealed: Overload[(x: int) -> int, (x: str) -> str]
+
+good: Callable[[int], int] = Base.from_value
+# error: [invalid-assignment]
+bad: Callable[[str], str] = Base.from_value
 ```
 
 #### `@final`
@@ -636,10 +1452,10 @@ class Foo:
 
     @overload
     @final
+    # error: [invalid-overload]
     def method2(self, x: int) -> int: ...
     @overload
     def method2(self, x: str) -> str: ...
-    # error: [invalid-overload]
     def method2(self, x: int | str) -> int | str:
         return x
 
@@ -647,8 +1463,8 @@ class Foo:
     def method3(self, x: int) -> int: ...
     @overload
     @final
-    def method3(self, x: str) -> str: ...
     # error: [invalid-overload]
+    def method3(self, x: str) -> str: ...
     def method3(self, x: int | str) -> int | str:
         return x
 ```
@@ -665,13 +1481,22 @@ class Foo:
     def method1(self, x: int) -> int: ...
     @overload
     def method1(self, x: str) -> str: ...
-
     @overload
     def method2(self, x: int) -> int: ...
     @final
     @overload
     # error: [invalid-overload]
     def method2(self, x: str) -> str: ...
+    @overload
+    def method3(self, x: int) -> int: ...
+    @final
+    @overload
+    def method3(self, x: str) -> int: ...  # error: [invalid-overload]
+    @overload
+    @final
+    def method3(self, x: bytes) -> bytes: ...  # error: [invalid-overload]
+    @overload
+    def method3(self, x: bytearray) -> bytearray: ...
 ```
 
 #### `@override`
@@ -705,18 +1530,18 @@ class Sub2(Base):
     def method(self, x: int) -> int: ...
     @overload
     @override
-    def method(self, x: str) -> str: ...
     # error: [invalid-overload]
+    def method(self, x: str) -> str: ...
     def method(self, x: int | str) -> int | str:
         return x
 
 class Sub3(Base):
     @overload
     @override
+    # error: [invalid-overload]
     def method(self, x: int) -> int: ...
     @overload
     def method(self, x: str) -> str: ...
-    # error: [invalid-overload]
     def method(self, x: int | str) -> int | str:
         return x
 ```
@@ -746,4 +1571,222 @@ class Sub2(Base):
     @override
     # error: [invalid-overload]
     def method(self, x: str) -> str: ...
+```
+
+### Regression: `def` statement shadows a non-`def` symbol with the same name
+
+We used to panic on snippets like these (see <https://github.com/astral-sh/ty/issues/1867>), because
+"iterating over the overloads" for the `def` statement would incorrectly list the overloads of the
+imported function.
+
+`module.pyi`:
+
+```pyi
+from typing import overload
+
+@overload
+def f() -> int: ...
+@overload
+def f(x) -> str: ...
+@overload
+def g() -> int: ...
+@overload
+def g(x) -> str: ...
+```
+
+`main.py`:
+
+```py
+import module
+
+foo = module.f
+
+# revealed: Overload[() -> int, (x) -> str]
+reveal_type(foo)
+
+def foo(): ...
+
+# revealed: def foo() -> Unknown
+reveal_type(foo)
+
+bar = module.g
+
+# revealed: Overload[() -> int, (x) -> str]
+reveal_type(bar)
+
+@staticmethod
+def bar(): ...
+
+# revealed: def bar() -> Unknown
+reveal_type(bar)
+```
+
+### Regression: local overload shadowed by an imported overloaded function in another branch
+
+We used to panic on snippets like this, because the post-inference overload checks for the local `a`
+definition would resolve the end-of-scope public binding to the imported `f` overload set, then try
+to render the `f` definitions using the current file's AST.
+
+`module.pyi`:
+
+```pyi
+from typing import overload
+
+@overload
+def f(x: int) -> int: ...
+@overload
+def f(x: str) -> str: ...
+```
+
+`main.py`:
+
+```py
+from typing import overload
+from module import f
+
+def flag() -> bool:
+    return True
+
+if flag():
+    @overload
+    def a(): ...
+
+else:
+    a = f
+
+reveal_type(a)  # revealed: (def a() -> Unknown) | (Overload[(x: int) -> int, (x: str) -> str])
+```
+
+### Conditional overloaded value and fallback implementation
+
+`module.pyi`:
+
+```pyi
+from typing import overload
+
+@overload
+def f(x: int) -> int: ...
+@overload
+def f(x: str) -> str: ...
+```
+
+`main.py`:
+
+```py
+from module import f
+
+def flag() -> bool:
+    return True
+
+if flag():
+    g = f
+else:
+    def g(x: bytes) -> bytes:
+        return x
+
+reveal_type(g)  # revealed: (Overload[(x: int) -> int, (x: str) -> str]) | (def g(x: bytes) -> bytes)
+```
+
+### Later overload set after shadowed overload set
+
+```py
+from typing import overload
+
+def flag() -> bool:
+    return True
+
+if flag():
+    @overload
+    def a(x: int) -> int: ...
+    @overload
+    def a(x: str) -> str: ...
+
+@overload
+# error: [invalid-overload] "Overloads for function `a` must be followed by a non-`@overload`-decorated implementation function"
+def a(x: bytes) -> bytes: ...
+@overload
+def a(x: bool) -> bool: ...
+```
+
+### Regression: `def` statement shadows a non-`def` symbol with the same name, defined in the same scope
+
+This is an even more pathological version of the above test. This version used to fail in the same
+way as the above snippet, but would only fail in a stub file, or in a `.py` file that had an
+overloaded function without an implementation. (Note that this is not always invalid even in `.py`
+files: we allow overloaded functions to omit the implementation function if they are decorated with
+`@abstractmethod` or they are defined in `if TYPE_CHECKING` blocks.)
+
+```pyi
+from typing import overload
+
+@overload
+def h() -> int: ...
+@overload
+def h(x) -> str: ...
+
+baz = h
+
+# revealed: Overload[() -> int, (x) -> str]
+reveal_type(baz)
+
+# This function is distinct from `h`, despite `h` originating
+# from the same scope and being aliased to the same name
+# in the same scope!
+@overload
+def baz(x, y) -> bytes: ...
+@overload
+def baz(x, y, z) -> list[str]: ...
+def baz(x, y, z=None) -> bytes | list[str]:
+    return b""
+
+# revealed: Overload[(x, y) -> bytes, (x, y, z) -> list[str]]
+reveal_type(baz)
+```
+
+## Generic overloaded protocol members preserve receiver relationships
+
+An overloaded method used to satisfy a protocol receiver can relate a method-scoped type variable to
+a concrete generic receiver. Binding that member must retain the scalar return type.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```pyi
+from typing import Any, Generic, Protocol, TypeVar, assert_type, overload, reveal_type
+
+class ScalarBase: ...
+class Scalar(ScalarBase): ...
+
+ScalarCo = TypeVar("ScalarCo", bound=ScalarBase, covariant=True, default=ScalarBase)
+ShapeCo = TypeVar("ShapeCo", bound=tuple[int, ...], covariant=True, default=tuple[Any, ...])
+
+class HasPhantom[T](Protocol):
+    def phantom(self) -> T: ...
+
+class Phantom(Generic[ShapeCo, ScalarCo]):
+    # An empty shape selects the scalar overload and relates its return type to the receiver.
+    @overload
+    def phantom[T: ScalarBase](self: "Phantom[tuple[()], T]") -> T: ...
+    # A non-empty shape selects the list-valued overload instead.
+    @overload
+    def phantom[Shape: tuple[int, *tuple[int, ...]], T: ScalarBase](
+        self: "Phantom[Shape, T]",
+    ) -> list[T]: ...
+
+class Normal(Phantom[ShapeCo, ScalarCo], Generic[ShapeCo, ScalarCo]):
+    # Matching this protocol receiver requires binding the inherited `phantom` overloads.
+    @property
+    def value[T](self: "HasPhantom[T]") -> T: ...
+
+# The empty shape selects `phantom() -> Scalar`, so the protocol and property type is `Scalar`.
+normal: Normal[tuple[()], Scalar]
+assert_type(normal.value, Scalar)
+
+# A non-empty shape selects `phantom() -> list[Scalar]`, so the property type is `list[Scalar]`.
+shaped: Normal[tuple[int], Scalar]
+assert_type(shaped.phantom(), list[Scalar])
+# TODO: The receiver constraint `Scalar <: T` should propagate through invariant `list[T]`.
+reveal_type(shaped.value)  # revealed: Unknown
 ```

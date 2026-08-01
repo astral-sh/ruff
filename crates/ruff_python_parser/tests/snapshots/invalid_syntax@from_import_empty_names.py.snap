@@ -23,6 +23,7 @@ Module(
                     ),
                     names: [],
                     level: 0,
+                    is_lazy: false,
                 },
             ),
             ImportFrom(
@@ -38,6 +39,7 @@ Module(
                     ),
                     names: [],
                     level: 0,
+                    is_lazy: false,
                 },
             ),
             ImportFrom(
@@ -53,6 +55,7 @@ Module(
                     ),
                     names: [],
                     level: 0,
+                    is_lazy: false,
                 },
             ),
         ],
@@ -82,7 +85,6 @@ Module(
 2 | from x import ()
 3 | from x import ,,
   |               ^ Syntax Error: Expected an import name
-  |
 
 
   |
@@ -90,7 +92,6 @@ Module(
 2 | from x import ()
 3 | from x import ,,
   |                ^ Syntax Error: Expected an import name
-  |
 
 
   |
@@ -98,4 +99,3 @@ Module(
 2 | from x import ()
 3 | from x import ,,
   |                 ^ Syntax Error: Expected one or more symbol names after import
-  |

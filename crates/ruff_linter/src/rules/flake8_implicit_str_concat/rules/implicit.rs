@@ -3,8 +3,8 @@ use std::borrow::Cow;
 use itertools::Itertools;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::StringFlags;
+use ruff_python_ast::token::{Token, TokenKind, Tokens};
 use ruff_python_index::Indexer;
-use ruff_python_parser::{Token, TokenKind, Tokens};
 use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextLen, TextRange};
 

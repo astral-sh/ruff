@@ -73,11 +73,11 @@ pub(crate) fn unnecessary_range_start(checker: &Checker, call: &ast::ExprCall) {
     let mut diagnostic = checker.report_diagnostic(UnnecessaryRangeStart, start.range());
     diagnostic.try_set_fix(|| {
         remove_argument(
-            &start,
+            start,
             &call.arguments,
             Parentheses::Preserve,
-            checker.locator().contents(),
-            checker.comment_ranges(),
+            checker.source(),
+            checker.tokens(),
         )
         .map(Fix::safe_edit)
     });

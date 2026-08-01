@@ -10,18 +10,16 @@ AIR311 [*] `airflow.Dataset` is removed in Airflow 3.0; It still works in Airflo
 21 |
 22 | # airflow.datasets
    |
-help: Use `Asset` from `airflow.sdk` instead.
-15 |     task,
-16 |     task_group,
+help: `Asset` has been moved to `airflow.sdk` since Airflow 3.0 (with apache-airflow-task-sdk>=1.0.0).
+   |
 17 | )
 18 + from airflow.sdk import Asset
-19 | 
+19 |
 20 | # airflow
    - DatasetFromRoot()
 21 + Asset()
-22 | 
-23 | # airflow.datasets
-24 | Dataset()
+22 |
+   |
 
 AIR311 [*] `airflow.datasets.Dataset` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
   --> AIR311_names.py:23:1
@@ -32,21 +30,17 @@ AIR311 [*] `airflow.datasets.Dataset` is removed in Airflow 3.0; It still works 
 24 | DatasetAlias()
 25 | DatasetAll()
    |
-help: Use `Asset` from `airflow.sdk` instead.
-15 |     task,
-16 |     task_group,
+help: `Asset` has been moved to `airflow.sdk` since Airflow 3.0 (with apache-airflow-task-sdk>=1.0.0).
+   |
 17 | )
 18 + from airflow.sdk import Asset
-19 | 
-20 | # airflow
-21 | DatasetFromRoot()
-22 | 
+19 |
+--------------------------------------------------------------------------------
 23 | # airflow.datasets
    - Dataset()
 24 + Asset()
 25 | DatasetAlias()
-26 | DatasetAll()
-27 | DatasetAny()
+   |
 
 AIR311 [*] `airflow.datasets.DatasetAlias` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
   --> AIR311_names.py:24:1
@@ -58,22 +52,17 @@ AIR311 [*] `airflow.datasets.DatasetAlias` is removed in Airflow 3.0; It still w
 25 | DatasetAll()
 26 | DatasetAny()
    |
-help: Use `AssetAlias` from `airflow.sdk` instead.
-15 |     task,
-16 |     task_group,
+help: `AssetAlias` has been moved to `airflow.sdk` since Airflow 3.0 (with apache-airflow-task-sdk>=1.0.0).
+   |
 17 | )
 18 + from airflow.sdk import AssetAlias
-19 | 
-20 | # airflow
-21 | DatasetFromRoot()
-22 | 
-23 | # airflow.datasets
+19 |
+--------------------------------------------------------------------------------
 24 | Dataset()
    - DatasetAlias()
 25 + AssetAlias()
 26 | DatasetAll()
-27 | DatasetAny()
-28 | Metadata()
+   |
 
 AIR311 [*] `airflow.datasets.DatasetAll` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
   --> AIR311_names.py:25:1
@@ -85,23 +74,17 @@ AIR311 [*] `airflow.datasets.DatasetAll` is removed in Airflow 3.0; It still wor
 26 | DatasetAny()
 27 | Metadata()
    |
-help: Use `AssetAll` from `airflow.sdk` instead.
-15 |     task,
-16 |     task_group,
+help: `AssetAll` has been moved to `airflow.sdk` since Airflow 3.0 (with apache-airflow-task-sdk>=1.0.0).
+   |
 17 | )
 18 + from airflow.sdk import AssetAll
-19 | 
-20 | # airflow
-21 | DatasetFromRoot()
+19 |
 --------------------------------------------------------------------------------
-23 | # airflow.datasets
-24 | Dataset()
 25 | DatasetAlias()
    - DatasetAll()
 26 + AssetAll()
 27 | DatasetAny()
-28 | Metadata()
-29 | expand_alias_to_datasets()
+   |
 
 AIR311 [*] `airflow.datasets.DatasetAny` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
   --> AIR311_names.py:26:1
@@ -113,23 +96,17 @@ AIR311 [*] `airflow.datasets.DatasetAny` is removed in Airflow 3.0; It still wor
 27 | Metadata()
 28 | expand_alias_to_datasets()
    |
-help: Use `AssetAny` from `airflow.sdk` instead.
-15 |     task,
-16 |     task_group,
+help: `AssetAny` has been moved to `airflow.sdk` since Airflow 3.0 (with apache-airflow-task-sdk>=1.0.0).
+   |
 17 | )
 18 + from airflow.sdk import AssetAny
-19 | 
-20 | # airflow
-21 | DatasetFromRoot()
+19 |
 --------------------------------------------------------------------------------
-24 | Dataset()
-25 | DatasetAlias()
 26 | DatasetAll()
    - DatasetAny()
 27 + AssetAny()
 28 | Metadata()
-29 | expand_alias_to_datasets()
-30 | 
+   |
 
 AIR311 [*] `airflow.datasets.metadata.Metadata` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
   --> AIR311_names.py:27:1
@@ -140,21 +117,16 @@ AIR311 [*] `airflow.datasets.metadata.Metadata` is removed in Airflow 3.0; It st
    | ^^^^^^^^
 28 | expand_alias_to_datasets()
    |
-help: Use `Metadata` from `airflow.sdk` instead.
-8  |     DatasetAny,
-9  |     expand_alias_to_datasets,
+help: `Metadata` has been moved to `airflow.sdk` since Airflow 3.0 (with apache-airflow-task-sdk>=1.0.0).
+   |
 10 | )
    - from airflow.datasets.metadata import Metadata
 11 | from airflow.decorators import (
-12 |     dag,
-13 |     setup,
-14 |     task,
-15 |     task_group,
+--------------------------------------------------------------------------------
 16 | )
 17 + from airflow.sdk import Metadata
-18 | 
-19 | # airflow
-20 | DatasetFromRoot()
+18 |
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 AIR311 [*] `airflow.datasets.expand_alias_to_datasets` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
@@ -168,22 +140,16 @@ AIR311 [*] `airflow.datasets.expand_alias_to_datasets` is removed in Airflow 3.0
 30 | # airflow.decorators
    |
 help: Use `expand_alias_to_assets` from `airflow.models.asset` instead.
-15 |     task,
-16 |     task_group,
+   |
 17 | )
 18 + from airflow.models.asset import expand_alias_to_assets
-19 | 
-20 | # airflow
-21 | DatasetFromRoot()
+19 |
 --------------------------------------------------------------------------------
-26 | DatasetAll()
-27 | DatasetAny()
 28 | Metadata()
    - expand_alias_to_datasets()
 29 + expand_alias_to_assets()
-30 | 
-31 | # airflow.decorators
-32 | dag()
+30 |
+   |
 
 AIR311 [*] `airflow.decorators.dag` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
   --> AIR311_names.py:31:1
@@ -194,9 +160,8 @@ AIR311 [*] `airflow.decorators.dag` is removed in Airflow 3.0; It still works in
 32 | task()
 33 | task_group()
    |
-help: Use `dag` from `airflow.sdk` instead.
-10 | )
-11 | from airflow.datasets.metadata import Metadata
+help: `dag` has been moved to `airflow.sdk` since Airflow 3.0 (with apache-airflow-task-sdk>=1.0.0).
+   |
 12 | from airflow.decorators import (
    -     dag,
 13 |     setup,
@@ -204,9 +169,8 @@ help: Use `dag` from `airflow.sdk` instead.
 15 |     task_group,
 16 | )
 17 + from airflow.sdk import dag
-18 | 
-19 | # airflow
-20 | DatasetFromRoot()
+18 |
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 AIR311 [*] `airflow.decorators.task` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
@@ -219,17 +183,15 @@ AIR311 [*] `airflow.decorators.task` is removed in Airflow 3.0; It still works i
 33 | task_group()
 34 | setup()
    |
-help: Use `task` from `airflow.sdk` instead.
-12 | from airflow.decorators import (
-13 |     dag,
+help: `task` has been moved to `airflow.sdk` since Airflow 3.0 (with apache-airflow-task-sdk>=1.0.0).
+   |
 14 |     setup,
    -     task,
 15 |     task_group,
 16 | )
 17 + from airflow.sdk import task
-18 | 
-19 | # airflow
-20 | DatasetFromRoot()
+18 |
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 AIR311 [*] `airflow.decorators.task_group` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
@@ -242,16 +204,14 @@ AIR311 [*] `airflow.decorators.task_group` is removed in Airflow 3.0; It still w
 34 | setup()
 35 | from airflow.decorators import teardown
    |
-help: Use `task_group` from `airflow.sdk` instead.
-13 |     dag,
-14 |     setup,
+help: `task_group` has been moved to `airflow.sdk` since Airflow 3.0 (with apache-airflow-task-sdk>=1.0.0).
+   |
 15 |     task,
    -     task_group,
 16 | )
 17 + from airflow.sdk import task_group
-18 | 
-19 | # airflow
-20 | DatasetFromRoot()
+18 |
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 AIR311 [*] `airflow.decorators.setup` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
@@ -264,18 +224,16 @@ AIR311 [*] `airflow.decorators.setup` is removed in Airflow 3.0; It still works 
 35 | from airflow.decorators import teardown
 36 | from airflow.io.path import ObjectStoragePath
    |
-help: Use `setup` from `airflow.sdk` instead.
-11 | from airflow.datasets.metadata import Metadata
-12 | from airflow.decorators import (
+help: `setup` has been moved to `airflow.sdk` since Airflow 3.0 (with apache-airflow-task-sdk>=1.0.0).
+   |
 13 |     dag,
    -     setup,
 14 |     task,
 15 |     task_group,
 16 | )
 17 + from airflow.sdk import setup
-18 | 
-19 | # airflow
-20 | DatasetFromRoot()
+18 |
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 AIR311 [*] `airflow.decorators.teardown` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
@@ -287,22 +245,16 @@ AIR311 [*] `airflow.decorators.teardown` is removed in Airflow 3.0; It still wor
 49 |
 50 | # # airflow.io
    |
-help: Use `teardown` from `airflow.sdk` instead.
-32 | task()
-33 | task_group()
+help: `teardown` has been moved to `airflow.sdk` since Airflow 3.0 (with apache-airflow-task-sdk>=1.0.0).
+   |
 34 | setup()
    - from airflow.decorators import teardown
 35 | from airflow.io.path import ObjectStoragePath
-36 | from airflow.io.store import attach
-37 | from airflow.models import DAG as DAGFromModel
 --------------------------------------------------------------------------------
-42 | from airflow.models.baseoperator import chain, chain_linear, cross_downstream
-43 | from airflow.models.baseoperatorlink import BaseOperatorLink
 44 | from airflow.models.dag import DAG as DAGFromDag
 45 + from airflow.sdk import teardown
-46 | 
-47 | # airflow.decorators
-48 | teardown()
+46 |
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 AIR311 [*] `airflow.io.path.ObjectStoragePath` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
@@ -313,22 +265,16 @@ AIR311 [*] `airflow.io.path.ObjectStoragePath` is removed in Airflow 3.0; It sti
    | ^^^^^^^^^^^^^^^^^
 52 | attach()
    |
-help: Use `ObjectStoragePath` from `airflow.sdk` instead.
-33 | task_group()
-34 | setup()
+help: `ObjectStoragePath` has been moved to `airflow.sdk` since Airflow 3.0 (with apache-airflow-task-sdk>=1.0.0).
+   |
 35 | from airflow.decorators import teardown
    - from airflow.io.path import ObjectStoragePath
 36 | from airflow.io.store import attach
-37 | from airflow.models import DAG as DAGFromModel
-38 | from airflow.models import (
 --------------------------------------------------------------------------------
-42 | from airflow.models.baseoperator import chain, chain_linear, cross_downstream
-43 | from airflow.models.baseoperatorlink import BaseOperatorLink
 44 | from airflow.models.dag import DAG as DAGFromDag
 45 + from airflow.sdk import ObjectStoragePath
-46 | 
-47 | # airflow.decorators
-48 | teardown()
+46 |
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 AIR311 [*] `airflow.io.store.attach` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
@@ -341,22 +287,16 @@ AIR311 [*] `airflow.io.store.attach` is removed in Airflow 3.0; It still works i
 53 |
 54 | # airflow.models
    |
-help: Use `attach` from `airflow.sdk.io` instead.
-34 | setup()
-35 | from airflow.decorators import teardown
+help: `attach` has been moved to `airflow.sdk.io` since Airflow 3.0 (with apache-airflow-task-sdk>=1.0.0).
+   |
 36 | from airflow.io.path import ObjectStoragePath
    - from airflow.io.store import attach
 37 | from airflow.models import DAG as DAGFromModel
-38 | from airflow.models import (
-39 |     Connection,
 --------------------------------------------------------------------------------
-42 | from airflow.models.baseoperator import chain, chain_linear, cross_downstream
-43 | from airflow.models.baseoperatorlink import BaseOperatorLink
 44 | from airflow.models.dag import DAG as DAGFromDag
 45 + from airflow.sdk.io import attach
-46 | 
-47 | # airflow.decorators
-48 | teardown()
+46 |
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 AIR311 [*] `airflow.models.Connection` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
@@ -368,20 +308,16 @@ AIR311 [*] `airflow.models.Connection` is removed in Airflow 3.0; It still works
 56 | DAGFromModel()
 57 | Variable()
    |
-help: Use `Connection` from `airflow.sdk` instead.
-37 | from airflow.io.store import attach
-38 | from airflow.models import DAG as DAGFromModel
+help: `Connection` has been moved to `airflow.sdk` since Airflow 3.0 (with apache-airflow-task-sdk>=1.0.0).
+   |
 39 | from airflow.models import (
    -     Connection,
 40 |     Variable,
-41 | )
-42 | from airflow.models.baseoperator import chain, chain_linear, cross_downstream
-43 | from airflow.models.baseoperatorlink import BaseOperatorLink
+--------------------------------------------------------------------------------
 44 | from airflow.models.dag import DAG as DAGFromDag
 45 + from airflow.sdk import Connection
-46 | 
-47 | # airflow.decorators
-48 | teardown()
+46 |
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 AIR311 [*] `airflow.models.DAG` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
@@ -393,23 +329,17 @@ AIR311 [*] `airflow.models.DAG` is removed in Airflow 3.0; It still works in Air
    | ^^^^^^^^^^^^
 57 | Variable()
    |
-help: Use `DAG` from `airflow.sdk` instead.
-43 | from airflow.models.baseoperator import chain, chain_linear, cross_downstream
-44 | from airflow.models.baseoperatorlink import BaseOperatorLink
+help: `DAG` has been moved to `airflow.sdk` since Airflow 3.0 (with apache-airflow-task-sdk>=1.0.0).
+   |
 45 | from airflow.models.dag import DAG as DAGFromDag
 46 + from airflow.sdk import DAG
-47 | 
-48 | # airflow.decorators
-49 | teardown()
+47 |
 --------------------------------------------------------------------------------
-54 | 
-55 | # airflow.models
 56 | Connection()
    - DAGFromModel()
 57 + DAG()
 58 | Variable()
-59 | 
-60 | # airflow.models.baseoperator
+   |
 
 AIR311 [*] `airflow.models.Variable` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
   --> AIR311_names.py:57:1
@@ -421,9 +351,8 @@ AIR311 [*] `airflow.models.Variable` is removed in Airflow 3.0; It still works i
 58 |
 59 | # airflow.models.baseoperator
    |
-help: Use `Variable` from `airflow.sdk` instead.
-38 | from airflow.models import DAG as DAGFromModel
-39 | from airflow.models import (
+help: `Variable` has been moved to `airflow.sdk` since Airflow 3.0 (with apache-airflow-task-sdk>=1.0.0).
+   |
 40 |     Connection,
    -     Variable,
 41 | )
@@ -431,9 +360,8 @@ help: Use `Variable` from `airflow.sdk` instead.
 43 | from airflow.models.baseoperatorlink import BaseOperatorLink
 44 | from airflow.models.dag import DAG as DAGFromDag
 45 + from airflow.sdk import Variable
-46 | 
-47 | # airflow.decorators
-48 | teardown()
+46 |
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 AIR311 [*] `airflow.models.baseoperator.chain` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
@@ -445,18 +373,16 @@ AIR311 [*] `airflow.models.baseoperator.chain` is removed in Airflow 3.0; It sti
 61 | chain_linear()
 62 | cross_downstream()
    |
-help: Use `chain` from `airflow.sdk` instead.
-40 |     Connection,
-41 |     Variable,
+help: `chain` has been moved to `airflow.sdk` since Airflow 3.0 (with apache-airflow-task-sdk>=1.0.0).
+   |
 42 | )
    - from airflow.models.baseoperator import chain, chain_linear, cross_downstream
 43 + from airflow.models.baseoperator import chain_linear, cross_downstream
 44 | from airflow.models.baseoperatorlink import BaseOperatorLink
 45 | from airflow.models.dag import DAG as DAGFromDag
 46 + from airflow.sdk import chain
-47 | 
-48 | # airflow.decorators
-49 | teardown()
+47 |
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 AIR311 [*] `airflow.models.baseoperator.chain_linear` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
@@ -468,18 +394,16 @@ AIR311 [*] `airflow.models.baseoperator.chain_linear` is removed in Airflow 3.0;
    | ^^^^^^^^^^^^
 62 | cross_downstream()
    |
-help: Use `chain_linear` from `airflow.sdk` instead.
-40 |     Connection,
-41 |     Variable,
+help: `chain_linear` has been moved to `airflow.sdk` since Airflow 3.0 (with apache-airflow-task-sdk>=1.0.0).
+   |
 42 | )
    - from airflow.models.baseoperator import chain, chain_linear, cross_downstream
 43 + from airflow.models.baseoperator import chain, cross_downstream
 44 | from airflow.models.baseoperatorlink import BaseOperatorLink
 45 | from airflow.models.dag import DAG as DAGFromDag
 46 + from airflow.sdk import chain_linear
-47 | 
-48 | # airflow.decorators
-49 | teardown()
+47 |
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 AIR311 [*] `airflow.models.baseoperator.cross_downstream` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
@@ -492,18 +416,16 @@ AIR311 [*] `airflow.models.baseoperator.cross_downstream` is removed in Airflow 
 63 |
 64 | # airflow.models.baseoperatolinker
    |
-help: Use `cross_downstream` from `airflow.sdk` instead.
-40 |     Connection,
-41 |     Variable,
+help: `cross_downstream` has been moved to `airflow.sdk` since Airflow 3.0 (with apache-airflow-task-sdk>=1.0.0).
+   |
 42 | )
    - from airflow.models.baseoperator import chain, chain_linear, cross_downstream
 43 + from airflow.models.baseoperator import chain, chain_linear
 44 | from airflow.models.baseoperatorlink import BaseOperatorLink
 45 | from airflow.models.dag import DAG as DAGFromDag
 46 + from airflow.sdk import cross_downstream
-47 | 
-48 | # airflow.decorators
-49 | teardown()
+47 |
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 AIR311 [*] `airflow.models.baseoperatorlink.BaseOperatorLink` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
@@ -515,16 +437,14 @@ AIR311 [*] `airflow.models.baseoperatorlink.BaseOperatorLink` is removed in Airf
 66 |
 67 | # airflow.models.dag
    |
-help: Use `BaseOperatorLink` from `airflow.sdk` instead.
-41 |     Variable,
-42 | )
+help: `BaseOperatorLink` has been moved to `airflow.sdk` since Airflow 3.0 (with apache-airflow-task-sdk>=1.0.0).
+   |
 43 | from airflow.models.baseoperator import chain, chain_linear, cross_downstream
    - from airflow.models.baseoperatorlink import BaseOperatorLink
 44 | from airflow.models.dag import DAG as DAGFromDag
 45 + from airflow.sdk import BaseOperatorLink
-46 | 
-47 | # airflow.decorators
-48 | teardown()
+46 |
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 AIR311 [*] `airflow.models.dag.DAG` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
@@ -536,23 +456,17 @@ AIR311 [*] `airflow.models.dag.DAG` is removed in Airflow 3.0; It still works in
 69 | from airflow.timetables.datasets import DatasetOrTimeSchedule
 70 | from airflow.utils.dag_parsing_context import get_parsing_context
    |
-help: Use `DAG` from `airflow.sdk` instead.
-43 | from airflow.models.baseoperator import chain, chain_linear, cross_downstream
-44 | from airflow.models.baseoperatorlink import BaseOperatorLink
+help: `DAG` has been moved to `airflow.sdk` since Airflow 3.0 (with apache-airflow-task-sdk>=1.0.0).
+   |
 45 | from airflow.models.dag import DAG as DAGFromDag
 46 + from airflow.sdk import DAG
-47 | 
-48 | # airflow.decorators
-49 | teardown()
+47 |
 --------------------------------------------------------------------------------
-66 | BaseOperatorLink()
-67 | 
 68 | # airflow.models.dag
    - DAGFromDag()
 69 + DAG()
 70 | from airflow.timetables.datasets import DatasetOrTimeSchedule
-71 | from airflow.utils.dag_parsing_context import get_parsing_context
-72 | 
+   |
 
 AIR311 [*] `airflow.timetables.datasets.DatasetOrTimeSchedule` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
   --> AIR311_names.py:73:1
@@ -564,17 +478,15 @@ AIR311 [*] `airflow.timetables.datasets.DatasetOrTimeSchedule` is removed in Air
 75 | # airflow.utils.dag_parsing_context
    |
 help: Use `AssetOrTimeSchedule` from `airflow.timetables.assets` instead.
-68 | DAGFromDag()
-69 | from airflow.timetables.datasets import DatasetOrTimeSchedule
+   |
 70 | from airflow.utils.dag_parsing_context import get_parsing_context
 71 + from airflow.timetables.assets import AssetOrTimeSchedule
-72 | 
+72 |
 73 | # airflow.timetables.datasets
    - DatasetOrTimeSchedule(datasets=[])
 74 + AssetOrTimeSchedule(datasets=[])
-75 | 
-76 | # airflow.utils.dag_parsing_context
-77 | get_parsing_context()
+75 |
+   |
 
 AIR311 [*] `datasets` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
   --> AIR311_names.py:73:23
@@ -586,14 +498,12 @@ AIR311 [*] `datasets` is removed in Airflow 3.0; It still works in Airflow 3.0 b
 75 | # airflow.utils.dag_parsing_context
    |
 help: Use `assets` instead
-70 | from airflow.utils.dag_parsing_context import get_parsing_context
-71 | 
+   |
 72 | # airflow.timetables.datasets
    - DatasetOrTimeSchedule(datasets=[])
 73 + DatasetOrTimeSchedule(assets=[])
-74 | 
-75 | # airflow.utils.dag_parsing_context
-76 | get_parsing_context()
+74 |
+   |
 
 AIR311 [*] `airflow.utils.dag_parsing_context.get_parsing_context` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
   --> AIR311_names.py:76:1
@@ -604,15 +514,13 @@ AIR311 [*] `airflow.utils.dag_parsing_context.get_parsing_context` is removed in
 77 |
 78 | from airflow.decorators.base import (
    |
-help: Use `get_parsing_context` from `airflow.sdk` instead.
-67 | # airflow.models.dag
-68 | DAGFromDag()
+help: `get_parsing_context` has been moved to `airflow.sdk` since Airflow 3.0 (with apache-airflow-task-sdk>=1.0.0).
+   |
 69 | from airflow.timetables.datasets import DatasetOrTimeSchedule
    - from airflow.utils.dag_parsing_context import get_parsing_context
 70 + from airflow.sdk import get_parsing_context
-71 | 
-72 | # airflow.timetables.datasets
-73 | DatasetOrTimeSchedule(datasets=[])
+71 |
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 AIR311 [*] `airflow.decorators.base.DecoratedMappedOperator` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
@@ -624,20 +532,16 @@ AIR311 [*] `airflow.decorators.base.DecoratedMappedOperator` is removed in Airfl
 88 | DecoratedOperator()
 89 | TaskDecorator()
    |
-help: Use `DecoratedMappedOperator` from `airflow.sdk.bases.decorator` instead.
-76 | get_parsing_context()
-77 | 
+help: `DecoratedMappedOperator` has been moved to `airflow.sdk.bases.decorator` since Airflow 3.0 (with apache-airflow-task-sdk>=1.0.0).
+   |
 78 | from airflow.decorators.base import (
    -     DecoratedMappedOperator,
 79 |     DecoratedOperator,
-80 |     TaskDecorator,
-81 |     get_unique_task_id,
-82 |     task_decorator_factory,
+--------------------------------------------------------------------------------
 83 | )
 84 + from airflow.sdk.bases.decorator import DecoratedMappedOperator
-85 | 
-86 | # airflow.decorators.base
-87 | DecoratedMappedOperator()
+85 |
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 AIR311 [*] `airflow.decorators.base.DecoratedOperator` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
@@ -650,9 +554,8 @@ AIR311 [*] `airflow.decorators.base.DecoratedOperator` is removed in Airflow 3.0
 89 | TaskDecorator()
 90 | get_unique_task_id()
    |
-help: Use `DecoratedOperator` from `airflow.sdk.bases.decorator` instead.
-77 | 
-78 | from airflow.decorators.base import (
+help: `DecoratedOperator` has been moved to `airflow.sdk.bases.decorator` since Airflow 3.0 (with apache-airflow-task-sdk>=1.0.0).
+   |
 79 |     DecoratedMappedOperator,
    -     DecoratedOperator,
 80 |     TaskDecorator,
@@ -660,9 +563,8 @@ help: Use `DecoratedOperator` from `airflow.sdk.bases.decorator` instead.
 82 |     task_decorator_factory,
 83 | )
 84 + from airflow.sdk.bases.decorator import DecoratedOperator
-85 | 
-86 | # airflow.decorators.base
-87 | DecoratedMappedOperator()
+85 |
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 AIR311 [*] `airflow.decorators.base.TaskDecorator` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
@@ -675,18 +577,16 @@ AIR311 [*] `airflow.decorators.base.TaskDecorator` is removed in Airflow 3.0; It
 90 | get_unique_task_id()
 91 | task_decorator_factory()
    |
-help: Use `TaskDecorator` from `airflow.sdk.bases.decorator` instead.
-78 | from airflow.decorators.base import (
-79 |     DecoratedMappedOperator,
+help: `TaskDecorator` has been moved to `airflow.sdk.bases.decorator` since Airflow 3.0 (with apache-airflow-task-sdk>=1.0.0).
+   |
 80 |     DecoratedOperator,
    -     TaskDecorator,
 81 |     get_unique_task_id,
 82 |     task_decorator_factory,
 83 | )
 84 + from airflow.sdk.bases.decorator import TaskDecorator
-85 | 
-86 | # airflow.decorators.base
-87 | DecoratedMappedOperator()
+85 |
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 AIR311 [*] `airflow.decorators.base.get_unique_task_id` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
@@ -698,17 +598,15 @@ AIR311 [*] `airflow.decorators.base.get_unique_task_id` is removed in Airflow 3.
    | ^^^^^^^^^^^^^^^^^^
 91 | task_decorator_factory()
    |
-help: Use `get_unique_task_id` from `airflow.sdk.bases.decorator` instead.
-79 |     DecoratedMappedOperator,
-80 |     DecoratedOperator,
+help: `get_unique_task_id` has been moved to `airflow.sdk.bases.decorator` since Airflow 3.0 (with apache-airflow-task-sdk>=1.0.0).
+   |
 81 |     TaskDecorator,
    -     get_unique_task_id,
 82 |     task_decorator_factory,
 83 | )
 84 + from airflow.sdk.bases.decorator import get_unique_task_id
-85 | 
-86 | # airflow.decorators.base
-87 | DecoratedMappedOperator()
+85 |
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 AIR311 [*] `airflow.decorators.base.task_decorator_factory` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
@@ -718,17 +616,14 @@ AIR311 [*] `airflow.decorators.base.task_decorator_factory` is removed in Airflo
 90 | get_unique_task_id()
 91 | task_decorator_factory()
    | ^^^^^^^^^^^^^^^^^^^^^^
+help: `task_decorator_factory` has been moved to `airflow.sdk.bases.decorator` since Airflow 3.0 (with apache-airflow-task-sdk>=1.0.0).
    |
-help: Use `task_decorator_factory` from `airflow.sdk.bases.decorator` instead.
-80 |     DecoratedOperator,
-81 |     TaskDecorator,
 82 |     get_unique_task_id,
    -     task_decorator_factory,
 83 | )
 84 + from airflow.sdk.bases.decorator import task_decorator_factory
-85 | 
-86 | # airflow.decorators.base
-87 | DecoratedMappedOperator()
+85 |
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 AIR311 [*] `airflow.models.Param` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
@@ -740,16 +635,14 @@ AIR311 [*] `airflow.models.Param` is removed in Airflow 3.0; It still works in A
 98 | DagParam()
 99 | ParamsDict()
    |
-help: Use `Param` from `airflow.sdk.definitions.param` instead.
-91 | task_decorator_factory()
-92 | 
-93 | 
+help: `Param` has been moved to `airflow.sdk.definitions.param` since Airflow 3.0 (with apache-airflow-task-sdk>=1.0.0).
+   |
+93 |
    - from airflow.models import DagParam, Param, ParamsDict
 94 + from airflow.models import DagParam, ParamsDict
 95 + from airflow.sdk.definitions.param import Param
-96 | 
-97 | # airflow.models
-98 | Param()
+96 |
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 AIR311 [*] `airflow.models.DagParam` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
@@ -761,16 +654,14 @@ AIR311 [*] `airflow.models.DagParam` is removed in Airflow 3.0; It still works i
    | ^^^^^^^^
 99 | ParamsDict()
    |
-help: Use `DagParam` from `airflow.sdk.definitions.param` instead.
-91 | task_decorator_factory()
-92 | 
-93 | 
+help: `DagParam` has been moved to `airflow.sdk.definitions.param` since Airflow 3.0 (with apache-airflow-task-sdk>=1.0.0).
+   |
+93 |
    - from airflow.models import DagParam, Param, ParamsDict
 94 + from airflow.models import Param, ParamsDict
 95 + from airflow.sdk.definitions.param import DagParam
-96 | 
-97 | # airflow.models
-98 | Param()
+96 |
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 AIR311 [*] `airflow.models.ParamsDict` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
@@ -780,17 +671,14 @@ AIR311 [*] `airflow.models.ParamsDict` is removed in Airflow 3.0; It still works
 98 | DagParam()
 99 | ParamsDict()
    | ^^^^^^^^^^
+help: `ParamsDict` has been moved to `airflow.sdk.definitions.param` since Airflow 3.0 (with apache-airflow-task-sdk>=1.0.0).
    |
-help: Use `ParamsDict` from `airflow.sdk.definitions.param` instead.
-91 | task_decorator_factory()
-92 | 
-93 | 
+93 |
    - from airflow.models import DagParam, Param, ParamsDict
 94 + from airflow.models import DagParam, Param
 95 + from airflow.sdk.definitions.param import ParamsDict
-96 | 
-97 | # airflow.models
-98 | Param()
+96 |
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 AIR311 [*] `airflow.models.param.Param` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
@@ -802,16 +690,14 @@ AIR311 [*] `airflow.models.param.Param` is removed in Airflow 3.0; It still work
 106 | DagParam()
 107 | ParamsDict()
     |
-help: Use `Param` from `airflow.sdk.definitions.param` instead.
-99  | ParamsDict()
-100 | 
-101 | 
+help: `Param` has been moved to `airflow.sdk.definitions.param` since Airflow 3.0 (with apache-airflow-task-sdk>=1.0.0).
+    |
+101 |
     - from airflow.models.param import DagParam, Param, ParamsDict
 102 + from airflow.models.param import DagParam, ParamsDict
 103 + from airflow.sdk.definitions.param import Param
-104 | 
-105 | # airflow.models.param
-106 | Param()
+104 |
+    |
 note: This is an unsafe fix and may change runtime behavior
 
 AIR311 [*] `airflow.models.param.DagParam` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
@@ -823,16 +709,14 @@ AIR311 [*] `airflow.models.param.DagParam` is removed in Airflow 3.0; It still w
     | ^^^^^^^^
 107 | ParamsDict()
     |
-help: Use `DagParam` from `airflow.sdk.definitions.param` instead.
-99  | ParamsDict()
-100 | 
-101 | 
+help: `DagParam` has been moved to `airflow.sdk.definitions.param` since Airflow 3.0 (with apache-airflow-task-sdk>=1.0.0).
+    |
+101 |
     - from airflow.models.param import DagParam, Param, ParamsDict
 102 + from airflow.models.param import Param, ParamsDict
 103 + from airflow.sdk.definitions.param import DagParam
-104 | 
-105 | # airflow.models.param
-106 | Param()
+104 |
+    |
 note: This is an unsafe fix and may change runtime behavior
 
 AIR311 [*] `airflow.models.param.ParamsDict` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
@@ -842,17 +726,14 @@ AIR311 [*] `airflow.models.param.ParamsDict` is removed in Airflow 3.0; It still
 106 | DagParam()
 107 | ParamsDict()
     | ^^^^^^^^^^
+help: `ParamsDict` has been moved to `airflow.sdk.definitions.param` since Airflow 3.0 (with apache-airflow-task-sdk>=1.0.0).
     |
-help: Use `ParamsDict` from `airflow.sdk.definitions.param` instead.
-99  | ParamsDict()
-100 | 
-101 | 
+101 |
     - from airflow.models.param import DagParam, Param, ParamsDict
 102 + from airflow.models.param import DagParam, Param
 103 + from airflow.sdk.definitions.param import ParamsDict
-104 | 
-105 | # airflow.models.param
-106 | Param()
+104 |
+    |
 note: This is an unsafe fix and may change runtime behavior
 
 AIR311 [*] `airflow.sensors.base.BaseSensorOperator` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
@@ -864,18 +745,16 @@ AIR311 [*] `airflow.sensors.base.BaseSensorOperator` is removed in Airflow 3.0; 
 118 | PokeReturnValue()
 119 | poke_mode_only()
     |
-help: Use `BaseSensorOperator` from `airflow.sdk` instead.
-108 | 
-109 | 
+help: `BaseSensorOperator` has been moved to `airflow.sdk` since Airflow 3.0 (with apache-airflow-task-sdk>=1.0.0).
+    |
 110 | from airflow.sensors.base import (
     -     BaseSensorOperator,
 111 |     PokeReturnValue,
 112 |     poke_mode_only,
 113 | )
 114 + from airflow.sdk import BaseSensorOperator
-115 | 
-116 | # airflow.sensors.base
-117 | BaseSensorOperator()
+115 |
+    |
 note: This is an unsafe fix and may change runtime behavior
 
 AIR311 [*] `airflow.sensors.base.PokeReturnValue` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
@@ -887,17 +766,15 @@ AIR311 [*] `airflow.sensors.base.PokeReturnValue` is removed in Airflow 3.0; It 
     | ^^^^^^^^^^^^^^^
 119 | poke_mode_only()
     |
-help: Use `PokeReturnValue` from `airflow.sdk` instead.
-109 | 
-110 | from airflow.sensors.base import (
+help: `PokeReturnValue` has been moved to `airflow.sdk` since Airflow 3.0 (with apache-airflow-task-sdk>=1.0.0).
+    |
 111 |     BaseSensorOperator,
     -     PokeReturnValue,
 112 |     poke_mode_only,
 113 | )
 114 + from airflow.sdk import PokeReturnValue
-115 | 
-116 | # airflow.sensors.base
-117 | BaseSensorOperator()
+115 |
+    |
 note: This is an unsafe fix and may change runtime behavior
 
 AIR311 [*] `airflow.sensors.base.poke_mode_only` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
@@ -907,15 +784,12 @@ AIR311 [*] `airflow.sensors.base.poke_mode_only` is removed in Airflow 3.0; It s
 118 | PokeReturnValue()
 119 | poke_mode_only()
     | ^^^^^^^^^^^^^^
+help: `poke_mode_only` has been moved to `airflow.sdk.bases.sensor` since Airflow 3.0 (with apache-airflow-task-sdk>=1.0.0).
     |
-help: Use `poke_mode_only` from `airflow.sdk` instead.
-110 | from airflow.sensors.base import (
-111 |     BaseSensorOperator,
 112 |     PokeReturnValue,
     -     poke_mode_only,
 113 | )
-114 + from airflow.sdk import poke_mode_only
-115 | 
-116 | # airflow.sensors.base
-117 | BaseSensorOperator()
+114 + from airflow.sdk.bases.sensor import poke_mode_only
+115 |
+    |
 note: This is an unsafe fix and may change runtime behavior

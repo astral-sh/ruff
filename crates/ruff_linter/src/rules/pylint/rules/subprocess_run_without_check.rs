@@ -5,7 +5,7 @@ use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::fix::edits::add_argument;
-use crate::{AlwaysFixableViolation, Applicability, Fix};
+use crate::{Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for uses of `subprocess.run` without an explicit `check` argument.
@@ -39,9 +39,12 @@ use crate::{AlwaysFixableViolation, Applicability, Fix};
 /// ```
 ///
 /// ## Fix safety
-/// This rule's fix is marked as unsafe for function calls that contain
-/// `**kwargs`, as adding a `check` keyword argument to such a call may lead
-/// to a duplicate keyword argument error.
+///
+/// This rule's fix is marked as display-only because it's not clear whether the
+/// potential exception was meant to be ignored by setting `check=False` or if
+/// the author simply forgot to include `check=True`. The fix adds
+/// `check=False`, making the existing behavior explicit but possibly masking
+/// the original intention.
 ///
 /// ## References
 /// - [Python documentation: `subprocess.run`](https://docs.python.org/3/library/subprocess.html#subprocess.run)
@@ -49,14 +52,18 @@ use crate::{AlwaysFixableViolation, Applicability, Fix};
 #[violation_metadata(stable_since = "v0.0.285")]
 pub(crate) struct SubprocessRunWithoutCheck;
 
-impl AlwaysFixableViolation for SubprocessRunWithoutCheck {
+impl Violation for SubprocessRunWithoutCheck {
+    // The fix is always set on the diagnostic, but display-only fixes aren't
+    // considered "fixable" in the tests.
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
         "`subprocess.run` without explicit `check` argument".to_string()
     }
 
-    fn fix_title(&self) -> String {
-        "Add explicit `check=False`".to_string()
+    fn fix_title(&self) -> Option<String> {
+        Some("Add explicit `check=False`".to_string())
     }
 }
 
@@ -74,25 +81,11 @@ pub(crate) fn subprocess_run_without_check(checker: &Checker, call: &ast::ExprCa
         if call.arguments.find_keyword("check").is_none() {
             let mut diagnostic =
                 checker.report_diagnostic(SubprocessRunWithoutCheck, call.func.range());
-            diagnostic.set_fix(Fix::applicable_edit(
-                add_argument(
-                    "check=False",
-                    &call.arguments,
-                    checker.comment_ranges(),
-                    checker.locator().contents(),
-                ),
-                // If the function call contains `**kwargs`, mark the fix as unsafe.
-                if call
-                    .arguments
-                    .keywords
-                    .iter()
-                    .any(|keyword| keyword.arg.is_none())
-                {
-                    Applicability::Unsafe
-                } else {
-                    Applicability::Safe
-                },
-            ));
+            diagnostic.set_fix(Fix::display_only_edit(add_argument(
+                "check=False",
+                &call.arguments,
+                checker.tokens(),
+            )));
         }
     }
 }

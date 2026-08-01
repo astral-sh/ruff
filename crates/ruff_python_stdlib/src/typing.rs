@@ -246,15 +246,7 @@ pub fn is_immutable_non_generic_type(qualified_name: &[&str]) -> bool {
             | ["typing", "LiteralString" | "Sized"]
             | [
                 "",
-                "bool"
-                    | "bytes"
-                    | "complex"
-                    | "float"
-                    | "frozenset"
-                    | "int"
-                    | "object"
-                    | "range"
-                    | "str"
+                "bool" | "bytes" | "complex" | "float" | "int" | "object" | "range" | "str"
             ]
     )
 }
@@ -264,7 +256,7 @@ pub fn is_immutable_non_generic_type(qualified_name: &[&str]) -> bool {
 pub fn is_immutable_generic_type(qualified_name: &[&str]) -> bool {
     matches!(
         qualified_name,
-        ["" | "builtins", "tuple"]
+        ["" | "builtins", "frozenset" | "tuple" | "frozendict"]
             | [
                 "collections",
                 "abc",
@@ -326,7 +318,17 @@ pub fn is_immutable_return_type(qualified_name: &[&str]) -> bool {
             | ["re", "compile"]
             | [
                 "",
-                "bool" | "bytes" | "complex" | "float" | "frozenset" | "int" | "str" | "tuple"
+                "bool"
+                    | "bytes"
+                    | "complex"
+                    | "float"
+                    | "frozenset"
+                    | "int"
+                    | "range"
+                    | "str"
+                    | "tuple"
+                    | "slice"
+                    | "frozendict"
             ]
     )
 }

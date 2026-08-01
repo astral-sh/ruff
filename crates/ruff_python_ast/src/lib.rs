@@ -12,6 +12,7 @@ pub use python_version::*;
 pub mod comparable;
 pub mod docstrings;
 mod expression;
+pub mod find_node;
 mod generated;
 pub mod helpers;
 pub mod identifier;
@@ -29,6 +30,7 @@ pub mod statement_visitor;
 pub mod stmt_if;
 pub mod str;
 pub mod str_prefix;
+pub mod token;
 pub mod traversal;
 pub mod types;
 pub mod visitor;
@@ -41,6 +43,18 @@ pub enum SourceType {
     Python(PySourceType),
     /// The file contains TOML.
     Toml(TomlSourceType),
+    /// The file contains Markdown.
+    Markdown,
+}
+
+impl SourceType {
+    pub fn from_extension(ext: &str) -> Self {
+        match ext {
+            "toml" => Self::Toml(TomlSourceType::Unrecognized),
+            "md" => Self::Markdown,
+            _ => Self::Python(PySourceType::from_extension(ext)),
+        }
+    }
 }
 
 impl Default for SourceType {
@@ -55,10 +69,15 @@ impl<P: AsRef<Path>> From<P> for SourceType {
             Some(filename) if filename == "pyproject.toml" => Self::Toml(TomlSourceType::Pyproject),
             Some(filename) if filename == "Pipfile" => Self::Toml(TomlSourceType::Pipfile),
             Some(filename) if filename == "poetry.lock" => Self::Toml(TomlSourceType::Poetry),
-            _ => match path.as_ref().extension() {
-                Some(ext) if ext == "toml" => Self::Toml(TomlSourceType::Unrecognized),
-                _ => Self::Python(PySourceType::from(path)),
-            },
+            Some(filename) if filename == "ruff.toml" || filename == ".ruff.toml" => {
+                Self::Toml(TomlSourceType::Ruff)
+            }
+            _ => Self::from_extension(
+                path.as_ref()
+                    .extension()
+                    .and_then(OsStr::to_str)
+                    .unwrap_or(""),
+            ),
         }
     }
 }
@@ -67,6 +86,8 @@ impl<P: AsRef<Path>> From<P> for SourceType {
 pub enum TomlSourceType {
     /// The source is a `pyproject.toml`.
     Pyproject,
+    /// The source is a `ruff.toml` or `.ruff.toml`.
+    Ruff,
     /// The source is a `Pipfile`.
     Pipfile,
     /// The source is a `poetry.lock`.

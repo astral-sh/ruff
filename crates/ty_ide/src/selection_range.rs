@@ -1,15 +1,15 @@
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
+use ruff_python_ast::find_node::covering_node;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::Db;
-use crate::find_node::covering_node;
 
 /// Returns a list of nested selection ranges, where each range contains the next one.
 /// The first range in the list is the largest range containing the cursor position.
 pub fn selection_range(db: &dyn Db, file: File, offset: TextSize) -> Vec<TextRange> {
     let parsed = parsed_module(db, file).load(db);
-    let range = TextRange::new(offset, offset);
+    let range = TextRange::empty(offset);
 
     let covering = covering_node(parsed.syntax().into(), range);
 
@@ -21,6 +21,9 @@ pub fn selection_range(db: &dyn Db, file: File, offset: TextSize) -> Vec<TextRan
             // Eliminate duplicates when parent and child nodes have the same range
             if ranges.last() != Some(&range) {
                 ranges.push(range);
+            }
+            if let Some(literal_range) = literal_content_range(node, offset) {
+                ranges.push(literal_range);
             }
         }
     }
@@ -43,6 +46,17 @@ fn should_include_in_selection(node: ruff_python_ast::AnyNodeRef) -> bool {
     }
 }
 
+/// Determines the content range of a valid string or byte literal if it's non-empty.
+fn literal_content_range(node: ruff_python_ast::AnyNodeRef, offset: TextSize) -> Option<TextRange> {
+    use ruff_python_ast::AnyNodeRef;
+    let range = match node {
+        AnyNodeRef::StringLiteral(s) if !s.flags.is_invalid() => Some(s.content_range()),
+        AnyNodeRef::BytesLiteral(b) if !b.flags.is_invalid() => Some(b.content_range()),
+        _ => None,
+    };
+    range.filter(|&range| !range.is_empty() && range.contains_inclusive(offset))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -54,7 +68,7 @@ mod tests {
 
     /// Test selection range on a simple expression
     #[test]
-    fn test_selection_range_simple_expression() {
+    fn selection_range_simple_expression() {
         let test = CursorTest::builder()
             .source(
                 "main.py",
@@ -64,33 +78,37 @@ x = 1 + <CURSOR>2
             )
             .build();
 
-        assert_snapshot!(test.selection_range(), @r"
+        assert_snapshot!(test.selection_range(), @"
         info[selection-range]: Selection Range 0
+         --> main.py:1:1
+          |
+        1 | /
+        2 | | x = 1 + 2
+          | |__________^
+
+        info[selection-range]: Selection Range 1
          --> main.py:2:1
           |
         2 | x = 1 + 2
           | ^^^^^^^^^
-          |
 
-        info[selection-range]: Selection Range 1
+        info[selection-range]: Selection Range 2
          --> main.py:2:5
           |
         2 | x = 1 + 2
           |     ^^^^^
-          |
 
-        info[selection-range]: Selection Range 2
+        info[selection-range]: Selection Range 3
          --> main.py:2:9
           |
         2 | x = 1 + 2
           |         ^
-          |
         ");
     }
 
     /// Test selection range on a function call
     #[test]
-    fn test_selection_range_function_call() {
+    fn selection_range_function_call() {
         let test = CursorTest::builder()
             .source(
                 "main.py",
@@ -102,31 +120,91 @@ print(\"he<CURSOR>llo\")
 
         assert_snapshot!(test.selection_range(), @r#"
         info[selection-range]: Selection Range 0
+         --> main.py:1:1
+          |
+        1 | /
+        2 | | print("hello")
+          | |_______________^
+
+        info[selection-range]: Selection Range 1
          --> main.py:2:1
           |
         2 | print("hello")
           | ^^^^^^^^^^^^^^
-          |
 
-        info[selection-range]: Selection Range 1
+        info[selection-range]: Selection Range 2
          --> main.py:2:6
           |
         2 | print("hello")
           |      ^^^^^^^^^
-          |
 
-        info[selection-range]: Selection Range 2
+        info[selection-range]: Selection Range 3
          --> main.py:2:7
           |
         2 | print("hello")
           |       ^^^^^^^
+
+        info[selection-range]: Selection Range 4
+         --> main.py:2:8
           |
+        2 | print("hello")
+          |        ^^^^^
+        "#);
+    }
+
+    /// Test selection range when the cursor is in a string literal prefix
+    #[test]
+    fn selection_range_string_literal_prefix() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+r<CURSOR>"hello"
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.selection_range(), @r#"
+        info[selection-range]: Selection Range 0
+         --> main.py:1:1
+          |
+        1 | /
+        2 | | r"hello"
+          | |_________^
+
+        info[selection-range]: Selection Range 1
+         --> main.py:2:1
+          |
+        2 | r"hello"
+          | ^^^^^^^^
+        "#);
+    }
+
+    /// Test selection range on a string literal created during parser recovery
+    #[test]
+    fn selection_range_recovered_invalid_string_literal() {
+        let test = CursorTest::builder()
+            .source("main.py", "f\"foo\" b\"b<CURSOR>ar\"")
+            .build();
+
+        assert_snapshot!(test.selection_range(), @r#"
+        info[selection-range]: Selection Range 0
+         --> main.py:1:1
+          |
+        1 | f"foo" b"bar"
+          | ^^^^^^^^^^^^^
+
+        info[selection-range]: Selection Range 1
+         --> main.py:1:8
+          |
+        1 | f"foo" b"bar"
+          |        ^^^^^^
         "#);
     }
 
     /// Test selection range on a function definition
     #[test]
-    fn test_selection_range_function_definition() {
+    fn selection_range_function_definition() {
         let test = CursorTest::builder()
             .source(
                 "main.py",
@@ -137,28 +215,33 @@ def my_<CURSOR>function():
             )
             .build();
 
-        assert_snapshot!(test.selection_range(), @r"
+        assert_snapshot!(test.selection_range(), @"
         info[selection-range]: Selection Range 0
+         --> main.py:1:1
+          |
+        1 | /
+        2 | | def my_function():
+        3 | |     return 42
+          | |______________^
+
+        info[selection-range]: Selection Range 1
          --> main.py:2:1
           |
         2 | / def my_function():
         3 | |     return 42
           | |_____________^
-          |
 
-        info[selection-range]: Selection Range 1
+        info[selection-range]: Selection Range 2
          --> main.py:2:5
           |
         2 | def my_function():
           |     ^^^^^^^^^^^
-        3 |     return 42
-          |
         ");
     }
 
     /// Test selection range on a class definition
     #[test]
-    fn test_selection_range_class_definition() {
+    fn selection_range_class_definition() {
         let test = CursorTest::builder()
             .source(
                 "main.py",
@@ -170,30 +253,35 @@ class My<CURSOR>Class:
             )
             .build();
 
-        assert_snapshot!(test.selection_range(), @r"
+        assert_snapshot!(test.selection_range(), @"
         info[selection-range]: Selection Range 0
+         --> main.py:1:1
+          |
+        1 | /
+        2 | | class MyClass:
+        3 | |     def __init__(self):
+        4 | |         self.value = 1
+          | |_______________________^
+
+        info[selection-range]: Selection Range 1
          --> main.py:2:1
           |
         2 | / class MyClass:
         3 | |     def __init__(self):
         4 | |         self.value = 1
           | |______________________^
-          |
 
-        info[selection-range]: Selection Range 1
+        info[selection-range]: Selection Range 2
          --> main.py:2:7
           |
         2 | class MyClass:
           |       ^^^^^^^
-        3 |     def __init__(self):
-        4 |         self.value = 1
-          |
         ");
     }
 
     /// Test selection range on a deeply nested expression with comprehension, lambda, and subscript
     #[test]
-    fn test_selection_range_deeply_nested_expression() {
+    fn selection_range_deeply_nested_expression() {
         let test = CursorTest::builder()
             .source(
                 "main.py",
@@ -203,56 +291,146 @@ result = [(lambda x: x[key.<CURSOR>attr])(item) for item in data if item is not 
             )
             .build();
 
-        assert_snapshot!(test.selection_range(), @r"
+        assert_snapshot!(test.selection_range(), @"
         info[selection-range]: Selection Range 0
+         --> main.py:1:1
+          |
+        1 | /
+        2 | | result = [(lambda x: x[key.attr])(item) for item in data if item is not None]
+          | |______________________________________________________________________________^
+
+        info[selection-range]: Selection Range 1
          --> main.py:2:1
           |
         2 | result = [(lambda x: x[key.attr])(item) for item in data if item is not None]
           | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-          |
 
-        info[selection-range]: Selection Range 1
+        info[selection-range]: Selection Range 2
          --> main.py:2:10
           |
         2 | result = [(lambda x: x[key.attr])(item) for item in data if item is not None]
           |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-          |
 
-        info[selection-range]: Selection Range 2
+        info[selection-range]: Selection Range 3
          --> main.py:2:11
           |
         2 | result = [(lambda x: x[key.attr])(item) for item in data if item is not None]
           |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-          |
 
-        info[selection-range]: Selection Range 3
+        info[selection-range]: Selection Range 4
          --> main.py:2:12
           |
         2 | result = [(lambda x: x[key.attr])(item) for item in data if item is not None]
           |            ^^^^^^^^^^^^^^^^^^^^^
-          |
 
-        info[selection-range]: Selection Range 4
+        info[selection-range]: Selection Range 5
          --> main.py:2:22
           |
         2 | result = [(lambda x: x[key.attr])(item) for item in data if item is not None]
           |                      ^^^^^^^^^^^
-          |
 
-        info[selection-range]: Selection Range 5
+        info[selection-range]: Selection Range 6
          --> main.py:2:24
           |
         2 | result = [(lambda x: x[key.attr])(item) for item in data if item is not None]
           |                        ^^^^^^^^
-          |
 
-        info[selection-range]: Selection Range 6
+        info[selection-range]: Selection Range 7
          --> main.py:2:28
           |
         2 | result = [(lambda x: x[key.attr])(item) for item in data if item is not None]
           |                            ^^^^
-          |
         ");
+    }
+
+    /// Test selection range on an empty string literal
+    #[test]
+    fn selection_range_empty_string_literal() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+"<CURSOR>"
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.selection_range(), @r#"
+        info[selection-range]: Selection Range 0
+         --> main.py:1:1
+          |
+        1 | /
+        2 | | ""
+          | |___^
+
+        info[selection-range]: Selection Range 1
+         --> main.py:2:1
+          |
+        2 | ""
+          | ^^
+        "#);
+    }
+
+    /// Test selection range on a bytes literal
+    #[test]
+    fn selection_range_bytes_literal() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+b"he<CURSOR>llo"
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.selection_range(), @r#"
+        info[selection-range]: Selection Range 0
+         --> main.py:1:1
+          |
+        1 | /
+        2 | | b"hello"
+          | |_________^
+
+        info[selection-range]: Selection Range 1
+         --> main.py:2:1
+          |
+        2 | b"hello"
+          | ^^^^^^^^
+
+        info[selection-range]: Selection Range 2
+         --> main.py:2:3
+          |
+        2 | b"hello"
+          |   ^^^^^
+        "#);
+    }
+
+    /// Test selection range on an invalid bytes literal
+    #[test]
+    fn selection_range_invalid_bytes_literal() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+b"123a𝐁<CURSOR>c"
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.selection_range(), @r#"
+        info[selection-range]: Selection Range 0
+         --> main.py:1:1
+          |
+        1 | /
+        2 | | b"123a𝐁c"
+          | |__________^
+
+        info[selection-range]: Selection Range 1
+         --> main.py:2:1
+          |
+        2 | b"123a𝐁c"
+          | ^^^^^^^^^
+        "#);
     }
 
     impl CursorTest {

@@ -24,10 +24,16 @@ if it is -1, mktime() should guess based on the date and time.
 
 import sys
 from _typeshed import structseq
-from typing import Any, Final, Literal, Protocol, final, type_check_only
-from typing_extensions import TypeAlias
+from typing import Any, Final, Literal, Protocol, SupportsFloat, SupportsIndex, TypeAlias, final, type_check_only
 
 _TimeTuple: TypeAlias = tuple[int, int, int, int, int, int, int, int, int]
+
+if sys.version_info >= (3, 15):
+    # anticipate on https://github.com/python/cpython/pull/139224
+    _SupportsFloatOrIndex: TypeAlias = SupportsFloat | SupportsIndex
+else:
+    # before, time functions only accept (subclass of) float, *not* SupportsFloat
+    _SupportsFloatOrIndex: TypeAlias = float | SupportsIndex
 
 altzone: int
 daylight: int
@@ -74,8 +80,7 @@ class struct_time(structseq[Any | int], _TimeTuple):
     fields' descriptions for details.
     """
 
-    if sys.version_info >= (3, 10):
-        __match_args__: Final = ("tm_year", "tm_mon", "tm_mday", "tm_hour", "tm_min", "tm_sec", "tm_wday", "tm_yday", "tm_isdst")
+    __match_args__: Final = ("tm_year", "tm_mon", "tm_mday", "tm_hour", "tm_min", "tm_sec", "tm_wday", "tm_yday", "tm_isdst")
 
     @property
     def tm_year(self) -> int:
@@ -112,6 +117,7 @@ class struct_time(structseq[Any | int], _TimeTuple):
     @property
     def tm_isdst(self) -> int:
         """1 if summer time is in effect, 0 if not, and -1 if unknown"""
+
     # These final two properties only exist if a 10- or 11-item sequence was passed to the constructor.
     @property
     def tm_zone(self) -> str:
@@ -129,7 +135,7 @@ def asctime(time_tuple: _TimeTuple | struct_time = ..., /) -> str:
     is used.
     """
 
-def ctime(seconds: float | None = None, /) -> str:
+def ctime(seconds: _SupportsFloatOrIndex | None = None, /) -> str:
     """ctime(seconds) -> string
 
     Convert a time in seconds since the Epoch to a string in local time.
@@ -137,7 +143,7 @@ def ctime(seconds: float | None = None, /) -> str:
     not present, current time as returned by localtime() is used.
     """
 
-def gmtime(seconds: float | None = None, /) -> struct_time:
+def gmtime(seconds: _SupportsFloatOrIndex | None = None, /) -> struct_time:
     """gmtime([seconds]) -> (tm_year, tm_mon, tm_mday, tm_hour, tm_min,
                            tm_sec, tm_wday, tm_yday, tm_isdst)
 
@@ -148,7 +154,7 @@ def gmtime(seconds: float | None = None, /) -> struct_time:
     attributes only.
     """
 
-def localtime(seconds: float | None = None, /) -> struct_time:
+def localtime(seconds: _SupportsFloatOrIndex | None = None, /) -> struct_time:
     """localtime([seconds]) -> (tm_year,tm_mon,tm_mday,tm_hour,tm_min,
                               tm_sec,tm_wday,tm_yday,tm_isdst)
 
@@ -165,7 +171,7 @@ def mktime(time_tuple: _TimeTuple | struct_time, /) -> float:
     of the timezone or altzone attributes on the time module.
     """
 
-def sleep(seconds: float, /) -> None:
+def sleep(seconds: _SupportsFloatOrIndex, /) -> None:
     """sleep(seconds)
 
     Delay execution for a given number of seconds.  The argument may be

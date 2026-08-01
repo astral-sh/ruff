@@ -3,12 +3,14 @@ use std::path::Path;
 use bitflags::bitflags;
 use rustc_hash::FxHashMap;
 
-use ruff_python_ast::helpers::from_relative_import;
+use ruff_python_ast::helpers::{from_relative_import, map_subscript};
 use ruff_python_ast::name::{QualifiedName, UnqualifiedName};
-use ruff_python_ast::{self as ast, Expr, ExprContext, PySourceType, Stmt};
+use ruff_python_ast::{self as ast, Expr, ExprContext, PySourceType, PythonVersion, Stmt};
+use ruff_python_stdlib::builtins::{is_python_builtin, python_builtins, python_magic_globals};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::Imported;
+use crate::analyze::visibility;
 use crate::binding::{
     Binding, BindingFlags, BindingId, BindingKind, Bindings, Exceptions, FromImport, Import,
     SubmoduleImport,
@@ -26,9 +28,38 @@ use crate::scope::{Scope, ScopeId, ScopeKind, Scopes};
 
 pub mod all;
 
+/// The result of looking up a symbol in a [`SemanticModel`].
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub enum Symbol {
+    /// The symbol resolves to a concrete binding.
+    Binding(BindingId),
+    /// The symbol resolves to a builtin that has not been materialized yet.
+    Builtin,
+    /// The symbol does not resolve to any binding.
+    Unbound,
+}
+
+impl Symbol {
+    /// Returns the [`BindingId`] if this symbol resolves to a concrete binding.
+    pub const fn binding_id(self) -> Option<BindingId> {
+        match self {
+            Self::Binding(binding_id) => Some(binding_id),
+            Self::Builtin | Self::Unbound => None,
+        }
+    }
+
+    /// Returns `true` if this symbol resolves to any binding, including a builtin.
+    pub const fn is_bound(self) -> bool {
+        !matches!(self, Self::Unbound)
+    }
+}
+
 /// A semantic model for a Python module, to enable querying the module's semantic information.
 pub struct SemanticModel<'a> {
     typing_modules: &'a [String],
+    custom_builtins: &'a [String],
+    target_version: PythonVersion,
+    source_type: PySourceType,
     module: Module<'a>,
 
     /// Stack of all AST nodes in the program.
@@ -146,9 +177,19 @@ pub struct SemanticModel<'a> {
 }
 
 impl<'a> SemanticModel<'a> {
-    pub fn new(typing_modules: &'a [String], path: &Path, module: Module<'a>) -> Self {
-        Self {
+    pub fn new(
+        typing_modules: &'a [String],
+        custom_builtins: &'a [String],
+        target_version: PythonVersion,
+        source_type: PySourceType,
+        path: &Path,
+        module: Module<'a>,
+    ) -> Self {
+        let mut semantic = Self {
             typing_modules,
+            custom_builtins,
+            target_version,
+            source_type,
             module,
             nodes: Nodes::default(),
             node_id: None,
@@ -169,7 +210,19 @@ impl<'a> SemanticModel<'a> {
             seen: Modules::empty(),
             handled_exceptions: Vec::default(),
             resolved_names: FxHashMap::default(),
-        }
+        };
+
+        let builtin_count = python_builtins(target_version.minor, source_type.is_ipynb()).count()
+            + python_magic_globals(target_version.minor).count()
+            + custom_builtins.len();
+        // Match the capacity that repeated `push` calls would reach while avoiding the
+        // intermediate allocations.
+        semantic
+            .bindings
+            .reserve_exact(builtin_count.next_power_of_two());
+        semantic.global_scope_mut().reserve_bindings(builtin_count);
+
+        semantic
     }
 
     /// Return the [`Binding`] for the given [`BindingId`].
@@ -208,7 +261,7 @@ impl<'a> SemanticModel<'a> {
         }
 
         if self.typing_modules.iter().any(|module| {
-            let module = QualifiedName::from_dotted_name(module);
+            let module = QualifiedName::user_defined(module);
             qualified_name == &module.append_member(target)
         }) {
             return true;
@@ -223,6 +276,34 @@ impl<'a> SemanticModel<'a> {
             .iter()
             .copied()
             .chain(self.typing_modules.iter().map(String::as_str))
+    }
+
+    /// Returns `true` if `name` is provided by the configured Python runtime.
+    ///
+    /// This includes version- and source-type-specific builtins, magic globals, and custom
+    /// builtins. It does not account for bindings that shadow the name in a scope.
+    fn is_builtin_name(&self, name: &str) -> bool {
+        is_python_builtin(name, self.target_version.minor, self.source_type.is_ipynb())
+            || python_magic_globals(self.target_version.minor).any(|builtin| builtin == name)
+            || self.custom_builtins.iter().any(|builtin| builtin == name)
+    }
+
+    /// Creates and returns a concrete binding for an unmaterialized builtin.
+    fn materialize_builtin_binding(&mut self, name: &'a str) -> Option<BindingId> {
+        if let Some(binding_id) = self.global_scope().get(name) {
+            return self.bindings[binding_id]
+                .kind
+                .is_builtin()
+                .then_some(binding_id);
+        }
+
+        if !self.is_builtin_name(name) {
+            return None;
+        }
+
+        let binding_id = self.push_builtin();
+        self.global_scope_mut().add(name, binding_id);
+        Some(binding_id)
     }
 
     /// Create a new [`Binding`] for a builtin.
@@ -242,10 +323,13 @@ impl<'a> SemanticModel<'a> {
     /// Create a new [`Binding`] for the given `name` and `range`.
     pub fn push_binding(
         &mut self,
+        name: &'a str,
         range: TextRange,
         kind: BindingKind<'a>,
         flags: BindingFlags,
     ) -> BindingId {
+        self.materialize_builtin_binding(name);
+
         self.bindings.push(Binding {
             range,
             kind,
@@ -280,9 +364,11 @@ impl<'a> SemanticModel<'a> {
     /// module, e.g. `import builtins; builtins.open`. It *only* includes the bindings
     /// that are pre-populated in Python's global scope before any imports have taken place.
     pub fn has_builtin_binding_in_scope(&self, member: &str, scope: ScopeId) -> bool {
-        self.lookup_symbol_in_scope(member, scope, false)
-            .map(|binding_id| &self.bindings[binding_id])
-            .is_some_and(|binding| binding.kind.is_builtin())
+        match self.lookup_symbol_in_scope(member, scope, false) {
+            Symbol::Binding(binding_id) => self.bindings[binding_id].kind.is_builtin(),
+            Symbol::Builtin => true,
+            Symbol::Unbound => false,
+        }
     }
 
     /// If `expr` is a reference to a builtins symbol,
@@ -342,13 +428,16 @@ impl<'a> SemanticModel<'a> {
     /// Return `true` if `member` is an "available" symbol in a given scope, i.e.,
     /// a symbol that has not been bound in that current scope, or in any containing scope.
     pub fn is_available_in_scope(&self, member: &str, scope_id: ScopeId) -> bool {
-        self.lookup_symbol_in_scope(member, scope_id, false)
-            .map(|binding_id| &self.bindings[binding_id])
-            .is_none_or(|binding| binding.kind.is_builtin())
+        match self.lookup_symbol_in_scope(member, scope_id, false) {
+            Symbol::Binding(binding_id) => self.bindings[binding_id].kind.is_builtin(),
+            Symbol::Builtin | Symbol::Unbound => true,
+        }
     }
 
     /// Resolve a `del` reference to `symbol` at `range`.
-    pub fn resolve_del(&mut self, symbol: &str, range: TextRange) {
+    pub fn resolve_del(&mut self, symbol: &'a str, range: TextRange) {
+        self.materialize_builtin_binding(symbol);
+
         let is_unbound = self.scopes[self.scope_id]
             .get(symbol)
             .is_none_or(|binding_id| {
@@ -362,13 +451,14 @@ impl<'a> SemanticModel<'a> {
             self.unresolved_references.push(
                 range,
                 self.exceptions(),
+                None,
                 UnresolvedReferenceFlags::empty(),
             );
         }
     }
 
     /// Resolve a `load` reference to an [`ast::ExprName`].
-    pub fn resolve_load(&mut self, name: &ast::ExprName) -> ReadResult {
+    pub fn resolve_load(&mut self, name: &'a ast::ExprName) -> ReadResult {
         // PEP 563 indicates that if a forward reference can be resolved in the module scope, we
         // should prefer it over local resolutions.
         if self.in_forward_reference() {
@@ -465,7 +555,7 @@ impl<'a> SemanticModel<'a> {
                 }
 
                 match self.bindings[binding_id].kind {
-                    // If it's a type annotation, don't treat it as resolved. For example, given:
+                    // Type annotations are generally not treated as resolved. For example, given:
                     //
                     // ```python
                     // name: str
@@ -475,9 +565,32 @@ impl<'a> SemanticModel<'a> {
                     // The `name` in `print(name)` should be treated as unresolved, but the `name` in
                     // `name: str` should be treated as used.
                     //
-                    // Stub files are an exception. In a stub file, it _is_ considered valid to
-                    // resolve to a type annotation.
-                    BindingKind::Annotation if !self.in_stub_file() => continue,
+                    // There are two exceptions to this rule:
+                    // 1. Stub files. In a stub file, it _is_ considered valid to resolve to a
+                    //    type annotation.
+                    // 2. Bare annotations inside functions. Per PEP 526, these create local
+                    //    variables, so we stop searching outer scopes and resolve them as unbound
+                    //    locals (or not found, if accessed from a nested scope). The binding ID
+                    //    is recorded in the unresolved reference so the linter can suppress the
+                    //    error if a nested scope initializes the variable via `nonlocal`.
+                    BindingKind::Annotation if !self.in_stub_file() => {
+                        if self.scopes[self.bindings[binding_id].scope]
+                            .kind
+                            .is_function()
+                        {
+                            self.unresolved_references.push(
+                                name.range,
+                                self.exceptions(),
+                                Some(binding_id),
+                                UnresolvedReferenceFlags::empty(),
+                            );
+                            if index == 0 {
+                                return ReadResult::UnboundLocal(binding_id);
+                            }
+                            return ReadResult::NotFound;
+                        }
+                        continue;
+                    }
 
                     // If it's a deletion, don't treat it as resolved, since the name is now
                     // unbound. For example, given:
@@ -501,19 +614,53 @@ impl<'a> SemanticModel<'a> {
                     // print(x)
                     //
                     // The `x` in `print(x)` should be treated as unresolved.
-                    BindingKind::Deletion | BindingKind::UnboundException(None) => {
+                    BindingKind::Deletion => {
+                        // In stub files, `del` is used to hide names from re-export
+                        // while the name is still valid for use in type annotations
+                        // within the same file. Since annotations are deferred in
+                        // stubs, the `Deletion` binding is seen at resolve time even
+                        // though the reference textually precedes the `del`. Resolve
+                        // to the shadowed (pre-`del`) binding when available.
+                        if self.in_stub_file() {
+                            if let Some(shadowed_id) =
+                                self.scopes[scope_id].shadowed_binding(binding_id)
+                            {
+                                // Only suppress F821 when the reference textually precedes
+                                // the `del` statement. If `del` comes before the reference,
+                                // the name is genuinely undefined at that point and F821
+                                // should still fire.
+                                let deletion_range = self.bindings[binding_id].range;
+                                if !self.bindings[shadowed_id].is_unbound()
+                                    && name.range.start() < deletion_range.start()
+                                {
+                                    let reference_id = self.resolved_references.push(
+                                        self.scope_id,
+                                        self.node_id,
+                                        ExprContext::Load,
+                                        self.flags,
+                                        name.range,
+                                    );
+                                    self.bindings[shadowed_id].references.push(reference_id);
+                                    self.resolved_names.insert(name.into(), shadowed_id);
+                                    return ReadResult::Resolved(shadowed_id);
+                                }
+                            }
+                        }
+
                         self.unresolved_references.push(
                             name.range,
                             self.exceptions(),
+                            None,
                             UnresolvedReferenceFlags::empty(),
                         );
                         return ReadResult::UnboundLocal(binding_id);
                     }
 
-                    BindingKind::ConditionalDeletion(binding_id) => {
+                    BindingKind::UnboundException(None) => {
                         self.unresolved_references.push(
                             name.range,
                             self.exceptions(),
+                            None,
                             UnresolvedReferenceFlags::empty(),
                         );
                         return ReadResult::UnboundLocal(binding_id);
@@ -612,10 +759,24 @@ impl<'a> SemanticModel<'a> {
             import_starred = import_starred || scope.uses_star_imports();
         }
 
+        if let Some(binding_id) = self.materialize_builtin_binding(name.id.as_str()) {
+            let reference_id = self.resolved_references.push(
+                self.scope_id,
+                self.node_id,
+                ExprContext::Load,
+                self.flags,
+                name.range,
+            );
+            self.bindings[binding_id].references.push(reference_id);
+            self.resolved_names.insert(name.into(), binding_id);
+            return ReadResult::Resolved(binding_id);
+        }
+
         if import_starred {
             self.unresolved_references.push(
                 name.range,
                 self.exceptions(),
+                None,
                 UnresolvedReferenceFlags::WILDCARD_IMPORT,
             );
             ReadResult::WildcardImport
@@ -623,18 +784,50 @@ impl<'a> SemanticModel<'a> {
             self.unresolved_references.push(
                 name.range,
                 self.exceptions(),
+                None,
                 UnresolvedReferenceFlags::empty(),
             );
             ReadResult::NotFound
         }
     }
 
-    /// Lookup a symbol in the current scope.
-    pub fn lookup_symbol(&self, symbol: &str) -> Option<BindingId> {
+    /// Lookup a symbol in the current scope without materializing lazy builtins.
+    pub fn lookup_symbol(&self, symbol: &str) -> Symbol {
         self.lookup_symbol_in_scope(symbol, self.scope_id, self.in_forward_reference())
     }
 
-    /// Lookup a symbol in a certain scope
+    /// Lookup a concrete binding in the current scope.
+    ///
+    /// If `symbol` resolves to an unmaterialized builtin, this creates its binding before
+    /// returning the [`BindingId`].
+    pub fn lookup_binding(&mut self, symbol: &'a str) -> Option<BindingId> {
+        self.lookup_binding_in_scope(symbol, self.scope_id, self.in_forward_reference())
+    }
+
+    /// Return a binding from the global scope, materializing it first if it is a builtin.
+    pub fn global_binding(&mut self, symbol: &'a str) -> Option<BindingId> {
+        self.materialize_builtin_binding(symbol);
+        self.global_scope().get(symbol)
+    }
+
+    /// Lookup a concrete binding in a certain scope.
+    ///
+    /// If `symbol` resolves to an unmaterialized builtin, this creates its binding before
+    /// returning the [`BindingId`].
+    fn lookup_binding_in_scope(
+        &mut self,
+        symbol: &'a str,
+        scope_id: ScopeId,
+        in_forward_reference: bool,
+    ) -> Option<BindingId> {
+        match self.lookup_symbol_in_scope(symbol, scope_id, in_forward_reference) {
+            Symbol::Binding(binding_id) => Some(binding_id),
+            Symbol::Builtin => self.materialize_builtin_binding(symbol),
+            Symbol::Unbound => None,
+        }
+    }
+
+    /// Lookup a symbol in a certain scope without materializing lazy builtins.
     ///
     /// This is a carbon copy of [`Self::resolve_load`], but
     /// doesn't add any read references to the resolved symbol.
@@ -643,11 +836,11 @@ impl<'a> SemanticModel<'a> {
         symbol: &str,
         scope_id: ScopeId,
         in_forward_reference: bool,
-    ) -> Option<BindingId> {
+    ) -> Symbol {
         if in_forward_reference {
             if let Some(binding_id) = self.scopes.global().get(symbol) {
                 if !self.bindings[binding_id].is_unbound() {
-                    return Some(binding_id);
+                    return Symbol::Binding(binding_id);
                 }
             }
         }
@@ -669,21 +862,28 @@ impl<'a> SemanticModel<'a> {
             if let Some(binding_id) = scope.get(symbol) {
                 match self.bindings[binding_id].kind {
                     BindingKind::Annotation => continue,
-                    BindingKind::Deletion | BindingKind::UnboundException(None) => return None,
-                    BindingKind::ConditionalDeletion(binding_id) => return Some(binding_id),
-                    BindingKind::UnboundException(Some(binding_id)) => return Some(binding_id),
-                    _ => return Some(binding_id),
+                    BindingKind::Deletion | BindingKind::UnboundException(None) => {
+                        return Symbol::Unbound;
+                    }
+                    BindingKind::UnboundException(Some(binding_id)) => {
+                        return Symbol::Binding(binding_id);
+                    }
+                    _ => return Symbol::Binding(binding_id),
                 }
             }
 
             if index == 0 && scope.kind.is_class() {
                 if matches!(symbol, "__module__" | "__qualname__") {
-                    return None;
+                    return Symbol::Unbound;
                 }
             }
         }
 
-        None
+        if self.is_builtin_name(symbol) {
+            Symbol::Builtin
+        } else {
+            Symbol::Unbound
+        }
     }
 
     /// Simulates a runtime load of a given [`ast::ExprName`].
@@ -803,8 +1003,7 @@ impl<'a> SemanticModel<'a> {
                         }
                         if let BindingKind::Annotation
                         | BindingKind::Deletion
-                        | BindingKind::UnboundException(..)
-                        | BindingKind::ConditionalDeletion(..) = binding.kind
+                        | BindingKind::UnboundException(..) = binding.kind
                         {
                             continue;
                         }
@@ -828,7 +1027,6 @@ impl<'a> SemanticModel<'a> {
                     let candidate_id = match self.bindings[binding_id].kind {
                         BindingKind::Annotation => continue,
                         BindingKind::Deletion | BindingKind::UnboundException(None) => return None,
-                        BindingKind::ConditionalDeletion(binding_id) => binding_id,
                         BindingKind::UnboundException(Some(binding_id)) => binding_id,
                         _ => binding_id,
                     };
@@ -868,8 +1066,9 @@ impl<'a> SemanticModel<'a> {
 
         // Find the symbol in the current scope.
         let (symbol, attribute) = unqualified_name.segments().split_first()?;
-        let mut binding_id =
-            self.lookup_symbol_in_scope(symbol, scope_id, self.in_forward_reference())?;
+        let mut binding_id = self
+            .lookup_symbol_in_scope(symbol, scope_id, self.in_forward_reference())
+            .binding_id()?;
 
         // Recursively resolve class attributes, e.g., `foo.bar.baz` in.
         let mut tail = attribute;
@@ -974,10 +1173,25 @@ impl<'a> SemanticModel<'a> {
 
         // If the name was already resolved, look it up; otherwise, search for the symbol.
         let head = match_head(value)?;
-        let binding = self
+        let symbol = self
             .resolve_name(head)
-            .or_else(|| self.lookup_symbol(&head.id))
-            .map(|id| self.binding(id))?;
+            .map_or_else(|| self.lookup_symbol(&head.id), Symbol::Binding);
+        let binding = match symbol {
+            Symbol::Binding(binding_id) => self.binding(binding_id),
+            Symbol::Builtin => {
+                if value.is_name_expr() {
+                    return Some(QualifiedName::builtin(head.id.as_str()));
+                }
+
+                let value_name = UnqualifiedName::from_expr(value)?;
+                return Some(
+                    std::iter::once("")
+                        .chain(value_name.segments().iter().copied())
+                        .collect(),
+                );
+            }
+            Symbol::Unbound => return None,
+        };
 
         match &binding.kind {
             BindingKind::Import(Import { qualified_name }) => {
@@ -1100,22 +1314,22 @@ impl<'a> SemanticModel<'a> {
                         // Ex) Given `module="sys"` and `object="exit"`:
                         // `import sys`         -> `sys.exit`
                         // `import sys as sys2` -> `sys2.exit`
-                        BindingKind::Import(Import { qualified_name }) => {
-                            if qualified_name.segments() == module_path.as_slice() {
-                                if let Some(source) = binding.source {
-                                    // Verify that `sys` isn't bound in an inner scope.
-                                    if self
-                                        .current_scopes()
-                                        .take(scope_index)
-                                        .all(|scope| !scope.has(name))
-                                    {
-                                        return Some(ImportedName {
-                                            name: format!("{name}.{member}"),
-                                            source,
-                                            range: self.nodes[source].range(),
-                                            context: binding.context,
-                                        });
-                                    }
+                        BindingKind::Import(Import { qualified_name })
+                            if qualified_name.segments() == module_path.as_slice() =>
+                        {
+                            if let Some(source) = binding.source {
+                                // Verify that `sys` isn't bound in an inner scope.
+                                if self
+                                    .current_scopes()
+                                    .take(scope_index)
+                                    .all(|scope| !scope.has(name))
+                                {
+                                    return Some(ImportedName {
+                                        name: format!("{name}.{member}"),
+                                        source,
+                                        range: self.nodes[source].range(),
+                                        context: binding.context,
+                                    });
                                 }
                             }
                         }
@@ -1151,22 +1365,22 @@ impl<'a> SemanticModel<'a> {
                         // `import os.path ` -> `os.name`
                         // Ex) Given `module="os.path"` and `object="join"`:
                         // `import os.path ` -> `os.path.join`
-                        BindingKind::SubmoduleImport(SubmoduleImport { qualified_name }) => {
-                            if qualified_name.segments().starts_with(&module_path) {
-                                if let Some(source) = binding.source {
-                                    // Verify that `os` isn't bound in an inner scope.
-                                    if self
-                                        .current_scopes()
-                                        .take(scope_index)
-                                        .all(|scope| !scope.has(name))
-                                    {
-                                        return Some(ImportedName {
-                                            name: format!("{module}.{member}"),
-                                            source,
-                                            range: self.nodes[source].range(),
-                                            context: binding.context,
-                                        });
-                                    }
+                        BindingKind::SubmoduleImport(SubmoduleImport { qualified_name })
+                            if qualified_name.segments().starts_with(&module_path) =>
+                        {
+                            if let Some(source) = binding.source {
+                                // Verify that `os` isn't bound in an inner scope.
+                                if self
+                                    .current_scopes()
+                                    .take(scope_index)
+                                    .all(|scope| !scope.has(name))
+                                {
+                                    return Some(ImportedName {
+                                        name: format!("{module}.{member}"),
+                                        source,
+                                        range: self.nodes[source].range(),
+                                        context: binding.context,
+                                    });
                                 }
                             }
                         }
@@ -1531,6 +1745,10 @@ impl<'a> SemanticModel<'a> {
         // ```
         if !self.at_top_level() {
             for (name, range) in globals.iter() {
+                // Global pre-scanning synthesizes an assignment when no global binding exists.
+                // Materialize builtins first so `global range` doesn't replace the builtin with
+                // that synthetic assignment.
+                self.materialize_builtin_binding(name);
                 if self
                     .global_scope()
                     .get(name)
@@ -1594,8 +1812,13 @@ impl<'a> SemanticModel<'a> {
     /// Return `true` if the model is in an async context.
     pub fn in_async_context(&self) -> bool {
         for scope in self.current_scopes() {
-            if let ScopeKind::Function(ast::StmtFunctionDef { is_async, .. }) = scope.kind {
-                return *is_async;
+            match scope.kind {
+                ScopeKind::Class(_) | ScopeKind::Lambda(_) => return false,
+                ScopeKind::Function(ast::StmtFunctionDef { is_async, .. }) => return *is_async,
+                ScopeKind::Generator { .. }
+                | ScopeKind::Module
+                | ScopeKind::Type
+                | ScopeKind::DunderClassCell => {}
             }
         }
         false
@@ -1986,6 +2209,11 @@ impl<'a> SemanticModel<'a> {
         self.flags.intersects(SemanticModelFlags::EXCEPTION_HANDLER)
     }
 
+    /// Return `true` if the model is in an exception handler.
+    pub const fn in_orelse(&self) -> bool {
+        self.flags.intersects(SemanticModelFlags::ORELSE)
+    }
+
     /// Return `true` if the model is in an `assert` statement.
     pub const fn in_assert_statement(&self) -> bool {
         self.flags.intersects(SemanticModelFlags::ASSERT_STATEMENT)
@@ -2151,6 +2379,21 @@ impl<'a> SemanticModel<'a> {
                 return false;
             };
             function.range() == function_def.range()
+        })
+    }
+
+    /// Return `true` if the model is in a `typing.Protocol` subclass or an abstract
+    /// method.
+    pub fn in_protocol_or_abstract_method(&self) -> bool {
+        self.current_scopes().any(|scope| match scope.kind {
+            ScopeKind::Class(class_def) => class_def
+                .bases()
+                .iter()
+                .any(|base| self.match_typing_expr(map_subscript(base), "Protocol")),
+            ScopeKind::Function(function_def) => {
+                visibility::is_abstract(&function_def.decorator_list, self)
+            }
+            _ => false,
         })
     }
 }
@@ -2637,6 +2880,19 @@ bitflags! {
         /// t'{x}'
         /// ```
         const T_STRING = 1 << 29;
+
+        /// The model is in the body of an `else` clause.
+        ///
+        /// For example, the model could be visiting `x` in:
+        /// ```python
+        /// try:
+        ///     ...
+        /// except Exception:
+        ///     ...
+        /// else:
+        ///     print(x)
+        /// ```
+        const ORELSE = 1 << 30;
 
 
         /// The context is in any type annotation.

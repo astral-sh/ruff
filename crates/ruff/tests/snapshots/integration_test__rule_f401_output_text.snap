@@ -72,9 +72,8 @@ import a
 a.b.foo()
 ```
 
-then a diagnostic will only be emitted for the first line under [preview],
-whereas a diagnostic would only be emitted for the second line under
-stable behavior.
+then a diagnostic will be emitted for the second line under [preview],
+whereas no diagnostic is emitted under stable behavior.
 
 Note that this behavior is somewhat subjective and is designed
 to conform to the developer's intuition rather than Python's actual

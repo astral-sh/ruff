@@ -11,18 +11,19 @@ info:
     - "--select"
     - UP007
     - foo/test.py
-snapshot_kind: text
 ---
 success: true
 exit_code: 0
 ----- stdout -----
 Resolved settings for: "[TMP]/foo/test.py"
+Settings path: "[TMP]/foo/pyproject.toml"
 
 # General Settings
 cache_dir = "[TMP]/foo/.ruff_cache"
 fix = false
 fix_only = false
 output_format = concise
+output_prefer_rule_codes = false
 show_fixes = false
 unsafe_fixes = hint
 
@@ -61,6 +62,9 @@ file_resolver.include = [
 	"*.pyi",
 	"*.ipynb",
 	"**/pyproject.toml",
+	"**/ruff.toml",
+	"**/.ruff.toml",
+	"*.md",
 ]
 file_resolver.extend_include = []
 file_resolver.respect_gitignore = true
@@ -127,7 +131,7 @@ linter.flake8_copyright.notice_rgx = (?i)Copyright\s+((?:\(C\)|©)\s+)?\d{4}((-|
 linter.flake8_copyright.author = none
 linter.flake8_copyright.min_file_size = 0
 linter.flake8_errmsg.max_string_length = 0
-linter.flake8_gettext.functions_names = [
+linter.flake8_gettext.function_names = [
 	_,
 	gettext,
 	ngettext,
@@ -184,6 +188,8 @@ linter.flake8_self.ignore_names = [
 linter.flake8_tidy_imports.ban_relative_imports = "parents"
 linter.flake8_tidy_imports.banned_api = {}
 linter.flake8_tidy_imports.banned_module_level_imports = []
+linter.flake8_tidy_imports.require_lazy = []
+linter.flake8_tidy_imports.ban_lazy = []
 linter.flake8_type_checking.strict = false
 linter.flake8_type_checking.exempt_modules = [
 	typing,
@@ -210,6 +216,7 @@ linter.isort.classes = []
 linter.isort.constants = []
 linter.isort.variables = []
 linter.isort.no_lines_before = []
+linter.isort.import_headings = {}
 linter.isort.lines_after_imports = -1
 linter.isort.lines_between_types = 0
 linter.isort.forced_separate = []
@@ -258,11 +265,13 @@ linter.pylint.max_returns = 6
 linter.pylint.max_bool_expr = 5
 linter.pylint.max_branches = 12
 linter.pylint.max_statements = 50
+linter.pylint.max_statements_in_try = 5
 linter.pylint.max_public_methods = 20
 linter.pylint.max_locals = 15
 linter.pylint.max_nested_blocks = 5
 linter.pyupgrade.keep_runtime_typing = false
 linter.ruff.parenthesize_tuple_in_subscript = false
+linter.ruff.strictly_empty_init_modules = false
 
 # Formatter Settings
 formatter.exclude = []
@@ -274,6 +283,7 @@ formatter.line_ending = auto
 formatter.indent_style = space
 formatter.indent_width = 4
 formatter.quote_style = double
+formatter.nested_string_quote_style = alternating
 formatter.magic_trailing_comma = respect
 formatter.docstring_code_format = disabled
 formatter.docstring_code_line_width = dynamic
@@ -285,5 +295,6 @@ analyze.target_version = 3.10
 analyze.string_imports = disabled
 analyze.extension = ExtensionMapping({})
 analyze.include_dependencies = {}
+analyze.type_checking_imports = true
 
 ----- stderr -----

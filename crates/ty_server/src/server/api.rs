@@ -2,9 +2,9 @@ use crate::server::schedule::Task;
 use crate::session::Session;
 use anyhow::anyhow;
 use lsp_server as server;
-use lsp_server::RequestId;
-use lsp_types::notification::Notification;
-use lsp_types::request::Request;
+use lsp_server::{ErrorCode, RequestId};
+use lsp_types::{LspNotificationMethod, Notification};
+use lsp_types::{LspRequestMethod, Request};
 use std::panic::{AssertUnwindSafe, UnwindSafe};
 
 mod diagnostics;
@@ -13,12 +13,12 @@ mod requests;
 mod semantic_tokens;
 mod symbols;
 mod traits;
+mod type_hierarchy;
 
 use self::traits::{NotificationHandler, RequestHandler};
 use super::{Result, schedule::BackgroundSchedule};
 use crate::session::client::Client;
 pub(crate) use diagnostics::publish_settings_diagnostics;
-pub use requests::{PartialWorkspaceProgress, PartialWorkspaceProgressParams};
 use ruff_db::panic::PanicError;
 
 /// Processes a request from the client to the server.
@@ -30,8 +30,11 @@ use ruff_db::panic::PanicError;
 pub(super) fn request(req: server::Request) -> Task {
     let id = req.id.clone();
 
-    match req.method.as_str() {
+    match LspRequestMethod::from(req.method.as_str()) {
         requests::ExecuteCommand::METHOD => sync_request_task::<requests::ExecuteCommand>(req),
+        requests::CodeActionRequestHandler::METHOD => background_document_request_task::<
+            requests::CodeActionRequestHandler,
+        >(req, BackgroundSchedule::Worker),
         requests::DocumentDiagnosticRequestHandler::METHOD => background_document_request_task::<
             requests::DocumentDiagnosticRequestHandler,
         >(
@@ -49,6 +52,11 @@ pub(super) fn request(req: server::Request) -> Task {
         ),
         requests::GotoDeclarationRequestHandler::METHOD => background_document_request_task::<
             requests::GotoDeclarationRequestHandler,
+        >(
+            req, BackgroundSchedule::Worker
+        ),
+        requests::GotoImplementationRequestHandler::METHOD => background_document_request_task::<
+            requests::GotoImplementationRequestHandler,
         >(
             req, BackgroundSchedule::Worker
         ),
@@ -94,6 +102,9 @@ pub(super) fn request(req: server::Request) -> Task {
         requests::SelectionRangeRequestHandler::METHOD => background_document_request_task::<
             requests::SelectionRangeRequestHandler,
         >(req, BackgroundSchedule::Worker),
+        requests::FoldingRangeRequestHandler::METHOD => background_document_request_task::<
+            requests::FoldingRangeRequestHandler,
+        >(req, BackgroundSchedule::Worker),
         requests::DocumentSymbolRequestHandler::METHOD => background_document_request_task::<
             requests::DocumentSymbolRequestHandler,
         >(req, BackgroundSchedule::Worker),
@@ -102,7 +113,40 @@ pub(super) fn request(req: server::Request) -> Task {
         >(
             req, BackgroundSchedule::Worker
         ),
-        lsp_types::request::Shutdown::METHOD => sync_request_task::<requests::ShutdownHandler>(req),
+        requests::PrepareTypeHierarchyRequestHandler::METHOD => background_document_request_task::<
+            requests::PrepareTypeHierarchyRequestHandler,
+        >(
+            req, BackgroundSchedule::Worker
+        ),
+        requests::TypeHierarchySupertypesRequestHandler::METHOD => {
+            background_request_task::<requests::TypeHierarchySupertypesRequestHandler>(
+                req,
+                BackgroundSchedule::Worker,
+            )
+        }
+        requests::TypeHierarchySubtypesRequestHandler::METHOD => background_request_task::<
+            requests::TypeHierarchySubtypesRequestHandler,
+        >(
+            req, BackgroundSchedule::Worker
+        ),
+        requests::PrepareCallHierarchyRequestHandler::METHOD => background_document_request_task::<
+            requests::PrepareCallHierarchyRequestHandler,
+        >(
+            req, BackgroundSchedule::Worker
+        ),
+        requests::CallHierarchyIncomingCallsRequestHandler::METHOD => {
+            background_request_task::<requests::CallHierarchyIncomingCallsRequestHandler>(
+                req,
+                BackgroundSchedule::Worker,
+            )
+        }
+        requests::CallHierarchyOutgoingCallsRequestHandler::METHOD => {
+            background_request_task::<requests::CallHierarchyOutgoingCallsRequestHandler>(
+                req,
+                BackgroundSchedule::Worker,
+            )
+        }
+        lsp_types::ShutdownRequest::METHOD => sync_request_task::<requests::ShutdownHandler>(req),
 
         method => {
             tracing::warn!("Received request {method} which does not have a handler");
@@ -116,10 +160,14 @@ pub(super) fn request(req: server::Request) -> Task {
     .unwrap_or_else(|err| {
         tracing::error!("Encountered error when routing request with ID {id}: {err}");
 
-        Task::sync(move |_session, client| {
-            client.show_error_message(
-                "ty failed to handle a request from the editor. Check the logs for more details.",
-            );
+        Task::sync(move |session, client| {
+            if matches!(err.code, ErrorCode::InternalError) {
+                client.show_error_message(format!(
+                    "ty failed to handle a request from the editor. {}",
+                    session.client_name().log_guidance()
+                ));
+            }
+
             respond_silent_error(
                 id,
                 client,
@@ -134,7 +182,7 @@ pub(super) fn request(req: server::Request) -> Task {
 }
 
 pub(super) fn notification(notif: server::Notification) -> Task {
-    match notif.method.as_str() {
+    match LspNotificationMethod::from(notif.method.as_str()) {
         notifications::DidCloseTextDocumentHandler::METHOD => {
             sync_notification_task::<notifications::DidCloseTextDocumentHandler>(notif)
         }
@@ -147,16 +195,25 @@ pub(super) fn notification(notif: server::Notification) -> Task {
         notifications::DidOpenNotebookHandler::METHOD => {
             sync_notification_task::<notifications::DidOpenNotebookHandler>(notif)
         }
+        notifications::DidChangeNotebookHandler::METHOD => {
+            sync_notification_task::<notifications::DidChangeNotebookHandler>(notif)
+        }
         notifications::DidCloseNotebookHandler::METHOD => {
             sync_notification_task::<notifications::DidCloseNotebookHandler>(notif)
+        }
+        notifications::DidSaveTextDocumentHandler::METHOD => {
+            sync_notification_task::<notifications::DidSaveTextDocumentHandler>(notif)
         }
         notifications::DidChangeWatchedFiles::METHOD => {
             sync_notification_task::<notifications::DidChangeWatchedFiles>(notif)
         }
-        lsp_types::notification::Cancel::METHOD => {
+        notifications::DidChangeWorkspaceFoldersHandler::METHOD => {
+            sync_notification_task::<notifications::DidChangeWorkspaceFoldersHandler>(notif)
+        }
+        lsp_types::CancelNotification::METHOD => {
             sync_notification_task::<notifications::CancelNotificationHandler>(notif)
         }
-        lsp_types::notification::SetTrace::METHOD => {
+        lsp_types::SetTraceNotification::METHOD => {
             tracing::trace!("Ignoring `setTrace` notification");
             return Task::nothing();
         }
@@ -166,14 +223,17 @@ pub(super) fn notification(notif: server::Notification) -> Task {
             return Task::nothing();
         }
     }
-        .unwrap_or_else(|err| {
-            tracing::error!("Encountered error when routing notification: {err}");
-            Task::sync(|_session, client| {
-                client.show_error_message(
-                    "ty failed to handle a notification from the editor. Check the logs for more details."
-                );
-            })
+    .unwrap_or_else(|err| {
+        tracing::error!("Encountered error when routing notification: {err}");
+        Task::sync(move |session, client| {
+            if matches!(err.code, ErrorCode::InternalError) {
+                client.show_error_message(format!(
+                    "ty failed to handle a notification from the editor. {}",
+                    session.client_name().log_guidance()
+                ));
+            }
         })
+    })
 }
 
 fn sync_request_task<R: traits::SyncRequestHandler>(req: server::Request) -> Result<Task>
@@ -182,9 +242,9 @@ where
 {
     let (id, params) = cast_request::<R>(req)?;
     Ok(Task::sync(move |session, client: &Client| {
-        let _span = tracing::debug_span!("request", %id, method = R::METHOD).entered();
+        let _span = tracing::debug_span!("request", %id, method = %R::METHOD).entered();
         let result = R::run(session, client, params);
-        respond::<R>(&id, result, client);
+        respond::<R>(&id, result, client, session.client_name().log_guidance());
     }))
 }
 
@@ -208,14 +268,15 @@ where
         // SAFETY: The `snapshot` is safe to move across the unwind boundary because it is not used
         // after unwinding.
         let snapshot = AssertUnwindSafe(session.snapshot_session());
+        let log_guidance = snapshot.0.client_name().log_guidance();
 
         Box::new(move |client| {
-            let _span = tracing::debug_span!("request", %id, method = R::METHOD).entered();
+            let _span = tracing::debug_span!("request", %id, method = %R::METHOD).entered();
 
             // Test again if the request was cancelled since it was scheduled on the background task
             // and, if so, return early
             if cancellation_token.is_cancelled() {
-                tracing::trace!(
+                tracing::debug!(
                     "Ignoring request id={id} method={} because it was cancelled",
                     R::METHOD
                 );
@@ -229,7 +290,7 @@ where
                 let snapshot = snapshot;
                 R::handle_request(&id, snapshot.0, client, params);
             }) {
-                panic_response::<R>(&id, client, &error, retry);
+                panic_response::<R>(&id, client, &error, retry, log_guidance);
             }
         })
     }))
@@ -252,10 +313,10 @@ where
             .cancellation_token(&id)
             .expect("request should have been tested for cancellation before scheduling");
 
-        let url = R::document_url(&params);
+        let uri = R::document_uri(&params);
 
-        let Ok(document) = session.snapshot_document(&url) else {
-            let reason = format!("Document {url} is not open in the session");
+        let Ok(document) = session.snapshot_document(&uri) else {
+            let reason = format!("Document {uri} is not open in the session");
             tracing::warn!(
                 "Ignoring request id={id} method={} because {reason}",
                 R::METHOD
@@ -273,16 +334,17 @@ where
             });
         };
 
-        let path = document.to_file_path();
-        let db = session.project_db(&path).clone();
+        let path = document.notebook_or_file_path();
+        let db = session.project_db(path).clone();
+        let log_guidance = document.client_name().log_guidance();
 
         Box::new(move |client| {
-            let _span = tracing::debug_span!("request", %id, method = R::METHOD).entered();
+            let _span = tracing::debug_span!("request", %id, method = %R::METHOD).entered();
 
             // Test again if the request was cancelled since it was scheduled on the background task
             // and, if so, return early
             if cancellation_token.is_cancelled() {
-                tracing::trace!(
+                tracing::debug!(
                     "Ignoring request id={id} method={} because it was cancelled",
                     R::METHOD
                 );
@@ -293,9 +355,11 @@ where
             }
 
             if let Err(error) = ruff_db::panic::catch_unwind(|| {
-                R::handle_request(&id, &db, document, client, params);
+                salsa::attach(&db, || {
+                    R::handle_request(&id, &db, document, client, params);
+                });
             }) {
-                panic_response::<R>(&id, client, &error, retry);
+                panic_response::<R>(&id, client, &error, retry, log_guidance);
             }
         })
     }))
@@ -306,6 +370,7 @@ fn panic_response<R>(
     client: &Client,
     error: &PanicError,
     request: Option<lsp_server::Request>,
+    log_guidance: &str,
 ) where
     R: traits::RetriableRequestHandler,
 {
@@ -314,14 +379,14 @@ fn panic_response<R>(
         // If the query supports retry, re-queue the request.
         // The query is still likely to succeed if the user modified any other document.
         if let Some(request) = request {
-            tracing::trace!(
+            tracing::debug!(
                 "request id={} method={} was cancelled by salsa, re-queueing for retry",
                 request.id,
                 request.method
             );
             client.retry(request);
         } else {
-            tracing::trace!(
+            tracing::debug!(
                 "request id={} was cancelled by salsa, sending content modified",
                 id
             );
@@ -335,6 +400,7 @@ fn panic_response<R>(
                 error: anyhow!("request handler {error}"),
             }),
             client,
+            log_guidance,
         );
     }
 }
@@ -344,10 +410,13 @@ fn sync_notification_task<N: traits::SyncNotificationHandler>(
 ) -> Result<Task> {
     let (id, params) = cast_notification::<N>(notif)?;
     Ok(Task::sync(move |session, client| {
-        let _span = tracing::debug_span!("notification", method = N::METHOD).entered();
+        let _span = tracing::debug_span!("notification", method = %N::METHOD).entered();
         if let Err(err) = N::run(session, client, params) {
             tracing::error!("An error occurred while running {id}: {err}");
-            client.show_error_message("ty encountered a problem. Check the logs for more details.");
+            client.show_error_message(format!(
+                "ty encountered a problem. {}",
+                session.client_name().log_guidance()
+            ));
 
             return;
         }
@@ -369,9 +438,9 @@ where
 {
     let (id, params) = cast_notification::<N>(req)?;
     Ok(Task::background(schedule, move |session: &Session| {
-        let url = N::document_url(&params);
-        let Ok(snapshot) = session.snapshot_document(&url) else {
-            let reason = format!("Document {url} is not open in the session");
+        let uri = N::document_uri(&params);
+        let Ok(snapshot) = session.snapshot_document(&uri) else {
+            let reason = format!("Document {uri} is not open in the session");
             tracing::warn!(
                 "Ignoring notification id={id} method={} because {reason}",
                 N::METHOD
@@ -379,8 +448,10 @@ where
             return Box::new(|_| {});
         };
 
+        let log_guidance = snapshot.client_name().log_guidance();
+
         Box::new(move |client| {
-            let _span = tracing::debug_span!("notification", method = N::METHOD).entered();
+            let _span = tracing::debug_span!("notification", method = %N::METHOD).entered();
 
             let result = match ruff_db::panic::catch_unwind(|| {
                 N::run_with_snapshot(snapshot, client, params)
@@ -388,18 +459,14 @@ where
                 Ok(result) => result,
                 Err(panic) => {
                     tracing::error!("An error occurred while running {id}: {panic}");
-                    client.show_error_message(
-                        "ty encountered a panic. Check the logs for more details.",
-                    );
+                    client.show_error_message(format!("ty encountered a panic. {log_guidance}"));
                     return;
                 }
             };
 
             if let Err(err) = result {
                 tracing::error!("An error occurred while running {id}: {err}");
-                client.show_error_message(
-                    "ty encountered a problem. Check the logs for more details.",
-                );
+                client.show_error_message(format!("ty encountered a problem. {log_guidance}"));
             }
         })
     }))
@@ -420,7 +487,7 @@ where
     <<Req as RequestHandler>::RequestType as Request>::Params: UnwindSafe,
 {
     request
-        .extract(Req::METHOD)
+        .extract(Req::METHOD.as_str())
         .map_err(|err| match err {
             json_err @ server::ExtractError::JsonError { .. } => {
                 anyhow::anyhow!("JSON parsing failure:\n{json_err}")
@@ -430,20 +497,21 @@ where
                     than the one whose method name was matched against earlier.")
             }
         })
-        .with_failure_code(server::ErrorCode::InternalError)
+        .with_failure_code(server::ErrorCode::InvalidParams)
 }
 
-/// Sends back a response to the server, but only if the request wasn't cancelled.
+/// Sends back a response to the client, but only if the request wasn't cancelled.
 fn respond<Req>(
     id: &RequestId,
     result: Result<<<Req as RequestHandler>::RequestType as Request>::Result>,
     client: &Client,
+    log_guidance: &str,
 ) where
     Req: RequestHandler,
 {
     if let Err(err) = &result {
         tracing::error!("An error occurred with request ID {id}: {err}");
-        client.show_error_message("ty encountered a problem. Check the logs for more details.");
+        client.show_error_message(format!("ty encountered a problem. {log_guidance}"));
     }
     client.respond(id, result);
 }
@@ -459,7 +527,7 @@ fn respond_silent_error(id: RequestId, client: &Client, error: lsp_server::Respo
 fn cast_notification<N>(
     notification: server::Notification,
 ) -> Result<(
-    &'static str,
+    LspNotificationMethod<'static>,
     <<N as NotificationHandler>::NotificationType as Notification>::Params,
 )>
 where
@@ -468,7 +536,7 @@ where
     Ok((
         N::METHOD,
         notification
-            .extract(N::METHOD)
+            .extract(N::METHOD.as_str())
             .map_err(|err| match err {
                 json_err @ server::ExtractError::JsonError { .. } => {
                     anyhow::anyhow!("JSON parsing failure:\n{json_err}")
@@ -478,7 +546,7 @@ where
                         than the one whose method name was matched against earlier.")
                 }
             })
-            .with_failure_code(server::ErrorCode::InternalError)?,
+            .with_failure_code(server::ErrorCode::InvalidParams)?,
     ))
 }
 

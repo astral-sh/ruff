@@ -1,6 +1,6 @@
 use crate::diagnostic::{
     Diagnostic, DisplayDiagnosticConfig, Severity,
-    stylesheet::{DiagnosticStylesheet, fmt_styled},
+    stylesheet::{DiagnosticStylesheet, fmt_styled, fmt_with_hyperlink},
 };
 
 use super::FileResolver;
@@ -21,13 +21,17 @@ impl<'a> ConciseRenderer<'a> {
         diagnostics: &[Diagnostic],
     ) -> std::fmt::Result {
         let stylesheet = if self.config.color {
-            DiagnosticStylesheet::styled()
+            DiagnosticStylesheet::styled().hyperlinks(self.config.hyperlinks)
         } else {
             DiagnosticStylesheet::plain()
         };
 
         let sep = fmt_styled(":", stylesheet.separator);
         for diag in diagnostics {
+            if self.config.is_canceled() {
+                return Ok(());
+            }
+
             if let Some(span) = diag.primary_span() {
                 write!(
                     f,
@@ -62,25 +66,31 @@ impl<'a> ConciseRenderer<'a> {
                 }
                 write!(f, "{sep} ")?;
             }
+
+            let use_name = self.config.preview && !self.config.prefer_rule_codes;
             if self.config.hide_severity {
-                if let Some(code) = diag.secondary_code() {
+                if !use_name && let Some(code) = diag.secondary_code() {
                     write!(
                         f,
                         "{code} ",
-                        code = fmt_styled(code, stylesheet.secondary_code)
+                        code = fmt_styled(
+                            fmt_with_hyperlink(&code, diag.documentation_url(), &stylesheet),
+                            stylesheet.secondary_code
+                        )
                     )?;
                 } else {
                     write!(
                         f,
                         "{id}: ",
-                        id = fmt_styled(diag.inner.id.as_str(), stylesheet.secondary_code)
+                        id = fmt_styled(
+                            fmt_with_hyperlink(
+                                &diag.inner.id,
+                                diag.documentation_url(),
+                                &stylesheet
+                            ),
+                            stylesheet.secondary_code
+                        )
                     )?;
-                }
-                if self.config.show_fix_status {
-                    // Do not display an indicator for inapplicable fixes
-                    if diag.has_applicable_fix(self.config) {
-                        write!(f, "[{fix}] ", fix = fmt_styled("*", stylesheet.separator))?;
-                    }
                 }
             } else {
                 let (severity, severity_style) = match diag.severity() {
@@ -89,12 +99,26 @@ impl<'a> ConciseRenderer<'a> {
                     Severity::Error => ("error", stylesheet.error),
                     Severity::Fatal => ("fatal", stylesheet.error),
                 };
+                let id = if use_name {
+                    diag.id().as_str()
+                } else {
+                    diag.secondary_code_or_id()
+                };
                 write!(
                     f,
                     "{severity}[{id}] ",
                     severity = fmt_styled(severity, severity_style),
-                    id = fmt_styled(diag.id(), stylesheet.emphasis)
+                    id = fmt_styled(
+                        fmt_with_hyperlink(id, diag.documentation_url(), &stylesheet),
+                        stylesheet.emphasis
+                    )
                 )?;
+            }
+            if self.config.show_fix_status {
+                // Do not display an indicator for inapplicable fixes
+                if diag.has_applicable_fix(self.config.fix_applicability()) {
+                    write!(f, "[{fix}] ", fix = fmt_styled("*", stylesheet.separator))?;
+                }
             }
 
             writeln!(f, "{message}", message = diag.concise_message())?;
@@ -119,10 +143,11 @@ mod tests {
     #[test]
     fn output() {
         let (env, diagnostics) = create_diagnostics(DiagnosticFormat::Concise);
-        insta::assert_snapshot!(env.render_diagnostics(&diagnostics), @r"
-        fib.py:1:8: error[unused-import] `os` imported but unused
-        fib.py:6:5: error[unused-variable] Local variable `x` is assigned to but never used
-        undef.py:1:4: error[undefined-name] Undefined name `a`
+        insta::assert_snapshot!(env.render_diagnostics(&diagnostics), @"
+        fib.py:1:8: error[F401] `os` imported but unused
+        fib.py:6:5: error[F841] Local variable `x` is assigned to but never used
+        undef.py:1:4: error[F821] Undefined name `a`
+        fib.py:12:16: error[F821] Undefined name `fibonaccii`
         ");
     }
 
@@ -132,10 +157,11 @@ mod tests {
         env.hide_severity(true);
         env.show_fix_status(true);
         env.fix_applicability(Applicability::DisplayOnly);
-        insta::assert_snapshot!(env.render_diagnostics(&diagnostics), @r"
+        insta::assert_snapshot!(env.render_diagnostics(&diagnostics), @"
         fib.py:1:8: F401 [*] `os` imported but unused
         fib.py:6:5: F841 [*] Local variable `x` is assigned to but never used
         undef.py:1:4: F821 Undefined name `a`
+        fib.py:12:16: F821 Undefined name `fibonaccii`
         ");
     }
 
@@ -146,10 +172,11 @@ mod tests {
         env.show_fix_status(true);
         env.fix_applicability(Applicability::DisplayOnly);
         env.preview(true);
-        insta::assert_snapshot!(env.render_diagnostics(&diagnostics), @r"
-        fib.py:1:8: F401 [*] `os` imported but unused
-        fib.py:6:5: F841 [*] Local variable `x` is assigned to but never used
-        undef.py:1:4: F821 Undefined name `a`
+        insta::assert_snapshot!(env.render_diagnostics(&diagnostics), @"
+        fib.py:1:8: unused-import: [*] `os` imported but unused
+        fib.py:6:5: unused-variable: [*] Local variable `x` is assigned to but never used
+        undef.py:1:4: undefined-name: Undefined name `a`
+        fib.py:12:16: undefined-name: Undefined name `fibonaccii`
         ");
     }
 
@@ -159,7 +186,7 @@ mod tests {
         env.hide_severity(true);
         env.show_fix_status(true);
         env.fix_applicability(Applicability::DisplayOnly);
-        insta::assert_snapshot!(env.render_diagnostics(&diagnostics), @r"
+        insta::assert_snapshot!(env.render_diagnostics(&diagnostics), @"
         syntax_errors.py:1:15: invalid-syntax: Expected one or more symbol names after import
         syntax_errors.py:3:12: invalid-syntax: Expected ')', found newline
         ");
@@ -168,7 +195,7 @@ mod tests {
     #[test]
     fn syntax_errors() {
         let (env, diagnostics) = create_syntax_error_diagnostics(DiagnosticFormat::Concise);
-        insta::assert_snapshot!(env.render_diagnostics(&diagnostics), @r"
+        insta::assert_snapshot!(env.render_diagnostics(&diagnostics), @"
         syntax_errors.py:1:15: error[invalid-syntax] Expected one or more symbol names after import
         syntax_errors.py:3:12: error[invalid-syntax] Expected ')', found newline
         ");
@@ -177,10 +204,10 @@ mod tests {
     #[test]
     fn notebook_output() {
         let (env, diagnostics) = create_notebook_diagnostics(DiagnosticFormat::Concise);
-        insta::assert_snapshot!(env.render_diagnostics(&diagnostics), @r"
-        notebook.ipynb:cell 1:2:8: error[unused-import] `os` imported but unused
-        notebook.ipynb:cell 2:2:8: error[unused-import] `math` imported but unused
-        notebook.ipynb:cell 3:4:5: error[unused-variable] Local variable `x` is assigned to but never used
+        insta::assert_snapshot!(env.render_diagnostics(&diagnostics), @"
+        notebook.ipynb:cell 1:2:8: error[F401] `os` imported but unused
+        notebook.ipynb:cell 2:2:8: error[F401] `math` imported but unused
+        notebook.ipynb:cell 3:4:5: error[F841] Local variable `x` is assigned to but never used
         ");
     }
 

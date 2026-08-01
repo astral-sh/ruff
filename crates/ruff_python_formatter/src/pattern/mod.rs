@@ -1,9 +1,8 @@
 use ruff_formatter::{FormatOwnedWithRule, FormatRefWithRule, FormatRule, FormatRuleWithOptions};
 use ruff_python_ast::{AnyNodeRef, Expr, PatternMatchAs};
 use ruff_python_ast::{MatchCase, Pattern};
-use ruff_python_trivia::CommentRanges;
 use ruff_python_trivia::{
-    BackwardsTokenizer, SimpleToken, SimpleTokenKind, first_non_trivia_token,
+    BackwardsTokenizer, CommentRanges, SimpleToken, SimpleTokenKind, first_non_trivia_token,
 };
 use ruff_text_size::Ranged;
 use std::cmp::Ordering;
@@ -14,7 +13,6 @@ use crate::expression::parentheses::{
     NeedsParentheses, OptionalParentheses, Parentheses, optional_parentheses, parenthesized,
 };
 use crate::prelude::*;
-use crate::preview::is_avoid_parens_for_long_as_captures_enabled;
 
 pub(crate) mod pattern_arguments;
 pub(crate) mod pattern_keyword;
@@ -57,7 +55,7 @@ impl FormatRule<Pattern, PyFormatContext<'_>> for FormatPattern {
         let parenthesize = match self.parentheses {
             Parentheses::Preserve => is_pattern_parenthesized(
                 pattern,
-                f.context().comments().ranges(),
+                f.context().trivia().comments(),
                 f.context().source(),
             ),
             Parentheses::Always => true,
@@ -214,8 +212,9 @@ impl Format<PyFormatContext<'_>> for MaybeParenthesizePattern<'_> {
     }
 }
 
-/// This function is very similar to [`can_omit_optional_parentheses`] with the only difference that it is for patterns
-/// and not expressions.
+/// This function is very similar to
+/// [`can_omit_optional_parentheses`](crate::expression::can_omit_optional_parentheses)
+/// with the only difference that it is for patterns and not expressions.
 ///
 /// The base idea of the omit optional parentheses layout is to prefer using parentheses of sub-patterns
 /// when splitting the pattern over introducing new patterns. For example, prefer splitting the sequence pattern in
@@ -245,10 +244,7 @@ pub(crate) fn can_pattern_omit_optional_parentheses(
                 | Pattern::MatchStar(_)
                 | Pattern::MatchOr(_) => false,
                 Pattern::MatchAs(PatternMatchAs { pattern, .. }) => match pattern {
-                    Some(pattern) => {
-                        is_avoid_parens_for_long_as_captures_enabled(context)
-                            && has_parentheses_and_is_non_empty(pattern, context)
-                    }
+                    Some(pattern) => has_parentheses_and_is_non_empty(pattern, context),
                     None => false,
                 },
                 Pattern::MatchSequence(sequence) => {
@@ -264,7 +260,7 @@ pub(crate) fn can_pattern_omit_optional_parentheses(
                 true
             } else {
                 // If the pattern has no own parentheses or it is empty (e.g. ([])), check for surrounding parentheses (that should be preserved).
-                is_pattern_parenthesized(pattern, context.comments().ranges(), context.source())
+                is_pattern_parenthesized(pattern, context.trivia().comments(), context.source())
             }
         }
 
@@ -326,9 +322,7 @@ impl<'a> CanOmitOptionalParenthesesVisitor<'a> {
                 self.first.set_if_none(First::Token);
             }
             Pattern::MatchAs(PatternMatchAs { pattern, .. }) => {
-                if let Some(pattern) = pattern
-                    && is_avoid_parens_for_long_as_captures_enabled(context)
-                {
+                if let Some(pattern) = pattern {
                     self.visit_sub_pattern(pattern, context);
                 }
             }
@@ -350,7 +344,7 @@ impl<'a> CanOmitOptionalParenthesesVisitor<'a> {
         self.last = Some(pattern);
 
         // Rule only applies for non-parenthesized patterns.
-        if is_pattern_parenthesized(pattern, context.comments().ranges(), context.source()) {
+        if is_pattern_parenthesized(pattern, context.trivia().comments(), context.source()) {
             self.any_parenthesized_expressions = true;
         } else {
             self.visit_pattern(pattern, context);

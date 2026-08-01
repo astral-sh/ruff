@@ -32,15 +32,15 @@ Example:
 
 import sys
 from _socket import _Address as _SourceAddress
-from _typeshed import ReadableBuffer, SizedBuffer
+from _typeshed import ReadableBuffer, SizedBuffer, StrOrBytesPath
 from collections.abc import Sequence
 from email.message import Message as _Message
 from re import Pattern
 from socket import socket
 from ssl import SSLContext
 from types import TracebackType
-from typing import Any, Final, Protocol, overload, type_check_only
-from typing_extensions import Self, TypeAlias
+from typing import Any, Final, Protocol, TypeAlias, overload, type_check_only
+from typing_extensions import Self, deprecated
 
 __all__ = [
     "SMTPException",
@@ -328,6 +328,7 @@ class SMTP:
 
     def verify(self, address: str) -> _Reply:
         """SMTP 'verify' command -- checks for address validity."""
+
     vrfy = verify
     def expn(self, address: str) -> _Reply:
         """SMTP 'expn' command -- expands a mailing list."""
@@ -343,6 +344,7 @@ class SMTP:
          SMTPHeloError            The server didn't reply properly to
                                   the helo greeting.
         """
+
     user: str
     password: str
     def auth(self, mechanism: str, authobject: _AuthObject, *, initial_response_ok: bool = True) -> _Reply:
@@ -370,9 +372,9 @@ class SMTP:
         """Authobject to use with CRAM-MD5 authentication. Requires self.user
         and self.password to be set.
         """
-
     @overload
     def auth_cram_md5(self, challenge: ReadableBuffer) -> str: ...
+
     def auth_plain(self, challenge: ReadableBuffer | None = None) -> str:
         """Authobject to use with PLAIN authentication. Requires self.user and
         self.password to be set.
@@ -410,6 +412,7 @@ class SMTP:
          SMTPException            No suitable authentication method was
                                   found.
         """
+
     if sys.version_info >= (3, 12):
         def starttls(self, *, context: SSLContext | None = None) -> _Reply:
             """Puts the connection to the SMTP server into TLS mode.
@@ -428,8 +431,10 @@ class SMTP:
              SMTPHeloError            The server didn't reply properly to
                                       the helo greeting.
             """
+
     else:
-        def starttls(self, keyfile: str | None = None, certfile: str | None = None, context: SSLContext | None = None) -> _Reply:
+        @overload
+        def starttls(self, keyfile: None = None, certfile: None = None, context: SSLContext | None = None) -> _Reply:
             """Puts the connection to the SMTP server into TLS mode.
 
             If there has been no previous EHLO or HELO command this session, this
@@ -446,6 +451,14 @@ class SMTP:
              SMTPHeloError            The server didn't reply properly to
                                       the helo greeting.
             """
+        @overload
+        @deprecated(
+            "The `keyfile`, `certfile` parameters are deprecated since Python 3.6; "
+            "removed in Python 3.12. Use `context` parameter instead."
+        )
+        def starttls(
+            self, keyfile: StrOrBytesPath | None = None, certfile: StrOrBytesPath | None = None, context: None = None
+        ) -> _Reply: ...
 
     def sendmail(
         self,
@@ -531,7 +544,7 @@ empty dictionary.
         The arguments are as for sendmail, except that msg is an
         email.message.Message object.  If from_addr is None or to_addrs is
         None, these arguments are taken from the headers of the Message as
-        described in RFC 2822 (a ValueError is raised if there is more than
+        described in RFC 5322 (a ValueError is raised if there is more than
         one set of 'Resent-' headers).  Regardless of the values of from_addr and
         to_addr, any Bcc field (or Resent-Bcc field, when the Message is a
         resent) of the Message object won't be transmitted.  The Message
@@ -563,8 +576,6 @@ class SMTP_SSL(SMTP):
 
     """
 
-    keyfile: str | None
-    certfile: str | None
     context: SSLContext
     if sys.version_info >= (3, 12):
         def __init__(
@@ -578,17 +589,37 @@ class SMTP_SSL(SMTP):
             context: SSLContext | None = None,
         ) -> None: ...
     else:
+        @overload
         def __init__(
             self,
             host: str = "",
             port: int = 0,
             local_hostname: str | None = None,
-            keyfile: str | None = None,
-            certfile: str | None = None,
+            keyfile: None = None,
+            certfile: None = None,
             timeout: float = ...,
             source_address: _SourceAddress | None = None,
             context: SSLContext | None = None,
         ) -> None: ...
+        @overload
+        @deprecated(
+            "The `keyfile`, `certfile` parameters are deprecated since Python 3.6; "
+            "removed in Python 3.12. Use `context` parameter instead."
+        )
+        def __init__(
+            self,
+            host: str = "",
+            port: int = 0,
+            local_hostname: str | None = None,
+            keyfile: StrOrBytesPath | None = None,
+            certfile: StrOrBytesPath | None = None,
+            timeout: float = ...,
+            source_address: _SourceAddress | None = None,
+            context: None = None,
+        ) -> None: ...
+
+        keyfile: StrOrBytesPath | None
+        certfile: StrOrBytesPath | None
 
 LMTP_PORT: Final = 2003
 

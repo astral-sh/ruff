@@ -125,8 +125,8 @@ from _typeshed import ReadableBuffer
 from collections.abc import Callable
 from io import BufferedIOBase
 from socket import socket as _socket
-from typing import Any, ClassVar
-from typing_extensions import Self, TypeAlias
+from typing import Any, ClassVar, TypeAlias
+from typing_extensions import Self
 
 __all__ = [
     "BaseServer",

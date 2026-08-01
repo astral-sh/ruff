@@ -35,7 +35,7 @@ reveal_type(C.ten)  # revealed: Literal[10]
 # This is fine:
 c.ten = 10
 
-# error: [invalid-assignment] "Invalid assignment to data descriptor attribute `ten` on type `C` with custom `__set__` method"
+# error: [invalid-assignment] "Invalid assignment to data descriptor attribute `ten` on type `C`"
 c.ten = 11
 ```
 
@@ -78,10 +78,54 @@ c.flexible_int = "42"  # also okay!
 
 reveal_type(c.flexible_int)  # revealed: int | None
 
-# error: [invalid-assignment] "Invalid assignment to data descriptor attribute `flexible_int` on type `C` with custom `__set__` method"
+# error: [invalid-assignment] "Invalid assignment to data descriptor attribute `flexible_int` on type `C`"
 c.flexible_int = None  # not okay
 
 reveal_type(c.flexible_int)  # revealed: int | None
+```
+
+### Enum complement as descriptor mutation receiver
+
+`overloaded.pyi`:
+
+```pyi
+from enum import Enum
+from typing import Literal, overload
+
+class Marker:
+    @overload
+    def __set__(self, instance: "Literal[Color.GREEN]", value: int) -> None: ...
+    @overload
+    def __set__(self, instance: "Literal[Color.BLUE]", value: int) -> None: ...
+    def __set__(self, instance, value: int) -> None: ...
+    @overload
+    def __delete__(self, instance: "Literal[Color.GREEN]") -> None: ...
+    @overload
+    def __delete__(self, instance: "Literal[Color.BLUE]") -> None: ...
+    def __delete__(self, instance) -> None: ...
+
+class Color(Enum):
+    RED = 1
+    GREEN = 2
+    BLUE = 3
+
+    marker: Marker
+```
+
+```py
+from typing import Literal
+
+from overloaded import Color
+
+def narrowed(color: Color):
+    if color is Color.RED:
+        return
+    color.marker = 1
+    del color.marker
+
+def explicit(color: Literal[Color.GREEN, Color.BLUE]):
+    color.marker = 1
+    del color.marker
 ```
 
 ### Data and non-data descriptors
@@ -121,22 +165,23 @@ class C:
 
         # However, for non-data descriptors, instance attributes do take precedence.
         # So it is possible to override them.
+        # error: [invalid-assignment] "Object of type `Literal[1]` is not assignable to attribute `non_data_descriptor` of type `NonDataDescriptor`"
         self.non_data_descriptor = 1
 
 c = C()
 
-reveal_type(c.data_descriptor)  # revealed: Unknown | Literal["data"]
+reveal_type(c.data_descriptor)  # revealed: Literal["data"]
 
-reveal_type(c.non_data_descriptor)  # revealed: Unknown | Literal["non-data", 1]
+reveal_type(c.non_data_descriptor)  # revealed: Literal["non-data"] | int
 
-reveal_type(C.data_descriptor)  # revealed: Unknown | Literal["data"]
+reveal_type(C.data_descriptor)  # revealed: Literal["data"]
 
-reveal_type(C.non_data_descriptor)  # revealed: Unknown | Literal["non-data"]
+reveal_type(C.non_data_descriptor)  # revealed: Literal["non-data"]
 
-# It is possible to override data descriptors via class objects. The following
-# assignment does not call `DataDescriptor.__set__`. For this reason, we infer
-# `Unknown | …` for all (descriptor) attributes.
-C.data_descriptor = "something else"  # This is okay
+# Assignments through class objects are still checked against the declared
+# descriptor type.
+# error: [invalid-assignment] "Object of type `Literal["something else"]` is not assignable to attribute `data_descriptor` of type `DataDescriptor`"
+C.data_descriptor = "something else"
 ```
 
 ### Partial fall back
@@ -170,12 +215,13 @@ def f1(flag: bool):
             attr = DataDescriptor()
 
         def f(self):
-            # error: [invalid-assignment] "Invalid assignment to data descriptor attribute `attr` on type `Self@f` with custom `__set__` method"
-            self.attr = "normal"
+            # error: [invalid-assignment] "Invalid assignment to data descriptor attribute `attr` on type `Self@f`"
+            self.attr = b"foo"
 
-    reveal_type(C1().attr)  # revealed: Unknown | Literal["data", "normal"]
+    reveal_type(C1().attr)  # revealed: Literal["data"] | bytes
 
     # Assigning to the attribute also causes no `possibly-unbound` diagnostic:
+    # error: [invalid-assignment] "Object of type `Literal[1]` is not assignable to attribute `attr` of type `bytes`"
     C1().attr = 1
 ```
 
@@ -185,13 +231,177 @@ descriptor here:
 ```py
 class C2:
     def f(self):
-        self.attr = "normal"
+        # error: [invalid-assignment] "Object of type `Literal[b"normal"]` is not assignable to attribute `attr` of type `NonDataDescriptor`"
+        self.attr = b"normal"
     attr = NonDataDescriptor()
 
-reveal_type(C2().attr)  # revealed: Unknown | Literal["non-data", "normal"]
+reveal_type(C2().attr)  # revealed: Literal["non-data"] | bytes
 
-# Assignments always go to the instance attribute in this case
+# Reads still fall back to the instance attribute in this case, but assignments
+# are checked against the declared class attribute type.
+# error: [invalid-assignment] "Object of type `Literal[1]` is not assignable to attribute `attr` of type `NonDataDescriptor`"
 C2().attr = 1
+```
+
+### Classes with unknown bases are not automatically descriptors
+
+When we cannot determine a class's base, we treat that base as `Unknown`. A `__get__` method written
+on the class still makes it a descriptor, but we do not assume that `Unknown` supplies `__set__` or
+`__delete__`. A `__set__` method written on the class still makes it a data descriptor:
+
+```py
+from typing import Literal
+from unknown_module import UnknownBase  # error: [unresolved-import]
+
+class NotADescriptor(UnknownBase): ...
+
+class NonDataDescriptor(UnknownBase):
+    def __get__(self, instance: object, owner: type | None = None) -> Literal["non-data"]:
+        return "non-data"
+
+class DataDescriptor(UnknownBase):
+    def __get__(self, instance: object, owner: type | None = None) -> Literal["data"]:
+        return "data"
+
+    def __set__(self, instance: object, value: object) -> None:
+        pass
+
+class C:
+    plain: NotADescriptor
+    non_data: NonDataDescriptor
+    data: DataDescriptor
+
+reveal_type(C().plain)  # revealed: NotADescriptor
+reveal_type(C().non_data)  # revealed: Literal["non-data"] | NonDataDescriptor
+reveal_type(C().data)  # revealed: Literal["data"]
+```
+
+An `Any` base follows the same rule. A `__get__` method written on the class still makes it a
+descriptor, but we do not assume that `Any` supplies `__set__` or `__delete__`. A `__set__` method
+written on the class still makes it a data descriptor:
+
+```py
+from typing import Any, Literal
+
+class NotADescriptor(Any): ...
+
+class NonDataDescriptor(Any):
+    def __get__(self, instance: object, owner: type | None = None) -> Literal["non-data"]:
+        return "non-data"
+
+class DataDescriptor(Any):
+    def __get__(self, instance: object, owner: type | None = None) -> Literal["data"]:
+        return "data"
+
+    def __set__(self, instance: object, value: object) -> None:
+        pass
+
+class C:
+    plain: NotADescriptor
+    non_data: NonDataDescriptor
+    data: DataDescriptor
+
+reveal_type(C().plain)  # revealed: NotADescriptor
+reveal_type(C().non_data)  # revealed: Literal["non-data"] | NonDataDescriptor
+reveal_type(C().data)  # revealed: Literal["data"]
+
+class OptionalAttribute:
+    value: NotADescriptor | None
+
+optional_attribute = OptionalAttribute()
+optional_attribute.value = NotADescriptor()
+
+# The assignment can narrow because `NotADescriptor` has no concrete `__set__` or `__delete__`
+# method.
+reveal_type(optional_attribute.value)  # revealed: NotADescriptor
+```
+
+An `Any` base that appears before another base class may override that class's `__get__` method at
+runtime. We still use the later method to determine that the class is a descriptor, but its return
+type must account for the earlier `Any` base:
+
+```py
+class DynamicBase:
+    def __get__(self, instance: object, owner: type | None = None) -> Literal["dynamic"]:
+        return "dynamic"
+
+class ConcreteBase:
+    def __get__(self, instance: object, owner: type | None = None) -> Literal["concrete"]:
+        return "concrete"
+
+    def __set__(self, instance: object, value: object) -> None:
+        pass
+
+AnyBase: Any = DynamicBase
+
+class Descriptor(AnyBase, ConcreteBase): ...
+
+class DescriptorOwner:
+    attribute: Descriptor = Descriptor()
+
+reveal_type(DescriptorOwner().attribute)  # revealed: Literal["concrete"] & Any
+```
+
+### Dynamically typed metaclass attributes
+
+A metaclass attribute typed as `Any` could itself be a data descriptor. When the attribute is read
+on a class, it therefore takes precedence over a class attribute with the same name. The same
+applies when `Any` is one arm of a union:
+
+```py
+from typing import Any, Literal
+
+class DataDescriptor:
+    def __get__(self, instance: object, owner: type | None = None) -> Literal["descriptor"]:
+        return "descriptor"
+
+    def __set__(self, instance: object, value: object) -> None:
+        pass
+
+class Meta(type):
+    attribute: Any = DataDescriptor()
+
+class C(metaclass=Meta):
+    attribute: int = 1
+
+reveal_type(C.attribute)  # revealed: Any
+C.attribute = "could be accepted by the dynamic descriptor"
+
+class UnionMeta(type):
+    attribute: Any | DataDescriptor = DataDescriptor()
+
+class UnionC(metaclass=UnionMeta):
+    attribute: int = 1
+
+reveal_type(UnionC.attribute)  # revealed: Any | Literal["descriptor"]
+```
+
+### Class objects with unknown metaclasses
+
+A `type[Any]` value could contain a class whose metaclass implements the descriptor protocol. We
+therefore preserve the possibility that an attribute typed as `type[Any]` is a data descriptor, both
+when reading the attribute and after assigning to it:
+
+```py
+from typing import Any
+
+class DescriptorMeta(type):
+    def __get__(self, instance: object, owner: type | None = None) -> str:
+        return "descriptor"
+
+    def __set__(self, instance: object, value: object) -> None:
+        pass
+
+class Descriptor(metaclass=DescriptorMeta): ...
+
+class C:
+    attribute: type[Any] = Descriptor
+
+c = C()
+reveal_type(c.attribute)  # revealed: Any
+
+c.attribute = int
+reveal_type(c.attribute)  # revealed: Any
 ```
 
 ### Descriptors only work when used as class variables
@@ -270,7 +480,7 @@ on the metaclass:
 ```py
 C1.meta_data_descriptor = 1
 
-# error: [invalid-assignment] "Invalid assignment to data descriptor attribute `meta_data_descriptor` on type `<class 'C1'>` with custom `__set__` method"
+# error: [invalid-assignment] "Invalid assignment to data descriptor attribute `meta_data_descriptor` on type `<class 'C1'>`"
 C1.meta_data_descriptor = "invalid"
 ```
 
@@ -336,6 +546,10 @@ reveal_type(C3.meta_attribute1)  # revealed: Literal["value on class"]
 reveal_type(C3.meta_attribute2)  # revealed: Literal["class level data descriptor"]
 reveal_type(C3.meta_non_data_descriptor1)  # revealed: Literal["value on class"]
 reveal_type(C3.meta_non_data_descriptor2)  # revealed: Literal["class level data descriptor"]
+
+C3.meta_non_data_descriptor1 = "value on class"
+# error: [invalid-assignment] "Object of type `Literal["invalid"]` is not assignable to attribute `meta_non_data_descriptor1` of type `Literal["value on class"]`"
+C3.meta_non_data_descriptor1 = "invalid"
 ```
 
 Finally, metaclass attributes and metaclass non-data descriptors are only accessible when they are
@@ -372,7 +586,7 @@ def _(flag: bool):
     # TODO: We currently emit two diagnostics here, corresponding to the two states of `flag`. The diagnostics are not
     # wrong, but they could be subsumed under a higher-level diagnostic.
 
-    # error: [invalid-assignment] "Invalid assignment to data descriptor attribute `meta_data_descriptor1` on type `<class 'C5'>` with custom `__set__` method"
+    # error: [invalid-assignment] "Invalid assignment to data descriptor attribute `meta_data_descriptor1` on type `<class 'C5'>`"
     # error: [invalid-assignment] "Object of type `None` is not assignable to attribute `meta_data_descriptor1` of type `Literal["value on class"]`"
     C5.meta_data_descriptor1 = None
 
@@ -521,13 +735,47 @@ reveal_type(C.name)  # revealed: property
 c.name = "new"
 c.name = None
 
-# error: [invalid-assignment] "Invalid assignment to data descriptor attribute `name` on type `C` with custom `__set__` method"
+# error: [invalid-assignment] "Invalid assignment to data descriptor attribute `name` on type `C`"
 c.name = 42
 ```
 
-### Properties with no setters
+### Overriding properties in subclasses
 
-<!-- snapshot-diagnostics -->
+When a subclass overrides a property, accessing other inherited properties from within the
+overriding property methods should still work correctly.
+
+```py
+class Base:
+    _value: float = 0.0
+
+    @property
+    def value(self) -> float:
+        return self._value
+
+    @value.setter
+    def value(self, v: float) -> None:
+        self._value = v
+
+    @property
+    def other(self) -> float:
+        return self.value
+
+    @other.setter
+    def other(self, v: float) -> None:
+        self.value = v
+
+class Derived(Base):
+    @property
+    def other(self) -> float:
+        return self.value
+
+    @other.setter
+    def other(self, v: float) -> None:
+        reveal_type(self.value)  # revealed: int | float
+        self.value = v
+```
+
+### Properties with no setters
 
 If a property has no setter, we emit a bespoke error message when a user attempts to set that
 attribute, since this is a common error.
@@ -537,8 +785,20 @@ class DontAssignToMe:
     @property
     def immutable(self): ...
 
-# error: [invalid-assignment]
+# snapshot: invalid-assignment
 DontAssignToMe().immutable = "the properties, they are a-changing"
+```
+
+```snapshot
+error[invalid-assignment]: Cannot assign to read-only property `immutable` on object of type `DontAssignToMe`
+ --> src/mdtest_snippet.py:6:1
+  |
+3 |     def immutable(self): ...
+  |         --------- Property `DontAssignToMe.immutable` defined here with no setter
+4 |
+5 | # snapshot: invalid-assignment
+6 | DontAssignToMe().immutable = "the properties, they are a-changing"
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^ Attempted assignment to `DontAssignToMe.immutable` here
 ```
 
 ### Built-in `classmethod` descriptor
@@ -590,20 +850,21 @@ Here, we only demonstrate how `__get__` works on functions:
 ```py
 import types
 from inspect import getattr_static
-from ty_extensions import static_assert, is_subtype_of, TypeOf
+from ty_extensions import static_assert
+from ty_extensions._internal import TypeOf, is_subtype_of
 
 def f(x: object) -> str:
     return "a"
 
 reveal_type(f)  # revealed: def f(x: object) -> str
-reveal_type(f.__get__)  # revealed: <method-wrapper `__get__` of `f`>
+reveal_type(f.__get__)  # revealed: <method-wrapper '__get__' of function 'f'>
 static_assert(is_subtype_of(TypeOf[f.__get__], types.MethodWrapperType))
 reveal_type(f.__get__(None, type(f)))  # revealed: def f(x: object) -> str
 reveal_type(f.__get__(None, type(f))(1))  # revealed: str
 
 wrapper_descriptor = getattr_static(f, "__get__")
 
-reveal_type(wrapper_descriptor)  # revealed: <wrapper-descriptor `__get__` of `function` objects>
+reveal_type(wrapper_descriptor)  # revealed: <wrapper-descriptor '__get__' of 'function' objects>
 reveal_type(wrapper_descriptor(f, None, type(f)))  # revealed: def f(x: object) -> str
 static_assert(is_subtype_of(TypeOf[wrapper_descriptor], types.WrapperDescriptorType))
 
@@ -696,8 +957,16 @@ reveal_type(C().instance_access)  # revealed: str
 reveal_type(C.metaclass_access)  # revealed: bytes
 
 # TODO: These should emit a diagnostic
-reveal_type(C().class_object_access)  # revealed: TailoredForClassObjectAccess
-reveal_type(C.instance_access)  # revealed: TailoredForInstanceAccess
+#
+# However, we use the return-type of `__get__` as the inferred type anyway:
+# the way to specify that the descriptor object itself is returned when the
+# attribute is accessed on the instance or the class is by overloading `__get__`.
+#
+# Using the return type of `__get__` even for `__get__` calls that have invalid
+# arguments passed to them avoids false positives in situations where there are
+# `__get__` calls that we don't sufficiently understand.
+reveal_type(C().class_object_access)  # revealed: int
+reveal_type(C.instance_access)  # revealed: str
 ```
 
 ### Descriptors with incorrect `__get__` signature
@@ -712,10 +981,28 @@ class C:
     descriptor: Descriptor = Descriptor()
 
 # TODO: This should be an error
-reveal_type(C.descriptor)  # revealed: Descriptor
+reveal_type(C.descriptor)  # revealed: int
 
 # TODO: This should be an error
-reveal_type(C().descriptor)  # revealed: Descriptor
+reveal_type(C().descriptor)  # revealed: int
+```
+
+### "Descriptors" with non-callable `__get__` attributes
+
+If `__get__` is not callable at all, the interpreter will still attempt to call the method at
+runtime, and this will raise an exception. As such, even for `__get__ = None`, we still "attempt to
+call `__get__`" on the descriptor object (leading us to infer `Unknown`):
+
+```py
+class BrokenDescriptor:
+    __get__: None = None
+
+class Foo:
+    desc: BrokenDescriptor = BrokenDescriptor()
+
+# TODO: this raises `TypeError` at runtime due to the implicit call to `__get__`;
+# we should emit a diagnostic
+reveal_type(Foo().desc)  # revealed: Unknown
 ```
 
 ### Undeclared descriptor arguments
@@ -735,8 +1022,9 @@ class Descriptor:
 class C:
     descriptor = Descriptor()
 
+# error: [invalid-assignment] "Object of type `Literal["something else"]` is not assignable to attribute `descriptor` of type `Descriptor`"
 C.descriptor = "something else"
-reveal_type(C.descriptor)  # revealed: Literal["something else"]
+reveal_type(C.descriptor)  # revealed: int
 ```
 
 ### Possibly unbound descriptor attributes
@@ -828,6 +1116,33 @@ class C:
     d: Descriptor1 = Descriptor1()
 
 reveal_type(C.d)  # revealed: int
+```
+
+### Descriptors with `Concatenate` self-types on `__get__`
+
+This is a regression test for <https://github.com/astral-sh/ty/issues/3289>.
+
+```py
+from typing import Any, Callable, Concatenate, Generic, ParamSpec, TypeVar
+
+P = ParamSpec("P")
+P2 = ParamSpec("P2")
+T = TypeVar("T")
+
+class FunctionWrapper(Generic[P]):
+    def __get__(
+        self: "FunctionWrapper[Concatenate[T, P2]]",
+        instance: T,
+    ) -> None:
+        raise NotImplementedError
+
+def wrapper(fn: Callable[P, Any]) -> FunctionWrapper[P]:
+    raise NotImplementedError
+
+class Example:
+    @wrapper
+    def __call__(self) -> None:
+        pass
 ```
 
 [descriptors]: https://docs.python.org/3/howto/descriptor.html

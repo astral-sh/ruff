@@ -19,6 +19,8 @@ use crate::docstrings::Docstring;
 /// the docstring should be placed on the non-decorated definition that contains
 /// the implementation.
 ///
+/// This rule does not apply to stub files, which don't contain implementations.
+///
 /// ## Example
 ///
 /// ```python
@@ -63,6 +65,10 @@ use crate::docstrings::Docstring;
 /// factorial.__doc__  # "Return the factorial of n."
 /// ```
 ///
+/// ## Options
+///
+/// - `lint.pydocstyle.ignore-decorators`
+///
 /// ## References
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
 /// - [Python documentation: `typing.overload`](https://docs.python.org/3/library/typing.html#typing.overload)
@@ -79,6 +85,10 @@ impl Violation for OverloadWithDocstring {
 
 /// D418
 pub(crate) fn if_needed(checker: &Checker, docstring: &Docstring) {
+    if checker.source_type.is_stub() {
+        return;
+    }
+
     let Some(function) = docstring.definition.as_function_def() else {
         return;
     };

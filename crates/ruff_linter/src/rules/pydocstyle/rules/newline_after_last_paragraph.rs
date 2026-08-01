@@ -37,6 +37,10 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 ///     """
 /// ```
 ///
+/// ## Options
+///
+/// - `lint.pydocstyle.ignore-decorators`
+///
 /// ## References
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
 /// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)

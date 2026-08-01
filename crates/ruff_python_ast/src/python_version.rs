@@ -35,6 +35,10 @@ impl PythonVersion {
         major: 3,
         minor: 14,
     };
+    pub const PY315: PythonVersion = PythonVersion {
+        major: 3,
+        minor: 15,
+    };
 
     pub fn iter() -> impl Iterator<Item = PythonVersion> {
         [
@@ -46,6 +50,7 @@ impl PythonVersion {
             PythonVersion::PY312,
             PythonVersion::PY313,
             PythonVersion::PY314,
+            PythonVersion::PY315,
         ]
         .into_iter()
     }
@@ -61,7 +66,7 @@ impl PythonVersion {
 
     /// The latest Python version supported in preview
     pub fn latest_preview() -> Self {
-        let latest_preview = Self::PY314;
+        let latest_preview = Self::PY315;
         debug_assert!(latest_preview >= Self::latest());
         latest_preview
     }
@@ -101,6 +106,18 @@ impl From<(u8, u8)> for PythonVersion {
     fn from(value: (u8, u8)) -> Self {
         let (major, minor) = value;
         Self { major, minor }
+    }
+}
+
+impl TryFrom<(i64, i64)> for PythonVersion {
+    type Error = std::num::TryFromIntError;
+
+    fn try_from(value: (i64, i64)) -> Result<Self, Self::Error> {
+        let (major, minor) = value;
+        Ok(Self {
+            major: u8::try_from(major)?,
+            minor: u8::try_from(minor)?,
+        })
     }
 }
 

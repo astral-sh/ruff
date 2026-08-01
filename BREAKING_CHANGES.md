@@ -1,5 +1,111 @@
 # Breaking Changes
 
+## 0.16.0
+
+- **New default rules**
+
+    Ruff now enables a much larger set of rules by default (413, up from 59). See the blog post for
+    more details and the new [Default Rules](https://docs.astral.sh/ruff/default-rules/) page for a
+    full listing of the enabled rules. Note that this is primarily an expansion, but 18 of the more
+    opinionated pycodestyle (`E`) and pyflakes (`F`) rules have been removed from the default set:
+    `E401`, `E402`, `E701`, `E702`, `E703`, `E711`, `E712`, `E713`, `E714`, `E721`, `E731`, `E741`,
+    `E742`, `E743`, `F403`, `F405`, `F406`, and `F722`.
+
+- **Python code block formatting in Markdown files**
+
+    Ruff can now format Python code blocks in Markdown files and will do this by default. See the
+    [documentation](https://docs.astral.sh/ruff/formatter/#markdown-code-formatting) for more details.
+
+- **`ruff: ignore` suppression comments**
+
+    Ruff now supports `ruff: ignore` comments at the ends of lines, like `noqa` comments, or on the line preceding a diagnostic. For example, these both suppress an [`unused-import`](https://docs.astral.sh/ruff/rules/unused-import/) (`F401`) diagnostic:
+
+    ```py
+    import math  # ruff: ignore[F401]
+
+    # ruff: ignore[F401]
+    import os
+    ```
+
+- **Fix diffs in linter and formatter output**
+
+    Fixes are now shown in `check` and `format --check` output:
+
+    ````console
+    ❯ ruff format --check .
+    unformatted: File would be reformatted
+     --> try.md:1:1
+      |
+    1 | ```python
+      - import   math
+    2 + import math
+    3 | ```
+      |
+
+    1 file would be reformatted
+    ````
+
+    This example also shows off the Markdown formatting.
+
+- **Output format support in `format --check`**
+
+    `format --check` now supports the same output formats as the linter, including the `github` and
+    `gitlab` outputs for rendering annotations in CI:
+
+    ```console
+    ❯ ruff format --check --output-format github .
+    ::error title=ruff (unformatted),file=try.md,line=2,col=8,endLine=2,endColumn=10::try.md:2:8: unformatted: File would be reformatted
+    ```
+
+    See the CLI help or [documentation](https://docs.astral.sh/ruff/settings/#output-format) for the
+    full list of supported formats.
+
+- **Some fields are now optional in the JSON output**
+
+    The `filename`, `location`, `end_location`, `fix.edits[].location`, and `fix.edits[].end_location`
+    fields in the JSON output format may now be `null` rather than defaulting to the empty string and
+    row 1, column 1, respectively.
+
+## 0.15.0
+
+- **2026 formatter style guide**
+
+    Ruff now formats your code according to the 2026 style guide. See the
+    formatter section in the changelog or blog post for a detailed list of
+    changes.
+
+- **Block suppression comments in the linter**
+
+    The linter now supports block suppression comments. For example, to suppress
+    `N803` for all parameters in this function:
+
+    ```python
+    # ruff: disable[N803]
+    def foo(
+        legacyArg1,
+        legacyArg2,
+        legacyArg3,
+        legacyArg4,
+    ): ...
+    # ruff: enable[N803]
+    ```
+
+- **Alpine Docker image**
+
+    The `ruff:alpine` Docker image is now based on Alpine 3.23 (up from 3.21).
+
+- **Debian Docker image**
+
+    The `ruff:debian` and `ruff:debian-slim` Docker images are now based on Debian 13 "Trixie" instead of Debian 12 "Bookworm."
+
+- **`ppc64` binaries**
+
+    Binaries for the `ppc64` (64-bit big-endian PowerPC) architecture are no longer included in our releases. It should still be possible to build Ruff manually for this platform, if needed.
+
+- **Default Python version and `extend`**
+
+    Ruff now resolves all `extend`ed configuration files before falling back on a default Python version.
+
 ## 0.14.0
 
 - **Default to Python 3.10**

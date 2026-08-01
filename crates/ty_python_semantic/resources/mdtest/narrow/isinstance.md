@@ -5,9 +5,9 @@ Narrowing for `isinstance(object, classinfo)` expressions.
 ## `classinfo` is a single type
 
 ```py
-def _(flag: bool):
-    x = 1 if flag else "a"
+from typing import Literal
 
+def _(x: Literal[1, "a"]):
     if isinstance(x, int):
         reveal_type(x)  # revealed: Literal[1]
 
@@ -26,9 +26,9 @@ Note: `isinstance(x, (int, str))` should not be confused with `isinstance(x, tup
 The former is equivalent to `isinstance(x, int | str)`:
 
 ```py
-def _(flag: bool, flag1: bool, flag2: bool):
-    x = 1 if flag else "a"
+from typing import Literal
 
+def _(x: Literal[1, "a"], y: Literal[1, "a", b"b"]):
     if isinstance(x, (int, str)):
         reveal_type(x)  # revealed: Literal[1, "a"]
     else:
@@ -47,7 +47,6 @@ def _(flag: bool, flag1: bool, flag2: bool):
     else:
         reveal_type(x)  # revealed: Never
 
-    y = 1 if flag1 else "a" if flag2 else b"b"
     if isinstance(y, (int, str)):
         reveal_type(y)  # revealed: Literal[1, "a"]
 
@@ -61,9 +60,9 @@ def _(flag: bool, flag1: bool, flag2: bool):
 ## `classinfo` is a nested tuple of types
 
 ```py
-def _(flag: bool):
-    x = 1 if flag else "a"
+from typing import Literal
 
+def _(x: Literal[1, "a"]):
     if isinstance(x, (bool, (bytes, int))):
         reveal_type(x)  # revealed: Literal[1]
     else:
@@ -82,7 +81,7 @@ def _(x: int | str | bytes | memoryview | range):
     if isinstance(x, int | str):
         reveal_type(x)  # revealed: int | str
     elif isinstance(x, bytes | memoryview):
-        reveal_type(x)  # revealed: bytes | memoryview[Unknown]
+        reveal_type(x)  # revealed: bytes | memoryview[int]
     else:
         reveal_type(x)  # revealed: range
 ```
@@ -104,8 +103,6 @@ Except for the `None` special case mentioned above, narrowing can only take plac
 the PEP-604 union are class literals. If any elements are generic aliases or other types, the
 `isinstance()` call may fail at runtime, so no narrowing can take place:
 
-<!-- snapshot-diagnostics -->
-
 ```toml
 [environment]
 python-version = "3.10"
@@ -115,36 +112,200 @@ python-version = "3.10"
 from typing import Any, Literal, NamedTuple
 
 def _(x: int | list[int] | bytes):
-    # error: [invalid-argument-type]
+    # snapshot: invalid-argument-type
     if isinstance(x, list[int] | int):
-        reveal_type(x)  # revealed: int | list[int] | bytes
-    # error: [invalid-argument-type]
-    elif isinstance(x, Literal[42] | list[int] | bytes):
-        reveal_type(x)  # revealed: int | list[int] | bytes
-    # error: [invalid-argument-type]
-    elif isinstance(x, Any | NamedTuple | list[int]):
-        reveal_type(x)  # revealed: int | list[int] | bytes
-    else:
         reveal_type(x)  # revealed: int | list[int] | bytes
 ```
 
-## PEP-604 unions on Python \<3.10
-
-PEP-604 unions were added in Python 3.10, so attempting to use them on Python 3.9 does not lead to
-any type narrowing.
-
-```toml
-[environment]
-python-version = "3.9"
+```snapshot
+error[invalid-argument-type]: Invalid second argument to `isinstance`
+ --> src/mdtest_snippet.py:5:8
+  |
+5 |     if isinstance(x, list[int] | int):
+  |        ^^^^^^^^^^^^^^---------------^
+  |                      |
+  |                      This `UnionType` instance contains non-class elements
+info: A `UnionType` instance can only be used as the second argument to `isinstance` if all elements are class objects
+info: Element `<class 'list[int]'>` in the union is not a class object
 ```
 
 ```py
-def _(x: int | str | bytes):
-    # error: [unsupported-operator]
-    if isinstance(x, int | str):
-        reveal_type(x)  # revealed: (int & Unknown) | (str & Unknown) | (bytes & Unknown)
+    # snapshot: invalid-argument-type
+    elif isinstance(x, Literal[42] | list[int] | bytes):
+        reveal_type(x)  # revealed: int | list[int] | bytes
+```
+
+```snapshot
+error[invalid-argument-type]: Invalid second argument to `isinstance`
+ --> src/mdtest_snippet.py:8:10
+  |
+8 |     elif isinstance(x, Literal[42] | list[int] | bytes):
+  |          ^^^^^^^^^^^^^^-------------------------------^
+  |                        |
+  |                        This `UnionType` instance contains non-class elements
+info: A `UnionType` instance can only be used as the second argument to `isinstance` if all elements are class objects
+info: Elements `<special-form 'Literal[42]'>` and `<class 'list[int]'>` in the union are not class objects
+```
+
+```py
+    # snapshot: invalid-argument-type
+    elif isinstance(x, Any | NamedTuple | list[int]):
+        reveal_type(x)  # revealed: int | list[int] | bytes
+```
+
+```snapshot
+error[invalid-argument-type]: Invalid second argument to `isinstance`
+  --> src/mdtest_snippet.py:11:10
+   |
+11 |     elif isinstance(x, Any | NamedTuple | list[int]):
+   |          ^^^^^^^^^^^^^^----------------------------^
+   |                        |
+   |                        This `UnionType` instance contains non-class elements
+info: A `UnionType` instance can only be used as the second argument to `isinstance` if all elements are class objects
+info: Element `<special-form 'typing.Any'>` in the union, and 2 more elements, are not class objects
+```
+
+```py
     else:
-        reveal_type(x)  # revealed: (int & Unknown) | (str & Unknown) | (bytes & Unknown)
+        reveal_type(x)  # revealed: int | list[int] | bytes
+```
+
+The same validation also applies when an invalid `UnionType` is nested inside a tuple:
+
+```py
+def _(x: int | list[int] | bytes):
+    # snapshot: invalid-argument-type
+    if isinstance(x, (int, list[int] | bytes)):
+        reveal_type(x)  # revealed: int | list[int] | bytes
+    else:
+        reveal_type(x)  # revealed: int | list[int] | bytes
+```
+
+```snapshot
+error[invalid-argument-type]: Invalid second argument to `isinstance`
+  --> src/mdtest_snippet.py:17:8
+   |
+17 |     if isinstance(x, (int, list[int] | bytes)):
+   |        ^^^^^^^^^^^^^^^^^^^^-----------------^^
+   |                            |
+   |                            This `UnionType` instance contains non-class elements
+info: A `UnionType` instance can only be used as the second argument to `isinstance` if all elements are class objects
+info: Element `<class 'list[int]'>` in the union is not a class object
+```
+
+Including nested tuples:
+
+```py
+def _(x: int | list[int] | bytes):
+    # snapshot: invalid-argument-type
+    if isinstance(x, (int, (str, list[int] | bytes))):
+        reveal_type(x)  # revealed: int | list[int] | bytes
+    else:
+        reveal_type(x)  # revealed: int | list[int] | bytes
+```
+
+```snapshot
+error[invalid-argument-type]: Invalid second argument to `isinstance`
+  --> src/mdtest_snippet.py:23:8
+   |
+23 |     if isinstance(x, (int, (str, list[int] | bytes))):
+   |        ^^^^^^^^^^^^^^^^^^^^^^^^^^-----------------^^^
+   |                                  |
+   |                                  This `UnionType` instance contains non-class elements
+info: A `UnionType` instance can only be used as the second argument to `isinstance` if all elements are class objects
+info: Element `<class 'list[int]'>` in the union is not a class object
+```
+
+And non-literal tuples:
+
+```py
+classes = (int, list[int] | bytes)
+
+def _(x: int | list[int] | bytes):
+    # snapshot: invalid-argument-type
+    if isinstance(x, classes):
+        reveal_type(x)  # revealed: int | list[int] | bytes
+    else:
+        reveal_type(x)  # revealed: int | list[int] | bytes
+```
+
+```snapshot
+error[invalid-argument-type]: Invalid second argument to `isinstance`
+  --> src/mdtest_snippet.py:31:8
+   |
+31 |     if isinstance(x, classes):
+   |        ^^^^^^^^^^^^^^^^^^^^^^
+info: A `UnionType` instance can only be used as the second argument to `isinstance` if all elements are class objects
+info: Element `<class 'list[int]'>` in the union `list[int] | bytes` is not a class object
+```
+
+## `classinfo` is a `types.UnionType`
+
+Python 3.10 added the ability to use `Union[int, str]` as the second argument to `isinstance()`:
+
+```py
+from typing import Union
+
+IntOrStr = Union[int, str]
+
+reveal_type(IntOrStr)  # revealed: <types.UnionType special-form 'int | str'>
+
+def _(x: int | str | bytes | memoryview | range):
+    if isinstance(x, IntOrStr):
+        reveal_type(x)  # revealed: int | str
+    elif isinstance(x, Union[bytes, memoryview]):
+        reveal_type(x)  # revealed: bytes | memoryview[int]
+    else:
+        reveal_type(x)  # revealed: range
+
+def _(x: int | str | None):
+    if isinstance(x, Union[int, None]):
+        reveal_type(x)  # revealed: int | None
+    else:
+        reveal_type(x)  # revealed: str
+
+ListStrOrInt = Union[list[str], int]
+
+def _(x: dict[int, str] | ListStrOrInt):
+    # TODO: this should ideally be an error
+    if isinstance(x, ListStrOrInt):
+        # TODO: this should not be narrowed
+        reveal_type(x)  # revealed: list[str] | int
+
+    # TODO: this should ideally be an error
+    if isinstance(x, Union[list[str], int]):
+        # TODO: this should not be narrowed
+        reveal_type(x)  # revealed: list[str] | int
+```
+
+## `Optional` as `classinfo`
+
+```py
+from typing import Optional
+
+def _(x: int | str | None):
+    if isinstance(x, Optional[int]):
+        reveal_type(x)  # revealed: int | None
+    else:
+        reveal_type(x)  # revealed: str
+```
+
+## `classinfo` is a `typing.py` special form
+
+Certain special forms in `typing.py` are aliases to classes elsewhere in the standard library; these
+can be used in `isinstance()` and `issubclass()` checks. We support narrowing using them:
+
+```py
+import typing as t
+
+def f(x: dict[str, int] | list[str], y: object):
+    if isinstance(x, t.Dict):
+        reveal_type(x)  # revealed: dict[str, int]
+    else:
+        reveal_type(x)  # revealed: list[str]
+
+    if isinstance(y, t.Callable):
+        reveal_type(y)  # revealed: Top[(...) -> object]
 ```
 
 ## Class types
@@ -174,9 +335,9 @@ else:
 ## No narrowing for instances of `builtins.type`
 
 ```py
-def _(flag: bool, t: type):
-    x = 1 if flag else "foo"
+from typing import Literal
 
+def _(x: Literal[1, "foo"], t: type):
     if isinstance(x, t):
         reveal_type(x)  # revealed: Literal[1, "foo"]
 ```
@@ -184,10 +345,11 @@ def _(flag: bool, t: type):
 ## Do not use custom `isinstance` for narrowing
 
 ```py
-def _(flag: bool):
+from typing import Literal
+
+def _(x: Literal[1, "a"]):
     def isinstance(x, t):
         return True
-    x = 1 if flag else "a"
 
     if isinstance(x, int):
         reveal_type(x)  # revealed: Literal[1, "a"]
@@ -196,10 +358,10 @@ def _(flag: bool):
 ## Do support narrowing if `isinstance` is aliased
 
 ```py
-def _(flag: bool):
-    isinstance_alias = isinstance
+from typing import Literal
 
-    x = 1 if flag else "a"
+def _(x: Literal[1, "a"]):
+    isinstance_alias = isinstance
 
     if isinstance_alias(x, int):
         reveal_type(x)  # revealed: Literal[1]
@@ -209,10 +371,9 @@ def _(flag: bool):
 
 ```py
 from builtins import isinstance as imported_isinstance
+from typing import Literal
 
-def _(flag: bool):
-    x = 1 if flag else "a"
-
+def _(x: Literal[1, "a"]):
     if imported_isinstance(x, int):
         reveal_type(x)  # revealed: Literal[1]
 ```
@@ -220,14 +381,14 @@ def _(flag: bool):
 ## Do not narrow if second argument is not a type
 
 ```py
-def _(flag: bool):
-    x = 1 if flag else "a"
+from typing import Literal
 
-    # error: [invalid-argument-type] "Argument to function `isinstance` is incorrect: Expected `type | UnionType | tuple[Unknown, ...]`, found `Literal["a"]"
+def _(x: Literal[1, "a"]):
+    # error: [invalid-argument-type] "Argument to function `isinstance` is incorrect: Expected `type | UnionType | tuple[Divergent, ...]`, found `Literal["a"]"
     if isinstance(x, "a"):
         reveal_type(x)  # revealed: Literal[1, "a"]
 
-    # error: [invalid-argument-type] "Argument to function `isinstance` is incorrect: Expected `type | UnionType | tuple[Unknown, ...]`, found `Literal["int"]"
+    # error: [invalid-argument-type] "Argument to function `isinstance` is incorrect: Expected `type | UnionType | tuple[Divergent, ...]`, found `Literal["int"]"
     if isinstance(x, "int"):
         reveal_type(x)  # revealed: Literal[1, "a"]
 ```
@@ -235,12 +396,38 @@ def _(flag: bool):
 ## Do not narrow if there are keyword arguments
 
 ```py
-def _(flag: bool):
-    x = 1 if flag else "a"
+from typing import Literal
 
+def _(x: Literal[1, "a"]):
     # error: [unknown-argument]
     if isinstance(x, int, foo="bar"):
         reveal_type(x)  # revealed: Literal[1, "a"]
+```
+
+## Splatted calls with invalid `classinfo`
+
+Diagnostics are still emitted for invalid `classinfo` types when the arguments are splatted:
+
+```py
+args = (object(), int | list[str])
+isinstance(*args)  # error: [invalid-argument-type]
+```
+
+## Generic aliases are not supported as second argument
+
+The `classinfo` argument cannot be a generic alias:
+
+```py
+def _(x: list[str] | list[int] | list[bytes]):
+    # TODO: Ideally, this would be an error (requires https://github.com/astral-sh/ty/issues/116)
+    if isinstance(x, list[int]):
+        # No narrowing here:
+        reveal_type(x)  # revealed: list[str] | list[int] | list[bytes]
+
+    # error: [invalid-argument-type] "Invalid second argument to `isinstance`"
+    if isinstance(x, list[int] | list[str]):
+        # No narrowing here:
+        reveal_type(x)  # revealed: list[str] | list[int] | list[bytes]
 ```
 
 ## `type[]` types are narrowed as well as class-literal types
@@ -249,6 +436,20 @@ def _(flag: bool):
 def _(x: object, y: type[int]):
     if isinstance(x, y):
         reveal_type(x)  # revealed: int
+```
+
+Negative narrowing is not sound in this case, because `type[A]` includes subclasses of `A`:
+
+```py
+class A: ...
+class B: ...
+
+def f(x: A | B, y: type[A]):
+    if isinstance(x, y):
+        reveal_type(x)  # revealed: A
+        return
+
+    reveal_type(x)  # revealed: A | B
 ```
 
 ## Adding a disjoint element to an existing intersection
@@ -384,6 +585,22 @@ def i[T: Intersection[type[Bar], type[Baz | Spam]], U: (type[Eggs], type[Ham])](
     return (y, z)
 ```
 
+If some (but not all) positive members of the intersection are not valid `isinstance()` targets --
+for example a parametrized generic alias such as `type[list[int]]`, which raises `TypeError` at
+runtime -- we skip those members and narrow using the remaining valid ones, rather than declining to
+narrow at all:
+
+```py
+from ty_extensions import Intersection
+
+def f(x: Foo, y: Intersection[type[Bar], type[list[int]]]):
+    if isinstance(x, y):
+        # `type[list[int]]` is not a valid `isinstance()` target and contributes no
+        # constraint, but `type[Bar]` still narrows.
+        reveal_type(x)  # revealed: Foo & Bar
+        reveal_type(x.attribute)  # revealed: int
+```
+
 ## Narrowing with generics
 
 ```toml
@@ -408,6 +625,73 @@ def _(x: object):
         reveal_type(x.get())  # revealed: object
 ```
 
+A bounded covariant generic uses its declared upper bound rather than `object`:
+
+```py
+class BoundedCovariant[T: int]:
+    def get(self) -> T:
+        raise NotImplementedError
+
+def _(x: object):
+    if isinstance(x, BoundedCovariant):
+        reveal_type(x)  # revealed: BoundedCovariant[int]
+        reveal_type(x.get())  # revealed: int
+```
+
+Negative narrowing must exclude every specialization of a bounded generic, including a gradual one.
+
+```py
+from typing import Any
+
+def excludes_bounded_generic(value: BoundedCovariant[Any] | bool) -> bool:
+    if isinstance(value, BoundedCovariant):
+        reveal_type(value)  # revealed: BoundedCovariant[Any]
+        return False
+
+    reveal_type(value)  # revealed: bool
+    return value
+```
+
+The same exclusion applies when the generic appears in a tuple of runtime classes.
+
+```py
+def excludes_bounded_generic_tuple(
+    value: BoundedCovariant[Any] | bool | bytes,
+) -> bool:
+    if isinstance(value, (BoundedCovariant, bytes)):
+        reveal_type(value)  # revealed: BoundedCovariant[Any] | bytes
+        return False
+
+    reveal_type(value)  # revealed: bool
+    return value
+```
+
+Constrained type parameters preserve the materialization of the generic class while making the union
+of valid constraints available when reading a covariant attribute:
+
+```py
+class ConstrainedCovariant[T: (int, str)]:
+    def get(self) -> T:
+        raise NotImplementedError
+
+def _(x: object):
+    if isinstance(x, ConstrainedCovariant):
+        reveal_type(x)  # revealed: Top[ConstrainedCovariant[Unknown]]
+        reveal_type(x.get())  # revealed: int | str
+```
+
+Constrained generics must also be excluded by negative narrowing.
+
+```py
+def excludes_constrained_generic(value: ConstrainedCovariant[Any] | bool) -> bool:
+    if isinstance(value, ConstrainedCovariant):
+        reveal_type(value)  # revealed: ConstrainedCovariant[Any]
+        return False
+
+    reveal_type(value)  # revealed: bool
+    return value
+```
+
 Similarly, contravariant type parameters use their lower bound of `Never`:
 
 ```py
@@ -417,8 +701,25 @@ class Contravariant[T]:
 def _(x: object):
     if isinstance(x, Contravariant):
         reveal_type(x)  # revealed: Contravariant[Never]
-        # error: [invalid-argument-type] "Argument to bound method `push` is incorrect: Expected `Never`, found `Literal[42]`"
+        # error: [invalid-argument-type] "Argument to bound method `Contravariant.push` is incorrect: Expected `Never`, found `Literal[42]`"
         x.push(42)
+```
+
+The same applies when the contravariant type parameter appears inside `type[T]`:
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T", contravariant=True)
+
+class ContravariantType(Generic[T]):
+    def push(self, x: type[T]) -> None: ...
+
+def _(x: object):
+    if isinstance(x, ContravariantType):
+        reveal_type(x)  # revealed: ContravariantType[Never]
+        # error: [invalid-argument-type]
+        x.push(str)
 ```
 
 Invariant generics are trickiest. The top materialization, conceptually the type that includes all
@@ -435,8 +736,41 @@ def _(x: object):
     if isinstance(x, Invariant):
         reveal_type(x)  # revealed: Top[Invariant[Unknown]]
         reveal_type(x.get())  # revealed: object
-        # error: [invalid-argument-type] "Argument to bound method `push` is incorrect: Expected `Never`, found `Literal[42]`"
+        # error: [invalid-argument-type] "Argument to bound method `Invariant.push` is incorrect: Expected `Never`, found `Literal[42]`"
         x.push(42)
+```
+
+When reading attributes from a top-materialized generic, only type parameters should be
+materialized. Unrelated gradual attribute types should be preserved.
+
+```py
+from typing import Any
+
+class InvariantWithAny[T: int]:
+    a: T
+    b: Any
+
+def _(x: object):
+    if isinstance(x, InvariantWithAny):
+        reveal_type(x)  # revealed: Top[InvariantWithAny[Unknown]]
+        reveal_type(x.a)  # revealed: int
+        reveal_type(x.b)  # revealed: Any
+```
+
+The same applies in contravariant positions: `Any` in a parameter type that isn't tied to the
+generic parameter should not be materialized.
+
+```py
+from typing import Any
+
+class ContravariantWithAny[T]:
+    def push(self, x: T, y: Any) -> None: ...
+
+def _(x: object):
+    if isinstance(x, ContravariantWithAny):
+        reveal_type(x)  # revealed: ContravariantWithAny[Never]
+        # error: [invalid-argument-type] "Argument to bound method `ContravariantWithAny.push` is incorrect: Expected `Never`, found `Literal[42]`"
+        x.push(42, "hello")
 ```
 
 When more complex types are involved, the `Top[]` type may get simplified away.
@@ -459,6 +793,28 @@ def _(x: Invariant[int] | Covariant[str]):
         reveal_type(x)  # revealed: Covariant[str] & ~Top[Invariant[Unknown]]
 ```
 
+The built-in `tuple` stores its variable-length shape separately from its generic type argument.
+Narrowing must preserve and materialize that shape.
+
+```py
+def narrow_tuple(value: object) -> None:
+    if isinstance(value, tuple):
+        reveal_type(value)  # revealed: tuple[object, ...]
+```
+
+A tuple subclass retains its nominal type and inherits its tuple shape from its specialized base.
+The subclass's own type parameter is still materialized using its declared bound.
+
+```py
+class BoundedTuple[T: int](tuple[T, str]): ...
+
+def narrow_tuple_subclass(value: object) -> None:
+    if isinstance(value, BoundedTuple):
+        reveal_type(value)  # revealed: BoundedTuple[int]
+        reveal_type(value[0])  # revealed: int
+        reveal_type(value[1])  # revealed: str
+```
+
 The behavior of `issubclass()` is similar.
 
 ```py
@@ -469,4 +825,229 @@ def _(x: type[object], y: type[object], z: type[object]):
         reveal_type(y)  # revealed: type[Contravariant[Never]]
     if issubclass(z, Invariant):
         reveal_type(z)  # revealed: type[Top[Invariant[Unknown]]]
+```
+
+Negative `issubclass()` narrowing also excludes every specialization of a bounded generic.
+
+```py
+def excludes_bounded_generic_subclass(
+    cls: type[BoundedCovariant[Any]] | type[bool],
+) -> type[bool]:
+    if issubclass(cls, BoundedCovariant):
+        reveal_type(cls)  # revealed: type[BoundedCovariant[Any]]
+        return bool
+
+    reveal_type(cls)  # revealed: <class 'bool'>
+    return cls
+```
+
+## Narrowing recursively bounded generics
+
+An `isinstance()` check must not recurse indefinitely when a generic bound refers to its own class.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Any
+
+class Recursive[T: "Recursive[Any]"]: ...
+
+def narrow(value: object) -> None:
+    if isinstance(value, Recursive):
+        reveal_type(value)  # revealed: Recursive[object]
+```
+
+A self-referential bound must also be safe when its recursion is hidden behind a type alias.
+
+```py
+class AliasedRecursive[T: "RecursiveAlias"]: ...
+
+type RecursiveAlias = AliasedRecursive[Any]
+
+def narrow_alias(value: object) -> None:
+    if isinstance(value, AliasedRecursive):
+        reveal_type(value)  # revealed: AliasedRecursive[object]
+```
+
+The same cycle recovery must handle bounds shared by mutually recursive generic classes.
+
+```py
+class Left[T: "Right[Any]"]: ...
+class Right[U: Left[Any]]: ...
+
+def narrow_mutual(value: object) -> None:
+    if isinstance(value, Left):
+        reveal_type(value)  # revealed: Left[object]
+
+    if isinstance(value, Right):
+        reveal_type(value)  # revealed: Right[object]
+```
+
+## Narrowing generic defaults in Python 3.13
+
+When a type parameter has a bare `Any` default, narrowing still materializes the substituted
+typevar. The default isn't used during `isinstance` narrowing (the type parameter gets `Unknown`
+instead), so the default value is irrelevant here:
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+from typing import Any
+
+class WithAnyDefault[T = Any]:
+    y: tuple[Any, T]
+
+def _(x: object):
+    if isinstance(x, WithAnyDefault):
+        reveal_type(x.y)  # revealed: tuple[Any, object]
+```
+
+Type alias defaults substituted into type parameters still need to be materialized when narrowing:
+
+```py
+from typing import Any
+
+type A = Any
+
+class WithAliasDefault[T = A]:
+    y: tuple[A, T]
+
+def _(x: object):
+    if isinstance(x, WithAliasDefault):
+        reveal_type(x.y)  # revealed: tuple[A, object]
+```
+
+`isinstance(value, Box)` checks the runtime class, not the type argument used to specialize it.
+Narrowing must therefore preserve the original type argument instead of substituting `Box`'s
+default.
+
+```py
+from typing import assert_never
+
+class Box[T: str = str]:
+    value: T
+
+    def __init__(self, value: T) -> None: ...
+
+def box_with_default[T: str = str](value: Box[T] | T) -> Box[T]:
+    if isinstance(value, Box):
+        reveal_type(value)  # revealed: Box[T@box_with_default]
+        return value
+
+    if not isinstance(value, Box):
+        reveal_type(value)  # revealed: T@box_with_default & ~Top[Box[Unknown]]
+        return Box[T](value)
+
+    assert_never(value)
+```
+
+When `isinstance()` narrows an unknown value to a tuple subclass, its type argument comes from the
+declared upper bound, not the default. Its element types are inherited from the specialized base.
+
+```py
+class DefaultedTuple[T: int = bool](tuple[T, str]): ...
+
+def narrow_defaulted_tuple(value: object) -> None:
+    if isinstance(value, DefaultedTuple):
+        reveal_type(value)  # revealed: DefaultedTuple[int]
+        reveal_type(value[0])  # revealed: int
+        reveal_type(value[1])  # revealed: str
+```
+
+Negative narrowing also excludes gradual specializations of the defaulted tuple subclass.
+
+```py
+def excludes_defaulted_tuple(value: DefaultedTuple[Any] | bool) -> bool:
+    if isinstance(value, DefaultedTuple):
+        reveal_type(value)  # revealed: DefaultedTuple[Any]
+        reveal_type(value[0])  # revealed: Any
+        reveal_type(value[1])  # revealed: str
+        return False
+
+    reveal_type(value)  # revealed: bool
+    return value
+```
+
+## Narrowing generic `classmethod`
+
+After an `isinstance(..., classmethod)` branch unwraps and replaces a generic `classmethod`, the
+false-branch residual should be impossible. This avoids retaining a `classmethod[...] & Top[...]`
+arm that later causes `call-top-callable` false positives.
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+from collections.abc import Callable
+from typing import Any, ParamSpec, TypeVar, cast
+
+P = ParamSpec("P")
+R = TypeVar("R")
+
+def f(fn: Callable[P, R] | classmethod[Any, P, R]) -> Callable[P, R]:
+    if isinstance(fn, classmethod):
+        fn = cast(Callable[P, R], fn.__func__)
+
+    if not callable(fn):
+        raise TypeError
+
+    reveal_type(fn)  # revealed: (**P@f) -> R@f
+    return fn
+```
+
+## Narrowing with TypedDict unions
+
+Narrowing unions of `int` and multiple TypedDicts using `isinstance(x, dict)` should not panic
+during type ordering of normalized intersection types. Regression test for
+<https://github.com/astral-sh/ty/issues/2451>.
+
+```py
+from typing import Any, TypedDict, cast
+
+class A(TypedDict):
+    x: str
+
+class B(TypedDict):
+    y: str
+
+T = int | A | B
+
+def test(a: Any, items: list[T]) -> None:
+    combined = a or items
+    v = combined[0]
+    if isinstance(v, dict):
+        cast(T, v)  # no panic
+```
+
+## Narrowing with named expressions (walrus operator)
+
+When `isinstance()` is used with a named expression, the target of the named expression should be
+narrowed. When the `isinstance()` check is the value of a named expression, its argument should also
+be narrowed.
+
+```py
+def get_value() -> int | str:
+    return 1
+
+def f():
+    if isinstance(x := get_value(), int):
+        reveal_type(x)  # revealed: int
+    else:
+        reveal_type(x)  # revealed: str
+
+    value = get_value()
+    if result := isinstance(value, int):
+        reveal_type(value)  # revealed: int
+        reveal_type(result)  # revealed: Literal[True]
+    else:
+        reveal_type(value)  # revealed: str
+        reveal_type(result)  # revealed: Literal[False]
 ```

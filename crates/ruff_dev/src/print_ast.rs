@@ -5,7 +5,7 @@ use std::path::PathBuf;
 use anyhow::Result;
 
 use ruff_linter::source_kind::SourceKind;
-use ruff_python_ast::PySourceType;
+use ruff_python_ast::{PySourceType, SourceType};
 use ruff_python_parser::{ParseOptions, parse};
 
 #[derive(clap::Args)]
@@ -17,12 +17,13 @@ pub(crate) struct Args {
 
 pub(crate) fn main(args: &Args) -> Result<()> {
     let source_type = PySourceType::from(&args.file);
-    let source_kind = SourceKind::from_path(&args.file, source_type)?.ok_or_else(|| {
-        anyhow::anyhow!(
-            "Could not determine source kind for file: {}",
-            args.file.display()
-        )
-    })?;
+    let source_kind = SourceKind::from_path(&args.file, SourceType::Python(source_type))?
+        .ok_or_else(|| {
+            anyhow::anyhow!(
+                "Could not determine source kind for file: {}",
+                args.file.display()
+            )
+        })?;
     let python_ast =
         parse(source_kind.source_code(), ParseOptions::from(source_type))?.into_syntax();
     println!("{python_ast:#?}");

@@ -1,15 +1,15 @@
-use ruff_macros::{ViolationMetadata, derive_message_formats};
+use std::borrow::Cow;
 
 use itertools::Itertools;
+use ruff_diagnostics::Applicability;
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_trivia::PythonWhitespace;
 use ruff_text_size::Ranged;
-use std::borrow::Cow;
 
 use crate::checkers::ast::Checker;
 use crate::linter::float::as_non_finite_float_string_literal;
 use crate::{Edit, Fix, FixAvailability, Violation};
-
 /// ## What it does
 /// Checks for unnecessary string literal or float casts in `Decimal`
 /// constructors.
@@ -44,6 +44,9 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// Decimal(0)
 /// Decimal("Infinity")
 /// ```
+///
+/// ## Fix safety
+/// This rule's fix is marked as safe, unless the expression contains comments.
 ///
 /// ## References
 /// - [Python documentation: `decimal`](https://docs.python.org/3/library/decimal.html)
@@ -153,10 +156,16 @@ pub(crate) fn verbose_decimal_constructor(checker: &Checker, call: &ast::ExprCal
                 value.range(),
             );
 
-            diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-                replacement,
-                value.range(),
-            )));
+            let applicability = if checker.comment_ranges().intersects(value.range()) {
+                Applicability::Unsafe
+            } else {
+                Applicability::Safe
+            };
+
+            diagnostic.set_fix(Fix::applicable_edit(
+                Edit::range_replacement(replacement, value.range()),
+                applicability,
+            ));
         }
         Expr::Call(ast::ExprCall {
             func, arguments, ..
@@ -193,10 +202,16 @@ pub(crate) fn verbose_decimal_constructor(checker: &Checker, call: &ast::ExprCal
                 value.range(),
             );
 
-            diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-                replacement,
-                value.range(),
-            )));
+            let applicability = if checker.comment_ranges().intersects(value.range()) {
+                Applicability::Unsafe
+            } else {
+                Applicability::Safe
+            };
+
+            diagnostic.set_fix(Fix::applicable_edit(
+                Edit::range_replacement(replacement, value.range()),
+                applicability,
+            ));
         }
         _ => {}
     }

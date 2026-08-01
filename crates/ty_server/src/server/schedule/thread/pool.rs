@@ -13,7 +13,9 @@
 //! The thread pool is implemented entirely using
 //! the threading utilities in [`crate::server::schedule::thread`].
 
+use super::{Builder, JoinHandle, ThreadPriority};
 use crossbeam::channel::{Receiver, Sender};
+use ruff_db::STACK_SIZE;
 use std::panic::AssertUnwindSafe;
 use std::{
     num::NonZeroUsize,
@@ -22,8 +24,6 @@ use std::{
         atomic::{AtomicUsize, Ordering},
     },
 };
-
-use super::{Builder, JoinHandle, ThreadPriority};
 
 pub(crate) struct Pool {
     // `_handles` is never read: the field is present
@@ -45,8 +45,6 @@ struct Job {
 
 impl Pool {
     pub(crate) fn new(threads: NonZeroUsize) -> Pool {
-        // Override OS defaults to avoid stack overflows on platforms with low stack size defaults.
-        const STACK_SIZE: usize = 2 * 1024 * 1024;
         const INITIAL_PRIORITY: ThreadPriority = ThreadPriority::Worker;
 
         let threads = usize::from(threads);

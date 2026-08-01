@@ -12,6 +12,7 @@ use std::hash::BuildHasherDefault;
 use std::num::NonZeroUsize;
 use ty_static::EnvVars;
 
+pub mod cancellation;
 pub mod diagnostic;
 pub mod display;
 pub mod file_revision;
@@ -46,6 +47,14 @@ pub fn program_version() -> Option<&'static str> {
 /// If the version has already been initialized (can only be set once).
 pub fn set_program_version(version: String) -> Result<(), String> {
     VERSION.set(version)
+}
+
+/// Disables LRU bookkeeping for all queries defined by this crate.
+///
+/// This is useful for short-lived database users that don't need to evict query results across
+/// revisions.
+pub fn disable_lru(db: &mut dyn Db) {
+    parsed::disable_lru(db);
 }
 
 /// Most basic database that gives access to files, the host system, source code, and parsed AST.
@@ -83,6 +92,13 @@ pub fn max_parallelism() -> NonZeroUsize {
             std::thread::available_parallelism().unwrap_or_else(|_| NonZeroUsize::new(1).unwrap())
         })
 }
+
+// Use a reasonably large stack size to avoid running into stack overflows too easily. The
+// size was chosen in such a way as to still be able to handle large expressions involving
+// binary operators (x + x + … + x) both during the AST walk in semantic index building as
+// well as during type checking. Using this stack size, we can handle handle expressions
+// that are several times larger than the corresponding limits in existing type checkers.
+pub const STACK_SIZE: usize = 16 * 1024 * 1024;
 
 /// Trait for types that can provide Rust documentation.
 ///

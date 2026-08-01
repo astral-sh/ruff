@@ -6,7 +6,8 @@ for both type variable syntaxes.
 
 Unless otherwise specified, all quotations come from the [Generics] section of the typing spec.
 
-Diagnostics for invalid type variables are snapshotted in `diagnostics/legacy_typevars.md`.
+Additional diagnostics for invalid type variables are snapshotted in
+`diagnostics/legacy_typevars.md`.
 
 ## Type variables
 
@@ -22,9 +23,11 @@ from typing import TypeVar
 
 T = TypeVar("T")
 reveal_type(type(T))  # revealed: <class 'TypeVar'>
-reveal_type(T)  # revealed: typing.TypeVar
+reveal_type(T)  # revealed: TypeVar
 reveal_type(T.__name__)  # revealed: Literal["T"]
 ```
+
+### Type variable name as a keyword argument
 
 The typevar name can also be provided as a keyword argument:
 
@@ -43,7 +46,7 @@ reveal_type(T.__name__)  # revealed: Literal["T"]
 ```py
 from typing import TypeVar
 
-T = TypeVar("T")
+TypingT = TypeVar("TypingT")
 # error: [invalid-legacy-type-variable]
 U: TypeVar = TypeVar("U")
 
@@ -69,23 +72,219 @@ reveal_type(tuple_with_typevar[1])  # revealed: TypeVar
 > The argument to `TypeVar()` must be a string equal to the variable name to which it is assigned.
 
 ```py
-from typing import TypeVar
+from typing import Generic, TypeVar
 
-# error: [invalid-legacy-type-variable]
+# error: [mismatched-type-name]
 T = TypeVar("Q")
+
+class Box(Generic[T]): ...
+
+reveal_type(Box[int]())  # revealed: Box[int]
+```
+
+### Shadowing checks use the binding name
+
+<!-- snapshot-diagnostics -->
+
+```py
+from typing import Generic, TypeVar
+
+S = TypeVar("S")
+T = TypeVar("T")
+
+# This recovers as the `Q` binding for source-level name resolution.
+# error: [mismatched-type-name]
+Q = TypeVar("T")
+
+class Outer(Generic[Q]):
+    class Ok(Generic[S]): ...
+    # error: [shadowed-type-variable]
+    # error: [shadowed-type-variable]
+    class Bad(Generic[Q]): ...
 ```
 
 ### No redefinition
 
 > Type variables must not be redefined.
 
+#### Sequential definitions
+
 ```py
 from typing import TypeVar
 
 T = TypeVar("T")
 
-# TODO: error
+# error: [invalid-legacy-type-variable] "Cannot redefine `T` as a type variable"
 T = TypeVar("T")
+
+S = object()
+
+# error: [invalid-legacy-type-variable] "Cannot redefine `S` as a type variable"
+S = TypeVar("S")
+
+DeclaredT: object
+
+# error: [invalid-legacy-type-variable] "Cannot redefine `DeclaredT` as a type variable"
+DeclaredT = TypeVar("DeclaredT")
+```
+
+#### Control flow
+
+A previous definition counts if it is reachable from the beginning of the scope, even if it is in a
+mutually exclusive branch. Statically unreachable definitions do not count.
+
+```py
+from typing import TypeVar
+
+def flag() -> bool:
+    return True
+
+if flag():
+    ConditionalT = TypeVar("ConditionalT")
+
+# error: [invalid-legacy-type-variable]
+ConditionalT = TypeVar("ConditionalT")
+
+if flag():
+    BranchT = TypeVar("BranchT")
+else:
+    # error: [invalid-legacy-type-variable]
+    BranchT = TypeVar("BranchT")
+
+# error: [invalid-legacy-type-variable]
+BranchT = TypeVar("BranchT")
+
+if False:
+    UnreachableT = TypeVar("UnreachableT")
+
+UnreachableT = TypeVar("UnreachableT")
+```
+
+Definitions in version-dependent fallback branches are also mutually exclusive:
+
+```toml
+[environment]
+python-version = "3.10"
+```
+
+```py
+import sys
+from typing import TypeVar
+
+class Reader: ...
+
+if sys.version_info >= (3, 11):
+    from typing import Self
+else:
+    Self = TypeVar("Self", bound=Reader)
+```
+
+#### Star imports
+
+Only names actually exported by a star import count as previous definitions.
+
+`excluded.py`:
+
+```py
+from typing import TypeVar
+
+__all__ = ["X"]
+
+X = 1
+ExcludedT = TypeVar("ExcludedT")
+```
+
+`included.py`:
+
+```py
+from typing import TypeVar
+
+__all__ = ["IncludedT"]
+
+IncludedT = TypeVar("IncludedT")
+```
+
+`main.py`:
+
+```py
+from typing import TypeVar
+
+from excluded import *
+from included import *
+
+ExcludedT = TypeVar("ExcludedT")
+
+# error: [invalid-assignment]
+# error: [invalid-legacy-type-variable]
+IncludedT = TypeVar("IncludedT")
+```
+
+#### Nested scopes
+
+```py
+from typing import TypeVar
+
+ScopedT = TypeVar("ScopedT")
+
+class C:
+    ScopedT = TypeVar("ScopedT")
+
+    # error: [invalid-legacy-type-variable]
+    ScopedT = TypeVar("ScopedT")
+
+GlobalT = TypeVar("GlobalT")
+
+def redefine_global() -> None:
+    global GlobalT
+    # error: [invalid-legacy-type-variable]
+    GlobalT = TypeVar("GlobalT")
+
+def define_global_before_module_binding() -> None:
+    global LaterGlobalT
+    LaterGlobalT = TypeVar("LaterGlobalT")
+
+LaterGlobalT = object()
+
+DeepGlobalT = object()
+
+def middle() -> None:
+    def redefine_deep_global() -> None:
+        global DeepGlobalT
+        # error: [invalid-legacy-type-variable]
+        DeepGlobalT = TypeVar("DeepGlobalT")
+
+def later_middle() -> None:
+    def define_deep_global_before_module_binding() -> None:
+        global LaterDeepGlobalT
+        LaterDeepGlobalT = TypeVar("LaterDeepGlobalT")
+
+LaterDeepGlobalT = object()
+
+def outer() -> None:
+    NonlocalT = TypeVar("NonlocalT")
+
+    def redefine_nonlocal() -> None:
+        nonlocal NonlocalT
+        # error: [invalid-legacy-type-variable]
+        NonlocalT = TypeVar("NonlocalT")
+
+def define_nonlocal_before_binding() -> None:
+    def inner() -> None:
+        nonlocal LaterNonlocalT
+        LaterNonlocalT = TypeVar("LaterNonlocalT")
+
+    LaterNonlocalT = object()
+
+def chained_nonlocal() -> None:
+    ChainedNonlocalT = object()
+
+    def middle() -> None:
+        nonlocal ChainedNonlocalT
+
+        def inner() -> None:
+            nonlocal ChainedNonlocalT
+            # error: [invalid-legacy-type-variable]
+            ChainedNonlocalT = TypeVar("ChainedNonlocalT")
 ```
 
 ### No variadic arguments
@@ -104,6 +303,34 @@ S = TypeVar("S", **{"bound": int})
 reveal_type(S)  # revealed: TypeVar
 ```
 
+### No explicit specialization
+
+A type variable itself cannot be explicitly specialized; the result of the specialization is
+`Unknown`. However, generic PEP 613 type aliases that point to type variables can be explicitly
+specialized.
+
+```py
+from typing import TypeVar, TypeAlias
+
+T = TypeVar("T")
+ImplicitPositive = T
+Positive: TypeAlias = T
+
+def _(
+    # error: [invalid-type-form] "A type variable itself cannot be specialized"
+    a: T[int],
+    # error: [invalid-type-form] "A type variable itself cannot be specialized"
+    b: T[T],
+    # error: [invalid-type-form] "A type variable itself cannot be specialized"
+    c: ImplicitPositive[int],
+    d: Positive[int],
+):
+    reveal_type(a)  # revealed: Unknown
+    reveal_type(b)  # revealed: Unknown
+    reveal_type(c)  # revealed: Unknown
+    reveal_type(d)  # revealed: int
+```
+
 ### Type variables with a default
 
 Note that the `__default__` property is only available in Python ≥3.13.
@@ -118,7 +345,7 @@ from typing import TypeVar
 
 T = TypeVar("T", default=int)
 reveal_type(type(T))  # revealed: <class 'TypeVar'>
-reveal_type(T)  # revealed: typing.TypeVar
+reveal_type(T)  # revealed: TypeVar
 reveal_type(T.__default__)  # revealed: int
 reveal_type(T.__bound__)  # revealed: None
 reveal_type(T.__constraints__)  # revealed: tuple[()]
@@ -148,8 +375,156 @@ reveal_type(Valid[int]())  # revealed: Valid[int, int, int]
 reveal_type(Valid[int, str]())  # revealed: Valid[int, str, int | str]
 reveal_type(Valid[int, str, None]())  # revealed: Valid[int, str, None]
 
-# TODO: error, default value for U isn't available in the generic context
+# error: [invalid-generic-class] "Default of `U` cannot reference out-of-scope type variable `T`"
 class Invalid(Generic[U]): ...
+```
+
+### Invalid defaults
+
+A TypeVar default must be compatible with its bound or constraints.
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+#### Concrete default with a bound
+
+<!-- snapshot-diagnostics -->
+
+The default must be assignable to the bound:
+
+```py
+from typing import TypeVar
+
+# error: [invalid-type-variable-default] "TypeVar default is not assignable to the TypeVar's upper bound"
+T = TypeVar("T", bound=str, default=int)
+
+S = TypeVar("S", bound=float, default=int)
+```
+
+#### Concrete default with constraints
+
+<!-- snapshot-diagnostics -->
+
+The default must be one of the constrained types, even if it is a subtype of one of them:
+
+```py
+from typing import Any, TypeVar
+
+# error: [invalid-type-variable-default] "TypeVar default is inconsistent with the TypeVar's constraints: `bytes` is not one of the constraints of `T`"
+T = TypeVar("T", int, str, default=bytes)
+
+S = TypeVar("S", int, str, default=int)
+
+# A subtype is not sufficient; the default must be exactly one of the constraints.
+# error: [invalid-type-variable-default] "TypeVar default is inconsistent with the TypeVar's constraints: `bool` is not one of the constraints of `U`"
+U = TypeVar("U", int, str, default=bool)
+
+# `Any` is always allowed as a default, even for constrained TypeVars.
+V = TypeVar("V", int, str, default=Any)
+```
+
+#### Default TypeVar's bound must be assignable to the outer bound
+
+<!-- snapshot-diagnostics -->
+
+When the default is a TypeVar, its upper bound must be assignable to the outer TypeVar's bound:
+
+```py
+from typing import Generic, TypeVar
+
+T1 = TypeVar("T1", bound=int)
+T2 = TypeVar("T2", bound=float)
+T3 = TypeVar("T3", bound=str)
+
+# OK: `float` in a type expression means `int | float`,
+# and the upper bound of `T` (`int`) is assignable to `int | float`
+S = TypeVar("S", default=T1, bound=float)
+
+# error: [invalid-type-variable-default] "Default `T3` of TypeVar `U` is not assignable to upper bound `int | float` of `U` because its upper bound `str` is not assignable to `int | float`"
+U = TypeVar("U", default=T3, bound=float)
+```
+
+#### An unbounded default TypeVar has an implicit `object` bound
+
+<!-- snapshot-diagnostics -->
+
+An unbounded TypeVar has an implicit upper bound of `object`, which is not assignable to a more
+restrictive bound:
+
+```py
+from typing import Generic, TypeVar
+
+T1 = TypeVar("T1")
+
+# error: [invalid-type-variable-default] "Default `T1` of TypeVar `S` is not assignable to upper bound `int` of `S` because its upper bound `object` is not assignable to `int`"
+S = TypeVar("S", default=T1, bound=int)
+```
+
+#### A constrained default TypeVar's constraints must all be assignable to the outer bound
+
+<!-- snapshot-diagnostics -->
+
+When the default TypeVar has constraints, every constraint must be assignable to the outer bound:
+
+```py
+from typing import Generic, TypeVar
+
+T1 = TypeVar("T1", int, str)
+T2 = TypeVar("T2", int, bool)
+
+# OK: `T1`'s constraints are `int` and `str,
+# which are both assignable to `object`
+S = TypeVar("S", default=T1, bound=object)
+
+# error: [invalid-type-variable-default] "Default `T1` of TypeVar `U` is not assignable to upper bound `int` of `U` because constraint `str` of `T1` is not assignable to `int`"
+U = TypeVar("U", default=T1, bound=int)
+
+# OK: `T2`'s constraints are `int` and `bool`,
+# which are both assignable to `int`
+V = TypeVar("V", default=T2, bound=int)
+```
+
+#### A constrained default TypeVar's constraints must be a subset of the outer constraints
+
+<!-- snapshot-diagnostics -->
+
+When the default TypeVar has constraints, they must all appear in the outer TypeVar's constraint
+list:
+
+```py
+from typing import Generic, TypeVar
+
+T1 = TypeVar("T1", int, str)
+T2 = TypeVar("T2", int, str, bool)
+
+# OK: `T1`'s constraints ({int, str}) are a subset
+# of `S`'s constraints ({int, str, bool})
+S = TypeVar("S", int, str, bool, default=T1)
+
+# error: [invalid-type-variable-default]
+U = TypeVar("U", bool, complex, default=T1)
+```
+
+#### A non-constrained default TypeVar is incompatible with a constrained outer TypeVar
+
+<!-- snapshot-diagnostics -->
+
+A bounded or unbounded TypeVar (one without constraints) cannot be used as the default for a
+constrained TypeVar, because there is no guarantee it will satisfy any of the constraints:
+
+```py
+from typing import Generic, TypeVar
+
+T1 = TypeVar("T1", bound=int)
+T2 = TypeVar("T2")
+
+# error: [invalid-type-variable-default]
+S = TypeVar("S", float, str, default=T1)
+
+# error: [invalid-type-variable-default]
+U = TypeVar("U", str, bytes, default=T2)
 ```
 
 ### Type variables with an upper bound
@@ -159,7 +534,7 @@ from typing import TypeVar
 
 T = TypeVar("T", bound=int)
 reveal_type(type(T))  # revealed: <class 'TypeVar'>
-reveal_type(T)  # revealed: typing.TypeVar
+reveal_type(T)  # revealed: TypeVar
 reveal_type(T.__bound__)  # revealed: int
 reveal_type(T.__constraints__)  # revealed: tuple[()]
 
@@ -173,7 +548,7 @@ The upper bound must be a valid type expression:
 from typing import TypedDict
 
 # error: [invalid-type-form]
-T = TypeVar("T", bound=TypedDict)
+InvalidBoundT = TypeVar("InvalidBoundT", bound=TypedDict)
 ```
 
 ### Type variables with constraints
@@ -183,16 +558,20 @@ from typing import TypeVar
 
 T = TypeVar("T", int, str)
 reveal_type(type(T))  # revealed: <class 'TypeVar'>
-reveal_type(T)  # revealed: typing.TypeVar
+reveal_type(T)  # revealed: TypeVar
 reveal_type(T.__constraints__)  # revealed: tuple[int, str]
 
 S = TypeVar("S")
 reveal_type(S.__constraints__)  # revealed: tuple[()]
 ```
 
+### Constraints are not simplified
+
 Constraints are not simplified relative to each other, even if one is a subtype of the other:
 
 ```py
+from typing import TypeVar
+
 T = TypeVar("T", int, bool)
 reveal_type(T.__constraints__)  # revealed: tuple[int, bool]
 
@@ -208,8 +587,16 @@ reveal_type(S.__constraints__)  # revealed: tuple[int | float, str]
 ```py
 from typing import TypeVar
 
-# error: [invalid-legacy-type-variable]
+# snapshot: invalid-legacy-type-variable
 T = TypeVar("T", int)
+```
+
+```snapshot
+error[invalid-legacy-type-variable]: A `TypeVar` cannot have exactly one constraint
+ --> src/mdtest_snippet.py:4:18
+  |
+4 | T = TypeVar("T", int)
+  |                  ^^^
 ```
 
 ### Cannot have both bound and constraint
@@ -217,8 +604,16 @@ T = TypeVar("T", int)
 ```py
 from typing import TypeVar
 
-# error: [invalid-legacy-type-variable]
+# snapshot: invalid-legacy-type-variable
 T = TypeVar("T", int, str, bound=bytes)
+```
+
+```snapshot
+error[invalid-legacy-type-variable]: A `TypeVar` cannot have both a bound and constraints
+ --> src/mdtest_snippet.py:4:5
+  |
+4 | T = TypeVar("T", int, str, bound=bytes)
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 ```
 
 ### Cannot be both covariant and contravariant
@@ -230,8 +625,102 @@ T = TypeVar("T", int, str, bound=bytes)
 ```py
 from typing import TypeVar
 
-# error: [invalid-legacy-type-variable]
+# snapshot: invalid-legacy-type-variable
 T = TypeVar("T", covariant=True, contravariant=True)
+```
+
+```snapshot
+error[invalid-legacy-type-variable]: A `TypeVar` cannot be both covariant and contravariant
+ --> src/mdtest_snippet.py:4:5
+  |
+4 | T = TypeVar("T", covariant=True, contravariant=True)
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+```
+
+### Infer variance
+
+For a `TypeVar` with `infer_variance=True`, we infer covariance when the type variable only appears
+in return positions, contravariance when it only appears in parameter positions, and invariance when
+it appears in both positions.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Generic, TypeVar
+
+OutT = TypeVar("OutT", infer_variance=True)
+
+class Source(Generic[OutT]):
+    def get(self) -> OutT:
+        raise NotImplementedError
+
+source_int: Source[int] = Source[object]()  # error: [invalid-assignment]
+source_obj: Source[object] = Source[int]()
+
+InT = TypeVar("InT", infer_variance=True)
+
+class Sink(Generic[InT]):
+    def send(self, value: InT) -> None:
+        raise NotImplementedError
+
+sink_obj: Sink[object] = Sink[int]()  # error: [invalid-assignment]
+sink_int: Sink[int] = Sink[object]()
+```
+
+Both assignments are errors when the type variable is inferred to be invariant:
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T", infer_variance=True)
+
+class Box(Generic[T]):
+    value: T
+
+box_int: Box[int] = Box[object]()  # error: [invalid-assignment]
+box_obj: Box[object] = Box[int]()  # error: [invalid-assignment]
+```
+
+> A generic class that uses the traditional syntax may include combinations of type variables with
+> explicit and inferred variance.
+
+```py
+from typing import Generic, TypeVar
+
+ExplicitOutT = TypeVar("ExplicitOutT", covariant=True)
+InferredInT = TypeVar("InferredInT", infer_variance=True)
+
+class Mixed(Generic[ExplicitOutT, InferredInT]):
+    def get(self) -> ExplicitOutT:
+        raise NotImplementedError
+
+    def send(self, value: InferredInT) -> None:
+        raise NotImplementedError
+
+mixed_covariant: Mixed[object, int] = Mixed[int, int]()
+mixed_not_covariant: Mixed[int, int] = Mixed[object, int]()  # error: [invalid-assignment]
+mixed_contravariant: Mixed[int, int] = Mixed[int, object]()
+mixed_not_contravariant: Mixed[int, object] = Mixed[int, int]()  # error: [invalid-assignment]
+```
+
+Variance cannot be specified explicitly when variance inference is requested:
+
+```py
+from typing import TypeVar
+
+# snapshot: invalid-legacy-type-variable
+CovariantAndInferred = TypeVar("CovariantAndInferred", covariant=True, infer_variance=True)
+```
+
+```snapshot
+error[invalid-legacy-type-variable]: A `TypeVar` cannot specify variance when `infer_variance=True`
+  --> src/mdtest_snippet.py:48:24
+   |
+48 | CovariantAndInferred = TypeVar("CovariantAndInferred", covariant=True, infer_variance=True)
+   |                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 ```
 
 ### Boolean parameters must be unambiguous
@@ -242,14 +731,36 @@ from typing_extensions import TypeVar
 def cond() -> bool:
     return True
 
-# error: [invalid-legacy-type-variable]
+# snapshot: invalid-legacy-type-variable
 T = TypeVar("T", covariant=cond())
 
-# error: [invalid-legacy-type-variable]
+# snapshot: invalid-legacy-type-variable
 U = TypeVar("U", contravariant=cond())
 
-# error: [invalid-legacy-type-variable]
+# snapshot: invalid-legacy-type-variable
 V = TypeVar("V", infer_variance=cond())
+```
+
+```snapshot
+error[invalid-legacy-type-variable]: The `covariant` parameter of `TypeVar` cannot have an ambiguous truthiness
+ --> src/mdtest_snippet.py:7:28
+  |
+7 | T = TypeVar("T", covariant=cond())
+  |                            ^^^^^^
+
+
+error[invalid-legacy-type-variable]: The `contravariant` parameter of `TypeVar` cannot have an ambiguous truthiness
+  --> src/mdtest_snippet.py:10:32
+   |
+10 | U = TypeVar("U", contravariant=cond())
+   |                                ^^^^^^
+
+
+error[invalid-legacy-type-variable]: The `infer_variance` parameter of `TypeVar` cannot have an ambiguous truthiness
+  --> src/mdtest_snippet.py:13:33
+   |
+13 | V = TypeVar("V", infer_variance=cond())
+   |                                 ^^^^^^
 ```
 
 ### Invalid keyword arguments
@@ -266,7 +777,45 @@ from typing import TypeVar
 
 # error: [invalid-legacy-type-variable]
 T = TypeVar("T", invalid_keyword=True)
+```
 
+### Forward references in stubs
+
+Stubs natively support forward references, so patterns that would raise `NameError` at runtime are
+allowed in stub files:
+
+`stub.pyi`:
+
+```pyi
+from typing import TypeVar
+
+T = TypeVar("T", bound=A, default=B)
+U = TypeVar("U", C, D)
+
+class A: ...
+class B(A): ...
+class C: ...
+class D: ...
+
+def f(x: T) -> T: ...
+def g(x: U) -> U: ...
+```
+
+`main.py`:
+
+```py
+from stub import f, g, A, B, C, D
+
+reveal_type(f(A()))  # revealed: A
+reveal_type(f(B()))  # revealed: B
+reveal_type(g(C()))  # revealed: C
+reveal_type(g(D()))  # revealed: D
+
+# error: [invalid-argument-type] "Argument type `C` does not satisfy upper bound `A` of type variable `T`"
+reveal_type(f(C()))  # revealed: B
+
+# error: [invalid-argument-type]
+reveal_type(g(A()))  # revealed: Unknown
 ```
 
 ### Constructor signature versioning
@@ -286,6 +835,7 @@ maintain compatibility.)
 
 ```pyi
 from typing import TypeVar
+
 T = TypeVar("T", default=int)
 ```
 
@@ -330,9 +880,13 @@ def bound(f: T):
     reveal_type(f())  # revealed: int
 ```
 
+## Constrained callability
+
 Same with a constrained typevar, as long as all constraints are callable:
 
 ```py
+from typing import Callable, TypeVar
+
 T = TypeVar("T", Callable[[], int], Callable[[], str])
 
 def constrained(f: T):
@@ -342,8 +896,7 @@ def constrained(f: T):
 
 ## Meta-type
 
-The meta-type of a typevar is the same as the meta-type of the upper bound, or the union of the
-meta-types of the constraints:
+The meta-type of a typevar is `type[T]`.
 
 ```py
 from typing import TypeVar
@@ -351,22 +904,22 @@ from typing import TypeVar
 T_normal = TypeVar("T_normal")
 
 def normal(x: T_normal):
-    reveal_type(type(x))  # revealed: type
+    reveal_type(type(x))  # revealed: type[T_normal@normal]
 
 T_bound_object = TypeVar("T_bound_object", bound=object)
 
 def bound_object(x: T_bound_object):
-    reveal_type(type(x))  # revealed: type
+    reveal_type(type(x))  # revealed: type[T_bound_object@bound_object]
 
 T_bound_int = TypeVar("T_bound_int", bound=int)
 
 def bound_int(x: T_bound_int):
-    reveal_type(type(x))  # revealed: type[int]
+    reveal_type(type(x))  # revealed: type[T_bound_int@bound_int]
 
 T_constrained = TypeVar("T_constrained", int, str)
 
 def constrained(x: T_constrained):
-    reveal_type(type(x))  # revealed: type[int] | type[str]
+    reveal_type(type(x))  # revealed: type[T_constrained@constrained]
 ```
 
 ## Cycles
@@ -376,31 +929,60 @@ def constrained(x: T_constrained):
 A typevar's bounds and constraints cannot be generic, cyclic or otherwise:
 
 ```py
-from typing import Any, TypeVar
+from typing import Any, TypeVar, Generic
 
 S = TypeVar("S")
 
-# TODO: error
+# error: [invalid-type-variable-bound] "TypeVar upper bound cannot be generic"
 T = TypeVar("T", bound=list[S])
 
-# TODO: error
+# error: [invalid-type-variable-constraints] "TypeVar constraint cannot be generic"
 U = TypeVar("U", list["T"], str)
 
-# TODO: error
+# error: [invalid-type-variable-constraints] "TypeVar constraint cannot be generic"
 V = TypeVar("V", list["V"], str)
+
+# error: [invalid-type-variable-constraints] "TypeVar constraint cannot be generic"
+# error: [invalid-type-variable-constraints] "TypeVar constraint cannot be generic"
+W = TypeVar("W", list[list[list[list["V"]]]], V)
+
+class Foo(Generic[S]):
+    # error: [invalid-type-variable-bound] "TypeVar upper bound cannot be generic"
+    T = TypeVar("T", bound=S)
 ```
+
+### Recursive bounds
 
 However, they are lazily evaluated and can cyclically refer to their own type:
 
 ```py
 from typing import TypeVar, Generic
 
-T = TypeVar("T", bound=list["G"])
+T = TypeVar("T", bound=list["G"])  # error: [missing-type-argument]
 
 class G(Generic[T]):
     x: T
 
+# error: [missing-type-argument]
 reveal_type(G[list[G]]().x)  # revealed: list[G[Unknown]]
+```
+
+### Invalid specialization in a recursive bound
+
+An invalid specialization in a recursive bound doesn't cause a panic:
+
+```py
+from typing import TypeVar, Generic
+
+# error: [invalid-type-arguments]
+T = TypeVar("T", bound="Node[int]")
+
+class Node(Generic[T]):
+    pass
+
+# error: [invalid-type-arguments]
+def _(n: Node[str]):
+    reveal_type(n)  # revealed: Node[Unknown]
 ```
 
 ### Defaults
@@ -434,8 +1016,7 @@ V = TypeVar("V", default="V")
 class D(Generic[V]):
     x: V
 
-# TODO: we shouldn't leak a typevar like this in type inference
-reveal_type(D().x)  # revealed: V@D
+reveal_type(D().x)  # revealed: Unknown
 ```
 
 ## Regression

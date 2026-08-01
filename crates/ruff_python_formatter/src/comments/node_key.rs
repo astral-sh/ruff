@@ -2,7 +2,8 @@ use ruff_python_ast::AnyNodeRef;
 use std::fmt::{Debug, Formatter};
 use std::hash::{Hash, Hasher};
 
-/// Used as key into the [`MultiMap`] storing the comments per node by [`Comments`].
+/// Used as key into the [`MultiMap`](super::MultiMap) storing the comments per node by
+/// [`Comments`](super::Comments).
 ///
 /// Implements equality and hashing based on the address of the [`AnyNodeRef`] to get fast and cheap
 /// hashing/equality comparison.

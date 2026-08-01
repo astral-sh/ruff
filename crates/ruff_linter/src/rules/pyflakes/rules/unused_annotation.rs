@@ -18,6 +18,12 @@ use crate::checkers::ast::Checker;
 ///     bar: int
 /// ```
 ///
+/// ## Options
+///
+/// This rule ignores dummy variables, as determined by:
+///
+/// - `lint.dummy-variable-rgx`
+///
 /// ## References
 /// - [PEP 484 – Type Hints](https://peps.python.org/pep-0484/)
 #[derive(ViolationMetadata)]

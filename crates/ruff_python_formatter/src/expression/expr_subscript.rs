@@ -5,7 +5,7 @@ use ruff_python_ast::{Expr, ExprSubscript};
 use crate::expression::CallChainLayout;
 use crate::expression::expr_tuple::TupleParentheses;
 use crate::expression::parentheses::{
-    NeedsParentheses, OptionalParentheses, Parentheses, is_expression_parenthesized, parenthesized,
+    NeedsParentheses, OptionalParentheses, Parentheses, parenthesized,
 };
 use crate::prelude::*;
 
@@ -43,15 +43,14 @@ impl FormatNodeRule<ExprSubscript> for FormatExprSubscript {
         );
 
         let format_inner = format_with(|f: &mut PyFormatter| {
-            if is_expression_parenthesized(
-                value.into(),
-                f.context().comments().ranges(),
-                f.context().source(),
-            ) {
+            if f.context().is_expression_parenthesized(value.into()) {
                 value.format().with_options(Parentheses::Always).fmt(f)
             } else {
                 match value.as_ref() {
-                    Expr::Attribute(expr) => expr.format().with_options(call_chain_layout).fmt(f),
+                    Expr::Attribute(expr) => expr
+                        .format()
+                        .with_options(call_chain_layout.decrement_call_like_count())
+                        .fmt(f),
                     Expr::Call(expr) => expr.format().with_options(call_chain_layout).fmt(f),
                     Expr::Subscript(expr) => expr.format().with_options(call_chain_layout).fmt(f),
                     _ => value.format().with_options(Parentheses::Never).fmt(f),
@@ -71,8 +70,8 @@ impl FormatNodeRule<ExprSubscript> for FormatExprSubscript {
                 .fmt(f)
         });
 
-        let is_call_chain_root = self.call_chain_layout == CallChainLayout::Default
-            && call_chain_layout == CallChainLayout::Fluent;
+        let is_call_chain_root =
+            self.call_chain_layout == CallChainLayout::Default && call_chain_layout.is_fluent();
         if is_call_chain_root {
             write!(f, [group(&format_inner)])
         } else {
@@ -88,18 +87,9 @@ impl NeedsParentheses for ExprSubscript {
         context: &PyFormatContext,
     ) -> OptionalParentheses {
         {
-            if CallChainLayout::from_expression(
-                self.into(),
-                context.comments().ranges(),
-                context.source(),
-            ) == CallChainLayout::Fluent
-            {
+            if CallChainLayout::from_expression(self.into(), context).is_fluent() {
                 OptionalParentheses::Multiline
-            } else if is_expression_parenthesized(
-                self.value.as_ref().into(),
-                context.comments().ranges(),
-                context.source(),
-            ) {
+            } else if context.is_expression_parenthesized(self.value.as_ref().into()) {
                 OptionalParentheses::Never
             } else {
                 match self.value.needs_parentheses(self.into(), context) {

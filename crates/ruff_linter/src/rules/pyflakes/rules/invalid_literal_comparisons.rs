@@ -2,8 +2,8 @@ use anyhow::{Error, bail};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers;
+use ruff_python_ast::token::{TokenKind, Tokens};
 use ruff_python_ast::{CmpOp, Expr};
-use ruff_python_parser::{TokenKind, Tokens};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
@@ -156,11 +156,7 @@ fn locate_cmp_ops(expr: &Expr, tokens: &Tokens) -> Vec<LocatedCmpOp> {
     // Track the nesting level.
     let mut nesting = 0u32;
 
-    loop {
-        let Some(token) = tok_iter.next() else {
-            break;
-        };
-
+    while let Some(token) = tok_iter.next() {
         match token.kind() {
             TokenKind::Lpar | TokenKind::Lsqb | TokenKind::Lbrace => {
                 nesting = nesting.saturating_add(1);

@@ -80,8 +80,8 @@ from _typeshed import StrPath
 from collections.abc import Callable, Generator, Sequence
 from contextlib import contextmanager
 from tkinter import Canvas, Frame, Misc, PhotoImage, Scrollbar
-from typing import Any, ClassVar, Literal, TypedDict, overload, type_check_only
-from typing_extensions import Self, TypeAlias, deprecated, disjoint_base
+from typing import Any, ClassVar, Literal, TypeAlias, TypedDict, overload, type_check_only
+from typing_extensions import Self, deprecated, disjoint_base
 
 __all__ = [
     "ScrolledCanvas",
@@ -258,10 +258,12 @@ if sys.version_info >= (3, 12):
 
         def __new__(cls, x: float, y: float) -> Self: ...
         def __add__(self, other: tuple[float, float]) -> Vec2D: ...  # type: ignore[override]
+
         @overload  # type: ignore[override]
         def __mul__(self, other: Vec2D) -> float: ...
         @overload
         def __mul__(self, other: float) -> Vec2D: ...
+
         def __rmul__(self, other: float) -> Vec2D: ...  # type: ignore[override]
         def __sub__(self, other: tuple[float, float]) -> Vec2D: ...
         def __neg__(self) -> Vec2D: ...
@@ -288,10 +290,12 @@ else:
 
         def __new__(cls, x: float, y: float) -> Self: ...
         def __add__(self, other: tuple[float, float]) -> Vec2D: ...  # type: ignore[override]
+
         @overload  # type: ignore[override]
         def __mul__(self, other: Vec2D) -> float: ...
         @overload
         def __mul__(self, other: float) -> Vec2D: ...
+
         def __rmul__(self, other: float) -> Vec2D: ...  # type: ignore[override]
         def __sub__(self, other: tuple[float, float]) -> Vec2D: ...
         def __neg__(self) -> Vec2D: ...
@@ -467,9 +471,9 @@ class TurtleScreen(TurtleScreenBase):
         >>> mode()
         'logo'
         """
-
     @overload
     def mode(self, mode: Literal["standard", "logo", "world"]) -> None: ...
+
     def setworldcoordinates(self, llx: float, lly: float, urx: float, ury: float) -> None:
         """Set up a user defined coordinate-system.
 
@@ -536,9 +540,9 @@ class TurtleScreen(TurtleScreenBase):
         >>> screen.colormode(255)
         >>> pencolor(240,160,80)
         """
-
     @overload
     def colormode(self, cmode: float) -> None: ...
+
     def reset(self) -> None:
         """Reset all Turtles on the Screen to their initial state.
 
@@ -560,22 +564,38 @@ class TurtleScreen(TurtleScreenBase):
     def bgcolor(self) -> _AnyColor:
         """Set or return backgroundcolor of the TurtleScreen.
 
-        Arguments (if given): a color string or three numbers
-        in the range 0..colormode or a 3-tuple of such numbers.
+        Four input formats are allowed:
+          - bgcolor()
+            Return the current background color as color specification
+            string or as a tuple (see example).  May be used as input
+            to another color/pencolor/fillcolor/bgcolor call.
+          - bgcolor(colorstring)
+            Set the background color to colorstring, which is a Tk color
+            specification string, such as "red", "yellow", or "#33cc8c".
+          - bgcolor((r, g, b))
+            Set the background color to the RGB color represented by
+            the tuple of r, g, and b.  Each of r, g, and b must be in
+            the range 0..colormode, where colormode is either 1.0 or 255
+            (see colormode()).
+          - bgcolor(r, g, b)
+            Set the background color to the RGB color represented by
+            r, g, and b.  Each of r, g, and b must be in the range
+            0..colormode.
 
         Example (for a TurtleScreen instance named screen):
         >>> screen.bgcolor("orange")
         >>> screen.bgcolor()
         'orange'
-        >>> screen.bgcolor(0.5,0,0.5)
+        >>> colormode(255)
+        >>> screen.bgcolor('#800080')
         >>> screen.bgcolor()
-        '#800080'
+        (128.0, 0.0, 128.0)
         """
-
     @overload
     def bgcolor(self, color: _Color) -> None: ...
     @overload
     def bgcolor(self, r: float, g: float, b: float) -> None: ...
+
     @overload
     def tracer(self, n: None = None) -> int:
         """Turns turtle animation on/off and set delay for update drawings.
@@ -596,9 +616,9 @@ class TurtleScreen(TurtleScreenBase):
         ...     rt(90)
         ...     dist += 2
         """
-
     @overload
     def tracer(self, n: int, delay: int | None = None) -> None: ...
+
     @overload
     def delay(self, delay: None = None) -> int:
         """Return or set the drawing delay in milliseconds.
@@ -611,9 +631,9 @@ class TurtleScreen(TurtleScreenBase):
         >>> screen.delay()
         15
         """
-
     @overload
     def delay(self, delay: int) -> None: ...
+
     if sys.version_info >= (3, 14):
         @contextmanager
         def no_animation(self) -> Generator[None]:
@@ -758,9 +778,9 @@ class TurtleScreen(TurtleScreenBase):
         >>> screen.bgpic()
         'landscape.gif'
         """
-
     @overload
     def bgpic(self, picname: str) -> None: ...
+
     @overload
     def screensize(self, canvwidth: None = None, canvheight: None = None, bg: None = None) -> tuple[int, int]:
         """Resize the canvas the turtles are drawing on.
@@ -782,6 +802,7 @@ class TurtleScreen(TurtleScreenBase):
     # Looks like if self.cv is not a ScrolledCanvas, this could return a tuple as well
     @overload
     def screensize(self, canvwidth: int, canvheight: int, bg: _Color | None = None) -> None: ...
+
     if sys.version_info >= (3, 14):
         def save(self, filename: StrPath, *, overwrite: bool = False) -> None:
             """Save the drawing as a PostScript file
@@ -796,6 +817,7 @@ class TurtleScreen(TurtleScreenBase):
             Example (for a TurtleScreen instance named screen):
             >>> screen.save('my_drawing.eps')
             """
+
     onscreenclick = onclick
     resetscreen = reset
     clearscreen = clear
@@ -825,6 +847,7 @@ class TurtleScreen(TurtleScreenBase):
         the up-arrow key, or by keeping pressed the up-arrow key.
         consequently drawing a hexagon.
         """
+
     onkeyrelease = onkey
 
 class TNavigator:
@@ -878,6 +901,7 @@ class TNavigator:
         >>> turtle.heading()
         1.5707963267948966
         """
+
     if sys.version_info >= (3, 12):
         def teleport(self, x: float | None = None, y: float | None = None, *, fill_gap: bool = False) -> None:
             """To be overwritten by child class RawTurtle.
@@ -897,7 +921,7 @@ class TNavigator:
 
         Example (for a Turtle instance named turtle):
         >>> turtle.position()
-        (0.00, 0.00)
+        (0.00,0.00)
         >>> turtle.forward(25)
         >>> turtle.position()
         (25.00,0.00)
@@ -919,10 +943,10 @@ class TNavigator:
 
         Example (for a Turtle instance named turtle):
         >>> turtle.position()
-        (0.00, 0.00)
+        (0.00,0.00)
         >>> turtle.backward(30)
         >>> turtle.position()
-        (-30.00, 0.00)
+        (-30.00,0.00)
         """
 
     def right(self, angle: float) -> None:
@@ -1023,7 +1047,7 @@ class TNavigator:
         Example (for a Turtle instance named turtle):
         >>> tp = turtle.pos()
         >>> tp
-        (0.00, 0.00)
+        (0.00,0.00)
         >>> turtle.setpos(60,30)
         >>> turtle.pos()
         (60.00,30.00)
@@ -1034,9 +1058,9 @@ class TNavigator:
         >>> turtle.pos()
         (0.00,0.00)
         """
-
     @overload
     def goto(self, x: float, y: float) -> None: ...
+
     def home(self) -> None:
         """Move turtle to the origin - coordinates (0,0).
 
@@ -1098,7 +1122,7 @@ class TNavigator:
 
         Example (for a Turtle instance named turtle):
         >>> turtle.pos()
-        (0.00, 0.00)
+        (0.00,0.00)
         >>> turtle.distance(30,40)
         50.0
         >>> pen = Turtle()
@@ -1106,9 +1130,9 @@ class TNavigator:
         >>> turtle.distance(pen)
         77.0
         """
-
     @overload
     def distance(self, x: float, y: float) -> float: ...
+
     @overload
     def towards(self, x: TNavigator | tuple[float, float], y: None = None) -> float:
         """Return the angle of the line from the turtle's position to (x, y).
@@ -1132,9 +1156,9 @@ class TNavigator:
         >>> turtle.towards(0,0)
         225.0
         """
-
     @overload
     def towards(self, x: float, y: float) -> float: ...
+
     def heading(self) -> float:
         """Return the turtle's current heading.
 
@@ -1203,6 +1227,7 @@ class TNavigator:
 
     def speed(self, s: int | None = 0) -> int | None:
         """dummy method - to be overwritten by child class"""
+
     fd = forward
     bk = back
     backward = back
@@ -1219,6 +1244,7 @@ class TPen:
     """
 
     def __init__(self, resizemode: Literal["auto", "user", "noresize"] = "noresize") -> None: ...
+
     @overload
     def resizemode(self, rmode: None = None) -> str:
         """Set resizemode to one of the values: "auto", "user", "noresize".
@@ -1242,9 +1268,9 @@ class TPen:
         >>> turtle.resizemode()
         'noresize'
         """
-
     @overload
     def resizemode(self, rmode: Literal["auto", "user", "noresize"]) -> None: ...
+
     @overload
     def pensize(self, width: None = None) -> int:
         """Set or return the line thickness.
@@ -1264,9 +1290,9 @@ class TPen:
         1
         >>> turtle.pensize(10)   # from here on lines of width 10 are drawn
         """
-
     @overload
     def pensize(self, width: int) -> None: ...
+
     def penup(self) -> None:
         """Pull the pen up -- no drawing when moving.
 
@@ -1331,9 +1357,9 @@ class TPen:
         Example (for a Turtle instance named turtle):
         >>> turtle.speed(3)
         """
-
     @overload
     def speed(self, speed: _Speed) -> None: ...
+
     @overload
     def pencolor(self) -> _AnyColor:
         """Return or set the pencolor.
@@ -1341,34 +1367,38 @@ class TPen:
         Arguments:
         Four input formats are allowed:
           - pencolor()
-            Return the current pencolor as color specification string,
-            possibly in hex-number format (see example).
-            May be used as input to another color/pencolor/fillcolor call.
+            Return the current pencolor as color specification string or
+            as a tuple (see example).  May be used as input to another
+            color/pencolor/fillcolor/bgcolor call.
           - pencolor(colorstring)
-            s is a Tk color specification string, such as "red" or "yellow"
+            Set pencolor to colorstring, which is a Tk color
+            specification string, such as "red", "yellow", or "#33cc8c".
           - pencolor((r, g, b))
-            *a tuple* of r, g, and b, which represent, an RGB color,
-            and each of r, g, and b are in the range 0..colormode,
-            where colormode is either 1.0 or 255
+            Set pencolor to the RGB color represented by the tuple of
+            r, g, and b.  Each of r, g, and b must be in the range
+            0..colormode, where colormode is either 1.0 or 255 (see
+            colormode()).
           - pencolor(r, g, b)
-            r, g, and b represent an RGB color, and each of r, g, and b
-            are in the range 0..colormode
+            Set pencolor to the RGB color represented by r, g, and b.
+            Each of r, g, and b must be in the range 0..colormode.
 
         If turtleshape is a polygon, the outline of that polygon is drawn
         with the newly set pencolor.
 
         Example (for a Turtle instance named turtle):
         >>> turtle.pencolor('brown')
-        >>> tup = (0.2, 0.8, 0.55)
-        >>> turtle.pencolor(tup)
         >>> turtle.pencolor()
-        '#33cc8c'
+        'brown'
+        >>> colormode(255)
+        >>> turtle.pencolor('#32c18f')
+        >>> turtle.pencolor()
+        (50.0, 193.0, 143.0)
         """
-
     @overload
     def pencolor(self, color: _Color) -> None: ...
     @overload
     def pencolor(self, r: float, g: float, b: float) -> None: ...
+
     @overload
     def fillcolor(self) -> _AnyColor:
         """Return or set the fillcolor.
@@ -1377,51 +1407,54 @@ class TPen:
         Four input formats are allowed:
           - fillcolor()
             Return the current fillcolor as color specification string,
-            possibly in hex-number format (see example).
-            May be used as input to another color/pencolor/fillcolor call.
+            possibly in tuple format (see example).  May be used as
+            input to another color/pencolor/fillcolor/bgcolor call.
           - fillcolor(colorstring)
-            s is a Tk color specification string, such as "red" or "yellow"
+            Set fillcolor to colorstring, which is a Tk color
+            specification string, such as "red", "yellow", or "#33cc8c".
           - fillcolor((r, g, b))
-            *a tuple* of r, g, and b, which represent, an RGB color,
-            and each of r, g, and b are in the range 0..colormode,
-            where colormode is either 1.0 or 255
+            Set fillcolor to the RGB color represented by the tuple of
+            r, g, and b.  Each of r, g, and b must be in the range
+            0..colormode, where colormode is either 1.0 or 255 (see
+            colormode()).
           - fillcolor(r, g, b)
-            r, g, and b represent an RGB color, and each of r, g, and b
-            are in the range 0..colormode
+            Set fillcolor to the RGB color represented by r, g, and b.
+            Each of r, g, and b must be in the range 0..colormode.
 
         If turtleshape is a polygon, the interior of that polygon is drawn
         with the newly set fillcolor.
 
         Example (for a Turtle instance named turtle):
         >>> turtle.fillcolor('violet')
-        >>> col = turtle.pencolor()
-        >>> turtle.fillcolor(col)
-        >>> turtle.fillcolor(0, .5, 0)
+        >>> turtle.fillcolor()
+        'violet'
+        >>> colormode(255)
+        >>> turtle.fillcolor('#ffffff')
+        >>> turtle.fillcolor()
+        (255.0, 255.0, 255.0)
         """
-
     @overload
     def fillcolor(self, color: _Color) -> None: ...
     @overload
     def fillcolor(self, r: float, g: float, b: float) -> None: ...
+
     @overload
     def color(self) -> tuple[_AnyColor, _AnyColor]:
         """Return or set the pencolor and fillcolor.
 
         Arguments:
         Several input formats are allowed.
-        They use 0, 1, 2, or 3 arguments as follows:
-
-        color()
-            Return the current pencolor and the current fillcolor
-            as a pair of color specification strings as are returned
-            by pencolor and fillcolor.
-        color(colorstring), color((r,g,b)), color(r,g,b)
-            inputs as in pencolor, set both, fillcolor and pencolor,
+        They use 0 to 3 arguments as follows:
+          - color()
+            Return the current pencolor and the current fillcolor as
+            a pair of color specification strings or tuples as returned
+            by pencolor() and fillcolor().
+          - color(colorstring), color((r,g,b)), color(r,g,b)
+            Inputs as in pencolor(), set both, fillcolor and pencolor,
             to the given value.
-        color(colorstring1, colorstring2),
-        color((r1,g1,b1), (r2,g2,b2))
-            equivalent to pencolor(colorstring1) and fillcolor(colorstring2)
-            and analogously, if the other input format is used.
+          - color(colorstring1, colorstring2), color((r1,g1,b1), (r2,g2,b2))
+            Equivalent to pencolor(colorstring1) and fillcolor(colorstring2)
+            and analogously if the other input format is used.
 
         If turtleshape is a polygon, outline and interior of that polygon
         is drawn with the newly set colors.
@@ -1432,17 +1465,17 @@ class TPen:
         >>> turtle.color()
         ('red', 'green')
         >>> colormode(255)
-        >>> color((40, 80, 120), (160, 200, 240))
+        >>> color(('#285078', '#a0c8f0'))
         >>> color()
-        ('#285078', '#a0c8f0')
+        ((40.0, 80.0, 120.0), (160.0, 200.0, 240.0))
         """
-
     @overload
     def color(self, color: _Color) -> None: ...
     @overload
     def color(self, r: float, g: float, b: float) -> None: ...
     @overload
     def color(self, color1: _Color, color2: _Color) -> None: ...
+
     if sys.version_info >= (3, 12):
         def teleport(self, x: float | None = None, y: float | None = None, *, fill_gap: bool = False) -> None:
             """To be overwritten by child class RawTurtle.
@@ -1486,6 +1519,7 @@ class TPen:
         >>> print(turtle.isvisible())
         False
         """
+
     # Note: signatures 1 and 2 overlap unsafely when no arguments are provided
     @overload
     def pen(self) -> _PenState:
@@ -1535,7 +1569,6 @@ class TPen:
         'pencolor': 'red', 'pendown': True, 'fillcolor': 'green',
         'stretchfactor': (1,1), 'speed': 3, 'shearfactor': 0.0}
         """
-
     @overload
     def pen(
         self,
@@ -1552,6 +1585,7 @@ class TPen:
         outline: int = ...,
         tilt: float = ...,
     ) -> None: ...
+
     width = pensize
     up = penup
     pu = penup
@@ -1667,9 +1701,9 @@ class RawTurtle(TPen, TNavigator):  # type: ignore[misc]  # Conflicting methods 
         >>> turtle.shape()
         'turtle'
         """
-
     @overload
     def shape(self, name: str) -> None: ...
+
     # Unsafely overlaps when no arguments are provided
     @overload
     def shapesize(self) -> tuple[float, float, float]:
@@ -1693,11 +1727,11 @@ class RawTurtle(TPen, TNavigator):  # type: ignore[misc]  # Conflicting methods 
         >>> turtle.shapesize(5, 5, 12)
         >>> turtle.shapesize(outline=8)
         """
-
     @overload
     def shapesize(
         self, stretch_wid: float | None = None, stretch_len: float | None = None, outline: float | None = None
     ) -> None: ...
+
     @overload
     def shearfactor(self, shear: None = None) -> float:
         """Set or return the current shearfactor.
@@ -1718,9 +1752,9 @@ class RawTurtle(TPen, TNavigator):  # type: ignore[misc]  # Conflicting methods 
         >>> turtle.shearfactor()
         >>> 0.5
         """
-
     @overload
     def shearfactor(self, shear: float) -> None: ...
+
     # Unsafely overlaps when no arguments are provided
     @overload
     def shapetransform(self) -> tuple[float, float, float, float]:
@@ -1743,11 +1777,11 @@ class RawTurtle(TPen, TNavigator):  # type: ignore[misc]  # Conflicting methods 
         >>> turtle.shapetransform()
         (4.0, -1.0, -0.0, 2.0)
         """
-
     @overload
     def shapetransform(
         self, t11: float | None = None, t12: float | None = None, t21: float | None = None, t22: float | None = None
     ) -> None: ...
+
     def get_shapepoly(self) -> _PolygonCoords | None:
         """Return the current shape polygon as tuple of coordinate pairs.
 
@@ -1760,6 +1794,7 @@ class RawTurtle(TPen, TNavigator):  # type: ignore[misc]  # Conflicting methods 
         ((50, -20), (30, 20), (-50, 20), (-30, -20))
 
         """
+
     if sys.version_info < (3, 13):
         @deprecated("Deprecated since Python 3.1; removed in Python 3.13. Use `tiltangle()` instead.")
         def settiltangle(self, angle: float) -> None:
@@ -1813,9 +1848,9 @@ class RawTurtle(TPen, TNavigator):  # type: ignore[misc]  # Conflicting methods 
         >>> turtle.stamp()
         >>> turtle.fd(50)
         """
-
     @overload
     def tiltangle(self, angle: float) -> None: ...
+
     def tilt(self, angle: float) -> None:
         """Rotate the turtleshape by angle.
 
@@ -1833,6 +1868,7 @@ class RawTurtle(TPen, TNavigator):  # type: ignore[misc]  # Conflicting methods 
         >>> turtle.tilt(30)
         >>> turtle.fd(50)
         """
+
     # Can return either 'int' or Tuple[int, ...] based on if the stamp is
     # a compound stamp or not. So, as per the "no Union return" policy,
     # we return Any.
@@ -1896,6 +1932,7 @@ class RawTurtle(TPen, TNavigator):  # type: ignore[misc]  # Conflicting methods 
         ... else:
         ...     turtle.pensize(3)
         """
+
     if sys.version_info >= (3, 14):
         @contextmanager
         def fill(self) -> Generator[None]:
@@ -1949,11 +1986,11 @@ class RawTurtle(TPen, TNavigator):  # type: ignore[misc]  # Conflicting methods 
         >>> turtle.dot()
         >>> turtle.fd(50); turtle.dot(20, "blue"); turtle.fd(50)
         """
-
     @overload
     def dot(self, size: int | None, color: _Color, /) -> None: ...
     @overload
     def dot(self, size: int | None, r: float, g: float, b: float, /) -> None: ...
+
     def write(
         self, arg: object, move: bool = False, align: str = "left", font: tuple[str, int, str] = ("Arial", 8, "normal")
     ) -> None:
@@ -1975,6 +2012,7 @@ class RawTurtle(TPen, TNavigator):  # type: ignore[misc]  # Conflicting methods 
         >>> turtle.write('Home = ', True, align="center")
         >>> turtle.write((0,0), True)
         """
+
     if sys.version_info >= (3, 14):
         @contextmanager
         def poly(self) -> Generator[None]:
@@ -2056,6 +2094,7 @@ class RawTurtle(TPen, TNavigator):  # type: ignore[misc]  # Conflicting methods 
         >>> turtles()
         [<turtle.Turtle object at 0x0187D810>]
         """
+
     getpen = getturtle
     def onclick(self, fun: Callable[[float, float], object], btn: int = 1, add: bool | None = None) -> None:
         """Bind fun to mouse-click event on this turtle on canvas.
@@ -2135,6 +2174,7 @@ class RawTurtle(TPen, TNavigator):  # type: ignore[misc]  # Conflicting methods 
         ...     turtle.undo()
         ...
         """
+
     turtlesize = shapesize
 
 class _Screen(TurtleScreen):
@@ -2326,9 +2366,9 @@ def mode(mode: None = None) -> str:
     >>> mode()
     'logo'
     """
-
 @overload
 def mode(mode: Literal["standard", "logo", "world"]) -> None: ...
+
 def setworldcoordinates(llx: float, lly: float, urx: float, ury: float) -> None:
     """Set up a user defined coordinate-system.
 
@@ -2395,9 +2435,9 @@ def colormode(cmode: None = None) -> float:
     >>> colormode(255)
     >>> pencolor(240,160,80)
     """
-
 @overload
 def colormode(cmode: float) -> None: ...
+
 def reset() -> None:
     """Delete the turtle's drawings and restore its default values.
 
@@ -2430,22 +2470,38 @@ def turtles() -> list[Turtle]:
 def bgcolor() -> _AnyColor:
     """Set or return backgroundcolor of the TurtleScreen.
 
-    Arguments (if given): a color string or three numbers
-    in the range 0..colormode or a 3-tuple of such numbers.
+    Four input formats are allowed:
+      - bgcolor()
+        Return the current background color as color specification
+        string or as a tuple (see example).  May be used as input
+        to another color/pencolor/fillcolor/bgcolor call.
+      - bgcolor(colorstring)
+        Set the background color to colorstring, which is a Tk color
+        specification string, such as "red", "yellow", or "#33cc8c".
+      - bgcolor((r, g, b))
+        Set the background color to the RGB color represented by
+        the tuple of r, g, and b.  Each of r, g, and b must be in
+        the range 0..colormode, where colormode is either 1.0 or 255
+        (see colormode()).
+      - bgcolor(r, g, b)
+        Set the background color to the RGB color represented by
+        r, g, and b.  Each of r, g, and b must be in the range
+        0..colormode.
 
     Example:
     >>> bgcolor("orange")
     >>> bgcolor()
     'orange'
-    >>> bgcolor(0.5,0,0.5)
+    >>> colormode(255)
+    >>> bgcolor('#800080')
     >>> bgcolor()
-    '#800080'
+    (128.0, 0.0, 128.0)
     """
-
 @overload
 def bgcolor(color: _Color) -> None: ...
 @overload
 def bgcolor(r: float, g: float, b: float) -> None: ...
+
 @overload
 def tracer(n: None = None) -> int:
     """Turns turtle animation on/off and set delay for update drawings.
@@ -2466,9 +2522,9 @@ def tracer(n: None = None) -> int:
     ...     rt(90)
     ...     dist += 2
     """
-
 @overload
 def tracer(n: int, delay: int | None = None) -> None: ...
+
 @overload
 def delay(delay: None = None) -> int:
     """Return or set the drawing delay in milliseconds.
@@ -2481,7 +2537,6 @@ def delay(delay: None = None) -> int:
     >>> delay()
     15
     """
-
 @overload
 def delay(delay: int) -> None: ...
 
@@ -2632,9 +2687,9 @@ def bgpic(picname: None = None) -> str:
     >>> bgpic()
     'landscape.gif'
     """
-
 @overload
 def bgpic(picname: str) -> None: ...
+
 @overload
 def screensize(canvwidth: None = None, canvheight: None = None, bg: None = None) -> tuple[int, int]:
     """Resize the canvas the turtles are drawing on.
@@ -2653,7 +2708,6 @@ def screensize(canvwidth: None = None, canvheight: None = None, bg: None = None)
     >>> turtle.screensize(2000,1500)
     >>> # e.g. to search for an erroneously escaped turtle ;-)
     """
-
 @overload
 def screensize(canvwidth: int, canvheight: int, bg: _Color | None = None) -> None: ...
 
@@ -2830,7 +2884,7 @@ def forward(distance: float) -> None:
 
     Example:
     >>> position()
-    (0.00, 0.00)
+    (0.00,0.00)
     >>> forward(25)
     >>> position()
     (25.00,0.00)
@@ -2852,10 +2906,10 @@ def back(distance: float) -> None:
 
     Example:
     >>> position()
-    (0.00, 0.00)
+    (0.00,0.00)
     >>> backward(30)
     >>> position()
-    (-30.00, 0.00)
+    (-30.00,0.00)
     """
 
 def right(angle: float) -> None:
@@ -2956,7 +3010,7 @@ def goto(x: tuple[float, float], y: None = None) -> None:
     Example:
     >>> tp = pos()
     >>> tp
-    (0.00, 0.00)
+    (0.00,0.00)
     >>> setpos(60,30)
     >>> pos()
     (60.00,30.00)
@@ -2967,9 +3021,9 @@ def goto(x: tuple[float, float], y: None = None) -> None:
     >>> pos()
     (0.00,0.00)
     """
-
 @overload
 def goto(x: float, y: float) -> None: ...
+
 def home() -> None:
     """Move turtle to the origin - coordinates (0,0).
 
@@ -3031,7 +3085,7 @@ def distance(x: TNavigator | tuple[float, float], y: None = None) -> float:
 
     Example:
     >>> pos()
-    (0.00, 0.00)
+    (0.00,0.00)
     >>> distance(30,40)
     50.0
     >>> pen = Turtle()
@@ -3039,9 +3093,9 @@ def distance(x: TNavigator | tuple[float, float], y: None = None) -> float:
     >>> distance(pen)
     77.0
     """
-
 @overload
 def distance(x: float, y: float) -> float: ...
+
 @overload
 def towards(x: TNavigator | tuple[float, float], y: None = None) -> float:
     """Return the angle of the line from the turtle's position to (x, y).
@@ -3065,9 +3119,9 @@ def towards(x: TNavigator | tuple[float, float], y: None = None) -> float:
     >>> towards(0,0)
     225.0
     """
-
 @overload
 def towards(x: float, y: float) -> float: ...
+
 def heading() -> float:
     """Return the turtle's current heading.
 
@@ -3168,9 +3222,9 @@ def resizemode(rmode: None = None) -> str:
     >>> resizemode()
     'noresize'
     """
-
 @overload
 def resizemode(rmode: Literal["auto", "user", "noresize"]) -> None: ...
+
 @overload
 def pensize(width: None = None) -> int:
     """Set or return the line thickness.
@@ -3190,9 +3244,9 @@ def pensize(width: None = None) -> int:
     1
     >>> pensize(10)   # from here on lines of width 10 are drawn
     """
-
 @overload
 def pensize(width: int) -> None: ...
+
 def penup() -> None:
     """Pull the pen up -- no drawing when moving.
 
@@ -3257,9 +3311,9 @@ def speed(speed: None = None) -> int:
     Example:
     >>> speed(3)
     """
-
 @overload
 def speed(speed: _Speed) -> None: ...
+
 @overload
 def pencolor() -> _AnyColor:
     """Return or set the pencolor.
@@ -3267,34 +3321,38 @@ def pencolor() -> _AnyColor:
     Arguments:
     Four input formats are allowed:
       - pencolor()
-        Return the current pencolor as color specification string,
-        possibly in hex-number format (see example).
-        May be used as input to another color/pencolor/fillcolor call.
+        Return the current pencolor as color specification string or
+        as a tuple (see example).  May be used as input to another
+        color/pencolor/fillcolor/bgcolor call.
       - pencolor(colorstring)
-        s is a Tk color specification string, such as "red" or "yellow"
+        Set pencolor to colorstring, which is a Tk color
+        specification string, such as "red", "yellow", or "#33cc8c".
       - pencolor((r, g, b))
-        *a tuple* of r, g, and b, which represent, an RGB color,
-        and each of r, g, and b are in the range 0..colormode,
-        where colormode is either 1.0 or 255
+        Set pencolor to the RGB color represented by the tuple of
+        r, g, and b.  Each of r, g, and b must be in the range
+        0..colormode, where colormode is either 1.0 or 255 (see
+        colormode()).
       - pencolor(r, g, b)
-        r, g, and b represent an RGB color, and each of r, g, and b
-        are in the range 0..colormode
+        Set pencolor to the RGB color represented by r, g, and b.
+        Each of r, g, and b must be in the range 0..colormode.
 
     If turtleshape is a polygon, the outline of that polygon is drawn
     with the newly set pencolor.
 
     Example:
     >>> pencolor('brown')
-    >>> tup = (0.2, 0.8, 0.55)
-    >>> pencolor(tup)
     >>> pencolor()
-    '#33cc8c'
+    'brown'
+    >>> colormode(255)
+    >>> pencolor('#32c18f')
+    >>> pencolor()
+    (50.0, 193.0, 143.0)
     """
-
 @overload
 def pencolor(color: _Color) -> None: ...
 @overload
 def pencolor(r: float, g: float, b: float) -> None: ...
+
 @overload
 def fillcolor() -> _AnyColor:
     """Return or set the fillcolor.
@@ -3303,51 +3361,54 @@ def fillcolor() -> _AnyColor:
     Four input formats are allowed:
       - fillcolor()
         Return the current fillcolor as color specification string,
-        possibly in hex-number format (see example).
-        May be used as input to another color/pencolor/fillcolor call.
+        possibly in tuple format (see example).  May be used as
+        input to another color/pencolor/fillcolor/bgcolor call.
       - fillcolor(colorstring)
-        s is a Tk color specification string, such as "red" or "yellow"
+        Set fillcolor to colorstring, which is a Tk color
+        specification string, such as "red", "yellow", or "#33cc8c".
       - fillcolor((r, g, b))
-        *a tuple* of r, g, and b, which represent, an RGB color,
-        and each of r, g, and b are in the range 0..colormode,
-        where colormode is either 1.0 or 255
+        Set fillcolor to the RGB color represented by the tuple of
+        r, g, and b.  Each of r, g, and b must be in the range
+        0..colormode, where colormode is either 1.0 or 255 (see
+        colormode()).
       - fillcolor(r, g, b)
-        r, g, and b represent an RGB color, and each of r, g, and b
-        are in the range 0..colormode
+        Set fillcolor to the RGB color represented by r, g, and b.
+        Each of r, g, and b must be in the range 0..colormode.
 
     If turtleshape is a polygon, the interior of that polygon is drawn
     with the newly set fillcolor.
 
     Example:
     >>> fillcolor('violet')
-    >>> col = pencolor()
-    >>> fillcolor(col)
-    >>> fillcolor(0, .5, 0)
+    >>> fillcolor()
+    'violet'
+    >>> colormode(255)
+    >>> fillcolor('#ffffff')
+    >>> fillcolor()
+    (255.0, 255.0, 255.0)
     """
-
 @overload
 def fillcolor(color: _Color) -> None: ...
 @overload
 def fillcolor(r: float, g: float, b: float) -> None: ...
+
 @overload
 def color() -> tuple[_AnyColor, _AnyColor]:
     """Return or set the pencolor and fillcolor.
 
     Arguments:
     Several input formats are allowed.
-    They use 0, 1, 2, or 3 arguments as follows:
-
-    color()
-        Return the current pencolor and the current fillcolor
-        as a pair of color specification strings as are returned
-        by pencolor and fillcolor.
-    color(colorstring), color((r,g,b)), color(r,g,b)
-        inputs as in pencolor, set both, fillcolor and pencolor,
+    They use 0 to 3 arguments as follows:
+      - color()
+        Return the current pencolor and the current fillcolor as
+        a pair of color specification strings or tuples as returned
+        by pencolor() and fillcolor().
+      - color(colorstring), color((r,g,b)), color(r,g,b)
+        Inputs as in pencolor(), set both, fillcolor and pencolor,
         to the given value.
-    color(colorstring1, colorstring2),
-    color((r1,g1,b1), (r2,g2,b2))
-        equivalent to pencolor(colorstring1) and fillcolor(colorstring2)
-        and analogously, if the other input format is used.
+      - color(colorstring1, colorstring2), color((r1,g1,b1), (r2,g2,b2))
+        Equivalent to pencolor(colorstring1) and fillcolor(colorstring2)
+        and analogously if the other input format is used.
 
     If turtleshape is a polygon, outline and interior of that polygon
     is drawn with the newly set colors.
@@ -3358,17 +3419,17 @@ def color() -> tuple[_AnyColor, _AnyColor]:
     >>> color()
     ('red', 'green')
     >>> colormode(255)
-    >>> color((40, 80, 120), (160, 200, 240))
+    >>> color(('#285078', '#a0c8f0'))
     >>> color()
-    ('#285078', '#a0c8f0')
+    ((40.0, 80.0, 120.0), (160.0, 200.0, 240.0))
     """
-
 @overload
 def color(color: _Color) -> None: ...
 @overload
 def color(r: float, g: float, b: float) -> None: ...
 @overload
 def color(color1: _Color, color2: _Color) -> None: ...
+
 def showturtle() -> None:
     """Makes the turtle visible.
 
@@ -3456,7 +3517,6 @@ def pen() -> _PenState:
     'pencolor': 'red', 'pendown': True, 'fillcolor': 'green',
     'stretchfactor': (1,1), 'speed': 3, 'shearfactor': 0.0}
     """
-
 @overload
 def pen(
     pen: _PenState | None = None,
@@ -3529,7 +3589,6 @@ def shape(name: None = None) -> str:
     >>> shape()
     'turtle'
     """
-
 @overload
 def shape(name: str) -> None: ...
 
@@ -3593,9 +3652,9 @@ def shapesize() -> tuple[float, float, float]:
     >>> shapesize(5, 5, 12)
     >>> shapesize(outline=8)
     """
-
 @overload
 def shapesize(stretch_wid: float | None = None, stretch_len: float | None = None, outline: float | None = None) -> None: ...
+
 @overload
 def shearfactor(shear: None = None) -> float:
     """Set or return the current shearfactor.
@@ -3616,7 +3675,6 @@ def shearfactor(shear: None = None) -> float:
     >>> shearfactor()
     >>> 0.5
     """
-
 @overload
 def shearfactor(shear: float) -> None: ...
 
@@ -3642,11 +3700,11 @@ def shapetransform() -> tuple[float, float, float, float]:
     >>> shapetransform()
     (4.0, -1.0, -0.0, 2.0)
     """
-
 @overload
 def shapetransform(
     t11: float | None = None, t12: float | None = None, t21: float | None = None, t22: float | None = None
 ) -> None: ...
+
 def get_shapepoly() -> _PolygonCoords | None:
     """Return the current shape polygon as tuple of coordinate pairs.
 
@@ -3713,9 +3771,9 @@ def tiltangle(angle: None = None) -> float:
     >>> stamp()
     >>> fd(50)
     """
-
 @overload
 def tiltangle(angle: float) -> None: ...
+
 def tilt(angle: float) -> None:
     """Rotate the turtleshape by angle.
 
@@ -3851,11 +3909,11 @@ def dot(size: int | _Color | None = None) -> None:
     >>> dot()
     >>> fd(50); dot(20, "blue"); fd(50)
     """
-
 @overload
 def dot(size: int | None, color: _Color, /) -> None: ...
 @overload
 def dot(size: int | None, r: float, g: float, b: float, /) -> None: ...
+
 def write(arg: object, move: bool = False, align: str = "left", font: tuple[str, int, str] = ("Arial", 8, "normal")) -> None:
     """Write text at the current turtle position.
 

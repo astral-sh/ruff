@@ -29,13 +29,13 @@ python ftplib.py -d localhost -l -p -l
 """
 
 import sys
-from _typeshed import SupportsRead, SupportsReadline
+from _typeshed import StrOrBytesPath, SupportsRead, SupportsReadline
 from collections.abc import Callable, Iterable, Iterator
 from socket import socket
 from ssl import SSLContext
 from types import TracebackType
-from typing import Any, Final, Literal, TextIO
-from typing_extensions import Self
+from typing import Any, Final, Literal, TextIO, overload
+from typing_extensions import Self, deprecated
 
 __all__ = ["FTP", "error_reply", "error_temp", "error_perm", "error_proto", "all_errors", "FTP_TLS"]
 
@@ -185,6 +185,7 @@ class FTP:
 
     def login(self, user: str = "", passwd: str = "", acct: str = "") -> str:
         """Login, default anonymous."""
+
     # In practice, `rest` can actually be anything whose str() is an integer sequence, so to make it simple we allow integers
     def ntransfercmd(self, cmd: str, rest: int | str | None = None) -> tuple[socket, int | None]:
         """Initiate a transfer over the data connection.
@@ -276,6 +277,7 @@ class FTP:
 
     def nlst(self, *args: str) -> list[str]:
         """Return a list of files in a given directory (default the current)."""
+
     # Technically only the last arg can be a Callable but ...
     def dir(self, *args: str | Callable[[str], object]) -> None:
         """List a directory in long form.
@@ -373,23 +375,44 @@ class FTP_TLS(FTP):
             encoding: str = "utf-8",
         ) -> None: ...
     else:
+        @overload
         def __init__(
             self,
             host: str = "",
             user: str = "",
             passwd: str = "",
             acct: str = "",
-            keyfile: str | None = None,
-            certfile: str | None = None,
+            keyfile: None = None,
+            certfile: None = None,
             context: SSLContext | None = None,
             timeout: float | None = ...,
             source_address: tuple[str, int] | None = None,
             *,
             encoding: str = "utf-8",
         ) -> None: ...
-    ssl_version: int
-    keyfile: str | None
-    certfile: str | None
+        @overload
+        @deprecated(
+            "The `keyfile`, `certfile` parameters are deprecated since Python 3.6; "
+            "removed in Python 3.12. Use `context` parameter instead."
+        )
+        def __init__(
+            self,
+            host: str = "",
+            user: str = "",
+            passwd: str = "",
+            acct: str = "",
+            keyfile: StrOrBytesPath | None = None,
+            certfile: StrOrBytesPath | None = None,
+            context: None = None,
+            timeout: float | None = ...,
+            source_address: tuple[str, int] | None = None,
+            *,
+            encoding: str = "utf-8",
+        ) -> None: ...
+
+        ssl_version: int
+        keyfile: StrOrBytesPath | None
+        certfile: StrOrBytesPath | None
     context: SSLContext
     def login(self, user: str = "", passwd: str = "", acct: str = "", secure: bool = True) -> str: ...
     def auth(self) -> str:

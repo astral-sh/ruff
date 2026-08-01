@@ -10,10 +10,11 @@ import re
 import time
 from asyncio import create_subprocess_exec
 from collections import Counter
+from collections.abc import Iterable, Iterator, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 from subprocess import PIPE
-from typing import TYPE_CHECKING, Iterable, Iterator, Self, Sequence
+from typing import TYPE_CHECKING, Self
 
 from ruff_ecosystem import logger
 from ruff_ecosystem.markdown import (
@@ -21,6 +22,7 @@ from ruff_ecosystem.markdown import (
     markdown_plus_minus,
     markdown_project_section,
 )
+from ruff_ecosystem.projects import rule_name_to_code
 from ruff_ecosystem.types import (
     Comparison,
     Diff,
@@ -45,8 +47,10 @@ CHECK_DIFF_LINE_RE = re.compile(
 )
 
 CHECK_DIAGNOSTIC_LINE_RE = re.compile(
-    r"^(?P<diff>[+-])? ?(?P<location>.*): (?P<code>[A-Z]{1,4}[0-9]{3,4}|[a-z\-]+:)(?P<fixable> \[\*\])? (?P<message>.*)"
+    r"^(?P<diff>[+-])? ?(?P<location>.*?): (?P<code>[A-Z]{1,5}[0-9]{3,4}|[a-z0-9\-]+):?(?P<fixable> \[\*\])? (?P<message>.*)"
 )
+
+PANIC_DIAGNOSTIC_LINE_RE = re.compile(r"^[^:]+: panic: Panicked at ")
 
 CHECK_VIOLATION_FIX_INDICATOR = " [*]"
 
@@ -417,7 +421,7 @@ class DiagnosticLine:
 
         if match is None:
             # Handle case where there are no regex match e.g.
-            # +                 "?application=AIRFLOW&authenticator=TEST_AUTH&role=TEST_ROLE&warehouse=TEST_WAREHOUSE" # noqa: E501, ERA001
+            # +                 "?application=AIRFLOW&authenticator=TEST_AUTH&role=TEST_ROLE&warehouse=TEST_WAREHOUSE"
             # Which was found in local testing
             return None
 
@@ -457,7 +461,7 @@ class CheckDiff(Diff):
         diff = diff.without_unchanged_lines()
 
         # Sort without account for the leading + / -
-        sorted_lines = list(sorted(diff, key=lambda line: line[2:]))
+        sorted_lines = sorted(diff, key=lambda line: line[2:])
 
         # Parse the lines, drop lines that cannot be parsed
         parsed_lines: list[DiagnosticLine] = list(
@@ -505,7 +509,13 @@ async def compare_check(
     config_overrides: ConfigOverrides,
     cloned_repo: ClonedRepository,
 ) -> Comparison:
-    with config_overrides.patch_config(cloned_repo.path, options.preview):
+    # TODO(brent) Remove this workaround when human-readable rule names are stabilized.
+    rule_names = (
+        rule_name_to_code(ruff_comparison_executable.resolve())
+        if not options.preview
+        else {}
+    )
+    with config_overrides.patch_config(cloned_repo.path, options.preview, rule_names):
         async with asyncio.TaskGroup() as tg:
             baseline_task = tg.create_task(
                 ruff_check(
@@ -528,6 +538,10 @@ async def compare_check(
         baseline_task.result(),
         comparison_task.result(),
     )
+
+    for line in comparison_output:
+        if PANIC_DIAGNOSTIC_LINE_RE.match(line):
+            raise ToolError(line)
 
     diff = Diff.from_pair(baseline_output, comparison_output)
 
@@ -558,11 +572,10 @@ async def ruff_check(
     if proc.returncode != 0:
         raise ToolError(err.decode("utf8"))
 
-    # Strip summary lines so the diff is only diagnostic lines
-    lines = [
+    # Strip summary lines so the diff is only diagnostic lines. Also sort the lines so that
+    # reordering isn't presented as an addition/deletion pair.
+    return sorted(
         line
         for line in result.decode("utf8").splitlines()
         if not CHECK_SUMMARY_LINE_RE.match(line)
-    ]
-
-    return lines
+    )

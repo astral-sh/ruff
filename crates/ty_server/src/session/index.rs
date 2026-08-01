@@ -1,31 +1,24 @@
+use rustc_hash::FxHashMap;
 use std::sync::Arc;
 
-use crate::document::DocumentKey;
+use crate::document::{DocumentKey, LanguageId};
 use crate::session::DocumentHandle;
 use crate::{
     PositionEncoding, TextDocument,
     document::{DocumentVersion, NotebookDocument},
-    system::AnySystemPath,
 };
-
-use ruff_db::system::SystemVirtualPath;
-use rustc_hash::FxHashMap;
 
 /// Stores and tracks all open documents in a session, along with their associated settings.
 #[derive(Debug)]
 pub(crate) struct Index {
     /// Maps all document file paths to the associated document controller
     documents: FxHashMap<DocumentKey, Document>,
-
-    /// Maps opaque cell URLs to a notebook path (document)
-    notebook_cells: FxHashMap<String, AnySystemPath>,
 }
 
 impl Index {
     pub(super) fn new() -> Self {
         Self {
             documents: FxHashMap::default(),
-            notebook_cells: FxHashMap::default(),
         }
     }
 
@@ -38,32 +31,28 @@ impl Index {
         })
     }
 
+    /// Iterates over open documents that correspond to file-level documents.
+    ///
+    /// The index only stores documents that the client has opened. This filter keeps normal text
+    /// documents and whole notebook documents, but excludes notebook cell text documents (because
+    /// the file-level representation for a cell is its containing notebook).
+    pub(super) fn file_documents(&self) -> impl Iterator<Item = &Document> + '_ {
+        self.documents.values().filter(|document| match document {
+            Document::Text(text_document) => text_document.notebook().is_none(),
+            Document::Notebook(_) => true,
+        })
+    }
+
     pub(crate) fn document_handle(
         &self,
-        url: &lsp_types::Url,
+        uri: &lsp_types::Uri,
     ) -> Result<DocumentHandle, DocumentError> {
-        let key = DocumentKey::from_url(url);
+        let key = DocumentKey::from_uri(uri);
         let Some(document) = self.documents.get(&key) else {
             return Err(DocumentError::NotFound(key));
         };
 
-        if let Some(path) = key.as_opaque() {
-            if let Some(notebook_path) = self.notebook_cells.get(path) {
-                return Ok(DocumentHandle {
-                    key: key.clone(),
-                    notebook_path: Some(notebook_path.clone()),
-                    url: url.clone(),
-                    version: document.version(),
-                });
-            }
-        }
-
-        Ok(DocumentHandle {
-            key: key.clone(),
-            notebook_path: None,
-            url: url.clone(),
-            version: document.version(),
-        })
+        Ok(DocumentHandle::from_document(document))
     }
 
     #[expect(dead_code)]
@@ -74,41 +63,118 @@ impl Index {
             .map(|(key, _)| key)
     }
 
-    #[expect(dead_code)]
     pub(super) fn update_notebook_document(
         &mut self,
         notebook_key: &DocumentKey,
-        cells: Option<lsp_types::NotebookDocumentCellChange>,
+        cells: Option<lsp_types::NotebookDocumentCellChanges>,
         metadata: Option<serde_json::Map<String, serde_json::Value>>,
         new_version: DocumentVersion,
         encoding: PositionEncoding,
     ) -> crate::Result<()> {
-        // update notebook cell index
-        if let Some(lsp_types::NotebookDocumentCellChangeStructure {
-            did_open: Some(did_open),
-            ..
-        }) = cells.as_ref().and_then(|cells| cells.structure.as_ref())
-        {
-            for opened_cell in did_open {
-                let cell_path = SystemVirtualPath::new(opened_cell.uri.as_str());
-                self.notebook_cells
-                    .insert(cell_path.to_string(), notebook_key.to_file_path());
-            }
-            // deleted notebook cells are closed via textDocument/didClose - we don't close them here.
-        }
-
         let document = self.document_mut(notebook_key)?;
         let Some(notebook) = document.as_notebook_mut() else {
             anyhow::bail!("Notebook document path does not point to a notebook document");
         };
 
-        notebook.update(cells, metadata, new_version, encoding)?;
+        let (structure, data, text_content) = cells
+            .map(|cells| {
+                let lsp_types::NotebookDocumentCellChanges {
+                    structure,
+                    data,
+                    text_content,
+                } = cells;
+                (structure, data, text_content)
+            })
+            .unwrap_or_default();
+
+        let (array, did_open, did_close) = structure
+            .map(|structure| {
+                let lsp_types::NotebookDocumentCellChangeStructure {
+                    array,
+                    did_open,
+                    did_close,
+                } = structure;
+
+                (array, did_open, did_close)
+            })
+            .unwrap_or_else(|| {
+                (
+                    lsp_types::NotebookCellArrayChange {
+                        start: 0,
+                        delete_count: 0,
+                        cells: None,
+                    },
+                    None,
+                    None,
+                )
+            });
+
+        tracing::info!(
+            "version: {}, new_version: {}",
+            notebook.version(),
+            new_version
+        );
+        notebook.update(array, data.unwrap_or_default(), metadata, new_version)?;
+
+        let notebook_path = notebook_key.to_file_path();
+
+        for opened_cell in did_open.into_iter().flatten() {
+            self.documents.insert(
+                DocumentKey::from_uri(&opened_cell.uri),
+                Document::Text(
+                    TextDocument::new(
+                        opened_cell.uri,
+                        opened_cell.text,
+                        opened_cell.version,
+                        opened_cell.language_id,
+                    )
+                    .with_notebook(notebook_path.clone())
+                    .into(),
+                ),
+            );
+        }
+
+        for updated_cell in text_content.into_iter().flatten() {
+            let Ok(document_mut) = self.document_mut(&DocumentKey::from_uri(
+                &updated_cell.document.text_document_identifier.uri,
+            )) else {
+                tracing::warn!(
+                    "Could not find document for cell {}",
+                    updated_cell.document.text_document_identifier.uri
+                );
+                continue;
+            };
+
+            let Some(document) = document_mut.as_text_mut() else {
+                continue;
+            };
+
+            if updated_cell.changes.is_empty() {
+                document.update_version(updated_cell.document.version);
+            } else {
+                document.apply_changes(
+                    updated_cell.changes,
+                    updated_cell.document.version,
+                    encoding,
+                );
+            }
+        }
+
+        // VS Code sends a separate `didClose` request for every cell
+        // and they're removed from the metadata (notebook document)
+        // because they get deleted as part of `change.cells.structure.array`
+        let _ = did_close;
+
+        let notebook = self.document(notebook_key).unwrap().as_notebook().unwrap();
+        let ruff_notebook = notebook.to_ruff_notebook(self);
+        tracing::debug!("Updated notebook: {:?}", ruff_notebook.source_code());
+
         Ok(())
     }
 
     /// Create a document reference corresponding to the given document key.
     ///
-    /// Returns an error if the document is not found or if the path cannot be converted to a URL.
+    /// Returns an error if the document is not found or if the path cannot be converted to a URI.
     pub(crate) fn document(&self, key: &DocumentKey) -> Result<&Document, DocumentError> {
         let Some(document) = self.documents.get(key) else {
             return Err(DocumentError::NotFound(key.clone()));
@@ -117,31 +183,10 @@ impl Index {
         Ok(document)
     }
 
-    pub(crate) fn notebook_arc(
-        &self,
-        key: &DocumentKey,
-    ) -> Result<Arc<NotebookDocument>, DocumentError> {
-        let Some(document) = self.documents.get(key) else {
-            return Err(DocumentError::NotFound(key.clone()));
-        };
-
-        if let Document::Notebook(notebook) = document {
-            Ok(notebook.clone())
-        } else {
-            Err(DocumentError::NotFound(key.clone()))
-        }
-    }
-
     pub(super) fn open_text_document(&mut self, document: TextDocument) -> DocumentHandle {
-        let key = DocumentKey::from_url(document.url());
+        let key = DocumentKey::from_uri(document.uri());
 
-        // TODO: Fix file path for notebook cells
-        let handle = DocumentHandle {
-            key: key.clone(),
-            notebook_path: None,
-            url: document.url().clone(),
-            version: document.version(),
-        };
+        let handle = DocumentHandle::from_text_document(&document);
 
         self.documents.insert(key, Document::new_text(document));
 
@@ -149,41 +194,21 @@ impl Index {
     }
 
     pub(super) fn open_notebook_document(&mut self, document: NotebookDocument) -> DocumentHandle {
-        let notebook_key = DocumentKey::from_url(document.url());
-        let url = document.url().clone();
-        let version = document.version();
-
-        for cell_url in document.cell_urls() {
-            self.notebook_cells
-                .insert(cell_url.to_string(), notebook_key.to_file_path());
-        }
+        let handle = DocumentHandle::from_notebook_document(&document);
+        let notebook_key = DocumentKey::from_uri(document.uri());
 
         self.documents
-            .insert(notebook_key.clone(), Document::new_notebook(document));
+            .insert(notebook_key, Document::new_notebook(document));
 
-        DocumentHandle {
-            notebook_path: Some(notebook_key.to_file_path()),
-            key: notebook_key,
-            url,
-            version,
-        }
+        handle
     }
 
-    pub(super) fn close_document(&mut self, key: &DocumentKey) -> crate::Result<()> {
-        // Notebook cells URIs are removed from the index here, instead of during
-        // `update_notebook_document`. This is because a notebook cell, as a text document,
-        // is requested to be `closed` by VS Code after the notebook gets updated.
-        // This is not documented in the LSP specification explicitly, and this assumption
-        // may need revisiting in the future as we support more editors with notebook support.
-        if let DocumentKey::Opaque(uri) = key {
-            self.notebook_cells.remove(uri);
-        }
-
-        let Some(_) = self.documents.remove(key) else {
-            anyhow::bail!("tried to close document that didn't exist at {key}")
+    pub(super) fn close_document(&mut self, key: &DocumentKey) -> Result<Document, DocumentError> {
+        let Some(document) = self.documents.remove(key) else {
+            return Err(DocumentError::NotFound(key.clone()));
         };
 
-        Ok(())
+        Ok(document)
     }
 
     pub(super) fn document_mut(
@@ -217,6 +242,13 @@ impl Document {
         match self {
             Self::Text(document) => document.version(),
             Self::Notebook(notebook) => notebook.version(),
+        }
+    }
+
+    pub(crate) fn language_id(&self) -> Option<LanguageId> {
+        match self {
+            Self::Text(document) => Some(document.language_id()),
+            Self::Notebook(_) => None,
         }
     }
 

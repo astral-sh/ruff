@@ -15,16 +15,19 @@ pub(crate) enum TrailingComma {
 pub(crate) struct ImportFromData<'a> {
     pub(crate) module: Option<&'a str>,
     pub(crate) level: u32,
+    pub(crate) is_lazy: bool,
 }
 
 #[derive(Debug, Hash, Ord, PartialOrd, Eq, PartialEq)]
 pub(crate) struct AliasData<'a> {
     pub(crate) name: &'a str,
     pub(crate) asname: Option<&'a str>,
+    pub(crate) is_lazy: bool,
 }
 
 #[derive(Debug, Default, Clone)]
 pub(crate) struct ImportCommentSet<'a> {
+    pub(crate) first_index: Option<usize>,
     pub(crate) atop: Vec<Cow<'a, str>>,
     pub(crate) inline: Vec<Cow<'a, str>>,
 }
@@ -72,6 +75,7 @@ impl<'a> Importable<'a> for ImportFromData<'a> {
 
 #[derive(Debug, Default)]
 pub(crate) struct ImportFromStatement<'a> {
+    pub(crate) first_index: Option<usize>,
     pub(crate) comments: ImportFromCommentSet<'a>,
     pub(crate) aliases: FxHashMap<AliasData<'a>, ImportFromCommentSet<'a>>,
     pub(crate) trailing_comma: TrailingComma,

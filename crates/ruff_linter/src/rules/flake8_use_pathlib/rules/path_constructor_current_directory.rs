@@ -1,10 +1,9 @@
 use std::ops::Range;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::parenthesize::parenthesized_range;
+use ruff_python_ast::token::parenthesized_range;
 use ruff_python_ast::{Expr, ExprBinOp, ExprCall, Operator};
 use ruff_python_semantic::SemanticModel;
-use ruff_python_trivia::CommentRanges;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
@@ -89,11 +88,7 @@ pub(crate) fn path_constructor_current_directory(
 
     let mut diagnostic = checker.report_diagnostic(PathConstructorCurrentDirectory, arg.range());
 
-    match parent_and_next_path_fragment_range(
-        checker.semantic(),
-        checker.comment_ranges(),
-        checker.source(),
-    ) {
+    match parent_and_next_path_fragment_range(checker.semantic(), checker.tokens()) {
         Some((parent_range, next_fragment_range)) => {
             let next_fragment_expr = checker.locator().slice(next_fragment_range);
             let call_expr = checker.locator().slice(call.range());
@@ -116,7 +111,7 @@ pub(crate) fn path_constructor_current_directory(
                 arguments,
                 Parentheses::Preserve,
                 checker.source(),
-                checker.comment_ranges(),
+                checker.tokens(),
             )?;
             Ok(Fix::applicable_edit(edit, applicability(call.range())))
         }),
@@ -125,8 +120,7 @@ pub(crate) fn path_constructor_current_directory(
 
 fn parent_and_next_path_fragment_range(
     semantic: &SemanticModel,
-    comment_ranges: &CommentRanges,
-    source: &str,
+    tokens: &ruff_python_ast::token::Tokens,
 ) -> Option<(TextRange, TextRange)> {
     let parent = semantic.current_expression_parent()?;
 
@@ -142,6 +136,6 @@ fn parent_and_next_path_fragment_range(
 
     Some((
         parent.range(),
-        parenthesized_range(right.into(), parent.into(), comment_ranges, source).unwrap_or(range),
+        parenthesized_range(right.into(), parent.into(), tokens).unwrap_or(range),
     ))
 }

@@ -1,4 +1,4 @@
-"""A parser of RFC 2822 and MIME email messages."""
+"""A parser of RFC 5322 and MIME email messages."""
 
 from _typeshed import SupportsRead
 from collections.abc import Callable
@@ -14,13 +14,13 @@ __all__ = ["Parser", "HeaderParser", "BytesParser", "BytesHeaderParser", "FeedPa
 class Parser(Generic[_MessageT]):
     @overload
     def __init__(self: Parser[Message[str, str]], _class: None = None) -> None:
-        """Parser of RFC 2822 and MIME email messages.
+        """Parser of RFC 5322 and MIME email messages.
 
         Creates an in-memory object tree representing the email message, which
         can then be manipulated and turned over to a Generator to return the
         textual representation of the message.
 
-        The string must be formatted as a block of RFC 2822 headers and header
+        The string must be formatted as a block of RFC 5322 headers and header
         continuation lines, optionally preceded by a 'Unix-from' header.  The
         header block is terminated either by the end of the string or by a
         blank line.
@@ -34,11 +34,11 @@ class Parser(Generic[_MessageT]):
         backward compatibility.
 
         """
-
     @overload
     def __init__(self, _class: None = None, *, policy: Policy[_MessageT]) -> None: ...
     @overload
     def __init__(self, _class: Callable[[], _MessageT] | None, *, policy: Policy[_MessageT] = ...) -> None: ...
+
     def parse(self, fp: SupportsRead[str], headersonly: bool = False) -> _MessageT:
         """Create a message structure from the data in a file.
 
@@ -63,15 +63,16 @@ class HeaderParser(Parser[_MessageT]):
 
 class BytesParser(Generic[_MessageT]):
     parser: Parser[_MessageT]
+
     @overload
     def __init__(self: BytesParser[Message[str, str]], _class: None = None) -> None:
-        """Parser of binary RFC 2822 and MIME email messages.
+        """Parser of binary RFC 5322 and MIME email messages.
 
         Creates an in-memory object tree representing the email message, which
         can then be manipulated and turned over to a Generator to return the
         textual representation of the message.
 
-        The input must be formatted as a block of RFC 2822 headers and header
+        The input must be formatted as a block of RFC 5322 headers and header
         continuation lines, optionally preceded by a 'Unix-from' header.  The
         header block is terminated either by the end of the input or by a
         blank line.
@@ -80,11 +81,11 @@ class BytesParser(Generic[_MessageT]):
         must be created.  This class must have a constructor that can take
         zero arguments.  Default is Message.Message.
         """
-
     @overload
     def __init__(self, _class: None = None, *, policy: Policy[_MessageT]) -> None: ...
     @overload
     def __init__(self, _class: Callable[[], _MessageT], *, policy: Policy[_MessageT] = ...) -> None: ...
+
     def parse(self, fp: _WrappedBuffer, headersonly: bool = False) -> _MessageT:
         """Create a message structure from the data in a binary file.
 

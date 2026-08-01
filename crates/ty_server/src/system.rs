@@ -1,32 +1,35 @@
 use std::any::Any;
 use std::fmt;
 use std::fmt::Display;
+use std::hash::{DefaultHasher, Hash, Hasher as _};
 use std::panic::RefUnwindSafe;
+use std::process::Output;
 use std::sync::Arc;
 
 use crate::Db;
-use crate::document::DocumentKey;
+use crate::document::{DocumentKey, LanguageId};
 use crate::session::index::{Document, Index};
-use lsp_types::Url;
+use lsp_types::Uri;
 use ruff_db::file_revision::FileRevision;
 use ruff_db::files::{File, FilePath};
 use ruff_db::system::walk_directory::WalkDirectoryBuilder;
 use ruff_db::system::{
-    CaseSensitivity, DirectoryEntry, FileType, GlobError, Metadata, PatternError, Result, System,
-    SystemPath, SystemPathBuf, SystemVirtualPath, SystemVirtualPathBuf, WritableSystem,
+    DirectoryEntry, FileType, Metadata, Result, System, SystemPath, SystemPathBuf,
+    SystemVirtualPath, SystemVirtualPathBuf, WhichResult, WritableSystem,
 };
 use ruff_notebook::{Notebook, NotebookError};
+use ruff_python_ast::PySourceType;
 use ty_ide::cached_vendored_path;
 
-/// Returns a [`Url`] for the given [`File`].
-pub(crate) fn file_to_url(db: &dyn Db, file: File) -> Option<Url> {
+/// Returns a [`Uri`] for the given [`File`].
+pub(crate) fn file_to_uri(db: &dyn Db, file: File) -> Option<Uri> {
     match file.path(db) {
-        FilePath::System(system) => Url::from_file_path(system.as_std_path()).ok(),
-        FilePath::SystemVirtual(path) => Url::parse(path.as_str()).ok(),
+        FilePath::System(system) => Uri::from_file_path(system.as_std_path()).ok(),
+        FilePath::SystemVirtual(path) => Uri::parse(path.as_str()).ok(),
         FilePath::Vendored(path) => {
             let system_path = cached_vendored_path(db, path)?;
 
-            Url::from_file_path(system_path.as_std_path()).ok()
+            Uri::from_file_path(system_path.as_std_path()).ok()
         }
     }
 }
@@ -117,6 +120,31 @@ impl LSPSystem {
         index.document(&DocumentKey::from(path)).ok()
     }
 
+    fn source_type_from_document(
+        document: &Document,
+        extension: Option<&str>,
+    ) -> Option<PySourceType> {
+        match document {
+            Document::Text(text) => match text.language_id() {
+                LanguageId::Python => {
+                    let source_type = extension
+                        .and_then(PySourceType::try_from_extension)
+                        .unwrap_or(PySourceType::Python);
+
+                    // JupyterLab presents notebook virtual documents to language servers as
+                    // simple text files rather than serialized `.ipynb` contents. See:
+                    // https://github.com/jupyterlab/jupyterlab/blob/f51404192bf6d0ff79187c884f21e1f91b928146/packages/lsp/src/virtual/document.ts#L308-L314
+                    Some(match source_type {
+                        PySourceType::Ipynb => PySourceType::Python,
+                        source_type => source_type,
+                    })
+                }
+                LanguageId::Other => None,
+            },
+            Document::Notebook(_) => Some(PySourceType::Ipynb),
+        }
+    }
+
     pub(crate) fn system_path_to_document(&self, path: &SystemPath) -> Option<&Document> {
         let any_path = AnySystemPath::System(path.to_path_buf());
         self.document(any_path)
@@ -137,7 +165,7 @@ impl System for LSPSystem {
 
         if let Some(document) = document {
             Ok(Metadata::new(
-                document_revision(document),
+                document_revision(document, self.index()),
                 None,
                 FileType::File,
             ))
@@ -150,8 +178,28 @@ impl System for LSPSystem {
         self.native_system.canonicalize_path(path)
     }
 
-    fn path_exists_case_sensitive(&self, path: &SystemPath, prefix: &SystemPath) -> bool {
-        self.native_system.path_exists_case_sensitive(path, prefix)
+    fn is_same_file(&self, first: &SystemPath, second: &SystemPath) -> Result<bool> {
+        self.native_system.is_same_file(first, second)
+    }
+
+    fn run_command(
+        &self,
+        program: &str,
+        args: &[&str],
+        current_directory: &SystemPath,
+    ) -> Result<Output> {
+        self.native_system
+            .run_command(program, args, current_directory)
+    }
+
+    fn source_type(&self, path: &SystemPath) -> Option<PySourceType> {
+        let document = self.system_path_to_document(path)?;
+        Self::source_type_from_document(document, path.extension())
+    }
+
+    fn virtual_path_source_type(&self, path: &SystemVirtualPath) -> Option<PySourceType> {
+        let document = self.system_virtual_path_to_document(path)?;
+        Self::source_type_from_document(document, path.extension())
     }
 
     fn read_to_string(&self, path: &SystemPath) -> Result<String> {
@@ -168,7 +216,7 @@ impl System for LSPSystem {
 
         match document {
             Some(Document::Text(document)) => Notebook::from_source_code(document.contents()),
-            Some(Document::Notebook(notebook)) => Ok(notebook.make_ruff_notebook()),
+            Some(Document::Notebook(notebook)) => Ok(notebook.to_ruff_notebook(self.index())),
             None => self.native_system.read_to_notebook(path),
         }
     }
@@ -195,8 +243,12 @@ impl System for LSPSystem {
 
         match document {
             Document::Text(document) => Notebook::from_source_code(document.contents()),
-            Document::Notebook(notebook) => Ok(notebook.make_ruff_notebook()),
+            Document::Notebook(notebook) => Ok(notebook.to_ruff_notebook(self.index())),
         }
+    }
+
+    fn which(&self, name: &str) -> WhichResult {
+        self.native_system.which(name)
     }
 
     fn current_directory(&self) -> &SystemPath {
@@ -222,16 +274,6 @@ impl System for LSPSystem {
         self.native_system.walk_directory(path)
     }
 
-    fn glob(
-        &self,
-        pattern: &str,
-    ) -> std::result::Result<
-        Box<dyn Iterator<Item = std::result::Result<SystemPathBuf, GlobError>> + '_>,
-        PatternError,
-    > {
-        self.native_system.glob(pattern)
-    }
-
     fn as_writable(&self) -> Option<&dyn WritableSystem> {
         self.native_system.as_writable()
     }
@@ -242,10 +284,6 @@ impl System for LSPSystem {
 
     fn as_any_mut(&mut self) -> &mut dyn Any {
         self
-    }
-
-    fn case_sensitivity(&self) -> CaseSensitivity {
-        self.native_system.case_sensitivity()
     }
 
     fn env_var(&self, name: &str) -> std::result::Result<String, std::env::VarError> {
@@ -272,9 +310,33 @@ fn virtual_path_not_found(path: impl Display) -> std::io::Error {
 }
 
 /// Helper function to get the [`FileRevision`] of the given document.
-fn document_revision(document: &Document) -> FileRevision {
+fn document_revision(document: &Document, index: &Index) -> FileRevision {
     // The file revision is just an opaque number which doesn't have any significant meaning other
     // than that the file has changed if the revisions are different.
     #[expect(clippy::cast_sign_loss)]
-    FileRevision::new(document.version() as u128)
+    match document {
+        Document::Text(text) => FileRevision::new(text.version() as u128),
+        Document::Notebook(notebook) => {
+            // VS Code doesn't always bump the notebook version when the cell content changes.
+            // Specifically, I noticed that VS Code re-uses the same version when:
+            // 1. Adding a new cell
+            // 2. Pasting some code that has an error
+            //
+            // The notification updating the cell content on paste re-used the same version as when the cell was added.
+            // Because of that, hash all cell versions and the notebook versions together.
+            let mut hasher = DefaultHasher::new();
+            for cell_uri in notebook.cell_uris() {
+                if let Ok(cell) = index.document(&DocumentKey::from_uri(cell_uri)) {
+                    cell.version().hash(&mut hasher);
+                }
+            }
+
+            // Use higher 64 bits for notebook version and lower 64 bits for cell revisions
+            let notebook_version_high = (notebook.version() as u128) << 64;
+            let cell_versions_low = u128::from(hasher.finish()) & 0xFFFF_FFFF_FFFF_FFFF;
+            let combined_revision = notebook_version_high | cell_versions_low;
+
+            FileRevision::new(combined_revision)
+        }
+    }
 }

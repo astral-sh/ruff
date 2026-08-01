@@ -101,7 +101,7 @@ impl EqHash {
     fn from_class(class: &StmtClassDef) -> Self {
         let (mut has_eq, mut has_hash) = (HasMethod::No, HasMethod::No);
 
-        any_member_declaration(class, &mut |declaration| {
+        any_member_declaration(class, |declaration| {
             let id = match declaration.kind() {
                 ClassMemberKind::Assign(StmtAssign { targets, .. }) => {
                     let [Expr::Name(ExprName { id, .. })] = &targets[..] else {

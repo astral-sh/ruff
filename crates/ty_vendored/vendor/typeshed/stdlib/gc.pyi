@@ -21,8 +21,7 @@ get_freeze_count() -- Return the number of objects in the permanent generation.
 """
 
 from collections.abc import Callable
-from typing import Any, Final, Literal
-from typing_extensions import TypeAlias
+from typing import Any, Final, Literal, TypeAlias
 
 DEBUG_COLLECTABLE: Final = 2
 DEBUG_LEAK: Final = 38
@@ -63,16 +62,17 @@ def get_objects(generation: int | None = None) -> list[Any]:
       generation
         Generation to extract the objects from.
 
-    If generation is not None, return only the objects tracked by the collector
-    that are in that generation.
+    If generation is not None, return only the objects tracked by the
+    collector that are in that generation.
     """
 
 def freeze() -> None:
     """Freeze all current tracked objects and ignore them for future collections.
 
-    This can be used before a POSIX fork() call to make the gc copy-on-write friendly.
-    Note: collection before a POSIX fork() call may free pages for future allocation
-    which can cause copy-on-write.
+    This can be used before a POSIX fork() call to make the gc copy-on-write
+    friendly.
+    Note: collection before a POSIX fork() call may free pages for future
+    allocation which can cause copy-on-write.
     """
 
 def unfreeze() -> None:
@@ -123,7 +123,7 @@ def set_debug(flags: int, /) -> None:
     Debugging information is written to sys.stderr.
     """
 
-def set_threshold(threshold0: int, threshold1: int = ..., threshold2: int = ..., /) -> None:
+def set_threshold(threshold0: int, threshold1: int = 0, threshold2: int = 0, /) -> None:
     """set_threshold(threshold0, [threshold1, [threshold2]])
     Set the collection thresholds (the collection frequency).
 

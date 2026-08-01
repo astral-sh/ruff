@@ -34,6 +34,7 @@ Module(
                         },
                     ],
                     level: 0,
+                    is_lazy: false,
                 },
             ),
             ImportFrom(
@@ -66,6 +67,7 @@ Module(
                         },
                     ],
                     level: 0,
+                    is_lazy: false,
                 },
             ),
             ImportFrom(
@@ -102,6 +104,7 @@ Module(
                         },
                     ],
                     level: 0,
+                    is_lazy: false,
                 },
             ),
         ],
@@ -131,4 +134,3 @@ Module(
 2 | from a import b as c,
 3 | from a import b, c,
   |                   ^ Syntax Error: Trailing comma not allowed
-  |

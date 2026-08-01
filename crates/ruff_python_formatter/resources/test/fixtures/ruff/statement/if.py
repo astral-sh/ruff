@@ -294,3 +294,39 @@ if parent_body:
       # d
         # e
           #f
+
+# Compare behavior with `while`/`else` comment placement
+
+if True: pass
+    # 1
+else:
+    pass
+
+if True:
+    pass
+        # 2
+else:
+    pass
+
+if True: pass
+# 3
+else:
+    pass
+
+if True: pass
+    # 4
+else:
+    pass
+
+def foo():
+    if True:
+        pass
+# 5
+    else:
+        pass
+
+if True:
+    first;second
+    # 6
+else:
+    pass

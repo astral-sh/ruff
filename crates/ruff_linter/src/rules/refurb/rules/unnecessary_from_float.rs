@@ -51,6 +51,7 @@ use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 /// - The `from_*` methods provide type validation that the constructors don't
 /// - Removing type validation can change program behavior
 /// - The parameter names are different between methods and constructors
+/// - The fix may remove comments attached to the original expression
 ///
 /// The fix is marked as safe only when:
 /// - The argument type is known to be valid for the target constructor
@@ -60,7 +61,7 @@ use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 /// - [Python documentation: `decimal`](https://docs.python.org/3/library/decimal.html)
 /// - [Python documentation: `fractions`](https://docs.python.org/3/library/fractions.html)
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "v0.3.5")]
+#[violation_metadata(stable_since = "0.16.0")]
 pub(crate) struct UnnecessaryFromFloat {
     method_name: MethodName,
     constructor: Constructor,
@@ -75,7 +76,7 @@ impl Violation for UnnecessaryFromFloat {
             method_name,
             constructor,
         } = self;
-        format!("Verbose method `{method_name}` in `{constructor}` construction",)
+        format!("Verbose method `{method_name}` in `{constructor}` construction")
     }
 
     fn fix_title(&self) -> Option<String> {
@@ -133,6 +134,7 @@ pub(crate) fn unnecessary_from_float(checker: &Checker, call: &ExprCall) {
     };
 
     let constructor_name = checker.locator().slice(&**value).to_string();
+    let has_comments = checker.comment_ranges().intersects(call.range());
 
     // Special case for non-finite float literals: Decimal.from_float(float("inf")) -> Decimal("inf")
     if let Some(replacement) = handle_non_finite_float_special_case(
@@ -143,7 +145,14 @@ pub(crate) fn unnecessary_from_float(checker: &Checker, call: &ExprCall) {
         &constructor_name,
         checker,
     ) {
-        diagnostic.set_fix(Fix::safe_edit(replacement));
+        diagnostic.set_fix(Fix::applicable_edit(
+            replacement,
+            if has_comments {
+                Applicability::Unsafe
+            } else {
+                Applicability::Safe
+            },
+        ));
         return;
     }
 
@@ -151,7 +160,7 @@ pub(crate) fn unnecessary_from_float(checker: &Checker, call: &ExprCall) {
     let is_type_safe = is_valid_argument_type(arg_value, method_name, constructor, checker);
 
     // Determine fix safety
-    let applicability = if is_type_safe {
+    let applicability = if is_type_safe && !has_comments {
         Applicability::Safe
     } else {
         Applicability::Unsafe

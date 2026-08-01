@@ -1,4 +1,4 @@
-use ruff_python_ast::parenthesize::parenthesized_range;
+use ruff_python_ast::token::{Tokens, parenthesized_range};
 use rustc_hash::FxHashMap;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
@@ -179,15 +179,14 @@ fn is_redundant_boolean_comparison(op: CmpOp, comparator: &Expr) -> Option<bool>
 
 fn generate_redundant_comparison(
     compare: &ast::ExprCompare,
-    comment_ranges: &ruff_python_trivia::CommentRanges,
+    tokens: &Tokens,
     source: &str,
     comparator: &Expr,
     kind: bool,
     needs_wrap: bool,
 ) -> String {
-    let comparator_range =
-        parenthesized_range(comparator.into(), compare.into(), comment_ranges, source)
-            .unwrap_or(comparator.range());
+    let comparator_range = parenthesized_range(comparator.into(), compare.into(), tokens)
+        .unwrap_or(comparator.range());
 
     let comparator_str = &source[comparator_range];
 
@@ -379,7 +378,7 @@ pub(crate) fn literal_comparisons(checker: &Checker, compare: &ast::ExprCompare)
             .copied()
             .collect::<Vec<_>>();
 
-        let comment_ranges = checker.comment_ranges();
+        let tokens = checker.tokens();
         let source = checker.source();
 
         let content = match (&*compare.ops, &*compare.comparators) {
@@ -387,18 +386,13 @@ pub(crate) fn literal_comparisons(checker: &Checker, compare: &ast::ExprCompare)
                 if let Some(kind) = is_redundant_boolean_comparison(*op, &compare.left) {
                     let needs_wrap = compare.left.range().start() != compare.range().start();
                     generate_redundant_comparison(
-                        compare,
-                        comment_ranges,
-                        source,
-                        comparator,
-                        kind,
-                        needs_wrap,
+                        compare, tokens, source, comparator, kind, needs_wrap,
                     )
                 } else if let Some(kind) = is_redundant_boolean_comparison(*op, comparator) {
                     let needs_wrap = comparator.range().end() != compare.range().end();
                     generate_redundant_comparison(
                         compare,
-                        comment_ranges,
+                        tokens,
                         source,
                         &compare.left,
                         kind,
@@ -410,7 +404,7 @@ pub(crate) fn literal_comparisons(checker: &Checker, compare: &ast::ExprCompare)
                         &ops,
                         &compare.comparators,
                         compare.into(),
-                        comment_ranges,
+                        tokens,
                         source,
                     )
                 }
@@ -420,7 +414,7 @@ pub(crate) fn literal_comparisons(checker: &Checker, compare: &ast::ExprCompare)
                 &ops,
                 &compare.comparators,
                 compare.into(),
-                comment_ranges,
+                tokens,
                 source,
             ),
         };

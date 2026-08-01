@@ -407,7 +407,7 @@ impl Format<PyFormatContext<'_>> for FormatLiteralContent {
                 Cow::Owned(normalized) => text(normalized).fmt(f)?,
             }
 
-            if self.trim_end && needs_chaperone_space(self.flags, &normalized, f.context()) {
+            if self.trim_end && needs_chaperone_space(self.flags, &normalized) {
                 space().fmt(f)?;
             }
         }

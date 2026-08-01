@@ -42,13 +42,13 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// - [Python documentation: Comparisons](https://docs.python.org/3/reference/expressions.html#comparisons)
 /// - [Python documentation: Membership test operations](https://docs.python.org/3/reference/expressions.html#membership-test-operations)
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "v0.1.0")]
+#[violation_metadata(stable_since = "0.15.0")]
 pub(crate) struct SingleItemMembershipTest {
     membership_test: MembershipTest,
 }
 
 impl Violation for SingleItemMembershipTest {
-    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Always;
 
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -95,7 +95,7 @@ pub(crate) fn single_item_membership_test(
                 &[membership_test.replacement_op()],
                 std::slice::from_ref(item),
                 expr.into(),
-                checker.comment_ranges(),
+                checker.tokens(),
                 checker.source(),
             ),
             expr.range(),

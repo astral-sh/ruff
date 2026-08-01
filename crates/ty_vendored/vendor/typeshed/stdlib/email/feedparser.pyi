@@ -35,9 +35,9 @@ class FeedParser(Generic[_MessageT]):
         backward compatibility.
 
         """
-
     @overload
     def __init__(self, _factory: Callable[[], _MessageT], *, policy: Policy[_MessageT] = ...) -> None: ...
+
     def feed(self, data: str) -> None:
         """Push more data into the parser."""
 
@@ -56,7 +56,7 @@ class BytesFeedParser(FeedParser[_MessageT]):
         backward compatibility.
 
         """
-
     @overload
     def __init__(self, _factory: Callable[[], _MessageT], *, policy: Policy[_MessageT] = ...) -> None: ...
+
     def feed(self, data: bytes | bytearray) -> None: ...  # type: ignore[override]

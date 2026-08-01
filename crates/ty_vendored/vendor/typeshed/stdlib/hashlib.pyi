@@ -8,7 +8,7 @@ Named constructor functions are also available, these are faster
 than using new(name):
 
 md5(), sha1(), sha224(), sha256(), sha384(), sha512(), blake2b(), blake2s(),
-sha3_224, sha3_256, sha3_384, sha3_512, shake_128, and shake_256.
+sha3_224(), sha3_256(), sha3_384(), sha3_512(), shake_128(), and shake_256().
 
 More algorithms may be available on your platform but the above are guaranteed
 to exist.  See the algorithms_guaranteed and algorithms_available attributes
@@ -17,8 +17,8 @@ to find out what algorithm names can be passed to new().
 NOTE: If you want the adler32 or crc32 hash functions they are available in
 the zlib module.
 
-Choose your hash function wisely.  Some have known collision weaknesses.
-sha384 and sha512 will be slow on 32 bit platforms.
+Choose your hash function wisely.  Some have known collision weaknesses,
+while others may be slower depending on the CPU architecture.
 
 Hash objects have these methods:
  - update(data): Update the hash object with the bytes in data. Repeated calls
@@ -32,21 +32,21 @@ Hash objects have these methods:
                  efficiently compute the digests of data that share a common
                  initial substring.
 
-For example, to obtain the digest of the byte string 'Nobody inspects the
-spammish repetition':
+Assuming that Python has been built with SHA-2 support, the SHA-256 digest
+of the byte string b'Nobody inspects the spammish repetition' is computed
+as follows:
 
     >>> import hashlib
-    >>> m = hashlib.md5()
+    >>> m = hashlib.sha256()
     >>> m.update(b"Nobody inspects")
     >>> m.update(b" the spammish repetition")
-    >>> m.digest()
-    b'\\xbbd\\x9c\\x83\\xdd\\x1e\\xa5\\xc9\\xd9\\xde\\xc9\\xa1\\x8d\\xf0\\xff\\xe9'
+    >>> m.digest()  # doctest: +ELLIPSIS
+    b'\\x03\\x1e\\xdd}Ae\\x15\\x93\\xc5\\xfe\\\\\\x00o\\xa5u+7...'
 
 More condensed:
 
-    >>> hashlib.sha224(b"Nobody inspects the spammish repetition").hexdigest()
-    'a4337bc45a8fc544c03f52dc550cd6e1e87021bc896588bd79e901e2'
-
+    >>> hashlib.sha256(b"Nobody inspects the spammish repetition").hexdigest()
+    '031edd7d41651593c5fe5c006fa5752b37fddff7bc4e843aa6af0c950f4b9406'
 """
 
 import sys
@@ -73,7 +73,7 @@ from _typeshed import ReadableBuffer
 from collections.abc import Callable, Set as AbstractSet
 from typing import Protocol, type_check_only
 
-if sys.version_info >= (3, 11):
+if sys.version_info >= (3, 15):
     __all__ = (
         "md5",
         "sha1",
@@ -92,8 +92,31 @@ if sys.version_info >= (3, 11):
         "new",
         "algorithms_guaranteed",
         "algorithms_available",
-        "pbkdf2_hmac",
         "file_digest",
+        "pbkdf2_hmac",
+        "scrypt",
+    )
+elif sys.version_info >= (3, 11):
+    __all__ = (
+        "md5",
+        "sha1",
+        "sha224",
+        "sha256",
+        "sha384",
+        "sha512",
+        "blake2b",
+        "blake2s",
+        "sha3_224",
+        "sha3_256",
+        "sha3_384",
+        "sha3_512",
+        "shake_128",
+        "shake_256",
+        "new",
+        "algorithms_guaranteed",
+        "algorithms_available",
+        "file_digest",
+        "pbkdf2_hmac",
     )
 else:
     __all__ = (
@@ -117,7 +140,7 @@ else:
         "pbkdf2_hmac",
     )
 
-def new(name: str, data: ReadableBuffer = b"", *, usedforsecurity: bool = ...) -> HASH:
+def new(name: str, data: ReadableBuffer = b"", *, usedforsecurity: bool = True) -> HASH:
     """new(name, data=b'') - Return a new hashing object using the named algorithm;
     optionally initialized with data (which must be a bytes-like object).
     """
