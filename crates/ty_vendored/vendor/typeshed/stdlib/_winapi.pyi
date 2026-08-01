@@ -1,7 +1,8 @@
 import sys
 from _typeshed import ReadableBuffer
 from collections.abc import Sequence
-from typing import Any, Final, Literal, NoReturn, final, overload
+from typing import Any, Final, Literal, final, overload
+from typing_extensions import Never
 
 if sys.platform == "win32":
     ABOVE_NORMAL_PRIORITY_CLASS: Final = 0x8000
@@ -267,7 +268,7 @@ if sys.platform == "win32":
         through both handles.
         """
 
-    def ExitProcess(ExitCode: int, /) -> NoReturn: ...
+    def ExitProcess(ExitCode: int, /) -> Never: ...
     def GetACP() -> int:
         """Get the current Windows ANSI code page identifier."""
 
@@ -448,3 +449,7 @@ if sys.platform == "win32":
             """
 
         def NeedCurrentDirectoryForExePath(exe_name: str, /) -> bool: ...
+
+    if sys.version_info >= (3, 15):
+        def GetTickCount64() -> int:
+            """Number of milliseconds that have elapsed since the system was started."""

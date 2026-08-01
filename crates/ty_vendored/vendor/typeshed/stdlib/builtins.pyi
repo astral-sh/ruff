@@ -42,7 +42,7 @@ from _typeshed import (
     SupportsRichComparisonT,
     SupportsWrite,
 )
-from collections.abc import Awaitable, Callable, Iterable, Iterator, MutableSet, Reversible, Set as AbstractSet, Sized
+from collections.abc import Awaitable, Callable, Iterable, Iterator, MutableSet, Set as AbstractSet, Sized
 from io import BufferedRandom, BufferedReader, BufferedWriter, FileIO, TextIOWrapper
 from os import PathLike
 from types import CellType, CodeType, EllipsisType, GenericAlias, NotImplementedType, TracebackType, UnionType
@@ -2830,6 +2830,7 @@ class slice(Generic[_StartT_co, _StopT_co, _StepT_co]):
     def __eq__(self, value: object, /) -> bool: ...
     if sys.version_info >= (3, 12):
         def __hash__(self) -> int: ...
+
     else:
         __hash__: ClassVar[None]  # type: ignore[assignment]
 
@@ -2947,6 +2948,7 @@ class function:
             closure: tuple[CellType, ...] | None = None,
             kwdefaults: dict[str, object] | None = None,
         ) -> Self: ...
+
     else:
         def __new__(
             cls,
@@ -3206,6 +3208,7 @@ class dict(MutableMapping[_KT, _VT]):
             """Return value|self."""
         @overload
         def __ror__(self, value: frozendict[_T1, _T2], /) -> frozendict[_KT | _T1, _VT | _T2]: ...
+
     else:
         def __or__(self, value: dict[_T1, _T2], /) -> dict[_KT | _T1, _VT | _T2]:
             """Return self|value."""
@@ -4599,7 +4602,7 @@ _SupportsSomeKindOfPow = (  # noqa: Y026  # TODO: Use TypeAlias once mypy bugs a
 )
 
 # TODO: `pow(int, int, Literal[0])` fails at runtime,
-# but adding a `NoReturn` overload isn't a good solution for expressing that (see #8566).
+# but adding a `Never` overload isn't a good solution for expressing that (see #8566).
 @overload
 def pow(base: int, exp: int, mod: int) -> int:
     """Equivalent to base**exp with 2 arguments or base**exp % mod with 3 arguments
@@ -4645,19 +4648,23 @@ def pow(base: _SupportsSomeKindOfPow, exp: complex, mod: None = None) -> complex
 
 quit: _sitebuiltins.Quitter
 
+@type_check_only
+class _SupportsReversed(Protocol[_T_co]):
+    def __reversed__(self) -> _T_co: ...
+
 @disjoint_base
-class reversed(Generic[_T]):
+class reversed(Generic[_T_co]):
     """Return a reverse iterator over the values of the given sequence."""
 
     @overload
-    def __new__(cls, sequence: Reversible[_T], /) -> Iterator[_T]: ...  # type: ignore[misc]
+    def __new__(cls, sequence: _SupportsReversed[_T], /) -> _T: ...  # type: ignore[misc]
     @overload
-    def __new__(cls, sequence: SupportsLenAndGetItem[_T], /) -> Iterator[_T]: ...  # type: ignore[misc]
+    def __new__(cls, sequence: SupportsLenAndGetItem[_T_co], /) -> Self: ...
 
     def __iter__(self) -> Self:
         """Implement iter(self)."""
 
-    def __next__(self) -> _T:
+    def __next__(self) -> _T_co:
         """Implement next(self)."""
 
     def __length_hint__(self) -> int:
@@ -4895,7 +4902,7 @@ class BaseException:
     __suppress_context__: bool
     __traceback__: TracebackType | None
     def __init__(self, *args: object) -> None: ...
-    def __new__(cls, *args: Any, **kwds: Any) -> Self: ...
+    def __new__(cls, /, *args: Any, **kwds: Any) -> Self: ...
     def __setstate__(self, state: dict[str, Any] | None, /) -> None: ...
     def with_traceback(self, tb: TracebackType | None, /) -> Self:
         """Set self.__traceback__ to tb and return self."""

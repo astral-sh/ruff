@@ -900,9 +900,9 @@ else:
         def __init__(self, typename: str, fields: None = None, **kwargs: Any) -> None: ...
 
         @classmethod
-        def _make(cls, iterable: Iterable[Any]) -> Self: ...
+        def _make(cls, iterable: Iterable[Any]) -> Self: ...  # ty:ignore[invalid-type-form]
         def _asdict(self) -> dict[str, Any]: ...
-        def _replace(self, **kwargs: Any) -> Self: ...
+        def _replace(self, **kwargs: Any) -> Self: ...  # ty:ignore[invalid-type-form]
 
     class NewType:
         """NewType creates simple unique types with almost zero
@@ -992,7 +992,7 @@ else:
     # At runtime it inherits from ABC and is not a Protocol, but it is on the
     # allowlist for use as a Protocol.
     @runtime_checkable
-    class Buffer(Protocol, abc.ABC):  # type: ignore[misc]  # pyright: ignore[reportGeneralTypeIssues]
+    class Buffer(Protocol, abc.ABC):  # type: ignore[misc]  # pyright: ignore[reportGeneralTypeIssues]  # ty:ignore[invalid-protocol]
         """Base class for classes that implement the buffer protocol.
 
         The buffer protocol allows Python objects to expose a low-level
@@ -1453,7 +1453,7 @@ else:
         def __module__(self) -> str | None: ...  # type: ignore[override]
         # Returns typing._GenericAlias, which isn't stubbed.
         def __getitem__(self, parameters: Incomplete | tuple[Incomplete, ...]) -> AnnotationForm: ...
-        def __init_subclass__(cls, *args: Unused, **kwargs: Unused) -> NoReturn: ...
+        def __init_subclass__(cls, *args: Unused, **kwargs: Unused) -> Never: ...
         def __or__(self, right: Any, /) -> _SpecialForm: ...
         def __ror__(self, left: Any, /) -> _SpecialForm: ...
 
