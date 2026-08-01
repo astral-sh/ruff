@@ -83,8 +83,7 @@ use crate::types::function::{
     same_module_uncached_raw_signature,
 };
 use crate::types::generics::{
-    GenericContext, Specialization, SpecializationBuilder, bind_paramspec_component, bind_typevar,
-    enclosing_binding_contexts,
+    GenericContext, Specialization, SpecializationBuilder, bind_typevar, enclosing_binding_contexts,
 };
 use crate::types::infer::builder::named_tuple::NamedTupleKind;
 use crate::types::infer::builder::paramspec_validation::validate_paramspec_components;
@@ -343,12 +342,6 @@ pub(super) struct TypeInferenceBuilder<'db, 'ast> {
     /// Whether we are in a context that binds unbound typevars.
     typevar_binding_context: Option<Definition<'db>>,
 
-    /// The selected bindings for `ParamSpec`s used by the function currently being inferred.
-    ///
-    /// A binding established by `P.args` and `P.kwargs` must also be used by ordinary occurrences
-    /// of `P` in the same function.
-    paramspec_bindings: FxOrderSet<BoundTypeVarInstance<'db>>,
-
     /// The deferred state of inferring types of certain expressions within the region.
     ///
     /// This is different from [`InferenceRegion::Deferred`] which works on the entire definition
@@ -488,23 +481,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             bindings: VecMap::default(),
             declarations: VecMap::default(),
             typevar_binding_context: None,
-            paramspec_bindings: FxOrderSet::default(),
             deferred: VecSet::default(),
             undecorated_type: None,
             cycle_recovery: None,
             discards_dict_key_assignments: false,
             dataclass_field_specifiers: SmallVec::new(),
         }
-    }
-
-    fn paramspec_binding(
-        &self,
-        typevar: TypeVarInstance<'db>,
-    ) -> Option<BoundTypeVarInstance<'db>> {
-        self.paramspec_bindings
-            .iter()
-            .find(|bound| bound.typevar(self.db()) == typevar)
-            .copied()
     }
 
     fn reachability_cache(&self) -> &ReachabilityEvaluationCache<'db> {
@@ -10064,35 +10046,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         if let Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) = value_type
             && typevar.is_paramspec(db)
+            && let Some(bound_typevar) = bind_typevar(
+                db,
+                self.index,
+                self.scope().file_scope_id(db),
+                self.typevar_binding_context,
+                typevar,
+            )
         {
-            let is_component = matches!(attr.id.as_str(), "args" | "kwargs");
-            let selected_binding = if is_component {
-                self.paramspec_binding(typevar)
-            } else {
-                None
-            };
-            let bound_typevar = selected_binding.or_else(|| {
-                if is_component {
-                    bind_paramspec_component(
-                        db,
-                        self.index,
-                        self.scope().file_scope_id(db),
-                        self.typevar_binding_context,
-                        typevar,
-                    )
-                } else {
-                    bind_typevar(
-                        db,
-                        self.index,
-                        self.scope().file_scope_id(db),
-                        self.typevar_binding_context,
-                        typevar,
-                    )
-                }
-            });
-            if let Some(bound_typevar) = bound_typevar {
-                value_type = Type::TypeVar(bound_typevar);
-            }
+            value_type = Type::TypeVar(bound_typevar);
         }
 
         let mut assigned_type = None;
@@ -10884,7 +10846,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             expression_cache: _,
             reachability_cache: _,
             typevar_binding_context: _,
-            paramspec_bindings: _,
             deferred_state: _,
             called_functions,
             index: _,
@@ -10947,7 +10908,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             reachability_cache: _,
             dataclass_field_specifiers: _,
             typevar_binding_context: _,
-            paramspec_bindings: _,
             deferred_state: _,
             index: _,
             region: _,
@@ -11052,7 +11012,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             undecorated_type: _,
             discards_dict_key_assignments: _,
             typevar_binding_context: _,
-            paramspec_bindings: _,
             deferred_state: _,
             index: _,
             region: _,
@@ -11102,7 +11061,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             reachability_cache: _,
             dataclass_field_specifiers: _,
             typevar_binding_context: _,
-            paramspec_bindings: _,
             deferred_state: _,
             index: _,
             region: _,
@@ -11241,7 +11199,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             reachability_cache: _,
             dataclass_field_specifiers: _,
             typevar_binding_context: _,
-            paramspec_bindings: _,
             deferred_state: _,
             called_functions: _,
             index: _,
@@ -11294,7 +11251,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             cycle_recovery,
             deferred_state,
             typevar_binding_context,
-            ref paramspec_bindings,
             ref expression_cache,
             ref reachability_cache,
             ref return_types_and_ranges,
@@ -11327,7 +11283,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         builder.cycle_recovery = cycle_recovery;
         builder.deferred_state = deferred_state;
         builder.typevar_binding_context = typevar_binding_context;
-        builder.paramspec_bindings.clone_from(paramspec_bindings);
         builder.context.inference_flags = self.inference_flags();
         builder.expression_cache.clone_from(expression_cache);
         builder.reachability_cache.clone_from(reachability_cache);
@@ -11376,7 +11331,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             expression_cache: _,
             reachability_cache: _,
             typevar_binding_context: _,
-            paramspec_bindings: _,
             deferred_state: _,
             called_functions,
             index: _,
