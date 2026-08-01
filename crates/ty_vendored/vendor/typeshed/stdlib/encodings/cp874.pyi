@@ -1,6 +1,5 @@
-"""Python Character Mapping Codec cp874 generated from 'MAPPINGS/VENDORS/MICSFT/WINDOWS/CP874.TXT' with gencodec.py.
+"""Python Character Mapping Codec cp874 generated from 'MAPPINGS/VENDORS/MICSFT/WINDOWS/CP874.TXT' with gencodec.py."""
 
-"""
 import codecs
 from _codecs import _EncodingMap
 from _typeshed import ReadableBuffer
