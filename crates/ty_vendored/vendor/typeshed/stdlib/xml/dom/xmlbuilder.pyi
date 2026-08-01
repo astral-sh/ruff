@@ -1,18 +1,11 @@
-"""Implementation of the DOM Level 3 'LS-Load' feature."""
-
 from _typeshed import SupportsRead
-from typing import Any, Final, Literal, NoReturn
+from typing import Any, Final, Literal
+from typing_extensions import Never
 from xml.dom.minidom import Document, Node, _DOMErrorHandler
 
 __all__ = ["DOMBuilder", "DOMEntityResolver", "DOMInputSource"]
 
 class Options:
-    """Features object that has variables set for each DOMBuilder feature.
-
-    The DOMBuilder class uses an instance of this class to pass settings to
-    the ExpatBuilder class.
-    """
-
     namespaces: int
     namespace_declarations: bool
     validation: bool
@@ -49,7 +42,7 @@ class DOMBuilder:
     def getFeature(self, name: str) -> Any: ...
     def parseURI(self, uri: str) -> Document: ...
     def parse(self, input: DOMInputSource) -> Document: ...
-    def parseWithContext(self, input: DOMInputSource, cnode: Node, action: Literal[1, 2, 3, 4]) -> NoReturn: ...
+    def parseWithContext(self, input: DOMInputSource, cnode: Node, action: Literal[1, 2, 3, 4]) -> Never: ...
 
 class DOMEntityResolver:
     __slots__ = ("_opener",)
@@ -66,10 +59,6 @@ class DOMInputSource:
     baseURI: str | None
 
 class DOMBuilderFilter:
-    """Element filter which can be used to tailor construction of
-    a DOM instance.
-    """
-
     FILTER_ACCEPT: Final = 1
     FILTER_REJECT: Final = 2
     FILTER_SKIP: Final = 3
@@ -79,17 +68,15 @@ class DOMBuilderFilter:
     def startContainer(self, element: Node) -> Literal[1, 2, 3, 4]: ...
 
 class DocumentLS:
-    """Mixin to create documents that conform to the load/save spec."""
-
     async_: bool
-    def abort(self) -> NoReturn: ...
-    def load(self, uri: str) -> NoReturn: ...
-    def loadXML(self, source: str) -> NoReturn: ...
+    def abort(self) -> Never: ...
+    def load(self, uri: str) -> Never: ...
+    def loadXML(self, source: str) -> Never: ...
     def saveXML(self, snode: Node | None) -> str: ...
 
 class DOMImplementationLS:
     MODE_SYNCHRONOUS: Final = 1
     MODE_ASYNCHRONOUS: Final = 2
     def createDOMBuilder(self, mode: Literal[1], schemaType: None) -> DOMBuilder: ...
-    def createDOMWriter(self) -> NoReturn: ...
+    def createDOMWriter(self) -> Never: ...
     def createDOMInputSource(self) -> DOMInputSource: ...
