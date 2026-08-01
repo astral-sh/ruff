@@ -4,7 +4,7 @@ The builtin function `hasattr()` can be used to narrow nominal and structural ty
 accomplished using an intersection with a synthesized protocol:
 
 ```py
-from typing import final
+from typing import Protocol, final
 from typing_extensions import LiteralString
 
 class NonFinalClass: ...
@@ -56,6 +56,42 @@ def _(obj: WithSpam):
         reveal_type(obj)  # revealed: WithSpam
         reveal_type(obj.spam)  # revealed: int
     else:
+        reveal_type(obj)  # revealed: Never
+```
+
+An implicit instance attribute may not have been initialized yet. It therefore cannot prove that the
+negative branch is unreachable, even though ordinary reads and structural protocol conformance treat
+implicit attributes as bound:
+
+```py
+class InitializedLater:
+    def initialize(self):
+        self.spam = 42
+
+class HasSpam(Protocol):
+    @property
+    def spam(self) -> int: ...
+
+def accepts_has_spam(obj: HasSpam): ...
+def _(obj: InitializedLater):
+    accepts_has_spam(obj)
+
+    if not hasattr(obj, "spam"):
+        reveal_type(obj)  # revealed: InitializedLater & ~<Protocol with members 'spam'>
+```
+
+A definitely-bound class attribute still makes the negative branch unreachable, even if methods also
+assign an instance attribute with the same name:
+
+```py
+class WithClassFallback:
+    spam: int = 42
+
+    def replace(self):
+        self.spam = 43
+
+def _(obj: WithClassFallback):
+    if not hasattr(obj, "spam"):
         reveal_type(obj)  # revealed: Never
 ```
 
