@@ -16,13 +16,12 @@ pub struct NoqaCode(&'static str, &'static str);
 
 impl NoqaCode {
     /// Return the prefix for the [`NoqaCode`], e.g., `SIM` for `SIM101`.
-    #[expect(dead_code)]
-    pub(crate) fn prefix(&self) -> &str {
+    pub fn prefix(&self) -> &str {
         self.0
     }
 
     /// Return the suffix for the [`NoqaCode`], e.g., `101` for `SIM101`.
-    pub(crate) fn suffix(&self) -> &str {
+    pub fn suffix(&self) -> &str {
         self.1
     }
 

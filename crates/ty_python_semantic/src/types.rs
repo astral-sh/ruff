@@ -44,14 +44,11 @@ pub(crate) use self::match_pattern::{
 };
 pub(crate) use self::relation_error::{ErrorContext, ErrorContextTree, ParameterDescription};
 use self::set_theoretic::KnownUnion;
+use self::set_theoretic::NegativeIntersectionElements;
 pub(crate) use self::set_theoretic::builder::{
     IntersectionBuilder, UnionAccumulator, UnionBuilder,
 };
 pub use self::set_theoretic::{IntersectionType, UnionType};
-#[expect(unused_imports)]
-pub(crate) use self::set_theoretic::{
-    NegativeIntersectionElements, NegativeIntersectionElementsIterator,
-};
 pub use self::signatures::ParameterKind;
 pub(crate) use self::signatures::Signature;
 pub(crate) use self::subclass_of::{SubclassOfInner, SubclassOfType};
