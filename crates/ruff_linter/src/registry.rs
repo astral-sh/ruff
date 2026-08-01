@@ -12,10 +12,6 @@ use crate::codes::{self};
 
 mod rule_set;
 
-pub trait AsRule {
-    fn rule(&self) -> Rule;
-}
-
 impl Rule {
     pub fn from_code(code: &str) -> Result<Self, FromCodeError> {
         let (linter, code) = Linter::parse_code(code).ok_or(FromCodeError::Unknown)?;

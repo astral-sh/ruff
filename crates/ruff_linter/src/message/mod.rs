@@ -175,7 +175,7 @@ pub(crate) trait Emitter {
     ) -> anyhow::Result<()>;
 }
 
-/// Context passed to diagnostic emitters.
+/// Context used while rendering diagnostics.
 pub struct EmitterContext<'a> {
     notebook_indexes: &'a FxHashMap<String, NotebookIndex>,
 }
@@ -183,11 +183,6 @@ pub struct EmitterContext<'a> {
 impl<'a> EmitterContext<'a> {
     pub fn new(notebook_indexes: &'a FxHashMap<String, NotebookIndex>) -> Self {
         Self { notebook_indexes }
-    }
-
-    /// Tests if the file with `name` is a jupyter notebook.
-    pub fn is_notebook(&self, name: &str) -> bool {
-        self.notebook_indexes.contains_key(name)
     }
 
     fn notebook_index(&self, name: &str) -> Option<&NotebookIndex> {

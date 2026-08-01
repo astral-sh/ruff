@@ -184,10 +184,6 @@ impl GlobPath {
         let absolute = fs::normalize_path_to(path, escaped);
         Self { path: absolute }
     }
-
-    pub fn into_inner(self) -> PathBuf {
-        self.path
-    }
 }
 
 impl Deref for GlobPath {

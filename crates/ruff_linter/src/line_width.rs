@@ -10,7 +10,6 @@ use unicode_width::UnicodeWidthChar;
 use ruff_cache::{CacheKey, CacheKeyHasher};
 use ruff_macros::CacheKey;
 use ruff_python_trivia::tab_offset;
-use ruff_text_size::TextSize;
 
 /// The length of a line of text that is considered too long.
 ///
@@ -26,10 +25,6 @@ impl LineLength {
     /// Return the numeric value for this [`LineLength`]
     pub fn value(&self) -> u16 {
         self.0.get()
-    }
-
-    pub fn text_len(&self) -> TextSize {
-        TextSize::from(u32::from(self.value()))
     }
 }
 
