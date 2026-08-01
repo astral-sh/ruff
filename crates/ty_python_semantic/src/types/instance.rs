@@ -237,9 +237,6 @@ impl<'db> NominalInstanceType<'db> {
     ///
     /// For example, for an instance of `builtins.str`, this returns `"str"`.
     ///
-    /// As of 2026-02-16, this method is not used in any crates in the Ruff
-    /// repo, but is exposed as a public API for external users of
-    /// `ty_python_semantic`.
     pub fn class_name(&self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> &'db Name {
         self.class(db, env).name(db)
     }
@@ -251,9 +248,6 @@ impl<'db> NominalInstanceType<'db> {
     /// `Some("pathlib")`. Returns `None` if the class's file cannot be resolved
     /// to a known module (e.g. for classes defined in scripts or notebooks).
     ///
-    /// As of 2026-02-16, this method is not used in any crates in the Ruff
-    /// repo, but is exposed as a public API for external users of
-    /// `ty_python_semantic`.
     pub fn class_module_name(
         &self,
         db: &'db dyn Db,
