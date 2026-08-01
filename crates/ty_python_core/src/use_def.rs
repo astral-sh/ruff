@@ -869,10 +869,6 @@ impl<'db> UseDefMap<'db> {
         &self.constraint_tables().reachability_constraints
     }
 
-    pub fn narrowing_constraints(&self) -> &NarrowingConstraints {
-        &self.constraint_tables().narrowing_constraints
-    }
-
     pub fn predicates(&self) -> &Predicates<'db> {
         &self.constraint_tables().predicates
     }
