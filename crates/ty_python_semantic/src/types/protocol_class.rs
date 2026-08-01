@@ -1948,21 +1948,22 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
                         .nominal_class(db, env)
                 })
                 .is_some_and(|class| {
-                    effective_superclass_variable_kind(db, class, Name::new(self.name))
-                        == Some(VariableKind::Instance)
-                        && [
-                            class
-                                .class_member(db, env, self.name, MemberLookupPolicy::default())
-                                .place,
-                            class.instance_member(db, env, self.name).place,
-                        ]
-                        .into_iter()
-                        .any(|place| {
-                            matches!(
-                                place,
-                                Place::Defined(defined) if defined.provenance != Provenance::Unknown
-                            )
-                        })
+                    matches!(
+                        effective_superclass_variable_kind(db, class, Name::new(self.name)),
+                        Some(VariableKind::Regular | VariableKind::InstanceOnly)
+                    ) && [
+                        class
+                            .class_member(db, env, self.name, MemberLookupPolicy::default())
+                            .place,
+                        class.instance_member(db, env, self.name).place,
+                    ]
+                    .into_iter()
+                    .any(|place| {
+                        matches!(
+                            place,
+                            Place::Defined(defined) if defined.provenance != Provenance::Unknown
+                        )
+                    })
                 })
     }
 
