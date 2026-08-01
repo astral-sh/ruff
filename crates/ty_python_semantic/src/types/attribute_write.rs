@@ -15,7 +15,9 @@ use super::{
     IntersectionType, KnownClass, KnownInstanceType, MemberLookupPolicy, Type, TypeQualifiers,
 };
 use crate::Db;
-use crate::place::{DefinedPlace, Definedness, Place, PlaceAndQualifiers, builtins_symbol};
+use crate::place::{
+    DefinedPlace, Definedness, Place, PlaceAndQualifiers, TypeOrigin, builtins_symbol,
+};
 
 /// The operation required to write an attribute.
 ///
@@ -154,6 +156,7 @@ pub(super) enum FallbackAttributeWriteRequirement<'db> {
     /// Check the value against `ty`, retaining whether the declaration may be absent at runtime.
     AssignableTo {
         ty: Type<'db>,
+        origin: TypeOrigin,
         qualifiers: TypeQualifiers,
         possibly_missing: bool,
     },
@@ -497,18 +500,20 @@ fn instance_fallback_write_requirement<'db>(
     attribute: &str,
     fallback: PlaceAndQualifiers<'db>,
 ) -> FallbackAttributeWriteRequirement<'db> {
-    let PlaceAndQualifiers {
-        place: Place::Defined(DefinedPlace {
-            ty, definedness, ..
-        }),
-        qualifiers,
-    } = fallback
+    let PlaceAndQualifiers { place, qualifiers } = fallback;
+    let Place::Defined(DefinedPlace {
+        ty,
+        origin,
+        definedness,
+        ..
+    }) = place
     else {
         return FallbackAttributeWriteRequirement::PossiblyMissing;
     };
     let ty = ty.bind_self_typevars(db, object_ty);
     FallbackAttributeWriteRequirement::AssignableTo {
         ty: effective_write_type(db, object_ty, attribute, ty),
+        origin,
         qualifiers,
         possibly_missing: definedness == Definedness::PossiblyUndefined,
     }
@@ -521,12 +526,13 @@ fn class_fallback_write_requirement<'db>(
     class_attr_self_ty: Type<'db>,
     fallback: PlaceAndQualifiers<'db>,
 ) -> FallbackAttributeWriteRequirement<'db> {
-    let PlaceAndQualifiers {
-        place: Place::Defined(DefinedPlace {
-            ty, definedness, ..
-        }),
-        qualifiers,
-    } = fallback
+    let PlaceAndQualifiers { place, qualifiers } = fallback;
+    let Place::Defined(DefinedPlace {
+        ty,
+        origin,
+        definedness,
+        ..
+    }) = place
     else {
         return FallbackAttributeWriteRequirement::PossiblyMissing;
     };
@@ -541,12 +547,13 @@ fn class_fallback_write_requirement<'db>(
     };
     FallbackAttributeWriteRequirement::AssignableTo {
         ty,
+        origin,
         qualifiers,
         possibly_missing: definedness == Definedness::PossiblyUndefined,
     }
 }
 
-/// Return the accepted type for writes to a declared attribute.
+/// Return the accepted type for writes to an attribute.
 ///
 /// A dataclass field with a converter accepts the converter's input type, not
 /// the field's post-conversion type. For example, a field declared as `int` with a
@@ -563,6 +570,24 @@ fn effective_write_type<'db>(
             .converter_input_type_for_field(db, attribute)
     {
         converter_ty
+    } else if matches!(attr_ty, Type::FunctionLiteral(_))
+        && !(attribute.starts_with("__") && attribute.ends_with("__"))
+        && !matches!(
+            object_ty,
+            Type::ClassLiteral(_) | Type::GenericAlias(_) | Type::SubclassOf(_)
+        )
+    {
+        // An ordinary method is read from an instance as a bound callable, and a value stored
+        // directly on the instance must satisfy that callable signature. Special methods are
+        // excluded because Python only looks them up on the class.
+        match attr_ty
+            .try_call_dunder_get(db, Some(object_ty), object_ty.to_meta_type(db))
+            .map_or(attr_ty, |(bound, _)| bound)
+        {
+            Type::FunctionLiteral(function) => Type::Callable(function.into_callable_type(db)),
+            Type::BoundMethod(method) => Type::Callable(method.into_callable_type(db)),
+            bound => bound,
+        }
     } else {
         attr_ty
     }

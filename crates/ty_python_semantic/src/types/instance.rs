@@ -150,13 +150,16 @@ impl<'db> Type<'db> {
         }
     }
 
-    /// Synthesize a protocol instance type with a given set of read-only property members.
-    pub(super) fn protocol_with_readonly_members<'a, M>(db: &'db dyn Db, members: M) -> Self
+    /// Synthesize a protocol instance type that requires the given attributes to be present at
+    /// runtime.
+    pub(super) fn protocol_with_attribute_presence<'a, M>(db: &'db dyn Db, members: M) -> Self
     where
         M: IntoIterator<Item = (&'a str, Type<'db>)>,
     {
         Self::ProtocolInstance(ProtocolInstanceType::synthesized(
-            SynthesizedProtocolType::new(ProtocolInterface::with_property_members(db, members)),
+            SynthesizedProtocolType::attribute_presence(ProtocolInterface::with_property_members(
+                db, members,
+            )),
         ))
     }
 
@@ -166,7 +169,7 @@ impl<'db> Type<'db> {
         M: IntoIterator<Item = (&'a str, CallableType<'db>)>,
     {
         Self::ProtocolInstance(ProtocolInstanceType::synthesized(
-            SynthesizedProtocolType::new(ProtocolInterface::with_methods(db, methods)),
+            SynthesizedProtocolType::structural(ProtocolInterface::with_methods(db, methods)),
         ))
     }
 }
@@ -607,11 +610,17 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 protocol.interface(db),
             )
         } else {
+            let requires_attribute_presence = protocol.requires_attribute_presence();
             protocol
                 .interface(db)
                 .members(db)
                 .when_all(db, self.constraints, |member| {
-                    self.type_satisfies_protocol_member(db, ty, &member)
+                    self.type_satisfies_protocol_member(
+                        db,
+                        ty,
+                        &member,
+                        requires_attribute_presence,
+                    )
                 })
         };
         if let Some(context) = self.report_context()
@@ -1086,6 +1095,16 @@ impl<'db> ProtocolInstanceType<'db> {
         }
     }
 
+    /// Return whether this synthesized protocol represents attributes proven present by a runtime
+    /// check such as `hasattr`.
+    pub(super) fn requires_attribute_presence(self) -> bool {
+        matches!(
+            self.inner,
+            Protocol::Synthesized(synthesized)
+                if synthesized.requires_attribute_presence()
+        )
+    }
+
     /// Returns the class origin of a protocol with a pending materialization.
     pub(super) fn materialized_origin(self, db: &'db dyn Db) -> Option<ProtocolClass<'db>> {
         match self.inner {
@@ -1435,13 +1454,39 @@ mod synthesized_protocol {
     use crate::{Db, FxOrderSet};
     use ty_python_core::definition::Definition;
 
+    /// The semantics represented by a synthesized protocol.
+    #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, get_size2::GetSize, salsa::SalsaValue)]
+    enum SynthesizedProtocolKind {
+        /// An ordinary structural interface.
+        Structural,
+        /// A runtime check has proven that every member is present.
+        AttributePresence,
+    }
+
     /// A "synthesized" protocol type that is dissociated from a class definition in source code.
     #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, get_size2::GetSize, salsa::SalsaValue)]
-    pub(in crate::types) struct SynthesizedProtocolType<'db>(ProtocolInterface<'db>);
+    pub(in crate::types) struct SynthesizedProtocolType<'db> {
+        interface: ProtocolInterface<'db>,
+        kind: SynthesizedProtocolKind,
+    }
 
     impl<'db> SynthesizedProtocolType<'db> {
-        pub(super) fn new(interface: ProtocolInterface<'db>) -> Self {
-            Self(interface)
+        pub(super) fn structural(interface: ProtocolInterface<'db>) -> Self {
+            Self {
+                interface,
+                kind: SynthesizedProtocolKind::Structural,
+            }
+        }
+
+        pub(super) fn attribute_presence(interface: ProtocolInterface<'db>) -> Self {
+            Self {
+                interface,
+                kind: SynthesizedProtocolKind::AttributePresence,
+            }
+        }
+
+        pub(super) fn requires_attribute_presence(self) -> bool {
+            self.kind == SynthesizedProtocolKind::AttributePresence
         }
 
         pub(super) fn apply_type_mapping_impl<'a>(
@@ -1451,10 +1496,12 @@ mod synthesized_protocol {
             tcx: TypeContext<'db>,
             visitor: &ApplyTypeMappingVisitor<'db>,
         ) -> Self {
-            Self(
-                self.0
+            Self {
+                interface: self
+                    .interface
                     .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
-            )
+                kind: self.kind,
+            }
         }
 
         pub(super) fn find_legacy_typevars_impl(
@@ -1464,12 +1511,12 @@ mod synthesized_protocol {
             typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
             visitor: &FindLegacyTypeVarsVisitor<'db>,
         ) {
-            self.0
+            self.interface
                 .find_legacy_typevars_impl(db, binding_context, typevars, visitor);
         }
 
         pub(in crate::types) fn interface(self) -> ProtocolInterface<'db> {
-            self.0
+            self.interface
         }
 
         pub(in crate::types) fn recursive_type_normalized_impl(
@@ -1478,9 +1525,12 @@ mod synthesized_protocol {
             div: Type<'db>,
             nested: bool,
         ) -> Option<Self> {
-            Some(Self(
-                self.0.recursive_type_normalized_impl(db, div, nested)?,
-            ))
+            Some(Self {
+                interface: self
+                    .interface
+                    .recursive_type_normalized_impl(db, div, nested)?,
+                kind: self.kind,
+            })
         }
     }
 
@@ -1490,7 +1540,7 @@ mod synthesized_protocol {
             db: &'db dyn Db,
             typevar: BoundTypeVarIdentity<'db>,
         ) -> TypeVarVariance {
-            self.0.variance_of(db, typevar)
+            self.interface.variance_of(db, typevar)
         }
     }
 }

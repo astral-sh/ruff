@@ -2,7 +2,7 @@ use ruff_python_ast as ast;
 use ruff_text_size::Ranged;
 
 use super::{ArgumentsIter, MultiInferenceGuard, TypeInferenceBuilder};
-use crate::place::{DefinedPlace, Place, PlaceAndQualifiers};
+use crate::place::{DefinedPlace, Place, PlaceAndQualifiers, TypeOrigin};
 use crate::types::attribute_write::{
     AttributeWriteRequirement, ClassAttributeWriteMember, ExplicitAttributeWriteRequirement,
     FallbackAttributeWriteRequirement, InstanceAttributeWriteMember,
@@ -726,11 +726,17 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
         match requirement {
             FallbackAttributeWriteRequirement::AssignableTo {
                 ty,
+                origin,
                 qualifiers,
                 possibly_missing,
             } => {
                 if !self.final_assignment_is_valid(object_ty, *qualifiers, emit_diagnostics) {
                     return false;
+                }
+                if *origin == TypeOrigin::Inferred
+                    && self.builder.is_instance_attribute_assignment(self.target)
+                {
+                    return true;
                 }
                 let value_ty = self.infer_value(TypeContext::new(Some(*ty)), false);
                 let valid = self.check_type_pair(value_ty, *ty, emit_diagnostics);
@@ -758,6 +764,7 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
                 ty,
                 qualifiers,
                 possibly_missing,
+                ..
             } => {
                 let value_ty = self.infer_value(
                     TypeContext::new(Some(*ty)),

@@ -2760,7 +2760,14 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         db: &'db dyn Db,
         ty: Type<'db>,
         member: &ProtocolMember<'_, 'db>,
+        requires_attribute_presence: bool,
     ) -> ConstraintSet<'db, 'c> {
+        if requires_attribute_presence
+            && !protocol_member_satisfies_attribute_presence(db, ty, member.name())
+        {
+            return self.never();
+        }
+
         let instance_access =
             member.implementation_access(db, ty, ProtocolMemberAccessMode::Instance);
         if let Some(context) = self.report_context() {
@@ -3381,6 +3388,7 @@ pub(super) fn has_all_protocol_members_defined<'db>(
     protocol: ProtocolInstanceType<'db>,
 ) -> bool {
     let target_interface = protocol.interface(db);
+    let requires_attribute_presence = protocol.requires_attribute_presence();
 
     match ty {
         Type::ProtocolInstance(source_protocol) => {
@@ -3392,13 +3400,41 @@ pub(super) fn has_all_protocol_members_defined<'db>(
                     .all(|member| source_interface.includes_member(db, member.name()))
         }
         _ => target_interface.members(db).all(|member| {
-            matches!(
-                ty.member(db, member.name()).place,
-                Place::Defined(DefinedPlace {
-                    definedness: Definedness::AlwaysDefined,
-                    ..
-                })
-            )
+            if requires_attribute_presence {
+                protocol_member_satisfies_attribute_presence(db, ty, member.name())
+            } else {
+                matches!(
+                    ty.member(db, member.name()).place,
+                    Place::Defined(DefinedPlace {
+                        definedness: Definedness::AlwaysDefined,
+                        ..
+                    })
+                )
+            }
         }),
+    }
+}
+
+/// Return whether `ty` satisfies an attribute-presence requirement without relying solely on an
+/// implicit instance attribute that may not have been initialized yet.
+fn protocol_member_satisfies_attribute_presence<'db>(
+    db: &'db dyn Db,
+    ty: Type<'db>,
+    name: &str,
+) -> bool {
+    let member = ty.member(db, name);
+    if !member.place.is_definitely_bound() {
+        return false;
+    }
+
+    if member
+        .qualifiers
+        .contains(TypeQualifiers::IMPLICIT_INSTANCE_ATTRIBUTE)
+    {
+        ty.member_lookup_with_policy(db, name, MemberLookupPolicy::NO_INSTANCE_FALLBACK)
+            .place
+            .is_definitely_bound()
+    } else {
+        true
     }
 }
