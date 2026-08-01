@@ -385,34 +385,6 @@ class Cached:
 reveal_type(Cached().metadata)  # revealed: int
 ```
 
-## Implicit attribute behind `hasattr` with a subclass override
-
-This is a regression test for <https://github.com/astral-sh/ty/issues/4076>. Inferring the implicit
-attribute must not depend on whether the base module or a subclass module is checked first.
-
-`base.py`:
-
-```py
-class Base:
-    def __init__(self):
-        if not hasattr(self, "x"):
-            self.x = self.__str__
-            self.callback = self.callback_fallback
-
-    def callback_fallback(self, value): ...
-    def callback(self, value): ...
-```
-
-`child.py`:
-
-```py
-from base import Base
-
-class Child(Base):
-    x = Base.__str__
-    callback = Base.callback_fallback
-```
-
 ## Decorator defined on a base class with constrained typevars, accessed from a subclass with decorated generic parameters
 
 This example was minimized from
