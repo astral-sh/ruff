@@ -17,8 +17,6 @@ use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_db::source::{SourceTextError, source_text};
 use rustc_hash::FxHasher;
-#[expect(unused_imports)]
-pub(crate) use semantic_model::HasOptionalDefinition;
 pub use semantic_model::{
     Completion, ExpectedStringLiteralCompletion, HasDefinition, HasType, MemberDefinition,
     NameKind, SemanticModel,
