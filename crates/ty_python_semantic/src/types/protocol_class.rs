@@ -2817,15 +2817,6 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 (implementation_self_binding_ty, protocol_self_binding_ty)
             };
 
-        // Checking a class object against a protocol's instance capabilities can expose the
-        // property descriptor itself rather than the value returned by its getter. Compatibility
-        // for properties on class objects is not yet modeled; retain the previous name-only
-        // behavior until generic upper-bound solving can handle the large recursive unions this
-        // otherwise creates.
-        if member.is_property() && matches!(attribute_type, Type::PropertyInstance(_)) {
-            return self.always();
-        }
-
         if member.is_method() && access == ProtocolMemberAccessMode::Instance {
             let Some(required_ty) = required_ty.resolve(db, env) else {
                 return self.never();

@@ -2071,6 +2071,14 @@ static_assert(is_subtype_of(XImplicitFinal, HasXProperty))
 static_assert(is_assignable_to(XImplicitFinal, HasXProperty))
 ```
 
+Accessing an instance property on the class object exposes the property descriptor, not the value
+returned by its getter. A class object with only an instance property therefore does not satisfy the
+protocol:
+
+```py
+x_class: HasXProperty = XReadProperty  # error: [invalid-assignment]
+```
+
 But only if it has the correct type:
 
 ```py
