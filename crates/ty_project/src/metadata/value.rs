@@ -37,7 +37,7 @@ use crate::glob::{
 pub struct RelativePathBuf(RangedValue<SystemPathBuf>);
 
 impl RelativePathBuf {
-    pub fn new(path: impl AsRef<SystemPath>, source: ValueSource) -> Self {
+    pub(crate) fn new(path: impl AsRef<SystemPath>, source: ValueSource) -> Self {
         Self(RangedValue::new(path.as_ref().to_path_buf(), source))
     }
 
@@ -54,11 +54,11 @@ impl RelativePathBuf {
         &self.0
     }
 
-    pub fn source(&self) -> &ValueSource {
+    pub(crate) fn source(&self) -> &ValueSource {
         self.0.source()
     }
 
-    pub fn range(&self) -> Option<TextRange> {
+    pub(crate) fn range(&self) -> Option<TextRange> {
         self.0.range()
     }
 
@@ -131,7 +131,7 @@ impl fmt::Display for RelativePathBuf {
 pub struct RelativeGlobPattern(RangedValue<String>);
 
 impl RelativeGlobPattern {
-    pub fn new(pattern: impl AsRef<str>, source: ValueSource) -> Self {
+    fn new(pattern: impl AsRef<str>, source: ValueSource) -> Self {
         Self(RangedValue::new(pattern.as_ref().to_string(), source))
     }
 

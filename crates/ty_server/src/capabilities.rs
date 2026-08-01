@@ -537,7 +537,7 @@ pub(crate) fn server_diagnostic_options(workspace_diagnostics: bool) -> Diagnost
     }
 }
 
-pub(crate) fn server_rename_options() -> RenameOptions {
+fn server_rename_options() -> RenameOptions {
     RenameOptions {
         prepare_provider: Some(true),
         work_done_progress_options: WorkDoneProgressOptions::default(),

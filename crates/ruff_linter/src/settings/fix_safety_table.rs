@@ -21,7 +21,7 @@ pub struct FixSafetyTable {
 }
 
 impl FixSafetyTable {
-    pub const fn resolve_applicability(
+    pub(crate) const fn resolve_applicability(
         &self,
         rule: Rule,
         applicability: Applicability,

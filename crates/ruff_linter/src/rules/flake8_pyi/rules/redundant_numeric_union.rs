@@ -281,7 +281,7 @@ enum Redundancy {
 }
 
 impl Redundancy {
-    pub(super) fn from_numeric_flags(numeric_flags: NumericFlags) -> Option<Self> {
+    fn from_numeric_flags(numeric_flags: NumericFlags) -> Option<Self> {
         if numeric_flags == NumericFlags::INT | NumericFlags::FLOAT | NumericFlags::COMPLEX {
             Some(Self::IntFloatComplex)
         } else if numeric_flags == NumericFlags::FLOAT | NumericFlags::COMPLEX {
@@ -309,7 +309,7 @@ bitflags! {
 }
 
 impl NumericFlags {
-    pub(super) fn seen_builtin_type(&mut self, name: &str) {
+    fn seen_builtin_type(&mut self, name: &str) {
         let flag: NumericFlags = match name {
             "int" => NumericFlags::INT,
             "float" => NumericFlags::FLOAT,

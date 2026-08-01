@@ -551,7 +551,7 @@ impl<'db> TypedDictType<'db> {
     }
 
     /// Creates a synthesized schema while preserving its undeclared-item policy.
-    pub(crate) fn from_schema_items_with_openness(
+    fn from_schema_items_with_openness(
         db: &'db dyn Db,
         items: TypedDictSchema<'db>,
         openness: TypedDictOpenness<'db>,
@@ -1575,7 +1575,7 @@ impl<'db> TypedDictKeyAssignment<'_, 'db, '_> {
 /// Reports errors for any keys that are required but not provided.
 ///
 /// Returns true if the assignment is valid, or false otherwise.
-pub(super) fn validate_typed_dict_required_keys<'db, 'ast>(
+fn validate_typed_dict_required_keys<'db, 'ast>(
     context: &InferContext<'db, 'ast>,
     typed_dict: TypedDictType<'db>,
     provided_keys: &OrderSet<Name>,
@@ -1961,7 +1961,7 @@ pub(super) fn infer_unpacked_keyword_types<'db>(
         .collect()
 }
 
-pub(super) fn unpacked_keyword_is_gradual<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
+fn unpacked_keyword_is_gradual<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
     match ty.resolve_type_alias(db) {
         ty if ty.is_never() || ty.is_dynamic() => true,
         Type::Union(union) => union
@@ -2070,7 +2070,7 @@ fn collect_guaranteed_keys_from_merged_unpacked_keyword<'db>(
 ///
 /// This is used for mixed positional-and-keyword constructor calls, where guaranteed keyword
 /// arguments override any same-named keys from the positional mapping.
-pub(super) fn typed_dict_without_keys<'db>(
+fn typed_dict_without_keys<'db>(
     db: &'db dyn Db,
     typed_dict: TypedDictType<'db>,
     excluded_keys: &OrderSet<Name>,
@@ -2920,7 +2920,7 @@ impl<'db> SynthesizedTypedDictType<'db> {
         self.kind(db) == SynthesizedTypedDictKind::Patch
     }
 
-    pub(super) fn apply_type_mapping_impl<'a>(
+    fn apply_type_mapping_impl<'a>(
         self,
         db: &'db dyn Db,
         type_mapping: &TypeMapping<'a, 'db>,
@@ -3041,7 +3041,7 @@ impl<'db> TypedDictField<'db> {
             .build()
     }
 
-    pub(crate) fn apply_type_mapping_impl<'a>(
+    fn apply_type_mapping_impl<'a>(
         self,
         db: &'db dyn Db,
         type_mapping: &TypeMapping<'a, 'db>,
@@ -3088,7 +3088,7 @@ impl<'db> TypedDictFieldBuilder<'db> {
         self
     }
 
-    pub(crate) fn first_declaration(mut self, definition: Option<Definition<'db>>) -> Self {
+    fn first_declaration(mut self, definition: Option<Definition<'db>>) -> Self {
         self.first_declaration = definition;
         self
     }

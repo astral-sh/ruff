@@ -579,7 +579,7 @@ pub(crate) enum CheckTypesMode {
 }
 
 impl CheckTypesMode {
-    pub(crate) fn is_provisional(self) -> bool {
+    fn is_provisional(self) -> bool {
         matches!(self, Self::Provisional)
     }
 }
@@ -1003,7 +1003,7 @@ impl<'db> Bindings<'db> {
     ///
     /// This handles the shared partial-specific preprocessing (callable validation and argument
     /// normalization) used by both inference and known-call evaluation.
-    pub(crate) fn functools_partial_matched_bindings<'a>(
+    fn functools_partial_matched_bindings<'a>(
         db: &'db dyn Db,
         wrapped_callable_ty: Type<'db>,
         call_arguments: &CallArguments<'a, 'db>,
@@ -3066,7 +3066,7 @@ pub(crate) struct CallableBinding<'db> {
 
     /// If this is a callable object (i.e. called via a `__call__` method), the boundness of
     /// that call method.
-    pub(crate) dunder_call_is_possibly_unbound: bool,
+    dunder_call_is_possibly_unbound: bool,
 
     /// The type of the bound `self` or `cls` parameter if this signature is for a bound method.
     pub(crate) bound_type: Option<Type<'db>>,
@@ -3144,7 +3144,7 @@ impl<'db> CallableBinding<'db> {
     ///
     /// The preserved indexes are used for diagnostics so filtered or reordered bindings can still
     /// point back to the correct overload declaration.
-    pub(crate) fn from_indexed_overloads(
+    fn from_indexed_overloads(
         signature_type: Type<'db>,
         overloads: impl IntoIterator<Item = (usize, Signature<'db>)>,
     ) -> Self {
@@ -3389,7 +3389,7 @@ impl<'db> CallableBinding<'db> {
         self
     }
 
-    pub(super) fn argument_matches_keyword_variadic(&self, argument_index: usize) -> bool {
+    fn argument_matches_keyword_variadic(&self, argument_index: usize) -> bool {
         let argument_index = argument_index + usize::from(self.bound_type.is_some());
         self.matching_overloads().any(|(_, overload)| {
             overload
@@ -4056,7 +4056,7 @@ impl<'db> CallableBinding<'db> {
         Ok(())
     }
 
-    pub(crate) fn is_callable(&self) -> bool {
+    fn is_callable(&self) -> bool {
         !self.overloads.is_empty()
     }
 
@@ -4109,7 +4109,7 @@ impl<'db> CallableBinding<'db> {
     }
 
     /// Returns the index of the matching overload in the form of [`MatchingOverloadIndex`].
-    pub(crate) fn matching_overload_index(&self) -> MatchingOverloadIndex {
+    fn matching_overload_index(&self) -> MatchingOverloadIndex {
         let mut matching_overloads = self.matching_overloads();
         match matching_overloads.next() {
             None => MatchingOverloadIndex::None,
@@ -4169,7 +4169,7 @@ impl<'db> CallableBinding<'db> {
     ///
     /// For an invalid call to an overloaded function, we return `Type::unknown`, since we cannot
     /// make any useful conclusions about which overload was intended to be called.
-    pub(crate) fn return_type(&self) -> Type<'db> {
+    fn return_type(&self) -> Type<'db> {
         if let Some(overload_call_return_type) = self.overload_call_return_type {
             return match overload_call_return_type {
                 OverloadCallReturnType::ArgumentTypeExpansion(return_type) => return_type,
@@ -6446,12 +6446,12 @@ pub(crate) struct Binding<'db> {
     source_parameter_index_offset: usize,
 
     /// The type that is (hopefully) callable.
-    pub(crate) callable_type: Type<'db>,
+    callable_type: Type<'db>,
 
     /// The type we'll use for error messages referring to details of the called signature. For
     /// calls to functions this will be the same as `callable_type`; for other callable instances
     /// it may be a `__call__` method.
-    pub(crate) signature_type: Type<'db>,
+    signature_type: Type<'db>,
 
     /// Return type of the call.
     pub(crate) return_ty: Type<'db>,
@@ -7012,7 +7012,7 @@ impl<'db> Binding<'db> {
         self.return_ty = return_ty;
     }
 
-    pub(crate) fn return_type(&self) -> Type<'db> {
+    fn return_type(&self) -> Type<'db> {
         self.return_ty
     }
 
@@ -7157,7 +7157,7 @@ impl<'db> Binding<'db> {
     /// that parameter.
     ///
     /// Returns an error if the parameter name is not found.
-    pub(crate) fn parameter_type_by_name(
+    fn parameter_type_by_name(
         &self,
         parameter_name: &str,
         fallback_to_default: bool,
@@ -7399,8 +7399,8 @@ impl CallableBindingSnapshotter {
 /// Describes a callable for the purposes of diagnostics.
 #[derive(Debug)]
 pub(crate) struct CallableDescription<'a> {
-    pub(crate) name: Cow<'a, str>,
-    pub(crate) kind: Option<&'static str>,
+    name: Cow<'a, str>,
+    kind: Option<&'static str>,
 }
 
 impl<'db> CallableDescription<'db> {
@@ -7753,7 +7753,7 @@ impl BindingError<'_> {
         )
     }
 
-    pub(crate) fn maybe_apply_argument_index_offset(mut self, offset: Option<usize>) -> Self {
+    fn maybe_apply_argument_index_offset(mut self, offset: Option<usize>) -> Self {
         if let Some(offset) = offset {
             self.apply_argument_index_offset(offset);
         }
@@ -7826,7 +7826,7 @@ impl BindingError<'_> {
     /// sub-call for a `ParamSpec`, where the argument indices are relative to the sub-call's
     /// argument list rather than the original call's argument list. The `offset` should be the
     /// number of arguments in the original call that were matched before the `ParamSpec` component.
-    pub(crate) fn apply_argument_index_offset(&mut self, offset: usize) {
+    fn apply_argument_index_offset(&mut self, offset: usize) {
         self.map_argument_indices(|argument_index| argument_index.map(|index| index + offset));
     }
 }

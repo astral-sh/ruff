@@ -1258,11 +1258,7 @@ impl<'db> Specialization<'db> {
         )
     }
 
-    pub(crate) fn apply_type_mapping<'a>(
-        self,
-        db: &'db dyn Db,
-        type_mapping: &TypeMapping<'a, 'db>,
-    ) -> Self {
+    fn apply_type_mapping<'a>(self, db: &'db dyn Db, type_mapping: &TypeMapping<'a, 'db>) -> Self {
         self.apply_type_mapping_impl(db, type_mapping, &[], &ApplyTypeMappingVisitor::default())
     }
 

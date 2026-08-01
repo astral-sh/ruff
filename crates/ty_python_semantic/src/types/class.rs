@@ -278,7 +278,7 @@ impl<'db> CodeGeneratorKind<'db> {
         )
     }
 
-    pub(super) fn dataclass_transformer_params(self) -> Option<DataclassTransformerParams<'db>> {
+    fn dataclass_transformer_params(self) -> Option<DataclassTransformerParams<'db>> {
         match self {
             Self::DataclassLike(params) => params,
             Self::Pydantic(_) | Self::NamedTuple | Self::TypedDict => None,
@@ -324,7 +324,7 @@ impl<'db> CodeGeneratorKind<'db> {
     /// def f(c: C):
     ///     c.value  # okay, `value` will be set by `C`'s constructor
     /// ```
-    pub(super) const fn treats_fields_as_instance_attributes(self) -> bool {
+    const fn treats_fields_as_instance_attributes(self) -> bool {
         matches!(self, Self::DataclassLike(_) | Self::Pydantic(_))
     }
 
@@ -339,7 +339,7 @@ impl<'db> CodeGeneratorKind<'db> {
     ///
     /// C(value=42)
     /// ```
-    pub(super) fn synthesizes_constructor_signature_from_fields(
+    fn synthesizes_constructor_signature_from_fields(
         self,
         db: &'db dyn Db,
         class: StaticClassLiteral<'db>,
@@ -571,7 +571,7 @@ impl<'db> ClassLiteral<'db> {
     }
 
     /// Returns whether this class has PEP 695 type parameters.
-    pub(crate) fn has_pep_695_type_params(self, db: &'db dyn Db) -> bool {
+    fn has_pep_695_type_params(self, db: &'db dyn Db) -> bool {
         self.as_static()
             .is_some_and(|class| class.has_pep_695_type_params(db))
     }
@@ -582,7 +582,7 @@ impl<'db> ClassLiteral<'db> {
     }
 
     /// Return the properties that affect how instances of this class are represented.
-    pub(super) fn instance_flags(self, db: &'db dyn Db) -> ClassInstanceFlags {
+    fn instance_flags(self, db: &'db dyn Db) -> ClassInstanceFlags {
         match self {
             Self::Static(literal) => literal.instance_flags(db),
             Self::DynamicTypedDict(_) => ClassInstanceFlags::TYPED_DICT,
@@ -790,7 +790,7 @@ impl<'db> ClassLiteral<'db> {
     /// ```python
     /// X = type("X", (), {"__lt__": lambda self, other: True})
     /// ```
-    pub(crate) fn has_own_ordering_method(self, db: &'db dyn Db) -> bool {
+    fn has_own_ordering_method(self, db: &'db dyn Db) -> bool {
         match self {
             Self::Static(class) => class.has_own_ordering_method(db),
             Self::Dynamic(class) => class.has_own_ordering_method(db),
@@ -876,7 +876,7 @@ impl<'db> ClassLiteral<'db> {
     ///     class Foo(int, X): ...
     /// TypeError: multiple bases have instance lay-out conflict
     /// ```
-    pub(super) fn as_disjoint_base(self, db: &'db dyn Db) -> Option<DisjointBase<'db>> {
+    fn as_disjoint_base(self, db: &'db dyn Db) -> Option<DisjointBase<'db>> {
         match self {
             Self::Static(class) => class.as_disjoint_base(db),
             Self::Dynamic(class) => class.as_disjoint_base(db),
@@ -1179,7 +1179,7 @@ impl<'db> ClassType<'db> {
     }
 
     /// Return `Some` if this class is known to be a [`DisjointBase`], or `None` if it is not.
-    pub(super) fn as_disjoint_base(self, db: &'db dyn Db) -> Option<DisjointBase<'db>> {
+    fn as_disjoint_base(self, db: &'db dyn Db) -> Option<DisjointBase<'db>> {
         self.class_literal(db).as_disjoint_base(db)
     }
 
@@ -1444,7 +1444,7 @@ impl<'db> ClassType<'db> {
     }
 
     /// Return `true` if this class could exist in the MRO of `other`.
-    pub(super) fn could_exist_in_mro_of(
+    fn could_exist_in_mro_of(
         self,
         db: &'db dyn Db,
         other: Self,
@@ -2597,7 +2597,7 @@ pub(super) struct MroLookup<'db, I> {
 
 impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
     /// Create a new MRO lookup from a database and an MRO iterator.
-    pub(super) fn new(db: &'db dyn Db, mro_iter: I) -> Self {
+    fn new(db: &'db dyn Db, mro_iter: I) -> Self {
         Self { db, mro_iter }
     }
 
@@ -2615,7 +2615,7 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
     /// If we encounter a dynamic type in the MRO, we save it and after traversal:
     /// 1. Use it as the type if no other classes define the attribute, or
     /// 2. Intersect it with the type from non-dynamic MRO members.
-    pub(super) fn class_member(
+    fn class_member(
         self,
         name: &str,
         policy: MemberLookupPolicy,
@@ -2696,7 +2696,7 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
     ///
     /// Returns `InstanceMemberResult::TypedDict` if a `TypedDict` base is encountered,
     /// allowing the caller to handle this case specially.
-    pub(super) fn instance_member(self, name: &str) -> InstanceMemberResult<'db> {
+    fn instance_member(self, name: &str) -> InstanceMemberResult<'db> {
         let db = self.db;
         let mut union = UnionBuilder::new(db);
         let mut union_qualifiers = TypeQualifiers::empty();
@@ -2792,7 +2792,7 @@ pub(super) struct CompletedMemberLookup<'db> {
 
 impl<'db> CompletedMemberLookup<'db> {
     /// Finalize the lookup result by handling dynamic type intersection.
-    pub(super) fn finalize(self, db: &'db dyn Db) -> PlaceAndQualifiers<'db> {
+    fn finalize(self, db: &'db dyn Db) -> PlaceAndQualifiers<'db> {
         match (
             PlaceAndQualifiers::from(self.lookup_result),
             self.dynamic_type,
@@ -2840,7 +2840,7 @@ pub(super) struct QualifiedClassName<'db> {
 }
 
 impl<'db> QualifiedClassName<'db> {
-    pub(super) fn from_class_literal(db: &'db dyn Db, class: ClassLiteral<'db>) -> Self {
+    fn from_class_literal(db: &'db dyn Db, class: ClassLiteral<'db>) -> Self {
         Self { db, class }
     }
 

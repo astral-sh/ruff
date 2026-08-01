@@ -609,13 +609,13 @@ impl<'db> AllMembers<'db> {
 /// A member of a type or scope, with the first reachable definition of that member.
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub struct MemberWithDefinition<'db> {
-    pub member: Member<'db>,
-    pub first_reachable_definition: Definition<'db>,
+    pub(crate) member: Member<'db>,
+    pub(crate) first_reachable_definition: Definition<'db>,
 }
 
 /// A member of a type or scope.
 ///
-/// In the context of the [`all_members`] routine, this represents
+/// In the context of the `all_members` routine, this represents
 /// a single item in (ideally) the list returned by `dir(object)`.
 ///
 /// The equality, comparison and hashing traits implemented for
@@ -628,8 +628,8 @@ pub struct MemberWithDefinition<'db> {
 /// ordered comparisons.
 #[derive(Clone, Debug)]
 pub struct Member<'db> {
-    pub name: Name,
-    pub ty: Type<'db>,
+    pub(crate) name: Name,
+    pub(crate) ty: Type<'db>,
 }
 
 impl std::hash::Hash for Member<'_> {
@@ -660,6 +660,6 @@ impl<'db> PartialOrd for Member<'db> {
 
 /// List all members of a given type: anything that would be valid when accessed
 /// as an attribute on an object of the given type.
-pub fn all_members<'db>(db: &'db dyn Db, ty: Type<'db>) -> FxHashSet<Member<'db>> {
+pub(crate) fn all_members<'db>(db: &'db dyn Db, ty: Type<'db>) -> FxHashSet<Member<'db>> {
     AllMembers::of(db, ty).members
 }

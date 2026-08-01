@@ -257,7 +257,7 @@ impl RuleSet {
 
     /// Returns `true` if any of the rules in `rules` are in this set.
     #[inline]
-    pub const fn any(&self, rules: &[Rule]) -> bool {
+    pub(crate) const fn any(&self, rules: &[Rule]) -> bool {
         let mut any = false;
         let mut i = 0;
 

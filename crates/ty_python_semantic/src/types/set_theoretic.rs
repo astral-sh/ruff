@@ -527,7 +527,7 @@ impl<'db> NegativeIntersectionElements<'db> {
         }
     }
 
-    pub(crate) fn len(&self) -> usize {
+    fn len(&self) -> usize {
         match self {
             Self::Empty => 0,
             Self::Single(_) => 1,
@@ -572,7 +572,7 @@ impl<'db> NegativeIntersectionElements<'db> {
     }
 
     /// Shrink the capacity of the collection as much as possible.
-    pub(crate) fn shrink_to_fit(&mut self) {
+    fn shrink_to_fit(&mut self) {
         match self {
             Self::Empty | Self::Single(_) => {}
             Self::Multiple(set) => set.shrink_to_fit(),
@@ -588,7 +588,7 @@ impl<'db> NegativeIntersectionElements<'db> {
     /// the last element in the collection is popped off the end of the collection
     /// and placed at the index where `ty` was previously, allowing this method to complete
     /// in O(1) time (average).
-    pub(crate) fn swap_remove(&mut self, ty: &Type<'db>) -> bool {
+    fn swap_remove(&mut self, ty: &Type<'db>) -> bool {
         match self {
             Self::Empty => false,
             Self::Single(existing) => {
@@ -610,7 +610,7 @@ impl<'db> NegativeIntersectionElements<'db> {
     /// The element is removed by swapping it with the last element
     /// of the collection and popping it off, allowing this method to complete
     /// in O(1) time (average).
-    pub(crate) fn swap_remove_index(&mut self, index: usize) -> Option<Type<'db>> {
+    fn swap_remove_index(&mut self, index: usize) -> Option<Type<'db>> {
         match self {
             Self::Empty => None,
             Self::Single(existing) => {
@@ -1085,7 +1085,7 @@ impl<'db> IntersectionType<'db> {
         self.positive(db).iter().copied()
     }
 
-    pub fn iter_negative(self, db: &'db dyn Db) -> impl Iterator<Item = Type<'db>> {
+    pub(crate) fn iter_negative(self, db: &'db dyn Db) -> impl Iterator<Item = Type<'db>> {
         self.negative(db).iter().copied()
     }
 

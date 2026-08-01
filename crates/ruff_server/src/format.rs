@@ -301,7 +301,7 @@ impl UvFormatCommand {
     }
 
     /// Execute the format command on the given source.
-    pub(crate) fn format(
+    fn format(
         &self,
         source: &str,
         path: &Path,
@@ -357,12 +357,12 @@ impl UvFormatCommand {
     }
 
     /// Format the entire document.
-    pub(crate) fn format_document(&self, source: &str, path: &Path) -> crate::Result<FormatResult> {
+    fn format_document(&self, source: &str, path: &Path) -> crate::Result<FormatResult> {
         self.format(source, path, None)
     }
 
     /// Format a specific range.
-    pub(crate) fn format_range(
+    fn format_range(
         &self,
         source: &str,
         range: TextRange,

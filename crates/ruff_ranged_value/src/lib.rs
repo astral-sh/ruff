@@ -155,7 +155,7 @@ impl<T> RangedValue<T> {
         Self::with_range(value, ValueSource::Editor, TextRange::default())
     }
 
-    pub fn with_range(value: T, source: ValueSource, range: TextRange) -> Self {
+    fn with_range(value: T, source: ValueSource, range: TextRange) -> Self {
         Self {
             value,
             range: Some(range),

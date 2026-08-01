@@ -48,7 +48,7 @@ impl<'db> ScopeId<'db> {
     }
 
     /// Returns the class definition for the enclosing class if this scope is a method body.
-    pub fn class_definition_of_method(self, db: &'db dyn Db) -> Option<Definition<'db>> {
+    fn class_definition_of_method(self, db: &'db dyn Db) -> Option<Definition<'db>> {
         semantic_index(db, self.file(db)).class_definition_of_method(self.file_scope_id(db))
     }
 
@@ -152,7 +152,7 @@ impl Scope {
         self.kind().visibility()
     }
 
-    pub fn descendants(&self) -> Range<FileScopeId> {
+    pub(crate) fn descendants(&self) -> Range<FileScopeId> {
         self.descendants.clone()
     }
 
@@ -227,7 +227,7 @@ impl ScopeKind {
         }
     }
 
-    pub(crate) const fn visibility(self) -> ScopeVisibility {
+    const fn visibility(self) -> ScopeVisibility {
         match self {
             ScopeKind::Module | ScopeKind::Class => ScopeVisibility::Public,
             ScopeKind::TypeParams
@@ -259,7 +259,7 @@ impl ScopeKind {
         matches!(self, ScopeKind::Module)
     }
 
-    pub const fn is_annotation(self) -> bool {
+    pub(crate) const fn is_annotation(self) -> bool {
         matches!(self, ScopeKind::TypeParams | ScopeKind::TypeAlias)
     }
 
@@ -328,7 +328,7 @@ impl NodeWithScopeRef<'_> {
         }
     }
 
-    pub fn node_key(self) -> NodeWithScopeKey {
+    pub(crate) fn node_key(self) -> NodeWithScopeKey {
         match self {
             NodeWithScopeRef::Module => NodeWithScopeKey::Module,
             NodeWithScopeRef::Class(class) => NodeWithScopeKey::Class(NodeKey::from_node(class)),
@@ -423,7 +423,7 @@ impl NodeWithScopeKind {
         self.as_function().expect("expected function")
     }
 
-    pub fn as_type_alias(&self) -> Option<&AstNodeRef<ast::StmtTypeAlias>> {
+    fn as_type_alias(&self) -> Option<&AstNodeRef<ast::StmtTypeAlias>> {
         match self {
             Self::TypeAlias(type_alias) => Some(type_alias),
             _ => None,

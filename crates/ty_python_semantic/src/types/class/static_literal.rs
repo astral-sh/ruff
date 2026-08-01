@@ -224,7 +224,7 @@ impl<'db> StaticClassLiteral<'db> {
     ///
     /// When the base namedtuple's fields were determined dynamically (e.g., from a variable),
     /// we can't synthesize precise method signatures and should fall back to `NamedTupleFallback`.
-    pub(crate) fn namedtuple_base_has_unknown_fields(self, db: &'db dyn Db) -> bool {
+    fn namedtuple_base_has_unknown_fields(self, db: &'db dyn Db) -> bool {
         self.explicit_bases(db).iter().any(|base| match base {
             Type::ClassLiteral(ClassLiteral::DynamicNamedTuple(namedtuple)) => {
                 !namedtuple.has_known_fields(db)
@@ -312,7 +312,7 @@ impl<'db> StaticClassLiteral<'db> {
     ///
     /// Note: We use direct scope lookups here to avoid infinite recursion
     /// through `own_class_member` -> `own_synthesized_member`.
-    pub(super) fn total_ordering_root_method(
+    fn total_ordering_root_method(
         self,
         db: &'db dyn Db,
         specialization: Option<Specialization<'db>>,

@@ -529,7 +529,7 @@ impl SpecialFormType {
     ///
     /// Most variants can only exist in one module, which is the same as `self.class().canonical_module(db)`.
     /// Some variants could validly be defined in either `typing` or `typing_extensions`, however.
-    pub(super) const fn check_module(self, module: KnownModule) -> bool {
+    const fn check_module(self, module: KnownModule) -> bool {
         match self {
             Self::TypeQualifier(qualifier) => qualifier.check_module(module),
             Self::LegacyStdlibAlias(_)

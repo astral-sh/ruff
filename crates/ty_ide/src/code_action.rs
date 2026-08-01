@@ -879,14 +879,14 @@ mod tests {
         ");
     }
 
-    pub(super) struct CodeActionTest {
-        pub(super) db: ty_project::TestDb,
-        pub(super) file: File,
-        pub(super) diagnostic_range: TextRange,
+    struct CodeActionTest {
+        db: ty_project::TestDb,
+        file: File,
+        diagnostic_range: TextRange,
     }
 
     impl CodeActionTest {
-        pub(super) fn with_source(source: &str) -> Self {
+        fn with_source(source: &str) -> Self {
             let mut db =
                 ty_project::TestDb::new(ProjectMetadata::new("test", SystemPathBuf::from("/")));
 
@@ -922,7 +922,7 @@ mod tests {
             }
         }
 
-        pub(super) fn code_actions(&self, lint: &LintMetadata) -> String {
+        fn code_actions(&self, lint: &LintMetadata) -> String {
             use std::fmt::Write;
 
             let mut buf = String::new();

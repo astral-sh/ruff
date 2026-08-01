@@ -1669,11 +1669,11 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
         self.name
     }
 
-    pub(super) fn qualifiers(&self) -> TypeQualifiers {
+    fn qualifiers(&self) -> TypeQualifiers {
         self.data.qualifiers
     }
 
-    pub(super) fn is_method(&self) -> bool {
+    fn is_method(&self) -> bool {
         matches!(self.data.kind, ProtocolMemberKind::Method(..))
     }
 

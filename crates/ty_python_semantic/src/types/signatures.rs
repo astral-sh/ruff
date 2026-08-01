@@ -822,7 +822,7 @@ impl<'db> Signature<'db> {
                 .any(|p| p.should_annotation_be_displayed() && p.annotated_type().contains_self(db))
     }
 
-    pub(crate) fn with_inherited_generic_context(
+    fn with_inherited_generic_context(
         mut self,
         db: &'db dyn Db,
         inherited_generic_context: GenericContext<'db>,
@@ -867,7 +867,7 @@ impl<'db> Signature<'db> {
         }
     }
 
-    pub(super) fn recursive_type_normalized_impl(
+    fn recursive_type_normalized_impl(
         &self,
         db: &'db dyn Db,
         div: Type<'db>,
@@ -898,7 +898,7 @@ impl<'db> Signature<'db> {
         })
     }
 
-    pub(crate) fn apply_type_mapping_impl<'a>(
+    fn apply_type_mapping_impl<'a>(
         &self,
         db: &'db dyn Db,
         type_mapping: &TypeMapping<'a, 'db>,
@@ -937,7 +937,7 @@ impl<'db> Signature<'db> {
         )
     }
 
-    pub(crate) fn max_typevar_freshness_matching_generic_context(
+    fn max_typevar_freshness_matching_generic_context(
         &self,
         db: &'db dyn Db,
         generic_context: GenericContext<'db>,
@@ -1445,11 +1445,7 @@ impl<'db> Signature<'db> {
     }
 
     /// Returns this signature with the given specialization applied to parameters and return type.
-    pub(crate) fn apply_specialization(
-        &self,
-        db: &'db dyn Db,
-        specialization: Specialization<'db>,
-    ) -> Self {
+    fn apply_specialization(&self, db: &'db dyn Db, specialization: Specialization<'db>) -> Self {
         let type_mapping =
             TypeMapping::ApplySpecialization(ApplySpecialization::Specialization(specialization));
         self.apply_type_mapping_impl(
@@ -1461,7 +1457,7 @@ impl<'db> Signature<'db> {
     }
 
     /// Returns the callable signature produced by partially applying this signature.
-    pub(crate) fn partially_apply(
+    fn partially_apply(
         &self,
         db: &'db dyn Db,
         partial_application: &PartialApplication<'db>,
@@ -1772,7 +1768,7 @@ impl<'db> Signature<'db> {
     }
 
     /// Create a new signature with the given parameters.
-    pub(crate) fn with_parameters(self, parameters: Parameters<'db>) -> Self {
+    fn with_parameters(self, parameters: Parameters<'db>) -> Self {
         Self { parameters, ..self }
     }
 
@@ -3844,7 +3840,7 @@ impl<'db> Parameters<'db> {
     /// `TypedDict`. Use [`Self::standard`] for a known-standard list and
     /// [`Self::from_annotation`] when the kind should be inferred from annotations; preserve the
     /// existing kind when transforming a parameter list.
-    pub(crate) fn new(value: impl Into<Box<[Parameter<'db>]>>, kind: ParametersKind<'db>) -> Self {
+    fn new(value: impl Into<Box<[Parameter<'db>]>>, kind: ParametersKind<'db>) -> Self {
         Self {
             data: Arc::new(ParametersData {
                 value: value.into(),
@@ -4265,7 +4261,7 @@ impl<'db> Parameters<'db> {
 
     /// Return parameters that represents `(*args: object, **kwargs: object)`, the bottom signature
     /// (accepts any call, so subtype of all other signatures.)
-    pub(crate) fn bottom() -> Self {
+    fn bottom() -> Self {
         Self::new(
             [
                 Parameter::variadic(Name::new_static("args")).with_annotated_type(Type::object()),
@@ -4590,7 +4586,7 @@ impl<'db> Parameters<'db> {
     }
 
     /// Expands adjacent `P.args`/`P.kwargs` placeholders into their mapped parameters.
-    pub(crate) fn expand_paramspec_variadics(&self, db: &'db dyn Db) -> Self {
+    fn expand_paramspec_variadics(&self, db: &'db dyn Db) -> Self {
         let mut variadic_index = None;
         let mut paramspec_callable = None;
 
@@ -4922,7 +4918,7 @@ impl<'db> Parameter<'db> {
         }
     }
 
-    pub(super) fn recursive_type_normalized_impl(
+    fn recursive_type_normalized_impl(
         &self,
         db: &'db dyn Db,
         div: Type<'db>,
@@ -5083,7 +5079,7 @@ impl<'db> Parameter<'db> {
         }
     }
 
-    pub(crate) fn callable_by_name(&self, name: &str) -> bool {
+    fn callable_by_name(&self, name: &str) -> bool {
         match &self.kind {
             ParameterKind::PositionalOrKeyword {
                 name: param_name, ..
@@ -5165,7 +5161,7 @@ impl<'db> Parameter<'db> {
     }
 
     /// Rewrites a positional-or-keyword parameter as keyword-only while preserving its metadata.
-    pub(crate) fn positional_or_keyword_to_keyword_only(&self) -> Self {
+    fn positional_or_keyword_to_keyword_only(&self) -> Self {
         let mut result = self.clone();
         if let ParameterKind::PositionalOrKeyword { name, default_type } = &self.kind {
             result.kind = ParameterKind::KeywordOnly {

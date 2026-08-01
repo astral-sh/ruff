@@ -806,7 +806,7 @@ mod tests {
     use ruff_db::system::{DbWithWritableSystem, SystemPathBuf};
     use ty_project::ProjectMetadata;
 
-    pub(super) fn inlay_hint_test(source: &str) -> InlayHintTest {
+    fn inlay_hint_test(source: &str) -> InlayHintTest {
         const START: &str = "<START>";
         const END: &str = "<END>";
 
@@ -851,10 +851,10 @@ mod tests {
         }
     }
 
-    pub(super) struct InlayHintTest {
-        pub(super) db: ty_project::TestDb,
-        pub(super) file: File,
-        pub(super) range: TextRange,
+    struct InlayHintTest {
+        db: ty_project::TestDb,
+        file: File,
+        range: TextRange,
         _insta_settings_guard: SettingsBindDropGuard,
     }
 

@@ -13,7 +13,7 @@ pub struct DirectoryListing(Box<[(CompactString, FileType)]>);
 
 impl DirectoryListing {
     /// Returns the type of the entry named `name`, if present.
-    pub fn file_type(&self, name: &str) -> Option<FileType> {
+    fn file_type(&self, name: &str) -> Option<FileType> {
         self.0
             .binary_search_by(|(candidate, _)| candidate.as_str().cmp(name))
             .ok()

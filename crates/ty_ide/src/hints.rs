@@ -26,7 +26,7 @@ pub enum HintKind {
 }
 
 impl HintKind {
-    pub fn message(&self) -> String {
+    fn message(&self) -> String {
         match self {
             Self::UnusedBinding(name) => format!("`{name}` is unused"),
             Self::UnreachableCode(UnreachableKind::Unconditional) => {

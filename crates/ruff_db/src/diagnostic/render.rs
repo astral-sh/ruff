@@ -2639,12 +2639,7 @@ watermelon
         /// of the corresponding line minus one. (The "minus one" is because
         /// otherwise, the span will end where the next line begins, and this
         /// confuses `ruff_annotate_snippets` as of 2025-03-13.)
-        pub(super) fn span(
-            &self,
-            path: &str,
-            line_offset_start: &str,
-            line_offset_end: &str,
-        ) -> Span {
+        fn span(&self, path: &str, line_offset_start: &str, line_offset_end: &str) -> Span {
             let span = self.path(path);
 
             let file = span.expect_ty_file();
@@ -2805,7 +2800,7 @@ watermelon
         }
 
         /// Set the fix on the diagnostic.
-        pub(super) fn fix(mut self, fix: Fix) -> DiagnosticBuilder<'e> {
+        fn fix(mut self, fix: Fix) -> DiagnosticBuilder<'e> {
             self.diag.set_fix(fix);
             self
         }

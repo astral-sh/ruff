@@ -35,7 +35,7 @@ pub(crate) enum SubscriptKind {
 }
 
 impl SubscriptKind {
-    pub(crate) const fn as_str(self) -> &'static str {
+    const fn as_str(self) -> &'static str {
         match self {
             Self::Tuple => "tuple",
             Self::String => "string",
@@ -64,7 +64,7 @@ impl Display for DunderMethod {
 }
 
 impl DunderMethod {
-    pub(crate) const fn as_str(self) -> &'static str {
+    const fn as_str(self) -> &'static str {
         match self {
             Self::GetItem => "__getitem__",
             Self::ClassGetItem => "__class_getitem__",

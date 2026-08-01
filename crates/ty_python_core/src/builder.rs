@@ -380,7 +380,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         }
     }
 
-    pub(crate) fn expect_single_definition(
+    fn expect_single_definition(
         &self,
         definition_key: impl Into<DefinitionNodeKey> + std::fmt::Debug + Copy,
     ) -> Definition<'db> {
@@ -5437,6 +5437,6 @@ fn is_collection_initializer(expr: &ast::Expr) -> bool {
     is_collection_literal(expr) || is_empty_collection_constructor_call(expr)
 }
 
-pub(crate) fn is_collection_literal(expr: &ast::Expr) -> bool {
+fn is_collection_literal(expr: &ast::Expr) -> bool {
     expr.is_list_expr() || expr.is_set_expr() || expr.is_dict_expr()
 }

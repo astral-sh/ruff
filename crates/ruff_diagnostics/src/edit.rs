@@ -77,20 +77,22 @@ impl Edit {
     }
 
     /// Returns `true` if this edit deletes content from the source document.
+    #[expect(dead_code)]
     #[inline]
-    pub fn is_deletion(&self) -> bool {
+    pub(crate) fn is_deletion(&self) -> bool {
         self.kind().is_deletion()
     }
 
     /// Returns `true` if this edit inserts new content into the source document.
     #[inline]
-    pub fn is_insertion(&self) -> bool {
+    pub(crate) fn is_insertion(&self) -> bool {
         self.kind().is_insertion()
     }
 
     /// Returns `true` if this edit replaces some existing content with new content.
+    #[expect(dead_code)]
     #[inline]
-    pub fn is_replacement(&self) -> bool {
+    pub(crate) fn is_replacement(&self) -> bool {
         self.kind().is_replacement()
     }
 }

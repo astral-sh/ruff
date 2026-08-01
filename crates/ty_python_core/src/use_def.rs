@@ -997,7 +997,7 @@ impl<'db> UseDefMap<'db> {
         )
     }
 
-    pub(crate) fn end_of_scope_member_bindings(
+    fn end_of_scope_member_bindings(
         &self,
         member: ScopedMemberId,
     ) -> BindingWithConstraintsIterator<'_, 'db> {
@@ -1113,7 +1113,7 @@ impl<'db> UseDefMap<'db> {
         self.declarations_iterator(declarations, BoundnessAnalysis::BasedOnUnboundVisibility)
     }
 
-    pub(crate) fn end_of_scope_member_declarations<'map>(
+    fn end_of_scope_member_declarations<'map>(
         &'map self,
         member: ScopedMemberId,
     ) -> DeclarationsIterator<'map, 'db> {
@@ -1772,7 +1772,7 @@ pub(super) struct UseDefMapBuilder<'db> {
     used_bindings: IndexVec<ScopedDefinitionId, bool>,
 
     /// Builder of predicates.
-    pub(super) predicates: PredicatesBuilder<'db>,
+    predicates: PredicatesBuilder<'db>,
 
     /// Builder of reachability constraints.
     pub(super) reachability_constraints: ReachabilityConstraintsBuilder,

@@ -50,7 +50,9 @@ pub use builders::BestFitting;
 pub use source_code::{SourceCode, SourceCodeSlice};
 
 pub use crate::diagnostics::{ActualStart, FormatError, InvalidDocumentError, PrintError};
-pub use format_element::{FormatElement, LINE_TERMINATORS, normalize_newlines};
+#[expect(unused_imports)]
+pub(crate) use format_element::LINE_TERMINATORS;
+pub use format_element::{FormatElement, normalize_newlines};
 pub use group_id::GroupId;
 use ruff_macros::CacheKey;
 use ruff_text_size::{TextLen, TextRange, TextSize};
@@ -361,7 +363,7 @@ pub struct Printed {
 }
 
 impl Printed {
-    pub fn new(
+    fn new(
         code: String,
         range: Option<TextRange>,
         sourcemap: Vec<SourceMarker>,
@@ -951,12 +953,12 @@ impl<Context> FormatState<Context> {
         }
     }
 
-    pub fn into_context(self) -> Context {
+    fn into_context(self) -> Context {
         self.context
     }
 
     /// Returns the context specifying how to format the current CST
-    pub fn context(&self) -> &Context {
+    fn context(&self) -> &Context {
         &self.context
     }
 
@@ -968,7 +970,7 @@ impl<Context> FormatState<Context> {
     /// Creates a new group id that is unique to this document. The passed debug name is used in the
     /// [`std::fmt::Debug`] of the document if this is a debug build.
     /// The name is unused for production builds and has no meaning on the equality of two group ids.
-    pub fn group_id(&self, debug_name: &'static str) -> GroupId {
+    fn group_id(&self, debug_name: &'static str) -> GroupId {
         self.group_id_builder.group_id(debug_name)
     }
 }

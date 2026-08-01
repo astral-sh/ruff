@@ -48,7 +48,7 @@ use crate::rules::pydocstyle::settings::Settings;
 #[derive(ViolationMetadata)]
 #[violation_metadata(preview_since = "0.15.18")]
 pub(crate) struct PropertyDocstringStartsWithVerb {
-    pub(crate) first_word: String,
+    first_word: String,
 }
 
 impl Violation for PropertyDocstringStartsWithVerb {

@@ -13,7 +13,7 @@ use ruff_source_file::{LineColumn, OneIndexed};
 use crate::fs::relativize_path;
 use crate::message::{Emitter, EmitterContext};
 
-pub struct GroupedEmitter {
+pub(crate) struct GroupedEmitter {
     show_fix_status: bool,
     applicability: Applicability,
     preview: bool,
@@ -33,25 +33,25 @@ impl Default for GroupedEmitter {
 
 impl GroupedEmitter {
     #[must_use]
-    pub fn with_show_fix_status(mut self, show_fix_status: bool) -> Self {
+    pub(crate) fn with_show_fix_status(mut self, show_fix_status: bool) -> Self {
         self.show_fix_status = show_fix_status;
         self
     }
 
     #[must_use]
-    pub fn with_applicability(mut self, applicability: Applicability) -> Self {
+    pub(crate) fn with_applicability(mut self, applicability: Applicability) -> Self {
         self.applicability = applicability;
         self
     }
 
     #[must_use]
-    pub fn with_preview(mut self, preview: bool) -> Self {
+    pub(crate) fn with_preview(mut self, preview: bool) -> Self {
         self.preview = preview;
         self
     }
 
     #[must_use]
-    pub fn with_prefer_rule_codes(mut self, prefer_rule_codes: bool) -> Self {
+    pub(crate) fn with_prefer_rule_codes(mut self, prefer_rule_codes: bool) -> Self {
         self.prefer_rule_codes = prefer_rule_codes;
         self
     }
@@ -201,11 +201,11 @@ impl Display for DisplayGroupedMessage<'_> {
 }
 
 pub(super) struct RuleCodeAndBody<'a> {
-    pub(crate) message: &'a Diagnostic,
-    pub(crate) show_fix_status: bool,
-    pub(crate) applicability: Applicability,
-    pub(crate) preview: bool,
-    pub(crate) prefer_rule_codes: bool,
+    message: &'a Diagnostic,
+    show_fix_status: bool,
+    applicability: Applicability,
+    preview: bool,
+    prefer_rule_codes: bool,
 }
 
 impl Display for RuleCodeAndBody<'_> {

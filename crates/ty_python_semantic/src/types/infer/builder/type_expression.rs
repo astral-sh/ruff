@@ -31,7 +31,7 @@ use crate::{FxOrderSet, Program, add_inferred_python_version_hint_to_diagnostic}
 
 /// Type expressions
 impl<'db> TypeInferenceBuilder<'db, '_> {
-    pub(super) const fn type_expression_context(&self) -> &'static str {
+    const fn type_expression_context(&self) -> &'static str {
         self.inference_flags().type_expression_context()
     }
 
@@ -1476,7 +1476,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         )
     }
 
-    pub(super) fn infer_subscript_type_expression(
+    fn infer_subscript_type_expression(
         &mut self,
         subscript: &ast::ExprSubscript,
         value_ty: Type<'db>,
@@ -2759,7 +2759,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     ///
     /// It returns `None` if the argument is invalid i.e., not a list of types, parameter
     /// specification, `typing.Concatenate`, or `...`.
-    pub(super) fn infer_callable_parameter_types(
+    fn infer_callable_parameter_types(
         &mut self,
         parameters: &ast::Expr,
     ) -> Option<Parameters<'db>> {
@@ -3049,11 +3049,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     ///
     /// Returns `Unknown` as a fallback if the type variable is unbound, otherwise returns the
     /// original type unchanged.
-    pub(super) fn check_for_unbound_type_variable(
-        &self,
-        expression: &ast::Expr,
-        ty: Type<'db>,
-    ) -> Type<'db> {
+    fn check_for_unbound_type_variable(&self, expression: &ast::Expr, ty: Type<'db>) -> Type<'db> {
         if !self
             .inference_flags()
             .contains(InferenceFlags::CHECK_UNBOUND_TYPEVARS)
