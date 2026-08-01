@@ -2879,10 +2879,6 @@ impl<'db> StaticClassLiteral<'db> {
                     continue;
                 };
 
-                if !is_method_reachable.is_always_false() {
-                    is_attribute_bound = true;
-                }
-
                 let inferred_ty = match binding.kind(db) {
                     DefinitionKind::AnnotatedAssignment(_) => {
                         // Annotated assignments were handled above. This branch is not
@@ -2999,9 +2995,16 @@ impl<'db> StaticClassLiteral<'db> {
                 };
 
                 if let Some(inferred_ty) = inferred_ty {
+                    if inferred_ty.is_never() {
+                        // Evaluating the value never completes, so the assignment cannot bind its
+                        // target. In particular, an attribute must not prove its own existence
+                        // through an assignment in a branch made unreachable by that existence.
+                        continue;
+                    }
                     provenance = provenance.or(Provenance::SingleDefinition(binding));
                     union_of_inferred_types = union_of_inferred_types.add(inferred_ty);
                 }
+                is_attribute_bound = true;
             }
         }
 

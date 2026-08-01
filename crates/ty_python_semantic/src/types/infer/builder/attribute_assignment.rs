@@ -391,6 +391,12 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
             (setattr_result, value_ty)
         };
 
+        if value_ty.is_never() {
+            // Python evaluates the value before assigning the attribute, so a value that never
+            // materializes cannot invoke a descriptor or `__setattr__`.
+            return true;
+        }
+
         // A terminal `__setattr__` blocks even explicitly declared attributes.
         let setattr_returns_never = matches!(
             frozen_dataclass_dispatch,
