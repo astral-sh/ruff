@@ -808,8 +808,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     /// Returns the parameter annotation from the enclosing function's completed signature.
     ///
-    /// The signature is the source of truth for rewrites that align independently inferred
-    /// annotations to the same type-variable binding.
+    /// Parameter annotation expressions are inferred independently, but signature construction can
+    /// align them to a `ParamSpec` binding selected by `P.args` and `P.kwargs`. Reading the completed
+    /// signature keeps the parameter's body-scope definition consistent with that normalization.
     fn function_parameter_annotation_type(&self, definition: Definition<'db>) -> Option<Type<'db>> {
         let db = self.db();
         let function = nearest_enclosing_function(db, self.index, self.scope())?;

@@ -110,7 +110,9 @@ pub(crate) fn bind_typevar<'db>(
 ///
 /// Unlike [`bind_typevar`], this function never introduces a binding in the current context. It
 /// also uses the lexical form of enclosing function signatures, in which type variables moved to
-/// a returned callable's public generic context are still visible within the function body.
+/// a returned callable's public generic context are still visible within the function body. This
+/// is the lookup required for `P.args` and `P.kwargs`, which refer to an existing `ParamSpec`
+/// rather than binding one.
 pub(crate) fn resolve_typevar_reference<'db>(
     db: &'db dyn Db,
     index: &SemanticIndex<'db>,
@@ -126,6 +128,12 @@ pub(crate) fn resolve_typevar_reference<'db>(
     )
 }
 
+/// Finds the nearest visible binding under the requested treatment of return-only callable type
+/// variables.
+///
+/// Captured `ParamSpec` bindings are recovered from component annotations because those bindings
+/// are deliberately excluded from a nested function's own generic context. A binding owned by a
+/// class is hidden after the search crosses a nested class boundary.
 fn find_typevar_binding<'db>(
     db: &'db dyn Db,
     index: &SemanticIndex<'db>,
@@ -133,6 +141,10 @@ fn find_typevar_binding<'db>(
     typevar: TypeVarInstance<'db>,
     return_callable_typevar_scope: ReturnCallableTypeVarScope,
 ) -> Option<BoundTypeVarInstance<'db>> {
+    /// Returns whether a binding remains visible after crossing an inner class boundary.
+    ///
+    /// Class-owned bindings are hidden by the inner class; function-owned and synthetic bindings
+    /// remain visible.
     fn is_visible_across_class_boundary<'db>(
         db: &'db dyn Db,
         bound: BoundTypeVarInstance<'db>,
@@ -389,7 +401,10 @@ impl<'db> GenericContext<'db> {
         }
     }
 
-    /// Returns the generic context visible from within the scope introduced by `node`.
+    /// Returns the generic context visible while checking the scope introduced by `node`.
+    ///
+    /// For functions, this retains type variables that are moved to a returned callable in the
+    /// externally visible signature. Other scope kinds have identical lexical and public contexts.
     fn lexical_of_node(
         db: &'db dyn Db,
         node: &NodeWithScopeKind,

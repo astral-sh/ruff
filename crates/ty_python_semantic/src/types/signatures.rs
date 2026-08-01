@@ -803,6 +803,19 @@ impl<'db> Signature<'db> {
     /// resolve to an enclosing lexical binding that is absent from the enclosing function's
     /// public signature, an ordinary `P` initially binds to the current function. Components are
     /// references, so their existing binding takes precedence throughout the completed signature.
+    ///
+    /// For example, every occurrence of `P` in `inner` must refer to the binding from `factory`:
+    ///
+    /// ```python
+    /// from typing import Callable, ParamSpec
+    ///
+    /// P = ParamSpec("P")
+    ///
+    /// def factory() -> Callable[P, int]:
+    ///     def inner(callback: Callable[P, int], *args: P.args, **kwargs: P.kwargs) -> int:
+    ///         return callback(*args, **kwargs)
+    ///     return inner
+    /// ```
     fn align_paramspec_component_bindings(
         db: &'db dyn Db,
         definition: Definition<'db>,
@@ -834,7 +847,10 @@ impl<'db> Signature<'db> {
         (parameters, return_ty)
     }
 
-    /// Returns the binding referenced by a `P.args` or `P.kwargs` parameter annotation.
+    /// Returns the binding referenced by a direct `P.args` or `P.kwargs` variadic parameter.
+    ///
+    /// This also exposes captured bindings that are intentionally absent from the function's own
+    /// generic context.
     pub(super) fn paramspec_component_binding(
         &self,
         db: &'db dyn Db,
@@ -4506,6 +4522,9 @@ impl<'db> Parameters<'db> {
         self.data.value.iter()
     }
 
+    /// Iterates over the `ParamSpec` bindings referenced by direct variadic component annotations.
+    ///
+    /// The returned bindings represent `P` itself, with the `args` or `kwargs` component removed.
     fn paramspec_component_bindings(
         &self,
         db: &'db dyn Db,

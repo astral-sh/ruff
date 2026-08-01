@@ -10043,33 +10043,24 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let ast::ExprAttribute { value, attr, .. } = attribute;
 
         let db = self.db();
+        let containing_scope = self.scope().file_scope_id(db);
         let mut constraint_keys = vec![];
 
         if let Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) = value_type
             && typevar.is_paramspec(db)
-            && let Some(bound_typevar) = if ParamSpecAttrKind::from_name(attr.id.as_str()).is_some()
-            {
-                resolve_typevar_reference(db, self.index, self.scope().file_scope_id(db), typevar)
-                    .or_else(|| {
-                        // Keep a bound recovery type for invalid components. This binding is not
-                        // recorded, so it cannot put the ParamSpec in scope for another annotation.
-                        bind_typevar(
-                            db,
-                            self.index,
-                            self.scope().file_scope_id(db),
-                            self.typevar_binding_context,
-                            typevar,
-                        )
-                    })
-            } else {
-                bind_typevar(
-                    db,
-                    self.index,
-                    self.scope().file_scope_id(db),
-                    self.typevar_binding_context,
-                    typevar,
-                )
-            }
+            && let Some(bound_typevar) = ParamSpecAttrKind::from_name(attr.id.as_str())
+                .and_then(|_| resolve_typevar_reference(db, self.index, containing_scope, typevar))
+                .or_else(|| {
+                    // If component resolution fails, keep a recovery type without putting the
+                    // ParamSpec in scope for another annotation. Other attributes bind normally.
+                    bind_typevar(
+                        db,
+                        self.index,
+                        containing_scope,
+                        self.typevar_binding_context,
+                        typevar,
+                    )
+                })
         {
             value_type = Type::TypeVar(bound_typevar);
         }

@@ -1512,6 +1512,7 @@ pub enum ParamSpecAttrKind {
 }
 
 impl ParamSpecAttrKind {
+    /// Returns the component represented by a `ParamSpec` attribute name.
     pub(crate) fn from_name(name: &str) -> Option<Self> {
         match name {
             "args" => Some(Self::Args),
