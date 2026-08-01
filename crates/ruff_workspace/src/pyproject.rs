@@ -33,17 +33,6 @@ pub struct Pyproject {
     project: Option<Project>,
 }
 
-impl Pyproject {
-    pub const fn new(options: Options) -> Self {
-        Self {
-            tool: Some(Tools {
-                ruff: Some(options),
-            }),
-            project: None,
-        }
-    }
-}
-
 fn parse_toml<P: AsRef<Path>, T: DeserializeOwned>(path: P, table_path: &[&str]) -> Result<T> {
     let path = path.as_ref();
 
