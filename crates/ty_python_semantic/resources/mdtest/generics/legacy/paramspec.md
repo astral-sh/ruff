@@ -435,19 +435,16 @@ class Outer(Generic[P]):
             def method(self, *args: P.args, **kwargs: P.kwargs) -> None: ...
 ```
 
-A `ParamSpec` bound by an enclosing function's return annotation is available to components used by
-a nested function in that function's body. A non-variadic parameter on the nested function still
-takes precedence and binds the `ParamSpec` to that function instead.
+Similarly, a `ParamSpec` that appears only in an enclosing legacy function's return type is not in
+scope for a nested function:
 
 ```py
 def callable_factory() -> Callable[P, int]:
+    # error: [unbound-type-variable] "ParamSpec `P` is not in scope"
     def nested(*args: P.args, **kwargs: P.kwargs) -> int:
         return 1
 
-    def nested_with_parameter(callback: Callable[P, int], *args: P.args, **kwargs: P.kwargs) -> int:
-        return callback(*args, **kwargs)
-
-    return nested
+    raise NotImplementedError
 ```
 
 And, they need to be used together.

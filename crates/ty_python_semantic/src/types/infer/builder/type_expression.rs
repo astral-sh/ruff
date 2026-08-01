@@ -119,24 +119,17 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             return ty;
         }
         report_missing_type_arguments(&self.context, ty, annotation);
-        let paramspec_binding = if let Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) = ty
-            && typevar.is_paramspec(db)
-        {
-            self.paramspec_binding(typevar)
-        } else {
-            None
-        };
-        let result_ty = match ty.default_specialize(db, env).in_type_expression(
-            db,
-            self.scope(),
-            self.typevar_binding_context,
-            self.inference_flags(),
-        ) {
-            Ok(result_ty) => paramspec_binding.map(Type::TypeVar).unwrap_or(result_ty),
-            Err(error) => {
+        let result_ty = ty
+            .default_specialize(db, env)
+            .in_type_expression(
+                db,
+                self.scope(),
+                self.typevar_binding_context,
+                self.inference_flags(),
+            )
+            .unwrap_or_else(|error| {
                 error.into_fallback_type(&self.context, annotation, self.inference_flags())
-            }
-        };
+            });
         self.check_for_unbound_type_variable(annotation, result_ty)
     }
 
