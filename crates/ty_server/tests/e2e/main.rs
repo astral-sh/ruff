@@ -1397,6 +1397,22 @@ impl TestServerBuilder {
         self
     }
 
+    /// Advertise support for the `ty.triggerParameterHints` completion command.
+    pub(crate) fn with_trigger_parameter_hints_command(mut self) -> Self {
+        let experimental = self
+            .client_capabilities
+            .experimental
+            .get_or_insert_with(|| serde_json::json!({}));
+        experimental
+            .as_object_mut()
+            .expect("experimental capabilities must be a JSON object")
+            .insert(
+                "commands".to_string(),
+                serde_json::json!({ "commands": ["ty.triggerParameterHints"] }),
+            );
+        self
+    }
+
     /// Set custom client capabilities (overrides any previously set capabilities)
     #[expect(dead_code)]
     pub(crate) fn with_client_capabilities(mut self, capabilities: ClientCapabilities) -> Self {

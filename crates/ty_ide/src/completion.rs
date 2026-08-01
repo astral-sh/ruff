@@ -646,9 +646,10 @@ pub enum CompletionKind {
 /// An editor action the client should perform after applying this completion.
 ///
 /// This is an editor-neutral *intent* produced by the analysis layer. The
-/// language server maps it to a concrete, client-specific command (for example
-/// VS Code's `editor.action.triggerParameterHints`) when building the LSP
-/// response, so this enum never names a particular editor.
+/// language server maps it to a concrete command (for example
+/// `ty.triggerParameterHints`) when building the LSP response, and only
+/// attaches it when the client advertised support for that command, so this
+/// enum never names a particular editor.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum CompletionCommand {
     /// The completion inserts an opening parenthesis with the cursor placed

@@ -142,7 +142,12 @@ impl BackgroundDocumentRequestHandler for CompletionRequestHandler {
                     insert_text_format,
                     additional_text_edits: import_edit.map(|edit| vec![edit]),
                     documentation,
-                    command: comp.command.map(to_lsp),
+                    command: comp.command.and_then(|command| {
+                        to_lsp(
+                            command,
+                            client_capabilities.supports_trigger_parameter_hints_command(),
+                        )
+                    }),
                     ..Default::default()
                 }
             })
@@ -171,14 +176,20 @@ impl RetriableRequestHandler for CompletionRequestHandler {
 ///
 /// The intent itself is decided in `ty_ide`; this is the single place that knows
 /// any editor-specific command identifiers.
-fn to_lsp(command: CompletionCommand) -> Command {
+///
+/// Returns `None` when the client has not advertised support for the command,
+/// so that clients without a handler never receive one.
+fn to_lsp(command: CompletionCommand, supported: bool) -> Option<Command> {
+    if !supported {
+        return None;
+    }
     match command {
-        CompletionCommand::TriggerSignatureHelp => Command {
+        CompletionCommand::TriggerSignatureHelp => Some(Command {
             title: String::new(),
             tooltip: None,
-            command: "editor.action.triggerParameterHints".into(),
+            command: "ty.triggerParameterHints".into(),
             arguments: None,
-        },
+        }),
     }
 }
 
