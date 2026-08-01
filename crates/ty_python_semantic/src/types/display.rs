@@ -225,8 +225,9 @@ impl<'db> DisplaySettings<'db> {
         }
     }
 
+    /// Creates settings that qualify otherwise ambiguous names across `types`.
     #[must_use]
-    pub(crate) fn from_possibly_ambiguous_types<I, T>(
+    pub fn from_possibly_ambiguous_types<I, T>(
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         types: I,
