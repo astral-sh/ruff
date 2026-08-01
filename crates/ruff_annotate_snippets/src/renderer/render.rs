@@ -1523,7 +1523,7 @@ fn emit_suggestion_default(
     sm: &SourceMap<'_>,
     primary_path: Option<&Cow<'_, str>>,
     matches_previous_suggestion: bool,
-    is_first: bool,
+    _is_first: bool,
     is_cont: bool,
 ) {
     let buffer_offset = buffer.num_lines();
@@ -1541,7 +1541,7 @@ fn emit_suggestion_default(
         for _ in 0..max_line_num_len {
             buffer.append(row_num - 1, " ", ElementStyle::NoStyle);
         }
-        let arrow = renderer.decor_style.file_start(is_first, false);
+        let arrow = renderer.decor_style.secondary_file_start();
         buffer.append(row_num - 1, arrow, ElementStyle::LineNumber);
         let origin = Origin {
             path: suggestion
