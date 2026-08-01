@@ -1,6 +1,7 @@
 use crate::Db;
 use crate::ProgramEnvironment;
 use crate::{
+    FxOrderSet,
     reachability::ReachabilityConstraintsExtension,
     types::{
         KnownClass, KnownInstanceType, ParamSpecAttrKind, SubclassOfInner, SubclassOfType, Type,
@@ -818,19 +819,36 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
     }
 
-    /// Returns the parameter annotation from the enclosing function's completed signature.
+    /// Normalizes the `ParamSpec` bindings in a parameter annotation.
     ///
     /// Parameter annotation expressions are inferred independently, but signature construction can
     /// align them to a `ParamSpec` binding selected by `P.args` and `P.kwargs`. Reading the completed
     /// signature keeps the parameter's body-scope definition consistent with that normalization.
-    fn function_parameter_annotation_type(&self, definition: Definition<'db>) -> Option<Type<'db>> {
+    /// An annotation without a `ParamSpec` cannot change, so it does not require the signature.
+    fn normalize_function_parameter_annotation_type(
+        &self,
+        definition: Definition<'db>,
+        annotation_type: Type<'db>,
+    ) -> Type<'db> {
         let db = self.db();
-        let function = nearest_enclosing_function(db, self.index, self.scope())?;
-        same_module_uncached_raw_signature(db, function, ReturnCallableTypeVarScope::Lexical)
+        let env = self.program_environment();
+
+        let mut typevars = FxOrderSet::default();
+        annotation_type.find_legacy_typevars(db, env, None, &mut typevars);
+        if !typevars.iter().any(|typevar| typevar.is_paramspec(db)) {
+            return annotation_type;
+        }
+
+        let Some(function) = nearest_enclosing_function(db, self.index, self.scope()) else {
+            return annotation_type;
+        };
+        function
+            .last_definition_raw_signature(db, ReturnCallableTypeVarScope::Lexical)
             .parameters()
             .iter()
             .find(|parameter| parameter.definition() == Some(definition))
             .map(Parameter::annotated_type)
+            .unwrap_or(annotation_type)
     }
 
     /// Set initial declared type (if annotated) and inferred type for a function-parameter symbol,
@@ -869,9 +887,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let default_expr = default.as_ref();
         if let Some(annotation) = parameter.annotation.as_ref() {
-            let declared_ty = self
-                .function_parameter_annotation_type(definition)
-                .unwrap_or_else(|| self.file_expression_type(annotation));
+            let annotation_type = self.file_expression_type(annotation);
+            let declared_ty =
+                self.normalize_function_parameter_annotation_type(definition, annotation_type);
 
             // P.args and P.kwargs are only valid as annotations on *args and **kwargs,
             // not on regular parameters.
