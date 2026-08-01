@@ -13,8 +13,6 @@ pub use resolve::{
 };
 pub use settings::{SearchPathSettings, SearchPathSettingsError};
 pub use strategy::{FallibleStrategy, MisconfigurationStrategy, UseDefaultStrategy};
-#[expect(unused_imports)]
-pub(crate) use typeshed::vendored_typeshed_versions;
 pub use typeshed::{PyVersionRange, TypeshedVersions, TypeshedVersionsParseError};
 
 pub use list::{all_modules, list_modules};

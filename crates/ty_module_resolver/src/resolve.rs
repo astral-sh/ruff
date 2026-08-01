@@ -760,7 +760,8 @@ impl SearchPaths {
     /// Returns a new `SearchPaths` with no search paths configured.
     ///
     /// This is primarily useful for testing.
-    pub fn empty(vendored: &VendoredFileSystem) -> Self {
+    #[cfg(test)]
+    pub(crate) fn empty(vendored: &VendoredFileSystem) -> Self {
         Self {
             static_paths: vec![],
             stdlib_path: Some(SearchPath::vendored_stdlib()),
