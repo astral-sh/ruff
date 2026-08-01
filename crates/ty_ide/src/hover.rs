@@ -12,7 +12,7 @@ use ty_python_semantic::ProgramEnvironment;
 use ty_python_semantic::types::ide_support::{resolved_call_signature, typed_dict_key_hover};
 use ty_python_semantic::types::{KnownInstanceType, Type, TypeAliasType, TypeVarVariance};
 
-use ty_python_semantic::{DisplaySettings, SemanticModel, TypeQualifiers};
+use ty_python_semantic::{SemanticModel, TypeQualifiers};
 
 pub fn hover<'db>(
     db: &'db dyn Db,
@@ -340,13 +340,7 @@ impl<'db> DisplayHoverContent<'_, 'db> {
         let db = self.db;
         // Special types like `<special-form of whatever 'blahblah' with 'florps'>`
         // render poorly with python syntax-highlighting but well as xml
-        let ty_string = ty
-            .display_with(
-                db,
-                self.env,
-                DisplaySettings::from_possibly_ambiguous_types(db, self.env, [*ty]).multiline(),
-            )
-            .to_string();
+        let ty_string = ty.display(db, self.env).multiline().to_string();
         let syntax = if ty_string.starts_with('<') {
             "xml"
         } else {
