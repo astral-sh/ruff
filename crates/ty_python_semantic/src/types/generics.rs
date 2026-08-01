@@ -19,7 +19,9 @@ use crate::types::relation::{
     DisjointnessChecker, HasRelationToVisitor, IsDisjointVisitor, TypeRelation,
     TypeRelationChecker, TypeVarEvaluation,
 };
-use crate::types::signatures::{CallableSignature, Parameters, SignatureRelationVisitor};
+use crate::types::signatures::{
+    CallableSignature, Parameters, ReturnCallableTypeVarScope, SignatureRelationVisitor,
+};
 use crate::types::tuple::{
     TupleSpec, TupleSpecBuilder, TupleType, VariableSegment, walk_tuple_type,
 };
@@ -91,6 +93,71 @@ pub(crate) fn bind_typevar<'db>(
     typevar_binding_context: Option<Definition<'db>>,
     typevar: TypeVarInstance<'db>,
 ) -> Option<BoundTypeVarInstance<'db>> {
+    find_typevar_binding(
+        db,
+        index,
+        containing_scope,
+        typevar,
+        ReturnCallableTypeVarScope::Public,
+    )
+    .or_else(|| {
+        typevar_binding_context.map(|typevar_binding_context| {
+            typevar.with_binding_context(db, typevar_binding_context)
+        })
+    })
+}
+
+/// Resolves a reference to a type variable that must already be bound.
+///
+/// Unlike [`bind_typevar`], this function never introduces a binding in the current context. It
+/// also uses the lexical form of enclosing function signatures, in which type variables moved to
+/// a returned callable's public generic context are still visible within the function body. This
+/// is the lookup required for `P.args` and `P.kwargs`, which refer to an existing `ParamSpec`
+/// rather than binding one.
+pub(crate) fn resolve_typevar_reference<'db>(
+    db: &'db dyn Db,
+    index: &SemanticIndex<'db>,
+    containing_scope: FileScopeId,
+    typevar: TypeVarInstance<'db>,
+) -> Option<BoundTypeVarInstance<'db>> {
+    find_typevar_binding(
+        db,
+        index,
+        containing_scope,
+        typevar,
+        ReturnCallableTypeVarScope::Lexical,
+    )
+}
+
+/// Finds the nearest visible binding under the requested treatment of return-only callable type
+/// variables.
+///
+/// Captured `ParamSpec` bindings are recovered from component annotations because those bindings
+/// are deliberately excluded from a nested function's own generic context. A binding owned by a
+/// class is hidden after the search crosses a nested class boundary.
+fn find_typevar_binding<'db>(
+    db: &'db dyn Db,
+    index: &SemanticIndex<'db>,
+    containing_scope: FileScopeId,
+    typevar: TypeVarInstance<'db>,
+    return_callable_typevar_scope: ReturnCallableTypeVarScope,
+) -> Option<BoundTypeVarInstance<'db>> {
+    /// Returns whether a binding remains visible after crossing an inner class boundary.
+    ///
+    /// Class-owned bindings are hidden by the inner class; function-owned and synthetic bindings
+    /// remain visible.
+    fn is_visible_across_class_boundary<'db>(
+        db: &'db dyn Db,
+        bound: BoundTypeVarInstance<'db>,
+        crossed_class_scope: bool,
+    ) -> bool {
+        !crossed_class_scope
+            || !bound
+                .binding_context(db)
+                .definition()
+                .is_some_and(|definition| matches!(definition.kind(db), DefinitionKind::Class(_)))
+    }
+
     // typing.Self is treated like a legacy typevar, but doesn't follow the same scoping rules. It
     // is always bound to the outermost method in the nearest enclosing class. The walk looks for a
     // (function, class) pair in the scope hierarchy. The caller (`typing_self`) is responsible for
@@ -138,12 +205,39 @@ pub(crate) fn bind_typevar<'db>(
             }
             continue;
         }
-        let generic_context = GenericContext::of_node(db, ancestor_scope.node(), index);
+        if typevar.is_paramspec(db)
+            && let NodeWithScopeKind::Function(function) = ancestor_scope.node()
+        {
+            let definition = index.expect_single_definition(function);
+            if let Some(function_ty) =
+                infer_definition_types(db, definition).function_type(definition)
+            {
+                let signature = function_ty
+                    .last_definition_raw_signature(db, ReturnCallableTypeVarScope::Lexical);
+                if let Some(bound) = signature.paramspec_component_binding(db, typevar)
+                    && bound.binding_context(db).definition() != Some(definition)
+                    && is_visible_across_class_boundary(db, bound, crossed_class_scope)
+                {
+                    return Some(bound);
+                }
+            }
+        }
+        let generic_context = match return_callable_typevar_scope {
+            ReturnCallableTypeVarScope::Lexical => {
+                GenericContext::lexical_of_node(db, ancestor_scope.node(), index)
+            }
+            ReturnCallableTypeVarScope::Public => {
+                GenericContext::of_node(db, ancestor_scope.node(), index)
+            }
+        };
         // If we've already crossed a class boundary, skip class-scoped generic contexts.
         // This prevents inner classes from accessing type parameters of outer classes.
+        // An enclosing function's context can also retain a type variable originally bound by its
+        // enclosing class, so check the binding context as well as the ancestor node.
         if (!is_class_scope || !crossed_class_scope)
             && let Some(generic_context) = generic_context
             && let Some(bound) = generic_context.binds_typevar(db, typevar)
+            && is_visible_across_class_boundary(db, bound, crossed_class_scope)
         {
             return Some(bound);
         }
@@ -151,8 +245,7 @@ pub(crate) fn bind_typevar<'db>(
             crossed_class_scope = true;
         }
     }
-    typevar_binding_context
-        .map(|typevar_binding_context| typevar.with_binding_context(db, typevar_binding_context))
+    None
 }
 
 /// Create a `typing.Self` type variable for a given class.
@@ -310,6 +403,26 @@ impl<'db> GenericContext<'db> {
                     .generic_context(db)
             }
             _ => None,
+        }
+    }
+
+    /// Returns the generic context visible while checking the scope introduced by `node`.
+    ///
+    /// For functions, this retains type variables that are moved to a returned callable in the
+    /// externally visible signature. Other scope kinds have identical lexical and public contexts.
+    fn lexical_of_node(
+        db: &'db dyn Db,
+        node: &NodeWithScopeKind,
+        index: &SemanticIndex<'db>,
+    ) -> Option<Self> {
+        if let NodeWithScopeKind::Function(function) = node {
+            let definition = index.expect_single_definition(function);
+            infer_definition_types(db, definition)
+                .function_type(definition)?
+                .last_definition_raw_signature(db, ReturnCallableTypeVarScope::Lexical)
+                .generic_context
+        } else {
+            Self::of_node(db, node, index)
         }
     }
 

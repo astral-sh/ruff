@@ -93,6 +93,8 @@ def decorator_factory() -> IdentityCallable[T]:
         return fn
     # revealed: ty_extensions._internal.GenericContext[T@decorator]
     reveal_type(generic_context(decorator))
+    # revealed: Literal[1]
+    reveal_type(decorator(1))
 
     return decorator
 

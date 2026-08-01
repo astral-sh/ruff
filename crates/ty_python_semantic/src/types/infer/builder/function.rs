@@ -28,7 +28,7 @@ use crate::{
             original_class_type,
         },
         infer_definition_types, infer_scope_types,
-        signatures::ReturnCallableTypeVarScope,
+        signatures::{Parameter, ReturnCallableTypeVarScope},
         tuple::{TupleSpecBuilder, TupleType},
         typed_dict::extract_unpacked_typed_dict_keys_from_kwargs_annotation,
     },
@@ -818,6 +818,21 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
     }
 
+    /// Returns the parameter annotation from the enclosing function's completed signature.
+    ///
+    /// Parameter annotation expressions are inferred independently, but signature construction can
+    /// align them to a `ParamSpec` binding selected by `P.args` and `P.kwargs`. Reading the completed
+    /// signature keeps the parameter's body-scope definition consistent with that normalization.
+    fn function_parameter_annotation_type(&self, definition: Definition<'db>) -> Option<Type<'db>> {
+        let db = self.db();
+        let function = nearest_enclosing_function(db, self.index, self.scope())?;
+        same_module_uncached_raw_signature(db, function, ReturnCallableTypeVarScope::Lexical)
+            .parameters()
+            .iter()
+            .find(|parameter| parameter.definition() == Some(definition))
+            .map(Parameter::annotated_type)
+    }
+
     /// Set initial declared type (if annotated) and inferred type for a function-parameter symbol,
     /// in the function body scope.
     ///
@@ -854,7 +869,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let default_expr = default.as_ref();
         if let Some(annotation) = parameter.annotation.as_ref() {
-            let declared_ty = self.file_expression_type(annotation);
+            let declared_ty = self
+                .function_parameter_annotation_type(definition)
+                .unwrap_or_else(|| self.file_expression_type(annotation));
 
             // P.args and P.kwargs are only valid as annotations on *args and **kwargs,
             // not on regular parameters.
