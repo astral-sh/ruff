@@ -166,7 +166,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.infer_subscript_load_impl(value_ty, subscript)
     }
 
-    pub(super) fn infer_subscript_load_impl(
+    fn infer_subscript_load_impl(
         &mut self,
         value_ty: Type<'db>,
         subscript: &ast::ExprSubscript,
@@ -563,7 +563,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         result
     }
 
-    pub(super) fn infer_explicit_callable_specialization_impl(
+    fn infer_explicit_callable_specialization_impl(
         &mut self,
         subscript: &ast::ExprSubscript,
         value_ty: Type<'db>,
@@ -2328,7 +2328,10 @@ enum LegacyGenericContextError<'db> {
     /// A duplicate typevar was provided.
     DuplicateTypevar(&'db str),
     /// A `TypeVarTuple` was provided but not unpacked.
-    TypeVarTupleMustBeUnpacked,
+    ///
+    /// The generic context is available when the argument is a bound `TypeVarTuple` and is used
+    /// to avoid cascading errors during recovery.
+    TypeVarTupleMustBeUnpacked(Option<GenericContext<'db>>),
 }
 
 impl<'db> LegacyGenericContextError<'db> {
@@ -2337,7 +2340,7 @@ impl<'db> LegacyGenericContextError<'db> {
             LegacyGenericContextError::InvalidArgument(_)
             | LegacyGenericContextError::VariadicTupleArguments
             | LegacyGenericContextError::DuplicateTypevar(_)
-            | LegacyGenericContextError::TypeVarTupleMustBeUnpacked => Type::unknown(),
+            | LegacyGenericContextError::TypeVarTupleMustBeUnpacked(_) => Type::unknown(),
             LegacyGenericContextError::NotYetSupported => {
                 todo_type!("ParamSpecs and TypeVarTuples")
             }
@@ -2373,10 +2376,14 @@ fn infer_legacy_generic_subscript<'db>(
                 typevar_name,
             },
         )),
-        Err(LegacyGenericContextError::TypeVarTupleMustBeUnpacked) => Err(SubscriptError::new(
-            Type::unknown(),
-            SubscriptErrorKind::TypeVarTupleNotUnpacked { origin },
-        )),
+        Err(LegacyGenericContextError::TypeVarTupleMustBeUnpacked(generic_context)) => {
+            Err(SubscriptError::new(
+                generic_context.map_or(Type::unknown(), |generic_context| {
+                    Type::KnownInstance(wrap_ok(generic_context))
+                }),
+                SubscriptErrorKind::TypeVarTupleNotUnpacked { origin },
+            ))
+        }
         Err(
             error @ (LegacyGenericContextError::NotYetSupported
             | LegacyGenericContextError::VariadicTupleArguments),
@@ -2423,7 +2430,10 @@ fn legacy_generic_class_context<'db>(
             let bound = bind_typevar(db, index, file_scope_id, typevar_binding_context, typevar)
                 .ok_or(LegacyGenericContextError::InvalidArgument(argument_ty))?;
             if bound.is_typevartuple(db) {
-                return Err(LegacyGenericContextError::TypeVarTupleMustBeUnpacked);
+                validated_typevars.insert(bound);
+                return Err(LegacyGenericContextError::TypeVarTupleMustBeUnpacked(Some(
+                    GenericContext::from_typevar_instances(db, validated_typevars),
+                )));
             }
             if !validated_typevars.insert(bound) {
                 return Err(LegacyGenericContextError::DuplicateTypevar(
@@ -2442,7 +2452,7 @@ fn legacy_generic_class_context<'db>(
                 Some(KnownClass::TypeVarTuple | KnownClass::ExtensionsTypeVarTuple)
             )
         {
-            return Err(LegacyGenericContextError::TypeVarTupleMustBeUnpacked);
+            return Err(LegacyGenericContextError::TypeVarTupleMustBeUnpacked(None));
         } else if any_over_type(db, argument_ty, true, |inner_ty| match inner_ty {
             Type::NominalInstance(nominal) => matches!(
                 nominal.known_class(db),

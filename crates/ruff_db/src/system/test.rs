@@ -69,7 +69,7 @@ impl TestSystem {
     }
 
     /// Returns the `InMemorySystem` or `None` if the underlying test system isn't the [`InMemorySystem`].
-    pub fn as_in_memory(&self) -> Option<&InMemorySystem> {
+    fn as_in_memory(&self) -> Option<&InMemorySystem> {
         self.system().as_any().downcast_ref::<InMemorySystem>()
     }
 
@@ -88,7 +88,7 @@ impl TestSystem {
         self.inner = Arc::new(system);
     }
 
-    pub fn system(&self) -> &dyn WritableSystem {
+    fn system(&self) -> &dyn WritableSystem {
         &*self.inner
     }
 }
@@ -333,13 +333,6 @@ pub struct InMemorySystem {
 }
 
 impl InMemorySystem {
-    pub fn new(cwd: SystemPathBuf) -> Self {
-        Self {
-            user_config_directory: Mutex::new(None).into(),
-            memory_fs: MemoryFileSystem::with_current_directory(cwd),
-        }
-    }
-
     pub fn from_memory_fs(memory_fs: MemoryFileSystem) -> Self {
         Self {
             user_config_directory: Mutex::new(None).into(),

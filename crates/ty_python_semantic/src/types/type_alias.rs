@@ -47,14 +47,14 @@ pub(super) fn walk_pep_695_type_alias<'db, V: visitor::TypeVisitor<'db> + ?Sized
 
 #[salsa::tracked]
 impl<'db> PEP695TypeAliasType<'db> {
-    pub(crate) fn definition(self, db: &'db dyn Db) -> Definition<'db> {
+    fn definition(self, db: &'db dyn Db) -> Definition<'db> {
         let scope = self.rhs_scope(db);
         let type_alias_stmt_node = scope.node(db).expect_type_alias();
         semantic_index(db, scope.file(db)).expect_single_definition(type_alias_stmt_node)
     }
 
     /// The RHS type of a PEP-695 style type alias with specialization applied.
-    pub(crate) fn value_type(self, db: &'db dyn Db) -> Type<'db> {
+    fn value_type(self, db: &'db dyn Db) -> Type<'db> {
         apply_type_alias_specialization(
             db,
             self.raw_value_type(db),
@@ -82,7 +82,7 @@ impl<'db> PEP695TypeAliasType<'db> {
         definition_expression_type(db, definition, &type_alias_stmt_node.node(&module).value)
     }
 
-    pub(crate) fn apply_specialization(
+    fn apply_specialization(
         self,
         db: &'db dyn Db,
         f: impl FnOnce(GenericContext<'db>) -> Specialization<'db>,
@@ -157,7 +157,7 @@ impl<'db> ManualPEP695TypeAliasType<'db> {
     /// The value type of this manual type alias.
     ///
     /// Computed lazily from the definition with specialization applied.
-    pub(crate) fn value_type(self, db: &'db dyn Db) -> Type<'db> {
+    fn value_type(self, db: &'db dyn Db) -> Type<'db> {
         apply_type_alias_specialization(
             db,
             self.raw_value_type(db),
@@ -196,7 +196,7 @@ impl<'db> ManualPEP695TypeAliasType<'db> {
         definition_expression_type(db, definition, value_arg)
     }
 
-    pub(crate) fn apply_specialization(
+    fn apply_specialization(
         self,
         db: &'db dyn Db,
         f: impl FnOnce(GenericContext<'db>) -> Specialization<'db>,
@@ -444,7 +444,7 @@ pub(crate) struct QualifiedTypeAliasName<'db> {
 }
 
 impl<'db> QualifiedTypeAliasName<'db> {
-    pub(crate) fn from_type_alias(db: &'db dyn Db, type_alias: TypeAliasType<'db>) -> Self {
+    fn from_type_alias(db: &'db dyn Db, type_alias: TypeAliasType<'db>) -> Self {
         Self { db, type_alias }
     }
 

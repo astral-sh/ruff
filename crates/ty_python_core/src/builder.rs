@@ -83,16 +83,6 @@ struct Loop {
     continue_states: Vec<FlowSnapshot>,
 }
 
-impl Loop {
-    fn push_break(&mut self, state: FlowSnapshot) {
-        self.break_states.push(state);
-    }
-
-    fn push_continue(&mut self, state: FlowSnapshot) {
-        self.continue_states.push(state);
-    }
-}
-
 /// A narrowing alias: a variable whose RHS is a narrowing expression
 /// (e.g., `is_none = x is None`).
 #[derive(Clone, Debug)]
@@ -390,7 +380,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         }
     }
 
-    pub(crate) fn expect_single_definition(
+    fn expect_single_definition(
         &self,
         definition_key: impl Into<DefinitionNodeKey> + std::fmt::Debug + Copy,
     ) -> Definition<'db> {
@@ -3487,7 +3477,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     *node.target,
                     ast::Expr::Attribute(_) | ast::Expr::Subscript(_) | ast::Expr::Name(_)
                 ) {
-                    self.push_assignment(node.into());
+                    self.push_assignment(CurrentAssignment::AnnAssign(node));
                     self.visit_expr(&node.target);
                     self.pop_assignment();
 
@@ -3520,12 +3510,12 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                             }
                         }
 
-                        self.push_assignment(aug_assign.into());
+                        self.push_assignment(CurrentAssignment::AugAssign(aug_assign));
                         self.visit_expr(target);
                         self.pop_assignment();
                     }
                     ast::Expr::Name(_) | ast::Expr::Attribute(_) | ast::Expr::Subscript(_) => {
-                        self.push_assignment(aug_assign.into());
+                        self.push_assignment(CurrentAssignment::AugAssign(aug_assign));
                         self.visit_expr(target);
                         self.pop_assignment();
                     }
@@ -4203,20 +4193,14 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 self.mark_unreachable();
             }
 
-            ast::Stmt::Continue(_) => {
+            ast::Stmt::Continue(_) | ast::Stmt::Break(_) => {
                 let snapshot = self.flow_snapshot();
                 if let Some(current_loop) = self.current_loop_mut() {
-                    current_loop.push_continue(snapshot);
-                }
-                self.record_terminal_finally_entry();
-                // Everything in the current block after a terminal statement is unreachable.
-                self.mark_unreachable();
-            }
-
-            ast::Stmt::Break(_) => {
-                let snapshot = self.flow_snapshot();
-                if let Some(current_loop) = self.current_loop_mut() {
-                    current_loop.push_break(snapshot);
+                    if stmt.is_continue_stmt() {
+                        current_loop.continue_states.push(snapshot);
+                    } else {
+                        current_loop.break_states.push(snapshot);
+                    }
                 }
                 self.record_terminal_finally_entry();
                 // Everything in the current block after a terminal statement is unreachable.
@@ -4687,7 +4671,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
 
                 // See https://peps.python.org/pep-0572/#differences-between-assignment-expressions-and-assignment-statements
                 if node.target.is_name_expr() {
-                    self.push_assignment(node.into());
+                    self.push_assignment(CurrentAssignment::Named(node));
                     self.visit_expr(&node.target);
                     self.pop_assignment();
                 } else {
@@ -5205,24 +5189,6 @@ impl CurrentAssignment<'_, '_> {
     }
 }
 
-impl<'ast> From<&'ast ast::StmtAnnAssign> for CurrentAssignment<'ast, '_> {
-    fn from(value: &'ast ast::StmtAnnAssign) -> Self {
-        Self::AnnAssign(value)
-    }
-}
-
-impl<'ast> From<&'ast ast::StmtAugAssign> for CurrentAssignment<'ast, '_> {
-    fn from(value: &'ast ast::StmtAugAssign) -> Self {
-        Self::AugAssign(value)
-    }
-}
-
-impl<'ast> From<&'ast ast::ExprNamed> for CurrentAssignment<'ast, '_> {
-    fn from(value: &'ast ast::ExprNamed) -> Self {
-        Self::Named(value)
-    }
-}
-
 #[derive(Default)]
 struct CurrentStatement<'ast, 'db> {
     /// A list of lambda expressions contained in this statement.
@@ -5471,6 +5437,6 @@ fn is_collection_initializer(expr: &ast::Expr) -> bool {
     is_collection_literal(expr) || is_empty_collection_constructor_call(expr)
 }
 
-pub(crate) fn is_collection_literal(expr: &ast::Expr) -> bool {
+fn is_collection_literal(expr: &ast::Expr) -> bool {
     expr.is_list_expr() || expr.is_set_expr() || expr.is_dict_expr()
 }

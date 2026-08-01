@@ -497,7 +497,7 @@ impl<'db> Mro<'db> {
     /// Compute a fallback MRO for a dynamic class when `of_dynamic_class` fails.
     ///
     /// Iterates over base MROs sequentially with deduplication.
-    pub(super) fn dynamic_fallback(db: &'db dyn Db, dynamic: DynamicClassLiteral<'db>) -> Self {
+    fn dynamic_fallback(db: &'db dyn Db, dynamic: DynamicClassLiteral<'db>) -> Self {
         let self_base = ClassBase::Class(ClassType::NonGeneric(dynamic.into()));
         let mut result = vec![self_base];
         let mut seen = FxHashSet::default();
@@ -718,7 +718,7 @@ impl<'db> StaticMroError<'db> {
 
     /// Return the fallback MRO we should infer for this class during type inference
     /// (since accurate resolution of its "true" MRO was impossible)
-    pub(super) fn fallback_mro(&self) -> &Mro<'db> {
+    fn fallback_mro(&self) -> &Mro<'db> {
         &self.fallback_mro
     }
 }
@@ -763,11 +763,7 @@ pub(super) enum StaticMroErrorKind<'db> {
 }
 
 impl<'db> StaticMroErrorKind<'db> {
-    pub(super) fn into_mro_error(
-        self,
-        db: &'db dyn Db,
-        class: ClassType<'db>,
-    ) -> StaticMroError<'db> {
+    fn into_mro_error(self, db: &'db dyn Db, class: ClassType<'db>) -> StaticMroError<'db> {
         StaticMroError {
             kind: self,
             fallback_mro: Mro::from_error(db, class),
@@ -892,7 +888,7 @@ impl<'db> DynamicMroError<'db> {
     }
 
     /// Return the fallback MRO to use for type inference.
-    pub(crate) fn fallback_mro(&self) -> &Mro<'db> {
+    fn fallback_mro(&self) -> &Mro<'db> {
         &self.fallback_mro
     }
 }

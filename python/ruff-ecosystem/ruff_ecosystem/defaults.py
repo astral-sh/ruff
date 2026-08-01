@@ -35,15 +35,7 @@ DEFAULT_TARGETS = [
         repo=Repository(owner="bokeh", name="bokeh", ref="branch-3.10"),
         check_options=CheckOptions(select="ALL"),
     ),
-    # Disabled due to use of explicit `select` with `E999`, which has been removed.
-    # See: https://github.com/astral-sh/ruff/pull/12129
-    # Project(
-    #     repo=Repository(owner="demisto", name="content", ref="master"),
-    #     format_options=FormatOptions(
-    #         # Syntax errors in this file
-    #         exclude="Packs/ThreatQ/Integrations/ThreatQ/ThreatQ.py"
-    #     ),
-    # ),
+    Project(repo=Repository(owner="demisto", name="content", ref="master")),
     Project(repo=Repository(owner="docker", name="docker-py", ref="main")),
     Project(repo=Repository(owner="facebookresearch", name="chameleon", ref="main")),
     Project(repo=Repository(owner="freedomofpress", name="securedrop", ref="develop")),

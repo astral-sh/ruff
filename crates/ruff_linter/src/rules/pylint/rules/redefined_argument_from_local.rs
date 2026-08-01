@@ -35,7 +35,7 @@ use crate::checkers::ast::Checker;
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "0.5.0")]
 pub(crate) struct RedefinedArgumentFromLocal {
-    pub(crate) name: String,
+    name: String,
 }
 
 impl Violation for RedefinedArgumentFromLocal {

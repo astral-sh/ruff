@@ -57,11 +57,8 @@ impl TupleLength {
 
     /// Returns the minimum and maximum length of this tuple. (The maximum length will be `None`
     /// for a tuple with a variable-length portion.)
-    pub(crate) fn size_hint(self) -> (usize, Option<usize>) {
-        match self {
-            TupleLength::Fixed(len) => (len, Some(len)),
-            TupleLength::Variable(prefix, suffix) => (prefix + suffix, None),
-        }
+    fn size_hint(self) -> (usize, Option<usize>) {
+        (self.minimum(), self.maximum())
     }
 
     /// Returns the minimum length of this tuple.
@@ -1069,7 +1066,7 @@ impl<T, V> VariableLengthTuple<T, V> {
         self.variable_segment
     }
 
-    pub(crate) fn variable_element_mut(&mut self) -> &mut V {
+    fn variable_element_mut(&mut self) -> &mut V {
         &mut self.variable_segment
     }
 
@@ -1084,7 +1081,7 @@ impl<T, V> VariableLengthTuple<T, V> {
         self.prefix_elements().iter().copied()
     }
 
-    pub(crate) fn prefix_elements_mut(&mut self) -> &mut [T] {
+    fn prefix_elements_mut(&mut self) -> &mut [T] {
         &mut self.fixed_elements[..self.prefix_len]
     }
 
@@ -1099,7 +1096,7 @@ impl<T, V> VariableLengthTuple<T, V> {
         self.suffix_elements().iter().copied()
     }
 
-    pub(crate) fn suffix_elements_mut(&mut self) -> &mut [T] {
+    fn suffix_elements_mut(&mut self) -> &mut [T] {
         &mut self.fixed_elements[self.prefix_len..]
     }
 
@@ -2262,7 +2259,7 @@ impl<T, V> Tuple<T, V> {
         }
     }
 
-    pub(crate) fn into_all_elements_with_kind(self) -> impl Iterator<Item = TupleElement<T, V>> {
+    fn into_all_elements_with_kind(self) -> impl Iterator<Item = TupleElement<T, V>> {
         match self {
             Tuple::Fixed(tuple) => {
                 Either::Left(tuple.owned_elements().into_iter().map(TupleElement::Fixed))
@@ -2375,7 +2372,7 @@ impl<'db> Tuple<Type<'db>, VariableSegment<'db>> {
         }
     }
 
-    pub(super) fn recursive_type_normalized_impl(
+    fn recursive_type_normalized_impl(
         &self,
         db: &'db dyn Db,
         div: Type<'db>,
@@ -2391,7 +2388,7 @@ impl<'db> Tuple<Type<'db>, VariableSegment<'db>> {
         }
     }
 
-    pub(crate) fn apply_type_mapping_impl<'a>(
+    fn apply_type_mapping_impl<'a>(
         &self,
         db: &'db dyn Db,
         type_mapping: &TypeMapping<'a, 'db>,
@@ -2625,7 +2622,7 @@ impl<'db> PyIndex<'db> for &TupleSpec<'db> {
     }
 }
 
-pub(crate) enum TupleElement<T, V = T> {
+enum TupleElement<T, V = T> {
     Fixed(T),
     Prefix(T),
     Variable(V),

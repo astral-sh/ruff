@@ -625,6 +625,73 @@ def _(x: object):
         reveal_type(x.get())  # revealed: object
 ```
 
+A bounded covariant generic uses its declared upper bound rather than `object`:
+
+```py
+class BoundedCovariant[T: int]:
+    def get(self) -> T:
+        raise NotImplementedError
+
+def _(x: object):
+    if isinstance(x, BoundedCovariant):
+        reveal_type(x)  # revealed: BoundedCovariant[int]
+        reveal_type(x.get())  # revealed: int
+```
+
+Negative narrowing must exclude every specialization of a bounded generic, including a gradual one.
+
+```py
+from typing import Any
+
+def excludes_bounded_generic(value: BoundedCovariant[Any] | bool) -> bool:
+    if isinstance(value, BoundedCovariant):
+        reveal_type(value)  # revealed: BoundedCovariant[Any]
+        return False
+
+    reveal_type(value)  # revealed: bool
+    return value
+```
+
+The same exclusion applies when the generic appears in a tuple of runtime classes.
+
+```py
+def excludes_bounded_generic_tuple(
+    value: BoundedCovariant[Any] | bool | bytes,
+) -> bool:
+    if isinstance(value, (BoundedCovariant, bytes)):
+        reveal_type(value)  # revealed: BoundedCovariant[Any] | bytes
+        return False
+
+    reveal_type(value)  # revealed: bool
+    return value
+```
+
+Constrained type parameters preserve the materialization of the generic class while making the union
+of valid constraints available when reading a covariant attribute:
+
+```py
+class ConstrainedCovariant[T: (int, str)]:
+    def get(self) -> T:
+        raise NotImplementedError
+
+def _(x: object):
+    if isinstance(x, ConstrainedCovariant):
+        reveal_type(x)  # revealed: Top[ConstrainedCovariant[Unknown]]
+        reveal_type(x.get())  # revealed: int | str
+```
+
+Constrained generics must also be excluded by negative narrowing.
+
+```py
+def excludes_constrained_generic(value: ConstrainedCovariant[Any] | bool) -> bool:
+    if isinstance(value, ConstrainedCovariant):
+        reveal_type(value)  # revealed: ConstrainedCovariant[Any]
+        return False
+
+    reveal_type(value)  # revealed: bool
+    return value
+```
+
 Similarly, contravariant type parameters use their lower bound of `Never`:
 
 ```py
@@ -686,7 +753,7 @@ class InvariantWithAny[T: int]:
 def _(x: object):
     if isinstance(x, InvariantWithAny):
         reveal_type(x)  # revealed: Top[InvariantWithAny[Unknown]]
-        reveal_type(x.a)  # revealed: object
+        reveal_type(x.a)  # revealed: int
         reveal_type(x.b)  # revealed: Any
 ```
 
@@ -726,6 +793,28 @@ def _(x: Invariant[int] | Covariant[str]):
         reveal_type(x)  # revealed: Covariant[str] & ~Top[Invariant[Unknown]]
 ```
 
+The built-in `tuple` stores its variable-length shape separately from its generic type argument.
+Narrowing must preserve and materialize that shape.
+
+```py
+def narrow_tuple(value: object) -> None:
+    if isinstance(value, tuple):
+        reveal_type(value)  # revealed: tuple[object, ...]
+```
+
+A tuple subclass retains its nominal type and inherits its tuple shape from its specialized base.
+The subclass's own type parameter is still materialized using its declared bound.
+
+```py
+class BoundedTuple[T: int](tuple[T, str]): ...
+
+def narrow_tuple_subclass(value: object) -> None:
+    if isinstance(value, BoundedTuple):
+        reveal_type(value)  # revealed: BoundedTuple[int]
+        reveal_type(value[0])  # revealed: int
+        reveal_type(value[1])  # revealed: str
+```
+
 The behavior of `issubclass()` is similar.
 
 ```py
@@ -736,6 +825,65 @@ def _(x: type[object], y: type[object], z: type[object]):
         reveal_type(y)  # revealed: type[Contravariant[Never]]
     if issubclass(z, Invariant):
         reveal_type(z)  # revealed: type[Top[Invariant[Unknown]]]
+```
+
+Negative `issubclass()` narrowing also excludes every specialization of a bounded generic.
+
+```py
+def excludes_bounded_generic_subclass(
+    cls: type[BoundedCovariant[Any]] | type[bool],
+) -> type[bool]:
+    if issubclass(cls, BoundedCovariant):
+        reveal_type(cls)  # revealed: type[BoundedCovariant[Any]]
+        return bool
+
+    reveal_type(cls)  # revealed: <class 'bool'>
+    return cls
+```
+
+## Narrowing recursively bounded generics
+
+An `isinstance()` check must not recurse indefinitely when a generic bound refers to its own class.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Any
+
+class Recursive[T: "Recursive[Any]"]: ...
+
+def narrow(value: object) -> None:
+    if isinstance(value, Recursive):
+        reveal_type(value)  # revealed: Recursive[object]
+```
+
+A self-referential bound must also be safe when its recursion is hidden behind a type alias.
+
+```py
+class AliasedRecursive[T: "RecursiveAlias"]: ...
+
+type RecursiveAlias = AliasedRecursive[Any]
+
+def narrow_alias(value: object) -> None:
+    if isinstance(value, AliasedRecursive):
+        reveal_type(value)  # revealed: AliasedRecursive[object]
+```
+
+The same cycle recovery must handle bounds shared by mutually recursive generic classes.
+
+```py
+class Left[T: "Right[Any]"]: ...
+class Right[U: Left[Any]]: ...
+
+def narrow_mutual(value: object) -> None:
+    if isinstance(value, Left):
+        reveal_type(value)  # revealed: Left[object]
+
+    if isinstance(value, Right):
+        reveal_type(value)  # revealed: Right[object]
 ```
 
 ## Narrowing generic defaults in Python 3.13
@@ -773,6 +921,57 @@ class WithAliasDefault[T = A]:
 def _(x: object):
     if isinstance(x, WithAliasDefault):
         reveal_type(x.y)  # revealed: tuple[A, object]
+```
+
+`isinstance(value, Box)` checks the runtime class, not the type argument used to specialize it.
+Narrowing must therefore preserve the original type argument instead of substituting `Box`'s
+default.
+
+```py
+from typing import assert_never
+
+class Box[T: str = str]:
+    value: T
+
+    def __init__(self, value: T) -> None: ...
+
+def box_with_default[T: str = str](value: Box[T] | T) -> Box[T]:
+    if isinstance(value, Box):
+        reveal_type(value)  # revealed: Box[T@box_with_default]
+        return value
+
+    if not isinstance(value, Box):
+        reveal_type(value)  # revealed: T@box_with_default & ~Top[Box[Unknown]]
+        return Box[T](value)
+
+    assert_never(value)
+```
+
+When `isinstance()` narrows an unknown value to a tuple subclass, its type argument comes from the
+declared upper bound, not the default. Its element types are inherited from the specialized base.
+
+```py
+class DefaultedTuple[T: int = bool](tuple[T, str]): ...
+
+def narrow_defaulted_tuple(value: object) -> None:
+    if isinstance(value, DefaultedTuple):
+        reveal_type(value)  # revealed: DefaultedTuple[int]
+        reveal_type(value[0])  # revealed: int
+        reveal_type(value[1])  # revealed: str
+```
+
+Negative narrowing also excludes gradual specializations of the defaulted tuple subclass.
+
+```py
+def excludes_defaulted_tuple(value: DefaultedTuple[Any] | bool) -> bool:
+    if isinstance(value, DefaultedTuple):
+        reveal_type(value)  # revealed: DefaultedTuple[Any]
+        reveal_type(value[0])  # revealed: Any
+        reveal_type(value[1])  # revealed: str
+        return False
+
+    reveal_type(value)  # revealed: bool
+    return value
 ```
 
 ## Narrowing generic `classmethod`

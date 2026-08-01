@@ -329,11 +329,11 @@ impl Format<PyFormatContext<'_>> for CommentsAroundText<'_> {
 #[derive(Debug)]
 pub(crate) struct ParameterSeparator {
     /// The end of the last node or separator before this separator
-    pub(crate) preceding_end: TextSize,
+    preceding_end: TextSize,
     /// The range of the separator itself
-    pub(crate) separator: TextRange,
+    separator: TextRange,
     /// The start of the first node or separator following this separator
-    pub(crate) following_start: TextSize,
+    following_start: TextSize,
 }
 
 /// Finds slash and star in `f(a, /, b, *, c)` or `lambda a, /, b, *, c: 1`.

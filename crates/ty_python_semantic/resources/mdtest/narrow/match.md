@@ -112,6 +112,63 @@ def f(x: Covariant[int]):
             assert_never(x)
 ```
 
+## Generic patterns ignore type parameter defaults
+
+A generic class pattern matches every runtime specialization, not only the specialization described
+by its type parameter's default.
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+from typing import Any
+
+class Box[T: str = str]:
+    value: T
+
+    def __init__(self, value: T) -> None: ...
+
+def box_with_default[T: str = str](value: Box[T] | T) -> Box[T]:
+    match value:
+        case Box():
+            reveal_type(value)  # revealed: Box[T@box_with_default]
+            return value
+        case remaining:
+            reveal_type(remaining)  # revealed: T@box_with_default & ~Top[Box[Unknown]]
+            return Box[T](remaining)
+```
+
+When a class pattern matches a tuple subclass, its type argument comes from the declared upper
+bound, not the default. Its element types are inherited from the specialized base.
+
+```py
+class DefaultedTuple[T: int = bool](tuple[T, str]): ...
+
+def match_defaulted_tuple(value: object) -> None:
+    match value:
+        case DefaultedTuple():
+            reveal_type(value)  # revealed: DefaultedTuple[int]
+            reveal_type(value[0])  # revealed: int
+            reveal_type(value[1])  # revealed: str
+```
+
+The same pattern excludes gradual specializations from the remaining match arms.
+
+```py
+def excludes_defaulted_tuple(value: DefaultedTuple[Any] | bool) -> bool:
+    match value:
+        case DefaultedTuple():
+            reveal_type(value)  # revealed: DefaultedTuple[Any]
+            reveal_type(value[0])  # revealed: Any
+            reveal_type(value[1])  # revealed: str
+            return False
+        case remaining:
+            reveal_type(remaining)  # revealed: bool
+            return remaining
+```
+
 ## Class patterns with generic `@final` classes
 
 These work the same as non-`@final` classes.

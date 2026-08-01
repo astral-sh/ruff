@@ -2046,7 +2046,7 @@ mod resolve_definition {
             }
         }
 
-        pub fn category(&self, db: &dyn Db) -> DefinitionCategory {
+        pub(crate) fn category(&self, db: &dyn Db) -> DefinitionCategory {
             match self {
                 ResolvedDefinition::Definition(definition) => {
                     let file = definition.file(db);

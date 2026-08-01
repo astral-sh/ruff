@@ -375,7 +375,7 @@ pub(crate) struct ComparisonSoundnessPolicy {
 }
 
 impl ComparisonSoundnessPolicy {
-    pub(crate) const CONSERVATIVE: Self = Self {
+    const CONSERVATIVE: Self = Self {
         allow_unsafe_equality: false,
     };
 

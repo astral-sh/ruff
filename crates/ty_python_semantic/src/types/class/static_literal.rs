@@ -15,7 +15,9 @@ use crate::{
         DefinedPlace, Definedness, Place, PlaceAndQualifiers, Provenance, PublicTypePolicy,
         TypeOrigin, place_from_bindings, place_from_declarations,
     },
-    reachability::{DeclarationsIteratorExtension, binding_reachability},
+    reachability::{
+        DeclarationsIteratorExtension, ReachabilityConstraintsExtension, binding_reachability,
+    },
     types::{
         ApplyTypeMappingVisitor, BoundTypeVarIdentity, BoundTypeVarInstance, CallArguments,
         CallableType, ClassBase, ClassLiteral, ClassType, DATACLASS_FLAGS, DataclassFlags,
@@ -188,6 +190,24 @@ struct InheritedFrozenDataclassFields<'db> {
     last_frozen_base: StaticClassLiteral<'db>,
 }
 
+/// Annotated fields and class-variable declarations collected from one class body.
+///
+/// Class variables are not constructor parameters, but they can mask inherited dataclass fields:
+///
+/// ```python
+/// @dataclass
+/// class Child(Base):
+///     value: ClassVar[int]
+///     required: int
+/// ```
+///
+/// Here, `required` is a constructor field and `value` masks an inherited `Base.value` field.
+#[derive(Debug, Default, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
+struct OwnClassFields<'db> {
+    fields: FxIndexMap<Name, Field<'db>>,
+    class_variables: Box<[Name]>,
+}
+
 #[salsa::tracked]
 impl<'db> StaticClassLiteral<'db> {
     /// Return `true` if this class represents `known_class`
@@ -204,7 +224,7 @@ impl<'db> StaticClassLiteral<'db> {
     ///
     /// When the base namedtuple's fields were determined dynamically (e.g., from a variable),
     /// we can't synthesize precise method signatures and should fall back to `NamedTupleFallback`.
-    pub(crate) fn namedtuple_base_has_unknown_fields(self, db: &'db dyn Db) -> bool {
+    fn namedtuple_base_has_unknown_fields(self, db: &'db dyn Db) -> bool {
         self.explicit_bases(db).iter().any(|base| match base {
             Type::ClassLiteral(ClassLiteral::DynamicNamedTuple(namedtuple)) => {
                 !namedtuple.has_known_fields(db)
@@ -292,7 +312,7 @@ impl<'db> StaticClassLiteral<'db> {
     ///
     /// Note: We use direct scope lookups here to avoid infinite recursion
     /// through `own_class_member` -> `own_synthesized_member`.
-    pub(super) fn total_ordering_root_method(
+    fn total_ordering_root_method(
         self,
         db: &'db dyn Db,
         specialization: Option<Specialization<'db>>,
@@ -525,7 +545,7 @@ impl<'db> StaticClassLiteral<'db> {
     pub(crate) fn top_materialization(self, db: &'db dyn Db) -> ClassType<'db> {
         self.apply_specialization(db, |generic_context| {
             generic_context
-                .default_specialization(db, self.known(db))
+                .unknown_specialization(db, self.known(db))
                 .materialize_impl(
                     db,
                     MaterializationKind::Top,
@@ -548,7 +568,7 @@ impl<'db> StaticClassLiteral<'db> {
     /// maps each of the class's typevars to `Unknown`.
     pub(crate) fn unknown_specialization(self, db: &'db dyn Db) -> ClassType<'db> {
         self.apply_specialization(db, |generic_context| {
-            generic_context.unknown_specialization(db)
+            generic_context.unknown_specialization(db, self.known(db))
         })
     }
 
@@ -2178,6 +2198,7 @@ impl<'db> StaticClassLiteral<'db> {
             "Collecting `fields` for NamedTuples should short-circuit in `fields()`"
         );
 
+        let mut class_variables = FxIndexSet::default();
         let mut map: FxIndexMap<_, _> = self
             .iter_mro(db, specialization)
             .rev()
@@ -2202,12 +2223,23 @@ impl<'db> StaticClassLiteral<'db> {
                 None
             })
             .flat_map(|source| match source {
-                FieldSource::Static(class, specialization) => Either::Left(
-                    class
-                        .own_fields(db, specialization, field_policy)
-                        .iter()
-                        .map(|(name, field)| (name.clone(), field.clone())),
-                ),
+                FieldSource::Static(class, specialization) => {
+                    let own_fields = class.own_fields_inner(db, specialization, field_policy);
+
+                    if field_policy.is_dataclass_like() {
+                        class_variables.extend(own_fields.class_variables.iter().cloned());
+                        for name in own_fields.fields.keys() {
+                            class_variables.swap_remove(name);
+                        }
+                    }
+
+                    Either::Left(
+                        own_fields
+                            .fields
+                            .iter()
+                            .map(|(name, field)| (name.clone(), field.clone())),
+                    )
+                }
                 FieldSource::DynamicTypedDict(typeddict) => {
                     Either::Right(typeddict.items(db).iter().map(|(name, td_field)| {
                         (
@@ -2229,6 +2261,12 @@ impl<'db> StaticClassLiteral<'db> {
             .filter(|(_, field)| !field.is_kw_only_sentinel(db))
             // We collect into a FxOrderMap here to deduplicate attributes
             .collect();
+
+        if field_policy.is_dataclass_like() {
+            // `own_fields` excludes class variables, but their declarations can still mask
+            // inherited fields. Delay removal so restoring a field preserves its original slot.
+            map.retain(|name, _| !class_variables.contains(name));
+        }
 
         map.shrink_to_fit();
         map
@@ -2313,17 +2351,31 @@ impl<'db> StaticClassLiteral<'db> {
     /// including properties inherited from class-level dataclass parameters (like `kw_only=True`)
     /// and dataclass-transform parameters (like `kw_only_default=True`). They do not represent
     /// only what is explicitly specified in each field definition.
-    #[salsa::tracked(
-        returns(ref),
-        cycle_initial=|_, _, _, _, _| FxIndexMap::default(),
-        heap_size=get_size2::GetSize::get_heap_size
-    )]
     pub(crate) fn own_fields(
         self,
         db: &'db dyn Db,
         specialization: Option<Specialization<'db>>,
         field_policy: CodeGeneratorKind<'db>,
-    ) -> FxIndexMap<Name, Field<'db>> {
+    ) -> &'db FxIndexMap<Name, Field<'db>> {
+        &self
+            .own_fields_inner(db, specialization, field_policy)
+            .fields
+    }
+
+    /// Collects ordered constructor fields and `ClassVar` masks in one pass over a class body.
+    ///
+    /// Keeping both together avoids reinterpreting declarations while merging inherited fields.
+    #[salsa::tracked(
+        returns(ref),
+        cycle_initial=|_, _, _, _, _| OwnClassFields::default(),
+        heap_size=get_size2::GetSize::get_heap_size
+    )]
+    fn own_fields_inner(
+        self,
+        db: &'db dyn Db,
+        specialization: Option<Specialization<'db>>,
+        field_policy: CodeGeneratorKind<'db>,
+    ) -> OwnClassFields<'db> {
         let class_body_scope = self.body_scope(db);
         let table = place_table(db, class_body_scope);
 
@@ -2340,9 +2392,11 @@ impl<'db> StaticClassLiteral<'db> {
             } else {
                 false
             };
-        let dataclass_kw_only_default = field_policy
-            .is_dataclass_like()
-            .then(|| self.has_dataclass_param(db, field_policy, DataclassFlags::KW_ONLY));
+        let dataclass_kw_only_default = field_policy.is_dataclass_like().then(|| {
+            let own_field_policy =
+                CodeGeneratorKind::from_class(db, self.into()).unwrap_or(field_policy);
+            self.has_dataclass_param(db, own_field_policy, DataclassFlags::KW_ONLY)
+        });
         let mut kw_only_sentinel_field_seen = false;
         let mut field_declarations = Vec::new();
 
@@ -2389,11 +2443,15 @@ impl<'db> StaticClassLiteral<'db> {
             .sort_unstable_by_key(|(first_declaration_order, _, _)| *first_declaration_order);
 
         let mut attributes = FxIndexMap::default();
+        let mut class_variables = Vec::new();
         for (_, symbol_id, result) in field_declarations {
             let symbol = table.symbol(symbol_id);
             let first_declaration = result.first_declaration;
             let attr = result.ignore_conflicting_declarations();
             if attr.is_class_var() {
+                if field_policy.is_dataclass_like() {
+                    class_variables.push(symbol.name().clone());
+                }
                 continue;
             }
 
@@ -2506,7 +2564,73 @@ impl<'db> StaticClassLiteral<'db> {
 
         attributes.shrink_to_fit();
 
-        attributes
+        OwnClassFields {
+            fields: attributes,
+            class_variables: class_variables.into_boxed_slice(),
+        }
+    }
+
+    /// Return the type qualifiers attached to each reachable annotated assignment in source order.
+    ///
+    /// This uses the declaration history rather than [`StaticClassLiteral::own_fields`], because a
+    /// later method or nested class can replace the symbol's binding while leaving its entry in
+    /// `__annotations__`:
+    ///
+    /// ```python
+    /// class Example(NamedTuple):
+    ///     value: Final[int]
+    ///     def value(self) -> int: ...
+    /// ```
+    ///
+    /// Each qualifier remains paired with its own definition so diagnostics can point to the
+    /// annotation that introduced it, including when declarations occur in different branches.
+    pub(crate) fn own_annotated_qualifiers(
+        self,
+        db: &'db dyn Db,
+    ) -> Vec<(Name, TypeQualifiers, Definition<'db>)> {
+        let body_scope = self.body_scope(db);
+        let table = place_table(db, body_scope);
+        let use_def = use_def_map(db, body_scope);
+        let mut annotated_qualifiers = Vec::new();
+
+        for (symbol_id, _) in use_def.all_end_of_scope_symbol_declarations() {
+            let declarations = use_def.reachable_symbol_declarations(symbol_id);
+            let predicates = declarations.predicates();
+            let reachability_constraints = declarations.reachability_constraints();
+
+            for declaration in declarations {
+                if reachability_constraints
+                    .evaluate(db, predicates, declaration.reachability_constraint)
+                    .is_always_false()
+                {
+                    continue;
+                }
+
+                let DefinitionState::Defined(definition) = declaration.declaration else {
+                    continue;
+                };
+                if !matches!(definition.kind(db), DefinitionKind::AnnotatedAssignment(..)) {
+                    continue;
+                }
+
+                let Some(declared) = inferred_declaration(db, definition).declared() else {
+                    continue;
+                };
+                annotated_qualifiers.push((
+                    declaration.declaration_order,
+                    table.symbol(symbol_id).name().clone(),
+                    declared.qualifiers(),
+                    definition,
+                ));
+            }
+        }
+
+        annotated_qualifiers
+            .sort_unstable_by_key(|(declaration_order, _, _, _)| *declaration_order);
+        annotated_qualifiers
+            .into_iter()
+            .map(|(_, name, qualifiers, definition)| (name, qualifiers, definition))
+            .collect()
     }
 
     /// Look up an instance attribute (available in `__dict__`) of the given name.

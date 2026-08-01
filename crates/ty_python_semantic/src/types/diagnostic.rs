@@ -18,6 +18,7 @@ use crate::types::function::{FunctionDecorators, FunctionType, KnownFunction, Ov
 use crate::types::infer::UnsupportedComparisonError;
 use crate::types::overrides::MethodKind;
 use crate::types::protocol_class::ProtocolMember;
+use crate::types::special_form::TypeQualifier;
 use crate::types::string_annotation::{
     ESCAPE_CHARACTER_IN_FORWARD_ANNOTATION, IMPLICIT_CONCATENATED_STRING_TYPE_ANNOTATION,
     INVALID_SYNTAX_IN_FORWARD_ANNOTATION, RAW_STRING_TYPE_ANNOTATION,
@@ -1351,7 +1352,7 @@ impl TypeCheckDiagnostics {
         self.diagnostics.is_empty() && self.used_suppressions.is_empty()
     }
 
-    pub fn iter(&self) -> std::slice::Iter<'_, Diagnostic> {
+    fn iter(&self) -> std::slice::Iter<'_, Diagnostic> {
         self.diagnostics().iter()
     }
 
@@ -3333,6 +3334,32 @@ pub(super) fn report_named_tuple_field_with_leading_underscore<'db>(
 
     diagnostic.set_concise_message(format_args!(
         "NamedTuple field `{field_name}` cannot start with an underscore"
+    ));
+}
+
+/// Report a `NamedTuple` field annotated with a type qualifier that `NamedTuple` does not accept.
+///
+/// The diagnostic is anchored to the annotated assignment that introduced the qualifier. It does
+/// not claim that class creation fails at runtime because deferred and wrapped annotations can
+/// preserve the qualifier without passing it directly to `typing._type_check`.
+pub(super) fn report_invalid_named_tuple_field_qualifier<'db>(
+    context: &InferContext<'db, '_>,
+    field_name: &str,
+    qualifier: TypeQualifier,
+    field_definition: Definition<'db>,
+) {
+    let db = context.db();
+    let module = context.module();
+    let qualifier = qualifier.name();
+    let diagnostic_range = field_definition.kind(db).full_range(module);
+    let Some(builder) = context.report_lint(&INVALID_NAMED_TUPLE, diagnostic_range) else {
+        return;
+    };
+    let mut diagnostic = builder.into_diagnostic(format_args!(
+        "Type qualifier `{qualifier}` is not allowed in a NamedTuple field"
+    ));
+    diagnostic.set_concise_message(format_args!(
+        "Type qualifier `{qualifier}` is not allowed on NamedTuple field `{field_name}`"
     ));
 }
 

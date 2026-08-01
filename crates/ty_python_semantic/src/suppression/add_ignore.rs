@@ -31,7 +31,7 @@ use crate::suppression::{
 /// an edit. It appends codes once to each applicable existing suppression and otherwise inserts at
 /// most one end-of-line suppression at each destination. Every returned [`SuppressFix`] records
 /// how many diagnostics its edit accounts for.
-pub fn suppress_all(
+pub(crate) fn suppress_all(
     db: &dyn Db,
     file: File,
     ids_with_range: &[(LintName, TextRange)],
@@ -159,10 +159,10 @@ pub fn suppress_all(
 }
 
 /// Fix to suppress one or more diagnostics.
-pub struct SuppressFix {
-    pub fix: Fix,
+pub(crate) struct SuppressFix {
+    pub(crate) fix: Fix,
     /// The number of diagnostics that will be suppressed if this fix is applied.
-    pub suppressed_diagnostics: usize,
+    pub(crate) suppressed_diagnostics: usize,
 }
 
 /// Creates a fix to suppress a single lint.

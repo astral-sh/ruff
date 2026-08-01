@@ -29,7 +29,7 @@ pub struct FailuresByLine {
 }
 
 impl FailuresByLine {
-    pub fn iter(&self) -> impl Iterator<Item = (OneIndexed, &[Failure])> {
+    pub(crate) fn iter(&self) -> impl Iterator<Item = (OneIndexed, &[Failure])> {
         self.lines.iter().map(|line_failures| {
             (
                 line_failures.line_number,

@@ -159,12 +159,12 @@ fn remove_cast(checker: &Checker, list_range: TextRange, iterable_range: TextRan
 /// A [`StatementVisitor`] that (conservatively) identifies mutations to a variable.
 #[derive(Default)]
 pub(crate) struct MutationVisitor<'a> {
-    pub(crate) target: &'a str,
-    pub(crate) is_mutated: bool,
+    target: &'a str,
+    is_mutated: bool,
 }
 
 impl<'a> MutationVisitor<'a> {
-    pub(crate) fn new(target: &'a str) -> Self {
+    fn new(target: &'a str) -> Self {
         Self {
             target,
             is_mutated: false,

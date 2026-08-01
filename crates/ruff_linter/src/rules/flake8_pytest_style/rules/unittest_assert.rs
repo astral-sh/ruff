@@ -228,7 +228,7 @@ impl UnittestAssert {
     }
 
     /// Create a map from argument name to value.
-    pub(crate) fn args_map<'a>(
+    fn args_map<'a>(
         &'a self,
         args: &'a [Expr],
         keywords: &'a [Keyword],

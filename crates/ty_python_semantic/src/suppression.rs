@@ -17,7 +17,8 @@ use rustc_hash::FxHasher;
 
 use crate::diagnostic::DiagnosticGuard;
 use crate::lint::{GetLintError, Level, LintMetadata, LintRegistry, LintStatus};
-pub use crate::suppression::add_ignore::{SuppressFix, suppress_all, suppress_single};
+pub use crate::suppression::add_ignore::suppress_single;
+pub(crate) use crate::suppression::add_ignore::{SuppressFix, suppress_all};
 use crate::suppression::parser::{
     ParseError, ParseErrorKind, SuppressionComment, SuppressionParser,
 };
@@ -27,7 +28,7 @@ use crate::{Db, declare_lint, lint::LintId};
 
 declare_lint! {
     #[doc = include_str!("../resources/lint_docs/unused-ignore-comment.md")]
-    pub static UNUSED_IGNORE_COMMENT = {
+    pub(crate) static UNUSED_IGNORE_COMMENT = {
         summary: "detects unused `ty: ignore` comments",
         status: LintStatus::stable("0.0.1-alpha.1"),
         default_level: Level::Warn,
@@ -70,7 +71,7 @@ declare_lint! {
     }
 }
 
-pub fn is_unused_ignore_comment_lint(name: LintName) -> bool {
+pub(crate) fn is_unused_ignore_comment_lint(name: LintName) -> bool {
     name == UNUSED_IGNORE_COMMENT.name() || name == UNUSED_TYPE_IGNORE_COMMENT.name()
 }
 
@@ -264,7 +265,7 @@ impl<'a> CheckSuppressionsContext<'a> {
 ///
 /// This type exists to separate the phases of "check if a diagnostic should
 /// be reported" and "build the actual diagnostic."
-pub(crate) struct SuppressionDiagnosticGuardBuilder<'ctx, 'db> {
+struct SuppressionDiagnosticGuardBuilder<'ctx, 'db> {
     ctx: &'ctx CheckSuppressionsContext<'db>,
     id: DiagnosticId,
     range: TextRange,
@@ -294,10 +295,7 @@ impl<'ctx, 'db> SuppressionDiagnosticGuardBuilder<'ctx, 'db> {
     ///
     /// The diagnostic can be further mutated on the guard via its `DerefMut`
     /// impl to `Diagnostic`.
-    pub(crate) fn into_diagnostic(
-        self,
-        message: impl IntoDiagnosticMessage,
-    ) -> DiagnosticGuard<'ctx> {
+    fn into_diagnostic(self, message: impl IntoDiagnosticMessage) -> DiagnosticGuard<'ctx> {
         let mut diag = Diagnostic::new(self.id, self.severity, message);
 
         let primary_span = Span::from(self.ctx.file).with_range(self.range);

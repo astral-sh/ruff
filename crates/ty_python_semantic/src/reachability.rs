@@ -1628,7 +1628,7 @@ impl<'db> ReachabilityEvaluationCache<'db> {
     /// predicate determines whether the constraint belongs to the primary scope. A primary-scope
     /// constraint from the primary graph is cached by dense index; all other constraints are cached
     /// by graph identity and id.
-    pub(crate) fn evaluate(
+    fn evaluate(
         &self,
         db: &'db dyn Db,
         constraints: &ReachabilityConstraints,

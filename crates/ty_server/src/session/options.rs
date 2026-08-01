@@ -487,43 +487,43 @@ impl Combine for PythonExtension {
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct ActiveEnvironment {
-    pub(crate) executable: PythonExecutable,
+    executable: PythonExecutable,
     #[deprecated]
-    pub(crate) environment: Option<PythonEnvironment>,
-    pub(crate) version: Option<EnvironmentVersion>,
+    environment: Option<PythonEnvironment>,
+    version: Option<EnvironmentVersion>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct EnvironmentVersion {
-    pub(crate) major: i64,
-    pub(crate) minor: i64,
+    major: i64,
+    minor: i64,
     #[deprecated(
         note = "Not provided by all clients (Zed, VS Code when using the Python Environment extension). Use `major` and `minor` instead."
     )]
-    pub(crate) patch: Option<i64>,
+    patch: Option<i64>,
     #[deprecated(
         note = "Not provided by all clients (Zed, VS Code when using the Python Environment extension)."
     )]
-    pub(crate) sys_version: Option<String>,
+    sys_version: Option<String>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct PythonEnvironment {
     #[deprecated]
-    pub(crate) folder_uri: Option<Uri>,
+    folder_uri: Option<Uri>,
     #[deprecated]
     #[serde(rename = "type")]
-    pub(crate) kind: Option<String>,
+    kind: Option<String>,
     #[deprecated]
-    pub(crate) name: Option<String>,
+    name: Option<String>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct PythonExecutable {
     #[deprecated]
-    pub(crate) uri: Option<Uri>,
-    pub(crate) sys_prefix: SystemPathBuf,
+    uri: Option<Uri>,
+    sys_prefix: SystemPathBuf,
 }

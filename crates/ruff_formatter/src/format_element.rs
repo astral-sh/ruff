@@ -69,7 +69,7 @@ pub enum FormatElement {
 }
 
 impl FormatElement {
-    pub fn tag_kind(&self) -> Option<TagKind> {
+    pub(crate) fn tag_kind(&self) -> Option<TagKind> {
         if let FormatElement::Tag(tag) = self {
             Some(tag.kind())
         } else {
@@ -229,7 +229,7 @@ impl FormatElement {
         matches!(self, FormatElement::Tag(_))
     }
 
-    /// Returns `true` if self is a [`FormatElement::Tag`] and [`Tag::is_start`] is `true`.
+    /// Returns `true` if self is a [`FormatElement::Tag`] and `Tag::is_start` is `true`.
     pub const fn is_start_tag(&self) -> bool {
         match self {
             FormatElement::Tag(tag) => tag.is_start(),
@@ -238,14 +238,14 @@ impl FormatElement {
     }
 
     /// Returns `true` if self is a [`FormatElement::Tag`] and [`Tag::is_end`] is `true`.
-    pub const fn is_end_tag(&self) -> bool {
+    const fn is_end_tag(&self) -> bool {
         match self {
             FormatElement::Tag(tag) => tag.is_end(),
             _ => false,
         }
     }
 
-    pub const fn is_text(&self) -> bool {
+    const fn is_text(&self) -> bool {
         matches!(
             self,
             FormatElement::SourceCodeSlice { .. }
@@ -254,7 +254,7 @@ impl FormatElement {
         )
     }
 
-    pub const fn is_space(&self) -> bool {
+    const fn is_space(&self) -> bool {
         matches!(self, FormatElement::Space)
     }
 }
@@ -339,7 +339,7 @@ impl BestFittingVariants {
     ///
     /// You're looking for a way to create a `BestFitting` object, use the `best_fitting![least_expanded, most_expanded]` macro.
     #[doc(hidden)]
-    pub fn from_vec_unchecked(variants: Vec<FormatElement>) -> Self {
+    pub(crate) fn from_vec_unchecked(variants: Vec<FormatElement>) -> Self {
         debug_assert!(
             variants
                 .iter()
@@ -368,7 +368,7 @@ impl BestFittingVariants {
         self.into_iter().last().unwrap()
     }
 
-    pub fn as_slice(&self) -> &[FormatElement] {
+    fn as_slice(&self) -> &[FormatElement] {
         &self.0
     }
 
@@ -377,7 +377,7 @@ impl BestFittingVariants {
     /// # Panics
     ///
     /// When the number of variants is less than two.
-    pub fn most_flat(&self) -> &[FormatElement] {
+    pub(crate) fn most_flat(&self) -> &[FormatElement] {
         assert!(
             self.as_slice()
                 .iter()
@@ -494,7 +494,7 @@ pub trait FormatElements {
 pub struct Width(NonZeroU32);
 
 impl Width {
-    pub(crate) const fn new(width: u32) -> Self {
+    const fn new(width: u32) -> Self {
         Width(NonZeroU32::MIN.saturating_add(width))
     }
 
@@ -553,7 +553,7 @@ impl TextWidth {
         }
     }
 
-    pub(crate) const fn is_multiline(self) -> bool {
+    const fn is_multiline(self) -> bool {
         matches!(self, TextWidth::Multiline)
     }
 }

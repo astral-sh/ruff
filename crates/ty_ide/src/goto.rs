@@ -343,7 +343,7 @@ impl<'db> Definitions<'db> {
     }
 
     /// Map definitions from stub files to corresponding source implementations.
-    pub(crate) fn map_stubs(self, db: &'db dyn ty_python_semantic::Db) -> Definitions<'db> {
+    fn map_stubs(self, db: &'db dyn ty_python_semantic::Db) -> Definitions<'db> {
         let resolved = StubMapper::new(db).map_definitions(self.0);
         Self::new(resolved)
     }
@@ -1397,7 +1397,7 @@ pub(crate) fn find_goto_target<'a>(
     find_goto_target_impl(model, parsed.tokens(), parsed.syntax().into(), offset)
 }
 
-pub(crate) fn find_goto_target_impl<'a>(
+fn find_goto_target_impl<'a>(
     model: &'a SemanticModel,
     tokens: &'a Tokens,
     syntax: AnyNodeRef<'a>,

@@ -700,7 +700,7 @@ pub(crate) fn definite_match_pattern_type_for_subject<'db>(
 ///         case other:
 ///             reveal_type(other)  # Literal[2]
 /// ```
-pub(crate) fn pattern_fallthrough_type<'db>(
+fn pattern_fallthrough_type<'db>(
     db: &'db dyn Db,
     kind: &PatternPredicateKind<'db>,
     subject_ty: Type<'db>,

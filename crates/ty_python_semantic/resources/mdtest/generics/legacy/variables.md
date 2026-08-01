@@ -6,7 +6,8 @@ for both type variable syntaxes.
 
 Unless otherwise specified, all quotations come from the [Generics] section of the typing spec.
 
-Diagnostics for invalid type variables are snapshotted in `diagnostics/legacy_typevars.md`.
+Additional diagnostics for invalid type variables are snapshotted in
+`diagnostics/legacy_typevars.md`.
 
 ## Type variables
 
@@ -586,8 +587,16 @@ reveal_type(S.__constraints__)  # revealed: tuple[int | float, str]
 ```py
 from typing import TypeVar
 
-# error: [invalid-legacy-type-variable]
+# snapshot: invalid-legacy-type-variable
 T = TypeVar("T", int)
+```
+
+```snapshot
+error[invalid-legacy-type-variable]: A `TypeVar` cannot have exactly one constraint
+ --> src/mdtest_snippet.py:4:18
+  |
+4 | T = TypeVar("T", int)
+  |                  ^^^
 ```
 
 ### Cannot have both bound and constraint
@@ -595,8 +604,16 @@ T = TypeVar("T", int)
 ```py
 from typing import TypeVar
 
-# error: [invalid-legacy-type-variable]
+# snapshot: invalid-legacy-type-variable
 T = TypeVar("T", int, str, bound=bytes)
+```
+
+```snapshot
+error[invalid-legacy-type-variable]: A `TypeVar` cannot have both a bound and constraints
+ --> src/mdtest_snippet.py:4:5
+  |
+4 | T = TypeVar("T", int, str, bound=bytes)
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 ```
 
 ### Cannot be both covariant and contravariant
@@ -608,8 +625,16 @@ T = TypeVar("T", int, str, bound=bytes)
 ```py
 from typing import TypeVar
 
-# error: [invalid-legacy-type-variable]
+# snapshot: invalid-legacy-type-variable
 T = TypeVar("T", covariant=True, contravariant=True)
+```
+
+```snapshot
+error[invalid-legacy-type-variable]: A `TypeVar` cannot be both covariant and contravariant
+ --> src/mdtest_snippet.py:4:5
+  |
+4 | T = TypeVar("T", covariant=True, contravariant=True)
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 ```
 
 ### Infer variance
@@ -706,14 +731,36 @@ from typing_extensions import TypeVar
 def cond() -> bool:
     return True
 
-# error: [invalid-legacy-type-variable]
+# snapshot: invalid-legacy-type-variable
 T = TypeVar("T", covariant=cond())
 
-# error: [invalid-legacy-type-variable]
+# snapshot: invalid-legacy-type-variable
 U = TypeVar("U", contravariant=cond())
 
-# error: [invalid-legacy-type-variable]
+# snapshot: invalid-legacy-type-variable
 V = TypeVar("V", infer_variance=cond())
+```
+
+```snapshot
+error[invalid-legacy-type-variable]: The `covariant` parameter of `TypeVar` cannot have an ambiguous truthiness
+ --> src/mdtest_snippet.py:7:28
+  |
+7 | T = TypeVar("T", covariant=cond())
+  |                            ^^^^^^
+
+
+error[invalid-legacy-type-variable]: The `contravariant` parameter of `TypeVar` cannot have an ambiguous truthiness
+  --> src/mdtest_snippet.py:10:32
+   |
+10 | U = TypeVar("U", contravariant=cond())
+   |                                ^^^^^^
+
+
+error[invalid-legacy-type-variable]: The `infer_variance` parameter of `TypeVar` cannot have an ambiguous truthiness
+  --> src/mdtest_snippet.py:13:33
+   |
+13 | V = TypeVar("V", infer_variance=cond())
+   |                                 ^^^^^^
 ```
 
 ### Invalid keyword arguments

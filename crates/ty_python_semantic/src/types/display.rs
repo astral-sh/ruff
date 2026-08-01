@@ -106,7 +106,7 @@ impl SignatureNameDisplay {
 #[derive(Debug, Clone, Default)]
 pub struct DisplaySettings<'db> {
     /// Whether rendering can be multiline
-    pub multiline: bool,
+    multiline: bool,
     /// Whether callable signatures should include their definition name.
     signature_name_display: SignatureNameDisplay,
     /// Class names that should be displayed fully qualified
@@ -116,17 +116,17 @@ pub struct DisplaySettings<'db> {
     /// (e.g., `A.Alias` instead of just `Alias`)
     qualified_type_aliases: Rc<FxHashMap<&'db str, QualificationLevel>>,
     /// Whether long unions and literals are displayed in full
-    pub preserve_full_unions: bool,
+    preserve_full_unions: bool,
     /// Scopes that are currently active in the display context (e.g. function scopes
     /// whose type parameters are currently being displayed).
     /// Used to suppress redundant `@{scope}` suffixes for type variables.
-    pub active_scopes: Rc<FxHashSet<Definition<'db>>>,
+    active_scopes: Rc<FxHashSet<Definition<'db>>>,
     /// Function types that are currently being displayed.
     /// Used to prevent infinite recursion when displaying self-referential function types.
-    pub visited_function_types: Rc<FxHashSet<FunctionType<'db>>>,
+    visited_function_types: Rc<FxHashSet<FunctionType<'db>>>,
     /// Whether to hide the return type of the outermost signature.
     /// Return types of nested callable types inside parameters are still shown.
-    pub hide_return_type: bool,
+    hide_return_type: bool,
 }
 
 impl<'db> DisplaySettings<'db> {
@@ -147,7 +147,7 @@ impl<'db> DisplaySettings<'db> {
     }
 
     #[must_use]
-    pub fn preserve_long_unions(self) -> Self {
+    pub(crate) fn preserve_long_unions(self) -> Self {
         Self {
             preserve_full_unions: true,
             ..self
@@ -155,7 +155,7 @@ impl<'db> DisplaySettings<'db> {
     }
 
     #[must_use]
-    pub fn disallow_signature_name(&self) -> Self {
+    pub(crate) fn disallow_signature_name(&self) -> Self {
         Self {
             signature_name_display: SignatureNameDisplay::Disallow,
             ..self.clone()
@@ -171,7 +171,7 @@ impl<'db> DisplaySettings<'db> {
     }
 
     #[must_use]
-    pub fn hide_return_type(&self) -> Self {
+    pub(crate) fn hide_return_type(&self) -> Self {
         Self {
             hide_return_type: true,
             ..self.clone()
@@ -206,7 +206,7 @@ impl<'db> DisplaySettings<'db> {
     }
 
     #[must_use]
-    pub fn from_possibly_ambiguous_types<I, T>(db: &'db dyn Db, types: I) -> Self
+    pub(crate) fn from_possibly_ambiguous_types<I, T>(db: &'db dyn Db, types: I) -> Self
     where
         I: IntoIterator<Item = T>,
         T: Into<Type<'db>>,
@@ -883,9 +883,7 @@ impl<'db> FmtDetailed<'db> for DisplayTypeAliasDeclaration<'db> {
             .display_with(self.db, settings.clone())
             .fmt_detailed(f)?;
         if let Some(generic_context) = generic_context {
-            generic_context
-                .display_with(self.db, settings.clone())
-                .fmt_detailed(f)?;
+            generic_context.display(self.db).fmt_detailed(f)?;
         }
         f.write_str(" = ")?;
         self.value_ty
@@ -1132,7 +1130,6 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                         let type_parameters = DisplayOptionalGenericContext {
                             generic_context: signature.generic_context.as_ref(),
                             db: self.db,
-                            settings: self.settings.clone(),
                             hide_unused_self,
                         };
                         f.set_invalid_type_annotation();
@@ -1349,11 +1346,7 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                         .write_str(if boolean { "True" } else { "False" })
                 }
                 LiteralValueTypeKind::String(string) => {
-                    write!(
-                        f.with_type(self.ty),
-                        "{}",
-                        string.display_with(self.db, self.settings.clone()),
-                    )
+                    write!(f.with_type(self.ty), "{}", string.display(self.db))
                 }
                 // We used to return `str` as the type here because that feels generally more useful.
                 // However, the inconsistency between the type shown in the inlay hint and its hover, and the
@@ -1617,7 +1610,7 @@ impl Display for DisplayTuple<'_, '_> {
 impl<'db> OverloadLiteral<'db> {
     // Not currently used, but useful for debugging.
     #[expect(dead_code)]
-    pub(crate) fn display(self, db: &'db dyn Db) -> DisplayOverloadLiteral<'db> {
+    fn display(self, db: &'db dyn Db) -> DisplayOverloadLiteral<'db> {
         Self::display_with(self, db, DisplaySettings::default())
     }
 
@@ -1647,7 +1640,6 @@ impl<'db> FmtDetailed<'db> for DisplayOverloadLiteral<'db> {
         let type_parameters = DisplayOptionalGenericContext {
             generic_context: signature.generic_context.as_ref(),
             db: self.db,
-            settings: self.settings.clone(),
             hide_unused_self,
         };
 
@@ -1716,7 +1708,6 @@ impl<'db> FmtDetailed<'db> for DisplayFunctionType<'db> {
                 let type_parameters = DisplayOptionalGenericContext {
                     generic_context: signature.generic_context.as_ref(),
                     db: self.db,
-                    settings: settings.clone(),
                     hide_unused_self,
                 };
                 f.set_invalid_type_annotation();
@@ -1825,29 +1816,19 @@ impl Display for DisplayGenericAlias<'_> {
 
 impl<'db> GenericContext<'db> {
     fn display<'a>(&'a self, db: &'db dyn Db) -> DisplayGenericContext<'a, 'db> {
-        Self::display_with(self, db, DisplaySettings::default())
+        DisplayGenericContext {
+            generic_context: self,
+            db,
+            full: false,
+            hide_unused_self: false,
+        }
     }
 
     fn display_full<'a>(&'a self, db: &'db dyn Db) -> DisplayGenericContext<'a, 'db> {
         DisplayGenericContext {
             generic_context: self,
             db,
-            settings: DisplaySettings::default(),
             full: true,
-            hide_unused_self: false,
-        }
-    }
-
-    fn display_with<'a>(
-        &'a self,
-        db: &'db dyn Db,
-        settings: DisplaySettings<'db>,
-    ) -> DisplayGenericContext<'a, 'db> {
-        DisplayGenericContext {
-            generic_context: self,
-            db,
-            settings,
-            full: false,
             hide_unused_self: false,
         }
     }
@@ -1856,7 +1837,6 @@ impl<'db> GenericContext<'db> {
 struct DisplayOptionalGenericContext<'a, 'db> {
     generic_context: Option<&'a GenericContext<'db>>,
     db: &'db dyn Db,
-    settings: DisplaySettings<'db>,
     /// If true, hide `Self` type variables from the generic context prefix
     /// when they are not displayed in the signature body.
     hide_unused_self: bool,
@@ -1868,7 +1848,6 @@ impl<'db> FmtDetailed<'db> for DisplayOptionalGenericContext<'_, 'db> {
             DisplayGenericContext {
                 generic_context,
                 db: self.db,
-                settings: self.settings.clone(),
                 full: false,
                 hide_unused_self: self.hide_unused_self,
             }
@@ -1888,8 +1867,6 @@ impl Display for DisplayOptionalGenericContext<'_, '_> {
 struct DisplayGenericContext<'a, 'db> {
     generic_context: &'a GenericContext<'db>,
     db: &'db dyn Db,
-    #[expect(dead_code)]
-    settings: DisplaySettings<'db>,
     full: bool,
     /// If true, hide `Self` type variables from the generic context prefix.
     hide_unused_self: bool,
@@ -2129,7 +2106,7 @@ impl TupleSpecialization {
 }
 
 impl<'db> CallableType<'db> {
-    pub(crate) fn display<'a>(&'a self, db: &'db dyn Db) -> DisplayCallableType<'a, 'db> {
+    fn display<'a>(&'a self, db: &'db dyn Db) -> DisplayCallableType<'a, 'db> {
         Self::display_with(self, db, DisplaySettings::default())
     }
 
@@ -2297,7 +2274,6 @@ impl<'db> FmtDetailed<'db> for DisplaySignature<'_, 'db> {
             DisplayOptionalGenericContext {
                 generic_context: self.generic_context,
                 db: self.db,
-                settings: settings.clone(),
                 hide_unused_self,
             }
             .fmt_detailed(&mut f)?;
@@ -3190,22 +3166,15 @@ impl Display for DisplayTypeArray<'_, '_> {
 }
 
 impl<'db> StringLiteralType<'db> {
-    fn display_with(
-        self,
-        db: &'db dyn Db,
-        settings: DisplaySettings<'db>,
-    ) -> DisplayStringLiteralType<'db> {
+    fn display(self, db: &'db dyn Db) -> DisplayStringLiteralType<'db> {
         DisplayStringLiteralType {
             string: self.value(db),
-            settings,
         }
     }
 }
 
 struct DisplayStringLiteralType<'db> {
     string: &'db str,
-    #[expect(dead_code)]
-    settings: DisplaySettings<'db>,
 }
 
 impl Display for DisplayStringLiteralType<'_> {
@@ -3224,9 +3193,9 @@ impl Display for DisplayStringLiteralType<'_> {
 }
 
 pub(crate) struct DisplayKnownInstanceRepr<'db> {
-    pub(crate) known_instance: KnownInstanceType<'db>,
-    pub(crate) db: &'db dyn Db,
-    pub(crate) settings: DisplaySettings<'db>,
+    known_instance: KnownInstanceType<'db>,
+    db: &'db dyn Db,
+    settings: DisplaySettings<'db>,
 }
 
 impl<'db> KnownInstanceType<'db> {

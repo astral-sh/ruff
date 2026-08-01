@@ -239,11 +239,7 @@ impl NotebookDocument {
 }
 
 impl NotebookCell {
-    pub(crate) fn new(
-        cell: lsp_types::NotebookCell,
-        contents: String,
-        version: DocumentVersion,
-    ) -> Self {
+    fn new(cell: lsp_types::NotebookCell, contents: String, version: DocumentVersion) -> Self {
         Self {
             uri: cell.document,
             kind: cell.kind,

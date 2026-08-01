@@ -105,7 +105,7 @@ pub(crate) enum FutureDefinitions {
 }
 
 impl PreviousDefinitions {
-    pub(super) fn are_shadowed(self) -> bool {
+    fn are_shadowed(self) -> bool {
         matches!(self, PreviousDefinitions::AreShadowed)
     }
 }
@@ -159,7 +159,7 @@ impl Declarations {
     }
 
     /// Add given reachability constraint to all live declarations.
-    pub(super) fn record_reachability_constraint(
+    fn record_reachability_constraint(
         &mut self,
         reachability_constraints: &mut ReachabilityConstraintsBuilder,
         constraint: ScopedReachabilityConstraintId,
@@ -386,7 +386,7 @@ impl Bindings {
     }
 
     /// Add given constraint to all live bindings.
-    pub(super) fn record_narrowing_constraint(
+    fn record_narrowing_constraint(
         &mut self,
         narrowing_constraints: &mut NarrowingConstraintsBuilder,
         constraint: ScopedNarrowingConstraint,
@@ -398,7 +398,7 @@ impl Bindings {
     }
 
     /// Add given reachability constraint to all live bindings.
-    pub(super) fn record_reachability_constraint(
+    fn record_reachability_constraint(
         &mut self,
         reachability_constraints: &mut ReachabilityConstraintsBuilder,
         constraint: ScopedReachabilityConstraintId,
@@ -621,7 +621,7 @@ mod tests {
     }
 
     #[track_caller]
-    pub(crate) fn assert_declarations(place: &PlaceState, expected: &[&str]) {
+    fn assert_declarations(place: &PlaceState, expected: &[&str]) {
         let actual = place
             .declarations()
             .iter()

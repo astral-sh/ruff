@@ -123,7 +123,7 @@ impl LintMetadata {
         self.documentation_lines().join("\n")
     }
 
-    pub fn documentation_url(&self) -> String {
+    pub(crate) fn documentation_url(&self) -> String {
         lint_documentation_url(self.name())
     }
 
@@ -144,7 +144,7 @@ impl LintMetadata {
     }
 }
 
-pub fn lint_documentation_url(lint_name: LintName) -> String {
+pub(crate) fn lint_documentation_url(lint_name: LintName) -> String {
     format!("https://ty.dev/rules#{lint_name}")
 }
 
@@ -205,11 +205,11 @@ impl LintStatus {
         LintStatus::Deprecated { since, reason }
     }
 
-    pub const fn removed(since: &'static str, reason: &'static str) -> Self {
+    pub(crate) const fn removed(since: &'static str, reason: &'static str) -> Self {
         LintStatus::Removed { since, reason }
     }
 
-    pub const fn is_removed(&self) -> bool {
+    const fn is_removed(&self) -> bool {
         matches!(self, LintStatus::Removed { .. })
     }
 
@@ -359,7 +359,7 @@ pub struct LintRegistryBuilder {
 
 impl LintRegistryBuilder {
     #[track_caller]
-    pub fn register_lint(&mut self, lint: &'static LintMetadata) {
+    pub(crate) fn register_lint(&mut self, lint: &'static LintMetadata) {
         assert_eq!(
             self.by_name.insert(&*lint.name, lint.into()),
             None,
@@ -396,7 +396,7 @@ impl LintRegistryBuilder {
         );
     }
 
-    pub fn build(self) -> LintRegistry {
+    pub(crate) fn build(self) -> LintRegistry {
         LintRegistry {
             lints: self.lints,
             by_name: self.by_name,
@@ -593,16 +593,16 @@ impl RuleSelection {
     }
 
     /// Returns the configured severity for the lint with the given id or `None` if the lint is disabled.
-    pub fn severity(&self, lint: LintId) -> Option<Severity> {
+    pub(crate) fn severity(&self, lint: LintId) -> Option<Severity> {
         self.lints.get(&lint).map(|(severity, _)| *severity)
     }
 
-    pub fn get(&self, lint: LintId) -> Option<(Severity, LintSource)> {
+    pub(crate) fn get(&self, lint: LintId) -> Option<(Severity, LintSource)> {
         self.lints.get(&lint).copied()
     }
 
     /// Returns `true` if the `lint` is enabled.
-    pub fn is_enabled(&self, lint: LintId) -> bool {
+    pub(crate) fn is_enabled(&self, lint: LintId) -> bool {
         self.severity(lint).is_some()
     }
 

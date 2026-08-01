@@ -2,17 +2,15 @@ use std::borrow::Cow;
 
 use itertools::Either;
 use ruff_db::diagnostic::Span;
-use ruff_db::parsed::parsed_module;
-use ruff_python_ast as ast;
-use ruff_python_ast::NodeIndex;
 use ruff_python_ast::name::Name;
 use ruff_python_stdlib::identifiers::is_identifier;
-use ruff_text_size::{Ranged, TextRange};
+use ruff_text_size::TextRange;
 use ty_module_resolver::KnownModule;
 
 use crate::place::PlaceAndQualifiers;
 use crate::place::known_module_symbol;
 use crate::types::callable::{CallableFunctionProvenance, CallableTypeKind};
+use crate::types::class::{DynamicClassHeaderAnchor, dynamic_class_header_range};
 use crate::types::generics::GenericContext;
 use crate::types::member::Member;
 use crate::types::mro::Mro;
@@ -871,38 +869,15 @@ impl<'db> DynamicTypedDictLiteral<'db> {
 
     /// Returns the range of the `TypedDict` call expression.
     pub(crate) fn header_range(self, db: &'db dyn Db) -> TextRange {
-        let scope = self.scope(db);
-        let file = scope.file(db);
-        let module = parsed_module(db, file).load(db);
-
-        match self.anchor(db) {
+        let anchor = match self.anchor(db) {
             DynamicTypedDictAnchor::Definition(definition) => {
-                // For definitions, get the range from the definition's value.
-                // The TypedDict call is the value of the assignment.
-                definition
-                    .kind(db)
-                    .value(&module)
-                    .expect(
-                        "DynamicTypedDictAnchor::Definition should only be used for assignments",
-                    )
-                    .range()
+                DynamicClassHeaderAnchor::Definition(*definition)
             }
             DynamicTypedDictAnchor::ScopeOffset { offset, .. } => {
-                // For dangling calls, compute the absolute index from the offset.
-                let scope_anchor = scope.node(db).node_index().unwrap_or(NodeIndex::from(0));
-                let anchor_u32 = scope_anchor
-                    .as_u32()
-                    .expect("anchor should not be NodeIndex::NONE");
-                let absolute_index = NodeIndex::from(anchor_u32 + offset);
-
-                // Get the node and return its range.
-                let node: &ast::ExprCall = module
-                    .get_by_index(absolute_index)
-                    .try_into()
-                    .expect("scope offset should point to ExprCall");
-                node.range()
+                DynamicClassHeaderAnchor::ScopeOffset(*offset)
             }
-        }
+        };
+        dynamic_class_header_range(db, self.scope(db), anchor)
     }
 
     /// Returns a [`Span`] pointing to the `TypedDict` call expression.

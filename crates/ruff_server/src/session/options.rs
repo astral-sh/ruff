@@ -58,12 +58,12 @@ pub(crate) struct GlobalOptions {
 }
 
 impl GlobalOptions {
-    pub(crate) fn set_preview(&mut self, preview: bool) {
+    fn set_preview(&mut self, preview: bool) {
         self.client.set_preview(preview);
     }
 
     #[cfg(test)]
-    pub(crate) fn client(&self) -> &ClientOptions {
+    fn client(&self) -> &ClientOptions {
         &self.client
     }
 
@@ -169,7 +169,7 @@ impl ClientOptions {
     }
 
     /// Update the preview flag for the linter and the formatter with the given value.
-    pub(crate) fn set_preview(&mut self, preview: bool) {
+    fn set_preview(&mut self, preview: bool) {
         match self.lint.as_mut() {
             None => self.lint = Some(LintOptions::default().with_preview(preview)),
             Some(lint) => lint.set_preview(preview),

@@ -1,7 +1,6 @@
 use ruff_db::{diagnostic::Span, parsed::parsed_module};
-use ruff_python_ast as ast;
-use ruff_python_ast::{NodeIndex, PythonVersion, name::Name};
-use ruff_text_size::{Ranged, TextRange};
+use ruff_python_ast::{PythonVersion, name::Name};
+use ruff_text_size::TextRange;
 
 use crate::{
     Db, Program,
@@ -10,7 +9,11 @@ use crate::{
         BindingContext, BoundTypeVarInstance, ClassBase, ClassLiteral, ClassType, GenericContext,
         KnownClass, KnownInstanceType, MemberLookupPolicy, Parameter, Parameters,
         PropertyInstanceType, Signature, SubclassOfType, Type, TypeContext, TypeMapping,
-        definition_expression_type, member::Member, mro::Mro, tuple::TupleType,
+        class::{DynamicClassHeaderAnchor, dynamic_class_header_range},
+        definition_expression_type,
+        member::Member,
+        mro::Mro,
+        tuple::TupleType,
     },
 };
 use ty_python_core::{definition::Definition, scope::ScopeId};
@@ -198,43 +201,22 @@ impl<'db> DynamicNamedTupleLiteral<'db> {
     }
 
     /// Returns an instance type for this dynamic namedtuple.
-    pub(crate) fn to_instance(self, db: &'db dyn Db) -> Type<'db> {
+    fn to_instance(self, db: &'db dyn Db) -> Type<'db> {
         Type::instance(db, ClassType::NonGeneric(self.into()))
     }
 
     /// Returns the range of the namedtuple call expression.
     pub(crate) fn header_range(self, db: &'db dyn Db) -> TextRange {
-        let scope = self.scope(db);
-        let file = scope.file(db);
-        let module = parsed_module(db, file).load(db);
-
-        match self.anchor(db) {
+        let anchor = match self.anchor(db) {
             DynamicNamedTupleAnchor::CollectionsDefinition { definition, .. }
             | DynamicNamedTupleAnchor::TypingDefinition(definition) => {
-                // For definitions, get the range from the definition's value.
-                // The namedtuple call is the value of the assignment.
-                definition
-                    .kind(db)
-                    .value(&module)
-                    .expect("DynamicClassAnchor::Definition should only be used for assignments")
-                    .range()
+                DynamicClassHeaderAnchor::Definition(*definition)
             }
             DynamicNamedTupleAnchor::ScopeOffset { offset, .. } => {
-                // For dangling calls, compute the absolute index from the offset.
-                let scope_anchor = scope.node(db).node_index().unwrap_or(NodeIndex::from(0));
-                let anchor_u32 = scope_anchor
-                    .as_u32()
-                    .expect("anchor should not be NodeIndex::NONE");
-                let absolute_index = NodeIndex::from(anchor_u32 + offset);
-
-                // Get the node and return its range.
-                let node: &ast::ExprCall = module
-                    .get_by_index(absolute_index)
-                    .try_into()
-                    .expect("scope offset should point to ExprCall");
-                node.range()
+                DynamicClassHeaderAnchor::ScopeOffset(*offset)
             }
-        }
+        };
+        dynamic_class_header_range(db, self.scope(db), anchor)
     }
 
     /// Returns a [`Span`] pointing to the namedtuple call expression.

@@ -389,7 +389,7 @@ impl<'db> SemanticModel<'db> {
     ///
     /// If we're analyzing a string annotation, it will return the string literal's node.
     /// Otherwise it will return the input.
-    pub fn node_in_ast<'a>(&'a self, node: ast::AnyNodeRef<'a>) -> ast::AnyNodeRef<'a> {
+    fn node_in_ast<'a>(&'a self, node: ast::AnyNodeRef<'a>) -> ast::AnyNodeRef<'a> {
         if let Some(string_annotation) = &self.in_string_annotation_expr {
             (&**string_annotation).into()
         } else {
@@ -401,7 +401,7 @@ impl<'db> SemanticModel<'db> {
     ///
     /// If we're analyzing a string annotation, it will return the string literal's expression.
     /// Otherwise it will return the input.
-    pub fn expr_in_ast<'a>(&'a self, expr: &'a Expr) -> &'a Expr {
+    fn expr_in_ast<'a>(&'a self, expr: &'a Expr) -> &'a Expr {
         if let Some(string_annotation) = &self.in_string_annotation_expr {
             string_annotation
         } else {
@@ -413,7 +413,7 @@ impl<'db> SemanticModel<'db> {
     ///
     /// If we're analyzing a string annotation, it will return the string literal's expression.
     /// Otherwise it will return the input.
-    pub fn expr_ref_in_ast<'a>(&'a self, expr: ExprRef<'a>) -> ExprRef<'a> {
+    fn expr_ref_in_ast<'a>(&'a self, expr: ExprRef<'a>) -> ExprRef<'a> {
         if let Some(string_annotation) = &self.in_string_annotation_expr {
             ExprRef::from(string_annotation)
         } else {
@@ -681,7 +681,7 @@ pub trait HasDefinition {
     fn definition<'db>(&self, model: &SemanticModel<'db>) -> Definition<'db>;
 }
 
-pub trait HasOptionalDefinition {
+pub(crate) trait HasOptionalDefinition {
     /// Returns the definition of `self`, if it has one.
     ///
     /// ## Panics

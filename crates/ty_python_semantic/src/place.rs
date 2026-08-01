@@ -88,7 +88,7 @@ pub(crate) enum PublicTypePolicy {
 
 impl PublicTypePolicy {
     /// Apply the public-type policy to the raw type.
-    pub(crate) fn apply_if_needed<'db>(self, db: &'db dyn Db, ty: Type<'db>) -> Type<'db> {
+    fn apply_if_needed<'db>(self, db: &'db dyn Db, ty: Type<'db>) -> Type<'db> {
         match self {
             Self::Raw => ty,
             Self::Promote => ty.promote(db).promote_singletons(db),
@@ -146,7 +146,7 @@ pub(crate) struct DefinedPlace<'db> {
 }
 
 impl<'db> DefinedPlace<'db> {
-    pub(crate) fn new(ty: Type<'db>) -> Self {
+    fn new(ty: Type<'db>) -> Self {
         Self {
             ty,
             origin: TypeOrigin::Inferred,
@@ -156,7 +156,7 @@ impl<'db> DefinedPlace<'db> {
         }
     }
 
-    pub(crate) fn with_origin(mut self, origin: TypeOrigin) -> Self {
+    fn with_origin(mut self, origin: TypeOrigin) -> Self {
         self.origin = origin;
         self
     }
@@ -166,17 +166,17 @@ impl<'db> DefinedPlace<'db> {
         self
     }
 
-    pub(crate) fn with_public_type_policy(mut self, public_type_policy: PublicTypePolicy) -> Self {
+    fn with_public_type_policy(mut self, public_type_policy: PublicTypePolicy) -> Self {
         self.public_type_policy = public_type_policy;
         self
     }
 
-    pub(crate) fn with_definition(mut self, definition: Definition<'db>) -> Self {
+    fn with_definition(mut self, definition: Definition<'db>) -> Self {
         self.provenance = Provenance::SingleDefinition(definition);
         self
     }
 
-    pub(crate) fn with_provenance(mut self, provenance: Provenance<'db>) -> Self {
+    fn with_provenance(mut self, provenance: Provenance<'db>) -> Self {
         self.provenance = provenance;
         self
     }
@@ -309,10 +309,7 @@ impl<'db> Place<'db> {
 
     /// Set the public-type policy for this place.
     #[must_use]
-    pub(crate) fn with_public_type_policy(
-        self,
-        new_public_type_policy: PublicTypePolicy,
-    ) -> Place<'db> {
+    fn with_public_type_policy(self, new_public_type_policy: PublicTypePolicy) -> Place<'db> {
         match self {
             Place::Defined(defined) => {
                 Place::Defined(defined.with_public_type_policy(new_public_type_policy))

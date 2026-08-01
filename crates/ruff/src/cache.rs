@@ -91,7 +91,7 @@ impl Cache {
     ///
     /// Finally `settings` is used to ensure we don't open a cache for different
     /// settings. It also defines the directory where to store the cache.
-    pub(crate) fn open(package_root: PathBuf, settings: &Settings) -> Self {
+    fn open(package_root: PathBuf, settings: &Settings) -> Self {
         debug_assert!(package_root.is_absolute(), "package root not canonicalized");
 
         let key = format!("{}", cache_key(&package_root, settings));
@@ -154,7 +154,7 @@ impl Cache {
     }
 
     /// Applies the pending changes and persists the cache to disk, if it has been changed.
-    pub(crate) fn persist(mut self) -> Result<()> {
+    fn persist(mut self) -> Result<()> {
         if !self.save() {
             // No changes made, no need to write the same cache file back to
             // disk.
@@ -199,7 +199,7 @@ impl Cache {
 
     /// Applies the pending changes without storing the cache to disk.
     #[expect(clippy::cast_possible_truncation)]
-    pub(crate) fn save(&mut self) -> bool {
+    fn save(&mut self) -> bool {
         /// Maximum duration for which we keep a file in cache that hasn't been seen.
         const MAX_LAST_SEEN: Duration = Duration::from_hours(720); // 30 days.
 
@@ -371,7 +371,7 @@ fn cache_key(package_root: &Path, settings: &Settings) -> u64 {
 }
 
 /// Initialize the cache at the specified `Path`.
-pub(crate) fn init(path: &Path) -> Result<()> {
+fn init(path: &Path) -> Result<()> {
     // Create the cache directories.
     fs::create_dir_all(path.join(VERSION))?;
 

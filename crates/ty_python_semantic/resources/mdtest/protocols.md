@@ -4291,6 +4291,75 @@ class Custom:
 static_assert(is_assignable_to(TypeOf[Custom], CustomProtocol))
 ```
 
+## Class objects with explicitly typed special-method receivers
+
+A special method defined on a metaclass receives the class object, not an instance of that class. An
+explicitly annotated metaclass receiver must therefore be checked against the class object when
+matching a collection protocol. Special-method lookup must also ignore conflicting methods defined
+on the class itself.
+
+```py
+from collections.abc import Collection, Container, Iterable, Iterator, Reversible
+from typing import Any, Protocol
+from ty_extensions import static_assert
+from ty_extensions._internal import TypeOf, is_assignable_to, is_subtype_of
+
+class Membership(Protocol):
+    def __contains__(self, value: int, /) -> bool: ...
+
+class CollectionMeta(type):
+    def __contains__(self: type[Any], value: object, /) -> bool:
+        return True
+
+    def __iter__(self: type[Any]) -> Iterator[int]:
+        return iter((1,))
+
+    def __reversed__(self: type[Any]) -> Iterator[int]:
+        return iter((1,))
+
+    def __len__(self: type[Any]) -> int:
+        return 1
+
+class ClassCollection(metaclass=CollectionMeta):
+    def __contains__(self, value: str, /) -> bool:
+        return True
+
+    def __iter__(self) -> Iterator[str]:
+        return iter(("member",))
+
+    def __reversed__(self) -> Iterator[str]:
+        return iter(("member",))
+
+static_assert(is_assignable_to(TypeOf[ClassCollection], Membership))
+static_assert(is_assignable_to(TypeOf[ClassCollection], Container[int]))
+static_assert(is_assignable_to(TypeOf[ClassCollection], Container[str]))
+static_assert(is_subtype_of(TypeOf[ClassCollection], Container[int]))
+static_assert(is_assignable_to(TypeOf[ClassCollection], Iterable[int]))
+static_assert(is_assignable_to(TypeOf[ClassCollection], Reversible[int]))
+static_assert(is_assignable_to(TypeOf[ClassCollection], Collection[int]))
+```
+
+The explicit receiver must not hide an incompatible membership parameter or return type.
+
+```py
+class StringMembershipMeta(type):
+    def __contains__(self: type[Any], value: str, /) -> bool:
+        return True
+
+class StringMembership(metaclass=StringMembershipMeta):
+    pass
+
+class NonBooleanMembershipMeta(type):
+    def __contains__(self: type[Any], value: object, /) -> int:
+        return 1
+
+class NonBooleanMembership(metaclass=NonBooleanMembershipMeta):
+    pass
+
+static_assert(not is_assignable_to(TypeOf[StringMembership], Container[int]))
+static_assert(not is_assignable_to(TypeOf[NonBooleanMembership], Container[int]))
+```
+
 ## Subtyping of protocols with `@classmethod` or `@staticmethod` members
 
 The typing spec states that protocols may have `@classmethod` or `@staticmethod` method members.
@@ -6494,7 +6563,7 @@ class B1(A1[T3], Protocol[T3]): ...
 class B2(A2[T4], Protocol[T4]): ...
 
 # TODO should just be `B2[Any]`
-reveal_type(T3.__bound__)  # revealed: B2[Any] | @Todo(specialized non-generic class)
+reveal_type(T3.__bound__)  # revealed: B2[Any] | Unknown
 
 # TODO error: [invalid-type-arguments]
 def f(x: B1[int]):

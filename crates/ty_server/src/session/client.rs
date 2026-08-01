@@ -118,7 +118,7 @@ impl Client {
     ///
     /// This is useful for notifications that don't require any data.
     #[expect(dead_code)]
-    pub(crate) fn send_notification_no_params(&self, method: &str) {
+    fn send_notification_no_params(&self, method: &str) {
         if let Err(err) =
             self.client_sender
                 .send(lsp_server::Message::Notification(Notification::new(
@@ -192,6 +192,21 @@ impl Client {
     /// Logs an error if the message could not be sent.
     pub(crate) fn show_error_message(&self, message: impl Display) {
         self.show_message(message, lsp_types::MessageType::Error);
+    }
+
+    /// Sends a notification of partial result progress to the client, via a `$/progress`
+    /// notification.
+    pub(crate) fn send_partial_result<R>(
+        &self,
+        token: lsp_types::ProgressToken,
+        partial_result: R::PartialResult,
+    ) where
+        R: lsp_types::RequestWithPartialResults,
+    {
+        self.send_notification::<lsp_types::ProgressNotification>(lsp_types::ProgressParams {
+            token,
+            value: serde_json::to_value(partial_result).expect("Partial result to be serializable"),
+        });
     }
 
     /// Re-queues this request after a salsa cancellation for a retry.

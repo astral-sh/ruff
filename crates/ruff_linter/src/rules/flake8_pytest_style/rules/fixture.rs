@@ -518,6 +518,11 @@ impl Violation for PytestFixtureFinalizerCallback {
 ///     return resource
 /// ```
 ///
+/// ## Fix safety
+///
+/// This rule's fix is always marked unsafe because removing the `yield` can change the behavior of
+/// code that relies on implicit cleanup, such as when a value is garbage-collected.
+///
 /// ## References
 /// - [`pytest` documentation: Teardown/Cleanup](https://docs.pytest.org/en/latest/how-to/fixtures.html#teardown-cleanup-aka-fixture-finalization)
 #[derive(ViolationMetadata)]
@@ -840,9 +845,9 @@ fn check_fixture_returns(checker: &Checker, name: &str, body: &[Stmt], returns: 
             ))
         });
         if let Some(return_type_edit) = return_type_edit {
-            diagnostic.set_fix(Fix::safe_edits(yield_edit, [return_type_edit]));
+            diagnostic.set_fix(Fix::unsafe_edits(yield_edit, [return_type_edit]));
         } else {
-            diagnostic.set_fix(Fix::safe_edit(yield_edit));
+            diagnostic.set_fix(Fix::unsafe_edit(yield_edit));
         }
     }
 }

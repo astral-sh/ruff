@@ -98,7 +98,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     /// expression refers to the first parameter of the enclosing method and has not been shadowed
     /// in intermediate scopes. We additionally check that the nearest enclosing function has an
     /// implicit receiver, since static methods also have a first parameter.
-    pub(super) fn is_instance_attribute_assignment(&self, target: &ast::ExprAttribute) -> bool {
+    fn is_instance_attribute_assignment(&self, target: &ast::ExprAttribute) -> bool {
         let Some(place_expr) = PlaceExpr::try_from_expr(target) else {
             return false;
         };
