@@ -1126,11 +1126,11 @@ impl KnownClass {
             }
 
             class_literal
-                .apply_specialization(env, |_| generic_context.specialize(db, specialization))
+                .apply_specialization(env.db(), |_| generic_context.specialize(db, specialization))
         }
 
         let class_literal = self.to_class_literal(env).as_class_literal()?.as_static()?;
-        let generic_context = class_literal.generic_context(env)?;
+        let generic_context = class_literal.generic_context(env.db())?;
         let specialization = specialization.into();
 
         Some(to_specialized_class_type_impl(

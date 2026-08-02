@@ -25,6 +25,7 @@ use crate::{
     lint::{LintId, LintMetadata},
     suppression::suppressions,
 };
+use ty_python_core::definition::Definition;
 use ty_python_core::scope::ScopeId;
 use ty_python_core::semantic_index;
 
@@ -41,6 +42,22 @@ impl<'db> SemanticEnvironment<'db> {
         Self {
             db,
             environment: Cell::new(ProgramSource::File(file.as_id())),
+        }
+    }
+
+    /// Creates an environment that lazily obtains its program from `definition`.
+    pub fn from_definition(db: &'db dyn Db, definition: Definition<'db>) -> Self {
+        Self {
+            db,
+            environment: Cell::new(ProgramSource::Definition(definition.as_id())),
+        }
+    }
+
+    /// Creates an environment that lazily obtains its program from `scope`.
+    pub fn from_scope(db: &'db dyn Db, scope: ScopeId<'db>) -> Self {
+        Self {
+            db,
+            environment: Cell::new(ProgramSource::Scope(scope.as_id())),
         }
     }
 
@@ -71,6 +88,18 @@ impl<'db> SemanticEnvironment<'db> {
                 self.environment.set(ProgramSource::Program(program));
                 program
             }
+            ProgramSource::Definition(definition) => {
+                cold_path();
+                let program = Definition::from_id(definition).program(self.db);
+                self.environment.set(ProgramSource::Program(program));
+                program
+            }
+            ProgramSource::Scope(scope) => {
+                cold_path();
+                let program = ScopeId::from_id(scope).program(self.db);
+                self.environment.set(ProgramSource::Program(program));
+                program
+            }
         }
     }
 
@@ -89,6 +118,8 @@ enum ProgramSource {
     // `PythonFile` out of the `Cell` preserves covariance in `'db`; replacing this variant after
     // the first read avoids repeated Salsa ingredient reads in hot, recursive type operations.
     File(Id),
+    Definition(Id),
+    Scope(Id),
 }
 
 /// Context for inferring the types of a single file.
@@ -288,18 +319,12 @@ impl<'db, 'ast> InferContext<'db, 'ast> {
             .ancestor_scopes(scope_id)
             .filter_map(|(_, scope)| scope.node().as_function())
             .filter_map(|node| {
-                infer_definition_types(
-                    self.semantic_environment(),
-                    index.expect_single_definition(node),
-                )
-                .undecorated_type()
-                .and_then(Type::as_function_literal)
+                infer_definition_types(self.db(), index.expect_single_definition(node))
+                    .undecorated_type()
+                    .and_then(Type::as_function_literal)
             })
             .any(|function_ty| {
-                function_ty.has_known_decorator(
-                    self.semantic_environment(),
-                    FunctionDecorators::NO_TYPE_CHECK,
-                )
+                function_ty.has_known_decorator(self.db(), FunctionDecorators::NO_TYPE_CHECK)
             })
     }
 

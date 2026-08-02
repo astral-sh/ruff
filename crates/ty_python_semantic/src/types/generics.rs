@@ -296,13 +296,13 @@ impl<'db> GenericContext<'db> {
         match node {
             NodeWithScopeKind::Class(class) => {
                 let definition = index.expect_single_definition(class);
-                original_class_type(env, definition)?.generic_context(env)
+                original_class_type(env, definition)?.generic_context(env.db())
             }
             NodeWithScopeKind::Function(function) => {
                 let definition = index.expect_single_definition(function);
-                infer_definition_types(env, definition)
+                infer_definition_types(env.db(), definition)
                     .function_type(definition)?
-                    .last_definition_signature(env)
+                    .last_definition_signature(env.db())
                     .generic_context
             }
             NodeWithScopeKind::TypeAlias(type_alias) => {
@@ -310,7 +310,7 @@ impl<'db> GenericContext<'db> {
                 binding_type(env, definition)
                     .as_type_alias()?
                     .as_pep_695_type_alias()?
-                    .generic_context(env)
+                    .generic_context(env.db())
             }
             _ => None,
         }
@@ -404,7 +404,7 @@ impl<'db> GenericContext<'db> {
     /// In this example, `method`'s generic context binds `Self` and `T`, but its inferable set
     /// also includes `A@C`. This is needed because at each call site, we need to infer the
     /// specialized class instance type whose method is being invoked.
-    pub(crate) fn inferable_typevars(self, env: &SemanticEnvironment<'db>) -> TypeVarSet<'db> {
+    pub(crate) fn inferable_typevars(self, db: &'db dyn Db) -> TypeVarSet<'db> {
         #[derive(Default)]
         struct CollectTypeVars<'db> {
             typevars: RefCell<FxOrderMap<BoundTypeVarIdentity<'db>, BoundTypeVarInstance<'db>>>,
@@ -454,8 +454,6 @@ impl<'db> GenericContext<'db> {
             TypeVarSet::from_typevars(db, visitor.typevars.into_inner().into_values())
         }
 
-        let db = env.db();
-        debug_assert_eq!(env.program(), self.program(db));
         inferable_typevars_inner(db, self)
     }
 
@@ -1285,12 +1283,8 @@ impl<'db> Specialization<'db> {
     /// `{U: int}`, we can apply the second specialization to the first, resulting in `T: int`.
     /// That lets us produce the generic alias `A[int]`, which is the corresponding entry in the
     /// MRO of `B[int]`.
-    pub(crate) fn apply_specialization(
-        self,
-        env: &SemanticEnvironment<'db>,
-        other: Specialization<'db>,
-    ) -> Self {
-        let db = env.db();
+    pub(crate) fn apply_specialization(self, db: &'db dyn Db, other: Specialization<'db>) -> Self {
+        let env = &SemanticEnvironment::from_program(db, other.generic_context(db).program(db));
         let new_specialization = self.apply_type_mapping(
             env,
             &TypeMapping::ApplySpecialization(ApplySpecialization::Specialization(other)),
@@ -1408,11 +1402,11 @@ impl<'db> Specialization<'db> {
     /// Applies an optional specialization to this specialization.
     pub(crate) fn apply_optional_specialization(
         self,
-        env: &SemanticEnvironment<'db>,
+        db: &'db dyn Db,
         other: Option<Specialization<'db>>,
     ) -> Self {
         if let Some(other) = other {
-            self.apply_specialization(env, other)
+            self.apply_specialization(db, other)
         } else {
             self
         }
@@ -1523,7 +1517,8 @@ impl<'db> Specialization<'db> {
 
                     if has_dynamic_type
                         && effective_materialization_kind == MaterializationKind::Top
-                        && let Some(upper_bound) = bound_typevar.top_materialized_upper_bound(env)
+                        && let Some(upper_bound) =
+                            bound_typevar.top_materialized_upper_bound(env.db())
                     {
                         IntersectionType::from_two_elements(env, materialized, upper_bound)
                     } else {
@@ -3588,7 +3583,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                         });
                     let when = if nominally_inherited
                         || formal_protocol
-                            .interface(self.env)
+                            .interface(self.env.db())
                             .has_only_finite_members(self.env)
                     {
                         Some(actual.when_constraint_set_assignable_to_owned(self.env, formal))
@@ -3795,7 +3790,9 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             // from matching the actual type's callable signature against the protocol's `__call__`
             // method signature.
             (Type::ProtocolInstance(formal_protocol), _) => {
-                let Some(call_method) = formal_protocol.interface(self.env).call_method(self.env)
+                let Some(call_method) = formal_protocol
+                    .interface(self.env.db())
+                    .call_method(self.env)
                 else {
                     return Ok(());
                 };
@@ -3891,7 +3888,7 @@ mod tests {
         });
         let context = GenericContext::from_typevar_instances(&env, [t]);
 
-        let inferable = context.inferable_typevars(&env);
+        let inferable = context.inferable_typevars(env.db());
         assert_eq!(inferable.iter(&db).collect::<Vec<_>>(), [t, u]);
         assert!(t.is_inferable(&db, inferable));
         assert!(u.is_inferable(&db, inferable));

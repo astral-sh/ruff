@@ -1839,7 +1839,7 @@ fn enum_literal_value<'db>(
 ) -> Option<Type<'db>> {
     let db = env.db();
     let enum_class_literal = literal.enum_class_literal(db);
-    let metadata = enum_metadata(env, enum_class_literal.class_literal(db))?;
+    let metadata = enum_metadata(env.db(), enum_class_literal.class_literal(db))?;
     let name = enum_class_literal.resolve_member(db, literal.name(db))?;
     metadata.concrete_value_type(env, name)
 }

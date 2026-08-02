@@ -74,7 +74,7 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
         );
 
         let value_inference = infer_expression_types(
-            self.context.semantic_environment(),
+            self.context.db(),
             value.expression(),
             TypeContext::default(),
         );

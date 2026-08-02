@@ -315,8 +315,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let db = self.db();
 
-        let decorator_inference = (!decorator_list.is_empty())
-            .then(|| function_known_decorators(self.semantic_environment(), definition));
+        let decorator_inference =
+            (!decorator_list.is_empty()).then(|| function_known_decorators(self.db(), definition));
         if let Some(decorator_inference) = decorator_inference.as_ref() {
             self.context.extend(decorator_inference.diagnostics());
             self.expressions
@@ -438,7 +438,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             dataclass_transformer_params,
             function.returns.is_some(),
         );
-        let function_literal = FunctionLiteral::new(self.semantic_environment(), overload_literal);
+        let function_literal = FunctionLiteral::new(db, overload_literal);
         let function_type = FunctionType::new(db, function_literal, None);
         let is_decorated_overload_implementation = !decorator_types_and_nodes.is_empty()
             && function_literal.has_separate_implementation(db);
@@ -615,11 +615,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     .index
                     .node_scope(NodeWithScopeRef::FunctionTypeParameters(function))
                     .to_scope_id(db, self.python_file());
-                let type_params_inference = infer_scope_types(
-                    self.semantic_environment(),
-                    type_params_scope,
-                    TypeContext::default(),
-                );
+                let type_params_inference =
+                    infer_scope_types(self.db(), type_params_scope, TypeContext::default());
 
                 for param_with_default in function.parameters.iter_non_variadic_params() {
                     let Some(default) = param_with_default.default.as_deref() else {
@@ -1065,7 +1062,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let function_name = &function_node.name;
 
         let mut is_classmethod = is_implicit_classmethod(function_name);
-        let inference = infer_definition_types(self.semantic_environment(), method_definition);
+        let inference = infer_definition_types(self.db(), method_definition);
         for decorator in &function_node.decorator_list {
             let decorator_ty = inference.expression_type(&decorator.expression);
             if let Some(known_class) = decorator_ty
@@ -1246,7 +1243,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         lambda: &'ast ast::ExprLambda,
     ) -> Option<Type<'db>> {
         let enclosing_stmt = infer_statement_types(
-            self.semantic_environment(),
+            self.db(),
             self.index.enclosing_lambda_statement(lambda.into())?,
         );
         let callable = enclosing_stmt.expression_type(lambda).as_callable()?;

@@ -171,7 +171,7 @@ impl Ty {
                     .place
                     .expect_type()
                     .expect_class_literal()
-                    .into_enum_class(env)
+                    .into_enum_class(env.db())
                     .expect("`uuid.SafeUUID` is an enum");
                 Type::enum_literal(EnumLiteralType::new(db, enum_class, Name::new(name)))
             }

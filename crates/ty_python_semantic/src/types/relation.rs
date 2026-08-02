@@ -1941,7 +1941,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                     self.check_callable_signature_pair(
                         env,
                         source_partial.partial(db).signatures(db),
-                        target_function.into_callable_type(env).signatures(db),
+                        target_function.into_callable_type(env.db()).signatures(db),
                     )
                 })
             }
@@ -2666,7 +2666,7 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
     ) -> ConstraintSet<'db, 'c> {
         let db = env.db();
         protocol
-            .interface(env)
+            .interface(env.db())
             .members(db)
             .when_any(env, self.constraints, |member| {
                 other
@@ -3125,21 +3125,20 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             (Type::ProtocolInstance(protocol), other)
             | (other, Type::ProtocolInstance(protocol)) => nontrivial_check(self, || {
                 self.with_recursion_guard(env, left, right, || {
-                    protocol
-                        .interface(env)
-                        .members(db)
-                        .when_any(env, self.constraints, |member| {
-                            match other.member(env, member.name()).place {
-                                Place::Defined(DefinedPlace {
-                                    ty: attribute_type, ..
-                                }) => self.protocol_member_has_disjoint_type_from_ty(
-                                    env,
-                                    &member,
-                                    attribute_type,
-                                ),
-                                Place::Undefined => self.never(),
-                            }
-                        })
+                    protocol.interface(env.db()).members(db).when_any(
+                        env,
+                        self.constraints,
+                        |member| match other.member(env, member.name()).place {
+                            Place::Defined(DefinedPlace {
+                                ty: attribute_type, ..
+                            }) => self.protocol_member_has_disjoint_type_from_ty(
+                                env,
+                                &member,
+                                attribute_type,
+                            ),
+                            Place::Undefined => self.never(),
+                        },
+                    )
                 })
             }),
 
@@ -3373,8 +3372,8 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
 
                 nontrivial_check(self, || {
                     if a_function != b_function
-                        && a_function.has_known_decorator(env, FunctionDecorators::FINAL)
-                        && b_function.has_known_decorator(env, FunctionDecorators::FINAL)
+                        && a_function.has_known_decorator(env.db(), FunctionDecorators::FINAL)
+                        && b_function.has_known_decorator(env.db(), FunctionDecorators::FINAL)
                     {
                         // If *both* methods are `@final` (and they're not literally the same
                         // definition), they must be disjoint.

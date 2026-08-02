@@ -1311,13 +1311,14 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                                 .unwrap_or_else(|| class_literal.default_specialization(env));
                             SubclassOfType::from(env, class_type)
                         } else {
-                            match class_literal.generic_context(env) {
+                            match class_literal.generic_context(env.db()) {
                                 Some(generic_context) => {
                                     let specialize = &|types: &[Option<Type<'db>>]| {
-                                        let class = class_literal.apply_specialization(env, |_| {
-                                            generic_context
-                                                .specialize_partial(env, types.iter().copied())
-                                        });
+                                        let class =
+                                            class_literal.apply_specialization(env.db(), |_| {
+                                                generic_context
+                                                    .specialize_partial(env, types.iter().copied())
+                                            });
                                         if class_literal.is_protocol(env) {
                                             match Type::instance(env, class) {
                                                 Type::ProtocolInstance(protocol) => {
@@ -1421,7 +1422,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         // belongs to the remaining type variables).
         if any_over_type(env, value_ty, true, |ty| ty.is_divergent()) {
             let value_ty = value_ty.apply_specialization(
-                env,
+                env.db(),
                 generic_context.specialize(
                     db,
                     std::iter::repeat_n(
@@ -1447,7 +1448,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
         let specialize = &|types: &[Option<Type<'db>>]| {
             let specialized = value_ty.apply_specialization(
-                env,
+                env.db(),
                 generic_context.specialize_partial(env, types.iter().copied()),
             );
 
@@ -1600,7 +1601,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     Type::unknown()
                 }
                 KnownInstanceType::TypeAliasType(type_alias) => {
-                    match type_alias.generic_context(self.semantic_environment()) {
+                    match type_alias.generic_context(self.db()) {
                         Some(generic_context) => {
                             let specialized_type_alias = self
                                 .infer_explicit_type_alias_type_specialization(
@@ -1631,8 +1632,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                                     type_alias.name(self.db())
                                 ));
                                 let secondary = self.context.secondary(&*subscript.value);
-                                let value_type =
-                                    type_alias.raw_value_type(self.semantic_environment());
+                                let value_type = type_alias.raw_value_type(self.db());
                                 if value_type.is_specialized_generic(self.db()) {
                                     diagnostic.annotate(secondary.message(format_args!(
                                         "Alias to `{}`, which is already specialized",
@@ -1763,10 +1763,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 value_ty
             }
             Type::ClassLiteral(class) => {
-                match (
-                    class.generic_context(self.semantic_environment()),
-                    class.as_static(),
-                ) {
+                match (class.generic_context(self.db()), class.as_static()) {
                     (Some(generic_context), Some(static_class)) => {
                         let specialized_class = self.infer_explicit_class_specialization(
                             subscript,

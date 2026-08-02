@@ -193,20 +193,11 @@ impl<'db> DynamicClassLiteral<'db> {
     /// or if the bases argument cannot be extracted precisely.
     ///
     /// Returns `[Unknown]` if the bases iterable is variable-length.
-    pub(crate) fn explicit_bases(self, env: &SemanticEnvironment<'db>) -> &'db [Type<'db>] {
+    pub(crate) fn explicit_bases(self, db: &'db dyn Db) -> &'db [Type<'db>] {
         /// Inner cached function for deferred inference of bases.
         /// Only called for assigned calls where inference was deferred.
-        fn deferred_explicit_bases<'db>(
-            env: &SemanticEnvironment<'db>,
-            definition: Definition<'db>,
-        ) -> &'db [Type<'db>] {
-            let db = env.db();
-            debug_assert_eq!(env.program(), definition.program(db));
-            deferred_explicit_bases_inner(db, definition)
-        }
-
         #[salsa::tracked(returns(deref), cycle_initial=|_, _, _| Box::default(), heap_size=ruff_memory_usage::heap_size)]
-        fn deferred_explicit_bases_inner<'db>(
+        fn deferred_explicit_bases<'db>(
             db: &'db dyn Db,
             definition: Definition<'db>,
         ) -> Box<[Type<'db>]> {
@@ -233,11 +224,11 @@ impl<'db> DynamicClassLiteral<'db> {
             .unwrap_or_else(|| Box::from([Type::unknown()]))
         }
 
-        match self.anchor(env.db()) {
+        match self.anchor(db) {
             // For dangling calls, bases are stored directly on the anchor.
             DynamicClassAnchor::ScopeOffset { explicit_bases, .. } => explicit_bases.as_ref(),
             // For assigned calls, use deferred inference.
-            DynamicClassAnchor::Definition(definition) => deferred_explicit_bases(env, *definition),
+            DynamicClassAnchor::Definition(definition) => deferred_explicit_bases(db, *definition),
         }
     }
 
@@ -282,7 +273,7 @@ impl<'db> DynamicClassLiteral<'db> {
         self,
         env: &SemanticEnvironment<'db>,
     ) -> Result<Type<'db>, DynamicMetaclassConflict<'db>> {
-        let original_bases = self.explicit_bases(env);
+        let original_bases = self.explicit_bases(env.db());
 
         // If no bases, metaclass is `type`.
         // To dynamically create a class with no bases that has a custom metaclass,
@@ -292,7 +283,7 @@ impl<'db> DynamicClassLiteral<'db> {
         }
 
         // If there's an MRO error, return unknown to avoid cascading errors.
-        if self.try_mro(env).is_err() {
+        if self.try_mro(env.db()).is_err() {
             return Ok(SubclassOfType::subclass_of_unknown());
         }
 
@@ -461,27 +452,18 @@ impl<'db> DynamicClassLiteral<'db> {
     ///
     /// Returns `Ok(Mro)` if successful, or `Err(DynamicMroError)` if there's
     /// an error (duplicate bases or C3 linearization failure).
-    pub(crate) fn try_mro(
-        self,
-        env: &SemanticEnvironment<'db>,
-    ) -> &'db Result<Mro<'db>, DynamicMroError<'db>> {
-        let db = env.db();
-        debug_assert_eq!(env.program(), self.scope(db).program(db));
-        self.try_mro_inner(db)
-    }
-
     #[salsa::tracked(
         returns(ref),
         cycle_initial=|db, _, self_: DynamicClassLiteral<'db>| {
             Ok(Mro::from([
                 ClassBase::Class(ClassType::NonGeneric(ClassLiteral::Dynamic(self_))),
-                ClassBase::object(&SemanticEnvironment::from_file(db, self_.scope(db).python_file(db))),
+                ClassBase::object(&SemanticEnvironment::from_scope(db, self_.scope(db))),
             ]))
         },
         heap_size=ruff_memory_usage::heap_size
     )]
-    fn try_mro_inner(self, db: &'db dyn Db) -> Result<Mro<'db>, DynamicMroError<'db>> {
-        let env = SemanticEnvironment::from_file(db, self.scope(db).python_file(db));
+    pub(crate) fn try_mro(self, db: &'db dyn Db) -> Result<Mro<'db>, DynamicMroError<'db>> {
+        let env = SemanticEnvironment::from_scope(db, self.scope(db));
         Mro::of_dynamic_class(&env, self)
     }
 
@@ -526,11 +508,12 @@ impl<'db> DynamicClassLiteral<'db> {
     /// if synthesis is valid.
     ///
     /// If the namespace is dynamic, returns `true` since we can't know if ordering methods exist.
-    pub(crate) fn has_own_ordering_method(self, env: &SemanticEnvironment<'db>) -> bool {
+    pub(crate) fn has_own_ordering_method(self, db: &'db dyn Db) -> bool {
         const ORDERING_METHODS: &[&str] = &["__lt__", "__le__", "__gt__", "__ge__"];
+        let env = SemanticEnvironment::from_scope(db, self.scope(db));
         ORDERING_METHODS
             .iter()
-            .any(|name| !self.own_class_member(env, name).is_undefined())
+            .any(|name| !self.own_class_member(&env, name).is_undefined())
     }
 
     /// Returns a new [`DynamicClassLiteral`] with the given dataclass params, preserving all other fields.

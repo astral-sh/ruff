@@ -301,7 +301,7 @@ impl<'db> ClassBase<'db> {
 
                 SpecialFormType::NamedTuple => {
                     let class = subclass?.as_static()?;
-                    let fields = class.own_fields(env, None, CodeGeneratorKind::NamedTuple);
+                    let fields = class.own_fields(env.db(), None, CodeGeneratorKind::NamedTuple);
                     Self::try_from_type(
                         env,
                         TupleType::heterogeneous(
@@ -386,11 +386,14 @@ impl<'db> ClassBase<'db> {
 
     pub(crate) fn apply_optional_specialization(
         self,
-        env: &SemanticEnvironment<'db>,
+        db: &'db dyn Db,
         specialization: Option<Specialization<'db>>,
     ) -> Self {
-        let db = env.db();
         if let Some(specialization) = specialization {
+            let env = &SemanticEnvironment::from_program(
+                db,
+                specialization.generic_context(db).program(db),
+            );
             let new_self = self.apply_type_mapping_impl(
                 env,
                 &TypeMapping::ApplySpecialization(ApplySpecialization::Specialization(
@@ -429,7 +432,7 @@ impl<'db> ClassBase<'db> {
                     return false;
                 };
                 class_literal
-                    .try_mro(env, specialization)
+                    .try_mro(env.db(), specialization)
                     .is_err_and(StaticMroError::is_cycle)
             }
             ClassBase::Any

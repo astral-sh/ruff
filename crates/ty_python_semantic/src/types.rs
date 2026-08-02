@@ -191,7 +191,7 @@ pub fn check_types(db: &dyn Db, file: PythonFile<'_>) -> Vec<Diagnostic> {
             continue;
         }
 
-        let result = infer_scope_types(&env, scope_id, TypeContext::default());
+        let result = infer_scope_types(env.db(), scope_id, TypeContext::default());
 
         if let Some(scope_diagnostics) = result.diagnostics() {
             diagnostics.extend(scope_diagnostics);
@@ -223,7 +223,7 @@ pub(crate) fn binding_type<'db>(
     env: &SemanticEnvironment<'db>,
     definition: Definition<'db>,
 ) -> Type<'db> {
-    let inference = infer_definition_types(env, definition);
+    let inference = infer_definition_types(env.db(), definition);
     inference.binding_type(definition)
 }
 
@@ -232,7 +232,7 @@ pub(crate) fn inferred_declaration<'db>(
     env: &SemanticEnvironment<'db>,
     definition: Definition<'db>,
 ) -> InferredDeclaration<'db> {
-    let inference = infer_definition_types(env, definition);
+    let inference = infer_definition_types(env.db(), definition);
     inference.inferred_declaration(definition)
 }
 
@@ -254,11 +254,11 @@ fn definition_expression_type<'db>(
     let scope = file_scope.to_scope_id(db, file);
     if scope == definition.scope(db) {
         // expression is in the definition scope
-        let inference = infer_definition_types(env, definition);
+        let inference = infer_definition_types(env.db(), definition);
         if let Some(ty) = inference.try_expression_type(expression) {
             ty
         } else {
-            infer_deferred_types(env, definition).expression_type(expression)
+            infer_deferred_types(env.db(), definition).expression_type(expression)
         }
     } else {
         // expression is in a type-params sub-scope
@@ -281,7 +281,7 @@ fn definition_expression_annotation<'db>(
     let file_scope = index.expression_scope_id(expression);
     let scope = file_scope.to_scope_id(db, file);
     if scope == definition.scope(db) {
-        let inference = infer_deferred_types(env, definition);
+        let inference = infer_deferred_types(env.db(), definition);
         TypeAndQualifiers::new(
             inference.expression_type(expression),
             TypeOrigin::Declared,
@@ -715,8 +715,8 @@ impl<'db> PropertyInstanceType<'db> {
             accessor
                 .and_then(Type::as_function_literal)
                 .into_iter()
-                .flat_map(|function| function.iter_overloads_and_implementation(env))
-                .filter_map(|overload| overload.signature(env).definition())
+                .flat_map(|function| function.iter_overloads_and_implementation(env.db()))
+                .filter_map(|overload| overload.signature(env.db()).definition())
                 .any(|accessor_def| accessor_def == def)
         };
 
@@ -1362,7 +1362,7 @@ impl<'db> Type<'db> {
 
     fn is_enum(&self, env: &SemanticEnvironment<'db>) -> bool {
         self.as_nominal_instance()
-            .is_some_and(|instance| enum_metadata(env, instance.class_literal(env)).is_some())
+            .is_some_and(|instance| enum_metadata(env.db(), instance.class_literal(env)).is_some())
     }
 
     fn is_typealias_special_form(&self) -> bool {
@@ -1471,7 +1471,7 @@ impl<'db> Type<'db> {
         match self {
             Type::ClassLiteral(class_literal) => class_literal.type_check_only(db),
             Type::FunctionLiteral(f) => {
-                f.has_known_decorator(env, FunctionDecorators::TYPE_CHECK_ONLY)
+                f.has_known_decorator(env.db(), FunctionDecorators::TYPE_CHECK_ONLY)
             }
             _ => false,
         }
@@ -1481,7 +1481,7 @@ impl<'db> Type<'db> {
     pub fn is_deprecated(&self, env: &SemanticEnvironment<'db>) -> bool {
         let db = env.db();
         match self {
-            Type::FunctionLiteral(f) => f.implementation_deprecated(env).is_some(),
+            Type::FunctionLiteral(f) => f.implementation_deprecated(env.db()).is_some(),
             Type::ClassLiteral(c) => c.deprecated(db).is_some(),
             _ => false,
         }
@@ -2230,7 +2230,7 @@ impl<'db> Type<'db> {
             Type::LiteralValue(literal) if literal.is_promotable() => {
                 literal.fallback_instance(env)
             }
-            Type::FunctionLiteral(literal) => Type::Callable(literal.into_callable_type(env)),
+            Type::FunctionLiteral(literal) => Type::Callable(literal.into_callable_type(env.db())),
             _ => self,
         }
     }
@@ -2794,7 +2794,7 @@ impl<'db> Type<'db> {
         if let Type::ProtocolInstance(protocol) = ty
             && let Some(origin) = protocol.materialized_origin(db)
         {
-            let interface = protocol.interface(env);
+            let interface = protocol.interface(env.db());
             return if interface.includes_member(db, name) {
                 interface.instance_member(env, name)
             } else {
@@ -3409,10 +3409,10 @@ impl<'db> Type<'db> {
         // for every function and access context.
         if let Type::FunctionLiteral(function) = self {
             let db = env.db();
-            let descriptor_result = if function.is_classmethod(env) {
+            let descriptor_result = if function.is_classmethod(env.db()) {
                 Type::BoundMethod(BoundMethodType::new(db, function, owner))
             } else if let Some(instance) = instance
-                && !function.is_staticmethod(env)
+                && !function.is_staticmethod(env.db())
             {
                 Type::BoundMethod(BoundMethodType::new(db, function, instance))
             } else {
@@ -3934,7 +3934,7 @@ impl<'db> Type<'db> {
                     _ => this
                         .nominal_class(env)
                         .map(|class| class.class_literal(db))
-                        .and_then(|class| class.into_enum_class(env)),
+                        .and_then(|class| class.into_enum_class(env.db())),
                 } && let Some(resolved_name) = enum_class.resolve_member(db, name)
                 {
                     return Place::bound(Type::enum_literal(EnumLiteralType::new(
@@ -4248,7 +4248,7 @@ impl<'db> Type<'db> {
                 Type::ProtocolInstance(protocol)
                     if protocol.class_origin(db).is_none()
                         && policy.mro_no_object_fallback()
-                        && !protocol.interface(env).includes_member(db, name_str) =>
+                        && !protocol.interface(env.db()).includes_member(db, name_str) =>
                 {
                     Place::Undefined.into()
                 }
@@ -4346,7 +4346,7 @@ impl<'db> Type<'db> {
                 Type::NominalInstance(instance)
                     if matches!(name_str, "name" | "_name_" | "value" | "_value_")
                         && let class_literal = instance.class_literal(env)
-                        && let Some(metadata) = enum_metadata(env, class_literal)
+                        && let Some(metadata) = enum_metadata(env.db(), class_literal)
                         && !enums::class_defines_property(env, class_literal, name_str) =>
                 {
                     let is_enum_subclass = Type::ClassLiteral(class_literal)
@@ -4430,11 +4430,11 @@ impl<'db> Type<'db> {
                     // Retain that TypeVar as the receiver so `Self` binds to `T'instance`, not `A`.
                     let receiver = receiver.unwrap_or(this);
                     let enum_class = match this {
-                        Type::ClassLiteral(literal) => literal.into_enum_class(env),
+                        Type::ClassLiteral(literal) => literal.into_enum_class(env.db()),
                         Type::SubclassOf(subclass_of) => subclass_of
                             .subclass_of()
                             .into_class(env)
-                            .and_then(|class| class.class_literal(db).into_enum_class(env)),
+                            .and_then(|class| class.class_literal(db).into_enum_class(env.db())),
                         _ => None,
                     };
                     if let Some(enum_class) = enum_class
@@ -4694,7 +4694,7 @@ impl<'db> Type<'db> {
             }
 
             Type::BoundMethod(bound_method) => {
-                let signature = bound_method.function(db).signature(env);
+                let signature = bound_method.function(db).signature(env.db());
                 let self_instance = bound_method.self_instance(db);
                 // Class-based protocol member lookup has already specialized the method for this
                 // receiver. Bake an implicit positional receiver into the signature instead of
@@ -4877,7 +4877,7 @@ impl<'db> Type<'db> {
 
                 _ => CallableBinding::from_overloads(
                     self,
-                    function_type.signature(env).overloads.iter().cloned(),
+                    function_type.signature(env.db()).overloads.iter().cloned(),
                 )
                 .into(),
             },
@@ -5040,7 +5040,7 @@ impl<'db> Type<'db> {
                 self,
                 Signature::new(
                     Parameters::standard([Parameter::positional_only(None)
-                        .with_annotated_type(newtype.base(env).instance_type(env))]),
+                        .with_annotated_type(newtype.base(env.db()).instance_type(env))]),
                     Type::NewTypeInstance(newtype),
                 ),
             )
@@ -5420,7 +5420,7 @@ impl<'db> Type<'db> {
 
         let db = env.db();
         let class_literal = class.class_literal(db);
-        let class_generic_context = class_literal.generic_context(env);
+        let class_generic_context = class_literal.generic_context(env.db());
 
         // Keep bespoke constructor behavior for cases that don't map cleanly to `__new__`/`__init__`.
         let fallback_bindings = || {
@@ -5488,7 +5488,7 @@ impl<'db> Type<'db> {
         // do this, we instead use the _identity_ specialization, which maps each of the class's
         // generic typevars to itself.
         let self_type = match self {
-            Type::ClassLiteral(class) if class.generic_context(env).is_some() => {
+            Type::ClassLiteral(class) if class.generic_context(env.db()).is_some() => {
                 Type::from(class.identity_specialization(env))
             }
             _ => self,
@@ -6535,11 +6535,11 @@ impl<'db> Type<'db> {
     #[must_use]
     fn apply_optional_specialization(
         self,
-        env: &SemanticEnvironment<'db>,
+        db: &'db dyn Db,
         specialization: Option<Specialization<'db>>,
     ) -> Type<'db> {
         if let Some(specialization) = specialization {
-            self.apply_specialization(env, specialization)
+            self.apply_specialization(db, specialization)
         } else {
             self
         }
@@ -6553,7 +6553,7 @@ impl<'db> Type<'db> {
     /// via a call to the generic object.
     fn apply_specialization(
         self,
-        env: &SemanticEnvironment<'db>,
+        db: &'db dyn Db,
         specialization: Specialization<'db>,
     ) -> Type<'db> {
         if matches!(
@@ -6604,11 +6604,6 @@ impl<'db> Type<'db> {
             return self;
         }
 
-        let db = env.db();
-        debug_assert_eq!(
-            env.program(),
-            specialization.generic_context(db).program(db)
-        );
         self.apply_specialization_inner(db, specialization)
     }
 
@@ -6863,7 +6858,7 @@ impl<'db> Type<'db> {
                     // detection rather than the visitor's cycle detection, because the visitor tracks
                     // Type values and `RecursiveList` is different from `RecursiveList[T]`.
                     TypeMapping::EagerExpansion => {
-                        alias.raw_value_type(env).expand_eagerly(env)
+                        alias.raw_value_type(env.db()).expand_eagerly(env)
                     },
                     // When specializing a generic type alias, instead of specializing the expanded type, the type alias itself is specialized.
                     // Without this special handling, recursive type aliases would result in cycles, returning an unspecialized fallback type.
@@ -6885,13 +6880,12 @@ impl<'db> Type<'db> {
                             current_specialization = current_specialization
                                 .with_materialization_kind(db, Some(*materialization_kind));
                         }
-                        Type::TypeAlias(alias.apply_specialization(
-                            env,
+                        Type::TypeAlias(alias.apply_specialization(env.db(),
                             |generic_context| {
                                 alias
                                     .specialization(db)
                                     .unwrap_or_else(|| generic_context.default_specialization(env, None))
-                                    .apply_specialization(env, current_specialization)
+                                    .apply_specialization(env.db(), current_specialization)
                             },
                         ))
                     }
@@ -7595,7 +7589,7 @@ impl<'db> Type<'db> {
         let mut variables = FxOrderSet::default();
         self.find_legacy_typevars(env, None, &mut variables);
         let generic_context = GenericContext::from_typevar_instances(env, variables);
-        self.apply_specialization(env, generic_context.default_specialization(env, None))
+        self.apply_specialization(env.db(), generic_context.default_specialization(env, None))
     }
 
     fn from_truthiness(env: &SemanticEnvironment<'db>, truthiness: Truthiness) -> Self {
@@ -7811,12 +7805,12 @@ impl<'db> VarianceInferable<'db> for Type<'db> {
 
             Type::FunctionLiteral(function_type) => {
                 // TODO: do we need to replace self?
-                function_type.variance_of(env, typevar)
+                function_type.variance_of(db, typevar)
             }
 
             Type::BoundMethod(method_type) => {
                 // TODO: do we need to replace self?
-                method_type.function(db).variance_of(env, typevar)
+                method_type.function(db).variance_of(db, typevar)
             }
 
             Type::NominalInstance(nominal_instance_type) => {
@@ -7936,17 +7930,8 @@ fn self_typevar_owner_class_literal<'db>(
         .map(|class| class.class_literal(db))
 }
 
-fn class_mro_literals<'db>(
-    env: &SemanticEnvironment<'db>,
-    class_literal: ClassLiteral<'db>,
-) -> &'db [ClassLiteral<'db>] {
-    let db = env.db();
-    debug_assert_eq!(env.program(), class_literal.program(db));
-    class_mro_literals_inner(db, class_literal)
-}
-
 #[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
-fn class_mro_literals_inner<'db>(
+fn class_mro_literals<'db>(
     db: &'db dyn Db,
     class_literal: ClassLiteral<'db>,
 ) -> Box<[ClassLiteral<'db>]> {
@@ -8022,7 +8007,7 @@ impl<'db> SelfBinding<'db> {
         // Check that the Self typevar's owner class is in the MRO of the self type's class.
         // If we can't determine either class, conservatively don't bind.
         self.class_literal.is_some_and(|class_literal| {
-            let class_mro = class_mro_literals(env, class_literal);
+            let class_mro = class_mro_literals(env.db(), class_literal);
             self_typevar_owner_class_literal(env, bound_typevar)
                 .is_none_or(|owner_class| class_mro.contains(&owner_class))
         })

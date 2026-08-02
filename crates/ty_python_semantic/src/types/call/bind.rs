@@ -171,10 +171,10 @@ fn generic_contexts_mentioned_in_type<'db>(
         }
 
         fn visit_function_type(&self, env: &SemanticEnvironment<'db>, function: FunctionType<'db>) {
-            for signature in &function.signature(env).overloads {
+            for signature in &function.signature(env.db()).overloads {
                 self.visit_signature(env, signature);
             }
-            self.visit_signature(env, function.last_definition_signature(env));
+            self.visit_signature(env, function.last_definition_signature(env.db()));
         }
 
         fn visit_type(&self, env: &SemanticEnvironment<'db>, ty: Type<'db>) {
@@ -1496,7 +1496,7 @@ impl<'db> Bindings<'db> {
                     Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderGet(
                         function,
                     )) => {
-                        if function.is_classmethod(env) {
+                        if function.is_classmethod(env.db()) {
                             match overload.parameter_types() {
                                 [_, Some(owner)] => {
                                     overload.set_return_type(Type::BoundMethod(
@@ -1514,7 +1514,7 @@ impl<'db> Bindings<'db> {
                                 }
                                 _ => {}
                             }
-                        } else if function.is_staticmethod(env) {
+                        } else if function.is_staticmethod(env.db()) {
                             overload.set_return_type(Type::FunctionLiteral(function));
                         } else if let [Some(first), _] = overload.parameter_types() {
                             if first.is_none(db) {
@@ -1531,7 +1531,7 @@ impl<'db> Bindings<'db> {
                         if let [Some(function_ty @ Type::FunctionLiteral(function)), ..] =
                             overload.parameter_types()
                         {
-                            if function.is_classmethod(env) {
+                            if function.is_classmethod(env.db()) {
                                 match overload.parameter_types() {
                                     [_, _, Some(owner)] => {
                                         overload.set_return_type(Type::BoundMethod(
@@ -1551,7 +1551,7 @@ impl<'db> Bindings<'db> {
 
                                     _ => {}
                                 }
-                            } else if function.is_staticmethod(env) {
+                            } else if function.is_staticmethod(env.db()) {
                                 overload.set_return_type(*function_ty);
                             } else {
                                 match overload.parameter_types() {
@@ -1998,23 +1998,23 @@ impl<'db> Bindings<'db> {
                                     if let Some(first_param) = params.get_positional(first_index) {
                                         let mut input_ty = first_param.annotated_type();
                                         if let Some(specialization) = default_specialization {
-                                            input_ty =
-                                                input_ty.apply_specialization(env, specialization);
+                                            input_ty = input_ty
+                                                .apply_specialization(env.db(), specialization);
                                         }
                                         input_types = input_types.add(input_ty);
                                         if let Some(specialization) = default_specialization {
-                                            return_ty =
-                                                return_ty.apply_specialization(env, specialization);
+                                            return_ty = return_ty
+                                                .apply_specialization(env.db(), specialization);
                                         }
                                         output_types = output_types.add(return_ty);
                                         found_any = true;
                                     } else if let Some((_, variadic)) = params.variadic() {
                                         let mut input_ty = variadic.annotated_type();
                                         if let Some(specialization) = default_specialization {
-                                            input_ty =
-                                                input_ty.apply_specialization(env, specialization);
-                                            return_ty =
-                                                return_ty.apply_specialization(env, specialization);
+                                            input_ty = input_ty
+                                                .apply_specialization(env.db(), specialization);
+                                            return_ty = return_ty
+                                                .apply_specialization(env.db(), specialization);
                                         }
                                         input_types = input_types.add(input_ty);
                                         output_types = output_types.add(return_ty);
@@ -2022,8 +2022,8 @@ impl<'db> Bindings<'db> {
                                     } else if params.is_gradual() {
                                         input_types = input_types.add(Type::unknown());
                                         if let Some(specialization) = default_specialization {
-                                            return_ty =
-                                                return_ty.apply_specialization(env, specialization);
+                                            return_ty = return_ty
+                                                .apply_specialization(env.db(), specialization);
                                         }
                                         output_types = output_types.add(return_ty);
                                         found_any = true;
@@ -2161,15 +2161,15 @@ impl<'db> Bindings<'db> {
 
                                 let generic_context_for_simple_type = |ty: Type<'db>| match ty {
                                     Type::ClassLiteral(class) => {
-                                        class.generic_context(env).map(wrap_generic_context)
+                                        class.generic_context(env.db()).map(wrap_generic_context)
                                     }
 
                                     Type::FunctionLiteral(function) => {
-                                        signature_generic_context(function.signature(env))
+                                        signature_generic_context(function.signature(env.db()))
                                     }
 
                                     Type::BoundMethod(bound_method) => signature_generic_context(
-                                        bound_method.function(db).signature(env),
+                                        bound_method.function(db).signature(env.db()),
                                     ),
 
                                     Type::Callable(callable) => {
@@ -2178,7 +2178,7 @@ impl<'db> Bindings<'db> {
 
                                     Type::KnownInstance(KnownInstanceType::TypeAliasType(
                                         alias,
-                                    )) => alias.generic_context(env).map(wrap_generic_context),
+                                    )) => alias.generic_context(env.db()).map(wrap_generic_context),
 
                                     _ => None,
                                 };
@@ -2251,7 +2251,8 @@ impl<'db> Bindings<'db> {
                             if let [Some(ty)] = overload.parameter_types() {
                                 let return_ty = match ty {
                                     Type::ClassLiteral(class) => {
-                                        if let Some(metadata) = enums::enum_metadata(env, *class)
+                                        if let Some(metadata) =
+                                            enums::enum_metadata(env.db(), *class)
                                             && metadata.aliases_are_known
                                         {
                                             Type::heterogeneous_tuple(
@@ -2325,7 +2326,7 @@ impl<'db> Bindings<'db> {
                                 && let Some(protocol_class) = class.into_protocol_class(env)
                             {
                                 let member_names = protocol_class
-                                    .interface(env)
+                                    .interface(env.db())
                                     .members(db)
                                     .map(|member| Type::string_literal(db, member.name()));
                                 let specialization = UnionType::from_elements(env, member_names);
@@ -2592,7 +2593,7 @@ impl<'db> Bindings<'db> {
                             // However, we do not yet enforce this, and in the case of multiple
                             // applications of the decorator, we will only consider the last one.
                             let transformer_params = function_type
-                                .iter_overloads_and_implementation(env)
+                                .iter_overloads_and_implementation(env.db())
                                 .rev()
                                 .find_map(|function_overload| {
                                     function_overload.dataclass_transformer_params(db)
@@ -3451,7 +3452,7 @@ impl<'db> CallableBinding<'db> {
         function: FunctionType<'db>,
     ) -> SmallVec<[usize; 1]> {
         if matches!(kind, FunctionKind::MethodWrapper) {
-            let (overloads, _) = function.overloads_and_implementation(env);
+            let (overloads, _) = function.overloads_and_implementation(env.db());
             return (0..overloads.len()).collect();
         }
 
@@ -3928,8 +3929,10 @@ impl<'db> CallableBinding<'db> {
                             let raw_parameter_type = overload.signature.parameters()
                                 [matched_parameter.index]
                                 .annotated_type();
-                            let parameter_type = raw_parameter_type
-                                .apply_optional_specialization(env, overload.specialization(db));
+                            let parameter_type = raw_parameter_type.apply_optional_specialization(
+                                env.db(),
+                                overload.specialization(db),
+                            );
                             OverloadFilterSlot {
                                 parameter: parameter_type,
                                 // Argument types are cached by the raw parameter type, even when
@@ -4385,7 +4388,7 @@ impl<'db> CallableBinding<'db> {
 
                 if let Some((kind, function)) = function_type_and_kind {
                     let (overloads, implementation) =
-                        function.overloads_and_implementation(context.semantic_environment());
+                        function.overloads_and_implementation(context.db());
                     let diagnostic_overload_indexes = self.diagnostic_overload_indexes(
                         context.semantic_environment(),
                         kind,
@@ -4424,7 +4427,10 @@ impl<'db> CallableBinding<'db> {
                     ));
 
                     for overload in possible_overloads.iter().take(MAXIMUM_OVERLOADS) {
-                        diag.info(format_args!("  {}", overload.signature(env).display(env)));
+                        diag.info(format_args!(
+                            "  {}",
+                            overload.signature(env.db()).display(env)
+                        ));
                     }
                     if possible_overloads.len() > MAXIMUM_OVERLOADS {
                         diag.info(format_args!(
@@ -5292,19 +5298,20 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                                     })
                                 })
                         };
-                        let prefix_len =
-                            if let Type::Union(union) = declared_type.resolve_type_alias(env) {
-                                union.elements(db).iter().find_map(|candidate| {
-                                    let specialized_candidate = candidate
-                                        .apply_optional_specialization(env, self.specialization());
-                                    argument_type
-                                        .is_assignable_to(env, specialized_candidate)
-                                        .then_some(*candidate)
-                                        .and_then(paramspec_prefix_len)
-                                })
-                            } else {
-                                paramspec_prefix_len(declared_type)
-                            }?;
+                        let prefix_len = if let Type::Union(union) =
+                            declared_type.resolve_type_alias(env)
+                        {
+                            union.elements(db).iter().find_map(|candidate| {
+                                let specialized_candidate = candidate
+                                    .apply_optional_specialization(env.db(), self.specialization());
+                                argument_type
+                                    .is_assignable_to(env, specialized_candidate)
+                                    .then_some(*candidate)
+                                    .and_then(paramspec_prefix_len)
+                            })
+                        } else {
+                            paramspec_prefix_len(declared_type)
+                        }?;
                         let (source_type, partial_signature) = match argument_type {
                             Type::KnownInstance(
                                 KnownInstanceType::FunctoolsPartial(partial)
@@ -5380,7 +5387,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
 
         let return_with_tcx = Some(self.return_ty).zip(self.call_expression_tcx.annotation);
 
-        self.inferable_typevars = generic_context.inferable_typevars(self.env);
+        self.inferable_typevars = generic_context.inferable_typevars(self.env.db());
         let mut builder =
             SpecializationBuilder::new(self.env, constraints, self.inferable_typevars);
 
@@ -5642,7 +5649,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
 
         self.return_ty = self
             .return_ty
-            .apply_specialization(self.env, specialization);
+            .apply_specialization(self.env.db(), specialization);
         self.inference = Some(inference);
     }
 
@@ -5765,9 +5772,9 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         let mut expected_ty = parameter.annotated_type();
         if let Some(specialization) = self.specialization() {
             if !constructor_receiver {
-                argument_type = argument_type.apply_specialization(self.env, specialization);
+                argument_type = argument_type.apply_specialization(self.env.db(), specialization);
             }
-            expected_ty = expected_ty.apply_specialization(self.env, specialization);
+            expected_ty = expected_ty.apply_specialization(self.env.db(), specialization);
         }
 
         // Some typing special forms are valid class-info arguments at runtime but are not
@@ -6629,7 +6636,7 @@ impl<'db> Binding<'db> {
             return 0;
         };
 
-        let inferable_typevars = generic_context.inferable_typevars(env);
+        let inferable_typevars = generic_context.inferable_typevars(env.db());
         argument
             .parameters
             .iter()
@@ -6750,7 +6757,7 @@ impl<'db> Binding<'db> {
         let parameter_type = specialized_overload
             .specialization(db)
             .map_or(parameter_type, |specialization| {
-                parameter_type.apply_specialization(env, specialization)
+                parameter_type.apply_specialization(env.db(), specialization)
             });
 
         (!parameter_type.has_dynamic(env) && !parameter_type.has_typevar_or_typevar_instance(env))
@@ -6849,7 +6856,7 @@ impl<'db> Binding<'db> {
                 ));
             }
 
-            parameter_type = parameter_type.apply_optional_specialization(env, specialization);
+            parameter_type = parameter_type.apply_optional_specialization(env.db(), specialization);
         }
 
         Some(ArgumentTypeContext::standard(
@@ -6882,7 +6889,7 @@ impl<'db> Binding<'db> {
             let path_bounds = normalized_return_ty.assignable_solutions_with_inferable(
                 env,
                 declared_return_ty,
-                generic_context.inferable_typevars(env),
+                generic_context.inferable_typevars(env.db()),
             );
 
             if let Solutions::Constrained(solutions) = path_bounds.solve(env, constraints) {
@@ -7660,7 +7667,7 @@ impl<'db> ForwardedParameterSource<'db> {
             .source_parameter_index
             .unwrap_or(parameter.signature_parameter_index + self.parameter_index_offset);
         self.function
-            .signature(env)
+            .signature(env.db())
             .overloads
             .get(self.overload_index)?
             .parameters()
@@ -7681,7 +7688,7 @@ impl<'db> ForwardedParameterSource<'db> {
         let parameter_index = self
             .source_parameter_index(env, parameter)
             .unwrap_or(parameter.signature_parameter_index + self.parameter_index_offset);
-        let (overloads, implementation) = self.function.overloads_and_implementation(env);
+        let (overloads, implementation) = self.function.overloads_and_implementation(env.db());
         overloads
             .get(self.overload_index)
             .copied()
@@ -8073,7 +8080,7 @@ impl<'db> BindingError<'db> {
                                 matches!(argument, ArgOrKeyword::Arg(_))
                             });
                             overload_literal
-                                .signature(env)
+                                .signature(env.db())
                                 .parameters()
                                 .iter()
                                 .position(|candidate| {
@@ -8109,7 +8116,10 @@ impl<'db> BindingError<'db> {
                             if overload_index == matching_overload.index {
                                 continue;
                             }
-                            diag.info(format_args!("  {}", overload.signature(env).display(env)));
+                            diag.info(format_args!(
+                                "  {}",
+                                overload.signature(env.db()).display(env)
+                            ));
                         }
                         if matching_overload.candidate_count() > MAXIMUM_OVERLOADS {
                             diag.info(format_args!(
@@ -8706,7 +8716,7 @@ struct MatchingOverloadLiteral<'db> {
 impl<'db> MatchingOverloadLiteral<'db> {
     /// Returns the [`OverloadLiteral`] representing this matching overload.
     fn get(&self, env: &SemanticEnvironment<'db>) -> Option<OverloadLiteral<'db>> {
-        let (overloads, _) = self.function.overloads_and_implementation(env);
+        let (overloads, _) = self.function.overloads_and_implementation(env.db());
 
         // TODO: This should actually be safe to index directly but isn't so as of this writing.
         // The main reason is that we've custom overload signatures that are constructed manually
@@ -8723,7 +8733,7 @@ impl<'db> MatchingOverloadLiteral<'db> {
         &self,
         env: &SemanticEnvironment<'db>,
     ) -> impl Iterator<Item = (usize, OverloadLiteral<'db>)> + '_ {
-        let (overloads, _) = self.function.overloads_and_implementation(env);
+        let (overloads, _) = self.function.overloads_and_implementation(env.db());
         self.candidate_indexes.iter().filter_map(|&index| {
             overloads
                 .get(index)

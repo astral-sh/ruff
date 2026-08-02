@@ -79,7 +79,7 @@ fn function_signature_expression_type<'db>(
     let scope = file_scope.to_scope_id(db, file);
     if scope == definition.scope(db) {
         // expression is in the function definition scope, but always deferred
-        infer_deferred_types(env, definition).expression_type(expression)
+        infer_deferred_types(env.db(), definition).expression_type(expression)
     } else {
         // expression is in the PEP-695 type params sub-scope
         infer_complete_scope_types(db, scope).expression_type(expression)
@@ -98,7 +98,7 @@ fn function_signature_type_expression_flags<'db>(
     let scope = file_scope.to_scope_id(db, file);
     if scope == definition.scope(db) {
         // expression is in the function definition scope, but always deferred
-        infer_deferred_types(env, definition).type_expression_flags(expression)
+        infer_deferred_types(env.db(), definition).type_expression_flags(expression)
     } else {
         // expression is in the PEP-695 type params sub-scope
         infer_complete_scope_types(db, scope).type_expression_flags(expression)
@@ -1226,7 +1226,7 @@ impl<'db> Signature<'db> {
 
         let constraints = ConstraintSetBuilder::new();
         let when = constraints.load(env, receiver_constraints);
-        let inferable = self.inferable_typevars(env);
+        let inferable = self.inferable_typevars(env.db());
 
         match when.solutions(env, &constraints, inferable) {
             Solutions::Unsatisfiable => return None,
@@ -1272,7 +1272,7 @@ impl<'db> Signature<'db> {
         });
 
         Some(
-            self.apply_specialization(env, specialization)
+            self.apply_specialization(env.db(), specialization)
                 .bind_self_with_receiver(env, Some(receiver_type), Some(typing_self_type)),
         )
     }
@@ -1325,7 +1325,7 @@ impl<'db> Signature<'db> {
         // A specialized receiver can make generic receiver annotations concrete enough to compare.
         if let Some((_, self_specialization)) = self_type.class_specialization(env) {
             expected_self_ty =
-                expected_self_ty.apply_optional_specialization(env, Some(self_specialization));
+                expected_self_ty.apply_optional_specialization(env.db(), Some(self_specialization));
 
             // Specialization can also make the receiver annotation trivially compatible.
             if accepts_any_or_exact_self(expected_self_ty) {
@@ -1339,7 +1339,7 @@ impl<'db> Signature<'db> {
                 env,
                 expected_self_ty,
                 &constraints,
-                self.inferable_typevars(env),
+                self.inferable_typevars(env.db()),
             )
             .is_always_satisfied(env)
     }
@@ -1476,11 +1476,9 @@ impl<'db> Signature<'db> {
     }
 
     /// Returns this signature with the given specialization applied to parameters and return type.
-    fn apply_specialization(
-        &self,
-        env: &SemanticEnvironment<'db>,
-        specialization: Specialization<'db>,
-    ) -> Self {
+    fn apply_specialization(&self, db: &'db dyn Db, specialization: Specialization<'db>) -> Self {
+        let env =
+            &SemanticEnvironment::from_program(db, specialization.generic_context(db).program(db));
         let type_mapping =
             TypeMapping::ApplySpecialization(ApplySpecialization::Specialization(specialization));
         self.apply_type_mapping_impl(
@@ -1503,13 +1501,13 @@ impl<'db> Signature<'db> {
             self.partial_application_specialization(env, partial_application, inference);
         let signature = signature_specialization.map_or_else(
             || self.clone(),
-            |specialization| self.apply_specialization(env, specialization),
+            |specialization| self.apply_specialization(env.db(), specialization),
         );
 
         let parameters = signature.parameters().as_slice();
         let return_ty = signature_specialization.map_or_else(
             || unspecialized_return_ty,
-            |specialization| unspecialized_return_ty.apply_specialization(env, specialization),
+            |specialization| unspecialized_return_ty.apply_specialization(env.db(), specialization),
         );
 
         let mut remaining = Vec::with_capacity(parameters.len());
@@ -1632,9 +1630,9 @@ impl<'db> Signature<'db> {
                 .any(|(_, parameter)| parameter.annotated_type().contains_self(env))
     }
 
-    fn inferable_typevars(&self, env: &SemanticEnvironment<'db>) -> TypeVarSet<'db> {
+    fn inferable_typevars(&self, db: &'db dyn Db) -> TypeVarSet<'db> {
         match self.generic_context {
-            Some(generic_context) => generic_context.inferable_typevars(env),
+            Some(generic_context) => generic_context.inferable_typevars(db),
             None => TypeVarSet::None,
         }
     }
@@ -2197,8 +2195,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             target
         };
 
-        let source_inferable = source.inferable_typevars(env);
-        let target_inferable = target.inferable_typevars(env);
+        let source_inferable = source.inferable_typevars(env.db());
+        let target_inferable = target.inferable_typevars(env.db());
         let signature_inferable = source_inferable.merge(db, target_inferable);
         let inferable = self.inferable.merge(db, signature_inferable);
 
@@ -4514,7 +4512,7 @@ impl<'db> Parameters<'db> {
                 // Use the same approach as function_signature_expression_type to avoid cycles.
                 // Defaults are always deferred (see infer_function_definition), so we can go
                 // directly to infer_deferred_types without first checking infer_definition_types.
-                infer_deferred_types(env, definition)
+                infer_deferred_types(env.db(), definition)
                     .expression_type(default)
                     .replace_parameter_defaults(env)
             })
@@ -5623,7 +5621,7 @@ mod tests {
             .literal(&db)
             .last_definition;
 
-        let sig = func.signature(&db.semantic_environment());
+        let sig = func.signature(&db);
 
         assert!(sig.return_ty.is_unknown());
         assert_params(&sig, &[]);
@@ -5648,7 +5646,7 @@ mod tests {
             .literal(&db)
             .last_definition;
 
-        let sig = func.signature(&db.semantic_environment());
+        let sig = func.signature(&db);
 
         assert_eq!(
             sig.return_ty
@@ -5706,7 +5704,7 @@ mod tests {
             .literal(&db)
             .last_definition;
 
-        let sig = func.signature(&db.semantic_environment());
+        let sig = func.signature(&db);
 
         let [
             Parameter {
@@ -5749,7 +5747,7 @@ mod tests {
             .literal(&db)
             .last_definition;
 
-        let sig = func.signature(&db.semantic_environment());
+        let sig = func.signature(&db);
 
         let [
             Parameter {
@@ -5792,7 +5790,7 @@ mod tests {
             .literal(&db)
             .last_definition;
 
-        let sig = func.signature(&db.semantic_environment());
+        let sig = func.signature(&db);
 
         let [
             Parameter {
@@ -5846,7 +5844,7 @@ mod tests {
             .literal(&db)
             .last_definition;
 
-        let sig = func.signature(&db.semantic_environment());
+        let sig = func.signature(&db);
 
         let [
             Parameter {
@@ -5893,11 +5891,11 @@ mod tests {
         let func = get_function_f(&db, "/src/a.py");
 
         let overload = func.literal(&db).last_definition;
-        let expected_sig = overload.signature(&db.semantic_environment());
+        let expected_sig = overload.signature(&db);
 
         // With no decorators, internal and external signature are the same
         assert_eq!(
-            func.signature(&db.semantic_environment()),
+            func.signature(&db),
             &CallableSignature::single(expected_sig)
         );
     }

@@ -46,28 +46,21 @@ impl get_size2::GetSize for NewType<'_> {}
 
 #[salsa::tracked]
 impl<'db> NewType<'db> {
-    pub fn base(self, env: &SemanticEnvironment<'db>) -> NewTypeBase<'db> {
-        let db = env.db();
+    pub fn base(self, db: &'db dyn Db) -> NewTypeBase<'db> {
         match self.eager_base(db) {
             Some(base) => base,
-            None => self.lazy_base(env),
+            None => self.lazy_base(db),
         }
-    }
-
-    fn lazy_base(self, env: &SemanticEnvironment<'db>) -> NewTypeBase<'db> {
-        let db = env.db();
-        debug_assert_eq!(env.program(), self.definition(db).program(db));
-        self.lazy_base_inner(db)
     }
 
     #[salsa::tracked(
         returns(copy),
         cycle_initial=|db, _, self_: NewType<'db>| NewTypeBase::ClassType(ClassType::object(
-            &SemanticEnvironment::from_file(db, self_.definition(db).python_file(db)),
+            &SemanticEnvironment::from_definition(db, self_.definition(db)),
         )),
         heap_size=ruff_memory_usage::heap_size
     )]
-    fn lazy_base_inner(self, db: &'db dyn Db) -> NewTypeBase<'db> {
+    fn lazy_base(self, db: &'db dyn Db) -> NewTypeBase<'db> {
         // `TypeInferenceBuilder` emits diagnostics for invalid `NewType` definitions that show up
         // in assignments, but invalid definitions still get here, and also `NewType` might show up
         // in places that aren't definitions at all. Fall back to `object` in all error cases.
@@ -266,7 +259,7 @@ pub(crate) fn walk_newtype_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Si
 ) {
     let db = env.db();
     let base = if visitor.should_visit_lazy_type_attributes() {
-        Some(newtype.base(env))
+        Some(newtype.base(env.db()))
     } else {
         newtype.eager_base(db)
     };
@@ -341,7 +334,7 @@ impl<'db> Iterator for NewTypeBaseIter<'db, '_> {
 
     fn next(&mut self) -> Option<Self::Item> {
         let current = self.current?;
-        match current.base(self.env) {
+        match current.base(self.env.db()) {
             NewTypeBase::NewType(base_newtype) => {
                 // Doing the insertion only in this branch avoids allocating in the common case.
                 self.seen_before.insert(current);

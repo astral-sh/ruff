@@ -243,7 +243,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     ));
                 }
 
-                if let Some(generic_context) = class.generic_context(env)
+                if let Some(generic_context) = class.generic_context(env.db())
                     && let Some(class) = class.as_static()
                 {
                     return self.infer_explicit_class_specialization(
@@ -255,7 +255,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             }
             Type::KnownInstance(KnownInstanceType::TypeAliasType(type_alias)) => {
-                if let Some(generic_context) = type_alias.generic_context(env) {
+                if let Some(generic_context) = type_alias.generic_context(env.db()) {
                     return self.infer_explicit_type_alias_type_specialization(
                         subscript,
                         value_ty,
@@ -472,7 +472,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let env = self.semantic_environment();
         let db = self.db();
         let specialize = &|types: &[Option<Type<'db>>]| {
-            Type::from(generic_class.apply_specialization(env, |_| {
+            Type::from(generic_class.apply_specialization(env.db(), |_| {
                 generic_context.specialize_partial(env, types.iter().copied())
             }))
         };
@@ -488,7 +488,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .into_protocol_class(env)
                 .is_some_and(|protocol| {
                     protocol
-                        .interface(env)
+                        .interface(env.db())
                         .includes_generic_writable_instance_member(
                             env,
                             "__class__",
@@ -543,7 +543,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         let specialize = &|types: &[Option<Type<'db>>]| {
-            let type_alias = generic_type_alias.apply_specialization(env, |_| {
+            let type_alias = generic_type_alias.apply_specialization(env.db(), |_| {
                 generic_context.specialize_partial(env, types.iter().copied())
             });
 
@@ -1576,7 +1576,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             && let Some((class_literal, _)) = object_ty.class_specialization(env)
         {
             let identity_instance = Type::instance(env, class_literal.identity_specialization(env));
-            let collection_generic_context = class_literal.generic_context(env);
+            let collection_generic_context = class_literal.generic_context(env.db());
 
             let ast_arguments = [
                 ArgOrKeyword::Arg(&target.slice),

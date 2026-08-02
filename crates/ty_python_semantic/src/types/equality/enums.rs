@@ -280,7 +280,7 @@ impl<'db> SameEnumComparison<'db> {
         Self {
             left,
             right,
-            profile: same_enum_comparison_profile(env, enum_class, operator),
+            profile: same_enum_comparison_profile(env.db(), enum_class, operator),
         }
     }
 
@@ -407,7 +407,7 @@ impl<'db> EnumValueSet<'db> {
                     }
                 }
                 Type::NominalInstance(instance) => EnumValueSet {
-                    enum_class: instance.class_literal(env).into_enum_class(env)?,
+                    enum_class: instance.class_literal(env).into_enum_class(env.db())?,
                     members: EnumValueSetMembers::All,
                 },
                 Type::EnumComplement(complement) => EnumValueSet {
@@ -1021,7 +1021,7 @@ impl<'db> EnumValueSet<'db> {
         projection: &mut EnumKeyProjection<'db>,
     ) -> Option<()> {
         let db = env.db();
-        let profile = enum_class_key_profile(env, self.enum_class, operator);
+        let profile = enum_class_key_profile(env.db(), self.enum_class, operator);
         let semantics = profile.semantics?;
         let key_domain = EnumComparisonKeyDomain::new(self.enum_class, semantics);
 
@@ -1057,7 +1057,7 @@ impl<'db> EnumValueSet<'db> {
         keys: &FxHashSet<EnumComparisonKey<'db>>,
     ) -> Result<Option<Self>, ()> {
         let db = env.db();
-        let profile = enum_class_key_profile(env, self.enum_class, operator);
+        let profile = enum_class_key_profile(env.db(), self.enum_class, operator);
         let semantics = profile.semantics.ok_or(())?;
         let mut included = FxOrderMap::default();
         for (name, scalar_key) in &profile.members {
@@ -1090,18 +1090,8 @@ struct EnumClassKeyProfile<'db> {
 }
 
 /// Cache each class's modeled comparison keys independently of any particular operand pair.
-fn enum_class_key_profile<'db>(
-    env: &SemanticEnvironment<'db>,
-    enum_class: EnumClassLiteral<'db>,
-    operator: ComparisonOperator,
-) -> &'db EnumClassKeyProfile<'db> {
-    let db = env.db();
-    debug_assert_eq!(env.program(), enum_class.class_literal(db).program(db));
-    enum_class_key_profile_inner(db, enum_class, operator)
-}
-
 #[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
-fn enum_class_key_profile_inner<'db>(
+fn enum_class_key_profile<'db>(
     db: &'db dyn Db,
     enum_class: EnumClassLiteral<'db>,
     operator: ComparisonOperator,
@@ -1149,24 +1139,13 @@ struct SameEnumComparisonProfile {
     comparison_keys: Option<SameEnumComparisonKeys>,
 }
 
-fn same_enum_comparison_profile<'db>(
-    env: &SemanticEnvironment<'db>,
-    enum_class: EnumClassLiteral<'db>,
-    operator: ComparisonOperator,
-) -> SameEnumComparisonProfile {
-    let db = env.db();
-    debug_assert_eq!(env.program(), enum_class.class_literal(db).program(db));
-    same_enum_comparison_profile_inner(db, enum_class, operator)
-}
-
 #[salsa::tracked(returns(copy), heap_size=ruff_memory_usage::heap_size)]
-fn same_enum_comparison_profile_inner<'db>(
+fn same_enum_comparison_profile<'db>(
     db: &'db dyn Db,
     enum_class: EnumClassLiteral<'db>,
     operator: ComparisonOperator,
 ) -> SameEnumComparisonProfile {
-    let env = SemanticEnvironment::from_file(db, enum_class.class_literal(db).python_file(db));
-    let profile = enum_class_key_profile(&env, enum_class, operator);
+    let profile = enum_class_key_profile(db, enum_class, operator);
     let (comparison_keys, members_compare_by_identity) = match profile.semantics {
         None => (None, false),
         Some(KnownComparisonSemantics::Object) if !enum_class.aliases_are_known(db) => {

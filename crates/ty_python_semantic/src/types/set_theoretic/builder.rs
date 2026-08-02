@@ -1422,7 +1422,8 @@ impl<'db> InnerIntersectionBuilder<'db> {
                 continue;
             };
 
-            let Some(enum_class_literal) = instance.class_literal(env).into_enum_class(env) else {
+            let Some(enum_class_literal) = instance.class_literal(env).into_enum_class(env.db())
+            else {
                 continue;
             };
             if !enum_class_literal.members_are_exhaustive(db) {

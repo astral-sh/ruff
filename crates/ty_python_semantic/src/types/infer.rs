@@ -121,27 +121,18 @@ fn extend_collection_use_constraints<'db>(
 
 /// Infer all types for a [`Definition`] (including sub-expressions).
 /// Use when resolving a place use or public type of a place.
-pub(crate) fn infer_definition_types<'db>(
-    env: &SemanticEnvironment<'db>,
-    definition: Definition<'db>,
-) -> &'db DefinitionInference<'db> {
-    let db = env.db();
-    debug_assert_eq!(env.program(), definition.program(db));
-    infer_definition_types_inner(db, definition)
-}
-
 #[salsa::tracked(
     returns(ref),
     cycle_initial=|db, id, definition: Definition<'db>| {
         DefinitionInference::cycle_initial(db, definition, Type::divergent(id))
     },
     cycle_fn=|db: &'db dyn Db, cycle, previous: &DefinitionInference<'db>, inference: DefinitionInference<'db>, definition: Definition<'db>| {
-        let env = SemanticEnvironment::from_file(db, definition.python_file(db));
+        let env = SemanticEnvironment::from_definition(db, definition);
         inference.cycle_normalized(&env, previous, cycle, definition)
     },
     heap_size=ruff_memory_usage::heap_size
 )]
-fn infer_definition_types_inner<'db>(
+pub(crate) fn infer_definition_types<'db>(
     db: &'db dyn Db,
     definition: Definition<'db>,
 ) -> DefinitionInference<'db> {
@@ -179,16 +170,15 @@ fn infer_definition_types_inner<'db>(
 /// Since the enclosing assignment was rejected, place resolution must ignore that binding and fall
 /// back to the declared value type of `x`.
 pub(crate) fn is_discarded_dict_key_assignment<'db>(
-    env: &SemanticEnvironment<'db>,
+    db: &'db dyn Db,
     definition: Definition<'db>,
 ) -> bool {
-    let db = env.db();
     let DefinitionKind::DictKeyAssignment(dict_key_assignment) = definition.kind(db) else {
         return false;
     };
 
     let assignment = dict_key_assignment.assignment();
-    infer_definition_types(env, assignment).discards_dict_key_assignments()
+    infer_definition_types(db, assignment).discards_dict_key_assignments()
 }
 
 /// Infer decorator expression types for a function definition.
@@ -197,21 +187,12 @@ pub(crate) fn is_discarded_dict_key_assignment<'db>(
 /// `infer_definition_types` when we need to check decorators while
 /// already inside definition inference (e.g. checking `Self` in a
 /// `@staticmethod`).
-pub(crate) fn function_known_decorators<'db>(
-    env: &SemanticEnvironment<'db>,
-    definition: Definition<'db>,
-) -> &'db FunctionDecoratorInference<'db> {
-    let db = env.db();
-    debug_assert_eq!(env.program(), definition.program(db));
-    function_known_decorators_inner(db, definition)
-}
-
 #[salsa::tracked(
     returns(ref),
     cycle_initial=|_, _, _| FunctionDecoratorInference::default(),
     heap_size=ruff_memory_usage::heap_size
 )]
-fn function_known_decorators_inner<'db>(
+pub(crate) fn function_known_decorators<'db>(
     db: &'db dyn Db,
     definition: Definition<'db>,
 ) -> FunctionDecoratorInference<'db> {
@@ -233,10 +214,10 @@ fn function_known_decorators_inner<'db>(
 }
 
 pub(crate) fn function_known_decorator_flags<'db>(
-    env: &SemanticEnvironment<'db>,
+    db: &'db dyn Db,
     definition: Definition<'db>,
 ) -> FunctionDecorators {
-    function_known_decorators(env, definition).known_decorators()
+    function_known_decorators(db, definition).known_decorators()
 }
 
 /// A compact inference result for function decorators.
@@ -288,27 +269,18 @@ impl<'db> FunctionDecoratorInference<'db> {
 ///
 /// Deferred expressions are type expressions (annotations, base classes, aliases...) in a stub
 /// file, or in a file with `from __future__ import annotations`, or stringified annotations.
-pub(crate) fn infer_deferred_types<'db>(
-    env: &SemanticEnvironment<'db>,
-    definition: Definition<'db>,
-) -> &'db DefinitionInference<'db> {
-    let db = env.db();
-    debug_assert_eq!(env.program(), definition.program(db));
-    infer_deferred_types_inner(db, definition)
-}
-
 #[salsa::tracked(
     returns(ref),
     cycle_initial=|db, id, definition: Definition<'db>| {
         DefinitionInference::cycle_initial(db, definition, Type::divergent(id))
     },
     cycle_fn=|db: &'db dyn Db, cycle, previous: &DefinitionInference<'db>, inference: DefinitionInference<'db>, definition: Definition<'db>| {
-        let env = SemanticEnvironment::from_file(db, definition.python_file(db));
+        let env = SemanticEnvironment::from_definition(db, definition);
         inference.cycle_normalized(&env, previous, cycle, definition)
     },
     heap_size=ruff_memory_usage::heap_size
 )]
-fn infer_deferred_types_inner<'db>(
+pub(crate) fn infer_deferred_types<'db>(
     db: &'db dyn Db,
     definition: Definition<'db>,
 ) -> DefinitionInference<'db> {
@@ -372,12 +344,10 @@ pub(crate) fn infer_complete_scope_types<'db>(
 /// Inferring a nested scope independently without type context can lead to incorrect inferred
 /// types or diagnostics.
 pub(crate) fn infer_scope_types<'db>(
-    env: &SemanticEnvironment<'db>,
+    db: &'db dyn Db,
     scope: ScopeId<'db>,
     tcx: TypeContext<'db>,
 ) -> &'db ScopeInference<'db> {
-    let db = env.db();
-    debug_assert_eq!(env.program(), scope.program(db));
     infer_scope_types_impl(db, InferScope::new(db, scope, tcx))
 }
 
@@ -386,7 +356,7 @@ pub(crate) fn infer_scope_types<'db>(
     cycle_initial=|_, id, _| ScopeInference::cycle_initial(Type::divergent(id)),
     cycle_fn=|db, cycle, previous: &ScopeInference<'db>, inference: ScopeInference<'db>, input: InferScope<'db>| {
         let (scope, _) = input.into_inner(db);
-        let env = SemanticEnvironment::from_file(db, scope.python_file(db));
+        let env = SemanticEnvironment::from_scope(db, scope);
         inference.cycle_normalized(&env, previous, cycle)
     },
     heap_size=ruff_memory_usage::heap_size
@@ -424,12 +394,10 @@ pub(crate) fn infer_scope_types_impl<'db>(
 /// assignment, which might be unpacking/multi-target and thus part of multiple definitions, or a
 /// type narrowing guard expression (e.g. if statement test node).
 pub(crate) fn infer_expression_types<'db>(
-    env: &SemanticEnvironment<'db>,
+    db: &'db dyn Db,
     expression: Expression<'db>,
     tcx: TypeContext<'db>,
 ) -> &'db ExpressionInference<'db> {
-    let db = env.db();
-    debug_assert_eq!(env.program(), expression.program(db));
     infer_expression_types_impl(db, InferExpression::new(db, expression, tcx))
 }
 
@@ -438,7 +406,7 @@ pub(crate) fn infer_expression_types<'db>(
     cycle_initial=expression_cycle_initial,
     cycle_fn=|db, cycle, previous: &ExpressionInference<'db>, inference: ExpressionInference<'db>, input: InferExpression<'db>| {
         let (expression, _) = input.into_inner(db);
-        let env = SemanticEnvironment::from_file(db, expression.python_file(db));
+        let env = SemanticEnvironment::from_scope(db, expression.scope(db));
         inference.cycle_normalized(&env, previous, cycle)
     },
     heap_size=ruff_memory_usage::heap_size
@@ -490,12 +458,11 @@ fn expression_cycle_initial<'db>(
 /// Use [`infer_expression_type()`] if it isn't guaranteed that `expression` is in the same file to
 /// avoid cross-file query dependencies.
 pub(crate) fn infer_same_file_expression_type<'db>(
-    env: &SemanticEnvironment<'db>,
+    db: &'db dyn Db,
     expression: Expression<'db>,
     tcx: TypeContext<'db>,
 ) -> Type<'db> {
-    let db = env.db();
-    let inference = infer_expression_types(env, expression, tcx);
+    let inference = infer_expression_types(db, expression, tcx);
     inference.expression_type(expression.node_ref(db))
 }
 
@@ -507,12 +474,10 @@ pub(crate) fn infer_same_file_expression_type<'db>(
 /// Use [`infer_same_file_expression_type`] if it is guaranteed that  `expression` is in the same
 /// to avoid unnecessary salsa ingredients. This is normally the case inside the `TypeInferenceBuilder`.
 pub(crate) fn infer_expression_type<'db>(
-    env: &SemanticEnvironment<'db>,
+    db: &'db dyn Db,
     expression: Expression<'db>,
     tcx: TypeContext<'db>,
 ) -> Type<'db> {
-    let db = env.db();
-    debug_assert_eq!(env.program(), expression.program(db));
     infer_expression_type_impl(db, InferExpression::new(db, expression, tcx))
 }
 
@@ -521,7 +486,7 @@ pub(crate) fn infer_expression_type<'db>(
     cycle_initial=|_, id, _| Type::divergent(id),
     cycle_fn=|db, cycle, previous: &Type<'db>, result: Type<'db>, input: InferExpression<'db>| {
         let (expression, _) = input.into_inner(db);
-        let env = SemanticEnvironment::from_file(db, expression.python_file(db));
+        let env = SemanticEnvironment::from_scope(db, expression.scope(db));
         result.cycle_normalized(&env, *previous, cycle)
     },
     heap_size=ruff_memory_usage::heap_size
@@ -540,19 +505,17 @@ fn infer_expression_type_impl<'db>(db: &'db dyn Db, input: InferExpression<'db>)
 /// This is useful when you want to infer a sub-expression with its natural type context, as
 /// statements are the minimal unit of code that can be inferred without external type context.
 pub(super) fn infer_statement_types<'db>(
-    env: &SemanticEnvironment<'db>,
+    db: &'db dyn Db,
     statement: Statement<'db>,
 ) -> StatementInference<'db> {
-    let db = env.db();
     match statement {
         Statement::Expression(expression) => StatementInference::Expression(
-            infer_expression_types(env, expression, TypeContext::default()),
+            infer_expression_types(db, expression, TypeContext::default()),
         ),
         Statement::Definition(definition) => {
-            StatementInference::Definition(definition, infer_definition_types(env, definition))
+            StatementInference::Definition(definition, infer_definition_types(db, definition))
         }
         Statement::Other(statement) => {
-            debug_assert_eq!(env.program(), statement.program(db));
             StatementInference::Other(infer_statement_types_impl(db, statement))
         }
     }
@@ -748,15 +711,6 @@ impl<'db> From<Type<'db>> for TypeContext<'db> {
 /// involved in an unpacking operation. It returns a result-like object that can be used to get the
 /// type of the variables involved in this unpacking along with any violations that are detected
 /// during this unpacking.
-pub(super) fn infer_unpack_types<'db>(
-    env: &SemanticEnvironment<'db>,
-    unpack: Unpack<'db>,
-) -> &'db UnpackResult<'db> {
-    let db = env.db();
-    debug_assert_eq!(env.program(), unpack.program(db));
-    infer_unpack_types_inner(db, unpack)
-}
-
 #[salsa::tracked(
     returns(ref),
     cycle_initial=|_, id, _| UnpackResult::cycle_initial(Type::divergent(id)),
@@ -766,7 +720,7 @@ pub(super) fn infer_unpack_types<'db>(
     },
     heap_size=ruff_memory_usage::heap_size
 )]
-fn infer_unpack_types_inner<'db>(db: &'db dyn Db, unpack: Unpack<'db>) -> UnpackResult<'db> {
+pub(super) fn infer_unpack_types<'db>(db: &'db dyn Db, unpack: Unpack<'db>) -> UnpackResult<'db> {
     let python_file = unpack.python_file(db);
     let module = parsed_module(db, python_file).load(db);
     let _span = tracing::trace_span!(
@@ -826,7 +780,7 @@ pub(crate) fn original_class_type<'db>(
     env: &SemanticEnvironment<'db>,
     definition: Definition<'db>,
 ) -> Option<ClassLiteral<'db>> {
-    let inference = infer_definition_types(env, definition);
+    let inference = infer_definition_types(env.db(), definition);
     inference
         .undecorated_type()
         .unwrap_or_else(|| inference.binding_type(definition))
@@ -850,7 +804,7 @@ pub(crate) fn nearest_enclosing_function<'db>(
         .find_map(|(_, ancestor_scope)| {
             let func = ancestor_scope.node().as_function()?;
             let definition = semantic.expect_single_definition(func);
-            infer_definition_types(env, definition).function_type(definition)
+            infer_definition_types(env.db(), definition).function_type(definition)
         })
 }
 
@@ -1383,7 +1337,7 @@ impl<'db> DefinitionInference<'db> {
         definition: Definition<'db>,
         cycle_recovery: Type<'db>,
     ) -> Self {
-        let env = SemanticEnvironment::from_file(db, definition.python_file(db));
+        let env = SemanticEnvironment::from_definition(db, definition);
         let mut types = DefinitionTypes::Empty;
 
         // Eagerly store more precise types for collection literals to avoid an extra
@@ -1401,7 +1355,7 @@ impl<'db> DefinitionInference<'db> {
             if let Some(known_collection) = known_collection {
                 if let Some(collection_class) = known_collection.try_to_class_literal(&env) {
                     let divergent_collection = collection_class
-                        .apply_specialization(&env, |generic_context| {
+                        .apply_specialization(env.db(), |generic_context| {
                             generic_context.repeat_specialization(db, cycle_recovery)
                         });
 

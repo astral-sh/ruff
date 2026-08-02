@@ -158,13 +158,13 @@ impl<'db> DynamicEnumLiteral<'db> {
         }
     }
 
-    pub(crate) fn explicit_bases(self, env: &SemanticEnvironment<'db>) -> Box<[Type<'db>]> {
-        let db = env.db();
+    pub(crate) fn explicit_bases(self, db: &'db dyn Db) -> Box<[Type<'db>]> {
         let mut bases = Vec::with_capacity(2);
         if let Some(mixin) = self.mixin_type(db) {
             bases.push(mixin);
         }
-        bases.push(self.base_class(db).to_class_literal(env));
+        let env = SemanticEnvironment::from_scope(db, self.scope(db));
+        bases.push(self.base_class(db).to_class_literal(&env));
         bases.into_boxed_slice()
     }
 
@@ -189,27 +189,18 @@ impl<'db> DynamicEnumLiteral<'db> {
         KnownClass::EnumType.to_class_literal(env)
     }
 
-    pub(crate) fn try_mro(
-        self,
-        env: &SemanticEnvironment<'db>,
-    ) -> &'db Result<Mro<'db>, DynamicMroError<'db>> {
-        let db = env.db();
-        debug_assert_eq!(env.program(), self.scope(db).program(db));
-        self.try_mro_inner(db)
-    }
-
     #[salsa::tracked(
         returns(ref),
         heap_size=ruff_memory_usage::heap_size,
         cycle_initial=|db, _, self_: DynamicEnumLiteral<'db>| {
             Ok(Mro::from([
                 ClassBase::Class(ClassType::NonGeneric(ClassLiteral::DynamicEnum(self_))),
-                ClassBase::object(&SemanticEnvironment::from_file(db, self_.scope(db).python_file(db))),
+                ClassBase::object(&SemanticEnvironment::from_scope(db, self_.scope(db))),
             ]))
         }
     )]
-    fn try_mro_inner(self, db: &'db dyn Db) -> Result<Mro<'db>, DynamicMroError<'db>> {
-        let env = SemanticEnvironment::from_file(db, self.scope(db).python_file(db));
+    pub(crate) fn try_mro(self, db: &'db dyn Db) -> Result<Mro<'db>, DynamicMroError<'db>> {
+        let env = SemanticEnvironment::from_scope(db, self.scope(db));
         Mro::of_dynamic_enum(&env, self)
     }
 
@@ -252,7 +243,7 @@ impl<'db> DynamicEnumLiteral<'db> {
         let db = env.db();
         let spec = self.spec(db);
         if spec.has_known_members(db)
-            && let Some(enum_class) = ClassLiteral::DynamicEnum(self).into_enum_class(env)
+            && let Some(enum_class) = ClassLiteral::DynamicEnum(self).into_enum_class(env.db())
             && let Some(canonical_name) = enum_class.resolve_member(db, &Name::new(name))
         {
             let enum_lit =

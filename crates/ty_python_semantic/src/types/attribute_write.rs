@@ -259,7 +259,7 @@ pub(super) fn attribute_write_requirement<'db>(
         }
 
         Type::ProtocolInstance(protocol) => protocol
-            .interface(env)
+            .interface(env.db())
             .instance_write_requirement(env, object_ty, attribute)
             .map_or_else(
                 || instance_attribute_write_requirement(env, object_ty, attribute),
@@ -536,9 +536,9 @@ fn class_fallback_write_requirement<'db>(
     let ty = ty.bind_self_typevars(env, class_attr_self_ty);
     let ty = if matches!(object_ty, Type::ClassLiteral(_))
         && let Type::FunctionLiteral(function) = ty
-        && function.callable_type_kind(env) == CallableTypeKind::FunctionLike
+        && function.callable_type_kind(env.db()) == CallableTypeKind::FunctionLike
     {
-        Type::Callable(function.into_callable_type(env))
+        Type::Callable(function.into_callable_type(env.db()))
     } else {
         ty
     };

@@ -449,7 +449,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
         let anchor = self.create_dynamic_enum_anchor(call_expr, definition, spec);
         let enum_lit = DynamicEnumLiteral::new(db, name, anchor, base_class, mixin_type);
-        if let Err(error) = enum_lit.try_mro(env) {
+        if let Err(error) = enum_lit.try_mro(env.db()) {
             report_mro_error_kind(
                 &self.context,
                 error,

@@ -336,10 +336,6 @@ impl<'db> OverloadLiteral<'db> {
         self.body_scope(db).python_file(db)
     }
 
-    pub(crate) fn program(self, db: &'db dyn Db) -> Program {
-        self.body_scope(db).program(db)
-    }
-
     pub(crate) fn has_known_decorator(self, db: &dyn Db, decorator: FunctionDecorators) -> bool {
         self.decorators(db).contains(decorator)
     }
@@ -453,8 +449,7 @@ impl<'db> OverloadLiteral<'db> {
 
     /// Returns the overload immediately before this one in the AST. Returns `None` if there is no
     /// previous overload.
-    fn previous_overload(self, env: &SemanticEnvironment<'db>) -> Option<FunctionLiteral<'db>> {
-        let db = env.db();
+    fn previous_overload(self, db: &'db dyn Db) -> Option<FunctionLiteral<'db>> {
         // The semantic model records a use for each function on the name node. This is used
         // here to get the previous function definition with the same name.
         let scope = self.definition(db).scope(db);
@@ -469,12 +464,13 @@ impl<'db> OverloadLiteral<'db> {
             .name
             .scoped_use_id(db, self.python_file(db));
 
+        let env = SemanticEnvironment::from_scope(db, scope);
         let Place::Defined(DefinedPlace {
             ty: previous_type,
             definedness: Definedness::AlwaysDefined,
             provenance,
             ..
-        }) = place_from_bindings(env, use_def.bindings_at_use(use_id)).place
+        }) = place_from_bindings(&env, use_def.bindings_at_use(use_id)).place
         else {
             return None;
         };
@@ -483,7 +479,7 @@ impl<'db> OverloadLiteral<'db> {
             Type::FunctionLiteral(previous_type) => previous_type.literal(db),
             Type::Callable(_) => {
                 let definition = provenance.definition()?;
-                infer_definition_types(env, definition)
+                infer_definition_types(env.db(), definition)
                     .function_type(definition)?
                     .literal(db)
             }
@@ -517,11 +513,10 @@ impl<'db> OverloadLiteral<'db> {
     /// calling query is not in the same file as this function is defined in, then this will create
     /// a cross-module dependency directly on the full AST which will lead to cache
     /// over-invalidation.
-    pub(crate) fn signature(self, env: &SemanticEnvironment<'db>) -> Signature<'db> {
-        let db = env.db();
+    pub(crate) fn signature(self, db: &'db dyn Db) -> Signature<'db> {
         let scope = self.body_scope(db);
         let python_file = self.python_file(db);
-        let mut signature = self.raw_signature(env, ReturnCallableTypeVarScope::Public);
+        let mut signature = self.raw_signature(db, ReturnCallableTypeVarScope::Public);
         let module = parsed_module(db, python_file).load(db);
         let function_node = scope.node(db).expect_function().node(&module);
         let index = semantic_index(db, python_file);
@@ -529,7 +524,8 @@ impl<'db> OverloadLiteral<'db> {
         let is_generator = file_scope_id.is_generator_function(index);
 
         if function_node.is_async && !is_generator {
-            signature = signature.wrap_coroutine_return_type(env);
+            let env = SemanticEnvironment::from_file(db, python_file);
+            signature = signature.wrap_coroutine_return_type(&env);
         }
 
         signature
@@ -538,14 +534,14 @@ impl<'db> OverloadLiteral<'db> {
     /// Returns the effective signatures of this overload after applying decorators.
     pub(crate) fn decorated_signatures(
         self,
-        env: &SemanticEnvironment<'db>,
+        db: &'db dyn Db,
     ) -> impl Iterator<Item = Signature<'db>> + Clone + 'db {
-        let db = env.db();
-        match binding_type(env, self.definition(db)) {
+        let env = SemanticEnvironment::from_scope(db, self.body_scope(db));
+        match binding_type(&env, self.definition(db)) {
             Type::Callable(callable) => {
                 Either::Left(callable.signatures(db).overloads.iter().cloned())
             }
-            _ => Either::Right(std::iter::once(self.signature(env))),
+            _ => Either::Right(std::iter::once(self.signature(db))),
         }
     }
 
@@ -562,7 +558,7 @@ impl<'db> OverloadLiteral<'db> {
     /// over-invalidation.
     pub(super) fn raw_signature(
         self,
-        env: &SemanticEnvironment<'db>,
+        db: &'db dyn Db,
         return_callable_typevar_scope: ReturnCallableTypeVarScope,
     ) -> Signature<'db> {
         /// `self` or `cls` can be implicitly positional-only if:
@@ -621,7 +617,7 @@ impl<'db> OverloadLiteral<'db> {
                 .is_some_and(|class| class.is_protocol(env))
         }
 
-        let db = env.db();
+        let env = &SemanticEnvironment::from_scope(db, self.body_scope(db));
         let scope = self.body_scope(db);
         let python_file = self.python_file(db);
         let module = parsed_module(db, python_file).load(db);
@@ -669,7 +665,7 @@ impl<'db> OverloadLiteral<'db> {
             let class_node = class_scope.node().as_class()?;
             let class_def = index.expect_single_definition(class_node);
             let class_literal = original_class_type(env, class_def)?;
-            let class_is_generic = class_literal.generic_context(env).is_some();
+            let class_is_generic = class_literal.generic_context(env.db()).is_some();
             let class_is_fallback = class_literal
                 .known(db)
                 .is_some_and(KnownClass::is_fallback_class);
@@ -780,15 +776,11 @@ pub struct FunctionLiteral<'db> {
 }
 
 impl<'db> FunctionLiteral<'db> {
-    pub(super) fn new(
-        env: &SemanticEnvironment<'db>,
-        last_definition: OverloadLiteral<'db>,
-    ) -> Self {
-        let db = env.db();
+    pub(super) fn new(db: &'db dyn Db, last_definition: OverloadLiteral<'db>) -> Self {
         Self {
             last_definition,
             overloaded: last_definition.is_overload(db)
-                || last_definition.previous_overload(env).is_some(),
+                || last_definition.previous_overload(db).is_some(),
         }
     }
 
@@ -833,25 +825,16 @@ impl<'db> FunctionLiteral<'db> {
         self.last_definition.known(db)
     }
 
-    fn has_known_decorator(
-        self,
-        env: &SemanticEnvironment<'db>,
-        decorator: FunctionDecorators,
-    ) -> bool {
-        let db = env.db();
-        self.iter_overloads_and_implementation(env)
+    fn has_known_decorator(self, db: &'db dyn Db, decorator: FunctionDecorators) -> bool {
+        self.iter_overloads_and_implementation(db)
             .any(|overload| overload.decorators(db).contains(decorator))
     }
 
     /// If the implementation of this function is deprecated, returns the `@warnings.deprecated`.
     ///
     /// Checking if an overload is deprecated requires deeper call analysis.
-    fn implementation_deprecated(
-        self,
-        env: &SemanticEnvironment<'db>,
-    ) -> Option<DeprecatedInstance<'db>> {
-        let db = env.db();
-        let (_overloads, implementation) = self.overloads_and_implementation(env);
+    fn implementation_deprecated(self, db: &'db dyn Db) -> Option<DeprecatedInstance<'db>> {
+        let (_overloads, implementation) = self.overloads_and_implementation(db);
         implementation.and_then(|overload| overload.deprecated(db))
     }
 
@@ -869,7 +852,7 @@ impl<'db> FunctionLiteral<'db> {
 
     fn overloads_and_implementation(
         self,
-        env: &SemanticEnvironment<'db>,
+        db: &'db dyn Db,
     ) -> (&'db [OverloadLiteral<'db>], Option<OverloadLiteral<'db>>) {
         #[salsa::tracked(
             returns(ref),
@@ -880,11 +863,10 @@ impl<'db> FunctionLiteral<'db> {
             db: &'db dyn Db,
             self_overload: OverloadLiteral<'db>,
         ) -> (Box<[OverloadLiteral<'db>]>, Option<OverloadLiteral<'db>>) {
-            let env = SemanticEnvironment::from_file(db, self_overload.python_file(db));
             let mut current = self_overload;
             let mut overloads = vec![];
 
-            while let Some(previous) = current.previous_overload(&env) {
+            while let Some(previous) = current.previous_overload(db) {
                 let overload = previous.last_definition;
                 overloads.push(overload);
                 current = overload;
@@ -907,8 +889,6 @@ impl<'db> FunctionLiteral<'db> {
             return (&[], Some(self.last_definition));
         }
 
-        let db = env.db();
-        debug_assert_eq!(env.program(), self.last_definition.program(db));
         let (overloads, implementation) =
             overloads_and_implementation_inner(db, self.last_definition);
         (overloads.as_ref(), *implementation)
@@ -920,9 +900,9 @@ impl<'db> FunctionLiteral<'db> {
 
     fn iter_overloads_and_implementation(
         self,
-        env: &SemanticEnvironment<'db>,
+        db: &'db dyn Db,
     ) -> impl DoubleEndedIterator<Item = OverloadLiteral<'db>> + 'db {
-        let (overloads, implementation) = self.overloads_and_implementation(env);
+        let (overloads, implementation) = self.overloads_and_implementation(db);
         overloads.iter().copied().chain(implementation)
     }
 
@@ -937,14 +917,14 @@ impl<'db> FunctionLiteral<'db> {
     /// calling query is not in the same file as this function is defined in, then this will create
     /// a cross-module dependency directly on the full AST which will lead to cache
     /// over-invalidation.
-    fn signature(self, env: &SemanticEnvironment<'db>) -> CallableSignature<'db> {
+    fn signature(self, db: &'db dyn Db) -> CallableSignature<'db> {
         // We only include an implementation (i.e. a definition not decorated with `@overload`) if
         // it's the only definition.
-        let (overloads, implementation) = self.overloads_and_implementation(env);
+        let (overloads, implementation) = self.overloads_and_implementation(db);
         if let Some(implementation) = implementation
             && overloads.is_empty()
         {
-            return CallableSignature::single(implementation.signature(env));
+            return CallableSignature::single(implementation.signature(db));
         }
 
         CallableSignature::from_overloads(overloads.iter().enumerate().flat_map(
@@ -953,11 +933,11 @@ impl<'db> FunctionLiteral<'db> {
                 if *overload == self.last_definition {
                     Either::Left(std::iter::once(
                         overload
-                            .signature(env)
+                            .signature(db)
                             .with_source_overload_index(Some(source_overload_index)),
                     ))
                 } else {
-                    Either::Right(overload.decorated_signatures(env).map(move |signature| {
+                    Either::Right(overload.decorated_signatures(db).map(move |signature| {
                         signature.with_source_overload_index(Some(source_overload_index))
                     }))
                 }
@@ -973,8 +953,8 @@ impl<'db> FunctionLiteral<'db> {
     /// calling query is not in the same file as this function is defined in, then this will create
     /// a cross-module dependency directly on the full AST which will lead to cache
     /// over-invalidation.
-    fn last_definition_signature(self, env: &SemanticEnvironment<'db>) -> Signature<'db> {
-        self.last_definition.signature(env)
+    fn last_definition_signature(self, db: &'db dyn Db) -> Signature<'db> {
+        self.last_definition.signature(db)
     }
 
     /// Typed externally-visible "raw" signature of the last overload or implementation of this function.
@@ -989,11 +969,11 @@ impl<'db> FunctionLiteral<'db> {
     /// over-invalidation.
     fn last_definition_raw_signature(
         self,
-        env: &SemanticEnvironment<'db>,
+        db: &'db dyn Db,
         return_callable_typevar_scope: ReturnCallableTypeVarScope,
     ) -> Signature<'db> {
         self.last_definition
-            .raw_signature(env, return_callable_typevar_scope)
+            .raw_signature(db, return_callable_typevar_scope)
     }
 
     /// Return `Some()` if this function is an abstract method.
@@ -1010,7 +990,7 @@ impl<'db> FunctionLiteral<'db> {
         enclosing_class: ClassType<'db>,
     ) -> Option<AbstractMethodKind> {
         let db = env.db();
-        if self.has_known_decorator(env, FunctionDecorators::ABSTRACT_METHOD) {
+        if self.has_known_decorator(env.db(), FunctionDecorators::ABSTRACT_METHOD) {
             return Some(AbstractMethodKind::Explicit);
         }
         if self.definition(db).file(db).is_stub(db) {
@@ -1019,7 +999,7 @@ impl<'db> FunctionLiteral<'db> {
         if !enclosing_class.is_protocol(env) {
             return None;
         }
-        match self.body_kind(env) {
+        match self.body_kind(db) {
             FunctionBodyKind::Stub => Some(AbstractMethodKind::ImplicitDueToStubBody),
             FunctionBodyKind::AlwaysRaisesNotImplementedError => {
                 Some(AbstractMethodKind::ImplicitDueToAlwaysRaising)
@@ -1032,7 +1012,7 @@ impl<'db> FunctionLiteral<'db> {
     ///
     /// For functions without an implementation (e.g., overloaded functions),
     /// returns [`FunctionBodyKind::Stub`].
-    fn body_kind(self, env: &SemanticEnvironment<'db>) -> FunctionBodyKind {
+    fn body_kind(self, db: &'db dyn Db) -> FunctionBodyKind {
         #[salsa::tracked(returns(copy))]
         fn implementation_body_kind<'db>(
             db: &'db dyn Db,
@@ -1049,12 +1029,10 @@ impl<'db> FunctionLiteral<'db> {
             })
         }
 
-        let (_, implementation) = self.overloads_and_implementation(env);
+        let (_, implementation) = self.overloads_and_implementation(db);
         let Some(implementation) = implementation else {
             return FunctionBodyKind::Stub;
         };
-        let db = env.db();
-        debug_assert_eq!(env.program(), implementation.program(db));
         implementation_body_kind(db, implementation)
     }
 
@@ -1065,11 +1043,10 @@ impl<'db> FunctionLiteral<'db> {
     ///
     /// Methods defined in stub files are never considered to have trivial bodies,
     /// since stubs use `...` as a placeholder regardless of the runtime implementation.
-    fn has_trivial_body(self, env: &SemanticEnvironment<'db>) -> bool {
-        let db = env.db();
+    fn has_trivial_body(self, db: &'db dyn Db) -> bool {
         !self.definition(db).file(db).is_stub(db)
             && matches!(
-                self.body_kind(env),
+                self.body_kind(db),
                 FunctionBodyKind::Stub | FunctionBodyKind::AlwaysRaisesNotImplementedError
             )
     }
@@ -1090,7 +1067,7 @@ pub(super) fn same_module_uncached_raw_signature<'db>(
     let db = env.db();
     function
         .literal(db)
-        .last_definition_raw_signature(env, return_callable_typevar_scope)
+        .last_definition_raw_signature(env.db(), return_callable_typevar_scope)
 }
 
 /// Indicates whether a method is explicitly or implicitly abstract.
@@ -1216,7 +1193,7 @@ impl<'db> FunctionType<'db> {
             || {
                 Cow::Owned(vec![CallableType::single(
                     db,
-                    self.last_definition_signature(env).clone(),
+                    self.last_definition_signature(env.db()).clone(),
                 )])
             },
             Cow::Borrowed,
@@ -1246,7 +1223,7 @@ impl<'db> FunctionType<'db> {
     ) -> Self {
         let db = env.db();
         let updated_signature = self
-            .signature(env)
+            .signature(env.db())
             .with_inherited_generic_context(db, inherited_generic_context);
         let literal = self.literal(db);
         let updated_implementation_callables = literal.has_separate_implementation(db).then(|| {
@@ -1310,10 +1287,12 @@ impl<'db> FunctionType<'db> {
             )
         } else {
             (
-                Some(
-                    self.signature(env)
-                        .apply_type_mapping_impl(env, type_mapping, tcx, visitor),
-                ),
+                Some(self.signature(env.db()).apply_type_mapping_impl(
+                    env,
+                    type_mapping,
+                    tcx,
+                    visitor,
+                )),
                 literal.has_separate_implementation(db).then(|| {
                     self.implementation_callables(env)
                         .iter()
@@ -1378,7 +1357,7 @@ impl<'db> FunctionType<'db> {
     }
 
     pub(crate) fn program(self, db: &'db dyn Db) -> Program {
-        self.literal(db).last_definition.program(db)
+        self.literal(db).last_definition.body_scope(db).program(db)
     }
 
     /// Returns the AST node for this function.
@@ -1410,25 +1389,23 @@ impl<'db> FunctionType<'db> {
     /// conditions.
     pub(crate) fn has_known_decorator(
         self,
-        env: &SemanticEnvironment<'db>,
+        db: &'db dyn Db,
         decorator: FunctionDecorators,
     ) -> bool {
-        self.literal(env.db()).has_known_decorator(env, decorator)
+        self.literal(db).has_known_decorator(db, decorator)
     }
 
     /// Returns true if this method is decorated with `@classmethod`, or if it is implicitly a
     /// classmethod.
-    pub(crate) fn is_classmethod(self, env: &SemanticEnvironment<'db>) -> bool {
-        let db = env.db();
-        self.iter_overloads_and_implementation(env)
+    pub(crate) fn is_classmethod(self, db: &'db dyn Db) -> bool {
+        self.iter_overloads_and_implementation(db)
             .any(|overload| overload.is_classmethod(db))
     }
 
     /// Returns true if this method is decorated with `@staticmethod`, or if it is implicitly a
     /// static method.
-    pub(crate) fn is_staticmethod(self, env: &SemanticEnvironment<'db>) -> bool {
-        let db = env.db();
-        self.iter_overloads_and_implementation(env)
+    pub(crate) fn is_staticmethod(self, db: &'db dyn Db) -> bool {
+        self.iter_overloads_and_implementation(db)
             .any(|overload| overload.is_staticmethod(db))
     }
 
@@ -1442,9 +1419,9 @@ impl<'db> FunctionType<'db> {
     /// Checking if an overload is deprecated requires deeper call analysis.
     pub(crate) fn implementation_deprecated(
         self,
-        env: &SemanticEnvironment<'db>,
+        db: &'db dyn Db,
     ) -> Option<DeprecatedInstance<'db>> {
-        self.literal(env.db()).implementation_deprecated(env)
+        self.literal(db).implementation_deprecated(db)
     }
 
     /// Returns the [`Definition`] of the implementation or first overload of this function.
@@ -1477,7 +1454,7 @@ impl<'db> FunctionType<'db> {
         definition: Definition<'db>,
     ) -> bool {
         let db = env.db();
-        self.iter_overloads_and_implementation(env)
+        self.iter_overloads_and_implementation(env.db())
             .any(|overload| overload.definition(db) == definition)
     }
 
@@ -1530,8 +1507,8 @@ impl<'db> FunctionType<'db> {
     }
 
     /// Returns `true` if this function has a trivial body.
-    pub(crate) fn has_trivial_body(self, env: &SemanticEnvironment<'db>) -> bool {
-        self.literal(env.db()).has_trivial_body(env)
+    pub(crate) fn has_trivial_body(self, db: &'db dyn Db) -> bool {
+        self.literal(db).has_trivial_body(db)
     }
 
     /// Returns `true` if any overload or implementation has an explicit return annotation.
@@ -1545,9 +1522,8 @@ impl<'db> FunctionType<'db> {
     /// def replace(cls) -> object:
     ///     return object()
     /// ```
-    pub(crate) fn has_explicit_return_annotation(self, env: &SemanticEnvironment<'db>) -> bool {
-        let db = env.db();
-        self.iter_overloads_and_implementation(env)
+    pub(crate) fn has_explicit_return_annotation(self, db: &'db dyn Db) -> bool {
+        self.iter_overloads_and_implementation(db)
             .any(|overload| overload.has_explicit_return_annotation(db))
     }
 
@@ -1555,26 +1531,22 @@ impl<'db> FunctionType<'db> {
     /// function. The overload signatures will be in source order.
     pub(crate) fn overloads_and_implementation(
         self,
-        env: &SemanticEnvironment<'db>,
+        db: &'db dyn Db,
     ) -> (&'db [OverloadLiteral<'db>], Option<OverloadLiteral<'db>>) {
-        self.literal(env.db()).overloads_and_implementation(env)
+        self.literal(db).overloads_and_implementation(db)
     }
 
     /// Returns an iterator of all of the definitions of this function, including both overload
     /// signatures and any implementation, all in source order.
     pub(crate) fn iter_overloads_and_implementation(
         self,
-        env: &SemanticEnvironment<'db>,
+        db: &'db dyn Db,
     ) -> impl DoubleEndedIterator<Item = OverloadLiteral<'db>> + 'db {
-        self.literal(env.db())
-            .iter_overloads_and_implementation(env)
+        self.literal(db).iter_overloads_and_implementation(db)
     }
 
-    pub(crate) fn first_overload_or_implementation(
-        self,
-        env: &SemanticEnvironment<'db>,
-    ) -> OverloadLiteral<'db> {
-        self.iter_overloads_and_implementation(env)
+    pub(crate) fn first_overload_or_implementation(self, db: &'db dyn Db) -> OverloadLiteral<'db> {
+        self.iter_overloads_and_implementation(db)
             .next()
             .expect("A function must have at least one overload/implementation")
     }
@@ -1591,57 +1563,47 @@ impl<'db> FunctionType<'db> {
     ///
     /// Were this not a salsa query, then the calling query
     /// would depend on the function's AST and rerun for every change in that file.
-    pub(crate) fn signature(self, env: &SemanticEnvironment<'db>) -> &'db CallableSignature<'db> {
-        let db = env.db();
-        debug_assert_eq!(env.program(), self.program(db));
-        self.signature_inner(db)
-    }
-
     #[salsa::tracked(
         returns(ref),
         cycle_initial=|db, id, function: FunctionType<'db>| {
-            let env = SemanticEnvironment::from_file(db, function.python_file(db));
+            let env = SemanticEnvironment::from_scope(
+                db,
+                function.literal(db).last_definition.body_scope(db),
+            );
             CallableSignature::cycle_initial(&env, id)
         },
         cycle_fn=|db, cycle, previous, value: CallableSignature<'db>, function: FunctionType<'db>| {
-            let env = SemanticEnvironment::from_file(db, function.python_file(db));
+            let env = SemanticEnvironment::from_scope(
+                db,
+                function.literal(db).last_definition.body_scope(db),
+            );
             value.cycle_normalized(&env, previous, cycle)
         },
         heap_size=ruff_memory_usage::heap_size,
     )]
-    fn signature_inner(self, db: &'db dyn Db) -> CallableSignature<'db> {
-        self.updated_signature(db).cloned().unwrap_or_else(|| {
-            let env = SemanticEnvironment::from_file(db, self.python_file(db));
-            self.literal(db).signature(&env)
-        })
+    pub(crate) fn signature(self, db: &'db dyn Db) -> CallableSignature<'db> {
+        self.updated_signature(db)
+            .cloned()
+            .unwrap_or_else(|| self.literal(db).signature(db))
     }
 
     /// Infer the variance of a type variable within this function's signature.
     ///
     /// This is tracked because signatures can contain recursive `TypeOf` references back to the
     /// function itself. Class and generic-alias variance use the same `Bivariant` cycle fallback.
-    pub(crate) fn variance_of(
-        self,
-        env: &SemanticEnvironment<'db>,
-        typevar: BoundTypeVarIdentity<'db>,
-    ) -> TypeVarVariance {
-        let db = env.db();
-        debug_assert_eq!(env.program(), self.program(db));
-        self.variance_of_inner(db, typevar)
-    }
-
     #[salsa::tracked(
         returns(copy),
         cycle_initial=|_, _, _, _| TypeVarVariance::Bivariant,
         heap_size=ruff_memory_usage::heap_size,
     )]
-    fn variance_of_inner(
+    pub(crate) fn variance_of(
         self,
         db: &'db dyn Db,
         typevar: BoundTypeVarIdentity<'db>,
     ) -> TypeVarVariance {
-        let env = SemanticEnvironment::from_file(db, self.python_file(db));
-        self.signature(&env).variance_of(&env, typevar)
+        let env =
+            SemanticEnvironment::from_scope(db, self.literal(db).last_definition.body_scope(db));
+        self.signature(db).variance_of(&env, typevar)
     }
 
     /// Typed externally-visible signature of the last overload or implementation of this function.
@@ -1653,67 +1615,46 @@ impl<'db> FunctionType<'db> {
     ///
     /// Were this not a salsa query, then the calling query
     /// would depend on the function's AST and rerun for every change in that file.
-    pub(crate) fn last_definition_signature(
-        self,
-        env: &SemanticEnvironment<'db>,
-    ) -> &'db Signature<'db> {
-        let db = env.db();
-        debug_assert_eq!(env.program(), self.program(db));
-        self.last_definition_signature_inner(db)
-    }
-
     #[salsa::tracked(
         returns(ref),
         cycle_initial=|_, _, _|Signature::bottom(),
         heap_size=ruff_memory_usage::heap_size,
     )]
-    fn last_definition_signature_inner(self, db: &'db dyn Db) -> Signature<'db> {
-        let env = SemanticEnvironment::from_file(db, self.python_file(db));
+    pub(crate) fn last_definition_signature(self, db: &'db dyn Db) -> Signature<'db> {
         let literal = self.literal(db);
         if literal.has_separate_implementation(db) {
             self.updated_implementation_signature(db)
                 .cloned()
-                .unwrap_or_else(|| literal.last_definition_signature(&env))
+                .unwrap_or_else(|| literal.last_definition_signature(db))
         } else {
             self.updated_signature(db)
                 .and_then(|signature| signature.overloads.last().cloned())
-                .unwrap_or_else(|| literal.last_definition_signature(&env))
+                .unwrap_or_else(|| literal.last_definition_signature(db))
         }
     }
 
     /// Typed externally-visible "raw" signature of the last overload or implementation of this function.
     /// The `return_callable_typevar_scope` controls whether type variables that only appear in a
     /// return-position `Callable` stay bound to the function or move to the returned callable.
-    pub(super) fn last_definition_raw_signature(
-        self,
-        env: &SemanticEnvironment<'db>,
-        return_callable_typevar_scope: ReturnCallableTypeVarScope,
-    ) -> &'db Signature<'db> {
-        let db = env.db();
-        debug_assert_eq!(env.program(), self.program(db));
-        self.last_definition_raw_signature_inner(db, return_callable_typevar_scope)
-    }
-
     #[salsa::tracked(
         returns(ref),
         cycle_initial=|_, _, _, _|Signature::bottom(),
         heap_size=ruff_memory_usage::heap_size,
     )]
-    fn last_definition_raw_signature_inner(
+    pub(super) fn last_definition_raw_signature(
         self,
         db: &'db dyn Db,
         return_callable_typevar_scope: ReturnCallableTypeVarScope,
     ) -> Signature<'db> {
-        let env = SemanticEnvironment::from_file(db, self.python_file(db));
         self.literal(db)
-            .last_definition_raw_signature(&env, return_callable_typevar_scope)
+            .last_definition_raw_signature(db, return_callable_typevar_scope)
     }
 
     /// Return the kind for this function when it is converted into a [`CallableType`].
-    pub(crate) fn callable_type_kind(self, env: &SemanticEnvironment<'db>) -> CallableTypeKind {
-        if self.is_classmethod(env) {
+    pub(crate) fn callable_type_kind(self, db: &'db dyn Db) -> CallableTypeKind {
+        if self.is_classmethod(db) {
             CallableTypeKind::ClassMethodLike
-        } else if self.is_staticmethod(env) {
+        } else if self.is_staticmethod(db) {
             CallableTypeKind::StaticMethodLike
         } else {
             CallableTypeKind::FunctionLike
@@ -1721,14 +1662,13 @@ impl<'db> FunctionType<'db> {
     }
 
     /// Convert the `FunctionType` into a [`CallableType`].
-    pub(crate) fn into_callable_type(self, env: &SemanticEnvironment<'db>) -> CallableType<'db> {
-        let db = env.db();
+    pub(crate) fn into_callable_type(self, db: &'db dyn Db) -> CallableType<'db> {
         CallableType::new(
             db,
-            self.signature(env),
-            self.callable_type_kind(env),
+            self.signature(db),
+            self.callable_type_kind(db),
             CallableFunctionProvenance::from_function_return_annotation(
-                self.has_explicit_return_annotation(env),
+                self.has_explicit_return_annotation(db),
             ),
         )
     }
@@ -1749,7 +1689,7 @@ impl<'db> FunctionType<'db> {
         typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
         visitor: &FindLegacyTypeVarsVisitor<'db>,
     ) {
-        let signatures = self.signature(env);
+        let signatures = self.signature(env.db());
         for signature in &signatures.overloads {
             signature.find_legacy_typevars_impl(env, binding_context, typevars, visitor);
         }
@@ -1819,7 +1759,11 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         if source.literal(db) != target.literal(db) {
             return self.never();
         }
-        self.check_callable_signature_pair(env, source.signature(env), target.signature(env))
+        self.check_callable_signature_pair(
+            env,
+            source.signature(env.db()),
+            target.signature(env.db()),
+        )
     }
 }
 
@@ -1854,7 +1798,8 @@ fn check_classinfo_in_isinstance<'db>(
                         function,
                     );
                 } else if function == KnownFunction::IsSubclass {
-                    let non_method_members = protocol_class.interface(env).non_method_members(db);
+                    let non_method_members =
+                        protocol_class.interface(env.db()).non_method_members(db);
                     if !non_method_members.is_empty() {
                         report_issubclass_check_against_protocol_with_non_method_members(
                             context,
@@ -2795,7 +2740,7 @@ impl KnownFunction {
                     );
                     diag.annotate(Annotation::primary(span).message(format_args!(
                         "`{}`",
-                        protocol_class.interface(env).display(env)
+                        protocol_class.interface(env.db()).display(env)
                     )));
                 }
             }

@@ -243,7 +243,7 @@ impl<'db> ConstructorBinding<'db> {
         }
 
         constructed_instance_type
-            .apply_optional_specialization(env, self.instance_return_specialization(env))
+            .apply_optional_specialization(env.db(), self.instance_return_specialization(env))
     }
 
     fn first_matching_overload(&self) -> Option<&Binding<'db>> {
@@ -302,7 +302,7 @@ impl<'db> ConstructorBinding<'db> {
                 let resolved_self_param_ty = overload
                     .specialization(db)
                     .map_or(self_param_ty, |specialization| {
-                        self_param_ty.apply_specialization(env, specialization)
+                        self_param_ty.apply_specialization(env.db(), specialization)
                     });
                 resolved_self_param_ty.specialization_of(env, lit)
             });
@@ -361,7 +361,7 @@ impl<'db> ConstructorBinding<'db> {
         }
 
         combined.map(|specialization| {
-            specialization.apply_optional_specialization(env, Some(class_specialization))
+            specialization.apply_optional_specialization(env.db(), Some(class_specialization))
         })
     }
 
@@ -457,7 +457,7 @@ impl<'db> ConstructorBinding<'db> {
         let return_ty = overload
             .unspecialized_return_type(env)
             .apply_optional_specialization(
-                env,
+                env.db(),
                 overload.specialization(db).map(|specialization| {
                     self.unspecialize_class_type_variables(env, specialization)
                 }),
@@ -469,8 +469,10 @@ impl<'db> ConstructorBinding<'db> {
             })
         {
             return (
-                return_ty
-                    .apply_optional_specialization(env, self.instance_return_specialization(env)),
+                return_ty.apply_optional_specialization(
+                    env.db(),
+                    self.instance_return_specialization(env),
+                ),
                 true,
             );
         }

@@ -966,7 +966,7 @@ fn member_implementation_definition<'db>(
         return Some(ResolvedDefinition::Definition(definition));
     };
 
-    let (_, implementation) = function.overloads_and_implementation(env);
+    let (_, implementation) = function.overloads_and_implementation(env.db());
     if implementation.is_some() {
         return Some(ResolvedDefinition::Definition(function.last_definition(db)));
     }
@@ -1289,8 +1289,8 @@ pub fn definitions_and_overloads_for_function<'db>(
     {
         let env = &model.semantic_environment();
         function_type
-            .iter_overloads_and_implementation(env)
-            .filter_map(|overload| overload.signature(env).definition())
+            .iter_overloads_and_implementation(env.db())
+            .filter_map(|overload| overload.signature(env.db()).definition())
             .map(ResolvedDefinition::Definition)
             .collect()
     } else {
@@ -1398,7 +1398,7 @@ fn displayed_parameters_for_signature<'db>(
     // call-site substitutions are reflected in the rendered signature. For
     // example, if `_KT` was inferred as `str`, display `str` instead of `_KT`.
     let apply_specialization =
-        |ty: Type<'db>| specialization.map_or(ty, |spec| ty.apply_specialization(env, spec));
+        |ty: Type<'db>| specialization.map_or(ty, |spec| ty.apply_specialization(env.db(), spec));
     let parameters = signature.parameters();
 
     match parameters.kind() {
@@ -2160,7 +2160,7 @@ mod resolve_definition {
             .end_of_scope_symbol_bindings(symbol_id)
             .filter_map(|binding| {
                 let ty = binding_type(env, binding.binding.definition()?).as_function_literal()?;
-                ty.iter_overloads_and_implementation(env)
+                ty.iter_overloads_and_implementation(env.db())
                     .any(|overload| overload == current_overload)
                     .then_some(ty)
             })
@@ -2737,7 +2737,7 @@ pub fn type_hierarchy_supertypes<'db>(
     }
 
     let mut supertypes: Vec<TypeHierarchyClass<'db>> = class_literal
-        .explicit_bases(env)
+        .explicit_bases(env.db())
         .into_iter()
         .filter_map(|base| extract_class_literal(env, base))
         .map(|class_literal| class_literal_to_hierarchy_info(db, class_literal))
@@ -2827,7 +2827,7 @@ fn direct_subtypes<'db>(
 
         let file_env = SemanticEnvironment::from_file(db, python_file);
         for class_ty in reachable_class_literals_in_file(&file_env, python_file) {
-            let bases = class_ty.explicit_bases(&file_env);
+            let bases = class_ty.explicit_bases(file_env.db());
             let is_subtype = if target_is_object
                 && bases.is_empty()
                 && !class_ty.is_known(db, KnownClass::Object)

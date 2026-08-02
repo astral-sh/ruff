@@ -88,9 +88,9 @@ impl<'db> Mro<'db> {
         }
 
         let db = env.db();
-        let class = class_literal.apply_optional_specialization(env, specialization);
+        let class = class_literal.apply_optional_specialization(env.db(), specialization);
 
-        let original_bases = class_literal.explicit_bases(env);
+        let original_bases = class_literal.explicit_bases(env.db());
 
         match original_bases {
             // `builtins.object` is the special case:
@@ -115,7 +115,7 @@ impl<'db> Mro<'db> {
             // ```
             [] => {
                 // e.g. `class Foo[T]: ...` implicitly has `Generic` inserted into its bases
-                if class.has_pep_695_type_params(env) {
+                if class.has_pep_695_type_params(env.db()) {
                     Ok(Self::from([
                         ClassBase::Class(class),
                         ClassBase::Generic,
@@ -135,7 +135,7 @@ impl<'db> Mro<'db> {
             // but it's a common case (i.e., worth optimizing for),
             // and the `c3_merge` function requires lots of allocations.
             [single_base]
-                if !class.has_pep_695_type_params(env)
+                if !class.has_pep_695_type_params(env.db())
                     && !matches!(
                         single_base,
                         Type::GenericAlias(_)
@@ -211,7 +211,7 @@ impl<'db> Mro<'db> {
 
                 // `Generic` is implicitly added to the bases list of a class that has PEP-695 type parameters
                 // (documented at https://docs.python.org/3/reference/compound_stmts.html#generic-classes)
-                if class.has_pep_695_type_params(env) {
+                if class.has_pep_695_type_params(env.db()) {
                     maybe_add_generic(&mut resolved_bases, original_bases, &[]);
                 }
 
@@ -225,7 +225,7 @@ impl<'db> Mro<'db> {
                 seqs.push(
                     resolved_bases
                         .iter()
-                        .map(|base| base.apply_optional_specialization(env, specialization))
+                        .map(|base| base.apply_optional_specialization(env.db(), specialization))
                         .collect(),
                 );
 
@@ -237,7 +237,7 @@ impl<'db> Mro<'db> {
                 // The rest of this function is dedicated to figuring out the best error message
                 // to report to the user.
 
-                if class.has_pep_695_type_params(env)
+                if class.has_pep_695_type_params(env.db())
                     && original_bases.iter().any(|base| {
                         matches!(
                             base,
@@ -347,7 +347,7 @@ impl<'db> Mro<'db> {
         env: &SemanticEnvironment<'db>,
         dynamic: DynamicClassLiteral<'db>,
     ) -> Result<Self, DynamicMroError<'db>> {
-        let original_bases = dynamic.explicit_bases(env);
+        let original_bases = dynamic.explicit_bases(env.db());
 
         // Convert Types to ClassBases, tracking any that fail conversion.
         let mut resolved_bases = Vec::with_capacity(original_bases.len());
@@ -443,7 +443,7 @@ impl<'db> Mro<'db> {
         // Convert the functional enum bases (`type=` mixin first, enum base second)
         // into `ClassBase`s, skipping any invalid mixin that we already diagnosed
         // during call inference.
-        let original_bases = dynamic_enum.explicit_bases(env);
+        let original_bases = dynamic_enum.explicit_bases(env.db());
         let mut resolved_bases: Vec<ClassBase<'db>> = Vec::with_capacity(original_bases.len());
         for base_type in original_bases.iter().copied() {
             if let Some(base) = ClassBase::try_from_explicit_base(env, base_type, None) {
@@ -507,7 +507,7 @@ impl<'db> Mro<'db> {
         let mut seen = FxHashSet::default();
         seen.insert(self_base);
 
-        for base_type in dynamic.explicit_bases(env) {
+        for base_type in dynamic.explicit_bases(env.db()) {
             // Convert `Type` to `ClassBase`, falling back to `Unknown` if conversion fails.
             let base = ClassBase::try_from_explicit_base(env, *base_type, None)
                 .unwrap_or_else(ClassBase::unknown);
@@ -606,7 +606,7 @@ impl<'db> MroIterator<'db> {
     fn first_element(&self) -> ClassBase<'db> {
         match self.class {
             ClassLiteral::Static(literal) => ClassBase::Class(
-                literal.apply_optional_specialization(&self.env, self.specialization),
+                literal.apply_optional_specialization(self.env.db(), self.specialization),
             ),
             ClassLiteral::Dynamic(literal) => {
                 ClassBase::Class(ClassType::NonGeneric(literal.into()))
@@ -632,7 +632,7 @@ impl<'db> MroIterator<'db> {
                     let specialization = self.specialization.map(|specialization| {
                         specialization.tuple_runtime_element_specialization(&self.env)
                     });
-                    let mut full_mro_iter = match literal.try_mro(&self.env, specialization) {
+                    let mut full_mro_iter = match literal.try_mro(self.env.db(), specialization) {
                         Ok(mro) => mro.iter(),
                         Err(error) => error.fallback_mro().iter(),
                     };
@@ -640,7 +640,7 @@ impl<'db> MroIterator<'db> {
                     full_mro_iter
                 }
                 ClassLiteral::Dynamic(literal) => {
-                    let mut full_mro_iter = match literal.try_mro(&self.env) {
+                    let mut full_mro_iter = match literal.try_mro(self.env.db()) {
                         Ok(mro) => mro.iter(),
                         Err(error) => error.fallback_mro().iter(),
                     };
@@ -648,17 +648,17 @@ impl<'db> MroIterator<'db> {
                     full_mro_iter
                 }
                 ClassLiteral::DynamicNamedTuple(literal) => {
-                    let mut full_mro_iter = literal.mro(&self.env).iter();
+                    let mut full_mro_iter = literal.mro(self.env.db()).iter();
                     full_mro_iter.next();
                     full_mro_iter
                 }
                 ClassLiteral::DynamicTypedDict(literal) => {
-                    let mut full_mro_iter = literal.mro(&self.env).iter();
+                    let mut full_mro_iter = literal.mro(self.env.db()).iter();
                     full_mro_iter.next();
                     full_mro_iter
                 }
                 ClassLiteral::DynamicEnum(literal) => {
-                    let mut full_mro_iter = match literal.try_mro(&self.env) {
+                    let mut full_mro_iter = match literal.try_mro(self.env.db()) {
                         Ok(mro) => mro.iter(),
                         Err(error) => error.fallback_mro().iter(),
                     };

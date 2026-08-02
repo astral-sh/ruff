@@ -823,7 +823,7 @@ impl<'db> TypeAliasType<'db> {
         self,
         env: &'env SemanticEnvironment<'db>,
     ) -> impl Display + 'env {
-        let value_ty = self.raw_value_type(env);
+        let value_ty = self.raw_value_type(env.db());
         DisplayTypeAliasDeclaration {
             env,
             type_alias: self,
@@ -889,7 +889,7 @@ struct DisplayTypeAliasDeclaration<'env, 'db> {
 
 impl<'db> FmtDetailed<'db> for DisplayTypeAliasDeclaration<'_, 'db> {
     fn fmt_detailed(&self, f: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result {
-        let generic_context = self.type_alias.generic_context(self.env);
+        let generic_context = self.type_alias.generic_context(self.env.db());
         let settings = self
             .settings
             .with_generic_context(self.env.db(), generic_context.as_ref());
@@ -1139,7 +1139,7 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'_, 'db> {
             Type::BoundMethod(bound_method) => {
                 let function = bound_method.function(self.env.db());
                 let self_ty = bound_method.self_instance(self.env.db());
-                let bound_signatures = bound_method.bound_signatures(self.env);
+                let bound_signatures = bound_method.bound_signatures(self.env.db());
 
                 match bound_signatures.overloads.as_slice() {
                     [signature] => {
@@ -1660,7 +1660,7 @@ pub(crate) struct DisplayOverloadLiteral<'env, 'db> {
 
 impl<'db> FmtDetailed<'db> for DisplayOverloadLiteral<'_, 'db> {
     fn fmt_detailed(&self, f: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result {
-        let signature = self.literal.signature(self.env);
+        let signature = self.literal.signature(self.env.db());
         let hide_unused_self = signature.should_hide_self_from_display(self.env);
         let type_parameters = DisplayOptionalGenericContext {
             generic_context: signature.generic_context.as_ref(),
@@ -1724,7 +1724,7 @@ impl<'db> FmtDetailed<'db> for DisplayFunctionType<'_, 'db> {
         visited.insert(self.ty);
         settings.visited_function_types = Rc::new(visited);
 
-        let signature = self.ty.signature(self.env);
+        let signature = self.ty.signature(self.env.db());
 
         match signature.overloads.as_slice() {
             [signature] => {

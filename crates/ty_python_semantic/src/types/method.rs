@@ -54,7 +54,7 @@ impl<'db> BoundMethodType<'db> {
     pub(crate) fn typing_self_type(self, env: &SemanticEnvironment<'db>) -> Type<'db> {
         let db = env.db();
         let mut self_instance = self.self_instance(db);
-        if self.function(db).is_classmethod(env) {
+        if self.function(db).is_classmethod(env.db()) {
             self_instance = self_instance
                 .to_instance_approximation(env)
                 .unwrap_or_else(Type::unknown);
@@ -70,27 +70,24 @@ impl<'db> BoundMethodType<'db> {
         Self::new(db, self.function(db), f(self.self_instance(db)))
     }
 
-    pub(crate) fn into_callable_type(self, env: &SemanticEnvironment<'db>) -> CallableType<'db> {
-        let db = env.db();
-        debug_assert_eq!(env.program(), self.function(db).program(db));
-        self.into_callable_type_inner(db)
-    }
-
     #[salsa::tracked(
         returns(copy),
         cycle_initial=|db, _, _| CallableType::bottom(db),
         heap_size=ruff_memory_usage::heap_size
     )]
-    fn into_callable_type_inner(self, db: &'db dyn Db) -> CallableType<'db> {
+    pub(crate) fn into_callable_type(self, db: &'db dyn Db) -> CallableType<'db> {
         let function = self.function(db);
-        let env = SemanticEnvironment::from_file(db, function.python_file(db));
+        let env = SemanticEnvironment::from_scope(
+            db,
+            function.literal(db).last_definition.body_scope(db),
+        );
 
         CallableType::new(
             db,
-            self.bound_signatures_inner(db),
+            self.bound_signatures(db),
             CallableTypeKind::FunctionLike,
             CallableFunctionProvenance::from_function_return_annotation(
-                function.has_explicit_return_annotation(&env),
+                function.has_explicit_return_annotation(env.db()),
             ),
         )
     }
@@ -110,24 +107,18 @@ impl<'db> BoundMethodType<'db> {
             self.bound_signatures_with_receiver(env, receiver_type, typing_self_type),
             CallableTypeKind::FunctionLike,
             CallableFunctionProvenance::from_function_return_annotation(
-                function.has_explicit_return_annotation(env),
+                function.has_explicit_return_annotation(env.db()),
             ),
         )
     }
 
-    pub(crate) fn bound_signatures(
-        self,
-        env: &SemanticEnvironment<'db>,
-    ) -> &'db CallableSignature<'db> {
-        let db = env.db();
-        debug_assert_eq!(env.program(), self.function(db).program(db));
-        self.bound_signatures_inner(db)
-    }
-
     #[salsa::tracked(returns(ref), cycle_initial=|_, _, _| CallableSignature::bottom(), heap_size=ruff_memory_usage::heap_size)]
-    fn bound_signatures_inner(self, db: &'db dyn Db) -> CallableSignature<'db> {
+    pub(crate) fn bound_signatures(self, db: &'db dyn Db) -> CallableSignature<'db> {
         let function = self.function(db);
-        let env = SemanticEnvironment::from_file(db, function.python_file(db));
+        let env = SemanticEnvironment::from_scope(
+            db,
+            function.literal(db).last_definition.body_scope(db),
+        );
         let typing_self_type = self.typing_self_type(&env);
         let receiver_type = self.self_instance(db);
 
@@ -141,7 +132,7 @@ impl<'db> BoundMethodType<'db> {
         typing_self_type: Type<'db>,
     ) -> CallableSignature<'db> {
         let db = env.db();
-        let function_signature = self.function(db).signature(env);
+        let function_signature = self.function(db).signature(env.db());
 
         let [signature] = function_signature.overloads.as_slice() else {
             if !function_signature
@@ -421,7 +412,7 @@ impl<'db> KnownBoundMethodType<'db> {
                 .into_iter(),
             )),
             KnownBoundMethodType::FunctionTypeDunderCall(function) => Either::Left(Either::Right(
-                function.signature(env).overloads.iter().cloned(),
+                function.signature(env.db()).overloads.iter().cloned(),
             )),
             KnownBoundMethodType::PropertyDunderSet(_) => {
                 Either::Right(std::iter::once(Signature::new(

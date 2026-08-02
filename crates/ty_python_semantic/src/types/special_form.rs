@@ -892,7 +892,7 @@ impl SpecialFormType {
                     }
 
                     binding_definition.name(db).as_deref() != Some("__new__")
-                        && function_known_decorator_flags(env, binding_definition)
+                        && function_known_decorator_flags(env.db(), binding_definition)
                             .contains(FunctionDecorators::STATICMETHOD)
                 });
                 if in_staticmethod {

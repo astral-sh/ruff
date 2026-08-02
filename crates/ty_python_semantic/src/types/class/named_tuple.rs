@@ -245,22 +245,16 @@ impl<'db> DynamicNamedTupleLiteral<'db> {
     /// 8. `typing.Protocol`
     /// 9. `typing.Generic`
     /// 10. `<class 'object'>`
-    pub(crate) fn mro(self, env: &SemanticEnvironment<'db>) -> &'db Mro<'db> {
-        let db = env.db();
-        debug_assert_eq!(env.program(), self.scope(db).program(db));
-        self.mro_inner(db)
-    }
-
     #[salsa::tracked(
         returns(ref),
         heap_size=ruff_memory_usage::heap_size,
         cycle_initial=|db, _, self_: DynamicNamedTupleLiteral<'db>| Mro::from_error(
-            &SemanticEnvironment::from_file(db, self_.scope(db).python_file(db)),
+            &SemanticEnvironment::from_scope(db, self_.scope(db)),
             ClassType::NonGeneric(ClassLiteral::DynamicNamedTuple(self_)),
         ),
     )]
-    fn mro_inner(self, db: &'db dyn Db) -> Mro<'db> {
-        let env = SemanticEnvironment::from_file(db, self.scope(db).python_file(db));
+    pub(crate) fn mro(self, db: &'db dyn Db) -> Mro<'db> {
+        let env = SemanticEnvironment::from_scope(db, self.scope(db));
         let self_base = ClassBase::Class(ClassType::NonGeneric(self.into()));
         let tuple_class = self.tuple_base_class(&env);
         std::iter::once(self_base)
@@ -283,11 +277,11 @@ impl<'db> DynamicNamedTupleLiteral<'db> {
         let db = env.db();
         // If fields are unknown, return `tuple[Unknown, ...]` to avoid false positives
         // like index-out-of-bounds errors.
-        if !self.has_known_fields(env) {
+        if !self.has_known_fields(env.db()) {
             return TupleType::homogeneous(env, Type::unknown()).to_class_type(db);
         }
 
-        let field_types = self.fields(env).iter().map(|field| field.ty);
+        let field_types = self.fields(env.db()).iter().map(|field| field.ty);
         TupleType::heterogeneous(env, field_types)
             .map(|tuple| tuple.to_class_type(db))
             .unwrap_or_else(|| {
@@ -308,7 +302,7 @@ impl<'db> DynamicNamedTupleLiteral<'db> {
         env: &SemanticEnvironment<'db>,
         _name: &str,
     ) -> Member<'db> {
-        if !self.has_known_fields(env) {
+        if !self.has_known_fields(env.db()) {
             return Member::definitely_declared(Type::any());
         }
 
@@ -353,7 +347,7 @@ impl<'db> DynamicNamedTupleLiteral<'db> {
 
         // If fields are unknown (dynamic) and the attribute wasn't found,
         // return `Any` instead of failing.
-        if !self.has_known_fields(env) && result.place.is_undefined() {
+        if !self.has_known_fields(env.db()) && result.place.is_undefined() {
             return Place::bound(Type::any()).into();
         }
 
@@ -376,7 +370,7 @@ impl<'db> DynamicNamedTupleLiteral<'db> {
         }
 
         // Check if it's a field name (returns a property descriptor).
-        for field in self.fields(env) {
+        for field in self.fields(env.db()) {
             if field.name == name {
                 return Member::definitely_declared(create_field_property(db, field.ty));
             }
@@ -395,7 +389,7 @@ impl<'db> DynamicNamedTupleLiteral<'db> {
         let instance_ty = self.to_instance(env);
 
         // When fields are unknown, handle constructor and field-specific methods specially.
-        if !self.has_known_fields(env) {
+        if !self.has_known_fields(env.db()) {
             match name {
                 // For constructors, return a gradual signature that accepts any arguments.
                 "__new__" | "__init__" => {
@@ -428,7 +422,7 @@ impl<'db> DynamicNamedTupleLiteral<'db> {
             env,
             name,
             instance_ty,
-            self.fields(env).iter().cloned(),
+            self.fields(env.db()).iter().cloned(),
             None,
         );
         // For fallback members from NamedTupleFallback, apply type mapping to handle
@@ -452,25 +446,13 @@ impl<'db> DynamicNamedTupleLiteral<'db> {
         }
     }
 
-    fn spec(self, env: &SemanticEnvironment<'db>) -> NamedTupleSpec<'db> {
-        fn deferred_spec<'db>(
-            env: &SemanticEnvironment<'db>,
-            definition: Definition<'db>,
-        ) -> NamedTupleSpec<'db> {
-            let db = env.db();
-            debug_assert_eq!(env.program(), definition.program(db));
-            deferred_spec_inner(db, definition)
-        }
-
+    fn spec(self, db: &'db dyn Db) -> NamedTupleSpec<'db> {
         #[salsa::tracked(
             returns(copy),
             cycle_initial=|db, _, _| NamedTupleSpec::unknown(db),
             heap_size=ruff_memory_usage::heap_size
         )]
-        fn deferred_spec_inner<'db>(
-            db: &'db dyn Db,
-            definition: Definition<'db>,
-        ) -> NamedTupleSpec<'db> {
+        fn deferred_spec<'db>(db: &'db dyn Db, definition: Definition<'db>) -> NamedTupleSpec<'db> {
             let python_file = definition.python_file(db);
             let env = SemanticEnvironment::from_file(db, python_file);
             let module = parsed_module(db, python_file).load(db);
@@ -486,30 +468,24 @@ impl<'db> DynamicNamedTupleLiteral<'db> {
             }
         }
 
-        match self.anchor(env.db()) {
+        match self.anchor(db) {
             DynamicNamedTupleAnchor::CollectionsDefinition { spec, .. }
             | DynamicNamedTupleAnchor::ScopeOffset { spec, .. } => *spec,
-            DynamicNamedTupleAnchor::TypingDefinition(definition) => {
-                deferred_spec(env, *definition)
-            }
+            DynamicNamedTupleAnchor::TypingDefinition(definition) => deferred_spec(db, *definition),
         }
     }
 
-    fn fields(self, env: &SemanticEnvironment<'db>) -> &'db [NamedTupleField<'db>] {
-        self.spec(env).fields(env.db())
+    fn fields(self, db: &'db dyn Db) -> &'db [NamedTupleField<'db>] {
+        self.spec(db).fields(db)
     }
 
     /// Returns the field declared directly on this dynamic named tuple, if any.
-    pub(crate) fn field(
-        self,
-        env: &SemanticEnvironment<'db>,
-        name: &Name,
-    ) -> Option<&'db NamedTupleField<'db>> {
-        self.fields(env).iter().find(|field| field.name == *name)
+    pub(crate) fn field(self, db: &'db dyn Db, name: &Name) -> Option<&'db NamedTupleField<'db>> {
+        self.fields(db).iter().find(|field| field.name == *name)
     }
 
-    pub(super) fn has_known_fields(self, env: &SemanticEnvironment<'db>) -> bool {
-        self.spec(env).has_known_fields(env.db())
+    pub(super) fn has_known_fields(self, db: &'db dyn Db) -> bool {
+        self.spec(db).has_known_fields(db)
     }
 }
 

@@ -236,26 +236,16 @@ use ty_python_core::{
 /// Caching each prefix lets the next case reuse the already-normalized subject instead of
 /// rebuilding it from the union of all preceding patterns, which can repeatedly distribute the
 /// same intersections.
-pub(crate) fn type_narrowed_by_previous_patterns<'db>(
-    env: &SemanticEnvironment<'db>,
-    predicate: PatternPredicate<'db>,
-    subject_ty: Type<'db>,
-) -> Type<'db> {
-    let db = env.db();
-    debug_assert_eq!(env.program(), predicate.program(db));
-    type_narrowed_by_previous_patterns_inner(db, predicate, subject_ty)
-}
-
 #[salsa::tracked(
     returns(copy),
     cycle_initial = |_, id, _, _| Type::divergent(id),
     cycle_fn = |db: &'db dyn Db, cycle, previous: &Type<'db>, result: Type<'db>, predicate: PatternPredicate<'db>, _| {
-        let env = SemanticEnvironment::from_file(db, predicate.subject(db).python_file(db));
+        let env = SemanticEnvironment::from_scope(db, predicate.subject(db).scope(db));
         result.cycle_normalized(&env, *previous, cycle)
     },
     heap_size = ruff_memory_usage::heap_size
 )]
-fn type_narrowed_by_previous_patterns_inner<'db>(
+pub(crate) fn type_narrowed_by_previous_patterns<'db>(
     db: &'db dyn Db,
     predicate: PatternPredicate<'db>,
     subject_ty: Type<'db>,
@@ -264,40 +254,29 @@ fn type_narrowed_by_previous_patterns_inner<'db>(
         return subject_ty;
     };
     let previous = *previous;
-    let env = SemanticEnvironment::from_file(db, predicate.subject(db).python_file(db));
     let narrowed_by_previous_patterns =
-        type_narrowed_by_previous_patterns(&env, previous, subject_ty);
+        type_narrowed_by_previous_patterns(db, previous, subject_ty);
 
     if previous.guard(db).is_some() {
         narrowed_by_previous_patterns
     } else {
-        type_narrowed_by_pattern(&env, previous, narrowed_by_previous_patterns)
+        type_narrowed_by_pattern(db, previous, narrowed_by_previous_patterns)
     }
 }
 
 /// Narrow `subject_ty` by a match pattern.
 ///
 /// This result is also the preceding-pattern prefix for the next unguarded case.
-fn type_narrowed_by_pattern<'db>(
-    env: &SemanticEnvironment<'db>,
-    predicate: PatternPredicate<'db>,
-    subject_ty: Type<'db>,
-) -> Type<'db> {
-    let db = env.db();
-    debug_assert_eq!(env.program(), predicate.program(db));
-    type_narrowed_by_pattern_inner(db, predicate, subject_ty)
-}
-
 #[salsa::tracked(
     returns(copy),
     cycle_initial = |_, id, _, _| Type::divergent(id),
     cycle_fn = |db: &'db dyn Db, cycle, previous: &Type<'db>, result: Type<'db>, predicate: PatternPredicate<'db>, _| {
-        let env = SemanticEnvironment::from_file(db, predicate.subject(db).python_file(db));
+        let env = SemanticEnvironment::from_scope(db, predicate.subject(db).scope(db));
         result.cycle_normalized(&env, *previous, cycle)
     },
     heap_size = ruff_memory_usage::heap_size
 )]
-fn type_narrowed_by_pattern_inner<'db>(
+fn type_narrowed_by_pattern<'db>(
     db: &'db dyn Db,
     predicate: PatternPredicate<'db>,
     subject_ty: Type<'db>,
@@ -490,27 +469,15 @@ fn analyze_enum_literal_union_pattern_predicate<'db>(
 /// statement with N cases where each case references the subject (e.g., `self`), we would
 /// re-analyze each pattern O(N) times (once per reference), leading to O(N²) total work.
 /// With memoization, each pattern is analyzed exactly once.
-fn analyze_pattern_predicate<'db>(
-    env: &SemanticEnvironment<'db>,
-    predicate: PatternPredicate<'db>,
-) -> Truthiness {
-    let db = env.db();
-    debug_assert_eq!(env.program(), predicate.program(db));
-    analyze_pattern_predicate_inner(db, predicate)
-}
-
 #[salsa::tracked(
     returns(copy),
     cycle_initial = |_, _, _| Truthiness::Ambiguous,
     heap_size = get_size2::GetSize::get_heap_size
 )]
-fn analyze_pattern_predicate_inner<'db>(
-    db: &'db dyn Db,
-    predicate: PatternPredicate<'db>,
-) -> Truthiness {
-    let env = SemanticEnvironment::from_file(db, predicate.subject(db).python_file(db));
+fn analyze_pattern_predicate<'db>(db: &'db dyn Db, predicate: PatternPredicate<'db>) -> Truthiness {
+    let env = SemanticEnvironment::from_scope(db, predicate.subject(db).scope(db));
     let subject_ty =
-        infer_same_file_expression_type(&env, predicate.subject(db), TypeContext::default());
+        infer_same_file_expression_type(env.db(), predicate.subject(db), TypeContext::default());
 
     if let Some(truthiness) =
         analyze_enum_literal_union_pattern_predicate(&env, predicate, subject_ty)
@@ -522,7 +489,7 @@ fn analyze_pattern_predicate_inner<'db>(
         .map(|types| UnionType::from_elements(&env, types))
         .unwrap_or(subject_ty);
     let narrowed_subject_ty =
-        type_narrowed_by_previous_patterns(&env, predicate, coverage_subject_ty);
+        type_narrowed_by_previous_patterns(db, predicate, coverage_subject_ty);
 
     // Consider a case where we match on a subject type of `Self` with an upper bound of `Answer`,
     // where `Answer` is a {YES, NO} enum. After a previous pattern matching on `NO`, the narrowed
@@ -533,7 +500,8 @@ fn analyze_pattern_predicate_inner<'db>(
     // means that subsequent patterns can never match. And we know that if we reach this point,
     // the current pattern will have to match. We return `AlwaysTrue` here, since the call to
     // `analyze_single_pattern_predicate_kind` below would return `Ambiguous` in this case.
-    let next_narrowed_subject_ty = type_narrowed_by_pattern(&env, predicate, narrowed_subject_ty);
+    let next_narrowed_subject_ty =
+        type_narrowed_by_pattern(env.db(), predicate, narrowed_subject_ty);
     if !narrowed_subject_ty.is_never() && next_narrowed_subject_ty.is_never() {
         return Truthiness::AlwaysTrue;
     }
@@ -616,7 +584,7 @@ fn analyze_non_terminal_call_prefix<'db>(
         return false;
     }
 
-    let call_predicates = non_terminal_call_predicates(env, scope);
+    let call_predicates = non_terminal_call_predicates(env.db(), scope);
     let call_count = call_predicates.partition_point(|predicate| *predicate <= root_predicate);
     let mut start = 0;
     // Leave the incomplete final block demand-driven. Its reverse dependency chain is bounded by
@@ -625,7 +593,7 @@ fn analyze_non_terminal_call_prefix<'db>(
     while remaining > 0 {
         let level = remaining.ilog2();
         let length = 1 << level;
-        analyze_non_terminal_call_range(env, scope, level, start >> level);
+        analyze_non_terminal_call_range(env.db(), scope, level, start >> level);
         start += length;
         remaining -= length;
     }
@@ -637,17 +605,8 @@ fn analyze_non_terminal_call_prefix<'db>(
 ///
 /// This tracked index is used only once a scope exceeds [`NON_TERMINAL_CALL_CHUNK_SIZE`], avoiding
 /// a persistent allocation for the common case of scopes with few calls.
-fn non_terminal_call_predicates<'db>(
-    env: &SemanticEnvironment<'db>,
-    scope: ScopeId<'db>,
-) -> &'db [ScopedPredicateId] {
-    let db = env.db();
-    debug_assert_eq!(env.program(), scope.program(db));
-    non_terminal_call_predicates_inner(db, scope)
-}
-
 #[salsa::tracked(returns(deref), heap_size = get_size2::GetSize::get_heap_size)]
-fn non_terminal_call_predicates_inner<'db>(
+fn non_terminal_call_predicates<'db>(
     db: &'db dyn Db,
     scope: ScopeId<'db>,
 ) -> Box<[ScopedPredicateId]> {
@@ -680,32 +639,21 @@ fn analyze_non_terminal_calls<'db>(
 /// Analyzing a call can re-enter reachability through expression inference and request this same
 /// range. Recovery is a no-op because the range only warms call queries; any call still needed for
 /// reachability is evaluated directly by the decision-diagram walk.
-fn analyze_non_terminal_call_range<'db>(
-    env: &SemanticEnvironment<'db>,
-    scope: ScopeId<'db>,
-    level: u32,
-    index: usize,
-) {
-    let db = env.db();
-    debug_assert_eq!(env.program(), scope.program(db));
-    analyze_non_terminal_call_range_inner(db, scope, level, index);
-}
-
 #[salsa::tracked(
     returns(copy),
     cycle_initial = |_, _, _, _, _| (),
     heap_size = get_size2::GetSize::get_heap_size
 )]
-fn analyze_non_terminal_call_range_inner<'db>(
+fn analyze_non_terminal_call_range<'db>(
     db: &'db dyn Db,
     scope: ScopeId<'db>,
     level: u32,
     index: usize,
 ) {
     if level == 0 {
-        let env = SemanticEnvironment::from_file(db, scope.python_file(db));
+        let env = SemanticEnvironment::from_scope(db, scope);
         let use_def = use_def_map(db, scope);
-        let call_predicates = non_terminal_call_predicates(&env, scope);
+        let call_predicates = non_terminal_call_predicates(db, scope);
         let start = index * NON_TERMINAL_CALL_CHUNK_SIZE;
         let end = start + NON_TERMINAL_CALL_CHUNK_SIZE;
         analyze_non_terminal_calls(&env, use_def.predicates(), &call_predicates[start..end]);
@@ -713,9 +661,8 @@ fn analyze_non_terminal_call_range_inner<'db>(
     }
 
     let child_index = index * 2;
-    let env = SemanticEnvironment::from_file(db, scope.python_file(db));
-    analyze_non_terminal_call_range(&env, scope, level - 1, child_index);
-    analyze_non_terminal_call_range(&env, scope, level - 1, child_index + 1);
+    analyze_non_terminal_call_range(db, scope, level - 1, child_index);
+    analyze_non_terminal_call_range(db, scope, level - 1, child_index + 1);
 }
 
 /// Evaluates a reachability constraint after warming its statement-call prefix.
@@ -737,7 +684,7 @@ fn evaluate_reachability_constraint<'db>(
     let predicates = use_def.predicates();
     let root_predicate = constraints.get_interior_node(id).atom();
     let has_many_calls = analyze_non_terminal_call_prefix(env, predicates, root_predicate);
-    let call_predicates = has_many_calls.then(|| non_terminal_call_predicates(env, scope));
+    let call_predicates = has_many_calls.then(|| non_terminal_call_predicates(env.db(), scope));
 
     evaluate_reachability_path(
         env,
@@ -792,7 +739,7 @@ fn evaluate_reachability_path<'db>(
                 is_reachability_checkpoint(call_predicates, node.atom())
             })
         {
-            return evaluate_reachability_checkpoint(env, scope, id);
+            return evaluate_reachability_checkpoint(env.db(), scope, id);
         }
 
         id = match analyze_single(env, &predicates[node.atom()]) {
@@ -809,34 +756,24 @@ fn evaluate_reachability_path<'db>(
 /// Only every [`REACHABILITY_EVALUATION_CHUNK_SIZE`]th non-terminal-call predicate is a checkpoint.
 /// This lets later statements reuse the constraints accumulated by earlier statements without
 /// retaining a Salsa query key and memo for every reachability constraint in the scope.
-fn evaluate_reachability_checkpoint<'db>(
-    env: &SemanticEnvironment<'db>,
-    scope: ScopeId<'db>,
-    id: ScopedReachabilityConstraintId,
-) -> Truthiness {
-    let db = env.db();
-    debug_assert_eq!(env.program(), scope.program(db));
-    evaluate_reachability_checkpoint_inner(db, scope, id)
-}
-
 #[salsa::tracked(
     returns(copy),
     cycle_initial = |_, _, _, _| Truthiness::Ambiguous,
     heap_size = get_size2::GetSize::get_heap_size
 )]
-fn evaluate_reachability_checkpoint_inner<'db>(
+fn evaluate_reachability_checkpoint<'db>(
     db: &'db dyn Db,
     scope: ScopeId<'db>,
     id: ScopedReachabilityConstraintId,
 ) -> Truthiness {
-    let env = SemanticEnvironment::from_file(db, scope.python_file(db));
+    let env = SemanticEnvironment::from_scope(db, scope);
     let use_def = use_def_map(db, scope);
     evaluate_reachability_path(
         &env,
         scope,
         use_def.reachability_constraints(),
         use_def.predicates(),
-        Some(non_terminal_call_predicates(&env, scope)),
+        Some(non_terminal_call_predicates(db, scope)),
         id,
         false,
     )
@@ -1344,7 +1281,8 @@ fn analyze_single_pattern_predicate_kind<'db>(
 ) -> Truthiness {
     match predicate_kind {
         PatternPredicateKind::Value(value) => {
-            let value_ty = infer_same_file_expression_type(env, *value, TypeContext::default());
+            let value_ty =
+                infer_same_file_expression_type(env.db(), *value, TypeContext::default());
 
             equality_truthiness(
                 env,
@@ -1410,7 +1348,8 @@ fn analyze_single_pattern_predicate_kind<'db>(
         }
         PatternPredicateKind::Class(kind) => {
             let class_ty =
-                match infer_same_file_expression_type(env, kind.class, TypeContext::default()) {
+                match infer_same_file_expression_type(env.db(), kind.class, TypeContext::default())
+                {
                     Type::ClassLiteral(class) => {
                         Type::instance(env, class.top_materialization(env))
                     }
@@ -1483,37 +1422,25 @@ fn analyze_single_pattern_predicate_kind<'db>(
 ///
 /// Cycle recovery conservatively treats the call as returning so that a cyclic type inference
 /// dependency cannot make subsequent code unreachable.
-fn analyze_non_terminal_call<'db>(
-    env: &SemanticEnvironment<'db>,
-    callable: Expression<'db>,
-    call_expr: Expression<'db>,
-    is_await: bool,
-) -> Truthiness {
-    let db = env.db();
-    debug_assert_eq!(env.program(), callable.program(db));
-    debug_assert_eq!(env.program(), call_expr.program(db));
-    analyze_non_terminal_call_inner(db, callable, call_expr, is_await)
-}
-
 #[salsa::tracked(
     returns(copy),
     cycle_initial = |_, _, _, _, _| Truthiness::AlwaysTrue,
     heap_size = get_size2::GetSize::get_heap_size
 )]
-fn analyze_non_terminal_call_inner<'db>(
+fn analyze_non_terminal_call<'db>(
     db: &'db dyn Db,
     callable: Expression<'db>,
     call_expr: Expression<'db>,
     is_await: bool,
 ) -> Truthiness {
-    let env = SemanticEnvironment::from_file(db, callable.python_file(db));
+    let env = SemanticEnvironment::from_scope(db, callable.scope(db));
     // We first infer just the type of the callable. In the most likely case that the function is
     // not marked with `NoReturn`, or that it always returns `NoReturn`, doing so allows us to avoid
     // the more expensive work of inferring the entire call expression (which could involve
     // inferring argument types to possibly run the overload selection algorithm). Avoiding this on
     // the happy path is important because these constraints can be very large in number, since we
     // add them on all statement-level function calls.
-    let ty = infer_same_file_expression_type(&env, callable, TypeContext::default());
+    let ty = infer_same_file_expression_type(env.db(), callable, TypeContext::default());
 
     // Short-circuit for well-known types that are known not to return `Never` when called. Without
     // the short-circuit, we've seen that threads keep blocking each other because they all try to
@@ -1549,7 +1476,8 @@ fn analyze_non_terminal_call_inner<'db>(
     } else if all_overloads_return_never {
         Truthiness::AlwaysFalse
     } else {
-        let call_expr_ty = infer_same_file_expression_type(&env, call_expr, TypeContext::default());
+        let call_expr_ty =
+            infer_same_file_expression_type(env.db(), call_expr, TypeContext::default());
         if call_expr_ty.is_equivalent_to(&env, Type::Never) {
             Truthiness::AlwaysFalse
         } else {
@@ -1559,7 +1487,7 @@ fn analyze_non_terminal_call_inner<'db>(
 }
 
 fn analyze_non_empty_iterable(env: &SemanticEnvironment<'_>, iterable: Expression) -> Truthiness {
-    match infer_same_file_expression_type(env, iterable, TypeContext::default()) {
+    match infer_same_file_expression_type(env.db(), iterable, TypeContext::default()) {
         Type::KnownInstance(KnownInstanceType::Range { is_non_empty }) => {
             Truthiness::from(is_non_empty)
         }
@@ -1573,7 +1501,7 @@ fn analyze_single(env: &SemanticEnvironment<'_>, predicate: &Predicate) -> Truth
 
     match predicate.node {
         PredicateNode::Expression(test_expr) => {
-            infer_same_file_expression_type(env, test_expr, TypeContext::default())
+            infer_same_file_expression_type(env.db(), test_expr, TypeContext::default())
                 .bool(env)
                 .negate_if(!predicate.is_positive)
         }
@@ -1581,11 +1509,11 @@ fn analyze_single(env: &SemanticEnvironment<'_>, predicate: &Predicate) -> Truth
             callable,
             call_expr,
             is_await,
-        }) => analyze_non_terminal_call(env, callable, call_expr, is_await)
+        }) => analyze_non_terminal_call(env.db(), callable, call_expr, is_await)
             .negate_if(!predicate.is_positive),
-        PredicateNode::Pattern(inner) => analyze_pattern_predicate(env, inner),
+        PredicateNode::Pattern(inner) => analyze_pattern_predicate(env.db(), inner),
         PredicateNode::SubjectElementPattern(subject_element) => {
-            analyze_pattern_predicate(env, subject_element.pattern)
+            analyze_pattern_predicate(env.db(), subject_element.pattern)
         }
         PredicateNode::IsNonEmptyIterable(iterable) => {
             analyze_non_empty_iterable(env, iterable).negate_if(!predicate.is_positive)
@@ -1897,7 +1825,7 @@ class TargetB:
 
         // Enter the range directly so it becomes the cycle head when inferring `other.target`
         // reaches the other module and then re-enters this scope.
-        analyze_non_terminal_call_range(&db.semantic_environment(), setup_scope, 0, 0);
+        analyze_non_terminal_call_range(&db, setup_scope, 0, 0);
         Ok(())
     }
 

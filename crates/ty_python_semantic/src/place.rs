@@ -1009,34 +1009,16 @@ impl<'db> From<Place<'db>> for PlaceAndQualifiers<'db> {
     }
 }
 
-pub(crate) fn place_by_id<'db>(
-    env: &SemanticEnvironment<'db>,
-    scope: ScopeId<'db>,
-    place_id: ScopedPlaceId,
-    requires_explicit_reexport: RequiresExplicitReExport,
-    considered_definitions: ConsideredDefinitions,
-) -> PlaceAndQualifiers<'db> {
-    let db = env.db();
-    debug_assert_eq!(env.program(), scope.program(db));
-    place_by_id_inner(
-        db,
-        scope,
-        place_id,
-        requires_explicit_reexport,
-        considered_definitions,
-    )
-}
-
 #[salsa::tracked(
     returns(copy),
     cycle_initial=|_, id, _, _, _, _| Place::bound(Type::divergent(id)).into(),
     cycle_fn=|db, cycle, previous: &PlaceAndQualifiers<'db>, place: PlaceAndQualifiers<'db>, scope: ScopeId<'db>, _, _, _| {
-        let env = SemanticEnvironment::from_file(db, scope.python_file(db));
+        let env = SemanticEnvironment::from_scope(db, scope);
         place.cycle_normalized(&env, *previous, cycle)
     },
     heap_size=ruff_memory_usage::heap_size
 )]
-fn place_by_id_inner<'db>(
+pub(crate) fn place_by_id<'db>(
     db: &'db dyn Db,
     scope: ScopeId<'db>,
     place_id: ScopedPlaceId,
@@ -1044,7 +1026,7 @@ fn place_by_id_inner<'db>(
     considered_definitions: ConsideredDefinitions,
 ) -> PlaceAndQualifiers<'db> {
     let use_def = use_def_map(db, scope);
-    let env = SemanticEnvironment::from_file(db, scope.python_file(db));
+    let env = SemanticEnvironment::from_scope(db, scope);
 
     // If the place is declared, the public type is based on declarations; otherwise, it's based
     // on inference from bindings.
@@ -1378,7 +1360,7 @@ fn symbol_impl<'db>(
         .symbol_id(name)
         .map(|symbol| {
             place_by_id(
-                env,
+                env.db(),
                 scope,
                 symbol.into(),
                 requires_explicit_reexport,
@@ -1389,29 +1371,20 @@ fn symbol_impl<'db>(
 }
 
 /// Pre-computed reachability analysis for loop-back bindings in a loop header.
-pub(crate) fn loop_header_reachability<'db>(
-    env: &SemanticEnvironment<'db>,
-    definition: Definition<'db>,
-) -> LoopHeaderReachability<'db> {
-    let db = env.db();
-    debug_assert_eq!(env.program(), definition.program(db));
-    loop_header_reachability_inner(db, definition)
-}
-
 #[salsa::tracked(
     returns(clone),
     cycle_initial=|db, _, definition: Definition<'db>| {
-        let env = SemanticEnvironment::from_file(db, definition.python_file(db));
+        let env = SemanticEnvironment::from_definition(db, definition);
         loop_header_reachability_impl(&env, definition, true)
     },
     cycle_fn=loop_header_reachability_cycle_recover,
     heap_size = ruff_memory_usage::heap_size,
 )]
-fn loop_header_reachability_inner<'db>(
+pub(crate) fn loop_header_reachability<'db>(
     db: &'db dyn Db,
     definition: Definition<'db>,
 ) -> LoopHeaderReachability<'db> {
-    let env = SemanticEnvironment::from_file(db, definition.python_file(db));
+    let env = SemanticEnvironment::from_definition(db, definition);
     loop_header_reachability_impl(&env, definition, false)
 }
 
@@ -1592,7 +1565,7 @@ fn place_from_bindings_impl<'db>(
          }| {
             let binding = match binding {
                 DefinitionState::Defined(binding)
-                    if is_discarded_dict_key_assignment(env, binding) =>
+                    if is_discarded_dict_key_assignment(env.db(), binding) =>
                 {
                     // This synthesized `d[key] = value` binding was derived from an assignment such
                     // as `d = {key: value}`. If the RHS is not known to be stored unchanged, discard
@@ -1688,7 +1661,7 @@ fn place_from_bindings_impl<'db>(
             // like all other bindings, so that it can participate in fixpoint iteration.
             let binding_kind = binding.kind(db);
             if binding_kind.is_loop_header() {
-                let loop_header = loop_header_reachability(env, binding);
+                let loop_header = loop_header_reachability(env.db(), binding);
                 deleted_reachability = deleted_reachability.or(loop_header.deleted_reachability);
                 // If all the bindings in the loop are in statically false branches, it might be
                 // that none of them loop-back. In that case short-circuit, so that we don't

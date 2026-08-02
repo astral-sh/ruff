@@ -436,9 +436,7 @@ fn type_alias_variance() {
         db: &'db TestDb,
         type_alias: PEP695TypeAliasType<'db>,
     ) -> BoundTypeVarInstance<'db> {
-        let generic_context = type_alias
-            .generic_context(&db.semantic_environment())
-            .unwrap();
+        let generic_context = type_alias.generic_context(db).unwrap();
         generic_context.variables(db).next().unwrap()
     }
 

@@ -86,7 +86,7 @@ fn function_scope_is_overload_declaration(
     };
 
     let definition = index.expect_single_definition(function);
-    function_known_decorator_flags(env, definition).contains(FunctionDecorators::OVERLOAD)
+    function_known_decorator_flags(env.db(), definition).contains(FunctionDecorators::OVERLOAD)
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, GetSize)]

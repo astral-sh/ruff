@@ -524,7 +524,8 @@ fn mapping_pattern_is_exhaustive(
     let db = env.db();
     typed_dict_pattern_domain_satisfies(env, subject_ty, &|typed_dict| {
         kind.entries.iter().all(|entry| {
-            let key_ty = infer_same_file_expression_type(env, entry.key, TypeContext::default());
+            let key_ty =
+                infer_same_file_expression_type(env.db(), entry.key, TypeContext::default());
             let Some(key) = key_ty.as_string_literal() else {
                 return false;
             };
@@ -635,7 +636,8 @@ pub(crate) fn definite_match_pattern_type_for_subject<'db>(
 
     match kind {
         PatternPredicateKind::Value(value) => {
-            let value_ty = infer_same_file_expression_type(env, *value, TypeContext::default());
+            let value_ty =
+                infer_same_file_expression_type(env.db(), *value, TypeContext::default());
             if equality_truthiness(
                 env,
                 resolved_subject_ty,
@@ -649,7 +651,8 @@ pub(crate) fn definite_match_pattern_type_for_subject<'db>(
             }
         }
         PatternPredicateKind::Class(kind) => {
-            let class_ty = infer_same_file_expression_type(env, kind.class, TypeContext::default());
+            let class_ty =
+                infer_same_file_expression_type(env.db(), kind.class, TypeContext::default());
             match class_ty {
                 Type::ClassLiteral(class) => {
                     if class_pattern_is_exhaustive(env, class, resolved_subject_ty, kind) {
@@ -737,7 +740,7 @@ fn pattern_fallthrough_type<'db>(
 ) -> Type<'db> {
     let db = env.db();
     if let PatternPredicateKind::Value(value) = kind {
-        let value_ty = infer_same_file_expression_type(env, *value, TypeContext::default());
+        let value_ty = infer_same_file_expression_type(env.db(), *value, TypeContext::default());
         // A subject confined to the same enum cannot contain cross-type values that compare equal
         // to the pattern, so direct subtraction avoids repeated equality evaluation in large enum
         // matches. This includes narrowed intersections containing `Self` or another type variable
@@ -1042,7 +1045,7 @@ fn subject_independent_definite_match_pattern_type<'db>(
 ) -> Option<Type<'db>> {
     match kind {
         PatternPredicateKind::Class(kind) => {
-            match infer_same_file_expression_type(env, kind.class, TypeContext::default()) {
+            match infer_same_file_expression_type(env.db(), kind.class, TypeContext::default()) {
                 Type::ClassLiteral(class) if kind.is_empty() => {
                     let class_instance_ty = Type::instance(env, class.top_materialization(env));
                     let typed_dict_adds_runtime_matches =
@@ -1092,7 +1095,7 @@ pub(crate) fn definite_match_pattern_type<'db>(
     match kind {
         PatternPredicateKind::Singleton(singleton) => singleton_pattern_type(env, *singleton),
         PatternPredicateKind::Value(value) => {
-            let ty = infer_same_file_expression_type(env, *value, TypeContext::default());
+            let ty = infer_same_file_expression_type(env.db(), *value, TypeContext::default());
             // Only return the type if it's guaranteed to match itself.
             // Otherwise, we can't definitively exclude it from subsequent patterns.
             let policy = ComparisonSoundnessPolicy::from_analysis_settings(
@@ -1105,7 +1108,7 @@ pub(crate) fn definite_match_pattern_type<'db>(
             }
         }
         PatternPredicateKind::Class(kind) => {
-            match infer_same_file_expression_type(env, kind.class, TypeContext::default()) {
+            match infer_same_file_expression_type(env.db(), kind.class, TypeContext::default()) {
                 Type::ClassLiteral(class) if kind.is_empty() => {
                     Type::instance(env, class.top_materialization(env))
                 }

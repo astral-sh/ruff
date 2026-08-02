@@ -203,7 +203,9 @@ impl<'db> EnumValueConstruction<'db> {
         } else if self.generate_next_value.is_opaque() {
             return None;
         } else if let Some(function) = self.generate_next_value.function() {
-            function.signature(env).overload_return_type_or_unknown(env)
+            function
+                .signature(env.db())
+                .overload_return_type_or_unknown(env)
         } else {
             value_ty
         };
@@ -314,23 +316,18 @@ pub struct EnumClassLiteral<'db> {
 impl get_size2::GetSize for EnumClassLiteral<'_> {}
 
 impl<'db> ClassLiteral<'db> {
-    pub(crate) fn into_enum_class(
-        self,
-        env: &SemanticEnvironment<'db>,
-    ) -> Option<EnumClassLiteral<'db>> {
-        let db = env.db();
-        debug_assert_eq!(env.program(), self.program(db));
-        enum_class_literal_inner(db, self)
+    pub(crate) fn into_enum_class(self, db: &'db dyn Db) -> Option<EnumClassLiteral<'db>> {
+        enum_class_literal(db, self)
     }
 }
 
 #[salsa::tracked(returns(copy), cycle_initial=|_, _, _| None, heap_size=ruff_memory_usage::heap_size)]
-fn enum_class_literal_inner<'db>(
+fn enum_class_literal<'db>(
     db: &'db dyn Db,
     class: ClassLiteral<'db>,
 ) -> Option<EnumClassLiteral<'db>> {
     let env = SemanticEnvironment::from_file(db, class.python_file(db));
-    let metadata = enum_metadata(&env, class)?;
+    let metadata = enum_metadata(env.db(), class)?;
     let members = metadata
         .members
         .keys()
@@ -579,7 +576,9 @@ impl<'db> EnumMetadata<'db> {
                 .is_user_defined()
             && let Some(func_ty) = self.value_construction.generate_next_value.function()
         {
-            func_ty.signature(env).overload_return_type_or_unknown(env)
+            func_ty
+                .signature(env.db())
+                .overload_return_type_or_unknown(env)
         } else {
             declared_value
         };
@@ -698,7 +697,8 @@ impl<'db> EnumComplementType<'db> {
                 continue;
             };
 
-            let Some(enum_class_literal) = instance.class_literal(env).into_enum_class(env) else {
+            let Some(enum_class_literal) = instance.class_literal(env).into_enum_class(env.db())
+            else {
                 rest.push(*positive);
                 continue;
             };
@@ -880,17 +880,8 @@ impl<'db> EnumComplementType<'db> {
 }
 
 /// Returns the set of names listed in an enum's `_ignore_` attribute.
-pub(crate) fn enum_ignored_names<'db>(
-    env: &SemanticEnvironment<'db>,
-    scope_id: ScopeId<'db>,
-) -> &'db FxHashSet<Name> {
-    let db = env.db();
-    debug_assert_eq!(env.program(), scope_id.program(db));
-    enum_ignored_names_inner(db, scope_id)
-}
-
 #[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
-fn enum_ignored_names_inner<'db>(db: &'db dyn Db, scope_id: ScopeId<'db>) -> FxHashSet<Name> {
+pub(crate) fn enum_ignored_names<'db>(db: &'db dyn Db, scope_id: ScopeId<'db>) -> FxHashSet<Name> {
     let use_def_map = use_def_map(db, scope_id);
     let table = place_table(db, scope_id);
 
@@ -899,7 +890,7 @@ fn enum_ignored_names_inner<'db>(db: &'db dyn Db, scope_id: ScopeId<'db>) -> FxH
     };
 
     let ignore_bindings = use_def_map.reachable_symbol_bindings(ignore);
-    let env = SemanticEnvironment::from_file(db, scope_id.python_file(db));
+    let env = SemanticEnvironment::from_scope(db, scope_id);
     let ignore_place = place_from_bindings(&env, ignore_bindings).place;
 
     match ignore_place {
@@ -948,17 +939,8 @@ fn try_register_alias<'db>(
 }
 
 /// List all members of an enum.
-pub(crate) fn enum_metadata<'db>(
-    env: &SemanticEnvironment<'db>,
-    class: ClassLiteral<'db>,
-) -> Option<&'db EnumMetadata<'db>> {
-    let db = env.db();
-    debug_assert_eq!(env.program(), class.program(db));
-    enum_metadata_inner(db, class)
-}
-
 #[salsa::tracked(returns(as_ref), cycle_initial=|_, _, _| Some(EnumMetadata::empty()), heap_size=ruff_memory_usage::heap_size)]
-fn enum_metadata_inner<'db>(
+pub(crate) fn enum_metadata<'db>(
     db: &'db dyn Db,
     class: ClassLiteral<'db>,
 ) -> Option<EnumMetadata<'db>> {
@@ -982,7 +964,7 @@ fn enum_metadata_inner<'db>(
             if !spec.has_known_members(db) {
                 return None;
             }
-            let env = SemanticEnvironment::from_file(db, enum_lit.scope(db).python_file(db));
+            let env = SemanticEnvironment::from_scope(db, enum_lit.scope(db));
             let value_construction = EnumValueConstruction {
                 data_type: inherited_enum_data_type(&env, ClassLiteral::DynamicEnum(enum_lit)),
                 ..EnumValueConstruction::default()
@@ -1042,7 +1024,7 @@ fn enum_metadata_inner<'db>(
     let mut aliases_are_known = true;
     let mut prev_value_was_non_literal_int = false;
     let mut prev_bool_literal = None;
-    let ignored_names = enum_ignored_names(&env, scope_id);
+    let ignored_names = enum_ignored_names(env.db(), scope_id);
 
     // Look up custom construction methods, falling back to parent enum classes. An opaque binding
     // still shadows methods from classes later in the MRO.
@@ -1396,7 +1378,7 @@ fn inherited_enum_data_type<'db>(
     let db = env.db();
     let mut selected = InheritedEnumDataType::None;
 
-    for explicit_base in class.explicit_bases(env) {
+    for explicit_base in class.explicit_bases(env.db()) {
         let Some(explicit_base) = explicit_base.to_class_type(env) else {
             return InheritedEnumDataType::Opaque;
         };
@@ -1558,7 +1540,7 @@ pub(crate) fn enum_member_literals<'a, 'db: 'a>(
     exclude_member: Option<&'a Name>,
 ) -> Option<impl Iterator<Item = Type<'a>> + 'a> {
     let db = env.db();
-    let enum_class_literal = class.into_enum_class(env)?;
+    let enum_class_literal = class.into_enum_class(env.db())?;
     if !enum_class_literal.members_are_exhaustive(db) {
         return None;
     }
@@ -1578,14 +1560,14 @@ pub(crate) fn is_single_member_enum<'db>(
     class: ClassLiteral<'db>,
 ) -> bool {
     let db = env.db();
-    class.into_enum_class(env).is_some_and(|enum_class| {
+    class.into_enum_class(env.db()).is_some_and(|enum_class| {
         enum_class.members_are_exhaustive(db) && enum_class.member_count(db) == 1
     })
 }
 
 pub(crate) fn is_enum_class<'db>(env: &SemanticEnvironment<'db>, ty: Type<'db>) -> bool {
     match ty {
-        Type::ClassLiteral(class_literal) => enum_metadata(env, class_literal).is_some(),
+        Type::ClassLiteral(class_literal) => enum_metadata(env.db(), class_literal).is_some(),
         _ => false,
     }
 }

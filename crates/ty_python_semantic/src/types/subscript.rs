@@ -237,7 +237,7 @@ impl<'db> SubscriptErrorKind<'db> {
                         "Cannot subscript non-generic type alias `{}`",
                         alias.name(db)
                     ));
-                    let value_type = alias.raw_value_type(env);
+                    let value_type = alias.raw_value_type(env.db());
                     if value_type.is_specialized_generic(db) {
                         diagnostic.annotate(context.secondary(&*subscript.value).message(
                             format_args!(
@@ -794,7 +794,7 @@ impl<'db> Type<'db> {
             }
 
             (Type::KnownInstance(KnownInstanceType::TypeAliasType(alias)), _)
-                if alias.generic_context(env).is_none() =>
+                if alias.generic_context(env.db()).is_none() =>
             {
                 debug_assert!(alias.specialization(db).is_none());
                 Some(Err(SubscriptError::new(
@@ -955,7 +955,7 @@ impl<'db> Type<'db> {
                     return Ok(KnownClass::GenericAlias.to_instance(env));
                 }
 
-                if class.generic_context(env).is_some() {
+                if class.generic_context(env.db()).is_some() {
                     // TODO: specialize the generic class using these explicit type
                     // variable assignments. This branch is only encountered when an
                     // explicit class specialization appears inside of some other subscript

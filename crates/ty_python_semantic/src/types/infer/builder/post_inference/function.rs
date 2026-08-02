@@ -31,8 +31,8 @@ pub(crate) fn check_function_definition<'db>(
 ) {
     let db = context.db();
 
-    let Some(function_type) = infer_definition_types(context.semantic_environment(), definition)
-        .function_type(definition)
+    let Some(function_type) =
+        infer_definition_types(context.db(), definition).function_type(definition)
     else {
         return;
     };
@@ -42,7 +42,7 @@ pub(crate) fn check_function_definition<'db>(
         return;
     }
     let env = context.semantic_environment();
-    let signature = last_definition.raw_signature(env, ReturnCallableTypeVarScope::Public);
+    let signature = last_definition.raw_signature(env.db(), ReturnCallableTypeVarScope::Public);
 
     check_legacy_positional_only_convention(context, last_definition, &signature);
     check_pep695_function_legacy_typevars(context, last_definition, file_expression_type);
@@ -88,7 +88,7 @@ fn check_pep695_function_legacy_typevars<'db>(
         return;
     }
 
-    let signature = last_definition.raw_signature(env, ReturnCallableTypeVarScope::Lexical);
+    let signature = last_definition.raw_signature(env.db(), ReturnCallableTypeVarScope::Lexical);
     let Some(definition) = signature.definition() else {
         return;
     };

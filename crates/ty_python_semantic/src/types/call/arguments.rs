@@ -585,7 +585,7 @@ pub(crate) fn is_expandable_type<'db>(env: &SemanticEnvironment<'db>, ty: Type<'
             {
                 return true;
             }
-            enum_metadata(env, class.class_literal(db)).is_some()
+            enum_metadata(env.db(), class.class_literal(db)).is_some()
         }
         Type::Union(_) => true,
         Type::TypeAlias(alias) => is_expandable_type(env, alias.value_type(env)),

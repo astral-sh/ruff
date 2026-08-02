@@ -102,17 +102,17 @@ impl<'db> Type<'db> {
             {
                 Some(CallableTypes::one(CallableType::bottom(db)))
             }
-            Type::FunctionLiteral(function_literal) => {
-                Some(CallableTypes::one(function_literal.into_callable_type(env)))
-            }
+            Type::FunctionLiteral(function_literal) => Some(CallableTypes::one(
+                function_literal.into_callable_type(env.db()),
+            )),
             Type::BoundMethod(bound_method)
                 if context.is_recursive_reference(env, bound_method.function(db)) =>
             {
                 Some(CallableTypes::one(CallableType::bottom(db)))
             }
-            Type::BoundMethod(bound_method) => {
-                Some(CallableTypes::one(bound_method.into_callable_type(env)))
-            }
+            Type::BoundMethod(bound_method) => Some(CallableTypes::one(
+                bound_method.into_callable_type(env.db()),
+            )),
 
             Type::NominalInstance(_) | Type::ProtocolInstance(_) => {
                 let call_symbol = self
@@ -139,10 +139,10 @@ impl<'db> Type<'db> {
             Type::ClassLiteral(class_literal) => Some(
                 class_literal
                     .identity_specialization(env)
-                    .into_callable(env),
+                    .into_callable(env.db()),
             ),
 
-            Type::GenericAlias(alias) => Some(ClassType::Generic(alias).into_callable(env)),
+            Type::GenericAlias(alias) => Some(ClassType::Generic(alias).into_callable(env.db())),
 
             Type::NewTypeInstance(newtype) => newtype
                 .concrete_base_type(env)
@@ -157,7 +157,7 @@ impl<'db> Type<'db> {
 
             // TODO: This is unsound so in future we can consider an opt-in option to disable it.
             Type::SubclassOf(subclass_of_ty) => match subclass_of_ty.subclass_of() {
-                SubclassOfInner::Class(class) => Some(class.into_callable(env)),
+                SubclassOfInner::Class(class) => Some(class.into_callable(env.db())),
                 SubclassOfInner::Protocol(protocol) => protocol.class_origin(db).map(|origin| {
                     if protocol.materialization_kind(db).is_some() {
                         // The origin supplies the constructor, but the actual receiver retains
@@ -165,7 +165,7 @@ impl<'db> Type<'db> {
                         // are materialized without replacing explicit non-instance returns.
                         (*origin).into_callable_with_receiver(db, self)
                     } else {
-                        (*origin).into_callable(env)
+                        (*origin).into_callable(env.db())
                     }
                 }),
                 SubclassOfInner::TypeVar(tvar) => {
@@ -272,7 +272,7 @@ impl<'db> Type<'db> {
                     db,
                     Signature::new(
                         Parameters::standard([Parameter::positional_only(None)
-                            .with_annotated_type(newtype.base(env).instance_type(env))]),
+                            .with_annotated_type(newtype.base(env.db()).instance_type(env))]),
                         Type::NewTypeInstance(newtype),
                     ),
                 )))

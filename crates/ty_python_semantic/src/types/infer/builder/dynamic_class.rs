@@ -169,7 +169,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                                 class_type.name(db)
                             ));
                         }
-                        if let Some(disjoint_base) = class_type.nearest_disjoint_base(env) {
+                        if let Some(disjoint_base) = class_type.nearest_disjoint_base(env.db()) {
                             disjoint_bases.insert(disjoint_base, idx, class_type.class_literal(db));
                         }
                         continue;
@@ -193,13 +193,13 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                                 "Consider using `Enum(\"{name}\", [])` instead"
                             ));
                         }
-                        if let Some(disjoint_base) = class_type.nearest_disjoint_base(env) {
+                        if let Some(disjoint_base) = class_type.nearest_disjoint_base(env.db()) {
                             disjoint_bases.insert(disjoint_base, idx, class_type.class_literal(db));
                         }
                         continue;
                     }
 
-                    if let Some(disjoint_base) = class_type.nearest_disjoint_base(env) {
+                    if let Some(disjoint_base) = class_type.nearest_disjoint_base(env.db()) {
                         disjoint_bases.insert(disjoint_base, idx, class_type.class_literal(db));
                     }
                 }
@@ -222,11 +222,11 @@ pub(super) fn report_dynamic_mro_errors<'db>(
 ) -> bool {
     let db = context.db();
     let env = context.semantic_environment();
-    let Err(error) = dynamic_class.try_mro(env) else {
+    let Err(error) = dynamic_class.try_mro(env.db()) else {
         return true;
     };
     let bases_display = dynamic_class
-        .explicit_bases(env)
+        .explicit_bases(env.db())
         .iter()
         .map(|base| base.display(env))
         .join(", ");
@@ -252,7 +252,7 @@ pub(super) fn report_inconsistent_dynamic_generic_bases<'db>(
     bases: &ast::Expr,
 ) {
     let db = context.db();
-    let explicit_bases = dynamic_class.explicit_bases(context.semantic_environment());
+    let explicit_bases = dynamic_class.explicit_bases(context.db());
     let base_nodes = bases
         .as_tuple_expr()
         .map(|tuple| tuple.elts.as_slice())

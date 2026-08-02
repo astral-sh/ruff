@@ -89,7 +89,7 @@ pub(crate) fn check_static_class_definitions<'db>(
     };
 
     // Check that the class does not have a cyclic definition
-    if let Some(inheritance_cycle) = class.inheritance_cycle(context.semantic_environment()) {
+    if let Some(inheritance_cycle) = class.inheritance_cycle(context.db()) {
         if inheritance_cycle.is_participant()
             && let Some(builder) = context.report_lint(&CYCLIC_CLASS_DEFINITION, class_node)
         {
@@ -107,7 +107,7 @@ pub(crate) fn check_static_class_definitions<'db>(
     let env = context.semantic_environment();
 
     // Check that the class is not an enum and generic
-    if is_enum_class_by_inheritance(env, class) && class.generic_context(env).is_some() {
+    if is_enum_class_by_inheritance(env, class) && class.generic_context(env.db()).is_some() {
         if let Some(builder) = context.report_lint(&INVALID_GENERIC_ENUM, class_node) {
             builder.into_diagnostic(format_args!(
                 "Enum class `{}` cannot be generic",
@@ -144,7 +144,7 @@ pub(crate) fn check_static_class_definitions<'db>(
 
         let mut field_with_default_encountered = None;
 
-        for (field_name, field) in class.own_fields(env, None, CodeGeneratorKind::NamedTuple) {
+        for (field_name, field) in class.own_fields(env.db(), None, CodeGeneratorKind::NamedTuple) {
             if field_name.starts_with('_') {
                 report_named_tuple_field_with_leading_underscore(
                     context,
@@ -338,7 +338,7 @@ pub(crate) fn check_static_class_definitions<'db>(
             Type::ClassLiteral(class) => ClassType::NonGeneric(class),
             Type::GenericAlias(base_alias) => {
                 if check_explicit_base_variance
-                    && let Some(generic_context) = class.generic_context(env)
+                    && let Some(generic_context) = class.generic_context(env.db())
                     && let Some((typevar, declared_variance, required_variance)) =
                         generic_context.variables(db).find_map(|typevar| {
                             let declared_variance = typevar.typevar(db).explicit_variance(db)?;
@@ -374,7 +374,7 @@ pub(crate) fn check_static_class_definitions<'db>(
             _ => continue,
         };
 
-        if let Some(disjoint_base) = base_class.nearest_disjoint_base(env) {
+        if let Some(disjoint_base) = base_class.nearest_disjoint_base(env.db()) {
             disjoint_bases.insert(disjoint_base, i, base_class.class_literal(db));
         }
 
@@ -441,7 +441,7 @@ pub(crate) fn check_static_class_definitions<'db>(
         if let Some(ordered_base_class) = ordered_dataclass_base_class(env, base_class) {
             // Suppress the diagnostic if the child class manually overrides all comparison
             // methods, since the user has explicitly fixed the LSP violation.
-            if !class.has_own_comparison_methods(env)
+            if !class.has_own_comparison_methods(env.db())
                 && let Some(builder) =
                     context.report_lint(&SUBCLASS_OF_DATACLASS_WITH_ORDER, source_node)
             {
@@ -471,7 +471,7 @@ pub(crate) fn check_static_class_definitions<'db>(
 
     // Check that the class's MRO is resolvable
     let mut inconsistent_generic_bases = false;
-    match class.try_mro(env, None) {
+    match class.try_mro(env.db(), None) {
         Err(mro_error) => match mro_error.reason() {
             StaticMroErrorKind::DuplicateBases(duplicates) => {
                 for duplicate in duplicates {
@@ -553,7 +553,7 @@ pub(crate) fn check_static_class_definitions<'db>(
                 );
             }
 
-            let explicit_bases = class.explicit_bases(context.semantic_environment());
+            let explicit_bases = class.explicit_bases(context.db());
             let base_nodes = (class_node.bases().len() == explicit_bases.len()
                 && !class_node.bases().iter().any(ast::Expr::is_starred_expr))
             .then_some(class_node.bases());
@@ -667,7 +667,7 @@ pub(crate) fn check_static_class_definitions<'db>(
     if let Some(args) = class_node.arguments.as_deref() {
         if class_kind == Some(CodeGeneratorKind::TypedDict) {
             let supports_pep_728 = context.in_stub()
-                || class.typed_dict_module(env) == Some(TypedDictModule::TypingExtensions)
+                || class.typed_dict_module(env.db()) == Some(TypedDictModule::TypingExtensions)
                 || env.python_version() >= PythonVersion::PY315;
 
             for keyword in &args.keywords {
@@ -770,8 +770,8 @@ pub(crate) fn check_static_class_definitions<'db>(
 
     // If the class is generic, verify that its generic context does not violate any of
     // the typevar scoping rules.
-    if class.has_pep_695_type_params(env)
-        && let Some(generic_context) = class.inherited_legacy_generic_context(env)
+    if class.has_pep_695_type_params(env.db())
+        && let Some(generic_context) = class.inherited_legacy_generic_context(env.db())
         && let Some(typevar) = generic_context
             .variables(db)
             .find(|typevar| !typevar.typevar(db).is_self(db))
@@ -785,7 +785,7 @@ pub(crate) fn check_static_class_definitions<'db>(
 
     if let (Some(legacy), Some(inherited)) = (
         class.legacy_generic_context(env),
-        class.inherited_legacy_generic_context(env),
+        class.inherited_legacy_generic_context(env.db()),
     ) {
         if !inherited.is_subset_of(db, legacy)
             && let Some(builder) = context.report_lint(&INVALID_GENERIC_CLASS, class_node)
@@ -813,7 +813,7 @@ pub(crate) fn check_static_class_definitions<'db>(
     }
 
     if context.is_lint_enabled(&INVALID_GENERIC_CLASS) {
-        if !class.has_pep_695_type_params(env)
+        if !class.has_pep_695_type_params(env.db())
             && let Some(generic_context) = class.legacy_generic_context(env)
         {
             struct State<'db> {
@@ -855,7 +855,7 @@ pub(crate) fn check_static_class_definitions<'db>(
         // Check that type variable defaults only reference type variables
         // that precede them in the type parameter list.
         if let Some(generic_context) = class
-            .pep695_generic_context(env)
+            .pep695_generic_context(env.db())
             .or_else(|| class.legacy_generic_context(env))
         {
             let typevars = generic_context.variables(db).map(|btv| btv.typevar(db));
@@ -896,7 +896,7 @@ pub(crate) fn check_static_class_definitions<'db>(
         if let Some(parent) = scope.parent() {
             // Check that the class's own type parameters don't shadow
             // type variables from enclosing scopes (by name).
-            if let Some(generic_context) = class.generic_context(env) {
+            if let Some(generic_context) = class.generic_context(env.db()) {
                 for self_typevar in generic_context.variables(db) {
                     let name = self_typevar.typevar(db).name(db);
                     for enclosing in enclosing_generic_contexts(env, index, parent) {
@@ -943,7 +943,7 @@ pub(crate) fn check_static_class_definitions<'db>(
     {
         let specialization = None;
         let class_init = class.has_dataclass_param(db, field_policy, DataclassFlags::INIT);
-        let own_fields = class.own_fields(env, specialization, field_policy);
+        let own_fields = class.own_fields(env.db(), specialization, field_policy);
 
         let kw_only_sentinel_fields: Vec<_> = own_fields
             .iter()
@@ -952,7 +952,7 @@ pub(crate) fn check_static_class_definitions<'db>(
         let mut field_order_violations = vec![];
         let mut previous_default_field = None;
 
-        for (name, field) in class.fields(env, specialization, field_policy) {
+        for (name, field) in class.fields(env.db(), specialization, field_policy) {
             // Extract dataclass field properties
             let FieldKind::Dataclass {
                 default_ty,
@@ -1110,7 +1110,7 @@ fn has_inherited_dataclass_field_order_violation<'db>(
                 return false;
             }
 
-            let fields = ancestor.fields(env, specialization, field_policy);
+            let fields = ancestor.fields(env.db(), specialization, field_policy);
             let Some((default_index, _, inherited_default_field)) = fields.get_full(default_name)
             else {
                 return false;
@@ -1296,7 +1296,7 @@ fn ordered_dataclass_base_class<'db>(
             return Some(ancestor);
         }
 
-        if ancestor_literal.has_own_comparison_methods(env) {
+        if ancestor_literal.has_own_comparison_methods(env.db()) {
             return None;
         }
     }
@@ -1333,7 +1333,7 @@ fn check_final_class_abstract_methods<'db>(
     let env = context.semantic_environment();
 
     let class_type = class.identity_specialization(env);
-    let abstract_methods = class_type.abstract_methods(env);
+    let abstract_methods = class_type.abstract_methods(env.db());
 
     // If there are no abstract methods, we're done.
     let Some((first_method_name, abstract_method)) = abstract_methods.iter().next() else {
@@ -1351,7 +1351,7 @@ fn check_final_class_abstract_methods<'db>(
         "Final class `{class_name}` has unimplemented abstract methods",
     ));
 
-    let definition_types = infer_definition_types(env, class.definition(db));
+    let definition_types = infer_definition_types(env.db(), class.definition(db));
 
     if let Some(class_node) = class.body_scope(db).node(db).as_class()
         && let Some(decorator) = class_node
@@ -1452,7 +1452,7 @@ fn check_final_class_abstract_methods<'db>(
         // and the return type is assignable to `None`, they may not have intended
         // for it to be implicitly abstract; add a clarificatory note:
         if kind.is_implicit_due_to_stub_body() && db.should_check_file(definition.file(db)) {
-            let function_type_as_callable = infer_definition_types(env, *definition)
+            let function_type_as_callable = infer_definition_types(env.db(), *definition)
                 .binding_type(*definition)
                 .try_upcast_to_callable(env);
 

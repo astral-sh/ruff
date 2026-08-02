@@ -252,7 +252,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 // treating this as an ordinary replacement-returning class decorator would
                 // conflate those two cases.
                 let transformer_params = f
-                    .iter_overloads_and_implementation(env)
+                    .iter_overloads_and_implementation(env.db())
                     .rev()
                     .find_map(|overload| overload.dataclass_transformer_params(db));
                 if let Some(transformer_params) = transformer_params {
@@ -656,19 +656,19 @@ impl ClassDecoratorUnknownResultPolicy {
         let db = env.db();
         match decorator_ty {
             Type::FunctionLiteral(function) => {
-                Some(if function.has_explicit_return_annotation(env) {
+                Some(if function.has_explicit_return_annotation(env.db()) {
                     Self::ReplaceBinding
                 } else {
                     Self::PreserveBinding
                 })
             }
-            Type::BoundMethod(method) => {
-                Some(if method.function(db).has_explicit_return_annotation(env) {
+            Type::BoundMethod(method) => Some(
+                if method.function(db).has_explicit_return_annotation(env.db()) {
                     Self::ReplaceBinding
                 } else {
                     Self::PreserveBinding
-                })
-            }
+                },
+            ),
             Type::NominalInstance(_) | Type::ProtocolInstance(_) => {
                 let call_symbol = decorator_ty
                     .member_lookup_with_policy(

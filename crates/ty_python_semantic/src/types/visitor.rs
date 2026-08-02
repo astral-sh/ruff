@@ -515,11 +515,21 @@ pub(super) fn non_any_dynamic_content<'db>(
             let db = env.db();
             let protocol_ty = Type::ProtocolInstance(protocol);
             let Some(class) = protocol.class_origin(db) else {
-                walk_protocol_instance_interface(env, protocol.interface(env), protocol_ty, self);
+                walk_protocol_instance_interface(
+                    env,
+                    protocol.interface(env.db()),
+                    protocol_ty,
+                    self,
+                );
                 return;
             };
             let Some((origin, specialization)) = class.static_class_literal(db) else {
-                walk_protocol_instance_interface(env, protocol.interface(env), protocol_ty, self);
+                walk_protocol_instance_interface(
+                    env,
+                    protocol.interface(env.db()),
+                    protocol_ty,
+                    self,
+                );
                 return;
             };
 
@@ -540,7 +550,7 @@ pub(super) fn non_any_dynamic_content<'db>(
                 || {
                     walk_protocol_instance_interface(
                         env,
-                        protocol.interface(env),
+                        protocol.interface(env.db()),
                         protocol_ty,
                         self,
                     );

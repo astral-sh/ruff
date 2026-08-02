@@ -763,8 +763,7 @@ pub(super) fn report_missing_type_arguments<'db>(
         Type::ClassLiteral(class) => {
             let db = context.db();
 
-            let Some(generic_context) = class.generic_context(context.semantic_environment())
-            else {
+            let Some(generic_context) = class.generic_context(context.db()) else {
                 return;
             };
             let env = &context.semantic_environment();
@@ -2821,7 +2820,7 @@ pub(super) fn abstract_method_span<'db>(
     policy: AbstractMethodAnnotationPolicy,
 ) -> Span {
     let db = env.db();
-    let (_, implementation) = function.overloads_and_implementation(env);
+    let (_, implementation) = function.overloads_and_implementation(env.db());
 
     let Some(implementation) = implementation else {
         return function.spans(db).name;
@@ -3514,7 +3513,7 @@ pub(crate) fn report_invalid_type_param_order<'db>(
     let db = context.db();
 
     let base_index = class
-        .explicit_bases(context.semantic_environment())
+        .explicit_bases(context.db())
         .iter()
         .position(|base| {
             matches!(
@@ -3664,7 +3663,7 @@ pub(crate) fn report_inconsistent_generic_bases<'db>(
     for (i, base) in explicit_bases.iter().enumerate() {
         let base_class = match base {
             Type::GenericAlias(alias) => ClassType::Generic(*alias),
-            Type::ClassLiteral(class) if class.generic_context(env).is_none() => {
+            Type::ClassLiteral(class) if class.generic_context(env.db()).is_none() => {
                 ClassType::NonGeneric(*class)
             }
             _ => continue,
@@ -4123,13 +4122,13 @@ pub(super) fn report_overridden_final_method<'db>(
 
     let first_final_superclass_definition = superclass_method_defs
         .iter()
-        .find(|function| function.has_known_decorator(env, FunctionDecorators::FINAL))
+        .find(|function| function.has_known_decorator(env.db(), FunctionDecorators::FINAL))
         .expect(
             "At least one function definition in the superclass should be decorated with `@final`",
         );
 
     let superclass_function_literal = if first_final_superclass_definition.file(db).is_stub(db) {
-        first_final_superclass_definition.first_overload_or_implementation(env)
+        first_final_superclass_definition.first_overload_or_implementation(env.db())
     } else {
         first_final_superclass_definition
             .literal(db)
@@ -4171,7 +4170,7 @@ pub(super) fn report_overridden_final_method<'db>(
             .expect_class()
             .node(context.module());
 
-        let (overloads, implementation) = function.overloads_and_implementation(env);
+        let (overloads, implementation) = function.overloads_and_implementation(env.db());
         let overload_count = overloads.len() + usize::from(implementation.is_some());
         let is_only = overload_count >= class_node.body.len();
 
@@ -4204,7 +4203,7 @@ pub(super) fn report_overridden_final_method<'db>(
                 .expect("`parsed_module` should have assigned a node index"),
         );
 
-        match function.overloads_and_implementation(env) {
+        match function.overloads_and_implementation(env.db()) {
             ([first_overload, rest @ ..], None) => {
                 diagnostic.help(format_args!("Remove all overloads for `{member}`"));
                 diagnostic.set_optional_fix(should_fix.then(|| {

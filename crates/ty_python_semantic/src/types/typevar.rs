@@ -444,14 +444,14 @@ impl<'db> TypeVarInstance<'db> {
                     return true;
                 }
                 type_alias.value_type(state.env)
-            } else if let Some(generic_context) = type_alias.generic_context(state.env)
+            } else if let Some(generic_context) = type_alias.generic_context(state.env.db())
                 && generic_context.variables(db).any(|typevar| {
                     typevar_default_is_self_referential(state, typevar.typevar(db), self_identity)
                 })
             {
                 return true;
             } else {
-                type_alias.raw_value_type(state.env)
+                type_alias.raw_value_type(state.env.db())
             };
 
             type_is_self_referential_impl(state, value_type, self_identity)
@@ -496,21 +496,13 @@ impl<'db> TypeVarInstance<'db> {
 
     /// Returns the "unchecked" upper bound of a type variable instance.
     /// `lazy_bound` checks if the upper bound type is generic (generic upper bound is not allowed).
-    fn lazy_bound_unchecked(self, env: &SemanticEnvironment<'db>) -> Option<Type<'db>> {
-        let db = env.db();
-        if let Some(definition) = self.definition(db) {
-            debug_assert_eq!(env.program(), definition.program(db));
-        }
-        self.lazy_bound_unchecked_inner(db)
-    }
-
     #[salsa::tracked(
         returns(copy),
         cycle_fn=lazy_bound_cycle_recover,
         cycle_initial=|_, _, _| None,
         heap_size=ruff_memory_usage::heap_size
     )]
-    fn lazy_bound_unchecked_inner(self, db: &'db dyn Db) -> Option<Type<'db>> {
+    fn lazy_bound_unchecked(self, db: &'db dyn Db) -> Option<Type<'db>> {
         let definition = self.definition(db)?;
         let python_file = definition.python_file(db);
         let env = SemanticEnvironment::from_file(db, python_file);
@@ -534,7 +526,7 @@ impl<'db> TypeVarInstance<'db> {
     }
 
     fn lazy_bound(self, env: &SemanticEnvironment<'db>) -> Option<Type<'db>> {
-        let bound = self.lazy_bound_unchecked(env)?;
+        let bound = self.lazy_bound_unchecked(env.db())?;
 
         if bound.has_typevar_or_typevar_instance(env) {
             return None;
@@ -545,24 +537,13 @@ impl<'db> TypeVarInstance<'db> {
 
     /// Returns the "unchecked" constraints of a type variable instance.
     /// `lazy_constraints` checks if any of the constraint types are generic (generic constraints are not allowed).
-    fn lazy_constraints_unchecked(
-        self,
-        env: &SemanticEnvironment<'db>,
-    ) -> Option<TypeVarConstraints<'db>> {
-        let db = env.db();
-        if let Some(definition) = self.definition(db) {
-            debug_assert_eq!(env.program(), definition.program(db));
-        }
-        self.lazy_constraints_unchecked_inner(db)
-    }
-
     #[salsa::tracked(
         returns(copy),
         cycle_fn=lazy_constraints_cycle_recover,
         cycle_initial=|_, _, _| None,
         heap_size=ruff_memory_usage::heap_size
     )]
-    fn lazy_constraints_unchecked_inner(self, db: &'db dyn Db) -> Option<TypeVarConstraints<'db>> {
+    fn lazy_constraints_unchecked(self, db: &'db dyn Db) -> Option<TypeVarConstraints<'db>> {
         let definition = self.definition(db)?;
         let python_file = definition.python_file(db);
         let env = SemanticEnvironment::from_file(db, python_file);
@@ -603,7 +584,7 @@ impl<'db> TypeVarInstance<'db> {
 
     fn lazy_constraints(self, env: &SemanticEnvironment<'db>) -> Option<TypeVarConstraints<'db>> {
         let db = env.db();
-        let constraints = self.lazy_constraints_unchecked(env)?;
+        let constraints = self.lazy_constraints_unchecked(db)?;
 
         if constraints
             .elements(db)
@@ -618,16 +599,8 @@ impl<'db> TypeVarInstance<'db> {
 
     /// Returns the "unchecked" default type of a type variable instance.
     /// `lazy_default` checks if the default type is not self-referential.
-    fn lazy_default_unchecked(self, env: &SemanticEnvironment<'db>) -> Option<Type<'db>> {
-        let db = env.db();
-        if let Some(definition) = self.definition(db) {
-            debug_assert_eq!(env.program(), definition.program(db));
-        }
-        self.lazy_default_unchecked_inner(db)
-    }
-
     #[salsa::tracked(returns(copy), cycle_initial=|_, id, _| Some(Type::divergent(id)), cycle_fn=lazy_default_cycle_recover, heap_size=ruff_memory_usage::heap_size)]
-    fn lazy_default_unchecked_inner(self, db: &'db dyn Db) -> Option<Type<'db>> {
+    fn lazy_default_unchecked(self, db: &'db dyn Db) -> Option<Type<'db>> {
         fn convert_type_to_paramspec_value<'db>(db: &'db dyn Db, ty: Type<'db>) -> Type<'db> {
             let parameters = match ty {
                 Type::NominalInstance(nominal_instance)
@@ -726,7 +699,7 @@ impl<'db> TypeVarInstance<'db> {
         env: &SemanticEnvironment<'db>,
         visitor: &TypeVarDefaultVisitor<'db>,
     ) -> Option<Type<'db>> {
-        let default = self.lazy_default_unchecked(env)?;
+        let default = self.lazy_default_unchecked(env.db())?;
 
         // Unlike bounds/constraints, default types are allowed to be generic
         // (https://typing.python.org/en/latest/spec/generics.html#defaults-for-type-parameters).
@@ -1245,7 +1218,7 @@ impl<'db> BoundTypeVarInstance<'db> {
                                 mapped,
                                 materialized,
                             )
-                            && let Some(upper_bound) = self.top_materialized_upper_bound(env)
+                            && let Some(upper_bound) = self.top_materialized_upper_bound(env.db())
                         {
                             IntersectionType::from_two_elements(env, materialized, upper_bound)
                         } else {
@@ -1304,10 +1277,7 @@ impl<'db> BoundTypeVarInstance<'db> {
     /// valid conservative upper bound. A bound may recursively refer to its own generic class,
     /// either directly or through other bounds. Such a bound has no finite static top
     /// materialization, so recover from its cycle without applying an upper bound.
-    pub(super) fn top_materialized_upper_bound(
-        self,
-        env: &SemanticEnvironment<'db>,
-    ) -> Option<Type<'db>> {
+    pub(super) fn top_materialized_upper_bound(self, db: &'db dyn Db) -> Option<Type<'db>> {
         #[salsa::tracked(
             returns(copy),
             cycle_result=|_, _, _| None,
@@ -1330,8 +1300,6 @@ impl<'db> BoundTypeVarInstance<'db> {
                 })
         }
 
-        let db = env.db();
-        debug_assert_eq!(env.program(), self.binding_context(db).program(db));
         top_materialized_upper_bound_inner(db, self)
     }
 }
@@ -1796,7 +1764,7 @@ fn bound_typevar_default_type<'db>(
     let definition = typevar
         .definition(db)
         .expect("a bound TypeVar with a default must have a source definition");
-    let env = SemanticEnvironment::from_file(db, definition.python_file(db));
+    let env = SemanticEnvironment::from_definition(db, definition);
     let default = typevar.default_type(&env)?;
     let binding_context = bound_typevar.binding_context(db);
 

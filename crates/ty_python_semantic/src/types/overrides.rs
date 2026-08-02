@@ -86,7 +86,7 @@ pub(super) fn check_class<'db>(
     if configuration.check_method_liskov_violations() && !inconsistent_generic_bases {
         check_inherited_method_conflicts(context, class, class_specialized, &own_class_members);
     }
-    let enum_info = enum_metadata(env, class.into());
+    let enum_info = enum_metadata(env.db(), class.into());
 
     #[expect(
         clippy::iter_over_hash_type,
@@ -132,7 +132,7 @@ fn check_inherited_method_conflicts<'db>(
     let env = &context.semantic_environment();
 
     let mut direct_bases = Vec::new();
-    for base in class.explicit_bases(env) {
+    for base in class.explicit_bases(env.db()) {
         match ClassBase::try_from_explicit_base(env, *base, Some(class.into())) {
             Some(ClassBase::Class(base)) if base.static_class_literal(db).is_some() => {
                 direct_bases.push(base);
@@ -147,7 +147,7 @@ fn check_inherited_method_conflicts<'db>(
             _ => return,
         }
     }
-    if direct_bases.len() < 2 || class.try_mro(env, None).is_err() {
+    if direct_bases.len() < 2 || class.try_mro(env.db(), None).is_err() {
         return;
     }
 
@@ -404,7 +404,7 @@ fn conflicting_named_tuple_field_in_mro<'db>(
                 ClassLiteral::Static(superclass_literal) => {
                     if let Some(field) = superclass_literal
                         .own_fields(
-                            env,
+                            env.db(),
                             superclass_specialization,
                             CodeGeneratorKind::NamedTuple,
                         )
@@ -414,7 +414,7 @@ fn conflicting_named_tuple_field_in_mro<'db>(
                     }
                 }
                 ClassLiteral::DynamicNamedTuple(namedtuple) => {
-                    if namedtuple.field(env, field_name).is_some() {
+                    if namedtuple.field(env.db(), field_name).is_some() {
                         return Some((superclass, namedtuple.definition(db)));
                     }
                 }
@@ -726,7 +726,7 @@ fn check_class_declaration<'db>(
                         );
 
                         if underlying_functions.iter().any(|function| {
-                            function.has_known_decorator(env, FunctionDecorators::FINAL)
+                            function.has_known_decorator(env.db(), FunctionDecorators::FINAL)
                         }) && is_function_definition(db, superclass_scope, superclass_symbol_id)
                         {
                             Some((superclass, underlying_functions))
@@ -775,7 +775,7 @@ fn check_class_declaration<'db>(
 
             if configuration.check_attribute_liskov_violations() {
                 if let Some(superclass_variable_kind) =
-                    effective_superclass_variable_kind(env, superclass, &member.name)
+                    effective_superclass_variable_kind(env.db(), superclass, member.name.clone())
                 {
                     if immediate_parent_variable_kind.is_none() {
                         immediate_parent_variable_kind =
@@ -997,7 +997,7 @@ fn method_override_types<'db>(
     let db = env.db();
     let (subclass_type, superclass_type) = match (subclass_type, superclass_type) {
         (Type::BoundMethod(subclass_method), Type::BoundMethod(superclass_method)) => {
-            let superclass_signature = superclass_method.function(db).signature(env);
+            let superclass_signature = superclass_method.function(db).signature(env.db());
             let receiver = match superclass_signature.overloads.as_slice() {
                 [signature] => signature
                     .parameters()
@@ -1103,19 +1103,9 @@ fn superclass_variable_kind<'db>(
 /// class Sub(Intermediate):
 ///     x: ClassVar[int] = 2
 /// ```
-fn effective_superclass_variable_kind<'db>(
-    env: &SemanticEnvironment<'db>,
-    superclass: ClassType<'db>,
-    name: &Name,
-) -> Option<VariableKind> {
-    let db = env.db();
-    debug_assert_eq!(env.program(), superclass.class_literal(db).program(db));
-    effective_superclass_variable_kind_inner(db, superclass, name.clone())
-}
-
 #[allow(clippy::needless_pass_by_value)]
 #[salsa::tracked(returns(copy), heap_size=ruff_memory_usage::heap_size)]
-fn effective_superclass_variable_kind_inner<'db>(
+fn effective_superclass_variable_kind<'db>(
     db: &'db dyn Db,
     superclass: ClassType<'db>,
     name: Name,
@@ -1126,7 +1116,7 @@ fn effective_superclass_variable_kind_inner<'db>(
             .iter_mro(env)
             .skip(1)
             .filter_map(ClassBase::into_class)
-            .find_map(|base| effective_superclass_variable_kind(env, base, &name))
+            .find_map(|base| effective_superclass_variable_kind(db, base, name.clone()))
     };
 
     let (superclass_literal, superclass_specialization) = superclass.static_class_literal(db)?;
@@ -1518,7 +1508,7 @@ impl LocalOverrideDefinition {
         Self {
             focus_range: focus_definition.focus_range(db, module),
             any_definition_has_override_decorator: function
-                .has_known_decorator(env, FunctionDecorators::OVERRIDE),
+                .has_known_decorator(env.db(), FunctionDecorators::OVERRIDE),
             focus_definition_has_override_decorator: focus_definition
                 .has_known_decorator(db, FunctionDecorators::OVERRIDE),
             focus_override_decorator_span: focus_definition
@@ -1646,7 +1636,7 @@ fn extract_local_override_definitions<'db>(
             .iter()
             .copied()
             .find(|function| function.contains_definition(env, definition))
-            .or_else(|| infer_definition_types(env, definition).function_type(definition));
+            .or_else(|| infer_definition_types(env.db(), definition).function_type(definition));
 
         let Some(function) = function else {
             continue;
@@ -1766,11 +1756,11 @@ fn overriding_definition<'db>(
     function: FunctionType<'db>,
     in_stub: bool,
 ) -> OverloadLiteral<'db> {
-    let (_, implementation) = function.overloads_and_implementation(env);
+    let (_, implementation) = function.overloads_and_implementation(env.db());
     if !in_stub && let Some(implementation) = implementation {
         implementation
     } else {
-        function.first_overload_or_implementation(env)
+        function.first_overload_or_implementation(env.db())
     }
 }
 
@@ -1819,18 +1809,19 @@ fn check_post_init_signature<'db>(
     };
     let env = &context.semantic_environment();
 
-    let init_var_fields = static_class
-        .fields(env, spec, policy)
-        .iter()
-        .filter(|(_, field)| {
-            matches!(
-                field.kind,
-                FieldKind::Dataclass {
-                    init_only: true,
-                    ..
-                }
-            )
-        });
+    let init_var_fields =
+        static_class
+            .fields(env.db(), spec, policy)
+            .iter()
+            .filter(|(_, field)| {
+                matches!(
+                    field.kind,
+                    FieldKind::Dataclass {
+                        init_only: true,
+                        ..
+                    }
+                )
+            });
 
     let first_parameter = Parameter::positional_only(Some(Name::new_static("self")))
         .with_annotated_type(Type::instance(env, class));

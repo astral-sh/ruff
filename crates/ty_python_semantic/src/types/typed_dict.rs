@@ -252,7 +252,7 @@ impl<'db> TypedDictType<'db> {
             let static_class = match class_literal {
                 ClassLiteral::Static(static_class) => static_class,
                 ClassLiteral::DynamicTypedDict(dynamic) => {
-                    let env = SemanticEnvironment::from_file(db, dynamic.scope(db).python_file(db));
+                    let env = SemanticEnvironment::from_scope(db, dynamic.scope(db));
                     return dynamic.openness(&env);
                 }
                 ClassLiteral::Dynamic(_)
@@ -280,7 +280,7 @@ impl<'db> TypedDictType<'db> {
                         class_definition,
                         &extra_items.value,
                     )
-                    .map_type(|ty| ty.apply_optional_specialization(&env, specialization));
+                    .map_type(|ty| ty.apply_optional_specialization(env.db(), specialization));
                     return TypedDictOpenness::extra(
                         &env,
                         annotation.inner_type(),
@@ -299,8 +299,8 @@ impl<'db> TypedDictType<'db> {
                 }
             }
 
-            for base in static_class.explicit_bases(&env) {
-                let base = base.apply_optional_specialization(&env, specialization);
+            for base in static_class.explicit_bases(env.db()) {
+                let base = base.apply_optional_specialization(env.db(), specialization);
                 let base_class = match base {
                     Type::ClassLiteral(base) => ClassType::NonGeneric(base),
                     Type::GenericAlias(base) => ClassType::Generic(base),
@@ -321,10 +321,7 @@ impl<'db> TypedDictType<'db> {
         let db = env.db();
 
         match self {
-            Self::Class(defining_class) => {
-                debug_assert_eq!(env.program(), defining_class.class_literal(db).program(db));
-                class_based_openness(db, defining_class)
-            }
+            Self::Class(defining_class) => class_based_openness(db, defining_class),
             Self::Synthesized(synthesized) => synthesized.openness(db),
         }
     }
@@ -526,9 +523,9 @@ impl<'db> TypedDictType<'db> {
             let Some((class_literal, specialization)) = class.static_class_literal(db) else {
                 return TypedDictSchema::default();
             };
-            let env = SemanticEnvironment::from_file(db, class_literal.python_file(db));
+            let env = SemanticEnvironment::from_scope(db, class_literal.body_scope(db));
             class_literal
-                .fields(&env, specialization, CodeGeneratorKind::TypedDict)
+                .fields(env.db(), specialization, CodeGeneratorKind::TypedDict)
                 .into_iter()
                 .map(|(name, field)| {
                     let field = match field {
@@ -561,7 +558,6 @@ impl<'db> TypedDictType<'db> {
                     return class.items(env);
                 }
 
-                debug_assert_eq!(env.program(), defining_class.class_literal(db).program(db));
                 class_based_items(db, defining_class)
             }
             Self::Synthesized(synthesized) => synthesized.items(db),
@@ -1309,21 +1305,12 @@ pub(crate) fn walk_typed_dict_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
     }
 }
 
-pub(super) fn deferred_functional_typed_dict_schema<'db>(
-    env: &SemanticEnvironment<'db>,
-    definition: Definition<'db>,
-) -> &'db TypedDictSchema<'db> {
-    let db = env.db();
-    debug_assert_eq!(env.program(), definition.program(db));
-    deferred_functional_typed_dict_schema_inner(db, definition)
-}
-
 #[salsa::tracked(
     returns(ref),
     cycle_initial = |_, _, _|TypedDictSchema::default(),
     heap_size = ruff_memory_usage::heap_size
 )]
-fn deferred_functional_typed_dict_schema_inner<'db>(
+pub(super) fn deferred_functional_typed_dict_schema<'db>(
     db: &'db dyn Db,
     definition: Definition<'db>,
 ) -> TypedDictSchema<'db> {
@@ -1337,7 +1324,7 @@ fn deferred_functional_typed_dict_schema_inner<'db>(
         .as_call_expr()
         .expect("Expected `TypedDict` definition r.h.s. to be a call expression");
 
-    let deferred_inference = infer_deferred_types(&env, definition);
+    let deferred_inference = infer_deferred_types(env.db(), definition);
 
     let total = node.arguments.find_keyword("total").is_none_or(|total_kw| {
         let total_ty = definition_expression_type(&env, definition, &total_kw.value);
@@ -1382,21 +1369,12 @@ fn deferred_functional_typed_dict_schema_inner<'db>(
 /// ```python
 /// Movie = TypedDict("Movie", {"name": str}, extra_items=ReadOnly[int])
 /// ```
-pub(super) fn deferred_functional_typed_dict_openness<'db>(
-    env: &SemanticEnvironment<'db>,
-    definition: Definition<'db>,
-) -> TypedDictOpenness<'db> {
-    let db = env.db();
-    debug_assert_eq!(env.program(), definition.program(db));
-    deferred_functional_typed_dict_openness_inner(db, definition)
-}
-
 #[salsa::tracked(
     returns(copy),
     cycle_initial = |_, _, _| TypedDictOpenness::ImplicitlyOpen,
     heap_size = ruff_memory_usage::heap_size
 )]
-fn deferred_functional_typed_dict_openness_inner<'db>(
+pub(super) fn deferred_functional_typed_dict_openness<'db>(
     db: &'db dyn Db,
     definition: Definition<'db>,
 ) -> TypedDictOpenness<'db> {
@@ -1411,7 +1389,7 @@ fn deferred_functional_typed_dict_openness_inner<'db>(
         .expect("Expected `TypedDict` definition r.h.s. to be a call expression");
 
     if let Some(extra_items) = node.arguments.find_keyword("extra_items") {
-        let deferred_inference = infer_deferred_types(&env, definition);
+        let deferred_inference = infer_deferred_types(env.db(), definition);
         return TypedDictOpenness::extra(
             &env,
             deferred_inference.expression_type(&extra_items.value),

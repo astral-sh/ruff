@@ -216,7 +216,7 @@ impl<'db> TypeVisitor<'db> for DefinitionReferenceVisitor<'db> {
     }
 
     fn visit_type_alias_type(&self, env: &SemanticEnvironment<'db>, alias: TypeAliasType<'db>) {
-        self.visit_type(env, alias.raw_value_type(env));
+        self.visit_type(env, alias.raw_value_type(env.db()));
     }
 
     fn visit_typed_dict_type(

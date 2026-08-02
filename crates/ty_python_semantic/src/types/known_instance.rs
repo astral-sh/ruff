@@ -239,9 +239,9 @@ impl<'db> VarianceInferable<'db> for KnownInstanceType<'db> {
         typevar: BoundTypeVarIdentity<'db>,
     ) -> TypeVarVariance {
         match self {
-            KnownInstanceType::TypeAliasType(type_alias) => {
-                type_alias.raw_value_type(env).variance_of(env, typevar)
-            }
+            KnownInstanceType::TypeAliasType(type_alias) => type_alias
+                .raw_value_type(env.db())
+                .variance_of(env, typevar),
             _ => TypeVarVariance::Bivariant,
         }
     }

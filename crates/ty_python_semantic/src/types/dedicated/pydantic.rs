@@ -54,7 +54,7 @@ impl<'db> ModelMetadata<'db> {
         Self::new(
             db,
             transformer_params.field_specifiers(db),
-            model_config(env, class),
+            model_config(env.db(), class),
         )
     }
 
@@ -274,7 +274,8 @@ impl<'db> FieldMetadata<'db> {
     ) {
         let db = env.db();
         if let Some(default_type) = field.default_type(db) {
-            self.default_ty = Some(default_type.apply_optional_specialization(env, specialization));
+            self.default_ty =
+                Some(default_type.apply_optional_specialization(env.db(), specialization));
         }
         self.init &= field.init(db);
         if let Some(alias) = field.alias(db) {
@@ -298,10 +299,11 @@ impl<'db> FieldMetadata<'db> {
             let default_type = definition_expression_type(env, definition, default);
             if !default_type.is_instance_of(db, KnownClass::EllipsisType) {
                 self.default_ty =
-                    Some(default_type.apply_optional_specialization(env, specialization));
+                    Some(default_type.apply_optional_specialization(env.db(), specialization));
             }
         } else if call.arguments.find_keyword("default_factory").is_some() {
-            self.default_ty = Some(call_type.apply_optional_specialization(env, specialization));
+            self.default_ty =
+                Some(call_type.apply_optional_specialization(env.db(), specialization));
         }
 
         if let Some(init) = call.arguments.find_keyword("init") {
@@ -532,21 +534,15 @@ pub(in crate::types) fn field_provides_default(
 /// Pydantic model fields are generally keyword-only, but a root model's `root` field can also be
 /// passed positionally.
 pub(in crate::types) fn constructor_fields_are_keyword_only(
-    env: &SemanticEnvironment<'_>,
+    db: &dyn Db,
     class: StaticClassLiteral<'_>,
 ) -> bool {
-    !is_root_model(env, class)
-}
-
-fn is_root_model<'db>(env: &SemanticEnvironment<'db>, class: StaticClassLiteral<'db>) -> bool {
-    let db = env.db();
-    debug_assert_eq!(env.program(), class.program(db));
-    is_root_model_inner(db, class)
+    !is_root_model(db, class)
 }
 
 #[salsa::tracked(returns(copy), heap_size=ruff_memory_usage::heap_size)]
-fn is_root_model_inner<'db>(db: &'db dyn Db, class: StaticClassLiteral<'db>) -> bool {
-    let env = SemanticEnvironment::from_file(db, class.python_file(db));
+fn is_root_model<'db>(db: &'db dyn Db, class: StaticClassLiteral<'db>) -> bool {
+    let env = SemanticEnvironment::from_scope(db, class.body_scope(db));
     class
         .iter_mro(&env, None)
         .filter_map(ClassBase::into_class)
@@ -595,7 +591,7 @@ pub(in crate::types) fn extend_settings_constructor_parameters<'db>(
     else {
         return;
     };
-    let Some(signature) = init.signature(env).iter().next() else {
+    let Some(signature) = init.signature(env.db()).iter().next() else {
         return;
     };
 
@@ -612,27 +608,18 @@ pub(in crate::types) fn extend_settings_constructor_parameters<'db>(
     );
 }
 
-fn model_config<'db>(
-    env: &SemanticEnvironment<'db>,
-    class: StaticClassLiteral<'db>,
-) -> ModelConfig {
-    let db = env.db();
-    debug_assert_eq!(env.program(), class.program(db));
-    model_config_inner(db, class)
-}
-
 #[salsa::tracked(
     returns(copy),
     cycle_initial=|_, _, _| ModelConfig::unknown(),
     heap_size=ruff_memory_usage::heap_size,
 )]
-fn model_config_inner<'db>(db: &'db dyn Db, class: StaticClassLiteral<'db>) -> ModelConfig {
-    let env = SemanticEnvironment::from_file(db, class.python_file(db));
+fn model_config<'db>(db: &'db dyn Db, class: StaticClassLiteral<'db>) -> ModelConfig {
+    let env = SemanticEnvironment::from_scope(db, class.body_scope(db));
     let mut config = ModelConfig::default();
 
     // Pydantic merges the effective config from each direct base from left to right. A later base
     // therefore takes precedence over an earlier base.
-    for base in class.explicit_bases(&env) {
+    for base in class.explicit_bases(env.db()) {
         let Some(base) = base.to_class_type(&env) else {
             config = ModelConfig::unknown();
             continue;
@@ -644,7 +631,7 @@ fn model_config_inner<'db>(db: &'db dyn Db, class: StaticClassLiteral<'db>) -> M
         };
 
         if is_model(&env, base) {
-            config.merge(model_config(&env, base));
+            config.merge(model_config(env.db(), base));
         } else if let Some(base_config) = inherited_model_config(&env, base) {
             config.merge(base_config);
         }
@@ -877,7 +864,7 @@ pub(in crate::types) fn constructor_parameter_type<'db>(
     metadata: ModelMetadata<'db>,
 ) -> Type<'db> {
     let db = env.db();
-    if has_before_or_plain_field_validator(env, class, field_name.clone()) {
+    if has_before_or_plain_field_validator(env.db(), class, field_name.clone()) {
         return Type::any();
     }
 
@@ -893,22 +880,13 @@ pub(in crate::types) fn constructor_parameter_type<'db>(
 /// A before validator can transform arbitrary values before Pydantic validates them against the
 /// declared field type, while a plain validator bypasses that validation entirely. We therefore
 /// cannot derive a useful input type from the field annotation alone.
-pub(in crate::types) fn has_before_or_plain_field_validator<'db>(
-    env: &SemanticEnvironment<'db>,
-    class: StaticClassLiteral<'db>,
-    field_name: Name,
-) -> bool {
-    debug_assert_eq!(env.program(), class.program(env.db()));
-    has_before_or_plain_field_validator_inner(env.db(), class, field_name)
-}
-
 #[salsa::tracked(returns(copy), heap_size=ruff_memory_usage::heap_size)]
-fn has_before_or_plain_field_validator_inner<'db>(
+pub(in crate::types) fn has_before_or_plain_field_validator<'db>(
     db: &'db dyn Db,
     class: StaticClassLiteral<'db>,
     field_name: Name,
 ) -> bool {
-    let env = SemanticEnvironment::from_file(db, class.python_file(db));
+    let env = SemanticEnvironment::from_scope(db, class.body_scope(db));
     let field_name = CharStr::from(field_name);
 
     // Pydantic inherits validators unless a subclass defines a symbol with the same method name.
@@ -961,7 +939,7 @@ fn function_has_before_or_plain_field_validator<'db>(
     if function_node.decorator_list.is_empty() {
         return false;
     }
-    let decorators = function_known_decorators(env, definition);
+    let decorators = function_known_decorators(env.db(), definition);
 
     function_node.decorator_list.iter().any(|decorator| {
         let Some(call) = decorator.expression.as_call_expr() else {
@@ -1156,7 +1134,7 @@ fn root_model_input_type<'db>(
 ) -> Option<Type<'db>> {
     let db = env.db();
     let (class, specialization) = field_type.nominal_class(env)?.static_class_literal(db)?;
-    if !is_root_model(env, class) {
+    if !is_root_model(env.db(), class) {
         return None;
     }
 
@@ -1165,7 +1143,10 @@ fn root_model_input_type<'db>(
     else {
         return Some(Type::any());
     };
-    let Some(root_field) = class.fields(env, specialization, field_policy).get("root") else {
+    let Some(root_field) = class
+        .fields(env.db(), specialization, field_policy)
+        .get("root")
+    else {
         return Some(Type::any());
     };
 
@@ -1197,12 +1178,15 @@ fn model_input_type<'db>(
 ) -> Option<Type<'db>> {
     let db = env.db();
     let (class, _) = field_type.nominal_class(env)?.static_class_literal(db)?;
-    if !is_model(env, class) || is_root_model(env, class) {
+    if !is_model(env, class) || is_root_model(env.db(), class) {
         return None;
     }
 
     // Attribute-based validation can accept arbitrary objects that do not implement `Mapping`.
-    if model_config(env, class).from_attributes.enabled_or(false) {
+    if model_config(env.db(), class)
+        .from_attributes
+        .enabled_or(false)
+    {
         return Some(Type::any());
     }
 
@@ -1279,7 +1263,7 @@ fn model_init_behavior(
                 .ignore_possibly_undefined()
                 .and_then(Type::as_function_literal)
                 .is_some_and(|init| {
-                    init.signature(env)
+                    init.signature(env.db())
                         .iter()
                         .any(|signature| signature.parameters().keyword_variadic().is_some())
                 }) {

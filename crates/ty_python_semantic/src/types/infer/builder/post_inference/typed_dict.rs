@@ -105,7 +105,7 @@ fn validate_typed_dict_field_overrides<'db>(
     let db = context.db();
     let env = context.semantic_environment();
     let child_fields = TypedDictType::new(class.identity_specialization(env)).items(env);
-    let own_fields = class.own_fields(env, None, CodeGeneratorKind::TypedDict);
+    let own_fields = class.own_fields(env.db(), None, CodeGeneratorKind::TypedDict);
     let mut reported_fields = FxHashSet::default();
 
     for base in direct_bases {

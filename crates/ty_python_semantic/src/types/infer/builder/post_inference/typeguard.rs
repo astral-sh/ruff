@@ -18,7 +18,7 @@ pub(crate) fn check_type_guard_definition<'db>(
     let env = context.semantic_environment();
 
     let overload = function.literal(db).last_definition;
-    let signature = overload.signature(env);
+    let signature = overload.signature(env.db());
     let return_ty = signature.return_ty;
 
     // Check if this is a `TypeIs` or `TypeGuard` return type.

@@ -54,7 +54,7 @@ pub(crate) fn check_overloaded_function<'db>(
         return;
     }
 
-    if !function.has_known_decorator(env, FunctionDecorators::OVERLOAD) {
+    if !function.has_known_decorator(env.db(), FunctionDecorators::OVERLOAD) {
         return;
     }
 
@@ -92,7 +92,7 @@ pub(crate) fn check_overloaded_function<'db>(
         return;
     }
 
-    let (overloads, implementation) = function.overloads_and_implementation(env);
+    let (overloads, implementation) = function.overloads_and_implementation(env.db());
     if overloads.is_empty() {
         return;
     }
@@ -136,12 +136,15 @@ pub(crate) fn check_overloaded_function<'db>(
     if implementation.is_none() && !context.in_stub() {
         let mut implementation_required = true;
 
-        if function.iter_overloads_and_implementation(env).all(|f| {
-            index.is_in_type_checking_block(
-                f.body_scope(db).file_scope_id(db),
-                f.node(db, context.file(), context.module()).range(),
-            )
-        }) {
+        if function
+            .iter_overloads_and_implementation(env.db())
+            .all(|f| {
+                index.is_in_type_checking_block(
+                    f.body_scope(db).file_scope_id(db),
+                    f.node(db, context.file(), context.module()).range(),
+                )
+            })
+        {
             implementation_required = false;
         } else if let NodeWithScopeKind::Class(class_node_ref) = scope
             && let Some(class) = original_class_type(
@@ -323,7 +326,7 @@ fn check_non_generic_overload_implementation_consistency<'db>(
 
     let overload_signatures = overloads.iter().flat_map(|overload| {
         overload
-            .decorated_signatures(env)
+            .decorated_signatures(env.db())
             .map(move |signature| (overload, signature))
     });
 

@@ -62,7 +62,7 @@ pub(super) fn class_member<'db>(
         .symbol_id(name)
         .map(|symbol_id| {
             let place_and_quals = place_by_id(
-                env,
+                env.db(),
                 scope,
                 symbol_id.into(),
                 RequiresExplicitReExport::No,

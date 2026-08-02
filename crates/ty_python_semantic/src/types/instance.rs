@@ -622,12 +622,12 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             self.check_protocol_interface_pair(
                 env,
                 ty,
-                source_protocol.interface(env),
-                protocol.interface(env),
+                source_protocol.interface(env.db()),
+                protocol.interface(env.db()),
             )
         } else {
             protocol
-                .interface(env)
+                .interface(env.db())
                 .members(db)
                 .when_all(env, self.constraints, |member| {
                     self.type_satisfies_protocol_member(env, ty, &member)
@@ -680,12 +680,16 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             .identity_specialization(env)
             .into_protocol_class(env)?;
 
-        let source_interface = source_protocol.interface(env);
-        let target_interface = protocol.interface(env);
-        let source_non_recursive =
-            non_recursive_protocol_interface(env, source_interface.base(), identity_protocol, ty);
+        let source_interface = source_protocol.interface(env.db());
+        let target_interface = protocol.interface(env.db());
+        let source_non_recursive = non_recursive_protocol_interface(
+            env.db(),
+            source_interface.base(),
+            identity_protocol,
+            ty,
+        );
         let target_non_recursive = non_recursive_protocol_interface(
-            env,
+            env.db(),
             target_interface.base(),
             identity_protocol,
             Type::ProtocolInstance(protocol),
@@ -765,19 +769,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
 ///     def value(self) -> T | int: ...
 ///     def child(self) -> P[list[T]]: ...
 /// ```
-fn non_recursive_protocol_interface<'db>(
-    env: &SemanticEnvironment<'db>,
-    interface: ProtocolInterface<'db>,
-    protocol: ProtocolClass<'db>,
-    receiver_ty: Type<'db>,
-) -> ProtocolInterface<'db> {
-    let db = env.db();
-    debug_assert_eq!(env.program(), protocol.class_literal(db).program(db));
-    non_recursive_protocol_interface_inner(db, interface, protocol, receiver_ty)
-}
-
 #[salsa::tracked(returns(copy), heap_size=ruff_memory_usage::heap_size)]
-fn non_recursive_protocol_interface_inner<'db>(
+fn non_recursive_protocol_interface<'db>(
     db: &'db dyn Db,
     interface: ProtocolInterface<'db>,
     protocol: ProtocolClass<'db>,
@@ -865,7 +858,7 @@ fn non_recursive_protocol_constraints<'db>(
         checker.check_protocol_interface_pair(
             &env,
             Type::ProtocolInstance(source),
-            source.interface(&env),
+            source.interface(env.db()),
             target,
         )
     })
@@ -1037,7 +1030,7 @@ pub(super) fn walk_protocol_instance_type<'db, V: super::visitor::TypeVisitor<'d
 ) {
     let db = env.db();
     if visitor.should_visit_lazy_type_attributes() {
-        walk_protocol_interface(env, protocol.interface(env), visitor);
+        walk_protocol_interface(env, protocol.interface(env.db()), visitor);
     } else {
         match protocol.inner {
             Protocol::FromClass(_) | Protocol::Materialized(_) => {
@@ -1150,7 +1143,7 @@ impl<'db> ProtocolInstanceType<'db> {
     ) -> Option<ProtocolClass<'db>> {
         let db = env.db();
         self.materialized_origin(db)
-            .filter(|_| self.interface(env).member_is_property(db, name))
+            .filter(|_| self.interface(env.db()).member_is_property(db, name))
     }
 
     /// Returns whether a materialization changes any member required by `target`.
@@ -1165,8 +1158,8 @@ impl<'db> ProtocolInstanceType<'db> {
         let db = env.db();
         self.materialization_kind(db).is_some()
             && self
-                .interface(env)
-                .differs_for_members_required_by(env, target.interface(env))
+                .interface(env.db())
+                .differs_for_members_required_by(env, target.interface(env.db()))
     }
 
     /// Returns the materialization wrapper needed for displaying this protocol.
@@ -1192,7 +1185,7 @@ impl<'db> ProtocolInstanceType<'db> {
             return None;
         }
 
-        let interface = self.interface(env);
+        let interface = self.interface(env.db());
         interface
             .differs_for_members_required_by(env, interface)
             .then_some(materialized.materialization_kind(db))
@@ -1264,7 +1257,7 @@ impl<'db> ProtocolInstanceType<'db> {
                 .is_always_satisfied(&env)
         }
 
-        is_equivalent_to_object_inner(env.db(), self.interface(env).base())
+        is_equivalent_to_object_inner(env.db(), self.interface(env.db()).base())
     }
 
     pub(super) fn recursive_type_normalized_impl(
@@ -1289,7 +1282,7 @@ impl<'db> ProtocolInstanceType<'db> {
     ) -> Option<PlaceAndQualifiers<'db>> {
         let db = env.db();
         self.materialization_kind(db)?;
-        let interface = self.interface(env);
+        let interface = self.interface(env.db());
         interface
             .includes_member(db, name)
             .then(|| interface.instance_member(env, name))
@@ -1377,8 +1370,8 @@ impl<'db> ProtocolInstanceType<'db> {
         }
     }
 
-    pub(super) fn interface(self, env: &SemanticEnvironment<'db>) -> ProtocolInterfaceView<'db> {
-        self.inner.interface(env)
+    pub(super) fn interface(self, db: &'db dyn Db) -> ProtocolInterfaceView<'db> {
+        self.inner.interface(db)
     }
 
     /// Returns constraints inferred from the nonrecursive requirements of `target`.
@@ -1392,9 +1385,9 @@ impl<'db> ProtocolInstanceType<'db> {
     ) -> Option<&'db OwnedConstraintSet<'db>> {
         let db = env.db();
         let origin = target.class_origin(db)?;
-        let interface = target.interface(env);
+        let interface = target.interface(env.db());
         let non_recursive = non_recursive_protocol_interface(
-            env,
+            env.db(),
             interface.base(),
             origin,
             Type::ProtocolInstance(target),
@@ -1440,15 +1433,14 @@ pub(super) enum Protocol<'db> {
 
 impl<'db> Protocol<'db> {
     /// Return the members of this protocol type
-    fn interface(self, env: &SemanticEnvironment<'db>) -> ProtocolInterfaceView<'db> {
-        let db = env.db();
+    fn interface(self, db: &'db dyn Db) -> ProtocolInterfaceView<'db> {
         match self {
-            Self::FromClass(class) => ProtocolInterfaceView::new(class.interface(env), None),
+            Self::FromClass(class) => ProtocolInterfaceView::new(class.interface(db), None),
             Self::Synthesized(synthesized) => {
                 ProtocolInterfaceView::new(synthesized.interface(), None)
             }
             Self::Materialized(materialized) => ProtocolInterfaceView::new(
-                materialized.origin(db).unmaterialized_interface(env),
+                materialized.origin(db).unmaterialized_interface(db),
                 Some(materialized.materialization_kind(db)),
             ),
         }

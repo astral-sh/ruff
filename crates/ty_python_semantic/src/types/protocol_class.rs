@@ -78,10 +78,8 @@ impl<'db> ProtocolClass<'db> {
     /// It is illegal for a protocol class to have any instance attributes that are not declared
     /// in the protocol's class body. If any are assigned to, they are not taken into account in
     /// the protocol's list of members.
-    pub(super) fn interface(self, env: &SemanticEnvironment<'db>) -> ProtocolInterface<'db> {
-        let db = env.db();
+    pub(super) fn interface(self, db: &'db dyn Db) -> ProtocolInterface<'db> {
         let _span = tracing::trace_span!("protocol_members", "class='{}'", self.name(db)).entered();
-        debug_assert_eq!(env.program(), self.class_literal(db).program(db));
         cached_protocol_interface(db, *self)
     }
 
@@ -92,17 +90,13 @@ impl<'db> ProtocolClass<'db> {
     /// invariant type variable as a read and then reuse that result as its write. Strip only the
     /// pending marker while constructing the shared interface so reads and writes can each apply
     /// the original materialization in their own variance position.
-    pub(super) fn unmaterialized_interface(
-        self,
-        env: &SemanticEnvironment<'db>,
-    ) -> ProtocolInterface<'db> {
-        let db = env.db();
+    pub(super) fn unmaterialized_interface(self, db: &'db dyn Db) -> ProtocolInterface<'db> {
         let ClassType::Generic(alias) = *self else {
-            return self.interface(env);
+            return self.interface(db);
         };
         let specialization = alias.specialization(db);
         if specialization.materialization_kind(db).is_none() {
-            return self.interface(env);
+            return self.interface(db);
         }
 
         let alias = GenericAlias::new(
@@ -110,7 +104,7 @@ impl<'db> ProtocolClass<'db> {
             alias.origin(db),
             specialization.with_materialization_kind(db, None),
         );
-        ProtocolClass(ClassType::Generic(alias)).interface(env)
+        ProtocolClass(ClassType::Generic(alias)).interface(db)
     }
 
     /// Walk the effective non-method member types declared by this protocol.
@@ -129,7 +123,7 @@ impl<'db> ProtocolClass<'db> {
             if !seen_members.insert(name.clone()) {
                 return;
             }
-            let candidate = candidate.apply_specialization(env, specialization);
+            let candidate = candidate.apply_specialization(env.db(), specialization);
             candidate.walk_recursive_member_types(env, visitor);
         });
     }
@@ -261,7 +255,7 @@ impl<'db> ProtocolClass<'db> {
     pub(super) fn validate_members(self, context: &InferContext) {
         let db = context.db();
         let env = context.semantic_environment();
-        let interface = self.interface(env);
+        let interface = self.interface(env.db());
         let Some((class_literal, _)) = self.static_class_literal(db) else {
             return;
         };
@@ -2978,7 +2972,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
     ) -> ConstraintSet<'db, 'c> {
         let db = env.db();
         protocol
-            .interface(env)
+            .interface(env.db())
             .members(db)
             .when_all(env, self.constraints, |member| {
                 let required = member.access(env, ProtocolMemberAccessMode::Class);
@@ -3342,10 +3336,10 @@ struct ProtocolMemberCandidate<'db> {
 impl<'db> ProtocolMemberCandidate<'db> {
     fn apply_specialization(
         mut self,
-        env: &SemanticEnvironment<'db>,
+        db: &'db dyn Db,
         specialization: Option<Specialization<'db>>,
     ) -> Self {
-        self.ty = self.ty.apply_optional_specialization(env, specialization);
+        self.ty = self.ty.apply_optional_specialization(db, specialization);
         self
     }
 
@@ -3406,7 +3400,7 @@ fn cached_protocol_interface<'db>(
             return;
         }
 
-        let candidate = candidate.apply_specialization(&env, specialization);
+        let candidate = candidate.apply_specialization(env.db(), specialization);
         let ProtocolMemberCandidate {
             ty,
             qualifiers,
@@ -3428,10 +3422,10 @@ fn cached_protocol_interface<'db>(
             }
             Type::FunctionLiteral(function)
                 if bound_on_class.is_yes()
-                    || function.is_staticmethod(&env)
-                    || function.is_classmethod(&env) =>
+                    || function.is_staticmethod(env.db())
+                    || function.is_classmethod(env.db()) =>
             {
-                ProtocolMemberData::method(&env, function.into_callable_type(&env), definition)
+                ProtocolMemberData::method(&env, function.into_callable_type(env.db()), definition)
             }
             _ if bound_on_class.is_yes()
                 && definition.is_some_and(|definition| definition.kind(db).is_function_def()) =>
@@ -3544,11 +3538,11 @@ pub(super) fn has_all_protocol_members_defined<'db>(
     protocol: ProtocolInstanceType<'db>,
 ) -> bool {
     let db = env.db();
-    let target_interface = protocol.interface(env);
+    let target_interface = protocol.interface(env.db());
 
     match ty {
         Type::ProtocolInstance(source_protocol) => {
-            let source_interface = source_protocol.interface(env);
+            let source_interface = source_protocol.interface(env.db());
 
             source_interface.member_count(db) >= target_interface.member_count(db)
                 && target_interface

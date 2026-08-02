@@ -682,7 +682,7 @@ fn synthesize_typed_dict_view_method<'db>(
         .ignore_possibly_undefined()
         .and_then(Type::as_class_literal)
         .map(|class| {
-            class.apply_specialization(env, |generic_context| {
+            class.apply_specialization(env.db(), |generic_context| {
                 generic_context
                     .specialize(db, &[typed_dict.key_type(env), typed_dict.value_type(env)])
             })
@@ -904,7 +904,7 @@ impl<'db> DynamicTypedDictLiteral<'db> {
         let db = env.db();
         match self.anchor(db) {
             DynamicTypedDictAnchor::Definition(definition) => {
-                deferred_functional_typed_dict_schema(env, *definition)
+                deferred_functional_typed_dict_schema(env.db(), *definition)
             }
             DynamicTypedDictAnchor::ScopeOffset { schema, .. } => schema,
         }
@@ -914,7 +914,7 @@ impl<'db> DynamicTypedDictLiteral<'db> {
         let db = env.db();
         match self.anchor(db) {
             DynamicTypedDictAnchor::Definition(definition) => {
-                deferred_functional_typed_dict_openness(env, *definition)
+                deferred_functional_typed_dict_openness(env.db(), *definition)
             }
             DynamicTypedDictAnchor::ScopeOffset { openness, .. } => *openness,
         }
@@ -924,16 +924,10 @@ impl<'db> DynamicTypedDictLiteral<'db> {
     ///
     /// Functional `TypedDict` classes have the same MRO as class-based ones:
     /// [self, `TypedDict`, object]
-    pub(crate) fn mro(self, env: &SemanticEnvironment<'db>) -> &'db Mro<'db> {
-        let db = env.db();
-        debug_assert_eq!(env.program(), self.scope(db).program(db));
-        self.mro_inner(db)
-    }
-
     #[salsa::tracked(returns(ref), heap_size = ruff_memory_usage::heap_size)]
-    fn mro_inner(self, db: &'db dyn Db) -> Mro<'db> {
+    pub(crate) fn mro(self, db: &'db dyn Db) -> Mro<'db> {
         let self_base = ClassBase::Class(ClassType::NonGeneric(self.into()));
-        let env = SemanticEnvironment::from_file(db, self.scope(db).python_file(db));
+        let env = SemanticEnvironment::from_scope(db, self.scope(db));
         let object_class = ClassType::object(&env);
         Mro::from([
             self_base,
