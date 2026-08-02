@@ -35,8 +35,8 @@ use super::{
 use crate::diagnostic::format_enumeration;
 use crate::place::{
     ConsideredDefinitions, DefinedPlace, Definedness, LookupError, Place, PlaceAndQualifiers,
-    RequiresExplicitReExport, TypeOrigin, builtins_module_scope, builtins_symbol,
-    class_body_implicit_symbol, explicit_global_symbol, loop_header_reachability,
+    RequiresExplicitReExport, TypeOrigin, builtins_module_scope, class_body_implicit_symbol,
+    explicit_global_symbol, implicit_builtins_symbol, loop_header_reachability,
     module_type_implicit_global_declaration, module_type_implicit_global_symbol, place_by_id,
     place_from_bindings_with_reachability_cache, place_from_declarations_with_reachability_cache,
     typing_extensions_symbol,
@@ -86,7 +86,6 @@ use crate::types::function::{
 use crate::types::generics::{
     GenericContext, Specialization, SpecializationBuilder, bind_typevar, enclosing_binding_contexts,
 };
-use crate::types::ide_support::is_stub_only_builtin_symbol;
 use crate::types::infer::builder::named_tuple::NamedTupleKind;
 use crate::types::infer::builder::paramspec_validation::validate_paramspec_components;
 use crate::types::infer::builder::typed_dict::TypedDictConstructorForm;
@@ -122,7 +121,7 @@ use crate::types::{
     UnionType, any_over_type, binding_type, extract_fixed_length_iterable_element_types,
     infer_complete_scope_types, infer_scope_types, is_discarded_dict_key_assignment, todo_type,
 };
-use crate::{AnalysisSettings, Db, FxIndexSet, FxOrderSet, NameKind};
+use crate::{AnalysisSettings, Db, FxIndexSet, FxOrderSet};
 use ty_python_core::ast_ids::ScopedUseId;
 use ty_python_core::definition::{
     AnnotatedAssignmentDefinitionKind, AssignmentDefinitionKind, ComprehensionDefinitionKind,
@@ -9637,12 +9636,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .or_fall_back_to(db, env, || {
                 if Some(self.scope()) == builtins_module_scope(db, env) {
                     Place::Undefined.into()
-                } else if matches!(NameKind::classify(symbol_name), NameKind::Sunder)
-                    && is_stub_only_builtin_symbol(db, symbol_name.clone())
-                {
-                    Place::Undefined.into()
                 } else {
-                    builtins_symbol(db, env, symbol_name)
+                    implicit_builtins_symbol(db, env, symbol_name)
                 }
             })
             // Still not found? It might be `reveal_type`...

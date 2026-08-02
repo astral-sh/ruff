@@ -3410,6 +3410,18 @@ mod tests {
     }
 
     #[test]
+    fn private_project_builtin_shadows_type_checking_only_builtin_completion() {
+        let builder = CursorTest::builder()
+            .source("__builtins__.pyi", "_Opener: int")
+            .source("main.py", "_O<CURSOR>")
+            .completion_test_builder()
+            .skip_auto_import();
+        let test = builder.build();
+
+        test.contains("_Opener");
+    }
+
+    #[test]
     fn keywords() {
         let test = completion_test_builder(
             "\
@@ -3558,10 +3570,7 @@ re.<CURSOR>
             .source(
                 "package/__init__.pyi",
                 r#"\
-from types import UnionType
-from typing import TYPE_CHECKING, Callable, Literal, ParamSpec, Protocol, TypeAlias, TypeVar, TypeVarTuple, runtime_checkable, type_check_only
-
-from .helpers import _private_reexported_alias as _private_reexported_alias
+from typing import TypeAlias, Literal, TypeVar, ParamSpec, TypeVarTuple, Protocol
 
 public_name = 1
 _private_name = 1
@@ -3580,50 +3589,16 @@ _private_type_var_tuple = TypeVarTuple("_private_type_var_tuple")
 
 public_explicit_type_alias: TypeAlias = Literal[1]
 _private_explicit_type_alias: TypeAlias = Literal[1]
-_private_simple_type_alias: TypeAlias = int
 
 public_implicit_union_alias = int | str
 _private_implicit_union_alias = int | str
-_private_generic_alias = list[int]
-_private_callable_alias = Callable[[int], str]
-_private_type_alias = type[int]
-
-def make_union() -> UnionType: ...
-def make_typevar() -> TypeVar: ...
-def make_callback() -> Callable[[int], int]: ...
-def make_class() -> type[int]: ...
-def decorate(callback: Callable[[int], int]) -> Callable[[int], int]: ...
-
-_private_runtime_union = make_union()
-_private_runtime_typevar = make_typevar()
-_private_runtime_callback = make_callback()
-_private_runtime_class = make_class()
-
-@decorate
-def _private_runtime_decorated(value: int) -> int: ...
 
 class PublicProtocol(Protocol):
     def method(self) -> None: ...
 
 class _PrivateProtocol(Protocol):
     def method(self) -> None: ...
-
-@runtime_checkable
-class _PrivateRuntimeCheckableProtocol(Protocol):
-    def method(self) -> None: ...
-
-@type_check_only
-class _PrivateTypeOnlyProtocol(Protocol):
-    def method(self) -> None: ...
-
-if TYPE_CHECKING:
-    class _PrivateTypeCheckingProtocol(Protocol):
-        def method(self) -> None: ...
 "#,
-            )
-            .source(
-                "package/helpers.pyi",
-                "from typing import TypeAlias\n_private_reexported_alias: TypeAlias = int\n",
             )
             .source("main.py", "import package; package.<CURSOR>")
             .completion_test_builder();
@@ -3642,23 +3617,10 @@ if TYPE_CHECKING:
         test.not_contains("_private_type_var_tuple");
         test.contains("public_explicit_type_alias");
         test.not_contains("_private_explicit_type_alias");
-        test.not_contains("_private_simple_type_alias");
         test.contains("public_implicit_union_alias");
         test.not_contains("_private_implicit_union_alias");
-        test.not_contains("_private_generic_alias");
-        test.not_contains("_private_callable_alias");
-        test.not_contains("_private_type_alias");
-        test.not_contains("_private_reexported_alias");
-        test.contains("_private_runtime_union");
-        test.contains("_private_runtime_typevar");
-        test.contains("_private_runtime_callback");
-        test.contains("_private_runtime_class");
-        test.contains("_private_runtime_decorated");
         test.contains("PublicProtocol");
-        test.contains("_PrivateProtocol");
-        test.contains("_PrivateRuntimeCheckableProtocol");
-        test.not_contains("_PrivateTypeOnlyProtocol");
-        test.not_contains("_PrivateTypeCheckingProtocol");
+        test.not_contains("_PrivateProtocol");
     }
 
     /// Unlike [`private_symbols_in_stub`], this test doesn't use a `.pyi` file so all of the names

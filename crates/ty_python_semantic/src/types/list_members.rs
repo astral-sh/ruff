@@ -11,15 +11,15 @@ use ruff_python_ast::name::Name;
 use rustc_hash::FxHashSet;
 
 use crate::{
-    Db,
+    Db, NameKind,
     place::{
         DefinedPlace, Place, PlaceWithDefinition, imported_symbol, place_from_bindings,
         place_from_declarations,
     },
     types::{
-        ClassBase, ClassLiteral, KnownClass, ProgramEnvironment, StaticClassLiteral,
-        SubclassOfInner, Type, TypeVarBoundOrConstraints, class::CodeGeneratorKind,
-        ide_support::is_private_stub_symbol,
+        ClassBase, ClassLiteral, KnownClass, KnownInstanceType, ProgramEnvironment,
+        StaticClassLiteral, SubclassOfInner, Type, TypeVarBoundOrConstraints,
+        class::CodeGeneratorKind,
     },
 };
 use ty_python_core::{
@@ -440,8 +440,38 @@ impl<'db> AllMembers<'db> {
                         continue;
                     };
 
-                    if is_private_stub_symbol(db, file, symbol_name) {
-                        continue;
+                    // Filter private symbols from stubs if they appear to be internal types
+                    let is_stub_file = file.path(db).extension() == Some("pyi");
+                    let is_private_symbol = match NameKind::classify(symbol_name) {
+                        NameKind::Dunder | NameKind::Normal => false,
+                        NameKind::Sunder => true,
+                    };
+                    if is_private_symbol && is_stub_file {
+                        match ty {
+                            Type::NominalInstance(instance)
+                                if matches!(
+                                    instance.known_class(db),
+                                    Some(
+                                        KnownClass::TypeVar
+                                            | KnownClass::TypeVarTuple
+                                            | KnownClass::ExtensionsTypeVarTuple
+                                            | KnownClass::ParamSpec
+                                            | KnownClass::UnionType
+                                    )
+                                ) =>
+                            {
+                                continue;
+                            }
+                            Type::ClassLiteral(class) if class.is_protocol(db) => continue,
+                            Type::KnownInstance(
+                                KnownInstanceType::TypeVar(_)
+                                | KnownInstanceType::TypeAliasType(_)
+                                | KnownInstanceType::UnionType(_)
+                                | KnownInstanceType::Literal(_)
+                                | KnownInstanceType::Annotated(_),
+                            ) => continue,
+                            _ => {}
+                        }
                     }
 
                     self.members.insert(Member {

@@ -1216,6 +1216,16 @@ def convert_to_number(value):
     }
 
     #[test]
+    fn cannot_rename_private_builtin_helper() {
+        let test = CursorTest::builder()
+            .source("other.py", "_T_co\n")
+            .source("main.py", "<CURSOR>_T_co\n")
+            .build();
+
+        assert_snapshot!(test.prepare_rename(), @"Cannot rename");
+    }
+
+    #[test]
     fn rename_keyword_argument() {
         // Test renaming a keyword argument and its corresponding parameter
         let test = cursor_test(

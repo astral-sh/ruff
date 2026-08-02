@@ -1,8 +1,8 @@
 use std::collections::{HashMap, VecDeque};
 
 use crate::FxIndexSet;
-use crate::place::{RequiresExplicitReExport, builtins_module_scope, imported_symbol};
-use crate::reachability::{evaluate_reachability, is_range_reachable};
+use crate::place::implicit_builtins_symbol_scope;
+use crate::reachability::is_range_reachable;
 use crate::types::call::bind::CheckTypesMode;
 use crate::types::call::{CallArguments, CallError, MatchedArgument};
 use crate::types::class::{DynamicClassAnchor, DynamicEnumAnchor, DynamicNamedTupleAnchor};
@@ -10,12 +10,10 @@ use crate::types::constraints::ConstraintSetBuilder;
 use crate::types::signatures::{ParametersKind, Signature};
 use crate::types::{
     CallDunderError, CallableTypes, ClassBase, ClassLiteral, ClassType, KnownClass, KnownFunction,
-    KnownInstanceType, KnownUnion, PropertyAccessorRole, SubclassOfInner, Type, TypeContext,
+    KnownUnion, PropertyAccessorRole, SubclassOfInner, Type, TypeContext,
     TypeVarBoundOrConstraints, binding_type,
 };
-use crate::{
-    Db, DisplaySettings, HasDefinition, HasType, NameKind, ProgramEnvironment, SemanticModel,
-};
+use crate::{Db, DisplaySettings, HasDefinition, HasType, ProgramEnvironment, SemanticModel};
 use itertools::Either;
 use ruff_db::PythonFile;
 use ruff_db::files::FileRange;
@@ -24,11 +22,9 @@ use ruff_db::source::source_text;
 use ruff_python_ast::{self as ast, AnyNodeRef, name::Name};
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashSet;
-use ty_module_resolver::{
-    KnownModule, Module, ModuleName, resolve_module, resolve_module_confident,
-};
+use ty_module_resolver::Module;
 use ty_python_core::definition::{Definition, DefinitionKind, NestedBindingExecution};
-use ty_python_core::{attribute_scopes, global_scope, place_table, semantic_index, use_def_map};
+use ty_python_core::{attribute_scopes, global_scope, semantic_index, use_def_map};
 
 mod unreachable_code;
 #[path = "ide_support/unused_bindings.rs"]
@@ -38,223 +34,6 @@ pub use resolve_definition::{ImportAliasResolution, ResolvedDefinition, map_stub
 use resolve_definition::{find_symbol_in_scope, resolve_definition};
 pub use unreachable_code::{UnreachableKind, UnreachableRange, unreachable_ranges};
 pub use unused_binding_support::{UnusedBinding, unused_bindings};
-
-/// Returns whether every reachable definition of a private builtin is a stub-only typing helper.
-///
-/// Builtin stubs contain type variables, aliases, and protocol classes that do not exist in the
-/// runtime builtins namespace. Imported helpers must be classified at their original definitions,
-/// while ordinary runtime values must remain visible even when their types are typing objects.
-pub(crate) fn is_stub_only_builtin_symbol<'db>(db: &'db dyn Db, name: Name) -> bool {
-    let custom_file = ModuleName::new_static("__builtins__")
-        .and_then(|module_name| resolve_module_confident(db, &module_name))
-        .and_then(|module| module.file(db))
-        .filter(|file| {
-            imported_symbol(db, Some(*file), &name, Some(RequiresExplicitReExport::Yes))
-                .ignore_possibly_undefined()
-                .is_some()
-        });
-
-    let Some(file) = custom_file.or_else(|| {
-        resolve_module_confident(db, &KnownModule::Builtins.name())
-            .and_then(|module| module.file(db))
-    }) else {
-        return false;
-    };
-
-    is_private_stub_symbol(db, file, &name)
-}
-
-/// Returns whether a privately named stub symbol exists only to support type checking.
-///
-/// Implicit builtin lookup and module completion must apply the same definition-aware visibility
-/// policy, including re-export resolution, reachable bindings, and actual runtime values.
-pub(crate) fn is_private_stub_symbol<'db>(db: &'db dyn Db, file: File, name: &Name) -> bool {
-    file.is_stub(db)
-        && matches!(NameKind::classify(name), NameKind::Sunder)
-        && is_stub_only_builtin_symbol_in_file(db, file, name.clone())
-}
-
-#[salsa::tracked(returns(copy), heap_size=ruff_memory_usage::heap_size)]
-fn is_stub_only_builtin_symbol_in_file<'db>(db: &'db dyn Db, file: File, name: Name) -> bool {
-    is_stub_only_builtin_symbol_in_file_recursive(db, file, &name, &mut FxHashSet::default())
-}
-
-fn is_stub_only_builtin_symbol_in_file_recursive<'db>(
-    db: &'db dyn Db,
-    file: File,
-    name: &str,
-    visiting: &mut FxHashSet<Definition<'db>>,
-) -> bool {
-    if !file.is_stub(db) {
-        return false;
-    }
-
-    let scope = global_scope(db, file);
-    let Some(symbol_id) = place_table(db, scope).symbol_id(&name) else {
-        return false;
-    };
-    let use_def = use_def_map(db, scope);
-    let mut has_definition = false;
-
-    for binding in use_def.end_of_scope_symbol_bindings(symbol_id) {
-        if evaluate_reachability(db, use_def, binding.reachability_constraint).is_always_false() {
-            continue;
-        }
-
-        let Some(definition) = binding.binding.definition() else {
-            continue;
-        };
-
-        if !visiting.insert(definition) {
-            return false;
-        }
-
-        has_definition = true;
-        let is_stub_only = is_stub_only_builtin_definition(db, definition, name, visiting);
-        visiting.remove(&definition);
-        if !is_stub_only {
-            return false;
-        }
-    }
-
-    has_definition
-}
-
-fn is_stub_only_builtin_definition<'db>(
-    db: &'db dyn Db,
-    definition: Definition<'db>,
-    name: &str,
-    visiting: &mut FxHashSet<Definition<'db>>,
-) -> bool {
-    let file = definition.file(db);
-    if !file.is_stub(db) {
-        return false;
-    }
-
-    let parsed = parsed_module(db, file).load(db);
-    if semantic_index(db, file).is_in_type_checking_block(
-        definition.file_scope(db),
-        definition.full_range(db, &parsed).range(),
-    ) {
-        return true;
-    }
-
-    match definition.kind(db) {
-        DefinitionKind::ImportFrom(import) => {
-            let file = definition.file(db);
-            let parsed = parsed_module(db, file).load(db);
-            let import_node = import.import(&parsed);
-            let imported_name = &import.alias(&parsed).name;
-
-            let Some(module_name) = ModuleName::from_import_statement(db, file, import_node).ok()
-            else {
-                return false;
-            };
-            let Some(file) =
-                resolve_module(db, file, &module_name).and_then(|module| module.file(db))
-            else {
-                return false;
-            };
-
-            is_stub_only_builtin_symbol_in_file_recursive(db, file, imported_name, visiting)
-        }
-        DefinitionKind::StarImport(import) => {
-            let file = definition.file(db);
-            let parsed = parsed_module(db, file).load(db);
-            let import_node = import.import(&parsed);
-
-            let Some(module_name) = ModuleName::from_import_statement(db, file, import_node).ok()
-            else {
-                return false;
-            };
-            let Some(file) =
-                resolve_module(db, file, &module_name).and_then(|module| module.file(db))
-            else {
-                return false;
-            };
-
-            is_stub_only_builtin_symbol_in_file_recursive(db, file, name, visiting)
-        }
-        DefinitionKind::TypeAlias(_)
-        | DefinitionKind::TypeVar(_)
-        | DefinitionKind::ParamSpec(_)
-        | DefinitionKind::TypeVarTuple(_) => true,
-        DefinitionKind::AnnotatedAssignment(_) => {
-            SemanticModel::new(db, definition.file(db)).is_type_alias_definition(definition)
-        }
-        DefinitionKind::Class(_) | DefinitionKind::Function(_) => {
-            binding_type(db, definition).is_type_check_only(db)
-        }
-        DefinitionKind::Assignment(assignment) => {
-            let ty = binding_type(db, definition);
-
-            if ty.is_type_check_only(db) {
-                return true;
-            }
-
-            match ty {
-                Type::NominalInstance(instance) => {
-                    if !matches!(
-                        instance.known_class(db),
-                        Some(
-                            KnownClass::TypeVar
-                                | KnownClass::ExtensionsTypeVar
-                                | KnownClass::TypeVarTuple
-                                | KnownClass::ExtensionsTypeVarTuple
-                                | KnownClass::ParamSpec
-                                | KnownClass::ExtensionsParamSpec
-                        )
-                    ) {
-                        return false;
-                    }
-
-                    let parsed = parsed_module(db, definition.file(db)).load(db);
-                    let ast::Expr::Call(call) = assignment.value(&parsed) else {
-                        return false;
-                    };
-                    let model = SemanticModel::new(db, definition.file(db));
-
-                    matches!(
-                        call.func
-                            .inferred_type(&model)
-                            .and_then(Type::as_class_literal)
-                            .and_then(|class| class.known(db)),
-                        Some(
-                            KnownClass::TypeVar
-                                | KnownClass::ExtensionsTypeVar
-                                | KnownClass::TypeVarTuple
-                                | KnownClass::ExtensionsTypeVarTuple
-                                | KnownClass::ParamSpec
-                                | KnownClass::ExtensionsParamSpec
-                        )
-                    )
-                }
-                Type::Callable(_)
-                | Type::GenericAlias(_)
-                | Type::SpecialForm(_)
-                | Type::SubclassOf(_) => {
-                    let parsed = parsed_module(db, definition.file(db)).load(db);
-                    matches!(
-                        assignment.value(&parsed),
-                        ast::Expr::Subscript(_) | ast::Expr::BinOp(_)
-                    )
-                }
-                Type::TypeAlias(_)
-                | Type::KnownInstance(
-                    KnownInstanceType::TypeVar(_)
-                    | KnownInstanceType::TypeAliasType(_)
-                    | KnownInstanceType::UnionType(_)
-                    | KnownInstanceType::Literal(_)
-                    | KnownInstanceType::Annotated(_)
-                    | KnownInstanceType::TypeGenericAlias(_)
-                    | KnownInstanceType::Callable(_),
-                ) => true,
-                _ => false,
-            }
-        }
-        _ => false,
-    }
-}
 
 /// Get the primary definition kind for a name expression within a specific file.
 /// Returns the first definition kind that is reachable for this name in its scope.
@@ -393,7 +172,7 @@ pub fn definitions_for_name<'db>(
     // If we didn't find any definitions in scopes, fallback to builtins
     let env = model.program_environment();
     if resolved_definitions.is_empty()
-        && let Some(builtins_scope) = builtins_module_scope(db, &env)
+        && let Some(builtins_scope) = implicit_builtins_symbol_scope(db, &env, name_str)
     {
         // Special cases for `float` and `complex` in type annotation positions.
         // We don't know whether we're in a type annotation position, so we'll just ask `Name`'s type,

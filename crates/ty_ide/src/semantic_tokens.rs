@@ -4656,6 +4656,14 @@ def f():
     }
 
     #[test]
+    fn private_builtin_helpers_do_not_receive_semantic_tokens() {
+        let test = SemanticTokenTest::new("_T_co\n_P\n");
+
+        let tokens = test.highlight_file();
+        assert_snapshot!(test.to_snapshot(&tokens), @"");
+    }
+
+    #[test]
     fn unresolved_attributes_do_not_receive_semantic_tokens() {
         let test = SemanticTokenTest::new(
             r#"

@@ -15,6 +15,7 @@ use ty_module_resolver::{
 };
 
 use crate::Db;
+use crate::place::implicit_builtins_symbol_scope;
 use crate::place::implicit_globals::all_implicit_module_globals;
 use crate::types::ide_support::{ImportAliasResolution, definition_for_name};
 use crate::types::list_members::{Member, all_members, all_reachable_members};
@@ -291,6 +292,7 @@ impl<'db> SemanticModel<'db> {
                 .into_iter()
                 .filter(|completion| {
                     !matches!(NameKind::classify(&completion.name), NameKind::Sunder)
+                        || implicit_builtins_symbol_scope(self.db, &completion.name).is_some()
                 }),
         );
 
