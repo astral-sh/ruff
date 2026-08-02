@@ -2589,6 +2589,13 @@ def copy_same_fallback(value: Left | Right) -> None:
     reveal_type(method.__self__)  # revealed: Left | Right
     reveal_type(method())  # revealed: Left | Right
 
+def copy_union_with_concrete_method(value: Left | Right, left: Left, flag: bool) -> None:
+    method = value.copy if flag else left.copy
+    reveal_type(method())  # revealed: Left | Right
+
+    # error: [invalid-assignment]
+    result: Left = method()
+
 def copy_mixed_fallback(value: Left | Extension) -> None:
     method = value.copy
     reveal_type(method.__self__)  # revealed: Left | Extension

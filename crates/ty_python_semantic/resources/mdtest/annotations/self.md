@@ -519,6 +519,18 @@ def inherited(value: First | Second) -> None:
     reveal_type(value.children())  # revealed: list[First] | list[Second]
 ```
 
+Combining a shared union-bound method with one concrete alternative must not discard the other
+possible receiver:
+
+```py
+def union_with_concrete_method(value: First | Second, first: First, flag: bool) -> None:
+    method = value.clone if flag else first.clone
+    reveal_type(method())  # revealed: First | Second
+
+    # error: [invalid-assignment]
+    result: First = method()
+```
+
 An override remains a separate bound method even when both implementations return `Self`:
 
 ```py
