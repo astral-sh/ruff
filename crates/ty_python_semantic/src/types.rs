@@ -101,7 +101,7 @@ use crate::types::typevar::{TypeVarInstance, TypeVarSet};
 pub use crate::types::variance::TypeVarVariance;
 use crate::types::variance::VarianceInferable;
 use crate::types::visitor::any_over_type;
-use crate::{Db, FxOrderSet, Program};
+use crate::{Db, FxOrderSet, HasType, Program, SemanticModel};
 pub(crate) use class::{ClassLiteral, ClassType, GenericAlias, StaticClassLiteral};
 pub use class::{KnownClass, MethodDecorator};
 use instance::Protocol;
@@ -111,7 +111,7 @@ pub(crate) use literal::{
 };
 pub use special_form::SpecialFormType;
 pub(crate) use special_form::TypedDictModule;
-use ty_python_core::definition::Definition;
+use ty_python_core::definition::{Definition, DefinitionKind};
 use ty_python_core::place::ScopedPlaceId;
 use ty_python_core::scope::ScopeId;
 use ty_python_core::{Truthiness, place_table, semantic_index, use_def_map};
@@ -221,6 +221,73 @@ pub fn check_types(db: &dyn Db, file: PythonFile<'_>) -> Vec<Diagnostic> {
 pub(crate) fn binding_type<'db>(db: &'db dyn Db, definition: Definition<'db>) -> Type<'db> {
     let inference = infer_definition_types(db, definition);
     inference.binding_type(definition)
+}
+
+/// Returns whether a stub definition represents a value that exists at runtime.
+///
+/// In addition to explicit aliases and `@type_check_only` definitions, this recognizes direct
+/// type-variable declarations and implicit aliases without confusing runtime factory results or
+/// indexing operations with typing-only definitions.
+#[salsa::tracked(returns(copy))]
+pub(crate) fn exists_at_runtime<'db>(db: &'db dyn Db, definition: Definition<'db>) -> bool {
+    let ty = binding_type(db, definition);
+
+    if ty.is_type_check_only(db)
+        || matches!(
+            ty,
+            Type::KnownInstance(KnownInstanceType::TypeVar(typevar))
+                if typevar.definition(db) == Some(definition)
+        )
+        || SemanticModel::new(db, definition.file(db)).is_type_alias_definition(definition)
+    {
+        return false;
+    }
+
+    let file = definition.file(db);
+    let parsed = parsed_module(db, file);
+    let module = parsed.load(db);
+
+    if semantic_index(db, file).is_in_type_checking_block(
+        definition.file_scope(db),
+        definition.full_range(db, &module).range(),
+    ) {
+        return false;
+    }
+
+    let DefinitionKind::Assignment(assignment) = definition.kind(db) else {
+        return true;
+    };
+
+    let value = assignment.value(&module);
+
+    match (ty, value) {
+        (
+            Type::KnownInstance(KnownInstanceType::UnionType(_)),
+            ast::Expr::BinOp(ast::ExprBinOp {
+                op: ast::Operator::BitOr,
+                ..
+            }),
+        ) => false,
+        (
+            Type::KnownInstance(
+                KnownInstanceType::Literal(_)
+                | KnownInstanceType::Annotated(_)
+                | KnownInstanceType::Callable(_)
+                | KnownInstanceType::TypeGenericAlias(_),
+            )
+            | Type::GenericAlias(_)
+            | Type::Callable(_)
+            | Type::SubclassOf(_),
+            ast::Expr::Subscript(subscript),
+        ) => {
+            let model = SemanticModel::new(db, definition.file(db));
+            !matches!(
+                subscript.value.inferred_type(&model),
+                Some(Type::SpecialForm(_) | Type::ClassLiteral(_) | Type::GenericAlias(_))
+            )
+        }
+        _ => true,
+    }
 }
 
 /// Infer the type of a declaration, returning `Rejected` if it is not valid.

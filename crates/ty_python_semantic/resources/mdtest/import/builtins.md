@@ -28,6 +28,7 @@ stub are implementation details. They must not be available without an explicit 
 _T_co  # error: [unresolved-reference]
 _P  # error: [unresolved-reference]
 _PositiveInteger  # error: [unresolved-reference]
+_LiteralInteger  # error: [unresolved-reference]
 _Opener  # error: [unresolved-reference]
 _SupportsSynchronousAnext  # error: [unresolved-reference]
 ```
@@ -37,8 +38,9 @@ _SupportsSynchronousAnext  # error: [unresolved-reference]
 Filtering implicit builtin fallback does not change explicit imports from the `builtins` module.
 
 ```py
-from builtins import _Opener, _P, _PositiveInteger, _SupportsSynchronousAnext, _T_co
+from builtins import _LiteralInteger, _Opener, _P, _PositiveInteger, _SupportsSynchronousAnext, _T_co
 
+_LiteralInteger
 _Opener
 _P
 _PositiveInteger
@@ -54,13 +56,38 @@ that overlap with private helpers in the standard `builtins` stub.
 ```py
 reveal_type(_private_value)  # revealed: int
 reveal_type(_T_co)  # revealed: int
+
+_PrivateTypeVar  # error: [unresolved-reference]
+_PrivateAlias  # error: [unresolved-reference]
+_PrivateTypeOnlyProtocol  # error: [unresolved-reference]
+_PrivateTypeCheckingProtocol  # error: [unresolved-reference]
+
+_RuntimeProtocol
+_runtime_typevar
 ```
 
 `__builtins__.pyi`:
 
 ```pyi
+from typing import TYPE_CHECKING, Protocol, TypeAlias, TypeVar, type_check_only
+
 _private_value: int
 _T_co: int
+
+_PrivateTypeVar = TypeVar("_PrivateTypeVar")
+_PrivateAlias: TypeAlias = int
+
+@type_check_only
+class _PrivateTypeOnlyProtocol(Protocol): ...
+
+if TYPE_CHECKING:
+    class _PrivateTypeCheckingProtocol(Protocol): ...
+
+class _RuntimeProtocol(Protocol): ...
+
+def make_typevar() -> TypeVar: ...
+
+_runtime_typevar = make_typevar()
 ```
 
 ## Private runtime standard builtins

@@ -13,11 +13,11 @@ use crate::reachability::{
 };
 use crate::types::narrow::NarrowingEvaluatorExtension;
 use crate::types::{
-    DynamicType, KnownClass, KnownInstanceType, MemberLookupPolicy, Type, TypeAndQualifiers,
-    TypeQualifiers, UnionBuilder, UnionType, binding_type, inferred_declaration,
+    DynamicType, KnownClass, MemberLookupPolicy, Type, TypeAndQualifiers, TypeQualifiers,
+    UnionBuilder, UnionType, binding_type, exists_at_runtime, inferred_declaration,
     is_discarded_dict_key_assignment,
 };
-use crate::{Db, FxIndexSet, FxOrderSet, NameKind, SemanticModel};
+use crate::{Db, FxIndexSet, FxOrderSet, NameKind};
 use ty_python_core::definition::{Definition, DefinitionKind, DefinitionState};
 use ty_python_core::narrowing_constraints::ScopedNarrowingConstraint;
 use ty_python_core::place::ScopedPlaceId;
@@ -616,8 +616,8 @@ pub(crate) fn builtins_symbol<'db>(
 
 /// Looks up `symbol` for implicit builtin fallback.
 ///
-/// Private type-checking-only definitions in the standard `builtins` stub are implementation
-/// details, but private runtime builtins and project-level `__builtins__` names remain available.
+/// Private type-checking-only definitions are implementation details, but private runtime
+/// definitions from either the standard or project-level builtins remain available.
 pub(crate) fn implicit_builtins_symbol<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
@@ -660,11 +660,20 @@ fn builtins_symbol_impl<'db>(
             // `imported_symbol`.
             module_type_implicit_global_symbol(db, python_file, symbol)
         });
-        // If this symbol is not present in project-level builtins, search in the default ones.
-        found_symbol
-            .ignore_possibly_undefined()
-            .map(|_| (scope, found_symbol))
+        found_symbol.ignore_possibly_undefined()?;
+
+        if exclude_type_checking_only_builtins
+            && matches!(NameKind::classify(symbol), NameKind::Sunder)
+            && let Place::Defined(defined) = found_symbol.place
+            && let Some(definition) = defined.provenance.definition()
+            && !exists_at_runtime(db, definition)
+        {
+            return None;
+        }
+
+        Some((scope, found_symbol))
     };
+    // If this symbol is not present in project-level builtins, search in the default ones.
     resolve_module_confident(
         db,
         python_version,
@@ -672,37 +681,9 @@ fn builtins_symbol_impl<'db>(
     )
     .and_then(&resolver)
     .or_else(|| {
-        let (scope, found_symbol) =
-            resolve_module_confident(db, python_version, &KnownModule::Builtins.name())
-                .and_then(resolver)?;
-
-        if exclude_type_checking_only_builtins
-            && matches!(NameKind::classify(symbol), NameKind::Sunder)
-            && let Place::Defined(defined) = found_symbol.place
-            && let Some(definition) = defined.provenance.definition()
-            && is_type_checking_only_builtin_definition(db, definition)
-        {
-            return None;
-        }
-
-        Some((scope, found_symbol))
+        resolve_module_confident(db, python_version, &KnownModule::Builtins.name())
+            .and_then(resolver)
     })
-}
-
-#[salsa::tracked(returns(copy))]
-fn is_type_checking_only_builtin_definition<'db>(
-    db: &'db dyn Db,
-    definition: Definition<'db>,
-) -> bool {
-    let ty = binding_type(db, definition);
-
-    ty.is_type_check_only(db)
-        || matches!(
-            ty,
-            Type::KnownInstance(KnownInstanceType::TypeVar(typevar))
-                if typevar.definition(db) == Some(definition)
-        )
-        || SemanticModel::new(db, definition.python_file(db)).is_type_alias_definition(definition)
 }
 
 /// Lookup the type of `symbol` in a given known module.
