@@ -2567,12 +2567,11 @@ def _(u: IntX | StrX) -> None:
 
 ## Copying a union of `TypedDict` instances
 
-The copied value retains every possible receiver, including when the union combines `TypedDict`
-classes from different fallback implementations:
+Two `TypedDict` classes from `typing` inherit the same `copy` method. A union of their instances
+therefore has one bound method that preserves both classes:
 
 ```py
 from typing import TypedDict
-from typing_extensions import TypedDict as ExtensionTypedDict
 
 class Left(TypedDict):
     left: int
@@ -2580,29 +2579,32 @@ class Left(TypedDict):
 class Right(TypedDict):
     right: str
 
-class Extension(ExtensionTypedDict):
-    extension: bytes
+def copy_union(value: Left | Right) -> None:
+    reveal_type(value.copy)  # revealed: bound method (Left | Right).copy() -> Left | Right
+```
 
-def copy_same_fallback(value: Left | Right) -> None:
-    method = value.copy
-    reveal_type(method)  # revealed: bound method (Left | Right).copy() -> Left | Right
-    reveal_type(method.__self__)  # revealed: Left | Right
-    reveal_type(method())  # revealed: Left | Right
+Choosing between this method and one bound to `Left` must not remove `Right` from the return type:
 
-def copy_union_with_concrete_method(value: Left | Right, left: Left, flag: bool) -> None:
+```py
+def copy_union_or_left(value: Left | Right, left: Left, flag: bool) -> None:
     method = value.copy if flag else left.copy
-    reveal_type(method())  # revealed: Left | Right
 
     # error: [invalid-assignment]
     result: Left = method()
+```
 
-def copy_mixed_fallback(value: Left | Extension) -> None:
-    method = value.copy
-    reveal_type(method.__self__)  # revealed: Left | Extension
-    reveal_type(method())  # revealed: Left | Extension
+A `TypedDict` created with `typing_extensions.TypedDict` does not share the same `copy` definition,
+so its bound method must remain separate:
 
-def copy_mixed_receiver(value: Left | dict[str, int]) -> None:
-    reveal_type(value.copy())  # revealed: Left | dict[str, int]
+```py
+from typing_extensions import TypedDict as ExtensionTypedDict
+
+class Extension(ExtensionTypedDict):
+    extension: bytes
+
+def separate_copy_methods(value: Left | Extension) -> None:
+    # revealed: (bound method Left.copy() -> Left) | (bound method Extension.copy() -> Extension)
+    reveal_type(value.copy)
 ```
 
 ## Unlike normal classes

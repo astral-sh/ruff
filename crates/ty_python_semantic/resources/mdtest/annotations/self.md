@@ -489,10 +489,10 @@ class Child(Parent):
         assert_type(self.create(), Self)
 ```
 
-## Inherited methods on union receivers
+## Inherited methods on a union
 
-A parameterless inherited method returning `Self` preserves every possible receiver when accessed
-through a union:
+If two classes inherit the same method, a union of their instances can share one bound method
+without losing either possible return type:
 
 ```py
 from typing import Self
@@ -506,50 +506,40 @@ class Original:
 
 class First(Original): ...
 class Second(Original): ...
+
+def shared_method(value: First | Second) -> None:
+    reveal_type(value.clone)  # revealed: bound method (First | Second).clone() -> First | Second
+```
+
+The bound method's `__func__` attribute is still the original function, so it also accepts another
+subclass of the declaring class:
+
+```py
 class Third(Original): ...
 
-def inherited(value: First | Second) -> None:
-    method = value.clone
-    reveal_type(method)  # revealed: bound method (First | Second).clone() -> First | Second
-    reveal_type(method.__self__)  # revealed: First | Second
-    reveal_type(method())  # revealed: First | Second
-    reveal_type(method.__func__(Third()))  # revealed: Third
+def declaring_function(value: First | Second) -> None:
+    reveal_type(value.clone.__func__(Third()))  # revealed: Third
+```
 
-    # An invariant container must retain the separate receiver specializations.
+A method that returns `list[Self]` must keep the two list types separate:
+
+```py
+def separate_list_types(value: First | Second) -> None:
     reveal_type(value.children())  # revealed: list[First] | list[Second]
 ```
 
-Combining a shared union-bound method with one concrete alternative must not discard the other
-possible receiver:
+Choosing between the shared method and a method bound to `First` must not remove `Second` from the
+return type:
 
 ```py
-def union_with_concrete_method(value: First | Second, first: First, flag: bool) -> None:
+def shared_or_first_method(value: First | Second, first: First, flag: bool) -> None:
     method = value.clone if flag else first.clone
-    reveal_type(method())  # revealed: First | Second
 
     # error: [invalid-assignment]
     result: First = method()
 ```
 
-The underlying function must retain its declaring class's original `Self` bound even when that class
-is generic:
-
-```py
-class GenericOriginal[T]:
-    def clone(self) -> Self:
-        return self
-
-class GenericFirst(GenericOriginal[int]): ...
-class GenericSecond(GenericOriginal[int]): ...
-class GenericThird(GenericOriginal[str]): ...
-
-def generic_declaring_function(value: GenericFirst | GenericSecond) -> None:
-    method = value.clone
-    reveal_type(method())  # revealed: GenericFirst | GenericSecond
-    reveal_type(method.__func__(GenericThird()))  # revealed: GenericThird
-```
-
-An override remains a separate bound method even when both implementations return `Self`:
+Methods with different implementations cannot be combined, even if both return `Self`:
 
 ```py
 class Overridden(Original):
@@ -559,7 +549,21 @@ class Overridden(Original):
 def overridden(value: First | Overridden) -> None:
     # revealed: (bound method First.clone() -> First) | (bound method Overridden.clone() -> Overridden)
     reveal_type(value.clone)
-    reveal_type(value.clone())  # revealed: First | Overridden
+```
+
+For a generic class, `__func__` must also accept a subclass with different type arguments:
+
+```py
+class GenericBase[T]:
+    def clone(self) -> Self:
+        return self
+
+class FirstInt(GenericBase[int]): ...
+class SecondInt(GenericBase[int]): ...
+class ThirdStr(GenericBase[str]): ...
+
+def generic_function(value: FirstInt | SecondInt) -> None:
+    reveal_type(value.clone.__func__(ThirdStr()))  # revealed: ThirdStr
 ```
 
 ## Attributes
