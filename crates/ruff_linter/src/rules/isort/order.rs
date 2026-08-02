@@ -1,11 +1,54 @@
 use crate::rules::isort::sorting::ImportStyle;
 use crate::rules::isort::{ImportSection, ImportType};
 use itertools::Itertools;
+use unicode_width::UnicodeWidthChar;
 
 use super::settings::Settings;
 use super::sorting::{MemberKey, ModuleKey};
 use super::types::EitherImport::{self, Import, ImportFrom};
 use super::types::{AliasData, ImportBlock, ImportFromCommentSet, ImportFromStatement};
+
+fn text_width(text: &str) -> usize {
+    text.chars()
+        .map(|character| character.width().unwrap_or_default())
+        .sum()
+}
+
+fn alias_width(name: &str, asname: Option<&str>) -> usize {
+    text_width(name)
+        + asname
+            .map(|asname| " as ".len() + text_width(asname))
+            .unwrap_or_default()
+}
+
+fn straight_import_width(alias: &AliasData, settings: &Settings) -> usize {
+    if settings.reverse_sort && (settings.length_sort || settings.length_sort_straight) {
+        "import ".len() + alias_width(alias.name, alias.asname)
+    } else {
+        0
+    }
+}
+
+fn from_import_width<'a>(
+    module: Option<&str>,
+    level: u32,
+    aliases: impl ExactSizeIterator<Item = (&'a str, Option<&'a str>)>,
+    settings: &Settings,
+) -> usize {
+    if settings.reverse_sort && settings.length_sort {
+        let separators_width = ", ".len() * aliases.len().saturating_sub(1);
+        "from ".len()
+            + level as usize
+            + module.map(text_width).unwrap_or_default()
+            + " import ".len()
+            + aliases
+                .map(|(name, asname)| alias_width(name, asname))
+                .sum::<usize>()
+            + separators_width
+    } else {
+        0
+    }
+}
 
 pub(crate) fn order_imports<'a>(
     block: ImportBlock<'a>,
@@ -66,6 +109,14 @@ pub(crate) fn order_imports<'a>(
                         import_from.level,
                         aliases.first().map(|(alias, _)| (alias.name, alias.asname)),
                         ImportStyle::From,
+                        from_import_width(
+                            import_from.module,
+                            import_from.level,
+                            aliases
+                                .iter()
+                                .map(|(alias, _)| (alias.name, alias.asname)),
+                            settings,
+                        ),
                         settings,
                     ),
                     *first_index,
@@ -91,6 +142,7 @@ pub(crate) fn order_imports<'a>(
                         0,
                         None,
                         ImportStyle::Straight,
+                        straight_import_width(alias, settings),
                         settings,
                     ),
                     comments.first_index.unwrap_or_default(),
@@ -142,6 +194,7 @@ pub(crate) fn order_imports<'a>(
                         0,
                         None,
                         ImportStyle::Straight,
+                        straight_import_width(alias, settings),
                         settings,
                     ),
                     *first_index,
@@ -153,6 +206,14 @@ pub(crate) fn order_imports<'a>(
                         import_from.level,
                         aliases.first().map(|(alias, _)| (alias.name, alias.asname)),
                         ImportStyle::From,
+                        from_import_width(
+                            import_from.module,
+                            import_from.level,
+                            aliases
+                                .iter()
+                                .map(|(alias, _)| (alias.name, alias.asname)),
+                            settings,
+                        ),
                         settings,
                     ),
                     *first_index,
@@ -189,6 +250,7 @@ pub(crate) fn order_imports<'a>(
                         0,
                         None,
                         ImportStyle::Straight,
+                        straight_import_width(alias, settings),
                         settings,
                     ),
                     comments.first_index.unwrap_or_default(),
@@ -214,6 +276,14 @@ pub(crate) fn order_imports<'a>(
                         import_from.level,
                         aliases.first().map(|(alias, _)| (alias.name, alias.asname)),
                         ImportStyle::From,
+                        from_import_width(
+                            import_from.module,
+                            import_from.level,
+                            aliases
+                                .iter()
+                                .map(|(alias, _)| (alias.name, alias.asname)),
+                            settings,
+                        ),
                         settings,
                     ),
                     *first_index,
@@ -260,5 +330,48 @@ pub(crate) fn order_imports<'a>(
                 ))
                 .collect()
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{Settings, from_import_width};
+
+    fn import_width(module: &str, level: u32, members: &[&str]) -> usize {
+        let settings = Settings {
+            length_sort: true,
+            reverse_sort: true,
+            ..Settings::default()
+        };
+
+        from_import_width(
+            Some(module),
+            level,
+            members.iter().map(|member| (*member, None)),
+            &settings,
+        )
+    }
+
+    #[test]
+    fn measures_complete_import_statements() {
+        assert!(
+            import_width("typing", 0, &["TYPE_CHECKING"])
+                > import_width("datetime", 0, &["datetime"])
+        );
+        assert!(
+            import_width(
+                "sqlalchemy.orm",
+                0,
+                &["mapped_column", "relationship", "Mapped"],
+            ) > import_width("sqlalchemy.dialects.postgresql", 0, &["JSONB"])
+        );
+        assert!(
+            import_width("sqlalchemy.dialects.postgresql", 0, &["JSONB"])
+                > import_width("sqlalchemy", 0, &["ForeignKey", "String"])
+        );
+        assert!(
+            import_width("mixins", 2, &["CreatedMixin"])
+                > import_width("base", 2, &["Base"])
+        );
     }
 }

@@ -2886,6 +2886,23 @@ pub struct IsortOptions {
     )]
     length_sort_straight: Option<bool>,
 
+    /// Reverse the order in which imports are sorted. When combined with
+    /// [`length-sort`](#lint_isort_length-sort), this places longer imports
+    /// before shorter imports based on each statement's complete single-line
+    /// form, including any imported members.
+    ///
+    /// See isort's [`reverse-sort`](https://pycqa.github.io/isort/docs/configuration/options.html#reverse-sort)
+    /// option.
+    #[option(
+        default = r#"false"#,
+        value_type = "bool",
+        example = r#"
+            length-sort = true
+            reverse-sort = true
+        "#
+    )]
+    reverse_sort: Option<bool>,
+
     // Tables are required to go last.
     /// A list of mappings from section names to modules.
     ///
@@ -3132,6 +3149,7 @@ impl IsortOptions {
             from_first,
             length_sort: self.length_sort.unwrap_or(false),
             length_sort_straight: self.length_sort_straight.unwrap_or(false),
+            reverse_sort: self.reverse_sort.unwrap_or(false),
         })
     }
 }

@@ -1989,6 +1989,13 @@
             "$ref": "#/definitions/NameImports"
           }
         },
+        "reverse-sort": {
+          "description": "Reverse the order in which imports are sorted. When combined with\n[`length-sort`](#lint_isort_length-sort), this places longer imports\nbefore shorter imports based on each statement's complete single-line\nform, including any imported members.\n\nSee isort's [`reverse-sort`](https://pycqa.github.io/isort/docs/configuration/options.html#reverse-sort)\noption.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
         "section-order": {
           "description": "Override in which order the sections should be output. Can be used to move custom sections.",
           "type": [
