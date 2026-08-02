@@ -68,11 +68,13 @@ impl<'db> Type<'db> {
             };
 
             let enter_return_type = return_type(&enter);
+            let exit_return_type = return_type(&exit);
             let awaited_enter_type =
                 enter_return_type.and_then(|return_type| return_type.try_await(db).ok());
+            let awaited_exit_type =
+                exit_return_type.and_then(|return_type| return_type.try_await(db).ok());
             let non_awaitable_enter = enter_return_type.filter(|_| awaited_enter_type.is_none());
-            let non_awaitable_exit =
-                return_type(&exit).filter(|return_type| return_type.try_await(db).is_err());
+            let non_awaitable_exit = exit_return_type.filter(|_| awaited_exit_type.is_none());
 
             if let Some(non_awaitable) =
                 NonAwaitableMethods::from_parts(non_awaitable_enter, non_awaitable_exit)
@@ -101,12 +103,12 @@ impl<'db> Type<'db> {
                 })
             }
             (Ok(enter), Err(exit_error)) => {
-                let ty = enter.return_type(db);
+                let return_type = enter.return_type(db);
                 Err(ContextManagerError::Exit {
                     enter_return_type: if mode.is_async() {
-                        ty.try_await(db).unwrap_or(Type::unknown())
+                        awaited_enter_type.unwrap_or(Type::unknown())
                     } else {
-                        ty
+                        return_type
                     },
                     exit_error,
                     mode,
