@@ -2457,6 +2457,35 @@ def _(p: Person) -> None:
     reveal_type(p.setdefault("extraz", "value"))  # revealed: Unknown
 ```
 
+Copying a union preserves all possible receivers, including when the `TypedDict` classes come from
+different fallback implementations:
+
+```py
+from typing_extensions import TypedDict as ExtensionTypedDict
+
+class CopyLeft(TypedDict):
+    left: int
+
+class CopyRight(TypedDict):
+    right: str
+
+class CopyExtension(ExtensionTypedDict):
+    extension: bytes
+
+def copy_same_fallback(value: CopyLeft | CopyRight) -> None:
+    method = value.copy
+    reveal_type(method.__self__)  # revealed: CopyLeft | CopyRight
+    reveal_type(method())  # revealed: CopyLeft | CopyRight
+
+def copy_mixed_fallback(value: CopyLeft | CopyExtension) -> None:
+    method = value.copy
+    reveal_type(method.__self__)  # revealed: CopyLeft | CopyExtension
+    reveal_type(method())  # revealed: CopyLeft | CopyExtension
+
+def copy_mixed_receiver(value: CopyLeft | dict[str, int]) -> None:
+    reveal_type(value.copy())  # revealed: CopyLeft | dict[str, int]
+```
+
 Known-key `get()` calls also use the field type as bidirectional context when that produces a valid
 default:
 

@@ -3874,9 +3874,41 @@ impl<'db> Type<'db> {
             }
 
             match this {
-                Type::Union(union) => union.map_with_boundness_and_qualifiers(db, |elem| {
-                    elem.member_lookup_with_policy_and_receiver(db, name_str, policy, receiver)
-                }),
+                Type::Union(union) => {
+                    let shared_copy_receiver = (name_str == "copy"
+                        && union.elements(db).iter().all(Type::is_typed_dict))
+                    .then(|| receiver.unwrap_or(this));
+                    let receiver = shared_copy_receiver.or(receiver);
+                    union.map_with_boundness_and_qualifiers(db, |elem| {
+                        let member = elem
+                            .member_lookup_with_policy_and_receiver(db, name_str, policy, receiver);
+                        if let Some(shared_receiver) = shared_copy_receiver {
+                            member.map_type(|ty| {
+                                let Type::BoundMethod(method) = ty else {
+                                    return ty;
+                                };
+                                // Each TypedDict fallback specializes Self to its own class. Give
+                                // the shared method the whole union as its bound before binding it.
+                                let mapping = TypeMapping::ReplaceSelf {
+                                    new_upper_bound: this,
+                                };
+                                let function = method.function(db).apply_type_mapping_impl(
+                                    db,
+                                    &mapping,
+                                    TypeContext::default(),
+                                    &ApplyTypeMappingVisitor::default(),
+                                );
+                                Type::BoundMethod(BoundMethodType::new(
+                                    db,
+                                    function,
+                                    shared_receiver,
+                                ))
+                            })
+                        } else {
+                            member
+                        }
+                    })
+                }
 
                 Type::Intersection(intersection) => {
                     if let Some(complement) = intersection.enum_complement(db) {
