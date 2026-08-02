@@ -3893,15 +3893,22 @@ impl<'db> Type<'db> {
                         return None;
                     }
 
-                    let mapping = TypeMapping::ReplaceSelf {
-                        new_upper_bound: receiver,
+                    let original_function = method.function(db);
+                    let unspecialized_function =
+                        FunctionType::new(db, original_function.literal(db), None);
+                    let function = if original_function == unspecialized_function {
+                        original_function
+                    } else {
+                        let mapping = TypeMapping::ReplaceSelf {
+                            new_upper_bound: receiver,
+                        };
+                        original_function.apply_type_mapping_impl(
+                            db,
+                            &mapping,
+                            TypeContext::default(),
+                            &ApplyTypeMappingVisitor::default(),
+                        )
                     };
-                    let function = method.function(db).apply_type_mapping_impl(
-                        db,
-                        &mapping,
-                        TypeContext::default(),
-                        &ApplyTypeMappingVisitor::default(),
-                    );
                     let method = BoundMethodType::new(db, function, receiver);
                     let [signature] = method.bound_signatures(db).overloads.as_slice() else {
                         return None;

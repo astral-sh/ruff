@@ -506,12 +506,14 @@ class Original:
 
 class First(Original): ...
 class Second(Original): ...
+class Third(Original): ...
 
 def inherited(value: First | Second) -> None:
     method = value.clone
     reveal_type(method)  # revealed: bound method (First | Second).clone() -> First | Second
     reveal_type(method.__self__)  # revealed: First | Second
     reveal_type(method())  # revealed: First | Second
+    reveal_type(method.__func__(Third()))  # revealed: Third
 
     # An invariant container must retain the separate receiver specializations.
     reveal_type(value.children())  # revealed: list[First] | list[Second]
