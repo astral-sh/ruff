@@ -224,11 +224,9 @@ mod tests {
         let snapshot = path.to_string_lossy().to_string();
         let diagnostics = test_path(
             Path::new("pyupgrade").join(path).as_path(),
-            &settings::LinterSettings {
-                preview: PreviewMode::Enabled,
-                unresolved_target_version: PythonVersion::PY312.into(),
-                ..settings::LinterSettings::for_rule(rule_code)
-            },
+            &settings::LinterSettings::for_rule(rule_code)
+                .with_preview_mode()
+                .with_target_version(PythonVersion::PY312),
         )?;
         assert_diagnostics!(snapshot, diagnostics);
         Ok(())

@@ -819,11 +819,9 @@ mod tests {
         );
         let diagnostics = test_path(
             Path::new("ruff").join(path).as_path(),
-            &settings::LinterSettings {
-                preview: PreviewMode::Enabled,
-                unresolved_target_version: PythonVersion::PY37.into(),
-                ..settings::LinterSettings::for_rule(rule_code)
-            },
+            &settings::LinterSettings::for_rule(rule_code)
+                .with_preview_mode()
+                .with_target_version(PythonVersion::PY37),
         )?;
         assert_diagnostics!(snapshot, diagnostics);
         Ok(())
@@ -838,11 +836,9 @@ mod tests {
         );
         let diagnostics = test_path(
             Path::new("ruff").join(path).as_path(),
-            &settings::LinterSettings {
-                preview: PreviewMode::Enabled,
-                unresolved_target_version: PythonVersion::PY38.into(),
-                ..settings::LinterSettings::for_rule(rule_code)
-            },
+            &settings::LinterSettings::for_rule(rule_code)
+                .with_preview_mode()
+                .with_target_version(PythonVersion::PY38),
         )?;
         assert_diagnostics!(snapshot, diagnostics);
         Ok(())
