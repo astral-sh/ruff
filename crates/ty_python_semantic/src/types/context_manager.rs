@@ -478,9 +478,7 @@ impl<'db> ContextManagerError<'db> {
             }
         }
 
-        // The remaining hint suggests switching between `with` and `async with`. That is not the
-        // problem here: the object already implements the methods for the mode it was used in,
-        // they just return values that cannot be awaited.
+        // Do not suggest switching between `with` and `async with` for a non-awaitable return.
         if matches!(self, Self::NotAwaitable { .. }) {
             return;
         }
