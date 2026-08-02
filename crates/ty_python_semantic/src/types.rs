@@ -3871,6 +3871,29 @@ impl<'db> Type<'db> {
                 policy: MemberLookupPolicy,
             ) -> Option<Vec<PlaceAndQualifiers<'db>>> {
                 let receiver = Type::Union(union);
+                let mut shared_function_literal = None;
+
+                for element in union.elements(db) {
+                    let member =
+                        element.member_lookup_with_policy_and_receiver(db, name, policy, None);
+                    let Place::Defined(DefinedPlace {
+                        ty: Type::BoundMethod(method),
+                        definedness: Definedness::AlwaysDefined,
+                        ..
+                    }) = member.place
+                    else {
+                        return None;
+                    };
+
+                    let function_literal = method.function(db).literal(db);
+                    if shared_function_literal.is_some_and(|shared_function_literal| {
+                        shared_function_literal != function_literal
+                    }) {
+                        return None;
+                    }
+                    shared_function_literal = Some(function_literal);
+                }
+
                 let mut methods = Vec::with_capacity(union.elements(db).len());
                 let mut shared_function: Option<FunctionType<'db>> = None;
 
