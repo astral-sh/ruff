@@ -460,7 +460,15 @@ pub fn traverse_union<'a, F>(func: &mut F, semantic: &SemanticModel, expr: &'a E
 where
     F: FnMut(&'a Expr, &'a Expr),
 {
-    traverse_union_options(func, semantic, expr, UnionTraversalOptions::default());
+    traverse_union_options(
+        func,
+        semantic,
+        expr,
+        UnionTraversalOptions {
+            traverse_optional: false,
+            resolve_quoted_annotation: None,
+        },
+    );
 }
 
 /// Traverse a "union" type annotation, applying `func` to each union member.
@@ -479,35 +487,80 @@ where
         expr,
         UnionTraversalOptions {
             traverse_optional: true,
+            resolve_quoted_annotation: None,
         },
     );
 }
 
-#[derive(Debug, Clone, Copy, Default)]
-/// Options for traversing union types.
+/// Traverse a "union" type annotation, applying `func` to each union member.
 ///
-/// See also [`traverse_union_options`].
-struct UnionTraversalOptions {
-    traverse_optional: bool,
-}
-
-fn traverse_union_options<'a, F>(
+/// Supports traversal of `Union`, `|`, and `Optional` union expressions, resolving quoted
+/// (forward-reference) union members along the way via `resolve_quoted_annotation`.
+///
+/// The function is called with each expression in the union (excluding declarations of nested
+/// unions) and the parent expression.
+pub fn traverse_union_and_optional_with_quoted_annotations<'a, 'r, F>(
     func: &mut F,
     semantic: &SemanticModel,
     expr: &'a Expr,
-    options: UnionTraversalOptions,
+    resolve_quoted_annotation: QuotedAnnotationResolver<'r, 'a>,
 ) where
     F: FnMut(&'a Expr, &'a Expr),
 {
-    fn inner<'a, F>(
+    traverse_union_options(
+        func,
+        semantic,
+        expr,
+        UnionTraversalOptions {
+            traverse_optional: true,
+            resolve_quoted_annotation: Some(resolve_quoted_annotation),
+        },
+    );
+}
+
+/// A callback that resolves a quoted (forward-reference) annotation to its parsed expression.
+type QuotedAnnotationResolver<'r, 'a> = &'r dyn Fn(&ast::ExprStringLiteral) -> Option<&'a Expr>;
+
+#[derive(Clone, Copy, Default)]
+/// Options for traversing union types.
+///
+/// See also [`traverse_union_options`].
+struct UnionTraversalOptions<'a, 'r> {
+    traverse_optional: bool,
+    /// If set, quoted (forward-reference) union members are resolved to their parsed
+    /// expression and traversed as if they weren't quoted.
+    resolve_quoted_annotation: Option<QuotedAnnotationResolver<'r, 'a>>,
+}
+
+fn traverse_union_options<'a, 'r, F>(
+    func: &mut F,
+    semantic: &SemanticModel,
+    expr: &'a Expr,
+    options: UnionTraversalOptions<'a, 'r>,
+) where
+    F: FnMut(&'a Expr, &'a Expr),
+{
+    fn inner<'a, 'r, F>(
         func: &mut F,
         semantic: &SemanticModel,
         expr: &'a Expr,
         parent: Option<&'a Expr>,
-        options: UnionTraversalOptions,
+        options: UnionTraversalOptions<'a, 'r>,
     ) where
         F: FnMut(&'a Expr, &'a Expr),
     {
+        let resolve_quoted_annotation = options.resolve_quoted_annotation;
+
+        // Ex) `"Foo"` as a union member - resolve quoted (forward-reference) annotations and
+        // traverse the resolved expression in their place.
+        if let Some(resolve) = resolve_quoted_annotation
+            && let Expr::StringLiteral(string_expr) = expr
+            && let Some(resolved) = resolve(string_expr)
+        {
+            inner(func, semantic, resolved, parent, options);
+            return;
+        }
+
         // Ex) `x | y`
         if let Expr::BinOp(ast::ExprBinOp {
             op: Operator::BitOr,

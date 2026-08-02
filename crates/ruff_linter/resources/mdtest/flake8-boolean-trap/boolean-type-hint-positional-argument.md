@@ -55,3 +55,27 @@ from typing import Literal
 def func_literal_nested(flag: Literal[True, Literal[False]]):  # error: [boolean-type-hint-positional-argument]
     pass
 ```
+
+Support quoted type expressions.
+
+```py
+from typing import Literal
+
+# Quoted base expression.
+def func_literal_quoted(flag: "Literal[True, False]"):  # error: [boolean-type-hint-positional-argument]
+    pass
+
+# Quoted union.
+def func_literal_quoted_union_leaf(flag: "int | Literal[True, False]"):  # error: [boolean-type-hint-positional-argument]
+    pass
+
+
+# Quoted union leaf.
+def func_literal_quoted_union_leaf(flag: int | "Literal[True, False]"):  # error: [boolean-type-hint-positional-argument]
+    pass
+
+# Quoted union inside union.
+def func_literal_quoted_nested_union(flag: str | "int | Literal[True, False]"):  # error: [boolean-type-hint-positional-argument]
+    pass
+
+```

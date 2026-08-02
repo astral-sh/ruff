@@ -3,8 +3,10 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::name::UnqualifiedName;
 use ruff_python_ast::{self as ast, Decorator, Expr, Parameters};
-use ruff_python_semantic::SemanticModel;
-use ruff_python_semantic::analyze::typing::{traverse_literal, traverse_union_and_optional};
+use ruff_python_parser::typing::ParsedAnnotation;
+use ruff_python_semantic::analyze::typing::{
+    traverse_literal, traverse_union_and_optional_with_quoted_annotations,
+};
 use ruff_python_semantic::analyze::visibility;
 
 use crate::Violation;
@@ -13,7 +15,6 @@ use crate::preview::is_boolean_type_hint_pos_arg_literal_enabled;
 use crate::rules::flake8_boolean_trap::helpers::{
     add_liskov_substitution_principle_help, is_allowed_func_def,
 };
-use crate::settings::LinterSettings;
 
 /// ## What it does
 /// Checks for the use of boolean positional arguments in function definitions,
@@ -138,7 +139,7 @@ pub(crate) fn boolean_type_hint_positional_argument(
         let Some(annotation) = parameter.annotation() else {
             continue;
         };
-        if !match_annotation_to_complex_bool(annotation, checker.semantic(), checker.settings()) {
+        if !match_annotation_to_complex_bool(annotation, checker) {
             continue;
         }
 
@@ -186,40 +187,61 @@ impl SeenBoolLiterals {
 ///
 /// In preview, `bool` may also be composed from `Literal` members containing `True`/`False`,
 /// E.g. `Literal[True] | Literal[False]`, `Literal[True, False]`.
-fn match_annotation_to_complex_bool(
-    annotation: &Expr,
-    semantic: &SemanticModel,
-    settings: &LinterSettings,
-) -> bool {
+fn match_annotation_to_complex_bool<'a, 'b>(annotation: &'b Expr, checker: &Checker<'a>) -> bool
+where
+    'a: 'b,
+{
+    let semantic = checker.semantic();
+
     let mut seen = SeenBoolLiterals::empty();
 
-    if match_simple_bool(annotation, semantic, settings, &mut seen) {
+    if match_simple_bool(annotation, checker, &mut seen) {
         return true;
     }
 
     let mut matched = false;
+    // Resolve quoted (forward-reference) union members, e.g. `"Literal[True, False]"`.
+    let resolve_quoted_annotation = |string_expr: &ast::ExprStringLiteral| {
+        checker
+            .parse_type_annotation(string_expr)
+            .ok()
+            .map(ParsedAnnotation::expression)
+    };
     // Ex) `typing.Union[bool, int]` or `Literal[True] | Literal[False] | int`
-    traverse_union_and_optional(
+    traverse_union_and_optional_with_quoted_annotations(
         &mut |inner_expr, _parent| {
-            matched = matched || match_simple_bool(inner_expr, semantic, settings, &mut seen);
+            matched = matched || match_simple_bool(inner_expr, checker, &mut seen);
         },
         semantic,
         annotation,
+        &resolve_quoted_annotation,
     );
     matched
 }
 
-fn match_simple_bool(
-    annotation: &Expr,
-    semantic: &SemanticModel,
-    settings: &LinterSettings,
+fn match_simple_bool<'a, 'b>(
+    annotation: &'b Expr,
+    checker: &Checker<'a>,
     seen: &mut SeenBoolLiterals,
-) -> bool {
+) -> bool
+where
+    'a: 'b,
+{
+    let semantic = checker.semantic();
+    let settings = checker.settings();
     match annotation {
         // Ex) `bool`
         Expr::Name(name) => &name.id == "bool",
-        // Ex) `"bool"`
-        Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => value == "bool",
+        // Ex) `"bool"`, or a quoted (forward-reference) annotation, e.g. `"Literal[True, False]"`.
+        // `parse_type_annotation` here is only needed to cover simple case
+        // when there's no union used at all.
+        Expr::StringLiteral(string_expr) => {
+            &string_expr.value == "bool"
+                || checker
+                    .parse_type_annotation(string_expr)
+                    .ok()
+                    .is_some_and(|parsed| match_simple_bool(parsed.expression(), checker, seen))
+        }
         // Ex) `typing.Literal[True, False]`
         Expr::Subscript(ast::ExprSubscript { value, .. })
             if is_boolean_type_hint_pos_arg_literal_enabled(settings)
