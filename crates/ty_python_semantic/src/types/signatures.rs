@@ -2314,21 +2314,71 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         {
             let source_positional = source.parameters.positional().count();
             let target_positional = target.parameters.positional().count();
+            let target_variadic = target.parameters.variadic();
+
+            // A subdiagnostic telling the user that `source` is missing a `*args` parameter
+            // is only guaranteed to be correct when `target` has a plain, open-ended variadic tail.
+            // (Well: we might be able to do better here in the future, but we simplify the logic here
+            // for now.)
+            //
+            // An unpacked annotation may represent a fixed-length tuple, and a variadic parameter
+            // followed by positional parameters may represent an unpacked tuple with a required suffix
+            // instead of an open-ended tail.
+            let target_has_open_ended_variadic = || {
+                target_variadic.is_some_and(|(index, parameter)| {
+                    !parameter.has_starred_annotation()
+                        && !target
+                            .parameters
+                            .iter()
+                            .skip(index)
+                            .any(Parameter::is_positional)
+                })
+            };
+
             let target_accepts_extra_positionals =
-                target_positional > source_positional || target.parameters.variadic().is_some();
+                target_positional > source_positional || target_variadic.is_some();
 
             if target_accepts_extra_positionals {
                 if let Some(context) = self.report_context()
-                    && target_positional > source_positional
-                    && let Some(ParameterKind::KeywordOnly { name, .. }) = source
-                        .parameters
-                        .iter()
-                        .nth(source_positional)
-                        .map(Parameter::kind)
+                    && (target_positional > source_positional || target_has_open_ended_variadic())
                 {
-                    context.push(ErrorContext::ParameterMustAcceptPositionalArguments {
-                        name: name.clone(),
-                    });
+                    let error_context = if target_positional > source_positional {
+                        let source_parameter_kind = source
+                            .parameters
+                            .get(source_positional)
+                            .map(Parameter::kind);
+
+                        match source_parameter_kind {
+                            Some(ParameterKind::KeywordOnly { name, .. }) => {
+                                ErrorContext::ParameterMustAcceptPositionalArguments {
+                                    name: name.clone(),
+                                }
+                            }
+                            Some(ParameterKind::KeywordVariadic { .. }) | None => {
+                                let parameter = target
+                                    .parameters
+                                    .get_positional(source_positional)
+                                    .and_then(Parameter::name);
+                                ErrorContext::MissingParameter {
+                                    parameter: ParameterDescription::new(
+                                        source_positional,
+                                        parameter,
+                                    ),
+                                }
+                            }
+                            Some(
+                                ParameterKind::PositionalOnly { .. }
+                                | ParameterKind::PositionalOrKeyword { .. }
+                                | ParameterKind::Variadic { .. },
+                            ) => unreachable!(
+                                "the first parameter after the positional prefix \
+                                cannot be positional or variadic"
+                            ),
+                        }
+                    } else {
+                        ErrorContext::MissingVariadicPositionalParameter
+                    };
+                    context.push(error_context);
                 }
 
                 return self.never();
@@ -2396,6 +2446,11 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             !result
                 .intersect(db, self.constraints, constraint_set)
                 .is_never_satisfied(db)
+        };
+        let parameter_must_have_default = |parameter: &Parameter<'db>, index: usize| {
+            ErrorContext::RequiredParameterMustHaveDefault {
+                parameter: ParameterDescription::new(index, parameter.name()),
+            }
         };
 
         if self.typevar_evaluation == TypeVarEvaluation::Lazy {
@@ -3000,6 +3055,11 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         if target.parameters.is_top() {
             return self.always();
         } else if source.parameters.is_top() && !target.parameters.is_gradual() {
+            if let Some(context) = self.report_context() {
+                context.push(ErrorContext::TopCallableAssignedToNonTop {
+                    return_type: source.return_ty,
+                });
+            }
             return self.never();
         }
 
@@ -3344,9 +3404,11 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
 
                 EitherOrBoth::Right(target_parameter) => {
                     if let Some(source_parameter_count) = as_target_typevartuple(target_parameter) {
-                        if source_parameter_count > 0 {
-                            return self.never();
-                        }
+                        assert_eq!(
+                            source_parameter_count, 0,
+                            "an exhausted source signature cannot provide parameters \
+                            to a TypeVarTuple"
+                        );
                         if !check_types(
                             &mut result,
                             target_parameter.annotated_type(),
@@ -3362,6 +3424,34 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
 
                     // If there are more parameters in `target` than in `source`, then `source` is
                     // not a subtype of `target`.
+                    if let Some(context) = self.report_context()
+                        && target.parameters.as_paramspec_with_prefix().is_none()
+                    {
+                        let error_context = match target_parameter.kind() {
+                            ParameterKind::PositionalOnly { .. }
+                            | ParameterKind::PositionalOrKeyword { .. } => unreachable!(
+                                "unmatched target positional parameters \
+                                are rejected by the positional fast path"
+                            ),
+                            ParameterKind::Variadic { .. } => {
+                                unreachable!(
+                                    "an unmatched target `*args` is impossible: \
+                                    a source without `*args` is rejected by the positional fast path, \
+                                    while a source with `*args` consumes the target during matching"
+                                )
+                            }
+                            ParameterKind::KeywordOnly { .. } => ErrorContext::MissingParameter {
+                                parameter: ParameterDescription::new(
+                                    target_index,
+                                    target_parameter.name(),
+                                ),
+                            },
+                            ParameterKind::KeywordVariadic { .. } => {
+                                ErrorContext::MissingVariadicKeywordParameter
+                            }
+                        };
+                        context.push(error_context);
+                    }
                     return self.never();
                 }
 
@@ -3382,6 +3472,12 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             },
                         ) => {
                             if source_default.is_none() && target_default.is_some() {
+                                if let Some(context) = self.report_context() {
+                                    context.push(parameter_must_have_default(
+                                        source_param,
+                                        target_index,
+                                    ));
+                                }
                                 return self.never();
                             }
                             if !check_types(
@@ -3416,6 +3512,12 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             }
                             // The following checks are the same as positional-only parameters.
                             if source_default.is_none() && target_default.is_some() {
+                                if let Some(context) = self.report_context() {
+                                    context.push(parameter_must_have_default(
+                                        source_param,
+                                        target_index,
+                                    ));
+                                }
                                 return self.never();
                             }
                             if !check_types(
@@ -3560,6 +3662,16 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             }
 
                             if !source_param.is_variadic() {
+                                if let Some(context) = self.report_context()
+                                    && target.parameters.as_paramspec_with_prefix().is_none()
+                                {
+                                    let parameter = ParameterDescription::new(
+                                        target_index,
+                                        source_param.name(),
+                                    );
+                                    context
+                                        .push(ErrorContext::ExtraRequiredParameter { parameter });
+                                }
                                 return self.never();
                             }
                             if !check_types(
@@ -3649,6 +3761,23 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     // only contains keyword-only and keyword-variadic parameters. However, if the
                     // parameter has a default, it's valid because callers don't need to provide it.
                     if default_type.is_none() {
+                        if let Some(context) = self.report_context() {
+                            if let Some(source_name) = source_param.name()
+                                && target
+                                    .parameters
+                                    .iter()
+                                    .any(|target_param| target_param.name() == Some(source_name))
+                            {
+                                context.push(ErrorContext::ParameterMustAcceptKeywordArguments {
+                                    source_name: Some(source_name.clone()),
+                                    target_name: source_name.clone(),
+                                });
+                            } else {
+                                let parameter =
+                                    ParameterDescription::new(target_index, source_param.name());
+                                context.push(ErrorContext::ExtraRequiredParameter { parameter });
+                            }
+                        }
                         return self.never();
                     }
                 }
@@ -3677,6 +3806,12 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                                 ..
                             } => {
                                 if source_default.is_none() && target_default.is_some() {
+                                    if let Some(context) = self.report_context() {
+                                        context.push(parameter_must_have_default(
+                                            source_param,
+                                            target_index,
+                                        ));
+                                    }
                                     return self.never();
                                 }
                                 if !check_types(
@@ -3704,6 +3839,11 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             return result;
                         }
                     } else {
+                        if let Some(context) = self.report_context() {
+                            let parameter =
+                                ParameterDescription::new(target_index, target_param.name());
+                            context.push(ErrorContext::MissingParameter { parameter });
+                        }
                         return self.never();
                     }
                 }
@@ -3711,6 +3851,11 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     let Some(source_keyword_variadic) = source_keyword_variadic else {
                         // For a `source <: target` relationship, if `target` has a keyword variadic
                         // parameter, `source` must also have a keyword variadic parameter.
+                        if let Some(context) = self.report_context()
+                            && target.parameters.as_paramspec_with_prefix().is_none()
+                        {
+                            context.push(ErrorContext::MissingVariadicKeywordParameter);
+                        }
                         return self.never();
                     };
                     if !check_types(
@@ -3738,6 +3883,10 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         )]
         for (_, source_param) in source_keywords {
             if source_param.default_type().is_none() {
+                if let Some(context) = self.report_context() {
+                    let parameter = ParameterDescription::new(target_index, source_param.name());
+                    context.push(ErrorContext::ExtraRequiredParameter { parameter });
+                }
                 return self.never();
             }
         }

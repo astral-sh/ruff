@@ -107,6 +107,17 @@ pub(crate) enum ErrorContext<'db> {
     ExtraRequiredParameter {
         parameter: ParameterDescription,
     },
+    MissingParameter {
+        parameter: ParameterDescription,
+    },
+    RequiredParameterMustHaveDefault {
+        parameter: ParameterDescription,
+    },
+    MissingVariadicPositionalParameter,
+    MissingVariadicKeywordParameter,
+    TopCallableAssignedToNonTop {
+        return_type: Type<'db>,
+    },
     ParameterNameMismatch {
         source_name: Name,
         target_name: Name,
@@ -287,9 +298,36 @@ impl<'db> ErrorContext<'db> {
                 callable.display(db),
             ),
             Self::ExtraRequiredParameter { parameter } => match parameter {
-                ParameterDescription::Named(name) => format!("unexpected extra parameter `{name}`"),
-                ParameterDescription::Index(_) => "unexpected extra parameter".to_string(),
+                ParameterDescription::Named(name) => {
+                    help_messages.insert(HelpMessages::ConsiderAddingADefaultValue {
+                        parameter_name: Some(name.clone()),
+                    });
+                    format!("unexpected extra parameter `{name}`")
+                }
+                ParameterDescription::Index(_) => {
+                    help_messages.insert(HelpMessages::ConsiderAddingADefaultValue {
+                        parameter_name: None,
+                    });
+                    "unexpected extra parameter".to_string()
+                }
             },
+            Self::MissingParameter { parameter } => format!("{parameter} is missing"),
+            Self::RequiredParameterMustHaveDefault { parameter } => {
+                format!("{parameter} must have a default value")
+            }
+            Self::MissingVariadicPositionalParameter => {
+                "the signature must accept arbitrary positional arguments".to_string()
+            }
+            Self::MissingVariadicKeywordParameter => {
+                "the signature must accept arbitrary keyword arguments".to_string()
+            }
+            Self::TopCallableAssignedToNonTop { return_type } => {
+                help_messages.insert(HelpMessages::TopCallableExplanation);
+                format!(
+                    "Object of type `Top[(...) -> {}]` is not safe to call; its signature is not known",
+                    return_type.display(db)
+                )
+            }
             Self::ParameterNameMismatch {
                 source_name,
                 target_name,
@@ -382,6 +420,8 @@ enum HelpMessages {
     RequiredFieldCouldBeRemoved,
     TypedDictNotAssignableToDict,
     ConsiderUsingMappingInsteadOfDict,
+    TopCallableExplanation,
+    ConsiderAddingADefaultValue { parameter_name: Option<Name> },
 }
 
 impl std::fmt::Display for HelpMessages {
@@ -396,6 +436,14 @@ impl std::fmt::Display for HelpMessages {
             HelpMessages::ConsiderUsingMappingInsteadOfDict => {
                 f.write_str("Consider using `Mapping[..]` instead of `dict[..]`.")
             }
+            HelpMessages::TopCallableExplanation => f.write_str(
+                "This type includes all possible parameter sets, \
+                so it cannot safely be called because there is no valid set of arguments for it",
+            ),
+            HelpMessages::ConsiderAddingADefaultValue { parameter_name } => match parameter_name {
+                Some(name) => write!(f, "Parameter `{name}` must have a default value"),
+                None => f.write_str("The parameter must have a default value"),
+            },
         }
     }
 }

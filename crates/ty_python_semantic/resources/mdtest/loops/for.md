@@ -892,6 +892,7 @@ info: Its `__iter__` method has an invalid signature
 info: type `Iterable` is not assignable to protocol `Iterable[Unknown]`
 info: └── protocol member `__iter__` is incompatible
 info:     └── unexpected extra parameter `extra_arg`
+help: Parameter `extra_arg` must have a default value
 info: Expected signature `def __iter__(self): ...`
 ```
 
@@ -970,6 +971,7 @@ info:     └── incompatible return types: `Iterator1` is not assignable to 
 info:         └── type `Iterator1` is not assignable to protocol `Iterator[Unknown]`
 info:             └── protocol member `__next__` is incompatible
 info:                 └── unexpected extra parameter `extra_arg`
+help: Parameter `extra_arg` must have a default value
 info: Expected signature for `__next__` is `def __next__(self): ...`
 ```
 
@@ -1233,6 +1235,7 @@ info: Its `__iter__` method may have an invalid signature
 info: type `Iterable1` is not assignable to protocol `Iterable[Unknown]`
 info: └── protocol member `__iter__` is incompatible
 info:     └── unexpected extra parameter `invalid_extra_arg`
+help: Parameter `invalid_extra_arg` must have a default value
 info: Type of `__iter__` is `(bound method Iterable1.__iter__() -> Iterator) | (bound method Iterable1.__iter__(invalid_extra_arg) -> Iterator)`
 info: Expected signature for `__iter__` is `def __iter__(self): ...`
 ```
@@ -1308,6 +1311,7 @@ info:     └── incompatible return types: `Iterator1` is not assignable to 
 info:         └── type `Iterator1` is not assignable to protocol `Iterator[Unknown]`
 info:             └── protocol member `__next__` is incompatible
 info:                 └── unexpected extra parameter `invalid_extra_arg`
+help: Parameter `invalid_extra_arg` must have a default value
 info: Expected signature for `__next__` is `def __next__(self): ...`
 ```
 
