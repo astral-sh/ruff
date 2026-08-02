@@ -137,3 +137,5 @@ foo: int
 baz: str
 chr: int
 ```
+
+## `TypeVar`/`ParamSpec`/`TypeVarTuple`
