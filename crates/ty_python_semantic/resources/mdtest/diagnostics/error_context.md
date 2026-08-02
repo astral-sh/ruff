@@ -286,6 +286,7 @@ error[invalid-assignment]: Object of type `(int, str, /) -> bool` is not assigna
    |             |
    |             Declared type
 info: unexpected extra parameter
+help: The parameter must have a default value
 ```
 
 Assigning a function with an extra required parameter to a `Callable`:
@@ -306,6 +307,7 @@ error[invalid-assignment]: Object of type `def source(x: int, extra: str) -> boo
    |         |
    |         Declared type
 info: unexpected extra parameter `extra`
+help: Parameter `extra` must have a default value
 ```
 
 Assigning a class to a `Callable`
@@ -350,6 +352,7 @@ error[invalid-argument-type]: Argument to function `accepts_callable` is incorre
    |                  ^^^ Expected `(Any, /) -> Any`, found `<class 'Foo'>`
 info: type `<class 'Foo'>` has inferred callable type `(x: Any, y: Any) -> Foo`
 info: └── unexpected extra parameter `y`
+help: Parameter `y` must have a default value
 info: Function defined here
   --> src/mdtest_snippet.py:23:5
    |
@@ -421,6 +424,134 @@ error[invalid-assignment]: Object of type `partial[(y: str) -> bool]` is not ass
    |                 |
    |                 Declared type
 info: the first parameter has an incompatible type: `bytes` is not assignable to `str`
+```
+
+## Missing unnamed callable parameters
+
+Parameters in a `Callable` type do not have names, so a missing parameter is identified by its
+position.
+
+```py
+from typing import Callable
+
+def assign(source: Callable[[], None]) -> None:
+    target: Callable[[int], None] = source  # snapshot: invalid-assignment
+```
+
+```snapshot
+error[invalid-assignment]: Object of type `() -> None` is not assignable to `(int, /) -> None`
+ --> src/mdtest_snippet.py:4:37
+  |
+4 |     target: Callable[[int], None] = source  # snapshot: invalid-assignment
+  |             ---------------------   ^^^^^^ Incompatible value of type `() -> None`
+  |             |
+  |             Declared type
+info: the first parameter is missing
+```
+
+## Missing parameters in nested generic calls involving `TypeVarTuple`s and `ParamSpec`s
+
+In the following example, the signature of the `callback` function does not satisfy the `fn`
+parameter of `wrapper` in the `accept()` call, because the arguments provided to `accept()`
+following `fn` indicate that it must accept the value `1` as a positional argument, and it does not.
+
+We don't currently add error context in this code path, but we could add it in the future:
+
+```py
+from collections.abc import Callable
+
+def wrapper1[**P](fn: Callable[P, None]) -> Callable[P, None]:
+    return fn
+
+def accept1[**P](fn: Callable[P, None], *args: P.args, **kwargs: P.kwargs) -> None: ...
+def callback1() -> None: ...
+
+accept1(wrapper1(callback1), 1)  # snapshot: invalid-argument-type
+```
+
+```snapshot
+error[invalid-argument-type]: Argument to function `wrapper1` is incorrect
+ --> src/mdtest_snippet.py:9:18
+  |
+9 | accept1(wrapper1(callback1), 1)  # snapshot: invalid-argument-type
+  |                  ^^^^^^^^^ Expected `(**P@accept1) -> None`, found `def callback1() -> None`
+info: Function defined here
+ --> src/mdtest_snippet.py:3:5
+  |
+3 | def wrapper1[**P](fn: Callable[P, None]) -> Callable[P, None]:
+  |     ^^^^^^^^      --------------------- Parameter declared here
+```
+
+The following case is similar, but exercises a different code path. Here, we could also add error
+context to improve the diagnostic in the future:
+
+```py
+def wrapper2[**P](fn: Callable[P, None]) -> Callable[P, None]:
+    return fn
+
+def accept2[**P](fn: Callable[P, None], *args: P.args, **kwargs: P.kwargs) -> None: ...
+def callback2(**kwargs: int) -> None: ...
+
+accept2(wrapper2(callback2), 1)  # snapshot: invalid-argument-type
+```
+
+```snapshot
+error[invalid-argument-type]: Argument to function `wrapper2` is incorrect
+  --> src/mdtest_snippet.py:16:18
+   |
+16 | accept2(wrapper2(callback2), 1)  # snapshot: invalid-argument-type
+   |                  ^^^^^^^^^ Expected `(**P@accept2) -> None`, found `def callback2(**kwargs: int) -> None`
+info: Function defined here
+  --> src/mdtest_snippet.py:10:5
+   |
+10 | def wrapper2[**P](fn: Callable[P, None]) -> Callable[P, None]:
+   |     ^^^^^^^^      --------------------- Parameter declared here
+```
+
+And the same applies to the following two examples too, which both use a `TypeVarTuple` instead of a
+`ParamSpec`:
+
+```py
+def wrapper3[*Ts](fn: Callable[[*Ts], None]) -> Callable[[*Ts], None]:
+    return fn
+
+def accept3[*Ts](fn: Callable[[*Ts], None], *args: *Ts) -> None: ...
+def callback3(value: int) -> None: ...
+
+accept3(wrapper3(callback3))  # snapshot: invalid-argument-type
+```
+
+```snapshot
+error[invalid-argument-type]: Argument to function `wrapper3` is incorrect
+  --> src/mdtest_snippet.py:23:18
+   |
+23 | accept3(wrapper3(callback3))  # snapshot: invalid-argument-type
+   |                  ^^^^^^^^^ Expected `(*int) -> None`, found `def callback3(value: int) -> None`
+info: Function defined here
+  --> src/mdtest_snippet.py:17:5
+   |
+17 | def wrapper3[*Ts](fn: Callable[[*Ts], None]) -> Callable[[*Ts], None]:
+   |     ^^^^^^^^      ------------------------- Parameter declared here
+```
+
+```py
+def accepts4[*Ts](fn: Callable[[*Ts, int], None]) -> None: ...
+def callback4() -> None: ...
+
+accepts4(callback4)  # snapshot: invalid-argument-type
+```
+
+```snapshot
+error[invalid-argument-type]: Argument to function `accepts4` is incorrect
+  --> src/mdtest_snippet.py:27:10
+   |
+27 | accepts4(callback4)  # snapshot: invalid-argument-type
+   |          ^^^^^^^^^ Expected `(*args: Unknown, int, /) -> None`, found `def callback4() -> None`
+info: Function defined here
+  --> src/mdtest_snippet.py:24:5
+   |
+24 | def accepts4[*Ts](fn: Callable[[*Ts, int], None]) -> None: ...
+   |     ^^^^^^^^      ------------------------------ Parameter declared here
 ```
 
 ## Function assignability and overrides
@@ -529,6 +660,31 @@ error[invalid-method-override]: Invalid override of method `method`
    |         ---------------------------- `Parent.method` defined here
 info: the parameter named `y` does not match `x` (and can be used as a keyword parameter)
 info: This violates the Liskov Substitution Principle
+```
+
+## Uncallable top signatures
+
+A top callable represents every possible callable signature, so no specific call is guaranteed to be
+accepted. It therefore cannot be assigned to a callable that promises to accept an integer.
+
+```py
+from typing import Callable
+from ty_extensions import Top
+
+def assign(source: Top[Callable[..., int]]) -> None:
+    target: Callable[[int], int] = source  # snapshot: invalid-assignment
+```
+
+```snapshot
+error[invalid-assignment]: Object of type `Top[(...) -> int]` is not assignable to `(int, /) -> int`
+ --> src/mdtest_snippet.py:5:36
+  |
+5 |     target: Callable[[int], int] = source  # snapshot: invalid-assignment
+  |             --------------------   ^^^^^^ Incompatible value of type `Top[(...) -> int]`
+  |             |
+  |             Declared type
+info: Object of type `Top[(...) -> int]` is not safe to call; its signature is not known
+help: This type includes all possible parameter sets, so it cannot safely be called because there is no valid set of arguments for it
 ```
 
 ## `TypedDict`
@@ -1652,5 +1808,6 @@ info:     └── incompatible return types: `WrongIterator` is not assignable
 info:         └── type `WrongIterator` is not assignable to protocol `Iterator[Unknown]`
 info:             └── protocol member `__next__` is incompatible
 info:                 └── unexpected extra parameter `wrong`
+help: Parameter `wrong` must have a default value
 info: Expected signature for `__next__` is `def __next__(self): ...`
 ```
