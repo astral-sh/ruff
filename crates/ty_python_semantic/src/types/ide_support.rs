@@ -13,7 +13,9 @@ use crate::types::{
     KnownInstanceType, KnownUnion, PropertyAccessorRole, SubclassOfInner, Type, TypeContext,
     TypeVarBoundOrConstraints, binding_type,
 };
-use crate::{Db, DisplaySettings, HasDefinition, HasType, ProgramEnvironment, SemanticModel};
+use crate::{
+    Db, DisplaySettings, HasDefinition, HasType, NameKind, ProgramEnvironment, SemanticModel,
+};
 use itertools::Either;
 use ruff_db::PythonFile;
 use ruff_db::files::FileRange;
@@ -59,7 +61,17 @@ pub(crate) fn is_stub_only_builtin_symbol<'db>(db: &'db dyn Db, name: Name) -> b
         return false;
     };
 
-    is_stub_only_builtin_symbol_in_file(db, file, name)
+    is_private_stub_symbol(db, file, &name)
+}
+
+/// Returns whether a privately named stub symbol exists only to support type checking.
+///
+/// Implicit builtin lookup and module completion must apply the same definition-aware visibility
+/// policy, including re-export resolution, reachable bindings, and actual runtime values.
+pub(crate) fn is_private_stub_symbol<'db>(db: &'db dyn Db, file: File, name: &Name) -> bool {
+    file.is_stub(db)
+        && matches!(NameKind::classify(name), NameKind::Sunder)
+        && is_stub_only_builtin_symbol_in_file(db, file, name.clone())
 }
 
 #[salsa::tracked(returns(copy), heap_size=ruff_memory_usage::heap_size)]
