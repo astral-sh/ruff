@@ -152,8 +152,8 @@ impl<'a> ModuleKey<'a> {
 
         let asname = asname.map(NatOrdStr::from);
 
-        let first_alias = first_alias
-            .map(|(name, asname)| MemberKeyInner::from_member(name, asname, settings));
+        let first_alias =
+            first_alias.map(|(name, asname)| MemberKeyInner::from_member(name, asname, settings));
 
         Self(SortKey::new(
             ModuleKeyInner {

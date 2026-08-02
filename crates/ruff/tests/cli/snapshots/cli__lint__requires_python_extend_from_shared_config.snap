@@ -230,6 +230,7 @@ linter.isort.no_sections = false
 linter.isort.from_first = false
 linter.isort.length_sort = false
 linter.isort.length_sort_straight = false
+linter.isort.reverse_sort = false
 linter.mccabe.max_complexity = 10
 linter.pep8_naming.ignore_names = [
 	setUp,

@@ -1669,4 +1669,22 @@ mod tests {
         assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
+
+    #[test]
+    fn reverse_length_sort() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("isort/reverse_length_sort.py"),
+            &LinterSettings {
+                isort: super::settings::Settings {
+                    length_sort: true,
+                    reverse_sort: true,
+                    ..super::settings::Settings::default()
+                },
+                src: vec![test_resource_path("fixtures/isort")],
+                ..LinterSettings::for_rule(Rule::UnsortedImports)
+            },
+        )?;
+        assert_diagnostics!(diagnostics);
+        Ok(())
+    }
 }

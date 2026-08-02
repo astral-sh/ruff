@@ -112,9 +112,7 @@ pub(crate) fn order_imports<'a>(
                         from_import_width(
                             import_from.module,
                             import_from.level,
-                            aliases
-                                .iter()
-                                .map(|(alias, _)| (alias.name, alias.asname)),
+                            aliases.iter().map(|(alias, _)| (alias.name, alias.asname)),
                             settings,
                         ),
                         settings,
@@ -209,9 +207,7 @@ pub(crate) fn order_imports<'a>(
                         from_import_width(
                             import_from.module,
                             import_from.level,
-                            aliases
-                                .iter()
-                                .map(|(alias, _)| (alias.name, alias.asname)),
+                            aliases.iter().map(|(alias, _)| (alias.name, alias.asname)),
                             settings,
                         ),
                         settings,
@@ -279,9 +275,7 @@ pub(crate) fn order_imports<'a>(
                         from_import_width(
                             import_from.module,
                             import_from.level,
-                            aliases
-                                .iter()
-                                .map(|(alias, _)| (alias.name, alias.asname)),
+                            aliases.iter().map(|(alias, _)| (alias.name, alias.asname)),
                             settings,
                         ),
                         settings,
@@ -369,9 +363,6 @@ mod tests {
             import_width("sqlalchemy.dialects.postgresql", 0, &["JSONB"])
                 > import_width("sqlalchemy", 0, &["ForeignKey", "String"])
         );
-        assert!(
-            import_width("mixins", 2, &["CreatedMixin"])
-                > import_width("base", 2, &["Base"])
-        );
+        assert!(import_width("mixins", 2, &["CreatedMixin"]) > import_width("base", 2, &["Base"]));
     }
 }

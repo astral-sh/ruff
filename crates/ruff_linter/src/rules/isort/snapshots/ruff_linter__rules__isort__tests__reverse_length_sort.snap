@@ -1,0 +1,33 @@
+---
+source: crates/ruff_linter/src/rules/isort/mod.rs
+---
+I001 [*] Import block is un-sorted or un-formatted
+  --> reverse_length_sort.py:1:1
+   |
+ 1 | / from datetime import datetime
+ 2 | | from typing import TYPE_CHECKING
+ 3 | | from uuid import UUID
+ 4 | |
+ 5 | | from sqlalchemy.dialects.postgresql import JSONB
+ 6 | | from sqlalchemy.orm import mapped_column, relationship, Mapped
+ 7 | | from sqlalchemy import ForeignKey, String
+ 8 | |
+ 9 | | from ..base import Base
+10 | | from ..mixins import CreatedMixin
+   | |_________________________________^
+help: Organize imports
+   |
+1  + from typing import TYPE_CHECKING
+2  | from datetime import datetime
+   - from typing import TYPE_CHECKING
+3  | from uuid import UUID
+4  |
+5  + from sqlalchemy.orm import mapped_column, relationship, Mapped
+6  | from sqlalchemy.dialects.postgresql import JSONB
+   - from sqlalchemy.orm import mapped_column, relationship, Mapped
+7  | from sqlalchemy import ForeignKey, String
+8  |
+   - from ..base import Base
+9  | from ..mixins import CreatedMixin
+10 + from ..base import Base
+   |
