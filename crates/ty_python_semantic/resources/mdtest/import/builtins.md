@@ -90,6 +90,32 @@ def make_typevar() -> TypeVar: ...
 _runtime_typevar = make_typevar()
 ```
 
+## Private type-checking-only builtins with stacked decorators
+
+An outer decorator can change the inferred type of a private function or class, but it does not make
+an inner `@type_check_only` definition available at runtime.
+
+```py
+_PrivateFunction  # error: [unresolved-reference]
+_PrivateClass  # error: [unresolved-reference]
+```
+
+`__builtins__.pyi`:
+
+```pyi
+from typing import Callable, type_check_only
+
+def decorate_function(callback: Callable[[int], int]) -> Callable[[int], int]: ...
+def decorate_class(cls: type[object]) -> type[object]: ...
+@decorate_function
+@type_check_only
+def _PrivateFunction(value: int) -> int: ...
+
+@decorate_class
+@type_check_only
+class _PrivateClass: ...
+```
+
 ## Private runtime standard builtins
 
 A private class declared by the standard `builtins` stub remains available when it represents a real

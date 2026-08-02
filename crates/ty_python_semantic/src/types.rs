@@ -230,9 +230,13 @@ pub(crate) fn binding_type<'db>(db: &'db dyn Db, definition: Definition<'db>) ->
 /// indexing operations with typing-only definitions.
 #[salsa::tracked(returns(copy))]
 pub(crate) fn exists_at_runtime<'db>(db: &'db dyn Db, definition: Definition<'db>) -> bool {
-    let ty = binding_type(db, definition);
+    let inference = infer_definition_types(db, definition);
+    let ty = inference.binding_type(definition);
 
     if ty.is_type_check_only(db)
+        || inference
+            .undecorated_type()
+            .is_some_and(|ty| ty.is_type_check_only(db))
         || matches!(
             ty,
             Type::KnownInstance(KnownInstanceType::TypeVar(typevar))
