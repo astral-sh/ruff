@@ -147,12 +147,13 @@ Re-exporting a private type alias does not make its original stub-only definitio
 
 ```py
 _ImportedAlias  # error: [unresolved-reference]
+_ReassignedAlias  # error: [unresolved-reference]
 ```
 
 `__builtins__.pyi`:
 
 ```pyi
-from helpers import _ImportedAlias as _ImportedAlias
+from helpers import _ImportedAlias as _ImportedAlias, _ReassignedAlias as _ReassignedAlias
 ```
 
 `helpers.pyi`:
@@ -160,7 +161,13 @@ from helpers import _ImportedAlias as _ImportedAlias
 ```pyi
 from typing import TypeAlias
 
-_ImportedAlias: TypeAlias = int
+if False:
+    _ImportedAlias: int
+else:
+    _ImportedAlias: TypeAlias = int
+
+_ReassignedAlias: int
+_ReassignedAlias: TypeAlias = str
 ```
 
 ## Conditionally defined private runtime values

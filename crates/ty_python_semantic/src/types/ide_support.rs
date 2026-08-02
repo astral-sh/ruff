@@ -22,7 +22,9 @@ use ruff_db::source::source_text;
 use ruff_python_ast::{self as ast, AnyNodeRef, name::Name};
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashSet;
-use ty_module_resolver::{KnownModule, Module, ModuleName, resolve_module_confident};
+use ty_module_resolver::{
+    KnownModule, Module, ModuleName, resolve_module, resolve_module_confident,
+};
 use ty_python_core::definition::{Definition, DefinitionKind, NestedBindingExecution};
 use ty_python_core::{attribute_scopes, global_scope, place_table, semantic_index, use_def_map};
 
@@ -62,6 +64,15 @@ pub(crate) fn is_stub_only_builtin_symbol<'db>(db: &'db dyn Db, name: Name) -> b
 
 #[salsa::tracked(returns(copy), heap_size=ruff_memory_usage::heap_size)]
 fn is_stub_only_builtin_symbol_in_file<'db>(db: &'db dyn Db, file: File, name: Name) -> bool {
+    is_stub_only_builtin_symbol_in_file_recursive(db, file, &name, &mut FxHashSet::default())
+}
+
+fn is_stub_only_builtin_symbol_in_file_recursive<'db>(
+    db: &'db dyn Db,
+    file: File,
+    name: &str,
+    visiting: &mut FxHashSet<Definition<'db>>,
+) -> bool {
     if !file.is_stub(db) {
         return false;
     }
@@ -82,33 +93,67 @@ fn is_stub_only_builtin_symbol_in_file<'db>(db: &'db dyn Db, file: File, name: N
             continue;
         };
 
-        let resolved = resolve_definition(
-            db,
-            definition,
-            Some(&name),
-            ImportAliasResolution::ResolveAliases,
-        );
+        if !visiting.insert(definition) {
+            return false;
+        }
 
-        for resolved in resolved {
-            let Some(definition) = resolved.definition() else {
-                return false;
-            };
-            has_definition = true;
-            if !is_stub_only_builtin_definition(db, definition) {
-                return false;
-            }
+        has_definition = true;
+        let is_stub_only = is_stub_only_builtin_definition(db, definition, name, visiting);
+        visiting.remove(&definition);
+        if !is_stub_only {
+            return false;
         }
     }
 
     has_definition
 }
 
-fn is_stub_only_builtin_definition<'db>(db: &'db dyn Db, definition: Definition<'db>) -> bool {
+fn is_stub_only_builtin_definition<'db>(
+    db: &'db dyn Db,
+    definition: Definition<'db>,
+    name: &str,
+    visiting: &mut FxHashSet<Definition<'db>>,
+) -> bool {
     if !definition.file(db).is_stub(db) {
         return false;
     }
 
     match definition.kind(db) {
+        DefinitionKind::ImportFrom(import) => {
+            let file = definition.file(db);
+            let parsed = parsed_module(db, file).load(db);
+            let import_node = import.import(&parsed);
+            let imported_name = &import.alias(&parsed).name;
+
+            let Some(module_name) = ModuleName::from_import_statement(db, file, import_node).ok()
+            else {
+                return false;
+            };
+            let Some(file) =
+                resolve_module(db, file, &module_name).and_then(|module| module.file(db))
+            else {
+                return false;
+            };
+
+            is_stub_only_builtin_symbol_in_file_recursive(db, file, imported_name, visiting)
+        }
+        DefinitionKind::StarImport(import) => {
+            let file = definition.file(db);
+            let parsed = parsed_module(db, file).load(db);
+            let import_node = import.import(&parsed);
+
+            let Some(module_name) = ModuleName::from_import_statement(db, file, import_node).ok()
+            else {
+                return false;
+            };
+            let Some(file) =
+                resolve_module(db, file, &module_name).and_then(|module| module.file(db))
+            else {
+                return false;
+            };
+
+            is_stub_only_builtin_symbol_in_file_recursive(db, file, name, visiting)
+        }
         DefinitionKind::TypeAlias(_)
         | DefinitionKind::TypeVar(_)
         | DefinitionKind::ParamSpec(_)
