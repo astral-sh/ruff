@@ -2565,6 +2565,39 @@ def _(u: IntX | StrX) -> None:
     reveal_type(u.setdefault("x", 1))  # revealed: int | str
 ```
 
+## Copying a union of `TypedDict` instances
+
+The copied value retains every possible receiver, including when the union combines `TypedDict`
+classes from different fallback implementations:
+
+```py
+from typing import TypedDict
+from typing_extensions import TypedDict as ExtensionTypedDict
+
+class Left(TypedDict):
+    left: int
+
+class Right(TypedDict):
+    right: str
+
+class Extension(ExtensionTypedDict):
+    extension: bytes
+
+def copy_same_fallback(value: Left | Right) -> None:
+    method = value.copy
+    reveal_type(method)  # revealed: bound method (Left | Right).copy() -> Left | Right
+    reveal_type(method.__self__)  # revealed: Left | Right
+    reveal_type(method())  # revealed: Left | Right
+
+def copy_mixed_fallback(value: Left | Extension) -> None:
+    method = value.copy
+    reveal_type(method.__self__)  # revealed: Left | Extension
+    reveal_type(method())  # revealed: Left | Extension
+
+def copy_mixed_receiver(value: Left | dict[str, int]) -> None:
+    reveal_type(value.copy())  # revealed: Left | dict[str, int]
+```
+
 ## Unlike normal classes
 
 `TypedDict` types do not act like normal classes. For example, calling `type(..)` on an inhabitant

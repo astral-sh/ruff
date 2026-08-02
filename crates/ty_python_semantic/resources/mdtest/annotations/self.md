@@ -489,6 +489,45 @@ class Child(Parent):
         assert_type(self.create(), Self)
 ```
 
+## Inherited methods on union receivers
+
+A parameterless inherited method returning `Self` preserves every possible receiver when accessed
+through a union:
+
+```py
+from typing import Self
+
+class Original:
+    def clone(self) -> Self:
+        return self
+
+    def children(self) -> list[Self]:
+        return [self]
+
+class First(Original): ...
+class Second(Original): ...
+
+def inherited(value: First | Second) -> None:
+    method = value.clone
+    reveal_type(method)  # revealed: bound method (First | Second).clone() -> First | Second
+    reveal_type(method.__self__)  # revealed: First | Second
+    reveal_type(method())  # revealed: First | Second
+
+    # An invariant container must retain the separate receiver specializations.
+    reveal_type(value.children())  # revealed: list[First] | list[Second]
+```
+
+An override remains a separate bound method even when both implementations return `Self`:
+
+```py
+class Overridden(Original):
+    def clone(self) -> Self:
+        return self
+
+def overridden(value: First | Overridden) -> None:
+    reveal_type(value.clone())  # revealed: First | Overridden
+```
+
 ## Attributes
 
 ```py

@@ -3859,6 +3859,67 @@ impl<'db> Type<'db> {
                 promote_inferred_attribute_class_literals(db, result)
             }
 
+            /// Collapse separately bound instances of the same receiver-returning method.
+            ///
+            /// This is only sound for parameterless methods whose return type is exactly the
+            /// receiver: method arguments or a return such as `list[Self]` can retain
+            /// correlations that would be lost by replacing each receiver with their union.
+            fn shared_receiver_returning_methods<'db>(
+                db: &'db dyn Db,
+                union: UnionType<'db>,
+                name: &str,
+                policy: MemberLookupPolicy,
+            ) -> Option<Vec<PlaceAndQualifiers<'db>>> {
+                let receiver = Type::Union(union);
+                let mut methods = Vec::with_capacity(union.elements(db).len());
+                let mut shared_function: Option<FunctionType<'db>> = None;
+
+                for element in union.elements(db) {
+                    let member =
+                        element.member_lookup_with_policy_and_receiver(db, name, policy, None);
+                    let Place::Defined(DefinedPlace {
+                        ty: Type::BoundMethod(method),
+                        definedness: Definedness::AlwaysDefined,
+                        ..
+                    }) = member.place
+                    else {
+                        return None;
+                    };
+
+                    let [signature] = method.bound_signatures(db).overloads.as_slice() else {
+                        return None;
+                    };
+                    if signature.parameters().len() != 0 || signature.return_ty != *element {
+                        return None;
+                    }
+
+                    let mapping = TypeMapping::ReplaceSelf {
+                        new_upper_bound: receiver,
+                    };
+                    let function = method.function(db).apply_type_mapping_impl(
+                        db,
+                        &mapping,
+                        TypeContext::default(),
+                        &ApplyTypeMappingVisitor::default(),
+                    );
+                    let method = BoundMethodType::new(db, function, receiver);
+                    let [signature] = method.bound_signatures(db).overloads.as_slice() else {
+                        return None;
+                    };
+                    if signature.parameters().len() != 0 || signature.return_ty != receiver {
+                        return None;
+                    }
+
+                    if shared_function.is_some_and(|shared_function| shared_function != function) {
+                        return None;
+                    }
+                    shared_function = Some(function);
+                    methods.push(member.map_type(|_| Type::BoundMethod(method)));
+                }
+
+                Some(methods)
+            }
+
             let this = key.ty(db);
             let name = key.name(db);
             let name_str = name.as_str();
@@ -3871,9 +3932,23 @@ impl<'db> Type<'db> {
             }
 
             match this {
-                Type::Union(union) => union.map_with_boundness_and_qualifiers(db, |elem| {
-                    elem.member_lookup_with_policy_and_receiver(db, name_str, policy, receiver)
-                }),
+                Type::Union(union) => {
+                    let mut shared_methods = receiver
+                        .is_none()
+                        .then(|| shared_receiver_returning_methods(db, union, name_str, policy))
+                        .flatten()
+                        .map(Vec::into_iter);
+                    union.map_with_boundness_and_qualifiers(db, |element| {
+                        shared_methods
+                            .as_mut()
+                            .and_then(Iterator::next)
+                            .unwrap_or_else(|| {
+                                element.member_lookup_with_policy_and_receiver(
+                                    db, name_str, policy, receiver,
+                                )
+                            })
+                    })
+                }
 
                 Type::Intersection(intersection) => {
                     if let Some(complement) = intersection.enum_complement(db) {
