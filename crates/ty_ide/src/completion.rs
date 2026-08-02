@@ -3573,9 +3573,17 @@ _private_type_alias = type[int]
 
 def make_union() -> UnionType: ...
 def make_typevar() -> TypeVar: ...
+def make_callback() -> Callable[[int], int]: ...
+def make_class() -> type[int]: ...
+def decorate(callback: Callable[[int], int]) -> Callable[[int], int]: ...
 
 _private_runtime_union = make_union()
 _private_runtime_typevar = make_typevar()
+_private_runtime_callback = make_callback()
+_private_runtime_class = make_class()
+
+@decorate
+def _private_runtime_decorated(value: int) -> int: ...
 
 class PublicProtocol(Protocol):
     def method(self) -> None: ...
@@ -3622,6 +3630,9 @@ class _PrivateTypeOnlyProtocol(Protocol):
         test.not_contains("_private_reexported_alias");
         test.contains("_private_runtime_union");
         test.contains("_private_runtime_typevar");
+        test.contains("_private_runtime_callback");
+        test.contains("_private_runtime_class");
+        test.contains("_private_runtime_decorated");
         test.contains("PublicProtocol");
         test.contains("_PrivateProtocol");
         test.contains("_PrivateRuntimeCheckableProtocol");

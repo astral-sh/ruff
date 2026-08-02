@@ -223,24 +223,35 @@ _runtime_union
 _runtime_typevar
 _runtime_paramspec
 _runtime_typevartuple
+_runtime_callback
+_runtime_class
+_runtime_decorated
 ```
 
 `__builtins__.pyi`:
 
 ```pyi
 from types import UnionType
-from typing import ParamSpec, TypeVar
+from typing import Callable, ParamSpec, TypeVar
 from typing_extensions import TypeVarTuple
 
 def make_union() -> UnionType: ...
 def make_typevar() -> TypeVar: ...
 def make_paramspec() -> ParamSpec: ...
 def make_typevartuple() -> TypeVarTuple: ...
+def make_callback() -> Callable[[int], int]: ...
+def make_class() -> type[int]: ...
+def decorate(callback: Callable[[int], int]) -> Callable[[int], int]: ...
 
 _runtime_union = make_union()
 _runtime_typevar = make_typevar()
 _runtime_paramspec = make_paramspec()
 _runtime_typevartuple = make_typevartuple()
+_runtime_callback = make_callback()
+_runtime_class = make_class()
+
+@decorate
+def _runtime_decorated(value: int) -> int: ...
 ```
 
 ## Explicitly writing private builtin aliases

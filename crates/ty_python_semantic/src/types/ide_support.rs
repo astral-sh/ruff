@@ -173,7 +173,10 @@ fn is_stub_only_builtin_definition<'db>(
         DefinitionKind::AnnotatedAssignment(_) => {
             SemanticModel::new(db, definition.file(db)).is_type_alias_definition(definition)
         }
-        DefinitionKind::Assignment(_) | DefinitionKind::Class(_) | DefinitionKind::Function(_) => {
+        DefinitionKind::Class(_) | DefinitionKind::Function(_) => {
+            binding_type(db, definition).is_type_check_only(db)
+        }
+        DefinitionKind::Assignment(assignment) => {
             let ty = binding_type(db, definition);
 
             if ty.is_type_check_only(db) {
@@ -196,9 +199,6 @@ fn is_stub_only_builtin_definition<'db>(
                         return false;
                     }
 
-                    let DefinitionKind::Assignment(assignment) = definition.kind(db) else {
-                        return false;
-                    };
                     let parsed = parsed_module(db, definition.file(db)).load(db);
                     let ast::Expr::Call(call) = assignment.value(&parsed) else {
                         return false;
@@ -223,8 +223,14 @@ fn is_stub_only_builtin_definition<'db>(
                 Type::Callable(_)
                 | Type::GenericAlias(_)
                 | Type::SpecialForm(_)
-                | Type::SubclassOf(_)
-                | Type::TypeAlias(_)
+                | Type::SubclassOf(_) => {
+                    let parsed = parsed_module(db, definition.file(db)).load(db);
+                    matches!(
+                        assignment.value(&parsed),
+                        ast::Expr::Subscript(_) | ast::Expr::BinOp(_)
+                    )
+                }
+                Type::TypeAlias(_)
                 | Type::KnownInstance(
                     KnownInstanceType::TypeVar(_)
                     | KnownInstanceType::TypeAliasType(_)
