@@ -46,3 +46,12 @@ from typing import Literal
 def func_literal_split_union_optional(flag: Literal[True] | Literal[False] | None):  # error: [boolean-type-hint-positional-argument]
     pass
 ```
+
+Support nested `Literal` expressions.
+
+```py
+from typing import Literal
+
+def func_literal_nested(flag: Literal[True, Literal[False]]):  # error: [boolean-type-hint-positional-argument]
+    pass
+```

@@ -4,7 +4,7 @@ use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::name::UnqualifiedName;
 use ruff_python_ast::{self as ast, Decorator, Expr, Parameters};
 use ruff_python_semantic::SemanticModel;
-use ruff_python_semantic::analyze::typing::traverse_union_and_optional;
+use ruff_python_semantic::analyze::typing::{traverse_literal, traverse_union_and_optional};
 use ruff_python_semantic::analyze::visibility;
 
 use crate::Violation;
@@ -192,6 +192,7 @@ fn match_annotation_to_complex_bool(
     settings: &LinterSettings,
 ) -> bool {
     let mut seen = SeenBoolLiterals::empty();
+
     if match_simple_bool(annotation, semantic, settings, &mut seen) {
         return true;
     }
@@ -220,24 +221,20 @@ fn match_simple_bool(
         // Ex) `"bool"`
         Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => value == "bool",
         // Ex) `typing.Literal[True, False]`
-        Expr::Subscript(ast::ExprSubscript { value, slice, .. })
+        Expr::Subscript(ast::ExprSubscript { value, .. })
             if is_boolean_type_hint_pos_arg_literal_enabled(settings)
                 && semantic.match_typing_expr(value, "Literal") =>
         {
             // Mark seen literals until we've confirmed the full bool (`True` and `False`).
-            match slice.as_ref() {
-                Expr::Tuple(ast::ExprTuple { elts, .. }) => {
-                    for elt in elts {
-                        if let Expr::BooleanLiteral(ast::ExprBooleanLiteral { value, .. }) = elt {
-                            *seen |= SeenBoolLiterals::from_value(*value);
-                        }
+            traverse_literal(
+                &mut |elt, _parent| {
+                    if let Expr::BooleanLiteral(ast::ExprBooleanLiteral { value, .. }) = elt {
+                        *seen |= SeenBoolLiterals::from_value(*value);
                     }
-                }
-                Expr::BooleanLiteral(ast::ExprBooleanLiteral { value, .. }) => {
-                    *seen |= SeenBoolLiterals::from_value(*value);
-                }
-                _ => {}
-            }
+                },
+                semantic,
+                annotation,
+            );
             seen.is_all()
         }
         _ => false,
