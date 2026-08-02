@@ -30,16 +30,16 @@ pub(crate) struct ExcludeFilter {
 
 impl ExcludeFilter {
     /// Returns `true` if the path to a directory is definitely excluded and `false` otherwise.
-    pub(crate) fn match_directory(&self, path: &SystemPath, mode: GlobFilterCheckMode) -> bool {
+    pub(crate) fn match_directory(&self, path: &SystemPath, mode: GlobFilterCheckMode<'_>) -> bool {
         self.matches(path, mode, true)
     }
 
     /// Returns `true` if the path to a file is definitely excluded and `false` otherwise.
-    pub(crate) fn match_file(&self, path: &SystemPath, mode: GlobFilterCheckMode) -> bool {
+    pub(crate) fn match_file(&self, path: &SystemPath, mode: GlobFilterCheckMode<'_>) -> bool {
         self.matches(path, mode, false)
     }
 
-    fn matches(&self, path: &SystemPath, mode: GlobFilterCheckMode, directory: bool) -> bool {
+    fn matches(&self, path: &SystemPath, mode: GlobFilterCheckMode<'_>, directory: bool) -> bool {
         // If the path is excluded, return `ignore`
         if self.ignore.matched(path, directory).is_ignore() {
             return true;
@@ -50,11 +50,12 @@ impl ExcludeFilter {
                 // No hit or an allow hit means the file or directory is not excluded.
                 false
             }
-            GlobFilterCheckMode::Adhoc => {
+            GlobFilterCheckMode::Adhoc { stop_at } => {
                 // If the path is allowlisted or there's no hit, try the parent to ensure we don't return false
                 // for a folder where there's an exclude for a parent.
                 path.ancestors()
                     .skip(1)
+                    .take_while(|ancestor| Some(*ancestor) != stop_at)
                     .any(|ancestor| self.ignore.matched(ancestor, true).is_ignore())
             }
         }
