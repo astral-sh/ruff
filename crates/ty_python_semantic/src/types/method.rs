@@ -174,13 +174,12 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         source: BoundMethodType<'db>,
         target: BoundMethodType<'db>,
     ) -> ConstraintSet<'db, 'c> {
-        // A bound method is a typically a subtype of itself. However, we must explicitly verify
-        // the subtyping of the underlying function signatures (since they might be specialized
-        // differently), and of the bound self parameter (taking care that parameters, including a
-        // bound self parameter, are contravariant.)
+        // The underlying function signature remains contravariant in its parameters, but the
+        // bound receiver is an already-captured value. A method bound to `A` is therefore a
+        // subtype of the same method bound to `A | B`, not the other way around.
         self.check_function_pair(db, source.function(db), target.function(db))
             .and(db, self.constraints, || {
-                self.check_type_pair(db, target.self_instance(db), source.self_instance(db))
+                self.check_type_pair(db, source.self_instance(db), target.self_instance(db))
             })
     }
 }

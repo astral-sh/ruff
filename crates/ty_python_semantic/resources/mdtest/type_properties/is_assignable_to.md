@@ -1146,6 +1146,39 @@ c: Callable[[Any], str] = A().f
 c: Callable[[Any], str] = A().g
 ```
 
+A bound receiver is a captured value, so methods inherited by a subclass can be assigned to the same
+method bound to the parent class, but not the other way around:
+
+```py
+from ty_extensions import static_assert
+from ty_extensions._internal import TypeOf, is_assignable_to
+
+class Writer:
+    def write(self, data: bytes) -> None: ...
+
+class ChildWriter(Writer): ...
+
+writer = Writer()
+child = ChildWriter()
+
+static_assert(is_assignable_to(TypeOf[child.write], TypeOf[writer.write]))
+static_assert(not is_assignable_to(TypeOf[writer.write], TypeOf[child.write]))
+```
+
+Narrowing a receiver before storing its method must not make an otherwise valid assignment fail:
+
+```py
+class OtherWriter(Writer):
+    def write(self, data: bytes) -> None: ...
+
+class Copy:
+    def __init__(self, writer: Writer | None) -> None:
+        if not writer:
+            writer = OtherWriter()
+
+        self._write = writer.write
+```
+
 ### Generic method types with gradual class return types
 
 A generic receiver makes signature comparison lazy without changing whether gradual class types are
