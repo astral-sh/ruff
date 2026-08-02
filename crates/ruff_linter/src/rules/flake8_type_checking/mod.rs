@@ -643,10 +643,8 @@ mod tests {
     fn contents_preview(contents: &str, snapshot: &str) {
         let diagnostics = test_snippet(
             contents,
-            &settings::LinterSettings {
-                preview: settings::types::PreviewMode::Enabled,
-                ..settings::LinterSettings::for_rules(Linter::Flake8TypeChecking.rules())
-            },
+            &settings::LinterSettings::for_rules(Linter::Flake8TypeChecking.rules())
+                .with_preview_mode(),
         );
         assert_diagnostics!(snapshot, diagnostics);
     }

@@ -274,10 +274,7 @@ mod tests {
         );
         let diagnostics = test_path(
             Path::new("pyflakes").join(path).as_path(),
-            &LinterSettings {
-                preview: PreviewMode::Enabled,
-                ..LinterSettings::for_rule(rule_code)
-            },
+            &LinterSettings::for_rule(rule_code).with_preview_mode(),
         )?;
         assert_diagnostics!(snapshot, diagnostics);
         Ok(())
@@ -471,10 +468,7 @@ mod tests {
             snapshot,
             Path::new("pyflakes").join(path).as_path(),
             &LinterSettings::for_rule(rule_code),
-            &LinterSettings {
-                preview: PreviewMode::Enabled,
-                ..LinterSettings::for_rule(rule_code)
-            }
+            &LinterSettings::for_rule(rule_code).with_preview_mode()
         );
         Ok(())
     }
@@ -612,10 +606,7 @@ mod tests {
                 is_stub: false,
             },
             Path::new("f401_preview_submodule.py"),
-            &LinterSettings {
-                preview: PreviewMode::Enabled,
-                ..LinterSettings::for_rule(Rule::UnusedImport)
-            },
+            &LinterSettings::for_rule(Rule::UnusedImport).with_preview_mode(),
         )
         .0;
         assert_diagnostics!(snapshot, diagnostics);
@@ -757,10 +748,7 @@ mod tests {
     fn f811_annotated_assignment_redefinition() -> Result<()> {
         let diagnostics = test_path(
             Path::new("pyflakes/F811_34.py"),
-            &LinterSettings {
-                preview: PreviewMode::Enabled,
-                ..LinterSettings::for_rule(Rule::RedefinedWhileUnused)
-            },
+            &LinterSettings::for_rule(Rule::RedefinedWhileUnused).with_preview_mode(),
         )?;
         assert_diagnostics!(diagnostics);
         Ok(())

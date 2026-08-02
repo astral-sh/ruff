@@ -11,7 +11,6 @@ mod tests {
 
     use crate::registry::Rule;
     use crate::rules::pep8_naming;
-    use crate::settings::types::PreviewMode;
     use crate::source_kind::SourceKind;
     use crate::test::{test_contents, test_path};
     use crate::{assert_diagnostics, assert_diagnostics_diff, settings};
@@ -156,14 +155,8 @@ mod tests {
         assert_diagnostics_diff!(
             snapshot,
             Path::new("flake8_pyi").join(path).as_path(),
-            &settings::LinterSettings {
-                preview: PreviewMode::Disabled,
-                ..settings::LinterSettings::for_rule(rule_code)
-            },
-            &settings::LinterSettings {
-                preview: PreviewMode::Enabled,
-                ..settings::LinterSettings::for_rule(rule_code)
-            },
+            &settings::LinterSettings::for_rule(rule_code),
+            &settings::LinterSettings::for_rule(rule_code).with_preview_mode(),
         );
         Ok(())
     }

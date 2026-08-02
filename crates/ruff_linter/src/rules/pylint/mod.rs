@@ -275,14 +275,8 @@ mod tests {
         assert_diagnostics_diff!(
             snapshot,
             Path::new("pylint").join(path).as_path(),
-            &LinterSettings {
-                preview: PreviewMode::Disabled,
-                ..LinterSettings::for_rule(rule_code)
-            },
-            &LinterSettings {
-                preview: PreviewMode::Enabled,
-                ..LinterSettings::for_rule(rule_code)
-            }
+            &LinterSettings::for_rule(rule_code),
+            &LinterSettings::for_rule(rule_code).with_preview_mode()
         );
         Ok(())
     }

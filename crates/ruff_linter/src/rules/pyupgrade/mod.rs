@@ -239,10 +239,7 @@ mod tests {
         let snapshot = format!("{}__preview", path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("pyupgrade").join(path).as_path(),
-            &settings::LinterSettings {
-                preview: PreviewMode::Enabled,
-                ..settings::LinterSettings::for_rule(rule_code)
-            },
+            &settings::LinterSettings::for_rule(rule_code).with_preview_mode(),
         )?;
         assert_diagnostics!(snapshot, diagnostics);
         Ok(())
@@ -272,14 +269,8 @@ mod tests {
         assert_diagnostics_diff!(
             snapshot,
             Path::new("pyupgrade").join(path).as_path(),
-            &settings::LinterSettings {
-                preview: PreviewMode::Disabled,
-                ..settings::LinterSettings::for_rule(rule_code)
-            },
-            &settings::LinterSettings {
-                preview: PreviewMode::Enabled,
-                ..settings::LinterSettings::for_rule(rule_code)
-            },
+            &settings::LinterSettings::for_rule(rule_code),
+            &settings::LinterSettings::for_rule(rule_code).with_preview_mode(),
         );
         Ok(())
     }
