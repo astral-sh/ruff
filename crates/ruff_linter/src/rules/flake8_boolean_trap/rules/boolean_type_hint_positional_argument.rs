@@ -155,11 +155,6 @@ pub(crate) fn boolean_type_hint_positional_argument(
             return;
         }
 
-        // If `bool` isn't actually a reference to the `bool` built-in, return.
-        if !checker.semantic().has_builtin_binding("bool") {
-            return;
-        }
-
         let mut diagnostic =
             checker.report_diagnostic(BooleanTypeHintPositionalArgument, parameter.identifier());
 
@@ -233,7 +228,7 @@ where
     let settings = checker.settings();
     match annotation {
         // Ex) `bool`
-        Expr::Name(name) => &name.id == "bool",
+        Expr::Name(name) => &name.id == "bool" && semantic.has_builtin_binding("bool"),
         // Ex) `typing.Literal[True, False]`
         Expr::Subscript(ast::ExprSubscript { value, .. })
             if is_boolean_type_hint_pos_arg_literal_enabled(settings)

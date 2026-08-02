@@ -81,3 +81,16 @@ def func_literal_quoted_nested_union(flag: str | "int | Literal[True, False]"):
     pass
 
 ```
+
+Don't let shadowed `bool` to get in the way of flagging literals.
+
+```py
+from typing import Literal
+
+def func_shadowed_bool():
+
+  bool = int
+
+  def func_literal_with_shadowed_bool(flag: Literal[True, False]):  # error: [boolean-type-hint-positional-argument]
+      pass
+```
