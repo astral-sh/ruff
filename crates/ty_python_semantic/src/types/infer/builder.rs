@@ -86,6 +86,7 @@ use crate::types::function::{
 use crate::types::generics::{
     GenericContext, Specialization, SpecializationBuilder, bind_typevar, enclosing_binding_contexts,
 };
+use crate::types::ide_support::is_stub_only_builtin_symbol;
 use crate::types::infer::builder::named_tuple::NamedTupleKind;
 use crate::types::infer::builder::paramspec_validation::validate_paramspec_components;
 use crate::types::infer::builder::typed_dict::TypedDictConstructorForm;
@@ -121,7 +122,7 @@ use crate::types::{
     UnionType, any_over_type, binding_type, extract_fixed_length_iterable_element_types,
     infer_complete_scope_types, infer_scope_types, is_discarded_dict_key_assignment, todo_type,
 };
-use crate::{AnalysisSettings, Db, FxIndexSet, FxOrderSet};
+use crate::{AnalysisSettings, Db, FxIndexSet, FxOrderSet, NameKind};
 use ty_python_core::ast_ids::ScopedUseId;
 use ty_python_core::definition::{
     AnnotatedAssignmentDefinitionKind, AssignmentDefinitionKind, ComprehensionDefinitionKind,
@@ -9635,6 +9636,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // (without infinite recursion if we're already in builtins.)
             .or_fall_back_to(db, env, || {
                 if Some(self.scope()) == builtins_module_scope(db, env) {
+                    Place::Undefined.into()
+                } else if matches!(NameKind::classify(symbol_name), NameKind::Sunder)
+                    && is_stub_only_builtin_symbol(db, symbol_name.clone())
+                {
                     Place::Undefined.into()
                 } else {
                     builtins_symbol(db, env, symbol_name)

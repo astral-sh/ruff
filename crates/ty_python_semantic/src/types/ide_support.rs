@@ -1,8 +1,8 @@
 use std::collections::{HashMap, VecDeque};
 
 use crate::FxIndexSet;
-use crate::place::builtins_module_scope;
-use crate::reachability::is_range_reachable;
+use crate::place::{RequiresExplicitReExport, builtins_module_scope, imported_symbol};
+use crate::reachability::{evaluate_reachability, is_range_reachable};
 use crate::types::call::bind::CheckTypesMode;
 use crate::types::call::{CallArguments, CallError, MatchedArgument};
 use crate::types::class::{DynamicClassAnchor, DynamicEnumAnchor, DynamicNamedTupleAnchor};
@@ -10,7 +10,7 @@ use crate::types::constraints::ConstraintSetBuilder;
 use crate::types::signatures::{ParametersKind, Signature};
 use crate::types::{
     CallDunderError, CallableTypes, ClassBase, ClassLiteral, ClassType, KnownClass, KnownFunction,
-    KnownUnion, PropertyAccessorRole, SubclassOfInner, Type, TypeContext,
+    KnownInstanceType, KnownUnion, PropertyAccessorRole, SubclassOfInner, Type, TypeContext,
     TypeVarBoundOrConstraints, binding_type,
 };
 use crate::{Db, DisplaySettings, HasDefinition, HasType, ProgramEnvironment, SemanticModel};
@@ -22,9 +22,9 @@ use ruff_db::source::source_text;
 use ruff_python_ast::{self as ast, AnyNodeRef, name::Name};
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashSet;
-use ty_module_resolver::Module;
+use ty_module_resolver::{KnownModule, Module, ModuleName, resolve_module_confident};
 use ty_python_core::definition::{Definition, DefinitionKind, NestedBindingExecution};
-use ty_python_core::{attribute_scopes, global_scope, semantic_index, use_def_map};
+use ty_python_core::{attribute_scopes, global_scope, place_table, semantic_index, use_def_map};
 
 mod unreachable_code;
 #[path = "ide_support/unused_bindings.rs"]
@@ -34,6 +34,121 @@ pub use resolve_definition::{ImportAliasResolution, ResolvedDefinition, map_stub
 use resolve_definition::{find_symbol_in_scope, resolve_definition};
 pub use unreachable_code::{UnreachableKind, UnreachableRange, unreachable_ranges};
 pub use unused_binding_support::{UnusedBinding, unused_bindings};
+
+/// Returns whether every reachable definition of a private builtin is a stub-only typing helper.
+///
+/// Builtin stubs contain type variables, aliases, and protocol classes that do not exist in the
+/// runtime builtins namespace. Imported helpers must be classified at their original definitions,
+/// while ordinary runtime values must remain visible even when their types are typing objects.
+pub(crate) fn is_stub_only_builtin_symbol<'db>(db: &'db dyn Db, name: Name) -> bool {
+    let custom_file = ModuleName::new_static("__builtins__")
+        .and_then(|module_name| resolve_module_confident(db, &module_name))
+        .and_then(|module| module.file(db))
+        .filter(|file| {
+            imported_symbol(db, Some(*file), &name, Some(RequiresExplicitReExport::Yes))
+                .ignore_possibly_undefined()
+                .is_some()
+        });
+
+    let Some(file) = custom_file.or_else(|| {
+        resolve_module_confident(db, &KnownModule::Builtins.name())
+            .and_then(|module| module.file(db))
+    }) else {
+        return false;
+    };
+
+    is_stub_only_builtin_symbol_in_file(db, file, name)
+}
+
+#[salsa::tracked(returns(copy), heap_size=ruff_memory_usage::heap_size)]
+fn is_stub_only_builtin_symbol_in_file<'db>(db: &'db dyn Db, file: File, name: Name) -> bool {
+    if !file.is_stub(db) {
+        return false;
+    }
+
+    let scope = global_scope(db, file);
+    let Some(symbol_id) = place_table(db, scope).symbol_id(&name) else {
+        return false;
+    };
+    let use_def = use_def_map(db, scope);
+    let mut has_definition = false;
+
+    for binding in use_def.end_of_scope_symbol_bindings(symbol_id) {
+        if evaluate_reachability(db, use_def, binding.reachability_constraint).is_always_false() {
+            continue;
+        }
+
+        let Some(definition) = binding.binding.definition() else {
+            continue;
+        };
+
+        let resolved = resolve_definition(
+            db,
+            definition,
+            Some(&name),
+            ImportAliasResolution::ResolveAliases,
+        );
+
+        for resolved in resolved {
+            let Some(definition) = resolved.definition() else {
+                return false;
+            };
+            has_definition = true;
+            if !is_stub_only_builtin_definition(db, definition) {
+                return false;
+            }
+        }
+    }
+
+    has_definition
+}
+
+fn is_stub_only_builtin_definition<'db>(db: &'db dyn Db, definition: Definition<'db>) -> bool {
+    if !definition.file(db).is_stub(db) {
+        return false;
+    }
+
+    match definition.kind(db) {
+        DefinitionKind::TypeAlias(_)
+        | DefinitionKind::TypeVar(_)
+        | DefinitionKind::ParamSpec(_)
+        | DefinitionKind::TypeVarTuple(_) => true,
+        DefinitionKind::AnnotatedAssignment(_) => {
+            SemanticModel::new(db, definition.file(db)).is_type_alias_definition(definition)
+        }
+        DefinitionKind::Assignment(_) | DefinitionKind::Class(_) | DefinitionKind::Function(_) => {
+            let ty = binding_type(db, definition);
+
+            if ty.is_type_check_only(db) {
+                return true;
+            }
+
+            match ty {
+                Type::NominalInstance(instance) => matches!(
+                    instance.known_class(db),
+                    Some(
+                        KnownClass::TypeVar
+                            | KnownClass::TypeVarTuple
+                            | KnownClass::ExtensionsTypeVarTuple
+                            | KnownClass::ParamSpec
+                            | KnownClass::UnionType
+                    )
+                ),
+                Type::ClassLiteral(class) => class.is_protocol(db),
+                Type::TypeAlias(_)
+                | Type::KnownInstance(
+                    KnownInstanceType::TypeVar(_)
+                    | KnownInstanceType::TypeAliasType(_)
+                    | KnownInstanceType::UnionType(_)
+                    | KnownInstanceType::Literal(_)
+                    | KnownInstanceType::Annotated(_),
+                ) => true,
+                _ => false,
+            }
+        }
+        _ => false,
+    }
+}
 
 /// Get the primary definition kind for a name expression within a specific file.
 /// Returns the first definition kind that is reachable for this name in its scope.
