@@ -531,6 +531,24 @@ def union_with_concrete_method(value: First | Second, first: First, flag: bool) 
     result: First = method()
 ```
 
+The underlying function must retain its declaring class's original `Self` bound even when that class
+is generic:
+
+```py
+class GenericOriginal[T]:
+    def clone(self) -> Self:
+        return self
+
+class GenericFirst(GenericOriginal[int]): ...
+class GenericSecond(GenericOriginal[int]): ...
+class GenericThird(GenericOriginal[str]): ...
+
+def generic_declaring_function(value: GenericFirst | GenericSecond) -> None:
+    method = value.clone
+    reveal_type(method())  # revealed: GenericFirst | GenericSecond
+    reveal_type(method.__func__(GenericThird()))  # revealed: GenericThird
+```
+
 An override remains a separate bound method even when both implementations return `Self`:
 
 ```py

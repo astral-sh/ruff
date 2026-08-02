@@ -3922,15 +3922,43 @@ impl<'db> Type<'db> {
                     let function = if original_function == unspecialized_function {
                         original_function
                     } else {
-                        let mapping = TypeMapping::ReplaceSelf {
-                            new_upper_bound: receiver,
+                        let original_signature = original_function.signature(db);
+                        let [signature] = original_signature.overloads.as_slice() else {
+                            return None;
                         };
-                        original_function.apply_type_mapping_impl(
-                            db,
-                            &mapping,
-                            TypeContext::default(),
-                            &ApplyTypeMappingVisitor::default(),
-                        )
+
+                        // A generic declaring class bounds `Self` by its class, not by any
+                        // particular specialization of that class.
+                        let receiver_satisfies_original_self_bound = match signature.return_ty {
+                            Type::TypeVar(typevar)
+                                if typevar.typevar(db).is_self(db)
+                                    && let Some(declaring_class) = typevar
+                                        .typevar(db)
+                                        .upper_bound(db)
+                                        .and_then(|upper_bound| upper_bound.nominal_class(db))
+                                    && let Some(receiver_class) = element.nominal_class(db) =>
+                            {
+                                receiver_class.is_subtype_of_class_literal(
+                                    db,
+                                    declaring_class.class_literal(db),
+                                )
+                            }
+                            _ => false,
+                        };
+
+                        if receiver_satisfies_original_self_bound {
+                            original_function
+                        } else {
+                            let mapping = TypeMapping::ReplaceSelf {
+                                new_upper_bound: receiver,
+                            };
+                            original_function.apply_type_mapping_impl(
+                                db,
+                                &mapping,
+                                TypeContext::default(),
+                                &ApplyTypeMappingVisitor::default(),
+                            )
+                        }
                     };
                     let method = BoundMethodType::new(db, function, receiver);
                     let [signature] = method.bound_signatures(db).overloads.as_slice() else {
