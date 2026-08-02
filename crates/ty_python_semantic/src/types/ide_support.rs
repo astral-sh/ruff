@@ -169,16 +169,45 @@ fn is_stub_only_builtin_definition<'db>(
             }
 
             match ty {
-                Type::NominalInstance(instance) => matches!(
-                    instance.known_class(db),
-                    Some(
-                        KnownClass::TypeVar
-                            | KnownClass::TypeVarTuple
-                            | KnownClass::ExtensionsTypeVarTuple
-                            | KnownClass::ParamSpec
-                            | KnownClass::UnionType
+                Type::NominalInstance(instance) => {
+                    if !matches!(
+                        instance.known_class(db),
+                        Some(
+                            KnownClass::TypeVar
+                                | KnownClass::ExtensionsTypeVar
+                                | KnownClass::TypeVarTuple
+                                | KnownClass::ExtensionsTypeVarTuple
+                                | KnownClass::ParamSpec
+                                | KnownClass::ExtensionsParamSpec
+                        )
+                    ) {
+                        return false;
+                    }
+
+                    let DefinitionKind::Assignment(assignment) = definition.kind(db) else {
+                        return false;
+                    };
+                    let parsed = parsed_module(db, definition.file(db)).load(db);
+                    let ast::Expr::Call(call) = assignment.value(&parsed) else {
+                        return false;
+                    };
+                    let model = SemanticModel::new(db, definition.file(db));
+
+                    matches!(
+                        call.func
+                            .inferred_type(&model)
+                            .and_then(Type::as_class_literal)
+                            .and_then(|class| class.known(db)),
+                        Some(
+                            KnownClass::TypeVar
+                                | KnownClass::ExtensionsTypeVar
+                                | KnownClass::TypeVarTuple
+                                | KnownClass::ExtensionsTypeVarTuple
+                                | KnownClass::ParamSpec
+                                | KnownClass::ExtensionsParamSpec
+                        )
                     )
-                ),
+                }
                 Type::Callable(_)
                 | Type::GenericAlias(_)
                 | Type::SpecialForm(_)

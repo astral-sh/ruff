@@ -213,6 +213,36 @@ else:
     _ConditionalValue: int
 ```
 
+## Runtime typing-object values in custom builtins
+
+A runtime factory can produce objects whose classes are also used for stub-only typing helpers.
+Those values must remain available as real builtins.
+
+```py
+_runtime_union
+_runtime_typevar
+_runtime_paramspec
+_runtime_typevartuple
+```
+
+`__builtins__.pyi`:
+
+```pyi
+from types import UnionType
+from typing import ParamSpec, TypeVar
+from typing_extensions import TypeVarTuple
+
+def make_union() -> UnionType: ...
+def make_typevar() -> TypeVar: ...
+def make_paramspec() -> ParamSpec: ...
+def make_typevartuple() -> TypeVarTuple: ...
+
+_runtime_union = make_union()
+_runtime_typevar = make_typevar()
+_runtime_paramspec = make_paramspec()
+_runtime_typevartuple = make_typevartuple()
+```
+
 ## Explicitly writing private builtin aliases
 
 Writing to the builtin module is explicit attribute access, so it must not apply implicit builtin
