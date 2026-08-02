@@ -106,10 +106,10 @@ async def main():
 
 ```py
 class Manager1:
-    def __aenter__(self) -> str:
+    async def __aenter__(self) -> str:
         return "foo"
 
-    def __aexit__(self, exc_type, exc_value, traceback): ...
+    async def __aexit__(self, exc_type, exc_value, traceback): ...
 
 class NotAContextManager: ...
 
@@ -117,6 +117,39 @@ async def _(context_expr: Manager1 | NotAContextManager):
     # error: [invalid-context-manager] "Object of type `Manager1 | NotAContextManager` cannot be used with `async with` because the methods `__aenter__` and `__aexit__` are possibly missing"
     async with context_expr as f:
         reveal_type(f)  # revealed: str
+```
+
+## Possibly unbound non-awaitable context-manager methods
+
+When a union member lacks the async context-manager methods, the methods on the remaining member
+must still return awaitables:
+
+```py
+class Invalid:
+    def __aenter__(self) -> int:
+        return 0
+
+    def __aexit__(self, exc_type, exc, tb) -> bool:
+        return False
+
+class Missing: ...
+
+async def main(manager: Invalid | Missing):
+    # snapshot: invalid-context-manager
+    async with manager as value:
+        reveal_type(value)  # revealed: Unknown
+```
+
+```snapshot
+error[invalid-context-manager]: Object of type `Invalid | Missing` cannot be used with `async with` because `__aenter__` and `__aexit__` may be missing or return non-awaitables
+  --> src/mdtest_snippet.py:12:16
+   |
+12 |     async with manager as value:
+   |                ^^^^^^^
+info: `Missing` does not implement `__aenter__` or `__aexit__`
+info: `__aenter__` returns `int`, which is not awaitable
+info: `__aexit__` returns `bool`, which is not awaitable
+info: Consider declaring the methods with `async def`
 ```
 
 ## Context expression with "sometimes" callable `__aenter__` method
@@ -132,7 +165,7 @@ async def _(flag: bool):
 
     # error: [invalid-context-manager] "Object of type `Manager` cannot be used with `async with` because the method `__aenter__` may be missing"
     async with Manager() as f:
-        reveal_type(f)  # revealed: CoroutineType[Any, Any, str]
+        reveal_type(f)  # revealed: str
 ```
 
 ## Invalid `__aenter__` signature
@@ -212,7 +245,8 @@ async def main():
 ## Non-awaitable `__aenter__`
 
 `async with` awaits whatever `__aenter__` returns, so a method that is callable but returns a
-non-awaitable fails at runtime with `TypeError: object int can't be used in 'await' expression`:
+non-awaitable fails at runtime with
+`TypeError: 'async with' received an object from __aenter__ that does not implement __await__: int`:
 
 ```py
 class Manager:
@@ -254,6 +288,56 @@ async def main():
     # error: [invalid-context-manager] "Object of type `Manager` cannot be used with `async with` because `__aexit__` does not return an awaitable"
     async with Manager() as value:
         reveal_type(value)  # revealed: int
+```
+
+## Non-awaitable `__aenter__` with missing `__aexit__`
+
+A missing exit method does not excuse an entry method that returns a non-awaitable:
+
+```py
+class Manager:
+    def __aenter__(self) -> int:
+        return 0
+
+async def main():
+    # snapshot: invalid-context-manager
+    async with Manager():
+        pass
+```
+
+```snapshot
+error[invalid-context-manager]: Object of type `Manager` cannot be used with `async with` because it does not implement `__aexit__`, and `__aenter__` does not return an awaitable
+ --> src/mdtest_snippet.py:7:16
+  |
+7 |     async with Manager():
+  |                ^^^^^^^^^
+info: `__aenter__` returns `int`, which is not awaitable
+info: Consider declaring the method with `async def`
+```
+
+## Missing `__aenter__` with non-awaitable `__aexit__`
+
+An exit method must return an awaitable even when the entry method is missing:
+
+```py
+class Manager:
+    def __aexit__(self, exc_type, exc, tb) -> bool:
+        return False
+
+async def main():
+    # snapshot: invalid-context-manager
+    async with Manager():
+        pass
+```
+
+```snapshot
+error[invalid-context-manager]: Object of type `Manager` cannot be used with `async with` because it does not implement `__aenter__`, and `__aexit__` does not return an awaitable
+ --> src/mdtest_snippet.py:7:16
+  |
+7 |     async with Manager():
+  |                ^^^^^^^^^
+info: `__aexit__` returns `bool`, which is not awaitable
+info: Consider declaring the method with `async def`
 ```
 
 ## Both methods non-awaitable

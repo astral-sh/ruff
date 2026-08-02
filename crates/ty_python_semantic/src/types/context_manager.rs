@@ -1,7 +1,7 @@
 use crate::{
     Db, FxOrderSet,
     types::{
-        CallArguments, CallDunderError, Type, TypeContext, call::CallErrorKind,
+        Bindings, CallArguments, CallDunderError, Type, TypeContext, call::CallErrorKind,
         context::InferContext, diagnostic::INVALID_CONTEXT_MANAGER,
     },
 };
@@ -58,41 +58,47 @@ impl<'db> Type<'db> {
             TypeContext::default(),
         );
 
+        let awaited_enter_type = if mode.is_async() {
+            let return_type = |call: &Result<Bindings<'db>, CallDunderError<'db>>| match call {
+                Ok(bindings) => Some(bindings.return_type(db)),
+                Err(CallDunderError::PossiblyUnbound { bindings, .. }) => {
+                    Some(bindings.return_type(db))
+                }
+                Err(CallDunderError::MethodNotAvailable | CallDunderError::CallError(..)) => None,
+            };
+
+            let enter_return_type = return_type(&enter);
+            let awaited_enter_type =
+                enter_return_type.and_then(|return_type| return_type.try_await(db).ok());
+            let non_awaitable_enter = enter_return_type.filter(|_| awaited_enter_type.is_none());
+            let non_awaitable_exit =
+                return_type(&exit).filter(|return_type| return_type.try_await(db).is_err());
+
+            if let Some(non_awaitable) =
+                NonAwaitableMethods::from_parts(non_awaitable_enter, non_awaitable_exit)
+            {
+                return Err(ContextManagerError::NotAwaitable {
+                    enter_return_type: awaited_enter_type.unwrap_or(Type::unknown()),
+                    non_awaitable,
+                    enter_error: enter.err().map(Box::new),
+                    exit_error: exit.err().map(Box::new),
+                });
+            }
+
+            awaited_enter_type
+        } else {
+            None
+        };
+
         // TODO: Make use of Protocols when we support it (the manager be assignable to `contextlib.AbstractContextManager`).
         match (enter, exit) {
-            (Ok(enter), Ok(exit)) => {
-                let enter_return_type = enter.return_type(db);
-
-                if !mode.is_async() {
-                    return Ok(enter_return_type);
-                }
-
-                // `async with` awaits whatever `__aenter__` and `__aexit__` return, so a method
-                // that is callable but returns a non-awaitable still fails at runtime:
-                //
-                // ```python
-                // class C:
-                //     def __aenter__(self) -> int: ...  # `await`ing an `int` raises `TypeError`
-                // ```
-                let (awaited_enter_type, non_awaitable_enter) =
-                    match enter_return_type.try_await(db) {
-                        Ok(awaited) => (awaited, None),
-                        Err(_) => (Type::unknown(), Some(enter_return_type)),
-                    };
-
-                let exit_return_type = exit.return_type(db);
-                let non_awaitable_exit = exit_return_type
-                    .try_await(db)
-                    .is_err()
-                    .then_some(exit_return_type);
-
-                match NonAwaitableMethods::from_parts(non_awaitable_enter, non_awaitable_exit) {
-                    None => Ok(awaited_enter_type),
-                    Some(non_awaitable) => Err(ContextManagerError::NotAwaitable {
-                        enter_return_type: awaited_enter_type,
-                        non_awaitable,
-                    }),
-                }
+            (Ok(enter), Ok(_)) => {
+                let return_type = enter.return_type(db);
+                Ok(if mode.is_async() {
+                    awaited_enter_type.unwrap_or(Type::unknown())
+                } else {
+                    return_type
+                })
             }
             (Ok(enter), Err(exit_error)) => {
                 let ty = enter.return_type(db);
@@ -131,13 +137,14 @@ pub(super) enum ContextManagerError<'db> {
         exit_error: CallDunderError<'db>,
         mode: EvaluationMode,
     },
-    /// `__aenter__` and `__aexit__` are both callable, but at least one of them returns a value
-    /// that cannot be awaited. This can only happen in [`EvaluationMode::Async`], since `with`
-    /// does not await what `__enter__` and `__exit__` return.
+    /// At least one async context-manager method returns a non-awaitable, possibly in addition to
+    /// a missing or invalid method.
     NotAwaitable {
         /// The type bound to the `as` target, already awaited when `__aenter__` allowed it.
         enter_return_type: Type<'db>,
         non_awaitable: NonAwaitableMethods<'db>,
+        enter_error: Option<Box<CallDunderError<'db>>>,
+        exit_error: Option<Box<CallDunderError<'db>>>,
     },
 }
 
@@ -198,16 +205,22 @@ impl<'db> ContextManagerError<'db> {
                 mode: _,
             }
             | Self::NotAwaitable {
-                enter_return_type,
-                non_awaitable: _,
+                enter_return_type, ..
             } => Some(*enter_return_type),
-            Self::Enter(enter_error, _)
+            Self::Enter(enter_error, mode)
             | Self::EnterAndExit {
                 enter_error,
                 exit_error: _,
-                mode: _,
+                mode,
             } => match enter_error {
-                CallDunderError::PossiblyUnbound { bindings, .. } => Some(bindings.return_type(db)),
+                CallDunderError::PossiblyUnbound { bindings, .. } => {
+                    let return_type = bindings.return_type(db);
+                    Some(if mode.is_async() {
+                        return_type.try_await(db).unwrap_or(Type::unknown())
+                    } else {
+                        return_type
+                    })
+                }
                 CallDunderError::CallError(CallErrorKind::NotCallable, _, _) => None,
                 CallDunderError::CallError(_, bindings, _) => Some(bindings.return_type(db)),
                 CallDunderError::MethodNotAvailable => None,
@@ -300,17 +313,51 @@ impl<'db> ContextManagerError<'db> {
                 exit_error,
                 mode: _,
             } => format_call_dunder_errors(enter_error, enter_method, exit_error, exit_method),
-            Self::NotAwaitable { non_awaitable, .. } => {
+            Self::NotAwaitable {
+                non_awaitable,
+                enter_error,
+                exit_error,
+                ..
+            } => {
                 let methods = non_awaitable
                     .named_return_types(enter_method, exit_method)
                     .iter()
                     .map(|(name, _)| format!("`{name}`"))
                     .collect::<Vec<_>>()
                     .join(" and ");
-                if non_awaitable.is_both() {
+                let await_error = if non_awaitable.is_both() {
                     format!("{methods} do not return awaitables")
                 } else {
                     format!("{methods} does not return an awaitable")
+                };
+
+                match (enter_error.as_deref(), exit_error.as_deref()) {
+                    (
+                        Some(CallDunderError::PossiblyUnbound { .. }),
+                        Some(CallDunderError::PossiblyUnbound { .. }),
+                    ) if non_awaitable.is_both() => {
+                        format!(
+                            "`{enter_method}` and `{exit_method}` may be missing or return non-awaitables"
+                        )
+                    }
+                    (Some(enter_error), Some(exit_error)) => format!(
+                        "{}, and {await_error}",
+                        format_call_dunder_errors(
+                            enter_error,
+                            enter_method,
+                            exit_error,
+                            exit_method
+                        )
+                    ),
+                    (Some(enter_error), None) => format!(
+                        "{}, and {await_error}",
+                        format_call_dunder_error(enter_error, enter_method)
+                    ),
+                    (None, Some(exit_error)) => format!(
+                        "{}, and {await_error}",
+                        format_call_dunder_error(exit_error, exit_method)
+                    ),
+                    (None, None) => await_error,
                 }
             }
         };
@@ -379,7 +426,42 @@ impl<'db> ContextManagerError<'db> {
                     }
                 }
             }
-            Self::NotAwaitable { non_awaitable, .. } => {
+            Self::NotAwaitable {
+                non_awaitable,
+                enter_error,
+                exit_error,
+                ..
+            } => {
+                let enter_unbound_on = enter_error
+                    .as_deref()
+                    .map_or_else(FxOrderSet::default, unbound_on);
+                let exit_unbound_on = exit_error
+                    .as_deref()
+                    .map_or_else(FxOrderSet::default, unbound_on);
+
+                for ty in &enter_unbound_on {
+                    if exit_unbound_on.contains(ty) {
+                        diag.info(format_args!(
+                            "`{}` does not implement `{enter_method}` or `{exit_method}`",
+                            ty.display(db)
+                        ));
+                    } else {
+                        diag.info(format_args!(
+                            "`{}` does not implement `{enter_method}`",
+                            ty.display(db)
+                        ));
+                    }
+                }
+
+                for ty in &exit_unbound_on {
+                    if !enter_unbound_on.contains(ty) {
+                        diag.info(format_args!(
+                            "`{}` does not implement `{exit_method}`",
+                            ty.display(db)
+                        ));
+                    }
+                }
+
                 for (method, return_type) in
                     non_awaitable.named_return_types(enter_method, exit_method)
                 {
