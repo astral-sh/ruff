@@ -527,6 +527,8 @@ class Overridden(Original):
         return self
 
 def overridden(value: First | Overridden) -> None:
+    # revealed: (bound method First.clone() -> First) | (bound method Overridden.clone() -> Overridden)
+    reveal_type(value.clone)
     reveal_type(value.clone())  # revealed: First | Overridden
 ```
 
