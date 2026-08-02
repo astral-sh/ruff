@@ -170,6 +170,28 @@ _ReassignedAlias: int
 _ReassignedAlias: TypeAlias = str
 ```
 
+## Private runtime protocols in custom builtins
+
+Protocol classes are real runtime objects unless their definitions are marked as type-check-only.
+
+```py
+_RuntimeProtocol
+_RuntimeCheckableProtocol
+```
+
+`__builtins__.pyi`:
+
+```pyi
+from typing import Protocol, runtime_checkable
+
+class _RuntimeProtocol(Protocol):
+    def method(self) -> int: ...
+
+@runtime_checkable
+class _RuntimeCheckableProtocol(Protocol):
+    def method(self) -> int: ...
+```
+
 ## Conditionally defined private runtime values
 
 A private name remains available when any reachable definition represents a real runtime value.

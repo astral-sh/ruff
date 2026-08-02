@@ -179,7 +179,6 @@ fn is_stub_only_builtin_definition<'db>(
                             | KnownClass::UnionType
                     )
                 ),
-                Type::ClassLiteral(class) => class.is_protocol(db),
                 Type::Callable(_)
                 | Type::GenericAlias(_)
                 | Type::SpecialForm(_)
