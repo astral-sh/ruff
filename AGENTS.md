@@ -11,6 +11,11 @@ consistency issues. Order findings by severity, cite files and lines, and
 distinguish blockers from non-blocking improvements. Number each review point
 for easy reference in subsequent review discussion.
 
+During code review, check the proposed changes against all applicable code, test,
+documentation, and architectural conventions in this `AGENTS.md`. Report
+meaningful violations introduced by the changes; do not apply agent-only workflow
+instructions to PR authors or flag unrelated pre-existing issues.
+
 ## Running Tests
 
 Run all tests (using `nextest` for faster execution, setting `CARGO_PROFILE_DEV_OPT_LEVEL=1 CARGO_PROFILE_DEV_DEBUG="line-tables-only"` to enable optimizations while retaining some debug info, and setting `INSTA_FORCE_PASS=1 INSTA_UPDATE=always MDTEST_UPDATE_SNAPSHOTS=1` to ensure all snapshots are updated):
