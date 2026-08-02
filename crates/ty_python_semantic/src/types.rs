@@ -228,8 +228,17 @@ pub(crate) fn binding_type<'db>(db: &'db dyn Db, definition: Definition<'db>) ->
 /// In addition to explicit aliases and `@type_check_only` definitions, this recognizes direct
 /// type-variable declarations and implicit aliases without confusing runtime factory results or
 /// indexing operations with typing-only definitions.
+///
+/// ```python
+/// _T = TypeVar("_T")  # Typing-only helper.
+/// _Alias = list[int]  # Typing-only alias.
+/// _runtime_typevar = make_typevar()  # Runtime value.
+/// _runtime_callback = callbacks[0]  # Runtime value.
+/// ```
 #[salsa::tracked(returns(copy))]
 pub(crate) fn exists_at_runtime<'db>(db: &'db dyn Db, definition: Definition<'db>) -> bool {
+    let file = definition.file(db);
+    let model = SemanticModel::new(db, file);
     let inference = infer_definition_types(db, definition);
     let ty = inference.binding_type(definition);
 
@@ -242,12 +251,11 @@ pub(crate) fn exists_at_runtime<'db>(db: &'db dyn Db, definition: Definition<'db
             Type::KnownInstance(KnownInstanceType::TypeVar(typevar))
                 if typevar.definition(db) == Some(definition)
         )
-        || SemanticModel::new(db, definition.file(db)).is_type_alias_definition(definition)
+        || model.is_type_alias_definition(definition)
     {
         return false;
     }
 
-    let file = definition.file(db);
     let parsed = parsed_module(db, file);
     let module = parsed.load(db);
 
@@ -262,9 +270,7 @@ pub(crate) fn exists_at_runtime<'db>(db: &'db dyn Db, definition: Definition<'db
         return true;
     };
 
-    let value = assignment.value(&module);
-
-    match (ty, value) {
+    match (ty, assignment.value(&module)) {
         (
             Type::KnownInstance(KnownInstanceType::UnionType(_)),
             ast::Expr::BinOp(ast::ExprBinOp {
@@ -283,13 +289,10 @@ pub(crate) fn exists_at_runtime<'db>(db: &'db dyn Db, definition: Definition<'db
             | Type::Callable(_)
             | Type::SubclassOf(_),
             ast::Expr::Subscript(subscript),
-        ) => {
-            let model = SemanticModel::new(db, definition.file(db));
-            !matches!(
-                subscript.value.inferred_type(&model),
-                Some(Type::SpecialForm(_) | Type::ClassLiteral(_) | Type::GenericAlias(_))
-            )
-        }
+        ) => !matches!(
+            subscript.value.inferred_type(&model),
+            Some(Type::SpecialForm(_) | Type::ClassLiteral(_) | Type::GenericAlias(_))
+        ),
         _ => true,
     }
 }

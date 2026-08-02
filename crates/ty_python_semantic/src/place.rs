@@ -618,6 +618,14 @@ pub(crate) fn builtins_symbol<'db>(
 ///
 /// Private type-checking-only definitions are implementation details, but private runtime
 /// definitions from either the standard or project-level builtins remain available.
+///
+/// ```python
+/// # builtins.pyi
+/// _T = TypeVar("_T")  # Not available as an implicit builtin.
+///
+/// # __builtins__.pyi
+/// _custom: int  # Available as an implicit builtin.
+/// ```
 pub(crate) fn implicit_builtins_symbol<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
@@ -629,6 +637,9 @@ pub(crate) fn implicit_builtins_symbol<'db>(
 }
 
 /// Returns the module scope that supplies `symbol` through implicit builtin fallback.
+///
+/// Uses the same visibility rules as [`implicit_builtins_symbol`] so IDE definition lookup cannot
+/// resolve a private typing-only helper that type inference considers undefined.
 pub(crate) fn implicit_builtins_symbol_scope<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
@@ -637,6 +648,10 @@ pub(crate) fn implicit_builtins_symbol_scope<'db>(
     builtins_symbol_impl(db, env, symbol, true).map(|(scope, _)| scope)
 }
 
+/// Resolves project-level builtins before standard builtins and optionally hides typing-only names.
+///
+/// Returns the supplying module's scope together with the symbol so inference and IDE lookups can
+/// share the same resolution and visibility policy.
 fn builtins_symbol_impl<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
