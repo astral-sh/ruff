@@ -209,6 +209,177 @@ async def main():
         pass
 ```
 
+## Non-awaitable `__aenter__`
+
+`async with` awaits whatever `__aenter__` returns, so a method that is callable but returns a
+non-awaitable fails at runtime with `TypeError: object int can't be used in 'await' expression`:
+
+```py
+class Manager:
+    def __aenter__(self) -> int:
+        return 0
+
+    async def __aexit__(self, exc_type, exc, tb) -> None: ...
+
+async def main():
+    # snapshot: invalid-context-manager
+    async with Manager():
+        pass
+```
+
+```snapshot
+error[invalid-context-manager]: Object of type `Manager` cannot be used with `async with` because `__aenter__` does not return an awaitable
+ --> src/mdtest_snippet.py:9:16
+  |
+9 |     async with Manager():
+  |                ^^^^^^^^^
+info: `__aenter__` returns `int`, which is not awaitable
+info: Consider declaring the method with `async def`
+```
+
+## Non-awaitable `__aexit__`
+
+The same applies on the way out. Here `__aenter__` is correct, so the target still binds, but
+leaving the block would await a `bool`:
+
+```py
+class Manager:
+    async def __aenter__(self) -> int:
+        return 0
+
+    def __aexit__(self, exc_type, exc, tb) -> bool:
+        return False
+
+async def main():
+    # error: [invalid-context-manager] "Object of type `Manager` cannot be used with `async with` because `__aexit__` does not return an awaitable"
+    async with Manager() as value:
+        reveal_type(value)  # revealed: int
+```
+
+## Both methods non-awaitable
+
+When neither method returns an awaitable, both are named in a single diagnostic:
+
+```py
+class Manager:
+    def __aenter__(self) -> int:
+        return 0
+
+    def __aexit__(self, exc_type, exc, tb) -> bool:
+        return False
+
+async def main():
+    # error: [invalid-context-manager] "Object of type `Manager` cannot be used with `async with` because `__aenter__` and `__aexit__` do not return awaitables"
+    async with Manager():
+        pass
+```
+
+## Awaitable returns that are not `async def`
+
+A method does not have to be `async` to satisfy `async with`; it only has to return something
+awaitable. None of these are errors:
+
+```py
+from typing import Any, Awaitable, Coroutine, Generator
+
+class ReturnsAwaitable:
+    def __aenter__(self) -> Awaitable[int]:
+        raise NotImplementedError
+
+    def __aexit__(self, exc_type, exc, tb) -> Awaitable[None]:
+        raise NotImplementedError
+
+class Custom:
+    def __await__(self) -> Generator[Any, None, int]:
+        raise NotImplementedError
+
+class ReturnsCustomAwaitable:
+    def __aenter__(self) -> Custom:
+        raise NotImplementedError
+
+    def __aexit__(self, exc_type, exc, tb) -> Custom:
+        raise NotImplementedError
+
+class ReturnsCoroutine:
+    def __aenter__(self) -> Coroutine[Any, Any, int]:
+        raise NotImplementedError
+
+    def __aexit__(self, exc_type, exc, tb) -> Coroutine[Any, Any, None]:
+        raise NotImplementedError
+
+async def main():
+    async with ReturnsAwaitable() as a:
+        reveal_type(a)  # revealed: int
+    async with ReturnsCustomAwaitable() as b:
+        reveal_type(b)  # revealed: int
+    async with ReturnsCoroutine() as c:
+        reveal_type(c)  # revealed: int
+```
+
+A union return type is awaitable when every member is, and `Never` is vacuously awaitable:
+
+```py
+from typing import Awaitable
+from typing_extensions import Never
+
+class UnionOfAwaitables:
+    def __aenter__(self) -> Awaitable[int] | Awaitable[str]:
+        raise NotImplementedError
+
+    def __aexit__(self, exc_type, exc, tb) -> Awaitable[None]:
+        raise NotImplementedError
+
+class NeverReturns:
+    def __aenter__(self) -> Never:
+        raise NotImplementedError
+
+    async def __aexit__(self, exc_type, exc, tb) -> None: ...
+
+async def main():
+    async with UnionOfAwaitables() as a:
+        reveal_type(a)  # revealed: int | str
+    async with NeverReturns() as b:
+        reveal_type(b)  # revealed: Never
+```
+
+A union is only awaitable if every member is, so mixing an awaitable with a plain value is still an
+error:
+
+```py
+from typing import Awaitable
+
+class Manager:
+    def __aenter__(self) -> int | Awaitable[int]:
+        raise NotImplementedError
+
+    async def __aexit__(self, exc_type, exc, tb) -> None: ...
+
+async def main():
+    # error: [invalid-context-manager] "Object of type `Manager` cannot be used with `async with` because `__aenter__` does not return an awaitable"
+    async with Manager():
+        pass
+```
+
+A method whose return type is not known does not produce a diagnostic either:
+
+```py
+from typing import Any
+
+class ReturnsAny:
+    def __aenter__(self) -> Any: ...
+    def __aexit__(self, exc_type, exc, tb) -> Any: ...
+
+class Unannotated:
+    def __aenter__(self): ...
+    def __aexit__(self, exc_type, exc, tb): ...
+
+async def main():
+    async with ReturnsAny() as a:
+        reveal_type(a)  # revealed: Any
+    async with Unannotated() as b:
+        reveal_type(b)  # revealed: Unknown
+```
+
 ## `@asynccontextmanager`
 
 ```py

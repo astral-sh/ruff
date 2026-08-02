@@ -60,13 +60,39 @@ impl<'db> Type<'db> {
 
         // TODO: Make use of Protocols when we support it (the manager be assignable to `contextlib.AbstractContextManager`).
         match (enter, exit) {
-            (Ok(enter), Ok(_)) => {
-                let ty = enter.return_type(db);
-                Ok(if mode.is_async() {
-                    ty.try_await(db).unwrap_or(Type::unknown())
-                } else {
-                    ty
-                })
+            (Ok(enter), Ok(exit)) => {
+                let enter_return_type = enter.return_type(db);
+
+                if !mode.is_async() {
+                    return Ok(enter_return_type);
+                }
+
+                // `async with` awaits whatever `__aenter__` and `__aexit__` return, so a method
+                // that is callable but returns a non-awaitable still fails at runtime:
+                //
+                // ```python
+                // class C:
+                //     def __aenter__(self) -> int: ...  # `await`ing an `int` raises `TypeError`
+                // ```
+                let (awaited_enter_type, non_awaitable_enter) =
+                    match enter_return_type.try_await(db) {
+                        Ok(awaited) => (awaited, None),
+                        Err(_) => (Type::unknown(), Some(enter_return_type)),
+                    };
+
+                let exit_return_type = exit.return_type(db);
+                let non_awaitable_exit = exit_return_type
+                    .try_await(db)
+                    .is_err()
+                    .then_some(exit_return_type);
+
+                match NonAwaitableMethods::from_parts(non_awaitable_enter, non_awaitable_exit) {
+                    None => Ok(awaited_enter_type),
+                    Some(non_awaitable) => Err(ContextManagerError::NotAwaitable {
+                        enter_return_type: awaited_enter_type,
+                        non_awaitable,
+                    }),
+                }
             }
             (Ok(enter), Err(exit_error)) => {
                 let ty = enter.return_type(db);
@@ -105,6 +131,56 @@ pub(super) enum ContextManagerError<'db> {
         exit_error: CallDunderError<'db>,
         mode: EvaluationMode,
     },
+    /// `__aenter__` and `__aexit__` are both callable, but at least one of them returns a value
+    /// that cannot be awaited. This can only happen in [`EvaluationMode::Async`], since `with`
+    /// does not await what `__enter__` and `__exit__` return.
+    NotAwaitable {
+        /// The type bound to the `as` target, already awaited when `__aenter__` allowed it.
+        enter_return_type: Type<'db>,
+        non_awaitable: NonAwaitableMethods<'db>,
+    },
+}
+
+/// Which of `__aenter__` and `__aexit__` returned a value that cannot be awaited, and what each
+/// of them returned.
+///
+/// At least one method must be at fault for the enclosing error to exist, which is why this is an
+/// enum rather than a pair of `Option`s or a collection that could be empty.
+#[derive(Debug)]
+pub(super) enum NonAwaitableMethods<'db> {
+    Enter(Type<'db>),
+    Exit(Type<'db>),
+    Both { enter: Type<'db>, exit: Type<'db> },
+}
+
+impl<'db> NonAwaitableMethods<'db> {
+    /// Builds the error description from whichever methods are at fault, or `None` if both
+    /// returned awaitables and there is nothing to report.
+    fn from_parts(enter: Option<Type<'db>>, exit: Option<Type<'db>>) -> Option<Self> {
+        match (enter, exit) {
+            (Some(enter), Some(exit)) => Some(Self::Both { enter, exit }),
+            (Some(enter), None) => Some(Self::Enter(enter)),
+            (None, Some(exit)) => Some(Self::Exit(exit)),
+            (None, None) => None,
+        }
+    }
+
+    /// The offending return types, paired with the name of the method that returned each one.
+    fn named_return_types(
+        &self,
+        enter_method: &'static str,
+        exit_method: &'static str,
+    ) -> Vec<(&'static str, Type<'db>)> {
+        match self {
+            Self::Enter(enter) => vec![(enter_method, *enter)],
+            Self::Exit(exit) => vec![(exit_method, *exit)],
+            Self::Both { enter, exit } => vec![(enter_method, *enter), (exit_method, *exit)],
+        }
+    }
+
+    const fn is_both(&self) -> bool {
+        matches!(self, Self::Both { .. })
+    }
 }
 
 impl<'db> ContextManagerError<'db> {
@@ -120,6 +196,10 @@ impl<'db> ContextManagerError<'db> {
                 enter_return_type,
                 exit_error: _,
                 mode: _,
+            }
+            | Self::NotAwaitable {
+                enter_return_type,
+                non_awaitable: _,
             } => Some(*enter_return_type),
             Self::Enter(enter_error, _)
             | Self::EnterAndExit {
@@ -160,6 +240,8 @@ impl<'db> ContextManagerError<'db> {
             Self::Exit { mode, .. } | Self::Enter(_, mode) | Self::EnterAndExit { mode, .. } => {
                 *mode
             }
+            // `NotAwaitable` is only ever constructed for `async with`.
+            Self::NotAwaitable { .. } => EvaluationMode::Async,
         };
 
         let (enter_method, exit_method) = match mode {
@@ -218,6 +300,19 @@ impl<'db> ContextManagerError<'db> {
                 exit_error,
                 mode: _,
             } => format_call_dunder_errors(enter_error, enter_method, exit_error, exit_method),
+            Self::NotAwaitable { non_awaitable, .. } => {
+                let methods = non_awaitable
+                    .named_return_types(enter_method, exit_method)
+                    .iter()
+                    .map(|(name, _)| format!("`{name}`"))
+                    .collect::<Vec<_>>()
+                    .join(" and ");
+                if non_awaitable.is_both() {
+                    format!("{methods} do not return awaitables")
+                } else {
+                    format!("{methods} does not return an awaitable")
+                }
+            }
         };
 
         // Suggest using `async with` if only async methods are available in a sync context,
@@ -284,6 +379,28 @@ impl<'db> ContextManagerError<'db> {
                     }
                 }
             }
+            Self::NotAwaitable { non_awaitable, .. } => {
+                for (method, return_type) in
+                    non_awaitable.named_return_types(enter_method, exit_method)
+                {
+                    diag.info(format_args!(
+                        "`{method}` returns `{}`, which is not awaitable",
+                        return_type.display(db)
+                    ));
+                }
+                if non_awaitable.is_both() {
+                    diag.info("Consider declaring the methods with `async def`");
+                } else {
+                    diag.info("Consider declaring the method with `async def`");
+                }
+            }
+        }
+
+        // The remaining hint suggests switching between `with` and `async with`. That is not the
+        // problem here: the object already implements the methods for the mode it was used in,
+        // they just return values that cannot be awaited.
+        if matches!(self, Self::NotAwaitable { .. }) {
+            return;
         }
 
         let (alt_mode, alt_enter_method, alt_exit_method, alt_with_kw) = match mode {
