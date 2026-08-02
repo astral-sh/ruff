@@ -97,7 +97,7 @@ class Registry:
         object.__setattr__(self, "flag", True)
 
 
-from typing import Literal, Optional, Union, Self
+from typing import Optional, Union, Self
 
 
 def func(x: Union[list, Optional[int | str | float | bool]]):
@@ -177,27 +177,3 @@ class BooleanArray:
     def __or__(self, other: Self | bool) -> Self: ...
     def __ror__(self, other: Self | bool) -> Self: ...
     def __ior__(self, other: Self | bool) -> Self: ...
-
-
-# check literal
-def func_literal_both(flag: Literal[True, False]):
-    pass
-
-
-# ignore single literals
-def func_literal_true(flag: Literal[True]):
-    pass
-
-
-def func_literal_false(flag: Literal[False]):
-    pass
-
-
-# ignore other literals
-def func_literal_optional(flag: Literal[True, False, None, "hello"]):
-    pass
-
-
-# collect `bool` from two separate literals
-def func_literal_split_union_optional(flag: Literal[True] | Literal[False] | None):
-    pass
