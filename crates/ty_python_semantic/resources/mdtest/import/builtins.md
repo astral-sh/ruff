@@ -213,6 +213,31 @@ else:
     _ConditionalValue: int
 ```
 
+## Private protocols guarded by TYPE_CHECKING
+
+Protocols defined only inside type-checking blocks do not exist at runtime, including when the guard
+is accessed through the `typing` module.
+
+```py
+_TypeCheckingProtocol  # error: [unresolved-reference]
+_QualifiedTypeCheckingProtocol  # error: [unresolved-reference]
+```
+
+`__builtins__.pyi`:
+
+```pyi
+import typing
+from typing import TYPE_CHECKING, Protocol
+
+if TYPE_CHECKING:
+    class _TypeCheckingProtocol(Protocol):
+        def method(self) -> int: ...
+
+if typing.TYPE_CHECKING:
+    class _QualifiedTypeCheckingProtocol(Protocol):
+        def method(self) -> int: ...
+```
+
 ## Runtime typing-object values in custom builtins
 
 A runtime factory can produce objects whose classes are also used for stub-only typing helpers.

@@ -126,8 +126,17 @@ fn is_stub_only_builtin_definition<'db>(
     name: &str,
     visiting: &mut FxHashSet<Definition<'db>>,
 ) -> bool {
-    if !definition.file(db).is_stub(db) {
+    let file = definition.file(db);
+    if !file.is_stub(db) {
         return false;
+    }
+
+    let parsed = parsed_module(db, file).load(db);
+    if semantic_index(db, file).is_in_type_checking_block(
+        definition.file_scope(db),
+        definition.full_range(db, &parsed).range(),
+    ) {
+        return true;
     }
 
     match definition.kind(db) {
