@@ -135,13 +135,19 @@ fn is_stub_only_builtin_definition<'db>(db: &'db dyn Db, definition: Definition<
                     )
                 ),
                 Type::ClassLiteral(class) => class.is_protocol(db),
-                Type::TypeAlias(_)
+                Type::Callable(_)
+                | Type::GenericAlias(_)
+                | Type::SpecialForm(_)
+                | Type::SubclassOf(_)
+                | Type::TypeAlias(_)
                 | Type::KnownInstance(
                     KnownInstanceType::TypeVar(_)
                     | KnownInstanceType::TypeAliasType(_)
                     | KnownInstanceType::UnionType(_)
                     | KnownInstanceType::Literal(_)
-                    | KnownInstanceType::Annotated(_),
+                    | KnownInstanceType::Annotated(_)
+                    | KnownInstanceType::TypeGenericAlias(_)
+                    | KnownInstanceType::Callable(_),
                 ) => true,
                 _ => false,
             }

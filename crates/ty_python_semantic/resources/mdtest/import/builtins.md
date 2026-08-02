@@ -64,13 +64,17 @@ _PrivateParamSpec  # error: [unresolved-reference]
 _PrivateTypeVarTuple  # error: [unresolved-reference]
 _PrivateAlias  # error: [unresolved-reference]
 _PrivateImplicitAlias  # error: [unresolved-reference]
+_PrivateListAlias  # error: [unresolved-reference]
+_PrivateTupleAlias  # error: [unresolved-reference]
+_PrivateCallableAlias  # error: [unresolved-reference]
+_PrivateTypeAlias  # error: [unresolved-reference]
 ```
 
 `__builtins__.pyi`:
 
 ```pyi
 from types import UnionType
-from typing import ParamSpec, TypeAlias, TypeVar
+from typing import Callable, ParamSpec, TypeAlias, TypeVar
 from typing_extensions import TypeVarTuple
 
 _private_value: int
@@ -83,6 +87,10 @@ _PrivateParamSpec = ParamSpec("_PrivateParamSpec")
 _PrivateTypeVarTuple = TypeVarTuple("_PrivateTypeVarTuple")
 _PrivateAlias: TypeAlias = int
 _PrivateImplicitAlias = int | str
+_PrivateListAlias = list[int]
+_PrivateTupleAlias = tuple[int, str]
+_PrivateCallableAlias = Callable[[int], str]
+_PrivateTypeAlias = type[int]
 ```
 
 ## Conditionally defined private aliases
