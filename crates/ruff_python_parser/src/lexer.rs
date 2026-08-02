@@ -7,6 +7,7 @@
 //! [Lexical analysis]: https://docs.python.org/3/reference/lexical_analysis.html
 
 use std::cmp::Ordering;
+use std::hint::cold_path;
 
 use unicode_ident::{is_xid_continue, is_xid_start};
 
@@ -148,7 +149,9 @@ impl<'src> Lexer<'src> {
         self.current_flags = TokenFlags::empty();
         self.current_kind = self.lex_token();
         // For `Unknown` token, the `push_error` method updates the current range.
-        if !matches!(self.current_kind, TokenKind::Unknown) {
+        if matches!(self.current_kind, TokenKind::Unknown) {
+            cold_path();
+        } else {
             self.current_range = self.token_range();
         }
         self.current_kind

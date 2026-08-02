@@ -517,18 +517,12 @@ impl TextWidth {
             matches!(byte, b' '..=b'~')
         }
 
-        let mut width = 0u32;
-
-        for (index, byte) in text.bytes().enumerate() {
-            match byte {
-                b'\t' => width += indent_width.value(),
-                b'\n' => return TextWidth::Multiline,
-                byte if is_printable_ascii(byte) => width += 1,
-                _ => return Self::from_text_slow(&text[index..], indent_width, width),
-            }
+        match text.bytes().position(|byte| !is_printable_ascii(byte)) {
+            #[expect(clippy::cast_possible_truncation)]
+            Some(index) => Self::from_text_slow(&text[index..], indent_width, index as u32),
+            #[expect(clippy::cast_possible_truncation)]
+            None => Self::Width(Width::new(text.len() as u32)),
         }
-
-        Self::Width(Width::new(width))
     }
 
     #[cold]
@@ -573,9 +567,15 @@ mod tests {
                 .map(super::Width::value)
         };
 
+        assert_eq!(width(""), Some(0));
         assert_eq!(width("hello"), Some(5));
+        assert_eq!(width("a\tb"), Some(6));
+        assert_eq!(width("\ta\t"), Some(9));
+        assert_eq!(width("a\nb"), None);
         assert_eq!(width("a寿司b"), Some(6));
+        assert_eq!(width("a\t寿司b"), Some(10));
         assert_eq!(width("a\0b"), Some(2));
+        assert_eq!(width("a\x7fb"), Some(2));
     }
 
     #[test]
