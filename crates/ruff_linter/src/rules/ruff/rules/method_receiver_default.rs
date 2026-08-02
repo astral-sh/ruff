@@ -104,7 +104,7 @@ pub(crate) fn method_receiver_default(checker: &Checker, scope: &Scope) {
         ..
     }) = &scope.kind
     else {
-        panic!("Expected ScopeKind::Function")
+        return;
     };
 
     let semantic = checker.semantic();
