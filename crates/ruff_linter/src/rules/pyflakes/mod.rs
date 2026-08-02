@@ -223,10 +223,8 @@ mod tests {
     fn f821_with_builtin_added_on_new_py_version_but_old_target_version_specified() {
         let diagnostics = test_snippet(
             "PythonFinalizationError",
-            &LinterSettings {
-                unresolved_target_version: ruff_python_ast::PythonVersion::PY312.into(),
-                ..LinterSettings::for_rule(Rule::UndefinedName)
-            },
+            &LinterSettings::for_rule(Rule::UndefinedName)
+                .with_target_version(ruff_python_ast::PythonVersion::PY312),
         );
         assert_diagnostics!(diagnostics);
     }
@@ -236,10 +234,8 @@ mod tests {
         // frozendict is available starting in Python 3.15.
         let diagnostics = test_snippet(
             "frozendict",
-            &LinterSettings {
-                unresolved_target_version: ruff_python_ast::PythonVersion::PY315.into(),
-                ..LinterSettings::for_rule(Rule::UndefinedName)
-            },
+            &LinterSettings::for_rule(Rule::UndefinedName)
+                .with_target_version(ruff_python_ast::PythonVersion::PY315),
         );
         assert!(diagnostics.is_empty());
     }
@@ -249,10 +245,8 @@ mod tests {
         // frozendict is not available before Python 3.15.
         let diagnostics = test_snippet(
             "frozendict",
-            &LinterSettings {
-                unresolved_target_version: ruff_python_ast::PythonVersion::PY314.into(),
-                ..LinterSettings::for_rule(Rule::UndefinedName)
-            },
+            &LinterSettings::for_rule(Rule::UndefinedName)
+                .with_target_version(ruff_python_ast::PythonVersion::PY314),
         );
         assert_diagnostics!(diagnostics);
     }

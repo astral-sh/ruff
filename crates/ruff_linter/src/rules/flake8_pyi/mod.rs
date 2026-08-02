@@ -188,10 +188,7 @@ mod tests {
         let snapshot = format!("py38_{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("flake8_pyi").join(path).as_path(),
-            &settings::LinterSettings {
-                unresolved_target_version: PythonVersion::PY38.into(),
-                ..settings::LinterSettings::for_rule(rule_code)
-            },
+            &settings::LinterSettings::for_rule(rule_code).with_target_version(PythonVersion::PY38),
         )?;
         assert_diagnostics!(snapshot, diagnostics);
         Ok(())

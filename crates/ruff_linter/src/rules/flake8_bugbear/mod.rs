@@ -144,10 +144,7 @@ mod tests {
         );
         let diagnostics = test_path(
             Path::new("flake8_bugbear").join(path).as_path(),
-            &LinterSettings {
-                unresolved_target_version: target_version.into(),
-                ..LinterSettings::for_rule(rule_code)
-            },
+            &LinterSettings::for_rule(rule_code).with_target_version(target_version),
         )?;
         assert_diagnostics!(snapshot, diagnostics);
         Ok(())

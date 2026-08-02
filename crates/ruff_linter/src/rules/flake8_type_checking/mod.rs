@@ -164,10 +164,7 @@ mod tests {
         let snapshot = format!("pre_py310_{}_{}", rule_code.name(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("flake8_type_checking").join(path).as_path(),
-            &settings::LinterSettings {
-                unresolved_target_version: PythonVersion::PY39.into(),
-                ..settings::LinterSettings::for_rule(rule_code)
-            },
+            &settings::LinterSettings::for_rule(rule_code).with_target_version(PythonVersion::PY39),
         )?;
         assert_diagnostics!(snapshot, diagnostics);
         Ok(())
