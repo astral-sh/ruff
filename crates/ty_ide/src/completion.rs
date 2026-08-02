@@ -3393,6 +3393,23 @@ mod tests {
     }
 
     #[test]
+    fn private_builtin_helpers_are_not_scoped_completions() {
+        let builder = completion_test_builder("_O<CURSOR>").skip_auto_import();
+        let test = builder.build();
+
+        test.not_contains("_Opener");
+    }
+
+    #[test]
+    fn explicitly_imported_private_builtin_helpers_are_scoped_completions() {
+        let builder =
+            completion_test_builder("from builtins import _Opener\n_Op<CURSOR>").skip_auto_import();
+        let test = builder.build();
+
+        test.contains("_Opener");
+    }
+
+    #[test]
     fn keywords() {
         let test = completion_test_builder(
             "\
