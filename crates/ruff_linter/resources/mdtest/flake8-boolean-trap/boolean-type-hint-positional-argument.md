@@ -74,8 +74,10 @@ def func_literal_quoted_union_leaf(flag: "int | Literal[True, False]"):  # error
 def func_literal_quoted_union_leaf(flag: int | "Literal[True, False]"):  # error: [boolean-type-hint-positional-argument]
     pass
 
+# Not supported, requires extending `traverse_union_and_optional`
+# to support resolving quotes unions.
 # Quoted union inside union.
-def func_literal_quoted_nested_union(flag: str | "int | Literal[True, False]"):  # error: [boolean-type-hint-positional-argument]
+def func_literal_quoted_nested_union(flag: str | "int | Literal[True, False]"):
     pass
 
 ```

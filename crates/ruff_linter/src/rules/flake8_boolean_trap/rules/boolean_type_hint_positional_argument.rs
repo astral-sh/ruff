@@ -4,9 +4,7 @@ use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::name::UnqualifiedName;
 use ruff_python_ast::{self as ast, Decorator, Expr, Parameters};
 use ruff_python_parser::typing::ParsedAnnotation;
-use ruff_python_semantic::analyze::typing::{
-    traverse_literal, traverse_union_and_optional_with_quoted_annotations,
-};
+use ruff_python_semantic::analyze::typing::{traverse_literal, traverse_union_and_optional};
 use ruff_python_semantic::analyze::visibility;
 
 use crate::Violation;
@@ -199,22 +197,20 @@ where
         return true;
     }
 
-    let mut matched = false;
-    // Resolve quoted (forward-reference) union members, e.g. `"Literal[True, False]"`.
-    let resolve_quoted_annotation = |string_expr: &ast::ExprStringLiteral| {
-        checker
-            .parse_type_annotation(string_expr)
-            .ok()
-            .map(ParsedAnnotation::expression)
+    // Resolve a top-level quoted (forward-reference) union, e.g. `x: "bool | str"`,
+    // since `traverse_union` doesn't resolve it by itself.
+    let Some(annotation) = resolve_possibly_quoted_annotation(annotation, checker) else {
+        return false;
     };
+
+    let mut matched = false;
     // Ex) `typing.Union[bool, int]` or `Literal[True] | Literal[False] | int`
-    traverse_union_and_optional_with_quoted_annotations(
+    traverse_union_and_optional(
         &mut |inner_expr, _parent| {
             matched = matched || match_simple_bool(inner_expr, checker, &mut seen);
         },
         semantic,
         annotation,
-        &resolve_quoted_annotation,
     );
     matched
 }
@@ -227,21 +223,17 @@ fn match_simple_bool<'a, 'b>(
 where
     'a: 'b,
 {
+    // Resolve quoted (forward-reference) annotations, e.g. `"Literal[True, False]"`, before
+    // matching. Returns early if the string fails to parse.
+    let Some(annotation) = resolve_possibly_quoted_annotation(annotation, checker) else {
+        return false;
+    };
+
     let semantic = checker.semantic();
     let settings = checker.settings();
     match annotation {
         // Ex) `bool`
         Expr::Name(name) => &name.id == "bool",
-        // Ex) `"bool"`, or a quoted (forward-reference) annotation, e.g. `"Literal[True, False]"`.
-        // `parse_type_annotation` here is only needed to cover simple case
-        // when there's no union used at all.
-        Expr::StringLiteral(string_expr) => {
-            &string_expr.value == "bool"
-                || checker
-                    .parse_type_annotation(string_expr)
-                    .ok()
-                    .is_some_and(|parsed| match_simple_bool(parsed.expression(), checker, seen))
-        }
         // Ex) `typing.Literal[True, False]`
         Expr::Subscript(ast::ExprSubscript { value, .. })
             if is_boolean_type_hint_pos_arg_literal_enabled(settings)
@@ -261,4 +253,23 @@ where
         }
         _ => false,
     }
+}
+
+/// Resolves `annotation` if it's a quoted string, e.g. `"Literal[True, False]"`.
+/// Returns the (possibly unchanged) annotation, or `None` if string failed to be parsed
+/// as a type expression.
+fn resolve_possibly_quoted_annotation<'a, 'b>(
+    annotation: &'b Expr,
+    checker: &Checker<'a>,
+) -> Option<&'b Expr>
+where
+    'a: 'b,
+{
+    let Expr::StringLiteral(string_expr) = annotation else {
+        return Some(annotation);
+    };
+    checker
+        .parse_type_annotation(string_expr)
+        .ok()
+        .map(ParsedAnnotation::expression)
 }
