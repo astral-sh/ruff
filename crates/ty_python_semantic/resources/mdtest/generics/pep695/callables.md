@@ -447,6 +447,34 @@ def consume_right(value: A | B | F | G | H) -> None: ...
 reveal_type(infer_from_consumers(consume_left, consume_right))  # revealed: A | B
 ```
 
+## Non-disjoint inferred union upper bounds exceeding the solution budget
+
+When the inferred upper-bound intersection cannot be represented within the solution budget,
+inference should fall back to `Unknown`. It must not union the bounds and then reject otherwise
+valid callable arguments.
+
+```py
+from collections.abc import Callable
+
+class A: ...
+class B: ...
+class C: ...
+class D: ...
+class E: ...
+class F: ...
+
+def infer_from_consumers[T](
+    left: Callable[[T], None],
+    right: Callable[[T], None],
+) -> T:
+    raise NotImplementedError
+
+def consume_left(value: A | B | C) -> None: ...
+def consume_right(value: D | E | F) -> None: ...
+
+reveal_type(infer_from_consumers(consume_left, consume_right))  # revealed: Unknown
+```
+
 ## Contextual generic return exceeding the solution budget
 
 A generic call can receive an upper bound from the type context in which its return value is used.
@@ -646,9 +674,10 @@ reveal_type(infer(callback))  # revealed: A | Any
 An overloaded callable should be assignable to a non-overloaded callable type when the overload set
 as a whole is compatible with the target callable.
 
-The type variable should be inferred from the first matching overload, rather than unioning
-parameter types across all overloads (which would create an unsatisfiable expected type for
-contravariant type variables).
+Each overload independently validates the same call, specializing `T` to `str` or `bytes`. Since the
+function receives only a consumer of `T`, it has no way to produce a value of type `T` to return.
+The return type must satisfy both specializations, so their intersection, `Never`, correctly
+captures that no value can be returned.
 
 ```py
 from typing import Callable, overload
@@ -656,14 +685,28 @@ from typing import Callable, overload
 def accepts_callable[T](converter: Callable[[T], None]) -> T:
     raise NotImplementedError
 
+def accepts_callable_and_value[T](converter: Callable[[T], None], value: T) -> T:
+    converter(value)
+    return value
+
 @overload
-def f(val: str) -> None: ...
+def overloaded_consumer(val: str) -> None: ...
 @overload
-def f(val: bytes) -> None: ...
-def f(val: str | bytes) -> None:
+def overloaded_consumer(val: bytes) -> None: ...
+def overloaded_consumer(val: str | bytes) -> None:
     pass
 
-reveal_type(accepts_callable(f))  # revealed: str | bytes
+reveal_type(accepts_callable(overloaded_consumer))  # revealed: Never
+```
+
+An additional argument of type `T` supplies the return value and constrains the valid
+specializations. A `str | bytes` value is accepted because the overload set covers both cases:
+
+```py
+def _(string: str, data: bytes, either: str | bytes) -> None:
+    reveal_type(accepts_callable_and_value(overloaded_consumer, string))  # revealed: str
+    reveal_type(accepts_callable_and_value(overloaded_consumer, data))  # revealed: bytes
+    reveal_type(accepts_callable_and_value(overloaded_consumer, either))  # revealed: str | bytes
 ```
 
 When `T` is constrained to a union by other arguments, the overloaded callable must still be treated

@@ -258,9 +258,10 @@ outside_callable(int_identity)("string")
 An overloaded callable should be assignable to a non-overloaded callable type when the overload set
 as a whole is compatible with the target callable.
 
-The type variable should be inferred from the first matching overload, rather than unioning
-parameter types across all overloads (which would create an unsatisfiable expected type for
-contravariant type variables).
+Each overload independently validates the same call, specializing `T` to `str` or `bytes`. Since the
+function receives only a consumer of `T`, it has no way to produce a value of type `T` to return.
+The return type must satisfy both specializations, so their intersection, `Never`, correctly
+captures that no value can be returned.
 
 ```py
 from typing import Callable, TypeVar, overload
@@ -270,14 +271,72 @@ T = TypeVar("T")
 def accepts_callable(converter: Callable[[T], None]) -> T:
     raise NotImplementedError
 
+def accepts_callable_and_value(converter: Callable[[T], None], value: T) -> T:
+    converter(value)
+    return value
+
 @overload
-def f(val: str) -> None: ...
+def overloaded_consumer(val: str) -> None: ...
 @overload
-def f(val: bytes) -> None: ...
-def f(val: str | bytes) -> None:
+def overloaded_consumer(val: bytes) -> None: ...
+def overloaded_consumer(val: str | bytes) -> None:
     pass
 
-reveal_type(accepts_callable(f))  # revealed: str | bytes
+reveal_type(accepts_callable(overloaded_consumer))  # revealed: Never
+```
+
+An additional argument of type `T` supplies the return value and constrains the valid
+specializations. A `str | bytes` value is accepted because the overload set covers both cases:
+
+```py
+def _(string: str, data: bytes, either: str | bytes) -> None:
+    reveal_type(accepts_callable_and_value(overloaded_consumer, string))  # revealed: str
+    reveal_type(accepts_callable_and_value(overloaded_consumer, data))  # revealed: bytes
+    reveal_type(accepts_callable_and_value(overloaded_consumer, either))  # revealed: str | bytes
+```
+
+## Overloaded methods with `Self` passed to a decorator
+
+A concrete overload can be fully solved while another valid overload keeps its receiver and return
+type correlated through `Self`. Ideally, the generic alternative would pass through the solver with
+that correlation preserved; this is not yet supported:
+
+```py
+from typing import Callable, TypeVar, overload
+from typing_extensions import Self
+
+A = TypeVar("A")
+B = TypeVar("B")
+R = TypeVar("R")
+
+def identity(fn: Callable[[A, B], R]) -> Callable[[A, B], R]:
+    return fn
+
+class Expr: ...
+
+class Matrix:
+    @overload
+    def __mul__(self, other: "Matrix") -> "Matrix": ...
+    @overload
+    def __mul__(self, other: Expr) -> Self: ...
+    def __mul__(self, other: "Matrix | Expr") -> "Matrix | Self":
+        raise NotImplementedError
+
+class SpecialMatrix(Matrix): ...
+
+matrix = Matrix()
+special = SpecialMatrix()
+expr = Expr()
+
+# TODO: Preserve both overloads, including the generic `Self` alternative, without erroring.
+# error: [invalid-argument-type]
+mul = identity(Matrix.__mul__)
+reveal_type(mul)  # revealed: (Matrix, Matrix | Expr, /) -> Matrix
+reveal_type(mul(matrix, expr))  # revealed: Matrix
+reveal_type(mul(matrix, matrix))  # revealed: Matrix
+# TODO: revealed: SpecialMatrix
+reveal_type(mul(special, expr))  # revealed: Matrix
+reveal_type(mul(special, special))  # revealed: Matrix
 ```
 
 ## Overloaded callable with a constrained type variable
