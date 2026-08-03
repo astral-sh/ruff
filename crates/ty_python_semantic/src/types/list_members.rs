@@ -52,6 +52,7 @@ pub(crate) fn all_end_of_scope_members<'db>(
             let member = Member {
                 name: symbol.name().clone(),
                 ty,
+                is_type_check_only: false,
             };
             Some(MemberWithDefinition {
                 member,
@@ -72,6 +73,7 @@ pub(crate) fn all_end_of_scope_members<'db>(
                 let member = Member {
                     name: symbol.name().clone(),
                     ty,
+                    is_type_check_only: false,
                 };
                 Some(MemberWithDefinition {
                     member,
@@ -109,6 +111,7 @@ pub(crate) fn all_reachable_members<'db>(
                         let member = Member {
                             name: symbol.name().clone(),
                             ty,
+                            is_type_check_only: false,
                         };
                         Some(MemberWithDefinition {
                             member,
@@ -125,6 +128,7 @@ pub(crate) fn all_reachable_members<'db>(
                         let member = Member {
                             name: symbol.name().clone(),
                             ty,
+                            is_type_check_only: false,
                         };
                         Some(MemberWithDefinition {
                             member,
@@ -154,14 +158,27 @@ const SYNTHETIC_DATACLASS_ATTRIBUTES: &[&str] = &[
     "__dataclass_params__",
 ];
 
+#[derive(Clone, Copy, Eq, PartialEq)]
+enum MemberVisibility {
+    Default,
+    IncludeTypeCheckOnly,
+}
+
 struct AllMembers<'db> {
     members: FxHashSet<Member<'db>>,
+    visibility: MemberVisibility,
 }
 
 impl<'db> AllMembers<'db> {
-    fn of(db: &'db dyn Db, env: &ProgramEnvironment<'db>, ty: Type<'db>) -> Self {
+    fn of(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        ty: Type<'db>,
+        visibility: MemberVisibility,
+    ) -> Self {
         let mut all_members = Self {
             members: FxHashSet::default(),
+            visibility,
         };
         all_members.extend_with_type(db, env, ty);
         all_members
@@ -191,7 +208,7 @@ impl<'db> AllMembers<'db> {
                     union
                         .elements(db)
                         .iter()
-                        .map(|ty| AllMembers::of(db, env, *ty).members)
+                        .map(|ty| AllMembers::of(db, env, *ty, self.visibility).members)
                         .reduce(|acc, members| acc.intersection(&members).cloned().collect())
                         .unwrap_or_default(),
                 );
@@ -201,7 +218,7 @@ impl<'db> AllMembers<'db> {
                 intersection
                     .positive(db)
                     .iter()
-                    .map(|ty| AllMembers::of(db, env, *ty).members)
+                    .map(|ty| AllMembers::of(db, env, *ty, self.visibility).members)
                     .reduce(|acc, members| acc.union(&members).cloned().collect())
                     .unwrap_or_default(),
             ),
@@ -342,7 +359,7 @@ impl<'db> AllMembers<'db> {
                             constraints
                                 .elements(db)
                                 .iter()
-                                .map(|ty| AllMembers::of(db, env, *ty).members)
+                                .map(|ty| AllMembers::of(db, env, *ty, self.visibility).members)
                                 .reduce(|acc, members| {
                                     acc.intersection(&members).cloned().collect()
                                 })
@@ -419,6 +436,7 @@ impl<'db> AllMembers<'db> {
                 self.members.insert(Member {
                     name: Name::new_static("__file__"),
                     ty: dunder_file_type,
+                    is_type_check_only: false,
                 });
 
                 self.extend_with_type(db, env, KnownClass::ModuleType.to_instance(db, env));
@@ -440,13 +458,17 @@ impl<'db> AllMembers<'db> {
                         continue;
                     };
 
-                    if let Some(definition) = defined.provenance.definition()
-                        && !exists_at_runtime(db, definition)
-                        // Source-module completions retain `@type_check_only` symbols and rank them
-                        // lower.
+                    let is_type_check_only = defined
+                        .provenance
+                        .definition()
+                        .is_some_and(|definition| !exists_at_runtime(db, definition));
+
+                    if self.visibility == MemberVisibility::Default
+                        && is_type_check_only
+                        // Source modules retain `@type_check_only` definitions.
                         && (file.is_stub(db) || !defined.ty.is_type_check_only(db))
-                        // The decorator itself is typing-only, but users must still be able to
-                        // import it when defining typing-only classes and functions.
+                        // The decorator itself must remain available for defining typing-only
+                        // classes and functions.
                         && !matches!(
                             defined.ty,
                             Type::FunctionLiteral(function)
@@ -459,6 +481,7 @@ impl<'db> AllMembers<'db> {
                     self.members.insert(Member {
                         name: symbol_name.clone(),
                         ty: defined.ty,
+                        is_type_check_only,
                     });
                 }
 
@@ -467,7 +490,11 @@ impl<'db> AllMembers<'db> {
                         |submodule_name| {
                             let ty = literal.resolve_submodule(db, &submodule_name)?;
                             let name = submodule_name.clone();
-                            Some(Member { name, ty })
+                            Some(Member {
+                                name,
+                                ty,
+                                is_type_check_only: false,
+                            })
                         },
                     ));
             }
@@ -516,6 +543,7 @@ impl<'db> AllMembers<'db> {
                 self.members.insert(Member {
                     name: memberdef.member.name,
                     ty,
+                    is_type_check_only: memberdef.member.is_type_check_only,
                 });
             }
         }
@@ -565,6 +593,7 @@ impl<'db> AllMembers<'db> {
                 self.members.insert(Member {
                     name: Name::new(name),
                     ty,
+                    is_type_check_only: false,
                 });
             }
         }
@@ -582,6 +611,7 @@ impl<'db> AllMembers<'db> {
             self.members.insert(Member {
                 name: memberdef.member.name,
                 ty,
+                is_type_check_only: memberdef.member.is_type_check_only,
             });
         }
     }
@@ -644,6 +674,7 @@ impl<'db> AllMembers<'db> {
                         self.members.insert(Member {
                             name: Name::from(*attr),
                             ty: synthetic_member,
+                            is_type_check_only: false,
                         });
                     }
                 }
@@ -677,6 +708,7 @@ pub struct MemberWithDefinition<'db> {
 pub struct Member<'db> {
     pub(crate) name: Name,
     pub(crate) ty: Type<'db>,
+    pub(crate) is_type_check_only: bool,
 }
 
 impl std::hash::Hash for Member<'_> {
@@ -712,5 +744,14 @@ pub(crate) fn all_members<'db>(
     env: &ProgramEnvironment<'db>,
     ty: Type<'db>,
 ) -> FxHashSet<Member<'db>> {
-    AllMembers::of(db, env, ty).members
+    AllMembers::of(db, env, ty, MemberVisibility::Default).members
+}
+
+/// Lists completion candidates, including module definitions unavailable at runtime.
+pub(crate) fn all_members_for_completion<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    ty: Type<'db>,
+) -> FxHashSet<Member<'db>> {
+    AllMembers::of(db, env, ty, MemberVisibility::IncludeTypeCheckOnly).members
 }
