@@ -484,6 +484,48 @@ pub(crate) fn infer_expression_type<'db>(
     infer_expression_type_impl(db, InferExpression::new(db, expression, tcx))
 }
 
+/// Infer an implicit attribute's initializer without depending on that attribute's absence.
+///
+/// Attribute discovery needs a separate query from ordinary expression inference: the receiver
+/// cannot be narrowed by the absence of the same attribute whose type this query is establishing.
+/// Keeping that inference mode in the query identity prevents its result from replacing the
+/// ordinary, flow-sensitive result for the same expression.
+#[salsa::tracked(
+    returns(copy),
+    cycle_initial=|_, id, _| Type::divergent(id),
+    cycle_fn=|db, cycle, previous: &Type<'db>, result: Type<'db>, definition: Definition<'db>| {
+        let env = ProgramEnvironment::from_definition(definition);
+        result.cycle_normalized(db, &env, *previous, cycle)
+    },
+    heap_size=ruff_memory_usage::heap_size
+)]
+pub(crate) fn infer_implicit_attribute_initializer<'db>(
+    db: &'db dyn Db,
+    definition: Definition<'db>,
+) -> Type<'db> {
+    let DefinitionKind::Assignment(assignment) = definition.kind(db) else {
+        return Type::unknown();
+    };
+
+    let python_file = definition.python_file(db);
+    let module = parsed_module(db, python_file).load(db);
+    let index = semantic_index(db, python_file);
+    let initializer = assignment.value(&module);
+    let env = ProgramEnvironment::from_file(python_file);
+
+    TypeInferenceBuilder::new(
+        db,
+        &env,
+        InferenceRegion::ImplicitAttributeInitializer(definition),
+        python_file.file(db),
+        python_file,
+        index,
+        &module,
+    )
+    .finish_expression()
+    .expression_type(initializer)
+}
+
 #[salsa::tracked(
     returns(copy),
     cycle_initial=|_, id, _| Type::divergent(id),
@@ -821,6 +863,8 @@ pub(crate) enum InferenceRegion<'db> {
     Statement(StatementInner<'db>),
     /// infer types for a standalone [`Expression`]
     Expression(Expression<'db>, TypeContext<'db>),
+    /// Infer an implicit attribute initializer without its self-referential absence constraint.
+    ImplicitAttributeInitializer(Definition<'db>),
     /// infer types for a [`Definition`]
     Definition(Definition<'db>),
     /// infer types for the decorators on a function [`Definition`]
@@ -836,7 +880,8 @@ impl<'db> InferenceRegion<'db> {
         match self {
             InferenceRegion::Statement(statement) => statement.scope(db),
             InferenceRegion::Expression(expression, _) => expression.scope(db),
-            InferenceRegion::Definition(definition)
+            InferenceRegion::ImplicitAttributeInitializer(definition)
+            | InferenceRegion::Definition(definition)
             | InferenceRegion::FunctionDecorators(definition)
             | InferenceRegion::Deferred(definition) => definition.scope(db),
             InferenceRegion::Scope(scope, _) => scope,

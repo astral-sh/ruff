@@ -1,3 +1,4 @@
+use char_str::CharStr;
 use compact_str::{CompactString, ToCompactString};
 use itertools::Itertools;
 use ruff_diagnostics::{Edit, Fix};
@@ -1655,6 +1656,41 @@ impl<'db> Type<'db> {
             }
             _ => None,
         }
+    }
+
+    /// Returns whether this type has an own or inherited class-attribute symbol.
+    ///
+    /// Unlike regular attribute lookup, this examines only class-body symbols and never infers
+    /// their values. Initializer inference can therefore use it without recursively requesting
+    /// the type of the instance attribute currently being initialized.
+    pub(crate) fn has_class_attribute_symbol_without_inference(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        name: &str,
+    ) -> bool {
+        #[salsa::tracked(returns(copy), heap_size=ruff_memory_usage::heap_size)]
+        fn class_has_attribute_symbol<'db>(
+            db: &'db dyn Db,
+            class: StaticClassLiteral<'db>,
+            name: Name,
+        ) -> bool {
+            let name = CharStr::from(name);
+            place_table(db, class.body_scope(db))
+                .symbol_id(name.as_str())
+                .is_some()
+        }
+
+        let Some(class) = self.nominal_class(db, env) else {
+            return false;
+        };
+        let name = Name::new(name);
+
+        class
+            .iter_mro(db)
+            .filter_map(ClassBase::into_class)
+            .filter_map(|class| class.static_class_literal(db))
+            .any(|(class, _)| class_has_attribute_symbol(db, class, name.clone()))
     }
 
     /// Returns `true` if this type may contain preferred type mappings when provided as type context
@@ -3407,36 +3443,6 @@ impl<'db> Type<'db> {
 
             Type::TypeAlias(alias) => alias.value_type(db).instance_member(db, env, name),
         }
-    }
-
-    /// Returns whether a method-defined instance attribute can be absent before initialization.
-    ///
-    /// This intentionally avoids [`Self::instance_member`] and [`Self::class_member`]: when
-    /// narrowing an initializer with `hasattr(self, "x")`, inferring either member to determine
-    /// whether `x` exists can recursively infer that same initializer. Syntactic instance
-    /// assignments and class-body bindings are available without inferring their value types.
-    fn has_possibly_absent_instance_attribute(self, db: &'db dyn Db, name: &str) -> bool {
-        let Some(class) = self.nominal_class(db) else {
-            return false;
-        };
-        let mut has_instance_attribute = false;
-
-        for base in class
-            .iter_mro(db)
-            .filter_map(ClassBase::into_class)
-            .filter_map(|base| base.static_class_literal(db))
-        {
-            let (base, _) = base;
-
-            if base.has_definitely_bound_class_attribute(db, name) {
-                return false;
-            }
-
-            has_instance_attribute =
-                has_instance_attribute || base.has_implicit_instance_attribute(db, name);
-        }
-
-        has_instance_attribute
     }
 
     /// Access an attribute of this type without invoking the descriptor protocol. This

@@ -38,8 +38,9 @@ use crate::place::{
     RequiresExplicitReExport, TypeOrigin, builtins_module_scope, class_body_implicit_symbol,
     explicit_global_symbol, implicit_builtins_symbol, loop_header_reachability,
     module_type_implicit_global_declaration, module_type_implicit_global_symbol, place_by_id,
-    place_from_bindings_with_reachability_cache, place_from_declarations_with_reachability_cache,
-    typing_extensions_symbol,
+    place_from_bindings_with_reachability_cache,
+    place_from_bindings_with_reachability_cache_ignoring_attribute_absence,
+    place_from_declarations_with_reachability_cache, typing_extensions_symbol,
 };
 use crate::reachability::{ReachabilityEvaluationCache, evaluate_reachability_with_cache};
 use crate::types::add_inferred_python_version_hint_to_diagnostic;
@@ -530,6 +531,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
             InferenceRegion::Statement(_)
             | InferenceRegion::Expression(_, _)
+            | InferenceRegion::ImplicitAttributeInitializer(_)
             | InferenceRegion::FunctionDecorators(_)
             | InferenceRegion::Scope(_, _) => None,
         })
@@ -1021,6 +1023,26 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             InferenceRegion::Expression(expression, tcx) => {
                 self.infer_region_expression(expression, tcx);
             }
+            InferenceRegion::ImplicitAttributeInitializer(definition) => {
+                if let DefinitionKind::Assignment(assignment) = definition.kind(self.db()) {
+                    let expression = self.index.expression(assignment.value(self.module()));
+                    self.infer_region_expression(expression, TypeContext::default());
+                }
+            }
+        }
+    }
+
+    /// Return the standalone expression being inferred by an expression-like region.
+    fn region_expression(&self) -> Option<Expression<'db>> {
+        match self.region {
+            InferenceRegion::Expression(expression, _) => Some(expression),
+            InferenceRegion::ImplicitAttributeInitializer(definition) => {
+                let DefinitionKind::Assignment(assignment) = definition.kind(self.db()) else {
+                    return None;
+                };
+                self.index.try_expression(assignment.value(self.module()))
+            }
+            _ => None,
         }
     }
 
@@ -7408,7 +7430,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         if tcx.annotation.is_none()
             && let Some(collection_expr) = collection_expr
-            && let InferenceRegion::Expression(current_expr, _) = self.region
+            && let Some(current_expr) = self.region_expression()
             && current_expr.node_ref(self.db()).index() == *collection_expr.node_index()
             && let Some(assignment) = current_expr.assigned_to(self.db())
             && let Ok(collection_def) =
@@ -9724,12 +9746,41 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
 
             let use_id = expr_ref.scoped_use_id(db, self.python_file());
-            let place = place_from_bindings_with_reachability_cache(
-                db,
-                env,
-                use_def.bindings_at_use(use_id),
-                self.reachability_cache(),
-            )
+            let bindings = use_def.bindings_at_use(use_id);
+
+            let ignored_attribute_absence = if let Some(loaded_symbol) = expr.as_symbol()
+                && let InferenceRegion::ImplicitAttributeInitializer(definition) = self.region
+                && let DefinitionKind::Assignment(assignment) = definition.kind(db)
+                && let ast::Expr::Attribute(target) = assignment.target(self.module())
+                && let Some(receiver) = target.value.as_name_expr()
+                && receiver.id.as_str() == loaded_symbol.name().as_str()
+                && place_table
+                    .member_id_by_instance_attribute_name(target.attr.as_str())
+                    .is_some()
+            {
+                Some(target.attr.as_str())
+            } else {
+                None
+            };
+
+            let place = if let Some(attribute) = ignored_attribute_absence {
+                // Proving this attribute absent would require first inferring the initializer we
+                // are already evaluating. Preserve narrowing from every unrelated constraint.
+                place_from_bindings_with_reachability_cache_ignoring_attribute_absence(
+                    db,
+                    env,
+                    bindings,
+                    self.reachability_cache(),
+                    attribute,
+                )
+            } else {
+                place_from_bindings_with_reachability_cache(
+                    db,
+                    env,
+                    bindings,
+                    self.reachability_cache(),
+                )
+            }
             .place;
 
             (place, Some(use_id))

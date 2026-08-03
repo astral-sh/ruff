@@ -3733,40 +3733,6 @@ class C:
 reveal_type(C().x)  # revealed: int
 ```
 
-An attribute initialized behind a negative `hasattr` guard must be recognized when an earlier method
-reads it. The initialization remains reachable even though the attribute is known to exist elsewhere
-on the class.
-
-```py
-class ReadBeforeInitialization:
-    def create(self) -> int:
-        return 1
-
-    def read(self) -> int:
-        return self.value
-
-    def initialize(self) -> None:
-        if not hasattr(self, "value"):
-            self.value = self.create()
-            reveal_type(self.value)  # revealed: int
-```
-
-The same behavior must hold when the initialization method appears before the reader.
-
-```py
-class InitializeBeforeRead:
-    def create(self) -> int:
-        return 1
-
-    def initialize(self) -> None:
-        if not hasattr(self, "value"):
-            self.value = self.create()
-            reveal_type(self.value)  # revealed: int
-
-    def read(self) -> int:
-        return self.value
-```
-
 If the only assignment to a name is cyclic, we infer `Divergent` for that attribute:
 
 ```py

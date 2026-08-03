@@ -1,7 +1,10 @@
 use std::borrow::Cow;
 use std::collections::{BTreeMap, btree_map::Entry as BTreeEntry, hash_map::Entry};
 
-use crate::reachability::{narrow_type_by_constraint, type_narrowed_by_previous_patterns};
+use crate::reachability::{
+    narrow_type_by_constraint, narrow_type_by_constraint_ignoring_attribute_absence,
+    type_narrowed_by_previous_patterns,
+};
 use crate::subscript::PyIndex;
 use crate::types::function::KnownFunction;
 use crate::types::infer::{ExpressionInference, infer_same_file_expression_type};
@@ -730,6 +733,68 @@ impl<'db> NarrowingConstraint<'db> {
             intersection_disjuncts: smallvec_inline![Conjunctions::singleton(constraint)],
             replacement_disjuncts: smallvec![],
         }
+    }
+
+    /// Returns whether this constraint only requires the synthesized protocol for `attribute`.
+    pub(crate) fn is_attribute_presence(&self, db: &'db dyn Db, attribute: &str) -> bool {
+        if !self.replacement_disjuncts.is_empty() {
+            return false;
+        }
+
+        let [conjunction] = self.intersection_disjuncts.as_slice() else {
+            return false;
+        };
+        let [Type::ProtocolInstance(protocol)] = conjunction.conjuncts.as_slice() else {
+            return false;
+        };
+
+        if protocol.class_origin(db).is_some() {
+            return false;
+        }
+
+        let interface = protocol.interface(db);
+        interface.member_count(db) == 1
+            && interface
+                .members(db)
+                .next()
+                .is_some_and(|member| member.name() == attribute)
+    }
+
+    /// Returns whether this constraint only excludes the synthesized protocol for `attribute`.
+    ///
+    /// Initializing an implicit attribute cannot depend on proving that the attribute is absent:
+    /// that proof would require the initializer's inferred type before inference has finished.
+    pub(crate) fn is_attribute_absence(&self, db: &'db dyn Db, attribute: &str) -> bool {
+        if !self.replacement_disjuncts.is_empty() {
+            return false;
+        }
+
+        let [conjunction] = self.intersection_disjuncts.as_slice() else {
+            return false;
+        };
+        let [Type::Intersection(intersection)] = conjunction.conjuncts.as_slice() else {
+            return false;
+        };
+
+        if !intersection.positive(db).is_empty() {
+            return false;
+        }
+
+        let mut negative = intersection.negative(db).iter();
+        let Some(Type::ProtocolInstance(protocol)) = negative.next() else {
+            return false;
+        };
+
+        if negative.next().is_some() || protocol.class_origin(db).is_some() {
+            return false;
+        }
+
+        let interface = protocol.interface(db);
+        interface.member_count(db) == 1
+            && interface
+                .members(db)
+                .next()
+                .is_some_and(|member| member.name() == attribute)
     }
 
     /// Create a "replacement" constraint: the previous type will be
@@ -3840,10 +3905,10 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
                 }
             }
             Type::FunctionLiteral(function_type) if expr_call.arguments.keywords.is_empty() => {
-                let [subject, second_arg] = &*expr_call.arguments.args else {
+                let [first_arg, second_arg] = &*expr_call.arguments.args else {
                     return None;
                 };
-                let first_arg = PlaceExpr::try_from_expr(subject)?;
+                let first_arg = PlaceExpr::try_from_expr(first_arg)?;
                 let function = function_type.known(db)?;
                 let place = self.expect_place(&first_arg);
 
@@ -3854,18 +3919,6 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
                         .value(db);
 
                     if !is_identifier(attr) {
-                        return None;
-                    }
-
-                    if !is_positive
-                        && inference
-                            .expression_type(subject)
-                            .has_possibly_absent_instance_attribute(self.db, attr)
-                    {
-                        // Instance assignments and annotations do not guarantee that the
-                        // attribute exists before initialization. Discover them syntactically:
-                        // inferring the member here would revisit its initializer and create a
-                        // cycle when that initializer is guarded by this same `hasattr` call.
                         return None;
                     }
 
@@ -4842,6 +4895,15 @@ pub(crate) trait NarrowingEvaluatorExtension<'db> {
         base_type: Type<'db>,
         place: ScopedPlaceId,
     ) -> Type<'db>;
+
+    fn narrow_ignoring_attribute_absence(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        base_type: Type<'db>,
+        place: ScopedPlaceId,
+        attribute: &str,
+    ) -> Type<'db>;
 }
 
 impl<'db> NarrowingEvaluatorExtension<'db> for NarrowingEvaluator<'_, 'db> {
@@ -4860,6 +4922,19 @@ impl<'db> NarrowingEvaluatorExtension<'db> for NarrowingEvaluator<'_, 'db> {
             self.constraint(),
             base_type,
             place,
+        )
+    }
+
+    fn narrow_ignoring_attribute_absence(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        base_type: Type<'db>,
+        place: ScopedPlaceId,
+        attribute: &str,
+    ) -> Type<'db> {
+        narrow_type_by_constraint_ignoring_attribute_absence(
+            db, env, self, base_type, place, attribute,
         )
     }
 }

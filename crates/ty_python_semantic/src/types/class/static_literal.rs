@@ -44,11 +44,11 @@ use crate::{
         diagnostic::INVALID_DATACLASS_OVERRIDE,
         enums::{enum_metadata, is_enum_class_by_inheritance, try_unwrap_nonmember_value},
         function::{
-            DataclassTransformerParams, FunctionDecorators, KnownFunction, is_implicit_classmethod,
+            DataclassTransformerParams, KnownFunction, is_implicit_classmethod,
             is_implicit_staticmethod,
         },
         generics::Specialization,
-        infer::{function_known_decorator_flags, infer_unpack_types},
+        infer::{infer_implicit_attribute_initializer, infer_unpack_types},
         infer_expression_type, inferred_declaration,
         known_instance::DeprecatedInstance,
         member::{Member, class_member},
@@ -62,13 +62,13 @@ use crate::{
 };
 use crate::{attribute_assignments, attribute_declarations};
 use ty_python_core::{
-    PlaceTable, attribute_scopes,
+    attribute_scopes,
     definition::{Definition, DefinitionKind, DefinitionState, TargetKind},
-    place::PlaceExprRef,
     place_table,
+    reachability_constraints::ScopedReachabilityConstraintId,
     scope::{Scope, ScopeId},
     semantic_index,
-    symbol::{ScopedSymbolId, Symbol},
+    symbol::Symbol,
     use_def_map,
 };
 
@@ -2734,66 +2734,6 @@ impl<'db> StaticClassLiteral<'db> {
         }
     }
 
-    /// Returns whether an instance method assigns to or declares an attribute with this name.
-    ///
-    /// Unlike [`Self::instance_member`], this only inspects the tracked syntactic attribute
-    /// summary; it never infers an initializer or evaluates its narrowing constraints.
-    pub(in crate::types) fn has_implicit_instance_attribute(
-        self,
-        db: &'db dyn Db,
-        name: &str,
-    ) -> bool {
-        let body_scope = self.body_scope(db);
-
-        if implicit_attribute_names(db, body_scope)
-            .binary_search_by(|candidate| candidate.as_str().cmp(name))
-            .is_err()
-        {
-            return false;
-        }
-
-        implicit_instance_attribute_names(db, body_scope)
-            .binary_search_by(|candidate| candidate.as_str().cmp(name))
-            .is_ok()
-    }
-
-    /// Returns whether the class body definitely creates an attribute with this name.
-    ///
-    /// Class-body annotations without a value do not bind runtime attributes. Inspecting the
-    /// binding states directly avoids inferring the class member while checking its presence.
-    pub(in crate::types) fn has_definitely_bound_class_attribute(
-        self,
-        db: &'db dyn Db,
-        name: &str,
-    ) -> bool {
-        let body_scope = self.body_scope(db);
-        let table = place_table(db, body_scope);
-        let Some(symbol) = table.symbol_id(name) else {
-            return false;
-        };
-
-        #[salsa::tracked(returns(copy), heap_size=ruff_memory_usage::heap_size)]
-        fn class_symbol_is_definitely_bound<'db>(
-            db: &'db dyn Db,
-            body_scope: ScopeId<'db>,
-            symbol: ScopedSymbolId,
-        ) -> bool {
-            let use_def = use_def_map(db, body_scope);
-            let mut has_binding = false;
-
-            for binding in use_def.end_of_scope_symbol_bindings(symbol) {
-                match binding.binding {
-                    DefinitionState::Defined(_) => has_binding = true,
-                    DefinitionState::Undefined | DefinitionState::Deleted => return false,
-                }
-            }
-
-            has_binding
-        }
-
-        class_symbol_is_definitely_bound(db, body_scope, symbol)
-    }
-
     /// Tries to find declarations/bindings of an attribute named `name` that are only
     /// "implicitly" defined (`self.x = …`, `cls.x = …`) in a method of the class that
     /// corresponds to `class_body_scope`. The `target_method_decorator` parameter is
@@ -3038,11 +2978,20 @@ impl<'db> StaticClassLiteral<'db> {
                             //
                             //     self.name = <value>
 
-                            Some(infer_expression_type(
-                                db,
-                                index.expression(assign.value(&module)),
-                                TypeContext::default(),
-                            ))
+                            Some(
+                                if class_table.symbol_id(name).is_some()
+                                    || attribute_assignment.reachability_constraint
+                                        == ScopedReachabilityConstraintId::ALWAYS_TRUE
+                                {
+                                    infer_expression_type(
+                                        db,
+                                        index.expression(assign.value(&module)),
+                                        TypeContext::default(),
+                                    )
+                                } else {
+                                    infer_implicit_attribute_initializer(db, binding)
+                                },
+                            )
                         }
                     },
                     DefinitionKind::For(for_stmt) => match for_stmt.target_kind() {
@@ -3857,68 +3806,17 @@ fn implicit_attribute_names<'db>(db: &'db dyn Db, class_body_scope: ScopeId<'db>
     let mut names = Vec::new();
 
     for function_scope_id in attribute_scopes(db, class_body_scope) {
-        extend_implicit_attribute_names(&mut names, index.place_table(function_scope_id));
+        names.extend(
+            index
+                .place_table(function_scope_id)
+                .members()
+                .filter_map(|member| member.as_instance_attribute().map(Name::new)),
+        );
     }
 
     names.sort_unstable();
     names.dedup();
     names.into_boxed_slice()
-}
-
-/// Collect instance-attribute names without considering class methods or static methods.
-///
-/// Method decorators are resolved by a dedicated lightweight query, so this summary does not
-/// infer the method body or any attribute initializer.
-#[salsa::tracked(returns(deref), heap_size=ruff_memory_usage::heap_size)]
-fn implicit_instance_attribute_names<'db>(
-    db: &'db dyn Db,
-    class_body_scope: ScopeId<'db>,
-) -> Box<[Name]> {
-    let file = class_body_scope.file(db);
-    let index = semantic_index(db, file);
-    let module = parsed_module(db, file).load(db);
-    let mut names = Vec::new();
-
-    for attribute_scope_id in attribute_scopes(db, class_body_scope) {
-        let previous_len = names.len();
-        extend_implicit_attribute_names(&mut names, index.place_table(attribute_scope_id));
-        if names.len() == previous_len {
-            continue;
-        }
-
-        let method = std::iter::successors(Some(attribute_scope_id), |scope_id| {
-            index.scope(*scope_id).parent()
-        })
-        .find_map(|scope_id| index.scope(scope_id).node().as_function());
-        let Some(method) = method else {
-            names.truncate(previous_len);
-            continue;
-        };
-
-        let method_node = method.node(&module);
-        let method_name = method_node.name.as_str();
-        if is_implicit_classmethod(method_name)
-            || is_implicit_staticmethod(method_name)
-            || (!method_node.decorator_list.is_empty()
-                && function_known_decorator_flags(db, index.expect_single_definition(method))
-                    .intersects(FunctionDecorators::CLASSMETHOD | FunctionDecorators::STATICMETHOD))
-        {
-            names.truncate(previous_len);
-        }
-    }
-
-    names.sort_unstable();
-    names.dedup();
-    names.into_boxed_slice()
-}
-
-fn extend_implicit_attribute_names(names: &mut Vec<Name>, table: &PlaceTable) {
-    names.extend(table.members().filter_map(|member| {
-        let name = member.as_instance_attribute()?;
-        let place = PlaceExprRef::from(member);
-
-        (place.is_bound() || place.is_declared()).then(|| Name::new(name))
-    }));
 }
 
 fn implicit_attribute_cycle_recover<'db>(
