@@ -5123,23 +5123,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         };
 
         let call_arguments = CallArguments::positional([decorated_ty]);
-        let (return_ty, decorator_bindings) =
-            match decorator_ty.try_call(self.db(), &call_arguments) {
-                Ok(bindings) => (bindings.return_type(self.db()), Some(bindings)),
-                Err(CallError(_, bindings)) => {
-                    bindings.report_diagnostics(&self.context, decorator_node.into());
-                    (bindings.return_type(self.db()), None)
-                }
-            };
-
-        // TODO: Remove this special case once the new constraint solver can preserve
-        // per-overload ParamSpec/return correlations for transparent callable decorators.
-        if let Some(decorator_bindings) = decorator_bindings.as_ref()
-            && let Some(result) =
-                transparent_callable_decorator_result(self.db(), decorator_bindings, decorated_ty)
-        {
-            return result;
-        }
+        let return_ty = match decorator_ty.try_call(self.db(), &call_arguments) {
+            Ok(bindings) => bindings.return_type(self.db()),
+            Err(CallError(_, bindings)) => {
+                bindings.report_diagnostics(&self.context, decorator_node.into());
+                bindings.return_type(self.db())
+            }
+        };
 
         // When a method on a class is decorated with a function that returns a
         // `Callable`, assume that the returned callable is also function-like (or

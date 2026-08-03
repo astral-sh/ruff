@@ -225,6 +225,31 @@ class Calculator:
 reveal_type(Calculator().square_then_round(3.14))  # revealed: int
 ```
 
+A callable object with the same signature must not become a method descriptor.
+
+```py
+from typing import assert_type
+
+class CallableReplacement:
+    def __call__(self, owner: "ReplacementExample", value: int, /) -> str:
+        return str(value)
+
+def replace_method(
+    method: Callable[["ReplacementExample", int], str],
+) -> Callable[["ReplacementExample", int], str]:
+    return CallableReplacement()
+
+class ReplacementExample:
+    def original(self, value: int, /) -> str:
+        return str(value)
+
+    replacement = replace_method(original)
+
+example = ReplacementExample()
+assert_type(example.replacement, Callable[[ReplacementExample, int], str])
+example.replacement(example, 1)
+```
+
 ## Use case: Wrappers with explicit receivers
 
 `trio` defines multiple functions that takes in a callable with `Concatenate`-prepended receiver
