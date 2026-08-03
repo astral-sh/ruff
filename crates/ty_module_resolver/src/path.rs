@@ -611,12 +611,13 @@ impl SearchPath {
         matches!(&*self.0, SearchPathInner::SitePackages(_))
     }
 
-    /// Is the module on a search path for installed third-party code?
-    pub(crate) fn is_third_party(&self) -> bool {
+    /// Is it plausible that this search path contains third-party code?
+    pub(crate) fn can_contain_third_party_code(&self) -> bool {
         match &*self.0 {
-            SearchPathInner::SitePackages(_) | SearchPathInner::Editable(_) => true,
-            SearchPathInner::Extra(_)
-            | SearchPathInner::FirstParty(_)
+            SearchPathInner::SitePackages(_)
+            | SearchPathInner::Editable(_)
+            | SearchPathInner::Extra(_) => true,
+            SearchPathInner::FirstParty(_)
             | SearchPathInner::StandardLibraryCustom(_)
             | SearchPathInner::StandardLibraryVendored(_)
             | SearchPathInner::StandardLibraryReal(_) => false,
