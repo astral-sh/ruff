@@ -1,5 +1,5 @@
 use std::{fmt, vec};
-use ty_python_semantic::SemanticEnvironment;
+use ty_python_semantic::ProgramEnvironment;
 
 use rustc_hash::FxHashMap;
 
@@ -41,9 +41,9 @@ impl InlayHint {
         } = context;
 
         let position = expr.range().end();
-        let env = SemanticEnvironment::from_file(db, file);
+        let env = ProgramEnvironment::from_file(file);
         // Render the type to a string, and get subspans for all the types that make it up
-        let details = ty.display(&env).to_string_parts();
+        let details = ty.display(db, &env).to_string_parts();
 
         // Filter out repetitive hints like `x: T = T()`
         if call_matches_name(rhs, &details.label) {
@@ -80,7 +80,7 @@ impl InlayHint {
 
                     // Possibly import the current type and return the qualified name
                     let mut qualified_name = |dynamic_importer: &mut DynamicImporter<'_, 'db>| {
-                        let type_definition = ty.definition(&env)?;
+                        let type_definition = ty.definition(db, &env)?;
                         let definition = type_definition.definition()?;
 
                         // Only module-level names can be imported with `from <module> import <name>`.
@@ -112,6 +112,7 @@ impl InlayHint {
                         let module_name = module.name(db).as_str();
 
                         dynamic_importer.import_symbol(
+                            db,
                             &env,
                             ty,
                             module_name,
@@ -132,7 +133,7 @@ impl InlayHint {
                                 qualified_name.len().cast_signed() - (end - start).cast_signed();
                         }
 
-                        let target = ty.navigation_targets(&env).into_iter().next();
+                        let target = ty.navigation_targets(db, &env).into_iter().next();
 
                         // Always use original text for the label part
                         label_parts.push(
@@ -706,7 +707,8 @@ impl<'a, 'db> DynamicImporter<'a, 'db> {
     /// If the symbol in the text edit needs to be qualified, we return the qualified symbol text.
     fn import_symbol(
         &mut self,
-        env: &SemanticEnvironment<'db>,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         ty: &Type<'db>,
         module_name: &str,
         symbol_name: &str,
@@ -724,7 +726,7 @@ impl<'a, 'db> DynamicImporter<'a, 'db> {
         let mut is_possibly_qualified_name = label_text.contains('.');
 
         if let Some(member) = members.find_member(symbol_name) {
-            if member.ty.definition(env) == ty.definition(env) {
+            if member.ty.definition(db, env) == ty.definition(db, env) {
                 return None;
             }
 

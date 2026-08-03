@@ -47,7 +47,7 @@ pub use types::ide_support::{
     map_stub_definition, type_hierarchy_prepare, type_hierarchy_subtypes,
     type_hierarchy_supertypes,
 };
-pub use types::{DisplaySettings, SemanticEnvironment, TypeQualifiers};
+pub use types::{DisplaySettings, ProgramEnvironment, TypeQualifiers};
 
 mod db;
 mod dunder_all;

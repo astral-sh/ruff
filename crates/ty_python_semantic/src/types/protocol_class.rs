@@ -1,4 +1,4 @@
-use crate::{Program, SemanticEnvironment};
+use crate::{Program, ProgramEnvironment};
 use std::fmt::Write;
 use std::{collections::BTreeMap, ops::Deref};
 
@@ -40,22 +40,16 @@ use ty_python_core::{definition::Definition, place::ScopedPlaceId, place_table, 
 
 impl<'db> StaticClassLiteral<'db> {
     /// Returns `Some` if this is a protocol class, `None` otherwise.
-    pub(super) fn into_protocol_class(
-        self,
-        env: &SemanticEnvironment<'db>,
-    ) -> Option<ProtocolClass<'db>> {
-        self.is_protocol(env)
+    pub(super) fn into_protocol_class(self, db: &'db dyn Db) -> Option<ProtocolClass<'db>> {
+        self.is_protocol(db)
             .then_some(ProtocolClass(ClassType::NonGeneric(self.into())))
     }
 }
 
 impl<'db> ClassType<'db> {
     /// Returns `Some` if this is a protocol class, `None` otherwise.
-    pub(super) fn into_protocol_class(
-        self,
-        env: &SemanticEnvironment<'db>,
-    ) -> Option<ProtocolClass<'db>> {
-        self.is_protocol(env).then_some(ProtocolClass(self))
+    pub(super) fn into_protocol_class(self, db: &'db dyn Db) -> Option<ProtocolClass<'db>> {
+        self.is_protocol(db).then_some(ProtocolClass(self))
     }
 }
 
@@ -114,18 +108,22 @@ impl<'db> ProtocolClass<'db> {
     /// inferred.
     pub(super) fn walk_recursive_member_types<V: super::visitor::TypeVisitor<'db> + ?Sized>(
         self,
-        env: &SemanticEnvironment<'db>,
+        db: &'db dyn Db,
         visitor: &V,
     ) {
         let mut seen_members = FxHashSet::default();
 
-        self.for_each_member_candidate(env, |name, candidate, specialization| {
-            if !seen_members.insert(name.clone()) {
-                return;
-            }
-            let candidate = candidate.apply_specialization(env.db(), specialization);
-            candidate.walk_recursive_member_types(env, visitor);
-        });
+        self.for_each_member_candidate(
+            db,
+            visitor.program_environment(),
+            |name, candidate, specialization| {
+                if !seen_members.insert(name.clone()) {
+                    return;
+                }
+                let candidate = candidate.apply_specialization(db, specialization);
+                candidate.walk_recursive_member_types(db, visitor);
+            },
+        );
     }
 
     /// Visits protocol member candidates in MRO order after applying declaration precedence.
@@ -133,16 +131,16 @@ impl<'db> ProtocolClass<'db> {
     /// Consumers discard shadowed names before applying the accompanying specialization.
     fn for_each_member_candidate(
         self,
-        env: &SemanticEnvironment<'db>,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         mut visit: impl FnMut(&Name, ProtocolMemberCandidate<'db>, Option<Specialization<'db>>),
     ) {
-        let db = env.db();
         for (parent_scope, specialization) in self
-            .iter_mro(env)
+            .iter_mro(db)
             .filter_map(ClassBase::into_class)
             .filter_map(|class| {
                 let (class_literal, specialization) = class.static_class_literal(db)?;
-                let protocol_class = class_literal.into_protocol_class(env)?;
+                let protocol_class = class_literal.into_protocol_class(db)?;
                 Some((
                     protocol_class.static_class_literal(db)?.0.body_scope(db),
                     specialization,
@@ -157,7 +155,7 @@ impl<'db> ProtocolClass<'db> {
             // runtime-checkable protocols still consider them members for `isinstance()` and
             // `issubclass()`.
             for (symbol_id, bindings) in use_def_map.all_end_of_scope_symbol_bindings() {
-                let place_and_definition = place_from_bindings(env, bindings);
+                let place_and_definition = place_from_bindings(db, env, bindings);
                 if let Some(ty) = place_and_definition.place.ignore_possibly_undefined() {
                     direct_members.insert(
                         symbol_id,
@@ -172,7 +170,7 @@ impl<'db> ProtocolClass<'db> {
             }
 
             for (symbol_id, declarations) in use_def_map.all_end_of_scope_symbol_declarations() {
-                let place_result = place_from_declarations(env, declarations);
+                let place_result = place_from_declarations(db, env, declarations);
                 let first_declaration = place_result.first_declaration;
                 let place = place_result.ignore_conflicting_declarations();
                 if let Some(ty) = place.place.ignore_possibly_undefined() {
@@ -206,12 +204,11 @@ impl<'db> ProtocolClass<'db> {
         }
     }
 
-    pub(super) fn is_runtime_checkable(self, env: &SemanticEnvironment<'db>) -> bool {
-        let db = env.db();
+    pub(super) fn is_runtime_checkable(self, db: &'db dyn Db) -> bool {
         self.static_class_literal(db)
             .is_some_and(|(class_literal, _)| {
                 class_literal
-                    .known_function_decorators(env)
+                    .known_function_decorators(db)
                     .contains(&KnownFunction::RuntimeCheckable)
             })
     }
@@ -225,9 +222,12 @@ impl<'db> ProtocolClass<'db> {
     /// class P(Protocol):
     ///     __doc__: str
     /// ```
-    pub(super) fn has_member_declaration(self, env: &SemanticEnvironment<'db>, name: &str) -> bool {
-        let db = env.db();
-        self.iter_mro(env)
+    pub(super) fn has_member_declaration(self, db: &'db dyn Db, name: &str) -> bool {
+        let Some((class, _)) = self.static_class_literal(db) else {
+            return false;
+        };
+        let env = ProgramEnvironment::from_scope(class.body_scope(db));
+        self.iter_mro(db)
             .filter_map(ClassBase::into_class)
             .any(|superclass| {
                 let Some((superclass_literal, _)) = superclass.static_class_literal(db) else {
@@ -239,7 +239,8 @@ impl<'db> ProtocolClass<'db> {
                     return false;
                 };
                 !place_from_declarations(
-                    env,
+                    db,
+                    &env,
                     use_def_map(db, superclass_scope)
                         .end_of_scope_declarations(ScopedPlaceId::Symbol(scoped_symbol_id)),
                 )
@@ -254,8 +255,7 @@ impl<'db> ProtocolClass<'db> {
     /// class body, or are declared in a superclass of the protocol class.
     pub(super) fn validate_members(self, context: &InferContext) {
         let db = context.db();
-        let env = context.semantic_environment();
-        let interface = self.interface(env.db());
+        let interface = self.interface(db);
         let Some((class_literal, _)) = self.static_class_literal(db) else {
             return;
         };
@@ -271,7 +271,7 @@ impl<'db> ProtocolClass<'db> {
                 continue;
             }
 
-            if self.has_member_declaration(env, symbol_name) {
+            if self.has_member_declaration(db, symbol_name) {
                 continue;
             }
 
@@ -287,25 +287,27 @@ impl<'db> ProtocolClass<'db> {
 
     pub(super) fn apply_type_mapping_impl<'a>(
         self,
-        env: &SemanticEnvironment<'db>,
+        db: &'db dyn Db,
         type_mapping: &TypeMapping<'a, 'db>,
         tcx: TypeContext<'db>,
-        visitor: &ApplyTypeMappingVisitor<'db>,
+        visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Self {
         Self(
             self.0
-                .apply_type_mapping_impl(env, type_mapping, tcx, visitor),
+                .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
         )
     }
 
     pub(super) fn recursive_type_normalized_impl(
         self,
-        env: &SemanticEnvironment<'db>,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         div: Type<'db>,
         nested: bool,
     ) -> Option<Self> {
         Some(Self(
-            self.0.recursive_type_normalized_impl(env, div, nested)?,
+            self.0
+                .recursive_type_normalized_impl(db, env, div, nested)?,
         ))
     }
 }
@@ -387,11 +389,11 @@ impl<'db> ProtocolInterfaceView<'db> {
     }
 
     /// Returns whether structural comparison can avoid recursive member expansion.
-    pub(super) fn has_only_finite_members(self, env: &SemanticEnvironment<'db>) -> bool {
-        let db = env.db();
+    pub(super) fn has_only_finite_members(self, db: &'db dyn Db) -> bool {
+        let env = ProgramEnvironment::from_program(self.interface.program(db));
         self.members(db).all(|member| {
             !matches!(
-                member.structural_member_priority(env),
+                member.structural_member_priority(db, &env),
                 StructuralMemberPriority::Recursive
             )
         })
@@ -418,10 +420,10 @@ impl<'db> ProtocolInterfaceView<'db> {
     /// nominal relationship to one of its bases.
     pub(super) fn differs_for_members_required_by(
         self,
-        env: &SemanticEnvironment<'db>,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         required: Self,
     ) -> bool {
-        let db = env.db();
         required.members(db).any(|required_member| {
             let Some(materialized) = self.member_by_name(db, required_member.name()) else {
                 return false;
@@ -433,11 +435,11 @@ impl<'db> ProtocolInterfaceView<'db> {
             };
 
             if materialized
-                .access(env, ProtocolMemberAccessMode::Instance)
-                .resolved(env)
+                .access(db, env, ProtocolMemberAccessMode::Instance)
+                .resolved(db, env)
                 != original
-                    .access(env, ProtocolMemberAccessMode::Instance)
-                    .resolved(env)
+                    .access(db, env, ProtocolMemberAccessMode::Instance)
+                    .resolved(db, env)
             {
                 return true;
             }
@@ -450,11 +452,11 @@ impl<'db> ProtocolInterfaceView<'db> {
             }
 
             materialized
-                .access(env, ProtocolMemberAccessMode::Class)
-                .resolved(env)
+                .access(db, env, ProtocolMemberAccessMode::Class)
+                .resolved(db, env)
                 != original
-                    .access(env, ProtocolMemberAccessMode::Class)
-                    .resolved(env)
+                    .access(db, env, ProtocolMemberAccessMode::Class)
+                    .resolved(db, env)
         })
     }
 
@@ -465,17 +467,17 @@ impl<'db> ProtocolInterfaceView<'db> {
     /// before it is returned.
     pub(super) fn instance_write_requirement(
         self,
-        env: &SemanticEnvironment<'db>,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         receiver_ty: Type<'db>,
         name: &str,
     ) -> Option<(Option<ProtocolMemberWriteRequirement<'db>>, TypeQualifiers)> {
-        let db = env.db();
         self.member_by_name(db, name).map(|member| {
             (
                 member
-                    .access(env, ProtocolMemberAccessMode::Instance)
+                    .access(db, env, ProtocolMemberAccessMode::Instance)
                     .write
-                    .and_then(|write| write.bind_requirement(env, receiver_ty)),
+                    .and_then(|write| write.bind_requirement(db, env, receiver_ty)),
                 member.qualifiers(),
             )
         })
@@ -487,17 +489,17 @@ impl<'db> ProtocolInterfaceView<'db> {
     /// Ordinary instance attributes are required on the constructed object instead.
     pub(super) fn meta_write_requirement(
         self,
-        env: &SemanticEnvironment<'db>,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         receiver_ty: Type<'db>,
         name: &str,
     ) -> Option<(Option<Type<'db>>, TypeQualifiers)> {
-        let db = env.db();
         self.member_by_name(db, name).map(|member| {
             (
                 member
-                    .access(env, ProtocolMemberAccessMode::Class)
+                    .access(db, env, ProtocolMemberAccessMode::Class)
                     .write
-                    .and_then(|write| write.bind_compatibility_type(env, receiver_ty)),
+                    .and_then(|write| write.bind_compatibility_type(db, env, receiver_ty)),
                 member.qualifiers(),
             )
         })
@@ -507,16 +509,19 @@ impl<'db> ProtocolInterfaceView<'db> {
     /// method.
     ///
     /// The callable is already in its instance-bound form, so callers must not bind it again.
-    pub(super) fn call_method(self, env: &SemanticEnvironment<'db>) -> Option<CallableType<'db>> {
-        let db = env.db();
+    pub(super) fn call_method(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> Option<CallableType<'db>> {
         self.member_by_name(db, "__call__").and_then(|member| {
             if !member.is_method() {
                 return None;
             }
             match member
-                .access(env, ProtocolMemberAccessMode::Instance)
+                .access(db, env, ProtocolMemberAccessMode::Instance)
                 .read
-                .and_then(|read| read.resolve(env))
+                .and_then(|read| read.resolve(db, env))
                 .map(ProtocolMemberType::ty)
             {
                 Some(Type::Callable(callable)) => Some(callable),
@@ -527,22 +532,22 @@ impl<'db> ProtocolInterfaceView<'db> {
 
     pub(super) fn instance_member(
         self,
-        env: &SemanticEnvironment<'db>,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         name: &str,
     ) -> PlaceAndQualifiers<'db> {
-        let db = env.db();
         self.member_by_name(db, name)
             .map(|member| PlaceAndQualifiers {
                 place: member
-                    .access(env, ProtocolMemberAccessMode::Instance)
+                    .access(db, env, ProtocolMemberAccessMode::Instance)
                     .read
-                    .and_then(|read| read.resolve(env))
+                    .and_then(|read| read.resolve(db, env))
                     .map(|read| Place::bound(read.ty()))
                     .unwrap_or(Place::Undefined)
                     .with_provenance(Provenance::from_definition(member.definition())),
                 qualifiers: member.qualifiers(),
             })
-            .unwrap_or_else(|| Type::object().member(env, name))
+            .unwrap_or_else(|| Type::object().member(db, env, name))
     }
 
     /// Looks up a member guaranteed to exist on every inhabitant of `type[Protocol]`.
@@ -552,15 +557,15 @@ impl<'db> ProtocolInterfaceView<'db> {
     /// the nominal protocol origin provides a property descriptor.
     pub(super) fn meta_member(
         self,
-        env: &SemanticEnvironment<'db>,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         name: &str,
     ) -> Option<PlaceAndQualifiers<'db>> {
-        let db = env.db();
         self.member_by_name(db, name).map(|member| {
-            let read = member.access(env, ProtocolMemberAccessMode::Class).read;
+            let read = member.access(db, env, ProtocolMemberAccessMode::Class).read;
             PlaceAndQualifiers {
                 place: read
-                    .and_then(|read| read.resolve(env))
+                    .and_then(|read| read.resolve(db, env))
                     .map(|read| Place::bound(read.ty()))
                     .unwrap_or(Place::Undefined)
                     .with_provenance(Provenance::from_definition(member.definition())),
@@ -576,13 +581,12 @@ impl<'db> ProtocolInterfaceView<'db> {
 }
 
 pub(super) fn walk_protocol_interface<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
-    env: &SemanticEnvironment<'db>,
+    db: &'db dyn Db,
     interface: ProtocolInterfaceView<'db>,
     visitor: &V,
 ) {
-    let db = env.db();
     for member in interface.members(db) {
-        walk_protocol_member(env, &member, visitor);
+        walk_protocol_member(db, &member, visitor);
     }
 }
 
@@ -600,45 +604,44 @@ pub(super) fn walk_protocol_instance_interface<
     'db,
     V: super::visitor::TypeVisitor<'db> + ?Sized,
 >(
-    env: &SemanticEnvironment<'db>,
+    db: &'db dyn Db,
     interface: ProtocolInterfaceView<'db>,
     receiver_ty: Type<'db>,
     visitor: &V,
 ) {
-    let db = env.db();
     for member in interface.members(db) {
-        walk_protocol_instance_member(env, &member, receiver_ty, visitor);
+        walk_protocol_instance_member(db, &member, receiver_ty, visitor);
     }
 }
 
 /// Walks the types of a protocol member after binding any implicit receiver to `receiver_ty`.
 pub(super) fn walk_protocol_instance_member<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
-    env: &SemanticEnvironment<'db>,
+    db: &'db dyn Db,
     member: &ProtocolMember<'_, 'db>,
     receiver_ty: Type<'db>,
     visitor: &V,
 ) {
-    let db = env.db();
+    let env = visitor.program_environment();
     match member.data.kind {
         ProtocolMemberKind::Method(method, _) => {
             let method = member
                 .materialization
-                .map_or(method, |kind| method.materialize(env, kind));
+                .map_or(method, |kind| method.materialize(db, env, kind));
             let Type::Callable(callable) = method.ty() else {
-                visitor.visit_type(env, method.ty());
+                visitor.visit_type(db, method.ty());
                 return;
             };
             for signature in callable.signatures(db) {
                 if signature.has_implicit_positional_receiver_annotation() {
-                    let signature = signature.bind_self(env, Some(receiver_ty));
-                    walk_signature(env, &signature, visitor);
+                    let signature = signature.bind_self(db, env, Some(receiver_ty));
+                    walk_signature(db, &signature, visitor);
                 } else {
-                    walk_signature(env, signature, visitor);
+                    walk_signature(db, signature, visitor);
                 }
             }
         }
         ProtocolMemberKind::Property { .. } => {
-            let access = member.access(env, ProtocolMemberAccessMode::Instance);
+            let access = member.access(db, env, ProtocolMemberAccessMode::Instance);
             for member_type in [
                 access.read,
                 access.write.and_then(ProtocolMemberWrite::domain),
@@ -647,17 +650,17 @@ pub(super) fn walk_protocol_instance_member<'db, V: super::visitor::TypeVisitor<
             .into_iter()
             .flatten()
             {
-                if let Some(ty) = member_type.bind_self(env, receiver_ty) {
-                    visitor.visit_type(env, ty);
+                if let Some(ty) = member_type.bind_self(db, env, receiver_ty) {
+                    visitor.visit_type(db, ty);
                 }
             }
         }
         ProtocolMemberKind::Attribute(attribute) => {
             let attribute = member
                 .materialization
-                .map_or(attribute, |kind| attribute.materialize(env, kind));
-            if let Some(ty) = attribute.bind_self(env, receiver_ty) {
-                visitor.visit_type(env, ty);
+                .map_or(attribute, |kind| attribute.materialize(db, env, kind));
+            if let Some(ty) = attribute.bind_self(db, env, receiver_ty) {
+                visitor.visit_type(db, ty);
             }
         }
     }
@@ -668,7 +671,11 @@ impl<'db> ProtocolInterface<'db> {
     ///
     /// All created members will be covariant, read-only property members
     /// rather than method members or mutable attribute members.
-    pub(super) fn with_property_members<'a, M>(env: &SemanticEnvironment<'db>, members: M) -> Self
+    pub(super) fn with_property_members<'a, M>(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        members: M,
+    ) -> Self
     where
         M: IntoIterator<Item = (&'a str, Type<'db>)>,
     {
@@ -681,38 +688,41 @@ impl<'db> ProtocolInterface<'db> {
                 )
             })
             .collect();
-        Self::new(env.db(), env.program(), members)
+        Self::new(db, env.program(db), members)
     }
 
     /// Synthesize a new protocol interface with the given methods.
-    pub(super) fn with_methods<'a, M>(env: &SemanticEnvironment<'db>, members: M) -> Self
+    pub(super) fn with_methods<'a, M>(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        members: M,
+    ) -> Self
     where
         M: IntoIterator<Item = (&'a str, CallableType<'db>)>,
     {
-        let db = env.db();
         let members: BTreeMap<_, _> = members
             .into_iter()
             .map(|(name, callable)| {
                 (
                     Name::new(name),
-                    ProtocolMemberData::method(env, callable, None),
+                    ProtocolMemberData::method(db, env, callable, None),
                 )
             })
             .collect();
-        Self::new(db, env.program(), members)
+        Self::new(db, env.program(db), members)
     }
 
-    fn empty(env: &SemanticEnvironment<'db>) -> Self {
-        Self::new(env.db(), env.program(), BTreeMap::default())
+    fn empty(db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Self {
+        Self::new(db, env.program(db), BTreeMap::default())
     }
 
     fn cycle_normalized(
         self,
-        env: &SemanticEnvironment<'db>,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         previous: Self,
         cycle: &salsa::Cycle,
     ) -> Self {
-        let db = env.db();
         let prev_inner = previous.inner(db);
         let curr_inner = self.inner(db);
 
@@ -720,14 +730,14 @@ impl<'db> ProtocolInterface<'db> {
             .iter()
             .map(|(name, curr_data)| {
                 let normalized = if let Some(prev_data) = prev_inner.get(name) {
-                    curr_data.cycle_normalized(env, prev_data, cycle)
+                    curr_data.cycle_normalized(db, env, prev_data, cycle)
                 } else {
                     curr_data.clone()
                 };
                 (name.clone(), normalized)
             })
             .collect();
-        Self::new(db, env.program(), members)
+        Self::new(db, env.program(db), members)
     }
 
     pub(super) fn members<'a>(
@@ -746,13 +756,12 @@ impl<'db> ProtocolInterface<'db> {
 
     pub(super) fn filter_members(
         self,
-        env: &SemanticEnvironment<'db>,
+        db: &'db dyn Db,
         mut predicate: impl FnMut(&ProtocolMember<'_, 'db>) -> bool,
     ) -> Self {
-        let db = env.db();
         Self::new(
             db,
-            env.program(),
+            self.program(db),
             self.inner(db)
                 .iter()
                 .filter(|&(name, data)| {
@@ -785,16 +794,16 @@ impl<'db> ProtocolInterface<'db> {
     /// to `generic_context`.
     pub(super) fn includes_generic_writable_instance_member(
         self,
-        env: &SemanticEnvironment<'db>,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         name: &str,
         generic_context: GenericContext<'db>,
     ) -> bool {
-        let db = env.db();
         self.inner(db)
             .get(name)
-            .and_then(|data| data.capabilities(env).instance.write)
+            .and_then(|data| data.capabilities(db, env).instance.write)
             .and_then(ProtocolMemberWrite::domain)
-            .and_then(|write| write.resolve(env))
+            .and_then(|write| write.resolve(db, env))
             .is_some_and(|write| {
                 matches!(
                     write.ty(),
@@ -808,28 +817,29 @@ impl<'db> ProtocolInterface<'db> {
 
     pub(super) fn instance_member(
         self,
-        env: &SemanticEnvironment<'db>,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         name: &str,
     ) -> PlaceAndQualifiers<'db> {
-        ProtocolInterfaceView::new(self, None).instance_member(env, name)
+        ProtocolInterfaceView::new(self, None).instance_member(db, env, name)
     }
 
     pub(super) fn recursive_type_normalized_impl(
         self,
-        env: &SemanticEnvironment<'db>,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         div: Type<'db>,
         nested: bool,
     ) -> Option<Self> {
-        let db = env.db();
         Some(Self::new(
             db,
-            env.program(),
+            env.program(db),
             self.inner(db)
                 .iter()
                 .map(|(name, data)| {
                     Some((
                         name.clone(),
-                        data.recursive_type_normalized_impl(env, div, nested)?,
+                        data.recursive_type_normalized_impl(db, env, div, nested)?,
                     ))
                 })
                 .collect::<Option<BTreeMap<_, _>>>()?,
@@ -838,21 +848,20 @@ impl<'db> ProtocolInterface<'db> {
 
     pub(super) fn apply_type_mapping_impl<'a>(
         self,
-        env: &SemanticEnvironment<'db>,
+        db: &'db dyn Db,
         type_mapping: &TypeMapping<'a, 'db>,
         tcx: TypeContext<'db>,
-        visitor: &ApplyTypeMappingVisitor<'db>,
+        visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Self {
-        let db = env.db();
         Self::new(
             db,
-            env.program(),
+            visitor.env.program(db),
             self.inner(db)
                 .iter()
                 .map(|(name, data)| {
                     (
                         name.clone(),
-                        data.apply_type_mapping_impl(env, type_mapping, tcx, visitor),
+                        data.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
                     )
                 })
                 .collect::<BTreeMap<_, _>>(),
@@ -861,32 +870,35 @@ impl<'db> ProtocolInterface<'db> {
 
     pub(super) fn find_legacy_typevars_impl(
         self,
-        env: &SemanticEnvironment<'db>,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         binding_context: Option<Definition<'db>>,
         typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
         visitor: &FindLegacyTypeVarsVisitor<'db>,
     ) {
-        let db = env.db();
         for data in self.inner(db).values() {
-            data.find_legacy_typevars_impl(env, binding_context, typevars, visitor);
+            data.find_legacy_typevars_impl(db, env, binding_context, typevars, visitor);
         }
     }
 
     pub(super) fn display<'env>(
         self,
-        env: &'env SemanticEnvironment<'db>,
+        db: &'db dyn Db,
+        env: &'env ProgramEnvironment<'db>,
     ) -> impl std::fmt::Display + 'env {
         struct ProtocolInterfaceDisplay<'env, 'db> {
-            env: &'env SemanticEnvironment<'db>,
+            db: &'db dyn Db,
+            env: &'env ProgramEnvironment<'db>,
             interface: ProtocolInterface<'db>,
         }
 
         impl std::fmt::Display for ProtocolInterfaceDisplay<'_, '_> {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                let db = self.db;
                 f.write_char('{')?;
-                for (i, (name, data)) in self.interface.inner(self.env.db()).iter().enumerate() {
-                    write!(f, "\"{name}\": {data}", data = data.display(self.env))?;
-                    if i < self.interface.inner(self.env.db()).len() - 1 {
+                for (i, (name, data)) in self.interface.inner(db).iter().enumerate() {
+                    write!(f, "\"{name}\": {data}", data = data.display(db, self.env))?;
+                    if i < self.interface.inner(db).len() - 1 {
                         f.write_str(", ")?;
                     }
                 }
@@ -895,6 +907,7 @@ impl<'db> ProtocolInterface<'db> {
         }
 
         ProtocolInterfaceDisplay {
+            db,
             env,
             interface: self,
         }
@@ -945,31 +958,36 @@ impl<'db> ProtocolMemberWrite<'db> {
         }
     }
 
-    fn display_type(self, env: &SemanticEnvironment<'db>) -> Option<ProtocolMemberType<'db>> {
+    fn display_type(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> Option<ProtocolMemberType<'db>> {
         match self {
-            Self::Type(member) => member.resolve(env),
+            Self::Type(member) => member.resolve(db, env),
             Self::Descriptor {
                 domain: Some(domain),
                 ..
-            } => domain.resolve(env),
+            } => domain.resolve(db, env),
             Self::Descriptor { domain: None, .. } => Some(ProtocolMemberType::new(Type::unknown())),
         }
     }
 
     fn bind_requirement(
         self,
-        env: &SemanticEnvironment<'db>,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         self_type: Type<'db>,
     ) -> Option<ProtocolMemberWriteRequirement<'db>> {
         match self {
             Self::Type(member) => Some(ProtocolMemberWriteRequirement::AssignableTo(
-                member.bind_self(env, self_type)?,
+                member.bind_self(db, env, self_type)?,
             )),
             Self::Descriptor { descriptor, domain } => {
                 Some(ProtocolMemberWriteRequirement::Descriptor {
-                    descriptor_ty: descriptor.bind_self(env, self_type)?,
+                    descriptor_ty: descriptor.bind_self(db, env, self_type)?,
                     receiver_ty: self_type,
-                    domain: domain.and_then(|domain| domain.bind_self(env, self_type)),
+                    domain: domain.and_then(|domain| domain.bind_self(db, env, self_type)),
                 })
             }
         }
@@ -977,14 +995,15 @@ impl<'db> ProtocolMemberWrite<'db> {
 
     fn bind_compatibility_type(
         self,
-        env: &SemanticEnvironment<'db>,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         self_type: Type<'db>,
     ) -> Option<Type<'db>> {
         match self {
-            Self::Type(member) => member.bind_self(env, self_type),
+            Self::Type(member) => member.bind_self(db, env, self_type),
             Self::Descriptor { domain, .. } => Some(
                 domain
-                    .and_then(|domain| domain.bind_self(env, self_type))
+                    .and_then(|domain| domain.bind_self(db, env, self_type))
                     .unwrap_or_else(Type::unknown),
             ),
         }
@@ -994,36 +1013,42 @@ impl<'db> ProtocolMemberWrite<'db> {
     ///
     /// The descriptor itself remains unchanged so normal descriptor dispatch and deletion
     /// continue to use the declaration on the original protocol class.
-    fn materialize(self, env: &SemanticEnvironment<'db>, kind: MaterializationKind) -> Self {
+    fn materialize(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        kind: MaterializationKind,
+    ) -> Self {
         match self {
-            Self::Type(member) => Self::Type(member.materialize(env, kind.flip())),
+            Self::Type(member) => Self::Type(member.materialize(db, env, kind.flip())),
             Self::Descriptor { descriptor, domain } => Self::Descriptor {
                 descriptor,
-                domain: domain.map(|domain| domain.materialize(env, kind.flip())),
+                domain: domain.map(|domain| domain.materialize(db, env, kind.flip())),
             },
         }
     }
 
     /// Resolve accessor representations without changing descriptor identity.
-    fn resolved(self, env: &SemanticEnvironment<'db>) -> Self {
+    fn resolved(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Self {
         match self {
-            Self::Type(member) => Self::Type(member.resolve(env).unwrap_or(member)),
+            Self::Type(member) => Self::Type(member.resolve(db, env).unwrap_or(member)),
             Self::Descriptor { descriptor, domain } => Self::Descriptor {
-                descriptor: descriptor.resolve(env).unwrap_or(descriptor),
-                domain: domain.map(|member| member.resolve(env).unwrap_or(member)),
+                descriptor: descriptor.resolve(db, env).unwrap_or(descriptor),
+                domain: domain.map(|member| member.resolve(db, env).unwrap_or(member)),
             },
         }
     }
 
     fn cycle_normalized(
         self,
-        env: &SemanticEnvironment<'db>,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         previous: Self,
         cycle: &salsa::Cycle,
     ) -> Self {
         match (self, previous) {
             (Self::Type(current), Self::Type(previous)) => {
-                Self::Type(current.cycle_normalized(env, previous, cycle))
+                Self::Type(current.cycle_normalized(db, env, previous, cycle))
             }
             (
                 Self::Descriptor {
@@ -1035,8 +1060,19 @@ impl<'db> ProtocolMemberWrite<'db> {
                     domain: previous_domain,
                 },
             ) => Self::Descriptor {
-                descriptor: current_descriptor.cycle_normalized(env, previous_descriptor, cycle),
-                domain: cycle_normalized_optional_type(env, current_domain, previous_domain, cycle),
+                descriptor: current_descriptor.cycle_normalized(
+                    db,
+                    env,
+                    previous_descriptor,
+                    cycle,
+                ),
+                domain: cycle_normalized_optional_type(
+                    db,
+                    env,
+                    current_domain,
+                    previous_domain,
+                    cycle,
+                ),
             },
             (current, _) => current,
         }
@@ -1044,11 +1080,12 @@ impl<'db> ProtocolMemberWrite<'db> {
 
     fn cycle_normalized_without_previous(
         self,
-        env: &SemanticEnvironment<'db>,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         cycle: &salsa::Cycle,
     ) -> Self {
         let normalize = |member: ProtocolMemberType<'db>| {
-            member.with_ty(member.ty().recursive_type_normalized(env, cycle))
+            member.with_ty(member.ty().recursive_type_normalized(db, env, cycle))
         };
         match self {
             Self::Type(member) => Self::Type(normalize(member)),
@@ -1061,18 +1098,21 @@ impl<'db> ProtocolMemberWrite<'db> {
 
     fn recursive_type_normalized_impl(
         self,
-        env: &SemanticEnvironment<'db>,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         div: Type<'db>,
         nested: bool,
     ) -> Option<Self> {
         Some(match self {
             Self::Type(member) => {
-                Self::Type(member.recursive_type_normalized_impl(env, div, nested)?)
+                Self::Type(member.recursive_type_normalized_impl(db, env, div, nested)?)
             }
             Self::Descriptor { descriptor, domain } => Self::Descriptor {
-                descriptor: descriptor.recursive_type_normalized_impl(env, div, nested)?,
+                descriptor: descriptor.recursive_type_normalized_impl(db, env, div, nested)?,
                 domain: match domain {
-                    Some(domain) => Some(domain.recursive_type_normalized_impl(env, div, nested)?),
+                    Some(domain) => {
+                        Some(domain.recursive_type_normalized_impl(db, env, div, nested)?)
+                    }
                     None => None,
                 },
             },
@@ -1081,19 +1121,19 @@ impl<'db> ProtocolMemberWrite<'db> {
 
     fn apply_type_mapping_impl<'a>(
         self,
-        env: &SemanticEnvironment<'db>,
+        db: &'db dyn Db,
         type_mapping: &TypeMapping<'a, 'db>,
         tcx: TypeContext<'db>,
-        visitor: &ApplyTypeMappingVisitor<'db>,
+        visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Self {
         match self {
             Self::Type(member) => {
-                Self::Type(member.apply_type_mapping_impl(env, type_mapping, tcx, visitor))
+                Self::Type(member.apply_type_mapping_impl(db, type_mapping, tcx, visitor))
             }
             Self::Descriptor { descriptor, domain } => Self::Descriptor {
-                descriptor: descriptor.apply_type_mapping_impl(env, type_mapping, tcx, visitor),
+                descriptor: descriptor.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
                 domain: domain
-                    .map(|domain| domain.apply_type_mapping_impl(env, type_mapping, tcx, visitor)),
+                    .map(|domain| domain.apply_type_mapping_impl(db, type_mapping, tcx, visitor)),
             },
         }
     }
@@ -1102,18 +1142,18 @@ impl<'db> ProtocolMemberWrite<'db> {
 impl<'db> VarianceInferable<'db> for ProtocolInterface<'db> {
     fn variance_of(
         self,
-        env: &SemanticEnvironment<'db>,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         typevar: BoundTypeVarIdentity<'db>,
     ) -> TypeVarVariance {
-        let db = env.db();
         self.members(db)
             .flat_map(|member| {
-                let capabilities = member.capabilities(env);
+                let capabilities = member.capabilities(db, env);
                 [capabilities.instance, capabilities.class]
                     .into_iter()
-                    .flat_map(|access| access.variances(env))
+                    .flat_map(|access| access.variances(db, env))
             })
-            .map(|(ty, variance)| ty.with_polarity(variance).variance_of(env, typevar))
+            .map(|(ty, variance)| ty.with_polarity(variance).variance_of(db, env, typevar))
             .collect()
     }
 }
@@ -1183,11 +1223,11 @@ impl<'db> ProtocolMemberType<'db> {
     }
 
     /// Resolves a stored property accessor to the value type exposed by that access.
-    fn resolve(self, env: &SemanticEnvironment<'db>) -> Option<Self> {
+    fn resolve(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Option<Self> {
         match self {
             Self::Value { .. } => Some(self),
-            Self::PropertyGetter(getter) => property_get_member_type(env, getter),
-            Self::PropertySetter(setter) => property_set_member_type(env, setter),
+            Self::PropertyGetter(getter) => property_get_member_type(db, env, getter),
+            Self::PropertySetter(setter) => property_set_member_type(db, env, setter),
         }
     }
 
@@ -1195,58 +1235,72 @@ impl<'db> ProtocolMemberType<'db> {
     ///
     /// In particular, resolving a property setter before materialization prevents its callable
     /// parameter from introducing a second contravariant flip.
-    fn materialize(self, env: &SemanticEnvironment<'db>, kind: MaterializationKind) -> Self {
-        let Some(resolved) = self.resolve(env) else {
+    fn materialize(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        kind: MaterializationKind,
+    ) -> Self {
+        let Some(resolved) = self.resolve(db, env) else {
             return self;
         };
         let ty = match kind {
-            MaterializationKind::Top => resolved.ty().top_materialization(env),
-            MaterializationKind::Bottom => resolved.ty().bottom_materialization(env),
+            MaterializationKind::Top => resolved.ty().top_materialization(db, env),
+            MaterializationKind::Bottom => resolved.ty().bottom_materialization(db, env),
         };
         resolved.with_ty(ty)
     }
 
     /// Resolves this member type and binds member-local `Self` occurrences to `self_type`.
-    fn bind_self(self, env: &SemanticEnvironment<'db>, self_type: Type<'db>) -> Option<Type<'db>> {
+    fn bind_self(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        self_type: Type<'db>,
+    ) -> Option<Type<'db>> {
         let Self::Value {
             ty,
             self_binding_context,
-        } = self.resolve(env)?
+        } = self.resolve(db, env)?
         else {
             return None;
         };
-        if !ty.contains_self(env) {
+        if !ty.contains_self(db, env) {
             return Some(ty);
         }
 
         Some(ty.apply_type_mapping(
+            db,
             env,
-            &TypeMapping::BindSelf(SelfBinding::new(env, self_type, self_binding_context)),
+            &TypeMapping::BindSelf(SelfBinding::new(db, env, self_type, self_binding_context)),
             TypeContext::default(),
         ))
     }
 
     fn cycle_normalized(
         self,
-        env: &SemanticEnvironment<'db>,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         previous: Self,
         cycle: &salsa::Cycle,
     ) -> Self {
-        let ty = self.ty().cycle_normalized(env, previous.ty(), cycle);
+        let ty = self.ty().cycle_normalized(db, env, previous.ty(), cycle);
         self.with_ty(ty)
     }
 
     fn recursive_type_normalized_impl(
         self,
-        env: &SemanticEnvironment<'db>,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         div: Type<'db>,
         nested: bool,
     ) -> Option<Self> {
         let ty = if nested {
-            self.ty().recursive_type_normalized_impl(env, div, true)?
+            self.ty()
+                .recursive_type_normalized_impl(db, env, div, true)?
         } else {
             self.ty()
-                .recursive_type_normalized_impl(env, div, true)
+                .recursive_type_normalized_impl(db, env, div, true)
                 .unwrap_or(div)
         };
         Some(self.with_ty(ty))
@@ -1254,14 +1308,14 @@ impl<'db> ProtocolMemberType<'db> {
 
     fn apply_type_mapping_impl<'a>(
         self,
-        env: &SemanticEnvironment<'db>,
+        db: &'db dyn Db,
         type_mapping: &TypeMapping<'a, 'db>,
         tcx: TypeContext<'db>,
-        visitor: &ApplyTypeMappingVisitor<'db>,
+        visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Self {
         let ty = self
             .ty()
-            .apply_type_mapping_impl(env, type_mapping, tcx, visitor);
+            .apply_type_mapping_impl(db, type_mapping, tcx, visitor);
         self.with_ty(ty)
     }
 }
@@ -1289,35 +1343,41 @@ impl<'db> ProtocolMemberAccess<'db> {
         Self { read, write }
     }
 
-    fn materialize(self, env: &SemanticEnvironment<'db>, kind: MaterializationKind) -> Self {
+    fn materialize(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        kind: MaterializationKind,
+    ) -> Self {
         Self {
-            read: self.read.map(|read| read.materialize(env, kind)),
-            write: self.write.map(|write| write.materialize(env, kind)),
+            read: self.read.map(|read| read.materialize(db, env, kind)),
+            write: self.write.map(|write| write.materialize(db, env, kind)),
         }
     }
 
     /// Resolve readable and writable accessor representations without losing descriptor identity.
-    fn resolved(self, env: &SemanticEnvironment<'db>) -> Self {
+    fn resolved(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Self {
         Self {
             read: self
                 .read
-                .map(|member| member.resolve(env).unwrap_or(member)),
-            write: self.write.map(|write| write.resolved(env)),
+                .map(|member| member.resolve(db, env).unwrap_or(member)),
+            write: self.write.map(|write| write.resolved(db, env)),
         }
     }
 
     fn variances(
         self,
-        env: &SemanticEnvironment<'db>,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
     ) -> impl Iterator<Item = (Type<'db>, TypeVarVariance)> {
         self.read
-            .and_then(|member| member.resolve(env))
+            .and_then(|member| member.resolve(db, env))
             .map(|member| (member.ty(), TypeVarVariance::Covariant))
             .into_iter()
             .chain(
                 self.write
                     .and_then(ProtocolMemberWrite::domain)
-                    .and_then(|member| member.resolve(env))
+                    .and_then(|member| member.resolve(db, env))
                     .map(|member| (member.ty(), TypeVarVariance::Contravariant)),
             )
     }
@@ -1335,10 +1395,15 @@ struct ProtocolMemberCapabilities<'db> {
 }
 
 impl<'db> ProtocolMemberCapabilities<'db> {
-    fn materialize(self, env: &SemanticEnvironment<'db>, kind: MaterializationKind) -> Self {
+    fn materialize(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        kind: MaterializationKind,
+    ) -> Self {
         Self {
-            instance: self.instance.materialize(env, kind),
-            class: self.class.materialize(env, kind),
+            instance: self.instance.materialize(db, env, kind),
+            class: self.class.materialize(db, env, kind),
         }
     }
 }
@@ -1350,15 +1415,16 @@ enum ProtocolMemberAccessMode {
 }
 
 fn cycle_normalized_optional_type<'db>(
-    env: &SemanticEnvironment<'db>,
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
     current: Option<ProtocolMemberType<'db>>,
     previous: Option<ProtocolMemberType<'db>>,
     cycle: &salsa::Cycle,
 ) -> Option<ProtocolMemberType<'db>> {
     match (current, previous) {
-        (Some(current), Some(previous)) => Some(current.cycle_normalized(env, previous, cycle)),
+        (Some(current), Some(previous)) => Some(current.cycle_normalized(db, env, previous, cycle)),
         (Some(current), None) => {
-            Some(current.with_ty(current.ty().recursive_type_normalized(env, cycle)))
+            Some(current.with_ty(current.ty().recursive_type_normalized(db, env, cycle)))
         }
         (None, _) => None,
     }
@@ -1373,15 +1439,15 @@ pub(super) struct ProtocolMemberData<'db> {
 
 impl<'db> ProtocolMemberData<'db> {
     fn method(
-        env: &SemanticEnvironment<'db>,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         callable: CallableType<'db>,
         definition: Option<Definition<'db>>,
     ) -> Self {
-        let db = env.db();
         let (method_kind, callable) = if callable.is_classmethod_like(db) {
             (
                 ProtocolMethodKind::Class,
-                protocol_bind_self(db, env.program(), callable, None),
+                protocol_bind_self(db, env.program(db), callable, None),
             )
         } else if callable.is_staticmethod_like(db) {
             (ProtocolMethodKind::Static, callable.into_regular(db))
@@ -1429,12 +1495,16 @@ impl<'db> ProtocolMemberData<'db> {
     ///
     /// These are views of the canonical method, property, or attribute representation below;
     /// keeping them derived prevents the stored member kind and its capabilities from diverging.
-    fn capabilities(&self, env: &SemanticEnvironment<'db>) -> ProtocolMemberCapabilities<'db> {
+    fn capabilities(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> ProtocolMemberCapabilities<'db> {
         match self.kind {
             ProtocolMemberKind::Method(member, kind) => {
                 let instance_method = match (member.ty(), kind) {
                     (Type::Callable(callable), ProtocolMethodKind::Instance) => member.with_ty(
-                        Type::Callable(protocol_bind_self(env.db(), env.program(), callable, None)),
+                        Type::Callable(protocol_bind_self(db, env.program(db), callable, None)),
                     ),
                     _ => member,
                 };
@@ -1471,12 +1541,13 @@ impl<'db> ProtocolMemberData<'db> {
 
     fn cycle_normalized(
         &self,
-        env: &SemanticEnvironment<'db>,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         previous: &Self,
         cycle: &salsa::Cycle,
     ) -> Self {
         Self {
-            kind: self.kind.cycle_normalized(env, previous.kind, cycle),
+            kind: self.kind.cycle_normalized(db, env, previous.kind, cycle),
             qualifiers: self.qualifiers,
             definition: self.definition,
         }
@@ -1484,12 +1555,15 @@ impl<'db> ProtocolMemberData<'db> {
 
     fn recursive_type_normalized_impl(
         &self,
-        env: &SemanticEnvironment<'db>,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         div: Type<'db>,
         nested: bool,
     ) -> Option<Self> {
         Some(Self {
-            kind: self.kind.recursive_type_normalized_impl(env, div, nested)?,
+            kind: self
+                .kind
+                .recursive_type_normalized_impl(db, env, div, nested)?,
             qualifiers: self.qualifiers,
             definition: self.definition,
         })
@@ -1497,15 +1571,15 @@ impl<'db> ProtocolMemberData<'db> {
 
     fn apply_type_mapping_impl<'a>(
         &self,
-        env: &SemanticEnvironment<'db>,
+        db: &'db dyn Db,
         type_mapping: &TypeMapping<'a, 'db>,
         tcx: TypeContext<'db>,
-        visitor: &ApplyTypeMappingVisitor<'db>,
+        visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Self {
         Self {
             kind: self
                 .kind
-                .apply_type_mapping_impl(env, type_mapping, tcx, visitor),
+                .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
             qualifiers: self.qualifiers,
             definition: self.definition,
         }
@@ -1513,7 +1587,8 @@ impl<'db> ProtocolMemberData<'db> {
 
     fn find_legacy_typevars_impl(
         &self,
-        env: &SemanticEnvironment<'db>,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         binding_context: Option<Definition<'db>>,
         typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
         _visitor: &FindLegacyTypeVarsVisitor<'db>,
@@ -1521,37 +1596,49 @@ impl<'db> ProtocolMemberData<'db> {
         for member_type in self.kind.member_types() {
             member_type
                 .ty()
-                .find_legacy_typevars(env, binding_context, typevars);
+                .find_legacy_typevars(db, env, binding_context, typevars);
         }
     }
 
-    fn display<'env>(&self, env: &'env SemanticEnvironment<'db>) -> impl std::fmt::Display + 'env {
+    fn display<'env>(
+        &self,
+        db: &'db dyn Db,
+        env: &'env ProgramEnvironment<'db>,
+    ) -> impl std::fmt::Display + 'env {
         struct ProtocolMemberDataDisplay<'env, 'db> {
-            env: &'env SemanticEnvironment<'db>,
+            db: &'db dyn Db,
+            env: &'env ProgramEnvironment<'db>,
             kind: ProtocolMemberKind<'db>,
             qualifiers: TypeQualifiers,
         }
 
         impl std::fmt::Display for ProtocolMemberDataDisplay<'_, '_> {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                let db = self.db;
                 match self.kind {
                     ProtocolMemberKind::Method(member, _) => {
-                        write!(f, "MethodMember(`{}`)", member.ty().display(self.env))
+                        write!(f, "MethodMember(`{}`)", member.ty().display(db, self.env))
                     }
                     ProtocolMemberKind::Property { read, write } => {
                         let env = self.env;
                         let mut d = f.debug_struct("PropertyMember");
-                        if let Some(read) = read.and_then(|read| read.resolve(env)) {
-                            d.field("read", &format_args!("`{}`", read.ty().display(self.env)));
+                        if let Some(read) = read.and_then(|read| read.resolve(db, env)) {
+                            d.field(
+                                "read",
+                                &format_args!("`{}`", read.ty().display(db, self.env)),
+                            );
                         }
-                        if let Some(write) = write.and_then(|write| write.display_type(env)) {
-                            d.field("write", &format_args!("`{}`", write.ty().display(self.env)));
+                        if let Some(write) = write.and_then(|write| write.display_type(db, env)) {
+                            d.field(
+                                "write",
+                                &format_args!("`{}`", write.ty().display(db, self.env)),
+                            );
                         }
                         d.finish()
                     }
                     ProtocolMemberKind::Attribute(attribute) => {
                         f.write_str("AttributeMember(")?;
-                        write!(f, "`{}`", attribute.ty().display(self.env))?;
+                        write!(f, "`{}`", attribute.ty().display(db, self.env))?;
                         if self.qualifiers.contains(TypeQualifiers::CLASS_VAR) {
                             f.write_str("; ClassVar")?;
                         }
@@ -1562,6 +1649,7 @@ impl<'db> ProtocolMemberData<'db> {
         }
 
         ProtocolMemberDataDisplay {
+            db,
             env,
             kind: self.kind,
             qualifiers: self.qualifiers,
@@ -1603,20 +1691,21 @@ impl<'db> ProtocolMemberKind<'db> {
 
     fn cycle_normalized(
         self,
-        env: &SemanticEnvironment<'db>,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         previous: Self,
         cycle: &salsa::Cycle,
     ) -> Self {
-        let db = env.db();
         match (self, previous) {
             (Self::Method(current, kind), Self::Method(previous, _)) => {
                 let (Type::Callable(current_callable), Type::Callable(previous_callable)) =
                     (current.ty(), previous.ty())
                 else {
-                    return Self::Method(current.cycle_normalized(env, previous, cycle), kind);
+                    return Self::Method(current.cycle_normalized(db, env, previous, cycle), kind);
                 };
                 debug_assert_eq!(current_callable.kind(db), previous_callable.kind(db));
                 let signatures = current_callable.signatures(db).cycle_normalized(
+                    db,
                     env,
                     previous_callable.signatures(db),
                     cycle,
@@ -1641,19 +1730,19 @@ impl<'db> ProtocolMemberKind<'db> {
                     write: previous_write,
                 },
             ) => Self::Property {
-                read: cycle_normalized_optional_type(env, current_read, previous_read, cycle),
+                read: cycle_normalized_optional_type(db, env, current_read, previous_read, cycle),
                 write: match (current_write, previous_write) {
                     (Some(current), Some(previous)) => {
-                        Some(current.cycle_normalized(env, previous, cycle))
+                        Some(current.cycle_normalized(db, env, previous, cycle))
                     }
                     (Some(current), None) => {
-                        Some(current.cycle_normalized_without_previous(env, cycle))
+                        Some(current.cycle_normalized_without_previous(db, env, cycle))
                     }
                     (None, _) => None,
                 },
             },
             (Self::Attribute(current), Self::Attribute(previous)) => {
-                Self::Attribute(current.cycle_normalized(env, previous, cycle))
+                Self::Attribute(current.cycle_normalized(db, env, previous, cycle))
             }
             (current, _) => current,
         }
@@ -1661,51 +1750,53 @@ impl<'db> ProtocolMemberKind<'db> {
 
     fn recursive_type_normalized_impl(
         self,
-        env: &SemanticEnvironment<'db>,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         div: Type<'db>,
         nested: bool,
     ) -> Option<Self> {
         Some(match self {
             Self::Method(member, kind) => Self::Method(
-                member.recursive_type_normalized_impl(env, div, nested)?,
+                member.recursive_type_normalized_impl(db, env, div, nested)?,
                 kind,
             ),
             Self::Property { read, write } => Self::Property {
                 read: match read {
-                    Some(read) => Some(read.recursive_type_normalized_impl(env, div, nested)?),
+                    Some(read) => Some(read.recursive_type_normalized_impl(db, env, div, nested)?),
                     None => None,
                 },
                 write: match write {
-                    Some(write) => Some(write.recursive_type_normalized_impl(env, div, nested)?),
+                    Some(write) => {
+                        Some(write.recursive_type_normalized_impl(db, env, div, nested)?)
+                    }
                     None => None,
                 },
             },
             Self::Attribute(attribute) => {
-                Self::Attribute(attribute.recursive_type_normalized_impl(env, div, nested)?)
+                Self::Attribute(attribute.recursive_type_normalized_impl(db, env, div, nested)?)
             }
         })
     }
 
     fn apply_type_mapping_impl<'a>(
         self,
-        env: &SemanticEnvironment<'db>,
+        db: &'db dyn Db,
         type_mapping: &TypeMapping<'a, 'db>,
         tcx: TypeContext<'db>,
-        visitor: &ApplyTypeMappingVisitor<'db>,
+        visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Self {
         match self {
             Self::Method(member, kind) => Self::Method(
-                member.apply_type_mapping_impl(env, type_mapping, tcx, visitor),
+                member.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
                 kind,
             ),
             Self::Property { read, write } => Self::Property {
-                read: read
-                    .map(|read| read.apply_type_mapping_impl(env, type_mapping, tcx, visitor)),
+                read: read.map(|read| read.apply_type_mapping_impl(db, type_mapping, tcx, visitor)),
                 write: write
-                    .map(|write| write.apply_type_mapping_impl(env, type_mapping, tcx, visitor)),
+                    .map(|write| write.apply_type_mapping_impl(db, type_mapping, tcx, visitor)),
             },
             Self::Attribute(attribute) => {
-                Self::Attribute(attribute.apply_type_mapping_impl(env, type_mapping, tcx, visitor))
+                Self::Attribute(attribute.apply_type_mapping_impl(db, type_mapping, tcx, visitor))
             }
         }
     }
@@ -1734,12 +1825,12 @@ enum StructuralMemberPriority {
 }
 
 fn walk_protocol_member<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
-    env: &SemanticEnvironment<'db>,
+    db: &'db dyn Db,
     member: &ProtocolMember<'_, 'db>,
     visitor: &V,
 ) {
     if member.materialization.is_some() {
-        let capabilities = member.capabilities(env);
+        let capabilities = member.capabilities(db, visitor.program_environment());
         for access in [capabilities.instance, capabilities.class] {
             for member_type in [
                 access.read,
@@ -1749,14 +1840,14 @@ fn walk_protocol_member<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
             .into_iter()
             .flatten()
             {
-                visitor.visit_type(env, member_type.ty());
+                visitor.visit_type(db, member_type.ty());
             }
         }
         return;
     }
 
     for member_type in member.data.kind.member_types() {
-        visitor.visit_type(env, member_type.ty());
+        visitor.visit_type(db, member_type.ty());
     }
 }
 
@@ -1779,11 +1870,11 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
     /// alias-containing members are compared last because they can expand the same interface again.
     fn structural_member_priority(
         &self,
-        env: &SemanticEnvironment<'db>,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
     ) -> StructuralMemberPriority {
-        let db = env.db();
         let is_recursive_type = |ty| {
-            any_over_type(env, ty, false, |nested| {
+            any_over_type(db, env, ty, false, |nested| {
                 matches!(nested, Type::ProtocolInstance(_) | Type::TypeAlias(_))
             })
         };
@@ -1791,7 +1882,7 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
         let ProtocolMemberKind::Method(member, _) = self.data.kind else {
             let is_finite = self.data.kind.member_types().all(|member| {
                 member
-                    .resolve(env)
+                    .resolve(db, env)
                     .is_some_and(|member| !is_recursive_type(member.ty()))
             });
             return if is_finite {
@@ -1969,10 +2060,14 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
         self.data.definition
     }
 
-    fn capabilities(&self, env: &SemanticEnvironment<'db>) -> ProtocolMemberCapabilities<'db> {
-        let capabilities = self.data.capabilities(env);
+    fn capabilities(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> ProtocolMemberCapabilities<'db> {
+        let capabilities = self.data.capabilities(db, env);
         self.materialization
-            .map_or(capabilities, |kind| capabilities.materialize(env, kind))
+            .map_or(capabilities, |kind| capabilities.materialize(db, env, kind))
     }
 
     /// Materialize only the access that an operation actually observes.
@@ -1981,16 +2076,17 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
     /// its unbound receiver can recursively refer to the very protocol being compared.
     fn access(
         &self,
-        env: &SemanticEnvironment<'db>,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         mode: ProtocolMemberAccessMode,
     ) -> ProtocolMemberAccess<'db> {
-        let capabilities = self.data.capabilities(env);
+        let capabilities = self.data.capabilities(db, env);
         let access = match mode {
             ProtocolMemberAccessMode::Instance => capabilities.instance,
             ProtocolMemberAccessMode::Class => capabilities.class,
         };
         self.materialization
-            .map_or(access, |kind| access.materialize(env, kind))
+            .map_or(access, |kind| access.materialize(db, env, kind))
     }
 
     /// Returns the access that a candidate value must provide for this member.
@@ -2001,7 +2097,8 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
     /// case needs a separate class-side check for the same member.
     fn implementation_access(
         &self,
-        env: &SemanticEnvironment<'db>,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         ty: Type<'db>,
         mode: ProtocolMemberAccessMode,
     ) -> ProtocolMemberAccess<'db> {
@@ -2019,63 +2116,64 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
         {
             ProtocolMemberAccess::NONE
         } else {
-            self.access(env, mode)
+            self.access(db, env, mode)
         }
     }
 }
 
 fn property_get_member_type<'db>(
-    env: &SemanticEnvironment<'db>,
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
     getter: Type<'db>,
 ) -> Option<ProtocolMemberType<'db>> {
-    let db = env.db();
     let mut get_types = Vec::new();
     let mut definition = None;
-    for callable in &getter.try_upcast_to_callable(env)? {
+    for callable in &getter.try_upcast_to_callable(db, env)? {
         for signature in callable.signatures(db) {
             get_types.push(signature.return_ty);
             definition = definition.or(signature.definition());
         }
     }
     Some(ProtocolMemberType::with_definition(
-        UnionType::from_elements(env, get_types),
+        UnionType::from_elements(db, env, get_types),
         definition,
     ))
 }
 
 fn property_set_member_type<'db>(
-    env: &SemanticEnvironment<'db>,
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
     setter: Type<'db>,
 ) -> Option<ProtocolMemberType<'db>> {
-    let db = env.db();
     let mut set_types = Vec::new();
     let mut definition = None;
-    for callable in &setter.try_upcast_to_callable(env)? {
+    for callable in &setter.try_upcast_to_callable(db, env)? {
         for signature in callable.signatures(db) {
             set_types.push(signature.parameters().get_positional(1)?.annotated_type());
             definition = definition.or(signature.definition());
         }
     }
     Some(ProtocolMemberType::with_definition(
-        UnionType::from_elements(env, set_types),
+        UnionType::from_elements(db, env, set_types),
         definition,
     ))
 }
 
 /// Derive the observable instance capabilities of a descriptor-decorated protocol member.
 fn descriptor_decorated_protocol_member<'db>(
-    env: &SemanticEnvironment<'db>,
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
     descriptor_ty: Type<'db>,
     protocol: ClassType<'db>,
     definition: Option<Definition<'db>>,
 ) -> Option<ProtocolMemberData<'db>> {
-    let descriptor_ty = descriptor_ty.resolve_type_alias(env);
+    let descriptor_ty = descriptor_ty.resolve_type_alias(db);
 
     // Applying a generic descriptor decorator to a method that refers to an enclosing type
     // variable can currently materialize that variable as `Unknown`. Reducing the descriptor to
     // its `__get__` result would then erase the remaining descriptor structure and weaken the
     // protocol member to a bare `Unknown`.
-    if super::visitor::any_over_type(env, descriptor_ty, false, |ty| ty.is_unknown()) {
+    if super::visitor::any_over_type(db, env, descriptor_ty, false, |ty| ty.is_unknown()) {
         return None;
     }
 
@@ -2083,18 +2181,22 @@ fn descriptor_decorated_protocol_member<'db>(
         definedness: Definedness::AlwaysDefined,
         ..
     }) = descriptor_ty
-        .class_member_with_policy(env, "__get__", MemberLookupPolicy::REQUIRE_CONCRETE)
+        .class_member_with_policy(db, env, "__get__", MemberLookupPolicy::REQUIRE_CONCRETE)
         .place
     else {
         return None;
     };
 
-    let receiver_ty = Type::instance(env, protocol);
-    let (read_ty, _) =
-        descriptor_ty.try_call_dunder_get(env, Some(receiver_ty), receiver_ty.to_meta_type(env))?;
+    let receiver_ty = Type::instance(db, env, protocol);
+    let (read_ty, _) = descriptor_ty.try_call_dunder_get(
+        db,
+        env,
+        Some(receiver_ty),
+        receiver_ty.to_meta_type(db, env),
+    )?;
     let read = Some(ProtocolMemberType::with_definition(read_ty, definition));
 
-    let write = match descriptor_setter_domain(env, descriptor_ty, receiver_ty) {
+    let write = match descriptor_setter_domain(db, env, descriptor_ty, receiver_ty) {
         DescriptorSetterDomain::Missing => None,
         DescriptorSetterDomain::Known(domain) => Some(ProtocolMemberWrite::descriptor(
             descriptor_ty,
@@ -2120,43 +2222,44 @@ enum DescriptorSetterDomain<'db> {
 
 /// Derive the values accepted by every possible descriptor setter when they fit in [`Type`].
 fn descriptor_setter_domain<'db>(
-    env: &SemanticEnvironment<'db>,
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
     descriptor_ty: Type<'db>,
     receiver_ty: Type<'db>,
 ) -> DescriptorSetterDomain<'db> {
-    let db = env.db();
     match descriptor_ty {
         Type::Union(union) => {
             let mut write_types = Vec::with_capacity(union.elements(db).len());
             for descriptor_ty in union.elements(db) {
-                match single_descriptor_setter_domain(env, *descriptor_ty, receiver_ty) {
+                match single_descriptor_setter_domain(db, env, *descriptor_ty, receiver_ty) {
                     DescriptorSetterDomain::Missing => return DescriptorSetterDomain::Missing,
                     DescriptorSetterDomain::Known(write_ty) => write_types.push(write_ty),
                     DescriptorSetterDomain::Deferred => return DescriptorSetterDomain::Deferred,
                 }
             }
-            IntersectionType::bounded_from_elements(env, write_types).map_or(
+            IntersectionType::bounded_from_elements(db, env, write_types).map_or(
                 DescriptorSetterDomain::Deferred,
                 DescriptorSetterDomain::Known,
             )
         }
-        _ => single_descriptor_setter_domain(env, descriptor_ty, receiver_ty),
+        _ => single_descriptor_setter_domain(db, env, descriptor_ty, receiver_ty),
     }
 }
 
 /// Derive the values accepted by one possible runtime descriptor.
 fn single_descriptor_setter_domain<'db>(
-    env: &SemanticEnvironment<'db>,
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
     descriptor_ty: Type<'db>,
     receiver_ty: Type<'db>,
 ) -> DescriptorSetterDomain<'db> {
-    let db = env.db();
     let Place::Defined(DefinedPlace {
         ty: setter_ty,
         definedness: Definedness::AlwaysDefined,
         ..
     }) = descriptor_ty
         .member_lookup_with_policy(
+            db,
             env,
             "__set__",
             MemberLookupPolicy::REQUIRE_CONCRETE | MemberLookupPolicy::NO_INSTANCE_FALLBACK,
@@ -2166,14 +2269,15 @@ fn single_descriptor_setter_domain<'db>(
         return DescriptorSetterDomain::Missing;
     };
 
-    let Some(callables) = setter_ty.try_upcast_to_callable(env) else {
+    let Some(callables) = setter_ty.try_upcast_to_callable(db, env) else {
         return DescriptorSetterDomain::Deferred;
     };
     let mut callable_domains = Vec::with_capacity(callables.iter().len());
     for callable in &callables {
         let mut write_types = Vec::new();
         for signature in callable.signatures(db) {
-            match descriptor_setter_signature_domain(env, signature, descriptor_ty, receiver_ty) {
+            match descriptor_setter_signature_domain(db, env, signature, descriptor_ty, receiver_ty)
+            {
                 DescriptorSetterSignatureDomain::Inapplicable => {}
                 DescriptorSetterSignatureDomain::Known(write_ty) => write_types.push(write_ty),
                 DescriptorSetterSignatureDomain::Deferred => {
@@ -2181,9 +2285,9 @@ fn single_descriptor_setter_domain<'db>(
                 }
             }
         }
-        callable_domains.push(UnionType::from_elements(env, write_types));
+        callable_domains.push(UnionType::from_elements(db, env, write_types));
     }
-    IntersectionType::bounded_from_elements(env, callable_domains).map_or(
+    IntersectionType::bounded_from_elements(db, env, callable_domains).map_or(
         DescriptorSetterDomain::Deferred,
         DescriptorSetterDomain::Known,
     )
@@ -2197,12 +2301,12 @@ enum DescriptorSetterSignatureDomain<'db> {
 
 /// Derive the values accepted by one `__set__` overload when they fit in [`Type`].
 fn descriptor_setter_signature_domain<'db>(
-    env: &SemanticEnvironment<'db>,
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
     signature: &Signature<'db>,
     descriptor_ty: Type<'db>,
     receiver_ty: Type<'db>,
 ) -> DescriptorSetterSignatureDomain<'db> {
-    let db = env.db();
     let parameters = signature.parameters();
     let missing_required_parameter = || {
         if parameters.is_gradual() || parameters.as_slice().iter().any(Parameter::is_variadic) {
@@ -2225,13 +2329,14 @@ fn descriptor_setter_signature_domain<'db>(
     let Some(receiver_parameter) = parameters.get_positional(0) else {
         return missing_required_parameter();
     };
-    let receiver_parameter = receiver_parameter
-        .annotated_type()
-        .bind_self_typevars(env, descriptor_ty);
-    if contains_signature_typevar(env, signature, receiver_parameter) {
+    let receiver_parameter =
+        receiver_parameter
+            .annotated_type()
+            .bind_self_typevars(db, env, descriptor_ty);
+    if contains_signature_typevar(db, env, signature, receiver_parameter) {
         return DescriptorSetterSignatureDomain::Deferred;
     }
-    if !receiver_ty.is_assignable_to(env, receiver_parameter) {
+    if !receiver_ty.is_assignable_to(db, env, receiver_parameter) {
         return DescriptorSetterSignatureDomain::Inapplicable;
     }
 
@@ -2240,8 +2345,8 @@ fn descriptor_setter_signature_domain<'db>(
     };
     let write_ty = write_parameter
         .annotated_type()
-        .bind_self_typevars(env, descriptor_ty);
-    if !contains_signature_typevar(env, signature, write_ty) {
+        .bind_self_typevars(db, env, descriptor_ty);
+    if !contains_signature_typevar(db, env, signature, write_ty) {
         return DescriptorSetterSignatureDomain::Known(write_ty);
     }
 
@@ -2260,10 +2365,10 @@ fn descriptor_setter_signature_domain<'db>(
         return DescriptorSetterSignatureDomain::Deferred;
     }
 
-    match typevar.typevar(db).bound_or_constraints(env) {
+    match typevar.typevar(db).bound_or_constraints(db, env) {
         None => DescriptorSetterSignatureDomain::Known(Type::object()),
         Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
-            DescriptorSetterSignatureDomain::Known(bound.bind_self_typevars(env, descriptor_ty))
+            DescriptorSetterSignatureDomain::Known(bound.bind_self_typevars(db, env, descriptor_ty))
         }
         Some(TypeVarBoundOrConstraints::Constraints(_)) => {
             DescriptorSetterSignatureDomain::Deferred
@@ -2272,25 +2377,25 @@ fn descriptor_setter_signature_domain<'db>(
 }
 
 fn contains_signature_typevar<'db>(
-    env: &SemanticEnvironment<'db>,
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
     signature: &Signature<'db>,
     ty: Type<'db>,
 ) -> bool {
-    let db = env.db();
     signature.generic_context.is_some_and(|generic_context| {
-        super::visitor::any_over_type(env, ty, true, |ty| {
+        super::visitor::any_over_type(db, env, ty, true, |ty| {
             matches!(ty, Type::TypeVar(typevar) if generic_context.contains(db, typevar.identity(db)))
         })
     })
 }
 
 fn property_set_type<'db>(
-    env: &SemanticEnvironment<'db>,
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
     property: PropertyInstanceType<'db>,
     receiver_ty: Type<'db>,
 ) -> Option<Type<'db>> {
-    let db = env.db();
-    property_set_member_type(env, property.setter(db)?)?.bind_self(env, receiver_ty)
+    property_set_member_type(db, env, property.setter(db)?)?.bind_self(db, env, receiver_ty)
 }
 
 fn is_class_object_type(ty: Type<'_>) -> bool {
@@ -2301,13 +2406,13 @@ fn is_class_object_type(ty: Type<'_>) -> bool {
 }
 
 fn protocol_member_read_type<'db>(
-    env: &SemanticEnvironment<'db>,
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
     ty: Type<'db>,
     receiver_ty: Type<'db>,
     member: &ProtocolMember<'_, 'db>,
     access: ProtocolMemberAccessMode,
 ) -> Option<Type<'db>> {
-    let db = env.db();
     // A callback protocol describes call syntax. Use the candidate's callable type instead of an
     // explicitly resolved `__call__` attribute, which can differ for class objects.
     if access == ProtocolMemberAccessMode::Instance
@@ -2325,10 +2430,11 @@ fn protocol_member_read_type<'db>(
         && (!is_class_object_type(ty) || member.uses_special_method_lookup())
     {
         Type::invoke_descriptor_protocol(
+            db,
             env,
             MemberLookupKey::new(
                 db,
-                env.program(),
+                env.program(db),
                 ty,
                 member.name,
                 // The undefined fallback excludes instance members. Keep the class
@@ -2341,7 +2447,7 @@ fn protocol_member_read_type<'db>(
         )
         .place
     } else {
-        receiver_ty.member(env, member.name).place
+        receiver_ty.member(db, env, member.name).place
     };
 
     match place {
@@ -2362,35 +2468,37 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
     /// assignment diagnostic.
     fn check_property_write(
         &self,
-        env: &SemanticEnvironment<'db>,
+        db: &'db dyn Db,
         ty: Type<'db>,
         member_name: &str,
         value_ty: Type<'db>,
     ) -> ConstraintSet<'db, 'c> {
-        let requirement = attribute_write_requirement(env, ty, member_name);
-        self.check_property_write_requirement(env, &requirement, member_name, value_ty)
+        let env = self.env;
+        let requirement = attribute_write_requirement(db, env, ty, member_name);
+        self.check_property_write_requirement(db, &requirement, member_name, value_ty)
     }
 
     fn check_property_write_requirement(
         &self,
-        env: &SemanticEnvironment<'db>,
+        db: &'db dyn Db,
         requirement: &AttributeWriteRequirement<'db>,
         member_name: &str,
         value_ty: Type<'db>,
     ) -> ConstraintSet<'db, 'c> {
-        let db = env.db();
         match requirement {
             AttributeWriteRequirement::All { element_tys, .. } => {
+                let env = self.env;
                 let mut result = self.always();
                 for element_ty in *element_tys {
-                    let requirement = attribute_write_requirement(env, *element_ty, member_name);
+                    let requirement =
+                        attribute_write_requirement(db, env, *element_ty, member_name);
                     let element_result = self.check_property_write_requirement(
-                        env,
+                        db,
                         &requirement,
                         member_name,
                         value_ty,
                     );
-                    result = result.and(env, self.constraints, || element_result);
+                    result = result.and(db, self.constraints, || element_result);
                     if result.is_trivially_never_satisfied() {
                         break;
                     }
@@ -2398,16 +2506,18 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 result
             }
             AttributeWriteRequirement::Any { intersection, .. } => {
+                let env = self.env;
                 let mut result = self.never();
                 for element_ty in intersection.positive(db) {
-                    let requirement = attribute_write_requirement(env, *element_ty, member_name);
+                    let requirement =
+                        attribute_write_requirement(db, env, *element_ty, member_name);
                     let element_result = self.check_property_write_requirement(
-                        env,
+                        db,
                         &requirement,
                         member_name,
                         value_ty,
                     );
-                    result = result.or(env, self.constraints, || element_result);
+                    result = result.or(db, self.constraints, || element_result);
                     if result.is_trivially_always_satisfied() {
                         break;
                     }
@@ -2417,37 +2527,38 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             AttributeWriteRequirement::Unconstrained => self.always(),
             AttributeWriteRequirement::CannotAssign => self.never(),
             AttributeWriteRequirement::Module(Some(write_ty)) => {
-                self.check_type_pair(env, value_ty, *write_ty)
+                self.check_type_pair(db, value_ty, *write_ty)
             }
             AttributeWriteRequirement::ProtocolMember {
                 write: Some(ProtocolMemberWriteRequirement::AssignableTo(write_ty)),
                 ..
-            } => self.check_type_pair(env, value_ty, *write_ty),
+            } => self.check_type_pair(db, value_ty, *write_ty),
             AttributeWriteRequirement::ProtocolMember {
                 write: Some(ProtocolMemberWriteRequirement::Descriptor { domain, .. }),
                 ..
-            } => self.check_type_pair(env, value_ty, domain.unwrap_or_else(Type::unknown)),
+            } => self.check_type_pair(db, value_ty, domain.unwrap_or_else(Type::unknown)),
             AttributeWriteRequirement::Module(None)
             | AttributeWriteRequirement::ProtocolMember { write: None, .. } => self.never(),
             AttributeWriteRequirement::Instance { object_ty, member } => {
-                self.check_instance_property_write(env, *object_ty, member, member_name, value_ty)
+                self.check_instance_property_write(db, *object_ty, member, member_name, value_ty)
             }
             AttributeWriteRequirement::Class { object_ty, member } => {
-                self.check_class_property_write(env, *object_ty, member, value_ty)
+                self.check_class_property_write(db, *object_ty, member, value_ty)
             }
         }
     }
 
     fn check_instance_property_write(
         &self,
-        env: &SemanticEnvironment<'db>,
+        db: &'db dyn Db,
         object_ty: Type<'db>,
         member: &InstanceAttributeWriteMember<'db>,
         member_name: &str,
         value_ty: Type<'db>,
     ) -> ConstraintSet<'db, 'c> {
-        let db = env.db();
+        let env = self.env;
         let setattr_result = object_ty.try_call_dunder_with_policy(
+            db,
             env,
             "__setattr__",
             &mut CallArguments::positional([Type::string_literal(db, member_name), value_ty]),
@@ -2455,8 +2566,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
         );
         if match &setattr_result {
-            Ok(bindings) => bindings.return_type(env).is_never(),
-            Err(error) => error.return_type(env).is_some_and(|ty| ty.is_never()),
+            Ok(bindings) => bindings.return_type(db, env).is_never(),
+            Err(error) => error.return_type(db, env).is_some_and(|ty| ty.is_never()),
         } {
             return self.never();
         }
@@ -2465,17 +2576,17 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             InstanceAttributeWriteMember::ClassVar => self.never(),
             InstanceAttributeWriteMember::Explicit { member, fallback } => {
                 let member_result =
-                    self.check_explicit_property_write(env, object_ty, member, value_ty);
+                    self.check_explicit_property_write(db, object_ty, member, value_ty);
                 if let Some(fallback) = fallback {
                     let fallback_result =
-                        self.check_fallback_property_write(env, fallback, value_ty);
-                    member_result.and(env, self.constraints, || fallback_result)
+                        self.check_fallback_property_write(db, fallback, value_ty);
+                    member_result.and(db, self.constraints, || fallback_result)
                 } else {
                     member_result
                 }
             }
             InstanceAttributeWriteMember::Instance(fallback) => {
-                self.check_fallback_property_write(env, fallback, value_ty)
+                self.check_fallback_property_write(db, fallback, value_ty)
             }
             InstanceAttributeWriteMember::SetAttr => {
                 if !matches!(
@@ -2484,14 +2595,14 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 ) {
                     return self.never();
                 }
-                self.check_setattr_property_write(env, object_ty, value_ty)
+                self.check_setattr_property_write(db, object_ty, value_ty)
             }
         }
     }
 
     fn check_class_property_write(
         &self,
-        env: &SemanticEnvironment<'db>,
+        db: &'db dyn Db,
         object_ty: Type<'db>,
         member: &ClassAttributeWriteMember<'db>,
         value_ty: Type<'db>,
@@ -2499,20 +2610,20 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         match member {
             ClassAttributeWriteMember::Explicit { member, fallback } => {
                 let member_result =
-                    self.check_explicit_property_write(env, object_ty, member, value_ty);
+                    self.check_explicit_property_write(db, object_ty, member, value_ty);
                 if member_result.is_trivially_never_satisfied() {
                     return member_result;
                 }
                 if let Some(fallback) = fallback {
                     let fallback_result =
-                        self.check_fallback_property_write(env, fallback, value_ty);
-                    member_result.and(env, self.constraints, || fallback_result)
+                        self.check_fallback_property_write(db, fallback, value_ty);
+                    member_result.and(db, self.constraints, || fallback_result)
                 } else {
                     member_result
                 }
             }
             ClassAttributeWriteMember::ClassAttribute(fallback) => {
-                self.check_fallback_property_write(env, fallback, value_ty)
+                self.check_fallback_property_write(db, fallback, value_ty)
             }
             ClassAttributeWriteMember::Unresolved { .. } => self.never(),
         }
@@ -2520,7 +2631,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
 
     fn check_explicit_property_write(
         &self,
-        env: &SemanticEnvironment<'db>,
+        db: &'db dyn Db,
         object_ty: Type<'db>,
         requirement: &ExplicitAttributeWriteRequirement<'db>,
         value_ty: Type<'db>,
@@ -2535,12 +2646,12 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 ..
             } => {
                 if let Some(property) = descriptor_ty.as_property_instance()
-                    && let Some(set_type) = property_set_type(env, property, object_ty)
+                    && let Some(set_type) = property_set_type(db, self.env, property, object_ty)
                 {
-                    return self.check_type_pair(env, value_ty, set_type);
+                    return self.check_type_pair(db, value_ty, set_type);
                 }
                 self.check_descriptor_property_write(
-                    env,
+                    db,
                     *descriptor_ty,
                     *setter_ty,
                     object_ty,
@@ -2548,21 +2659,23 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 )
             }
             ExplicitAttributeWriteRequirement::AssignableTo { ty, .. } => {
-                self.check_type_pair(env, value_ty, *ty)
+                self.check_type_pair(db, value_ty, *ty)
             }
         }
     }
 
     fn check_descriptor_property_write(
         &self,
-        env: &SemanticEnvironment<'db>,
+        db: &'db dyn Db,
         descriptor_ty: Type<'db>,
         setter_ty: Type<'db>,
         object_ty: Type<'db>,
         value_ty: Type<'db>,
     ) -> ConstraintSet<'db, 'c> {
+        let env = self.env;
         if setter_ty
             .try_call(
+                db,
                 env,
                 &CallArguments::positional([descriptor_ty, object_ty, Type::unknown()]),
             )
@@ -2571,17 +2684,19 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             return self.never();
         }
 
-        self.check_callable_write_parameter(env, setter_ty, 2, descriptor_ty, value_ty)
+        self.check_callable_write_parameter(db, setter_ty, 2, descriptor_ty, value_ty)
     }
 
     fn check_setattr_property_write(
         &self,
-        env: &SemanticEnvironment<'db>,
+        db: &'db dyn Db,
         object_ty: Type<'db>,
         value_ty: Type<'db>,
     ) -> ConstraintSet<'db, 'c> {
+        let env = self.env;
         let Place::Defined(DefinedPlace { ty: setattr_ty, .. }) = object_ty
             .member_lookup_with_policy(
+                db,
                 env,
                 "__setattr__",
                 MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK
@@ -2592,25 +2707,24 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             return self.never();
         };
 
-        self.check_callable_write_parameter(env, setattr_ty, 1, object_ty, value_ty)
+        self.check_callable_write_parameter(db, setattr_ty, 1, object_ty, value_ty)
     }
 
     fn check_callable_write_parameter(
         &self,
-        env: &SemanticEnvironment<'db>,
+        db: &'db dyn Db,
         callable_ty: Type<'db>,
         parameter_index: usize,
         self_ty: Type<'db>,
         value_ty: Type<'db>,
     ) -> ConstraintSet<'db, 'c> {
-        let db = env.db();
         if let Type::Union(union) = value_ty {
             return union
                 .elements(db)
                 .iter()
-                .when_all(env, self.constraints, |value_ty| {
+                .when_all(db, self.constraints, |value_ty| {
                     self.check_callable_write_parameter(
-                        env,
+                        db,
                         callable_ty,
                         parameter_index,
                         self_ty,
@@ -2619,39 +2733,40 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 });
         }
 
+        let env = self.env;
         callable_ty
-            .try_upcast_to_callable_with_policy(env, UpcastPolicy::from(self.relation))
+            .try_upcast_to_callable_with_policy(db, env, UpcastPolicy::from(self.relation))
             .when_some_and(db, self.constraints, |callables| {
-                callables
-                    .iter()
-                    .when_all(env, self.constraints, |callable| {
-                        callable.signatures(db).into_iter().when_any(
-                            env,
-                            self.constraints,
-                            |signature| {
-                                let parameters = signature.parameters();
-                                parameters
-                                    .get_positional(parameter_index)
-                                    .or_else(|| {
-                                        parameters.variadic().and_then(|(index, parameter)| {
-                                            (index <= parameter_index).then_some(parameter)
-                                        })
+                callables.iter().when_all(db, self.constraints, |callable| {
+                    callable.signatures(db).into_iter().when_any(
+                        db,
+                        self.constraints,
+                        |signature| {
+                            let parameters = signature.parameters();
+                            parameters
+                                .get_positional(parameter_index)
+                                .or_else(|| {
+                                    parameters.variadic().and_then(|(index, parameter)| {
+                                        (index <= parameter_index).then_some(parameter)
                                     })
-                                    .map(|parameter| {
-                                        parameter.annotated_type().bind_self_typevars(env, self_ty)
-                                    })
-                                    .when_some_and(db, self.constraints, |write_ty| {
-                                        self.check_type_pair(env, value_ty, write_ty)
-                                    })
-                            },
-                        )
-                    })
+                                })
+                                .map(|parameter| {
+                                    parameter
+                                        .annotated_type()
+                                        .bind_self_typevars(db, env, self_ty)
+                                })
+                                .when_some_and(db, self.constraints, |write_ty| {
+                                    self.check_type_pair(db, value_ty, write_ty)
+                                })
+                        },
+                    )
+                })
             })
     }
 
     fn check_fallback_property_write(
         &self,
-        env: &SemanticEnvironment<'db>,
+        db: &'db dyn Db,
         requirement: &FallbackAttributeWriteRequirement<'db>,
         value_ty: Type<'db>,
     ) -> ConstraintSet<'db, 'c> {
@@ -2660,7 +2775,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 if qualifiers.contains(TypeQualifiers::FINAL) {
                     self.never()
                 } else {
-                    self.check_type_pair(env, value_ty, *ty)
+                    self.check_type_pair(db, value_ty, *ty)
                 }
             }
             FallbackAttributeWriteRequirement::PossiblyMissing => self.always(),
@@ -2669,15 +2784,16 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
 
     fn check_protocol_member_read(
         &self,
-        env: &SemanticEnvironment<'db>,
+        db: &'db dyn Db,
         ty: Type<'db>,
         receiver_ty: Type<'db>,
         member: &ProtocolMember<'_, 'db>,
         required_ty: ProtocolMemberType<'db>,
         access: ProtocolMemberAccessMode,
     ) -> ConstraintSet<'db, 'c> {
-        let db = env.db();
-        let Some(attribute_type) = protocol_member_read_type(env, ty, receiver_ty, member, access)
+        let env = self.env;
+        let Some(attribute_type) =
+            protocol_member_read_type(db, env, ty, receiver_ty, member, access)
         else {
             return self.never();
         };
@@ -2686,16 +2802,16 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         // method on a class object names instances of that class: a `@classmethod` returning
         // `Self` returns `Factory`, not `type[Factory]`. Keep the bindings separate so a method
         // that returns an instance cannot satisfy a protocol that promises the class object.
-        let protocol_self_binding_ty = ty.literal_fallback_instance(env).unwrap_or(ty);
+        let protocol_self_binding_ty = ty.literal_fallback_instance(db, env).unwrap_or(ty);
         let implementation_self_binding_ty = ty
-            .to_instance_approximation(env)
-            .or_else(|| ty.literal_fallback_instance(env))
+            .to_instance_approximation(db, env)
+            .or_else(|| ty.literal_fallback_instance(db, env))
             .unwrap_or(ty);
         let (implementation_receiver_binding_ty, protocol_receiver_binding_ty) =
             if member.is_class_method() {
                 (
-                    implementation_self_binding_ty.to_meta_type(env),
-                    protocol_self_binding_ty.to_meta_type(env),
+                    implementation_self_binding_ty.to_meta_type(db, env),
+                    protocol_self_binding_ty.to_meta_type(db, env),
                 )
             } else {
                 (implementation_self_binding_ty, protocol_self_binding_ty)
@@ -2711,21 +2827,21 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         }
 
         if member.is_method() && access == ProtocolMemberAccessMode::Instance {
-            let Some(required_ty) = required_ty.resolve(env) else {
+            let Some(required_ty) = required_ty.resolve(db, env) else {
                 return self.never();
             };
             let Type::Callable(required_callable) = required_ty.ty() else {
                 return self.never();
             };
             attribute_type
-                .try_upcast_to_callable_with_policy(env, UpcastPolicy::from(self.relation))
+                .try_upcast_to_callable_with_policy(db, env, UpcastPolicy::from(self.relation))
                 .when_some_and(db, self.constraints, |callables| {
                     self.check_callables_vs_callable(
-                        env,
+                        db,
                         &callables.map(|callable| {
                             protocol_apply_self_with_receiver(
                                 db,
-                                env.program(),
+                                env.program(db),
                                 callable,
                                 implementation_receiver_binding_ty,
                                 implementation_self_binding_ty,
@@ -2733,7 +2849,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         }),
                         protocol_apply_self_with_receiver(
                             db,
-                            env.program(),
+                            env.program(db),
                             required_callable,
                             protocol_receiver_binding_ty,
                             protocol_self_binding_ty,
@@ -2741,47 +2857,45 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     )
                 })
         } else if member.is_instance_method() {
-            let Some(required_ty) = required_ty.resolve(env) else {
+            let Some(required_ty) = required_ty.resolve(db, env) else {
                 return self.never();
             };
             let Type::Callable(required_callable) = required_ty.ty() else {
                 return self.never();
             };
             attribute_type
-                .try_upcast_to_callable_with_policy(env, UpcastPolicy::from(self.relation))
+                .try_upcast_to_callable_with_policy(db, env, UpcastPolicy::from(self.relation))
                 .when_some_and(db, self.constraints, |callables| {
-                    callables
-                        .iter()
-                        .when_all(env, self.constraints, |callable| {
-                            if callable.is_function_like(db) {
-                                self.check_callable_pair(
-                                    env,
-                                    callable.bind_self(env, Some(implementation_self_binding_ty)),
-                                    protocol_bind_self(
-                                        env.db(),
-                                        env.program(),
-                                        required_callable,
-                                        Some(protocol_self_binding_ty),
-                                    ),
-                                )
-                            } else {
-                                self.check_callable_pair(env, *callable, required_callable)
-                            }
-                        })
+                    callables.iter().when_all(db, self.constraints, |callable| {
+                        if callable.is_function_like(db) {
+                            self.check_callable_pair(
+                                db,
+                                callable.bind_self(db, env, Some(implementation_self_binding_ty)),
+                                protocol_bind_self(
+                                    db,
+                                    env.program(db),
+                                    required_callable,
+                                    Some(protocol_self_binding_ty),
+                                ),
+                            )
+                        } else {
+                            self.check_callable_pair(db, *callable, required_callable)
+                        }
+                    })
                 })
         } else if member.is_method() {
-            let Some(required_ty) = required_ty.resolve(env) else {
+            let Some(required_ty) = required_ty.resolve(db, env) else {
                 return self.never();
             };
             let Type::Callable(required_callable) = required_ty.ty() else {
                 return self.never();
             };
             self.check_type_pair(
-                env,
+                db,
                 attribute_type,
                 Type::Callable(protocol_apply_self_with_receiver(
                     db,
-                    env.program(),
+                    env.program(db),
                     required_callable,
                     protocol_receiver_binding_ty,
                     protocol_self_binding_ty,
@@ -2789,11 +2903,11 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             )
         } else {
             required_ty
-                .bind_self(env, protocol_self_binding_ty)
+                .bind_self(db, env, protocol_self_binding_ty)
                 .when_some_and(db, self.constraints, |required_ty| {
-                    let result = self.check_type_pair(env, attribute_type, required_ty);
+                    let result = self.check_type_pair(db, attribute_type, required_ty);
                     if let Some(context) = self.report_context()
-                        && result.is_never_satisfied(env)
+                        && result.is_never_satisfied(db, env)
                     {
                         context.push(ErrorContext::ProtocolMemberReadTypeIncompatible {
                             source: attribute_type,
@@ -2811,14 +2925,13 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
     /// instance-side signature check is authoritative and class access only establishes presence.
     fn type_satisfies_protocol_member_access(
         &self,
-        env: &SemanticEnvironment<'db>,
+        db: &'db dyn Db,
         ty: Type<'db>,
         receiver_ty: Type<'db>,
         member: &ProtocolMember<'_, 'db>,
         required: ProtocolMemberAccess<'db>,
         access: ProtocolMemberAccessMode,
     ) -> ConstraintSet<'db, 'c> {
-        let db = env.db();
         if access == ProtocolMemberAccessMode::Class
             && member.is_instance_method()
             && required.read.is_some()
@@ -2831,7 +2944,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 self.constraints,
                 member.name == "__call__"
                     || protocol_member_read_type(
-                        env,
+                        db,
+                        self.env,
                         ty,
                         receiver_ty,
                         member,
@@ -2844,15 +2958,16 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         let read_result = required.read.map_or_else(
             || self.always(),
             |required_ty| {
-                self.check_protocol_member_read(env, ty, receiver_ty, member, required_ty, access)
+                self.check_protocol_member_read(db, ty, receiver_ty, member, required_ty, access)
             },
         );
 
-        read_result.and(env, self.constraints, || {
+        read_result.and(db, self.constraints, || {
             required.write.map_or_else(
                 || self.always(),
                 |write| {
-                    let fallback_ty = ty.literal_fallback_instance(env).unwrap_or(ty);
+                    let env = self.env;
+                    let fallback_ty = ty.literal_fallback_instance(db, env).unwrap_or(ty);
                     let receiver_ty = if access == ProtocolMemberAccessMode::Instance
                         && matches!(ty, Type::LiteralValue(_))
                     {
@@ -2861,12 +2976,12 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         receiver_ty
                     };
                     write
-                        .bind_compatibility_type(env, fallback_ty)
+                        .bind_compatibility_type(db, env, fallback_ty)
                         .when_some_and(db, self.constraints, |write_ty| {
                             let result =
-                                self.check_property_write(env, receiver_ty, member.name, write_ty);
+                                self.check_property_write(db, receiver_ty, member.name, write_ty);
                             if let Some(context) = self.report_context()
-                                && result.is_never_satisfied(env)
+                                && result.is_never_satisfied(db, env)
                             {
                                 context.push(ErrorContext::ProtocolMemberWriteTypeIncompatible {
                                     target: write_ty,
@@ -2882,15 +2997,17 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
     /// Return `true` if `ty` provides every access required by this protocol member.
     pub(super) fn type_satisfies_protocol_member(
         &self,
-        env: &SemanticEnvironment<'db>,
+        db: &'db dyn Db,
         ty: Type<'db>,
         member: &ProtocolMember<'_, 'db>,
     ) -> ConstraintSet<'db, 'c> {
+        let env = self.env;
         let instance_access =
-            member.implementation_access(env, ty, ProtocolMemberAccessMode::Instance);
+            member.implementation_access(db, env, ty, ProtocolMemberAccessMode::Instance);
         if let Some(context) = self.report_context() {
             let instance_read_missing = instance_access.read.is_some()
                 && protocol_member_read_type(
+                    db,
                     env,
                     ty,
                     ty,
@@ -2899,13 +3016,14 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 )
                 .is_none();
             let class_access =
-                member.implementation_access(env, ty, ProtocolMemberAccessMode::Class);
+                member.implementation_access(db, env, ty, ProtocolMemberAccessMode::Class);
             let class_read_missing = class_access.read.is_some()
                 && !(member.is_instance_method() && member.name == "__call__")
                 && protocol_member_read_type(
+                    db,
                     env,
                     ty,
-                    ty.to_meta_type(env),
+                    ty.to_meta_type(db, env),
                     member,
                     ProtocolMemberAccessMode::Class,
                 )
@@ -2928,27 +3046,27 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
 
         let result = self
             .type_satisfies_protocol_member_access(
-                env,
+                db,
                 ty,
                 ty,
                 member,
                 instance_access,
                 ProtocolMemberAccessMode::Instance,
             )
-            .and(env, self.constraints, || {
+            .and(db, self.constraints, || {
                 let class_access =
-                    member.implementation_access(env, ty, ProtocolMemberAccessMode::Class);
+                    member.implementation_access(db, env, ty, ProtocolMemberAccessMode::Class);
                 self.type_satisfies_protocol_member_access(
-                    env,
+                    db,
                     ty,
-                    ty.to_meta_type(env),
+                    ty.to_meta_type(db, env),
                     member,
                     class_access,
                     ProtocolMemberAccessMode::Class,
                 )
             });
         if let Some(context) = self.report_context()
-            && result.is_never_satisfied(env)
+            && result.is_never_satisfied(db, env)
         {
             context.push(ErrorContext::ProtocolMemberIncompatible {
                 member_name: member.name.into(),
@@ -2965,17 +3083,17 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
     /// matching, method access compares the unbound signature instead of checking only presence.
     pub(super) fn check_meta_protocol_members(
         &self,
-        env: &SemanticEnvironment<'db>,
+        db: &'db dyn Db,
         instance_ty: Type<'db>,
         meta_ty: Type<'db>,
         protocol: ProtocolInstanceType<'db>,
     ) -> ConstraintSet<'db, 'c> {
-        let db = env.db();
+        let env = self.env;
         protocol
-            .interface(env.db())
+            .interface(db)
             .members(db)
-            .when_all(env, self.constraints, |member| {
-                let required = member.access(env, ProtocolMemberAccessMode::Class);
+            .when_all(db, self.constraints, |member| {
+                let required = member.access(db, env, ProtocolMemberAccessMode::Class);
                 if required.read.is_none() && required.write.is_none() {
                     return self.always();
                 }
@@ -2985,7 +3103,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         || self.always(),
                         |required_ty| {
                             self.check_protocol_member_read(
-                                env,
+                                db,
                                 instance_ty,
                                 meta_ty,
                                 &member,
@@ -2996,7 +3114,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     )
                 } else {
                     self.type_satisfies_protocol_member_access(
-                        env,
+                        db,
                         instance_ty,
                         meta_ty,
                         &member,
@@ -3006,7 +3124,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 };
 
                 if let Some(context) = self.report_context()
-                    && result.is_never_satisfied(env)
+                    && result.is_never_satisfied(db, env)
                 {
                     context.push(ErrorContext::ProtocolMemberIncompatible {
                         member_name: member.name.into(),
@@ -3022,14 +3140,14 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
     /// covariantly and writable types contravariantly.
     fn check_protocol_member_access_pair(
         &self,
-        env: &SemanticEnvironment<'db>,
+        db: &'db dyn Db,
         source_type: Type<'db>,
         source_member: &ProtocolMember<'_, 'db>,
         target_member: &ProtocolMember<'_, 'db>,
         access: ProtocolMemberAccessMode,
     ) -> ConstraintSet<'db, 'c> {
-        let db = env.db();
-        let source = source_member.access(env, access);
+        let env = self.env;
+        let source = source_member.access(db, env, access);
 
         if access == ProtocolMemberAccessMode::Class
             && source_member.is_method()
@@ -3039,7 +3157,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             // access only establishes that the source member is also present on the class.
             return ConstraintSet::from_bool(self.constraints, source.read.is_some());
         }
-        let target = target_member.access(env, access);
+        let target = target_member.access(db, env, access);
 
         let read_result = match (source.read, target.read) {
             (_, None) => self.always(),
@@ -3047,19 +3165,19 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             (Some(source), Some(target)) => {
                 let bind_read = |member_type: ProtocolMemberType<'db>,
                                  member: &ProtocolMember<'_, 'db>| {
-                    let member_type = member_type.resolve(env)?;
+                    let member_type = member_type.resolve(db, env)?;
                     if member.is_method()
                         && let Type::Callable(callable) = member_type.ty()
                     {
                         Some(Type::Callable(protocol_apply_self_with_receiver(
                             db,
-                            env.program(),
+                            env.program(db),
                             callable,
                             source_type,
                             source_type,
                         )))
                     } else {
-                        member_type.bind_self(env, source_type)
+                        member_type.bind_self(db, env, source_type)
                     }
                 };
                 let (Some(source), Some(target)) = (
@@ -3068,10 +3186,10 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 ) else {
                     return self.never();
                 };
-                let result = self.check_type_pair(env, source, target);
+                let result = self.check_type_pair(db, source, target);
                 if let Some(context) = self.report_context()
                     && !target_member.is_method()
-                    && result.is_never_satisfied(env)
+                    && result.is_never_satisfied(db, env)
                 {
                     context
                         .push(ErrorContext::ProtocolMemberReadTypeIncompatible { source, target });
@@ -3080,7 +3198,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             }
         };
 
-        read_result.and(env, self.constraints, || {
+        read_result.and(db, self.constraints, || {
             match (source.write, target.write) {
                 (_, None) => self.always(),
                 (None, Some(_)) => {
@@ -3091,14 +3209,14 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 }
                 (Some(source), Some(target)) => {
                     let (Some(target), Some(source)) = (
-                        target.bind_compatibility_type(env, source_type),
-                        source.bind_compatibility_type(env, source_type),
+                        target.bind_compatibility_type(db, env, source_type),
+                        source.bind_compatibility_type(db, env, source_type),
                     ) else {
                         return self.never();
                     };
-                    let result = self.check_type_pair(env, target, source);
+                    let result = self.check_type_pair(db, target, source);
                     if let Some(context) = self.report_context()
-                        && result.is_never_satisfied(env)
+                        && result.is_never_satisfied(db, env)
                     {
                         context.push(ErrorContext::ProtocolMemberWriteTypeIncompatible { target });
                     }
@@ -3110,22 +3228,22 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
 
     pub(super) fn check_protocol_interface_pair(
         &self,
-        env: &SemanticEnvironment<'db>,
+        db: &'db dyn Db,
         source_type: Type<'db>,
         source: ProtocolInterfaceView<'db>,
         target: ProtocolInterfaceView<'db>,
     ) -> ConstraintSet<'db, 'c> {
-        let db = env.db();
         if source.member_count(db) < target.member_count(db)
             && !self.is_context_collection_enabled()
         {
             return self.never();
         }
 
+        let env = self.env;
         target
             .members(db)
-            .sorted_by_cached_key(|member| member.structural_member_priority(env))
-            .when_all(env, self.constraints, |target_member| {
+            .sorted_by_cached_key(|member| member.structural_member_priority(db, env))
+            .when_all(db, self.constraints, |target_member| {
                 let source_member = source.member_by_name(db, target_member.name);
 
                 if let Some(context) = self.report_context()
@@ -3140,15 +3258,15 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
 
                 let result = source_member.when_some_and(db, self.constraints, |source_member| {
                     self.check_protocol_member_access_pair(
-                        env,
+                        db,
                         source_type,
                         &source_member,
                         &target_member,
                         ProtocolMemberAccessMode::Instance,
                     )
-                    .and(env, self.constraints, || {
+                    .and(db, self.constraints, || {
                         self.check_protocol_member_access_pair(
-                            env,
+                            db,
                             source_type,
                             &source_member,
                             &target_member,
@@ -3157,7 +3275,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     })
                 });
                 if let Some(context) = self.report_context()
-                    && result.is_never_satisfied(env)
+                    && result.is_never_satisfied(db, env)
                 {
                     context.push(ErrorContext::ProtocolMemberIncompatible {
                         member_name: target_member.name.into(),
@@ -3175,13 +3293,13 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
     /// behavior is not sufficient to prove disjointness.
     pub(super) fn protocol_member_write_is_definitely_missing_from_ty(
         &self,
-        env: &SemanticEnvironment<'db>,
+        db: &'db dyn Db,
         member: &ProtocolMember<'_, 'db>,
         ty: Type<'db>,
     ) -> ConstraintSet<'db, 'c> {
-        let db = env.db();
+        let env = self.env;
         if member
-            .access(env, ProtocolMemberAccessMode::Instance)
+            .access(db, env, ProtocolMemberAccessMode::Instance)
             .write
             .is_none()
         {
@@ -3192,7 +3310,7 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
             ty: Type::PropertyInstance(actual_property),
             definedness: Definedness::AlwaysDefined,
             ..
-        }) = ty.class_member(env, member.name()).place
+        }) = ty.class_member(db, env, member.name()).place
         else {
             return self.never();
         };
@@ -3206,70 +3324,68 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
     /// than their full callable signatures.
     pub(super) fn protocol_member_has_disjoint_type_from_ty(
         &self,
-        env: &SemanticEnvironment<'db>,
+        db: &'db dyn Db,
         member: &ProtocolMember<'_, 'db>,
         ty: Type<'db>,
     ) -> ConstraintSet<'db, 'c> {
-        let db = env.db();
         // An unbound property descriptor does not establish that the value returned by its
         // getter is disjoint from the required property type.
         if member.is_property() && matches!(ty, Type::PropertyInstance(_)) {
             return self.never();
         }
-        let access = member.access(env, ProtocolMemberAccessMode::Instance);
+        let env = self.env;
+        let access = member.access(db, env, ProtocolMemberAccessMode::Instance);
         if !member.is_method() {
             access.read.when_some_and(db, self.constraints, |read_ty| {
                 read_ty
-                    .resolve(env)
+                    .resolve(db, env)
                     .when_some_and(db, self.constraints, |read_ty| {
-                        self.check_type_pair(env, ty, read_ty.ty())
+                        self.check_type_pair(db, ty, read_ty.ty())
                     })
             })
         } else {
             let Some(Type::Callable(method)) = access
                 .read
-                .and_then(|read| read.resolve(env))
+                .and_then(|read| read.resolve(db, env))
                 .map(ProtocolMemberType::ty)
             else {
                 return self.never();
             };
-            if !callable_has_only_non_never_returns(env, method) {
+            if !callable_has_only_non_never_returns(db, method) {
                 return self.never();
             }
 
-            let Some(callables) = ty.try_upcast_to_callable_with_policy(env, UpcastPolicy::Sound)
+            let Some(callables) =
+                ty.try_upcast_to_callable_with_policy(db, env, UpcastPolicy::Sound)
             else {
                 return self.never();
             };
 
-            callables
-                .iter()
-                .when_all(env, self.constraints, |callable| {
-                    if !callable_has_only_non_never_returns(env, *callable) {
-                        return self.never();
-                    }
+            callables.iter().when_all(db, self.constraints, |callable| {
+                if !callable_has_only_non_never_returns(db, *callable) {
+                    return self.never();
+                }
 
-                    // Disjointness distributes over unions. Compare the overload return arms
-                    // directly so that recursive return types do not require canonicalizing an
-                    // intermediate union merely to distribute it again.
-                    method.signatures(db).iter().when_all(
-                        env,
-                        self.constraints,
-                        |method_signature| {
-                            callable.signatures(db).iter().when_all(
-                                env,
-                                self.constraints,
-                                |callable_signature| {
-                                    self.check_type_pair(
-                                        env,
-                                        method_signature.return_ty,
-                                        callable_signature.return_ty,
-                                    )
-                                },
-                            )
-                        },
-                    )
-                })
+                // Disjointness distributes over unions. Compare the overload return arms
+                // directly so that recursive return types do not require canonicalizing an
+                // intermediate union merely to distribute it again.
+                method
+                    .signatures(db)
+                    .iter()
+                    .when_all(db, self.constraints, |method_signature| {
+                        callable.signatures(db).iter().when_all(
+                            db,
+                            self.constraints,
+                            |callable_signature| {
+                                self.check_type_pair(
+                                    db,
+                                    method_signature.return_ty,
+                                    callable_signature.return_ty,
+                                )
+                            },
+                        )
+                    })
+            })
         }
     }
 }
@@ -3354,10 +3470,9 @@ impl<'db> ProtocolMemberCandidate<'db> {
 
     fn walk_recursive_member_types<V: super::visitor::TypeVisitor<'db> + ?Sized>(
         self,
-        env: &SemanticEnvironment<'db>,
+        db: &'db dyn Db,
         visitor: &V,
     ) {
-        let db = env.db();
         match self.ty {
             Type::PropertyInstance(property) => {
                 // A property exposes its getter return and setter value types. Walking the
@@ -3370,13 +3485,13 @@ impl<'db> ProtocolMemberCandidate<'db> {
                 .into_iter()
                 .flatten()
                 {
-                    if let Some(member) = member.resolve(env) {
-                        visitor.visit_type(env, member.ty());
+                    if let Some(member) = member.resolve(db, visitor.program_environment()) {
+                        visitor.visit_type(db, member.ty());
                     }
                 }
             }
             _ if self.is_bound_method_like(db) => {}
-            _ => visitor.visit_type(env, self.ty),
+            _ => visitor.visit_type(db, self.ty),
         }
     }
 }
@@ -3392,15 +3507,15 @@ fn cached_protocol_interface<'db>(
     db: &'db dyn Db,
     class: ClassType<'db>,
 ) -> ProtocolInterface<'db> {
-    let env = SemanticEnvironment::from_file(db, class.class_literal(db).python_file(db));
+    let env = ProgramEnvironment::from_file(class.class_literal(db).python_file(db));
     let mut members = BTreeMap::default();
 
-    ProtocolClass(class).for_each_member_candidate(&env, |name, candidate, specialization| {
+    ProtocolClass(class).for_each_member_candidate(db, &env, |name, candidate, specialization| {
         if members.contains_key(name) {
             return;
         }
 
-        let candidate = candidate.apply_specialization(env.db(), specialization);
+        let candidate = candidate.apply_specialization(db, specialization);
         let ProtocolMemberCandidate {
             ty,
             qualifiers,
@@ -3418,20 +3533,20 @@ fn cached_protocol_interface<'db>(
                 definition,
             ),
             Type::Callable(callable) if bound_on_class.is_yes() && callable.is_method_like(db) => {
-                ProtocolMemberData::method(&env, callable, definition)
+                ProtocolMemberData::method(db, &env, callable, definition)
             }
             Type::FunctionLiteral(function)
                 if bound_on_class.is_yes()
-                    || function.is_staticmethod(env.db())
-                    || function.is_classmethod(env.db()) =>
+                    || function.is_staticmethod(db)
+                    || function.is_classmethod(db) =>
             {
-                ProtocolMemberData::method(&env, function.into_callable_type(env.db()), definition)
+                ProtocolMemberData::method(db, &env, function.into_callable_type(db), definition)
             }
             _ if bound_on_class.is_yes()
                 && definition.is_some_and(|definition| definition.kind(db).is_function_def()) =>
             {
                 if let Some(descriptor) =
-                    descriptor_decorated_protocol_member(&env, ty, class, definition)
+                    descriptor_decorated_protocol_member(db, &env, ty, class, definition)
                 {
                     descriptor
                 } else {
@@ -3444,7 +3559,7 @@ fn cached_protocol_interface<'db>(
         members.insert(name.clone(), member);
     });
 
-    ProtocolInterface::new(db, env.program(), members)
+    ProtocolInterface::new(db, env.program(db), members)
 }
 
 fn protocol_interface_cycle_initial<'db>(
@@ -3452,10 +3567,10 @@ fn protocol_interface_cycle_initial<'db>(
     _id: salsa::Id,
     class: ClassType<'db>,
 ) -> ProtocolInterface<'db> {
-    ProtocolInterface::empty(&SemanticEnvironment::from_file(
+    ProtocolInterface::empty(
         db,
-        class.class_literal(db).python_file(db),
-    ))
+        &ProgramEnvironment::from_file(class.class_literal(db).python_file(db)),
+    )
 }
 
 #[allow(clippy::trivially_copy_pass_by_ref)]
@@ -3466,8 +3581,8 @@ fn proto_interface_cycle_recover<'db>(
     value: ProtocolInterface<'db>,
     class: ClassType<'db>,
 ) -> ProtocolInterface<'db> {
-    let env = SemanticEnvironment::from_file(db, class.class_literal(db).python_file(db));
-    value.cycle_normalized(&env, *previous, cycle)
+    let env = ProgramEnvironment::from_file(class.class_literal(db).python_file(db));
+    value.cycle_normalized(db, &env, *previous, cycle)
 }
 
 /// Bind `self` unless this is a `Callable[P, R]` dunder, and *also* discard the functionlike-ness
@@ -3483,8 +3598,8 @@ fn protocol_bind_self<'db>(
     callable: CallableType<'db>,
     self_type: Option<Type<'db>>,
 ) -> CallableType<'db> {
-    let env = SemanticEnvironment::from_program(db, program);
-    callable.bind_self(&env, self_type).into_regular(db)
+    let env = ProgramEnvironment::from_program(program);
+    callable.bind_self(db, &env, self_type).into_regular(db)
 }
 
 /// Cache receiver and `Self` binding only for protocol-member compatibility checks.
@@ -3500,12 +3615,12 @@ fn protocol_apply_self_with_receiver<'db>(
     receiver_type: Type<'db>,
     self_type: Type<'db>,
 ) -> CallableType<'db> {
-    let env = SemanticEnvironment::from_program(db, program);
+    let env = ProgramEnvironment::from_program(program);
 
     if receiver_type == self_type {
-        callable.apply_self(&env, self_type)
+        callable.apply_self(db, &env, self_type)
     } else {
-        callable.apply_self_with_receiver(&env, receiver_type, self_type)
+        callable.apply_self_with_receiver(db, &env, receiver_type, self_type)
     }
 }
 
@@ -3513,19 +3628,15 @@ fn protocol_apply_self_with_receiver<'db>(
 ///
 /// Return-type disjointness is a pragmatic approximation for method members: a callable returning
 /// `Never` could satisfy otherwise-incompatible signatures, so it must not establish disjointness.
-fn callable_has_only_non_never_returns<'db>(
-    env: &SemanticEnvironment<'db>,
-    callable: CallableType<'db>,
-) -> bool {
-    let db = env.db();
+fn callable_has_only_non_never_returns<'db>(db: &'db dyn Db, callable: CallableType<'db>) -> bool {
     let mut signatures = callable.signatures(db).iter();
     let Some(first) = signatures.next() else {
         // An empty signature previously produced `Unknown`, which cannot establish disjointness.
         return false;
     };
 
-    !first.return_ty.resolve_type_alias(env).is_never()
-        && signatures.all(|signature| !signature.return_ty.resolve_type_alias(env).is_never())
+    !first.return_ty.resolve_type_alias(db).is_never()
+        && signatures.all(|signature| !signature.return_ty.resolve_type_alias(db).is_never())
 }
 
 /// Protocol compatibility can only succeed if every required member is present.
@@ -3533,16 +3644,16 @@ fn callable_has_only_non_never_returns<'db>(
 /// Check that necessary condition up front so we can avoid expensive per-member type
 /// comparisons and generic protocol solving when the actual type is plainly missing a member.
 pub(super) fn has_all_protocol_members_defined<'db>(
-    env: &SemanticEnvironment<'db>,
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
     ty: Type<'db>,
     protocol: ProtocolInstanceType<'db>,
 ) -> bool {
-    let db = env.db();
-    let target_interface = protocol.interface(env.db());
+    let target_interface = protocol.interface(db);
 
     match ty {
         Type::ProtocolInstance(source_protocol) => {
-            let source_interface = source_protocol.interface(env.db());
+            let source_interface = source_protocol.interface(db);
 
             source_interface.member_count(db) >= target_interface.member_count(db)
                 && target_interface
@@ -3551,7 +3662,7 @@ pub(super) fn has_all_protocol_members_defined<'db>(
         }
         _ => target_interface.members(db).all(|member| {
             matches!(
-                ty.member(env, member.name()).place,
+                ty.member(db, env, member.name()).place,
                 Place::Defined(DefinedPlace {
                     definedness: Definedness::AlwaysDefined,
                     ..

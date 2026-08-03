@@ -43,7 +43,7 @@
 //! of iterations, so if we fail to converge, Salsa will eventually panic. (This should of course
 //! be considered a bug.)
 
-use crate::SemanticEnvironment;
+use crate::ProgramEnvironment;
 use itertools::Either;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast as ast;
@@ -127,8 +127,7 @@ fn extend_collection_use_constraints<'db>(
         DefinitionInference::cycle_initial(db, definition, Type::divergent(id))
     },
     cycle_fn=|db: &'db dyn Db, cycle, previous: &DefinitionInference<'db>, inference: DefinitionInference<'db>, definition: Definition<'db>| {
-        let env = SemanticEnvironment::from_definition(db, definition);
-        inference.cycle_normalized(&env, previous, cycle, definition)
+        inference.cycle_normalized(db, previous, cycle, definition)
     },
     heap_size=ruff_memory_usage::heap_size
 )]
@@ -147,9 +146,10 @@ pub(crate) fn infer_definition_types<'db>(
 
     let index = semantic_index(db, python_file);
 
-    let env = SemanticEnvironment::from_file(db, python_file);
+    let env = ProgramEnvironment::from_file(python_file);
 
     TypeInferenceBuilder::new(
+        db,
         &env,
         InferenceRegion::Definition(definition),
         python_file.file(db),
@@ -200,9 +200,10 @@ pub(crate) fn function_known_decorators<'db>(
     let module = parsed_module(db, python_file).load(db);
     let index = semantic_index(db, python_file);
 
-    let env = SemanticEnvironment::from_file(db, python_file);
+    let env = ProgramEnvironment::from_file(python_file);
 
     TypeInferenceBuilder::new(
+        db,
         &env,
         InferenceRegion::FunctionDecorators(definition),
         python_file.file(db),
@@ -275,8 +276,7 @@ impl<'db> FunctionDecoratorInference<'db> {
         DefinitionInference::cycle_initial(db, definition, Type::divergent(id))
     },
     cycle_fn=|db: &'db dyn Db, cycle, previous: &DefinitionInference<'db>, inference: DefinitionInference<'db>, definition: Definition<'db>| {
-        let env = SemanticEnvironment::from_definition(db, definition);
-        inference.cycle_normalized(&env, previous, cycle, definition)
+        inference.cycle_normalized(db, previous, cycle, definition)
     },
     heap_size=ruff_memory_usage::heap_size
 )]
@@ -296,9 +296,10 @@ pub(crate) fn infer_deferred_types<'db>(
 
     let index = semantic_index(db, python_file);
 
-    let env = SemanticEnvironment::from_file(db, python_file);
+    let env = ProgramEnvironment::from_file(python_file);
 
     TypeInferenceBuilder::new(
+        db,
         &env,
         InferenceRegion::Deferred(definition),
         python_file.file(db),
@@ -356,8 +357,8 @@ pub(crate) fn infer_scope_types<'db>(
     cycle_initial=|_, id, _| ScopeInference::cycle_initial(Type::divergent(id)),
     cycle_fn=|db, cycle, previous: &ScopeInference<'db>, inference: ScopeInference<'db>, input: InferScope<'db>| {
         let (scope, _) = input.into_inner(db);
-        let env = SemanticEnvironment::from_scope(db, scope);
-        inference.cycle_normalized(&env, previous, cycle)
+        let env = ProgramEnvironment::from_scope(scope);
+        inference.cycle_normalized(db, &env, previous, cycle)
     },
     heap_size=ruff_memory_usage::heap_size
 )]
@@ -376,9 +377,10 @@ pub(crate) fn infer_scope_types_impl<'db>(
     // The isolation of the query is by the return inferred types.
     let index = semantic_index(db, python_file);
 
-    let env = SemanticEnvironment::from_file(db, python_file);
+    let env = ProgramEnvironment::from_file(python_file);
 
     TypeInferenceBuilder::new(
+        db,
         &env,
         InferenceRegion::Scope(scope, tcx),
         python_file.file(db),
@@ -406,8 +408,8 @@ pub(crate) fn infer_expression_types<'db>(
     cycle_initial=expression_cycle_initial,
     cycle_fn=|db, cycle, previous: &ExpressionInference<'db>, inference: ExpressionInference<'db>, input: InferExpression<'db>| {
         let (expression, _) = input.into_inner(db);
-        let env = SemanticEnvironment::from_scope(db, expression.scope(db));
-        inference.cycle_normalized(&env, previous, cycle)
+        let env = ProgramEnvironment::from_scope(expression.scope(db));
+        inference.cycle_normalized(db, &env, previous, cycle)
     },
     heap_size=ruff_memory_usage::heap_size
 )]
@@ -429,9 +431,10 @@ pub(super) fn infer_expression_types_impl<'db>(
 
     let index = semantic_index(db, python_file);
 
-    let env = SemanticEnvironment::from_file(db, python_file);
+    let env = ProgramEnvironment::from_file(python_file);
 
     TypeInferenceBuilder::new(
+        db,
         &env,
         InferenceRegion::Expression(expression, tcx),
         python_file.file(db),
@@ -486,8 +489,8 @@ pub(crate) fn infer_expression_type<'db>(
     cycle_initial=|_, id, _| Type::divergent(id),
     cycle_fn=|db, cycle, previous: &Type<'db>, result: Type<'db>, input: InferExpression<'db>| {
         let (expression, _) = input.into_inner(db);
-        let env = SemanticEnvironment::from_scope(db, expression.scope(db));
-        result.cycle_normalized(&env, *previous, cycle)
+        let env = ProgramEnvironment::from_scope(expression.scope(db));
+        result.cycle_normalized(db, &env, *previous, cycle)
     },
     heap_size=ruff_memory_usage::heap_size
 )]
@@ -527,8 +530,8 @@ pub(super) fn infer_statement_types<'db>(
         StatementInferenceInner::cycle_initial(statement.scope(db), Type::divergent(id))
     },
     cycle_fn=|db, cycle, previous: &StatementInferenceInner<'db>, inference: StatementInferenceInner<'db>, statement: StatementInner<'db>| {
-        let env = SemanticEnvironment::from_file(db, statement.python_file(db));
-        inference.cycle_normalized(&env, previous, cycle)
+        let env = ProgramEnvironment::from_file(statement.python_file(db));
+        inference.cycle_normalized(db, &env, previous, cycle)
     },
     heap_size=ruff_memory_usage::heap_size
 )]
@@ -548,9 +551,10 @@ fn infer_statement_types_impl<'db>(
 
     let index = semantic_index(db, python_file);
 
-    let env = SemanticEnvironment::from_file(db, python_file);
+    let env = ProgramEnvironment::from_file(python_file);
 
     TypeInferenceBuilder::new(
+        db,
         &env,
         InferenceRegion::Statement(statement),
         python_file.file(db),
@@ -658,11 +662,12 @@ impl<'db> TypeContext<'db> {
     /// specialization.
     fn known_specialization(
         &self,
-        env: &SemanticEnvironment<'db>,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         known_class: KnownClass,
     ) -> Option<Specialization<'db>> {
         self.annotation
-            .and_then(|ty| ty.known_specialization(env, known_class))
+            .and_then(|ty| ty.known_specialization(db, env, known_class))
     }
 
     fn map(self, f: impl FnOnce(Type<'db>) -> Type<'db>) -> Self {
@@ -677,13 +682,16 @@ impl<'db> TypeContext<'db> {
     }
 
     /// If the type annotation is a union, returns the target elements that it can be narrowed to.
-    fn narrow_targets(&self, env: &SemanticEnvironment<'db>) -> Option<Cow<'db, [Type<'db>]>> {
-        let db = env.db();
-        let union = self.annotation?.as_union_like(env)?;
+    fn narrow_targets(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> Option<Cow<'db, [Type<'db>]>> {
+        let union = self.annotation?.as_union_like(db)?;
 
         let targets = if union.has_aliases(db) {
-            let expanded = union.expand_aliases(env);
-            if let Some(union) = expanded.as_union_like(env) {
+            let expanded = union.expand_aliases(db, env);
+            if let Some(union) = expanded.as_union_like(db) {
                 Cow::Borrowed(union.elements(db))
             } else {
                 Cow::Owned(vec![expanded])
@@ -715,8 +723,8 @@ impl<'db> From<Type<'db>> for TypeContext<'db> {
     returns(ref),
     cycle_initial=|_, id, _| UnpackResult::cycle_initial(Type::divergent(id)),
     cycle_fn=|db, cycle, previous: &UnpackResult<'db>, result: UnpackResult<'db>, unpack: Unpack<'db>| {
-        let env = SemanticEnvironment::from_file(db, unpack.python_file(db));
-        result.cycle_normalized(&env, previous, cycle)
+        let env = ProgramEnvironment::from_file(unpack.python_file(db));
+        result.cycle_normalized(db, &env, previous, cycle)
     },
     heap_size=ruff_memory_usage::heap_size
 )]
@@ -730,8 +738,8 @@ pub(super) fn infer_unpack_types<'db>(db: &'db dyn Db, unpack: Unpack<'db>) -> U
     )
     .entered();
 
-    let env = SemanticEnvironment::from_file(db, python_file);
-    let mut unpacker = Unpacker::new(&env, unpack.target_scope(db), python_file, &module);
+    let env = ProgramEnvironment::from_file(python_file);
+    let mut unpacker = Unpacker::new(db, &env, unpack.target_scope(db), python_file, &module);
     unpacker.unpack(unpack.target(db, &module), unpack.value(db));
     unpacker.finish()
 }
@@ -746,17 +754,16 @@ pub(super) fn infer_unpack_types<'db>(db: &'db dyn Db, unpack: Unpack<'db>) -> U
 ///
 /// Returns `None` if no enclosing class is found.
 pub(crate) fn nearest_enclosing_class<'db>(
-    env: &SemanticEnvironment<'db>,
+    db: &'db dyn Db,
     semantic: &SemanticIndex<'db>,
     scope: ScopeId,
 ) -> Option<StaticClassLiteral<'db>> {
-    let db = env.db();
     semantic
         .ancestor_scopes(scope.file_scope_id(db))
         .find_map(|(_, ancestor_scope)| {
             let class = ancestor_scope.node().as_class()?;
             let definition = semantic.expect_single_definition(class);
-            original_class_type(env, definition).and_then(ClassLiteral::as_static)
+            original_class_type(db, definition).and_then(ClassLiteral::as_static)
         })
 }
 
@@ -777,10 +784,10 @@ pub(crate) fn nearest_enclosing_class<'db>(
 ///     def method(self) -> None: ...
 /// ```
 pub(crate) fn original_class_type<'db>(
-    env: &SemanticEnvironment<'db>,
+    db: &'db dyn Db,
     definition: Definition<'db>,
 ) -> Option<ClassLiteral<'db>> {
-    let inference = infer_definition_types(env.db(), definition);
+    let inference = infer_definition_types(db, definition);
     inference
         .undecorated_type()
         .unwrap_or_else(|| inference.binding_type(definition))
@@ -794,17 +801,16 @@ pub(crate) fn original_class_type<'db>(
 ///
 /// Returns `None` if no enclosing function is found.
 pub(crate) fn nearest_enclosing_function<'db>(
-    env: &SemanticEnvironment<'db>,
+    db: &'db dyn Db,
     semantic: &SemanticIndex<'db>,
     scope: ScopeId,
 ) -> Option<FunctionType<'db>> {
-    let db = env.db();
     semantic
         .ancestor_scopes(scope.file_scope_id(db))
         .find_map(|(_, ancestor_scope)| {
             let func = ancestor_scope.node().as_function()?;
             let definition = semantic.expect_single_definition(func);
-            infer_definition_types(env.db(), definition).function_type(definition)
+            infer_definition_types(db, definition).function_type(definition)
         })
 }
 
@@ -885,12 +891,13 @@ impl<'db> ScopeInference<'db> {
 
     fn cycle_normalized(
         mut self,
-        env: &SemanticEnvironment<'db>,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         previous_inference: &ScopeInference<'db>,
         cycle: &salsa::Cycle,
     ) -> ScopeInference<'db> {
         self.expressions.map_values(|expr, ty| {
-            ty.cycle_normalized(env, previous_inference.expression_type(expr), cycle)
+            ty.cycle_normalized(db, env, previous_inference.expression_type(expr), cycle)
         });
 
         if cycle.iteration() > crate::TAINTED_CYCLES
@@ -1073,7 +1080,8 @@ impl<'db> DefinitionTypes<'db> {
     }
 
     fn normalize_binding(
-        env: &SemanticEnvironment<'db>,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         previous: &DefinitionTypes<'db>,
         cycle: &salsa::Cycle,
         owner: Definition<'db>,
@@ -1081,14 +1089,15 @@ impl<'db> DefinitionTypes<'db> {
         ty: Type<'db>,
     ) -> Type<'db> {
         if let Some(previous_ty) = previous.binding_type(owner, definition) {
-            ty.cycle_normalized(env, previous_ty, cycle)
+            ty.cycle_normalized(db, env, previous_ty, cycle)
         } else {
-            ty.recursive_type_normalized(env, cycle)
+            ty.recursive_type_normalized(db, env, cycle)
         }
     }
 
     fn normalize_declaration(
-        env: &SemanticEnvironment<'db>,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         previous: &DefinitionTypes<'db>,
         cycle: &salsa::Cycle,
         owner: Definition<'db>,
@@ -1096,15 +1105,16 @@ impl<'db> DefinitionTypes<'db> {
         ty: TypeAndQualifiers<'db>,
     ) -> TypeAndQualifiers<'db> {
         if let Some(previous_ty) = previous.declaration_type(owner, definition) {
-            ty.map_type(|inner| inner.cycle_normalized(env, previous_ty.inner_type(), cycle))
+            ty.map_type(|inner| inner.cycle_normalized(db, env, previous_ty.inner_type(), cycle))
         } else {
-            ty.map_type(|inner| inner.recursive_type_normalized(env, cycle))
+            ty.map_type(|inner| inner.recursive_type_normalized(db, env, cycle))
         }
     }
 
     fn cycle_normalized(
         self,
-        env: &SemanticEnvironment<'db>,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         previous: &DefinitionTypes<'db>,
         cycle: &salsa::Cycle,
         owner: Definition<'db>,
@@ -1112,13 +1122,14 @@ impl<'db> DefinitionTypes<'db> {
         match self {
             Self::Empty => Self::Empty,
             Self::Binding(ty) => Self::Binding(Self::normalize_binding(
-                env, previous, cycle, owner, owner, ty,
+                db, env, previous, cycle, owner, owner, ty,
             )),
             Self::Declaration(ty) => Self::Declaration(Self::normalize_declaration(
-                env, previous, cycle, owner, owner, ty,
+                db, env, previous, cycle, owner, owner, ty,
             )),
             Self::BindingAndDeclaration(declaration_ty) => {
                 let binding_ty = Self::normalize_binding(
+                    db,
                     env,
                     previous,
                     cycle,
@@ -1126,8 +1137,15 @@ impl<'db> DefinitionTypes<'db> {
                     owner,
                     declaration_ty.inner_type(),
                 );
-                let declaration_ty =
-                    Self::normalize_declaration(env, previous, cycle, owner, owner, declaration_ty);
+                let declaration_ty = Self::normalize_declaration(
+                    db,
+                    env,
+                    previous,
+                    cycle,
+                    owner,
+                    owner,
+                    declaration_ty,
+                );
 
                 if binding_ty == declaration_ty.inner_type() {
                     Self::BindingAndDeclaration(declaration_ty)
@@ -1140,11 +1158,19 @@ impl<'db> DefinitionTypes<'db> {
             }
             Self::Other(mut other) => {
                 for (definition, ty) in &mut other.bindings {
-                    *ty = Self::normalize_binding(env, previous, cycle, owner, *definition, *ty);
+                    *ty =
+                        Self::normalize_binding(db, env, previous, cycle, owner, *definition, *ty);
                 }
                 for (definition, ty) in &mut other.declarations {
-                    *ty =
-                        Self::normalize_declaration(env, previous, cycle, owner, *definition, *ty);
+                    *ty = Self::normalize_declaration(
+                        db,
+                        env,
+                        previous,
+                        cycle,
+                        owner,
+                        *definition,
+                        *ty,
+                    );
                 }
 
                 match (&*other.bindings, &*other.declarations) {
@@ -1337,7 +1363,7 @@ impl<'db> DefinitionInference<'db> {
         definition: Definition<'db>,
         cycle_recovery: Type<'db>,
     ) -> Self {
-        let env = SemanticEnvironment::from_definition(db, definition);
+        let env = ProgramEnvironment::from_definition(definition);
         let mut types = DefinitionTypes::Empty;
 
         // Eagerly store more precise types for collection literals to avoid an extra
@@ -1353,13 +1379,14 @@ impl<'db> DefinitionInference<'db> {
             };
 
             if let Some(known_collection) = known_collection {
-                if let Some(collection_class) = known_collection.try_to_class_literal(&env) {
+                if let Some(collection_class) = known_collection.try_to_class_literal(db, &env) {
                     let divergent_collection = collection_class
-                        .apply_specialization(env.db(), |generic_context| {
+                        .apply_specialization(db, |generic_context| {
                             generic_context.repeat_specialization(db, cycle_recovery)
                         });
 
-                    types = DefinitionTypes::Binding(Type::instance(&env, divergent_collection));
+                    types =
+                        DefinitionTypes::Binding(Type::instance(db, &env, divergent_collection));
                 }
             }
         }
@@ -1380,17 +1407,19 @@ impl<'db> DefinitionInference<'db> {
 
     fn cycle_normalized(
         mut self,
-        env: &SemanticEnvironment<'db>,
+        db: &'db dyn Db,
         previous_inference: &DefinitionInference<'db>,
         cycle: &salsa::Cycle,
         definition: Definition<'db>,
     ) -> DefinitionInference<'db> {
+        let env = ProgramEnvironment::from_definition(definition);
         for (expr, ty) in &mut self.expressions {
             let previous_ty = previous_inference.expression_type(*expr);
-            *ty = ty.cycle_normalized(env, previous_ty, cycle);
+            *ty = ty.cycle_normalized(db, &env, previous_ty, cycle);
         }
         self.types = std::mem::take(&mut self.types).cycle_normalized(
-            env,
+            db,
+            &env,
             &previous_inference.types,
             cycle,
             definition,
@@ -1626,7 +1655,8 @@ impl<'db> ExpressionInference<'db> {
 
     fn cycle_normalized(
         mut self,
-        env: &SemanticEnvironment<'db>,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         previous: &ExpressionInference<'db>,
         cycle: &salsa::Cycle,
     ) -> ExpressionInference<'db> {
@@ -1638,16 +1668,16 @@ impl<'db> ExpressionInference<'db> {
                         .iter()
                         .find(|(previous_binding, _)| previous_binding == binding)
                 }) {
-                    *binding_ty = binding_ty.cycle_normalized(env, *previous_binding, cycle);
+                    *binding_ty = binding_ty.cycle_normalized(db, env, *previous_binding, cycle);
                 } else {
-                    *binding_ty = binding_ty.recursive_type_normalized(env, cycle);
+                    *binding_ty = binding_ty.recursive_type_normalized(db, env, cycle);
                 }
             }
         }
 
         for (expr, ty) in &mut self.expressions {
             let previous_ty = previous.expression_type(*expr);
-            *ty = ty.cycle_normalized(env, previous_ty, cycle);
+            *ty = ty.cycle_normalized(db, env, previous_ty, cycle);
         }
 
         if cycle.iteration() > crate::TAINTED_CYCLES
@@ -1802,13 +1832,14 @@ impl<'db> StatementInferenceInner<'db> {
 
     fn cycle_normalized(
         mut self,
-        env: &SemanticEnvironment<'db>,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         previous_inference: &StatementInferenceInner<'db>,
         cycle: &salsa::Cycle,
     ) -> StatementInferenceInner<'db> {
         for (expr, ty) in &mut self.expressions {
             let previous_ty = previous_inference.expression_type(*expr);
-            *ty = ty.cycle_normalized(env, previous_ty, cycle);
+            *ty = ty.cycle_normalized(db, env, previous_ty, cycle);
         }
         for (binding, binding_ty) in &mut self.bindings {
             if let Some((_, previous_binding)) = previous_inference
@@ -1816,9 +1847,9 @@ impl<'db> StatementInferenceInner<'db> {
                 .iter()
                 .find(|(previous_binding, _)| previous_binding == binding)
             {
-                *binding_ty = binding_ty.cycle_normalized(env, *previous_binding, cycle);
+                *binding_ty = binding_ty.cycle_normalized(db, env, *previous_binding, cycle);
             } else {
-                *binding_ty = binding_ty.recursive_type_normalized(env, cycle);
+                *binding_ty = binding_ty.recursive_type_normalized(db, env, cycle);
             }
         }
         for (declaration, declaration_ty) in &mut self.declarations {
@@ -1828,11 +1859,11 @@ impl<'db> StatementInferenceInner<'db> {
                 .find(|(previous_declaration, _)| previous_declaration == declaration)
             {
                 *declaration_ty = declaration_ty.map_type(|decl_ty| {
-                    decl_ty.cycle_normalized(env, previous_declaration.inner_type(), cycle)
+                    decl_ty.cycle_normalized(db, env, previous_declaration.inner_type(), cycle)
                 });
             } else {
                 *declaration_ty = declaration_ty
-                    .map_type(|decl_ty| decl_ty.recursive_type_normalized(env, cycle));
+                    .map_type(|decl_ty| decl_ty.recursive_type_normalized(db, env, cycle));
             }
         }
 

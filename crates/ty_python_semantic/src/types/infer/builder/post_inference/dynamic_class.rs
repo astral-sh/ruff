@@ -24,7 +24,7 @@ pub(crate) fn check_dynamic_class_definition<'db>(
         return;
     };
 
-    let ty = binding_type(context.semantic_environment(), definition);
+    let ty = binding_type(context.db(), definition);
 
     // Check if it's a dynamic class with a Definition anchor.
     let Type::ClassLiteral(ClassLiteral::Dynamic(dynamic_class)) = ty else {
@@ -46,7 +46,7 @@ pub(crate) fn check_dynamic_class_definition<'db>(
         return;
     };
 
-    let env = context.semantic_environment();
+    let env = context.program_environment();
 
     // Check for MRO errors.
     if report_dynamic_mro_errors(context, dynamic_class, call_expr, bases) {
@@ -62,14 +62,14 @@ pub(crate) fn check_dynamic_class_definition<'db>(
             .enumerate()
         {
             // Convert to ClassType to access nearest_disjoint_base.
-            if let Some(class_type) = base_type.to_class_type(env)
-                && let Some(disjoint_base) = class_type.nearest_disjoint_base(env.db())
+            if let Some(class_type) = base_type.to_class_type(db)
+                && let Some(disjoint_base) = class_type.nearest_disjoint_base(db)
             {
                 disjoint_bases.insert(disjoint_base, idx, class_type.class_literal(db));
             }
         }
 
-        disjoint_bases.remove_redundant_entries(env);
+        disjoint_bases.remove_redundant_entries(db);
         if disjoint_bases.len() > 1 {
             report_instance_layout_conflict(
                 context,
@@ -86,16 +86,16 @@ pub(crate) fn check_dynamic_class_definition<'db>(
         base1,
         metaclass2,
         base2,
-    }) = dynamic_class.try_metaclass(env)
+    }) = dynamic_class.try_metaclass(db)
     {
         report_conflicting_metaclass_from_bases(
             context,
             call_expr.into(),
             dynamic_class.name(db),
             metaclass1,
-            base1.display(env),
+            base1.display(db, env),
             metaclass2,
-            base2.display(env),
+            base2.display(db, env),
         );
     }
 }

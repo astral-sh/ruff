@@ -175,8 +175,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 AnnotationExpressionInference::new(annotation_ty)
             }
         }
+        let db = self.db();
 
-        let env = self.semantic_environment();
+        let env = self.program_environment();
         // https://typing.python.org/en/latest/spec/annotations.html#grammar-token-expression-grammar-annotation_expression
         let inferred = match annotation {
             // String annotations: https://typing.python.org/en/latest/spec/annotations.html#string-annotations
@@ -240,7 +241,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             );
                             let in_type_expression = inferred
                                 .inner_type()
-                                .in_type_expression(env, self.scope(), None, self.inference_flags())
+                                .in_type_expression(db, self.scope(), None, self.inference_flags())
                                 .unwrap_or_else(|err| {
                                     err.into_fallback_type(
                                         &self.context,
@@ -277,15 +278,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                                     _ => false,
                                 };
                                 if classvar_and_final
-                                    && nearest_enclosing_class(
-                                        self.semantic_environment(),
-                                        self.index,
-                                        self.scope(),
-                                    )
-                                    .is_none_or(|class| {
-                                        !class.is_dataclass_like(self.semantic_environment())
-                                            && !class.is_protocol(self.semantic_environment())
-                                    })
+                                    && nearest_enclosing_class(self.db(), self.index, self.scope())
+                                        .is_none_or(|class| {
+                                            !class.is_dataclass_like(self.db())
+                                                && !class.is_protocol(self.db())
+                                        })
                                     && let Some(builder) = self
                                         .context
                                         .report_lint(&REDUNDANT_FINAL_CLASSVAR, subscript)
@@ -296,7 +293,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                                 }
 
                                 if qualifier == TypeQualifier::ClassVar
-                                    && type_and_qualifiers.inner_type().has_non_self_typevar(env)
+                                    && type_and_qualifiers
+                                        .inner_type()
+                                        .has_non_self_typevar(db, env)
                                     && let Some(builder) =
                                         self.context.report_lint(&INVALID_TYPE_FORM, subscript)
                                 {

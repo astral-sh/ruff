@@ -7,6 +7,7 @@
 //! diagnostics, while protocol checking can evaluate the same lookup result using its active type
 //! relation and constraint set.
 
+use crate::Db;
 use ty_module_resolver::KnownModule;
 
 use super::call::CallArguments;
@@ -14,7 +15,7 @@ use super::callable::CallableTypeKind;
 use super::{
     IntersectionType, KnownClass, KnownInstanceType, MemberLookupPolicy, Type, TypeQualifiers,
 };
-use crate::SemanticEnvironment;
+use crate::ProgramEnvironment;
 use crate::place::{DefinedPlace, Definedness, Place, PlaceAndQualifiers, builtins_symbol};
 
 /// The operation required to write an attribute.
@@ -222,11 +223,11 @@ impl<'db> AssignmentAttributeMembers<'db> {
 /// intersections, and dispatches instance and class-object writes to their respective lookup
 /// paths. It does not compare the assigned value with the resulting types.
 pub(super) fn attribute_write_requirement<'db>(
-    env: &SemanticEnvironment<'db>,
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
     object_ty: Type<'db>,
     attribute: &str,
 ) -> AttributeWriteRequirement<'db> {
-    let db = env.db();
     match object_ty {
         Type::Union(union) => AttributeWriteRequirement::All {
             object_ty,
@@ -241,12 +242,15 @@ pub(super) fn attribute_write_requirement<'db>(
             }
         }
 
-        Type::EnumComplement(complement) => {
-            attribute_write_requirement(env, complement.remaining_literal_union(env), attribute)
-        }
+        Type::EnumComplement(complement) => attribute_write_requirement(
+            db,
+            env,
+            complement.remaining_literal_union(db, env),
+            attribute,
+        ),
 
         Type::TypeAlias(alias) => {
-            attribute_write_requirement(env, alias.value_type(env), attribute)
+            attribute_write_requirement(db, env, alias.value_type(db), attribute)
         }
 
         Type::NominalInstance(instance) if instance.has_known_class(db, KnownClass::Super) => {
@@ -259,10 +263,10 @@ pub(super) fn attribute_write_requirement<'db>(
         }
 
         Type::ProtocolInstance(protocol) => protocol
-            .interface(env.db())
-            .instance_write_requirement(env, object_ty, attribute)
+            .interface(db)
+            .instance_write_requirement(db, env, object_ty, attribute)
             .map_or_else(
-                || instance_attribute_write_requirement(env, object_ty, attribute),
+                || instance_attribute_write_requirement(db, env, object_ty, attribute),
                 |(write, qualifiers)| AttributeWriteRequirement::ProtocolMember {
                     write,
                     qualifiers,
@@ -289,13 +293,13 @@ pub(super) fn attribute_write_requirement<'db>(
         | Type::TypeForm(_)
         | Type::TypedDict(_)
         | Type::NewTypeInstance(_) => {
-            instance_attribute_write_requirement(env, object_ty, attribute)
+            instance_attribute_write_requirement(db, env, object_ty, attribute)
         }
 
         Type::SubclassOf(subclass_of) => subclass_of
-            .meta_write_requirement(env, attribute)
+            .meta_write_requirement(db, env, attribute)
             .map_or_else(
-                || class_attribute_write_requirement(env, object_ty, attribute),
+                || class_attribute_write_requirement(db, env, object_ty, attribute),
                 |(write_ty, qualifiers)| AttributeWriteRequirement::ProtocolMember {
                     write: write_ty.map(ProtocolMemberWriteRequirement::AssignableTo),
                     qualifiers,
@@ -303,7 +307,7 @@ pub(super) fn attribute_write_requirement<'db>(
             ),
 
         Type::ClassLiteral(..) | Type::GenericAlias(..) => {
-            class_attribute_write_requirement(env, object_ty, attribute)
+            class_attribute_write_requirement(db, env, object_ty, attribute)
         }
 
         Type::ModuleLiteral(module) => {
@@ -312,9 +316,9 @@ pub(super) fn attribute_write_requirement<'db>(
                 .known(db)
                 .is_some_and(KnownModule::is_builtins)
             {
-                builtins_symbol(env, attribute)
+                builtins_symbol(db, env, attribute)
             } else {
-                module.static_member(env, attribute)
+                module.static_member(db, env, attribute)
             };
             AttributeWriteRequirement::Module(match symbol.place {
                 Place::Defined(DefinedPlace { ty, .. }) => Some(ty),
@@ -325,13 +329,14 @@ pub(super) fn attribute_write_requirement<'db>(
 }
 
 fn instance_attribute_write_requirement<'db>(
-    env: &SemanticEnvironment<'db>,
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
     object_ty: Type<'db>,
     attribute: &str,
 ) -> AttributeWriteRequirement<'db> {
     AttributeWriteRequirement::Instance {
         object_ty,
-        member: instance_attribute_write_member_requirement(env, object_ty, attribute),
+        member: instance_attribute_write_member_requirement(db, env, object_ty, attribute),
     }
 }
 
@@ -341,11 +346,12 @@ fn instance_attribute_write_requirement<'db>(
 /// because both runtime paths must accept the write. If neither exists, the caller must evaluate
 /// `__setattr__`.
 fn instance_attribute_write_member_requirement<'db>(
-    env: &SemanticEnvironment<'db>,
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
     object_ty: Type<'db>,
     attribute: &str,
 ) -> InstanceAttributeWriteMember<'db> {
-    let Some(members) = assignment_attribute_members(env, object_ty, attribute) else {
+    let Some(members) = assignment_attribute_members(db, env, object_ty, attribute) else {
         return InstanceAttributeWriteMember::SetAttr;
     };
     let (type_member, receiver_fallback) = match members {
@@ -355,7 +361,7 @@ fn instance_attribute_write_member_requirement<'db>(
         } => (member, receiver_fallback),
         AssignmentAttributeMembers::ReceiverMember(member) => {
             return InstanceAttributeWriteMember::Instance(instance_fallback_write_requirement(
-                env, object_ty, attribute, member,
+                db, env, object_ty, attribute, member,
             ));
         }
     };
@@ -367,14 +373,15 @@ fn instance_attribute_write_member_requirement<'db>(
             qualifiers,
         } => InstanceAttributeWriteMember::Explicit {
             member: explicit_attribute_write_requirement(
+                db,
                 env,
                 object_ty,
                 attribute,
-                ty.bind_self_typevars(env, object_ty),
+                ty.bind_self_typevars(db, env, object_ty),
                 qualifiers,
             ),
             fallback: receiver_fallback.map(|fallback| {
-                instance_fallback_write_requirement(env, object_ty, attribute, fallback)
+                instance_fallback_write_requirement(db, env, object_ty, attribute, fallback)
             }),
         },
         PlaceAndQualifiers {
@@ -387,7 +394,7 @@ fn instance_attribute_write_member_requirement<'db>(
                     ..
                 },
             ) => InstanceAttributeWriteMember::Instance(instance_fallback_write_requirement(
-                env, object_ty, attribute, fallback,
+                db, env, object_ty, attribute, fallback,
             )),
             _ => InstanceAttributeWriteMember::SetAttr,
         },
@@ -399,14 +406,15 @@ fn instance_attribute_write_member_requirement<'db>(
 /// The receiver must be convertible to an instance type so that `Self` in class-attribute
 /// declarations can be bound consistently with normal class-object member lookup.
 fn class_attribute_write_requirement<'db>(
-    env: &SemanticEnvironment<'db>,
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
     object_ty: Type<'db>,
     attribute: &str,
 ) -> AttributeWriteRequirement<'db> {
-    let Some(members) = assignment_attribute_members(env, object_ty, attribute) else {
+    let Some(members) = assignment_attribute_members(db, env, object_ty, attribute) else {
         return AttributeWriteRequirement::Unconstrained;
     };
-    let Some(class_attr_self_ty) = object_ty.to_instance_approximation(env) else {
+    let Some(class_attr_self_ty) = object_ty.to_instance_approximation(db, env) else {
         return AttributeWriteRequirement::Unconstrained;
     };
     let (type_member, receiver_fallback) = match members {
@@ -418,7 +426,13 @@ fn class_attribute_write_requirement<'db>(
             return AttributeWriteRequirement::Class {
                 object_ty,
                 member: ClassAttributeWriteMember::ClassAttribute(
-                    class_fallback_write_requirement(env, object_ty, class_attr_self_ty, member),
+                    class_fallback_write_requirement(
+                        db,
+                        env,
+                        object_ty,
+                        class_attr_self_ty,
+                        member,
+                    ),
                 ),
             };
         }
@@ -429,9 +443,11 @@ fn class_attribute_write_requirement<'db>(
             place: Place::Defined(DefinedPlace { ty, .. }),
             qualifiers,
         } => ClassAttributeWriteMember::Explicit {
-            member: explicit_attribute_write_requirement(env, object_ty, attribute, ty, qualifiers),
+            member: explicit_attribute_write_requirement(
+                db, env, object_ty, attribute, ty, qualifiers,
+            ),
             fallback: receiver_fallback.map(|fallback| {
-                class_fallback_write_requirement(env, object_ty, class_attr_self_ty, fallback)
+                class_fallback_write_requirement(db, env, object_ty, class_attr_self_ty, fallback)
             }),
         },
         PlaceAndQualifiers {
@@ -444,6 +460,7 @@ fn class_attribute_write_requirement<'db>(
                     ..
                 },
             ) => ClassAttributeWriteMember::ClassAttribute(class_fallback_write_requirement(
+                db,
                 env,
                 object_ty,
                 class_attr_self_ty,
@@ -451,7 +468,7 @@ fn class_attribute_write_requirement<'db>(
             )),
             _ => ClassAttributeWriteMember::Unresolved {
                 has_instance_attribute: !class_attr_self_ty
-                    .instance_member(env, attribute)
+                    .instance_member(db, env, attribute)
                     .place
                     .is_undefined(),
             },
@@ -467,14 +484,15 @@ fn class_attribute_write_requirement<'db>(
 /// [`MemberLookupPolicy::REQUIRE_CONCRETE`]. An `Any` or `Unknown` base therefore does not cause an
 /// ordinary attribute to be treated as a data descriptor.
 fn explicit_attribute_write_requirement<'db>(
-    env: &SemanticEnvironment<'db>,
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
     object_ty: Type<'db>,
     attribute: &str,
     attr_ty: Type<'db>,
     qualifiers: TypeQualifiers,
 ) -> ExplicitAttributeWriteRequirement<'db> {
     if let Place::Defined(DefinedPlace { ty: setter_ty, .. }) = attr_ty
-        .class_member_with_policy(env, "__set__", MemberLookupPolicy::REQUIRE_CONCRETE)
+        .class_member_with_policy(db, env, "__set__", MemberLookupPolicy::REQUIRE_CONCRETE)
         .place
     {
         ExplicitAttributeWriteRequirement::Descriptor {
@@ -484,7 +502,7 @@ fn explicit_attribute_write_requirement<'db>(
         }
     } else {
         ExplicitAttributeWriteRequirement::AssignableTo {
-            ty: effective_write_type(env, object_ty, attribute, attr_ty),
+            ty: effective_write_type(db, env, object_ty, attribute, attr_ty),
             qualifiers,
         }
     }
@@ -495,7 +513,8 @@ fn explicit_attribute_write_requirement<'db>(
 /// This also applies dataclass converter semantics and preserves possible undefinedness for the
 /// assignment diagnostic layer.
 fn instance_fallback_write_requirement<'db>(
-    env: &SemanticEnvironment<'db>,
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
     object_ty: Type<'db>,
     attribute: &str,
     fallback: PlaceAndQualifiers<'db>,
@@ -509,9 +528,9 @@ fn instance_fallback_write_requirement<'db>(
     else {
         return FallbackAttributeWriteRequirement::PossiblyMissing;
     };
-    let ty = ty.bind_self_typevars(env, object_ty);
+    let ty = ty.bind_self_typevars(db, env, object_ty);
     FallbackAttributeWriteRequirement::AssignableTo {
-        ty: effective_write_type(env, object_ty, attribute, ty),
+        ty: effective_write_type(db, env, object_ty, attribute, ty),
         qualifiers,
         possibly_missing: definedness == Definedness::PossiblyUndefined,
     }
@@ -519,7 +538,8 @@ fn instance_fallback_write_requirement<'db>(
 
 /// Convert a class-attribute fallback into a write type, binding `Self` to the class instance.
 fn class_fallback_write_requirement<'db>(
-    env: &SemanticEnvironment<'db>,
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
     object_ty: Type<'db>,
     class_attr_self_ty: Type<'db>,
     fallback: PlaceAndQualifiers<'db>,
@@ -533,12 +553,12 @@ fn class_fallback_write_requirement<'db>(
     else {
         return FallbackAttributeWriteRequirement::PossiblyMissing;
     };
-    let ty = ty.bind_self_typevars(env, class_attr_self_ty);
+    let ty = ty.bind_self_typevars(db, env, class_attr_self_ty);
     let ty = if matches!(object_ty, Type::ClassLiteral(_))
         && let Type::FunctionLiteral(function) = ty
-        && function.callable_type_kind(env.db()) == CallableTypeKind::FunctionLike
+        && function.callable_type_kind(db) == CallableTypeKind::FunctionLike
     {
-        Type::Callable(function.into_callable_type(env.db()))
+        Type::Callable(function.into_callable_type(db))
     } else {
         ty
     };
@@ -555,15 +575,16 @@ fn class_fallback_write_requirement<'db>(
 /// the field's post-conversion type. For example, a field declared as `int` with a
 /// `(str) -> int` converter is read as `int` but accepts `str` assignments.
 fn effective_write_type<'db>(
-    env: &SemanticEnvironment<'db>,
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
     object_ty: Type<'db>,
     attribute: &str,
     attr_ty: Type<'db>,
 ) -> Type<'db> {
     if let Type::NominalInstance(instance) = object_ty
         && let Some(converter_ty) = instance
-            .class(env)
-            .converter_input_type_for_field(env, attribute)
+            .class(db, env)
+            .converter_input_type_for_field(db, attribute)
     {
         converter_ty
     } else {
@@ -588,17 +609,17 @@ fn effective_write_type<'db>(
 ///     def value(self, value: int) -> Never: ...
 /// ```
 pub(super) fn property_setter_returns_never<'db>(
-    env: &SemanticEnvironment<'db>,
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
     property_ty: Type<'db>,
     object_ty: Type<'db>,
     value_ty: Type<'db>,
 ) -> bool {
-    let db = env.db();
     property_ty.as_property_instance().is_some_and(|property| {
         property.setter(db).is_some_and(|setter| {
-            match setter.try_call(env, &CallArguments::positional([object_ty, value_ty])) {
-                Ok(result) => result.return_type(env).is_never(),
-                Err(error) => error.return_type(env).is_never(),
+            match setter.try_call(db, env, &CallArguments::positional([object_ty, value_ty])) {
+                Ok(result) => result.return_type(db, env).is_never(),
+                Err(error) => error.return_type(db, env).is_never(),
             }
         })
     })
@@ -606,7 +627,8 @@ pub(super) fn property_setter_returns_never<'db>(
 
 /// Return the class member that takes precedence over a definitely non-data metaclass member.
 fn class_member_preceding_non_data_metaclass_member<'db>(
-    env: &SemanticEnvironment<'db>,
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
     object_ty: Type<'db>,
     attribute: &str,
     type_member: PlaceAndQualifiers<'db>,
@@ -617,13 +639,13 @@ fn class_member_preceding_non_data_metaclass_member<'db>(
     ) || !type_member
         .place
         .ignore_possibly_undefined()?
-        .is_definitely_non_data_descriptor(env)
+        .is_definitely_non_data_descriptor(db, env)
     {
         return None;
     }
 
     object_ty
-        .find_name_in_mro_with_policy(env, attribute, MemberLookupPolicy::default())
+        .find_name_in_mro_with_policy(db, env, attribute, MemberLookupPolicy::default())
         .filter(|class_attr| !class_attr.place.is_undefined())
 }
 
@@ -638,7 +660,8 @@ fn class_member_preceding_non_data_metaclass_member<'db>(
 /// This helper deliberately does not bind `Self` or interpret descriptors so that assignment,
 /// protocol compatibility, and `Final` validation share exactly the same lookup precedence.
 pub(super) fn assignment_attribute_members<'db>(
-    env: &SemanticEnvironment<'db>,
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
     object_ty: Type<'db>,
     attribute: &str,
 ) -> Option<AssignmentAttributeMembers<'db>> {
@@ -649,16 +672,16 @@ pub(super) fn assignment_attribute_members<'db>(
             object_ty,
             Type::KnownInstance(KnownInstanceType::FunctoolsPartial(_))
         ) {
-        object_ty.member(env, attribute)
+        object_ty.member(db, env, attribute)
     } else if let Type::ProtocolInstance(protocol) = object_ty
-        && let Some(origin) = protocol.materialized_origin_property(env, attribute)
+        && let Some(origin) = protocol.materialized_origin_property(db, attribute)
     {
-        Type::instance(env, *origin).class_member(env, attribute)
+        Type::instance(db, env, *origin).class_member(db, env, attribute)
     } else {
-        object_ty.class_member(env, attribute)
+        object_ty.class_member(db, env, attribute)
     };
     if let Some(receiver_member) =
-        class_member_preceding_non_data_metaclass_member(env, object_ty, attribute, type_member)
+        class_member_preceding_non_data_metaclass_member(db, env, object_ty, attribute, type_member)
     {
         return Some(AssignmentAttributeMembers::ReceiverMember(receiver_member));
     }
@@ -692,9 +715,9 @@ pub(super) fn assignment_attribute_members<'db>(
             | Type::TypeGuard(_)
             | Type::TypeForm(_)
             | Type::TypedDict(_)
-            | Type::NewTypeInstance(_) => object_ty.instance_member(env, attribute),
+            | Type::NewTypeInstance(_) => object_ty.instance_member(db, env, attribute),
             Type::ClassLiteral(..) | Type::GenericAlias(..) | Type::SubclassOf(..) => {
-                object_ty.class_object_member(env, attribute, MemberLookupPolicy::default())
+                object_ty.class_object_member(db, env, attribute, MemberLookupPolicy::default())
             }
             Type::Union(..)
             | Type::Intersection(..)

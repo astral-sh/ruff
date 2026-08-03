@@ -1,4 +1,4 @@
-use crate::SemanticEnvironment;
+use crate::ProgramEnvironment;
 use char_str::CharStr;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::{ArgOrKeyword, Arguments, Expr, ExprCall, ExprDict, Keyword, name::Name};
@@ -46,15 +46,14 @@ impl get_size2::GetSize for ModelMetadata<'_> {}
 
 impl<'db> ModelMetadata<'db> {
     pub(in crate::types) fn from_class(
-        env: &SemanticEnvironment<'db>,
+        db: &'db dyn Db,
         class: StaticClassLiteral<'db>,
         transformer_params: DataclassTransformerParams<'db>,
     ) -> Self {
-        let db = env.db();
         Self::new(
             db,
             transformer_params.field_specifiers(db),
-            model_config(env.db(), class),
+            model_config(db, class),
         )
     }
 
@@ -116,13 +115,13 @@ impl<'db> FieldMetadata<'db> {
     /// ```
     fn collect_from_rhs_type(
         &mut self,
-        env: &SemanticEnvironment<'db>,
+        db: &'db dyn Db,
         rhs_type: Option<Type<'db>>,
         specialization: Option<Specialization<'db>>,
     ) {
         match rhs_type {
             Some(Type::KnownInstance(KnownInstanceType::Field(field))) => {
-                self.merge_field(env, field, specialization);
+                self.merge_field(db, field, specialization);
             }
             Some(rhs_type) => self.default_ty = Some(rhs_type),
             None => {}
@@ -143,18 +142,17 @@ impl<'db> FieldMetadata<'db> {
     /// where `StrictInt` is defined as `StrictInt = Annotated[int, Strict()]`.
     fn collect_from_annotation(
         &mut self,
-        env: &SemanticEnvironment<'db>,
+        db: &'db dyn Db,
         definition: Definition<'db>,
         specialization: Option<Specialization<'db>>,
     ) {
-        let db = env.db();
         let module = parsed_module(db, definition.python_file(db)).load(db);
         let DefinitionKind::AnnotatedAssignment(assignment) = definition.kind(db) else {
             return;
         };
         let annotation = assignment.annotation(&module);
 
-        if self.collect_from_annotated(env, definition, annotation, specialization) {
+        if self.collect_from_annotated(db, definition, annotation, specialization) {
             return;
         }
 
@@ -198,22 +196,21 @@ impl<'db> FieldMetadata<'db> {
             _ => return,
         };
 
-        self.collect_from_annotated(env, alias_definition, value, specialization);
+        self.collect_from_annotated(db, alias_definition, value, specialization);
     }
 
     /// Collect Pydantic field metadata from the `Annotated` part of a field's annotation.
     fn collect_from_annotated(
         &mut self,
-        env: &SemanticEnvironment<'db>,
+        db: &'db dyn Db,
         definition: Definition<'db>,
         annotation: &Expr,
         specialization: Option<Specialization<'db>>,
     ) -> bool {
-        let db = env.db();
         let Some(subscript) = annotation.as_subscript_expr() else {
             return false;
         };
-        if definition_expression_type(env, definition, &subscript.value)
+        if definition_expression_type(db, definition, &subscript.value)
             != Type::SpecialForm(SpecialFormType::Annotated)
         {
             return false;
@@ -230,7 +227,7 @@ impl<'db> FieldMetadata<'db> {
             let Some(call) = metadata.as_call_expr() else {
                 continue;
             };
-            let callee = definition_expression_type(env, definition, &call.func);
+            let callee = definition_expression_type(db, definition, &call.func);
 
             if callee
                 .as_class_literal()
@@ -239,9 +236,7 @@ impl<'db> FieldMetadata<'db> {
                 let strict = call.arguments.find_argument_value("strict", 0).map_or(
                     ConfigBoolean::Enabled,
                     |strict| {
-                        ConfigBoolean::from_type(definition_expression_type(
-                            env, definition, strict,
-                        ))
+                        ConfigBoolean::from_type(definition_expression_type(db, definition, strict))
                     },
                 );
                 self.merge_strict(strict);
@@ -250,11 +245,11 @@ impl<'db> FieldMetadata<'db> {
                 Type::FunctionLiteral(function)
                     if function.is_known(db, KnownFunction::PydanticField)
             ) {
-                let field_type = definition_expression_type(env, definition, metadata);
+                let field_type = definition_expression_type(db, definition, metadata);
                 if let Type::KnownInstance(KnownInstanceType::Field(field)) = field_type {
-                    self.merge_field(env, field, specialization);
+                    self.merge_field(db, field, specialization);
                 } else {
-                    self.merge_field_call(env, definition, call, field_type, specialization);
+                    self.merge_field_call(db, definition, call, field_type, specialization);
                 }
             }
         }
@@ -268,14 +263,12 @@ impl<'db> FieldMetadata<'db> {
 
     fn merge_field(
         &mut self,
-        env: &SemanticEnvironment<'db>,
+        db: &'db dyn Db,
         field: FieldInstance<'db>,
         specialization: Option<Specialization<'db>>,
     ) {
-        let db = env.db();
         if let Some(default_type) = field.default_type(db) {
-            self.default_ty =
-                Some(default_type.apply_optional_specialization(env.db(), specialization));
+            self.default_ty = Some(default_type.apply_optional_specialization(db, specialization));
         }
         self.init &= field.init(db);
         if let Some(alias) = field.alias(db) {
@@ -288,27 +281,26 @@ impl<'db> FieldMetadata<'db> {
 
     fn merge_field_call(
         &mut self,
-        env: &SemanticEnvironment<'db>,
+        db: &'db dyn Db,
         definition: Definition<'db>,
         call: &ExprCall,
         call_type: Type<'db>,
         specialization: Option<Specialization<'db>>,
     ) {
-        let db = env.db();
         if let Some(default) = call.arguments.find_argument_value("default", 0) {
-            let default_type = definition_expression_type(env, definition, default);
+            let default_type = definition_expression_type(db, definition, default);
             if !default_type.is_instance_of(db, KnownClass::EllipsisType) {
                 self.default_ty =
-                    Some(default_type.apply_optional_specialization(env.db(), specialization));
+                    Some(default_type.apply_optional_specialization(db, specialization));
             }
         } else if call.arguments.find_keyword("default_factory").is_some() {
-            self.default_ty =
-                Some(call_type.apply_optional_specialization(env.db(), specialization));
+            self.default_ty = Some(call_type.apply_optional_specialization(db, specialization));
         }
 
         if let Some(init) = call.arguments.find_keyword("init") {
-            let init = definition_expression_type(env, definition, &init.value);
-            self.init &= !init.bool(env).is_always_false();
+            let init = definition_expression_type(db, definition, &init.value);
+            let env = ProgramEnvironment::from_definition(definition);
+            self.init &= !init.bool(db, &env).is_always_false();
         }
 
         if let Some(alias) = call
@@ -316,13 +308,13 @@ impl<'db> FieldMetadata<'db> {
             .find_keyword("validation_alias")
             .or_else(|| call.arguments.find_keyword("alias"))
         {
-            self.alias = definition_expression_type(env, definition, &alias.value)
+            self.alias = definition_expression_type(db, definition, &alias.value)
                 .as_string_literal()
                 .map(|literal| Box::from(literal.value(db)));
         }
 
         if let Some(strict) = call.arguments.find_keyword("strict") {
-            let strict = definition_expression_type(env, definition, &strict.value);
+            let strict = definition_expression_type(db, definition, &strict.value);
             if !strict.is_none(db) {
                 self.merge_strict(ConfigBoolean::from_type(strict));
             }
@@ -332,16 +324,16 @@ impl<'db> FieldMetadata<'db> {
 
 /// Resolve a Pydantic field's metadata from its annotation and right-hand side.
 pub(in crate::types) fn field_metadata<'db>(
-    env: &SemanticEnvironment<'db>,
+    db: &'db dyn Db,
     definition: Option<Definition<'db>>,
     rhs_type: Option<Type<'db>>,
     specialization: Option<Specialization<'db>>,
 ) -> FieldMetadata<'db> {
     let mut metadata = FieldMetadata::default();
     if let Some(definition) = definition {
-        metadata.collect_from_annotation(env, definition, specialization);
+        metadata.collect_from_annotation(db, definition, specialization);
     }
-    metadata.collect_from_rhs_type(env, rhs_type, specialization);
+    metadata.collect_from_rhs_type(db, rhs_type, specialization);
     metadata
 }
 
@@ -488,32 +480,31 @@ impl ConfigBoolean {
 }
 
 fn config_boolean(
-    env: &SemanticEnvironment<'_>,
+    db: &dyn Db,
     definition: Definition<'_>,
     keyword: Option<&Keyword>,
 ) -> ConfigBoolean {
     keyword.map_or(ConfigBoolean::Unspecified, |keyword| {
-        ConfigBoolean::from_type(definition_expression_type(env, definition, &keyword.value))
+        ConfigBoolean::from_type(definition_expression_type(db, definition, &keyword.value))
     })
 }
 
-pub(in crate::types) fn is_model(
-    env: &SemanticEnvironment<'_>,
-    class: StaticClassLiteral<'_>,
-) -> bool {
-    let db = env.db();
+pub(in crate::types) fn is_model<'db>(db: &'db dyn Db, class: StaticClassLiteral<'db>) -> bool {
     class
-        .iter_mro(env, None)
+        .iter_mro(db, None)
         .filter_map(ClassBase::into_class)
         .any(|base| base.is_known(db, KnownClass::PydanticBaseModel))
 }
 
 /// Return whether `ty` is an instance of a Pydantic model.
-pub(in crate::types) fn is_model_instance(env: &SemanticEnvironment<'_>, ty: Type<'_>) -> bool {
-    let db = env.db();
-    ty.nominal_class(env)
+pub(in crate::types) fn is_model_instance(
+    db: &dyn Db,
+    env: &ProgramEnvironment<'_>,
+    ty: Type<'_>,
+) -> bool {
+    ty.nominal_class(db, env)
         .and_then(|class| class.static_class_literal(db))
-        .is_some_and(|(class, _)| is_model(env, class))
+        .is_some_and(|(class, _)| is_model(db, class))
 }
 
 /// Return whether a field specifier's `default` argument provides a default value.
@@ -542,9 +533,8 @@ pub(in crate::types) fn constructor_fields_are_keyword_only(
 
 #[salsa::tracked(returns(copy), heap_size=ruff_memory_usage::heap_size)]
 fn is_root_model<'db>(db: &'db dyn Db, class: StaticClassLiteral<'db>) -> bool {
-    let env = SemanticEnvironment::from_scope(db, class.body_scope(db));
     class
-        .iter_mro(&env, None)
+        .iter_mro(db, None)
         .filter_map(ClassBase::into_class)
         .any(|base| base.is_known(db, KnownClass::PydanticRootModel))
 }
@@ -554,12 +544,11 @@ fn is_root_model<'db>(db: &'db dyn Db, class: StaticClassLiteral<'db>) -> bool {
 /// A settings model can populate any field from environment variables or another configured
 /// settings source, so no field value is necessarily required at the call site.
 pub(in crate::types) fn constructor_fields_are_optional(
-    env: &SemanticEnvironment<'_>,
+    db: &dyn Db,
     class: StaticClassLiteral<'_>,
 ) -> bool {
-    let db = env.db();
     class
-        .iter_mro(env, None)
+        .iter_mro(db, None)
         .filter_map(ClassBase::into_class)
         .any(|base| base.is_known(db, KnownClass::PydanticBaseSettings))
 }
@@ -570,13 +559,12 @@ pub(in crate::types) fn constructor_fields_are_optional(
 /// `model_config` for a single instantiation. These parameters are defined on
 /// `BaseSettings.__init__`, so we reuse them instead of duplicating their names and types.
 pub(in crate::types) fn extend_settings_constructor_parameters<'db>(
-    env: &SemanticEnvironment<'db>,
+    db: &'db dyn Db,
     class: StaticClassLiteral<'db>,
     parameters: &mut Vec<Parameter<'db>>,
 ) {
-    let db = env.db();
     let Some(base_settings) = class
-        .iter_mro(env, None)
+        .iter_mro(db, None)
         .filter_map(ClassBase::into_class)
         .filter_map(|base| base.static_class_literal(db))
         .map(|(base, _)| base)
@@ -585,13 +573,13 @@ pub(in crate::types) fn extend_settings_constructor_parameters<'db>(
         return;
     };
 
-    let Some(init) = class_member(env, base_settings.body_scope(db), "__init__")
+    let Some(init) = class_member(db, base_settings.body_scope(db), "__init__")
         .ignore_possibly_undefined()
         .and_then(Type::as_function_literal)
     else {
         return;
     };
-    let Some(signature) = init.signature(env.db()).iter().next() else {
+    let Some(signature) = init.signature(db).iter().next() else {
         return;
     };
 
@@ -614,13 +602,12 @@ pub(in crate::types) fn extend_settings_constructor_parameters<'db>(
     heap_size=ruff_memory_usage::heap_size,
 )]
 fn model_config<'db>(db: &'db dyn Db, class: StaticClassLiteral<'db>) -> ModelConfig {
-    let env = SemanticEnvironment::from_scope(db, class.body_scope(db));
     let mut config = ModelConfig::default();
 
     // Pydantic merges the effective config from each direct base from left to right. A later base
     // therefore takes precedence over an earlier base.
-    for base in class.explicit_bases(env.db()) {
-        let Some(base) = base.to_class_type(&env) else {
+    for base in class.explicit_bases(db) {
+        let Some(base) = base.to_class_type(db) else {
             config = ModelConfig::unknown();
             continue;
         };
@@ -630,42 +617,34 @@ fn model_config<'db>(db: &'db dyn Db, class: StaticClassLiteral<'db>) -> ModelCo
             continue;
         };
 
-        if is_model(&env, base) {
-            config.merge(model_config(env.db(), base));
-        } else if let Some(base_config) = inherited_model_config(&env, base) {
+        if is_model(db, base) {
+            config.merge(model_config(db, base));
+        } else if let Some(base_config) = inherited_model_config(db, base) {
             config.merge(base_config);
         }
     }
 
-    if let Some(own_config) = own_model_config(&env, class) {
+    if let Some(own_config) = own_model_config(db, class) {
         config.merge(own_config);
     }
-    config.merge(class_keyword_config(&env, class));
+    config.merge(class_keyword_config(db, class));
     config
 }
 
-fn inherited_model_config(
-    env: &SemanticEnvironment<'_>,
-    class: StaticClassLiteral<'_>,
-) -> Option<ModelConfig> {
-    let db = env.db();
-    for base in class.iter_mro(env, None).filter_map(ClassBase::into_class) {
+fn inherited_model_config(db: &dyn Db, class: StaticClassLiteral<'_>) -> Option<ModelConfig> {
+    for base in class.iter_mro(db, None).filter_map(ClassBase::into_class) {
         let Some((base, _)) = base.static_class_literal(db) else {
             return Some(ModelConfig::unknown());
         };
-        if let Some(config) = own_model_config(env, base) {
+        if let Some(config) = own_model_config(db, base) {
             return Some(config);
         }
     }
     None
 }
 
-fn own_model_config(
-    env: &SemanticEnvironment<'_>,
-    class: StaticClassLiteral<'_>,
-) -> Option<ModelConfig> {
-    let db = env.db();
-    let model_config = class_member(env, class.body_scope(db), "model_config")
+fn own_model_config(db: &dyn Db, class: StaticClassLiteral<'_>) -> Option<ModelConfig> {
+    let model_config = class_member(db, class.body_scope(db), "model_config")
         .inner
         .place;
     let Place::Defined(DefinedPlace {
@@ -697,13 +676,13 @@ fn own_model_config(
     };
 
     if let Some(dict) = value.as_dict_expr() {
-        return Some(model_config_from_dict(env, definition, dict));
+        return Some(model_config_from_dict(db, definition, dict));
     }
 
     let Some(call) = value.as_call_expr() else {
         return Some(ModelConfig::unknown());
     };
-    let callee = definition_expression_type(env, definition, &call.func);
+    let callee = definition_expression_type(db, definition, &call.func);
     if !callee.as_class_literal().is_some_and(|class| {
         class.is_known(db, KnownClass::PydanticConfigDict) || class.is_known(db, KnownClass::Dict)
     }) {
@@ -722,30 +701,30 @@ fn own_model_config(
     // Keep this list of recognized options in sync with `model_config_from_dict` and
     // `class_keyword_config`.
     let extra = call.arguments.find_keyword("extra").map(|extra| {
-        let extra = definition_expression_type(env, definition, &extra.value)
+        let extra = definition_expression_type(db, definition, &extra.value)
             .as_string_literal()
             .map(|literal| literal.value(db));
         ExtraBehavior::from_value(extra)
     });
-    let strict = config_boolean(env, definition, call.arguments.find_keyword("strict"));
+    let strict = config_boolean(db, definition, call.arguments.find_keyword("strict"));
     let from_attributes = config_boolean(
-        env,
+        db,
         definition,
         call.arguments.find_keyword("from_attributes"),
     );
-    let frozen = config_boolean(env, definition, call.arguments.find_keyword("frozen"));
+    let frozen = config_boolean(db, definition, call.arguments.find_keyword("frozen"));
     let validate_by_alias = config_boolean(
-        env,
+        db,
         definition,
         call.arguments.find_keyword("validate_by_alias"),
     );
     let validate_by_name = config_boolean(
-        env,
+        db,
         definition,
         call.arguments.find_keyword("validate_by_name"),
     );
     let populate_by_name = config_boolean(
-        env,
+        db,
         definition,
         call.arguments.find_keyword("populate_by_name"),
     );
@@ -761,12 +740,7 @@ fn own_model_config(
     })
 }
 
-fn model_config_from_dict(
-    env: &SemanticEnvironment<'_>,
-    definition: Definition<'_>,
-    dict: &ExprDict,
-) -> ModelConfig {
-    let db = env.db();
+fn model_config_from_dict(db: &dyn Db, definition: Definition<'_>, dict: &ExprDict) -> ModelConfig {
     let mut config = ModelConfig::default();
 
     for item in dict {
@@ -779,7 +753,7 @@ fn model_config_from_dict(
             // it could incorrectly preserve a lower-precedence configuration value.
             return ModelConfig::unknown();
         };
-        let value = definition_expression_type(env, definition, &item.value);
+        let value = definition_expression_type(db, definition, &item.value);
 
         // Keep this match in sync with the options recognized for `ConfigDict` calls in
         // `own_model_config` and for class keywords in `class_keyword_config`.
@@ -802,11 +776,7 @@ fn model_config_from_dict(
     config
 }
 
-fn class_keyword_config(
-    env: &SemanticEnvironment<'_>,
-    class: StaticClassLiteral<'_>,
-) -> ModelConfig {
-    let db = env.db();
+fn class_keyword_config(db: &dyn Db, class: StaticClassLiteral<'_>) -> ModelConfig {
     let definition = class.definition(db);
     let module = parsed_module(db, class.python_file(db)).load(db);
     let kind = definition.kind(db);
@@ -827,21 +797,20 @@ fn class_keyword_config(
     // Keep this list of recognized options in sync with `own_model_config` and
     // `model_config_from_dict`.
     let extra = arguments.find_keyword("extra").map(|extra| {
-        let extra = definition_expression_type(env, definition, &extra.value)
+        let extra = definition_expression_type(db, definition, &extra.value)
             .as_string_literal()
             .map(|literal| literal.value(db));
         ExtraBehavior::from_value(extra)
     });
-    let strict = config_boolean(env, definition, arguments.find_keyword("strict"));
-    let from_attributes =
-        config_boolean(env, definition, arguments.find_keyword("from_attributes"));
-    let frozen = config_boolean(env, definition, arguments.find_keyword("frozen"));
+    let strict = config_boolean(db, definition, arguments.find_keyword("strict"));
+    let from_attributes = config_boolean(db, definition, arguments.find_keyword("from_attributes"));
+    let frozen = config_boolean(db, definition, arguments.find_keyword("frozen"));
     let validate_by_alias =
-        config_boolean(env, definition, arguments.find_keyword("validate_by_alias"));
+        config_boolean(db, definition, arguments.find_keyword("validate_by_alias"));
     let validate_by_name =
-        config_boolean(env, definition, arguments.find_keyword("validate_by_name"));
+        config_boolean(db, definition, arguments.find_keyword("validate_by_name"));
     let populate_by_name =
-        config_boolean(env, definition, arguments.find_keyword("populate_by_name"));
+        config_boolean(db, definition, arguments.find_keyword("populate_by_name"));
 
     ModelConfig {
         extra,
@@ -856,15 +825,14 @@ fn class_keyword_config(
 
 /// Return the input type accepted by a Pydantic field's synthesized constructor parameter.
 pub(in crate::types) fn constructor_parameter_type<'db>(
-    env: &SemanticEnvironment<'db>,
+    db: &'db dyn Db,
     class: StaticClassLiteral<'db>,
     field_name: &Name,
     field_type: Type<'db>,
     field_strict: ConfigBoolean,
     metadata: ModelMetadata<'db>,
 ) -> Type<'db> {
-    let db = env.db();
-    if has_before_or_plain_field_validator(env.db(), class, field_name.clone()) {
+    if has_before_or_plain_field_validator(db, class, field_name.clone()) {
         return Type::any();
     }
 
@@ -872,7 +840,8 @@ pub(in crate::types) fn constructor_parameter_type<'db>(
         return field_type;
     }
 
-    lax_input_type(env, field_type)
+    let env = ProgramEnvironment::from_scope(class.body_scope(db));
+    lax_input_type(db, &env, field_type)
 }
 
 /// Return whether `field_name` has a Pydantic field validator that receives the raw input.
@@ -886,13 +855,12 @@ pub(in crate::types) fn has_before_or_plain_field_validator<'db>(
     class: StaticClassLiteral<'db>,
     field_name: Name,
 ) -> bool {
-    let env = SemanticEnvironment::from_scope(db, class.body_scope(db));
     let field_name = CharStr::from(field_name);
 
     // Pydantic inherits validators unless a subclass defines a symbol with the same method name.
     let mut shadowed_symbols = FxHashSet::default();
 
-    for base in class.iter_mro(&env, None).filter_map(ClassBase::into_class) {
+    for base in class.iter_mro(db, None).filter_map(ClassBase::into_class) {
         if base.is_known(db, KnownClass::PydanticBaseModel) {
             break;
         }
@@ -908,10 +876,10 @@ pub(in crate::types) fn has_before_or_plain_field_validator<'db>(
             if !shadowed_symbols.insert(name) {
                 continue;
             }
-            if declarations.any_reachable(&env, |declaration| {
+            if declarations.any_reachable(db, |declaration| {
                 declaration.is_defined_and(|definition| {
                     function_has_before_or_plain_field_validator(
-                        &env,
+                        db,
                         definition,
                         field_name.as_str(),
                     )
@@ -926,11 +894,10 @@ pub(in crate::types) fn has_before_or_plain_field_validator<'db>(
 }
 
 fn function_has_before_or_plain_field_validator<'db>(
-    env: &SemanticEnvironment<'db>,
+    db: &'db dyn Db,
     definition: Definition<'db>,
     field_name: &str,
 ) -> bool {
-    let db = env.db();
     let DefinitionKind::Function(function) = definition.kind(db) else {
         return false;
     };
@@ -939,7 +906,7 @@ fn function_has_before_or_plain_field_validator<'db>(
     if function_node.decorator_list.is_empty() {
         return false;
     }
-    let decorators = function_known_decorators(env.db(), definition);
+    let decorators = function_known_decorators(db, definition);
 
     function_node.decorator_list.iter().any(|decorator| {
         let Some(call) = decorator.expression.as_call_expr() else {
@@ -977,16 +944,20 @@ fn function_has_before_or_plain_field_validator<'db>(
 }
 
 /// Return the documented Python input type accepted by Pydantic for `field_type` in lax mode.
-fn lax_input_type<'db>(env: &SemanticEnvironment<'db>, field_type: Type<'db>) -> Type<'db> {
-    lax_input_type_impl(env, field_type, &mut FxHashSet::default())
+fn lax_input_type<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    field_type: Type<'db>,
+) -> Type<'db> {
+    lax_input_type_impl(db, env, field_type, &mut FxHashSet::default())
 }
 
 fn lax_input_type_impl<'db>(
-    env: &SemanticEnvironment<'db>,
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
     field_type: Type<'db>,
     expanding_types: &mut FxHashSet<Type<'db>>,
 ) -> Type<'db> {
-    let db = env.db();
     if field_type.is_none(db) || matches!(field_type, Type::LiteralValue(_) | Type::SubclassOf(_)) {
         return field_type;
     }
@@ -995,35 +966,36 @@ fn lax_input_type_impl<'db>(
         if !expanding_types.insert(field_type) {
             return Type::any();
         }
-        let result = lax_input_type_impl(env, alias.value_type(env), expanding_types);
+        let result = lax_input_type_impl(db, env, alias.value_type(db), expanding_types);
         expanding_types.remove(&field_type);
         return result;
     }
 
     if field_type.as_union().and_then(|union| union.known(db)) == Some(KnownUnion::Float) {
-        return lax_alias(env, "LaxFloat");
+        return lax_alias(db, env, "LaxFloat");
     }
 
     if let Type::Union(union) = field_type {
         return UnionType::from_elements_leave_aliases(
+            db,
             env,
             union
                 .elements(db)
                 .iter()
-                .map(|element| lax_input_type_impl(env, *element, expanding_types)),
+                .map(|element| lax_input_type_impl(db, env, *element, expanding_types)),
         );
     }
 
-    if let Some(input_type) = root_model_input_type(env, field_type, expanding_types) {
+    if let Some(input_type) = root_model_input_type(db, env, field_type, expanding_types) {
         return input_type;
     }
 
-    if let Some(input_type) = model_input_type(env, field_type) {
+    if let Some(input_type) = model_input_type(db, env, field_type) {
         return input_type;
     }
 
     let known_class = field_type
-        .nominal_class(env)
+        .nominal_class(db, env)
         .and_then(|class| class.known(db));
 
     if matches!(
@@ -1038,25 +1010,29 @@ fn lax_input_type_impl<'db>(
                 | KnownClass::Tuple
         )
     ) {
-        let Ok(elements) = field_type.try_iterate(env) else {
+        let Ok(elements) = field_type.try_iterate(db, env) else {
             return Type::any();
         };
-        let element_type =
-            lax_input_type_impl(env, elements.homogeneous_element_type(env), expanding_types);
-        return KnownClass::Iterable.to_specialized_instance(env, &[element_type]);
+        let element_type = lax_input_type_impl(
+            db,
+            env,
+            elements.homogeneous_element_type(db, env),
+            expanding_types,
+        );
+        return KnownClass::Iterable.to_specialized_instance(db, env, &[element_type]);
     }
 
     if matches!(known_class, Some(KnownClass::Dict | KnownClass::Mapping)) {
-        let Some(specialization) =
-            known_class.and_then(|known_class| field_type.known_specialization(env, known_class))
+        let Some(specialization) = known_class
+            .and_then(|known_class| field_type.known_specialization(db, env, known_class))
         else {
             return Type::any();
         };
         let [key_type, value_type] = specialization.types(db) else {
             return Type::any();
         };
-        let value_type = lax_input_type_impl(env, *value_type, expanding_types);
-        return KnownClass::Mapping.to_specialized_instance(env, &[*key_type, value_type]);
+        let value_type = lax_input_type_impl(db, env, *value_type, expanding_types);
+        return KnownClass::Mapping.to_specialized_instance(db, env, &[*key_type, value_type]);
     }
 
     let builtin_alias = match known_class {
@@ -1069,10 +1045,10 @@ fn lax_input_type_impl<'db>(
         _ => None,
     };
     if let Some(alias) = builtin_alias {
-        return lax_alias(env, alias);
+        return lax_alias(db, env, alias);
     }
 
-    let Some((module, symbol, class)) = instance_symbol(env, field_type) else {
+    let Some((module, symbol, class)) = instance_symbol(db, env, field_type) else {
         return Type::any();
     };
     let symbol_alias = match (module, symbol) {
@@ -1092,23 +1068,23 @@ fn lax_input_type_impl<'db>(
         _ => None,
     };
     if let Some(alias) = symbol_alias {
-        return lax_alias(env, alias);
+        return lax_alias(db, env, alias);
     }
 
     let alias = if (module, symbol) == (KnownModule::Re, "Pattern") {
-        let Some(specialization) = field_type.specialization_of(env, class) else {
+        let Some(specialization) = field_type.specialization_of(db, env, class) else {
             return Type::any();
         };
         let [pattern_type] = specialization.types(db) else {
             return Type::any();
         };
         if pattern_type
-            .nominal_class(env)
+            .nominal_class(db, env)
             .is_some_and(|class| class.is_known(db, KnownClass::Str))
         {
             "LaxStrPattern"
         } else if pattern_type
-            .nominal_class(env)
+            .nominal_class(db, env)
             .is_some_and(|class| class.is_known(db, KnownClass::Bytes))
         {
             "LaxBytesPattern"
@@ -1119,7 +1095,7 @@ fn lax_input_type_impl<'db>(
         return Type::any();
     };
 
-    lax_alias(env, alias)
+    lax_alias(db, env, alias)
 }
 
 /// Return the input type accepted for a Pydantic root model field.
@@ -1128,39 +1104,39 @@ fn lax_input_type_impl<'db>(
 /// a field annotated with an `IntList` derived from `RootModel[list[int]]` accepts both an
 /// `IntList` instance and an `Iterable[LaxInt]`.
 fn root_model_input_type<'db>(
-    env: &SemanticEnvironment<'db>,
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
     field_type: Type<'db>,
     expanding_types: &mut FxHashSet<Type<'db>>,
 ) -> Option<Type<'db>> {
-    let db = env.db();
-    let (class, specialization) = field_type.nominal_class(env)?.static_class_literal(db)?;
-    if !is_root_model(env.db(), class) {
+    let (class, specialization) = field_type
+        .nominal_class(db, env)?
+        .static_class_literal(db)?;
+    if !is_root_model(db, class) {
         return None;
     }
 
     let Some(field_policy @ CodeGeneratorKind::Pydantic(_)) =
-        CodeGeneratorKind::from_class(env, class.into())
+        CodeGeneratorKind::from_class(db, class.into())
     else {
         return Some(Type::any());
     };
-    let Some(root_field) = class
-        .fields(env.db(), specialization, field_policy)
-        .get("root")
-    else {
+    let Some(root_field) = class.fields(db, specialization, field_policy).get("root") else {
         return Some(Type::any());
     };
 
     if !expanding_types.insert(field_type) {
         return Some(Type::any());
     }
-    let root_input_type = lax_input_type_impl(env, root_field.declared_ty, expanding_types);
+    let root_input_type = lax_input_type_impl(db, env, root_field.declared_ty, expanding_types);
 
     expanding_types.remove(&field_type);
     // In lax mode, Pydantic accepts a Box[str] when a Box[int] is expected, so we widen
     // to a gradual specialization here. Widening to `Box[LaxStr]` would only work for
     // covariant generics.
-    let model_instance = Type::instance(env, class.unknown_specialization(env));
+    let model_instance = Type::instance(db, env, class.unknown_specialization(db));
     Some(UnionType::from_two_elements(
+        db,
         env,
         model_instance,
         root_input_type,
@@ -1173,46 +1149,53 @@ fn root_model_input_type<'db>(
 /// input values. Other custom validators can accept additional input types, which are not modeled
 /// here.
 fn model_input_type<'db>(
-    env: &SemanticEnvironment<'db>,
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
     field_type: Type<'db>,
 ) -> Option<Type<'db>> {
-    let db = env.db();
-    let (class, _) = field_type.nominal_class(env)?.static_class_literal(db)?;
-    if !is_model(env, class) || is_root_model(env.db(), class) {
+    let (class, _) = field_type
+        .nominal_class(db, env)?
+        .static_class_literal(db)?;
+    if !is_model(db, class) || is_root_model(db, class) {
         return None;
     }
 
     // Attribute-based validation can accept arbitrary objects that do not implement `Mapping`.
-    if model_config(env.db(), class)
-        .from_attributes
-        .enabled_or(false)
-    {
+    if model_config(db, class).from_attributes.enabled_or(false) {
         return Some(Type::any());
     }
 
     // In lax mode, Pydantic accepts a Box[str] when a Box[int] is expected, so we widen
     // to a gradual specialization here. Widening to `Box[LaxStr]` would only work for
     // covariant generics.
-    let model_instance = Type::instance(env, class.unknown_specialization(env));
-    let mapping = KnownClass::Mapping
-        .to_specialized_instance(env, &[KnownClass::Str.to_instance(env), Type::any()]);
-    Some(UnionType::from_two_elements(env, model_instance, mapping))
+    let model_instance = Type::instance(db, env, class.unknown_specialization(db));
+    let mapping = KnownClass::Mapping.to_specialized_instance(
+        db,
+        env,
+        &[KnownClass::Str.to_instance(db, env), Type::any()],
+    );
+    Some(UnionType::from_two_elements(
+        db,
+        env,
+        model_instance,
+        mapping,
+    ))
 }
 
 /// Return the known module, name, and class literal for an instance's nominal class.
 fn instance_symbol<'db>(
-    env: &SemanticEnvironment<'db>,
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
     ty: Type<'db>,
 ) -> Option<(KnownModule, &'db str, StaticClassLiteral<'db>)> {
-    let db = env.db();
-    let class = ty.nominal_class(env)?.class_literal(db).as_static()?;
+    let class = ty.nominal_class(db, env)?.class_literal(db).as_static()?;
     let module = file_to_module(db, class.python_file(db))?.known(db)?;
     Some((module, class.name(db).as_str(), class))
 }
 
 /// Return a lax-input alias like `LaxInt` from `ty_extensions.pydantic`.
-fn lax_alias<'db>(env: &SemanticEnvironment<'db>, name: &str) -> Type<'db> {
-    match known_module_symbol(env, KnownModule::TyExtensionsPydantic, name)
+fn lax_alias<'db>(db: &'db dyn Db, env: &ProgramEnvironment<'db>, name: &str) -> Type<'db> {
+    match known_module_symbol(db, env, KnownModule::TyExtensionsPydantic, name)
         .place
         .ignore_possibly_undefined()
     {
@@ -1235,13 +1218,9 @@ enum ModelInitBehavior {
     Other,
 }
 
-fn model_init_behavior(
-    env: &SemanticEnvironment<'_>,
-    class: StaticClassLiteral<'_>,
-) -> ModelInitBehavior {
-    let db = env.db();
+fn model_init_behavior(db: &dyn Db, class: StaticClassLiteral<'_>) -> ModelInitBehavior {
     for base in class
-        .iter_mro(env, None)
+        .iter_mro(db, None)
         .filter_map(ClassBase::into_class)
         .filter_map(|base| base.static_class_literal(db))
         .map(|(base, _)| base)
@@ -1257,13 +1236,13 @@ fn model_init_behavior(
             return ModelInitBehavior::Other;
         }
 
-        let init = class_member(env, base.body_scope(db), "__init__");
+        let init = class_member(db, base.body_scope(db), "__init__");
         if !init.is_undefined() {
             return if init
                 .ignore_possibly_undefined()
                 .and_then(Type::as_function_literal)
                 .is_some_and(|init| {
-                    init.signature(env.db())
+                    init.signature(db)
                         .iter()
                         .any(|signature| signature.parameters().keyword_variadic().is_some())
                 }) {
@@ -1283,34 +1262,32 @@ fn model_init_behavior(
 /// its subclasses. A variadic custom initializer still allows Pydantic to validate field values
 /// passed via keyword arguments.
 pub(in crate::types) fn synthesizes_constructor_signature_from_fields(
-    env: &SemanticEnvironment<'_>,
+    db: &dyn Db,
     class: StaticClassLiteral<'_>,
 ) -> bool {
-    model_init_behavior(env, class) != ModelInitBehavior::CustomFixed
+    model_init_behavior(db, class) != ModelInitBehavior::CustomFixed
 }
 
 /// Return `true` if `class` should accept extra keywords in its synthesized constructor.
 pub(in crate::types) fn model_init_accepts_extra(
-    env: &SemanticEnvironment<'_>,
+    db: &dyn Db,
     class: StaticClassLiteral<'_>,
     metadata: ModelMetadata<'_>,
 ) -> bool {
-    let db = env.db();
     metadata.accepts_extra(db)
         && matches!(
-            model_init_behavior(env, class),
+            model_init_behavior(db, class),
             ModelInitBehavior::BaseModel | ModelInitBehavior::CustomVariadic
         )
 }
 
 /// Return `true` if extra keywords passed to `class` are silently discarded by Pydantic.
 fn model_init_discards_extra(
-    env: &SemanticEnvironment<'_>,
+    db: &dyn Db,
     class: StaticClassLiteral<'_>,
     metadata: ModelMetadata<'_>,
 ) -> bool {
-    let db = env.db();
-    metadata.discards_extra(db) && model_init_behavior(env, class) == ModelInitBehavior::BaseModel
+    metadata.discards_extra(db) && model_init_behavior(db, class) == ModelInitBehavior::BaseModel
 }
 
 /// Report keyword arguments that the Pydantic model constructor silently discards.
@@ -1325,16 +1302,15 @@ pub(in crate::types) fn report_discarded_extra_arguments<'db>(
     }
 
     let db = context.db();
-    let env = context.semantic_environment();
     let Some((class, _)) = class.static_class_literal(db) else {
         return;
     };
-    let Some(metadata) = CodeGeneratorKind::from_class(env, class.into())
+    let Some(metadata) = CodeGeneratorKind::from_class(db, class.into())
         .and_then(CodeGeneratorKind::pydantic_metadata)
     else {
         return;
     };
-    if !model_init_discards_extra(env, class, metadata) {
+    if !model_init_discards_extra(db, class, metadata) {
         return;
     }
 

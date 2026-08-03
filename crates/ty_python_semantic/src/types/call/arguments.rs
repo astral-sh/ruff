@@ -1,3 +1,4 @@
+use crate::Db;
 use std::borrow::Cow;
 use std::fmt::Display;
 
@@ -5,7 +6,7 @@ use itertools::{Either, Itertools};
 use ruff_python_ast as ast;
 use rustc_hash::FxHashMap;
 
-use crate::SemanticEnvironment;
+use crate::ProgramEnvironment;
 use crate::types::enums::enum_metadata;
 use crate::types::tuple::Tuple;
 use crate::types::typed_dict::extract_unpacked_typed_dict_keys_from_value_type;
@@ -290,7 +291,8 @@ impl<'a, 'db> CallArguments<'a, 'db> {
     /// to synthesize a precise partial signature.
     pub(crate) fn functools_partial_bound_arguments(
         &self,
-        env: &SemanticEnvironment<'db>,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
     ) -> Option<(Self, bool)> {
         let bound_call_arguments = self.start_from(1);
         let mut can_synthesize_signature = true;
@@ -300,7 +302,7 @@ impl<'a, 'db> CallArguments<'a, 'db> {
             match argument {
                 Argument::Variadic => {
                     if !matches!(
-                        argument_ty.tuple_instance_spec(env),
+                        argument_ty.tuple_instance_spec(db, env),
                         Some(spec) if spec.as_fixed_length().is_some()
                     ) {
                         return None;
@@ -310,7 +312,7 @@ impl<'a, 'db> CallArguments<'a, 'db> {
                     // Known `TypedDict` items can still be checked against their target
                     // parameters, even though possible hidden items prevent us from synthesizing
                     // a precise partial signature.
-                    extract_unpacked_typed_dict_keys_from_value_type(env, argument_ty)?;
+                    extract_unpacked_typed_dict_keys_from_value_type(db, env, argument_ty)?;
                     can_synthesize_signature = false;
                 }
                 Argument::Positional | Argument::Synthetic | Argument::Keyword(_) => {}
@@ -328,7 +330,8 @@ impl<'a, 'db> CallArguments<'a, 'db> {
     /// [argument type expansion]: https://typing.python.org/en/latest/spec/overload.html#argument-type-expansion
     pub(super) fn expand(
         &self,
-        env: &SemanticEnvironment<'db>,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
     ) -> impl Iterator<Item = Expansion<'a, 'db>> + '_ {
         /// Represents the state of the expansion process.
         enum State<'a, 'db> {
@@ -386,7 +389,7 @@ impl<'a, 'db> CallArguments<'a, 'db> {
                     // this only shows up in very convoluted instances of generic call inference across multiple
                     // overloads, and is unlikely to happen in practice.
                     if let Some(arg_type) = arg_type.get_default()
-                        && let Some(expanded_types) = expand_type(&env, arg_type)
+                        && let Some(expanded_types) = expand_type(db, &env, arg_type)
                     {
                         break expanded_types;
                     }
@@ -433,20 +436,23 @@ impl<'a, 'db> CallArguments<'a, 'db> {
 
     pub(super) fn display<'env>(
         &'env self,
-        env: &'env SemanticEnvironment<'db>,
+        db: &'db dyn Db,
+        env: &'env ProgramEnvironment<'db>,
     ) -> impl Display + 'env {
         struct DisplayCallArgumentTypes<'env, 'a, 'db> {
             types: &'a CallArgumentTypes<'db>,
-            env: &'env SemanticEnvironment<'db>,
+            db: &'db dyn Db,
+            env: &'env ProgramEnvironment<'db>,
         }
 
         impl std::fmt::Display for DisplayCallArgumentTypes<'_, '_, '_> {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                let db = self.db;
                 f.debug_map()
                     .entries(self.types.iter().map(|(tcx, ty)| {
                         (
-                            tcx.annotation.as_ref().map(|ty| ty.display(self.env)),
-                            ty.display(self.env),
+                            tcx.annotation.as_ref().map(|ty| ty.display(db, self.env)),
+                            ty.display(db, self.env),
                         )
                     }))
                     .finish()
@@ -455,7 +461,8 @@ impl<'a, 'db> CallArguments<'a, 'db> {
 
         struct DisplayCallArguments<'env, 'a, 'db> {
             call_arguments: &'a CallArguments<'a, 'db>,
-            env: &'env SemanticEnvironment<'db>,
+            db: &'db dyn Db,
+            env: &'env ProgramEnvironment<'db>,
         }
 
         impl std::fmt::Display for DisplayCallArguments<'_, '_, '_> {
@@ -472,6 +479,7 @@ impl<'a, 'db> CallArguments<'a, 'db> {
                                 "self: {}",
                                 DisplayCallArgumentTypes {
                                     types,
+                                    db: self.db,
                                     env: self.env,
                                 }
                             )?;
@@ -482,6 +490,7 @@ impl<'a, 'db> CallArguments<'a, 'db> {
                                 "{}",
                                 DisplayCallArgumentTypes {
                                     types,
+                                    db: self.db,
                                     env: self.env,
                                 }
                             )?;
@@ -492,6 +501,7 @@ impl<'a, 'db> CallArguments<'a, 'db> {
                                 "*{}",
                                 DisplayCallArgumentTypes {
                                     types,
+                                    db: self.db,
                                     env: self.env,
                                 }
                             )?;
@@ -502,6 +512,7 @@ impl<'a, 'db> CallArguments<'a, 'db> {
                             name,
                             DisplayCallArgumentTypes {
                                 types,
+                                db: self.db,
                                 env: self.env,
                             }
                         )?,
@@ -511,6 +522,7 @@ impl<'a, 'db> CallArguments<'a, 'db> {
                                 "**{}",
                                 DisplayCallArgumentTypes {
                                     types,
+                                    db: self.db,
                                     env: self.env,
                                 }
                             )?;
@@ -523,6 +535,7 @@ impl<'a, 'db> CallArguments<'a, 'db> {
 
         DisplayCallArguments {
             call_arguments: self,
+            db,
             env,
         }
     }
@@ -567,28 +580,31 @@ impl<'a, 'db> FromIterator<(Argument<'a>, Option<Type<'db>>)> for CallArguments<
 /// Returns `true` if the type can be expanded into its subtypes.
 ///
 /// In other words, it returns `true` if [`expand_type`] returns [`Some`] for the given type.
-pub(crate) fn is_expandable_type<'db>(env: &SemanticEnvironment<'db>, ty: Type<'db>) -> bool {
-    let db = env.db();
+pub(crate) fn is_expandable_type<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    ty: Type<'db>,
+) -> bool {
     match ty {
         Type::EnumComplement(_) => true,
-        Type::Intersection(intersection) => intersection.finite_alternatives(env).is_some(),
+        Type::Intersection(intersection) => intersection.finite_alternatives(db, env).is_some(),
         Type::NominalInstance(instance) => {
-            let class = instance.class(env);
+            let class = instance.class(db, env);
             if class.is_known(db, KnownClass::Bool) {
                 return true;
             }
-            if let Some(tuple_spec) = instance.tuple_spec(env)
+            if let Some(tuple_spec) = instance.tuple_spec(db, env)
                 && let Tuple::Fixed(fixed_length_tuple) = &*tuple_spec
                 && fixed_length_tuple
                     .iter_all_elements()
-                    .any(|element| is_expandable_type(env, element))
+                    .any(|element| is_expandable_type(db, env, element))
             {
                 return true;
             }
-            enum_metadata(env.db(), class.class_literal(db)).is_some()
+            enum_metadata(db, class.class_literal(db)).is_some()
         }
         Type::Union(_) => true,
-        Type::TypeAlias(alias) => is_expandable_type(env, alias.value_type(env)),
+        Type::TypeAlias(alias) => is_expandable_type(db, env, alias.value_type(db)),
         _ => false,
     }
 }

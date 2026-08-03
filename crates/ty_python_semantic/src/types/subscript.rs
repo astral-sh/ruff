@@ -1,6 +1,7 @@
 //! Inference for subscript expressions (e.g., `x[0]`, `list[int]`).
 
-use crate::SemanticEnvironment;
+use crate::Db;
+use crate::ProgramEnvironment;
 use std::fmt::{self, Display};
 
 use compact_str::{CompactString, ToCompactString};
@@ -211,7 +212,7 @@ impl<'db> SubscriptErrorKind<'db> {
         slice_node: &ast::Expr,
     ) {
         let db = context.db();
-        let env = context.semantic_environment();
+        let env = context.program_environment();
         match self {
             Self::IndexOutOfBounds {
                 kind,
@@ -237,12 +238,12 @@ impl<'db> SubscriptErrorKind<'db> {
                         "Cannot subscript non-generic type alias `{}`",
                         alias.name(db)
                     ));
-                    let value_type = alias.raw_value_type(env.db());
+                    let value_type = alias.raw_value_type(db);
                     if value_type.is_specialized_generic(db) {
                         diagnostic.annotate(context.secondary(&*subscript.value).message(
                             format_args!(
                                 "Alias to `{}`, which is already specialized",
-                                value_type.display(env)
+                                value_type.display(db, env)
                             ),
                         ));
                     }
@@ -262,7 +263,7 @@ impl<'db> SubscriptErrorKind<'db> {
                 {
                     builder.into_diagnostic(format_args!(
                         "Method `{method}` of type `{}` may be missing",
-                        value_ty.display(env),
+                        value_ty.display(db, env),
                     ));
                 }
             }
@@ -278,8 +279,8 @@ impl<'db> SubscriptErrorKind<'db> {
                         builder.into_diagnostic(format_args!(
                             "Method `{method}` of type `{}` is not callable \
                             on object of type `{}`",
-                            bindings.callable_type().display(env),
-                            value_ty.display(env),
+                            bindings.callable_type().display(db, env),
+                            value_ty.display(db, env),
                         ));
                     }
                 }
@@ -292,7 +293,7 @@ impl<'db> SubscriptErrorKind<'db> {
                             *value_ty,
                             None,
                             *slice_ty,
-                            typed_dict.items(env),
+                            typed_dict.items(db),
                         );
                     } else if let Some(builder) =
                         context.report_lint(&INVALID_ARGUMENT_TYPE, value_node)
@@ -300,9 +301,9 @@ impl<'db> SubscriptErrorKind<'db> {
                         builder.into_diagnostic(format_args!(
                             "Method `{method}` of type `{}` cannot be called \
                             with key of type `{}` on object of type `{}`",
-                            bindings.callable_type().display(env),
-                            slice_ty.display(env),
-                            value_ty.display(env),
+                            bindings.callable_type().display(db, env),
+                            slice_ty.display(db, env),
+                            value_ty.display(db, env),
                         ));
                     }
                 }
@@ -311,8 +312,8 @@ impl<'db> SubscriptErrorKind<'db> {
                         builder.into_diagnostic(format_args!(
                             "Method `{method}` of type `{}` may not be callable \
                             on object of type `{}`",
-                            bindings.callable_type().display(env),
-                            value_ty.display(env),
+                            bindings.callable_type().display(db, env),
+                            value_ty.display(db, env),
                         ));
                     }
                 }
@@ -330,7 +331,7 @@ impl<'db> SubscriptErrorKind<'db> {
                     typed_dict_ty,
                     *full_object_ty,
                     *slice_ty,
-                    typed_dict.items(env),
+                    typed_dict.items(db),
                 );
             }
             Self::NotSubscriptable { value_ty, method } => {
@@ -343,7 +344,7 @@ impl<'db> SubscriptErrorKind<'db> {
                 if let Some(builder) = context.report_lint(&INVALID_ARGUMENT_TYPE, value_node) {
                     builder.into_diagnostic(format_args!(
                         "`{}` is not a valid argument to `{origin}`",
-                        argument_ty.display(env),
+                        argument_ty.display(db, env),
                     ));
                 }
             }
@@ -385,15 +386,15 @@ impl<'db> SubscriptErrorKind<'db> {
 }
 
 fn map_union_subscript<'db, F>(
-    env: &SemanticEnvironment<'db>,
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
     union: UnionType<'db>,
     mut map_fn: F,
 ) -> Result<Type<'db>, SubscriptError<'db>>
 where
     F: FnMut(Type<'db>) -> Result<Type<'db>, SubscriptError<'db>>,
 {
-    let db = env.db();
-    let mut builder = UnionBuilder::new(env);
+    let mut builder = UnionBuilder::new(db, env);
     let mut errors = Vec::new();
 
     for element in union.elements(db) {
@@ -424,15 +425,15 @@ where
 }
 
 fn map_intersection_subscript<'db, F>(
-    env: &SemanticEnvironment<'db>,
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
     intersection: IntersectionType<'db>,
     mut map_fn: F,
 ) -> Result<Type<'db>, SubscriptError<'db>>
 where
     F: FnMut(Type<'db>) -> Result<Type<'db>, SubscriptError<'db>>,
 {
-    let db = env.db();
-    if let Some(alternatives) = intersection.finite_alternative_union(env) {
+    if let Some(alternatives) = intersection.finite_alternative_union(db, env) {
         return map_fn(alternatives);
     }
 
@@ -451,7 +452,7 @@ where
 
     // If any element succeeded, return the intersection of successful results.
     if !results.is_empty() {
-        let mut builder = IntersectionBuilder::new(env);
+        let mut builder = IntersectionBuilder::new(db, env);
         for result in results {
             builder.add_positive_in_place(result);
         }
@@ -463,7 +464,7 @@ where
     // for elements that lack the method.
     let any_has_method = errors.iter().any(SubscriptError::any_method_available);
 
-    let mut builder = IntersectionBuilder::new(env);
+    let mut builder = IntersectionBuilder::new(db, env);
     let mut collected_errors = Vec::new();
     let full_object_ty = Type::Intersection(intersection);
 
@@ -494,13 +495,13 @@ where
 // recovering with the union of value types for non-literal string keys on closed `TypedDict`s and
 // `Unknown` otherwise. This is not naturally representable via synthesized `__getitem__` overloads.
 fn typed_dict_subscript<'db>(
-    env: &SemanticEnvironment<'db>,
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
     typed_dict: TypedDictType<'db>,
     slice_ty: Type<'db>,
 ) -> Result<Type<'db>, SubscriptError<'db>> {
-    let db = env.db();
     if let Some(fallback) = slice_ty.materialized_divergent_fallback() {
-        return typed_dict_subscript(env, typed_dict, fallback);
+        return typed_dict_subscript(db, env, typed_dict, fallback);
     }
 
     if slice_ty.is_dynamic() {
@@ -511,15 +512,15 @@ fn typed_dict_subscript<'db>(
         .as_string_literal()
         .map(|literal| literal.value(db))
     else {
-        if typed_dict.explicit_extra_items(env).is_some()
-            && slice_ty.is_assignable_to(env, KnownClass::Str.to_instance(env))
+        if typed_dict.explicit_extra_items(db).is_some()
+            && slice_ty.is_assignable_to(db, env, KnownClass::Str.to_instance(db, env))
         {
-            return Ok(typed_dict.value_type(env));
+            return Ok(typed_dict.value_type(db, env));
         }
-        let result_ty = if typed_dict.openness(env).is_closed()
-            && slice_ty.is_assignable_to(env, KnownClass::Str.to_instance(env))
+        let result_ty = if typed_dict.openness(db).is_closed()
+            && slice_ty.is_assignable_to(db, env, KnownClass::Str.to_instance(db, env))
         {
-            typed_dict.value_type(env)
+            typed_dict.value_type(db, env)
         } else {
             Type::unknown()
         };
@@ -533,7 +534,7 @@ fn typed_dict_subscript<'db>(
         ));
     };
 
-    typed_dict.item(env, key).map_or_else(
+    typed_dict.item(db, key).map_or_else(
         || {
             Err(SubscriptError::new(
                 Type::unknown(),
@@ -551,17 +552,17 @@ fn typed_dict_subscript<'db>(
 impl<'db> Type<'db> {
     pub(super) fn subscript(
         self,
-        env: &SemanticEnvironment<'db>,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         slice_ty: Type<'db>,
         expr_context: ast::ExprContext,
     ) -> Result<Type<'db>, SubscriptError<'db>> {
-        let db = env.db();
         if let Some(fallback) = self.materialized_divergent_fallback() {
-            return fallback.subscript(env, slice_ty, expr_context);
+            return fallback.subscript(db, env, slice_ty, expr_context);
         }
 
         if let Some(fallback) = slice_ty.materialized_divergent_fallback() {
-            return self.subscript(env, fallback, expr_context);
+            return self.subscript(db, env, fallback, expr_context);
         }
 
         let value_ty = self;
@@ -569,47 +570,58 @@ impl<'db> Type<'db> {
         let inferred = match (value_ty, slice_ty) {
             (Type::Dynamic(_) | Type::Divergent(_) | Type::Never, _) => Some(Ok(value_ty)),
 
-            (Type::TypeAlias(alias), _) => {
-                Some(alias.value_type(env).subscript(env, slice_ty, expr_context))
-            }
+            (Type::TypeAlias(alias), _) => Some(alias.value_type(db).subscript(
+                db,
+                env,
+                slice_ty,
+                expr_context,
+            )),
 
             (_, Type::TypeAlias(alias)) => {
-                Some(value_ty.subscript(env, alias.value_type(env), expr_context))
+                Some(value_ty.subscript(db, env, alias.value_type(db), expr_context))
             }
 
-            (Type::Union(union), _) => Some(map_union_subscript(env, union, |element| {
-                element.subscript(env, slice_ty, expr_context)
+            (Type::Union(union), _) => Some(map_union_subscript(db, env, union, |element| {
+                element.subscript(db, env, slice_ty, expr_context)
             })),
 
-            (_, Type::Union(union)) => Some(map_union_subscript(env, union, |element| {
-                value_ty.subscript(env, element, expr_context)
+            (_, Type::Union(union)) => Some(map_union_subscript(db, env, union, |element| {
+                value_ty.subscript(db, env, element, expr_context)
             })),
 
-            (Type::EnumComplement(complement), _) => Some(
-                complement
-                    .remaining_literal_union(env)
-                    .subscript(env, slice_ty, expr_context),
-            ),
-
-            (_, Type::EnumComplement(complement)) => {
-                Some(value_ty.subscript(env, complement.remaining_literal_union(env), expr_context))
+            (Type::EnumComplement(complement), _) => {
+                Some(complement.remaining_literal_union(db, env).subscript(
+                    db,
+                    env,
+                    slice_ty,
+                    expr_context,
+                ))
             }
 
-            (Type::Intersection(intersection), _) => {
-                Some(map_intersection_subscript(env, intersection, |element| {
-                    element.subscript(env, slice_ty, expr_context)
-                }))
-            }
+            (_, Type::EnumComplement(complement)) => Some(value_ty.subscript(
+                db,
+                env,
+                complement.remaining_literal_union(db, env),
+                expr_context,
+            )),
 
-            (_, Type::Intersection(intersection)) => {
-                Some(map_intersection_subscript(env, intersection, |element| {
-                    value_ty.subscript(env, element, expr_context)
-                }))
-            }
+            (Type::Intersection(intersection), _) => Some(map_intersection_subscript(
+                db,
+                env,
+                intersection,
+                |element| element.subscript(db, env, slice_ty, expr_context),
+            )),
+
+            (_, Type::Intersection(intersection)) => Some(map_intersection_subscript(
+                db,
+                env,
+                intersection,
+                |element| value_ty.subscript(db, env, element, expr_context),
+            )),
 
             // Ex) Given `person["name"]`, return `str`
             (Type::TypedDict(typed_dict), _) if expr_context != ast::ExprContext::Store => {
-                Some(typed_dict_subscript(env, typed_dict, slice_ty))
+                Some(typed_dict_subscript(db, env, typed_dict, slice_ty))
             }
 
             (
@@ -638,10 +650,10 @@ impl<'db> Type<'db> {
             // Ex) Given `("a", "b", "c", "d")[1]`, return `"b"`
             (Type::NominalInstance(nominal), Type::LiteralValue(literal))
                 if let Some(i64_int) = literal.as_int()
-                    && let Some(tuple) = nominal.tuple_spec(env)
+                    && let Some(tuple) = nominal.tuple_spec(db, env)
                     && let Ok(i32_int) = i32::try_from(i64_int) =>
             {
-                let result = tuple.py_index(env, i32_int).map_err(|_| {
+                let result = tuple.py_index(db, env, i32_int).map_err(|_| {
                     SubscriptError::new(
                         Type::unknown(),
                         SubscriptErrorKind::IndexOutOfBounds {
@@ -660,13 +672,20 @@ impl<'db> Type<'db> {
             (
                 Type::NominalInstance(maybe_tuple_nominal),
                 Type::NominalInstance(maybe_slice_nominal),
-            ) if let Some(tuple) = maybe_tuple_nominal.tuple_spec(env)
+            ) if let Some(tuple) = maybe_tuple_nominal.tuple_spec(db, env)
                 && let Some(SliceLiteral { start, stop, step }) =
                     maybe_slice_nominal.slice_literal(db) =>
             {
-                Some(tuple.py_slice_type(env, start, stop, step).map_err(|_| {
-                    SubscriptError::new(Type::unknown(), SubscriptErrorKind::SliceStepSizeZero)
-                }))
+                Some(
+                    tuple
+                        .py_slice_type(db, env, start, stop, step)
+                        .map_err(|_| {
+                            SubscriptError::new(
+                                Type::unknown(),
+                                SubscriptErrorKind::SliceStepSizeZero,
+                            )
+                        }),
+                )
             }
 
             // Ex) Given `"value"[1]`, return `"a"`
@@ -677,7 +696,7 @@ impl<'db> Type<'db> {
             {
                 let literal_value = literal_ty.value(db);
 
-                let result = match (&mut literal_value.chars()).py_index(env, i32_int) {
+                let result = match (&mut literal_value.chars()).py_index(db, env, i32_int) {
                     Ok(ch) => Ok(Type::string_literal(db, ch.to_compact_string())),
                     Err(_) => Err(SubscriptError::new(
                         Type::unknown(),
@@ -736,7 +755,7 @@ impl<'db> Type<'db> {
             {
                 let literal_value = literal_ty.value(db);
 
-                let result = match literal_value.py_index(env, i32_int) {
+                let result = match literal_value.py_index(db, env, i32_int) {
                     Ok(byte) => Ok(Type::int_literal((*byte).into())),
                     Err(_) => Err(SubscriptError::new(
                         Type::unknown(),
@@ -778,14 +797,14 @@ impl<'db> Type<'db> {
                 if (lhs_literal.is_string() || lhs_literal.is_bytes())
                     && let Some(bool) = rhs_literal.as_bool() =>
             {
-                Some(value_ty.subscript(env, Type::int_literal(i64::from(bool)), expr_context))
+                Some(value_ty.subscript(db, env, Type::int_literal(i64::from(bool)), expr_context))
             }
 
             (Type::NominalInstance(nominal), Type::LiteralValue(literal))
                 if let Some(bool) = literal.as_bool()
-                    && nominal.tuple_spec(env).is_some() =>
+                    && nominal.tuple_spec(db, env).is_some() =>
             {
-                Some(value_ty.subscript(env, Type::int_literal(i64::from(bool)), expr_context))
+                Some(value_ty.subscript(db, env, Type::int_literal(i64::from(bool)), expr_context))
             }
 
             (Type::KnownInstance(KnownInstanceType::SubscriptedProtocol(_)), _) => {
@@ -794,7 +813,7 @@ impl<'db> Type<'db> {
             }
 
             (Type::KnownInstance(KnownInstanceType::TypeAliasType(alias)), _)
-                if alias.generic_context(env.db()).is_none() =>
+                if alias.generic_context(db).is_none() =>
             {
                 debug_assert!(alias.specialization(db).is_none());
                 Some(Err(SubscriptError::new(
@@ -870,17 +889,18 @@ impl<'db> Type<'db> {
         //
         // See: https://docs.python.org/3/reference/datamodel.html#class-getitem-versus-getitem
         match value_ty.try_call_dunder(
+            db,
             env,
             "__getitem__",
             CallArguments::positional([slice_ty]),
             TypeContext::default(),
         ) {
             Ok(outcome) => {
-                return Ok(outcome.return_type(env));
+                return Ok(outcome.return_type(db, env));
             }
             Err(CallDunderError::PossiblyUnbound { bindings, .. }) => {
                 return Err(SubscriptError::new(
-                    bindings.return_type(env),
+                    bindings.return_type(db, env),
                     SubscriptErrorKind::DunderPossiblyUnbound {
                         method: DunderMethod::GetItem,
                         value_ty,
@@ -889,7 +909,7 @@ impl<'db> Type<'db> {
             }
             Err(CallDunderError::CallError(call_error_kind, bindings, _)) => {
                 return Err(SubscriptError::new(
-                    bindings.return_type(env),
+                    bindings.return_type(db, env),
                     SubscriptErrorKind::DunderCallError {
                         method: DunderMethod::GetItem,
                         value_ty,
@@ -913,20 +933,21 @@ impl<'db> Type<'db> {
         // even if the target version is Python 3.8 or lower,
         // despite the fact that there will be no corresponding `__class_getitem__`
         // method in these `sys.version_info` branches.
-        if value_ty.is_subtype_of(env, KnownClass::Type.to_instance(env)) {
+        if value_ty.is_subtype_of(db, env, KnownClass::Type.to_instance(db, env)) {
             let call_arguments = CallArguments::positional([slice_ty]);
             match value_ty.try_call_dunder_on_class(
+                db,
                 env,
                 "__class_getitem__",
                 &call_arguments,
                 TypeContext::default(),
             ) {
                 Ok(bindings) => {
-                    return Ok(bindings.return_type(env));
+                    return Ok(bindings.return_type(db, env));
                 }
                 Err(CallDunderError::PossiblyUnbound { bindings, .. }) => {
                     return Err(SubscriptError::new(
-                        bindings.return_type(env),
+                        bindings.return_type(db, env),
                         SubscriptErrorKind::DunderPossiblyUnbound {
                             method: DunderMethod::ClassGetItem,
                             value_ty,
@@ -935,7 +956,7 @@ impl<'db> Type<'db> {
                 }
                 Err(CallDunderError::CallError(call_error_kind, bindings, _)) => {
                     return Err(SubscriptError::new(
-                        bindings.return_type(env),
+                        bindings.return_type(db, env),
                         SubscriptErrorKind::DunderCallError {
                             method: DunderMethod::ClassGetItem,
                             value_ty,
@@ -952,10 +973,10 @@ impl<'db> Type<'db> {
 
             if let Type::ClassLiteral(class) = value_ty {
                 if class.is_known(db, KnownClass::Type) {
-                    return Ok(KnownClass::GenericAlias.to_instance(env));
+                    return Ok(KnownClass::GenericAlias.to_instance(db, env));
                 }
 
-                if class.generic_context(env.db()).is_some() {
+                if class.generic_context(db).is_some() {
                     // TODO: specialize the generic class using these explicit type
                     // variable assignments. This branch is only encountered when an
                     // explicit class specialization appears inside of some other subscript
@@ -966,7 +987,7 @@ impl<'db> Type<'db> {
                     return Ok(value_ty);
                 }
 
-                if class.iter_mro(env).any(|base| base == ClassBase::Generic) {
+                if class.iter_mro(db).any(|base| base == ClassBase::Generic) {
                     return Err(SubscriptError::new(
                         Type::unknown(),
                         SubscriptErrorKind::NonGenericClass { class },

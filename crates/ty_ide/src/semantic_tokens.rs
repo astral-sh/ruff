@@ -585,10 +585,7 @@ impl<'db> SemanticTokenVisitor<'db> {
                 .inferred_type(self.model)
                 .and_then(Type::as_function_literal)
                 .and_then(|function_ty| {
-                    MethodDecorator::try_from_fn_type(
-                        &self.model.semantic_environment(),
-                        function_ty,
-                    )
+                    MethodDecorator::try_from_fn_type(self.model.db(), function_ty)
                 })
                 .unwrap_or_default();
 

@@ -1,6 +1,6 @@
 use std::cmp::Ordering;
 use std::collections::{BinaryHeap, binary_heap};
-use ty_python_semantic::SemanticEnvironment;
+use ty_python_semantic::ProgramEnvironment;
 
 use compact_str::{CompactString, CompactStringExt};
 use ruff_db::PythonFile;
@@ -91,7 +91,7 @@ pub fn completion<'db>(
                 completions.extend(model.attribute_completions(expr));
             }
             CompletionTargetAst::Scoped(scoped) => {
-                let env = model.semantic_environment();
+                let env = model.program_environment();
                 for semantic_completion in model.scoped_completions(scoped.node) {
                     let module_dependency_kind = if semantic_completion.builtin {
                         ModuleDependencyKind::Builtin
@@ -99,11 +99,11 @@ pub fn completion<'db>(
                         ModuleDependencyKind::Current
                     };
                     completions.add(
-                        CompletionBuilder::from_semantic_completion(&env, semantic_completion)
+                        CompletionBuilder::from_semantic_completion(db, &env, semantic_completion)
                             .module_dependency_kind(module_dependency_kind),
                     );
                 }
-                add_keyword_completions(&env, &mut completions);
+                add_keyword_completions(db, &env, &mut completions);
                 add_argument_completions(
                     db,
                     python_file,
@@ -250,10 +250,13 @@ impl<'db> Completions<'db> {
     /// When added, `true` is returned.
     fn add_semantic(
         &mut self,
-        env: &SemanticEnvironment<'db>,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         completion: SemanticCompletion<'db>,
     ) -> bool {
-        self.add(CompletionBuilder::from_semantic_completion(env, completion))
+        self.add(CompletionBuilder::from_semantic_completion(
+            db, env, completion,
+        ))
     }
 
     /// Attempts to add the given completion to this collection.
@@ -290,9 +293,10 @@ impl<'db> Extend<SemanticCompletion<'db>> for Completions<'db> {
     where
         T: IntoIterator<Item = SemanticCompletion<'db>>,
     {
-        let env = SemanticEnvironment::from_file(self.db, self.python_file);
+        let db = self.db;
+        let env = ProgramEnvironment::from_file(self.python_file);
         for c in it {
-            self.add_semantic(&env, c);
+            self.add_semantic(db, &env, c);
         }
     }
 }
@@ -440,11 +444,12 @@ impl<'db> CompletionBuilder<'db> {
     }
 
     fn from_semantic_completion(
-        env: &SemanticEnvironment<'db>,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         semantic: SemanticCompletion<'db>,
     ) -> CompletionBuilder<'db> {
-        let definition = semantic.ty.and_then(|ty| Definitions::from_ty(env, ty));
-        let documentation = definition.and_then(|def| def.docstring(env.db()));
+        let definition = semantic.ty.and_then(|ty| Definitions::from_ty(db, env, ty));
+        let documentation = definition.and_then(|def| def.docstring(db));
         Completion::builder(semantic.name)
             .ty(semantic.ty)
             .builtin(semantic.builtin)
@@ -486,9 +491,8 @@ impl<'db> CompletionBuilder<'db> {
         collection_context: &CollectionContext<'db>,
         query: &UserQuery,
     ) -> Completion<'db> {
-        let env = SemanticEnvironment::from_file(db, python_file);
         if let Some(ty) = self.ty {
-            self.is_type_check_only = ty.is_type_check_only(&env);
+            self.is_type_check_only = ty.is_type_check_only(db);
             // Tags completions with context-specific if they are
             // known to be usable in an exception context and we have
             // determined an `exception_ty`.
@@ -497,7 +501,8 @@ impl<'db> CompletionBuilder<'db> {
             // but aren't marked here. That is, false negatives are
             // possible but false positives are not.
             if let Some(exception_ty) = collection_context.exception_ty {
-                self.is_context_specific |= ty.is_assignable_to(&env, exception_ty);
+                let env = ProgramEnvironment::from_file(python_file);
+                self.is_context_specific |= ty.is_assignable_to(db, &env, exception_ty);
             }
             if collection_context.is_in_class_def() {
                 self.is_context_specific |= ty.is_class_literal()
@@ -512,11 +517,11 @@ impl<'db> CompletionBuilder<'db> {
                     );
             }
 
-            self.deprecated = ty.is_deprecated(&env);
+            self.deprecated = ty.is_deprecated(db);
         }
         let kind = self
             .kind
-            .or_else(|| self.ty.and_then(|ty| completion_kind_from_type(&env, ty)));
+            .or_else(|| self.ty.and_then(|ty| completion_kind_from_type(db, ty)));
         let relevance = Relevance::new(collection_context, query, &self);
         let (label, insert, insert_text_format, command) =
             if collection_context.should_complete_callable_parentheses(kind) {
@@ -811,7 +816,7 @@ impl<'m> Context<'m> {
     /// Returns a filtering context for use with a completion collector.
     fn collection_context<'db>(
         &self,
-        _db: &'db dyn Db,
+        db: &'db dyn Db,
         model: &SemanticModel<'db>,
         settings: &CompletionSettings,
         capabilities: CompletionCapabilities,
@@ -819,8 +824,8 @@ impl<'m> Context<'m> {
         match self.kind {
             ContextKind::Keywords(_) | ContextKind::Import(_) => CollectionContext::none(),
             ContextKind::NonImport(_) => {
-                let env = model.semantic_environment();
-                let exception_ty = self.cursor.exception_ty(&env);
+                let env = model.program_environment();
+                let exception_ty = self.cursor.exception_ty(db, &env);
                 let complete_callable_parentheses = settings.complete_function_parentheses
                     && !self.cursor.suppress_callable_parentheses();
                 let existing_class_bases = self.cursor.enclosing_class_def().map(|class_def| {
@@ -1355,16 +1360,22 @@ impl<'m> ContextCursor<'m> {
     ///
     /// The return value is always `None` if the cursor is not
     /// inside a `raise` or `except` context.
-    fn exception_ty<'db>(&self, env: &SemanticEnvironment<'db>) -> Option<Type<'db>> {
-        let base_exception_ty = KnownClass::BaseException.to_subclass_of(env);
-        let base_exception_instance = KnownClass::BaseException.to_instance(env);
-        let raise_ty = UnionType::from_elements(env, [base_exception_ty, base_exception_instance]);
-        let cause_ty = UnionType::from_elements(env, [raise_ty, Type::none(env)]);
+    fn exception_ty<'db>(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> Option<Type<'db>> {
+        let base_exception_ty = KnownClass::BaseException.to_subclass_of(db, env);
+        let base_exception_instance = KnownClass::BaseException.to_instance(db, env);
+        let raise_ty =
+            UnionType::from_elements(db, env, [base_exception_ty, base_exception_instance]);
+        let cause_ty = UnionType::from_elements(db, env, [raise_ty, Type::none(db, env)]);
         let except_ty = UnionType::from_elements(
+            db,
             env,
             [
                 base_exception_ty,
-                Type::homogeneous_tuple(env, base_exception_ty),
+                Type::homogeneous_tuple(db, env, base_exception_ty),
             ],
         );
 
@@ -2005,30 +2016,31 @@ fn add_class_arg_completions<'db>(
     class_def: &ast::StmtClassDef,
     completions: &mut Completions<'db>,
 ) {
+    let db = model.db();
     let is_set = |name| {
         class_def
             .arguments
             .as_ref()
             .is_some_and(|args| args.find_keyword(name).is_some())
     };
-    let env = model.semantic_environment();
+    let env = model.program_environment();
 
     if !is_set("metaclass") {
-        let ty = KnownClass::Type.to_subclass_of(&env);
+        let ty = KnownClass::Type.to_subclass_of(db, &env);
         completions.add(CompletionBuilder::argument("metaclass").ty(ty));
     }
 
     let is_typed_dict = class_def
         .inferred_type(model)
         .and_then(Type::as_class_literal)
-        .is_some_and(|t| t.is_typed_dict(&env));
+        .is_some_and(|t| t.is_typed_dict(db));
 
     // TODO: Handle PEP 728 that adds two extra keywords,
     // closed and extra_items.
     //
     // See https://peps.python.org/pep-0728/
     if is_typed_dict && !is_set("total") {
-        let ty = KnownClass::Bool.to_instance(&env);
+        let ty = KnownClass::Bool.to_instance(db, &env);
         completions.add(CompletionBuilder::argument("total").ty(ty));
     }
 }
@@ -2168,11 +2180,12 @@ pub(crate) fn unresolved_fixes<'db>(
 /// This will include keywords corresponding to Python values (like `None`)
 /// and general language keywords (like `raise`).
 fn add_keyword_completions<'db>(
-    env: &SemanticEnvironment<'db>,
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
     completions: &mut Completions<'db>,
 ) {
     let keyword_values = [
-        ("None", Type::none(env)),
+        ("None", Type::none(db, env)),
         ("True", Type::bool_literal(true)),
         ("False", Type::bool_literal(false)),
     ];
@@ -3058,10 +3071,10 @@ fn add_import_completions_impl<'db>(
     semantic_completions: impl IntoIterator<Item = SemanticCompletion<'db>>,
     module_dependency_kind: impl Fn(&SemanticCompletion<'db>) -> Option<ModuleDependencyKind>,
 ) {
-    let env = SemanticEnvironment::from_file(db, completions.python_file);
+    let env = ProgramEnvironment::from_file(completions.python_file);
     for semantic in semantic_completions {
         let module_dependency_kind = module_dependency_kind(&semantic);
-        let mut builder = CompletionBuilder::from_semantic_completion(&env, semantic);
+        let mut builder = CompletionBuilder::from_semantic_completion(db, &env, semantic);
         if let Some(module_dependency_kind) = module_dependency_kind {
             builder = builder.module_dependency_kind(module_dependency_kind);
         }
@@ -3164,19 +3177,15 @@ fn is_name_like_token(token: &Token) -> bool {
 /// general, if callers have more specific knowledge about the kind of
 /// a completion, then they should use that to explicitly set its kind
 /// on `CompletionBuilder`.
-fn completion_kind_from_type<'db>(
-    env: &SemanticEnvironment<'db>,
-    ty: Type<'db>,
-) -> Option<CompletionKind> {
+fn completion_kind_from_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<CompletionKind> {
     type CompletionKindVisitor<'db> =
         CycleDetector<'db, CompletionKind, Type<'db>, Option<CompletionKind>, 3>;
 
     fn imp<'db>(
-        env: &SemanticEnvironment<'db>,
+        db: &'db dyn Db,
         ty: Type<'db>,
         visitor: &CompletionKindVisitor<'db>,
     ) -> Option<CompletionKind> {
-        let db = env.db();
         Some(match ty {
             Type::FunctionLiteral(_)
             | Type::DataclassDecorator(_)
@@ -3205,10 +3214,10 @@ fn completion_kind_from_type<'db>(
             Type::Union(union) => union
                 .elements(db)
                 .iter()
-                .find_map(|&ty| imp(env, ty, visitor))?,
+                .find_map(|&ty| imp(db, ty, visitor))?,
             Type::Intersection(intersection) => intersection
                 .iter_positive(db)
-                .find_map(|ty| imp(env, ty, visitor))?,
+                .find_map(|ty| imp(db, ty, visitor))?,
             Type::Dynamic(_)
             | Type::Divergent(_)
             | Type::Never
@@ -3217,11 +3226,11 @@ fn completion_kind_from_type<'db>(
             | Type::AlwaysTruthy
             | Type::AlwaysFalsy => return None,
             Type::TypeAlias(alias) => {
-                visitor.visit(env, ty, || imp(env, alias.value_type(env), visitor))?
+                visitor.visit(db, ty, || imp(db, alias.value_type(db), visitor))?
             }
         })
     }
-    imp(env, ty, &CompletionKindVisitor::default())
+    imp(db, ty, &CompletionKindVisitor::default())
 }
 
 /// Defines an ordering relating the two completions for ranking purposes.
@@ -10993,6 +11002,7 @@ raise <CURSOR>
 
     impl<'db> CompletionTest<'db> {
         fn snapshot(&self) -> String {
+            let db = self.db;
             if self.original.is_empty() {
                 return "<No completions found>".to_string();
             } else if self.filtered.is_empty() {
@@ -11004,14 +11014,14 @@ raise <CURSOR>
                 // ---AG
                 return "<No completions found after filtering out completions>".to_string();
             }
-            let env = self.db.semantic_environment();
+            let env = self.db.program_environment();
             self.filtered
                 .iter()
                 .map(|c| {
                     let mut snapshot = c.insert.as_deref().unwrap_or(c.label()).to_string();
                     if self.type_signatures {
                         let ty =
-                            c.ty.map(|ty| ty.display(&env).to_string())
+                            c.ty.map(|ty| ty.display(db, &env).to_string())
                                 .unwrap_or_else(|| "Unavailable".to_string());
                         snapshot = format!("{snapshot} :: {ty}");
                     }

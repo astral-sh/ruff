@@ -36,7 +36,7 @@ pub(crate) mod tests {
     use anyhow::Context;
     use ty_python_core::platform::PythonPlatform;
 
-    use crate::{SemanticEnvironment, check_file_unwrap, default_lint_registry};
+    use crate::{ProgramEnvironment, check_file_unwrap, default_lint_registry};
     use ruff_db::files::Files;
     use ruff_db::system::{
         DbWithTestSystem, DbWithWritableSystem as _, System, SystemPath, SystemPathBuf, TestSystem,
@@ -89,8 +89,8 @@ pub(crate) mod tests {
             Program::get(self).python_version(self)
         }
 
-        pub(crate) fn semantic_environment(&self) -> SemanticEnvironment<'_> {
-            SemanticEnvironment::from_program(self, self.python_version())
+        pub(crate) fn program_environment(&self) -> ProgramEnvironment<'_> {
+            ProgramEnvironment::from_program(self.python_version())
         }
 
         /// Marks `file` as open in the editor.

@@ -2,6 +2,7 @@ use crate::docstring::Docstring;
 pub use crate::goto_declaration::goto_declaration;
 pub use crate::goto_definition::goto_definition;
 pub use crate::goto_type_definition::goto_type_definition;
+use ty_python_semantic::Db;
 
 use std::borrow::Cow;
 
@@ -22,7 +23,7 @@ use ty_python_semantic::types::ide_support::{
 };
 use ty_python_semantic::{Db as SemanticDb, ResolvedDefinition};
 use ty_python_semantic::{
-    HasDefinition, HasType, ImportAliasResolution, SemanticEnvironment, SemanticModel,
+    HasDefinition, HasType, ImportAliasResolution, ProgramEnvironment, SemanticModel,
     TypeQualifiers, definitions_for_imported_symbol, definitions_for_name,
 };
 
@@ -256,11 +257,15 @@ impl<'db> Definitions<'db> {
         Self(resolved)
     }
 
-    pub(crate) fn from_ty(env: &SemanticEnvironment<'db>, ty: Type<'db>) -> Option<Self> {
-        let ty_def = ty.definition(env)?;
+    pub(crate) fn from_ty(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        ty: Type<'db>,
+    ) -> Option<Self> {
+        let ty_def = ty.definition(db, env)?;
         let resolved = match ty_def {
             ty_python_semantic::types::TypeDefinition::Module(module) => {
-                ResolvedDefinition::Module(module.python_file(env.db())?)
+                ResolvedDefinition::Module(module.python_file(db)?)
             }
             ty_python_semantic::types::TypeDefinition::StaticClass(definition)
             | ty_python_semantic::types::TypeDefinition::DynamicClass(definition)
@@ -470,14 +475,13 @@ impl<'a, 'db> IntoIterator for &'a Definitions<'db> {
 /// Shared by hover and signature help so both surfaces render the same
 /// docstring for a given call site.
 pub(crate) fn docstring_for_call_definition<'db>(
-    env: &SemanticEnvironment<'db>,
+    db: &'db dyn Db,
     definition: Definition<'db>,
 ) -> Option<Docstring> {
-    let db = env.db();
     let resolved = ResolvedDefinition::Definition(definition);
     Definitions::new(vec![resolved.clone()])
         .docstring(db)
-        .or_else(|| resolved.implementation_docstring(env).map(Docstring::new))
+        .or_else(|| resolved.implementation_docstring(db).map(Docstring::new))
 }
 
 impl GotoTarget<'_> {

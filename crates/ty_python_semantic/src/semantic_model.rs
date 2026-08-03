@@ -19,7 +19,7 @@ use crate::place::implicit_globals::all_implicit_module_globals;
 use crate::types::ide_support::{ImportAliasResolution, definition_for_name};
 use crate::types::list_members::{Member, all_members, all_reachable_members};
 use crate::types::{
-    CycleDetector, SemanticEnvironment, SpecialFormType, Type, TypeQualifiers, binding_type,
+    CycleDetector, ProgramEnvironment, SpecialFormType, Type, TypeQualifiers, binding_type,
     infer_complete_scope_types, inferred_declaration,
 };
 use ty_python_core::definition::{Definition, DefinitionKind};
@@ -68,8 +68,8 @@ impl<'db> SemanticModel<'db> {
         self.file
     }
 
-    pub fn semantic_environment(&self) -> SemanticEnvironment<'db> {
-        SemanticEnvironment::from_file(self.db, self.python_file())
+    pub fn program_environment(&self) -> ProgramEnvironment<'db> {
+        ProgramEnvironment::from_file(self.python_file())
     }
 
     pub fn file_path(&self) -> &FilePath {
@@ -89,22 +89,20 @@ impl<'db> SemanticModel<'db> {
         &self,
         node: ast::AnyNodeRef<'_>,
     ) -> FxHashMap<Name, MemberDefinition<'db>> {
+        let db = self.db;
         let mut members = FxHashMap::default();
         let python_file = self.python_file();
         let index = semantic_index(self.db, python_file);
         let Some(file_scope) = self.scope(node) else {
             return members;
         };
-        let env = self.semantic_environment();
-
         for (file_scope, _) in index
             .visible_ancestor_scopes(file_scope)
             .collect::<Vec<_>>()
             .into_iter()
             .rev()
         {
-            for memberdef in
-                all_reachable_members(&env, file_scope.to_scope_id(self.db, python_file))
+            for memberdef in all_reachable_members(db, file_scope.to_scope_id(self.db, python_file))
             {
                 members.insert(
                     memberdef.member.name,
@@ -191,6 +189,7 @@ impl<'db> SemanticModel<'db> {
     /// Returns completions for symbols available in the given module as if
     /// it were imported by this model's `File`.
     fn module_completions(&self, module_name: &ModuleName) -> Vec<Completion<'db>> {
+        let db = self.db;
         let Some(module) = resolve_module(self.db, self.python_file(), module_name) else {
             tracing::debug!("Could not resolve module from `{module_name:?}`");
             return vec![];
@@ -203,7 +202,7 @@ impl<'db> SemanticModel<'db> {
             clippy::iter_over_hash_type,
             reason = "completion order is determined later by relevance ranking"
         )]
-        for Member { name, ty } in all_members(&self.semantic_environment(), ty) {
+        for Member { name, ty } in all_members(db, &self.program_environment(), ty) {
             completions.push(Completion {
                 name: CompactString::new(name),
                 ty: Some(ty),
@@ -233,11 +232,12 @@ impl<'db> SemanticModel<'db> {
 
     /// Returns completions for symbols available in a `object.<CURSOR>` context.
     pub fn attribute_completions(&self, node: &ast::ExprAttribute) -> Vec<Completion<'db>> {
+        let db = self.db;
         let Some(ty) = node.value.inferred_type(self) else {
             return Vec::new();
         };
 
-        all_members(&self.semantic_environment(), ty)
+        all_members(db, &self.program_environment(), ty)
             .into_iter()
             .map(|member| Completion {
                 name: CompactString::new(member.name),
@@ -253,16 +253,16 @@ impl<'db> SemanticModel<'db> {
     /// If a scope could not be determined, then completions for the global
     /// scope of this model's `File` are returned.
     pub fn scoped_completions(&self, node: ast::AnyNodeRef<'_>) -> Vec<Completion<'db>> {
+        let db = self.db;
         let python_file = self.python_file();
         let index = semantic_index(self.db, python_file);
         let Some(file_scope) = self.scope(node) else {
             return vec![];
         };
-        let env = self.semantic_environment();
         let mut completions = vec![];
         for (file_scope, _) in index.ancestor_scopes(file_scope) {
             completions.extend(
-                all_reachable_members(&env, file_scope.to_scope_id(self.db, python_file)).map(
+                all_reachable_members(db, file_scope.to_scope_id(self.db, python_file)).map(
                     |memberdef| Completion {
                         name: CompactString::new(memberdef.member.name),
                         ty: Some(memberdef.member.ty),
@@ -506,6 +506,7 @@ impl<'db> SemanticModel<'db> {
     /// Returns the type qualifiers (e.g. `Final`, `ClassVar`) for a given expression,
     /// if the expression refers to a name or attribute with declared qualifiers.
     pub fn type_qualifiers(&self, expr: ExprRef<'_>) -> TypeQualifiers {
+        let db = self.db;
         match expr {
             ExprRef::Name(name) => {
                 let Some(definition) =
@@ -522,9 +523,7 @@ impl<'db> SemanticModel<'db> {
                 {
                     return TypeQualifiers::empty();
                 }
-                let Some(declared) =
-                    inferred_declaration(&self.semantic_environment(), definition).declared()
-                else {
+                let Some(declared) = inferred_declaration(self.db(), definition).declared() else {
                     return TypeQualifiers::empty();
                 };
                 declared.qualifiers()
@@ -535,7 +534,8 @@ impl<'db> SemanticModel<'db> {
                 };
                 value_ty
                     .member_lookup_with_policy(
-                        &self.semantic_environment(),
+                        db,
+                        &self.program_environment(),
                         &attr.attr.id,
                         crate::types::MemberLookupPolicy::default(),
                     )
@@ -560,11 +560,10 @@ impl<'db> SemanticModel<'db> {
         >;
 
         fn collect<'db>(
-            env: &SemanticEnvironment<'db>,
+            db: &'db dyn Db,
             ty: Type<'db>,
             visitor: &StringLiteralCandidatesVisitor<'db>,
         ) -> Vec<ExpectedStringLiteralCompletion<'db>> {
-            let db = env.db();
             match ty {
                 Type::LiteralValue(literal) => literal
                     .as_string()
@@ -579,29 +578,26 @@ impl<'db> SemanticModel<'db> {
                 Type::Union(union) => union
                     .elements(db)
                     .iter()
-                    .flat_map(|element| collect(env, *element, visitor))
+                    .flat_map(|element| collect(db, *element, visitor))
                     .collect(),
                 Type::Intersection(intersection) => intersection
                     .positive(db)
                     .iter()
-                    .flat_map(|element| collect(env, *element, visitor))
+                    .flat_map(|element| collect(db, *element, visitor))
                     .collect(),
                 Type::TypeAlias(alias) => {
-                    visitor.visit(env, ty, || collect(env, alias.value_type(env), visitor))
+                    visitor.visit(db, ty, || collect(db, alias.value_type(db), visitor))
                 }
                 _ => Vec::new(),
             }
         }
+        let db = self.db;
 
         let Some(expected_ty) = self.string_literal_completion_expected_type(string_expr) else {
             return Vec::new();
         };
 
-        let mut candidates = collect(
-            &self.semantic_environment(),
-            expected_ty,
-            &StringLiteralCandidatesVisitor::default(),
-        );
+        let mut candidates = collect(db, expected_ty, &StringLiteralCandidatesVisitor::default());
         candidates.sort_unstable_by(|left, right| left.value.cmp(&right.value));
         candidates.dedup_by(|left, right| left.value == right.value);
         candidates
@@ -826,7 +822,7 @@ macro_rules! impl_binding_has_ty_def {
             #[inline]
             fn inferred_type<'db>(&self, model: &SemanticModel<'db>) -> Option<Type<'db>> {
                 let binding = HasDefinition::definition(self, model);
-                Some(binding_type(&model.semantic_environment(), binding))
+                Some(binding_type(model.db(), binding))
             }
         }
     };
@@ -848,7 +844,7 @@ impl HasType for ast::Alias {
         }
         let index = semantic_index(model.db, model.python_file());
         Some(binding_type(
-            &model.semantic_environment(),
+            model.db(),
             index.expect_single_definition(self),
         ))
     }
@@ -866,7 +862,7 @@ impl HasOptionalDefinition for ast::ExceptHandlerExceptHandler {
 impl HasType for ast::ExceptHandlerExceptHandler {
     fn inferred_type<'db>(&self, model: &SemanticModel<'db>) -> Option<Type<'db>> {
         let definition = self.optional_definition(model)?;
-        Some(binding_type(&model.semantic_environment(), definition))
+        Some(binding_type(model.db(), definition))
     }
 }
 

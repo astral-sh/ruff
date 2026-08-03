@@ -1,4 +1,5 @@
-use crate::SemanticEnvironment;
+use crate::Db;
+use crate::ProgramEnvironment;
 use crate::types::{ClassBase, IntersectionBuilder, KnownClass, Type, UnionBuilder};
 
 enum ContainmentBehavior<'db> {
@@ -13,11 +14,11 @@ enum ContainmentBehavior<'db> {
 
 /// Return the containment behavior known for this type.
 fn containment_behavior<'db>(
-    env: &SemanticEnvironment<'db>,
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
     ty: Type<'db>,
 ) -> ContainmentBehavior<'db> {
-    let db = env.db();
-    let ty = ty.resolve_type_alias(env);
+    let ty = ty.resolve_type_alias(db);
 
     match ty {
         Type::Union(union) => {
@@ -25,10 +26,10 @@ fn containment_behavior<'db>(
             // through wrappers such as type variables. Positive unions that contain string
             // literals are distributed in `evaluate_expr_in` instead because substring semantics
             // depend on the value of each literal haystack.
-            let mut builder = UnionBuilder::new(env);
+            let mut builder = UnionBuilder::new(db, env);
             let mut has_unknown_behavior = false;
             for element in union.elements(db) {
-                match containment_behavior(env, *element) {
+                match containment_behavior(db, env, *element) {
                     ContainmentBehavior::ElementsOf(elements_of) => {
                         builder = builder.add(elements_of);
                     }
@@ -42,14 +43,14 @@ fn containment_behavior<'db>(
                 ContainmentBehavior::ElementsOf(builder.build())
             }
         }
-        Type::TypeVar(type_var) => type_var
-            .typevar(db)
-            .bound_or_constraints(env)
-            .map_or(ContainmentBehavior::Unknown, |bound_or_constraints| {
-                containment_behavior(env, bound_or_constraints.as_type(env))
-            }),
+        Type::TypeVar(type_var) => type_var.typevar(db).bound_or_constraints(db, env).map_or(
+            ContainmentBehavior::Unknown,
+            |bound_or_constraints| {
+                containment_behavior(db, env, bound_or_constraints.as_type(db, env))
+            },
+        ),
         Type::NewTypeInstance(newtype) => {
-            containment_behavior(env, newtype.concrete_base_type(env))
+            containment_behavior(db, env, newtype.concrete_base_type(db))
         }
         Type::Intersection(intersection) => {
             // Preserve the narrowing already supported on main for unsimplified intersections
@@ -63,20 +64,19 @@ fn containment_behavior<'db>(
             // https://github.com/astral-sh/ruff/pull/26365
             let mut has_elements_of = false;
             let mut has_custom_behavior = false;
-            let elements_of =
-                intersection.map_positive(env, |element| {
-                    match containment_behavior(env, *element) {
-                        ContainmentBehavior::ElementsOf(elements_of) => {
-                            has_elements_of = true;
-                            elements_of
-                        }
-                        ContainmentBehavior::Custom => {
-                            has_custom_behavior = true;
-                            *element
-                        }
-                        ContainmentBehavior::Unknown => *element,
+            let elements_of = intersection.map_positive(db, env, |element| {
+                match containment_behavior(db, env, *element) {
+                    ContainmentBehavior::ElementsOf(elements_of) => {
+                        has_elements_of = true;
+                        elements_of
                     }
-                });
+                    ContainmentBehavior::Custom => {
+                        has_custom_behavior = true;
+                        *element
+                    }
+                    ContainmentBehavior::Unknown => *element,
+                }
+            });
             if has_custom_behavior {
                 ContainmentBehavior::Custom
             } else if has_elements_of {
@@ -89,7 +89,7 @@ fn containment_behavior<'db>(
         Type::NominalInstance(instance) => {
             // Walk the MRO until we find either a visible override or a supported built-in
             // implementation.
-            for base in instance.class(env).iter_mro(env) {
+            for base in instance.class(db, env).iter_mro(db) {
                 let class = match base {
                     ClassBase::Class(class) => class,
                     ClassBase::Generic | ClassBase::Protocol => continue,
@@ -119,16 +119,16 @@ fn containment_behavior<'db>(
                     // takes precedence over `__iter__` for containment checks, but this is only
                     // relevant to us for built-ins, since user types with `__contains__` have
                     // containment behavior that we can't understand and don't try to model.)
-                    return ContainmentBehavior::ElementsOf(Type::instance(env, class));
+                    return ContainmentBehavior::ElementsOf(Type::instance(db, env, class));
                 }
                 if !class
-                    .own_class_member(env, None, "__contains__")
+                    .own_class_member(db, env, None, "__contains__")
                     .is_undefined()
                 {
                     return ContainmentBehavior::Custom;
                 }
             }
-            if instance.class(env).is_final(env) {
+            if instance.class(db, env).is_final(db) {
                 ContainmentBehavior::ElementsOf(ty)
             } else {
                 ContainmentBehavior::Unknown
@@ -139,8 +139,12 @@ fn containment_behavior<'db>(
 }
 
 /// Return the type whose iterated elements may satisfy membership for `ty`.
-pub(super) fn elements_of<'db>(env: &SemanticEnvironment<'db>, ty: Type<'db>) -> Option<Type<'db>> {
-    match containment_behavior(env, ty) {
+pub(super) fn elements_of<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    ty: Type<'db>,
+) -> Option<Type<'db>> {
+    match containment_behavior(db, env, ty) {
         ContainmentBehavior::ElementsOf(elements_of) => Some(elements_of),
         ContainmentBehavior::Custom | ContainmentBehavior::Unknown => None,
     }
@@ -151,20 +155,21 @@ const MAX_STRING_MEMBERSHIP_EXCLUSIONS: usize = 128;
 
 /// Narrow membership in a known string literal using substring semantics.
 pub(super) fn narrow_string_membership<'db>(
-    env: &SemanticEnvironment<'db>,
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
     lhs_ty: Type<'db>,
     haystack: &str,
     is_contained: bool,
 ) -> Option<Type<'db>> {
-    let db = env.db();
-    let lhs_ty = lhs_ty.resolve_type_alias(env);
-    let flattened_lhs_ty = lhs_ty.flatten_typevars(env);
+    let lhs_ty = lhs_ty.resolve_type_alias(db);
+    let flattened_lhs_ty = lhs_ty.flatten_typevars(db, env);
     let keep = |element: &Type<'db>| {
-        let element = element.resolve_type_alias(env);
+        let element = element.resolve_type_alias(db);
         if let Some(needle) = element.as_string_literal() {
             haystack.contains(needle.value(db)) == is_contained
         } else {
-            !(is_contained && element.is_disjoint_from(env, KnownClass::Str.to_instance(env)))
+            !(is_contained
+                && element.is_disjoint_from(db, env, KnownClass::Str.to_instance(db, env)))
         }
     };
 
@@ -180,7 +185,7 @@ pub(super) fn narrow_string_membership<'db>(
             .nth(MAX_STRING_MEMBERSHIP_EXCLUSIONS)
             .is_none()
     {
-        let mut builder = IntersectionBuilder::new(env).add_positive(narrowed);
+        let mut builder = IntersectionBuilder::new(db, env).add_positive(narrowed);
         for character in haystack.chars() {
             builder.add_negative_in_place(Type::single_char_string_literal(db, character));
         }

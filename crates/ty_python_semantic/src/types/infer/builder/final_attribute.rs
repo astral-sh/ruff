@@ -50,10 +50,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         attribute: &str,
     ) -> Option<Definition<'db>> {
         let db = self.db();
-        let env = self.semantic_environment();
-        let class_ty = object_ty.nominal_class(env)?;
+        let env = self.program_environment();
+        let class_ty = object_ty.nominal_class(db, env)?;
 
-        for base in class_ty.iter_mro(env) {
+        for base in class_ty.iter_mro(db) {
             let Some(class) = base.into_class() else {
                 continue;
             };
@@ -70,8 +70,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             };
 
             let use_def = class_index.use_def_map(class_scope_id);
-            let place_and_quals_result =
-                place_from_declarations(env, use_def.end_of_scope_symbol_declarations(symbol_id));
+            let place_and_quals_result = place_from_declarations(
+                db,
+                env,
+                use_def.end_of_scope_symbol_declarations(symbol_id),
+            );
 
             let Some(declaration) = place_and_quals_result.first_declaration else {
                 continue;
@@ -108,7 +111,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             return false;
         };
         place_table.member(member_id).is_instance_attribute()
-            && nearest_enclosing_function(self.semantic_environment(), self.index, self.scope())
+            && nearest_enclosing_function(self.db(), self.index, self.scope())
                 .is_some_and(|function| function.has_implicit_receiver(self.db()))
     }
 
@@ -183,7 +186,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         attribute: &str,
         qualifiers: TypeQualifiers,
     ) -> bool {
-        let env = self.semantic_environment();
+        let env = self.program_environment();
         let db = self.db();
         if !qualifiers.contains(TypeQualifiers::FINAL) {
             return false;
@@ -199,12 +202,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
         let report_not_in_init = || {
             let is_dataclass_like = object_ty
-                .nominal_class(env)
-                .or_else(|| object_ty.to_class_type(env))
+                .nominal_class(db, env)
+                .or_else(|| object_ty.to_class_type(db))
                 .and_then(|cls| cls.static_class_literal(db))
-                .is_some_and(|(class_literal, _)| {
-                    class_literal.is_dataclass_like(self.semantic_environment())
-                });
+                .is_some_and(|(class_literal, _)| class_literal.is_dataclass_like(self.db()));
             let Some(builder) = self
                 .context
                 .report_lint(&INVALID_ASSIGNMENT, target.range())
@@ -213,7 +214,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             };
             let mut diagnostic = builder.into_diagnostic(format_args!(
                 "Cannot assign to final attribute `{attribute}` on type `{}`",
-                object_ty.display(env)
+                object_ty.display(db, env)
             ));
             diagnostic.set_primary_annotation_message(if is_dataclass_like {
                 "`Final` attributes can only be assigned in the class body, `__init__`, or `__post_init__` on dataclass-like classes"
@@ -243,9 +244,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         // Final ownership is nominal: checking structural protocol requirements can
         // incorrectly reject the declaring class's own receiver.
         let is_current_class_instance = is_self_parameter
-            && object_ty.nominal_class(env).is_some_and(|object_class| {
-                object_class.is_subtype_of_class_literal(env, class_ty.class_literal(db))
-            });
+            && object_ty
+                .nominal_class(db, env)
+                .is_some_and(|object_class| {
+                    object_class.is_subtype_of_class_literal(db, class_ty.class_literal(db))
+                });
         if !is_current_class_instance {
             report_not_in_init();
             return true;
@@ -289,6 +292,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         qualifiers: TypeQualifiers,
         emit_diagnostics: bool,
     ) -> bool {
+        let db = self.db();
         if !qualifiers.contains(TypeQualifiers::FINAL) {
             return false;
         }
@@ -302,7 +306,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             {
                 let mut diagnostic = builder.into_diagnostic(format_args!(
                     "Cannot delete final attribute `{attribute}` on type `{}`",
-                    object_ty.display(self.semantic_environment())
+                    object_ty.display(db, self.program_environment())
                 ));
                 diagnostic.set_primary_annotation_message("`Final` attributes cannot be deleted");
                 if let Some(final_declaration) = final_declaration {
@@ -320,8 +324,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         object_ty: Type<'db>,
         attribute: &str,
     ) {
+        let db = self.db();
         let Some(members) =
-            assignment_attribute_members(self.semantic_environment(), object_ty, attribute)
+            assignment_attribute_members(db, self.program_environment(), object_ty, attribute)
         else {
             return;
         };
@@ -345,8 +350,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         attribute: &str,
         emit_diagnostics: bool,
     ) -> bool {
+        let db = self.db();
         let Some(members) =
-            assignment_attribute_members(self.semantic_environment(), object_ty, attribute)
+            assignment_attribute_members(db, self.program_environment(), object_ty, attribute)
         else {
             return false;
         };

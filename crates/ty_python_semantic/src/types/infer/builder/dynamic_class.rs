@@ -47,16 +47,17 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         bases_type: Type<'db>,
         kind: DynamicClassKind,
     ) -> Option<Box<[Type<'db>]>> {
-        let env = self.semantic_environment();
+        let db = self.db();
+        let env = self.program_environment();
         let fn_name = kind.function_name();
         let formal_parameter_type = match kind {
-            DynamicClassKind::TypeCall => Type::homogeneous_tuple(env, Type::object()),
+            DynamicClassKind::TypeCall => Type::homogeneous_tuple(db, env, Type::object()),
             DynamicClassKind::NewClass => {
-                KnownClass::Iterable.to_specialized_instance(env, &[Type::object()])
+                KnownClass::Iterable.to_specialized_instance(db, env, &[Type::object()])
             }
         };
 
-        if !bases_type.is_assignable_to(env, formal_parameter_type)
+        if !bases_type.is_assignable_to(db, env, formal_parameter_type)
             && let Some(builder) = self.context.report_lint(&INVALID_ARGUMENT_TYPE, bases_node)
         {
             let mut diagnostic = builder.into_diagnostic(format_args!(
@@ -64,12 +65,12 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             ));
             diagnostic.set_primary_annotation_message(format_args!(
                 "Expected `{}`, found `{}`",
-                formal_parameter_type.display(env),
-                bases_type.display(env)
+                formal_parameter_type.display(db, env),
+                bases_type.display(db, env)
             ));
         }
 
-        extract_fixed_length_iterable_element_types(env, bases_node, |expr| {
+        extract_fixed_length_iterable_element_types(db, env, bases_node, |expr| {
             self.expression_type(expr)
         })
     }
@@ -95,14 +96,14 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             .map(|tuple| tuple.elts.as_slice());
         let mut disjoint_bases = IncompatibleBases::default();
         let fn_name = kind.function_name();
-        let env = self.context.semantic_environment();
+        let env = self.context.program_environment();
 
         for (idx, base) in bases.iter().enumerate() {
             let diagnostic_node = bases_tuple_elts
                 .and_then(|elts| elts.get(idx))
                 .unwrap_or(bases_node);
 
-            let Some(class_base) = ClassBase::try_from_type(env, *base, None) else {
+            let Some(class_base) = ClassBase::try_from_type(db, env, *base, None) else {
                 continue;
             };
 
@@ -115,7 +116,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         ));
                         diagnostic.set_primary_annotation_message(format_args!(
                             "Has type `{}`",
-                            base.display(env)
+                            base.display(db, env)
                         ));
                         match class_base {
                             ClassBase::Generic => {
@@ -148,7 +149,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         ));
                         diagnostic.set_primary_annotation_message(format_args!(
                             "Has type `{}`",
-                            base.display(env)
+                            base.display(db, env)
                         ));
                         diagnostic.info(format_args!(
                             "Classes created via `{fn_name}` cannot be protocols",
@@ -159,7 +160,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     }
                 }
                 ClassBase::Class(class_type) => {
-                    if class_type.is_final(env) {
+                    if class_type.is_final(db) {
                         if let Some(builder) = self
                             .context
                             .report_lint(&SUBCLASS_OF_FINAL_CLASS, diagnostic_node)
@@ -169,7 +170,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                                 class_type.name(db)
                             ));
                         }
-                        if let Some(disjoint_base) = class_type.nearest_disjoint_base(env.db()) {
+                        if let Some(disjoint_base) = class_type.nearest_disjoint_base(db) {
                             disjoint_bases.insert(disjoint_base, idx, class_type.class_literal(db));
                         }
                         continue;
@@ -177,7 +178,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
                     if kind == DynamicClassKind::TypeCall
                         && let Some((static_class, _)) = class_type.static_class_literal(db)
-                        && is_enum_class_by_inheritance(env, static_class)
+                        && is_enum_class_by_inheritance(db, env, static_class)
                     {
                         if let Some(builder) =
                             self.context.report_lint(&INVALID_BASE, diagnostic_node)
@@ -186,20 +187,20 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                                 .into_diagnostic("Invalid base for class created via `type()`");
                             diagnostic.set_primary_annotation_message(format_args!(
                                 "Has type `{}`",
-                                base.display(env)
+                                base.display(db, env)
                             ));
                             diagnostic.info("Creating an enum class via `type()` is not supported");
                             diagnostic.info(format_args!(
                                 "Consider using `Enum(\"{name}\", [])` instead"
                             ));
                         }
-                        if let Some(disjoint_base) = class_type.nearest_disjoint_base(env.db()) {
+                        if let Some(disjoint_base) = class_type.nearest_disjoint_base(db) {
                             disjoint_bases.insert(disjoint_base, idx, class_type.class_literal(db));
                         }
                         continue;
                     }
 
-                    if let Some(disjoint_base) = class_type.nearest_disjoint_base(env.db()) {
+                    if let Some(disjoint_base) = class_type.nearest_disjoint_base(db) {
                         disjoint_bases.insert(disjoint_base, idx, class_type.class_literal(db));
                     }
                 }
@@ -221,14 +222,14 @@ pub(super) fn report_dynamic_mro_errors<'db>(
     bases: &ast::Expr,
 ) -> bool {
     let db = context.db();
-    let env = context.semantic_environment();
-    let Err(error) = dynamic_class.try_mro(env.db()) else {
+    let env = context.program_environment();
+    let Err(error) = dynamic_class.try_mro(db) else {
         return true;
     };
     let bases_display = dynamic_class
-        .explicit_bases(env.db())
+        .explicit_bases(db)
         .iter()
-        .map(|base| base.display(env))
+        .map(|base| base.display(db, env))
         .join(", ");
     report_mro_error_kind(
         context,
@@ -287,28 +288,29 @@ pub(super) fn report_mro_error_kind<'db>(
     bases_expr: Option<&ast::Expr>,
     bases_display: Option<&str>,
 ) {
+    let db = context.db();
     match error.reason() {
         DynamicMroErrorKind::InvalidBases(invalid_bases) => {
             let Some(bases) = bases_expr else {
                 return;
             };
-            let env = context.semantic_environment();
+            let env = context.program_environment();
             let bases_tuple_elts = bases.as_tuple_expr().map(|tuple| tuple.elts.as_slice());
             for (idx, base_type) in invalid_bases {
-                let instance_of_type = KnownClass::Type.to_instance(env);
+                let instance_of_type = KnownClass::Type.to_instance(db, env);
                 let specific_base = bases_tuple_elts.and_then(|elts| elts.get(*idx));
                 let diagnostic_range = specific_base
                     .map(ast::Expr::range)
                     .unwrap_or_else(|| bases.range());
 
-                if base_type.is_assignable_to(env, instance_of_type) {
+                if base_type.is_assignable_to(db, env, instance_of_type) {
                     if let Some(builder) =
                         context.report_lint(&UNSUPPORTED_DYNAMIC_BASE, diagnostic_range)
                     {
                         let mut diagnostic = builder.into_diagnostic("Unsupported class base");
                         diagnostic.set_primary_annotation_message(format_args!(
                             "Has type `{}`",
-                            base_type.display(env)
+                            base_type.display(db, env)
                         ));
                         diagnostic.info(format_args!(
                             "ty cannot determine a MRO for class `{class_name}` due to this base",
@@ -318,7 +320,7 @@ pub(super) fn report_mro_error_kind<'db>(
                 } else if let Some(builder) = context.report_lint(&INVALID_BASE, diagnostic_range) {
                     let mut diagnostic = builder.into_diagnostic(format_args!(
                         "Invalid class base with type `{}`",
-                        base_type.display(env)
+                        base_type.display(db, env)
                     ));
                     if specific_base.is_none() {
                         diagnostic
@@ -334,13 +336,13 @@ pub(super) fn report_mro_error_kind<'db>(
         }
         DynamicMroErrorKind::DuplicateBases(duplicates) => {
             if let Some(builder) = context.report_lint(&DUPLICATE_BASE, call_expr) {
-                let env = context.semantic_environment();
+                let env = context.program_environment();
                 builder.into_diagnostic(format_args!(
                     "Duplicate base class{maybe_s} {dupes} in class `{class_name}`",
                     maybe_s = if duplicates.len() == 1 { "" } else { "es" },
                     dupes = duplicates
                         .iter()
-                        .map(|base: &ClassBase<'_>| base.display(env))
+                        .map(|base: &ClassBase<'_>| base.display(db, env))
                         .join(", "),
                 ));
             }

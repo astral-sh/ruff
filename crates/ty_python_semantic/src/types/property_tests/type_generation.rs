@@ -1,5 +1,5 @@
 use crate::Db;
-use crate::SemanticEnvironment;
+use crate::ProgramEnvironment;
 use crate::place::{DefinedPlace, Place, builtins_symbol, global_symbol, known_module_symbol};
 use crate::types::enums::is_single_member_enum;
 use crate::types::known_instance::KnownInstanceType;
@@ -92,11 +92,15 @@ pub(crate) enum CallableParams {
 }
 
 impl CallableParams {
-    fn into_parameters<'db>(self, env: &SemanticEnvironment<'db>) -> Parameters<'db> {
+    fn into_parameters<'db>(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> Parameters<'db> {
         match self {
             CallableParams::GradualForm => Parameters::gradual_form(),
             CallableParams::List(params) => Parameters::from_annotation(
-                env,
+                db,
                 params.into_iter().map(|param| {
                     let parameter = match param.kind {
                         ParamKind::PositionalOnly => Parameter::positional_only(param.name),
@@ -110,8 +114,8 @@ impl CallableParams {
                         }
                     };
                     parameter
-                        .with_annotated_type(param.annotated_ty.into_type(env))
-                        .with_optional_default_type(param.default_ty.map(|t| t.into_type(env)))
+                        .with_annotated_type(param.annotated_ty.into_type(db, env))
+                        .with_optional_default_type(param.default_ty.map(|t| t.into_type(db, env)))
                 }),
             ),
         }
@@ -142,24 +146,27 @@ fn create_bound_method<'db>(
     function: Type<'db>,
     builtins_class: Type<'db>,
 ) -> Type<'db> {
-    let env = SemanticEnvironment::from_program(db, python_version);
+    let env = ProgramEnvironment::from_program(python_version);
     Type::BoundMethod(BoundMethodType::new(
         db,
         function.expect_function_literal(),
-        builtins_class.to_instance_approximation(&env).unwrap(),
+        builtins_class.to_instance_approximation(db, &env).unwrap(),
     ))
 }
 
 impl Ty {
-    pub(crate) fn into_type<'db>(self, env: &SemanticEnvironment<'db>) -> Type<'db> {
-        let db = env.db();
+    pub(crate) fn into_type<'db>(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> Type<'db> {
         match self {
             Ty::Never => Type::Never,
             Ty::Unknown => Type::unknown(),
-            Ty::Divergent => divergent(env, 1, None),
-            Ty::TopDivergent => divergent(env, 2, Some(MaterializationKind::Top)),
-            Ty::BottomDivergent => divergent(env, 3, Some(MaterializationKind::Bottom)),
-            Ty::None => Type::none(env),
+            Ty::Divergent => divergent(db, env, 1, None),
+            Ty::TopDivergent => divergent(db, env, 2, Some(MaterializationKind::Top)),
+            Ty::BottomDivergent => divergent(db, env, 3, Some(MaterializationKind::Bottom)),
+            Ty::None => Type::none(db, env),
             Ty::Any => Type::any(),
             Ty::IntLiteral(n) => Type::int_literal(n),
             Ty::StringLiteral(s) => Type::string_literal(db, s),
@@ -167,133 +174,135 @@ impl Ty {
             Ty::LiteralString => Type::literal_string(),
             Ty::BytesLiteral(s) => Type::bytes_literal(db, s.as_bytes()),
             Ty::EnumLiteral(name) => {
-                let enum_class = known_module_symbol(env, KnownModule::Uuid, "SafeUUID")
+                let enum_class = known_module_symbol(db, env, KnownModule::Uuid, "SafeUUID")
                     .place
                     .expect_type()
                     .expect_class_literal()
-                    .into_enum_class(env.db())
+                    .into_enum_class(db)
                     .expect("`uuid.SafeUUID` is an enum");
                 Type::enum_literal(EnumLiteralType::new(db, enum_class, Name::new(name)))
             }
             Ty::SingleMemberEnumLiteral => {
-                let ty = known_module_symbol(env, KnownModule::Dataclasses, "MISSING")
+                let ty = known_module_symbol(db, env, KnownModule::Dataclasses, "MISSING")
                     .place
                     .expect_type();
                 debug_assert!(
-                    matches!(ty, Type::NominalInstance(instance) if is_single_member_enum(env, instance.class_literal(env)))
+                    matches!(ty, Type::NominalInstance(instance) if is_single_member_enum(db, instance.class_literal(db, env)))
                 );
                 ty
             }
-            Ty::BuiltinInstance(s) => builtins_symbol(env, s)
+            Ty::BuiltinInstance(s) => builtins_symbol(db, env, s)
                 .place
                 .expect_type()
-                .to_instance_approximation(env)
+                .to_instance_approximation(db, env)
                 .unwrap(),
-            Ty::AbcInstance(s) => known_module_symbol(env, KnownModule::Abc, s)
+            Ty::AbcInstance(s) => known_module_symbol(db, env, KnownModule::Abc, s)
                 .place
                 .expect_type()
-                .to_instance_approximation(env)
+                .to_instance_approximation(db, env)
                 .unwrap(),
-            Ty::AbcClassLiteral(s) => known_module_symbol(env, KnownModule::Abc, s)
+            Ty::AbcClassLiteral(s) => known_module_symbol(db, env, KnownModule::Abc, s)
                 .place
                 .expect_type(),
-            Ty::UnittestMockLiteral => known_module_symbol(env, KnownModule::UnittestMock, "Mock")
-                .place
-                .expect_type(),
+            Ty::UnittestMockLiteral => {
+                known_module_symbol(db, env, KnownModule::UnittestMock, "Mock")
+                    .place
+                    .expect_type()
+            }
             Ty::UnittestMockInstance => Ty::UnittestMockLiteral
-                .into_type(env)
-                .to_instance_approximation(env)
+                .into_type(db, env)
+                .to_instance_approximation(db, env)
                 .unwrap(),
             Ty::TypingLiteral => Type::SpecialForm(SpecialFormType::Literal),
-            Ty::BuiltinClassLiteral(s) => builtins_symbol(env, s).place.expect_type(),
-            Ty::KnownClassInstance(known_class) => known_class.to_instance(env),
+            Ty::BuiltinClassLiteral(s) => builtins_symbol(db, env, s).place.expect_type(),
+            Ty::KnownClassInstance(known_class) => known_class.to_instance(db, env),
             Ty::Union(tys) => {
-                UnionType::from_elements(env, tys.into_iter().map(|ty| ty.into_type(env)))
+                UnionType::from_elements(db, env, tys.into_iter().map(|ty| ty.into_type(db, env)))
             }
             Ty::Intersection { pos, neg } => {
-                let mut builder = IntersectionBuilder::new(env);
+                let mut builder = IntersectionBuilder::new(db, env);
                 for p in pos {
-                    builder.add_positive_in_place(p.into_type(env));
+                    builder.add_positive_in_place(p.into_type(db, env));
                 }
                 for n in neg {
-                    builder.add_negative_in_place(n.into_type(env));
+                    builder.add_negative_in_place(n.into_type(db, env));
                 }
                 builder.build()
             }
             Ty::FixedLengthTuple(tys) => {
-                let elements = tys.into_iter().map(|ty| ty.into_type(env));
-                Type::heterogeneous_tuple(env, elements)
+                let elements = tys.into_iter().map(|ty| ty.into_type(db, env));
+                Type::heterogeneous_tuple(db, env, elements)
             }
             Ty::VariableLengthTuple(prefix, variable, suffix) => {
-                let prefix = prefix.into_iter().map(|ty| ty.into_type(env));
-                let variable = variable.into_type(env);
-                let suffix = suffix.into_iter().map(|ty| ty.into_type(env));
-                Type::tuple(TupleType::mixed(env, prefix, variable, suffix))
+                let prefix = prefix.into_iter().map(|ty| ty.into_type(db, env));
+                let variable = variable.into_type(db, env);
+                let suffix = suffix.into_iter().map(|ty| ty.into_type(db, env));
+                Type::tuple(TupleType::mixed(db, env, prefix, variable, suffix))
             }
             Ty::SubclassOfAny => SubclassOfType::subclass_of_any(),
             Ty::SubclassOfBuiltinClass(s) => SubclassOfType::from(
+                db,
                 env,
-                builtins_symbol(env, s)
+                builtins_symbol(db, env, s)
                     .place
                     .expect_type()
                     .expect_class_literal()
-                    .default_specialization(env),
+                    .default_specialization(db),
             ),
             Ty::SubclassOfAbcClass(s) => SubclassOfType::from(
+                db,
                 env,
-                known_module_symbol(env, KnownModule::Abc, s)
+                known_module_symbol(db, env, KnownModule::Abc, s)
                     .place
                     .expect_type()
                     .expect_class_literal()
-                    .default_specialization(env),
+                    .default_specialization(db),
             ),
             Ty::AlwaysTruthy => Type::AlwaysTruthy,
             Ty::AlwaysFalsy => Type::AlwaysFalsy,
-            Ty::BuiltinsFunction(name) => builtins_symbol(env, name).place.expect_type(),
+            Ty::BuiltinsFunction(name) => builtins_symbol(db, env, name).place.expect_type(),
             Ty::BuiltinsBoundMethod { class, method } => {
-                let builtins_class = builtins_symbol(env, class).place.expect_type();
-                let function = builtins_class.member(env, method).place.expect_type();
+                let builtins_class = builtins_symbol(db, env, class).place.expect_type();
+                let function = builtins_class.member(db, env, method).place.expect_type();
 
-                create_bound_method(db, env.python_version(), function, builtins_class)
+                create_bound_method(db, env.python_version(db), function, builtins_class)
             }
             Ty::Callable { params, returns } => Type::single_callable(
                 db,
-                Signature::new(params.into_parameters(env), returns.into_type(env)),
+                Signature::new(params.into_parameters(db, env), returns.into_type(db, env)),
             ),
-            Ty::FloatNewtypeInstance => newtype_instance(env, "NewTypeOfFloat"),
-            Ty::IntNewtypeInstance => newtype_instance(env, "NewTypeOfInt"),
-            Ty::StrNewtypeInstance => newtype_instance(env, "NewTypeOfStr"),
-            Ty::ComplexNewtypeInstance => newtype_instance(env, "NewTypeOfComplex"),
-            Ty::SubNewTypeOfIntInstance => newtype_instance(env, "SubNewTypeOfInt"),
-            Ty::SubSubNewTypeOfIntInstance => newtype_instance(env, "SubSubNewTypeOfInt"),
-            Ty::SubNewTypeOfFloatInstance => newtype_instance(env, "SubNewTypeOfFloat"),
+            Ty::FloatNewtypeInstance => newtype_instance(db, env, "NewTypeOfFloat"),
+            Ty::IntNewtypeInstance => newtype_instance(db, env, "NewTypeOfInt"),
+            Ty::StrNewtypeInstance => newtype_instance(db, env, "NewTypeOfStr"),
+            Ty::ComplexNewtypeInstance => newtype_instance(db, env, "NewTypeOfComplex"),
+            Ty::SubNewTypeOfIntInstance => newtype_instance(db, env, "SubNewTypeOfInt"),
+            Ty::SubSubNewTypeOfIntInstance => newtype_instance(db, env, "SubSubNewTypeOfInt"),
+            Ty::SubNewTypeOfFloatInstance => newtype_instance(db, env, "SubNewTypeOfFloat"),
         }
     }
 }
 
 fn divergent<'db>(
-    env: &SemanticEnvironment<'db>,
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
     id_bits: u64,
     materialization: Option<MaterializationKind>,
 ) -> Type<'db> {
     let divergent = Type::divergent(salsa::plumbing::Id::from_bits(id_bits));
 
     match materialization {
-        Some(materialization_kind) => divergent.materialize(
-            env,
-            materialization_kind,
-            &ApplyTypeMappingVisitor::default(),
-        ),
+        Some(materialization_kind) => {
+            divergent.materialize(db, materialization_kind, &ApplyTypeMappingVisitor::new(env))
+        }
         None => divergent,
     }
 }
 
-fn newtype_instance<'db>(env: &SemanticEnvironment<'db>, name: &str) -> Type<'db> {
-    let db = env.db();
+fn newtype_instance<'db>(db: &'db dyn Db, env: &ProgramEnvironment<'db>, name: &str) -> Type<'db> {
     let file = system_path_to_file(db, super::setup::PROPERTY_TEST_MODULE_PATH)
         .expect("Property-test module must exist");
-    let file = PythonFile::new(db, file, env.python_version());
-    let Place::Defined(DefinedPlace { ty, .. }) = global_symbol(env, file, name).place else {
+    let file = PythonFile::new(db, file, env.python_version(db));
+    let Place::Defined(DefinedPlace { ty, .. }) = global_symbol(db, file, name).place else {
         panic!(
             "Expected a global symbol for `{name}` in the property test module, but it was not found"
         );
@@ -308,8 +317,12 @@ fn newtype_instance<'db>(env: &SemanticEnvironment<'db>, name: &str) -> Type<'db
 pub(crate) struct FullyStaticTy(Ty);
 
 impl FullyStaticTy {
-    pub(crate) fn into_type<'db>(self, env: &SemanticEnvironment<'db>) -> Type<'db> {
-        self.0.into_type(env)
+    pub(crate) fn into_type<'db>(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> Type<'db> {
+        self.0.into_type(db, env)
     }
 }
 
@@ -629,15 +642,17 @@ impl Arbitrary for FullyStaticTy {
 }
 
 pub(crate) fn intersection<'db>(
-    env: &SemanticEnvironment<'db>,
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
     tys: impl IntoIterator<Item = Type<'db>>,
 ) -> Type<'db> {
-    IntersectionType::from_elements(env, tys)
+    IntersectionType::from_elements(db, env, tys)
 }
 
 pub(crate) fn union<'db>(
-    env: &SemanticEnvironment<'db>,
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
     tys: impl IntoIterator<Item = Type<'db>>,
 ) -> Type<'db> {
-    UnionType::from_elements(env, tys)
+    UnionType::from_elements(db, env, tys)
 }

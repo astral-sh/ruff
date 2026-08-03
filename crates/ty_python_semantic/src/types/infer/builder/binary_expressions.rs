@@ -1,4 +1,5 @@
-use crate::SemanticEnvironment;
+use crate::Db;
+use crate::ProgramEnvironment;
 use compact_str::CompactString;
 use ruff_python_ast::{self as ast, AnyNodeRef};
 
@@ -61,7 +62,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         node: &ast::ExprBinOp,
         tcx: TypeContext<'db>,
     ) -> Type<'db> {
-        let env = self.semantic_environment();
+        let db = self.db();
+        let env = self.program_environment();
         let ast::ExprBinOp {
             left,
             op,
@@ -84,11 +86,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         // `TypeAlias`, which uses `X | Y` syntax, where the returned type is not actually a union.
         // And attempting to enforce this more tightly showed a lot of potential false positives in
         // the ecosystem.
-        if left_ty.is_equivalent_to(env, right_ty) {
+        if left_ty.is_equivalent_to(db, env, right_ty) {
             left_ty
         } else {
             UnionTypeInstance::from_value_expression_types(
-                env,
+                db,
                 [left_ty, right_ty],
                 self.scope(),
                 self.typevar_binding_context,
@@ -106,6 +108,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         right: &ast::Expr,
         tcx: TypeContext<'db>,
     ) -> BinaryExpressionOperandTypes<'db> {
+        let db = self.db();
         // As a special case, pass `tcx` to binary operands that are collection literals/displays.
         // Note that it's not correct to pass it to all binary operands, for example:
         // ```
@@ -138,7 +141,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             if let Type::TypedDict(typed_dict) = right_ty
                 && let Some(ty) = self.try_typed_dict_pep_584_dunder(
                     left,
-                    typed_dict.to_partial(self.semantic_environment()),
+                    typed_dict.to_partial(db),
                     typed_dict,
                     "__ror__",
                 )
@@ -160,7 +163,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             && matches!(right, ast::Expr::Dict(_))
             && let Some(ty) = self.try_typed_dict_pep_584_dunder(
                 right,
-                typed_dict.to_partial(self.semantic_environment()),
+                typed_dict.to_partial(db),
                 typed_dict,
                 "__or__",
             )
@@ -181,21 +184,23 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         result_typed_dict: TypedDictType<'db>,
         dunder_name: &str,
     ) -> Option<Type<'db>> {
+        let db = self.db();
         let update_ty = self.speculate_without_diagnostics().infer_expression(
             update,
             TypeContext::new(Some(Type::TypedDict(update_context_typed_dict))),
         );
-        let env = self.semantic_environment();
+        let env = self.program_environment();
 
         Type::TypedDict(result_typed_dict)
             .try_call_dunder(
+                db,
                 env,
                 dunder_name,
                 CallArguments::positional([update_ty]),
                 TypeContext::default(),
             )
             .ok()
-            .map(|bindings| bindings.return_type(env))
+            .map(|bindings| bindings.return_type(db, env))
     }
 
     /// Handle `TypedDict |= value` before the normal `__ior__` path runs.
@@ -212,6 +217,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         value_expr: &ast::Expr,
         infer_value_ty: &mut dyn FnMut(&mut Self, TypeContext<'db>) -> Type<'db>,
     ) -> Option<Type<'db>> {
+        let db = self.db();
         if assignment.op != ast::Operator::BitOr {
             return None;
         }
@@ -233,7 +239,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         }
 
         // Subset updates use the mutation-safe patch as context.
-        let update_patch = typed_dict.to_update_patch(self.semantic_environment());
+        let update_patch = typed_dict.to_update_patch(db);
         if self
             .try_typed_dict_pep_584_dunder(value_expr, update_patch, typed_dict, "__ior__")
             .is_some()
@@ -254,18 +260,18 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     /// Returns the original `TypeVar` if each result is equivalent to its input constraint;
     /// otherwise returns the union of all results.
     pub(super) fn map_constrained_typevar_constraints(
-        env: &SemanticEnvironment<'db>,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         typevar: Type<'db>,
         constraints: TypeVarConstraints<'db>,
         mut op: impl FnMut(Type<'db>) -> Option<Type<'db>>,
     ) -> Option<Type<'db>> {
-        let db = env.db();
-        let mut builder = UnionBuilder::new(env);
+        let mut builder = UnionBuilder::new(db, env);
         let mut any_different = false;
 
         for constraint in constraints.elements(db) {
             let result = op(*constraint)?;
-            if !result.is_equivalent_to(env, *constraint) {
+            if !result.is_equivalent_to(db, env, *constraint) {
                 any_different = true;
             }
             builder = builder.add(result);
@@ -305,7 +311,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         op: ast::Operator,
         visitor: &BinaryExpressionVisitor<'db>,
     ) -> Option<Type<'db>> {
-        let env = self.semantic_environment();
+        let env = self.program_environment();
         let db = self.db();
 
         // Check for division by zero; this doesn't change the inferred type for the expression, but
@@ -323,7 +329,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         }
 
         match (left_ty, right_ty, op) {
-            (Type::Union(lhs_union), rhs, _) => lhs_union.try_map(env, |lhs_element| {
+            (Type::Union(lhs_union), rhs, _) => lhs_union.try_map(db, env, |lhs_element| {
                 self.infer_binary_expression_type_impl(
                     node,
                     emitted_division_by_zero_diagnostic,
@@ -333,7 +339,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     visitor,
                 )
             }),
-            (lhs, Type::Union(rhs_union), _) => rhs_union.try_map(env, |rhs_element| {
+            (lhs, Type::Union(rhs_union), _) => rhs_union.try_map(db, env, |rhs_element| {
                 self.infer_binary_expression_type_impl(
                     node,
                     emitted_division_by_zero_diagnostic,
@@ -344,36 +350,36 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 )
             }),
 
-            (Type::TypeAlias(alias), rhs, _) => visitor.visit(env, (left_ty, op, right_ty), || {
+            (Type::TypeAlias(alias), rhs, _) => visitor.visit(db, (left_ty, op, right_ty), || {
                 self.infer_binary_expression_type_impl(
                     node,
                     emitted_division_by_zero_diagnostic,
-                    alias.value_type(env),
+                    alias.value_type(db),
                     rhs,
                     op,
                     visitor,
                 )
             }),
 
-            (lhs, Type::TypeAlias(alias), _) => visitor.visit(env, (left_ty, op, right_ty), || {
+            (lhs, Type::TypeAlias(alias), _) => visitor.visit(db, (left_ty, op, right_ty), || {
                 self.infer_binary_expression_type_impl(
                     node,
                     emitted_division_by_zero_diagnostic,
                     lhs,
-                    alias.value_type(env),
+                    alias.value_type(db),
                     op,
                     visitor,
                 )
             }),
 
             (Type::TypedDict(left_typed_dict), rhs, ast::Operator::BitOr)
-                if rhs.is_assignable_to(env, Type::TypedDict(left_typed_dict)) =>
+                if rhs.is_assignable_to(db, env, Type::TypedDict(left_typed_dict)) =>
             {
                 Some(Type::TypedDict(left_typed_dict))
             }
 
             (lhs, Type::TypedDict(right_typed_dict), ast::Operator::BitOr)
-                if lhs.is_assignable_to(env, Type::TypedDict(right_typed_dict)) =>
+                if lhs.is_assignable_to(db, env, Type::TypedDict(right_typed_dict)) =>
             {
                 Some(Type::TypedDict(right_typed_dict))
             }
@@ -417,9 +423,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             (Type::TypeVar(left_tvar), Type::TypeVar(right_tvar), _)
                 if left_tvar.identity(db) == right_tvar.identity(db) =>
             {
-                match left_tvar.typevar(db).bound_or_constraints(env) {
+                match left_tvar.typevar(db).bound_or_constraints(db, env) {
                     Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
                         Self::map_constrained_typevar_constraints(
+                            db,
                             env,
                             left_ty,
                             constraints,
@@ -435,7 +442,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         )
                     }
                     // For bounded TypeVars or unconstrained TypeVars, fall through to the default handling.
-                    _ => Type::try_call_bin_op_return_type(env, left_ty, op, right_ty),
+                    _ => Type::try_call_bin_op_return_type(db, env, left_ty, op, right_ty),
                 }
             }
 
@@ -447,9 +454,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             // TODO: We expect to replace this with more general support once we migrate to the new
             // solver.
             (Type::TypeVar(left_tvar), rhs, _) if !rhs.is_type_var() => {
-                match left_tvar.typevar(db).bound_or_constraints(env) {
+                match left_tvar.typevar(db).bound_or_constraints(db, env) {
                     Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
                         Self::map_constrained_typevar_constraints(
+                            db,
                             env,
                             left_ty,
                             constraints,
@@ -466,16 +474,17 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         )
                     }
                     // For bounded TypeVars or unconstrained TypeVars, fall through to the default handling.
-                    _ => Type::try_call_bin_op_return_type(env, left_ty, op, right_ty),
+                    _ => Type::try_call_bin_op_return_type(db, env, left_ty, op, right_ty),
                 }
             }
 
             // When the right operand is a constrained TypeVar and the left operand is not a TypeVar,
             // we check if each constraint supports the operation with the left operand.
             (lhs, Type::TypeVar(right_tvar), _) if !lhs.is_type_var() => {
-                match right_tvar.typevar(db).bound_or_constraints(env) {
+                match right_tvar.typevar(db).bound_or_constraints(db, env) {
                     Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
                         Self::map_constrained_typevar_constraints(
+                            db,
                             env,
                             right_ty,
                             constraints,
@@ -492,7 +501,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         )
                     }
                     // For bounded TypeVars or unconstrained TypeVars, fall through to the default handling.
-                    _ => Type::try_call_bin_op_return_type(env, left_ty, op, right_ty),
+                    _ => Type::try_call_bin_op_return_type(db, env, left_ty, op, right_ty),
                 }
             }
 
@@ -503,11 +512,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             // positional arguments get. In those cases we need to explicitly delegate to the base
             // type, so that it hits the `Type::Union` branches above.
             (Type::NewTypeInstance(newtype), rhs, _) => {
-                Type::try_call_bin_op_return_type(env, left_ty, op, right_ty).or_else(|| {
+                Type::try_call_bin_op_return_type(db, env, left_ty, op, right_ty).or_else(|| {
                     self.infer_binary_expression_type_impl(
                         node,
                         emitted_division_by_zero_diagnostic,
-                        newtype.concrete_base_type(env),
+                        newtype.concrete_base_type(db),
                         rhs,
                         op,
                         visitor,
@@ -515,12 +524,12 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 })
             }
             (lhs, Type::NewTypeInstance(newtype), _) => {
-                Type::try_call_bin_op_return_type(env, left_ty, op, right_ty).or_else(|| {
+                Type::try_call_bin_op_return_type(db, env, left_ty, op, right_ty).or_else(|| {
                     self.infer_binary_expression_type_impl(
                         node,
                         emitted_division_by_zero_diagnostic,
                         lhs,
-                        newtype.concrete_base_type(env),
+                        newtype.concrete_base_type(db),
                         op,
                         visitor,
                     )
@@ -549,7 +558,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         n.as_i64()
                             .checked_add(m.as_i64())
                             .map(Type::int_literal)
-                            .unwrap_or_else(|| KnownClass::Int.to_instance(env)),
+                            .unwrap_or_else(|| KnownClass::Int.to_instance(db, env)),
                     ),
 
                     (
@@ -560,7 +569,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         n.as_i64()
                             .checked_sub(m.as_i64())
                             .map(Type::int_literal)
-                            .unwrap_or_else(|| KnownClass::Int.to_instance(env)),
+                            .unwrap_or_else(|| KnownClass::Int.to_instance(db, env)),
                     ),
 
                     (
@@ -571,14 +580,14 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         n.as_i64()
                             .checked_mul(m.as_i64())
                             .map(Type::int_literal)
-                            .unwrap_or_else(|| KnownClass::Int.to_instance(env)),
+                            .unwrap_or_else(|| KnownClass::Int.to_instance(db, env)),
                     ),
 
                     (
                         LiteralValueTypeKind::Int(_),
                         LiteralValueTypeKind::Int(_),
                         ast::Operator::Div,
-                    ) => Some(KnownClass::Float.to_instance(env)),
+                    ) => Some(KnownClass::Float.to_instance(db, env)),
 
                     (
                         LiteralValueTypeKind::Int(n),
@@ -595,7 +604,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             q = q.map(|q| q - 1);
                         }
                         q.map(Type::int_literal)
-                            .unwrap_or_else(|| KnownClass::Int.to_instance(env))
+                            .unwrap_or_else(|| KnownClass::Int.to_instance(db, env))
                     }),
 
                     (
@@ -613,7 +622,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             r = r.map(|x| x + m.as_i64());
                         }
                         r.map(Type::int_literal)
-                            .unwrap_or_else(|| KnownClass::Int.to_instance(env))
+                            .unwrap_or_else(|| KnownClass::Int.to_instance(db, env))
                     }),
 
                     (
@@ -622,13 +631,13 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         ast::Operator::Pow,
                     ) => Some({
                         if m.as_i64() < 0 {
-                            KnownClass::Float.to_instance(env)
+                            KnownClass::Float.to_instance(db, env)
                         } else {
                             u32::try_from(m.as_i64())
                                 .ok()
                                 .and_then(|m| n.as_i64().checked_pow(m))
                                 .map(Type::int_literal)
-                                .unwrap_or_else(|| KnownClass::Int.to_instance(env))
+                                .unwrap_or_else(|| KnownClass::Int.to_instance(db, env))
                         }
                     }),
 
@@ -800,7 +809,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                                 .filter(|&m| m <= headroom)
                                 .and_then(|m| n.checked_shl(m))
                                 .map(Type::int_literal)
-                                .unwrap_or_else(|| KnownClass::Int.to_instance(env)),
+                                .unwrap_or_else(|| KnownClass::Int.to_instance(db, env)),
                         )
                     }
 
@@ -815,12 +824,12 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             Err(_) if m.as_i64() > 0 => {
                                 Type::int_literal(if n >= 0 { 0 } else { -1 })
                             }
-                            Err(_) => KnownClass::Int.to_instance(env),
+                            Err(_) => KnownClass::Int.to_instance(db, env),
                         };
                         Some(result)
                     }
 
-                    _ => Type::try_call_bin_op_return_type(env, left_ty, op, right_ty),
+                    _ => Type::try_call_bin_op_return_type(db, env, left_ty, op, right_ty),
                 };
 
                 result.map(|result| match result {
@@ -838,9 +847,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             ) => {
                 let constraints = ConstraintSetBuilder::new();
                 let result = constraints.into_owned(|constraints| {
-                    let left = constraints.load(env, left.constraints(db));
-                    let right = constraints.load(env, right.constraints(db));
-                    left.and(env, constraints, || right)
+                    let left = constraints.load(db, env, left.constraints(db));
+                    let right = constraints.load(db, env, right.constraints(db));
+                    left.and(db, constraints, || right)
                 });
                 Some(Type::KnownInstance(KnownInstanceType::ConstraintSet(
                     InternedConstraintSet::new(db, result),
@@ -854,9 +863,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             ) => {
                 let constraints = ConstraintSetBuilder::new();
                 let result = constraints.into_owned(|constraints| {
-                    let left = constraints.load(env, left.constraints(db));
-                    let right = constraints.load(env, right.constraints(db));
-                    left.or(env, constraints, || right)
+                    let left = constraints.load(db, env, left.constraints(db));
+                    let right = constraints.load(db, env, right.constraints(db));
+                    left.or(db, constraints, || right)
                 });
                 Some(Type::KnownInstance(KnownInstanceType::ConstraintSet(
                     InternedConstraintSet::new(db, result),
@@ -895,11 +904,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 ),
                 ast::Operator::BitOr,
             ) => {
-                if left_ty.is_equivalent_to(env, right_ty) {
+                if left_ty.is_equivalent_to(db, env, right_ty) {
                     Some(left_ty)
                 } else {
                     Some(UnionTypeInstance::from_value_expression_types(
-                        env,
+                        db,
                         [left_ty, right_ty],
                         self.scope(),
                         self.typevar_binding_context,
@@ -926,7 +935,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 ast::Operator::BitOr,
             ) if instance.has_known_class(db, KnownClass::NoneType) => {
                 Some(UnionTypeInstance::from_value_expression_types(
-                    env,
+                    db,
                     [left_ty, right_ty],
                     self.scope(),
                     self.typevar_binding_context,
@@ -951,6 +960,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 Type::ClassLiteral(..) | Type::GenericAlias(..) | Type::SubclassOf(..),
                 ast::Operator::BitOr,
             ) => Type::try_call_bin_op_with_policy(
+                db,
                 env,
                 left_ty,
                 ast::Operator::BitOr,
@@ -958,7 +968,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 MemberLookupPolicy::META_CLASS_NO_TYPE_FALLBACK,
             )
             .ok()
-            .map(|binding| binding.return_type(env)),
+            .map(|binding| binding.return_type(db, env)),
 
             // We've handled all of the special cases that we support for literals, so we need to
             // fall back on looking for dunder methods on one of the operand types.
@@ -1018,7 +1028,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 | Type::TypeForm(_)
                 | Type::TypedDict(_),
                 op,
-            ) => Type::try_call_bin_op_return_type(env, left_ty, op, right_ty),
+            ) => Type::try_call_bin_op_return_type(db, env, left_ty, op, right_ty),
         }
     }
 
@@ -1056,7 +1066,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         if let Some(builder) = self.context.report_lint(&DIVISION_BY_ZERO, node) {
             builder.into_diagnostic(format_args!(
                 "Cannot {op} object of type `{}` {by_zero}",
-                left.display(self.semantic_environment())
+                left.display(db, self.program_environment())
             ));
         }
 

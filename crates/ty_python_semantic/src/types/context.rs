@@ -1,4 +1,4 @@
-use std::{cell::Cell, fmt, hint::cold_path};
+use std::{cell::Cell, fmt, hint::cold_path, marker::PhantomData};
 
 use drop_bomb::DebugDropBomb;
 use ruff_db::PythonFile;
@@ -29,74 +29,68 @@ use ty_python_core::definition::Definition;
 use ty_python_core::scope::ScopeId;
 use ty_python_core::semantic_index;
 
-/// The database and Python environment used by a semantic operation.
+/// The lazily resolved program used by a semantic operation.
 #[derive(Clone)]
-pub struct SemanticEnvironment<'db> {
-    db: &'db dyn Db,
+pub struct ProgramEnvironment<'db> {
     environment: Cell<ProgramSource>,
+    lifetime: PhantomData<&'db ()>,
 }
 
-impl<'db> SemanticEnvironment<'db> {
+impl<'db> ProgramEnvironment<'db> {
     /// Creates an environment that lazily obtains its Python version from `file`.
-    pub fn from_file(db: &'db dyn Db, file: PythonFile<'db>) -> Self {
+    pub fn from_file(file: PythonFile<'db>) -> Self {
         Self {
-            db,
             environment: Cell::new(ProgramSource::File(file.as_id())),
+            lifetime: PhantomData,
         }
     }
 
     /// Creates an environment that lazily obtains its program from `definition`.
-    pub fn from_definition(db: &'db dyn Db, definition: Definition<'db>) -> Self {
+    pub fn from_definition(definition: Definition<'db>) -> Self {
         Self {
-            db,
             environment: Cell::new(ProgramSource::Definition(definition.as_id())),
+            lifetime: PhantomData,
         }
     }
 
     /// Creates an environment that lazily obtains its program from `scope`.
-    pub fn from_scope(db: &'db dyn Db, scope: ScopeId<'db>) -> Self {
+    pub fn from_scope(scope: ScopeId<'db>) -> Self {
         Self {
-            db,
             environment: Cell::new(ProgramSource::Scope(scope.as_id())),
+            lifetime: PhantomData,
         }
     }
 
     /// Creates an environment with an already-established program.
-    pub const fn from_program(db: &'db dyn Db, program: Program) -> Self {
+    pub const fn from_program(program: Program) -> Self {
         Self {
-            db,
             environment: Cell::new(ProgramSource::Program(program)),
+            lifetime: PhantomData,
         }
-    }
-
-    /// Returns the database used by this operation.
-    #[inline]
-    pub const fn db(&self) -> &'db dyn Db {
-        self.db
     }
 
     /// Returns the program used by this operation.
     #[inline]
-    pub fn program(&self) -> Program {
+    pub fn program(&self, db: &'db dyn Db) -> Program {
         match self.environment.get() {
             ProgramSource::Program(program) => program,
             ProgramSource::File(file) => {
                 cold_path();
-                // `from_file` paired this `Id` with `self.db` from the same `'db`; immediately
-                // re-wrapping it for this ingredient read restores that database lifetime.
-                let program = PythonFile::from_id(file).python_version(self.db);
+                // The source handle and database share `'db`; re-wrapping the stored ingredient
+                // ID immediately before the read restores the original database lifetime.
+                let program = PythonFile::from_id(file).python_version(db);
                 self.environment.set(ProgramSource::Program(program));
                 program
             }
             ProgramSource::Definition(definition) => {
                 cold_path();
-                let program = Definition::from_id(definition).program(self.db);
+                let program = Definition::from_id(definition).program(db);
                 self.environment.set(ProgramSource::Program(program));
                 program
             }
             ProgramSource::Scope(scope) => {
                 cold_path();
-                let program = ScopeId::from_id(scope).program(self.db);
+                let program = ScopeId::from_id(scope).program(db);
                 self.environment.set(ProgramSource::Program(program));
                 program
             }
@@ -105,8 +99,8 @@ impl<'db> SemanticEnvironment<'db> {
 
     /// Returns the Python version used by this operation.
     #[inline]
-    pub fn python_version(&self) -> PythonVersion {
-        self.program()
+    pub fn python_version(&self, db: &'db dyn Db) -> PythonVersion {
+        self.program(db)
     }
 }
 
@@ -135,7 +129,8 @@ enum ProgramSource {
 /// [`InferContext::finish`] and the returned diagnostics must be stored
 /// on the current inference result.
 pub(crate) struct InferContext<'db, 'ast> {
-    semantic_environment: &'ast SemanticEnvironment<'db>,
+    db: &'db dyn Db,
+    program_environment: &'ast ProgramEnvironment<'db>,
     scope: ScopeId<'db>,
     file: File,
     python_file: PythonFile<'db>,
@@ -149,18 +144,19 @@ pub(crate) struct InferContext<'db, 'ast> {
 
 impl<'db, 'ast> InferContext<'db, 'ast> {
     pub(crate) fn new(
-        semantic_environment: &'ast SemanticEnvironment<'db>,
+        db: &'db dyn Db,
+        program_environment: &'ast ProgramEnvironment<'db>,
         scope: ScopeId<'db>,
         file: File,
         python_file: PythonFile<'db>,
         module: &'ast ParsedModuleRef,
     ) -> Self {
-        let db = semantic_environment.db();
         debug_assert_eq!(scope.python_file(db), python_file);
         debug_assert_eq!(python_file.file(db), file);
 
         Self {
-            semantic_environment,
+            db,
+            program_environment,
             scope,
             module,
             file,
@@ -184,8 +180,8 @@ impl<'db, 'ast> InferContext<'db, 'ast> {
     }
 
     #[inline]
-    pub(crate) fn semantic_environment(&self) -> &'ast SemanticEnvironment<'db> {
-        self.semantic_environment
+    pub(crate) fn program_environment(&self) -> &'ast ProgramEnvironment<'db> {
+        self.program_environment
     }
 
     /// The module for which the types are inferred.
@@ -217,7 +213,7 @@ impl<'db, 'ast> InferContext<'db, 'ast> {
 
     #[inline]
     pub(crate) fn db(&self) -> &'db dyn Db {
-        self.semantic_environment.db()
+        self.db
     }
 
     pub(crate) fn extend(&mut self, other: &TypeCheckDiagnostics) {
@@ -333,9 +329,10 @@ impl<'db, 'ast> InferContext<'db, 'ast> {
     /// This checks both whether the scope itself is reachable and whether the
     /// specific statement or expression containing this range is reachable.
     fn is_range_reachable(&self, range: TextRange) -> bool {
+        let db = self.db;
         let index = semantic_index(self.db(), self.python_file);
         let scope_id = self.scope.file_scope_id(self.db());
-        is_range_reachable(self.semantic_environment(), index, scope_id, range)
+        is_range_reachable(db, index, scope_id, range)
     }
 
     /// Are we currently inferring types in a stub file?
