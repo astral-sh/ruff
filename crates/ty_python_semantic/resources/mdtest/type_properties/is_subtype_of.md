@@ -2078,8 +2078,9 @@ static_assert(not is_subtype_of(TypeOf[A.g], Callable[[], int]))
 static_assert(is_subtype_of(TypeOf[A.f], Callable[[A, int], int]))
 ```
 
-A bound receiver is an already-captured value, so the same inherited method bound to a subclass is a
-subtype of the method bound to its parent, not the other way around.
+A bound method keeps the instance it was accessed on. If the methods accept the same arguments and
+return the same type, a method bound to a child instance can be used where the same method bound to
+a parent instance is expected, but not the other way around.
 
 ```py
 class Child(A): ...
@@ -2090,8 +2091,7 @@ static_assert(is_subtype_of(TypeOf[child.f], TypeOf[a.f]))
 static_assert(not is_subtype_of(TypeOf[a.f], TypeOf[child.f]))
 ```
 
-Receiver covariance must not override parameter contravariance when binding specializes `Self` to
-the receiver's class. A `Self` return remains covariant.
+An inherited method can also use `Self` in its arguments or return value.
 
 ```py
 from typing import Self
@@ -2105,9 +2105,19 @@ class ChildWithSelf(ParentWithSelf): ...
 
 parent_with_self = ParentWithSelf()
 child_with_self = ChildWithSelf()
+```
 
+`ChildWithSelf.merge` only accepts another `ChildWithSelf`, so it cannot be used where
+`ParentWithSelf.merge` must accept any `ParentWithSelf`.
+
+```py
 static_assert(not is_subtype_of(TypeOf[child_with_self.merge], TypeOf[parent_with_self.merge]))
-static_assert(not is_subtype_of(TypeOf[parent_with_self.merge], TypeOf[child_with_self.merge]))
+```
+
+A method returning the child can be used where the parent method is expected because the child is
+also a valid parent.
+
+```py
 static_assert(is_subtype_of(TypeOf[child_with_self.clone], TypeOf[parent_with_self.clone]))
 ```
 

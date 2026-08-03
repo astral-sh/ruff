@@ -1146,6 +1146,19 @@ c: Callable[[Any], str] = A().f
 c: Callable[[Any], str] = A().g
 ```
 
+Checking whether a writer is truthy must not prevent its bound method from being assigned to an
+attribute.
+
+```py
+class Writer:
+    def write(self) -> None: ...
+
+class Copy:
+    def __init__(self, writer: Writer):
+        if writer:
+            self._write = writer.write
+```
+
 ### Generic method types with gradual class return types
 
 A generic receiver makes signature comparison lazy without changing whether gradual class types are
