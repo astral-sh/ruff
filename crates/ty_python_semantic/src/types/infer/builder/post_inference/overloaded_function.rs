@@ -7,7 +7,7 @@ use rustc_hash::FxHashSet;
 
 use crate::{
     Db,
-    place::{DefinedPlace, Definedness, Place, place_from_bindings},
+    place::{DefinedPlace, Definedness, Place, place_from_bindings_with_prepared_dependencies},
     types::{
         CallableType, KnownClass, Type,
         context::InferContext,
@@ -66,7 +66,7 @@ pub(crate) fn check_overloaded_function<'db>(
         ty: Type::FunctionLiteral(function),
         definedness: Definedness::AlwaysDefined,
         ..
-    }) = place_from_bindings(
+    }) = place_from_bindings_with_prepared_dependencies(
         db,
         env,
         use_def.end_of_scope_symbol_bindings(place.as_symbol().unwrap()),

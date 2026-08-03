@@ -13,13 +13,13 @@ use rustc_hash::FxHashSet;
 use crate::{
     Db, NameKind,
     place::{
-        DefinedPlace, Place, PlaceWithDefinition, imported_symbol, place_from_bindings,
-        place_from_declarations,
+        DefinedPlace, Place, PlaceWithDefinition, imported_symbol,
+        place_from_bindings_with_prepared_dependencies, place_from_declarations,
     },
     types::{
         ClassBase, ClassLiteral, KnownClass, KnownInstanceType, ProgramEnvironment,
         StaticClassLiteral, SubclassOfInner, Type, TypeVarBoundOrConstraints,
-        class::CodeGeneratorKind,
+        class::CodeGeneratorKind, infer_name_dependencies_for_scope,
     },
 };
 use ty_python_core::{
@@ -33,6 +33,7 @@ pub(crate) fn all_end_of_scope_members<'db>(
     db: &'db dyn Db,
     scope_id: ScopeId<'db>,
 ) -> impl Iterator<Item = MemberWithDefinition<'db>> + 'db {
+    infer_name_dependencies_for_scope(db, scope_id);
     let env = ProgramEnvironment::from_scope(scope_id);
 
     let use_def_map = use_def_map(db, scope_id);
@@ -63,7 +64,7 @@ pub(crate) fn all_end_of_scope_members<'db>(
                 let PlaceWithDefinition {
                     place,
                     first_definition,
-                } = place_from_bindings(db, &bindings_ctx, bindings);
+                } = place_from_bindings_with_prepared_dependencies(db, &bindings_ctx, bindings);
 
                 let first_reachable_definition = first_definition?;
                 let ty = place.ignore_possibly_undefined()?;
@@ -87,6 +88,7 @@ pub(crate) fn all_reachable_members<'db>(
     db: &'db dyn Db,
     scope_id: ScopeId<'db>,
 ) -> impl Iterator<Item = MemberWithDefinition<'db>> + 'db {
+    infer_name_dependencies_for_scope(db, scope_id);
     let env = ProgramEnvironment::from_scope(scope_id);
 
     let use_def_map = use_def_map(db, scope_id);
@@ -116,7 +118,8 @@ pub(crate) fn all_reachable_members<'db>(
                         })
                     });
 
-            let place_with_definition = place_from_bindings(db, &env, bindings);
+            let place_with_definition =
+                place_from_bindings_with_prepared_dependencies(db, &env, bindings);
             let binding =
                 place_with_definition
                     .first_definition

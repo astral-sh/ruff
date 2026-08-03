@@ -29,8 +29,8 @@ use super::{
     DefinitionInferenceExtra, DefinitionTypes, ExpressionInference, ExpressionInferenceExtra,
     FrozenMap, FrozenSet, FrozenValueMap, FunctionDecoratorInference, InferenceRegion,
     OtherDefinitionInferenceExtra, ScopeInference, ScopeInferenceExtra, infer_deferred_types,
-    infer_definition_types, infer_expression_types, infer_same_file_expression_type,
-    infer_unpack_types,
+    infer_definition_types_with_prepared_dependencies, infer_expression_types,
+    infer_same_file_expression_type, infer_unpack_types,
 };
 use crate::diagnostic::format_enumeration;
 use crate::place::{
@@ -38,8 +38,8 @@ use crate::place::{
     RequiresExplicitReExport, TypeOrigin, builtins_module_scope, builtins_symbol,
     class_body_implicit_symbol, explicit_global_symbol, loop_header_reachability,
     module_type_implicit_global_declaration, module_type_implicit_global_symbol, place_by_id,
-    place_from_bindings_with_reachability_cache, place_from_declarations_with_reachability_cache,
-    typing_extensions_symbol,
+    place_from_bindings_with_prepared_dependencies_and_reachability_cache,
+    place_from_declarations_with_reachability_cache, typing_extensions_symbol,
 };
 use crate::reachability::{ReachabilityEvaluationCache, evaluate_reachability_with_cache};
 use crate::types::add_inferred_python_version_hint_to_diagnostic;
@@ -118,8 +118,9 @@ use crate::types::{
     Parameters, ProgramEnvironment, SentinelInstance, Signature, SpecialFormType, SubclassOfType,
     Type, TypeAliasType, TypeAndQualifiers, TypeContext, TypeQualifiers, TypeVarBoundOrConstraints,
     TypeVarKind, TypeVarVariance, TypedDictModule, TypedDictType, UnionAccumulator, UnionBuilder,
-    UnionType, any_over_type, binding_type, extract_fixed_length_iterable_element_types,
-    infer_complete_scope_types, infer_scope_types, is_discarded_dict_key_assignment, todo_type,
+    UnionType, any_over_type, binding_type_with_prepared_dependencies,
+    extract_fixed_length_iterable_element_types, infer_complete_scope_types, infer_scope_types,
+    is_discarded_dict_key_assignment, todo_type,
 };
 use crate::{AnalysisSettings, Db, FxIndexSet, FxOrderSet};
 use ty_python_core::ast_ids::ScopedUseId;
@@ -224,11 +225,12 @@ const NUM_FIELD_SPECIFIERS_INLINE: usize = 1;
 /// a single AST node and are called as part of this AST visit.
 ///
 /// When the visit encounters a node which creates a [`Definition`], we look up the definition in
-/// the semantic index and call the [`infer_definition_types()`] query on it, which creates another
-/// [`TypeInferenceBuilder`] just for that definition, and we merge the returned inference result
-/// into the one we are currently building for the entire scope. Using the query in this way
-/// ensures that if we first infer types for some scattered definitions in a scope, and later for
-/// the entire scope, we don't re-infer any types, we reuse the cached inference for those
+/// the semantic index and call [`infer_definition_types()`][super::infer_definition_types] on it.
+/// This prepares ordinary variable dependencies and invokes a tracked query that creates another
+/// [`TypeInferenceBuilder`] just for that definition. We merge the returned inference result into
+/// the one we are currently building for the entire scope. Using a tracked query for each
+/// definition ensures that if we first infer types for some scattered definitions in a scope, and
+/// later for the entire scope, we don't re-infer any types; we reuse the cached inference for those
 /// definitions and their sub-expressions.
 ///
 /// Functions with a name like `infer_*_definition` take both a node and a [`Definition`], and are
@@ -240,8 +242,8 @@ const NUM_FIELD_SPECIFIERS_INLINE: usize = 1;
 /// [`infer_function_definition`](TypeInferenceBuilder::infer_function_definition), which takes
 /// both the node and the [`Definition`] id. The former is called as part of walking the AST, and
 /// it just looks up the [`Definition`] for that function in the semantic index and calls
-/// [`infer_definition_types()`] on it, which will create a new [`TypeInferenceBuilder`] with
-/// [`InferenceRegion::Definition`], and in that builder
+/// [`infer_definition_types()`][super::infer_definition_types] on it, which will create a new
+/// [`TypeInferenceBuilder`] with [`InferenceRegion::Definition`], and in that builder
 /// [`infer_region_definition`](TypeInferenceBuilder::infer_region_definition) will call
 /// [`infer_function_definition`](TypeInferenceBuilder::infer_function_definition) to actually
 /// infer a type for the definition.
@@ -1622,7 +1624,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let prior_bindings = use_def.bindings_at_definition(declaration);
         let env = self.program_environment();
         // unbound_ty is Never because for this check we don't care about unbound
-        let inferred_ty = place_from_bindings_with_reachability_cache(
+        let inferred_ty = place_from_bindings_with_prepared_dependencies_and_reachability_cache(
             db,
             env,
             prior_bindings,
@@ -1933,7 +1935,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     fn function_type(&self, function: &ast::StmtFunctionDef) -> Option<FunctionType<'db>> {
         let definition = self.index.expect_single_definition(function);
-        infer_definition_types(self.db(), definition).function_type(definition)
+        infer_definition_types_with_prepared_dependencies(self.db(), definition)
+            .function_type(definition)
     }
 
     fn current_function_type(&self) -> Option<FunctionType<'db>> {
@@ -1946,7 +1949,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     ) -> impl Iterator<Item = Type<'db>> + 'a {
         let definition = self.index.expect_single_definition(function);
 
-        let definition_types = infer_definition_types(self.db(), definition);
+        let definition_types =
+            infer_definition_types_with_prepared_dependencies(self.db(), definition);
 
         function
             .decorator_list
@@ -2051,7 +2055,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     fn infer_definition(&mut self, node: impl Into<DefinitionNodeKey> + std::fmt::Debug + Copy) {
         let definition = self.index.expect_single_definition(node);
-        let result = infer_definition_types(self.db(), definition);
+        let result = infer_definition_types_with_prepared_dependencies(self.db(), definition);
         self.extend_definition(definition, result);
     }
 
@@ -2474,7 +2478,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let mut union = UnionBuilder::new(db, env).recursively_defined(RecursivelyDefined::Yes);
 
         for reachable_binding in &loop_header.reachable_bindings {
-            let binding_ty = binding_type(db, reachable_binding.definition);
+            let binding_ty =
+                binding_type_with_prepared_dependencies(db, reachable_binding.definition);
             let narrowed_ty = use_def
                 .narrowing_evaluator(reachable_binding.narrowing_constraint)
                 .narrow(db, env, binding_ty, place);
@@ -2527,7 +2532,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     let DefinitionState::Defined(source) = binding.binding else {
                         continue;
                     };
-                    let ty = binding_type(db, source);
+                    let ty = binding_type_with_prepared_dependencies(db, source);
                     union.add_in_place(binding.narrowing_constraint.narrow(
                         db,
                         env,
@@ -2538,7 +2543,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 continue;
             }
 
-            let Some(ty) = place_from_bindings_with_reachability_cache(
+            let Some(ty) = place_from_bindings_with_prepared_dependencies_and_reachability_cache(
                 db,
                 env,
                 bindings,
@@ -4787,7 +4792,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         assignment: Definition<'db>,
         definition: Definition<'db>,
     ) {
-        let value_ty = infer_definition_types(self.db(), assignment).expression_type(value);
+        let value_ty = infer_definition_types_with_prepared_dependencies(self.db(), assignment)
+            .expression_type(value);
         self.add_binding(key.into(), definition)
             .insert(self, value_ty);
     }
@@ -8133,7 +8139,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // See https://peps.python.org/pep-0572/#differences-between-assignment-expressions-and-assignment-statements
         if named.target.is_name_expr() {
             let definition = self.index.expect_single_definition(named);
-            let result = infer_definition_types(self.db(), definition);
+            let result = infer_definition_types_with_prepared_dependencies(self.db(), definition);
             self.extend_definition(definition, result);
             result.binding_type(definition)
         } else {
@@ -8402,9 +8408,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         // Collect the types of each distinct key.
         let mut elements: Vec<(&str, Type<'db>)> = Vec::new();
+
         for bindings in use_def.multi_bindings_at_use(keyword.scoped_use_id(db, self.python_file()))
         {
-            let place = place_from_bindings_with_reachability_cache(
+            let place = place_from_bindings_with_prepared_dependencies_and_reachability_cache(
                 db,
                 env,
                 bindings.clone(),
@@ -9522,7 +9529,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             DefinitionState::Defined(definition)
                                 if !is_discarded_dict_key_assignment(db, definition) =>
                             {
-                                let binding_ty = binding_type(db, definition);
+                                let binding_ty =
+                                    binding_type_with_prepared_dependencies(db, definition);
                                 union.add_in_place(
                                     binding
                                         .narrowing_constraint
@@ -9687,7 +9695,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // If we're inferring types of deferred expressions, look them up from end-of-scope.
         if self.is_deferred() {
             let place = if let Some(place_id) = place_table.place_id(expr) {
-                place_from_bindings_with_reachability_cache(
+                place_from_bindings_with_prepared_dependencies_and_reachability_cache(
                     db,
                     env,
                     use_def.reachable_bindings(place_id),
@@ -9716,7 +9724,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             if let ast::ExprRef::Named(named) = expr_ref {
                 let place = if named.target.is_name_expr() {
                     let definition = self.index.expect_single_definition(named);
-                    Place::bound(binding_type(self.db(), definition)).with_definition(definition)
+                    Place::bound(binding_type_with_prepared_dependencies(db, definition))
+                        .with_definition(definition)
                 } else {
                     Place::Undefined
                 };
@@ -9724,7 +9733,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
 
             let use_id = expr_ref.scoped_use_id(db, self.python_file());
-            let place = place_from_bindings_with_reachability_cache(
+            let place = place_from_bindings_with_prepared_dependencies_and_reachability_cache(
                 db,
                 env,
                 use_def.bindings_at_use(use_id),
@@ -9778,12 +9787,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     return Place::Undefined.into();
                 }
                 EnclosingSnapshotResult::FoundBindings(bindings) => {
-                    let mut place_and_qualifiers = place_from_bindings_with_reachability_cache(
-                        db,
-                        self.program_environment(),
-                        bindings,
-                        self.reachability_cache(),
-                    );
+                    let mut place_and_qualifiers =
+                        place_from_bindings_with_prepared_dependencies_and_reachability_cache(
+                            db,
+                            self.program_environment(),
+                            bindings,
+                            self.reachability_cache(),
+                        );
                     if assume_bound && let Place::Defined(defined) = place_and_qualifiers.place {
                         place_and_qualifiers.place =
                             Place::Defined(defined.with_definedness(Definedness::AlwaysDefined));
@@ -9996,7 +10006,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             }
                         }
                         EnclosingSnapshotResult::FoundBindings(bindings) => {
-                            let place = place_from_bindings_with_reachability_cache(
+                            let place =
+                                place_from_bindings_with_prepared_dependencies_and_reachability_cache(
                                 db,
                                 env,
                                 bindings,

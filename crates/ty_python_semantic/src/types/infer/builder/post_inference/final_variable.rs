@@ -1,6 +1,6 @@
 use crate::{
     TypeQualifiers,
-    place::{place_from_bindings, place_from_declarations},
+    place::{place_from_bindings_with_prepared_dependencies, place_from_declarations},
     types::{context::InferContext, diagnostic::FINAL_WITHOUT_VALUE},
 };
 use ty_python_core::SemanticIndex;
@@ -47,7 +47,7 @@ pub(crate) fn check_final_without_value<'db>(
 
         // Check if the symbol has any bindings in the current scope.
         let bindings = use_def.end_of_scope_symbol_bindings(symbol_id);
-        let binding_place = place_from_bindings(db, env, bindings);
+        let binding_place = place_from_bindings_with_prepared_dependencies(db, env, bindings);
 
         if !binding_place.place.is_undefined() {
             continue;

@@ -1,3 +1,5 @@
+use std::fmt::Write;
+
 use super::builder::TypeInferenceBuilder;
 use crate::db::tests::{TestDb, TestDbBuilder, setup_db};
 use crate::place::symbol;
@@ -483,6 +485,122 @@ fn unbound_symbol_no_reachability_constraint_check() {
 const MANY_WIDGETS: usize = 400;
 const MANY_NON_TERMINAL_CALLS: usize = 1_100;
 const FEW_NON_TERMINAL_CALLS: usize = 80;
+const LONG_NAME_CHAIN: usize = 4_000;
+const LARGE_BRANCHING_NAME_GRAPH: usize = 1_000;
+
+fn run_name_dependency_stack_test(
+    thread_name: &str,
+    test: impl FnOnce(&mut TestDb) -> anyhow::Result<()> + Send + 'static,
+) -> anyhow::Result<()> {
+    let handle = std::thread::Builder::new()
+        .name(thread_name.into())
+        // Match the stack size used by ty's production worker threads.
+        .stack_size(ruff_db::STACK_SIZE)
+        .spawn(move || {
+            let mut db = setup_db();
+            test(&mut db)
+        })?;
+
+    handle.join().expect("regression test thread panicked")
+}
+
+#[test]
+fn large_augmented_assignment_name_dependency_chain_does_not_overflow_stack() -> anyhow::Result<()>
+{
+    run_name_dependency_stack_test("augmented-assignment-name-dependency-stack-test", |db| {
+        let mut module =
+            String::from("from typing_extensions import reveal_type\n\nclass C:\n    n = 0\n");
+        for _ in 0..LONG_NAME_CHAIN {
+            module.push_str("    n += 1\n");
+        }
+        module.push_str("reveal_type(C.n)\n");
+
+        let path = "/src/augmented.py";
+        db.write_file(path, module)?;
+        assert_revealed_type(db, path, "int");
+        Ok(())
+    })
+}
+
+#[test]
+fn large_binary_expression_name_dependency_chain_does_not_overflow_stack() -> anyhow::Result<()> {
+    run_name_dependency_stack_test("binary-expression-name-dependency-stack-test", |db| {
+        let mut module =
+            String::from("from typing_extensions import reveal_type\n\nclass C:\n    n = 0\n");
+        for _ in 0..LONG_NAME_CHAIN {
+            module.push_str("    n = n + 1\n");
+        }
+        module.push_str("reveal_type(C.n)\n");
+
+        let path = "/src/binary.py";
+        db.write_file(path, module)?;
+        assert_revealed_type(db, path, "int");
+        Ok(())
+    })
+}
+
+#[test]
+fn large_call_expression_name_dependency_chain_does_not_overflow_stack() -> anyhow::Result<()> {
+    run_name_dependency_stack_test("call-expression-name-dependency-stack-test", |db| {
+        let mut module = String::from(
+            "from typing_extensions import reveal_type\n\ndef increment(value: int) -> int:\n    return value + 1\n\nclass C:\n    n = 0\n",
+        );
+        for _ in 0..LONG_NAME_CHAIN {
+            module.push_str("    n = increment(n)\n");
+        }
+        module.push_str("reveal_type(C.n)\n");
+
+        let path = "/src/call.py";
+        db.write_file(path, module)?;
+        assert_revealed_type(db, path, "int");
+        Ok(())
+    })
+}
+
+#[test]
+fn large_branching_name_dependency_graph_does_not_overflow_stack() -> anyhow::Result<()> {
+    run_name_dependency_stack_test("branching-name-dependency-stack-test", |db| {
+        let mut module = String::from(
+            "from typing_extensions import reveal_type\n\ndef seed() -> int:\n    return 0\n\ndef add(left: int, right: int) -> int:\n    return left + right\n\nclass C:\n    n0 = seed()\n    n1 = add(n0, n0)\n",
+        );
+        for index in 2..=LARGE_BRANCHING_NAME_GRAPH {
+            writeln!(module, "    n{index} = add(n{}, n{})", index - 1, index - 2)?;
+        }
+        writeln!(module, "reveal_type(C.n{LARGE_BRANCHING_NAME_GRAPH})")?;
+
+        let path = "/src/branching.py";
+        db.write_file(path, module)?;
+        assert_revealed_type(db, path, "int");
+        Ok(())
+    })
+}
+
+#[test]
+fn large_name_dependency_chain_is_incrementally_invalidated() -> anyhow::Result<()> {
+    run_name_dependency_stack_test("incremental-name-dependency-stack-test", |db| {
+        let mut module = String::from("def seed() -> int:\n    return 0\n\nn0 = seed()\n");
+        for index in 1..=LONG_NAME_CHAIN {
+            writeln!(module, "n{index} = n{}", index - 1)?;
+        }
+        db.write_file("/src/incremental.py", module.clone())?;
+        db.write_file(
+            "/src/incremental_main.py",
+            format!(
+                "from typing_extensions import reveal_type\nfrom incremental import n{LONG_NAME_CHAIN}\n\nreveal_type(n{LONG_NAME_CHAIN})\n"
+            ),
+        )?;
+        assert_revealed_type(db, "/src/incremental_main.py", "int");
+
+        let module = module.replacen(
+            "def seed() -> int:\n    return 0",
+            "def seed() -> str:\n    return ''",
+            1,
+        );
+        db.write_file("/src/incremental.py", module)?;
+        assert_revealed_type(db, "/src/incremental_main.py", "str");
+        Ok(())
+    })
+}
 
 #[test]
 fn implicit_attribute_after_many_non_terminal_calls() -> anyhow::Result<()> {

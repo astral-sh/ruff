@@ -1,5 +1,5 @@
 use crate::types::{
-    ClassLiteral, Type, binding_type,
+    ClassLiteral, Type, binding_type_with_prepared_dependencies,
     class::{DynamicClassAnchor, DynamicMetaclassConflict, dynamic_class_bases_argument},
     context::InferContext,
     diagnostic::{
@@ -24,7 +24,7 @@ pub(crate) fn check_dynamic_class_definition<'db>(
         return;
     };
 
-    let ty = binding_type(context.db(), definition);
+    let ty = binding_type_with_prepared_dependencies(db, definition);
 
     // Check if it's a dynamic class with a Definition anchor.
     let Type::ClassLiteral(ClassLiteral::Dynamic(dynamic_class)) = ty else {

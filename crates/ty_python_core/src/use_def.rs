@@ -246,7 +246,7 @@ use std::sync::LazyLock;
 
 use ruff_index::{FrozenIndexVec, Idx, IndexVec, newtype_index};
 use ruff_text_size::TextRange;
-use rustc_hash::{FxBuildHasher, FxHashMap, FxHasher};
+use rustc_hash::{FxBuildHasher, FxHashMap, FxHashSet, FxHasher};
 use smallvec::SmallVec;
 use thin_vec::ThinVec;
 
@@ -1799,6 +1799,12 @@ pub(super) struct UseDefMapBuilder<'db> {
     definitions_by_definition:
         FxHashMap<Definition<'db>, DefinitionsAtDefinition<Bindings, Declarations>>,
 
+    /// Ordinary variable definitions directly needed to infer a definition.
+    name_dependencies: FxHashMap<Definition<'db>, Box<[Definition<'db>]>>,
+
+    /// Ordinary variable definitions that are safe to infer before their source-order visit.
+    name_dependency_eligible: FxHashSet<Definition<'db>>,
+
     /// Currently live bindings and declarations for each place.
     symbol_states: IndexVec<ScopedSymbolId, PendingPlaceState>,
 
@@ -1837,6 +1843,8 @@ impl<'db> UseDefMapBuilder<'db> {
             reachability: ScopedReachabilityConstraintId::ALWAYS_TRUE,
             range_reachability: Vec::new(),
             definitions_by_definition: FxHashMap::default(),
+            name_dependencies: FxHashMap::default(),
+            name_dependency_eligible: FxHashSet::default(),
             symbol_states: IndexVec::new(),
             member_states: IndexVec::new(),
             pending_reachability: PendingReachability::default(),
@@ -1865,6 +1873,25 @@ impl<'db> UseDefMapBuilder<'db> {
 
     pub(super) fn definition(&self, def_id: ScopedDefinitionId) -> DefinitionState<'db> {
         self.all_definitions[def_id]
+    }
+
+    /// Marks `binding` as eligible for dependency sorting and records its direct dependencies.
+    pub(super) fn record_name_dependencies(
+        &mut self,
+        binding: Definition<'db>,
+        dependencies: impl IntoIterator<Item = Definition<'db>>,
+    ) {
+        self.name_dependency_eligible.insert(binding);
+        let dependencies = dependencies.into_iter().collect::<Vec<_>>();
+        if !dependencies.is_empty() {
+            self.name_dependencies
+                .insert(binding, dependencies.into_boxed_slice());
+        }
+    }
+
+    /// Returns whether `definition` can be moved before its source-order inference.
+    pub(super) fn is_name_dependency_eligible(&self, definition: Definition<'db>) -> bool {
+        self.name_dependency_eligible.contains(&definition)
     }
 
     pub(super) fn mark_unreachable(&mut self) {
@@ -2752,7 +2779,12 @@ impl<'db> UseDefMapBuilder<'db> {
             .add_or_constraint(self.reachability, snapshot.reachability);
     }
 
-    pub(super) fn finish(mut self: Box<Self>) -> UseDefMap<'db> {
+    pub(super) fn finish(
+        mut self: Box<Self>,
+    ) -> (
+        UseDefMap<'db>,
+        FxHashMap<Definition<'db>, Box<[Definition<'db>]>>,
+    ) {
         let pending = self.pending_reachability.current;
         for state in self
             .symbol_states
@@ -2892,19 +2924,23 @@ impl<'db> UseDefMapBuilder<'db> {
                 narrowing_constraints,
             })
         });
+        let name_dependencies = std::mem::take(&mut self.name_dependencies);
         let all_definitions = RetainedDefinitions::new(self.all_definitions, self.used_bindings);
 
-        UseDefMap {
-            all_definitions,
-            constraint_tables,
-            interned_bindings,
-            interned_declarations,
-            range_reachability: self.range_reachability.into_boxed_slice(),
-            symbol_states,
-            definitions_by_definition,
-            extra,
-            end_of_scope_reachability: self.reachability,
-        }
+        (
+            UseDefMap {
+                all_definitions,
+                constraint_tables,
+                interned_bindings,
+                interned_declarations,
+                range_reachability: self.range_reachability.into_boxed_slice(),
+                symbol_states,
+                definitions_by_definition,
+                extra,
+                end_of_scope_reachability: self.reachability,
+            },
+            name_dependencies,
+        )
     }
 
     fn zip_place_states<I: Idx, T>(

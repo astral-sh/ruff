@@ -121,6 +121,34 @@ fn extend_collection_use_constraints<'db>(
 
 /// Infer all types for a [`Definition`] (including sub-expressions).
 /// Use when resolving a place use or public type of a place.
+pub(crate) fn infer_definition_types<'db>(
+    db: &'db dyn Db,
+    definition: Definition<'db>,
+) -> &'db DefinitionInference<'db> {
+    let python_file = definition.python_file(db);
+    let index = semantic_index(db, python_file);
+
+    if !index.name_dependencies(definition).is_empty() {
+        for dependency in index.name_dependencies_in_order(definition) {
+            infer_definition_types_with_prepared_dependencies(db, dependency);
+        }
+    }
+
+    infer_definition_types_with_prepared_dependencies(db, definition)
+}
+
+/// Infers every ordinary variable dependency in `scope` in dependency order.
+pub(crate) fn infer_name_dependencies_for_scope<'db>(db: &'db dyn Db, scope: ScopeId<'db>) {
+    let index = semantic_index(db, scope.python_file(db));
+    for definition in index.all_name_dependencies_in_order(scope.file_scope_id(db)) {
+        infer_definition_types_with_prepared_dependencies(db, definition);
+    }
+}
+
+/// Infers one definition whose ordinary variable dependencies have already been inferred in
+/// dependency order.
+///
+/// Scope inference may also use this query because it visits definitions in source order.
 #[salsa::tracked(
     returns(ref),
     cycle_initial=|db, id, definition: Definition<'db>| {
@@ -131,7 +159,7 @@ fn extend_collection_use_constraints<'db>(
     },
     heap_size=ruff_memory_usage::heap_size
 )]
-pub(crate) fn infer_definition_types<'db>(
+pub(super) fn infer_definition_types_with_prepared_dependencies<'db>(
     db: &'db dyn Db,
     definition: Definition<'db>,
 ) -> DefinitionInference<'db> {
