@@ -3230,7 +3230,6 @@ impl NodeId {
         result
     }
 
-
     /// Invokes a closure for each unique BDD node that appears anywhere in a BDD.
     ///
     /// This treats the BDD as a DAG and does not revisit shared subgraphs. Use this when the
@@ -4532,7 +4531,16 @@ impl InteriorNode {
                 .expect("every BDD constraint should have a source-order entry")
         });
 
-        if !self.node().is_single_conjunction(storage) {
+        // Concrete alternatives cannot introduce relationships between distinct typevars, so
+        // they can use the same independence optimization as a single conjunction.
+        if !self.node().is_single_conjunction(storage)
+            && constraints.iter().any(|constraint| {
+                !storage
+                    .constraint_data(*constraint)
+                    .bounds
+                    .is_concrete(db, env)
+            })
+        {
             return PathAssignments::new(constraints, FxHashSet::default());
         }
 
