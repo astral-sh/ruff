@@ -295,8 +295,9 @@ pub(crate) fn exists_at_runtime<'db>(db: &'db dyn Db, definition: Definition<'db
         return true;
     };
 
-    // Preserve the existing narrow heuristics for private union, `Literal`, and `Annotated`
-    // aliases without mistaking runtime calls or indexing for type-alias definitions.
+    // Treat only unambiguous union, `Literal`, and `Annotated` expressions as implicit aliases.
+    // Other expressions may also be aliases, but a false negative is preferable to incorrectly
+    // hiding a value that exists at runtime.
     match (ty, assignment.value(&module)) {
         (
             Type::KnownInstance(KnownInstanceType::UnionType(_)),
