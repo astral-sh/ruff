@@ -3070,6 +3070,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             })
         }
 
+        #[expect(clippy::too_many_arguments)]
         fn collect_typed_dicts<'db>(
             db: &'db dyn Db,
             env: &ProgramEnvironment<'db>,
