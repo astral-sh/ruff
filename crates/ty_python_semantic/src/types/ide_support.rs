@@ -1281,7 +1281,7 @@ pub fn definitions_for_imported_symbol<'db>(
     resolve_definition::resolve_from_import_definitions(
         model.db(),
         &env,
-        ImportingFile::File(model.file(), env.program(model.db())),
+        ImportingFile::File(model.file(), env.resolver_environment(model.db())),
         import_node,
         symbol_name,
         &mut visited,
@@ -2270,7 +2270,8 @@ mod resolve_definition {
                 };
 
                 // Resolve the module to its file
-                let importing_file = ImportingFile::File(file.file(db), env.program(db));
+                let importing_file =
+                    ImportingFile::File(file.file(db), env.resolver_environment(db));
                 let Some(resolved_module) = resolve_module(db, importing_file, &module_name) else {
                     return Vec::new(); // Module not found, return empty list
                 };
@@ -2302,7 +2303,7 @@ mod resolve_definition {
                 resolve_from_import_definitions(
                     db,
                     env,
-                    ImportingFile::File(file.file(db), env.program(db)),
+                    ImportingFile::File(file.file(db), env.resolver_environment(db)),
                     import_node,
                     &alias.name,
                     visited,
@@ -2321,7 +2322,7 @@ mod resolve_definition {
                     resolve_from_import_definitions(
                         db,
                         env,
-                        ImportingFile::File(file.file(db), env.program(db)),
+                        ImportingFile::File(file.file(db), env.resolver_environment(db)),
                         import_node,
                         symbol_name,
                         visited,

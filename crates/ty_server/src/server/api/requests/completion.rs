@@ -12,8 +12,7 @@ use ty_ide::{
     CompletionCapabilities, CompletionCommand, CompletionInsertTextFormat, CompletionKind,
     completion,
 };
-use ty_project::ProjectDatabase;
-use ty_python_core::program::Program;
+use ty_project::{ProjectDatabase, SemanticDb as _};
 use ty_python_semantic::ProgramEnvironment;
 
 use crate::capabilities::ResolvedClientCapabilities;
@@ -63,7 +62,7 @@ impl BackgroundDocumentRequestHandler for CompletionRequestHandler {
             return Ok(None);
         };
         let client_capabilities = snapshot.resolved_client_capabilities();
-        let program_file = Program::get(db).program_file(db, file);
+        let program_file = db.program_file(file);
         let env = ProgramEnvironment::from_file(program_file);
         let completions = completion(
             db,

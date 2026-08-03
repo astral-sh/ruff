@@ -2,12 +2,15 @@ use crate::AnalysisSettings;
 use crate::lint::{LintRegistry, RuleSelection};
 use ruff_db::diagnostic::Diagnostic;
 use ruff_db::files::File;
-use ty_python_core::Db as PythonCoreDb;
+use ty_python_core::{Db as PythonCoreDb, ProgramFile};
 
 /// Database giving access to semantic information about a Python program.
 #[salsa::db]
 pub trait Db: PythonCoreDb {
     fn check_file(&self, file: File) -> Vec<Diagnostic>;
+
+    /// Returns the program file for `file`.
+    fn program_file(&self, file: File) -> ProgramFile<'_>;
 
     /// Resolves the rule selection for a given file.
     fn rule_selection(&self, file: File) -> &RuleSelection;
@@ -155,7 +158,11 @@ pub(crate) mod tests {
                 return Vec::new();
             }
 
-            check_file_unwrap(self, Program::get(self).program_file(self, file))
+            check_file_unwrap(self, self.program_file(file))
+        }
+
+        fn program_file(&self, file: File) -> ProgramFile<'_> {
+            Program::get(self).program_file(self, file)
         }
 
         fn rule_selection(&self, _file: File) -> &RuleSelection {

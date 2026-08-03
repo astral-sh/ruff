@@ -23,12 +23,12 @@ use crate::types::{
     CycleDetector, ProgramEnvironment, SpecialFormType, Type, TypeQualifiers, binding_type,
     infer_complete_scope_types, inferred_declaration,
 };
-use ty_python_core::ProgramFile;
 use ty_python_core::definition::{Definition, DefinitionKind};
 use ty_python_core::place_table;
 use ty_python_core::scope::{FileScopeId, Scope};
 use ty_python_core::semantic_index;
 use ty_python_core::symbol::Symbol;
+use ty_python_core::{Program, ProgramFile};
 
 /// The primary interface the LSP should use for querying semantic information about a [`File`].
 ///
@@ -72,6 +72,10 @@ impl<'db> SemanticModel<'db> {
 
     pub fn program_file(&self) -> ProgramFile<'db> {
         self.file
+    }
+
+    pub fn program(&self) -> Program<'db> {
+        self.file.program(self.db)
     }
 
     pub fn program_environment(&self) -> ProgramEnvironment<'db> {
@@ -131,8 +135,10 @@ impl<'db> SemanticModel<'db> {
 
     /// Resolve the given import made in this file to a Module
     pub fn resolve_module(&self, module: Option<&str>, level: u32) -> Option<Module<'db>> {
-        let importing_file =
-            ImportingFile::File(self.file(), self.program_environment().program(self.db));
+        let importing_file = ImportingFile::File(
+            self.file(),
+            self.program_environment().resolver_environment(self.db),
+        );
         let module_name =
             ModuleName::from_identifier_parts(self.db, importing_file, module, level).ok()?;
         resolve_module(self.db, importing_file, &module_name)
@@ -142,7 +148,7 @@ impl<'db> SemanticModel<'db> {
     pub fn import_completions(&self) -> Vec<Completion<'db>> {
         let typing_extensions = ModuleName::new_static("typing_extensions").unwrap();
         let file = self.file();
-        let resolver_environment = self.program_environment().program(self.db);
+        let resolver_environment = self.program_environment().resolver_environment(self.db);
         let is_typing_extensions_available = file.is_stub(self.db)
             || resolve_real_shadowable_module(
                 self.db,
@@ -172,7 +178,10 @@ impl<'db> SemanticModel<'db> {
     pub fn from_import_completions(&self, import: &ast::StmtImportFrom) -> Vec<Completion<'db>> {
         let module_name = match ModuleName::from_import_statement(
             self.db,
-            ImportingFile::File(self.file(), self.program_environment().program(self.db)),
+            ImportingFile::File(
+                self.file(),
+                self.program_environment().resolver_environment(self.db),
+            ),
             import,
         ) {
             Ok(module_name) => module_name,
@@ -195,7 +204,10 @@ impl<'db> SemanticModel<'db> {
     ) -> Vec<Completion<'db>> {
         let Some(module) = resolve_module(
             self.db,
-            ImportingFile::File(self.file(), self.program_environment().program(self.db)),
+            ImportingFile::File(
+                self.file(),
+                self.program_environment().resolver_environment(self.db),
+            ),
             module_name,
         ) else {
             tracing::debug!("Could not resolve module from `{module_name:?}`");
@@ -210,7 +222,10 @@ impl<'db> SemanticModel<'db> {
         let db = self.db;
         let Some(module) = resolve_module(
             self.db,
-            ImportingFile::File(self.file(), self.program_environment().program(self.db)),
+            ImportingFile::File(
+                self.file(),
+                self.program_environment().resolver_environment(self.db),
+            ),
             module_name,
         ) else {
             tracing::debug!("Could not resolve module from `{module_name:?}`");

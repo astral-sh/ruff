@@ -15,6 +15,7 @@ use ruff_db::system::System;
 use ruff_db::vendored::VendoredFileSystem;
 use ruff_python_ast::PythonVersion;
 use salsa::{Database, Event, Setter};
+use ty_python_core::ProgramFile;
 use ty_python_core::program::{
     FallibleStrategy, MisconfigurationStrategy, Program, UseDefaultStrategy,
 };
@@ -545,6 +546,10 @@ impl SemanticDb for ProjectDatabase {
         ProjectDatabase::check_file(self, file)
     }
 
+    fn program_file(&self, file: File) -> ProgramFile<'_> {
+        Program::get(self).program_file(self, file)
+    }
+
     fn rule_selection(&self, file: File) -> &RuleSelection {
         let settings = file_settings(self, file);
         settings.rules(self)
@@ -645,6 +650,7 @@ pub(crate) mod testing {
     use ruff_db::vendored::VendoredFileSystem;
     use ruff_python_ast::PythonVersion;
     use ty_module_resolver::SearchPathSettings;
+    use ty_python_core::ProgramFile;
     use ty_python_core::platform::PythonPlatform;
     use ty_python_core::program::{FallibleStrategy, Program, ProgramSettings};
     use ty_python_semantic::lint::{LintRegistry, RuleSelection};
@@ -783,6 +789,10 @@ pub(crate) mod testing {
         #[inline]
         fn check_file(&self, file: File) -> Vec<Diagnostic> {
             crate::check_file(self, file)
+        }
+
+        fn program_file(&self, file: File) -> ProgramFile<'_> {
+            Program::get(self).program_file(self, file)
         }
 
         fn rule_selection(&self, _file: ruff_db::files::File) -> &RuleSelection {

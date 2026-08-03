@@ -12,12 +12,12 @@ use ty_python_core::platform::PythonPlatform;
 use ty_python_core::program::{FallibleStrategy, Program, ProgramSettings};
 use ty_python_semantic::lint::{LintRegistry, RuleSelection};
 use ty_python_semantic::pull_types::pull_types;
-use ty_python_semantic::{AnalysisSettings, check_file_unwrap, default_lint_registry};
+use ty_python_semantic::{AnalysisSettings, Db as _, check_file_unwrap, default_lint_registry};
 use ty_site_packages::{PythonVersionSource, PythonVersionWithSource};
 
 use ruff_db::diagnostic::Diagnostic;
 use test_case::test_case;
-use ty_python_core::Db as _;
+use ty_python_core::{Db as _, ProgramFile};
 
 fn get_cargo_workspace_root() -> anyhow::Result<&'static SystemPath> {
     SystemPath::new(env!("CARGO_MANIFEST_DIR"))
@@ -112,7 +112,7 @@ fn run_corpus_tests(pattern: &str) -> anyhow::Result<()> {
             let file = system_path_to_file(&db, path).unwrap();
 
             if let Err(err) = std::panic::catch_unwind(|| {
-                pull_types(&db, Program::get(&db).program_file(&db, file));
+                pull_types(&db, db.program_file(file));
             }) {
                 println!("Check failed for {relative_path:?}.");
                 std::panic::resume_unwind(err);
@@ -220,10 +220,14 @@ impl ty_python_core::Db for CorpusDb {
 impl ty_python_semantic::Db for CorpusDb {
     fn check_file(&self, file: File) -> Vec<Diagnostic> {
         if self.should_check_file(file) {
-            check_file_unwrap(self, Program::get(self).program_file(self, file))
+            check_file_unwrap(self, self.program_file(file))
         } else {
             Vec::new()
         }
+    }
+
+    fn program_file(&self, file: File) -> ProgramFile<'_> {
+        Program::get(self).program_file(self, file)
     }
 
     fn rule_selection(&self, _file: File) -> &RuleSelection {

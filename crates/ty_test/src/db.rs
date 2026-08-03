@@ -15,8 +15,8 @@ use std::borrow::Cow;
 use std::sync::Arc;
 use tempfile::TempDir;
 use ty_module_resolver::ModuleGlobSetBuilder;
-use ty_python_core::Db as _;
 use ty_python_core::program::Program;
+use ty_python_core::{Db as _, ProgramFile};
 use ty_python_semantic::lint::{LintRegistry, RuleSelection};
 use ty_python_semantic::{
     AnalysisSettings, Db as SemanticDb, check_file_unwrap, default_lint_registry,
@@ -129,7 +129,11 @@ impl SemanticDb for Db {
             return Vec::new();
         }
 
-        check_file_unwrap(self, Program::get(self).program_file(self, file))
+        check_file_unwrap(self, self.program_file(file))
+    }
+
+    fn program_file(&self, file: File) -> ProgramFile<'_> {
+        Program::get(self).program_file(self, file)
     }
 
     fn rule_selection(&self, file: File) -> &RuleSelection {

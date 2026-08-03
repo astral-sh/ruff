@@ -2,8 +2,7 @@ use std::borrow::Cow;
 
 use lsp_types::{PrepareRenameParams, PrepareRenameRequest, PrepareRenameResult, Uri};
 use ty_ide::can_rename;
-use ty_project::ProjectDatabase;
-use ty_python_core::program::Program;
+use ty_project::{ProjectDatabase, SemanticDb as _};
 
 use crate::document::{PositionExt, ToRangeExt};
 use crate::server::api::traits::{
@@ -49,7 +48,7 @@ impl BackgroundDocumentRequestHandler for PrepareRenameRequestHandler {
             return Ok(None);
         };
 
-        let Some(range) = can_rename(db, Program::get(db).program_file(db, file), offset) else {
+        let Some(range) = can_rename(db, db.program_file(file), offset) else {
             return Ok(None);
         };
 

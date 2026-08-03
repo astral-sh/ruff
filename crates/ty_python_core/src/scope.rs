@@ -32,7 +32,7 @@ impl<'db> ScopeId<'db> {
     }
 
     pub fn program(self, db: &'db dyn Db) -> Program<'db> {
-        self.program_file(db).resolver_environment(db)
+        self.program_file(db).program(db)
     }
 
     pub fn is_annotation(self, db: &'db dyn Db) -> bool {

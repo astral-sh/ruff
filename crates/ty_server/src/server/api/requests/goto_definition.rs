@@ -3,8 +3,7 @@ use std::borrow::Cow;
 use lsp_types::DefinitionRequest;
 use lsp_types::{DefinitionParams, DefinitionResponse, Uri};
 use ty_ide::goto_definition;
-use ty_project::ProjectDatabase;
-use ty_python_core::program::Program;
+use ty_project::{ProjectDatabase, SemanticDb as _};
 
 use crate::document::{PositionExt, ToLink};
 use crate::server::api::traits::{
@@ -50,8 +49,7 @@ impl BackgroundDocumentRequestHandler for GotoDefinitionRequestHandler {
             return Ok(None);
         };
 
-        let Some(ranged) = goto_definition(db, Program::get(db).program_file(db, file), offset)
-        else {
+        let Some(ranged) = goto_definition(db, db.program_file(file), offset) else {
             return Ok(None);
         };
 

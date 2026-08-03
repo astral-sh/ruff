@@ -28,7 +28,6 @@ use std::iter::FusedIterator;
 use std::panic::{AssertUnwindSafe, UnwindSafe};
 use std::sync::Arc;
 use ty_python_core::ProgramFile;
-use ty_python_core::program::Program;
 pub use ty_python_semantic::Db as SemanticDb;
 use ty_python_semantic::lint::RuleSelection;
 
@@ -395,7 +394,7 @@ impl Project {
                 let check_file_span =
                     tracing::debug_span!(parent: &project_span, "check_file", ?file);
                 let _entered = check_file_span.entered();
-                let program_file = Program::get(db).program_file(db, file);
+                let program_file = db.program_file(file);
 
                 match check_file_impl(db, program_file) {
                     Ok(diagnostics) => {
@@ -662,7 +661,7 @@ fn check_file(db: &dyn Db, file: File) -> Vec<Diagnostic> {
         return Vec::new();
     }
 
-    check_file_impl(db, Program::get(db).program_file(db, file))
+    check_file_impl(db, db.program_file(file))
         .map(<[Diagnostic]>::to_vec)
         .unwrap_or_else(|diagnostic| vec![diagnostic.clone()])
 }
@@ -900,7 +899,7 @@ mod tests {
     use ruff_db::source::source_text;
     use ruff_db::system::{DbWithTestSystem, DbWithWritableSystem as _, SystemPath, SystemPathBuf};
     use ruff_db::testing::assert_function_query_was_not_run;
-    use ty_python_core::program::Program;
+    use ty_python_semantic::Db as _;
     use ty_python_semantic::types::check_types;
 
     #[test]
@@ -919,7 +918,7 @@ mod tests {
 
         assert_eq!(source_text(&db, file).as_str(), "");
         assert_eq!(
-            check_file_impl(&db, Program::get(&db).program_file(&db, file))
+            check_file_impl(&db, db.program_file(file))
                 .as_ref()
                 .unwrap_err()
                 .headline_message()
@@ -928,12 +927,7 @@ mod tests {
         );
 
         let events = db.take_salsa_events();
-        assert_function_query_was_not_run(
-            &db,
-            check_types,
-            Program::get(&db).program_file(&db, file),
-            &events,
-        );
+        assert_function_query_was_not_run(&db, check_types, db.program_file(file), &events);
 
         // The user now creates a new file with an empty text. The source text
         // content returned by `source_text` remains unchanged, but the diagnostics should get updated.
@@ -941,7 +935,7 @@ mod tests {
 
         assert_eq!(source_text(&db, file).as_str(), "");
         assert_eq!(
-            check_file_impl(&db, Program::get(&db).program_file(&db, file))
+            check_file_impl(&db, db.program_file(file))
                 .as_ref()
                 .unwrap()
                 .iter()

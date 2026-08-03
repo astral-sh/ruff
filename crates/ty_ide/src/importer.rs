@@ -29,7 +29,7 @@ use ruff_python_ast::visitor::source_order::{SourceOrderVisitor, TraversalSignal
 use ruff_python_codegen::Stylist;
 use ruff_python_importer::Insertion;
 use ruff_text_size::{Ranged, TextRange, TextSize};
-use ty_module_resolver::{ImportingFile, ModuleName, ResolverFile};
+use ty_module_resolver::{ImportingFile, ModuleName};
 use ty_project::Db;
 use ty_python_core::ProgramFile;
 use ty_python_core::definition::DefinitionKind;
@@ -146,9 +146,13 @@ impl<'a> Importer<'a> {
         request: ImportRequest<'_>,
         members: &MembersInScope,
     ) -> ImportAction {
-        let request = request.avoid_conflicts(self.db, self.file.resolver_file(self.db), members);
+        let importing_file = ImportingFile::File(
+            self.file.file(self.db),
+            self.file.resolver_environment(self.db),
+        );
+        let request = request.avoid_conflicts(self.db, importing_file, members);
         let mut symbol_text: Box<str> = request.member.unwrap_or(request.module).into();
-        let Some(response) = self.find(&request, members.at) else {
+        let Some(response) = self.find(importing_file, &request, members.at) else {
             let insertion = if let Some(future) = self.find_last_future_import(members.at) {
                 Insertion::end_of_statement(future.stmt, self.source, self.stylist)
             } else {
@@ -223,6 +227,7 @@ impl<'a> Importer<'a> {
     /// satisfies the request.
     fn find<'importer>(
         &'importer self,
+        importing_file: ImportingFile<'_>,
         request: &ImportRequest<'_>,
         available_at: TextSize,
     ) -> Option<ImportResponse<'importer, 'a>> {
@@ -248,9 +253,7 @@ impl<'a> Importer<'a> {
                 return choice;
             }
 
-            if let Some(response) =
-                import.satisfies(self.db, self.file.resolver_file(self.db), request)
-            {
+            if let Some(response) = import.satisfies(self.db, importing_file, request) {
                 let partial = matches!(response.kind, ImportResponseKind::Partial { .. });
 
                 // The LSP doesn't support edits across cell boundaries.
@@ -375,7 +378,7 @@ impl<'ast> MembersInScope<'ast> {
     pub(crate) fn satisfies(
         &self,
         db: &dyn Db,
-        importing_file: ResolverFile<'_>,
+        importing_file: ImportingFile<'_>,
         request: &ImportRequest<'_>,
     ) -> bool {
         let symbol_text = request.member.unwrap_or(request.module);
@@ -411,7 +414,7 @@ impl<'ast> MemberInScope<'ast> {
     fn satisfies_anywhere(
         &self,
         db: &dyn Db,
-        importing_file: ResolverFile<'_>,
+        importing_file: ImportingFile<'_>,
         request: &ImportRequest<'_>,
     ) -> bool {
         let MemberImportKind::Imported(ref ast_import) = self.kind else {
@@ -483,7 +486,7 @@ impl<'ast> AstImport<'ast> {
     fn satisfies<'importer>(
         &'importer self,
         db: &'_ dyn Db,
-        importing_file: ResolverFile<'_>,
+        importing_file: ImportingFile<'_>,
         request: &ImportRequest<'_>,
     ) -> Option<ImportResponse<'importer, 'ast>> {
         self.kind
@@ -514,7 +517,7 @@ impl<'ast> AstImportKind<'ast> {
     fn satisfies<'importer>(
         &'importer self,
         db: &'_ dyn Db,
-        importing_file: ResolverFile<'_>,
+        importing_file: ImportingFile<'_>,
         request: &ImportRequest<'_>,
     ) -> Option<ImportResponseKind<'ast>> {
         match *self {
@@ -544,12 +547,7 @@ impl<'ast> AstImportKind<'ast> {
                     return None;
                 }
 
-                let module = ModuleName::from_import_statement(
-                    db,
-                    ImportingFile::ResolverFile(importing_file),
-                    ast,
-                )
-                .ok()?;
+                let module = ModuleName::from_import_statement(db, importing_file, ast).ok()?;
                 if module.as_str() != request.module {
                     return None;
                 }
@@ -646,7 +644,7 @@ impl<'a> ImportRequest<'a> {
     fn avoid_conflicts(
         self,
         db: &dyn Db,
-        importing_file: ResolverFile<'_>,
+        importing_file: ImportingFile<'_>,
         members: &MembersInScope,
     ) -> Self {
         let Some(member) = self.member else {

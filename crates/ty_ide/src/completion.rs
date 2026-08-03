@@ -15,7 +15,7 @@ use ruff_python_codegen::Stylist;
 use ruff_python_literal::escape::{Escape, UnicodeEscape};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 use rustc_hash::FxHashSet;
-use ty_module_resolver::{ImportingFile, KnownModule, Module, ModuleName, ResolverFile};
+use ty_module_resolver::{ImportingFile, KnownModule, Module, ModuleName};
 use ty_python_core::ProgramFile;
 use ty_python_semantic::HasType;
 use ty_python_semantic::types::{SpecialFormType, UnionType};
@@ -42,8 +42,7 @@ pub fn completion<'db>(
     let file = file.file(db);
     let source = source_text(db, file);
 
-    let Some(context) = Context::new(db, program_file.resolver_file(db), &parsed, &source, offset)
-    else {
+    let Some(context) = Context::new(db, program_file, &parsed, &source, offset) else {
         return vec![];
     };
     let model = SemanticModel::new(db, program_file);
@@ -789,7 +788,7 @@ impl<'m> Context<'m> {
     /// Create a new context for finding completions.
     fn new(
         db: &'_ dyn Db,
-        file: ResolverFile<'_>,
+        file: ProgramFile<'_>,
         parsed: &'m ParsedModuleRef,
         source: &'m SourceText,
         offset: TextSize,
@@ -803,7 +802,11 @@ impl<'m> Context<'m> {
             ContextKind::Keywords(keywords)
         } else if cursor.is_in_definition_place() {
             return None;
-        } else if let Some(import) = ImportStatement::detect(db, file, &cursor) {
+        } else if let Some(import) = ImportStatement::detect(
+            db,
+            ImportingFile::File(file.file(db), file.resolver_environment(db)),
+            &cursor,
+        ) {
             ContextKind::Import(import)
         } else {
             let target_token = CompletionTargetTokens::find(&cursor)?;
@@ -2296,9 +2299,9 @@ fn add_unimported_completions<'db>(
     let stylist = Stylist::from_tokens(parsed.tokens(), source.as_str());
     let importer = Importer::new(db, &stylist, file, source.as_str(), parsed);
     let members = importer.members_in_scope_at(scoped.node, scoped.node.start());
-    let resolver_file = file.resolver_file(db);
+    let importing_file = ImportingFile::File(source_file, file.resolver_environment(db));
 
-    for symbol in all_symbols(db, resolver_file, &completions.query.pattern) {
+    for symbol in all_symbols(db, file, &completions.query.pattern) {
         if symbol.file() == source_file || symbol.module().is_known(db, KnownModule::Builtins) {
             continue;
         }
@@ -2313,7 +2316,7 @@ fn add_unimported_completions<'db>(
             });
 
         // Don't suggest symbols that are already imported.
-        if members.satisfies(db, resolver_file, &request) {
+        if members.satisfies(db, importing_file, &request) {
             continue;
         }
 
@@ -2578,7 +2581,7 @@ impl<'a> ImportStatement<'a> {
     /// `tokens`.
     fn detect(
         db: &'_ dyn Db,
-        file: ResolverFile<'_>,
+        file: ImportingFile<'_>,
         cursor: &ContextCursor<'a>,
     ) -> Option<ImportStatement<'a>> {
         use TokenKind as TK;
@@ -2944,12 +2947,7 @@ impl<'a> ImportStatement<'a> {
                         let import_keyword_allowed =
                             all_dots || !to_complete_without_leading_dots.contains('.');
                         let parent = if all_dots {
-                            ModuleName::from_import_statement(
-                                db,
-                                ImportingFile::ResolverFile(file),
-                                ast,
-                            )
-                            .ok()?
+                            ModuleName::from_import_statement(db, file, ast).ok()?
                         } else {
                             // We know `to_complete` is not all dots.
                             // But that it starts with a dot.
@@ -2963,13 +2961,7 @@ impl<'a> ImportStatement<'a> {
                             let parent = to_complete_without_leading_dots
                                 .rsplit_once('.')
                                 .map(|(parent, _)| parent);
-                            ModuleName::from_identifier_parts(
-                                db,
-                                ImportingFile::ResolverFile(file),
-                                parent,
-                                ast.level,
-                            )
-                            .ok()?
+                            ModuleName::from_identifier_parts(db, file, parent, ast.level).ok()?
                         };
                         FromImportKind::Relative {
                             parent,

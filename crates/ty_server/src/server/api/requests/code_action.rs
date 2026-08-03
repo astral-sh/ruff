@@ -6,8 +6,7 @@ use ruff_db::files::File;
 use ruff_diagnostics::Edit;
 use ruff_text_size::Ranged;
 use ty_ide::code_actions;
-use ty_project::ProjectDatabase;
-use ty_python_core::program::Program;
+use ty_project::{ProjectDatabase, SemanticDb as _};
 use types::CodeActionKind;
 
 use crate::db::Db;
@@ -42,7 +41,7 @@ impl BackgroundDocumentRequestHandler for CodeActionRequestHandler {
         let Some(file) = snapshot.to_notebook_or_file(db) else {
             return Ok(None);
         };
-        let python_file = Program::get(db).program_file(db, file);
+        let python_file = db.program_file(file);
         let mut actions = Vec::new();
 
         for mut diagnostic in diagnostics.into_iter().filter(|diagnostic| {

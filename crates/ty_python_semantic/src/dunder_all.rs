@@ -163,7 +163,8 @@ impl<'db> DunderAllNamesCollector<'db> {
     ) -> Option<&'db FxHashSet<Name>> {
         let db = self.db;
 
-        let importing_file = ImportingFile::File(self.file.file(db), self.env.program(db));
+        let importing_file =
+            ImportingFile::File(self.file.file(db), self.env.resolver_environment(db));
         let module_name =
             ModuleName::from_import_statement(db, importing_file, import_from).ok()?;
         let module = resolve_module(db, importing_file, &module_name)?;

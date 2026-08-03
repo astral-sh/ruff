@@ -415,7 +415,7 @@ mod tests {
     use ruff_python_trivia::textwrap::dedent;
     use ruff_text_size::TextSize;
     use ty_module_resolver::SearchPathSettings;
-    use ty_project::{Db as _, ProjectMetadata};
+    use ty_project::{Db as _, ProjectMetadata, SemanticDb as _};
     use ty_python_core::ProgramFile;
     use ty_python_core::platform::PythonPlatform;
     use ty_python_core::program::{FallibleStrategy, Program, ProgramSettings};
@@ -441,7 +441,7 @@ mod tests {
         }
 
         pub(super) fn program_file(&self, file: File) -> ProgramFile<'_> {
-            Program::get(&self.db).program_file(&self.db, file)
+            self.db.program_file(file)
         }
 
         pub(super) fn write_file(
@@ -568,11 +568,8 @@ mod tests {
                     db.project().open_file(&mut db, file);
 
                     let source = source_text(&db, file);
-                    let parsed = parsed_module(
-                        &db,
-                        Program::get(&db).program_file(&db, file).python_file(&db),
-                    )
-                    .load(&db);
+                    let parsed =
+                        parsed_module(&db, db.program_file(file).python_file(&db)).load(&db);
                     let stylist =
                         Stylist::from_tokens(parsed.tokens(), source.as_str()).into_owned();
                     cursor = Some(Cursor {
@@ -724,11 +721,8 @@ mod tests {
                     db.project().open_file(&mut db, file);
 
                     let source = source_text(&db, file);
-                    let parsed = parsed_module(
-                        &db,
-                        Program::get(&db).program_file(&db, file).python_file(&db),
-                    )
-                    .load(&db);
+                    let parsed =
+                        parsed_module(&db, db.program_file(file).python_file(&db)).load(&db);
                     let stylist =
                         Stylist::from_tokens(parsed.tokens(), source.as_str()).into_owned();
                     cursor = Some(Cursor {

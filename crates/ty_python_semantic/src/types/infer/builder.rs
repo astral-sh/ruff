@@ -3413,8 +3413,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         if let Some(special_form) = target.as_name_expr().and_then(|name| {
             let db = self.db();
-            let importing_file =
-                ImportingFile::File(self.file(), self.program_environment().program(db));
+            let importing_file = ImportingFile::File(
+                self.file(),
+                self.program_environment().resolver_environment(db),
+            );
             SpecialFormType::try_from_file_and_name(db, importing_file, &name.id)
         }) {
             target_ty = Type::SpecialForm(special_form);
@@ -4459,7 +4461,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         if let Some(name_expr) = target.as_name_expr()
             && let Some(special_form) = SpecialFormType::try_from_file_and_name(
                 self.db(),
-                ImportingFile::File(self.file(), self.program_environment().program(self.db())),
+                ImportingFile::File(
+                    self.file(),
+                    self.program_environment().resolver_environment(self.db()),
+                ),
                 &name_expr.id,
             )
         {
@@ -5091,8 +5096,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     fn module_type_from_name(&self, module_name: &ModuleName) -> Option<Type<'db>> {
         let db = self.db();
-        let importing_file =
-            ImportingFile::File(self.file(), self.program_environment().program(db));
+        let importing_file = ImportingFile::File(
+            self.file(),
+            self.program_environment().resolver_environment(db),
+        );
         resolve_module(db, importing_file, module_name)
             .map(|module| Type::module_literal(self.db(), self.program_file(), module))
     }
@@ -10369,7 +10376,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 db,
                                 ImportingFile::File(
                                     self.file(),
-                                    self.program_environment().program(db),
+                                    self.program_environment().resolver_environment(db),
                                 ),
                                 &maybe_submodule_name,
                             )

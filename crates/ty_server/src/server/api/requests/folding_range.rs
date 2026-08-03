@@ -5,8 +5,7 @@ use lsp_types::{FoldingRange, FoldingRangeKind, FoldingRangeParams, Uri};
 use ruff_db::source::source_text;
 use ruff_text_size::TextRange;
 use ty_ide::folding_ranges;
-use ty_project::ProjectDatabase;
-use ty_python_core::program::Program;
+use ty_project::{ProjectDatabase, SemanticDb as _};
 
 use crate::db::Db;
 use crate::document::ToRangeExt;
@@ -57,33 +56,29 @@ impl BackgroundDocumentRequestHandler for FoldingRangeRequestHandler {
             cell_range = cell_index.and_then(|index| notebook.cell_range(index));
         }
 
-        let results: Vec<_> = folding_ranges(
-            db,
-            Program::get(db).program_file(db, file).python_file(db),
-            cell_range,
-        )
-        .into_iter()
-        .filter_map(|folding_range| {
-            let lsp_range = folding_range
-                .range
-                .to_lsp_range(db, file, snapshot.encoding())?;
+        let results: Vec<_> = folding_ranges(db, db.program_file(file).python_file(db), cell_range)
+            .into_iter()
+            .filter_map(|folding_range| {
+                let lsp_range = folding_range
+                    .range
+                    .to_lsp_range(db, file, snapshot.encoding())?;
 
-            let kind = folding_range.kind.map(|k| match k {
-                ty_ide::FoldingRangeKind::Comment => FoldingRangeKind::Comment,
-                ty_ide::FoldingRangeKind::Imports => FoldingRangeKind::Imports,
-                ty_ide::FoldingRangeKind::Region => FoldingRangeKind::Region,
-            });
+                let kind = folding_range.kind.map(|k| match k {
+                    ty_ide::FoldingRangeKind::Comment => FoldingRangeKind::Comment,
+                    ty_ide::FoldingRangeKind::Imports => FoldingRangeKind::Imports,
+                    ty_ide::FoldingRangeKind::Region => FoldingRangeKind::Region,
+                });
 
-            Some(FoldingRange {
-                start_line: lsp_range.local_range().start.line,
-                start_character: Some(lsp_range.local_range().start.character),
-                end_line: lsp_range.local_range().end.line,
-                end_character: Some(lsp_range.local_range().end.character),
-                kind,
-                collapsed_text: None,
+                Some(FoldingRange {
+                    start_line: lsp_range.local_range().start.line,
+                    start_character: Some(lsp_range.local_range().start.character),
+                    end_line: lsp_range.local_range().end.line,
+                    end_character: Some(lsp_range.local_range().end.character),
+                    kind,
+                    collapsed_text: None,
+                })
             })
-        })
-        .collect();
+            .collect();
 
         if results.is_empty() {
             Ok(None)

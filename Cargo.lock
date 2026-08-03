@@ -3157,6 +3157,7 @@ dependencies = [
  "ruff_python_trivia",
  "ruff_ranged_value",
  "rustc-hash",
+ "salsa",
  "serde",
  "serde_json",
  "tikv-jemallocator",
@@ -4653,7 +4654,6 @@ dependencies = [
  "ruff_text_size",
  "ty_ide",
  "ty_project",
- "ty_python_core",
 ]
 
 [[package]]
@@ -4673,7 +4673,6 @@ dependencies = [
  "ty_ide",
  "ty_module_resolver",
  "ty_project",
- "ty_python_core",
  "walkdir",
 ]
 

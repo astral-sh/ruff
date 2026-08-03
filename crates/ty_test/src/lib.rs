@@ -25,7 +25,7 @@ use ty_python_core::program::{FallibleStrategy, Program, ProgramSettings};
 use ty_python_semantic::pull_types::pull_types;
 use ty_python_semantic::types::UNDEFINED_REVEAL;
 use ty_python_semantic::{
-    PythonEnvironment, PythonVersionSource, PythonVersionWithSource, SysPrefixPathOrigin,
+    Db as _, PythonEnvironment, PythonVersionSource, PythonVersionWithSource, SysPrefixPathOrigin,
     fix_all_diagnostics,
 };
 
@@ -361,10 +361,8 @@ fn run_test(
 
             all_diagnostics.extend(diagnostics);
 
-            let pull_types_result = attempt_test(
-                |file| pull_types(db, Program::get(db).program_file(db, file)),
-                test_file,
-            );
+            let pull_types_result =
+                attempt_test(|file| pull_types(db, db.program_file(file)), test_file);
             match pull_types_result {
                 Ok(()) => {}
                 Err(failures) => {

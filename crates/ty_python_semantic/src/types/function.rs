@@ -2907,8 +2907,10 @@ impl KnownFunction {
                 let Some(module_name) = ModuleName::new(module_name) else {
                     return;
                 };
-                let importing_file =
-                    ImportingFile::File(context.file(), context.program_environment().program(db));
+                let importing_file = ImportingFile::File(
+                    context.file(),
+                    context.program_environment().resolver_environment(db),
+                );
                 let Some(module) = resolve_module(db, importing_file, &module_name) else {
                     return;
                 };

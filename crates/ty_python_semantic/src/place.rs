@@ -713,7 +713,7 @@ pub(crate) fn known_module_symbol<'db>(
     known_module: KnownModule,
     symbol: &str,
 ) -> PlaceAndQualifiers<'db> {
-    resolve_module_confident(db, env.program(db), &known_module.name())
+    resolve_module_confident(db, env.resolver_environment(db), &known_module.name())
         .and_then(|module| {
             let file = ProgramFile::new(db, module.file(db)?, env.program(db));
             Some(imported_symbol(db, env, Some(file), symbol, None))

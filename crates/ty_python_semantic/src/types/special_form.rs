@@ -830,7 +830,8 @@ impl SpecialFormType {
         self.definition_modules()
             .iter()
             .find_map(|module| {
-                let module = resolve_module_confident(db, env.program(db), &module.name())?;
+                let module =
+                    resolve_module_confident(db, env.resolver_environment(db), &module.name())?;
                 let file = ProgramFile::new(db, module.file(db)?, env.program(db));
                 let scope = FileScopeId::global().to_scope_id(db, file);
                 let symbol_id = place_table(db, scope).symbol_id(self.name())?;

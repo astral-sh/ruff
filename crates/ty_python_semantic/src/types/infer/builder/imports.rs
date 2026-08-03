@@ -97,8 +97,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             }
         } else {
-            let importing_file =
-                ImportingFile::File(self.file(), self.program_environment().program(db));
+            let importing_file = ImportingFile::File(
+                self.file(),
+                self.program_environment().resolver_environment(db),
+            );
             if let Some(better_level) = (0..level).rev().find(|reduced_level| {
                 let Ok(module_name) =
                     ModuleName::from_identifier_parts(db, importing_file, module, *reduced_level)
@@ -126,7 +128,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let verbose = db.verbose();
         let search_paths = search_paths(
             db,
-            self.program_environment().program(db),
+            self.program_environment().resolver_environment(db),
             ModuleResolveMode::Typing,
         );
 
@@ -275,8 +277,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             format_import_from_module(*level, module),
             self.file().path(db),
         );
-        let importing_file =
-            ImportingFile::File(self.file(), self.program_environment().program(db));
+        let importing_file = ImportingFile::File(
+            self.file(),
+            self.program_environment().resolver_environment(db),
+        );
         let module_name = ModuleName::from_import_statement(db, importing_file, import_from);
 
         let module_name = match module_name {
@@ -319,8 +323,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     ) {
         let db = self.db();
 
-        let importing_file =
-            ImportingFile::File(self.file(), self.program_environment().program(db));
+        let importing_file = ImportingFile::File(
+            self.file(),
+            self.program_environment().resolver_environment(db),
+        );
         let Ok(module_name) = ModuleName::from_import_statement(db, importing_file, import_from)
         else {
             self.add_unknown_declaration_with_binding(alias.into(), definition);
@@ -545,8 +551,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         definition: Definition<'db>,
     ) {
         let db = self.db();
-        let importing_file =
-            ImportingFile::File(self.file(), self.program_environment().program(db));
+        let importing_file = ImportingFile::File(
+            self.file(),
+            self.program_environment().resolver_environment(db),
+        );
 
         // Get this package's absolute module name by resolving `.`, and make sure it exists
         let Ok(thispackage_name) = ModuleName::package_for_file(db, importing_file) else {

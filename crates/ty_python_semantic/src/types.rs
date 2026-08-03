@@ -9282,7 +9282,10 @@ impl<'db> ModuleLiteralType<'db> {
         absolute_submodule_name.extend(&relative_submodule_name);
         let submodule = resolve_module(
             db,
-            ImportingFile::File(importing_file.file(db), importing_file.program(db)),
+            ImportingFile::File(
+                importing_file.file(db),
+                importing_file.resolver_environment(db),
+            ),
             &absolute_submodule_name,
         )?;
         Some(Type::module_literal(db, importing_file, submodule))

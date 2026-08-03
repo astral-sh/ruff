@@ -27,7 +27,7 @@ use ty_ide::{NavigationTarget, NavigationTargets, hints, signature_help};
 use ty_project::metadata::options::Options;
 use ty_project::watch::{ChangeEvent, ChangedKind, CreatedKind, DeletedKind};
 use ty_project::{CheckMode, ProjectMetadata};
-use ty_project::{Db, ProjectDatabase};
+use ty_project::{Db, ProjectDatabase, SemanticDb as _};
 use ty_python_core::program::{FallibleStrategy, Program};
 use ty_python_semantic::ProgramEnvironment;
 use wasm_bindgen::prelude::*;
@@ -277,13 +277,10 @@ impl Workspace {
 
     #[wasm_bindgen(js_name = "hints")]
     pub fn hints(&self, file_id: &FileHandle) -> Result<Vec<Hint>, Error> {
-        Ok(hints(
-            &self.db,
-            Program::get(&self.db).program_file(&self.db, file_id.file),
-        )
-        .into_iter()
-        .map(|hint| Hint::from_ide_hint(&self.db, file_id.file, self.position_encoding, &hint))
-        .collect())
+        Ok(hints(&self.db, self.db.program_file(file_id.file))
+            .into_iter()
+            .map(|hint| Hint::from_ide_hint(&self.db, file_id.file, self.position_encoding, &hint))
+            .collect())
     }
 
     /// Checks all open files
@@ -337,11 +334,9 @@ impl Workspace {
 
         let offset = position.to_text_size(&source, &index, self.position_encoding)?;
 
-        let Some(targets) = goto_type_definition(
-            &self.db,
-            Program::get(&self.db).program_file(&self.db, file_id.file),
-            offset,
-        ) else {
+        let Some(targets) =
+            goto_type_definition(&self.db, self.db.program_file(file_id.file), offset)
+        else {
             return Ok(Vec::new());
         };
 
@@ -365,11 +360,8 @@ impl Workspace {
 
         let offset = position.to_text_size(&source, &index, self.position_encoding)?;
 
-        let Some(targets) = goto_declaration(
-            &self.db,
-            Program::get(&self.db).program_file(&self.db, file_id.file),
-            offset,
-        ) else {
+        let Some(targets) = goto_declaration(&self.db, self.db.program_file(file_id.file), offset)
+        else {
             return Ok(Vec::new());
         };
 
@@ -393,11 +385,8 @@ impl Workspace {
 
         let offset = position.to_text_size(&source, &index, self.position_encoding)?;
 
-        let Some(targets) = goto_definition(
-            &self.db,
-            Program::get(&self.db).program_file(&self.db, file_id.file),
-            offset,
-        ) else {
+        let Some(targets) = goto_definition(&self.db, self.db.program_file(file_id.file), offset)
+        else {
             return Ok(Vec::new());
         };
 
@@ -421,12 +410,9 @@ impl Workspace {
 
         let offset = position.to_text_size(&source, &index, self.position_encoding)?;
 
-        let Some(targets) = find_references(
-            &self.db,
-            Program::get(&self.db).program_file(&self.db, file_id.file),
-            offset,
-            true,
-        ) else {
+        let Some(targets) =
+            find_references(&self.db, self.db.program_file(file_id.file), offset, true)
+        else {
             return Ok(Vec::new());
         };
 
@@ -465,11 +451,7 @@ impl Workspace {
 
         let offset = position.to_text_size(&source, &index, self.position_encoding)?;
 
-        let Some(range) = can_rename(
-            &self.db,
-            Program::get(&self.db).program_file(&self.db, file_id.file),
-            offset,
-        ) else {
+        let Some(range) = can_rename(&self.db, self.db.program_file(file_id.file), offset) else {
             return Ok(None);
         };
 
@@ -492,7 +474,7 @@ impl Workspace {
         let index = line_index(&self.db, file_id.file);
 
         let offset = position.to_text_size(&source, &index, self.position_encoding)?;
-        let program_file = Program::get(&self.db).program_file(&self.db, file_id.file);
+        let program_file = self.db.program_file(file_id.file);
 
         if can_rename(&self.db, program_file, offset).is_none() {
             return Ok(Vec::new());
@@ -523,11 +505,7 @@ impl Workspace {
 
         let offset = position.to_text_size(&source, &index, self.position_encoding)?;
 
-        let Some(range_info) = hover(
-            &self.db,
-            Program::get(&self.db).program_file(&self.db, file_id.file),
-            offset,
-        ) else {
+        let Some(range_info) = hover(&self.db, self.db.program_file(file_id.file), offset) else {
             return Ok(None);
         };
 
@@ -558,7 +536,7 @@ impl Workspace {
         let offset = position.to_text_size(&source, &index, self.position_encoding)?;
 
         let settings = ty_ide::CompletionSettings::default();
-        let program_file = Program::get(&self.db).program_file(&self.db, file_id.file);
+        let program_file = self.db.program_file(file_id.file);
         let env = ProgramEnvironment::from_file(program_file);
         let completions = ty_ide::completion(
             &self.db,
@@ -608,7 +586,7 @@ impl Workspace {
 
         let result = inlay_hints(
             &self.db,
-            Program::get(&self.db).program_file(&self.db, file_id.file),
+            self.db.program_file(file_id.file),
             range.to_text_range(&index, &source, self.position_encoding)?,
             // TODO: Provide a way to configure this
             &InlayHintSettings {
@@ -665,11 +643,8 @@ impl Workspace {
         let index = line_index(&self.db, file_id.file);
         let source = source_text(&self.db, file_id.file);
 
-        let semantic_token = ty_ide::semantic_tokens(
-            &self.db,
-            Program::get(&self.db).program_file(&self.db, file_id.file),
-            None,
-        );
+        let semantic_token =
+            ty_ide::semantic_tokens(&self.db, self.db.program_file(file_id.file), None);
 
         let result = semantic_token
             .iter()
@@ -694,7 +669,7 @@ impl Workspace {
 
         let semantic_token = ty_ide::semantic_tokens(
             &self.db,
-            Program::get(&self.db).program_file(&self.db, file_id.file),
+            self.db.program_file(file_id.file),
             Some(range.to_text_range(&index, &source, self.position_encoding)?),
         );
 
@@ -731,7 +706,7 @@ impl Workspace {
             actions.extend(
                 ty_ide::code_actions(
                     &self.db,
-                    Program::get(&self.db).program_file(&self.db, file_id.file),
+                    self.db.program_file(file_id.file),
                     range,
                     diagnostic.inner.id().as_str(),
                 )
@@ -766,11 +741,9 @@ impl Workspace {
 
         let offset = position.to_text_size(&source, &index, self.position_encoding)?;
 
-        let Some(signature_help_info) = signature_help(
-            &self.db,
-            Program::get(&self.db).program_file(&self.db, file_id.file),
-            offset,
-        ) else {
+        let Some(signature_help_info) =
+            signature_help(&self.db, self.db.program_file(file_id.file), offset)
+        else {
             return Ok(None);
         };
 
@@ -817,11 +790,9 @@ impl Workspace {
 
         let offset = position.to_text_size(&source, &index, self.position_encoding)?;
 
-        let Some(targets) = document_highlights(
-            &self.db,
-            Program::get(&self.db).program_file(&self.db, file_id.file),
-            offset,
-        ) else {
+        let Some(targets) =
+            document_highlights(&self.db, self.db.program_file(file_id.file), offset)
+        else {
             return Ok(Vec::new());
         };
 

@@ -110,7 +110,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             .to_scope_id(db, self.program_file());
 
         let file = self.program_file();
-        let importing_file = ImportingFile::File(file.file(db), env.program(db));
+        let importing_file = ImportingFile::File(file.file(db), env.resolver_environment(db));
         let maybe_known_class = KnownClass::try_from_file_and_name(db, importing_file, name);
 
         let known_module = || {
