@@ -664,6 +664,7 @@ fn builtins_symbol_impl<'db>(
     visibility: BuiltinVisibility,
 ) -> Option<(ScopeId<'db>, PlaceAndQualifiers<'db>)> {
     let program = env.program(db);
+    let resolver_environment = program.resolver_environment(db);
     let resolver = |module: Module<'db>| {
         let file = ProgramFile::new(db, module.file(db)?, program);
         let scope = global_scope(db, file);
@@ -695,17 +696,13 @@ fn builtins_symbol_impl<'db>(
     // If this symbol is not present in project-level builtins, search in the default ones.
     resolve_module_confident(
         db,
-        program.resolver_environment(db),
+        resolver_environment,
         &ModuleName::new_static("__builtins__").unwrap(),
     )
     .and_then(&resolver)
     .or_else(|| {
-        resolve_module_confident(
-            db,
-            program.resolver_environment(db),
-            &KnownModule::Builtins.name(),
-        )
-        .and_then(resolver)
+        resolve_module_confident(db, resolver_environment, &KnownModule::Builtins.name())
+            .and_then(resolver)
     })
 }
 

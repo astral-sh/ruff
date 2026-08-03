@@ -604,7 +604,7 @@ impl<'db> Imports<'db> {
             ImportingFile::File(program_file.file(db), program_file.resolver_environment(db));
         let module_name = match module_kind {
             ImportModuleKind::Definitive(name) | ImportModuleKind::Possible(name) => {
-                name.to_module_name(db, importing_file.resolver_file(db))?
+                name.to_module_name(db, importing_file)?
             }
         };
         let module = resolve_module(db, importing_file, &module_name)?;

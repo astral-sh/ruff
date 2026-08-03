@@ -788,10 +788,6 @@ pub(crate) mod testing {
             crate::check_file(self, file)
         }
 
-        fn program_file(&self, file: File) -> ProgramFile<'_> {
-            Program::get(self).program_file(self, file)
-        }
-
         fn rule_selection(&self, _file: ruff_db::files::File) -> &RuleSelection {
             self.project().rules(self)
         }

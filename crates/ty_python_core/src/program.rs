@@ -22,13 +22,12 @@ pub struct Program<'db> {
     #[returns(ref)]
     pub python_platform: PythonPlatform,
 
-    #[returns(ref)]
-    pub search_paths: SearchPaths,
+    #[returns(copy)]
+    pub resolver_environment: ResolverEnvironment<'db>,
 }
 
 impl get_size2::GetSize for Program<'_> {}
 
-#[salsa::tracked]
 impl<'db> Program<'db> {
     /// Creates a program from settings whose search roots have already been registered.
     pub fn from_settings(db: &'db dyn Db, settings: ProgramSettings) -> Self {
@@ -38,17 +37,17 @@ impl<'db> Program<'db> {
             search_paths,
         } = settings;
 
-        Program::new(db, python_version, python_platform, search_paths)
+        let resolver_environment =
+            ResolverEnvironment::new(db, python_version.version, &search_paths);
+        Program::new(db, python_version, python_platform, resolver_environment)
     }
 
     pub fn python_version(self, db: &'db dyn Db) -> PythonVersion {
         self.python_version_with_source(db).version
     }
 
-    /// Returns the module-resolution environment for this program.
-    #[salsa::tracked(returns(copy))]
-    pub fn resolver_environment(self, db: &'db dyn Db) -> ResolverEnvironment<'db> {
-        ResolverEnvironment::new(db, self.python_version(db), self.search_paths(db))
+    pub fn search_paths(self, db: &'db dyn Db) -> &'db SearchPaths {
+        self.resolver_environment(db).search_paths(db)
     }
 
     pub fn program_file(self, db: &'db dyn Db, file: File) -> ProgramFile<'db> {

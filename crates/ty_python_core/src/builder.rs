@@ -254,6 +254,7 @@ pub(super) struct SemanticIndexBuilder<'db, 'ast> {
 
     // Used for checking semantic syntax errors
     resolver_environment: ResolverEnvironment<'db>,
+    python_version: PythonVersion,
     source_text: OnceCell<SourceText>,
     semantic_checker: SemanticSyntaxChecker,
     in_try: bool,
@@ -345,6 +346,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             enclosing_snapshots: FxHashMap::default(),
 
             resolver_environment: file.resolver_environment(db),
+            python_version: file.python_version(db),
             source_text: OnceCell::new(),
             semantic_checker: SemanticSyntaxChecker::default(),
             in_try: false,
@@ -5015,7 +5017,7 @@ impl SemanticSyntaxContext for SemanticIndexBuilder<'_, '_> {
     }
 
     fn python_version(&self) -> PythonVersion {
-        self.resolver_environment.python_version(self.db)
+        self.python_version
     }
 
     fn source(&self) -> &str {
