@@ -1,6 +1,9 @@
+use crate::ProgramEnvironment;
 use std::borrow::Cow;
 
 use ruff_db::parsed::ParsedModuleRef;
+
+use ruff_db::PythonFile;
 use rustc_hash::FxHashMap;
 
 use ruff_python_ast::visitor::{self, Visitor};
@@ -38,11 +41,20 @@ impl<'ast> Visitor<'ast> for UnknownTargetCollector<'_, '_> {
 impl<'db, 'ast> Unpacker<'db, 'ast> {
     pub(crate) fn new(
         db: &'db dyn Db,
+        env: &'ast ProgramEnvironment<'db>,
         target_scope: ScopeId<'db>,
+        python_file: PythonFile<'db>,
         module: &'ast ParsedModuleRef,
     ) -> Self {
         Self {
-            context: InferContext::new(db, target_scope, module),
+            context: InferContext::new(
+                db,
+                env,
+                target_scope,
+                python_file.file(db),
+                python_file,
+                module,
+            ),
             targets: FxHashMap::default(),
         }
     }
@@ -57,13 +69,17 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
 
     /// Unpack the value to the target expression.
     pub(crate) fn unpack(&mut self, target: &ast::Expr, value: UnpackValue<'db>) {
+        let db = self.db();
         debug_assert!(
             matches!(target, ast::Expr::List(_) | ast::Expr::Tuple(_)),
             "Unpacking target must be a list or tuple expression"
         );
 
-        let value_inference =
-            infer_expression_types(self.db(), value.expression(), TypeContext::default());
+        let value_inference = infer_expression_types(
+            self.context.db(),
+            value.expression(),
+            TypeContext::default(),
+        );
         let value_expr = value.expression().node_ref(self.db()).node(self.module());
 
         if matches!(value.kind(), UnpackKind::Assign)
@@ -82,27 +98,33 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
                     value_type
                 }
             }
-            UnpackKind::Iterable { mode } => value_type
-                .try_iterate_with_mode(self.db(), mode)
-                .map(|tuple| tuple.homogeneous_element_type(self.db()))
-                .unwrap_or_else(|err| {
-                    err.report_diagnostic(
-                        &self.context,
-                        value_type,
-                        value.as_any_node_ref(self.db(), self.module()),
-                    );
-                    err.fallback_element_type(self.db())
-                }),
-            UnpackKind::ContextManager { mode } => value_type
-                .try_enter_with_mode(self.db(), mode)
-                .unwrap_or_else(|err| {
-                    err.report_diagnostic(
-                        &self.context,
-                        value_type,
-                        value.as_any_node_ref(self.db(), self.module()),
-                    );
-                    err.fallback_enter_type(self.db())
-                }),
+            UnpackKind::Iterable { mode } => {
+                let env = self.context.program_environment();
+                value_type
+                    .try_iterate_with_mode(db, env, mode)
+                    .map(|tuple| tuple.homogeneous_element_type(db, env))
+                    .unwrap_or_else(|err| {
+                        err.report_diagnostic(
+                            &self.context,
+                            value_type,
+                            value.as_any_node_ref(self.db(), self.module()),
+                        );
+                        err.fallback_element_type(db, env)
+                    })
+            }
+            UnpackKind::ContextManager { mode } => {
+                let env = self.context.program_environment();
+                value_type
+                    .try_enter_with_mode(db, env, mode)
+                    .unwrap_or_else(|err| {
+                        err.report_diagnostic(
+                            &self.context,
+                            value_type,
+                            value.as_any_node_ref(self.db(), self.module()),
+                        );
+                        err.fallback_enter_type(db, env)
+                    })
+            }
         };
 
         self.unpack_inner(target, value_expr.into(), value_type);
@@ -187,6 +209,7 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
         value_expr: AnyNodeRef<'_>,
         value_ty: Type<'db>,
     ) {
+        let db = self.db();
         match target {
             ast::Expr::Name(_) | ast::Expr::Attribute(_) | ast::Expr::Subscript(_) => {
                 self.targets.insert(target.into(), value_ty);
@@ -202,7 +225,8 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
                     }
                     None => TupleLength::Fixed(elts.len()),
                 };
-                let mut unpacker = TupleUnpacker::new(self.db(), target_len);
+                let env = self.context.program_environment();
+                let mut unpacker = TupleUnpacker::new(db, env, target_len);
 
                 // N.B. `Type::try_iterate` internally handles unions, but in a lossy way.
                 // For our purposes here, we get better error messages and more precise inference
@@ -215,9 +239,9 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
                 };
 
                 for ty in unpack_types.iter().copied() {
-                    let tuple = ty.try_iterate(self.db()).unwrap_or_else(|err| {
+                    let tuple = ty.try_iterate(db, env).unwrap_or_else(|err| {
                         err.report_diagnostic(&self.context, ty, value_expr);
-                        Cow::Owned(TupleSpec::homogeneous(err.fallback_element_type(self.db())))
+                        Cow::Owned(TupleSpec::homogeneous(err.fallback_element_type(db, env)))
                     });
 
                     if let Err(err) = unpacker.unpack_tuple(tuple.as_ref()) {
@@ -328,12 +352,13 @@ impl<'db> UnpackResult<'db> {
     pub(crate) fn cycle_normalized(
         mut self,
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         previous_cycle_result: &UnpackResult<'db>,
         cycle: &salsa::Cycle,
     ) -> Self {
         for (expr, ty) in &mut self.targets {
             let previous_ty = previous_cycle_result.expression_type(*expr);
-            *ty = ty.cycle_normalized(db, previous_ty, cycle);
+            *ty = ty.cycle_normalized(db, env, previous_ty, cycle);
         }
 
         self

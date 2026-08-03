@@ -31,11 +31,11 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use smallvec::SmallVec;
 use ty_python_core::definition::Definition;
 
-use crate::Db;
 use crate::types::function::FunctionLiteral;
 use crate::types::generics::Specialization;
 use crate::types::visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard};
 use crate::types::{ClassType, ProtocolInstanceType, Type, TypeAliasType, TypedDictType};
+use crate::{Db, ProgramEnvironment};
 
 /// The type identity used for recursive checks/transformations.
 #[derive(Debug, Clone, Copy, Eq, Hash, PartialEq)]
@@ -106,6 +106,7 @@ impl<'db> Type<'db> {
 }
 
 struct DefinitionReferenceVisitor<'db> {
+    env: ProgramEnvironment<'db>,
     target: Definition<'db>,
     active_definitions: ActiveRecursionDetector<Definition<'db>>,
     visited_types: TypeCollector<'db>,
@@ -122,6 +123,7 @@ impl<'db> DefinitionReferenceVisitor<'db> {
 
     fn new(target: Definition<'db>) -> Self {
         Self {
+            env: ProgramEnvironment::from_definition(target),
             target,
             active_definitions: ActiveRecursionDetector::default(),
             visited_types: TypeCollector::default(),
@@ -158,7 +160,9 @@ impl<'db> DefinitionReferenceVisitor<'db> {
     fn visit_definition_body(&self, db: &'db dyn Db, ty: Type<'db>) {
         match ty {
             Type::TypeAlias(alias) => self.visit_type_alias_type(db, alias),
-            Type::ProtocolInstance(protocol) => self.visit_protocol_instance_type(db, protocol),
+            Type::ProtocolInstance(protocol) => {
+                self.visit_protocol_instance_type(db, protocol);
+            }
             Type::TypedDict(typed_dict) => self.visit_typed_dict_type(db, typed_dict),
             _ => {}
         }
@@ -166,6 +170,10 @@ impl<'db> DefinitionReferenceVisitor<'db> {
 }
 
 impl<'db> TypeVisitor<'db> for DefinitionReferenceVisitor<'db> {
+    fn program_environment(&self) -> &ProgramEnvironment<'db> {
+        &self.env
+    }
+
     fn should_visit_lazy_type_attributes(&self) -> bool {
         false
     }
@@ -241,9 +249,10 @@ impl<'db> ProtocolInstanceType<'db> {
             return false;
         };
         let definition = origin.definition(db);
+        let env = ProgramEnvironment::from_definition(definition);
         // Inspect the definition without its current specialization. Otherwise, a finite
         // type such as `Protocol[Protocol[int]]` would appear recursive.
-        let unspecialized = Type::instance(db, ClassType::NonGeneric(origin.into()));
+        let unspecialized = Type::instance(db, &env, ClassType::NonGeneric(origin.into()));
         DefinitionReferenceVisitor::references(db, unspecialized, definition)
     }
 }
@@ -677,9 +686,11 @@ impl<T: Hash + Eq> Drop for ActiveRecursionGuard<'_, T> {
 #[cfg(test)]
 mod tests {
     use super::{CycleDetector, CycleDetectorVisit, Db, HasIdentity, TypeIdentity};
-    use crate::db::tests::{TestDb, setup_db};
+    use crate::ProgramEnvironment;
+    use crate::db::tests::setup_db;
     use crate::place::global_symbol;
     use crate::types::Type;
+    use ruff_db::PythonFile;
     use ruff_db::files::system_path_to_file;
     use ruff_db::system::DbWithWritableSystem;
     use std::cell::Cell;
@@ -748,12 +759,17 @@ mod tests {
         fn to_identity(&self, _db: &'db dyn Db) -> Self::Id {}
     }
 
-    fn global_instance_type<'db>(db: &'db TestDb, name: &str) -> Type<'db> {
+    fn global_instance_type<'db>(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        name: &str,
+    ) -> Type<'db> {
         let file = system_path_to_file(db, "/src/a.py").unwrap();
+        let file = PythonFile::new(db, file, env.python_version(db));
         global_symbol(db, file, name)
             .place
             .expect_type()
-            .to_instance_approximation(db)
+            .to_instance_approximation(db, env)
             .unwrap()
     }
 
@@ -785,16 +801,17 @@ class RecursivePropertySetter[T](Protocol):
         )
         .unwrap();
 
+        let env = db.program_environment();
         assert_eq!(
-            global_instance_type(&db, "GenericProperty").recursive_identity(&db),
+            global_instance_type(&db, &env, "GenericProperty").recursive_identity(&db),
             None
         );
         assert!(matches!(
-            global_instance_type(&db, "RecursiveProperty").recursive_identity(&db),
+            global_instance_type(&db, &env, "RecursiveProperty").recursive_identity(&db),
             Some(TypeIdentity::RecursiveProtocol(_))
         ));
         assert!(matches!(
-            global_instance_type(&db, "RecursivePropertySetter").recursive_identity(&db),
+            global_instance_type(&db, &env, "RecursivePropertySetter").recursive_identity(&db),
             Some(TypeIdentity::RecursiveProtocol(_))
         ));
     }
@@ -802,26 +819,28 @@ class RecursivePropertySetter[T](Protocol):
     #[test]
     fn caches_results_and_spills_after_two_entries() {
         let db = setup_db();
+        let db = &db;
         let detector = Detector::new(0);
 
-        assert_eq!(detector.visit(&db, 1, || 10), 10);
-        assert_eq!(detector.visit(&db, 1, || 40), 10);
-        assert_eq!(detector.visit(&db, 2, || 20), 20);
+        assert_eq!(detector.visit(db, 1, || 10), 10);
+        assert_eq!(detector.visit(db, 1, || 40), 10);
+        assert_eq!(detector.visit(db, 2, || 20), 20);
         assert!(!detector.cache.borrow().is_spilled());
-        assert_eq!(detector.visit(&db, 3, || 30), 30);
+        assert_eq!(detector.visit(db, 3, || 30), 30);
         assert!(detector.cache.borrow().is_spilled());
 
-        assert_eq!(detector.visit(&db, 2, || 40), 20);
-        assert_eq!(detector.visit(&db, 3, || 40), 30);
+        assert_eq!(detector.visit(db, 2, || 40), 20);
+        assert_eq!(detector.visit(db, 3, || 40), 30);
     }
 
     #[test]
     fn nested_visit_short_circuits_on_cycle() {
         let db = setup_db();
+        let db = &db;
         let detector = Detector::new(0);
 
         assert_eq!(
-            detector.visit(&db, 1, || detector.visit(&db, 1, || 20) + 10),
+            detector.visit(db, 1, || detector.visit(db, 1, || 20) + 10),
             10
         );
     }
@@ -829,12 +848,13 @@ class RecursivePropertySetter[T](Protocol):
     #[test]
     fn computes_each_active_identity_once() {
         let db = setup_db();
+        let db = &db;
         let identity_calls = Cell::new(0);
         let detector = CycleDetector::<TestVisit, CountingIdentityItem<'_>, u8, 1>::new(0);
 
         assert_eq!(
-            detector.visit(&db, CountingIdentityItem::new(1, &identity_calls), || {
-                detector.visit(&db, CountingIdentityItem::new(3, &identity_calls), || 1)
+            detector.visit(db, CountingIdentityItem::new(1, &identity_calls), || {
+                detector.visit(db, CountingIdentityItem::new(3, &identity_calls), || 1)
             }),
             1
         );
@@ -844,12 +864,13 @@ class RecursivePropertySetter[T](Protocol):
     #[test]
     fn skips_identity_for_distinct_candidates() {
         let db = setup_db();
+        let db = &db;
         let identity_calls = Cell::new(0);
         let detector = CycleDetector::<TestVisit, CountingIdentityItem<'_>, u8, 1>::new(0);
 
         assert_eq!(
-            detector.visit(&db, CountingIdentityItem::new(1, &identity_calls), || {
-                detector.visit(&db, CountingIdentityItem::new(2, &identity_calls), || 1)
+            detector.visit(db, CountingIdentityItem::new(1, &identity_calls), || {
+                detector.visit(db, CountingIdentityItem::new(2, &identity_calls), || 1)
             }),
             1
         );
@@ -859,15 +880,16 @@ class RecursivePropertySetter[T](Protocol):
     #[test]
     fn skips_identity_without_a_distinct_active_item() {
         let db = setup_db();
+        let db = &db;
         let identity_calls = Cell::new(0);
         let detector = CycleDetector::<TestVisit, CountingIdentityItem<'_>, u8, 1>::new(0);
 
         assert_eq!(
-            detector.visit(&db, CountingIdentityItem::new(1, &identity_calls), || 1),
+            detector.visit(db, CountingIdentityItem::new(1, &identity_calls), || 1),
             1
         );
         assert_eq!(
-            detector.visit(&db, CountingIdentityItem::new(1, &identity_calls), || 2),
+            detector.visit(db, CountingIdentityItem::new(1, &identity_calls), || 2),
             1
         );
         assert_eq!(identity_calls.get(), 0);
@@ -876,32 +898,33 @@ class RecursivePropertySetter[T](Protocol):
     #[test]
     fn different_items_with_same_identity_form_cycle() {
         let db = setup_db();
+        let db = &db;
         let detector = CycleDetector::<TestVisit, ConstantIdentityItem, u8, 1>::new(0);
 
         let CycleDetectorVisit::Pending(pending) =
-            detector.begin_visit(&db, ConstantIdentityItem(1))
+            detector.begin_visit(db, ConstantIdentityItem(1))
         else {
             panic!("the first identity should be pending");
         };
-        let CycleDetectorVisit::Cycle(item) = detector.begin_visit(&db, ConstantIdentityItem(2))
+        let CycleDetectorVisit::Cycle(item) = detector.begin_visit(db, ConstantIdentityItem(2))
         else {
             panic!("a different item with the same identity should form a cycle");
         };
         assert_eq!(item.0, 2);
         detector.finish_visit(pending, 1);
 
-        let CycleDetectorVisit::Ready(seen) = detector.begin_visit(&db, ConstantIdentityItem(1))
+        let CycleDetectorVisit::Ready(seen) = detector.begin_visit(db, ConstantIdentityItem(1))
         else {
             panic!("the first identity should be ready after the pending visit is finished");
         };
         assert_eq!(seen, 1);
         let CycleDetectorVisit::Pending(pending) =
-            detector.begin_visit(&db, ConstantIdentityItem(2))
+            detector.begin_visit(db, ConstantIdentityItem(2))
         else {
             panic!("the second identity should be pending after the first is finished");
         };
         detector.finish_visit(pending, 2);
-        let CycleDetectorVisit::Ready(seen) = detector.begin_visit(&db, ConstantIdentityItem(2))
+        let CycleDetectorVisit::Ready(seen) = detector.begin_visit(db, ConstantIdentityItem(2))
         else {
             panic!("the second identity should be ready after the pending visit is finished");
         };

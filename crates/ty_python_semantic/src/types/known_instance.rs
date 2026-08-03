@@ -1,3 +1,4 @@
+use crate::ProgramEnvironment;
 use itertools::Either;
 use ruff_python_ast::name::Name;
 
@@ -231,10 +232,15 @@ pub(super) fn walk_known_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Size
 }
 
 impl<'db> VarianceInferable<'db> for KnownInstanceType<'db> {
-    fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarIdentity<'db>) -> TypeVarVariance {
+    fn variance_of(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        typevar: BoundTypeVarIdentity<'db>,
+    ) -> TypeVarVariance {
         match self {
             KnownInstanceType::TypeAliasType(type_alias) => {
-                type_alias.raw_value_type(db).variance_of(db, typevar)
+                type_alias.raw_value_type(db).variance_of(db, env, typevar)
             }
             _ => TypeVarVariance::Bivariant,
         }
@@ -245,6 +251,7 @@ impl<'db> KnownInstanceType<'db> {
     pub(super) fn recursive_type_normalized_impl(
         self,
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         div: Type<'db>,
         nested: bool,
     ) -> Option<Self> {
@@ -259,42 +266,42 @@ impl<'db> KnownInstanceType<'db> {
             Self::TypeVar(typevar) => Some(Self::TypeVar(typevar)),
             Self::TypeAliasType(type_alias) => Some(Self::TypeAliasType(type_alias)),
             Self::Field(field) => field
-                .recursive_type_normalized_impl(db, div, nested)
+                .recursive_type_normalized_impl(db, env, div, nested)
                 .map(Self::Field),
             Self::UnionType(union_type) => union_type
-                .recursive_type_normalized_impl(db, div, nested)
+                .recursive_type_normalized_impl(db, env, div, nested)
                 .map(Self::UnionType),
             Self::Literal(ty) => ty
-                .recursive_type_normalized_impl(db, div, true)
+                .recursive_type_normalized_impl(db, env, div, true)
                 .map(Self::Literal),
             Self::Annotated(ty) => ty
-                .recursive_type_normalized_impl(db, div, true)
+                .recursive_type_normalized_impl(db, env, div, true)
                 .map(Self::Annotated),
             Self::TypeGenericAlias(ty) => ty
-                .recursive_type_normalized_impl(db, div, true)
+                .recursive_type_normalized_impl(db, env, div, true)
                 .map(Self::TypeGenericAlias),
             Self::LiteralStringAlias(ty) => ty
-                .recursive_type_normalized_impl(db, div, true)
+                .recursive_type_normalized_impl(db, env, div, true)
                 .map(Self::LiteralStringAlias),
             Self::Callable(callable) => callable
-                .recursive_type_normalized_impl(db, div, nested)
+                .recursive_type_normalized_impl(db, env, div, nested)
                 .map(Self::Callable),
             Self::NewType(newtype) => newtype
-                .recursive_type_normalized_impl(db, div, true)
+                .recursive_type_normalized_impl(db, env, div, true)
                 .map(Self::NewType),
             Self::Sentinel(sentinel) => Some(Self::Sentinel(sentinel)),
             Self::GenericContext(generic) => Some(Self::GenericContext(generic)),
             Self::Specialization(specialization) => specialization
-                .recursive_type_normalized_impl(db, div, true)
+                .recursive_type_normalized_impl(db, env, div, true)
                 .map(Self::Specialization),
             Self::NamedTupleSpec(spec) => spec
-                .recursive_type_normalized_impl(db, div, true)
+                .recursive_type_normalized_impl(db, env, div, true)
                 .map(Self::NamedTupleSpec),
             Self::FunctoolsPartial(partial) => partial
-                .recursive_type_normalized_impl(db, div, nested)
+                .recursive_type_normalized_impl(db, env, div, nested)
                 .map(Self::FunctoolsPartial),
             Self::FunctoolsPartialCall(partial) => partial
-                .recursive_type_normalized_impl(db, div, nested)
+                .recursive_type_normalized_impl(db, env, div, nested)
                 .map(Self::FunctoolsPartialCall),
         }
     }
@@ -334,31 +341,39 @@ impl<'db> KnownInstanceType<'db> {
         }
     }
 
-    pub(super) fn to_meta_type(self, db: &'db dyn Db) -> Type<'db> {
-        self.class(db).to_class_literal(db)
+    pub(super) fn to_meta_type(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Type<'db> {
+        self.class(db).to_class_literal(db, env)
     }
 
     /// Return the instance type which this type is a subtype of.
     ///
     /// For example, an alias created using the `type` statement is an instance of
-    /// `typing.TypeAliasType`, so `KnownInstanceType::TypeAliasType(_).instance_fallback(db)`
+    /// `typing.TypeAliasType`, so `KnownInstanceType::TypeAliasType(_).instance_fallback(db, python_version)`
     /// returns `Type::NominalInstance(NominalInstanceType { class: <typing.TypeAliasType> })`.
-    pub(super) fn instance_fallback(self, db: &'db dyn Db) -> Type<'db> {
-        self.class(db).to_instance(db)
+    pub(super) fn instance_fallback(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> Type<'db> {
+        self.class(db).to_instance(db, env)
     }
 
     /// Return the type denoted by this retained runtime type-expression object.
     ///
     /// This is the scope-independent subset of `Type::in_type_expression` used when a value
     /// reaches a `TypeForm` position after it has already been inferred in value context.
-    pub(crate) fn type_form_argument(self, db: &'db dyn Db) -> Option<Type<'db>> {
+    pub(crate) fn type_form_argument(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> Option<Type<'db>> {
         match self {
             Self::TypeAliasType(alias) => Some(Type::TypeAlias(alias)),
             Self::UnionType(instance) => instance.union_type(db).as_ref().ok().copied(),
             Self::Literal(ty) | Self::Annotated(ty) | Self::LiteralStringAlias(ty) => {
                 Some(ty.inner(db))
             }
-            Self::TypeGenericAlias(instance) => Some(instance.inner(db).to_meta_type(db)),
+            Self::TypeGenericAlias(instance) => Some(instance.inner(db).to_meta_type(db, env)),
             Self::Callable(callable) => Some(Type::Callable(callable)),
             Self::NewType(newtype) => Some(Type::NewTypeInstance(newtype)),
             Self::Sentinel(sentinel) => {
@@ -385,13 +400,22 @@ impl<'db> KnownInstanceType<'db> {
     }
 
     /// Return `true` if this symbol is an instance of `class`.
-    pub(super) fn is_instance_of(self, db: &dyn Db, class: ClassType) -> bool {
-        self.class(db).is_subclass_of(db, class)
+    pub(super) fn is_instance_of(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        class: ClassType,
+    ) -> bool {
+        self.class(db).is_subclass_of(db, env, class)
     }
 
     /// Return the repr of the symbol at runtime
-    pub(super) fn repr(self, db: &'db dyn Db) -> impl std::fmt::Display + 'db {
-        self.display_with(db, DisplaySettings::default())
+    pub(super) fn repr<'env>(
+        self,
+        db: &'db dyn Db,
+        env: &'env ProgramEnvironment<'db>,
+    ) -> impl std::fmt::Display + 'env {
+        self.display_with(db, env, DisplaySettings::default())
     }
 
     pub(super) fn apply_type_mapping_impl(
@@ -399,7 +423,7 @@ impl<'db> KnownInstanceType<'db> {
         db: &'db dyn Db,
         type_mapping: &TypeMapping<'_, 'db>,
         tcx: TypeContext<'db>,
-        visitor: &ApplyTypeMappingVisitor<'db>,
+        visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Type<'db> {
         match self {
             KnownInstanceType::TypeVar(typevar) => match type_mapping {
@@ -447,7 +471,7 @@ impl<'db> KnownInstanceType<'db> {
             }
             KnownInstanceType::Range { .. } => match type_mapping {
                 TypeMapping::Promote(PromotionMode::On, PromotionKind::Regular) => {
-                    self.instance_fallback(db)
+                    self.instance_fallback(db, visitor.env)
                 }
                 _ => Type::KnownInstance(self),
             },
@@ -559,29 +583,32 @@ impl<'db> FieldInstance<'db> {
     fn recursive_type_normalized_impl(
         self,
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         div: Type<'db>,
         nested: bool,
     ) -> Option<Self> {
         let default_type = match self.default_type(db) {
-            Some(default) if nested => Some(default.recursive_type_normalized_impl(db, div, true)?),
+            Some(default) if nested => {
+                Some(default.recursive_type_normalized_impl(db, env, div, true)?)
+            }
             Some(default) => Some(
                 default
-                    .recursive_type_normalized_impl(db, div, true)
+                    .recursive_type_normalized_impl(db, env, div, true)
                     .unwrap_or(div),
             ),
             None => None,
         };
         let converter = match self.converter(db) {
             Some((input_ty, output_ty)) if nested => Some((
-                input_ty.recursive_type_normalized_impl(db, div, true)?,
-                output_ty.recursive_type_normalized_impl(db, div, true)?,
+                input_ty.recursive_type_normalized_impl(db, env, div, true)?,
+                output_ty.recursive_type_normalized_impl(db, env, div, true)?,
             )),
             Some((input_ty, output_ty)) => Some((
                 input_ty
-                    .recursive_type_normalized_impl(db, div, true)
+                    .recursive_type_normalized_impl(db, env, div, true)
                     .unwrap_or(div),
                 output_ty
-                    .recursive_type_normalized_impl(db, div, true)
+                    .recursive_type_normalized_impl(db, env, div, true)
                     .unwrap_or(div),
             )),
             None => None,
@@ -633,9 +660,11 @@ impl<'db> UnionTypeInstance<'db> {
         typevar_binding_context: Option<Definition<'db>>,
         inference_flags: InferenceFlags,
     ) -> Type<'db> {
-        let mut builder = UnionBuilder::new(db);
+        let env = ProgramEnvironment::from_scope(scope_id);
+        let mut builder = UnionBuilder::new(db, &env);
         for ty in &value_expr_types {
-            match ty.in_type_expression(db, scope_id, typevar_binding_context, inference_flags) {
+            match ty.in_type_expression_impl(db, scope_id, typevar_binding_context, inference_flags)
+            {
                 Ok(ty) => builder.add_in_place(ty),
                 Err(error) => {
                     return Type::KnownInstance(KnownInstanceType::UnionType(
@@ -671,7 +700,7 @@ impl<'db> UnionTypeInstance<'db> {
         db: &'db dyn Db,
         type_mapping: &TypeMapping<'_, 'db>,
         tcx: TypeContext<'db>,
-        visitor: &ApplyTypeMappingVisitor<'db>,
+        visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Self {
         if let Ok(union_type) = self.union_type(db) {
             UnionTypeInstance::new(
@@ -693,12 +722,14 @@ impl<'db> UnionTypeInstance<'db> {
     pub(crate) fn value_expression_types(
         self,
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
     ) -> Result<impl Iterator<Item = Type<'db>> + 'db, InvalidTypeExpressionError<'db>> {
-        let to_class_literal = |ty: Type<'db>| {
+        let env = env.clone();
+        let to_class_literal = move |ty: Type<'db>| {
             ty.as_nominal_instance()
                 .and_then(|instance| {
                     instance
-                        .class(db)
+                        .class(db, &env)
                         .static_class_literal(db)
                         .map(|(lit, _)| Type::ClassLiteral(lit.into()))
                 })
@@ -722,6 +753,7 @@ impl<'db> UnionTypeInstance<'db> {
     fn recursive_type_normalized_impl(
         self,
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         div: Type<'db>,
         nested: bool,
     ) -> Option<Self> {
@@ -729,23 +761,23 @@ impl<'db> UnionTypeInstance<'db> {
         // See `UnionType::recursive_type_normalized_impl` for details.
         let value_expr_types = match self._value_expr_types(db).as_ref() {
             Some([first, second]) if nested => Some([
-                first.recursive_type_normalized_impl(db, div, nested)?,
-                second.recursive_type_normalized_impl(db, div, nested)?,
+                first.recursive_type_normalized_impl(db, env, div, nested)?,
+                second.recursive_type_normalized_impl(db, env, div, nested)?,
             ]),
             Some([first, second]) => Some([
                 first
-                    .recursive_type_normalized_impl(db, div, nested)
+                    .recursive_type_normalized_impl(db, env, div, nested)
                     .unwrap_or(div),
                 second
-                    .recursive_type_normalized_impl(db, div, nested)
+                    .recursive_type_normalized_impl(db, env, div, nested)
                     .unwrap_or(div),
             ]),
             None => None,
         };
         let union_type = match self.union_type(db).clone() {
-            Ok(ty) if nested => Ok(ty.recursive_type_normalized_impl(db, div, nested)?),
+            Ok(ty) if nested => Ok(ty.recursive_type_normalized_impl(db, env, div, nested)?),
             Ok(ty) => Ok(ty
-                .recursive_type_normalized_impl(db, div, nested)
+                .recursive_type_normalized_impl(db, env, div, nested)
                 .unwrap_or(div)),
             Err(err) => Err(err),
         };
@@ -759,6 +791,7 @@ impl<'db> FunctoolsPartialInstance<'db> {
     fn recursive_type_normalized_impl(
         self,
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         div: Type<'db>,
         nested: bool,
     ) -> Option<Self> {
@@ -768,10 +801,10 @@ impl<'db> FunctoolsPartialInstance<'db> {
                 db,
                 self.wrapped(db)
                     .inner(db)
-                    .recursive_type_normalized_impl(db, div, nested)?,
+                    .recursive_type_normalized_impl(db, env, div, nested)?,
             ),
             self.partial(db)
-                .recursive_type_normalized_impl(db, div, nested)?,
+                .recursive_type_normalized_impl(db, env, div, nested)?,
         ))
     }
 
@@ -781,7 +814,7 @@ impl<'db> FunctoolsPartialInstance<'db> {
         db: &'db dyn Db,
         type_mapping: &TypeMapping<'_, 'db>,
         tcx: TypeContext<'db>,
-        visitor: &ApplyTypeMappingVisitor<'db>,
+        visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Self {
         Self::new(
             db,
@@ -810,15 +843,16 @@ impl<'db> InternedType<'db> {
     fn recursive_type_normalized_impl(
         self,
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         div: Type<'db>,
         nested: bool,
     ) -> Option<Self> {
         let inner = if nested {
             self.inner(db)
-                .recursive_type_normalized_impl(db, div, nested)?
+                .recursive_type_normalized_impl(db, env, div, nested)?
         } else {
             self.inner(db)
-                .recursive_type_normalized_impl(db, div, nested)
+                .recursive_type_normalized_impl(db, env, div, nested)
                 .unwrap_or(div)
         };
         Some(InternedType::new(db, inner))

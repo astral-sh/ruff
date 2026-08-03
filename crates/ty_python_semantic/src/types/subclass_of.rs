@@ -1,3 +1,6 @@
+use crate::Db;
+use crate::FxOrderSet;
+use crate::ProgramEnvironment;
 use crate::place::PlaceAndQualifiers;
 use crate::types::class::DynamicClassLiteral;
 use crate::types::constraints::ConstraintSet;
@@ -9,7 +12,6 @@ use crate::types::{
     ProtocolInstanceType, SpecialFormType, Type, TypeContext, TypeMapping, TypeQualifiers,
     TypeVarBoundOrConstraints, TypeVarVariance, TypedDictType, UnionType, todo_type,
 };
-use crate::{Db, FxOrderSet};
 use ty_python_core::definition::Definition;
 
 /// A type that represents `type[C]`, i.e. the class object `C` and class objects that are subclasses of `C`.
@@ -39,14 +41,18 @@ impl<'db> SubclassOfType<'db> {
     ///
     /// The eager normalization here means that we do not need to worry elsewhere about distinguishing
     /// between `@final` classes and other classes when dealing with [`Type::SubclassOf`] variants.
-    pub(crate) fn from(db: &'db dyn Db, subclass_of: impl Into<SubclassOfInner<'db>>) -> Type<'db> {
+    pub(crate) fn from(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        subclass_of: impl Into<SubclassOfInner<'db>>,
+    ) -> Type<'db> {
         let subclass_of = subclass_of.into();
         match subclass_of {
             SubclassOfInner::Class(class) => {
                 if class.is_final(db) {
                     Type::from(class)
                 } else if class.is_object(db) {
-                    Self::subclass_of_object(db)
+                    Self::subclass_of_object(db, env)
                 } else {
                     Type::SubclassOf(Self { subclass_of })
                 }
@@ -65,7 +71,11 @@ impl<'db> SubclassOfType<'db> {
     }
 
     /// Given the class object `T`, returns a [`Type`] instance representing `type[T]`.
-    pub(crate) fn try_from_type(db: &'db dyn Db, ty: Type<'db>) -> Option<Type<'db>> {
+    pub(crate) fn try_from_type(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        ty: Type<'db>,
+    ) -> Option<Type<'db>> {
         let subclass_of = match ty {
             Type::Dynamic(dynamic) => SubclassOfInner::Dynamic(dynamic),
             Type::ClassLiteral(literal) => {
@@ -79,24 +89,29 @@ impl<'db> SubclassOfType<'db> {
             _ => return None,
         };
 
-        Some(Self::from(db, subclass_of))
+        Some(Self::from(db, env, subclass_of))
     }
 
     /// Given an instance of the class or type variable `T`, returns a [`Type`] instance representing `type[T]`.
-    pub(crate) fn try_from_instance(db: &'db dyn Db, ty: Type<'db>) -> Option<Type<'db>> {
+    pub(crate) fn try_from_instance(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        ty: Type<'db>,
+    ) -> Option<Type<'db>> {
         // Handle unions by distributing `type[]` over each element:
         // `type[A | B]` -> `type[A] | type[B]`
         match ty {
             Type::Union(union) => UnionType::try_from_elements(
                 db,
+                env,
                 union
                     .elements(db)
                     .iter()
-                    .map(|element| Self::try_from_instance(db, *element)),
+                    .map(|element| Self::try_from_instance(db, env, *element)),
             ),
-            Type::ProtocolInstance(protocol) => Some(protocol.to_meta_type(db)),
-            _ => SubclassOfInner::try_from_instance(db, ty)
-                .map(|subclass_of| Self::from(db, subclass_of)),
+            Type::ProtocolInstance(protocol) => Some(protocol.to_meta_type(db, env)),
+            _ => SubclassOfInner::try_from_instance(db, env, ty)
+                .map(|subclass_of| Self::from(db, env, subclass_of)),
         }
     }
 
@@ -116,9 +131,9 @@ impl<'db> SubclassOfType<'db> {
     }
 
     /// Return a [`Type`] instance representing the type `type[object]`.
-    fn subclass_of_object(db: &'db dyn Db) -> Type<'db> {
+    fn subclass_of_object(db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Type<'db> {
         // See the documentation of `SubclassOfType::from` for details.
-        KnownClass::Type.to_instance(db)
+        KnownClass::Type.to_instance(db, env)
     }
 
     /// Return the inner [`SubclassOfInner`] value wrapped by this `SubclassOfType`.
@@ -130,6 +145,7 @@ impl<'db> SubclassOfType<'db> {
     pub(super) fn meta_write_requirement(
         self,
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         name: &str,
     ) -> Option<(Option<Type<'db>>, TypeQualifiers)> {
         let SubclassOfInner::Protocol(protocol) = self.subclass_of else {
@@ -137,7 +153,7 @@ impl<'db> SubclassOfType<'db> {
         };
         protocol
             .interface(db)
-            .meta_write_requirement(db, Type::ProtocolInstance(protocol), name)
+            .meta_write_requirement(db, env, Type::ProtocolInstance(protocol), name)
             .map(|(write_ty, mut qualifiers)| {
                 // `ClassVar` prohibits instance writes, not writes through the class object.
                 qualifiers.remove(TypeQualifiers::CLASS_VAR);
@@ -163,11 +179,15 @@ impl<'db> SubclassOfType<'db> {
     /// Return the exact class-object type of this `type[T]` `TypeVar`'s upper bound, if it has one.
     ///
     /// This can only succeed when the upper bound normalizes to a final class.
-    pub(crate) fn exact_typevar_upper_bound(self, db: &'db dyn Db) -> Option<Type<'db>> {
+    pub(crate) fn exact_typevar_upper_bound(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> Option<Type<'db>> {
         self.into_type_var()
-            .and_then(|typevar| typevar.typevar(db).upper_bound(db))
+            .and_then(|typevar| typevar.typevar(db).upper_bound(db, env))
             .and_then(|bound| {
-                let bound = Self::try_from_instance(db, bound.resolve_type_alias(db))?;
+                let bound = Self::try_from_instance(db, env, bound.resolve_type_alias(db))?;
                 matches!(bound, Type::ClassLiteral(_) | Type::GenericAlias(_)).then_some(bound)
             })
     }
@@ -177,7 +197,7 @@ impl<'db> SubclassOfType<'db> {
         db: &'db dyn Db,
         type_mapping: &TypeMapping<'a, 'db>,
         tcx: TypeContext<'db>,
-        visitor: &ApplyTypeMappingVisitor<'db>,
+        visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Type<'db> {
         match self.subclass_of {
             SubclassOfInner::Class(class) => Type::SubclassOf(Self {
@@ -190,17 +210,18 @@ impl<'db> SubclassOfType<'db> {
             }),
             SubclassOfInner::Protocol(protocol) => protocol
                 .apply_type_mapping_impl(db, type_mapping, tcx, visitor)
-                .to_meta_type(db),
+                .to_meta_type(db, visitor.env),
             SubclassOfInner::Dynamic(_) => match type_mapping {
                 TypeMapping::Materialize(materialization_kind) => match materialization_kind {
-                    MaterializationKind::Top => KnownClass::Type.to_instance(db),
+                    MaterializationKind::Top => KnownClass::Type.to_instance(db, visitor.env),
                     MaterializationKind::Bottom => Type::Never,
                 },
                 _ => Type::SubclassOf(self),
             },
             SubclassOfInner::TypeVar(typevar) => {
                 let mapped = typevar.apply_type_mapping_impl(db, type_mapping, visitor);
-                Self::try_from_instance(db, mapped).unwrap_or_else(|| mapped.to_meta_type(db))
+                Self::try_from_instance(db, visitor.env, mapped)
+                    .unwrap_or_else(|| mapped.to_meta_type(db, visitor.env))
             }
         }
     }
@@ -208,6 +229,7 @@ impl<'db> SubclassOfType<'db> {
     pub(super) fn find_legacy_typevars_impl(
         self,
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         binding_context: Option<Definition<'db>>,
         typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
         visitor: &FindLegacyTypeVarsVisitor<'db>,
@@ -215,14 +237,15 @@ impl<'db> SubclassOfType<'db> {
         match self.subclass_of {
             SubclassOfInner::Dynamic(_) => {}
             SubclassOfInner::Class(class) => {
-                class.find_legacy_typevars_impl(db, binding_context, typevars, visitor);
+                class.find_legacy_typevars_impl(db, env, binding_context, typevars, visitor);
             }
             SubclassOfInner::Protocol(protocol) => {
-                protocol.find_legacy_typevars_impl(db, binding_context, typevars, visitor);
+                protocol.find_legacy_typevars_impl(db, env, binding_context, typevars, visitor);
             }
             SubclassOfInner::TypeVar(typevar) => {
                 Type::TypeVar(typevar).find_legacy_typevars_impl(
                     db,
+                    env,
                     binding_context,
                     typevars,
                     visitor,
@@ -234,49 +257,51 @@ impl<'db> SubclassOfType<'db> {
     pub(crate) fn find_name_in_mro_with_policy(
         self,
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         name: &str,
         policy: MemberLookupPolicy,
     ) -> Option<PlaceAndQualifiers<'db>> {
         if let SubclassOfInner::Protocol(protocol) = self.subclass_of
-            && let Some(member) = protocol.interface(db).meta_member(db, name)
+            && let Some(member) = protocol.interface(db).meta_member(db, env, name)
         {
             return Some(member);
         }
 
-        let class_like = match self.subclass_of.with_transposed_type_var(db) {
+        let class_like = match self.subclass_of.with_transposed_type_var(db, env) {
             SubclassOfInner::Class(class) => Type::from(class),
             SubclassOfInner::Dynamic(dynamic) => Type::Dynamic(dynamic),
             SubclassOfInner::Protocol(protocol) => Type::from(*protocol.class_origin(db)?),
             SubclassOfInner::TypeVar(bound_typevar) => {
-                match bound_typevar.typevar(db).bound_or_constraints(db) {
+                match bound_typevar.typevar(db).bound_or_constraints(db, env) {
                     None => unreachable!(),
                     Some(TypeVarBoundOrConstraints::UpperBound(bound)) => bound,
                     Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
-                        constraints.as_type(db)
+                        constraints.as_type(db, env)
                     }
                 }
             }
         };
 
-        class_like.find_name_in_mro_with_policy(db, name, policy)
+        class_like.find_name_in_mro_with_policy(db, env, name, policy)
     }
 
     pub(super) fn recursive_type_normalized_impl(
         self,
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         div: Type<'db>,
         nested: bool,
     ) -> Option<Self> {
         Some(Self {
             subclass_of: self
                 .subclass_of
-                .recursive_type_normalized_impl(db, div, nested)?,
+                .recursive_type_normalized_impl(db, env, div, nested)?,
         })
     }
 
-    pub(crate) fn to_instance(self, db: &'db dyn Db) -> Type<'db> {
+    pub(crate) fn to_instance(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Type<'db> {
         match self.subclass_of {
-            SubclassOfInner::Class(class) => Type::instance(db, class),
+            SubclassOfInner::Class(class) => Type::instance(db, env, class),
             SubclassOfInner::Dynamic(dynamic_type) => Type::Dynamic(dynamic_type),
             SubclassOfInner::Protocol(protocol) => Type::ProtocolInstance(protocol),
             SubclassOfInner::TypeVar(bound_typevar) => Type::TypeVar(bound_typevar),
@@ -284,14 +309,18 @@ impl<'db> SubclassOfType<'db> {
     }
 
     /// Return a type representing "the set of all instances of the metaclass of this type".
-    pub(crate) fn to_metaclass_instance(self, db: &'db dyn Db) -> Type<'db> {
+    pub(crate) fn to_metaclass_instance(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> Type<'db> {
         // This kind of looks like a no-op, but it's not. For `type[C]` where `C` has metaclass
         // `M`, `to_meta_type` transforms `type[C]` to `type[M]`, and then `to_instance` makes it
         // just `M`. And `to_meta_type` will transpose `type[T: C]` into `T: type[C]`, collapse to
         // the upper bound `type[C]`, and transform that to the meta-type `type[M]`, which
         // `to_instance` then resolves to `M`.
-        self.to_meta_type(db)
-            .to_instance_approximation(db)
+        self.to_meta_type(db, env)
+            .to_instance_approximation(db, env)
             .expect("the meta-type of a SubclassOf type should always be instantiable")
     }
 
@@ -300,45 +329,54 @@ impl<'db> SubclassOfType<'db> {
     /// For `type[C]` where `C` is a concrete class, this returns `type[metaclass(C)]`.
     /// For `type[T]` where `T` is a `TypeVar`, this computes the metatype based on the
     /// `TypeVar`'s bounds or constraints.
-    pub(crate) fn to_meta_type(self, db: &'db dyn Db) -> Type<'db> {
-        match self.subclass_of.with_transposed_type_var(db) {
+    pub(crate) fn to_meta_type(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Type<'db> {
+        match self.subclass_of.with_transposed_type_var(db, env) {
             SubclassOfInner::Dynamic(dynamic) => {
-                SubclassOfType::from(db, SubclassOfInner::Dynamic(dynamic))
+                SubclassOfType::from(db, env, SubclassOfInner::Dynamic(dynamic))
             }
-            SubclassOfInner::Class(class) => SubclassOfType::try_from_type(db, class.metaclass(db))
-                .unwrap_or(SubclassOfType::subclass_of_unknown()),
+            SubclassOfInner::Class(class) => {
+                SubclassOfType::try_from_type(db, env, class.metaclass(db))
+                    .unwrap_or(SubclassOfType::subclass_of_unknown())
+            }
             // Structural implementations of a protocol can have arbitrary metaclasses. The only
             // guaranteed upper bound is therefore `type`, not the protocol origin's metaclass.
-            SubclassOfInner::Protocol(_) => KnownClass::Type.to_subclass_of(db),
+            SubclassOfInner::Protocol(_) => KnownClass::Type.to_subclass_of(db, env),
             // For `type[T]` where `T` is a TypeVar, `with_transposed_type_var` transforms
             // the bounds from instance types to `type[]` types. For example, `type[T]` where
             // `T: A | B` becomes a TypeVar with bound `type[A] | type[B]`. The metatype is
             // then the metatype of that bound.
             SubclassOfInner::TypeVar(bound_typevar) => {
-                match bound_typevar.typevar(db).bound_or_constraints(db) {
+                match bound_typevar.typevar(db).bound_or_constraints(db, env) {
                     // `with_transposed_type_var` always adds a bound for unbounded TypeVars
                     None => unreachable!(),
-                    Some(TypeVarBoundOrConstraints::UpperBound(bound)) => bound.to_meta_type(db),
+                    Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
+                        bound.to_meta_type(db, env)
+                    }
                     Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
-                        constraints.as_type(db).to_meta_type(db)
+                        constraints.as_type(db, env).to_meta_type(db, env)
                     }
                 }
             }
         }
     }
 
-    pub(crate) fn is_typed_dict(self, db: &'db dyn Db) -> bool {
+    pub(crate) fn is_typed_dict(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> bool {
         self.subclass_of
-            .into_class(db)
+            .into_class(db, env)
             .is_some_and(|class| class.class_literal(db).is_typed_dict(db))
     }
 }
 
 impl<'db> VarianceInferable<'db> for SubclassOfType<'db> {
-    fn variance_of(self, db: &dyn Db, typevar: BoundTypeVarIdentity<'_>) -> TypeVarVariance {
+    fn variance_of(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        typevar: BoundTypeVarIdentity<'_>,
+    ) -> TypeVarVariance {
         match self.subclass_of {
-            SubclassOfInner::Class(class) => class.variance_of(db, typevar),
-            SubclassOfInner::Protocol(protocol) => protocol.variance_of(db, typevar),
+            SubclassOfInner::Class(class) => class.variance_of(db, env, typevar),
+            SubclassOfInner::Protocol(protocol) => protocol.variance_of(db, env, typevar),
             SubclassOfInner::Dynamic(_) | SubclassOfInner::TypeVar(_) => TypeVarVariance::Bivariant,
         }
     }
@@ -363,7 +401,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             return self.check_type_pair(
                 db,
                 Type::ProtocolInstance(source_protocol),
-                target.to_instance(db),
+                target.to_instance(db, self.env),
             );
         }
 
@@ -423,7 +461,7 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
             (SubclassOfInner::Class(left), SubclassOfInner::Class(right)) => {
                 ConstraintSet::from_bool(
                     self.constraints,
-                    !left.could_coexist_in_mro_with_disjointness_checker(db, right, self),
+                    !left.could_coexist_in_mro_with_disjointness_checker(db, self.env, right, self),
                 )
             }
             (SubclassOfInner::TypeVar(_), _) | (_, SubclassOfInner::TypeVar(_)) => {
@@ -473,19 +511,25 @@ impl<'db> SubclassOfInner<'db> {
         matches!(self, Self::TypeVar(_))
     }
 
-    pub(crate) fn into_class(self, db: &'db dyn Db) -> Option<ClassType<'db>> {
+    pub(crate) fn into_class(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> Option<ClassType<'db>> {
         match self {
             Self::Dynamic(_) | Self::Protocol(_) => None,
             Self::Class(class) => Some(class),
             Self::TypeVar(bound_typevar) => {
-                match bound_typevar.typevar(db).bound_or_constraints(db) {
-                    None => Some(ClassType::object(db)),
+                match bound_typevar.typevar(db).bound_or_constraints(db, env) {
+                    None => Some(ClassType::object(db, env)),
                     Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
-                        Self::try_from_instance(db, bound)
-                            .and_then(|subclass_of| subclass_of.into_class(db))
+                        Self::try_from_instance(db, env, bound)
+                            .and_then(|subclass_of| subclass_of.into_class(db, env))
                     }
                     // TODO this is quite imprecise
-                    Some(TypeVarBoundOrConstraints::Constraints(_)) => Some(ClassType::object(db)),
+                    Some(TypeVarBoundOrConstraints::Constraints(_)) => {
+                        Some(ClassType::object(db, env))
+                    }
                 }
             }
         }
@@ -505,9 +549,13 @@ impl<'db> SubclassOfInner<'db> {
         }
     }
 
-    fn try_from_instance(db: &'db dyn Db, ty: Type<'db>) -> Option<Self> {
+    fn try_from_instance(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        ty: Type<'db>,
+    ) -> Option<Self> {
         Some(match ty {
-            Type::NominalInstance(instance) => SubclassOfInner::Class(instance.class(db)),
+            Type::NominalInstance(instance) => SubclassOfInner::Class(instance.class(db, env)),
             Type::TypedDict(typed_dict) => match typed_dict {
                 TypedDictType::Class(class) => SubclassOfInner::Class(class),
                 TypedDictType::Synthesized(_) => SubclassOfInner::Dynamic(
@@ -537,7 +585,11 @@ impl<'db> SubclassOfInner<'db> {
     /// - Otherwise, for an unbounded type variable, this returns `type[object]`.
     ///
     /// If this is type of a concrete type `C`, returns the type unchanged.
-    pub(crate) fn with_transposed_type_var(self, db: &'db dyn Db) -> Self {
+    pub(crate) fn with_transposed_type_var(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> Self {
         let Some(bound_typevar) = self.into_type_var() else {
             return self;
         };
@@ -545,15 +597,15 @@ impl<'db> SubclassOfInner<'db> {
         let bound_typevar = bound_typevar.map_bound_or_constraints(db, |bound_or_constraints| {
             Some(match bound_or_constraints {
                 None => TypeVarBoundOrConstraints::UpperBound(
-                    SubclassOfType::try_from_instance(db, Type::object())
+                    SubclassOfType::try_from_instance(db, env, Type::object())
                         .unwrap_or(SubclassOfType::subclass_of_unknown()),
                 ),
                 Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
-                    TypeVarBoundOrConstraints::UpperBound(bound.to_meta_type(db))
+                    TypeVarBoundOrConstraints::UpperBound(bound.to_meta_type(db, env))
                 }
                 Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
                     TypeVarBoundOrConstraints::Constraints(
-                        constraints.map(db, |constraint| constraint.to_meta_type(db)),
+                        constraints.map(db, |constraint| constraint.to_meta_type(db, env)),
                     )
                 }
             })
@@ -565,16 +617,17 @@ impl<'db> SubclassOfInner<'db> {
     fn recursive_type_normalized_impl(
         self,
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         div: Type<'db>,
         nested: bool,
     ) -> Option<Self> {
         match self {
             Self::Class(class) => Some(Self::Class(
-                class.recursive_type_normalized_impl(db, div, nested)?,
+                class.recursive_type_normalized_impl(db, env, div, nested)?,
             )),
             Self::Dynamic(dynamic) => Some(Self::Dynamic(dynamic.recursive_type_normalized())),
             Self::Protocol(protocol) => Some(Self::Protocol(
-                protocol.recursive_type_normalized_impl(db, div, nested)?,
+                protocol.recursive_type_normalized_impl(db, env, div, nested)?,
             )),
             Self::TypeVar(_) => Some(self),
         }

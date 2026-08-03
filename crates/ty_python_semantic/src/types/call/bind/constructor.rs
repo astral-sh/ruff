@@ -1,5 +1,6 @@
 use super::{Binding, Bindings, CallableBinding, CallableItem, CheckTypesMode};
-use crate::db::Db;
+use crate::Db;
+use crate::ProgramEnvironment;
 use crate::types::call::arguments::CallArguments;
 use crate::types::constraints::ConstraintSetBuilder;
 use crate::types::generics::Specialization;
@@ -65,14 +66,19 @@ impl<'db> ConstructorBinding<'db> {
     }
 
     /// Match parameters for this constructor method and downstream constructors.
-    pub(super) fn match_parameters(&mut self, db: &'db dyn Db, arguments: &CallArguments<'_, 'db>) {
-        self.entry.match_parameters(db, arguments);
+    pub(super) fn match_parameters(
+        &mut self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        arguments: &CallArguments<'_, 'db>,
+    ) {
+        self.entry.match_parameters(db, env, arguments);
 
         // We don't know at this point whether we'll need to check downstream constructors or not
         // (since we can't resolve return types yet), so we match parameters for all downstream
         // constructors; this may be needed for argument type contexts.
         if let Some(downstream) = self.downstream_constructor.as_mut() {
-            downstream.match_parameters_in_place(db, arguments);
+            downstream.match_parameters_in_place(db, env, arguments);
         }
     }
 
@@ -83,13 +89,14 @@ impl<'db> ConstructorBinding<'db> {
     pub(super) fn check_types(
         &mut self,
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         constraints: &ConstraintSetBuilder<'db>,
         argument_types: &CallArguments<'_, 'db>,
         call_expression_tcx: TypeContext<'db>,
         mode: CheckTypesMode,
     ) {
         self.entry
-            .check_types(db, constraints, argument_types, call_expression_tcx);
+            .check_types(db, env, constraints, argument_types, call_expression_tcx);
 
         // Now that we've fully checked our own callable, we can determine whether downstream
         // constructors should be checked or not.
@@ -97,6 +104,7 @@ impl<'db> ConstructorBinding<'db> {
             if let Some(downstream) = self.downstream_constructor_mut() {
                 let _ = downstream.check_types_impl(
                     db,
+                    env,
                     constraints,
                     argument_types,
                     call_expression_tcx,
@@ -104,7 +112,7 @@ impl<'db> ConstructorBinding<'db> {
                     mode,
                 );
             }
-        } else if !self.should_check_downstream(db) {
+        } else if !self.should_check_downstream(db, env) {
             // If not, we can discard the downstream constructor bindings entirely.
             self.downstream_constructor = None;
         }
@@ -117,7 +125,7 @@ impl<'db> ConstructorBinding<'db> {
     /// the overall callable, because in multiple-matching-overload cases where the overload
     /// resolution algorithm might just collapse to `Unknown`, we want to make a more informed
     /// decision based on whether all overloads return instance types, or not.
-    fn should_check_downstream(&self, db: &'db dyn Db) -> bool {
+    fn should_check_downstream(&self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> bool {
         let constructor_kind = self.constructor_kind();
         if constructor_kind.is_init() || self.downstream_constructor().is_none() {
             return false;
@@ -129,21 +137,25 @@ impl<'db> ConstructorBinding<'db> {
         }
 
         let constructed_instance_type = self.constructed_instance_type();
-        let constructor_class_literal = self.constructed_class_literal(db);
+        let constructor_class_literal = self.constructed_class_literal(db, env);
 
         // If any matching overload returns the constructed instance type itself, or an instance of
         // the constructed class, we need to check downstream constructors.
         callable.matching_overloads().any(|(_, overload)| {
             overload.return_ty == constructed_instance_type
                 || constructor_class_literal.is_some_and(|class_literal| {
-                    constructor_returns_instance(db, class_literal, overload.return_ty)
+                    constructor_returns_instance(db, env, class_literal, overload.return_ty)
                 })
         })
     }
 
     /// Discards an inactive downstream constructor.
-    pub(super) fn discard_downstream_constructor(&mut self, db: &'db dyn Db) -> bool {
-        if self.should_check_downstream(db) {
+    pub(super) fn discard_downstream_constructor(
+        &mut self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> bool {
+        if self.should_check_downstream(db, env) {
             true
         } else {
             self.downstream_constructor = None;
@@ -155,6 +167,7 @@ impl<'db> ConstructorBinding<'db> {
     pub(super) fn check_downstream_constructor(
         &mut self,
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         constraints: &ConstraintSetBuilder<'db>,
         argument_types: &CallArguments<'_, 'db>,
         call_expression_tcx: TypeContext<'db>,
@@ -165,6 +178,7 @@ impl<'db> ConstructorBinding<'db> {
             // `as_result` that ultimately matter.
             let _ = downstream.check_types_impl(
                 db,
+                env,
                 constraints,
                 argument_types,
                 call_expression_tcx,
@@ -207,7 +221,7 @@ impl<'db> ConstructorBinding<'db> {
     }
 
     /// Compute the overall effective return type of this `ConstructorBinding`.
-    pub(super) fn return_type(&self, db: &'db dyn Db) -> Type<'db> {
+    pub(super) fn return_type(&self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Type<'db> {
         let constructed_instance_type = self.constructed_instance_type();
 
         // If we are checking downstream constructors, and the downstream constructor resolves to a
@@ -221,22 +235,23 @@ impl<'db> ConstructorBinding<'db> {
         // annotation. But no other type checker considers it an error, and it probably rarely if
         // ever comes up.)
         if let Some(downstream) = self.downstream_constructor()
-            && let Some(constructor_class_literal) = self.constructed_class_literal(db)
+            && let Some(constructor_class_literal) = self.constructed_class_literal(db, env)
         {
-            let downstream_return = downstream.return_type(db);
-            if !constructor_returns_instance(db, constructor_class_literal, downstream_return) {
+            let downstream_return = downstream.return_type(db, env);
+            if !constructor_returns_instance(db, env, constructor_class_literal, downstream_return)
+            {
                 return downstream_return;
             }
         }
 
         // If `__new__` or metaclass `__call__` produced an explicit return type, use it
         // directly rather than building an instance of the constructed class.
-        if let Some(return_ty) = self.explicit_return_type(db) {
+        if let Some(return_ty) = self.explicit_return_type(db, env) {
             return return_ty;
         }
 
         constructed_instance_type
-            .apply_optional_specialization(db, self.instance_return_specialization(db))
+            .apply_optional_specialization(db, self.instance_return_specialization(db, env))
     }
 
     fn first_matching_overload(&self) -> Option<&Binding<'db>> {
@@ -250,15 +265,19 @@ impl<'db> ConstructorBinding<'db> {
     /// resulting specialization can be applied either to the constructed instance type or to an
     /// explicit `__new__` / `__call__` return annotation that is an instance of the constructed
     /// type or a subclass.
-    fn instance_return_specialization(&self, db: &'db dyn Db) -> Option<Specialization<'db>> {
+    fn instance_return_specialization(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> Option<Specialization<'db>> {
         let constructed_instance_type = self.constructed_instance_type();
         // This will be `None` if we're constructing a non-generic class. If we're constructing a
         // non-specialized generic class (`C(...)`), it'll be the identity specialization. If we're
         // constructing an already-specialized generic alias (`C[str](...)`), it'll be the
         // specialization of that alias.
-        let (_, class_specialization) = constructed_instance_type.class_specialization(db)?;
+        let (_, class_specialization) = constructed_instance_type.class_specialization(db, env)?;
         let static_class_literal = self
-            .constructed_class_literal(db)
+            .constructed_class_literal(db, env)
             .and_then(ClassLiteral::as_static);
         let class_context = class_specialization.generic_context(db);
 
@@ -269,7 +288,7 @@ impl<'db> ConstructorBinding<'db> {
             };
             let return_specialization = static_class_literal
                 // Use the already-resolved overload return type when possible.
-                .and_then(|lit| overload.return_ty.specialization_of(db, lit));
+                .and_then(|lit| overload.return_ty.specialization_of(db, env, lit));
 
             // TODO All this handling of return-specialization vs self-specialization is a hacky
             // work-around to a situation that can occur with a case like `def __init__(self:
@@ -293,7 +312,7 @@ impl<'db> ConstructorBinding<'db> {
                     .map_or(self_param_ty, |specialization| {
                         self_param_ty.apply_specialization(db, specialization)
                     });
-                resolved_self_param_ty.specialization_of(db, lit)
+                resolved_self_param_ty.specialization_of(db, env, lit)
             });
             let refined_self_parameter_specialization =
                 self_parameter_specialization.map(|specialization| {
@@ -309,7 +328,7 @@ impl<'db> ConstructorBinding<'db> {
                             } else {
                                 without_unknown
                             };
-                            mapped_ty.promote(db)
+                            mapped_ty.promote(db, env)
                         })
                         .collect();
                     Specialization::new(
@@ -364,8 +383,12 @@ impl<'db> ConstructorBinding<'db> {
     ///
     /// This must be called only after downstream constructor bindings have been type-checked,
     /// because instance-returning constructor paths may incorporate downstream specializations.
-    fn explicit_return_type(&self, db: &'db dyn Db) -> Option<Type<'db>> {
-        if self.constructor_kind().is_init() || self.constructed_class_literal(db).is_none() {
+    fn explicit_return_type(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> Option<Type<'db>> {
+        if self.constructor_kind().is_init() || self.constructed_class_literal(db, env).is_none() {
             return None;
         }
 
@@ -378,9 +401,9 @@ impl<'db> ConstructorBinding<'db> {
         // consider all overloads' return types. (This increases the chances of an `Unknown`
         // return, but still preserves more precise returns in unambiguous cases.)
         if matching_overloads.clone().next().is_none() {
-            self.analyze_overload_returns(db, self.callable().overloads().iter())
+            self.analyze_overload_returns(db, env, self.callable().overloads().iter())
         } else {
-            self.analyze_overload_returns(db, matching_overloads)
+            self.analyze_overload_returns(db, env, matching_overloads)
         }
     }
 
@@ -389,6 +412,7 @@ impl<'db> ConstructorBinding<'db> {
     fn analyze_overload_returns<'a>(
         &self,
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         overloads: impl IntoIterator<Item = &'a Binding<'db>>,
     ) -> Option<Type<'db>>
     where
@@ -405,7 +429,7 @@ impl<'db> ConstructorBinding<'db> {
         let mut saw_instance_return = false;
         let mut non_instance_return = None;
         for overload in overloads {
-            let (return_ty, is_instance_return) = self.single_overload_return(db, overload);
+            let (return_ty, is_instance_return) = self.single_overload_return(db, env, overload);
             if is_instance_return {
                 if saw_instance_return {
                     sole_instance_return = None;
@@ -440,6 +464,7 @@ impl<'db> ConstructorBinding<'db> {
     fn single_overload_return(
         &self,
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         overload: &Binding<'db>,
     ) -> (Type<'db>, bool) {
         let return_ty = overload
@@ -447,16 +472,20 @@ impl<'db> ConstructorBinding<'db> {
             .apply_optional_specialization(
                 db,
                 overload.specialization(db).map(|specialization| {
-                    self.unspecialize_class_type_variables(db, specialization)
+                    self.unspecialize_class_type_variables(db, env, specialization)
                 }),
             );
         if self
-            .constructed_class_literal(db)
-            .is_some_and(|class_literal| constructor_returns_instance(db, class_literal, return_ty))
+            .constructed_class_literal(db, env)
+            .is_some_and(|class_literal| {
+                constructor_returns_instance(db, env, class_literal, return_ty)
+            })
         {
             return (
-                return_ty
-                    .apply_optional_specialization(db, self.instance_return_specialization(db)),
+                return_ty.apply_optional_specialization(
+                    db,
+                    self.instance_return_specialization(db, env),
+                ),
                 true,
             );
         }
@@ -479,11 +508,12 @@ impl<'db> ConstructorBinding<'db> {
     fn unspecialize_class_type_variables(
         &self,
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         specialization: Specialization<'db>,
     ) -> Specialization<'db> {
         let Some(class_context) = self
             .constructed_instance_type()
-            .class_specialization(db)
+            .class_specialization(db, env)
             .map(|(_, specialization)| specialization.generic_context(db))
         else {
             return specialization;
@@ -516,11 +546,15 @@ impl<'db> ConstructorBinding<'db> {
         )
     }
 
-    fn constructed_class_literal(&self, db: &'db dyn Db) -> Option<ClassLiteral<'db>> {
+    fn constructed_class_literal(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> Option<ClassLiteral<'db>> {
         self.constructed_instance_type()
             .as_nominal_instance()
             // TODO may need to handle `Type::KnownInstance` here as well?
-            .map(|instance| instance.class(db).class_literal(db))
+            .map(|instance| instance.class(db, env).class_literal(db))
     }
 
     fn constructor_kind(&self) -> ConstructorCallableKind {
@@ -580,6 +614,7 @@ impl ConstructorCallableKind {
 /// explicit `Any` is considered "not an instance", but an `Unknown` is considered "an instance".
 fn constructor_returns_instance<'db>(
     db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
     class_literal: ClassLiteral<'db>,
     return_ty: Type<'db>,
 ) -> bool {
@@ -587,10 +622,10 @@ fn constructor_returns_instance<'db>(
         Type::Union(union) => union
             .elements(db)
             .iter()
-            .all(|element| constructor_returns_instance(db, class_literal, *element)),
+            .all(|element| constructor_returns_instance(db, env, class_literal, *element)),
         Type::Intersection(intersection) => intersection
             .iter_positive(db)
-            .any(|element| constructor_returns_instance(db, class_literal, element)),
+            .any(|element| constructor_returns_instance(db, env, class_literal, element)),
         // Spec says an explicit `Any` return type should be considered non-instance.
         Type::Dynamic(DynamicType::Any) => false,
         // But a missing return annotation should be considered instance.
@@ -600,7 +635,7 @@ fn constructor_returns_instance<'db>(
         // A `Never` constructor return is terminal and does not run downstream construction.
         Type::Never => false,
         Type::NominalInstance(instance) => instance
-            .class(db)
+            .class(db, env)
             .is_subtype_of_class_literal(db, class_literal),
         // We don't need to handle `ProtocolInstance` here, since the only way a protocol can be
         // instantiated is if a nominal class inherits it. If the nominal class inherits a

@@ -16,6 +16,7 @@
 //! that adds that "collapse `Never`" behavior, whereas [`TupleSpec`] allows you to add any element
 //! types, including `Never`.)
 
+use crate::{Program, ProgramEnvironment};
 use std::cmp::Ordering;
 use std::hash::Hash;
 use std::num::{NonZeroI32, NonZeroUsize};
@@ -34,7 +35,7 @@ use crate::types::{
     ApplyTypeMappingVisitor, BoundTypeVarInstance, ErrorContext, FindLegacyTypeVarsVisitor,
     IntersectionType, Type, TypeContext, TypeMapping, UnionBuilder, UnionType,
 };
-use crate::{Db, FxOrderSet, Program};
+use crate::{Db, FxOrderSet};
 use ty_python_core::Truthiness;
 use ty_python_core::definition::Definition;
 
@@ -129,6 +130,9 @@ impl TupleLength {
 
 #[salsa::interned(debug, constructor=new_internal, heap_size=ruff_memory_usage::heap_size)]
 pub struct TupleType<'db> {
+    #[returns(copy)]
+    pub(crate) program: Program,
+
     #[returns(ref)]
     pub(crate) tuple: TupleSpec<'db>,
 }
@@ -149,7 +153,9 @@ pub(super) fn walk_tuple_type<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>
                 visitor.visit_type(db, element);
             }
             match tuple.variable() {
-                VariableSegment::Homogeneous(element) => visitor.visit_type(db, element),
+                VariableSegment::Homogeneous(element) => {
+                    visitor.visit_type(db, element);
+                }
                 VariableSegment::TypeVarTuple(typevartuple) => {
                     visitor.visit_type(db, Type::TypeVar(typevartuple));
                 }
@@ -166,7 +172,11 @@ impl get_size2::GetSize for TupleType<'_> {}
 
 #[salsa::tracked]
 impl<'db> TupleType<'db> {
-    pub(crate) fn new(db: &'db dyn Db, spec: &TupleSpec<'db>) -> Option<Self> {
+    pub(crate) fn new(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        spec: &TupleSpec<'db>,
+    ) -> Option<Self> {
         // If a fixed-length (i.e., mandatory) element of the tuple is `Never`, then it's not
         // possible to instantiate the tuple as a whole.
         if spec.fixed_elements().any(Type::is_never) {
@@ -183,56 +193,79 @@ impl<'db> TupleType<'db> {
                     .iter_prefix_elements()
                     .chain(tuple.iter_suffix_elements()),
             ));
-            return Some(TupleType::new_internal::<_, TupleSpec<'db>>(db, tuple));
+            return Some(TupleType::new_internal(db, env.program(db), tuple));
         }
 
-        Some(TupleType::new_internal(db, spec))
+        Some(TupleType::new_internal(db, env.program(db), spec))
     }
 
-    pub(crate) fn empty(db: &'db dyn Db) -> Self {
-        TupleType::new_internal(db, TupleSpec::from(FixedLengthTuple::empty()))
+    pub(crate) fn empty(db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Self {
+        TupleType::new_internal(
+            db,
+            env.program(db),
+            TupleSpec::from(FixedLengthTuple::empty()),
+        )
     }
 
     pub(crate) fn heterogeneous(
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         types: impl IntoIterator<Item = Type<'db>>,
     ) -> Option<Self> {
-        TupleType::new(db, &TupleSpec::heterogeneous(types))
+        TupleType::new(db, env, &TupleSpec::heterogeneous(types))
     }
 
     pub(crate) fn mixed(
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         prefix: impl IntoIterator<Item = Type<'db>>,
         variable: Type<'db>,
         suffix: impl IntoIterator<Item = Type<'db>>,
     ) -> Option<Self> {
-        Self::mixed_with_segment(db, prefix, VariableSegment::Homogeneous(variable), suffix)
+        Self::mixed_with_segment(
+            db,
+            env,
+            prefix,
+            VariableSegment::Homogeneous(variable),
+            suffix,
+        )
     }
 
     pub(crate) fn mixed_with_segment(
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         prefix: impl IntoIterator<Item = Type<'db>>,
         variable: VariableSegment<'db>,
         suffix: impl IntoIterator<Item = Type<'db>>,
     ) -> Option<Self> {
-        TupleType::new(db, &VariableLengthTuple::mixed(prefix, variable, suffix))
+        TupleType::new(
+            db,
+            env,
+            &VariableLengthTuple::mixed(prefix, variable, suffix),
+        )
     }
 
-    pub(crate) fn homogeneous(db: &'db dyn Db, element: Type<'db>) -> Self {
+    pub(crate) fn homogeneous(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        element: Type<'db>,
+    ) -> Self {
         match element {
-            Type::Never => TupleType::empty(db),
-            _ => TupleType::new_internal(db, TupleSpec::homogeneous(element)),
+            Type::Never => TupleType::empty(db, env),
+            _ => TupleType::new_internal(db, env.program(db), TupleSpec::homogeneous(element)),
         }
     }
 
     /// Packs a `TypeVarTuple` into the tuple value used for generic specialization relations.
     pub(crate) fn unpacked_typevartuple(
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         typevar: BoundTypeVarInstance<'db>,
     ) -> Self {
         debug_assert!(typevar.is_typevartuple(db));
         TupleType::new_internal(
             db,
+            env.program(db),
             VariableLengthTuple::mixed([], VariableSegment::TypeVarTuple(typevar), []),
         )
     }
@@ -242,13 +275,14 @@ impl<'db> TupleType<'db> {
     // from `NominalInstanceType::class()`, which is a very hot method.
     #[salsa::tracked(returns(copy), cycle_initial=to_class_type_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
     pub(crate) fn to_class_type(self, db: &'db dyn Db) -> ClassType<'db> {
+        let env = &ProgramEnvironment::from_program(self.program(db));
         let tuple_class = KnownClass::Tuple
-            .try_to_class_literal(db)
+            .try_to_class_literal(db, env)
             .expect("Typeshed should always have a `tuple` class in `builtins.pyi`");
 
         tuple_class.apply_specialization(db, |generic_context| {
             if generic_context.variables(db).len() == 1 {
-                let element_type = self.tuple(db).tuple_class_type(db);
+                let element_type = self.tuple(db).tuple_class_type(db, env);
                 generic_context.specialize_tuple(db, element_type, self)
             } else {
                 generic_context.default_specialization(db, Some(KnownClass::Tuple))
@@ -259,13 +293,15 @@ impl<'db> TupleType<'db> {
     pub(super) fn recursive_type_normalized_impl(
         self,
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         div: Type<'db>,
         nested: bool,
     ) -> Option<Self> {
         Some(Self::new_internal(
             db,
+            env.program(db),
             self.tuple(db)
-                .recursive_type_normalized_impl(db, div, nested)?,
+                .recursive_type_normalized_impl(db, env, div, nested)?,
         ))
     }
 
@@ -274,10 +310,11 @@ impl<'db> TupleType<'db> {
         db: &'db dyn Db,
         type_mapping: &TypeMapping<'a, 'db>,
         tcx: TypeContext<'db>,
-        visitor: &ApplyTypeMappingVisitor<'db>,
+        visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Option<Self> {
         TupleType::new(
             db,
+            visitor.env,
             &self
                 .tuple(db)
                 .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
@@ -287,12 +324,13 @@ impl<'db> TupleType<'db> {
     pub(crate) fn find_legacy_typevars_impl(
         self,
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         binding_context: Option<Definition<'db>>,
         typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
         visitor: &FindLegacyTypeVarsVisitor<'db>,
     ) {
         self.tuple(db)
-            .find_legacy_typevars_impl(db, binding_context, typevars, visitor);
+            .find_legacy_typevars_impl(db, env, binding_context, typevars, visitor);
     }
 }
 
@@ -349,7 +387,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             |(&source, &target)| {
                                 let constraint_set = self.check_type_pair(db, source, target);
                                 if let Some(context) = self.report_context()
-                                    && constraint_set.is_never_satisfied(db)
+                                    && constraint_set.is_never_satisfied(db, self.env)
                                 {
                                     context.push(ErrorContext::TupleElementNotCompatible {
                                         source,
@@ -400,7 +438,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
 
                 match target.variable() {
                     VariableSegment::TypeVarTuple(typevartuple) => {
-                        let packed = Type::heterogeneous_tuple(db, source_iter.copied());
+                        let packed = Type::heterogeneous_tuple(db, self.env, source_iter.copied());
                         result.and(db, self.constraints, || {
                             self.check_type_pair(db, packed, Type::TypeVar(typevartuple))
                         })
@@ -446,12 +484,14 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     return self.never();
                 }
 
+                let env = self.env;
+
                 // In addition, the other tuple must have enough elements to match up with this
                 // tuple's prefix and suffix, and each of those elements must pairwise satisfy the
                 // relation.
                 let mut result = self.always();
                 let mut target_iter = target.iter_all_elements();
-                for source_ty in source.prenormalized_prefix_elements(db, None) {
+                for source_ty in source.prenormalized_prefix_elements(db, env, None) {
                     let Some(target_ty) = target_iter.next() else {
                         return self.never();
                     };
@@ -463,7 +503,9 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         return result;
                     }
                 }
-                let suffix: Vec<_> = source.prenormalized_suffix_elements(db, None).collect();
+                let suffix: Vec<_> = source
+                    .prenormalized_suffix_elements(db, env, None)
+                    .collect();
                 for &source_ty in suffix.iter().rev() {
                     let Some(target_ty) = target_iter.next_back() else {
                         return self.never();
@@ -508,6 +550,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         });
                 }
 
+                let env = self.env;
+
                 if self.typevar_evaluation == TypeVarEvaluation::Lazy
                     && let VariableSegment::TypeVarTuple(typevartuple) = target.variable()
                 {
@@ -536,6 +580,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
 
                     let packed = Type::tuple(TupleType::new(
                         db,
+                        env,
                         &VariableLengthTuple::mixed(
                             source_prefix[target_prefix.len()..].iter().copied(),
                             source.variable(),
@@ -569,10 +614,12 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 // variable-length part.
                 let mut result = self.always();
                 let pairwise = source
-                    .prenormalized_prefix_elements(db, source_prenormalize_variable)
-                    .zip_longest(
-                        target.prenormalized_prefix_elements(db, target_prenormalize_variable),
-                    );
+                    .prenormalized_prefix_elements(db, env, source_prenormalize_variable)
+                    .zip_longest(target.prenormalized_prefix_elements(
+                        db,
+                        env,
+                        target_prenormalize_variable,
+                    ));
                 for pair in pairwise {
                     let pair_constraints = match pair {
                         EitherOrBoth::Both(self_ty, other_ty) => {
@@ -601,10 +648,10 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 }
 
                 let source_suffix: Vec<_> = source
-                    .prenormalized_suffix_elements(db, source_prenormalize_variable)
+                    .prenormalized_suffix_elements(db, env, source_prenormalize_variable)
                     .collect();
                 let target_suffix: Vec<_> = target
-                    .prenormalized_suffix_elements(db, target_prenormalize_variable)
+                    .prenormalized_suffix_elements(db, env, target_prenormalize_variable)
                     .collect();
                 let pairwise = source_suffix
                     .iter()
@@ -720,8 +767,9 @@ fn to_class_type_cycle_initial<'db>(
     id: salsa::Id,
     self_: TupleType<'db>,
 ) -> ClassType<'db> {
+    let env = &ProgramEnvironment::from_program(self_.program(db));
     let tuple_class = KnownClass::Tuple
-        .try_to_class_literal(db)
+        .try_to_class_literal(db, env)
         .expect("Typeshed should always have a `tuple` class in `builtins.pyi`");
 
     tuple_class.apply_specialization(db, |generic_context| {
@@ -832,6 +880,7 @@ impl<'db> FixedLengthTuple<Type<'db>> {
     fn resize(
         &self,
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         new_length: TupleLength,
     ) -> Result<TupleSpec<'db>, ResizeTupleError> {
         match new_length {
@@ -851,8 +900,11 @@ impl<'db> FixedLengthTuple<Type<'db>> {
                 // suffix.
                 let mut elements = self.iter_all_elements();
                 let prefix: Vec<_> = elements.by_ref().take(prefix).collect();
-                let variable =
-                    UnionType::from_elements_leave_aliases(db, elements.by_ref().take(variable));
+                let variable = UnionType::from_elements_leave_aliases(
+                    db,
+                    env,
+                    elements.by_ref().take(variable),
+                );
                 let suffix = elements.by_ref().take(suffix);
                 Ok(VariableLengthTuple::mixed(
                     prefix,
@@ -866,6 +918,7 @@ impl<'db> FixedLengthTuple<Type<'db>> {
     fn recursive_type_normalized_impl(
         &self,
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         div: Type<'db>,
         nested: bool,
     ) -> Option<Self> {
@@ -873,7 +926,7 @@ impl<'db> FixedLengthTuple<Type<'db>> {
             Some(Self::from_elements(
                 self.0
                     .iter()
-                    .map(|ty| ty.recursive_type_normalized_impl(db, div, true))
+                    .map(|ty| ty.recursive_type_normalized_impl(db, env, div, true))
                     .collect::<Option<Box<[_]>>>()?,
             ))
         } else {
@@ -881,7 +934,7 @@ impl<'db> FixedLengthTuple<Type<'db>> {
                 self.0
                     .iter()
                     .map(|ty| {
-                        ty.recursive_type_normalized_impl(db, div, true)
+                        ty.recursive_type_normalized_impl(db, env, div, true)
                             .unwrap_or(div)
                     })
                     .collect::<Box<[_]>>(),
@@ -894,16 +947,18 @@ impl<'db> FixedLengthTuple<Type<'db>> {
         db: &'db dyn Db,
         type_mapping: &TypeMapping<'a, 'db>,
         tcx: TypeContext<'db>,
-        visitor: &ApplyTypeMappingVisitor<'db>,
+        visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Self {
         let tcx_tuple = tcx
             .annotation
-            .and_then(|annotation| annotation.known_specialization(db, KnownClass::Tuple))
+            .and_then(|annotation| {
+                annotation.known_specialization(db, visitor.env, KnownClass::Tuple)
+            })
             .and_then(|specialization| {
                 specialization
                     .tuple(db)
                     .expect("the specialization of `KnownClass::Tuple` must have a tuple spec")
-                    .resize(db, TupleLength::Fixed(self.0.len()))
+                    .resize(db, visitor.env, TupleLength::Fixed(self.0.len()))
                     .ok()
             });
 
@@ -927,12 +982,13 @@ impl<'db> FixedLengthTuple<Type<'db>> {
     fn find_legacy_typevars_impl(
         &self,
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         binding_context: Option<Definition<'db>>,
         typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
         visitor: &FindLegacyTypeVarsVisitor<'db>,
     ) {
         for ty in &self.0 {
-            ty.find_legacy_typevars_impl(db, binding_context, typevars, visitor);
+            ty.find_legacy_typevars_impl(db, env, binding_context, typevars, visitor);
         }
     }
 }
@@ -940,8 +996,13 @@ impl<'db> FixedLengthTuple<Type<'db>> {
 impl<'db> PyIndex<'db> for &FixedLengthTuple<Type<'db>> {
     type Item = Type<'db>;
 
-    fn py_index(self, db: &'db dyn Db, index: i32) -> Result<Self::Item, OutOfBoundsError> {
-        self.0.py_index(db, index).copied()
+    fn py_index(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        index: i32,
+    ) -> Result<Self::Item, OutOfBoundsError> {
+        self.0.py_index(db, env, index).copied()
     }
 }
 
@@ -1300,10 +1361,12 @@ impl VariableSlice {
     fn ty<'db>(
         self,
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         tuple: &VariableLengthTuple<Type<'db>, VariableSegment<'db>>,
     ) -> Type<'db> {
         UnionType::from_elements_leave_aliases(
             db,
+            env,
             matches!(
                 self.kind,
                 VariableSliceKind::ElementType | VariableSliceKind::Preserved
@@ -1324,15 +1387,16 @@ impl VariableTupleSlicePlan {
     fn into_type<'db>(
         self,
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         tuple: &VariableLengthTuple<Type<'db>, VariableSegment<'db>>,
     ) -> Type<'db> {
         match self {
             VariableTupleSlicePlan::Empty => {
-                Type::heterogeneous_tuple(db, std::iter::empty::<Type<'db>>())
+                Type::heterogeneous_tuple(db, env, std::iter::empty::<Type<'db>>())
             }
 
             VariableTupleSlicePlan::Fixed(fixed) => {
-                Type::heterogeneous_tuple(db, tuple.slice_fixed_position(db, fixed))
+                Type::heterogeneous_tuple(db, env, tuple.slice_fixed_position(db, env, fixed))
             }
 
             VariableTupleSlicePlan::Mixed {
@@ -1343,11 +1407,12 @@ impl VariableTupleSlicePlan {
                 let variable_segment = match variable.kind {
                     VariableSliceKind::Preserved => tuple.variable(),
                     VariableSliceKind::Excluded | VariableSliceKind::ElementType => {
-                        VariableSegment::Homogeneous(variable.ty(db, tuple))
+                        VariableSegment::Homogeneous(variable.ty(db, env, tuple))
                     }
                 };
                 Type::tuple(TupleType::new(
                     db,
+                    env,
                     &VariableLengthTuple::mixed(
                         VariableLengthTuple::optional_fixed_slice(
                             tuple.prefix_elements(),
@@ -1362,7 +1427,7 @@ impl VariableTupleSlicePlan {
                 ))
             }
 
-            VariableTupleSlicePlan::Homogeneous => tuple.homogeneous_type(db),
+            VariableTupleSlicePlan::Homogeneous => tuple.homogeneous_type(db, env),
         }
     }
 }
@@ -1441,6 +1506,7 @@ impl<'db> VariableLengthTuple<Type<'db>, VariableSegment<'db>> {
     fn slice_fixed_position<'a>(
         &'a self,
         db: &'db dyn Db,
+        env: &'a ProgramEnvironment<'db>,
         slice: FixedPositionSlice,
     ) -> impl Iterator<Item = Type<'db>> + 'a
     where
@@ -1454,10 +1520,10 @@ impl<'db> VariableLengthTuple<Type<'db>, VariableSegment<'db>> {
         } = slice;
         match origin {
             FixedPositionOrigin::Front => {
-                Either::Left(self.slice_front_forward(db, start, exclusive_stop, step))
+                Either::Left(self.slice_front_forward(db, env, start, exclusive_stop, step))
             }
             FixedPositionOrigin::Back => {
-                Either::Right(self.slice_back(db, start, exclusive_stop, step))
+                Either::Right(self.slice_back(db, env, start, exclusive_stop, step))
             }
         }
     }
@@ -1465,6 +1531,7 @@ impl<'db> VariableLengthTuple<Type<'db>, VariableSegment<'db>> {
     fn slice_front_forward<'a>(
         &'a self,
         db: &'db dyn Db,
+        env: &'a ProgramEnvironment<'db>,
         start: usize,
         exclusive_stop: usize,
         step: NonZeroUsize,
@@ -1475,17 +1542,19 @@ impl<'db> VariableLengthTuple<Type<'db>, VariableSegment<'db>> {
         (start..exclusive_stop)
             .step_by(step.get())
             .map(move |index| {
-                self.type_at_nonnegative_index(db, index).unwrap_or_else(|| {
+                self.type_at_nonnegative_index(db, env, index)
+                    .unwrap_or_else(|| {
                     unreachable!(
                         "front-origin fixed slice positions are validated during plan construction"
                     )
-                })
+                    })
             })
     }
 
     fn slice_back<'a>(
         &'a self,
         db: &'db dyn Db,
+        env: &'a ProgramEnvironment<'db>,
         start: usize,
         exclusive_stop: usize,
         step: NonZeroUsize,
@@ -1502,7 +1571,7 @@ impl<'db> VariableLengthTuple<Type<'db>, VariableSegment<'db>> {
             }
 
             let element = self
-                .type_at_negative_distance(db, distance)
+                .type_at_negative_distance(db, env, distance)
                 .unwrap_or_else(|| {
                     unreachable!(
                         "back-origin fixed slice positions are validated during plan construction"
@@ -1538,6 +1607,7 @@ impl<'db> VariableLengthTuple<Type<'db>, VariableSegment<'db>> {
     fn py_slice_type(
         &self,
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         start: Option<i32>,
         stop: Option<i32>,
         step: Option<i32>,
@@ -1553,7 +1623,7 @@ impl<'db> VariableLengthTuple<Type<'db>, VariableSegment<'db>> {
         Ok(match direction {
             TupleSliceDirection::Forward => self
                 .forward_slice_plan(start, stop, step)
-                .into_type(db, self),
+                .into_type(db, env, self),
             TupleSliceDirection::Backward => {
                 let reversed = self.reversed(db);
                 reversed
@@ -1562,7 +1632,7 @@ impl<'db> VariableLengthTuple<Type<'db>, VariableSegment<'db>> {
                         TupleSliceDirection::reverse_bound(stop),
                         step,
                     )
-                    .into_type(db, &reversed)
+                    .into_type(db, env, &reversed)
             }
         })
     }
@@ -1870,20 +1940,36 @@ impl<'db> VariableLengthTuple<Type<'db>, VariableSegment<'db>> {
         start + ((stop - start - 1) / step) * step
     }
 
-    fn type_at_nonnegative_index(&self, db: &'db dyn Db, index: usize) -> Option<Type<'db>> {
-        (index < self.len().minimum()).then(|| self.type_at_nonnegative_index_unbounded(db, index))
+    fn type_at_nonnegative_index(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        index: usize,
+    ) -> Option<Type<'db>> {
+        (index < self.len().minimum())
+            .then(|| self.type_at_nonnegative_index_unbounded(db, env, index))
     }
 
-    fn type_at_nonnegative_index_unbounded(&self, db: &'db dyn Db, index: usize) -> Type<'db> {
+    fn type_at_nonnegative_index_unbounded(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        index: usize,
+    ) -> Type<'db> {
         if let Some(element) = self.prefix_elements().get(index) {
             *element
         } else {
             let suffix_stop = index - self.prefix_len() + 1;
-            self.variable_and_suffix_type(db, Some(suffix_stop))
+            self.variable_and_suffix_type(db, env, Some(suffix_stop))
         }
     }
 
-    fn type_at_negative_distance(&self, db: &'db dyn Db, distance: usize) -> Option<Type<'db>> {
+    fn type_at_negative_distance(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        distance: usize,
+    ) -> Option<Type<'db>> {
         if distance == 0 || distance > self.len().minimum() {
             return None;
         }
@@ -1898,6 +1984,7 @@ impl<'db> VariableLengthTuple<Type<'db>, VariableSegment<'db>> {
         let prefix_and_variable_len = distance - self.suffix_len();
         Some(UnionType::from_elements_leave_aliases(
             db,
+            env,
             self.iter_prefix_elements()
                 .skip(self.prefix_len() - prefix_and_variable_len)
                 .chain(std::iter::once(self.variable().element_type(db))),
@@ -1913,14 +2000,20 @@ impl<'db> VariableLengthTuple<Type<'db>, VariableSegment<'db>> {
             .chain(self.iter_suffix_elements())
     }
 
-    fn homogeneous_type(&self, db: &'db dyn Db) -> Type<'db> {
-        let element = UnionType::from_elements_leave_aliases(db, self.iter_all_elements(db));
-        Type::homogeneous_tuple(db, element)
+    fn homogeneous_type(&self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Type<'db> {
+        let element = UnionType::from_elements_leave_aliases(db, env, self.iter_all_elements(db));
+        Type::homogeneous_tuple(db, env, element)
     }
 
-    fn variable_and_suffix_type(&self, db: &'db dyn Db, suffix_stop: Option<usize>) -> Type<'db> {
+    fn variable_and_suffix_type(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        suffix_stop: Option<usize>,
+    ) -> Type<'db> {
         UnionType::from_elements_leave_aliases(
             db,
+            env,
             std::iter::once(self.variable().element_type(db)).chain(
                 self.iter_suffix_elements()
                     .take(suffix_stop.unwrap_or_else(|| self.suffix_len())),
@@ -1950,12 +2043,13 @@ impl<'db> VariableLengthTuple<Type<'db>, VariableSegment<'db>> {
     fn prenormalized_prefix_elements<'a>(
         &'a self,
         db: &'db dyn Db,
+        env: &'a ProgramEnvironment<'db>,
         variable: Option<Type<'db>>,
     ) -> impl Iterator<Item = Type<'db>> + 'a {
         let variable = variable.unwrap_or_else(|| self.variable().element_type(db));
         self.iter_prefix_elements().chain(
             self.iter_suffix_elements()
-                .take_while(move |element| element.is_equivalent_to(db, variable)),
+                .take_while(move |element| element.is_equivalent_to(db, env, variable)),
         )
     }
 
@@ -1981,16 +2075,18 @@ impl<'db> VariableLengthTuple<Type<'db>, VariableSegment<'db>> {
     fn prenormalized_suffix_elements<'a>(
         &'a self,
         db: &'db dyn Db,
+        env: &'a ProgramEnvironment<'db>,
         variable: Option<Type<'db>>,
     ) -> impl Iterator<Item = Type<'db>> + 'a {
         let variable = variable.unwrap_or_else(|| self.variable().element_type(db));
         self.iter_suffix_elements()
-            .skip_while(move |element| element.is_equivalent_to(db, variable))
+            .skip_while(move |element| element.is_equivalent_to(db, env, variable))
     }
 
     fn resize(
         &self,
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         new_length: TupleLength,
     ) -> Result<TupleSpec<'db>, ResizeTupleError> {
         match new_length {
@@ -2026,6 +2122,7 @@ impl<'db> VariableLengthTuple<Type<'db>, VariableSegment<'db>> {
                 // `I2` (variable empty, suffix shifts left), so it should be `I1 | I2`.
                 let variable = UnionType::from_elements_leave_aliases(
                     db,
+                    env,
                     self.iter_prefix_elements()
                         .skip(prefix_length)
                         .chain(std::iter::once(self.variable().element_type(db)))
@@ -2047,6 +2144,7 @@ impl<'db> VariableLengthTuple<Type<'db>, VariableSegment<'db>> {
     fn recursive_type_normalized_impl(
         &self,
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         div: Type<'db>,
         nested: bool,
     ) -> Option<Self> {
@@ -2054,11 +2152,11 @@ impl<'db> VariableLengthTuple<Type<'db>, VariableSegment<'db>> {
             let prefix = self
                 .prefix_elements()
                 .iter()
-                .map(|ty| ty.recursive_type_normalized_impl(db, div, true));
+                .map(|ty| ty.recursive_type_normalized_impl(db, env, div, true));
 
             let variable_segment = match self.variable() {
                 VariableSegment::Homogeneous(variable) => VariableSegment::Homogeneous(
-                    variable.recursive_type_normalized_impl(db, div, true)?,
+                    variable.recursive_type_normalized_impl(db, env, div, true)?,
                 ),
                 VariableSegment::TypeVarTuple(typevartuple) => {
                     VariableSegment::TypeVarTuple(typevartuple)
@@ -2068,19 +2166,19 @@ impl<'db> VariableLengthTuple<Type<'db>, VariableSegment<'db>> {
             let suffix = self
                 .suffix_elements()
                 .iter()
-                .map(|ty| ty.recursive_type_normalized_impl(db, div, true));
+                .map(|ty| ty.recursive_type_normalized_impl(db, env, div, true));
 
             Self::try_new(prefix, variable_segment, suffix)
         } else {
             let prefix = self.prefix_elements().iter().map(|ty| {
-                ty.recursive_type_normalized_impl(db, div, true)
+                ty.recursive_type_normalized_impl(db, env, div, true)
                     .unwrap_or(div)
             });
 
             let variable_segment = match self.variable() {
                 VariableSegment::Homogeneous(variable) => VariableSegment::Homogeneous(
                     variable
-                        .recursive_type_normalized_impl(db, div, true)
+                        .recursive_type_normalized_impl(db, env, div, true)
                         .unwrap_or(div),
                 ),
                 VariableSegment::TypeVarTuple(typevartuple) => {
@@ -2089,7 +2187,7 @@ impl<'db> VariableLengthTuple<Type<'db>, VariableSegment<'db>> {
             };
 
             let suffix = self.suffix_elements().iter().map(|ty| {
-                ty.recursive_type_normalized_impl(db, div, true)
+                ty.recursive_type_normalized_impl(db, env, div, true)
                     .unwrap_or(div)
             });
 
@@ -2102,7 +2200,7 @@ impl<'db> VariableLengthTuple<Type<'db>, VariableSegment<'db>> {
         db: &'db dyn Db,
         type_mapping: &TypeMapping<'a, 'db>,
         tcx: TypeContext<'db>,
-        visitor: &ApplyTypeMappingVisitor<'db>,
+        visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> TupleSpec<'db> {
         let prefix = self
             .prefix_elements()
@@ -2152,7 +2250,7 @@ impl<'db> VariableLengthTuple<Type<'db>, VariableSegment<'db>> {
                     for element in prefix {
                         builder.push(element);
                     }
-                    builder = builder.concat(db, &mapped_tuple);
+                    builder = builder.concat(db, visitor.env, &mapped_tuple);
                     for element in suffix {
                         builder.push(element);
                     }
@@ -2167,20 +2265,22 @@ impl<'db> VariableLengthTuple<Type<'db>, VariableSegment<'db>> {
     fn find_legacy_typevars_impl(
         &self,
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         binding_context: Option<Definition<'db>>,
         typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
         visitor: &FindLegacyTypeVarsVisitor<'db>,
     ) {
         for ty in self.prefix_elements() {
-            ty.find_legacy_typevars_impl(db, binding_context, typevars, visitor);
+            ty.find_legacy_typevars_impl(db, env, binding_context, typevars, visitor);
         }
         match self.variable() {
             VariableSegment::Homogeneous(variable) => {
-                variable.find_legacy_typevars_impl(db, binding_context, typevars, visitor);
+                variable.find_legacy_typevars_impl(db, env, binding_context, typevars, visitor);
             }
             VariableSegment::TypeVarTuple(typevartuple) => {
                 Type::TypeVar(typevartuple).find_legacy_typevars_impl(
                     db,
+                    env,
                     binding_context,
                     typevars,
                     visitor,
@@ -2188,7 +2288,7 @@ impl<'db> VariableLengthTuple<Type<'db>, VariableSegment<'db>> {
             }
         }
         for ty in self.suffix_elements() {
-            ty.find_legacy_typevars_impl(db, binding_context, typevars, visitor);
+            ty.find_legacy_typevars_impl(db, env, binding_context, typevars, visitor);
         }
     }
 }
@@ -2196,9 +2296,14 @@ impl<'db> VariableLengthTuple<Type<'db>, VariableSegment<'db>> {
 impl<'db> PyIndex<'db> for &VariableLengthTuple<Type<'db>, VariableSegment<'db>> {
     type Item = Type<'db>;
 
-    fn py_index(self, db: &'db dyn Db, index: i32) -> Result<Self::Item, OutOfBoundsError> {
+    fn py_index(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        index: i32,
+    ) -> Result<Self::Item, OutOfBoundsError> {
         match Nth::from_index(index) {
-            Nth::FromStart(index) => Ok(self.type_at_nonnegative_index_unbounded(db, index)),
+            Nth::FromStart(index) => Ok(self.type_at_nonnegative_index_unbounded(db, env, index)),
 
             Nth::FromEnd(index_from_end) => {
                 if index_from_end < self.suffix_elements().len() {
@@ -2214,6 +2319,7 @@ impl<'db> PyIndex<'db> for &VariableLengthTuple<Type<'db>, VariableSegment<'db>>
                 let index_past_suffix = index_from_end - self.suffix_elements().len() + 1;
                 Ok(UnionType::from_elements_leave_aliases(
                     db,
+                    env,
                     (self.prefix_elements().iter().rev().copied())
                         .take(index_past_suffix)
                         .rev()
@@ -2295,24 +2401,29 @@ impl<'db> Tuple<Type<'db>, VariableSegment<'db>> {
         ))
     }
 
-    pub(crate) fn homogeneous_element_type(&self, db: &'db dyn Db) -> Type<'db> {
+    pub(crate) fn homogeneous_element_type(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> Type<'db> {
         match self {
             Tuple::Fixed(tuple) => {
-                UnionType::from_elements_leave_aliases(db, tuple.iter_all_elements())
+                UnionType::from_elements_leave_aliases(db, env, tuple.iter_all_elements())
             }
             Tuple::Variable(tuple) => {
-                UnionType::from_elements_leave_aliases(db, tuple.iter_all_elements(db))
+                UnionType::from_elements_leave_aliases(db, env, tuple.iter_all_elements(db))
             }
         }
     }
 
-    fn tuple_class_type(&self, db: &'db dyn Db) -> Type<'db> {
+    fn tuple_class_type(&self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Type<'db> {
         match self {
             Tuple::Fixed(tuple) => {
-                UnionType::from_elements_leave_aliases(db, tuple.iter_all_elements())
+                UnionType::from_elements_leave_aliases(db, env, tuple.iter_all_elements())
             }
             Tuple::Variable(tuple) => UnionType::from_elements_leave_aliases(
                 db,
+                env,
                 tuple
                     .iter_prefix_elements()
                     .chain(std::iter::once(tuple.variable().tuple_class_type()))
@@ -2345,6 +2456,7 @@ impl<'db> Tuple<Type<'db>, VariableSegment<'db>> {
     pub(crate) fn py_slice_type(
         &self,
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         start: Option<i32>,
         stop: Option<i32>,
         step: Option<i32>,
@@ -2352,9 +2464,10 @@ impl<'db> Tuple<Type<'db>, VariableSegment<'db>> {
         match self {
             Tuple::Fixed(tuple) => Ok(Type::heterogeneous_tuple(
                 db,
+                env,
                 tuple.py_slice(db, start, stop, step)?,
             )),
-            Tuple::Variable(tuple) => tuple.py_slice_type(db, start, stop, step),
+            Tuple::Variable(tuple) => tuple.py_slice_type(db, env, start, stop, step),
         }
     }
 
@@ -2364,26 +2477,28 @@ impl<'db> Tuple<Type<'db>, VariableSegment<'db>> {
     pub(crate) fn resize(
         &self,
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         new_length: TupleLength,
     ) -> Result<Self, ResizeTupleError> {
         match self {
-            Tuple::Fixed(tuple) => tuple.resize(db, new_length),
-            Tuple::Variable(tuple) => tuple.resize(db, new_length),
+            Tuple::Fixed(tuple) => tuple.resize(db, env, new_length),
+            Tuple::Variable(tuple) => tuple.resize(db, env, new_length),
         }
     }
 
     fn recursive_type_normalized_impl(
         &self,
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         div: Type<'db>,
         nested: bool,
     ) -> Option<Self> {
         match self {
             Tuple::Fixed(tuple) => Some(Tuple::Fixed(
-                tuple.recursive_type_normalized_impl(db, div, nested)?,
+                tuple.recursive_type_normalized_impl(db, env, div, nested)?,
             )),
             Tuple::Variable(tuple) => Some(Tuple::Variable(
-                tuple.recursive_type_normalized_impl(db, div, nested)?,
+                tuple.recursive_type_normalized_impl(db, env, div, nested)?,
             )),
         }
     }
@@ -2393,7 +2508,7 @@ impl<'db> Tuple<Type<'db>, VariableSegment<'db>> {
         db: &'db dyn Db,
         type_mapping: &TypeMapping<'a, 'db>,
         tcx: TypeContext<'db>,
-        visitor: &ApplyTypeMappingVisitor<'db>,
+        visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Self {
         match self {
             Tuple::Fixed(tuple) => {
@@ -2406,16 +2521,17 @@ impl<'db> Tuple<Type<'db>, VariableSegment<'db>> {
     fn find_legacy_typevars_impl(
         &self,
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         binding_context: Option<Definition<'db>>,
         typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
         visitor: &FindLegacyTypeVarsVisitor<'db>,
     ) {
         match self {
             Tuple::Fixed(tuple) => {
-                tuple.find_legacy_typevars_impl(db, binding_context, typevars, visitor);
+                tuple.find_legacy_typevars_impl(db, env, binding_context, typevars, visitor);
             }
             Tuple::Variable(tuple) => {
-                tuple.find_legacy_typevars_impl(db, binding_context, typevars, visitor);
+                tuple.find_legacy_typevars_impl(db, env, binding_context, typevars, visitor);
             }
         }
     }
@@ -2571,9 +2687,12 @@ impl<'db> Tuple<Type<'db>, VariableSegment<'db>> {
     }
 
     /// Return the `TupleSpec` for the singleton `sys.version_info`
-    pub(crate) fn version_info_spec(db: &'db dyn Db) -> TupleSpec<'db> {
-        let python_version = Program::get(db).python_version(db);
-        let int_instance_ty = KnownClass::Int.to_instance(db);
+    pub(crate) fn version_info_spec(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> TupleSpec<'db> {
+        let python_version = env.python_version(db);
+        let int_instance_ty = KnownClass::Int.to_instance(db, env);
 
         // TODO: just grab this type from typeshed (it's a `sys._ReleaseLevel` type alias there)
         let release_level_ty = {
@@ -2614,10 +2733,15 @@ impl<T, V> From<VariableLengthTuple<T, V>> for Tuple<T, V> {
 impl<'db> PyIndex<'db> for &TupleSpec<'db> {
     type Item = Type<'db>;
 
-    fn py_index(self, db: &'db dyn Db, index: i32) -> Result<Self::Item, OutOfBoundsError> {
+    fn py_index(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        index: i32,
+    ) -> Result<Self::Item, OutOfBoundsError> {
         match self {
-            Tuple::Fixed(tuple) => tuple.py_index(db, index),
-            Tuple::Variable(tuple) => tuple.py_index(db, index),
+            Tuple::Fixed(tuple) => tuple.py_index(db, env, index),
+            Tuple::Variable(tuple) => tuple.py_index(db, env, index),
         }
     }
 }
@@ -2638,23 +2762,29 @@ enum TupleElement<T, V = T> {
 /// assigned to the starred target in `list`.
 pub(crate) struct TupleUnpacker<'db> {
     db: &'db dyn Db,
+    env: ProgramEnvironment<'db>,
     targets: Tuple<UnionBuilder<'db>>,
 }
 
 impl<'db> TupleUnpacker<'db> {
-    pub(crate) fn new(db: &'db dyn Db, len: TupleLength) -> Self {
-        let new_builders = |len: usize| std::iter::repeat_with(|| UnionBuilder::new(db)).take(len);
+    pub(crate) fn new(db: &'db dyn Db, env: &ProgramEnvironment<'db>, len: TupleLength) -> Self {
+        let new_builders =
+            |len: usize| std::iter::repeat_with(|| UnionBuilder::new(db, env)).take(len);
         let targets = match len {
             TupleLength::Fixed(len) => {
                 Tuple::Fixed(FixedLengthTuple::from_elements(new_builders(len)))
             }
             TupleLength::Variable(prefix, suffix) => VariableLengthTuple::mixed(
                 new_builders(prefix),
-                UnionBuilder::new(db),
+                UnionBuilder::new(db, env),
                 new_builders(suffix),
             ),
         };
-        Self { db, targets }
+        Self {
+            db,
+            env: env.clone(),
+            targets,
+        }
     }
 
     /// Unpacks a single rhs tuple into the target tuple that we are building. If you want to
@@ -2665,13 +2795,14 @@ impl<'db> TupleUnpacker<'db> {
     /// side is variable-length, we will pull multiple values out of the rhs variable-length
     /// portion, and assign multiple values to the starred target, as needed.
     pub(crate) fn unpack_tuple(&mut self, values: &TupleSpec<'db>) -> Result<(), ResizeTupleError> {
-        let values = values.resize(self.db, self.targets.len())?;
+        let db = self.db;
+        let values = values.resize(db, &self.env, self.targets.len())?;
         match (&mut self.targets, &values) {
             (Tuple::Fixed(targets), Tuple::Fixed(values)) => {
                 targets.unpack_tuple(values);
             }
             (Tuple::Variable(targets), Tuple::Variable(values)) => {
-                targets.unpack_tuple(self.db, values);
+                targets.unpack_tuple(db, &self.env, values);
             }
             _ => panic!("should have ensured that tuples are the same length"),
         }
@@ -2683,11 +2814,12 @@ impl<'db> TupleUnpacker<'db> {
     /// union of the type unpacked into that target from each of the rhs tuples. If there is a
     /// starred target, we will each unpacked type in `list`.
     pub(crate) fn into_types(self) -> impl Iterator<Item = Type<'db>> {
-        self.targets
+        let Self { db, env, targets } = self;
+        targets
             .into_all_elements_with_kind()
-            .map(|builder| match builder {
+            .map(move |builder| match builder {
                 TupleElement::Variable(builder) => builder.try_build().unwrap_or_else(|| {
-                    KnownClass::List.to_specialized_instance(self.db, &[Type::unknown()])
+                    KnownClass::List.to_specialized_instance(db, &env, &[Type::unknown()])
                 }),
                 TupleElement::Fixed(builder)
                 | TupleElement::Prefix(builder)
@@ -2711,6 +2843,7 @@ impl<'db> VariableLengthTuple<UnionBuilder<'db>> {
     fn unpack_tuple(
         &mut self,
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         values: &VariableLengthTuple<Type<'db>, VariableSegment<'db>>,
     ) {
         // We have already verified above that the two tuples have the same length.
@@ -2719,9 +2852,12 @@ impl<'db> VariableLengthTuple<UnionBuilder<'db>> {
         {
             target.add_in_place(value);
         }
-        self.variable_element_mut().add_in_place(
-            KnownClass::List.to_specialized_instance(db, &[values.variable().element_type(db)]),
-        );
+        self.variable_element_mut()
+            .add_in_place(KnownClass::List.to_specialized_instance(
+                db,
+                env,
+                &[values.variable().element_type(db)],
+            ));
         for (target, value) in
             (self.suffix_elements_mut().iter_mut()).zip(values.iter_suffix_elements())
         {
@@ -2763,15 +2899,21 @@ impl<'db> TupleSpecBuilder<'db> {
     pub(crate) fn concat_variadic_typevar(
         self,
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         typevar: BoundTypeVarInstance<'db>,
     ) -> Self {
         debug_assert!(typevar.is_typevartuple(db));
         let other = VariableLengthTuple::mixed([], VariableSegment::TypeVarTuple(typevar), []);
-        self.concat(db, &other)
+        self.concat(db, env, &other)
     }
 
     /// Concatenates another tuple to the end of this tuple, returning a new tuple.
-    pub(crate) fn concat(mut self, db: &'db dyn Db, other: &TupleSpec<'db>) -> Self {
+    pub(crate) fn concat(
+        mut self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        other: &TupleSpec<'db>,
+    ) -> Self {
         match (&mut self, other) {
             (TupleSpecBuilder::Fixed(left_tuple), TupleSpec::Fixed(right_tuple)) => {
                 left_tuple.extend_from_slice(&right_tuple.0);
@@ -2809,6 +2951,7 @@ impl<'db> TupleSpecBuilder<'db> {
             ) => {
                 let variable = UnionType::from_elements_leave_aliases(
                     db,
+                    env,
                     left_suffix
                         .iter()
                         .copied()
@@ -2854,13 +2997,18 @@ impl<'db> TupleSpecBuilder<'db> {
     /// `tuple[int, str, bytes]`, the result will be a tuple-spec builder for
     /// `tuple[int | str | bytes, ...]`. We could consider improving this in the future if real-world
     /// use cases arise.
-    pub(crate) fn union(mut self, db: &'db dyn Db, other: &TupleSpec<'db>) -> Self {
+    pub(crate) fn union(
+        mut self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        other: &TupleSpec<'db>,
+    ) -> Self {
         match (&mut self, other) {
             (TupleSpecBuilder::Fixed(our_elements), TupleSpec::Fixed(new_elements))
                 if our_elements.len() == new_elements.len() =>
             {
                 for (existing, new) in our_elements.iter_mut().zip(new_elements.all_elements()) {
-                    *existing = UnionType::from_elements_leave_aliases(db, [*existing, *new]);
+                    *existing = UnionType::from_elements_leave_aliases(db, env, [*existing, *new]);
                 }
                 self
             }
@@ -2875,6 +3023,7 @@ impl<'db> TupleSpecBuilder<'db> {
             _ => {
                 let unioned = UnionType::from_elements_leave_aliases(
                     db,
+                    env,
                     self.iter_element_types(db)
                         .chain(other.iter_element_types(db)),
                 );
@@ -2894,14 +3043,19 @@ impl<'db> TupleSpecBuilder<'db> {
     /// For example, if `self` is a tuple-spec builder for `tuple[int, str]` and `other` is a
     /// tuple-spec for `tuple[object, object]`, the result will be a tuple-spec builder for
     /// `tuple[int, str]` (since `int & object` simplifies to `int`, and `str & object` to `str`).
-    pub(crate) fn intersect(mut self, db: &'db dyn Db, other: &TupleSpec<'db>) -> Option<Self> {
+    pub(crate) fn intersect(
+        mut self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        other: &TupleSpec<'db>,
+    ) -> Option<Self> {
         match (&mut self, other) {
             // Both fixed-length with the same length: element-wise intersection.
             (TupleSpecBuilder::Fixed(our_elements), TupleSpec::Fixed(new_elements))
                 if our_elements.len() == new_elements.len() =>
             {
                 for (existing, new) in our_elements.iter_mut().zip(new_elements.all_elements()) {
-                    *existing = IntersectionType::from_elements(db, [*existing, *new]);
+                    *existing = IntersectionType::from_elements(db, env, [*existing, *new]);
                 }
                 Some(self)
             }
@@ -2910,16 +3064,16 @@ impl<'db> TupleSpecBuilder<'db> {
             (TupleSpecBuilder::Fixed(_), TupleSpec::Fixed(_)) => None,
 
             (TupleSpecBuilder::Fixed(our_elements), TupleSpec::Variable(var)) => var
-                .resize(db, TupleLength::Fixed(our_elements.len()))
+                .resize(db, env, TupleLength::Fixed(our_elements.len()))
                 .ok()
-                .and_then(|tuple| self.intersect(db, &tuple)),
+                .and_then(|tuple| self.intersect(db, env, &tuple)),
 
             (TupleSpecBuilder::Variable { .. }, TupleSpec::Fixed(fixed)) => self
                 .clone()
                 .build()
-                .resize(db, TupleLength::Fixed(fixed.len()))
+                .resize(db, env, TupleLength::Fixed(fixed.len()))
                 .ok()
-                .and_then(|tuple| TupleSpecBuilder::from(&tuple).intersect(db, other)),
+                .and_then(|tuple| TupleSpecBuilder::from(&tuple).intersect(db, env, other)),
 
             (
                 TupleSpecBuilder::Variable {
@@ -2933,7 +3087,7 @@ impl<'db> TupleSpecBuilder<'db> {
                     && suffix.len() == var.suffix_elements().len()
                 {
                     for (existing, new) in prefix.iter_mut().zip(var.prefix_elements()) {
-                        *existing = IntersectionType::from_two_elements(db, *existing, *new);
+                        *existing = IntersectionType::from_two_elements(db, env, *existing, *new);
                     }
                     *segment = match (*segment, var.variable()) {
                         (
@@ -2943,26 +3097,30 @@ impl<'db> TupleSpecBuilder<'db> {
                         (left, right) => {
                             VariableSegment::Homogeneous(IntersectionType::from_two_elements(
                                 db,
+                                env,
                                 left.element_type(db),
                                 right.element_type(db),
                             ))
                         }
                     };
                     for (existing, new) in suffix.iter_mut().zip(var.suffix_elements()) {
-                        *existing = IntersectionType::from_two_elements(db, *existing, *new);
+                        *existing = IntersectionType::from_two_elements(db, env, *existing, *new);
                     }
                     return Some(self);
                 }
 
                 let self_built = self.clone().build();
                 let self_len = self_built.len();
-                var.resize(db, self_len)
+                var.resize(db, env, self_len)
                     .ok()
-                    .and_then(|resized| self.intersect(db, &resized))
+                    .and_then(|resized| self.intersect(db, env, &resized))
                     .or_else(|| {
-                        self_built.resize(db, var.len()).ok().and_then(|resized| {
-                            TupleSpecBuilder::from(&resized).intersect(db, other)
-                        })
+                        self_built
+                            .resize(db, env, var.len())
+                            .ok()
+                            .and_then(|resized| {
+                                TupleSpecBuilder::from(&resized).intersect(db, env, other)
+                            })
                     })
             }
         }

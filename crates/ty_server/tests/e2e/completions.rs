@@ -129,6 +129,53 @@ complete_parenth
             ClientOptions::default().with_complete_function_parentheses(true),
         )
         .enable_completion_snippets(true)
+        .with_trigger_parameter_hints_command()
+        .with_workspace(workspace_root, None)?
+        .with_file(foo, foo_content)?
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    server.open_text_document(foo, foo_content, 1);
+
+    let completions = server.completion_request(&server.file_uri(foo), Position::new(2, 16));
+    insta::assert_json_snapshot!(completions, @r#"
+    [
+      {
+        "label": "complete_parentheses",
+        "kind": 3,
+        "detail": "def complete_parentheses() -> None",
+        "sortText": "0",
+        "insertText": "complete_parentheses($0)",
+        "insertTextFormat": 2,
+        "command": {
+          "title": "Trigger parameter hints",
+          "command": "ty.triggerParameterHints"
+        }
+      }
+    ]
+    "#);
+
+    Ok(())
+}
+
+/// Tests that the signature-help command is omitted when the client has not
+/// advertised support for it (for example, editors that would surface an
+/// "unsupported command" error).
+#[test]
+fn complete_function_parentheses_without_command_support() -> Result<()> {
+    let workspace_root = SystemPath::new("src");
+    let foo = SystemPath::new("src/foo.py");
+    let foo_content = "\
+def complete_parentheses() -> None: ...
+
+complete_parenth
+";
+
+    let mut server = TestServerBuilder::new()?
+        .with_initialization_options(
+            ClientOptions::default().with_complete_function_parentheses(true),
+        )
+        .enable_completion_snippets(true)
         .with_workspace(workspace_root, None)?
         .with_file(foo, foo_content)?
         .build()
@@ -205,6 +252,7 @@ is_typedd
             ClientOptions::default().with_complete_function_parentheses(true),
         )
         .enable_completion_snippets(true)
+        .with_trigger_parameter_hints_command()
         .with_workspace(workspace_root, None)?
         .with_file(foo, foo_content)?
         .build()
@@ -220,7 +268,11 @@ is_typedd
         "kind": 3,
         "sortText": "0",
         "insertText": "typing.is_typeddict($0)",
-        "insertTextFormat": 2
+        "insertTextFormat": 2,
+        "command": {
+          "title": "Trigger parameter hints",
+          "command": "ty.triggerParameterHints"
+        }
       }
     ]
     "#);

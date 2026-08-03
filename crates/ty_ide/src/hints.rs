@@ -1,4 +1,4 @@
-use ruff_db::files::File;
+use ruff_db::PythonFile;
 use ruff_python_ast::name::Name;
 use ruff_text_size::TextRange;
 use ty_python_semantic::types::ide_support::{
@@ -40,8 +40,9 @@ impl HintKind {
     }
 }
 
-pub fn hints(db: &dyn Db, file: File) -> Vec<Hint> {
-    if !db.should_check_file(file) {
+pub fn hints(db: &dyn Db, file: PythonFile<'_>) -> Vec<Hint> {
+    let source_file = file.file(db);
+    if !db.should_check_file(source_file) {
         return Vec::new();
     }
 

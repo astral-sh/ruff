@@ -37,8 +37,8 @@ pub use call_hierarchy::outgoing_calls::{OutgoingCall, outgoing_calls};
 pub use call_hierarchy::{CallHierarchyItem, prepare_call_hierarchy};
 pub use code_action::{QuickFix, code_actions};
 pub use completion::{
-    Completion, CompletionCapabilities, CompletionInsertTextFormat, CompletionKind,
-    CompletionSettings, completion,
+    Completion, CompletionCapabilities, CompletionCommand, CompletionInsertTextFormat,
+    CompletionKind, CompletionSettings, completion,
 };
 pub use doc_highlights::document_highlights;
 pub use document_symbols::document_symbols;
@@ -74,6 +74,7 @@ use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::{FxBuildHasher, FxHashSet};
 use std::ops::{Deref, DerefMut};
 use ty_project::Db;
+use ty_python_semantic::ProgramEnvironment;
 use ty_python_semantic::types::{Type, TypeDefinition};
 
 type FxIndexMap<K, V> = indexmap::IndexMap<K, V, FxBuildHasher>;
@@ -280,23 +281,23 @@ impl FromIterator<NavigationTarget> for NavigationTargets {
 }
 
 pub trait HasNavigationTargets {
-    fn navigation_targets(&self, db: &dyn Db) -> NavigationTargets;
+    fn navigation_targets(&self, db: &dyn Db, env: &ProgramEnvironment<'_>) -> NavigationTargets;
 }
 
 impl HasNavigationTargets for Type<'_> {
-    fn navigation_targets(&self, db: &dyn Db) -> NavigationTargets {
+    fn navigation_targets(&self, db: &dyn Db, env: &ProgramEnvironment<'_>) -> NavigationTargets {
         match self {
             Type::Union(union) => union
                 .elements(db)
                 .iter()
-                .flat_map(|target| target.navigation_targets(db))
+                .flat_map(|target| target.navigation_targets(db, env))
                 .collect(),
 
             Type::Intersection(intersection) => {
-                if let Some(alternatives) = intersection.finite_alternatives(db) {
+                if let Some(alternatives) = intersection.finite_alternatives(db, env) {
                     return alternatives
                         .iter()
-                        .flat_map(|alternative| alternative.navigation_targets(db))
+                        .flat_map(|alternative| alternative.navigation_targets(db, env))
                         .collect();
                 }
 
@@ -313,26 +314,26 @@ impl HasNavigationTargets for Type<'_> {
                         // because the type is the intersection of all those types.
                         NavigationTargets::empty()
                     }
-                    None => first.navigation_targets(db),
+                    None => first.navigation_targets(db, env),
                 }
             }
 
             Type::EnumComplement(complement) => complement
-                .remaining_literal_types(db)
+                .remaining_literal_types(db, env)
                 .iter()
-                .flat_map(|alternative| alternative.navigation_targets(db))
+                .flat_map(|alternative| alternative.navigation_targets(db, env))
                 .collect(),
 
             ty => ty
-                .definition(db)
-                .map(|definition| definition.navigation_targets(db))
+                .definition(db, env)
+                .map(|definition| definition.navigation_targets(db, env))
                 .unwrap_or_else(NavigationTargets::empty),
         }
     }
 }
 
 impl HasNavigationTargets for TypeDefinition<'_> {
-    fn navigation_targets(&self, db: &dyn Db) -> NavigationTargets {
+    fn navigation_targets(&self, db: &dyn Db, _: &ProgramEnvironment<'_>) -> NavigationTargets {
         let Some(full_range) = self.full_range(db) else {
             return NavigationTargets::empty();
         };
@@ -402,6 +403,7 @@ mod tests {
     use insta::internals::SettingsBindDropGuard;
 
     use ruff_db::Db;
+    use ruff_db::PythonFile;
     use ruff_db::diagnostic::{
         Annotation, Diagnostic, DiagnosticFormat, DisplayDiagnosticConfig, UnifiedFile,
     };
@@ -436,6 +438,10 @@ mod tests {
     impl CursorTest {
         pub(super) fn builder() -> CursorTestBuilder {
             CursorTestBuilder::default()
+        }
+
+        pub(super) fn python_file(&self, file: File) -> PythonFile<'_> {
+            PythonFile::new(&self.db, file, self.db.python_version())
         }
 
         pub(super) fn write_file(
@@ -562,7 +568,9 @@ mod tests {
                     db.project().open_file(&mut db, file);
 
                     let source = source_text(&db, file);
-                    let parsed = parsed_module(&db, file).load(&db);
+                    let parsed =
+                        parsed_module(&db, PythonFile::new(&db, file, db.python_version()))
+                            .load(&db);
                     let stylist =
                         Stylist::from_tokens(parsed.tokens(), source.as_str()).into_owned();
                     cursor = Some(Cursor {
@@ -714,7 +722,9 @@ mod tests {
                     db.project().open_file(&mut db, file);
 
                     let source = source_text(&db, file);
-                    let parsed = parsed_module(&db, file).load(&db);
+                    let parsed =
+                        parsed_module(&db, PythonFile::new(&db, file, db.python_version()))
+                            .load(&db);
                     let stylist =
                         Stylist::from_tokens(parsed.tokens(), source.as_str()).into_owned();
                     cursor = Some(Cursor {

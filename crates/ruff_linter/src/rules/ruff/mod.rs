@@ -243,14 +243,10 @@ mod tests {
     fn missing_fstring_syntax_backslash_py311() -> Result<()> {
         assert_diagnostics_diff!(
             Path::new("ruff/RUF027_0.py"),
-            &LinterSettings {
-                unresolved_target_version: PythonVersion::PY312.into(),
-                ..LinterSettings::for_rule(Rule::MissingFStringSyntax)
-            },
-            &LinterSettings {
-                unresolved_target_version: PythonVersion::PY311.into(),
-                ..LinterSettings::for_rule(Rule::MissingFStringSyntax)
-            },
+            &LinterSettings::for_rule(Rule::MissingFStringSyntax)
+                .with_target_version(PythonVersion::PY312),
+            &LinterSettings::for_rule(Rule::MissingFStringSyntax)
+                .with_target_version(PythonVersion::PY311),
         );
         Ok(())
     }
@@ -353,10 +349,8 @@ mod tests {
 
             print(None | (int)and 2)
             ",
-            &settings::LinterSettings {
-                unresolved_target_version: PythonVersion::PY313.into(),
-                ..settings::LinterSettings::for_rule(Rule::NoneNotAtEndOfUnion)
-            },
+            &settings::LinterSettings::for_rule(Rule::NoneNotAtEndOfUnion)
+                .with_target_version(PythonVersion::PY313),
         );
         assert_diagnostics!("PY313_RUF036_runtime_evaluated", diagnostics);
     }
@@ -365,10 +359,8 @@ mod tests {
     fn quadratic_list_summation_py315() -> Result<()> {
         let diagnostics = test_path(
             Path::new("ruff/RUF017_0.py"),
-            &settings::LinterSettings {
-                unresolved_target_version: PythonVersion::PY315.into(),
-                ..settings::LinterSettings::for_rule(Rule::QuadraticListSummation)
-            },
+            &settings::LinterSettings::for_rule(Rule::QuadraticListSummation)
+                .with_target_version(PythonVersion::PY315),
         )?;
         assert_diagnostics!("PY315_RUF017_RUF017_0.py", diagnostics);
         Ok(())
@@ -378,12 +370,8 @@ mod tests {
     fn unnecessary_iterable_allocation_for_first_element_py315() -> Result<()> {
         let diagnostics = test_path(
             Path::new("ruff/RUF015_py315.py"),
-            &settings::LinterSettings {
-                unresolved_target_version: PythonVersion::PY315.into(),
-                ..settings::LinterSettings::for_rule(
-                    Rule::UnnecessaryIterableAllocationForFirstElement,
-                )
-            },
+            &settings::LinterSettings::for_rule(Rule::UnnecessaryIterableAllocationForFirstElement)
+                .with_target_version(PythonVersion::PY315),
         )?;
         assert_diagnostics!("PY315_RUF015_RUF015_py315.py", diagnostics);
         Ok(())
@@ -393,10 +381,8 @@ mod tests {
     fn access_annotations_from_class_dict_py310() -> Result<()> {
         let diagnostics = test_path(
             Path::new("ruff/RUF063.py"),
-            &LinterSettings {
-                unresolved_target_version: PythonVersion::PY310.into(),
-                ..LinterSettings::for_rule(Rule::AccessAnnotationsFromClassDict)
-            },
+            &LinterSettings::for_rule(Rule::AccessAnnotationsFromClassDict)
+                .with_target_version(PythonVersion::PY310),
         )?;
         assert_diagnostics!(diagnostics);
         Ok(())
@@ -406,10 +392,8 @@ mod tests {
     fn access_annotations_from_class_dict_py314() -> Result<()> {
         let diagnostics = test_path(
             Path::new("ruff/RUF063.py"),
-            &LinterSettings {
-                unresolved_target_version: PythonVersion::PY314.into(),
-                ..LinterSettings::for_rule(Rule::AccessAnnotationsFromClassDict)
-            },
+            &LinterSettings::for_rule(Rule::AccessAnnotationsFromClassDict)
+                .with_target_version(PythonVersion::PY314),
         )?;
         assert_diagnostics!(diagnostics);
         Ok(())
@@ -820,10 +804,7 @@ mod tests {
         );
         let diagnostics = test_path(
             Path::new("ruff").join(path).as_path(),
-            &settings::LinterSettings {
-                preview: PreviewMode::Enabled,
-                ..settings::LinterSettings::for_rule(rule_code)
-            },
+            &settings::LinterSettings::for_rule(rule_code).with_preview_mode(),
         )?;
         assert_diagnostics!(snapshot, diagnostics);
         Ok(())
@@ -838,11 +819,9 @@ mod tests {
         );
         let diagnostics = test_path(
             Path::new("ruff").join(path).as_path(),
-            &settings::LinterSettings {
-                preview: PreviewMode::Enabled,
-                unresolved_target_version: PythonVersion::PY37.into(),
-                ..settings::LinterSettings::for_rule(rule_code)
-            },
+            &settings::LinterSettings::for_rule(rule_code)
+                .with_preview_mode()
+                .with_target_version(PythonVersion::PY37),
         )?;
         assert_diagnostics!(snapshot, diagnostics);
         Ok(())
@@ -857,11 +836,9 @@ mod tests {
         );
         let diagnostics = test_path(
             Path::new("ruff").join(path).as_path(),
-            &settings::LinterSettings {
-                preview: PreviewMode::Enabled,
-                unresolved_target_version: PythonVersion::PY38.into(),
-                ..settings::LinterSettings::for_rule(rule_code)
-            },
+            &settings::LinterSettings::for_rule(rule_code)
+                .with_preview_mode()
+                .with_target_version(PythonVersion::PY38),
         )?;
         assert_diagnostics!(snapshot, diagnostics);
         Ok(())
@@ -904,10 +881,8 @@ mod tests {
         );
         let diagnostics = test_path(
             Path::new("ruff").join(path).as_path(),
-            &settings::LinterSettings {
-                unresolved_target_version: PythonVersion::PY314.into(),
-                ..settings::LinterSettings::for_rule(rule_code)
-            },
+            &settings::LinterSettings::for_rule(rule_code)
+                .with_target_version(PythonVersion::PY314),
         )?;
         assert_diagnostics!(snapshot, diagnostics);
         Ok(())
