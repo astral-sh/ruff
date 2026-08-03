@@ -262,35 +262,49 @@ impl<'db> SolutionWalker<'db> {
         let mut any_constrained_solutions = false;
         let mut mappings: FxIndexMap<BoundTypeVarInstance<'db>, ConstraintBoundsBuilder<'db>> =
             FxIndexMap::default();
+        let is_bare_inferable_typevar = |ty: Type<'db>| {
+            ty.as_typevar()
+                .is_some_and(|typevar| typevar.is_inferable(db, self.inferable))
+        };
 
         for path in self.sorted_paths {
             mappings.clear();
             for (constraint, _) in path {
                 let constraint = storage.constraint_data(constraint);
                 let typevar = constraint.typevar;
-                if let Some(lower) = constraint.bounds.lower {
-                    if typevar.is_inferable(db, self.inferable) {
-                        let bounds = mappings.entry(typevar).or_default();
-                        bounds.add_lower(db, env, lower);
-                    }
 
-                    if let Type::TypeVar(lower_bound_typevar) = lower
-                        && lower_bound_typevar.is_inferable(db, self.inferable)
-                    {
+                // A direct relationship between an inferable and non-inferable typevar must
+                // contribute bounds for both endpoints. Contextual inference relies on the
+                // reverse, non-inferable binding to preserve relationships to outer typevars.
+                // Constraints on unrelated non-inferable typevars must not contribute bindings.
+                if !typevar.is_inferable(db, self.inferable)
+                    && !constraint
+                        .bounds
+                        .lower
+                        .is_some_and(is_bare_inferable_typevar)
+                    && !constraint
+                        .bounds
+                        .upper
+                        .is_some_and(is_bare_inferable_typevar)
+                {
+                    continue;
+                }
+
+                if let Some(lower) = constraint.bounds.lower {
+                    let bounds = mappings.entry(typevar).or_default();
+                    bounds.add_lower(db, env, lower);
+
+                    if let Type::TypeVar(lower_bound_typevar) = lower {
                         let bounds = mappings.entry(lower_bound_typevar).or_default();
                         bounds.add_upper(db, env, Type::TypeVar(typevar));
                     }
                 }
 
                 if let Some(upper) = constraint.bounds.upper {
-                    if typevar.is_inferable(db, self.inferable) {
-                        let bounds = mappings.entry(typevar).or_default();
-                        bounds.add_upper(db, env, upper);
-                    }
+                    let bounds = mappings.entry(typevar).or_default();
+                    bounds.add_upper(db, env, upper);
 
-                    if let Type::TypeVar(upper_bound_typevar) = upper
-                        && upper_bound_typevar.is_inferable(db, self.inferable)
-                    {
+                    if let Type::TypeVar(upper_bound_typevar) = upper {
                         let bounds = mappings.entry(upper_bound_typevar).or_default();
                         bounds.add_lower(db, env, Type::TypeVar(typevar));
                     }

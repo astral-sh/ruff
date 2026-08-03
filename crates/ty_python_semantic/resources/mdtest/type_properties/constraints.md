@@ -944,8 +944,9 @@ def inferable_last[I, N0, N1, N2, N3, N4, N5, N6, N7, N8, N9, N10, N11]() -> Non
 ### Symbolic relationships and fixed non-inferable bindings
 
 A bare relationship must have the same meaning regardless of which type variable the TDD chooses as
-its constraint subject. An explicit exact constraint fixes a non-inferable variable to a concrete
-type; a one-sided bound does not.
+its constraint subject. Directly related non-inferable variables retain their reverse bindings,
+while unrelated non-inferable constraints do not. An explicit exact constraint fixes a non-inferable
+variable to a concrete type; a one-sided bound does not.
 
 ```py
 from typing import Any, Never
@@ -953,18 +954,18 @@ from ty_extensions._internal import ConstraintSet, Unknown
 
 def symbolic_relationship[I, N]() -> None:
     constraints = ConstraintSet.range(N, I, N)
-    # revealed: tuple[Solution[I=N@symbolic_relationship]]
+    # revealed: tuple[Solution[I=N@symbolic_relationship, N=I@symbolic_relationship]]
     reveal_type(constraints.solutions(inferable=tuple[I]))
 
 def symbolic_relationship_reversed[N, I]() -> None:
     constraints = ConstraintSet.range(N, I, N)
-    # revealed: tuple[Solution[I=N@symbolic_relationship_reversed]]
+    # revealed: tuple[Solution[I=N@symbolic_relationship_reversed, N=I@symbolic_relationship_reversed]]
     reveal_type(constraints.solutions(inferable=tuple[I]))
 
 def fixed_noninferable[I, N]() -> None:
     constraints = ConstraintSet.range(int, N, int) & ConstraintSet.range(N, I, N)
     # TODO: revealed: tuple[Solution[I=int]]
-    # revealed: tuple[Solution[I=int | N@fixed_noninferable]]
+    # revealed: tuple[Solution[I=int | N@fixed_noninferable, N=I@fixed_noninferable]]
     reveal_type(constraints.solutions(inferable=tuple[I]))
 
 def fixed_nested_noninferable[I, N]() -> None:
@@ -975,12 +976,12 @@ def fixed_nested_noninferable[I, N]() -> None:
 
 def gradual_noninferable_any[I, N]() -> None:
     constraints = ConstraintSet.range(Any, N, Any) & ConstraintSet.range(N, I, N)
-    # revealed: tuple[Solution[I=Any | N@gradual_noninferable_any]]
+    # revealed: tuple[Solution[I=Any | N@gradual_noninferable_any, N=I@gradual_noninferable_any]]
     reveal_type(constraints.solutions(inferable=tuple[I]))
 
 def gradual_noninferable_unknown[I, N]() -> None:
     constraints = ConstraintSet.range(Unknown, N, Unknown) & ConstraintSet.range(N, I, N)
-    # revealed: tuple[Solution[I=Unknown | N@gradual_noninferable_unknown]]
+    # revealed: tuple[Solution[I=Unknown | N@gradual_noninferable_unknown, N=I@gradual_noninferable_unknown]]
     reveal_type(constraints.solutions(inferable=tuple[I]))
 
 def lower_bounded_noninferable[I, N]() -> None:
@@ -991,7 +992,7 @@ def lower_bounded_noninferable[I, N]() -> None:
 
 def upper_bounded_noninferable[I, N]() -> None:
     constraints = ConstraintSet.range(Never, N, int) & ConstraintSet.range(N, I, N)
-    # revealed: tuple[Solution[I=N@upper_bounded_noninferable]]
+    # revealed: tuple[Solution[I=N@upper_bounded_noninferable, N=I@upper_bounded_noninferable]]
     reveal_type(constraints.solutions(inferable=tuple[I]))
 ```
 

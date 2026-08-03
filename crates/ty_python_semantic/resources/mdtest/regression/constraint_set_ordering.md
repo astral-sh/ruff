@@ -232,8 +232,8 @@ def chain_uts[U, T, S]() -> None:
 ## Non-inferable constraint source order and typevar orientation
 
 A non-inferable constraint can appear before or after inferable constraints, and a bare relationship
-can be encoded with either variable as its subject. None of those representation choices should
-change which type variables are returned.
+can be encoded with either variable as its subject. Unrelated non-inferable variables are omitted,
+but a directly related non-inferable variable must be retained regardless of its orientation.
 
 ```py
 from ty_extensions._internal import ConstraintSet
@@ -250,20 +250,20 @@ def noninferable_constraint_last[I, J, N]() -> None:
 
 def inferable_subject[I, N]() -> None:
     constraints = ConstraintSet.range(N, I, N)
-    # revealed: tuple[Solution[I=N@inferable_subject]]
+    # revealed: tuple[Solution[I=N@inferable_subject, N=I@inferable_subject]]
     reveal_type(constraints.solutions(inferable=tuple[I]))
 
 def noninferable_subject[N, I]() -> None:
     constraints = ConstraintSet.range(I, N, I)
-    # revealed: tuple[Solution[I=N@noninferable_subject]]
+    # revealed: tuple[Solution[N=I@noninferable_subject, I=N@noninferable_subject]]
     reveal_type(constraints.solutions(inferable=tuple[I]))
 ```
 
 ## Abstraction and non-inferable typevars
 
-Non-inferable typevars must not appear in reported solution bindings, and irrelevant positive
-decisions must not leak onto independent alternatives. Universal abstraction of an alternative must
-likewise leave only the unrelated branch.
+Irrelevant non-inferable typevars must not appear in reported solution bindings, and irrelevant
+positive decisions must not leak onto independent alternatives. Universal abstraction of an
+alternative must likewise leave only the unrelated branch.
 
 ```py
 from typing import Never

@@ -638,9 +638,7 @@ x2: dict[Hashable, Callable[..., object]] = dict(x=lambda: 1)
 ## Covariant constructors with outer return contexts
 
 A bounded, defaulted, covariant constructor should use its outer return context instead of falling
-back to its declared default. These false positives are pending
-[#26680](https://github.com/astral-sh/ruff/pull/26680), which will conjoin contextual return
-constraints with argument constraints before solving.
+back to its declared default.
 
 ```py
 from __future__ import annotations
@@ -650,8 +648,6 @@ from typing_extensions import Self, TypeVar
 
 class Client:
     def no_argument(self) -> EmptyBox[Self]:
-        # TODO(#26680): no error
-        # error: [invalid-return-type] "expected `EmptyBox[Self@no_argument]`, found `EmptyBox[Client]`"
         return EmptyBox()
 
 T = TypeVar("T", bound=Client, default=Client, covariant=True)
@@ -662,8 +658,6 @@ class EmptyBox(Generic[T]):
 
 class Holder(Generic[T]):
     def related(self) -> RelatedBox[T]:
-        # TODO(#26680): no error
-        # error: [invalid-return-type] "expected `RelatedBox[T@Holder]`, found `RelatedBox[Client]`"
         return RelatedBox(self)
 
 class RelatedBox(Generic[T]):
@@ -674,8 +668,7 @@ class RelatedBox(Generic[T]):
 ## Dataclass constructors with outer return contexts
 
 A covariant dataclass argument referring to outer `Self` should not specialize to its declared
-default. The resulting return and argument false positives are pending
-[#26680](https://github.com/astral-sh/ruff/pull/26680).
+default.
 
 ```py
 from __future__ import annotations
@@ -686,11 +679,7 @@ from typing_extensions import Self, TypeVar
 
 class PartialUser:
     def equipped(self, present: bool) -> Equipped[Self]:
-        # TODO(#26680): no error
-        # error: [invalid-return-type]
         return Equipped(
-            # TODO(#26680): no error
-            # error: [invalid-argument-type] "Expected `Item[User] | None`, found `Item[Self@equipped] | None`"
             first=Item(self) if present else None,
         )
 
@@ -755,7 +744,7 @@ def maybe_iterable_to_list[T](value: Iterable[T] | T) -> Collection[T] | T:
 
 A constrained outer return type should remain visible in an invalid callback diagnostic. The
 callback itself is still invalid, but replacing its expected result with `Unknown` loses useful
-information. Restoring the outer result is pending
+information. The false-positive return diagnostic is pending
 [#26680](https://github.com/astral-sh/ruff/pull/26680).
 
 ```py
@@ -775,18 +764,17 @@ class CallbackInterface(Generic[C]):
 
     def view(self) -> CallbackView[C]:
         # TODO(#26680): no [invalid-return-type] error
-        # TODO(#26680): error: [invalid-argument-type] "Expected `(int, /) -> C@CallbackInterface`, found `Selector@__init__`"
         # error: [invalid-return-type]
-        # error: [invalid-argument-type] "Expected `(int, /) -> Unknown`, found `Selector@__init__`"
+        # error: [invalid-argument-type] "Expected `(int, /) -> C@CallbackInterface`, found `Selector@__init__`"
         return CallbackView(self.callback)
 ```
 
 ## Callable factories retain contextual outer element types
 
 Narrowing a union to a callable should not replace its outer iterable element type with `Unknown`.
-The factory argument remains invalid, but its expected result should preserve the outer `CT`. Its
-correct diagnostic is pending [#26680](https://github.com/astral-sh/ruff/pull/26680); the separate
-narrowed-sequence constructor must remain valid.
+The factory argument remains invalid, but its expected result should preserve the outer `CT`. The
+false-positive return diagnostic and separate narrowed-sequence constructor diagnostics are pending
+[#26680](https://github.com/astral-sh/ruff/pull/26680).
 
 ```py
 from collections.abc import Callable, Iterable, Iterator, Sequence
@@ -812,12 +800,14 @@ class SequenceView(Iterable[RT], Generic[RT]):
 def build_iter_view(matches: Iterable[CT] | Callable[[], Iterable[CT]]) -> Iterable[CT]:
     if callable(matches):
         # TODO(#26680): no [invalid-return-type] error
-        # TODO(#26680): error: [invalid-argument-type] "Expected `() -> Iterable[CT@built_iter_view]`"
         # error: [invalid-return-type]
-        # error: [invalid-argument-type] "Expected `() -> Iterable[Unknown]`"
+        # error: [invalid-argument-type] "Expected `() -> Iterable[CT@build_iter_view]`"
         return FactoryView(matches)
     if not isinstance(matches, Sequence):
         matches = list(matches)
+    # TODO(#26680): no errors
+    # error: [invalid-return-type]
+    # error: [invalid-argument-type] "Expected `Sequence[CT@build_iter_view]`"
     return SequenceView(matches)
 ```
 
