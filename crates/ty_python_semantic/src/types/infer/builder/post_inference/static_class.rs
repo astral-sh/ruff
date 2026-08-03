@@ -8,14 +8,19 @@ use ruff_python_ast::{self as ast, PythonVersion, name::Name};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 use rustc_hash::FxHashSet;
 
+use crate::types::infer::infer_definition_types_with_prepared_dependencies;
 use crate::{
     Db, Program, TypeQualifiers,
     diagnostic::format_enumeration,
-    place::{DefinedPlace, Place, TypeOrigin, place_from_bindings, place_from_declarations},
+    place::{
+        DefinedPlace, Place, TypeOrigin, place_from_bindings_with_prepared_dependencies,
+        place_from_declarations,
+    },
     types::{
         CallArguments, ClassBase, ClassLiteral, ClassType, DataclassFlags, KnownClass,
         KnownInstanceType, MemberLookupPolicy, MetaclassCandidate, Parameters, Signature,
-        SpecialFormType, StaticClassLiteral, Type, TypeVarVariance, TypedDictModule, binding_type,
+        SpecialFormType, StaticClassLiteral, Type, TypeVarVariance, TypedDictModule,
+        binding_type_with_prepared_dependencies,
         call::Argument,
         class::{
             AbstractMethod, CodeGeneratorKind, Field, FieldKind, MetaclassErrorKind,
@@ -45,7 +50,6 @@ use crate::{
         function::KnownFunction,
         generics::enclosing_generic_contexts,
         infer::builder::post_inference::typed_dict::validate_typed_dict_class,
-        infer_definition_types,
         mro::StaticMroErrorKind,
         overrides,
         special_form::TypeQualifier,
@@ -1223,7 +1227,7 @@ fn check_class_namespace_against_metaclass_members<'db>(
                     continue;
                 }
 
-                let assigned_ty = binding_type(db, definition);
+                let assigned_ty = binding_type_with_prepared_dependencies(db, definition);
                 if !assigned_ty.is_assignable_to(db, metaclass_member_ty) {
                     reported_incompatible_binding = true;
                     report_invalid_attribute_assignment(
@@ -1342,7 +1346,8 @@ fn check_final_class_abstract_methods<'db>(
         "Final class `{class_name}` has unimplemented abstract methods",
     ));
 
-    let definition_types = infer_definition_types(db, class.definition(db));
+    let definition_types =
+        infer_definition_types_with_prepared_dependencies(db, class.definition(db));
 
     if let Some(class_node) = class.body_scope(db).node(db).as_class()
         && let Some(decorator) = class_node
@@ -1406,7 +1411,9 @@ fn check_final_class_abstract_methods<'db>(
 
     let defining_class_name = defining_class.name(db);
 
-    if let Type::FunctionLiteral(function) = binding_type(db, *definition) {
+    if let Type::FunctionLiteral(function) =
+        binding_type_with_prepared_dependencies(db, *definition)
+    {
         let policy = if kind.is_explicit() {
             AbstractMethodAnnotationPolicy::ExcludeVerboseBody
         } else {
@@ -1443,9 +1450,10 @@ fn check_final_class_abstract_methods<'db>(
         // and the return type is assignable to `None`, they may not have intended
         // for it to be implicitly abstract; add a clarificatory note:
         if kind.is_implicit_due_to_stub_body() && db.should_check_file(definition.file(db)) {
-            let function_type_as_callable = infer_definition_types(db, *definition)
-                .binding_type(*definition)
-                .try_upcast_to_callable(db);
+            let function_type_as_callable =
+                infer_definition_types_with_prepared_dependencies(db, *definition)
+                    .binding_type(*definition)
+                    .try_upcast_to_callable(db);
 
             if let Some(callables) = function_type_as_callable
                 && Type::function_like_callable(
@@ -1500,7 +1508,7 @@ fn check_class_final_without_value<'db>(
 
         // Check if the symbol has any bindings at class level.
         let bindings = use_def.end_of_scope_symbol_bindings(symbol_id);
-        let binding_place = place_from_bindings(db, bindings);
+        let binding_place = place_from_bindings_with_prepared_dependencies(db, bindings);
 
         if !binding_place.place.is_undefined() {
             continue;

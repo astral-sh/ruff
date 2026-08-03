@@ -31,7 +31,8 @@ pub use self::diagnostic::{UNDEFINED_REVEAL, UNRESOLVED_REFERENCE};
 pub(crate) use self::infer::{
     InferredDeclaration, TypeContext, infer_complete_scope_types, infer_deferred_types,
     infer_definition_types, infer_expression_type, infer_expression_types,
-    infer_same_file_expression_type, infer_scope_types, is_discarded_dict_key_assignment,
+    infer_name_dependencies_for_scope, infer_same_file_expression_type, infer_scope_types,
+    is_discarded_dict_key_assignment,
 };
 pub(crate) use self::iteration::extract_fixed_length_iterable_element_types;
 pub use self::known_instance::KnownInstanceType;
@@ -219,6 +220,16 @@ pub fn check_types(db: &dyn Db, file: File) -> Vec<Diagnostic> {
 pub(crate) fn binding_type<'db>(db: &'db dyn Db, definition: Definition<'db>) -> Type<'db> {
     let inference = infer_definition_types(db, definition);
     inference.binding_type(definition)
+}
+
+/// Infer the type of a binding whose ordinary variable dependencies have already been inferred in
+/// dependency order.
+pub(crate) fn binding_type_with_prepared_dependencies<'db>(
+    db: &'db dyn Db,
+    definition: Definition<'db>,
+) -> Type<'db> {
+    infer::infer_definition_types_with_prepared_dependencies(db, definition)
+        .binding_type(definition)
 }
 
 /// Infer the type of a declaration, returning `Rejected` if it is not valid.

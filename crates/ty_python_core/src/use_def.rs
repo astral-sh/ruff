@@ -246,7 +246,7 @@ use std::sync::LazyLock;
 
 use ruff_index::{FrozenIndexVec, Idx, IndexVec, newtype_index};
 use ruff_text_size::TextRange;
-use rustc_hash::{FxBuildHasher, FxHashMap, FxHasher};
+use rustc_hash::{FxBuildHasher, FxHashMap, FxHashSet, FxHasher};
 use smallvec::SmallVec;
 use thin_vec::ThinVec;
 
@@ -780,6 +780,14 @@ pub struct UseDefMap<'db> {
         DefinitionsAtDefinition<InternedBindingsId, InternedDeclarationsId>,
     >,
 
+    /// Ordinary variable definitions directly needed to infer a definition.
+    ///
+    /// Type inference traverses this graph iteratively before inferring a requested definition.
+    name_dependencies: FrozenMap<Definition<'db>, Box<[Definition<'db>]>>,
+
+    /// Ordinary variable definitions that have entries in `name_dependencies`.
+    name_dependency_roots: FrozenMap<Definition<'db>, ()>,
+
     /// Retained [`PlaceState`] values for each symbol.
     symbol_states: FrozenIndexVec<ScopedSymbolId, RetainedPlaceStates<InternedPlaceStateId>>,
 
@@ -1073,6 +1081,62 @@ impl<'db> UseDefMap<'db> {
             |definitions| &self.interned_bindings[definitions.bindings],
         );
         self.bindings_iterator(bindings, BoundnessAnalysis::BasedOnUnboundVisibility)
+    }
+
+    /// Returns the ordinary variable definitions directly referenced by `definition`.
+    pub fn name_dependencies(&self, definition: Definition<'db>) -> &[Definition<'db>] {
+        self.name_dependencies
+            .get(&definition)
+            .map(AsRef::as_ref)
+            .unwrap_or_default()
+    }
+
+    /// Returns every ordinary variable definition in the dependency graph in dependency order.
+    pub fn all_name_dependencies_in_order(&self) -> Vec<Definition<'db>> {
+        let roots = self
+            .all_definitions
+            .iter_enumerated()
+            .filter_map(|(_, state)| state.state().definition())
+            .filter(|definition| self.name_dependency_roots.get(definition).is_some());
+        self.name_dependency_order(roots)
+    }
+
+    /// Returns the ordinary variable dependencies of `definition` in dependency order.
+    pub fn name_dependencies_in_order(&self, definition: Definition<'db>) -> Vec<Definition<'db>> {
+        self.name_dependency_order(self.name_dependencies(definition).iter().copied())
+    }
+
+    fn name_dependency_order(
+        &self,
+        roots: impl IntoIterator<Item = Definition<'db>>,
+    ) -> Vec<Definition<'db>> {
+        let mut pending = Vec::new();
+        let mut visited = FxHashSet::default();
+        let mut ordered = Vec::new();
+
+        for root in roots {
+            pending.push((root, false));
+
+            while let Some((definition, expanded)) = pending.pop() {
+                if expanded {
+                    ordered.push(definition);
+                    continue;
+                }
+                if !visited.insert(definition) {
+                    continue;
+                }
+
+                pending.push((definition, true));
+                pending.extend(
+                    self.name_dependencies(definition)
+                        .iter()
+                        .rev()
+                        .map(|dependency| (*dependency, false)),
+                );
+            }
+        }
+
+        ordered
     }
 
     pub fn declarations_at_binding(
@@ -1799,6 +1863,12 @@ pub(super) struct UseDefMapBuilder<'db> {
     definitions_by_definition:
         FxHashMap<Definition<'db>, DefinitionsAtDefinition<Bindings, Declarations>>,
 
+    /// Ordinary variable definitions directly needed to infer a definition.
+    name_dependencies: FxHashMap<Definition<'db>, Box<[Definition<'db>]>>,
+
+    /// Ordinary variable definitions that have entries in `name_dependencies`.
+    name_dependency_roots: FxHashSet<Definition<'db>>,
+
     /// Currently live bindings and declarations for each place.
     symbol_states: IndexVec<ScopedSymbolId, PendingPlaceState>,
 
@@ -1837,6 +1907,8 @@ impl<'db> UseDefMapBuilder<'db> {
             reachability: ScopedReachabilityConstraintId::ALWAYS_TRUE,
             range_reachability: Vec::new(),
             definitions_by_definition: FxHashMap::default(),
+            name_dependencies: FxHashMap::default(),
+            name_dependency_roots: FxHashSet::default(),
             symbol_states: IndexVec::new(),
             member_states: IndexVec::new(),
             pending_reachability: PendingReachability::default(),
@@ -1865,6 +1937,23 @@ impl<'db> UseDefMapBuilder<'db> {
 
     pub(super) fn definition(&self, def_id: ScopedDefinitionId) -> DefinitionState<'db> {
         self.all_definitions[def_id]
+    }
+
+    /// Records the ordinary variable definitions directly referenced by `binding`.
+    pub(super) fn record_name_dependencies(
+        &mut self,
+        binding: Definition<'db>,
+        dependencies: impl IntoIterator<Item = Definition<'db>>,
+        is_root: bool,
+    ) {
+        let dependencies = dependencies.into_iter().collect::<Vec<_>>();
+        if !dependencies.is_empty() {
+            self.name_dependencies
+                .insert(binding, dependencies.into_boxed_slice());
+            if is_root {
+                self.name_dependency_roots.insert(binding);
+            }
+        }
     }
 
     pub(super) fn mark_unreachable(&mut self) {
@@ -2902,6 +2991,12 @@ impl<'db> UseDefMapBuilder<'db> {
             range_reachability: self.range_reachability.into_boxed_slice(),
             symbol_states,
             definitions_by_definition,
+            name_dependencies: FrozenMap::from(self.name_dependencies),
+            name_dependency_roots: self
+                .name_dependency_roots
+                .into_iter()
+                .map(|definition| (definition, ()))
+                .collect(),
             extra,
             end_of_scope_reachability: self.reachability,
         }

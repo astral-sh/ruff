@@ -4,6 +4,7 @@ use ty_module_resolver::{
     ModuleName, ModuleNameResolutionError, ModuleResolveMode, resolve_module, search_paths,
 };
 
+use crate::types::infer::infer_definition_types_with_prepared_dependencies;
 use crate::{
     Program, TypeQualifiers, add_inferred_python_version_hint_to_diagnostic,
     place::{DefinedPlace, Definedness, Place, PlaceAndQualifiers, TypeOrigin},
@@ -15,7 +16,6 @@ use crate::{
             hint_if_stdlib_submodule_exists_on_other_versions,
         },
         infer::{TypeInferenceBuilder, builder::DeclaredAndInferredType},
-        infer_definition_types,
     },
 };
 use ty_python_core::definition::Definition;
@@ -235,7 +235,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         for alias in names {
             for definition in self.index.definitions(alias) {
-                let inferred = infer_definition_types(db, *definition);
+                let inferred = infer_definition_types_with_prepared_dependencies(db, *definition);
                 // Check non-star imports for deprecations
                 if definition.kind(db).as_star_import().is_none() {
                     // In the initial cycle, `declaration_types()` is empty, so no deprecation check is performed.

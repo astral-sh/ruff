@@ -1,3 +1,4 @@
+use crate::types::infer::infer_definition_types_with_prepared_dependencies;
 use crate::{
     Db,
     reachability::ReachabilityConstraintsExtension,
@@ -26,7 +27,7 @@ use crate::{
             function_known_decorators, infer_statement_types, nearest_enclosing_function,
             original_class_type,
         },
-        infer_definition_types, infer_scope_types,
+        infer_scope_types,
         signatures::ReturnCallableTypeVarScope,
         tuple::{TupleSpecBuilder, TupleType},
         typed_dict::extract_unpacked_typed_dict_keys_from_kwargs_annotation,
@@ -1050,7 +1051,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let function_name = &function_node.name;
 
         let mut is_classmethod = is_implicit_classmethod(function_name);
-        let inference = infer_definition_types(db, method_definition);
+        let inference = infer_definition_types_with_prepared_dependencies(db, method_definition);
         for decorator in &function_node.decorator_list {
             let decorator_ty = inference.expression_type(&decorator.expression);
             if let Some(known_class) = decorator_ty

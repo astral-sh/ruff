@@ -1,3 +1,4 @@
+use crate::types::infer::infer_definition_types_with_prepared_dependencies;
 use crate::{
     diagnostic::format_enumeration,
     types::{
@@ -9,7 +10,6 @@ use crate::{
         },
         function::{FunctionDecorators, OverloadLiteral},
         generics::GenericContext,
-        infer_definition_types,
         signatures::ReturnCallableTypeVarScope,
         typevar::TypeVarInstance,
         visitor::find_over_type,
@@ -31,7 +31,8 @@ pub(crate) fn check_function_definition<'db>(
 ) {
     let db = context.db();
 
-    let Some(function_type) = infer_definition_types(db, definition).function_type(definition)
+    let Some(function_type) =
+        infer_definition_types_with_prepared_dependencies(db, definition).function_type(definition)
     else {
         return;
     };
