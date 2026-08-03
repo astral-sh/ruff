@@ -70,31 +70,31 @@ impl<'db> ProgramEnvironment<'db> {
     }
 
     /// Returns the program used by this operation.
-    #[inline]
     pub fn program(&self, db: &'db dyn Db) -> Program {
-        match self.environment.get() {
-            ProgramSource::Program(program) => program,
+        let program = match self.environment.get() {
+            ProgramSource::Program(program) => return program,
             ProgramSource::File(file) => {
                 cold_path();
                 // The source handle and database share `'db`; re-wrapping the stored ingredient
                 // ID immediately before the read restores the original database lifetime.
-                let program = PythonFile::from_id(file).python_version(db);
-                self.environment.set(ProgramSource::Program(program));
-                program
+                PythonFile::from_id(file).python_version(db)
             }
             ProgramSource::Definition(definition) => {
                 cold_path();
-                let program = Definition::from_id(definition).program(db);
-                self.environment.set(ProgramSource::Program(program));
-                program
+                // The source handle and database share `'db`; re-wrapping the stored ingredient
+                // ID immediately before the read restores the original database lifetime.
+                Definition::from_id(definition).program(db)
             }
             ProgramSource::Scope(scope) => {
                 cold_path();
-                let program = ScopeId::from_id(scope).program(db);
-                self.environment.set(ProgramSource::Program(program));
-                program
+                // The source handle and database share `'db`; re-wrapping the stored ingredient
+                // ID immediately before the read restores the original database lifetime.
+                ScopeId::from_id(scope).program(db)
             }
-        }
+        };
+
+        self.environment.set(ProgramSource::Program(program));
+        program
     }
 
     /// Returns the Python version used by this operation.
