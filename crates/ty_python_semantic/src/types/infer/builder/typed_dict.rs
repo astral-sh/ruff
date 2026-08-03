@@ -25,6 +25,14 @@ use crate::types::{
 use crate::{Db, ProgramEnvironment, TypeQualifiers};
 use ty_python_core::definition::Definition;
 
+/// Returns whether a field type contains a `TypedDict` with unresolved type variables.
+///
+/// Structural wrappers and type aliases are traversed. Revisiting an alias definition counts as a
+/// match so aliases that grow with every specialization cannot recurse indefinitely:
+///
+/// ```python
+/// type Growing[T] = T | Growing[list[T]]
+/// ```
 fn contains_generic_typed_dict<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
@@ -32,7 +40,7 @@ fn contains_generic_typed_dict<'db>(
     active_aliases: &ActiveRecursionDetector<Definition<'db>>,
 ) -> bool {
     any_over_type(db, env, ty, false, |nested| match nested {
-        Type::TypedDict(typed_dict) => Type::TypedDict(typed_dict).has_typevar(db, env),
+        Type::TypedDict(_) => nested.has_typevar(db, env),
         Type::TypeAlias(alias) => active_aliases.visit(
             &alias.definition(db),
             || true,
@@ -412,7 +420,15 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         .map(|_| Type::TypedDict(typed_dict))
     }
 
-    /// Infer and validate a `TypedDict` constructor, including its constructed type.
+    /// Infers and validates a `TypedDict` constructor through one call-binding pipeline.
+    ///
+    /// Bare generic constructors infer from direct keyword arguments. Other forms use the existing
+    /// field-directed validation and bind against the class's default specialization:
+    ///
+    /// ```python
+    /// Box(value=1)        # Box[int]
+    /// Box({"value": 1})   # Box[Unknown]
+    /// ```
     pub(super) fn infer_typed_dict_constructor<'expr>(
         &mut self,
         callable_type: Type<'db>,
@@ -423,6 +439,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let db = self.db();
         let env = self.program_environment();
         let typed_dict = TypedDictType::new(class);
+        let arguments = &call_expression.arguments;
+        let form = TypedDictConstructorForm::from_arguments(arguments);
+        let error_node: AnyNodeRef = call_expression.func.as_ref().into();
         let fallback_ty = callable_type
             .to_instance_approximation(db, env)
             .unwrap_or_else(Type::unknown);
@@ -431,22 +450,13 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             Type::ClassLiteral(class_literal) if class_literal.generic_context(db).is_some()
         );
         let can_infer = is_generic
-            && self.can_infer_generic_typed_dict_constructor(
-                class,
-                &call_expression.arguments,
-                call_expression_tcx,
-            );
+            && self.can_infer_generic_typed_dict_constructor(class, arguments, call_expression_tcx);
 
         if !can_infer {
-            self.prepare_typed_dict_constructor(
-                typed_dict,
-                TypedDictConstructorForm::from_arguments(&call_expression.arguments),
-                &call_expression.arguments,
-                call_expression.func.as_ref().into(),
-            );
+            self.prepare_typed_dict_constructor(typed_dict, form, arguments, error_node);
         }
 
-        let mut call_arguments = self.prepare_call_arguments(&call_expression.arguments);
+        let mut call_arguments = self.prepare_call_arguments(arguments);
         let binding_callable = if is_generic && !can_infer {
             class.class_literal(db).default_specialization(db).into()
         } else {
@@ -457,17 +467,12 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 .match_parameters(db, env, &call_arguments);
 
         if can_infer && !bindings.satisfies(|_| true) {
-            self.prepare_typed_dict_constructor(
-                typed_dict,
-                TypedDictConstructorForm::from_arguments(&call_expression.arguments),
-                &call_expression.arguments,
-                call_expression.func.as_ref().into(),
-            );
+            self.prepare_typed_dict_constructor(typed_dict, form, arguments, error_node);
             return fallback_ty;
         }
 
         let result = self.infer_and_check_argument_types(
-            ArgumentsIter::from_ast(&call_expression.arguments),
+            ArgumentsIter::from_ast(arguments),
             &mut call_arguments,
             &mut |builder, (_, expr, tcx)| {
                 if can_infer {
@@ -482,7 +487,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
         if result.is_err() {
             if can_infer
-                && call_expression.arguments.keywords.iter().any(|keyword| {
+                && arguments.keywords.iter().any(|keyword| {
                     keyword
                         .arg
                         .as_ref()
@@ -499,8 +504,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 validate_typed_dict_constructor(
                     &self.context,
                     typed_dict,
-                    &call_expression.arguments,
-                    call_expression.func.as_ref().into(),
+                    arguments,
+                    error_node,
                     |expr, _| self.expression_type(expr),
                 );
                 return fallback_ty;
@@ -512,7 +517,14 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         bindings.return_type(db, env)
     }
 
-    /// Only direct keywords without unresolved nested `TypedDict` fields can use generic inference.
+    /// Returns whether constructor arguments can safely constrain a generic `TypedDict`.
+    ///
+    /// Mapping arguments, unresolved nested `TypedDict` fields, and gradual expected types remain
+    /// on the field-directed path so sibling arguments cannot force an unsound specialization:
+    ///
+    /// ```python
+    /// Outer(inner=Inner(value=1), marker="x")  # Outer[Unknown]
+    /// ```
     fn can_infer_generic_typed_dict_constructor(
         &self,
         class: ClassType<'db>,
@@ -548,16 +560,14 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 let Some(name) = keyword.arg.as_ref() else {
                     return false;
                 };
-                let Some(field) = typed_dict.item(db, name.id.as_str()) else {
-                    return true;
-                };
-
-                !contains_generic_typed_dict(
-                    db,
-                    env,
-                    field.declared_ty,
-                    &ActiveRecursionDetector::default(),
-                )
+                typed_dict.item(db, name.id.as_str()).is_none_or(|field| {
+                    !contains_generic_typed_dict(
+                        db,
+                        env,
+                        field.declared_ty,
+                        &ActiveRecursionDetector::default(),
+                    )
+                })
             })
     }
 
