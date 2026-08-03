@@ -37,6 +37,7 @@ bitflags::bitflags! {
         const COMPLETION_ITEM_SNIPPET_SUPPORT = 1 << 19;
         const FULL_DIAGNOSTIC_OUTPUT = 1 << 20;
         const IMPLEMENTATION_LINK_SUPPORT = 1 << 21;
+        const TRIGGER_SIGNATURE_HELP_COMMAND = 1 << 22;
     }
 }
 
@@ -201,6 +202,11 @@ impl ResolvedClientCapabilities {
         self.contains(Self::PREFER_MARKDOWN_IN_COMPLETION)
     }
 
+    /// Returns `true` if the client supports the `ty.triggerParameterHints` completion command.
+    pub(crate) const fn supports_trigger_parameter_hints_command(self) -> bool {
+        self.contains(Self::TRIGGER_SIGNATURE_HELP_COMMAND)
+    }
+
     pub(super) fn new(client_capabilities: &ClientCapabilities) -> Self {
         let mut flags = Self::empty();
 
@@ -270,6 +276,19 @@ impl ResolvedClientCapabilities {
             .unwrap_or_default()
         {
             flags |= Self::FULL_DIAGNOSTIC_OUTPUT;
+        }
+
+        if client_capabilities
+            .experimental
+            .as_ref()
+            .and_then(|experimental| experimental.get("commands")?.get("commands")?.as_array())
+            .is_some_and(|commands| {
+                commands
+                    .iter()
+                    .any(|command| command.as_str() == Some("ty.triggerParameterHints"))
+            })
+        {
+            flags |= Self::TRIGGER_SIGNATURE_HELP_COMMAND;
         }
 
         if text_document
