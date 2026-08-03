@@ -512,6 +512,15 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             }
 
             bindings.report_diagnostics(&self.context, call_expression.into());
+            if can_infer {
+                // If `Consumer[T]` has a callback field and `accepts_dog` only accepts
+                // `Dog`, `value: Consumer[Animal] = Consumer(callback=accepts_dog)`
+                // fails while inferring `T`. The binding may still return `Consumer[T]`,
+                // leaking the unresolved type variable and producing an additional
+                // assignment error. Return the gradual fallback after reporting the
+                // invalid callback instead.
+                return fallback_ty;
+            }
         }
 
         bindings.return_type(db, env)

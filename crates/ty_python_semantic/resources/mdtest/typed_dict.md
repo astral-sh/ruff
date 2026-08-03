@@ -3720,8 +3720,8 @@ A nested dictionary literal also falls back without exposing an internal type pa
 reveal_type(Outer(inner={"value": 1}, marker="x"))  # revealed: Outer[Unknown]
 ```
 
-A generic `TypedDict` hidden inside a container and type alias also remains gradual, so another
-field cannot give its unknown contents an incorrect concrete type.
+A generic `TypedDict` nested in a container or type alias must not acquire an incompatible concrete
+type from another field.
 
 ```py
 type MaybeInner[T] = Inner[T] | None
@@ -3730,6 +3730,7 @@ class AliasOuter[T](TypedDict):
     values: list[MaybeInner[T]]
     marker: T
 
+# TODO: Infer `AliasOuter[int | str]`.
 outer = AliasOuter(values=[Inner(value=1)], marker="x")
 reveal_type(outer)  # revealed: AliasOuter[Unknown]
 item = outer["values"][0]
@@ -3876,6 +3877,40 @@ legacy_dog = LegacyBox(value=Dog())
 legacy_animal: LegacyBox[Animal] = legacy_dog
 ```
 
+### Constructor inference with contravariant fields
+
+A read-only callable field makes its type parameter contravariant.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Callable, TypedDict
+from typing_extensions import ReadOnly
+
+class Animal: ...
+class Dog(Animal): ...
+
+class Consumer[T](TypedDict):
+    callback: ReadOnly[Callable[[T], None]]
+
+def accepts_animal(value: Animal) -> None: ...
+def accepts_dog(value: Dog) -> None: ...
+
+dog_consumer: Consumer[Dog] = Consumer(callback=accepts_animal)
+```
+
+An incompatible callback reports its argument error without producing an additional assignment
+error.
+
+```py
+animal_consumer: Consumer[Animal] = Consumer(
+    callback=accepts_dog,  # error: [invalid-argument-type]
+)
+```
+
 ### Constructor inference from extra items
 
 An extra keyword constrains the type parameter used by mutable extra items.
@@ -3895,7 +3930,8 @@ reveal_type(box)  # revealed: Box[int]
 box["value"] = "invalid"  # error: [invalid-assignment]
 ```
 
-Nested generic extra items remain gradual without rejecting the inner constructor.
+A nested generic extra item should constrain its enclosing `TypedDict` without rejecting the inner
+constructor.
 
 ```py
 class Inner[T](TypedDict):
@@ -3903,6 +3939,7 @@ class Inner[T](TypedDict):
 
 class NestedExtra[T](TypedDict, extra_items=Inner[T]): ...
 
+# TODO: Infer `NestedExtra[int]`.
 reveal_type(NestedExtra(item=Inner(value=1)))  # revealed: NestedExtra[Unknown]
 ```
 
