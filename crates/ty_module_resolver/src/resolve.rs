@@ -406,9 +406,15 @@ pub fn search_paths<'db>(
     resolver_environment: ResolverEnvironment<'db>,
     resolve_mode: ModuleResolveMode,
 ) -> SearchPathIterator<'db> {
-    resolver_environment
-        .search_paths(db)
-        .iter(db, resolver_environment, resolve_mode)
+    let search_paths = resolver_environment.search_paths(db);
+
+    SearchPathIterator {
+        db,
+        static_paths: search_paths.static_paths.iter(),
+        stdlib_path: search_paths.stdlib(resolve_mode),
+        dynamic_paths: None,
+        mode: ModuleResolveModeIngredient::new(db, resolver_environment, resolve_mode),
+    }
 }
 
 #[derive(Debug, Clone, Copy, Default)]
@@ -858,22 +864,6 @@ impl SearchPaths {
                     files.try_add_root(db, system_path, FileRootKind::SearchPath);
                 }
             }
-        }
-    }
-
-    pub(super) fn iter<'a>(
-        &'a self,
-        db: &'a dyn Db,
-        resolver_environment: ResolverEnvironment<'a>,
-        mode: ModuleResolveMode,
-    ) -> SearchPathIterator<'a> {
-        let stdlib_path = self.stdlib(mode);
-        SearchPathIterator {
-            db,
-            static_paths: self.static_paths.iter(),
-            stdlib_path,
-            dynamic_paths: None,
-            mode: ModuleResolveModeIngredient::new(db, resolver_environment, mode),
         }
     }
 
@@ -1327,14 +1317,9 @@ impl<'db, 'name> NameResolver<'db, 'name> {
     /// a fallback when no stub provides the requested module. A stub overlay may use runtime
     /// packages as parents, but its final module must come from a stub file.
     fn resolve_typing(&self, stub_packages: &StubPackageIndex) -> Option<ResolvedNames> {
-        let search_paths = self
-            .context
-            .resolver_environment
-            .search_paths(self.context.db);
-
         if self.name.components().nth(1).is_none() {
             let candidates = self.discover_roots(
-                search_paths.iter(
+                search_paths(
                     self.context.db,
                     self.context.resolver_environment,
                     ModuleResolveMode::Typing,
@@ -1349,13 +1334,12 @@ impl<'db, 'name> NameResolver<'db, 'name> {
         // normal fallback so that each extra path is probed only once.
         let (overlay_stub_packages, remaining_stub_packages) = stub_packages.split_overlay();
         let mut candidates = self.discover_roots(
-            search_paths
-                .iter(
-                    self.context.db,
-                    self.context.resolver_environment,
-                    ModuleResolveMode::Typing,
-                )
-                .take_while(|search_path| search_path.is_extra()),
+            search_paths(
+                self.context.db,
+                self.context.resolver_environment,
+                ModuleResolveMode::Typing,
+            )
+            .take_while(|search_path| search_path.is_extra()),
             overlay_stub_packages,
         );
         if let Some(resolved) =
@@ -1365,13 +1349,12 @@ impl<'db, 'name> NameResolver<'db, 'name> {
         }
 
         let remaining_candidates = self.discover_roots(
-            search_paths
-                .iter(
-                    self.context.db,
-                    self.context.resolver_environment,
-                    ModuleResolveMode::Typing,
-                )
-                .skip_while(|search_path| search_path.is_extra()),
+            search_paths(
+                self.context.db,
+                self.context.resolver_environment,
+                ModuleResolveMode::Typing,
+            )
+            .skip_while(|search_path| search_path.is_extra()),
             remaining_stub_packages,
         );
         candidates.extend(remaining_candidates);

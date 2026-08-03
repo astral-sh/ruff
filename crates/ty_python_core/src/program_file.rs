@@ -9,7 +9,6 @@ use crate::{Db, Program};
 #[salsa::interned(
     debug,
     constructor = new_internal,
-    revisions = usize::MAX,
     heap_size = ruff_memory_usage::heap_size
 )]
 pub struct ProgramFile<'db> {

@@ -73,6 +73,7 @@ fn setup_case(n: usize) -> Case {
     });
 
     let db = ProjectDatabase::fallible(metadata, system).unwrap();
+    // Intern the resolver environment before timing so its initial allocation is not benchmarked.
     let _ = Program::get(&db).resolver_environment(&db);
     let importing_file = system_path_to_file(&db, &importing_path).unwrap();
 

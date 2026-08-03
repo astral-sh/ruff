@@ -54,7 +54,7 @@ impl fmt::Display for DisplaySearchPaths<'_> {
 }
 
 /// A physical file interpreted in one module-resolution environment.
-#[salsa::interned(debug, revisions = usize::MAX, heap_size = ruff_memory_usage::heap_size)]
+#[salsa::interned(debug, heap_size = ruff_memory_usage::heap_size)]
 pub struct ResolverFile<'db> {
     #[returns(copy)]
     pub file: File,

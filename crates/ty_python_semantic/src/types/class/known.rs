@@ -2074,7 +2074,7 @@ mod tests {
                 source: PythonVersionSource::default(),
             });
         let python_version = db.python_version();
-        let program = db.program_environment().program(&db);
+        let resolver_environment = db.program_environment().resolver_environment(&db);
         for class in KnownClass::iter() {
             if class.canonical_module(python_version).is_third_party() {
                 continue;
@@ -2082,7 +2082,7 @@ mod tests {
             let class_name = class.name(python_version);
             let class_module = resolve_module_confident(
                 &db,
-                program,
+                resolver_environment,
                 &class.canonical_module(python_version).name(),
             )
             .unwrap();
@@ -2090,7 +2090,7 @@ mod tests {
             assert_eq!(
                 KnownClass::try_from_file_and_name(
                     &db,
-                    ImportingFile::File(class_module.file(&db).unwrap(), program),
+                    ImportingFile::File(class_module.file(&db).unwrap(), resolver_environment),
                     class_name
                 ),
                 Some(class),

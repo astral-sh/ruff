@@ -423,7 +423,6 @@ fn run_test(
         let token_source = CancellationTokenSource::new();
         let result = fix_all_diagnostics(
             db,
-            python_version,
             all_diagnostics,
             Applicability::Unsafe,
             &token_source.token(),
