@@ -73,8 +73,8 @@ fn setup_case(n: usize) -> Case {
 
     let db = ProjectDatabase::fallible(metadata, system).unwrap();
 
-    // Keep lazy program initialization out of the measured module-resolution queries.
-    let _ = db.project().program(&db);
+    // Keep lazy program and resolver initialization out of the measured module-resolution queries.
+    let _ = db.project().program(&db).resolver_environment(&db);
 
     let importing_file = system_path_to_file(&db, &importing_path).unwrap();
 
