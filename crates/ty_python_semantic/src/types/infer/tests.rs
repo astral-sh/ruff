@@ -1,5 +1,4 @@
 use super::builder::TypeInferenceBuilder;
-use crate::SemanticTestDb as _;
 use crate::db::tests::{TestDb, TestDbBuilder, setup_db};
 use crate::place::symbol;
 use crate::place::{ConsideredDefinitions, Place, PlaceAndQualifiers};
@@ -13,7 +12,9 @@ use salsa::plumbing::AsId;
 use ty_python_core::definition::Definition;
 use ty_python_core::program::{Program, ProgramSettings};
 use ty_python_core::scope::FileScopeId;
-use ty_python_core::{ProgramFile, global_scope, place_table, semantic_index, use_def_map};
+use ty_python_core::{
+    ProgramFile, TestProgramDb as _, global_scope, place_table, semantic_index, use_def_map,
+};
 use ty_site_packages::{PythonVersionSource, PythonVersionWithSource};
 
 use super::*;

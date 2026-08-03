@@ -1,11 +1,33 @@
 use ruff_db::files::File;
 use ty_module_resolver::Db as ModuleResolverDb;
 
+#[cfg(any(test, feature = "testing"))]
+use crate::program::{Program, ProgramSettings};
+
 /// Database giving access to semantic information about a Python program.
 #[salsa::db]
 pub trait Db: ModuleResolverDb {
     /// Returns `true` if the file should be checked.
     fn should_check_file(&self, file: File) -> bool;
+}
+
+#[cfg(any(test, feature = "testing"))]
+#[salsa::db]
+pub trait TestProgramDb: Db {
+    fn program_settings(&self) -> &ProgramSettings;
+
+    // Salsa-cached because interning a program requires hashing all search paths.
+    fn program(&self) -> Program<'_>
+    where
+        Self: Sized,
+    {
+        #[salsa::tracked(returns(copy), heap_size=ruff_memory_usage::heap_size)]
+        fn program_inner(db: &dyn TestProgramDb) -> Program<'_> {
+            Program::from_settings(db, db.program_settings().clone())
+        }
+
+        program_inner(self)
+    }
 }
 
 #[cfg(test)]
@@ -25,9 +47,9 @@ pub(crate) mod tests {
     use ty_site_packages::{PythonVersionSource, PythonVersionWithSource};
 
     use crate::platform::PythonPlatform;
-    use crate::program::{Program, ProgramSettings};
+    use crate::program::ProgramSettings;
 
-    use super::Db;
+    use super::{Db, TestProgramDb};
 
     type Events = Arc<Mutex<Vec<salsa::Event>>>;
 
@@ -96,23 +118,6 @@ pub(crate) mod tests {
 
     #[salsa::db]
     impl ModuleResolverDb for TestDb {}
-
-    #[salsa::db]
-    pub(crate) trait TestProgramDb: Db {
-        fn program_settings(&self) -> &ProgramSettings;
-
-        fn program(&self) -> Program<'_>
-        where
-            Self: Sized,
-        {
-            #[salsa::tracked(returns(copy), heap_size=ruff_memory_usage::heap_size)]
-            fn program_inner(db: &dyn TestProgramDb) -> Program<'_> {
-                Program::from_settings(db, db.program_settings().clone())
-            }
-
-            program_inner(self)
-        }
-    }
 
     #[salsa::db]
     impl TestProgramDb for TestDb {

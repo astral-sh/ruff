@@ -16,10 +16,10 @@ use std::sync::Arc;
 use tempfile::TempDir;
 use ty_module_resolver::ModuleGlobSetBuilder;
 use ty_python_core::program::ProgramSettings;
-use ty_python_core::{Db as _, ProgramFile};
+use ty_python_core::{Db as _, ProgramFile, TestProgramDb};
 use ty_python_semantic::lint::{LintRegistry, RuleSelection};
 use ty_python_semantic::{
-    AnalysisSettings, Db as SemanticDb, SemanticTestDb, check_file_unwrap, default_lint_registry,
+    AnalysisSettings, Db as SemanticDb, check_file_unwrap, default_lint_registry,
 };
 
 #[salsa::db]
@@ -172,7 +172,7 @@ impl SemanticDb for Db {
 }
 
 #[salsa::db]
-impl SemanticTestDb for Db {
+impl TestProgramDb for Db {
     fn program_settings(&self) -> &ProgramSettings {
         self.settings().program(self)
     }

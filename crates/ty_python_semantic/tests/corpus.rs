@@ -8,13 +8,11 @@ use ruff_db::vendored::VendoredFileSystem;
 use ty_python_core::program::ProgramSettings;
 use ty_python_semantic::lint::{LintRegistry, RuleSelection};
 use ty_python_semantic::pull_types::pull_types;
-use ty_python_semantic::{
-    AnalysisSettings, Db as _, SemanticTestDb, check_file_unwrap, default_lint_registry,
-};
+use ty_python_semantic::{AnalysisSettings, Db as _, check_file_unwrap, default_lint_registry};
 
 use ruff_db::diagnostic::Diagnostic;
 use test_case::test_case;
-use ty_python_core::{Db as _, ProgramFile};
+use ty_python_core::{Db as _, ProgramFile, TestProgramDb};
 
 fn get_cargo_workspace_root() -> anyhow::Result<&'static SystemPath> {
     SystemPath::new(env!("CARGO_MANIFEST_DIR"))
@@ -202,7 +200,7 @@ impl ty_python_core::Db for CorpusDb {
 }
 
 #[salsa::db]
-impl SemanticTestDb for CorpusDb {
+impl TestProgramDb for CorpusDb {
     fn program_settings(&self) -> &ProgramSettings {
         &self.program_settings
     }

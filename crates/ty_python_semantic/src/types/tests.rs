@@ -2,13 +2,13 @@ use super::*;
 use crate::db::tests::{TestDbBuilder, setup_db};
 use crate::place::{typing_extensions_symbol, typing_symbol};
 use crate::types::type_alias::PEP695TypeAliasType;
-use crate::{Db, ProgramEnvironment, SemanticTestDb as _};
+use crate::{Db, ProgramEnvironment};
 use ruff_db::system::DbWithWritableSystem as _;
 use ruff_python_ast as ast;
 use ruff_python_ast::PythonVersion;
 use test_case::test_case;
-use ty_python_core::ProgramFile;
 use ty_python_core::program::Program;
+use ty_python_core::{ProgramFile, TestProgramDb as _};
 
 /// Explicitly test for Python version <3.13 and >=3.13, to ensure that
 /// the fallback to `typing_extensions` is working correctly.

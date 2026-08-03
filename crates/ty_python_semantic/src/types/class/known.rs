@@ -2059,9 +2059,10 @@ impl<'db> KnownClassLookupError<'db> {
 mod tests {
     use super::*;
     use crate::db::tests::{TestDbBuilder, setup_db};
-    use crate::{PythonVersionSource, PythonVersionWithSource, SemanticTestDb as _};
+    use crate::{PythonVersionSource, PythonVersionWithSource};
     use strum::IntoEnumIterator;
     use ty_module_resolver::resolve_module_confident;
+    use ty_python_core::TestProgramDb as _;
     use ty_python_core::program::{Program, ProgramSettings};
 
     #[test]

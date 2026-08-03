@@ -638,13 +638,16 @@ pub(crate) mod testing {
     use ruff_db::files::{File, FileRootKind, Files};
     use ruff_db::system::{DbWithTestSystem, System, TestSystem};
     use ruff_db::vendored::VendoredFileSystem;
+    #[cfg(feature = "testing")]
     use ruff_python_ast::PythonVersion;
     use ty_module_resolver::SearchPathSettings;
     use ty_python_core::ProgramFile;
     use ty_python_core::platform::PythonPlatform;
     use ty_python_core::program::{FallibleStrategy, ProgramSettings};
+    #[cfg(feature = "testing")]
+    use ty_python_semantic::ProgramEnvironment;
     use ty_python_semantic::lint::{LintRegistry, RuleSelection};
-    use ty_python_semantic::{AnalysisSettings, ProgramEnvironment, PythonVersionWithSource};
+    use ty_python_semantic::{AnalysisSettings, PythonVersionWithSource};
 
     use crate::db::Db;
     use crate::{Project, ProjectMetadata};
@@ -711,6 +714,7 @@ pub(crate) mod testing {
             db
         }
 
+        #[cfg(feature = "testing")]
         pub fn set_python_version(&mut self, python_version: PythonVersion) {
             let program = self.project().program(self);
             let settings = ProgramSettings {
@@ -726,10 +730,7 @@ pub(crate) mod testing {
     }
 
     impl TestDb {
-        pub fn python_version(&self) -> PythonVersion {
-            self.project().program(self).python_version(self)
-        }
-
+        #[cfg(feature = "testing")]
         pub fn program_environment(&self) -> ProgramEnvironment<'_> {
             ProgramEnvironment::from_program(self.project().program(self))
         }

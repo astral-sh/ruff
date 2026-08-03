@@ -48,11 +48,7 @@ use crate::{Db, program::Program};
 /// This allows programs with the same Python version to share parsed syntax, and programs with
 /// equivalent resolver environments to share module resolution, while keeping type inference
 /// isolated.
-#[salsa::interned(
-    debug,
-    revisions = usize::MAX,
-    heap_size = ruff_memory_usage::heap_size
-)]
+#[salsa::interned(debug, heap_size = ruff_memory_usage::heap_size)]
 pub struct ProgramFile<'db> {
     #[returns(copy)]
     pub file: File,

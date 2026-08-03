@@ -43,7 +43,7 @@ impl<'db> Program<'db> {
     }
 
     pub fn python_version(self, db: &'db dyn Db) -> PythonVersion {
-        self.python_version_with_source(db).version
+        self.resolver_environment(db).python_version(db)
     }
 
     pub fn search_paths(self, db: &'db dyn Db) -> &'db SearchPaths {

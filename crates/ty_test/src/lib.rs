@@ -20,13 +20,14 @@ use std::fmt::Write;
 use ty_module_resolver::{
     Module, SearchPath, SearchPathSettings, list_modules, resolve_module_confident,
 };
+use ty_python_core::TestProgramDb as _;
 use ty_python_core::platform::PythonPlatform;
 use ty_python_core::program::{FallibleStrategy, ProgramSettings};
 use ty_python_semantic::pull_types::pull_types;
 use ty_python_semantic::types::UNDEFINED_REVEAL;
 use ty_python_semantic::{
-    Db as _, PythonEnvironment, PythonVersionSource, PythonVersionWithSource, SemanticTestDb as _,
-    SysPrefixPathOrigin, fix_all_diagnostics,
+    Db as _, PythonEnvironment, PythonVersionSource, PythonVersionWithSource, SysPrefixPathOrigin,
+    fix_all_diagnostics,
 };
 
 mod config;

@@ -2,8 +2,6 @@ use crate::AnalysisSettings;
 use crate::lint::{LintRegistry, RuleSelection};
 use ruff_db::diagnostic::Diagnostic;
 use ruff_db::files::File;
-#[cfg(any(test, feature = "testing"))]
-use ty_python_core::program::{Program, ProgramSettings};
 use ty_python_core::{Db as PythonCoreDb, ProgramFile};
 
 /// Database giving access to semantic information about a Python program.
@@ -32,25 +30,6 @@ pub trait Db: PythonCoreDb {
     fn dyn_clone(&self) -> Box<dyn Db>;
 }
 
-#[cfg(any(test, feature = "testing"))]
-#[salsa::db]
-pub trait SemanticTestDb: Db {
-    fn program_settings(&self) -> &ProgramSettings;
-
-    // Salsa-cached because interning a Program requires hashing all search paths.
-    fn program(&self) -> Program<'_>
-    where
-        Self: Sized,
-    {
-        #[salsa::tracked(returns(copy), heap_size=ruff_memory_usage::heap_size)]
-        fn program_inner(db: &dyn SemanticTestDb) -> Program<'_> {
-            Program::from_settings(db, db.program_settings().clone())
-        }
-
-        program_inner(self)
-    }
-}
-
 #[cfg(test)]
 pub(crate) mod tests {
     use super::*;
@@ -69,7 +48,8 @@ pub(crate) mod tests {
     use ruff_db::vendored::VendoredFileSystem;
     use ruff_python_ast::PythonVersion;
     use ty_module_resolver::{Db as ModuleResolverDb, SearchPathSettings};
-    use ty_python_core::program::FallibleStrategy;
+    use ty_python_core::TestProgramDb;
+    use ty_python_core::program::{FallibleStrategy, ProgramSettings};
     use ty_site_packages::{PythonVersionSource, PythonVersionWithSource};
 
     type Events = Arc<Mutex<Vec<salsa::Event>>>;
@@ -177,7 +157,7 @@ pub(crate) mod tests {
     }
 
     #[salsa::db]
-    impl SemanticTestDb for TestDb {
+    impl TestProgramDb for TestDb {
         fn program_settings(&self) -> &ProgramSettings {
             &self.program_settings
         }

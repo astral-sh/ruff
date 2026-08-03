@@ -18,12 +18,12 @@ use ruff_python_parser::{Mode, ParseOptions, parse_unchecked};
 use ty_module_resolver::{Db as ModuleResolverDb, SearchPathSettings};
 use ty_python_core::platform::PythonPlatform;
 use ty_python_core::program::{FallibleStrategy, ProgramSettings};
-use ty_python_core::{Db as _, ProgramFile};
+use ty_python_core::{Db as _, ProgramFile, TestProgramDb};
 use ty_python_semantic::lint::LintRegistry;
 use ty_python_semantic::types::check_types;
 use ty_python_semantic::{
-    AnalysisSettings, Db as SemanticDb, PythonVersionWithSource, SemanticTestDb,
-    default_lint_registry, lint::RuleSelection,
+    AnalysisSettings, Db as SemanticDb, PythonVersionWithSource, default_lint_registry,
+    lint::RuleSelection,
 };
 
 /// Database that can be used for testing.
@@ -153,7 +153,7 @@ impl SemanticDb for TestDb {
 }
 
 #[salsa::db]
-impl SemanticTestDb for TestDb {
+impl TestProgramDb for TestDb {
     fn program_settings(&self) -> &ProgramSettings {
         &self.program_settings
     }
