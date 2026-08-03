@@ -8810,7 +8810,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     )
                 });
         let generic_typed_dict_constructor = generic_typed_dict_class.filter(|_| {
-            arguments.args.is_empty()
+            (arguments.args.is_empty()
+                || (arguments.args.len() == 1
+                    && arguments.keywords.is_empty()
+                    && !arguments.args[0].is_starred_expr()
+                    && arguments.args[0].as_dict_expr().is_none_or(|dict| {
+                        dict.items.iter().all(|item| {
+                            item.key
+                                .as_ref()
+                                .is_some_and(ast::Expr::is_string_literal_expr)
+                        })
+                    })))
                 && !(arguments
                     .keywords
                     .iter()

@@ -7084,7 +7084,29 @@ impl<'db> Binding<'db> {
                     .specialization(db)
                     .and_then(|specialization| specialization.get(db, typevar))
                     .filter(|ty| !ty.has_dynamic(db, env))
-                    .map(|ty| ty.promote(db, env));
+                    .map(|ty| {
+                        // A TypedDict field may impose an upper bound through a callable
+                        // parameter. Its chosen specialization has already accounted for that
+                        // bound, so promoting it again would invalidate the next inference round.
+                        if self.return_ty.as_typed_dict().is_some()
+                            && self.signature.parameters().iter().any(|parameter| {
+                                parameter.is_positional_only()
+                                    && parameter.annotated_type().as_typed_dict().is_some()
+                            })
+                        {
+                            return ty;
+                        }
+
+                        let promoted = ty.promote(db, env);
+                        if let Some(TypeVarBoundOrConstraints::UpperBound(bound)) =
+                            typevar.typevar(db).bound_or_constraints(db, env)
+                            && !promoted.is_assignable_to(db, env, bound)
+                        {
+                            ty
+                        } else {
+                            promoted
+                        }
+                    });
 
                 // TODO: We should similarly combine both the call expression and argument constraints
                 // here. We currently only rely on argument constraints when there is no explicit declared

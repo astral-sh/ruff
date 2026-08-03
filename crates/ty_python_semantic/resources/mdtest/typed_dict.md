@@ -3605,10 +3605,74 @@ reveal_type(ListBox(value=[1]))  # revealed: ListBox[int]
 reveal_type(ListBox(**{"value": [1]}))  # revealed: ListBox[int]
 ```
 
-A positional dictionary does not yet provide its individual values to constructor inference.
+### Constructor inference from positional dictionary literals
+
+A positional dictionary literal provides the same field information as explicit keyword arguments.
+
+```toml
+[environment]
+python-version = "3.12"
+```
 
 ```py
-reveal_type(ListBox({"value": [1]}))  # revealed: ListBox[Unknown]
+from typing import TypedDict
+
+class ListBox[T](TypedDict):
+    value: list[T]
+
+reveal_type(ListBox({"value": [1]}))  # revealed: ListBox[int]
+```
+
+A positional value that is already specialized retains its existing type argument.
+
+```py
+existing = ListBox(value=[1])
+reveal_type(ListBox(existing))  # revealed: ListBox[int]
+```
+
+Multiple values can constrain the same type parameter.
+
+```py
+class Pair[T](TypedDict):
+    first: T
+    second: T
+
+reveal_type(Pair({"first": 1, "second": "x"}))  # revealed: Pair[int | str]
+```
+
+### Inference from dictionary literals passed to generic functions
+
+A dictionary literal checked against a generic `TypedDict` parameter constrains the function's type
+argument.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import TypedDict
+
+class Box[T](TypedDict):
+    value: T
+
+def get_value[T](box: Box[T]) -> T:
+    return box["value"]
+
+reveal_type(get_value({"value": 1}))  # revealed: int
+```
+
+### Constructor inference from positional and keyword arguments
+
+Inference from a positional dictionary mixed with keyword arguments is not supported.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import TypedDict
 
 class Box[T](TypedDict):
     value: T
@@ -3637,6 +3701,7 @@ class MaybeString(TypedDict):
 
 def optional_overwrite(maybe: MaybeString) -> None:
     reveal_type(Box(**{"value": 1, **maybe}))  # revealed: Box[int | Unknown]
+    reveal_type(Box({"value": 1, **maybe}))  # revealed: Box[Unknown]
 ```
 
 An ordinary dictionary may also replace the earlier value, producing a union of both possible value
@@ -3780,11 +3845,13 @@ class LiteralBound[T: Literal[1]](TypedDict):
     value: T
 
 reveal_type(LiteralBound(value=1))  # revealed: LiteralBound[Literal[1]]
+reveal_type(LiteralBound({"value": 1}))  # revealed: LiteralBound[Literal[1]]
 
 class IntBound[T: int](TypedDict):
     value: T
 
 reveal_type(IntBound(value=1))  # revealed: IntBound[int]
+reveal_type(IntBound({"value": 1}))  # revealed: IntBound[int]
 ```
 
 ### Constructor inference with callable parameters
@@ -3807,6 +3874,9 @@ def accepts_one(value: Literal[1]) -> None: ...
 
 box = Box(value=1, callback=accepts_one)
 box["callback"](2)  # error: [invalid-argument-type]
+
+positional = Box({"value": 1, "callback": accepts_one})
+positional["callback"](2)  # error: [invalid-argument-type]
 ```
 
 ### Constructor inference with an expected type
@@ -3877,6 +3947,7 @@ class Box[T](TypedDict):
     callback: Callable[[T], int]
 
 Box(value=1, callback=lambda x: x.upper())  # error: [unresolved-attribute]
+Box({"value": 1, "callback": lambda x: x.upper()})  # error: [unresolved-attribute]
 ```
 
 ### Constructor inference with a contextual callable
