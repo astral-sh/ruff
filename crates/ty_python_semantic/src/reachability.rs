@@ -215,7 +215,7 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use smallvec::SmallVec;
 use ty_python_core::{
     BindingWithConstraints, DeclarationWithConstraint, DeclarationsIterator, FileScopeId,
-    ScopedDefinitionId, SemanticIndex, Truthiness, UseDefMap,
+    PredicateNarrowingTargets, ScopedDefinitionId, SemanticIndex, Truthiness, UseDefMap,
     definition::DefinitionState,
     expression::Expression,
     narrowing_constraints::{NarrowingConstraints, ScopedNarrowingConstraint},
@@ -807,6 +807,7 @@ pub(crate) fn narrow_type_by_constraint<'db>(
     db: &'db dyn Db,
     constraints: &NarrowingConstraints,
     predicates: &IndexSlice<ScopedPredicateId, Predicate<'db>>,
+    predicate_narrowing_targets: &PredicateNarrowingTargets,
     id: ScopedNarrowingConstraint,
     base_ty: Type<'db>,
     place: ScopedPlaceId,
@@ -817,7 +818,13 @@ pub(crate) fn narrow_type_by_constraint<'db>(
         _ => {}
     }
 
-    let mut projector = NarrowingProjector::new(db, constraints, predicates, place);
+    let mut projector = NarrowingProjector::new(
+        db,
+        constraints,
+        predicates,
+        Some(predicate_narrowing_targets),
+        place,
+    );
     let projected_root = projector.project(id);
     let mut context = ProjectedNarrowingContext {
         db,
@@ -1041,6 +1048,7 @@ struct NarrowingProjector<'a, 'db> {
     db: &'db dyn Db,
     constraints: &'a NarrowingConstraints,
     predicates: &'a IndexSlice<ScopedPredicateId, Predicate<'db>>,
+    predicate_narrowing_targets: Option<&'a PredicateNarrowingTargets>,
     place: ScopedPlaceId,
     project_cache: FxHashMap<ScopedNarrowingConstraint, ProjectedNarrowingNodeId>,
     graph: ProjectedNarrowingGraph<'db>,
@@ -1052,12 +1060,14 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
         db: &'db dyn Db,
         constraints: &'a NarrowingConstraints,
         predicates: &'a IndexSlice<ScopedPredicateId, Predicate<'db>>,
+        predicate_narrowing_targets: Option<&'a PredicateNarrowingTargets>,
         place: ScopedPlaceId,
     ) -> Self {
         Self {
             db,
             constraints,
             predicates,
+            predicate_narrowing_targets,
             place,
             project_cache: FxHashMap::default(),
             graph: ProjectedNarrowingGraph::default(),
@@ -1076,8 +1086,14 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
             return cached.clone();
         }
 
-        let constraints =
-            infer_narrowing_constraints(self.db, self.predicates[predicate_id], self.place);
+        let constraints = if self
+            .predicate_narrowing_targets
+            .is_some_and(|targets| !targets.contains(predicate_id, self.place))
+        {
+            (None, None)
+        } else {
+            infer_narrowing_constraints(self.db, self.predicates[predicate_id], self.place)
+        };
         self.graph
             .predicate_constraints_cache
             .insert(predicate_id, constraints.clone());
@@ -1146,8 +1162,17 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
                     let (pos_constraint, neg_constraint) = self.predicate_constraints(node.atom);
 
                     let projected = if pos_constraint.is_none() && neg_constraint.is_none() {
-                        let either = self.graph.or(if_true, if_false);
-                        self.graph.or(either, if_uncertain)
+                        // This node represents `if_uncertain || (P && if_true) || (!P && if_false)`.
+                        // Since the predicate `P` cannot narrow this place, remove it while retaining only branches that `P` can take.
+                        // Including a statically unreachable branch could erase narrowing from the reachable branch.
+                        match analyze_single(self.db, &self.predicates[node.atom]) {
+                            Truthiness::AlwaysTrue => self.graph.or(if_true, if_uncertain),
+                            Truthiness::AlwaysFalse => self.graph.or(if_false, if_uncertain),
+                            Truthiness::Ambiguous => {
+                                let either = self.graph.or(if_true, if_false);
+                                self.graph.or(either, if_uncertain)
+                            }
+                        }
                     } else {
                         self.graph.add_node(ProjectedNarrowingNode {
                             atom: node.atom,
@@ -1896,6 +1921,7 @@ class TargetB:
                     &db,
                     &constraints,
                     &predicates,
+                    None,
                     ScopedPlaceId::Symbol(x),
                 );
 
