@@ -997,6 +997,22 @@ def f[T](x: T, y: Not[T]) -> T:
     return x
 ```
 
+## Return type inference from object-variadic callbacks
+
+Object-variadic callbacks must preserve `Callable[..., T]` return constraints.
+
+```py
+from collections.abc import Callable
+
+def call[T](callback: Callable[..., T]) -> T:
+    return callback()
+
+def callback(*args: object, **kwargs: object) -> int:
+    return 1
+
+reveal_type(call(callback))  # revealed: int
+```
+
 ## `Callable` parameters
 
 ### Class constructors

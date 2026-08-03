@@ -2524,7 +2524,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 .keyword_variadic()
                 .is_some_and(|(_, param)| param.annotated_type().is_object())
         {
-            return self.always();
+            return result;
         }
 
         // The top signature is supertype of (and assignable from) all other signatures. It is a
