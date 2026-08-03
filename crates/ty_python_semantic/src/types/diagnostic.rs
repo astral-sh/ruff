@@ -37,6 +37,7 @@ use itertools::Itertools;
 use ruff_db::source::source_text;
 use ruff_db::{
     diagnostic::{Annotation, Diagnostic, Span, SubDiagnostic, SubDiagnosticSeverity},
+    files::File,
     parsed::parsed_module,
 };
 use ruff_diagnostics::{Edit, Fix, IsolationLevel};
@@ -4689,6 +4690,7 @@ pub(super) fn report_invalid_total_ordering_call(
 /// The function returns `true` if a hint was added, `false` otherwise.
 pub(super) fn hint_if_stdlib_submodule_exists_on_other_versions(
     db: &dyn Db,
+    file: File,
     env: &ProgramEnvironment<'_>,
     diagnostic: &mut Diagnostic,
     full_submodule_name: &ModuleName,
@@ -4722,7 +4724,7 @@ pub(super) fn hint_if_stdlib_submodule_exists_on_other_versions(
         version_range = version_range.diagnostic_display(),
     ));
 
-    add_inferred_python_version_hint_to_diagnostic(db, env, diagnostic, "resolving modules");
+    add_inferred_python_version_hint_to_diagnostic(db, file, diagnostic, "resolving modules");
 
     true
 }
@@ -4737,7 +4739,7 @@ pub(super) fn hint_if_stdlib_submodule_exists_on_other_versions(
 /// misconfigured their Python version.
 pub(super) fn hint_if_stdlib_attribute_exists_on_other_versions(
     db: &dyn Db,
-    env: &ProgramEnvironment<'_>,
+    source_file: ProgramFile<'_>,
     mut diagnostic: LintDiagnosticGuard,
     value_type: Type,
     attr: &str,
@@ -4750,7 +4752,7 @@ pub(super) fn hint_if_stdlib_attribute_exists_on_other_versions(
         return;
     };
     let module = module_ty.module(db);
-    let Some(file) = module.file(db) else {
+    let Some(module_file) = module.file(db) else {
         return;
     };
     let Some(search_path) = module.search_path(db) else {
@@ -4763,7 +4765,7 @@ pub(super) fn hint_if_stdlib_attribute_exists_on_other_versions(
     // We populate place_table entries for stdlib items across all known versions and platforms,
     // so if this lookup succeeds then we know that this lookup *could* succeed with possible
     // configuration changes.
-    let program_file = ProgramFile::new(db, file, env.program(db));
+    let program_file = ProgramFile::new(db, module_file, source_file.program(db));
     let symbol_table = place_table(db, global_scope(db, program_file));
     let Some(symbol) = symbol_table.symbol_by_name(attr) else {
         return;
@@ -4779,7 +4781,12 @@ pub(super) fn hint_if_stdlib_attribute_exists_on_other_versions(
     // TODO: determine what version they need to be on
     // TODO: also mention the platform we're assuming
     // TODO: determine what platform they need to be on
-    add_inferred_python_version_hint_to_diagnostic(db, env, &mut diagnostic, action);
+    add_inferred_python_version_hint_to_diagnostic(
+        db,
+        source_file.file(db),
+        &mut diagnostic,
+        action,
+    );
 }
 
 pub(super) fn report_invalid_concatenate_last_arg<'db>(

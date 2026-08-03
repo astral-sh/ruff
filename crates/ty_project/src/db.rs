@@ -17,7 +17,7 @@ use salsa::{Database, Event, Setter};
 use ty_python_core::ProgramFile;
 use ty_python_core::program::{FallibleStrategy, MisconfigurationStrategy, UseDefaultStrategy};
 use ty_python_semantic::lint::{LintRegistry, RuleSelection};
-use ty_python_semantic::{AnalysisSettings, Db as SemanticDb};
+use ty_python_semantic::{AnalysisSettings, Db as SemanticDb, PythonVersionWithSource};
 
 mod changes;
 
@@ -542,6 +542,10 @@ impl SemanticDb for ProjectDatabase {
         self.project().program(self).program_file(self, file)
     }
 
+    fn python_version_with_source(&self, _file: File) -> &PythonVersionWithSource {
+        &self.project().program_settings(self).python_version
+    }
+
     fn rule_selection(&self, file: File) -> &RuleSelection {
         let settings = file_settings(self, file);
         settings.rules(self)
@@ -782,6 +786,10 @@ pub(crate) mod testing {
     impl ty_python_semantic::Db for TestDb {
         fn program_file(&self, file: File) -> ProgramFile<'_> {
             self.project().program(self).program_file(self, file)
+        }
+
+        fn python_version_with_source(&self, _file: File) -> &PythonVersionWithSource {
+            &self.project().program_settings(self).python_version
         }
 
         #[inline]

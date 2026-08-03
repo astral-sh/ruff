@@ -1,5 +1,5 @@
-use crate::AnalysisSettings;
 use crate::lint::{LintRegistry, RuleSelection};
+use crate::{AnalysisSettings, PythonVersionWithSource};
 use ruff_db::diagnostic::Diagnostic;
 use ruff_db::files::File;
 use ty_python_core::{Db as PythonCoreDb, ProgramFile};
@@ -11,6 +11,9 @@ pub trait Db: PythonCoreDb {
 
     /// Returns the program file for `file`.
     fn program_file(&self, file: File) -> ProgramFile<'_>;
+
+    /// Returns the Python version and its configuration source for `file`.
+    fn python_version_with_source(&self, file: File) -> &PythonVersionWithSource;
 
     /// Resolves the rule selection for a given file.
     fn rule_selection(&self, file: File) -> &RuleSelection;
@@ -175,6 +178,10 @@ pub(crate) mod tests {
 
         fn program_file(&self, file: File) -> ProgramFile<'_> {
             self.program().program_file(self, file)
+        }
+
+        fn python_version_with_source(&self, _file: File) -> &PythonVersionWithSource {
+            &self.program_settings.python_version
         }
 
         fn rule_selection(&self, _file: File) -> &RuleSelection {

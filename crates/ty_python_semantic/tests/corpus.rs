@@ -8,7 +8,9 @@ use ruff_db::vendored::VendoredFileSystem;
 use ty_python_core::program::ProgramSettings;
 use ty_python_semantic::lint::{LintRegistry, RuleSelection};
 use ty_python_semantic::pull_types::pull_types;
-use ty_python_semantic::{AnalysisSettings, Db as _, check_file_unwrap, default_lint_registry};
+use ty_python_semantic::{
+    AnalysisSettings, Db as _, PythonVersionWithSource, check_file_unwrap, default_lint_registry,
+};
 
 use ruff_db::diagnostic::Diagnostic;
 use test_case::test_case;
@@ -218,6 +220,10 @@ impl ty_python_semantic::Db for CorpusDb {
 
     fn program_file(&self, file: File) -> ProgramFile<'_> {
         self.program().program_file(self, file)
+    }
+
+    fn python_version_with_source(&self, _file: File) -> &PythonVersionWithSource {
+        &self.program_settings.python_version
     }
 
     fn rule_selection(&self, _file: File) -> &RuleSelection {

@@ -19,7 +19,8 @@ use ty_python_core::program::ProgramSettings;
 use ty_python_core::{Db as _, ProgramFile, TestProgramDb};
 use ty_python_semantic::lint::{LintRegistry, RuleSelection};
 use ty_python_semantic::{
-    AnalysisSettings, Db as SemanticDb, check_file_unwrap, default_lint_registry,
+    AnalysisSettings, Db as SemanticDb, PythonVersionWithSource, check_file_unwrap,
+    default_lint_registry,
 };
 
 #[salsa::db]
@@ -144,6 +145,10 @@ impl SemanticDb for Db {
 
     fn program_file(&self, file: File) -> ProgramFile<'_> {
         self.program().program_file(self, file)
+    }
+
+    fn python_version_with_source(&self, _file: File) -> &PythonVersionWithSource {
+        &self.settings().program(self).python_version
     }
 
     fn rule_selection(&self, file: File) -> &RuleSelection {
