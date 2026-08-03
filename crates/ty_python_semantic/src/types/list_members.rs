@@ -678,6 +678,7 @@ pub struct MemberWithDefinition<'db> {
 pub struct Member<'db> {
     pub(crate) name: Name,
     pub(crate) ty: Type<'db>,
+    /// Whether this member is known to exist only during type checking.
     pub(crate) is_type_check_only: bool,
 }
 

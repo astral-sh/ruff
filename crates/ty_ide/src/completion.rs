@@ -3615,25 +3615,15 @@ if TYPE_CHECKING:
         test.contains("__mangled_name");
         test.contains("__dunder_name__");
         test.contains("public_type_var");
-        test.contains("_private_type_var");
-        test.contains("__mangled_type_var");
         test.contains("public_param_spec");
-        test.contains("_private_param_spec");
         test.contains("public_type_var_tuple");
-        test.contains("_private_type_var_tuple");
         test.contains("public_explicit_type_alias");
-        test.contains("_private_explicit_type_alias");
         test.contains("public_implicit_union_alias");
-        test.contains("_private_implicit_union_alias");
         test.contains("_private_runtime_union");
         test.contains("_private_runtime_typevar");
         test.contains("_private_precise_runtime_union");
         test.contains("PublicProtocol");
         test.contains("_PrivateProtocol");
-        test.contains("PublicTypeOnlyProtocol");
-        test.contains("_PrivateTypeOnlyProtocol");
-        test.contains("PublicTypeCheckingProtocol");
-        test.contains("_PrivateTypeCheckingProtocol");
 
         for name in [
             "_private_type_var",
