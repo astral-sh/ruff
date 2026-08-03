@@ -283,7 +283,8 @@ impl<'db> DefinitionsByNode<'db> {
 /// Prior ordinary variable definitions used by eager value expressions in one file.
 #[derive(Debug, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
 struct NameDependencies<'db> {
-    definitions: ThinVec<(Definition<'db>, usize)>,
+    /// The definition and exclusive dependency end offset for each graph node.
+    definitions: ThinVec<(Definition<'db>, u32)>,
     dependencies: ThinVec<Definition<'db>>,
 }
 
@@ -302,7 +303,9 @@ impl<'db> NameDependencies<'db> {
         let mut dependencies = ThinVec::with_capacity(dependency_count);
         for (definition, definition_dependencies) in entries {
             dependencies.extend(definition_dependencies);
-            definitions.push((definition, dependencies.len()));
+            let end = u32::try_from(dependencies.len())
+                .expect("Expected name-dependency length to fit into a u32");
+            definitions.push((definition, end));
         }
 
         Self {
@@ -320,7 +323,7 @@ impl<'db> NameDependencies<'db> {
             .checked_sub(1)
             .map_or(0, |previous| self.definitions[previous].1);
         let end = self.definitions[index].1;
-        Some(&self.dependencies[start..end])
+        Some(&self.dependencies[start as usize..end as usize])
     }
 }
 
