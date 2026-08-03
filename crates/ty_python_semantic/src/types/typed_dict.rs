@@ -735,27 +735,14 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             return result;
         }
 
+        // First do a quick nominal check that (if it succeeds) means that we can avoid
+        // materializing the full `TypedDict` schema for either `source` or `target`.
+        // This should be cheaper in many cases, and also helps us avoid some cycles.
         if let Some(defining_class) = source.defining_class()
             && let Some(target_defining_class) = target.defining_class()
+            && self.is_class_subtype(db, defining_class, target_defining_class)
         {
-            if let (ClassType::Generic(source_alias), ClassType::Generic(target_alias)) =
-                (defining_class, target_defining_class)
-                && source_alias.origin(db) == target_alias.origin(db)
-            {
-                // A recursive schema can revisit itself before its fields contribute constraints.
-                // Comparing specializations directly preserves those constraints without
-                // expanding the schema.
-                let nominal = self.check_class_pair(db, defining_class, target_defining_class);
-                if !nominal.is_never_satisfied(db, self.env) {
-                    return nominal;
-                }
-            }
-
-            // A successful nominal check avoids materializing either schema and can also break
-            // cycles through inherited fields.
-            if self.is_class_subtype(db, defining_class, target_defining_class) {
-                return self.always();
-            }
+            return self.always();
         }
 
         let source_items = source.items(db);

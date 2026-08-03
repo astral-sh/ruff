@@ -44,7 +44,7 @@ use crate::reachability::{ReachabilityEvaluationCache, evaluate_reachability_wit
 use crate::types::add_inferred_python_version_hint_to_diagnostic;
 use crate::types::attribute_write::{AssignmentAttributeMembers, assignment_attribute_members};
 use crate::types::call::bind::{
-    ArgumentTypeContext, BindingError, CheckTypesMode, OverloadSet, requires_overload_evaluation,
+    ArgumentTypeContext, CheckTypesMode, OverloadSet, requires_overload_evaluation,
 };
 use crate::types::call::{Binding, Bindings, CallArguments, CallError, CallErrorKind};
 use crate::types::callable::{CallableFunctionProvenance, CallableTypeKind};
@@ -53,6 +53,7 @@ use crate::types::class::{
 };
 use crate::types::constraints::{ConstraintSetBuilder, PathBounds, Solutions};
 use crate::types::context::InferContext;
+use crate::types::cyclic::ActiveRecursionDetector;
 use crate::types::dedicated::pydantic;
 use crate::types::diagnostic::{
     self, CALL_NON_CALLABLE, CONFLICTING_DECLARATIONS, CYCLIC_TYPE_ALIAS_DEFINITION,
@@ -8696,6 +8697,23 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         }
 
+        fn contains_generic_typed_dict<'db>(
+            db: &'db dyn Db,
+            env: &ProgramEnvironment<'db>,
+            ty: Type<'db>,
+            active_aliases: &ActiveRecursionDetector<Definition<'db>>,
+        ) -> bool {
+            any_over_type(db, env, ty, false, |nested| match nested {
+                Type::TypedDict(typed_dict) => Type::TypedDict(typed_dict).has_typevar(db, env),
+                Type::TypeAlias(alias) => active_aliases.visit(
+                    &alias.definition(db),
+                    || true,
+                    || contains_generic_typed_dict(db, env, alias.value_type(db), active_aliases),
+                ),
+                _ => false,
+            })
+        }
+
         let db = self.db();
         let env = self.program_environment();
         let ast::ExprCall {
@@ -8799,31 +8817,57 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             _ => None,
         };
 
-        let generic_typed_dict_class =
-            class
-                .filter(|class| class.is_typed_dict(self.db()))
-                .filter(|_| {
-                    matches!(
-                        callable_type,
-                        Type::ClassLiteral(class_literal)
-                            if class_literal.generic_context(self.db()).is_some()
-                    )
+        let generic_typed_dict_class = class.filter(|class| {
+            class.is_typed_dict(db)
+                && matches!(
+                    callable_type,
+                    Type::ClassLiteral(class_literal)
+                        if class_literal.generic_context(db).is_some()
+                )
+        });
+        let generic_typed_dict_constructor = generic_typed_dict_class.filter(|class| {
+            let class_literal = class.class_literal(db);
+
+            // An inner `Node(value=1)` must retain `Node[Unknown]` when its enclosing
+            // `Node(child=...)` cannot infer through the recursive field.
+            let has_gradual_class_context = class_literal
+                .as_static()
+                .zip(call_expression_tcx.annotation)
+                .is_some_and(|(class_literal, annotation)| {
+                    any_over_type(db, env, annotation.resolve_type_alias(db), false, |ty| {
+                        ty.resolve_type_alias(db)
+                            .specialization_of(db, env, class_literal)
+                            .is_some_and(|specialization| {
+                                specialization
+                                    .types(db)
+                                    .iter()
+                                    .any(|ty| ty.is_unknown() || ty.has_typevar(db, env))
+                            })
+                    })
                 });
-        let generic_typed_dict_constructor = generic_typed_dict_class.filter(|_| {
+            let typed_dict = TypedDictType::new(class_literal.identity_specialization(db));
+
             arguments.args.is_empty()
-                && !(arguments
-                    .keywords
-                    .iter()
-                    .any(|keyword| keyword.arg.is_none())
-                    && arguments
-                        .keywords
-                        .iter()
-                        .any(|keyword| keyword.arg.is_some()))
+                && !has_gradual_class_context
+                && arguments.keywords.iter().all(|keyword| {
+                    let Some(name) = keyword.arg.as_ref() else {
+                        return false;
+                    };
+                    let Some(field) = typed_dict.item(db, name.id.as_str()) else {
+                        return true;
+                    };
+
+                    !contains_generic_typed_dict(
+                        db,
+                        env,
+                        field.declared_ty,
+                        &ActiveRecursionDetector::default(),
+                    )
+                })
         });
 
-        // Non-generic calls and unsupported mapping forms still need field-directed preparation
-        // before variadic arguments are inferred. Generic keyword calls obtain their context
-        // from the actual constructor signature instead.
+        // Mapping arguments and nested generic TypedDict fields still need dedicated preparation.
+        // Supported keyword calls obtain their context from the constructor signature instead.
         let has_prepared_typed_dict_constructor = class
             .filter(|class| class.is_typed_dict(self.db()))
             .filter(|_| generic_typed_dict_constructor.is_none())
@@ -9192,19 +9236,23 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let mut bindings = match bindings_result {
             Ok(()) => bindings,
             Err(_) => {
-                let mut has_invalid_keyword_key = false;
                 if let Some(class) = generic_typed_dict_constructor {
-                    bindings.visit_type_context_callables(&mut |binding| {
-                        has_invalid_keyword_key |= binding.overloads().iter().any(|overload| {
-                            overload
-                                .errors()
-                                .iter()
-                                .any(|error| matches!(error, BindingError::InvalidKeyType { .. }))
-                        });
+                    let typed_dict = TypedDictType::new(class);
+                    let has_invalid_field = arguments.keywords.iter().any(|keyword| {
+                        keyword
+                            .arg
+                            .as_ref()
+                            .and_then(|name| typed_dict.item(db, name.id.as_str()))
+                            .is_some_and(|field| {
+                                !self.expression_type(&keyword.value).is_assignable_to(
+                                    db,
+                                    env,
+                                    field.declared_ty,
+                                )
+                            })
                     });
 
-                    if has_invalid_keyword_key {
-                        let typed_dict = TypedDictType::new(class);
+                    if has_invalid_field {
                         validate_typed_dict_constructor(
                             &self.context,
                             typed_dict,
@@ -9222,20 +9270,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 return bindings.return_type(db, env);
             }
         };
-
-        // Validate against the solved specialization so field-sensitive diagnostics use the same
-        // concrete types that the constructor returns.
-        if generic_typed_dict_constructor.is_some()
-            && let Some(typed_dict) = bindings.return_type(db, env).as_typed_dict()
-        {
-            validate_typed_dict_constructor(
-                &self.context,
-                typed_dict,
-                arguments,
-                func.as_ref().into(),
-                |expr, _| self.expression_type(expr),
-            );
-        }
 
         if let Some(class) = class {
             pydantic::report_discarded_extra_arguments(&self.context, class, arguments, &bindings);

@@ -2204,17 +2204,6 @@ impl<'db> StaticClassLiteral<'db> {
         name: &str,
         policy: MemberLookupPolicy,
     ) -> PlaceAndQualifiers<'db> {
-        // A bare constructor must retain its class type variables, while an explicitly
-        // specialized constructor substitutes the provided type arguments.
-        let specialization = if name == "__init__" {
-            specialization.or_else(|| {
-                self.generic_context(db)
-                    .map(|generic_context| generic_context.identity_specialization(db))
-            })
-        } else {
-            specialization
-        };
-
         if let Some(member) = self.own_synthesized_member(db, env, specialization, None, name) {
             Place::bound(member).into()
         } else {
