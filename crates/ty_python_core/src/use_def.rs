@@ -780,12 +780,12 @@ pub struct UseDefMap<'db> {
         DefinitionsAtDefinition<InternedBindingsId, InternedDeclarationsId>,
     >,
 
-    /// Ordinary variable definitions directly needed to infer a definition.
+    /// Prior ordinary variable definitions used by eager value expressions.
     ///
     /// Type inference traverses this graph iteratively before inferring a requested definition.
     name_dependencies: FrozenMap<Definition<'db>, Box<[Definition<'db>]>>,
 
-    /// Ordinary variable definitions that have entries in `name_dependencies`.
+    /// Ordinary variable definitions whose eager value expressions have dependency entries.
     name_dependency_roots: FrozenMap<Definition<'db>, ()>,
 
     /// Retained [`PlaceState`] values for each symbol.
@@ -1083,7 +1083,7 @@ impl<'db> UseDefMap<'db> {
         self.bindings_iterator(bindings, BoundnessAnalysis::BasedOnUnboundVisibility)
     }
 
-    /// Returns the ordinary variable definitions directly referenced by `definition`.
+    /// Returns prior ordinary variable definitions used by `definition`'s eager value expression.
     pub fn name_dependencies(&self, definition: Definition<'db>) -> &[Definition<'db>] {
         self.name_dependencies
             .get(&definition)
@@ -1091,7 +1091,7 @@ impl<'db> UseDefMap<'db> {
             .unwrap_or_default()
     }
 
-    /// Returns every ordinary variable definition in the dependency graph in dependency order.
+    /// Returns every definition in the eager value dependency graph in dependency order.
     pub fn all_name_dependencies_in_order(&self) -> Vec<Definition<'db>> {
         let roots = self
             .all_definitions
@@ -1101,7 +1101,7 @@ impl<'db> UseDefMap<'db> {
         self.name_dependency_order(roots)
     }
 
-    /// Returns the ordinary variable dependencies of `definition` in dependency order.
+    /// Returns `definition`'s eager value dependencies in dependency order.
     pub fn name_dependencies_in_order(&self, definition: Definition<'db>) -> Vec<Definition<'db>> {
         self.name_dependency_order(self.name_dependencies(definition).iter().copied())
     }

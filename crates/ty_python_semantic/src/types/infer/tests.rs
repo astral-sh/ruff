@@ -496,29 +496,6 @@ fn large_branching_name_dependency_graph_does_not_overflow_stack() -> anyhow::Re
 }
 
 #[test]
-fn large_function_default_name_dependency_chain_does_not_overflow_stack() -> anyhow::Result<()> {
-    run_name_dependency_stack_test("function-default-name-dependency-stack-test", |db| {
-        let mut module = String::from(
-            "def seed() -> int:\n    return 0\n\ndef add(left: int, right: int) -> int:\n    return left + right\n\nn0 = seed()\n",
-        );
-        for index in 1..=LONG_NAME_CHAIN {
-            writeln!(module, "n{index} = add(n{}, n0)", index - 1)?;
-        }
-        writeln!(
-            module,
-            "\ndef target(value: int = n{LONG_NAME_CHAIN}) -> int:\n    return value"
-        )?;
-        db.write_file("/src/lazy_boundary.py", module)?;
-        db.write_file(
-            "/src/lazy_boundary_main.py",
-            "from typing_extensions import reveal_type\nfrom lazy_boundary import target\n\nreveal_type(target())\n",
-        )?;
-        assert_revealed_type(db, "/src/lazy_boundary_main.py", "int");
-        Ok(())
-    })
-}
-
-#[test]
 fn large_name_dependency_chain_is_incrementally_invalidated() -> anyhow::Result<()> {
     run_name_dependency_stack_test("incremental-name-dependency-stack-test", |db| {
         let mut module = String::from("def seed() -> int:\n    return 0\n\nn0 = seed()\n");
@@ -541,46 +518,6 @@ fn large_name_dependency_chain_is_incrementally_invalidated() -> anyhow::Result<
         );
         db.write_file("/src/incremental.py", module)?;
         assert_revealed_type(db, "/src/incremental_main.py", "str");
-        Ok(())
-    })
-}
-
-#[test]
-fn large_annotation_name_dependency_chain_does_not_overflow_stack() -> anyhow::Result<()> {
-    run_name_dependency_stack_test("annotation-name-dependency-stack-test", |db| {
-        let mut module = String::from("T0 = int\n");
-        for index in 1..=LONG_NAME_CHAIN {
-            writeln!(module, "T{index} = T{}", index - 1)?;
-        }
-        writeln!(module, "\nx: T{LONG_NAME_CHAIN}")?;
-        db.write_file("/src/annotation_boundary.py", module)?;
-        db.write_file(
-            "/src/annotation_boundary_main.py",
-            "from typing_extensions import reveal_type\nfrom annotation_boundary import x\n\nreveal_type(x)\n",
-        )?;
-        assert_revealed_type(db, "/src/annotation_boundary_main.py", "int");
-        Ok(())
-    })
-}
-
-#[test]
-fn large_type_parameter_bound_name_dependency_chain_does_not_overflow_stack() -> anyhow::Result<()>
-{
-    run_name_dependency_stack_test("type-parameter-name-dependency-stack-test", |db| {
-        let mut module = String::from("T0 = int\n");
-        for index in 1..=LONG_NAME_CHAIN {
-            writeln!(module, "T{index} = T{}", index - 1)?;
-        }
-        writeln!(
-            module,
-            "\ndef target[T: T{LONG_NAME_CHAIN}]() -> int:\n    return 1"
-        )?;
-        db.write_file("/src/type_parameter_boundary.py", module)?;
-        db.write_file(
-            "/src/type_parameter_boundary_main.py",
-            "from typing_extensions import reveal_type\nfrom type_parameter_boundary import target\n\nreveal_type(target())\n",
-        )?;
-        assert_revealed_type(db, "/src/type_parameter_boundary_main.py", "int");
         Ok(())
     })
 }

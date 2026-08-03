@@ -1570,7 +1570,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 | DefinitionKind::AnnotatedAssignment(_)
                 | DefinitionKind::AugmentedAssignment(_)
         );
-        let name_dependencies = if place.is_symbol() {
+        let name_dependencies = if place.is_symbol() && is_name_dependency_root {
             self.name_dependencies(kind)
         } else {
             SmallVec::new()
@@ -1638,7 +1638,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         self.try_node_context_stack_manager = try_node_stack_manager;
     }
 
-    /// Returns the ordinary variable definitions needed to infer this definition.
+    /// Returns prior ordinary variable definitions used by eager value expressions.
     fn name_dependencies(&mut self, kind: &DefinitionKind<'db>) -> SmallVec<[Definition<'db>; 2]> {
         let mut dependencies = SmallVec::new();
 
@@ -1658,10 +1658,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             DefinitionKind::AnnotatedAssignment(assignment)
                 if assignment.target(self.module).is_name_expr() =>
             {
-                self.extend_name_dependencies(
-                    assignment.annotation(self.module),
-                    &mut dependencies,
-                );
                 if let Some(value) = assignment.value(self.module) {
                     self.extend_name_dependencies(value, &mut dependencies);
                 }
@@ -1673,118 +1669,10 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 self.extend_name_dependencies(&assignment.target, &mut dependencies);
                 self.extend_name_dependencies(&assignment.value, &mut dependencies);
             }
-            DefinitionKind::Function(function) => {
-                let function = function.node(self.module);
-                for decorator in &function.decorator_list {
-                    self.extend_name_dependencies(&decorator.expression, &mut dependencies);
-                }
-                for parameter in &function.parameters {
-                    if let Some(default) = parameter.default() {
-                        self.extend_name_dependencies(default, &mut dependencies);
-                    }
-                    if let Some(annotation) = parameter.annotation() {
-                        self.extend_name_dependencies(annotation, &mut dependencies);
-                    }
-                }
-                if let Some(returns) = &function.returns {
-                    self.extend_name_dependencies(returns, &mut dependencies);
-                }
-                self.extend_type_parameter_dependencies(
-                    function.type_params.as_deref(),
-                    &mut dependencies,
-                );
-            }
-            DefinitionKind::Class(class) => {
-                let class = class.node(self.module);
-                for decorator in &class.decorator_list {
-                    self.extend_name_dependencies(&decorator.expression, &mut dependencies);
-                }
-                if let Some(arguments) = &class.arguments {
-                    for argument in &arguments.args {
-                        self.extend_name_dependencies(argument, &mut dependencies);
-                    }
-                    for keyword in &arguments.keywords {
-                        self.extend_name_dependencies(&keyword.value, &mut dependencies);
-                    }
-                }
-                self.extend_type_parameter_dependencies(
-                    class.type_params.as_deref(),
-                    &mut dependencies,
-                );
-            }
             _ => {}
         }
 
         dependencies
-    }
-
-    fn extend_type_parameter_dependencies(
-        &mut self,
-        type_params: Option<&ast::TypeParams>,
-        dependencies: &mut SmallVec<[Definition<'db>; 2]>,
-    ) {
-        let Some(type_params) = type_params else {
-            return;
-        };
-        let names = type_params
-            .type_params
-            .iter()
-            .map(ast::TypeParam::name)
-            .collect::<SmallVec<[_; 4]>>();
-
-        for type_param in &type_params.type_params {
-            match type_param {
-                ast::TypeParam::TypeVar(type_var) => {
-                    if let Some(bound) = &type_var.bound {
-                        self.extend_enclosing_name_dependencies(bound, &names, dependencies);
-                    }
-                    if let Some(default) = &type_var.default {
-                        self.extend_enclosing_name_dependencies(default, &names, dependencies);
-                    }
-                }
-                ast::TypeParam::ParamSpec(param_spec) => {
-                    if let Some(default) = &param_spec.default {
-                        self.extend_enclosing_name_dependencies(default, &names, dependencies);
-                    }
-                }
-                ast::TypeParam::TypeVarTuple(type_var_tuple) => {
-                    if let Some(default) = &type_var_tuple.default {
-                        self.extend_enclosing_name_dependencies(default, &names, dependencies);
-                    }
-                }
-            }
-        }
-    }
-
-    // Type-parameter expressions use a child scope, so resolve their free names against the
-    // enclosing definition scope instead of looking up their use IDs.
-    fn extend_enclosing_name_dependencies(
-        &mut self,
-        expression: &ast::Expr,
-        type_parameter_names: &[&ast::Identifier],
-        dependencies: &mut SmallVec<[Definition<'db>; 2]>,
-    ) {
-        any_over_expr(expression, |expression| {
-            let Some(name) = expression.as_name_expr() else {
-                return false;
-            };
-            if type_parameter_names
-                .iter()
-                .any(|type_parameter| type_parameter.id == name.id)
-            {
-                return false;
-            }
-
-            let Some(symbol) = self.current_place_table().symbol_id(name.id.as_str()) else {
-                return false;
-            };
-            let live_bindings = self
-                .current_use_def_map_mut()
-                .current_bindings(symbol.into())
-                .collect::<SmallVec<[_; 2]>>();
-            self.extend_live_binding_dependencies(live_bindings, dependencies);
-            false
-        });
     }
 
     fn extend_name_dependencies(
