@@ -246,7 +246,7 @@ impl ProjectDatabase {
                 0
             });
 
-            (cmp::Reverse(memo.size_of_fields() + heap_size), *query)
+            cmp::Reverse(memo.size_of_fields() + heap_size)
         });
 
         let mut total_fields = 0;

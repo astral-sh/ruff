@@ -48,10 +48,16 @@ use crate::{Db, program::Program};
 /// This allows programs with the same Python version to share parsed syntax, and programs with
 /// equivalent resolver environments to share module resolution, while keeping type inference
 /// isolated.
-#[salsa::interned(debug, heap_size = ruff_memory_usage::heap_size)]
+#[salsa::interned(
+    debug,
+    constructor = new_internal,
+    heap_size = ruff_memory_usage::heap_size
+)]
 pub struct ProgramFile<'db> {
+    /// Cache the parser key even though its Python version is redundant with `program`:
+    /// program files are created infrequently, but their parser keys are looked up extensively.
     #[returns(copy)]
-    pub file: File,
+    pub python_file: PythonFile<'db>,
 
     #[returns(copy)]
     pub program: Program<'db>,
@@ -59,12 +65,15 @@ pub struct ProgramFile<'db> {
 
 impl get_size2::GetSize for ProgramFile<'_> {}
 
-#[salsa::tracked]
 impl<'db> ProgramFile<'db> {
-    /// Returns the parser key for this file and its program's Python version.
-    #[salsa::tracked(returns(copy))]
-    pub fn python_file(self, db: &'db dyn Db) -> PythonFile<'db> {
-        PythonFile::new(db, self.file(db), self.program(db).python_version(db))
+    pub fn new(db: &'db dyn Db, file: File, program: Program<'db>) -> Self {
+        let python_file = PythonFile::new(db, file, program.python_version(db));
+        Self::new_internal(db, python_file, program)
+    }
+
+    /// Returns the physical file represented by this program file.
+    pub fn file(self, db: &'db dyn Db) -> File {
+        self.python_file(db).file(db)
     }
 
     /// Returns the module-resolution environment for this program file.

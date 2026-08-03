@@ -1354,10 +1354,6 @@ impl<'db> FunctionType<'db> {
         self.literal(db).last_definition.program_file(db)
     }
 
-    pub(crate) fn program(self, db: &'db dyn Db) -> Program<'db> {
-        self.literal(db).last_definition.body_scope(db).program(db)
-    }
-
     /// Returns the AST node for this function.
     pub(super) fn node<'ast>(
         self,
