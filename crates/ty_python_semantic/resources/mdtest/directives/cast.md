@@ -63,7 +63,7 @@ the gradual guarantee and leads to cascading errors when an object is inferred a
 `Unknown` due to a missing import or similar.
 
 ```py
-from ty_extensions import Unknown
+from ty_extensions._internal import Unknown
 
 def f(x: Any, y: Unknown, z: Any | str | int):
     a = cast(dict[str, Any], x)

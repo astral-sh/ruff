@@ -34,7 +34,7 @@ We also support unions in type aliases:
 
 ```py
 from typing_extensions import Any, Never, Literal, LiteralString, Tuple, Annotated, Optional, Union, Callable, TypeVar
-from ty_extensions import Unknown
+from ty_extensions._internal import Unknown
 
 T = TypeVar("T")
 

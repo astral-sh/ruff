@@ -1,4 +1,11 @@
 # ruff: noqa: PYI021
+"""
+Internal-only symbols for special forms and type-system tests.
+
+Some symbols provide definitions and on-hover documentation for special forms. Others exist only as
+helpers for ty's tests. None of these symbols are intended to be directly imported by end users.
+"""
+
 import types
 from enum import Enum
 from typing import Any, Protocol, _SpecialForm
@@ -48,6 +55,15 @@ ordinary `Callable[...]` types in type-theoretic tests.
 # -----
 # Types
 # -----
+
+Unknown: _SpecialForm
+"""
+`Unknown` is a dynamic type inferred due to missing type information or an inference error.
+
+ty infers `Unknown` for unannotated values with insufficient type information. It also uses it as a
+fallback after certain type errors. This contrasts with `Any`, which represents an *explicitly*
+annotated dynamic type. Like `Any`, however, it is a dynamic type, so ty allows any operation on it.
+"""
 
 Todo: _SpecialForm
 """

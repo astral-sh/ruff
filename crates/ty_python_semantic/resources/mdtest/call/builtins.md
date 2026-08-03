@@ -406,7 +406,7 @@ result to `Sized` or `object`; ideally the element type would remain `Unknown`, 
 return type would still be used where possible.
 
 ```py
-from ty_extensions import Unknown
+from ty_extensions._internal import Unknown
 
 def _(xs: Unknown):
     # TODO: should be `list[Unknown]`
@@ -481,7 +481,7 @@ error[call-non-callable]: `NotImplemented` is not callable
 ## `map` with generic callbacks
 
 ```py
-from ty_extensions import Unknown
+from ty_extensions._internal import Unknown
 import re
 
 def _(s: Unknown | str):

@@ -29,8 +29,8 @@ Types that "produce" data on demand are covariant in their typevar. If you expec
 get from the sequence is a valid `int`.
 
 ```py
-from ty_extensions import static_assert, Unknown
-from ty_extensions._internal import is_assignable_to, is_equivalent_to, is_subtype_of
+from ty_extensions import static_assert
+from ty_extensions._internal import Unknown, is_assignable_to, is_equivalent_to, is_subtype_of
 from typing import Any, Never
 
 class A: ...
@@ -108,8 +108,8 @@ Types that "consume" data are contravariant in their typevar. If you expect a co
 that you pass into the consumer is a valid `int`.
 
 ```py
-from ty_extensions import static_assert, Unknown
-from ty_extensions._internal import is_assignable_to, is_equivalent_to, is_subtype_of
+from ty_extensions import static_assert
+from ty_extensions._internal import Unknown, is_assignable_to, is_equivalent_to, is_subtype_of
 from typing import Any, Never
 
 class A: ...
@@ -216,8 +216,8 @@ In the end, if you expect a mutable list, you must always be given a list of exa
 since we can't know in advance which of the allowed methods you'll want to use.
 
 ```py
-from ty_extensions import static_assert, Unknown
-from ty_extensions._internal import is_assignable_to, is_equivalent_to, is_subtype_of
+from ty_extensions import static_assert
+from ty_extensions._internal import Unknown, is_assignable_to, is_equivalent_to, is_subtype_of
 from typing import Any, Never
 
 class A: ...
@@ -292,8 +292,8 @@ If inference for a PEP 695 type parameter would otherwise conclude bivariance be
 parameter is unused, we fall back to covariance instead.
 
 ```py
-from ty_extensions import static_assert, Unknown
-from ty_extensions._internal import is_assignable_to, is_equivalent_to, is_subtype_of
+from ty_extensions import static_assert
+from ty_extensions._internal import Unknown, is_assignable_to, is_equivalent_to, is_subtype_of
 from typing import Any, Never
 
 class A: ...
