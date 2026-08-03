@@ -53,7 +53,41 @@ impl fmt::Display for DisplaySearchPaths<'_> {
     }
 }
 
-/// A physical file interpreted in one module-resolution environment.
+/// A file interpreted within a particular module-resolution environment.
+///
+/// The same file can resolve imports differently depending on the Python version and search paths
+/// used to interpret it.
+///
+/// For example, consider a file containing:
+///
+/// ```python
+/// from zipfile._path import Path
+/// ```
+///
+/// Typeshed makes `zipfile._path` available only on Python 3.12 and newer:
+///
+/// ```text
+/// resolve_module(ResolverFile(shared.py, Python 3.11), "zipfile._path")
+///     -> unresolved
+///
+/// resolve_module(ResolverFile(shared.py, Python 3.12), "zipfile._path")
+///     -> zipfile/_path/__init__.pyi
+/// ```
+///
+/// Search paths can also change which file an import resolves to, even when the Python version is
+/// identical:
+///
+/// ```text
+/// resolve_module(ResolverFile(shared.py, project environment), "dependency")
+///     -> .venv/lib/dependency.py
+///
+/// resolve_module(ResolverFile(shared.py, script environment), "dependency")
+///     -> .script-venv/lib/dependency.py
+/// ```
+///
+/// Including the resolver environment in the file's identity keeps these resolution results
+/// separate. Projects and scripts with equivalent resolver environments can still share resolution
+/// results.
 #[salsa::interned(debug, heap_size = ruff_memory_usage::heap_size)]
 pub struct ResolverFile<'db> {
     #[returns(copy)]

@@ -5,7 +5,49 @@ use ty_module_resolver::{ResolverEnvironment, ResolverFile};
 
 use crate::{Db, Program};
 
-/// A physical file interpreted in one program.
+/// A file interpreted within a particular Python program.
+///
+/// The same file can participate in multiple programs, each with different Python versions, search
+/// paths, or other settings that affect type inference.
+///
+/// For example:
+///
+/// ```text
+/// project/
+/// ├── app.py         # Project program: Python 3.11
+/// ├── generate.py    # Script program:  Python 3.12
+/// └── shared.py      # Imported by both
+/// ```
+///
+/// In `shared.py`, version-dependent code can produce different types:
+///
+/// ```python
+/// import sys
+///
+/// if sys.version_info >= (3, 12):
+///     value = 1
+/// else:
+///     value = "one"
+/// ```
+///
+/// The two interpretations therefore need separate semantic identities:
+///
+/// ```text
+/// ProgramFile(shared.py, project program) -> value: str
+/// ProgramFile(shared.py, script program)  -> value: int
+/// ```
+///
+/// Semantic queries, such as `semantic_index`, use `ProgramFile` to avoid sharing results between
+/// incompatible programs. Lower-level operations use narrower identities where possible:
+///
+/// ```text
+/// program_file.python_file(db)   -> File + Python version
+/// program_file.resolver_file(db) -> File + resolver environment
+/// ```
+///
+/// This allows programs with the same Python version to share parsed syntax, and programs with
+/// equivalent resolver environments to share module resolution, while keeping type inference
+/// isolated.
 #[salsa::interned(
     debug,
     constructor = new_internal,

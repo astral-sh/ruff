@@ -468,10 +468,34 @@ impl std::fmt::Display for ModuleName {
     }
 }
 
-/// The file containing an import statement, with either an existing resolver key or its parts.
+/// The file from which an import is resolved.
+///
+/// Most absolute imports only need the resolver environment. Creating a [`ResolverFile`] for each
+/// such import would unnecessarily intern the file and environment together, even though that
+/// combined identity is never used:
+///
+/// ```text
+/// resolve_module(ImportingFile::File(shared.py, environment), "dependency")
+///     -> resolve using environment; no ResolverFile needed
+/// ```
+///
+/// Relative imports, on the other hand, need the importing file's module identity and therefore
+/// require a [`ResolverFile`]:
+///
+/// ```text
+/// from .dependency import value
+///     -> importing_file.resolver_file(db)
+///     -> ResolverFile(shared.py, environment)
+/// ```
+///
+/// [`ImportingFile::File`] defers interning until such a code path actually calls
+/// [`ImportingFile::resolver_file`]. Callers that already have an interned resolver file can pass
+/// [`ImportingFile::ResolverFile`] to reuse it directly.
 #[derive(Clone, Copy)]
 pub enum ImportingFile<'db> {
+    /// An already-interned resolver key that can be reused without materialization.
     ResolverFile(ResolverFile<'db>),
+    /// An importing file and resolver environment whose combined key is materialized lazily.
     File(File, ResolverEnvironment<'db>),
 }
 
@@ -494,6 +518,7 @@ impl<'db> ImportingFile<'db> {
         self.resolver_environment(db).python_version(db)
     }
 
+    /// Returns the existing resolver key or materializes one when required.
     pub fn resolver_file(self, db: &'db dyn Db) -> ResolverFile<'db> {
         match self {
             Self::ResolverFile(file) => file,
