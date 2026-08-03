@@ -51,10 +51,9 @@ config.optionxform = str  # snapshot: invalid-assignment
 ```
 
 ```snapshot
-error[invalid-assignment]: Object of type `<class 'str'>` is not assignable to attribute `optionxform` of type `(optionstr: str) -> str`
+error[invalid-assignment]: Object of type `<class 'str'>` is not assignable to attribute `optionxform` of type `def optionxform(self, optionstr: str) -> str`
  --> src/mdtest_snippet.py:4:1
   |
 4 | config.optionxform = str  # snapshot: invalid-assignment
   | ^^^^^^^^^^^^^^^^^^
-info: type `<class 'str'>` has inferred callable type `Overload[(object: object = "") -> str, (object: Buffer, encoding: str = "utf-8", errors: str = "strict") -> str]`
 ```

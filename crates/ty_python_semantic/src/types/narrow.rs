@@ -3840,10 +3840,10 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
                 }
             }
             Type::FunctionLiteral(function_type) if expr_call.arguments.keywords.is_empty() => {
-                let [first_arg, second_arg] = &*expr_call.arguments.args else {
+                let [subject, second_arg] = &*expr_call.arguments.args else {
                     return None;
                 };
-                let first_arg = PlaceExpr::try_from_expr(first_arg)?;
+                let first_arg = PlaceExpr::try_from_expr(subject)?;
                 let function = function_type.known(db)?;
                 let place = self.expect_place(&first_arg);
 
@@ -3854,6 +3854,18 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
                         .value(db);
 
                     if !is_identifier(attr) {
+                        return None;
+                    }
+
+                    if !is_positive
+                        && inference
+                            .expression_type(subject)
+                            .has_possibly_absent_instance_attribute(self.db, attr)
+                    {
+                        // Instance assignments and annotations do not guarantee that the
+                        // attribute exists before initialization. Discover them syntactically:
+                        // inferring the member here would revisit its initializer and create a
+                        // cycle when that initializer is guarded by this same `hasattr` call.
                         return None;
                     }
 
