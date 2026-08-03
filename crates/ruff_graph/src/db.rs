@@ -1,15 +1,13 @@
 use anyhow::{Context, Result};
 use std::panic::RefUnwindSafe;
-use std::sync::{Arc, OnceLock};
+use std::sync::Arc;
 use zip::CompressionMethod;
 
 use ruff_db::Db as SourceDb;
 use ruff_db::files::Files;
 use ruff_db::system::{System, SystemPathBuf};
 use ruff_db::vendored::{VendoredFileSystem, VendoredFileSystemBuilder};
-use ruff_python_ast::PythonVersion;
-use salsa::plumbing::{AsId, FromId, Id};
-use ty_module_resolver::{FallibleStrategy, ResolverEnvironment, SearchPathSettings, SearchPaths};
+use ty_module_resolver::{FallibleStrategy, SearchPathSettings, SearchPaths};
 use ty_site_packages::{PythonEnvironment, SysPrefixPathOrigin};
 
 static EMPTY_VENDORED: std::sync::LazyLock<VendoredFileSystem> = std::sync::LazyLock::new(|| {
@@ -24,68 +22,42 @@ pub struct ModuleDb {
     storage: salsa::Storage<Self>,
     files: Files,
     system: Arc<dyn System + Send + Sync + RefUnwindSafe>,
-    search_paths: Arc<SearchPaths>,
-    /// All cloned databases share their Salsa storage, so their cached environment IDs remain valid.
-    resolver_environments: Arc<[(PythonVersion, OnceLock<Id>)]>,
 }
 
 impl ModuleDb {
-    pub(crate) fn resolver_environment(
-        &self,
-        python_version: PythonVersion,
-    ) -> ResolverEnvironment<'_> {
-        let Some((_, cached)) = self
-            .resolver_environments
-            .iter()
-            .find(|(version, _)| *version == python_version)
-        else {
-            return ResolverEnvironment::new(self, python_version, self.search_paths.as_ref());
-        };
-
-        let id = *cached.get_or_init(|| {
-            ResolverEnvironment::new(self, python_version, self.search_paths.as_ref()).as_id()
-        });
-        ResolverEnvironment::from_id(id)
-    }
-
-    /// Initialize a [`ModuleDb`] from the given source root.
-    pub fn from_src_roots<S>(
-        system: S,
-        src_roots: Vec<SystemPathBuf>,
-        venv_path: Option<SystemPathBuf>,
-    ) -> Result<Self>
+    /// Initialize a [`ModuleDb`] for the given system.
+    pub fn new<S>(system: S) -> Self
     where
         S: System + 'static + Send + Sync + RefUnwindSafe,
     {
-        let mut search_path_settings = SearchPathSettings::new(src_roots);
-        // TODO: Consider calling `PythonEnvironment::discover` if the `venv_path` is not provided.
-        if let Some(venv_path) = venv_path {
-            let environment =
-                PythonEnvironment::new(venv_path, SysPrefixPathOrigin::PythonCliFlag, &system)?;
-            search_path_settings.site_packages_paths = environment
-                .site_packages_paths(&system)
-                .context("Failed to discover the site-packages directory")?
-                .into_vec();
-        }
-        let search_paths = search_path_settings
-            .to_search_paths(&system, &EMPTY_VENDORED, &FallibleStrategy)
-            .context("Invalid search path settings")?;
-
-        let db = Self {
+        Self {
             storage: salsa::Storage::new(None),
             files: Files::default(),
             system: Arc::new(system),
-            search_paths: Arc::new(search_paths),
-            resolver_environments: PythonVersion::iter()
-                .map(|version| (version, OnceLock::new()))
-                .collect(),
-        };
-
-        // Register the static roots for salsa durability
-        db.search_paths.try_register_static_roots(&db);
-
-        Ok(db)
+        }
     }
+}
+
+/// Resolve module search paths for the given source roots and Python environment.
+pub fn resolve_search_paths(
+    system: &dyn System,
+    src_roots: Vec<SystemPathBuf>,
+    venv_path: Option<SystemPathBuf>,
+) -> Result<SearchPaths> {
+    let mut search_path_settings = SearchPathSettings::new(src_roots);
+    // TODO: Consider calling `PythonEnvironment::discover` if the `venv_path` is not provided.
+    if let Some(venv_path) = venv_path {
+        let environment =
+            PythonEnvironment::new(venv_path, SysPrefixPathOrigin::PythonCliFlag, system)?;
+        search_path_settings.site_packages_paths = environment
+            .site_packages_paths(system)
+            .context("Failed to discover the site-packages directory")?
+            .into_vec();
+    }
+
+    search_path_settings
+        .to_search_paths(system, &EMPTY_VENDORED, &FallibleStrategy)
+        .context("Invalid search path settings")
 }
 
 #[salsa::db]
