@@ -7,12 +7,10 @@ use strum::IntoEnumIterator;
 use super::TypeInferenceBuilder;
 use crate::TypeQualifiers;
 use crate::types::class::{ClassLiteral, DynamicTypedDictAnchor, DynamicTypedDictLiteral};
-use crate::types::constraints::ConstraintSetBuilder;
 use crate::types::diagnostic::{
     INVALID_ARGUMENT_TYPE, INVALID_TYPE_FORM, MISSING_ARGUMENT, TOO_MANY_POSITIONAL_ARGUMENTS,
     UNKNOWN_ARGUMENT, report_mismatched_type_name,
 };
-use crate::types::generics::SpecializationBuilder;
 use crate::types::infer::builder::DeferredExpressionState;
 use crate::types::special_form::TypeQualifier;
 use crate::types::typed_dict::{
@@ -21,8 +19,8 @@ use crate::types::typed_dict::{
     validate_typed_dict_constructor, validate_typed_dict_dict_literal,
 };
 use crate::types::{
-    ClassType, IntersectionType, KnownClass, Type, TypeAndQualifiers, TypeContext,
-    TypeVarBoundOrConstraints, TypedDictModule, TypedDictType,
+    IntersectionType, KnownClass, Type, TypeAndQualifiers, TypeContext, TypedDictModule,
+    TypedDictType,
 };
 use ty_python_core::definition::Definition;
 
@@ -392,82 +390,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     })
             },
         )
-        .ok()?;
-
-        let Some(ClassType::Generic(alias)) = typed_dict.defining_class() else {
-            return Some(Type::TypedDict(typed_dict));
-        };
-
-        if !alias
-            .specialization(db)
-            .types(db)
-            .iter()
-            .any(|ty| ty.has_unspecialized_type_var(db, env))
-        {
-            return Some(Type::TypedDict(typed_dict));
-        }
-
-        let generic_context = alias.specialization(db).generic_context(db);
-        let identity_typed_dict = TypedDictType::new(alias.origin(db).identity_specialization(db));
-        let constraints = ConstraintSetBuilder::new();
-        let mut specialization_builder = SpecializationBuilder::new(
-            db,
-            env,
-            &constraints,
-            generic_context.inferable_typevars(db),
-        );
-
-        for item in items {
-            let Some(key) = item
-                .key
-                .as_ref()
-                .and_then(|key| item_types.get(&key.node_index().load()))
-                .and_then(|ty| ty.as_string_literal())
-            else {
-                return Some(Type::TypedDict(typed_dict));
-            };
-            let Some(field) = identity_typed_dict.item(db, key.value(db)) else {
-                continue;
-            };
-            let Some(value_ty) = item_types.get(&item.value.node_index().load()).copied() else {
-                continue;
-            };
-
-            if specialization_builder
-                .infer(field.declared_ty, value_ty)
-                .is_err()
-            {
-                return Some(Type::TypedDict(typed_dict));
-            }
-        }
-
-        let specialization =
-            specialization_builder.build_with(generic_context, |typevar, bounds| {
-                let bounds = bounds?;
-                let lower = bounds.lower?;
-                let promoted = lower.promote(db, env);
-
-                let violates_inferred_upper_bound = bounds.has_upper()
-                    && bounds
-                        .upper
-                        .as_single_bound(db, env)
-                        .is_none_or(|upper| !promoted.is_assignable_to(db, env, upper));
-                let violates_declared_upper_bound = matches!(
-                    typevar.typevar(db).bound_or_constraints(db, env),
-                    Some(TypeVarBoundOrConstraints::UpperBound(bound))
-                        if !promoted.is_assignable_to(db, env, bound)
-                );
-
-                if violates_inferred_upper_bound || violates_declared_upper_bound {
-                    Some(lower)
-                } else {
-                    Some(promoted)
-                }
-            });
-        let class = alias
-            .origin(db)
-            .apply_specialization(db, |_| specialization);
-        Some(Type::TypedDict(TypedDictType::new(class)))
+        .ok()
+        .map(|_| Type::TypedDict(typed_dict))
     }
 
     /// Prepare a `TypedDict` constructor call before general argument inference.

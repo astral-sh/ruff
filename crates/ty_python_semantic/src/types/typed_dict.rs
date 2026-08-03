@@ -745,7 +745,10 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 // A recursive schema can revisit itself before its fields contribute constraints.
                 // Comparing specializations directly preserves those constraints without
                 // expanding the schema.
-                return self.check_class_pair(db, defining_class, target_defining_class);
+                let nominal = self.check_class_pair(db, defining_class, target_defining_class);
+                if !nominal.is_never_satisfied(db, self.env) {
+                    return nominal;
+                }
             }
 
             // A successful nominal check avoids materializing either schema and can also break

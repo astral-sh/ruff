@@ -5778,7 +5778,14 @@ impl<'db> Type<'db> {
             return fallback_bindings();
         };
 
-        let new_method = self_type.lookup_dunder_new(db, env);
+        // TypedDict classes inherit `dict.__new__`, whose gradual `**kwargs` signature cannot
+        // constrain their type variables. Their synthesized `__init__` contains the actual field
+        // types, including generic extra items, so constructor inference should start there.
+        let new_method = if class_literal.is_typed_dict(db) {
+            None
+        } else {
+            self_type.lookup_dunder_new(db, env)
+        };
 
         let init_method_no_object = constructor_instance_ty.member_lookup_with_policy(
             db,

@@ -44,7 +44,7 @@ use crate::reachability::{ReachabilityEvaluationCache, evaluate_reachability_wit
 use crate::types::add_inferred_python_version_hint_to_diagnostic;
 use crate::types::attribute_write::{AssignmentAttributeMembers, assignment_attribute_members};
 use crate::types::call::bind::{
-    ArgumentTypeContext, CheckTypesMode, OverloadSet, requires_overload_evaluation,
+    ArgumentTypeContext, BindingError, CheckTypesMode, OverloadSet, requires_overload_evaluation,
 };
 use crate::types::call::{Binding, Bindings, CallArguments, CallError, CallErrorKind};
 use crate::types::callable::{CallableFunctionProvenance, CallableTypeKind};
@@ -8810,17 +8810,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     )
                 });
         let generic_typed_dict_constructor = generic_typed_dict_class.filter(|_| {
-            (arguments.args.is_empty()
-                || (arguments.args.len() == 1
-                    && arguments.keywords.is_empty()
-                    && !arguments.args[0].is_starred_expr()
-                    && arguments.args[0].as_dict_expr().is_none_or(|dict| {
-                        dict.items.iter().all(|item| {
-                            item.key
-                                .as_ref()
-                                .is_some_and(ast::Expr::is_string_literal_expr)
-                        })
-                    })))
+            arguments.args.is_empty()
                 && !(arguments
                     .keywords
                     .iter()
@@ -9202,6 +9192,32 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let mut bindings = match bindings_result {
             Ok(()) => bindings,
             Err(_) => {
+                let mut has_invalid_keyword_key = false;
+                if let Some(class) = generic_typed_dict_constructor {
+                    bindings.visit_type_context_callables(&mut |binding| {
+                        has_invalid_keyword_key |= binding.overloads().iter().any(|overload| {
+                            overload
+                                .errors()
+                                .iter()
+                                .any(|error| matches!(error, BindingError::InvalidKeyType { .. }))
+                        });
+                    });
+
+                    if has_invalid_keyword_key {
+                        let typed_dict = TypedDictType::new(class);
+                        validate_typed_dict_constructor(
+                            &self.context,
+                            typed_dict,
+                            arguments,
+                            func.as_ref().into(),
+                            |expr, _| self.expression_type(expr),
+                        );
+                        return callable_type
+                            .to_instance_approximation(db, env)
+                            .unwrap_or_else(Type::unknown);
+                    }
+                }
+
                 bindings.report_diagnostics(&self.context, call_expression.into());
                 return bindings.return_type(db, env);
             }
