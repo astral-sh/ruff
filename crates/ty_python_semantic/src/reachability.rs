@@ -216,7 +216,7 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use smallvec::SmallVec;
 use ty_python_core::{
     BindingWithConstraints, DeclarationWithConstraint, DeclarationsIterator, FileScopeId,
-    NarrowingEvaluator, ScopedDefinitionId, SemanticIndex, Truthiness, UseDefMap,
+    ScopedDefinitionId, SemanticIndex, Truthiness, UseDefMap,
     definition::DefinitionState,
     expression::Expression,
     narrowing_constraints::{NarrowingConstraints, ScopedNarrowingConstraint},
@@ -830,71 +830,13 @@ pub(crate) fn narrow_type_by_constraint<'db>(
     base_ty: Type<'db>,
     place: ScopedPlaceId,
 ) -> Type<'db> {
-    narrow_type_by_constraint_impl(
-        db,
-        env,
-        constraints,
-        predicates,
-        id,
-        base_ty,
-        NarrowingPolicy {
-            place,
-            ignored_attribute_absence: None,
-        },
-    )
-}
-
-/// Narrow a receiver without assuming the attribute currently being initialized is absent.
-pub(crate) fn narrow_type_by_constraint_ignoring_attribute_absence<'db>(
-    db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
-    evaluator: &NarrowingEvaluator<'_, 'db>,
-    base_ty: Type<'db>,
-    place: ScopedPlaceId,
-    attribute: &str,
-) -> Type<'db> {
-    narrow_type_by_constraint_impl(
-        db,
-        env,
-        evaluator.narrowing_constraints(),
-        evaluator.predicates(),
-        evaluator.constraint(),
-        base_ty,
-        NarrowingPolicy {
-            place,
-            ignored_attribute_absence: Some(attribute),
-        },
-    )
-}
-
-/// Controls which receiver facts may participate in narrowing one place.
-#[derive(Clone, Copy)]
-struct NarrowingPolicy<'a> {
-    place: ScopedPlaceId,
-    ignored_attribute_absence: Option<&'a str>,
-}
-
-fn narrow_type_by_constraint_impl<'db>(
-    db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
-    constraints: &NarrowingConstraints,
-    predicates: &IndexSlice<ScopedPredicateId, Predicate<'db>>,
-    id: ScopedNarrowingConstraint,
-    base_ty: Type<'db>,
-    policy: NarrowingPolicy<'_>,
-) -> Type<'db> {
     match id {
         ScopedNarrowingConstraint::ALWAYS_TRUE => return base_ty,
         ScopedNarrowingConstraint::ALWAYS_FALSE => return Type::Never,
         _ => {}
     }
 
-    let mut projector = NarrowingProjector::new(db, env, constraints, predicates, policy.place);
-    if let Some(attribute) = policy.ignored_attribute_absence
-        && !projector.has_attribute_presence(id, attribute)
-    {
-        projector = projector.ignoring_attribute_absence(Some(attribute));
-    }
+    let mut projector = NarrowingProjector::new(db, env, constraints, predicates, place);
     let projected_root = projector.project(id);
     let mut context = ProjectedNarrowingContext {
         db,
@@ -1122,7 +1064,6 @@ struct NarrowingProjector<'a, 'db> {
     constraints: &'a NarrowingConstraints,
     predicates: &'a IndexSlice<ScopedPredicateId, Predicate<'db>>,
     place: ScopedPlaceId,
-    ignored_attribute_absence: Option<&'a str>,
     project_cache: FxHashMap<ScopedNarrowingConstraint, ProjectedNarrowingNodeId>,
     graph: ProjectedNarrowingGraph<'db>,
 }
@@ -1142,48 +1083,9 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
             constraints,
             predicates,
             place,
-            ignored_attribute_absence: None,
             project_cache: FxHashMap::default(),
             graph: ProjectedNarrowingGraph::default(),
         }
-    }
-
-    fn ignoring_attribute_absence(mut self, attribute: Option<&'a str>) -> Self {
-        self.ignored_attribute_absence = attribute;
-        self
-    }
-
-    /// Keep contradictory presence and absence facts intact while inferring an initializer.
-    fn has_attribute_presence(&self, root: ScopedNarrowingConstraint, attribute: &str) -> bool {
-        let mut pending = SmallVec::<[ScopedNarrowingConstraint; 8]>::new();
-        let mut visited = FxHashSet::default();
-        pending.push(root);
-
-        while let Some(id) = pending.pop() {
-            if id.is_terminal() || !visited.insert(id) {
-                continue;
-            }
-
-            let node = self.constraints.get_interior_node(id);
-            let (positive, negative) =
-                infer_narrowing_constraints(self.db, self.predicates[node.atom], self.place);
-
-            if node.if_true != ScopedNarrowingConstraint::ALWAYS_FALSE
-                && positive
-                    .as_ref()
-                    .is_some_and(|constraint| constraint.is_attribute_presence(self.db, attribute))
-                || node.if_false != ScopedNarrowingConstraint::ALWAYS_FALSE
-                    && negative.as_ref().is_some_and(|constraint| {
-                        constraint.is_attribute_presence(self.db, attribute)
-                    })
-            {
-                return true;
-            }
-
-            pending.extend([node.if_true, node.if_uncertain, node.if_false]);
-        }
-
-        false
     }
 
     /// Returns the cached positive and negative narrowing constraints for a predicate.
@@ -1199,26 +1101,8 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
             return cached.clone();
         }
 
-        let mut constraints =
+        let constraints =
             infer_narrowing_constraints(db, self.predicates[predicate_id], self.place);
-
-        if let Some(attribute) = self.ignored_attribute_absence {
-            if constraints
-                .0
-                .as_ref()
-                .is_some_and(|constraint| constraint.is_attribute_absence(db, attribute))
-            {
-                constraints.0 = None;
-            }
-            if constraints
-                .1
-                .as_ref()
-                .is_some_and(|constraint| constraint.is_attribute_absence(db, attribute))
-            {
-                constraints.1 = None;
-            }
-        }
-
         self.graph
             .predicate_constraints_cache
             .insert(predicate_id, constraints.clone());

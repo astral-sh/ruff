@@ -803,27 +803,6 @@ pub(super) fn place_from_bindings_with_reachability_cache<'db>(
     )
 }
 
-/// Resolve a receiver while inferring an initializer for one of its attributes.
-///
-/// The fact that the attribute is absent cannot participate in its own initializer: determining
-/// whether that fact applies would require first inferring the initializer being evaluated.
-pub(super) fn place_from_bindings_with_reachability_cache_ignoring_attribute_absence<'db>(
-    db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
-    bindings_with_constraints: BindingWithConstraintsIterator<'_, 'db>,
-    reachability_cache: &ReachabilityEvaluationCache<'db>,
-    attribute: &str,
-) -> PlaceWithDefinition<'db> {
-    place_from_bindings_with_narrowing_policy(
-        db,
-        env,
-        bindings_with_constraints,
-        RequiresExplicitReExport::No,
-        Some(reachability_cache),
-        Some(attribute),
-    )
-}
-
 /// Build a declared type from a [`DeclarationsIterator`].
 ///
 /// If there is only one declaration, or all declarations declare the same type, returns
@@ -1626,24 +1605,6 @@ fn place_from_bindings_impl<'db>(
     requires_explicit_reexport: RequiresExplicitReExport,
     reachability_cache: Option<&ReachabilityEvaluationCache<'db>>,
 ) -> PlaceWithDefinition<'db> {
-    place_from_bindings_with_narrowing_policy(
-        db,
-        env,
-        bindings_with_constraints,
-        requires_explicit_reexport,
-        reachability_cache,
-        None,
-    )
-}
-
-fn place_from_bindings_with_narrowing_policy<'db>(
-    db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
-    bindings_with_constraints: BindingWithConstraintsIterator<'_, 'db>,
-    requires_explicit_reexport: RequiresExplicitReExport,
-    reachability_cache: Option<&ReachabilityEvaluationCache<'db>>,
-    ignored_attribute_absence: Option<&str>,
-) -> PlaceWithDefinition<'db> {
     let predicates = bindings_with_constraints.predicates();
     let reachability_constraints = bindings_with_constraints.reachability_constraints();
     let boundness_analysis = bindings_with_constraints.boundness_analysis();
@@ -1807,23 +1768,10 @@ fn place_from_bindings_with_narrowing_policy<'db>(
             first_definition.get_or_insert(binding);
             provenance = provenance.or(Provenance::SingleDefinition(binding));
             let binding_ty = binding_type(db, binding);
-            let ignored_attribute_absence = ignored_attribute_absence.filter(|attribute| {
-                narrowing_constraint.constraint() != ScopedNarrowingConstraint::ALWAYS_TRUE
-                    && !binding_ty.has_class_attribute_symbol_without_inference(db, env, attribute)
-            });
-            let narrowed_ty = ignored_attribute_absence.map_or_else(
-                || narrowing_constraint.narrow(db, env, binding_ty, binding.place(db)),
-                |attribute| {
-                    narrowing_constraint.narrow_ignoring_attribute_absence(
-                        db,
-                        env,
-                        binding_ty,
-                        binding.place(db),
-                        attribute,
-                    )
-                },
-            );
-            Some((narrowed_ty, static_reachability))
+            Some((
+                narrowing_constraint.narrow(db, env, binding_ty, binding.place(db)),
+                static_reachability,
+            ))
         },
     );
 

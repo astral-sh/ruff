@@ -48,7 +48,7 @@ use crate::{
             is_implicit_staticmethod,
         },
         generics::Specialization,
-        infer::{infer_implicit_attribute_initializer, infer_unpack_types},
+        infer::infer_unpack_types,
         infer_expression_type, inferred_declaration,
         known_instance::DeprecatedInstance,
         member::{Member, class_member},
@@ -65,7 +65,6 @@ use ty_python_core::{
     attribute_scopes,
     definition::{Definition, DefinitionKind, DefinitionState, TargetKind},
     place_table,
-    reachability_constraints::ScopedReachabilityConstraintId,
     scope::{Scope, ScopeId},
     semantic_index,
     symbol::Symbol,
@@ -2978,20 +2977,11 @@ impl<'db> StaticClassLiteral<'db> {
                             //
                             //     self.name = <value>
 
-                            Some(
-                                if class_table.symbol_id(name).is_some()
-                                    || attribute_assignment.reachability_constraint
-                                        == ScopedReachabilityConstraintId::ALWAYS_TRUE
-                                {
-                                    infer_expression_type(
-                                        db,
-                                        index.expression(assign.value(&module)),
-                                        TypeContext::default(),
-                                    )
-                                } else {
-                                    infer_implicit_attribute_initializer(db, binding)
-                                },
-                            )
+                            Some(infer_expression_type(
+                                db,
+                                index.expression(assign.value(&module)),
+                                TypeContext::default(),
+                            ))
                         }
                     },
                     DefinitionKind::For(for_stmt) => match for_stmt.target_kind() {

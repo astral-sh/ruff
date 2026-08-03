@@ -2078,6 +2078,39 @@ static_assert(not is_subtype_of(TypeOf[A.g], Callable[[], int]))
 static_assert(is_subtype_of(TypeOf[A.f], Callable[[A, int], int]))
 ```
 
+A bound receiver is an already-captured value, so the same inherited method bound to a subclass is a
+subtype of the method bound to its parent, not the other way around.
+
+```py
+class Child(A): ...
+
+child = Child()
+
+static_assert(is_subtype_of(TypeOf[child.f], TypeOf[a.f]))
+static_assert(not is_subtype_of(TypeOf[a.f], TypeOf[child.f]))
+```
+
+Receiver covariance must not override parameter contravariance when binding specializes `Self` to
+the receiver's class. A `Self` return remains covariant.
+
+```py
+from typing import Self
+
+class ParentWithSelf:
+    def merge(self, other: Self) -> None: ...
+    def clone(self) -> Self:
+        return self
+
+class ChildWithSelf(ParentWithSelf): ...
+
+parent_with_self = ParentWithSelf()
+child_with_self = ChildWithSelf()
+
+static_assert(not is_subtype_of(TypeOf[child_with_self.merge], TypeOf[parent_with_self.merge]))
+static_assert(not is_subtype_of(TypeOf[parent_with_self.merge], TypeOf[child_with_self.merge]))
+static_assert(is_subtype_of(TypeOf[child_with_self.clone], TypeOf[parent_with_self.clone]))
+```
+
 ### Overloads
 
 #### Subtype overloaded

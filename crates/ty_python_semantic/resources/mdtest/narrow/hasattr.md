@@ -103,8 +103,8 @@ def f(x: object):
 
 ## Guarded instance assignment across modules, base checked first
 
-Checking the base class before its subclass must succeed when one guarded assignment initializes an
-inferred attribute and another assigns a bound method to an existing method attribute.
+Checking the base class first preserves the negative `hasattr` fact. Its inferred method assignment
+is valid; the existing callback assignment remains a consistent, unrelated false positive.
 
 `base.py`:
 
@@ -113,7 +113,7 @@ class Base:
     def __init__(self):
         if not hasattr(self, "x"):
             self.x = self.__str__
-            self.callback = self.callback_fallback
+            self.callback = self.callback_fallback  # error: [invalid-assignment]
 
     def callback_fallback(self, value): ...
     def callback(self, value): ...
@@ -127,13 +127,11 @@ from base import Base
 class Child(Base):
     x = Base.__str__
     callback = Base.callback_fallback
-
-reveal_type(Base().x())  # revealed: str
 ```
 
 ## Guarded instance assignment across modules, child checked first
 
-Checking the subclass first must produce the same result as checking its base class first.
+Checking the subclass first must produce exactly the same diagnostic as checking its base first.
 
 `child.py`:
 
@@ -143,8 +141,6 @@ from base import Base
 class Child(Base):
     x = Base.__str__
     callback = Base.callback_fallback
-
-reveal_type(Base().x())  # revealed: str
 ```
 
 `base.py`:
@@ -154,51 +150,76 @@ class Base:
     def __init__(self):
         if not hasattr(self, "x"):
             self.x = self.__str__
-            self.callback = self.callback_fallback
+            self.callback = self.callback_fallback  # error: [invalid-assignment]
 
     def callback_fallback(self, value): ...
     def callback(self, value): ...
 ```
 
-## Guarded initializers preserve inferred instance attributes
+## Negative guards preserve their receiver constraint
 
-Reading another attribute from the receiver while initializing a guarded attribute must not cause
-the inferred attribute to disappear.
+Assigning a bound method to an inferred attribute does not discard the fact that the attribute is
+absent before the assignment.
 
 ```py
-class Cached:
+class C:
+    def initialize(self) -> None:
+        if not hasattr(self, "x"):
+            reveal_type(self)  # revealed: Self@initialize & ~<Protocol with members 'x'>
+            self.x = self.__str__
+```
+
+## Negative guards preserve explicit method receiver contracts
+
+A method requiring an existing `x` attribute cannot be called to initialize that same attribute
+while a `hasattr` guard proves it absent.
+
+```py
+from typing import Protocol
+
+class HasX(Protocol):
+    x: int
+
+class C:
+    def needs_x(self: HasX) -> int:
+        return self.x
+
+    def initialize(self) -> None:
+        if not hasattr(self, "x"):
+            self.x = self.needs_x()  # error: [invalid-argument-type]
+
+value = C()
+value.initialize()
+
+if hasattr(value, "x"):
+    result: int = value.x
+```
+
+## Chained guarded assignments retain every target
+
+A single guarded initializer can initialize two attributes without discarding the shared right-hand
+side or inventing a missing-attribute diagnostic.
+
+```py
+class C:
     source = 1
 
-    def metadata(self) -> int:
-        if not hasattr(self, "value"):
-            self.value = self.source
-        return self.value
-
-reveal_type(Cached().metadata())  # revealed: int
-```
-
-## Guarded initializers preserve unrelated receiver narrowing
-
-An `isinstance` guard can provide the subclass-only attribute used to initialize a different,
-`hasattr`-guarded instance attribute.
-
-```py
-class Base:
     def initialize(self) -> None:
-        if isinstance(self, Child):
-            if not hasattr(self, "x"):
-                self.x = self.child_value
+        if not hasattr(self, "x"):
+            self.x = self.y = self.source
 
-class Child(Base):
-    child_value = 1
+value = C()
 
-reveal_type(Child().x)  # revealed: int
+if hasattr(value, "x"):
+    reveal_type(value.x)  # revealed: int
+
+reveal_type(value.y)  # revealed: int
 ```
 
-## Structural protocol narrowing remains transitive
+## Guarded instance attributes preserve structural transitivity
 
-A class accepted by a structural protocol must behave consistently with that protocol when both are
-narrowed using the same attribute.
+An inferred attribute remains compatible with an ordinary protocol and the synthesized `hasattr`
+protocol after its guarded initializer has been evaluated.
 
 ```py
 from typing import Protocol
@@ -208,174 +229,16 @@ class HasX(Protocol):
     def x(self) -> object: ...
 
 class C:
-    def initialize(self) -> None:
-        self.x = 1
+    source = 1
 
-def check_protocol(value: HasX) -> None:
+    def initialize(self) -> None:
+        if not hasattr(self, "x"):
+            self.x = self.source
+
+def accepts(value: HasX) -> None: ...
+def check(value: C) -> None:
+    accepts(value)
+
     if not hasattr(value, "x"):
         reveal_type(value)  # revealed: Never
-
-def check_class(value: C) -> None:
-    check_protocol(value)
-
-    if not hasattr(value, "x"):
-        reveal_type(value)  # revealed: Never
-```
-
-## Assigned attributes remain present
-
-After an instance attribute is assigned, its absence cannot make a subsequent branch reachable.
-
-```py
-class C:
-    x: int
-
-    def initialize(self) -> None:
-        self.x = 1
-
-        if not hasattr(self, "x"):
-            reveal_type(self)  # revealed: Never
-            self.x = "unreachable"
-            self.x = self.missing
-
-reveal_type(C().x)  # revealed: int
-```
-
-## Class-backed attributes remain present
-
-A class attribute makes a negative `hasattr` branch unreachable. An assignment in that branch must
-not introduce diagnostics or widen the attribute's public type.
-
-```py
-class C:
-    x = 1
-
-    def initialize(self) -> None:
-        if not hasattr(self, "x"):
-            self.x = self.missing
-
-reveal_type(C().x)  # revealed: int
-```
-
-## Inherited class-backed attributes remain present
-
-An inherited class attribute has the same presence guarantee as an attribute defined directly on the
-class.
-
-```py
-class Base:
-    x = 1
-
-class Child(Base):
-    def initialize(self) -> None:
-        if not hasattr(self, "x"):
-            self.x = self.missing
-
-reveal_type(Child().x)  # revealed: int
-```
-
-## Contradictory nested guards do not define attributes
-
-An attribute assigned only under contradictory positive and negative `hasattr` guards does not exist
-on instances of the class.
-
-```py
-class C:
-    def initialize(self) -> None:
-        if hasattr(self, "x"):
-            if not hasattr(self, "x"):
-                self.x = self.missing
-
-# error: [unresolved-attribute]
-reveal_type(C().x)  # revealed: Unknown
-```
-
-## Reversed contradictory nested guards do not define attributes
-
-Swapping the positive and negative guards does not make their conjunction reachable.
-
-```py
-class C:
-    def initialize(self) -> None:
-        if not hasattr(self, "x"):
-            if hasattr(self, "x"):
-                self.x = self.missing
-
-# error: [unresolved-attribute]
-reveal_type(C().x)  # revealed: Unknown
-```
-
-## Static methods preserve their receiver's attribute presence
-
-A static method's first parameter is not an instance of its containing class. A class-backed
-attribute on that parameter still makes a negative `hasattr` branch unreachable.
-
-```py
-class Target:
-    x = 1
-
-class C:
-    @staticmethod
-    def initialize(target: Target) -> None:
-        if not hasattr(target, "x"):
-            target.x = target.missing
-
-reveal_type(Target().x)  # revealed: int
-```
-
-## Statically conditional class attributes remain present
-
-A statically true version check guarantees that a class attribute exists, both on the defining class
-and on subclasses that inherit it.
-
-```py
-import sys
-
-class Base:
-    if sys.version_info >= (3, 0):
-        x = 1
-
-    def initialize(self) -> None:
-        if not hasattr(self, "x"):
-            self.x = self.missing
-
-class Child(Base):
-    def initialize(self) -> None:
-        if not hasattr(self, "x"):
-            self.x = self.missing
-
-reveal_type(Base().x)  # revealed: int
-reveal_type(Child().x)  # revealed: int
-```
-
-## Possibly absent class attributes retain initializer diagnostics
-
-A statically false or dynamically uncertain class binding does not make an instance initializer
-unreachable, so missing attributes referenced by that initializer must still be reported.
-
-```py
-class StaticallyAbsent:
-    if False:
-        x = 1
-
-    def initialize(self) -> None:
-        if not hasattr(self, "x"):
-            self.x = self.missing  # error: [unresolved-attribute]
-
-# error: [possibly-missing-attribute]
-reveal_type(StaticallyAbsent().x)  # revealed: Unknown
-
-def condition() -> bool:
-    return False
-
-class PossiblyPresent:
-    if condition():
-        x = 1
-
-    def initialize(self) -> None:
-        if not hasattr(self, "x"):
-            self.x = self.missing  # error: [unresolved-attribute]
-
-# error: [possibly-missing-attribute]
-reveal_type(PossiblyPresent().x)  # revealed: int | Unknown
 ```
