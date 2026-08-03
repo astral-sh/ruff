@@ -1567,17 +1567,11 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         let kind = definition.kind(self.db);
         let is_loop_header = kind.is_loop_header();
         let category = kind.category(self.source_type.is_stub(), self.module);
-        let is_name_dependency_root = matches!(
-            kind,
-            DefinitionKind::NamedExpression(_)
-                | DefinitionKind::Assignment(_)
-                | DefinitionKind::AnnotatedAssignment(_)
-                | DefinitionKind::AugmentedAssignment(_)
-        );
-        let name_dependencies = if place.is_symbol() && is_name_dependency_root {
-            self.name_dependencies(kind)
+        let definition_id = self.current_use_def_map().next_definition_id();
+        let name_dependencies = if place.is_symbol() {
+            self.name_dependencies(kind, definition_id)
         } else {
-            SmallVec::new()
+            None
         };
 
         // We need to avoid marking places as bound as soon as we encounter a loop header
@@ -1596,7 +1590,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             self.mark_place_declared(place);
         }
 
-        let definition_id = self.current_use_def_map().next_definition_id();
         let use_def = self.current_use_def_map_mut();
         match category {
             DefinitionCategory::DeclarationAndBinding => {
@@ -1622,12 +1615,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             }
         }
 
-        if place.is_symbol() {
-            self.current_use_def_map_mut().record_name_dependencies(
-                definition,
-                name_dependencies,
-                is_name_dependency_root,
-            );
+        if let Some(name_dependencies) = name_dependencies {
+            self.current_use_def_map_mut()
+                .record_name_dependencies(definition, name_dependencies);
         }
 
         if category.is_binding()
@@ -1643,48 +1633,68 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     }
 
     /// Returns prior ordinary variable definitions used by eager value expressions.
-    fn name_dependencies(&mut self, kind: &DefinitionKind<'db>) -> SmallVec<[Definition<'db>; 2]> {
+    ///
+    /// Returns `None` if inference could follow a synthetic or forward binding. Such a definition
+    /// must be left to source-order inference instead of being moved by dependency sorting.
+    fn name_dependencies(
+        &self,
+        kind: &DefinitionKind<'db>,
+        definition_id: ScopedDefinitionId,
+    ) -> Option<SmallVec<[Definition<'db>; 2]>> {
         let mut dependencies = SmallVec::new();
 
-        match kind {
+        let is_safe = match kind {
             DefinitionKind::NamedExpression(named) => {
                 let named = named.node(self.module);
                 if named.target.is_name_expr() {
-                    self.extend_name_dependencies(&named.value, &mut dependencies);
+                    self.extend_name_dependencies(&named.value, definition_id, &mut dependencies)
+                } else {
+                    false
                 }
             }
             DefinitionKind::Assignment(assignment)
                 if assignment.unpack().is_none()
                     && assignment.target(self.module).is_name_expr() =>
             {
-                self.extend_name_dependencies(assignment.value(self.module), &mut dependencies);
+                self.extend_name_dependencies(
+                    assignment.value(self.module),
+                    definition_id,
+                    &mut dependencies,
+                )
             }
             DefinitionKind::AnnotatedAssignment(assignment)
                 if assignment.target(self.module).is_name_expr() =>
             {
                 if let Some(value) = assignment.value(self.module) {
-                    self.extend_name_dependencies(value, &mut dependencies);
+                    self.extend_name_dependencies(value, definition_id, &mut dependencies)
+                } else {
+                    false
                 }
             }
             DefinitionKind::AugmentedAssignment(assignment)
                 if assignment.node(self.module).target.is_name_expr() =>
             {
                 let assignment = assignment.node(self.module);
-                self.extend_name_dependencies(&assignment.target, &mut dependencies);
-                self.extend_name_dependencies(&assignment.value, &mut dependencies);
+                self.extend_name_dependencies(&assignment.target, definition_id, &mut dependencies)
+                    && self.extend_name_dependencies(
+                        &assignment.value,
+                        definition_id,
+                        &mut dependencies,
+                    )
             }
-            _ => {}
-        }
+            _ => false,
+        };
 
-        dependencies
+        is_safe.then_some(dependencies)
     }
 
     fn extend_name_dependencies(
         &self,
         expression: &ast::Expr,
+        definition_id: ScopedDefinitionId,
         dependencies: &mut SmallVec<[Definition<'db>; 2]>,
-    ) {
-        any_over_expr(expression, |expression| {
+    ) -> bool {
+        !any_over_expr(expression, |expression| {
             if !expression.is_name_expr() {
                 return false;
             }
@@ -1693,39 +1703,53 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 return false;
             };
 
-            self.extend_live_binding_dependencies(
+            !self.extend_live_binding_dependencies(
                 self.current_use_def_map().bindings_at_use(use_id).copied(),
+                definition_id,
                 dependencies,
-            );
-
-            false
-        });
+            )
+        })
     }
 
     fn extend_live_binding_dependencies(
         &self,
         live_bindings: impl IntoIterator<Item = LiveBinding>,
+        definition_id: ScopedDefinitionId,
         dependencies: &mut SmallVec<[Definition<'db>; 2]>,
-    ) {
+    ) -> bool {
         for live_binding in live_bindings {
+            let binding_id = live_binding.binding();
             let Some(dependency) = self
                 .current_use_def_map()
-                .definition(live_binding.binding())
+                .definition(binding_id)
                 .definition()
             else {
                 continue;
             };
-            if matches!(
+            let is_ordinary_variable = matches!(
                 dependency.kind(self.db),
                 DefinitionKind::NamedExpression(_)
                     | DefinitionKind::Assignment(_)
                     | DefinitionKind::AnnotatedAssignment(_)
                     | DefinitionKind::AugmentedAssignment(_)
-            ) && !dependencies.contains(&dependency)
+            );
+
+            if binding_id >= definition_id
+                || !dependency.kind(self.db).is_user_visible()
+                || (is_ordinary_variable
+                    && !self
+                        .current_use_def_map()
+                        .is_name_dependency_eligible(dependency))
             {
+                return false;
+            }
+
+            if is_ordinary_variable && !dependencies.contains(&dependency) {
                 dependencies.push(dependency);
             }
         }
+
+        true
     }
 
     // Creates a definition for each key-value assignment in the dictionary.

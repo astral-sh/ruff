@@ -1869,6 +1869,9 @@ pub(super) struct UseDefMapBuilder<'db> {
     /// Ordinary variable definitions that have entries in `name_dependencies`.
     name_dependency_roots: FxHashSet<Definition<'db>>,
 
+    /// Ordinary variable definitions that are safe to infer before their source-order visit.
+    name_dependency_eligible: FxHashSet<Definition<'db>>,
+
     /// Currently live bindings and declarations for each place.
     symbol_states: IndexVec<ScopedSymbolId, PendingPlaceState>,
 
@@ -1909,6 +1912,7 @@ impl<'db> UseDefMapBuilder<'db> {
             definitions_by_definition: FxHashMap::default(),
             name_dependencies: FxHashMap::default(),
             name_dependency_roots: FxHashSet::default(),
+            name_dependency_eligible: FxHashSet::default(),
             symbol_states: IndexVec::new(),
             member_states: IndexVec::new(),
             pending_reachability: PendingReachability::default(),
@@ -1939,21 +1943,24 @@ impl<'db> UseDefMapBuilder<'db> {
         self.all_definitions[def_id]
     }
 
-    /// Records the ordinary variable definitions directly referenced by `binding`.
+    /// Marks `binding` as eligible for dependency sorting and records its direct dependencies.
     pub(super) fn record_name_dependencies(
         &mut self,
         binding: Definition<'db>,
         dependencies: impl IntoIterator<Item = Definition<'db>>,
-        is_root: bool,
     ) {
+        self.name_dependency_eligible.insert(binding);
         let dependencies = dependencies.into_iter().collect::<Vec<_>>();
         if !dependencies.is_empty() {
             self.name_dependencies
                 .insert(binding, dependencies.into_boxed_slice());
-            if is_root {
-                self.name_dependency_roots.insert(binding);
-            }
+            self.name_dependency_roots.insert(binding);
         }
+    }
+
+    /// Returns whether `definition` can be moved before its source-order inference.
+    pub(super) fn is_name_dependency_eligible(&self, definition: Definition<'db>) -> bool {
+        self.name_dependency_eligible.contains(&definition)
     }
 
     pub(super) fn mark_unreachable(&mut self) {
