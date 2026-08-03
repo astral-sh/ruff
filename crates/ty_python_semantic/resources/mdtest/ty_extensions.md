@@ -91,8 +91,8 @@ The `Unknown` type is a special type that we use to represent actually unknown t
 annotation), as opposed to `Any` which represents an explicitly unknown type.
 
 ```py
-from ty_extensions import Unknown, static_assert
-from ty_extensions._internal import is_assignable_to, reveal_mro
+from ty_extensions import static_assert
+from ty_extensions._internal import Unknown, is_assignable_to, reveal_mro
 
 static_assert(is_assignable_to(Unknown, int))
 static_assert(is_assignable_to(int, Unknown))
@@ -111,7 +111,7 @@ class C(Unknown): ...
 # revealed: (<class 'C'>, Unknown, <class 'object'>)
 reveal_mro(C)
 
-# error: "Special form `ty_extensions.Unknown` expected no type parameter"
+# error: "Special form `ty_extensions._internal.Unknown` expected no type parameter"
 u: Unknown[str]
 ```
 

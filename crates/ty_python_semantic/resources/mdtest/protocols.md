@@ -5685,7 +5685,7 @@ python-version = "3.12"
 ```py
 from typing import Protocol, cast
 
-from ty_extensions import Unknown
+from ty_extensions._internal import Unknown
 
 class UnknownMethod[T](Protocol):
     def method(self) -> Unknown: ...
@@ -5700,7 +5700,7 @@ checked.
 ```py
 from typing import Protocol, cast
 
-from ty_extensions import Unknown
+from ty_extensions._internal import Unknown
 
 class IntProperty[T](Protocol):
     @property
@@ -5723,7 +5723,7 @@ has been replaced by `int`, so the cast is redundant.
 ```py
 from typing import Protocol, TypeVar, cast
 
-from ty_extensions import Unknown
+from ty_extensions._internal import Unknown
 
 T = TypeVar("T", bound=Unknown)
 
@@ -5776,7 +5776,7 @@ example, descriptor overload resolution exposes `Unknown` only through the neste
 ```py
 from typing import Protocol, cast, overload
 
-from ty_extensions import Unknown
+from ty_extensions._internal import Unknown
 
 class Descriptor:
     @overload

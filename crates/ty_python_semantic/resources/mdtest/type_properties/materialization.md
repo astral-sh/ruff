@@ -29,7 +29,8 @@ The dynamic type at the top-level is replaced with `object`.
 
 ```py
 from typing import Any, Callable
-from ty_extensions import Unknown, Top
+from ty_extensions import Top
+from ty_extensions._internal import Unknown
 
 def _(top_any: Top[Any], top_unknown: Top[Unknown]):
     reveal_type(top_any)  # revealed: object
@@ -56,7 +57,8 @@ The dynamic type at the top-level is replaced with `Never`.
 
 ```py
 from typing import Any, Callable
-from ty_extensions import Unknown, Bottom
+from ty_extensions import Bottom
+from ty_extensions._internal import Unknown
 
 def _(bottom_any: Bottom[Any], bottom_unknown: Bottom[Unknown]):
     reveal_type(bottom_any)  # revealed: Never
@@ -150,8 +152,8 @@ python-version = "3.12"
 
 ```py
 from typing import Any, Callable
-from ty_extensions import Unknown, Bottom, Top
-from ty_extensions._internal import TypeOf
+from ty_extensions import Bottom, Top
+from ty_extensions._internal import Unknown, TypeOf
 
 type C1 = Callable[[Any, Unknown], Any]
 
@@ -288,8 +290,8 @@ python-version = "3.12"
 
 ```py
 from typing import Any, Never
-from ty_extensions import Unknown, Bottom, Top, static_assert
-from ty_extensions._internal import is_equivalent_to
+from ty_extensions import Bottom, Top, static_assert
+from ty_extensions._internal import Unknown, is_equivalent_to
 
 static_assert(is_equivalent_to(Top[tuple[Any, int]], tuple[object, int]))
 static_assert(is_equivalent_to(Bottom[tuple[Any, int]], Never))
@@ -351,8 +353,8 @@ python-version = "3.12"
 
 ```py
 from typing import Any
-from ty_extensions import Unknown, Bottom, Top, static_assert
-from ty_extensions._internal import is_equivalent_to
+from ty_extensions import Bottom, Top, static_assert
+from ty_extensions._internal import Unknown, is_equivalent_to
 
 static_assert(is_equivalent_to(Top[Any | int], object))
 static_assert(is_equivalent_to(Bottom[Any | int], int))
@@ -404,8 +406,8 @@ All positions in an intersection are covariant.
 ```pyi
 from typing import Any
 from typing_extensions import Never
-from ty_extensions import Unknown, Bottom, Top, static_assert
-from ty_extensions._internal import is_equivalent_to
+from ty_extensions import Bottom, Top, static_assert
+from ty_extensions._internal import Unknown, is_equivalent_to
 
 static_assert(is_equivalent_to(Top[Any & int], int))
 static_assert(is_equivalent_to(Bottom[Any & int], Never))
@@ -460,8 +462,8 @@ All positions in a negation are contravariant.
 ```pyi
 from typing import Any
 from typing_extensions import Never
-from ty_extensions import Unknown, Bottom, Top, static_assert
-from ty_extensions._internal import is_equivalent_to
+from ty_extensions import Bottom, Top, static_assert
+from ty_extensions._internal import Unknown, is_equivalent_to
 
 # ~Any is still Any, so the top materialization is object
 static_assert(is_equivalent_to(Top[~Any], object))
@@ -483,8 +485,8 @@ python-version = "3.12"
 ```py
 from typing import Any
 from typing_extensions import Never
-from ty_extensions import Unknown, Bottom, Top, static_assert
-from ty_extensions._internal import is_equivalent_to
+from ty_extensions import Bottom, Top, static_assert
+from ty_extensions._internal import Unknown, is_equivalent_to
 
 static_assert(is_equivalent_to(Top[type[Any]], type))
 static_assert(is_equivalent_to(Bottom[type[Any]], Never))
@@ -575,8 +577,8 @@ python-version = "3.12"
 
 ```py
 from typing import Any, Never, TypeVar
-from ty_extensions import Unknown, Bottom, Top, static_assert
-from ty_extensions._internal import is_subtype_of
+from ty_extensions import Bottom, Top, static_assert
+from ty_extensions._internal import Unknown, is_subtype_of
 
 def bounded_by_gradual[T: Any](t: T) -> None:
     # Top materialization of `T: Any` is `T: object`

@@ -727,7 +727,8 @@ simplified, due to the fact that a `LiteralString` inhabitant is known to have `
 exactly `str` (and not a subclass of `str`):
 
 ```py
-from ty_extensions import AlwaysTruthy, AlwaysFalsy, Unknown
+from ty_extensions import AlwaysTruthy, AlwaysFalsy
+from ty_extensions._internal import Unknown
 from typing_extensions import LiteralString
 
 def f(
@@ -826,7 +827,8 @@ This slightly strange-looking test is a regression test for a mistake that was n
 <https://github.com/astral-sh/ruff/pull/15475#discussion_r1915041987>.
 
 ```py
-from ty_extensions import AlwaysFalsy, Unknown
+from ty_extensions import AlwaysFalsy
+from ty_extensions._internal import Unknown
 from typing_extensions import Literal
 
 def _(x: str & Unknown & AlwaysFalsy & Literal[""]):
@@ -842,7 +844,7 @@ is still an unknown set of runtime values, so `~Any` is equivalent to `Any`. We 
 simplify `~Any` to `Any` in intersections. The same applies to `Unknown`.
 
 ```py
-from ty_extensions import Unknown
+from ty_extensions._internal import Unknown
 from typing_extensions import Any, Never
 
 class P: ...
@@ -872,7 +874,7 @@ The intersection of an unknown set of runtime values with (another) unknown set 
 still an unknown set of runtime values:
 
 ```py
-from ty_extensions import Unknown
+from ty_extensions._internal import Unknown
 from typing_extensions import Any
 
 class P: ...
@@ -907,7 +909,7 @@ of another unknown set of values is not necessarily empty, so we keep the positi
 
 ```py
 from typing import Any
-from ty_extensions import Unknown
+from ty_extensions._internal import Unknown
 
 def any(
     i1: Any & ~Any,
@@ -930,7 +932,7 @@ Gradually-equivalent types can be simplified out of intersections:
 
 ```py
 from typing import Any
-from ty_extensions import Unknown
+from ty_extensions._internal import Unknown
 
 def mixed(
     i1: Any & Unknown,
@@ -1349,7 +1351,7 @@ For any gradual type `G`, `Invariant[G] & Invariant[Any] = Invariant[G]`.
 
 ```py
 from typing import Any
-from ty_extensions import Unknown
+from ty_extensions._internal import Unknown
 
 class P: ...
 class Q: ...

@@ -75,7 +75,7 @@ pub enum SpecialFormType {
     NoReturn,
     /// The symbol `typing.Never` available since 3.11 (which can also be found as `typing_extensions.Never`)
     Never,
-    /// The symbol `ty_extensions.Unknown`
+    /// The symbol `ty_extensions._internal.Unknown`
     Unknown,
     /// The symbol `ty_extensions._internal.Divergent`
     Divergent,
@@ -559,15 +559,15 @@ impl SpecialFormType {
                 matches!(module, KnownModule::Typing | KnownModule::TypingExtensions)
             }
 
-            Self::Unknown
-            | Self::AlwaysTruthy
+            Self::AlwaysTruthy
             | Self::AlwaysFalsy
             | Self::Not
             | Self::Top
             | Self::Bottom
             | Self::Intersection => module.is_ty_extensions(),
 
-            Self::Divergent
+            Self::Unknown
+            | Self::Divergent
             | Self::Todo
             | Self::TypeOf
             | Self::CallableTypeOf
@@ -786,15 +786,15 @@ impl SpecialFormType {
 
             SpecialFormType::CollectionsAbcCallable => &[KnownModule::CollectionsAbc],
 
-            SpecialFormType::Unknown
-            | SpecialFormType::AlwaysTruthy
+            SpecialFormType::AlwaysTruthy
             | SpecialFormType::AlwaysFalsy
             | SpecialFormType::Not
             | SpecialFormType::Intersection
             | SpecialFormType::Top
             | SpecialFormType::Bottom => &[KnownModule::TyExtensions],
 
-            SpecialFormType::Divergent
+            SpecialFormType::Unknown
+            | SpecialFormType::Divergent
             | SpecialFormType::Todo
             | SpecialFormType::TypeOf
             | SpecialFormType::CallableTypeOf

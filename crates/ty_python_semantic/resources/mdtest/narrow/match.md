@@ -365,7 +365,7 @@ a fixed-length tuple, we can determine exactly which elements appear in that lis
 
 ```py
 from typing import Any, Literal, TypeVar
-from ty_extensions import Unknown
+from ty_extensions._internal import Unknown
 
 BoundTupleT = TypeVar("BoundTupleT", bound=tuple[int] | tuple[str])
 
@@ -1444,7 +1444,7 @@ declared by the pattern class.
 
 ```py
 from typing import Any
-from ty_extensions import Unknown
+from ty_extensions._internal import Unknown
 
 class GradualPatternBox:
     value: int
@@ -1613,7 +1613,7 @@ keep the same uncertainty as the subject.
 
 ```py
 from typing import Any
-from ty_extensions import Unknown
+from ty_extensions._internal import Unknown
 
 def test_match_gradual_mapping_captures(any_value: Any, unknown_value: Unknown) -> None:
     match any_value:
@@ -1736,7 +1736,7 @@ also keeps the uncertainty of an `Any` or `Unknown` subject.
 ```py
 from typing import Any, Generic, Literal, TypeVar, final
 from typing_extensions import TypedDict
-from ty_extensions import Unknown
+from ty_extensions._internal import Unknown
 
 TagT = TypeVar("TagT")
 PayloadT = TypeVar("PayloadT")
@@ -1948,7 +1948,8 @@ exercise three separate checks: an optional field, an unknown key, and a non-str
 
 ```py
 from typing import Any, Literal, Protocol, TypeVar, TypedDict
-from ty_extensions import Intersection, Unknown
+from ty_extensions import Intersection
+from ty_extensions._internal import Unknown
 
 class RequiredPayload(TypedDict):
     tag: Literal["int"]
@@ -3116,7 +3117,7 @@ python-version = "3.11"
 ```py
 from enum import Enum, IntEnum, StrEnum, auto
 from typing import Literal, assert_never
-from ty_extensions import Unknown
+from ty_extensions._internal import Unknown
 
 class Color(StrEnum):
     RED = "r"

@@ -898,7 +898,7 @@ mod tests {
         LL | a: "MyClass |" = 1
            |    ^^^^^^^^^^^ Clicking here
         info: Found 1 type definition
-          --> stdlib/ty_extensions/__init__.pyi:LL:1
+          --> stdlib/ty_extensions/_internal.pyi:LL:1
            |
         LL | Unknown: _SpecialForm
            | -------
@@ -948,7 +948,7 @@ mod tests {
         LL | a: "MyClass | No" = 1
            |               ^^ Clicking here
         info: Found 1 type definition
-          --> stdlib/ty_extensions/__init__.pyi:LL:1
+          --> stdlib/ty_extensions/_internal.pyi:LL:1
            |
         LL | Unknown: _SpecialForm
            | -------
@@ -970,7 +970,7 @@ mod tests {
         LL | ab: "ab"
            |      ^^ Clicking here
         info: Found 1 type definition
-          --> stdlib/ty_extensions/__init__.pyi:LL:1
+          --> stdlib/ty_extensions/_internal.pyi:LL:1
            |
         LL | Unknown: _SpecialForm
            | -------
@@ -992,7 +992,7 @@ mod tests {
         LL | x: "foobar"
            |     ^^^^^^ Clicking here
         info: Found 1 type definition
-          --> stdlib/ty_extensions/__init__.pyi:LL:1
+          --> stdlib/ty_extensions/_internal.pyi:LL:1
            |
         LL | Unknown: _SpecialForm
            | -------
@@ -1142,7 +1142,7 @@ mod tests {
         LL | x: """'list["MyClass" | "str"]' | None"""
            |             ^^^^^^^^^ Clicking here
         info: Found 1 type definition
-          --> stdlib/ty_extensions/__init__.pyi:LL:1
+          --> stdlib/ty_extensions/_internal.pyi:LL:1
            |
         LL | Unknown: _SpecialForm
            | -------
@@ -1902,7 +1902,7 @@ def function():
         LL | x = submod
            |     ^^^^^^ Clicking here
         info: Found 1 type definition
-          --> stdlib/ty_extensions/__init__.pyi:LL:1
+          --> stdlib/ty_extensions/_internal.pyi:LL:1
            |
         LL | Unknown: _SpecialForm
            | -------
