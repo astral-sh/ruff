@@ -1064,7 +1064,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             let mut seen_overloaded_places = FxHashSet::default();
             let mut seen_public_functions = FxHashSet::default();
 
-            for (&definition, ty_and_quals) in self.declarations.iter() {
+            for (&definition, ty_and_quals) in &self.declarations {
                 let ty = ty_and_quals.inner_type();
                 match definition.kind(self.db()) {
                     DefinitionKind::Function(function) => {
@@ -11830,8 +11830,10 @@ impl<K, V> VecMap<K, V> {
         self.0.is_empty()
     }
 
-    fn iter(&self) -> impl ExactSizeIterator<Item = (&K, &V)> {
-        self.0.iter().map(|(key, value)| (key, value))
+    fn iter(&self) -> VecMapIterator<'_, K, V> {
+        VecMapIterator {
+            inner: self.0.iter(),
+        }
     }
 
     fn into_boxed_slice(self) -> Box<[(K, V)]> {
@@ -11873,6 +11875,35 @@ where
 impl<K, V> Default for VecMap<K, V> {
     fn default() -> Self {
         Self(Vec::default())
+    }
+}
+
+impl<'a, K, V> IntoIterator for &'a VecMap<K, V> {
+    type Item = (&'a K, &'a V);
+    type IntoIter = VecMapIterator<'a, K, V>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
+    }
+}
+
+struct VecMapIterator<'a, K, V> {
+    inner: std::slice::Iter<'a, (K, V)>,
+}
+
+impl<'a, K, V> Iterator for VecMapIterator<'a, K, V> {
+    type Item = (&'a K, &'a V);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next().map(|(k, v)| (k, v))
+    }
+}
+
+impl<K, V> std::iter::FusedIterator for VecMapIterator<'_, K, V> {}
+
+impl<K, V> ExactSizeIterator for VecMapIterator<'_, K, V> {
+    fn len(&self) -> usize {
+        self.inner.len()
     }
 }
 
