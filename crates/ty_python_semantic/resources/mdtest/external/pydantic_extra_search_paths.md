@@ -7,7 +7,7 @@ path, such as when its `site-packages` directory is included in `PYTHONPATH`.
 [environment]
 python-version = "3.11"
 python-platform = "linux"
-extra-paths = ["/.venv/lib/python3.11/site-packages"]
+extra-paths = ["/.venv/<path-to-site-packages>"]
 
 [project]
 dependencies = ["pydantic==2.13.4"]
