@@ -797,9 +797,6 @@ impl<'db> Signature<'db> {
             .as_ref()
             .map(|returns| function_signature_expression_type(db, definition, returns.as_ref()))
             .unwrap_or_else(Type::unknown);
-        let env = ProgramEnvironment::from_definition(definition);
-        let (parameters, return_ty) =
-            Self::align_paramspec_component_bindings(db, &env, definition, parameters, return_ty);
         let legacy_generic_context =
             GenericContext::from_function_params(db, definition, &parameters, return_ty);
         let full_generic_context = GenericContext::merge_pep695_and_legacy(
@@ -834,58 +831,10 @@ impl<'db> Signature<'db> {
         }
     }
 
-    /// Makes ordinary occurrences of a `ParamSpec` use the binding selected by its components.
-    ///
-    /// Parameter and return annotations are inferred independently. If `P.args` and `P.kwargs`
-    /// resolve to an enclosing lexical binding that is absent from the enclosing function's
-    /// public signature, an ordinary `P` initially binds to the current function. Components are
-    /// references, so their existing binding takes precedence throughout the completed signature.
-    ///
-    /// For example, every occurrence of `P` in `inner` must refer to the binding from `factory`:
-    ///
-    /// ```python
-    /// from typing import Callable, ParamSpec
-    ///
-    /// P = ParamSpec("P")
-    ///
-    /// def factory() -> Callable[P, int]:
-    ///     def inner(callback: Callable[P, int], *args: P.args, **kwargs: P.kwargs) -> int:
-    ///         return callback(*args, **kwargs)
-    ///     return inner
-    /// ```
-    fn align_paramspec_component_bindings(
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        definition: Definition<'db>,
-        mut parameters: Parameters<'db>,
-        mut return_ty: Type<'db>,
-    ) -> (Parameters<'db>, Type<'db>) {
-        let component_bindings: FxOrderSet<_> =
-            parameters.paramspec_component_bindings(db).collect();
-
-        for component_binding in component_bindings {
-            let current_binding = component_binding
-                .typevar(db)
-                .with_binding_context(db, definition);
-            if current_binding == component_binding {
-                continue;
-            }
-
-            let mapping = TypeMapping::ApplySpecialization(ApplySpecialization::Single(
-                current_binding,
-                Type::TypeVar(component_binding),
-            ));
-            let visitor = ApplyTypeMappingVisitor::new(env);
-            parameters =
-                parameters.apply_type_mapping_impl(db, &mapping, TypeContext::default(), &visitor);
-            return_ty =
-                return_ty.apply_type_mapping_impl(db, &mapping, TypeContext::default(), &visitor);
-        }
-
-        (parameters, return_ty)
-    }
-
     /// Returns the binding referenced by a direct `P.args` or `P.kwargs` variadic parameter.
+    ///
+    /// Returns `None` if this signature has no `ParamSpec` component parameters, or if none of
+    /// their `ParamSpec`s has the same identity as `typevar`.
     ///
     /// This also exposes captured bindings that are intentionally absent from the function's own
     /// generic context.

@@ -406,7 +406,7 @@ function is not sufficient. A generic outer class does not make its `ParamSpec` 
 nested class boundary.
 
 ```py
-# error: [unbound-type-variable] "ParamSpec `P` is not in scope"
+# snapshot: unbound-type-variable
 def bar1(*args: P.args, **kwargs: P.kwargs) -> None:
     pass
 
@@ -436,9 +436,17 @@ class Outer(Generic[P]):
             def method(self, *args: P.args, **kwargs: P.kwargs) -> None: ...
 ```
 
-A `ParamSpec` moved to an enclosing factory's returned callable remains lexically bound within the
-factory's body. A nested function can refer to it through its components and through ordinary
-annotations without binding a second `ParamSpec`:
+```snapshot
+error[unbound-type-variable]: ParamSpec `P` is not in scope
+  --> src/mdtest_snippet.py:32:17
+   |
+32 | def bar1(*args: P.args, **kwargs: P.kwargs) -> None:
+   |                 ^^^^^^            -------- This component uses the same out-of-scope ParamSpec
+```
+
+A `ParamSpec` moved to an enclosing factory's returned callable remains lexically visible within the
+factory's body. A nested function referring to it through its components owns its own binding,
+consistently with an ordinary return-only `TypeVar`:
 
 ```py
 def callable_factory() -> Callable[P, int]:
@@ -448,7 +456,7 @@ def callable_factory() -> Callable[P, int]:
     def nested_with_parameter(callback: Callable[P, int], *args: P.args, **kwargs: P.kwargs) -> int:
         return callback(*args, **kwargs)
 
-    # revealed: None
+    # revealed: ty_extensions._internal.GenericContext[P@nested_with_parameter]
     reveal_type(generic_context(nested_with_parameter))
     return nested
 
@@ -517,6 +525,56 @@ def bar(c: Callable[P, int]) -> None:
 
     # error: [invalid-paramspec] "No parameters may appear between `*a: P.args` and `**kw: P.kwargs`"
     def f4(*a: P.args, x: int, **kw: P.kwargs) -> None: ...
+```
+
+## Return-only ParamSpecs own nested callables
+
+A legacy `ParamSpec` appearing only in a factory's returned callable belongs to the callable, just
+as a return-only `TypeVar` does. The nested callable should therefore own its `ParamSpec`, making it
+possible to infer concrete arguments when the callable is used inside the factory.
+
+```py
+from typing import Callable, ParamSpec, TypeVar
+from ty_extensions._internal import generic_context
+
+P = ParamSpec("P")
+T = TypeVar("T")
+
+def takes_int(value: int) -> int:
+    return value
+
+def paramspec_factory() -> Callable[P, int]:
+    def nested(*args: P.args, **kwargs: P.kwargs) -> int:
+        reveal_type(args)  # revealed: P@nested.args
+        return 1
+
+    def with_callback(callback: Callable[P, int], *args: P.args, **kwargs: P.kwargs) -> int:
+        reveal_type(callback)  # revealed: (**P@with_callback) -> int
+        return callback(*args, **kwargs)
+
+    reveal_type(generic_context(nested))  # revealed: ty_extensions._internal.GenericContext[P@nested]
+    reveal_type(generic_context(with_callback))  # revealed: ty_extensions._internal.GenericContext[P@with_callback]
+    reveal_type(with_callback(takes_int, 1))  # revealed: int
+    return nested
+
+def typevar_factory() -> Callable[[T], int]:
+    def nested(value: T) -> int:
+        reveal_type(value)  # revealed: T@nested
+        return 1
+
+    reveal_type(generic_context(nested))  # revealed: ty_extensions._internal.GenericContext[T@nested]
+    return nested
+```
+
+A genuinely generic enclosing function still owns the `ParamSpec` captured by its nested callable.
+
+```py
+def public_paramspec(callback: Callable[P, int]) -> None:
+    def nested(*args: P.args, **kwargs: P.kwargs) -> int:
+        reveal_type(args)  # revealed: P@public_paramspec.args
+        return callback(*args, **kwargs)
+
+    reveal_type(generic_context(nested))  # revealed: None
 ```
 
 ## Specializing generic classes explicitly

@@ -112,8 +112,8 @@ pub(crate) fn bind_typevar<'db>(
 /// Unlike [`bind_typevar`], this function never introduces a binding in the current context. It
 /// also uses the lexical form of enclosing function signatures, in which type variables moved to
 /// a returned callable's public generic context are still visible within the function body. This
-/// is the lookup required for `P.args` and `P.kwargs`, which refer to an existing `ParamSpec`
-/// rather than binding one.
+/// lets `P.args` and `P.kwargs` validation establish that an enclosing `ParamSpec` is in scope
+/// without changing the binding selected for the current function's signature.
 pub(crate) fn resolve_typevar_reference<'db>(
     db: &'db dyn Db,
     index: &SemanticIndex<'db>,
@@ -663,16 +663,9 @@ impl<'db> GenericContext<'db> {
         // Find all of the legacy typevars mentioned in the function signature.
         let mut variables = FxOrderSet::default();
         for param in parameters {
-            let annotated_type = param.annotated_type();
-            // `P.args` and `P.kwargs` can only refer to a `ParamSpec` that is already in scope;
-            // they do not bind `P` themselves.
-            if !matches!(
-                annotated_type,
-                Type::TypeVar(typevar)
-                     if typevar.is_paramspec(db) && typevar.paramspec_attr(db).is_some()
-            ) {
-                annotated_type.find_legacy_typevars(db, &env, Some(definition), &mut variables);
-            }
+            param
+                .annotated_type()
+                .find_legacy_typevars(db, &env, Some(definition), &mut variables);
             if let Some(ty) = param.default_type() {
                 ty.find_legacy_typevars(db, &env, Some(definition), &mut variables);
             }

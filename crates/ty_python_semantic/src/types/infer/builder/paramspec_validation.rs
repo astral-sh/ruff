@@ -105,10 +105,15 @@ pub(super) fn validate_paramspec_components<'db>(
                     && let Some(builder) =
                         context.report_lint(&UNBOUND_TYPE_VARIABLE, args_annotation)
                 {
-                    builder.into_diagnostic(format_args!(
+                    let mut diagnostic = builder.into_diagnostic(format_args!(
                         "ParamSpec `{}` is not in scope",
                         args_tv.name(db),
                     ));
+                    diagnostic.annotate(
+                        context
+                            .secondary(kwargs_annotation)
+                            .message("This component uses the same out-of-scope ParamSpec"),
+                    );
                 }
 
                 // Same ParamSpec - check no keyword-only params between them
