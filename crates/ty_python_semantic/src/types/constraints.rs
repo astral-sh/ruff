@@ -4871,7 +4871,16 @@ impl InteriorNode {
                 .expect("every BDD constraint should have a source-order entry")
         });
 
-        if !self.node().is_single_conjunction(storage) {
+        // Concrete alternatives cannot introduce relationships between distinct typevars, so
+        // they can use the same independence optimization as a single conjunction.
+        if !self.node().is_single_conjunction(storage)
+            && constraints.iter().any(|constraint| {
+                !storage
+                    .constraint_data(*constraint)
+                    .bounds
+                    .is_concrete(db, env)
+            })
+        {
             return PathAssignments::new(constraints, FxHashSet::default());
         }
 
@@ -9562,6 +9571,7 @@ class E: ...
         let t_int = create_constraint(db, &builder, t, KnownClass::Int);
         let t_str = create_constraint(db, &builder, t, KnownClass::Str);
         let set = t_int.or(db, &builder, || t_str);
+        let inferable = TypeVarSet::from_typevars(db, [t]);
         let source_orders = builder
             .storage
             .borrow()
@@ -9571,7 +9581,7 @@ class E: ...
             &env,
             &mut builder.storage.borrow_mut(),
             set.node,
-            TypeVarSet::from_typevars(db, [t]),
+            inferable,
             set.source_order,
         );
 
@@ -9587,7 +9597,8 @@ class E: ...
                 remaining_paths,
                 remaining_visits,
             };
-            let mut walker = SolutionWalker::new(source_orders.clone());
+            let mut walker =
+                SolutionWalker::new(db, &mut storage, inferable, source_orders.clone());
             assert_eq!(
                 walker.visit_node(db, &env, &mut storage, &mut path, set.node, &mut limits),
                 ControlFlow::Break(error)
@@ -9595,7 +9606,8 @@ class E: ...
             drop(walker);
 
             let mut limits = UnboundedSolutionLimits;
-            let mut walker = SolutionWalker::new(source_orders.clone());
+            let mut walker =
+                SolutionWalker::new(db, &mut storage, inferable, source_orders.clone());
             let ControlFlow::Continue(()) =
                 walker.visit_node(db, &env, &mut storage, &mut path, set.node, &mut limits);
             assert_eq!(walker.finish(db, &env, &mut storage), expected);

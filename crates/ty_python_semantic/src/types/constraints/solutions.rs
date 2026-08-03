@@ -4,7 +4,7 @@ use rustc_hash::FxHashSet;
 
 use crate::types::constraints::support::Support;
 use crate::types::constraints::{
-    ALWAYS_FALSE, ConstraintAssignment, ConstraintBoundsBuilder, ConstraintId,
+    ALWAYS_FALSE, ConstraintAssignment, ConstraintBound, ConstraintBoundsBuilder, ConstraintId,
     ConstraintSetStorage, Node, NodeId, PathAssignments, PathBounds, SolutionLimits,
 };
 use crate::types::typevar::TypeVarSet;
@@ -111,7 +111,7 @@ impl<'db> SolutionWalker<'db> {
             // This node cannot affect the solution we've found. Make sure that the node has _at
             // least one_ satisfiable path, without walking them all. As long as it does, we can
             // report the solution we have so far as-is.
-            if Self::node_is_satisfiable_on_path(db, env, storage, path, node) {
+            if Self::node_is_satisfiable_on_path(db, env, storage, path, node, limits)? {
                 limits.satisfied_path()?;
                 self.found_satisfied_path(storage, path, &visible_typevars);
             }
@@ -145,68 +145,47 @@ impl<'db> SolutionWalker<'db> {
     /// Returns if there is _any_ satisfiable path in `node`, assuming that the assignments in
     /// `path` already hold. Avoids walking the entire subtree if possible, by returning early once
     /// we find the first satisfied path.
-    fn node_is_satisfiable_on_path(
+    fn node_is_satisfiable_on_path<L: SolutionLimits>(
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         storage: &mut ConstraintSetStorage<'db>,
         path: &mut PathAssignments,
         node: NodeId,
-    ) -> bool {
+        limits: &mut L,
+    ) -> ControlFlow<L::Break, bool> {
         match node.node() {
-            Node::AlwaysTrue => return true,
-            Node::AlwaysFalse => return false,
+            Node::AlwaysTrue => return ControlFlow::Continue(true),
+            Node::AlwaysFalse => return ControlFlow::Continue(false),
             Node::Interior(_) => {}
         }
 
         let interior = storage.interior_node_data(node);
+        let constraint = interior.constraint;
+        for (assignment, child) in [
+            (constraint.when_true(), interior.if_true),
+            (constraint.when_unconstrained(), interior.if_uncertain),
+            (constraint.when_false(), interior.if_false),
+        ] {
+            let is_satisfied = path.walk_edge(
+                db,
+                env,
+                storage,
+                assignment,
+                |storage, path, _new_range, found_conflict| {
+                    if found_conflict {
+                        return ControlFlow::Continue(false);
+                    }
 
-        let true_is_satisfied = path.walk_edge(
-            db,
-            env,
-            storage,
-            interior.constraint.when_true(),
-            |storage, path, _new_range, found_conflict| {
-                if found_conflict {
-                    false
-                } else {
-                    Self::node_is_satisfiable_on_path(db, env, storage, path, interior.if_true)
-                }
-            },
-        );
-        if true_is_satisfied {
-            return true;
+                    limits.visit_node()?;
+                    Self::node_is_satisfiable_on_path(db, env, storage, path, child, limits)
+                },
+            )?;
+            if is_satisfied {
+                return ControlFlow::Continue(true);
+            }
         }
 
-        let uncertain_is_satisfied = path.walk_edge(
-            db,
-            env,
-            storage,
-            interior.constraint.when_unconstrained(),
-            |storage, path, _new_range, found_conflict| {
-                if found_conflict {
-                    false
-                } else {
-                    Self::node_is_satisfiable_on_path(db, env, storage, path, interior.if_uncertain)
-                }
-            },
-        );
-        if uncertain_is_satisfied {
-            return true;
-        }
-
-        path.walk_edge(
-            db,
-            env,
-            storage,
-            interior.constraint.when_false(),
-            |storage, path, _new_range, found_conflict| {
-                if found_conflict {
-                    false
-                } else {
-                    Self::node_is_satisfiable_on_path(db, env, storage, path, interior.if_false)
-                }
-            },
-        )
+        ControlFlow::Continue(false)
     }
 
     fn found_satisfied_path(
@@ -226,6 +205,11 @@ impl<'db> SolutionWalker<'db> {
                     (assignment.constraint(), source_order)
                 })
                 .collect();
+        // Sort the constraints in each path by their `source_order`s, to ensure that we construct
+        // any unions or intersections in our type mappings in a stable order. Constraints might
+        // come out of `PathAssignments` with identical `source_order`s, but if they do, those
+        // "tied" constraints will still be ordered in a stable way. So we need a stable sort to
+        // retain that stable per-tie ordering.
         path.sort_by_key(|(_, source_order)| *source_order);
         self.sorted_paths.push(path);
     }
@@ -255,35 +239,52 @@ impl<'db> SolutionWalker<'db> {
         let mut any_constrained_solutions = false;
         let mut mappings: FxIndexMap<BoundTypeVarInstance<'db>, ConstraintBoundsBuilder<'db>> =
             FxIndexMap::default();
+        let is_bare_inferable_typevar = |bound: ConstraintBound<'db>| {
+            matches!(
+                bound,
+                ConstraintBound::Evidence(Type::TypeVar(typevar))
+                    if typevar.is_inferable(db, self.inferable)
+            )
+        };
 
         for path in self.sorted_paths {
             mappings.clear();
             for (constraint, _) in path {
                 let constraint = storage.constraint_data(constraint);
                 let typevar = constraint.typevar;
-                if let Some(lower) = constraint.bounds.lower {
-                    if typevar.is_inferable(db, self.inferable) {
-                        let bounds = mappings.entry(typevar).or_default();
-                        bounds.add_lower(db, env, lower);
-                    }
 
-                    if let Type::TypeVar(lower_bound_typevar) = lower.ty()
-                        && lower_bound_typevar.is_inferable(db, self.inferable)
-                    {
+                // A direct relationship between an inferable and non-inferable typevar must
+                // contribute bounds for both endpoints. Contextual inference relies on the
+                // reverse, non-inferable binding to preserve relationships to outer typevars.
+                // Constraints on unrelated non-inferable typevars must not contribute bindings.
+                if !typevar.is_inferable(db, self.inferable)
+                    && !constraint
+                        .bounds
+                        .lower
+                        .is_some_and(is_bare_inferable_typevar)
+                    && !constraint
+                        .bounds
+                        .upper
+                        .is_some_and(is_bare_inferable_typevar)
+                {
+                    continue;
+                }
+
+                if let Some(lower) = constraint.bounds.lower {
+                    let bounds = mappings.entry(typevar).or_default();
+                    bounds.add_lower(db, env, lower);
+
+                    if let Type::TypeVar(lower_bound_typevar) = lower.ty() {
                         let bounds = mappings.entry(lower_bound_typevar).or_default();
                         bounds.add_upper(db, env, lower.with_type(Type::TypeVar(typevar)));
                     }
                 }
 
                 if let Some(upper) = constraint.bounds.upper {
-                    if typevar.is_inferable(db, self.inferable) {
-                        let bounds = mappings.entry(typevar).or_default();
-                        bounds.add_upper(db, env, upper);
-                    }
+                    let bounds = mappings.entry(typevar).or_default();
+                    bounds.add_upper(db, env, upper);
 
-                    if let Type::TypeVar(upper_bound_typevar) = upper.ty()
-                        && upper_bound_typevar.is_inferable(db, self.inferable)
-                    {
+                    if let Type::TypeVar(upper_bound_typevar) = upper.ty() {
                         let bounds = mappings.entry(upper_bound_typevar).or_default();
                         bounds.add_lower(db, env, upper.with_type(Type::TypeVar(typevar)));
                     }

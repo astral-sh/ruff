@@ -141,7 +141,7 @@ class Manager(Generic[T]):
     async def __aenter__(self) -> T:
         # TODO(#26680): Keep the return error, but report `Response | (T@Manager & Socket)`.
         # TODO(#26680): Remove both invalid-argument-type errors.
-        # error: [invalid-return-type] "expected `T@Manager`, found `Response | Unknown`"
+        # error: [invalid-return-type] "expected `T@Manager`, found `Response | T@Manager`"
         # error: [invalid-argument-type]
         # error: [invalid-argument-type]
         return await self.response.__aenter__()
