@@ -285,7 +285,7 @@ impl<'db> SemanticModel<'db> {
         );
 
         // Project-level builtins take precedence over the standard builtins.
-        let project_builtins = ModuleName::new_static("__builtins__").expect("valid module name");
+        let project_builtins = ModuleName::new_static("__builtins__").unwrap();
         if resolve_module(self.db, self.file, &project_builtins).is_some() {
             completions.extend(self.module_completions(&project_builtins).into_iter().map(
                 |mut completion| {
@@ -296,7 +296,7 @@ impl<'db> SemanticModel<'db> {
         }
 
         // Builtins are available in all scopes.
-        let builtins = ModuleName::new_static("builtins").expect("valid module name");
+        let builtins = KnownModule::Builtins.name();
         completions.extend(self.module_completions(&builtins));
 
         // The above can sometimes result in duplicates. Get rid of them.

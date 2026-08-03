@@ -101,7 +101,7 @@ use crate::types::typevar::{TypeVarInstance, TypeVarSet};
 pub use crate::types::variance::TypeVarVariance;
 use crate::types::variance::VarianceInferable;
 use crate::types::visitor::any_over_type;
-use crate::{Db, FxOrderSet, HasType, Program, SemanticModel};
+use crate::{Db, FxOrderSet, HasType, NameKind, Program, SemanticModel};
 pub(crate) use class::{ClassLiteral, ClassType, GenericAlias, StaticClassLiteral};
 pub use class::{KnownClass, MethodDecorator};
 use instance::Protocol;
@@ -225,9 +225,9 @@ pub(crate) fn binding_type<'db>(db: &'db dyn Db, definition: Definition<'db>) ->
 
 /// Returns whether a stub definition represents a value that exists at runtime.
 ///
-/// In addition to explicit aliases and `@type_check_only` definitions, this recognizes direct
-/// type-variable declarations and implicit aliases without confusing runtime factory results or
-/// indexing operations with typing-only definitions.
+/// Type-checking-only decorators and guards never represent runtime values. Private type-variable
+/// declarations and aliases are also stub-only, while public aliases and genuine runtime values
+/// remain visible.
 ///
 /// ```python
 /// _T = TypeVar("_T")  # Typing-only helper.
@@ -237,7 +237,7 @@ pub(crate) fn binding_type<'db>(db: &'db dyn Db, definition: Definition<'db>) ->
 /// ```
 #[salsa::tracked(returns(copy))]
 pub(crate) fn exists_at_runtime<'db>(db: &'db dyn Db, definition: Definition<'db>) -> bool {
-    let file = definition.file(db);
+    let file = definition.python_file(db);
     let model = SemanticModel::new(db, file);
     let inference = infer_definition_types(db, definition);
     let ty = inference.binding_type(definition);
@@ -246,12 +246,6 @@ pub(crate) fn exists_at_runtime<'db>(db: &'db dyn Db, definition: Definition<'db
         || inference
             .undecorated_type()
             .is_some_and(|ty| ty.is_type_check_only(db))
-        || matches!(
-            ty,
-            Type::KnownInstance(KnownInstanceType::TypeVar(typevar))
-                if typevar.definition(db) == Some(definition)
-        )
-        || model.is_type_alias_definition(definition)
     {
         return false;
     }
@@ -263,6 +257,26 @@ pub(crate) fn exists_at_runtime<'db>(db: &'db dyn Db, definition: Definition<'db
         definition.file_scope(db),
         definition.full_range(db, &module).range(),
     ) {
+        return false;
+    }
+
+    let is_private = definition.place(db).as_symbol().is_some_and(|symbol| {
+        matches!(
+            NameKind::classify(place_table(db, definition.scope(db)).symbol(symbol).name()),
+            NameKind::Sunder
+        )
+    });
+
+    if !is_private {
+        return true;
+    }
+
+    if matches!(
+        ty,
+        Type::KnownInstance(KnownInstanceType::TypeVar(typevar))
+            if typevar.definition(db) == Some(definition)
+    ) || model.is_type_alias_definition(definition)
+    {
         return false;
     }
 

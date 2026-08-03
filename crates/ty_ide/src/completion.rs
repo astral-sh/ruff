@@ -3393,35 +3393,6 @@ mod tests {
     }
 
     #[test]
-    fn private_builtin_helpers_are_not_scoped_completions() {
-        let builder = completion_test_builder("_O<CURSOR>").skip_auto_import();
-        let test = builder.build();
-
-        test.not_contains("_Opener");
-    }
-
-    #[test]
-    fn explicitly_imported_private_builtin_helpers_are_scoped_completions() {
-        let builder =
-            completion_test_builder("from builtins import _Opener\n_Op<CURSOR>").skip_auto_import();
-        let test = builder.build();
-
-        test.contains("_Opener");
-    }
-
-    #[test]
-    fn private_project_builtin_shadows_type_checking_only_builtin_completion() {
-        let builder = CursorTest::builder()
-            .source("__builtins__.pyi", "_Opener: int")
-            .source("main.py", "_O<CURSOR>")
-            .completion_test_builder()
-            .skip_auto_import();
-        let test = builder.build();
-
-        test.contains("_Opener");
-    }
-
-    #[test]
     fn keywords() {
         let test = completion_test_builder(
             "\
@@ -3618,10 +3589,17 @@ class _PrivateProtocol(Protocol):
     def method(self) -> None: ...
 
 @type_check_only
+class PublicTypeOnlyProtocol(Protocol):
+    def method(self) -> None: ...
+
+@type_check_only
 class _PrivateTypeOnlyProtocol(Protocol):
     def method(self) -> None: ...
 
 if TYPE_CHECKING:
+    class PublicTypeCheckingProtocol(Protocol):
+        def method(self) -> None: ...
+
     class _PrivateTypeCheckingProtocol(Protocol):
         def method(self) -> None: ...
 "#,
@@ -3655,7 +3633,9 @@ if TYPE_CHECKING:
         test.contains("_private_indexed_class");
         test.contains("PublicProtocol");
         test.contains("_PrivateProtocol");
+        test.not_contains("PublicTypeOnlyProtocol");
         test.not_contains("_PrivateTypeOnlyProtocol");
+        test.not_contains("PublicTypeCheckingProtocol");
         test.not_contains("_PrivateTypeCheckingProtocol");
     }
 

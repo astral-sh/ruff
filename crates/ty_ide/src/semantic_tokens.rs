@@ -4657,6 +4657,8 @@ def f():
 
     #[test]
     fn private_builtin_helpers_do_not_receive_semantic_tokens() {
+        // Private helpers excluded from implicit builtin lookup must remain unresolved for IDE
+        // highlighting instead of receiving tokens from their typeshed definitions.
         let test = SemanticTokenTest::new("_T_co\n_P\n");
 
         let tokens = test.highlight_file();

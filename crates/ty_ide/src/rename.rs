@@ -1217,6 +1217,8 @@ def convert_to_number(value):
 
     #[test]
     fn cannot_rename_private_builtin_helper() {
+        // Unresolved references must not resolve to a private typeshed helper or rename matching
+        // unresolved references in other files.
         let test = CursorTest::builder()
             .source("other.py", "_T_co\n")
             .source("main.py", "<CURSOR>_T_co\n")

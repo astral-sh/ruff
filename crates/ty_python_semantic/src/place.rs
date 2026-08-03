@@ -17,7 +17,7 @@ use crate::types::{
     UnionBuilder, UnionType, binding_type, exists_at_runtime, inferred_declaration,
     is_discarded_dict_key_assignment,
 };
-use crate::{Db, FxIndexSet, FxOrderSet, NameKind};
+use crate::{Db, FxIndexSet, FxOrderSet};
 use ty_python_core::definition::{Definition, DefinitionKind, DefinitionState};
 use ty_python_core::narrowing_constraints::ScopedNarrowingConstraint;
 use ty_python_core::place::ScopedPlaceId;
@@ -609,7 +609,7 @@ pub(crate) fn builtins_symbol<'db>(
     env: &ProgramEnvironment<'db>,
     symbol: &str,
 ) -> PlaceAndQualifiers<'db> {
-    builtins_symbol_impl(db, env, symbol, false)
+    builtins_symbol_impl(db, env, symbol, BuiltinVisibility::All)
         .map(|(_, symbol)| symbol)
         .unwrap_or_default()
 }
@@ -631,7 +631,7 @@ pub(crate) fn implicit_builtins_symbol<'db>(
     env: &ProgramEnvironment<'db>,
     symbol: &str,
 ) -> PlaceAndQualifiers<'db> {
-    builtins_symbol_impl(db, env, symbol, true)
+    builtins_symbol_impl(db, env, symbol, BuiltinVisibility::RuntimeOnly)
         .map(|(_, symbol)| symbol)
         .unwrap_or_default()
 }
@@ -645,7 +645,13 @@ pub(crate) fn implicit_builtins_symbol_scope<'db>(
     env: &ProgramEnvironment<'db>,
     symbol: &str,
 ) -> Option<ScopeId<'db>> {
-    builtins_symbol_impl(db, env, symbol, true).map(|(scope, _)| scope)
+    builtins_symbol_impl(db, env, symbol, BuiltinVisibility::RuntimeOnly).map(|(scope, _)| scope)
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum BuiltinVisibility {
+    All,
+    RuntimeOnly,
 }
 
 /// Resolves project-level builtins before standard builtins and optionally hides typing-only names.
@@ -656,7 +662,7 @@ fn builtins_symbol_impl<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
     symbol: &str,
-    exclude_type_checking_only_builtins: bool,
+    visibility: BuiltinVisibility,
 ) -> Option<(ScopeId<'db>, PlaceAndQualifiers<'db>)> {
     let python_version = env.python_version(db);
     let resolver = |module: Module<'db>| {
@@ -677,8 +683,7 @@ fn builtins_symbol_impl<'db>(
         });
         found_symbol.ignore_possibly_undefined()?;
 
-        if exclude_type_checking_only_builtins
-            && matches!(NameKind::classify(symbol), NameKind::Sunder)
+        if matches!(visibility, BuiltinVisibility::RuntimeOnly)
             && let Place::Defined(defined) = found_symbol.place
             && let Some(definition) = defined.provenance.definition()
             && !exists_at_runtime(db, definition)

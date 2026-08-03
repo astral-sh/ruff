@@ -21,31 +21,113 @@ reveal_type(str)  # revealed: <class 'str'>
 
 ## Private type-checking-only builtin helpers are not implicit builtins
 
-Private type variables, type aliases, and type-checking-only protocols in the standard `builtins`
-stub are implementation details. They must not be available without an explicit import.
+Private type variables, type aliases, and type-checking-only definitions in a `builtins` stub are
+implementation details. They must not be available without an explicit import.
+
+```toml
+[environment]
+typeshed = "/typeshed"
+```
+
+`/typeshed/stdlib/typing.pyi`:
+
+```pyi
+class TypeVar:
+    def __new__(cls, name): ...
+
+class ParamSpec:
+    def __new__(cls, name): ...
+
+class Protocol: ...
+class _SpecialForm: ...
+
+TypeAlias: _SpecialForm
+
+def type_check_only(obj): ...
+```
+
+`/typeshed/stdlib/builtins.pyi`:
+
+```pyi
+from typing import ParamSpec, Protocol, TypeAlias, TypeVar, type_check_only
+
+class object: ...
+class int: ...
+class str: ...
+
+_T = TypeVar("_T")
+_P = ParamSpec("_P")
+_PrivateAlias: TypeAlias = int
+_PrivateUnion = int | str
+
+@type_check_only
+class _PrivateProtocol(Protocol): ...
+
+@type_check_only
+class PublicTypeOnlyClass: ...
+
+@type_check_only
+def public_type_only_function(): ...
+```
 
 ```py
-_T_co  # error: [unresolved-reference]
+_T  # error: [unresolved-reference]
 _P  # error: [unresolved-reference]
-_PositiveInteger  # error: [unresolved-reference]
-_LiteralInteger  # error: [unresolved-reference]
-_Opener  # error: [unresolved-reference]
-_SupportsSynchronousAnext  # error: [unresolved-reference]
+_PrivateAlias  # error: [unresolved-reference]
+_PrivateUnion  # error: [unresolved-reference]
+_PrivateProtocol  # error: [unresolved-reference]
+PublicTypeOnlyClass  # error: [unresolved-reference]
+public_type_only_function  # error: [unresolved-reference]
 ```
 
 ## Explicitly importing private builtin helpers
 
-Filtering implicit builtin fallback does not change explicit imports from the `builtins` module.
+We still allow users to explicitly import implementation details from the `builtins` module.
+
+```toml
+[environment]
+typeshed = "/typeshed"
+```
+
+`/typeshed/stdlib/typing.pyi`:
+
+```pyi
+class TypeVar:
+    def __new__(cls, name): ...
+
+class Protocol: ...
+class _SpecialForm: ...
+
+TypeAlias: _SpecialForm
+
+def type_check_only(obj): ...
+```
+
+`/typeshed/stdlib/builtins.pyi`:
+
+```pyi
+from typing import Protocol, TypeAlias, TypeVar, type_check_only
+
+class object: ...
+class int: ...
+
+_T = TypeVar("_T")
+_PrivateAlias: TypeAlias = int
+
+@type_check_only
+class _PrivateProtocol(Protocol): ...
+
+@type_check_only
+class PublicTypeOnlyClass: ...
+```
 
 ```py
-from builtins import _LiteralInteger, _Opener, _P, _PositiveInteger, _SupportsSynchronousAnext, _T_co
+from builtins import PublicTypeOnlyClass, _PrivateAlias, _PrivateProtocol, _T
 
-_LiteralInteger
-_Opener
-_P
-_PositiveInteger
-_SupportsSynchronousAnext
-_T_co
+_T
+_PrivateAlias
+_PrivateProtocol
+PublicTypeOnlyClass
 ```
 
 ## Private project-level builtins

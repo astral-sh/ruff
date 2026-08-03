@@ -11,13 +11,13 @@ use ruff_python_ast::name::Name;
 use rustc_hash::FxHashSet;
 
 use crate::{
-    Db, NameKind,
+    Db,
     place::{
         DefinedPlace, Place, PlaceWithDefinition, imported_symbol, place_from_bindings,
         place_from_declarations,
     },
     types::{
-        ClassBase, ClassLiteral, KnownClass, ProgramEnvironment, StaticClassLiteral,
+        ClassBase, ClassLiteral, KnownClass, KnownFunction, ProgramEnvironment, StaticClassLiteral,
         SubclassOfInner, Type, TypeVarBoundOrConstraints, class::CodeGeneratorKind,
         exists_at_runtime,
     },
@@ -441,9 +441,15 @@ impl<'db> AllMembers<'db> {
                     };
 
                     if file.is_stub(db)
-                        && matches!(NameKind::classify(symbol_name), NameKind::Sunder)
                         && let Some(definition) = defined.provenance.definition()
                         && !exists_at_runtime(db, definition)
+                        // The decorator itself is typing-only, but users must still be able to
+                        // import it when defining typing-only classes and functions.
+                        && !matches!(
+                            defined.ty,
+                            Type::FunctionLiteral(function)
+                                if function.known(db) == Some(KnownFunction::TypeCheckOnly)
+                        )
                     {
                         continue;
                     }
