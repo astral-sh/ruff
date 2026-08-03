@@ -53,7 +53,6 @@ use crate::types::class::{
 };
 use crate::types::constraints::{ConstraintSetBuilder, PathBounds, Solutions};
 use crate::types::context::InferContext;
-use crate::types::cyclic::ActiveRecursionDetector;
 use crate::types::dedicated::pydantic;
 use crate::types::diagnostic::{
     self, CALL_NON_CALLABLE, CONFLICTING_DECLARATIONS, CYCLIC_TYPE_ALIAS_DEFINITION,
@@ -88,7 +87,6 @@ use crate::types::generics::{
 };
 use crate::types::infer::builder::named_tuple::NamedTupleKind;
 use crate::types::infer::builder::paramspec_validation::validate_paramspec_components;
-use crate::types::infer::builder::typed_dict::TypedDictConstructorForm;
 use crate::types::infer::{
     StatementInference, StatementInferenceInner, StatementInferenceInnerExtra, TypeAndRange,
     TypeExpressionFlags, infer_statement_types, nearest_enclosing_class,
@@ -105,9 +103,7 @@ use crate::types::subclass_of::SubclassOfInner;
 use crate::types::tuple::promotion::TupleSizePromotionConstraints;
 use crate::types::tuple::{Tuple, TupleLength, TupleSpecBuilder, TupleType, VariableSegment};
 use crate::types::type_alias::{ManualPEP695TypeAliasType, PEP695TypeAliasType};
-use crate::types::typed_dict::{
-    TypedDictAssignmentKind, TypedDictKeyAssignment, validate_typed_dict_constructor,
-};
+use crate::types::typed_dict::{TypedDictAssignmentKind, TypedDictKeyAssignment};
 use crate::types::typevar::{
     BoundTypeVarIdentity, TypeVarConstraints, TypeVarIdentity, TypeVarInstance, TypeVarSet,
 };
@@ -119,8 +115,8 @@ use crate::types::{
     LiteralValueType, LiteralValueTypeKind, MemberLookupPolicy, ParamSpecAttrKind, Parameter,
     Parameters, ProgramEnvironment, SentinelInstance, Signature, SpecialFormType, SubclassOfType,
     Type, TypeAliasType, TypeAndQualifiers, TypeContext, TypeQualifiers, TypeVarBoundOrConstraints,
-    TypeVarKind, TypeVarVariance, TypedDictModule, TypedDictType, UnionAccumulator, UnionBuilder,
-    UnionType, any_over_type, binding_type, extract_fixed_length_iterable_element_types,
+    TypeVarKind, TypeVarVariance, TypedDictModule, UnionAccumulator, UnionBuilder, UnionType,
+    any_over_type, binding_type, extract_fixed_length_iterable_element_types,
     infer_complete_scope_types, infer_scope_types, is_discarded_dict_key_assignment, todo_type,
 };
 use crate::{AnalysisSettings, Db, FxIndexSet, FxOrderSet};
@@ -8697,23 +8693,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         }
 
-        fn contains_generic_typed_dict<'db>(
-            db: &'db dyn Db,
-            env: &ProgramEnvironment<'db>,
-            ty: Type<'db>,
-            active_aliases: &ActiveRecursionDetector<Definition<'db>>,
-        ) -> bool {
-            any_over_type(db, env, ty, false, |nested| match nested {
-                Type::TypedDict(typed_dict) => Type::TypedDict(typed_dict).has_typevar(db, env),
-                Type::TypeAlias(alias) => active_aliases.visit(
-                    &alias.definition(db),
-                    || true,
-                    || contains_generic_typed_dict(db, env, alias.value_type(db), active_aliases),
-                ),
-                _ => false,
-            })
-        }
-
         let db = self.db();
         let env = self.program_environment();
         let ast::ExprCall {
@@ -8817,71 +8796,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             _ => None,
         };
 
-        let generic_typed_dict_class = class.filter(|class| {
-            class.is_typed_dict(db)
-                && matches!(
-                    callable_type,
-                    Type::ClassLiteral(class_literal)
-                        if class_literal.generic_context(db).is_some()
-                )
-        });
-        let generic_typed_dict_constructor = generic_typed_dict_class.filter(|class| {
-            let class_literal = class.class_literal(db);
-
-            // An inner `Node(value=1)` must retain `Node[Unknown]` when its enclosing
-            // `Node(child=...)` cannot infer through the recursive field.
-            let has_gradual_class_context = class_literal
-                .as_static()
-                .zip(call_expression_tcx.annotation)
-                .is_some_and(|(class_literal, annotation)| {
-                    any_over_type(db, env, annotation.resolve_type_alias(db), false, |ty| {
-                        ty.resolve_type_alias(db)
-                            .specialization_of(db, env, class_literal)
-                            .is_some_and(|specialization| {
-                                specialization
-                                    .types(db)
-                                    .iter()
-                                    .any(|ty| ty.is_unknown() || ty.has_typevar(db, env))
-                            })
-                    })
-                });
-            let typed_dict = TypedDictType::new(class_literal.identity_specialization(db));
-
-            arguments.args.is_empty()
-                && !has_gradual_class_context
-                && arguments.keywords.iter().all(|keyword| {
-                    let Some(name) = keyword.arg.as_ref() else {
-                        return false;
-                    };
-                    let Some(field) = typed_dict.item(db, name.id.as_str()) else {
-                        return true;
-                    };
-
-                    !contains_generic_typed_dict(
-                        db,
-                        env,
-                        field.declared_ty,
-                        &ActiveRecursionDetector::default(),
-                    )
-                })
-        });
-
-        // Mapping arguments and nested generic TypedDict fields still need dedicated preparation.
-        // Supported keyword calls obtain their context from the constructor signature instead.
-        let has_prepared_typed_dict_constructor = class
-            .filter(|class| class.is_typed_dict(self.db()))
-            .filter(|_| generic_typed_dict_constructor.is_none())
-            .map(|class| {
-                let typed_dict = TypedDictType::new(class);
-                let form = TypedDictConstructorForm::from_arguments(arguments);
-                self.prepare_typed_dict_constructor(
-                    typed_dict,
-                    form,
-                    arguments,
-                    func.as_ref().into(),
-                );
-            })
-            .is_some();
+        if let Some(class) = class
+            && class.is_typed_dict(db)
+        {
+            return self.infer_typed_dict_constructor(
+                callable_type,
+                class,
+                call_expression,
+                call_expression_tcx,
+            );
+        }
 
         // We don't call `Type::try_call`, because we want to perform type inference on the
         // arguments after matching them to parameters, but before checking that the argument types
@@ -9179,38 +9103,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 _ => {}
             }
         }
-        let call_bindings =
-            if generic_typed_dict_class.is_some() && generic_typed_dict_constructor.is_none() {
-                Binding::single(
-                    callable_type,
-                    Signature::new(
-                        Parameters::gradual_form(),
-                        callable_type
-                            .to_instance_approximation(db, env)
-                            .unwrap_or_else(Type::unknown),
-                    ),
-                )
-                .into()
-            } else {
-                self.bindings_for_call(callable_type)
-            };
-        let mut bindings = call_bindings.match_parameters(db, env, &call_arguments);
-
-        // Preserve TypedDict-specific missing-key and unknown-key diagnostics when neither
-        // synthesized constructor overload matches the call shape.
-        if let Some(class) = generic_typed_dict_constructor
-            && !bindings.satisfies(|_| true)
-        {
-            self.prepare_typed_dict_constructor(
-                TypedDictType::new(class),
-                TypedDictConstructorForm::from_arguments(arguments),
-                arguments,
-                func.as_ref().into(),
-            );
-            return callable_type
-                .to_instance_approximation(db, env)
-                .unwrap_or_else(Type::unknown);
-        }
+        let mut bindings =
+            self.bindings_for_call(callable_type)
+                .match_parameters(db, env, &call_arguments);
 
         report_missing_implicit_constructor_call(
             &self.context,
@@ -9222,13 +9117,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let bindings_result = self.infer_and_check_argument_types(
             ArgumentsIter::from_ast(arguments),
             &mut call_arguments,
-            &mut |builder, (_, expr, tcx)| {
-                if has_prepared_typed_dict_constructor {
-                    builder.get_or_infer_expression(expr, tcx)
-                } else {
-                    builder.infer_expression(expr, tcx)
-                }
-            },
+            &mut |builder, (_, expr, tcx)| builder.infer_expression(expr, tcx),
             &mut bindings,
             call_expression_tcx,
         );
@@ -9236,36 +9125,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let mut bindings = match bindings_result {
             Ok(()) => bindings,
             Err(_) => {
-                if let Some(class) = generic_typed_dict_constructor {
-                    let typed_dict = TypedDictType::new(class);
-                    let has_invalid_field = arguments.keywords.iter().any(|keyword| {
-                        keyword
-                            .arg
-                            .as_ref()
-                            .and_then(|name| typed_dict.item(db, name.id.as_str()))
-                            .is_some_and(|field| {
-                                !self.expression_type(&keyword.value).is_assignable_to(
-                                    db,
-                                    env,
-                                    field.declared_ty,
-                                )
-                            })
-                    });
-
-                    if has_invalid_field {
-                        validate_typed_dict_constructor(
-                            &self.context,
-                            typed_dict,
-                            arguments,
-                            func.as_ref().into(),
-                            |expr, _| self.expression_type(expr),
-                        );
-                        return callable_type
-                            .to_instance_approximation(db, env)
-                            .unwrap_or_else(Type::unknown);
-                    }
-                }
-
                 bindings.report_diagnostics(&self.context, call_expression.into());
                 return bindings.return_type(db, env);
             }
